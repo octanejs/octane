@@ -10,7 +10,10 @@
     "integrity": "sha256:62112dac2d8eea337fb8bafb5c9ce5a5d3574f03e06adfe1411ae40e3cc84d97",
     "verification": "verified"
   },
-  "upstreamSuites": { "runtime": "present", "types": "absent" },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "absent"
+  },
   "adaptedRoots": {
     "source": {
       "roots": ["packages/input-otp/src"],
@@ -66,7 +69,7 @@
         {
           "path": "packages/input-otp/audit/pristine-runtime-crosswalk.json",
           "role": "support",
-          "sha256": "79e436f2f9415119037b98b63d7a6ffb308d623b055e89f427e69816588e43a3"
+          "sha256": "fb1073b5e138bbeb15d48331b6c6d7c4f21452749e4db2d5166b039dabf2ed0f"
         },
         {
           "path": "packages/input-otp/audit/pristine-adaptation-ledger.json",
@@ -76,7 +79,7 @@
         {
           "path": "packages/input-otp/tests/pristine/upstream.browser.test.ts",
           "role": "support",
-          "sha256": "f9257765451998e0b6103c0b014f39680dce85ec9637411126ba3bf17a671f3a"
+          "sha256": "e7fdfc659200c780071b325792a13a26b3a6e3bc9e81c6df195334d56145cf08"
         },
         {
           "path": "packages/input-otp/upstream/apps/playground/src/tests/base.delete-word.spec.ts",

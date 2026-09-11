@@ -41,7 +41,7 @@
   ],
   "rewrittenExecution": {
     "path": "packages/input-otp/tests/pristine/upstream.browser.test.ts",
-    "sha256": "f9257765451998e0b6103c0b014f39680dce85ec9637411126ba3bf17a671f3a"
+    "sha256": "e7fdfc659200c780071b325792a13a26b3a6e3bc9e81c6df195334d56145cf08"
   },
   "identityCrosswalk": [
     {

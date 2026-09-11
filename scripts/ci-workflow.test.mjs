@@ -654,6 +654,7 @@ describe('CI workflow aggregation', () => {
 			parityVitestModule.default.test.projects.map((project) => project.test.name).sort(),
 			requiredVitestProjects.sort(),
 		);
+		assert.equal(parityVitestModule.default.test.maxWorkers, process.env.CI ? 2 : undefined);
 		const inputOtpBrowser = parityVitestModule.default.test.projects.find(
 			(project) => project.test.name === 'input-otp-browser',
 		);

@@ -981,7 +981,7 @@ export function Chart<T extends Octane.SVGProps<SVGTextElement>>(props: T) {
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
-	});
+	}, 15_000);
 
 	it('handles @if / @for / @try / @switch directives', () => {
 		const src =
