@@ -1,5 +1,20 @@
 # @octanejs/mcp-server
 
+## 0.2.27
+
+### Patch Changes
+
+- de3f2e6: Index universal owner drafts only when a render reads an earlier owner's hook or ref, preserving fast reads of the newest draft and the latest draft after retries.
+  Expose the new universal draft lookup benchmark in the MCP suite catalog.
+- 3606d04: Keep distinct client and server `memo()` wrappers on stable property shapes while preserving live defaults and static-hoisting behavior.
+  Expose the memo wrapper shape benchmark in the MCP suite catalog.
+- 1c28da5: Keep scoped JSX element and value descriptors on stable property shapes while preserving deferred children, cloning, and server rendering behavior.
+  Expose the scoped descriptor benchmark in the MCP suite catalog.
+- 1298a69: Reject known ambient browser-state reads during Strong renders with `OCTANE_STRONG_RENDER_AMBIENT_READ`, including browser handle aliases and `globalThis` property reads outside known standard language builtins. Preserve shadowing, events, effects, external-store snapshot callbacks, and lazy state initialization, and document how to render subscribed snapshots safely across server and client.
+- 856febc: Reject render-time reads of reassigned module-scope `let` and `var` bindings in Strong modules with source-located diagnostics. Keep compatibility modules and event, effect, and deferred reads unchanged, and document the snapshot-safe alternative.
+- 236d4b5: Reject render-time reads of `useRef.current` in Strong modules with a source-located diagnostic, while retaining event and effect reads and compatibility-mode behavior. Document the rule in Octane's authoring guidance and MCP skill.
+- a8f34fd: Reject render-time calls to known state getters from `useState`, `useReducer`, and `useLinkedState` in Strong modules, with source-located diagnostics. Keep event, effect, deferred, and compatibility-mode calls legal and document the snapshot-safe render pattern.
+
 ## 0.2.26
 
 ### Patch Changes

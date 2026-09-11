@@ -1,5 +1,11 @@
 # @octanejs/aria
 
+## 0.0.48
+
+### Patch Changes
+
+- bfb010f: Fix virtualized item size observation, native keyboard event propagation in grid lists and shortcut handlers, and public TokenField and TreeSection prop types. Keep IDs and hook state distinct when Aria hooks are called with explicit slots from plain TypeScript, including dialog description IDs.
+
 ## 0.0.47
 
 ### Patch Changes
