@@ -7,7 +7,9 @@
   "scripts": {
     "dev": "vite --host --port 5213 --strictPort",
     "build": "vite build",
-    "preview": "vite preview --port 5213 --strictPort"
+    "preview": "vite preview --port 5213 --strictPort",
+    "build:style-literals": "vite build --config vite.style-literals.config.js",
+    "preview:style-literals": "vite preview --config vite.style-literals.config.js --host 127.0.0.1"
   },
   "dependencies": {
     "octane": "workspace:*"
