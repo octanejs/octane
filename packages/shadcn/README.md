@@ -46,7 +46,7 @@ adaptations and styling remain intact; `@octanejs/shadcn/cn` re-exports the same
 
 <!-- BEGIN COVERAGE -->
 
-**44 families** — Radix 44/44 · React Aria 33/44 · Base UI 43/44
+**45 families** — Radix 45/45 · React Aria 33/45 · Base UI 44/45
 
 ✅ ported · — not ported yet (fair game) · ⛔ blocked, see notes below
 
@@ -60,6 +60,7 @@ adaptations and styling remain intact; `@octanejs/shadcn/cn` re-exports the same
 | `badge` | ✅ | ✅ | ✅ |
 | `breadcrumb` | ✅ | ✅ | ✅ |
 | `button` | ✅ | ✅ | ✅ |
+| `calendar` | ✅ | — | ✅ |
 | `card` | ✅ | ✅ | ✅ |
 | `checkbox` | ✅ | ✅ | ✅ |
 | `collapsible` | ✅ | ✅ | ✅ |

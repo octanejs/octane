@@ -1,4 +1,4 @@
-import type { ElementDescriptor } from 'octane';
+import type { CSSProperties, ElementDescriptor } from 'octane';
 
 export type SVGElementType =
 	'circle' | 'ellipse' | 'g' | 'line' | 'path' | 'polygon' | 'polyline' | 'rect';
@@ -18,7 +18,10 @@ export interface SVGAttributes {
 	strokeLinecap?: string;
 	strokeLinejoin?: string;
 	strokeWidth?: string | number;
-	style?: string | Record<string, string | number | null | undefined>;
+	// `CSSProperties` belongs here because callers forward a style object typed by octane's own
+	// JSX types (a component that passes its `style` prop straight through to an icon); the
+	// runtime only spreads this onto the `<svg>`, so the wider type changes no behavior.
+	style?: string | CSSProperties | Record<string, string | number | null | undefined>;
 	tabIndex?: number;
 	viewBox?: string;
 	width?: string | number;

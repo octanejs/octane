@@ -2,10 +2,11 @@
 // the differential rig) into the module shape of '@octanejs/shadcn', so the
 // compiled React fixtures can rewrite the bare specifier to this module. Only
 // the differential subset is vendored: badge, button, tabs, dialog,
-// dropdown-menu (+ lib/utils and the icon-placeholder shim).
+// dropdown-menu, calendar (+ lib/utils and the icon-placeholder shim).
 export { cn } from "./utils"
 export { Badge, badgeVariants } from "./badge"
 export { Button, buttonVariants } from "./button"
+export { Calendar, CalendarDayButton } from "./calendar"
 export { Tabs, TabsList, TabsTrigger, TabsContent, tabsListVariants } from "./tabs"
 export {
   Dialog,
