@@ -1,5 +1,11 @@
 # @octanejs/seo
 
+## 0.0.39
+
+### Patch Changes
+
+- f6a0b41: Place hoisted SSR metadata inside an authored head at a fragment root, and omit the SEO stray-owner diagnostic from production browser bundles.
+
 ## 0.0.38
 
 ### Patch Changes

@@ -53,7 +53,7 @@
     },
     {
       "name": "@octanejs/aria",
-      "version": "0.0.47",
+      "version": "0.0.48",
       "category": "UI Libraries",
       "upstream": { "package": "react-aria", "version": "3.51.0" },
       "surface": "The `@octanejs/aria/components` entry point matches the complete named public surface of `react-aria-components@1.20.0`: 286 runtime exports and 327 type exports, checked in both directions with no missing or extra names. This includes TokenField, PreviewTrigger, calendar/date/time, color, drag-and-drop, DropZone/FileTrigger, toast, data hooks, and virtualized layout APIs in addition to the previously ported primitives, overlays, collections, Tree, and Table. The root behavior-hook and `/stately` entries remain curated React Aria 3.51.0 / React Stately 3.49.0 surfaces rather than separate full-export claims.",
@@ -1006,7 +1006,7 @@
     },
     {
       "name": "@octanejs/shadcn",
-      "version": "0.0.39",
+      "version": "0.0.40",
       "category": "UI Libraries",
       "upstream": {
         "package": "shadcn-ui/ui (component registry)",

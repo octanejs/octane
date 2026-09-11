@@ -1,5 +1,17 @@
 # @octanejs/shadcn
 
+## 0.0.40
+
+### Patch Changes
+
+- 6bf8671: Correct the Base UI Select menu classes and keep the release React differential aligned with the shipped source. Exercise Select and Navigation Menu popup content in differential coverage and avoid installing test-only class utilities for consumers.
+- Updated dependencies [bfb010f]
+  - @octanejs/aria@0.0.48
+  - @octanejs/base-ui@0.1.52
+  - @octanejs/lucide@0.1.47
+  - @octanejs/radix@0.1.52
+  - @octanejs/sonner@0.1.47
+
 ## 0.0.39
 
 ### Patch Changes
