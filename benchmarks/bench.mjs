@@ -1195,6 +1195,16 @@ const SUITES = [
 		runs: [{ script: 'run-size.mjs', args: () => [] }],
 	},
 	{
+		name: 'effect-scheduling',
+		cwd: 'effect-scheduling',
+		servers: [],
+		iter: { normal: 1, quick: 1 },
+		runs: [
+			{ script: 'wave.mjs', args: () => [] },
+			{ script: '../effect-postorder/refs.mjs', args: () => [] },
+		],
+	},
+	{
 		// Production spread resolution: executed allocation expressions under
 		// client/SSR semantic controls; untouched timing is a separate manual run.
 		name: 'spread-hosts',

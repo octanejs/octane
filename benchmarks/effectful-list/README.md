@@ -86,25 +86,11 @@ produces numbers — so one broken transition can't blank out the whole run. If
 ANY gate failed the harness still exits 1 and writes `BENCH_JSON` with a
 top-level `failed` reason (the contract). Counters are reset between ops.
 
-> **Known octane bug (as of this writing): `clear` and `remount` gates FAIL on
-> both octane targets.** When a keyed `@for` list of cross-module `<Row/>`
-> components is cleared to empty (`clear`) or fully replaced with all-new keys
-> (`remount`), octane fires **zero** effect/ref cleanups (`cleanups` and
-> `refCleanups` stay 0 instead of 1000) — a genuine effect/ref-cleanup **leak**
-> on the bulk-teardown fast path. It reproduces only on the batch-clear path:
-> the per-item reconcile teardown is correct, which is why `remove_100_scattered`
-> (100 scattered unmounts with 900 survivors) passes with `cleanups`/`refCleanups`
-> = 100. Root cause is `fireCleanupsOnly` in `packages/octane/src/runtime.ts`
-> (the `batchClearItems` disposal path): it recurses only into `scope.children`
-> and never walks `scope._slots`, so a row's slot-stashed child block (a
-> cross-module component rendered via `componentSlot`, and by extension nested
-> portals/control-flow) has its cleanups skipped. `unmountScope` (the per-item
-> path) walks `_slots` correctly. The fixtures are authored faithfully and are
-> NOT worked around — the failing gates are the intended regression signal and
-> will auto-pass once the runtime walks `_slots` in `fireCleanupsOnly` (and its
-> `b.cleanups.length || b.children.length` call-guard in `batchClearItems`
-> accounts for `_slots`). React, Preact, Solid, Ripple, and Svelte pass all six
-> gates.
+The earlier batch-clear cleanup defect no longer reproduces on the frozen
+`8a45222ab` baseline or the current effects/scheduling candidate. The production
+Octane fixture passes all six lifecycle gates, including 1,000 effect cleanups
+and 1,000 ref cleanups for `clear` and `remount`. The fixtures retain those gates
+as regression protection; see [the current measurements](../effect-scheduling/README.md).
 
 `clear` is specifically the path js-framework's `clear` skips: there, teardown
 of effect-free rows is pure DOM removal; here every removed row runs a passive
@@ -200,7 +186,7 @@ output (median/min/p95/sd per op per target).
   ops (it's the idiomatic solid pattern for externally-produced immutable
   data, same as the dbmon bench).
 
-## Dispatch argument allocation guard
+## Effect dispatch work and callback contract
 
 ```bash
 node benchmarks/effectful-list/dispatch.mjs
@@ -208,20 +194,68 @@ node benchmarks/effectful-list/dispatch.mjs <baseline-git-ref>
 BENCH_JSON=/tmp/effect-dispatch.json node benchmarks/effectful-list/dispatch.mjs <baseline-git-ref>
 ```
 
-This untimed companion extracts the actual `runEffectBody` declaration by
-TypeScript AST and compiles its production branch. It dispatches 1,000 effects
+This untimed companion extracts the actual `runEffectBody` and
+`fireEffectCleanup` declarations by TypeScript AST and compiles their production
+branches. It dispatches 1,000 effects
 in each of the three effect phases, with omitted arguments, an explicit empty
 array, and three explicit values. Separate clean and observed executions must
 agree on callback arguments and receiver, cleanup delivery, and exception
 handling. Stale revisions, disconnected bodies, and superseded publications
-are skipped. The default guard requires zero argument-array creation events;
+are skipped. Additional controls remove or replace the current hook entry while
+retaining the declaration list, and revoke membership inside a cleanup before
+its body runs. The default guard requires zero argument-array creation events
+and at most one hook Map read per cleanup/body attempt;
 `--measure` records historical implementations without enforcing that ceiling.
 
 The observer runs after production transformation and counts source array-literal
-creation events inside this helper. Its collaborators are boundary stubs; the
+creation events inside these helpers. A fixture-owned Map observer counts their
+hook lookups. Their collaborators are boundary stubs; the
 fixture and observer allocations are excluded. The existing browser workload
 and runtime tests cover lifecycle integration. These numbers do not measure
 heap allocation, garbage collection, or end-user latency: an optimizing engine
 may already remove a short-lived empty array. The JSON records Node/V8 versions
 and runtime/helper hashes; a paired run uses the same fixture and toolchain.
 The explicit-array cases are negative controls and must remain at zero.
+
+### Remaining dispatch proposals from #981
+
+The `8a45222ab` baseline and this change both perform **21,000 hook Map reads and
+zero argument-array creations** in each 3,000-effect case. Each iteration has
+three current cleanup/body attempts, two stale-revision attempts, two superseded
+publication attempts, and a disconnected body that returns before lookup.
+These are deterministic work counts, not timing or heap-allocation measurements.
+The earlier removal of the no-deps `[]` fallback remains protected; this audit
+makes no additional dispatch throughput claim.
+
+Two alternatives were rejected:
+
+- **Indexing the effect declaration list or retaining an unchecked slot pointer:**
+  the hooks Map remains the authority for membership. The body pass must resolve
+  it again after user cleanup can reenter rendering. An old slot's matching
+  revision does not prove current membership after a removal or replacement.
+  The membership controls reject the indexed-list variant; no per-record pointer,
+  generation, or extra invalidation scheme was added to force this optimization.
+- **Calling zero-to-four-argument callbacks directly:** a callback can expose its
+  own `apply` property, including a getter that throws. Reading dependency values
+  before that property also changes observable ordering. The new public-root
+  callback tests preserve the null receiver, positional values, sparse arrays,
+  getter ordering, returned cleanup, and error reporting in every effect phase.
+  A specialization would need additional guards and a benefit sufficient to pay
+  for them. The existing `apply(null, args)` path is retained.
+
+Reproduce the dispatch comparison with:
+
+```bash
+BENCH_JSON=/tmp/effect-dispatch-981.json node benchmarks/effectful-list/dispatch.mjs 8a45222ab
+./node_modules/.bin/vitest run packages/octane/tests/effect-callback-contract.test.ts
+```
+
+The full effectful-list browser gates remain the integration check for actual
+mount, unchanged-dependency update, changed-dependency update, and teardown.
+
+Validation on Node 26.4.0 / V8 14.6: all 54 callback-contract cases passed in
+development and production. Replacing the call with `Reflect.apply` made all
+12 own-`apply` cases fail; the original call was restored and all 54 passed
+again. A scratch extraction using `effectSlots[entry.order]` with both key and
+revision guards failed the membership control. The final guard passed for both
+the baseline and candidate; their extracted dispatch-helper hashes are equal.

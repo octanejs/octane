@@ -56,6 +56,14 @@ function workload(shape, counted = false) {
 			let parent = add(root);
 			for (let depth = 0; depth < i % 6; depth++) parent = add(parent);
 		}
+	} else if (shape === 'deep-disjoint') {
+		// Leaves share only the root. Comparing adjacent entries must reject
+		// ancestry even though their immediate parents are many levels apart.
+		for (let i = 0; i < 128; i++) {
+			let parent = add(root, false);
+			for (let depth = 0; depth < 24; depth++) parent = add(parent, false);
+			add(parent);
+		}
 	}
 	const expected = [];
 	function visit(node) {
@@ -86,7 +94,7 @@ function time(comparison, nodes, repeats) {
 	return ((performance.now() - start) * 1000) / repeats;
 }
 
-for (const shape of ['chain', 'siblings', 'mixed']) {
+for (const shape of ['chain', 'siblings', 'mixed', 'deep-disjoint']) {
 	const { nodes, expected } = workload(shape);
 	assert.deepEqual(
 		sorted(baseline, nodes).map((entry) => entry.id),
