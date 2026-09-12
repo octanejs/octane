@@ -360,7 +360,7 @@
         {
           "path": "packages/tanstack-query/tests/vitest.adapted-ssr.config.ts",
           "role": "support",
-          "sha256": "bbe15c99496848b0f0657dcc3b2e806089ddd76c37485ec70f7cdc9b2eece8b3"
+          "sha256": "b790aea3713027ef24e0b1483a633c1cbc04e5775080481f52d21ca2b5ac4c09"
         }
       ]
     },

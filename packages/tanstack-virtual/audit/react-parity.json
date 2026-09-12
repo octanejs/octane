@@ -119,13 +119,13 @@
       "type": "pristine-upstream",
       "oracle": "required",
       "environment": "workspace-node",
-      "project": "tanstack-virtual-browser",
+      "project": "tanstack-virtual-pristine-browser",
       "notes": "Executes the complete browser suite in Chromium and compares every observed file, expanded test title and result. The native lane also checks both end-anchor regressions.",
       "files": [
         {
-          "path": "packages/tanstack-virtual/tests/browser-parity.test.ts",
+          "path": "packages/tanstack-virtual/tests/browser-original.test.ts",
           "role": "test",
-          "sha256": "2ce68ba0cb0abe65a43cd6d28de9bab7ee5040009bb9ad55f302338b75edadfc",
+          "sha256": "7ffcfe5c2ad751c9d81500d5e104cdfe5405dac421ce9179a2bcf87125b095b5",
           "cases": [
             {
               "id": "pristine:virtual-original-browser-suite",
@@ -178,6 +178,11 @@
           "path": "packages/tanstack-virtual/audit/crosswalk.json",
           "role": "support",
           "sha256": "43da45752dfa4f65e8c333409a308b1e6ce00ee0ec96dbf11a8a0b925270daf5"
+        },
+        {
+          "path": "packages/tanstack-virtual/tests/browser-suite.ts",
+          "role": "support",
+          "sha256": "38b2ecf6bdcca311237b4a5045df1721f184f9478a01e1b2c6c4ef734dcc21ff"
         }
       ]
     },
@@ -289,13 +294,13 @@
       "type": "adapted-octane",
       "oracle": "required",
       "environment": "workspace-node",
-      "project": "tanstack-virtual-browser",
+      "project": "tanstack-virtual-adapted-browser",
       "notes": "Executes the complete browser suite in Chromium and compares every observed file, expanded test title and result. The native lane also checks both end-anchor regressions.",
       "files": [
         {
           "path": "packages/tanstack-virtual/tests/browser-parity.test.ts",
           "role": "test",
-          "sha256": "2ce68ba0cb0abe65a43cd6d28de9bab7ee5040009bb9ad55f302338b75edadfc",
+          "sha256": "d3bfb66ff70781e278787a81af9c42bafefcfca0798d93027aaef9f507b3d350",
           "cases": [
             {
               "id": "adapted:virtual-browser-suite",
@@ -368,6 +373,11 @@
           "path": "packages/tanstack-virtual/tests/browser-fixtures/prepend/index.html",
           "role": "support",
           "sha256": "15f770d92d95fa91f40e107b21bcada5255d9f6ed4dce33f5df6827a204dafce"
+        },
+        {
+          "path": "packages/tanstack-virtual/tests/browser-suite.ts",
+          "role": "support",
+          "sha256": "38b2ecf6bdcca311237b4a5045df1721f184f9478a01e1b2c6c4ef734dcc21ff"
         }
       ]
     },

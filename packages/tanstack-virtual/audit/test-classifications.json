@@ -54,13 +54,18 @@
     },
     {
       "path": "packages/tanstack-virtual/tests/browser-parity.test.ts",
-      "disposition": "pristine-and-adapted-browser-suites",
-      "reason": "Runs every pinned Chromium registration in both renderers, plus two native prepend regressions; compares exact identities and passing results."
+      "disposition": "adapted-browser-suite",
+      "reason": "Runs all 35 adapted browser cases and both native prepend regressions, verifying exact identities and results."
     },
     {
       "path": "packages/tanstack-virtual/tests/ssr-hydration.test.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Checks real SSR/client hydration, surviving nodes, updates and observer cleanup."
+    },
+    {
+      "path": "packages/tanstack-virtual/tests/browser-original.test.ts",
+      "disposition": "pristine-upstream-suite",
+      "reason": "Runs all 35 pinned Chromium registrations against React, verifying exact identities and results."
     }
   ]
 }

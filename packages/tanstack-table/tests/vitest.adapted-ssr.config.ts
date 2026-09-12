@@ -1,7 +1,7 @@
 import { resolve } from 'node:path';
 import { defineConfig } from 'vitest/config';
 import { octane } from '../../octane/src/compiler/vite.js';
-import adapted from './vitest.adapted.config';
+import adapted from './vitest.adapted.config.ts';
 
 const packageRoot = resolve(import.meta.dirname, '..');
 const server = resolve(packageRoot, '../octane/src/server/index.ts');

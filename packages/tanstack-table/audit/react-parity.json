@@ -311,7 +311,7 @@
         {
           "path": "packages/tanstack-table/tests/vitest.adapted-ssr.config.ts",
           "role": "support",
-          "sha256": "2a22eff40ddf103eccce481ddc7815a258ffda035d5386c81dd73278d83f29da"
+          "sha256": "e6d005212d1a250db84bc8652f8456360626f7271765fcb403dc15cfa8b4b24b"
         },
         {
           "path": "packages/tanstack-table/audit/upstream.lock.json",
