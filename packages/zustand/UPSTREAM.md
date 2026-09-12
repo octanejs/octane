@@ -1,6 +1,6 @@
 # Zustand upstream ledger
 
-## Pin
+## Adapter source pin
 
 - Package: `zustand@5.0.14`
 - Repository: `https://github.com/pmndrs/zustand.git`
@@ -11,7 +11,11 @@
 - License: MIT
 - React oracle: workspace React 19.2.7
 
-The binding reuses the pinned framework-neutral vanilla store, shallow comparator, and middleware. It adapts the React-facing `create`, `useStore`, `createWithEqualityFn`, `useStoreWithEqualityFn`, and `useShallow` hooks onto Octane subscriptions.
+The binding reuses the upstream framework-neutral vanilla store, shallow comparator, and middleware. It adapts the React-facing `create`, `useStore`, `createWithEqualityFn`, `useStoreWithEqualityFn`, and `useShallow` hooks onto Octane subscriptions.
+
+## Runtime dependency
+
+The runtime dependency and React differential oracle now use `zustand@5.0.15`. Its React adapters and public declarations are byte-identical to 5.0.14. The changes are in the imported middleware: clearing persisted storage invalidates pending hydration, and devtools action names handle async and constructor stack frames. The original adapter source pin above remains the provenance baseline. The persistence regression in `tests/conformance/extras.test.ts` fails with 5.0.14 and verifies that late hydration cannot restore cleared state.
 
 ## Export crosswalk
 

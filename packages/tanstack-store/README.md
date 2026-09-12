@@ -10,7 +10,7 @@ npm install @octanejs/tanstack-store
 pnpm add @octanejs/tanstack-store
 ```
 
-This package ports `@tanstack/react-store@0.11.0` by reusing the
+This package ports `@tanstack/react-store@0.11.1` by reusing the
 framework-agnostic `@tanstack/store` core unchanged and transcribing its small
 React hook layer onto Octane. The supported runtime and type surfaces match the
 React package, so an application can migrate by changing its import:
@@ -43,9 +43,9 @@ export function Counter() @{
 
 ## API
 
-The package re-exports all of `@tanstack/store@0.11.0`, including atoms,
+The package re-exports all of `@tanstack/store@0.11.1`, including atoms,
 stores, actions, derived sources, `shallow`, and async atoms. It also provides
-the stable adapter surface from `@tanstack/react-store@0.11.0`:
+the stable adapter surface from `@tanstack/react-store@0.11.1`:
 
 - `useSelector` reads any atom or store and supports a custom comparator.
 - `useAtom` returns a writable atom's current value and setter.

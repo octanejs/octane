@@ -77,11 +77,11 @@
         "source": "https://github.com/formkit/auto-animate/tree/b6a6feebf75c198dd85f280c549bc0303f9e7aa8",
         "license": "MIT"
       },
-      "surface": "Vanilla autoAnimate core is reused from @formkit/auto-animate@0.10.0. The React useAutoAnimate hook is ported at ./react. Vue, Preact, Solid, Angular, Nuxt, Marko, and Qwik entry points are explicit gaps.",
+      "surface": "Vanilla autoAnimate core is reused unchanged from @formkit/auto-animate@0.10.0; direct upstream imports are supported for those APIs. The useAutoAnimate hook at ./react integrates the copied React adapter with Octane. Adapters for other frameworks are outside the Octane binding contract.",
       "divergences": [
-        "Consumers import from @octanejs/auto-animate and @octanejs/auto-animate/react rather than @formkit/auto-animate and @formkit/auto-animate/react.",
+        "Import useAutoAnimate from @octanejs/auto-animate/react for Octane lifecycle integration. Vanilla APIs may be imported directly from @formkit/auto-animate; the existing @octanejs/auto-animate re-exports remain supported.",
         "useAutoAnimate treats a compiler-injected symbol in the options position as omitted options.",
-        "Vue, Preact, Solid, Angular, Nuxt, Marko, and Qwik bindings are not ported."
+        "Vue, Preact, Solid, Angular, Nuxt, Marko, and Qwik adapters require their own renderers and are inapplicable to Octane."
       ],
       "ssr": "The vanilla core is DOM-only; the hook attaches in a ref callback and destroys the controller on unmount. No server DOM mutations.",
       "verified": "2026-08-20"
@@ -1225,8 +1225,8 @@
       "name": "@octanejs/tanstack-form",
       "version": "0.0.48",
       "category": "Forms",
-      "upstream": { "package": "@tanstack/react-form", "version": "1.33.2" },
-      "surface": "Ports the complete @tanstack/react-form 1.33.2 adapter surface (`useForm`, `useField`, form and field groups, hook contexts and component composition) while re-exporting @tanstack/form-core 1.33.2 unchanged and using @octanejs/tanstack-store for subscriptions.",
+      "upstream": { "package": "@tanstack/react-form", "version": "1.33.5" },
+      "surface": "Ports the complete @tanstack/react-form 1.33.5 adapter surface (`useForm`, `useField`, form and field groups, hook contexts and component composition) while re-exporting @tanstack/form-core 1.33.5 unchanged and using @octanejs/tanstack-store for subscriptions.",
       "divergences": [
         "Octane uses native events: text controls call `field.handleChange` from `onInput`; TanStack Form's `onChange` validator and listener option names remain unchanged.",
         "Octane has no StrictMode double-invoke and always provides `useId`, so the adapter omits StrictMode scenarios and the legacy random-UUID fallback.",
@@ -1299,8 +1299,8 @@
       "name": "@octanejs/tanstack-store",
       "version": "0.0.48",
       "category": "State Management",
-      "upstream": { "package": "@tanstack/react-store", "version": "0.11.0" },
-      "surface": "Re-exports `@tanstack/store@0.11.0` unchanged and implements the stable React binding surface (`useSelector`, `useAtom`, `useCreateAtom`, `useCreateStore`, `createStoreContext`, and deprecated `useStore`) on Octane hooks.",
+      "upstream": { "package": "@tanstack/react-store", "version": "0.11.1" },
+      "surface": "Re-exports `@tanstack/store@0.11.1` unchanged and implements the stable React binding surface (`useSelector`, `useAtom`, `useCreateAtom`, `useCreateStore`, `createStoreContext`, and deprecated `useStore`) on Octane hooks.",
       "divergences": [
         "The upstream experimental `_useStore` hook is intentionally omitted; use `useSelector` with `store.actions` or `store.setState` instead."
       ],
@@ -1652,7 +1652,7 @@
       "name": "@octanejs/zustand",
       "version": "0.1.52",
       "category": "State Management",
-      "upstream": { "package": "zustand", "version": "5.0.14" },
+      "upstream": { "package": "zustand", "version": "5.0.15" },
       "surface": "Complete 1:1 port: the framework-agnostic vanilla store is reused verbatim; `create`/`useStore`, `shallow`/`useShallow`, the traditional equality-fn variants, and all middleware (persist, devtools, subscribeWithSelector, combine, redux).",
       "divergences": [],
       "ssr": "No SSR-specific surface; no dedicated SSR tests.",

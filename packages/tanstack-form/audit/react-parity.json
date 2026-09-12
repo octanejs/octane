@@ -11,7 +11,10 @@
     "integrity": "sha256:db24c9288d56428e8f67742ca9e0fcf314917c21c8d8d4ff095aee8043602606",
     "verification": "recorded-unverified"
   },
-  "upstreamSuites": { "runtime": "present", "types": "present" },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "present"
+  },
   "adaptedRoots": {
     "source": {
       "roots": ["packages/tanstack-form/src"],
@@ -37,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "8b22926b6186369bfc8ca72aedb69b7853160e5ab762b1a36e1a61bf24f6c322"
+      "lockfileSha256": "c59eb31d459a52db2de19f8e5d45e921ee077693ba852b1e026f18f2a782aba6"
     }
   },
   "lanes": [
@@ -48,7 +51,7 @@
       "environment": "workspace-node",
       "project": "tanstack-form-differential",
       "evidenceOrigin": "repo-authored",
-      "notes": "Runs one exact shared values, validation, array, and reset scenario against @tanstack/react-form@1.33.2.",
+      "notes": "Runs one exact shared values, validation, array, and reset scenario against @tanstack/react-form@1.33.5.",
       "files": [
         {
           "path": "packages/tanstack-form/tests/differential/parity.test.ts",
@@ -75,7 +78,7 @@
         {
           "path": "packages/tanstack-form/audit/test-classifications.json",
           "role": "support",
-          "sha256": "a5d4378ef69b3c29e26d40ce774c5ef9149c357318f26de63bfc695f2b616fd4"
+          "sha256": "89e3c5b4b19af23b51146e9f6127b14b0d2570873c0ef07c47e50cf72465d282"
         },
         {
           "path": "packages/octane/tests/differential/_rig.ts",
@@ -145,7 +148,7 @@
         {
           "path": "packages/tanstack-form/audit/test-classifications.json",
           "role": "support",
-          "sha256": "a5d4378ef69b3c29e26d40ce774c5ef9149c357318f26de63bfc695f2b616fd4"
+          "sha256": "89e3c5b4b19af23b51146e9f6127b14b0d2570873c0ef07c47e50cf72465d282"
         }
       ]
     },

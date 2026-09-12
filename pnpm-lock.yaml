@@ -341,8 +341,8 @@ catalogs:
       specifier: 0.5.0
       version: 0.5.0
     '@tanstack/form-core':
-      specifier: 1.33.2
-      version: 1.33.2
+      specifier: 1.33.5
+      version: 1.33.5
     '@tanstack/history':
       specifier: 1.162.0
       version: 1.162.0
@@ -350,8 +350,8 @@ catalogs:
       specifier: ^5.101.3
       version: 5.101.3
     '@tanstack/react-form':
-      specifier: 1.33.2
-      version: 1.33.2
+      specifier: 1.33.5
+      version: 1.33.5
     '@tanstack/react-query':
       specifier: ^5.101.3
       version: 5.101.3
@@ -974,8 +974,8 @@ catalogs:
       specifier: ^3.25.76
       version: 3.25.76
     zustand:
-      specifier: ^5.0.14
-      version: 5.0.14
+      specifier: ^5.0.15
+      version: 5.0.15
   dnd-kit-react-oracle:
     react:
       specifier: 19.2.7
@@ -1154,8 +1154,8 @@ catalogs:
       version: 19.2.7
   tanstack-store-react-oracle:
     '@tanstack/react-store':
-      specifier: 0.11.0
-      version: 0.11.0
+      specifier: 0.11.1
+      version: 0.11.1
     '@testing-library/react':
       specifier: 16.3.1
       version: 16.3.1
@@ -8833,14 +8833,14 @@ importers:
         version: link:../tanstack-store
       '@tanstack/form-core':
         specifier: catalog:default
-        version: 1.33.2
+        version: 1.33.5
     devDependencies:
       '@octanejs/testing-library':
         specifier: workspace:*
         version: link:../testing-library
       '@tanstack/react-form':
         specifier: catalog:default
-        version: 1.33.2(@tanstack/react-start@1.168.28(@rsbuild/core@2.1.6(core-js@3.49.0))(@rspack/core@2.1.4(@swc/helpers@0.5.23))(esbuild@0.28.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(rolldown@1.2.0)(rollup@4.62.3)(supports-color@10.2.2)(vite-plugin-solid@3.0.0-next.5(@solidjs/web@2.0.0-beta.20(solid-js@2.0.0-beta.20))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0-beta.20)(supports-color@10.2.2)(vite@8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(vite@8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.28.1)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20)))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+        version: 1.33.5(@tanstack/react-start@1.168.28(@rsbuild/core@2.1.6(core-js@3.49.0))(@rspack/core@2.1.4(@swc/helpers@0.5.23))(esbuild@0.28.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(rolldown@1.2.0)(rollup@4.62.3)(supports-color@10.2.2)(vite-plugin-solid@3.0.0-next.5(@solidjs/web@2.0.0-beta.20(solid-js@2.0.0-beta.20))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0-beta.20)(supports-color@10.2.2)(vite@8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(vite@8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.28.1)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20)))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@testing-library/jest-dom':
         specifier: catalog:default
         version: 6.9.1
@@ -9193,15 +9193,15 @@ importers:
   packages/tanstack-store:
     dependencies:
       '@tanstack/store':
-        specifier: 0.11.0
-        version: 0.11.0
+        specifier: 0.11.1
+        version: 0.11.1
     devDependencies:
       '@octanejs/testing-library':
         specifier: workspace:*
         version: link:../testing-library
       '@tanstack/react-store':
         specifier: catalog:tanstack-store-react-oracle
-        version: 0.11.0(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
+        version: 0.11.1(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
       '@testing-library/jest-dom':
         specifier: catalog:default
         version: 6.9.1
@@ -9438,7 +9438,7 @@ importers:
     dependencies:
       zustand:
         specifier: catalog:default
-        version: 5.0.14(@types/react@19.2.18)(immer@11.1.15)(react@19.2.7)(use-sync-external-store@1.6.0(react@19.2.7))
+        version: 5.0.15(@types/react@19.2.18)(immer@11.1.15)(react@19.2.7)(use-sync-external-store@1.6.0(react@19.2.7))
     devDependencies:
       '@octanejs/rsbuild-plugin':
         specifier: workspace:*
@@ -10304,7 +10304,7 @@ importers:
     dependencies:
       zustand:
         specifier: catalog:default
-        version: 5.0.14(@types/react@19.2.18)(immer@11.1.15)(react@19.2.7)(use-sync-external-store@1.6.0(react@19.2.7))
+        version: 5.0.15(@types/react@19.2.18)(immer@11.1.15)(react@19.2.7)(use-sync-external-store@1.6.0(react@19.2.7))
     devDependencies:
       '@tsrx/react':
         specifier: catalog:default
@@ -19549,8 +19549,8 @@ packages:
     peerDependencies:
       solid-js: 1.9.14
 
-  '@tanstack/form-core@1.33.2':
-    resolution: {integrity: sha512-F60zJd15bGrXKonc1kpRYnNRNfiES7F+hgvrPMrsZznPLqZtO2DIg76OU6R25kCYkqYQY5xvuKteuWcUsc587A==}
+  '@tanstack/form-core@1.33.5':
+    resolution: {integrity: sha512-3dfx9MBP0aq5sXKteikG629X9oviptrQj0IFRk9YGcb+lB7Kv5x8S17oOSk1wUWgjQZ4xVJEMbKwOAODymocgA==}
 
   '@tanstack/highlight@0.0.3':
     resolution: {integrity: sha512-U+4VEcxpRH1hazU9DHkeK31+O3V3pjU71UUNzTs+C4w2PtVsC5hDcnxbJxMC+fCvl9aLJGEIPc78Uw4tpd6mUw==}
@@ -19612,8 +19612,8 @@ packages:
       react: '>=16.8'
       react-dom: '>=16.8'
 
-  '@tanstack/react-form@1.33.2':
-    resolution: {integrity: sha512-nEfayOu+27q5cZ5E0G5dmnddqLcLjdFCatbL/LCs/iLD469a1o1yYJlr8RISV3GfnqsBpm0hf+8kM4okh5fPCw==}
+  '@tanstack/react-form@1.33.5':
+    resolution: {integrity: sha512-LlRB28qJwO/QCGaHvWnbdh4haBgTFiZVmzA2uzxSBS3YA7/IqrQ6HOBK70CkFQ+DbflZ7NawsmSln13h5iIdTA==}
     peerDependencies:
       '@tanstack/react-start': '*'
       react: ^17.0.0 || ^18.0.0 || ^19.0.0
@@ -19780,6 +19780,12 @@ packages:
 
   '@tanstack/react-store@0.11.0':
     resolution: {integrity: sha512-tX4YXh3PDkmpvGQWkWqKpzs/MSqbtuwY9dWdWhtV9Q50PmO+jOkUKIWIX4G85dwt7lxdHLXsiaEKPdKmC8F41w==}
+    peerDependencies:
+      react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+      react-dom: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+
+  '@tanstack/react-store@0.11.1':
+    resolution: {integrity: sha512-HaIGKI3YLmjBYIvy5DFDY23oNaYZIsTZfngey07Uh5iLVJgM3bIGCnZeOFOqzjFld9JHWcaHJnasD/bKoGKwJQ==}
     peerDependencies:
       react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
       react-dom: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
@@ -19956,6 +19962,9 @@ packages:
 
   '@tanstack/store@0.11.0':
     resolution: {integrity: sha512-WlzzCt3xi0G6pCAJu1U+2jiECwabETDpQDi3hfkFZvJii9AuZqEKbOiVarX1/bWhTNjU486yQtJCCasi/0q+Cw==}
+
+  '@tanstack/store@0.11.1':
+    resolution: {integrity: sha512-mzTOBhypOuDJAy/D8n2MfUZ1HFkXnmSETviRyhqEC8LUE7/IZQExOTxMANj3KjTofYTkFNpBY67qaVrT41YccA==}
 
   '@tanstack/store@0.7.7':
     resolution: {integrity: sha512-xa6pTan1bcaqYDS9BDpSiS63qa6EoDkPN9RsRaxHuDdVDNntzq3xNwR5YKTU/V3SkSyC9T4YVOPh2zRQN0nhIQ==}
@@ -34017,6 +34026,24 @@ packages:
       use-sync-external-store:
         optional: true
 
+  zustand@5.0.15:
+    resolution: {integrity: sha512-MpSEjRiBkA9crSYeOUH32rJC7SVqAbm0Fqcqge/bUi2PPoLcBWKOsG+C8mevmpr8TwXHBVkChbbJiyvkE+i/3A==}
+    engines: {node: '>=12.20.0'}
+    peerDependencies:
+      '@types/react': '>=18.0.0'
+      immer: '>=9.0.6'
+      react: '>=18.0.0'
+      use-sync-external-store: '>=1.2.0'
+    peerDependenciesMeta:
+      '@types/react':
+        optional: true
+      immer:
+        optional: true
+      react:
+        optional: true
+      use-sync-external-store:
+        optional: true
+
   zustand@5.0.3:
     resolution: {integrity: sha512-14fwWQtU3pH4dE0dOpdMiWjddcH+QzKIgk1cl8epwSE7yag43k/AD/m4L6+K7DytAOr9gGBe3/EXj9g7cdostg==}
     engines: {node: '>=12.20.0'}
@@ -46485,7 +46512,7 @@ snapshots:
       - csstype
       - utf-8-validate
 
-  '@tanstack/form-core@1.33.2':
+  '@tanstack/form-core@1.33.5':
     dependencies:
       '@tanstack/devtools-event-client': 0.4.4
       '@tanstack/pacer-lite': 0.1.1
@@ -46558,9 +46585,9 @@ snapshots:
       - solid-js
       - utf-8-validate
 
-  '@tanstack/react-form@1.33.2(@tanstack/react-start@1.168.28(@rsbuild/core@2.1.6(core-js@3.49.0))(@rspack/core@2.1.4(@swc/helpers@0.5.23))(esbuild@0.28.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(rolldown@1.2.0)(rollup@4.62.3)(supports-color@10.2.2)(vite-plugin-solid@3.0.0-next.5(@solidjs/web@2.0.0-beta.20(solid-js@2.0.0-beta.20))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0-beta.20)(supports-color@10.2.2)(vite@8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(vite@8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.28.1)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20)))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
+  '@tanstack/react-form@1.33.5(@tanstack/react-start@1.168.28(@rsbuild/core@2.1.6(core-js@3.49.0))(@rspack/core@2.1.4(@swc/helpers@0.5.23))(esbuild@0.28.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(rolldown@1.2.0)(rollup@4.62.3)(supports-color@10.2.2)(vite-plugin-solid@3.0.0-next.5(@solidjs/web@2.0.0-beta.20(solid-js@2.0.0-beta.20))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0-beta.20)(supports-color@10.2.2)(vite@8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(vite@8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))(webpack@5.108.4(@swc/core@1.15.41(@swc/helpers@0.5.23))(clean-css@5.3.3)(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.28.1)(html-minifier-terser@7.2.0)(lightningcss@1.33.0)(postcss@8.5.20)))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
     dependencies:
-      '@tanstack/form-core': 1.33.2
+      '@tanstack/form-core': 1.33.5
       '@tanstack/react-store': 0.11.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       react: 19.2.7
     optionalDependencies:
@@ -46897,6 +46924,13 @@ snapshots:
       react: 19.2.7
       react-dom: 19.2.7(react@19.2.7)
       use-sync-external-store: 1.6.0(react@19.2.7)
+
+  '@tanstack/react-store@0.11.1(react-dom@19.2.3(react@19.2.3))(react@19.2.3)':
+    dependencies:
+      '@tanstack/store': 0.11.1
+      react: 19.2.3
+      react-dom: 19.2.3(react@19.2.3)
+      use-sync-external-store: 1.6.0(react@19.2.3)
 
   '@tanstack/react-store@0.7.7(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
     dependencies:
@@ -47258,6 +47292,8 @@ snapshots:
       '@tanstack/router-core': 1.171.15
 
   '@tanstack/store@0.11.0': {}
+
+  '@tanstack/store@0.11.1': {}
 
   '@tanstack/store@0.7.7': {}
 
@@ -67173,6 +67209,13 @@ snapshots:
       react: 19.2.8
       use-sync-external-store: 1.6.0(react@19.2.8)
     optional: true
+
+  zustand@5.0.15(@types/react@19.2.18)(immer@11.1.15)(react@19.2.7)(use-sync-external-store@1.6.0(react@19.2.7)):
+    optionalDependencies:
+      '@types/react': 19.2.18
+      immer: 11.1.15
+      react: 19.2.7
+      use-sync-external-store: 1.6.0(react@19.2.7)
 
   zustand@5.0.3(@types/react@19.2.18)(immer@11.1.15)(react@19.2.7)(use-sync-external-store@1.4.0(react@19.2.7)):
     optionalDependencies:
