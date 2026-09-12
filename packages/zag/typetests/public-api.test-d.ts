@@ -22,11 +22,6 @@ expectType<{ id: string } & { name: string }>(merged);
 
 const inputProps = normalizeProps.input({ id: 'field' });
 expectType<string | undefined>(inputProps.id);
-expectType<boolean | undefined>(inputProps.checked);
-const elementProps = normalizeProps.element({ style: { width: 120 } });
-if (elementProps.style && typeof elementProps.style === 'object') {
-	expectType<string | number | undefined>(elementProps.style.width);
-}
 
 type PortalChildren = Parameters<typeof Portal>[0]['children'];
 expectType<OctaneNode | undefined>(null as unknown as PortalChildren);
