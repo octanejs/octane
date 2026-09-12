@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'octane';
+import { isChildrenBlock, useEffect, useMemo, useState } from 'octane';
+import type { OctaneNode } from 'octane';
 import { AsyncRateLimiter } from '@tanstack/pacer/async-rate-limiter';
 import { shallow } from '@octanejs/tanstack-store';
 import { useDefaultPacerOptions } from '../provider/context';
@@ -32,8 +33,8 @@ export interface ReactAsyncRateLimiter<TFn extends AnyAsyncFunction, TSelected =
 	 */
 	Subscribe: <TSelected>(props: {
 		selector: (state: AsyncRateLimiterState<TFn>) => TSelected;
-		children: ((state: TSelected) => unknown) | unknown;
-	}) => unknown;
+		children: ((state: TSelected) => OctaneNode) | OctaneNode;
+	}) => OctaneNode;
 	/**
 	 * Reactive state selected by the hook's `selector` (empty object without one).
 	 */
@@ -76,7 +77,7 @@ export function useAsyncRateLimiter<TFn extends AnyAsyncFunction, TSelected = {}
 
 		asyncRateLimiterInstance.Subscribe = function Subscribe<TSelected>(props: {
 			selector: (state: AsyncRateLimiterState<TFn>) => TSelected;
-			children: ((state: TSelected) => unknown) | unknown;
+			children: ((state: TSelected) => OctaneNode) | OctaneNode;
 		}) {
 			const selected = useSelectorSlot(
 				asyncRateLimiterInstance.store,
@@ -85,8 +86,8 @@ export function useAsyncRateLimiter<TFn extends AnyAsyncFunction, TSelected = {}
 				subscribeSlot,
 			);
 
-			return typeof props.children === 'function'
-				? (props.children as (state: TSelected) => unknown)(selected)
+			return typeof props.children === 'function' && !isChildrenBlock(props.children)
+				? (props.children as (state: TSelected) => OctaneNode)(selected)
 				: props.children;
 		};
 

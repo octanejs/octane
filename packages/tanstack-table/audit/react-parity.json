@@ -3,15 +3,18 @@
   "schemaVersion": 1,
   "provenance": {
     "repo": "https://github.com/TanStack/table.git",
-    "version": "@tanstack/react-table@9.0.0-beta.58",
-    "commit": "9fa764702b25d675f97deedd714e8b9133994927",
+    "version": "9.2.4",
+    "commit": "d01c01bedbab0ff6c2641f18b2fc9a11545d9bf6",
     "sourceRoot": "packages/react-table/src",
     "testRoot": "packages/react-table",
     "license": "MIT",
-    "integrity": "sha256:924a64009738996f1a2f32ef950aed338a6aafb0dbf85af548c7c98388deb559",
-    "verification": "recorded-unverified"
+    "integrity": "sha256:c9e40b73d195b76f81e1602513e96d7ab03eac0e0611da86e05cc144f629b8ab",
+    "verification": "verified"
   },
-  "upstreamSuites": { "runtime": "present", "types": "insufficient" },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "insufficient"
+  },
   "adaptedRoots": {
     "source": {
       "roots": ["packages/tanstack-table/src"],
@@ -19,14 +22,14 @@
       "exclude": ["\\.d\\.ts$"]
     },
     "tests": {
-      "roots": ["packages/tanstack-table/tests/differential"],
-      "include": ["\\.test\\.ts$"],
+      "roots": ["packages/tanstack-table/tests/upstream"],
+      "include": ["\\.test\\.tsx$"],
       "exclude": []
     }
   },
   "adaptedRuntimeSummary": {
-    "inventoryEntries": 0,
-    "uniqueIdentities": 0,
+    "inventoryEntries": 34,
+    "uniqueIdentities": 34,
     "duplicateEntriesWithinLanes": 0,
     "identitiesSharedAcrossLanes": 0
   },
@@ -37,10 +40,301 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "c59eb31d459a52db2de19f8e5d45e921ee077693ba852b1e026f18f2a782aba6"
+      "lockfileSha256": "8c6917b3bdc395e057892a96a41d2041b3e2edd2fe8e040870d1dfc07fdbaf4a"
     }
   },
   "lanes": [
+    {
+      "id": "tanstack-table-pristine-runtime",
+      "type": "pristine-upstream",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tanstack-table-pristine",
+      "notes": "Executes every one of the 34 immutable React adapter cases, including SSR and legacy.",
+      "evidenceOrigin": "upstream-suite",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/tanstack-table/audit/pristine-wrapper-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/tanstack-table/audit/pristine-wrapper-runtime.json",
+          "role": "support",
+          "sha256": "fd2957538328d4944070bd5f770d04fd8cb7757375a387e68154569e0876dc55"
+        },
+        {
+          "path": "packages/tanstack-table/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "143659d1cdd01502ba907a36af4b4e25600673fb3cfb8d6d0b56721362aea319"
+        },
+        {
+          "path": "packages/tanstack-table/audit/provenance.json",
+          "role": "support",
+          "sha256": "6c1db34cde8afa650eeb2c98914198b431423453bbdae9b35c97319936859cb4"
+        },
+        {
+          "path": "packages/tanstack-table/audit/registrations.json",
+          "role": "support",
+          "sha256": "e5d2eea214b2848014eb79ac765bcdd3aac160557df66f7e77c4bbb211e83b9a"
+        },
+        {
+          "path": "packages/tanstack-table/audit/crosswalk.json",
+          "role": "support",
+          "sha256": "49b4a0397b7dd988ebf6fce60a2049b8f75d641ec37a43177f9aa33d365e0415"
+        },
+        {
+          "path": "packages/tanstack-table/tests/upstream-original.test.ts",
+          "role": "support",
+          "sha256": "fe1bc05fd8a817dad158b6a8aa35968ab2f100fecaa614d9b17a37d23d623b95"
+        },
+        {
+          "path": "packages/tanstack-table/audit/pristine-runtime.json",
+          "role": "support",
+          "sha256": "4353efab0885cfba99817916e9e89f60acba98616fc68c0bf9bc47b60f736bbd"
+        },
+        {
+          "path": "packages/tanstack-table/tests/upstream-vitest.config.ts",
+          "role": "support",
+          "sha256": "dc57cf601bd7d9216851811f843dc6e932794221ff0dd3fd39573b84ec40ed4e"
+        },
+        {
+          "path": "packages/tanstack-table/audit/pristine-suite.json",
+          "role": "support",
+          "sha256": "1dec126e09097a0d1ca78c2d1096a7160ed6379becd5fe4a5942c4cadece0210"
+        },
+        {
+          "path": "scripts/react-parity/tanstack-table-pristine-runtime.mjs",
+          "role": "support",
+          "sha256": "adf6cddb4d44a95237d28af884c33a88714bfccb349a5bd2fca588009537144b"
+        },
+        {
+          "path": "scripts/react-parity/pristine-suite-lib.mjs",
+          "role": "support",
+          "sha256": "d34ffc2dca00e6eef7dcaf5bc002024cc511f32dd20c681547555af520438bbb"
+        }
+      ]
+    },
+    {
+      "id": "tanstack-table-pristine-types",
+      "type": "pristine-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tanstack-table-pristine-types",
+      "notes": "No dedicated upstream type-test registrations: compile full pinned source and 774 public export contracts, with typed consumers and negative controls.",
+      "evidenceOrigin": "repo-authored",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsc",
+        "project": "packages/tanstack-table/typetests/pristine/tsconfig.json"
+      },
+      "files": [
+        {
+          "path": "packages/tanstack-table/typetests/pristine/tsconfig.json",
+          "role": "test",
+          "sha256": "205a2eb0edf9e8ccea4271b3adc810651b02c2cfdef57e087740205b803bfc75",
+          "cases": [
+            {
+              "id": "types:table-pristine",
+              "testName": "complete Table public contract",
+              "fullName": "complete Table public contract"
+            }
+          ]
+        },
+        {
+          "path": "packages/tanstack-table/typetests/pristine/public-contracts.test-d.ts",
+          "role": "support",
+          "sha256": "7ddd86682030bda8a6e2975b86c31d785c07c5205284962cad21fb8bddd16938"
+        },
+        {
+          "path": "packages/tanstack-table/typetests/pristine/types.test-d.ts",
+          "role": "support",
+          "sha256": "c293e132f44058c8247be40904783a5cfbef93047b1cf389b3d33ce184c48ffc"
+        },
+        {
+          "path": "packages/tanstack-table/typetests/expected-contracts.d.ts",
+          "role": "support",
+          "sha256": "23424b5aefd97fbe360972aa7f46c0f58dda3d9bd076231ba72b2238eb61b94e"
+        },
+        {
+          "path": "packages/tanstack-table/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "143659d1cdd01502ba907a36af4b4e25600673fb3cfb8d6d0b56721362aea319"
+        },
+        {
+          "path": "packages/tanstack-table/audit/provenance.json",
+          "role": "support",
+          "sha256": "6c1db34cde8afa650eeb2c98914198b431423453bbdae9b35c97319936859cb4"
+        },
+        {
+          "path": "packages/tanstack-table/audit/registrations.json",
+          "role": "support",
+          "sha256": "e5d2eea214b2848014eb79ac765bcdd3aac160557df66f7e77c4bbb211e83b9a"
+        },
+        {
+          "path": "packages/tanstack-table/audit/crosswalk.json",
+          "role": "support",
+          "sha256": "49b4a0397b7dd988ebf6fce60a2049b8f75d641ec37a43177f9aa33d365e0415"
+        }
+      ]
+    },
+    {
+      "id": "tanstack-table-adapted-runtime",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tanstack-table-adapted",
+      "notes": "Executes all 31 adapted client cases. The three SSR cases run in the separate server-compiled lane.",
+      "evidenceOrigin": "upstream-suite",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/tanstack-table/audit/adapted-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/tanstack-table/audit/adapted-runtime.json",
+          "role": "support",
+          "sha256": "6c5ba7246ecba1789f947c7b765c4d9cf5ab1f8b34d796680488a0254c0545e0"
+        },
+        {
+          "path": "packages/tanstack-table/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "143659d1cdd01502ba907a36af4b4e25600673fb3cfb8d6d0b56721362aea319"
+        },
+        {
+          "path": "packages/tanstack-table/audit/provenance.json",
+          "role": "support",
+          "sha256": "6c1db34cde8afa650eeb2c98914198b431423453bbdae9b35c97319936859cb4"
+        },
+        {
+          "path": "packages/tanstack-table/audit/registrations.json",
+          "role": "support",
+          "sha256": "e5d2eea214b2848014eb79ac765bcdd3aac160557df66f7e77c4bbb211e83b9a"
+        },
+        {
+          "path": "packages/tanstack-table/audit/crosswalk.json",
+          "role": "support",
+          "sha256": "49b4a0397b7dd988ebf6fce60a2049b8f75d641ec37a43177f9aa33d365e0415"
+        },
+        {
+          "path": "packages/tanstack-table/tests/vitest.adapted.config.ts",
+          "role": "support",
+          "sha256": "0de64e7c0f180f1d6ca268005d7c1b2cbf07c9191a92efc937cbf980779d7523"
+        }
+      ]
+    },
+    {
+      "id": "tanstack-table-adapted-types",
+      "type": "adapted-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tanstack-table-adapted-types",
+      "notes": "No dedicated upstream type-test registrations: compile full pinned source and 774 public export contracts, with typed consumers and negative controls.",
+      "evidenceOrigin": "repo-authored",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsrx-tsc",
+        "project": "packages/tanstack-table/typetests/adapted/tsconfig.json"
+      },
+      "files": [
+        {
+          "path": "packages/tanstack-table/typetests/adapted/tsconfig.json",
+          "role": "test",
+          "sha256": "9631e5a3e58c94599f1ac820888b8b388f4303f2dbade99414a53b89234c69a4",
+          "cases": [
+            {
+              "id": "types:table-adapted",
+              "testName": "complete Table public contract",
+              "fullName": "complete Table public contract"
+            }
+          ]
+        },
+        {
+          "path": "packages/tanstack-table/typetests/adapted/public-contracts.test-d.ts",
+          "role": "support",
+          "sha256": "3621d8c98a13c7db1c540e9437dcded14aa634b844351538bcc32a25f1d09427"
+        },
+        {
+          "path": "packages/tanstack-table/typetests/adapted/types.test-d.ts",
+          "role": "support",
+          "sha256": "eb1e9eb220da2212501ddb7b2fe2f7e82417eac1c0703b4ba607dd768197f237"
+        },
+        {
+          "path": "packages/tanstack-table/typetests/expected-contracts.d.ts",
+          "role": "support",
+          "sha256": "23424b5aefd97fbe360972aa7f46c0f58dda3d9bd076231ba72b2238eb61b94e"
+        },
+        {
+          "path": "packages/tanstack-table/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "143659d1cdd01502ba907a36af4b4e25600673fb3cfb8d6d0b56721362aea319"
+        },
+        {
+          "path": "packages/tanstack-table/audit/provenance.json",
+          "role": "support",
+          "sha256": "6c1db34cde8afa650eeb2c98914198b431423453bbdae9b35c97319936859cb4"
+        },
+        {
+          "path": "packages/tanstack-table/audit/registrations.json",
+          "role": "support",
+          "sha256": "e5d2eea214b2848014eb79ac765bcdd3aac160557df66f7e77c4bbb211e83b9a"
+        },
+        {
+          "path": "packages/tanstack-table/audit/crosswalk.json",
+          "role": "support",
+          "sha256": "49b4a0397b7dd988ebf6fce60a2049b8f75d641ec37a43177f9aa33d365e0415"
+        }
+      ]
+    },
+    {
+      "id": "tanstack-table-adapted-ssr",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tanstack-table-adapted-ssr",
+      "notes": "The complete three-case upstream SSR suite with native result containers, hydration marker normalization, memo and ref props.",
+      "evidenceOrigin": "upstream-suite",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/tanstack-table/audit/adapted-ssr-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/tanstack-table/audit/adapted-ssr-runtime.json",
+          "role": "support",
+          "sha256": "9ae582c05fc6eb5e58c86c18da02c362b3a0ff34ad8e0a6235f8c2b42f0269e1"
+        },
+        {
+          "path": "packages/tanstack-table/tests/vitest.adapted.config.ts",
+          "role": "support",
+          "sha256": "0de64e7c0f180f1d6ca268005d7c1b2cbf07c9191a92efc937cbf980779d7523"
+        },
+        {
+          "path": "packages/tanstack-table/tests/vitest.adapted-ssr.config.ts",
+          "role": "support",
+          "sha256": "e6d005212d1a250db84bc8652f8456360626f7271765fcb403dc15cfa8b4b24b"
+        },
+        {
+          "path": "packages/tanstack-table/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "143659d1cdd01502ba907a36af4b4e25600673fb3cfb8d6d0b56721362aea319"
+        },
+        {
+          "path": "packages/tanstack-table/audit/provenance.json",
+          "role": "support",
+          "sha256": "6c1db34cde8afa650eeb2c98914198b431423453bbdae9b35c97319936859cb4"
+        },
+        {
+          "path": "packages/tanstack-table/audit/registrations.json",
+          "role": "support",
+          "sha256": "e5d2eea214b2848014eb79ac765bcdd3aac160557df66f7e77c4bbb211e83b9a"
+        },
+        {
+          "path": "packages/tanstack-table/audit/crosswalk.json",
+          "role": "support",
+          "sha256": "49b4a0397b7dd988ebf6fce60a2049b8f75d641ec37a43177f9aa33d365e0415"
+        }
+      ]
+    },
     {
       "id": "tanstack-table-runtime-differential",
       "type": "differential",
@@ -48,7 +342,7 @@
       "environment": "workspace-node",
       "project": "tanstack-table-differential",
       "evidenceOrigin": "repo-authored",
-      "notes": "Runs exact rendering, sorting, filtering/pagination, selection, and visibility/expanding scenarios against @tanstack/react-table@9.0.0-beta.58. Owned by testExecution.group react-parity so the five cases execute once via react-parity:check; recorded-unverified provenance still blocks a verified claim.",
+      "notes": "Five complete same-fixture scenarios against the pinned React Table 9.2.4 adapter and the same neutral table-core 9.2.4.",
       "files": [
         {
           "path": "packages/tanstack-table/tests/differential/parity.test.ts",
@@ -140,149 +434,64 @@
       ]
     },
     {
-      "id": "tanstack-table-pristine-types",
-      "type": "pristine-types",
-      "oracle": "required",
-      "available": true,
-      "environment": "workspace-node",
-      "project": "tanstack-table-pristine-types",
-      "evidenceOrigin": "repo-authored",
-      "notes": "Type assertions for the public surface, compiled against @tanstack/react-table@9.0.0-beta.58 with tsc; per-file/per-group inventories and negative controls are enforced by tanstack-table-types-lib.",
-      "execution": {
-        "kind": "typescript",
-        "compiler": "tsc",
-        "project": "packages/tanstack-table/typetests/pristine/tsconfig.json"
-      },
-      "files": [
-        {
-          "path": "packages/tanstack-table/audit/pristine-types.json",
-          "role": "test",
-          "sha256": "e87c4b10c5f3619a7734647f17c298a3cea9b7a3d63b2c512ad26edd2232f5cd",
-          "cases": [
-            {
-              "id": "types:tanstack-table-pristine",
-              "testName": "public surface type assertions",
-              "fullName": "public surface type assertions"
-            }
-          ]
-        },
-        {
-          "path": "packages/tanstack-table/typetests/pristine/types.test-d.ts",
-          "role": "support",
-          "sha256": "c293e132f44058c8247be40904783a5cfbef93047b1cf389b3d33ce184c48ffc"
-        },
-        {
-          "path": "packages/tanstack-table/typetests/pristine/tsconfig.json",
-          "role": "support",
-          "sha256": "cb82e03159b832dd6a70589b26cd2a47d7361981f4b9ff8e7550692c2896b46c"
-        },
-        {
-          "path": "packages/tanstack-table/typetests/assertions.md",
-          "role": "support",
-          "sha256": "3c705814e055f8dd06438a1dc1dcf6b94d5049968ca1283fbe4d8546f1b4eee0"
-        },
-        {
-          "path": "packages/tanstack-table/audit/type-parity.json",
-          "role": "support",
-          "sha256": "73d82ea6996541d7b4b931af7b078b5f63fa62a88503ab77b9c8e499529a44af"
-        },
-        {
-          "path": "scripts/react-parity/tanstack-table-types-lib.mjs",
-          "role": "support",
-          "sha256": "6da105d5ade5db790439261a1ff528bbd1c1a8f52dbba6cb420fef3d354a94e6"
-        }
-      ]
-    },
-    {
-      "id": "tanstack-table-adapted-types",
-      "type": "adapted-types",
-      "oracle": "required",
-      "available": true,
-      "environment": "workspace-node",
-      "project": "tanstack-table-adapted-types",
-      "evidenceOrigin": "repo-authored",
-      "notes": "The same assertion groups against @octanejs/tanstack-table with tsrx-tsc; structural comparison and negative controls are enforced by tanstack-table-types-lib.",
-      "execution": {
-        "kind": "typescript",
-        "compiler": "tsrx-tsc",
-        "project": "packages/tanstack-table/typetests/adapted/tsconfig.json"
-      },
-      "files": [
-        {
-          "path": "packages/tanstack-table/audit/adapted-types.json",
-          "role": "test",
-          "sha256": "cee81dff84e33d550e9b485d0af73c08825b5fe730416c748e350a0d9fd0fda0",
-          "cases": [
-            {
-              "id": "types:tanstack-table-adapted",
-              "testName": "public surface type assertions",
-              "fullName": "public surface type assertions"
-            }
-          ]
-        },
-        {
-          "path": "packages/tanstack-table/typetests/adapted/types.test-d.ts",
-          "role": "support",
-          "sha256": "eb1e9eb220da2212501ddb7b2fe2f7e82417eac1c0703b4ba607dd768197f237"
-        },
-        {
-          "path": "packages/tanstack-table/typetests/adapted/tsconfig.json",
-          "role": "support",
-          "sha256": "765b85e3b0cd62da394dee3faaf0c03438ceb783c73a4579fee7acc86d8a709d"
-        },
-        {
-          "path": "packages/tanstack-table/typetests/assertions.md",
-          "role": "support",
-          "sha256": "3c705814e055f8dd06438a1dc1dcf6b94d5049968ca1283fbe4d8546f1b4eee0"
-        },
-        {
-          "path": "packages/tanstack-table/audit/type-parity.json",
-          "role": "support",
-          "sha256": "73d82ea6996541d7b4b931af7b078b5f63fa62a88503ab77b9c8e499529a44af"
-        },
-        {
-          "path": "scripts/react-parity/tanstack-table-types-lib.mjs",
-          "role": "support",
-          "sha256": "6da105d5ade5db790439261a1ff528bbd1c1a8f52dbba6cb420fef3d354a94e6"
-        }
-      ]
-    },
-    {
-      "id": "tanstack-table-legacy-subpath",
+      "id": "tanstack-table-conformance",
       "type": "adapted-octane",
       "oracle": "required",
-      "available": true,
       "environment": "workspace-node",
       "project": "tanstack-table",
-      "notes": "Focused same-scenario package-export observation for the ./legacy omission. Classified react-octane-differential; owned by file-granular testExecution.include on the mixed tanstack-table project so react-parity:check executes the case once and ordinary shards omit it; pins divergence legacy-migration-subpath.",
+      "notes": "Focused native hydration and legacy export contracts. The remaining 38 native conformance cases run in the ordinary package suite.",
       "files": [
+        {
+          "path": "packages/tanstack-table/tests/ssr-hydration.test.ts",
+          "role": "test",
+          "sha256": "a8ace993ce09b95343a383b2bbb8a98db8301a72f46b0670b989e01fe9bd4b95",
+          "cases": [
+            {
+              "id": "conformance:table-hydration",
+              "testName": "adopts server table rows and updates their data without remounting",
+              "fullName": "adopts server table rows and updates their data without remounting"
+            }
+          ]
+        },
         {
           "path": "packages/tanstack-table/tests/conformance/parity-legacy-api.test.ts",
           "role": "test",
-          "sha256": "a1ce67f812df9a828c09c6a08985a7913242355b45dc8e8339ec35a2a100e2d8",
+          "sha256": "08a417d90e416ea14a5081b4db2af8af7422b32949e0c2c7ad1a8e51c1cce900",
           "cases": [
             {
               "id": "adapted:tanstack-table-legacy-subpath",
-              "testName": "records React ./legacy presence versus Octane omission",
-              "fullName": "export surface records React ./legacy presence versus Octane omission"
+              "testName": "publishes the pinned legacy migration entrypoint",
+              "fullName": "export surface publishes the pinned legacy migration entrypoint"
             }
           ]
+        },
+        {
+          "path": "packages/tanstack-table/tests/_fixtures/hydration.tsrx",
+          "role": "support",
+          "sha256": "7dc0e85cb6c406bb7f60e3a4691f18348552d972a1742d6e004cc5723b8bf563"
         }
       ]
     }
   ],
   "divergences": [
     {
-      "id": "legacy-migration-subpath",
-      "caseIds": ["adapted:tanstack-table-legacy-subpath"],
-      "upstreamResult": "@tanstack/react-table publishes a ./legacy migration subpath for React v8 codebases.",
-      "octaneResult": "@octanejs/tanstack-table omits ./legacy from package exports and does not port useLegacyTable.",
-      "rationale": "The legacy adapter exists only to migrate existing React v8 table apps; an Octane binding has no such migration surface and targets the v9 useTable API directly.",
-      "classification": "public-api",
-      "consumerImpact": "Imports of @octanejs/tanstack-table/legacy fail; consumers must use the v9 useTable surface.",
-      "migrationGuidance": "Replace any ./legacy or useLegacyTable usage with useTable and the shared @tanstack/table-core feature APIs.",
+      "id": "native-table-renderer",
+      "caseIds": [
+        "runtime:04f25b5e91e1eac6",
+        "runtime:764e3ef437d97dd0",
+        "runtime:ab1ee1bf7691ec3b",
+        "runtime:b6cd7c54b4b62831",
+        "runtime:fb46ac117ec9d307"
+      ],
+      "upstreamResult": "React uses synthetic input changes, forwardRef wrappers, SSR strings and an invisible suspended owner without an additional committed notification.",
+      "octaneResult": "Native input events and ref props preserve the same DOM assertions. SSR assertions read RenderResult.html and normalize only hydration boundary comments. The first held transition restores the committed owner to publish its cue; this accepted render produces one unchanged-state notification, while suspended state never reaches base atoms or subscribers.",
+      "rationale": "These adaptations follow Octane’s documented native events, ref/SSR APIs and pending-cue commit behavior. The immutable React suites keep all original assertions. Native tests retain exact visible state, base state, notification values, markup and mounted-input identity.",
+      "classification": "renderer-contract",
+      "consumerImpact": "Use onInput for per-keystroke text edits and refs as props. Raw store observers may receive the unchanged committed snapshot during a held transition; they never observe the suspended controlled value.",
+      "migrationGuidance": "Read server result .html, use native input events/ref props, and compare selected store values instead of relying on React-specific commit counts.",
       "owner": "@octanejs/tanstack-table",
-      "reviewCondition": "Review if Octane gains a React-table v8 migration audience that needs the legacy subpath."
+      "reviewCondition": "Review when upstream tests or Octane’s input, ref, SSR or transition commit contracts change."
     }
-  ]
+  ],
+  "materializedTests": "packages/tanstack-table"
 }

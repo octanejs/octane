@@ -1251,25 +1251,27 @@
       "name": "@octanejs/tanstack-pacer",
       "version": "0.0.43",
       "category": "UI Utilities",
-      "upstream": { "package": "@tanstack/react-pacer", "version": "0.22.1" },
-      "surface": "Surface-present for all 15 runtime/type entrypoints from `@tanstack/react-pacer@0.22.1`, plus the byte-identical `@tanstack/pacer@0.21.1` core re-export. Repo-authored adapted-octane and differential lanes cover a representative debounce/throttle/batching/teardown lifecycle; upstream has no runtime suite and insufficient type evidence, so provenance remains `recorded-unverified` with nearly every export still `surface-present-unverified`.",
+      "upstream": { "package": "@tanstack/react-pacer", "version": "0.23.0" },
+      "surface": "All 15 runtime/type entrypoints from @tanstack/react-pacer@0.23.0, with framework-neutral @tanstack/pacer@0.22.0 imported directly. Complete source/type structural crosswalk and strict public contracts accompany paired scheduler runtime scenarios, all ten scheduler stores and cleanup, nested providers, and server/hydration adoption. The three async callback helpers preserve Awaited results and possible undefined. Upstream publishes no runtime or dedicated type-assertion suite; independent probes retain that distinction.",
       "divergences": [
         "Upstream types spelled with `React.Dispatch<React.SetStateAction<T>>` use structurally identical local aliases (Octane state setters have the same shape)."
       ],
       "ssr": "Supported: instances are created lazily in `useState` initializers, cleanup runs in effects, and no browser globals are touched during render, so server rendering produces the initial (non-pending) state exactly like upstream.",
-      "verified": "2026-08-03"
+      "verified": "2026-09-12"
     },
     {
       "name": "@octanejs/tanstack-query",
       "version": "0.1.52",
       "category": "Data",
-      "upstream": { "package": "@tanstack/react-query", "version": "5.101.3" },
-      "surface": "Complete: 58/58 runtime exports plus the full TypeScript surface; the export surface is byte-identical to upstream in both directions (locked by test), and `@tanstack/query-core` is re-exported verbatim.",
+      "upstream": { "package": "@tanstack/react-query", "version": "5.102.8" },
+      "surface": "Complete published root adapter and neutral core re-exports. Exact runtime export comparison, 213 public value/type probes, 404 pristine and 404 adapted runtime registrations, and 167 pristine/adapted type registrations.",
       "divergences": [
-        "Suspense integrates via octane's `use(thenable)` rather than throwing a promise (observable behavior matches)."
+        "Native compiler-assigned hook slots and retained suspense promises preserve observer ownership across replay.",
+        "Native renderer types replace React renderables and context types.",
+        "Upstream React-only StrictMode/render-stream, console formatting, render counts, timer observation and SSR harnesses are adapted with committed patches."
       ],
-      "ssr": "`HydrationBoundary` is fully ported (including streaming `promise`/`dehydratedAt` re-hydration), and initial query data is covered by a DOM-free Octane server-render test; dedicated streaming server entries remain open.",
-      "verified": "2026-08-02"
+      "ssr": "Nine adapted upstream server cases, three real server/client hydration cases with surviving DOM identity, and the DOM-free Octane conformance scenario. No separate React streaming entry is published by this adapter.",
+      "verified": "2026-09-12"
     },
     {
       "name": "@octanejs/tanstack-router",
@@ -1311,26 +1313,26 @@
       "name": "@octanejs/tanstack-table",
       "version": "0.1.51",
       "category": "Tables",
-      "upstream": { "package": "@tanstack/react-table", "version": "9.0.0-beta.58" },
-      "surface": "Complete port of the v9 adapter: the framework-agnostic `@tanstack/table-core` (constructTable + every tree-shakeable feature and row model) is reused verbatim, and the adapter — `useTable`, `Subscribe`, `flexRender`/`FlexRender`, `createTableHook`, `createTableHookContexts` — is transcribed onto octane hooks. Table state lives in TanStack Store atoms via the `coreReactivityFeature` bindings, and `useSelector` drives re-renders from the selected slice. Every store primitive (hooks, `createAtom`, `batch`, `shallow`, and the atom/store types) is imported from @octanejs/tanstack-store, which re-exports all of @tanstack/store — the binding takes no direct dependency on the store core, so there is only one path to it and atom identity cannot be split across duplicate copies.",
+      "upstream": { "package": "@tanstack/react-table", "version": "9.2.4" },
+      "surface": "TanStack Table 9.2.4 adapter using table-core 9.2.4 and the existing Octane Store integration. Covers useTable, Subscribe, FlexRender/flexRender, createTableHook, scoped contexts and the legacy migration hook/markers/types. Root, flex-render, legacy, static-functions, experimental-worker-plugin and package.json imports remain available. Core algorithms and worker helpers are imported directly.",
       "divergences": [
         "`flexRender`'s class-component and `react.memo`/`forwardRef` exotic-component branches are dropped — octane has no class components or forwardRef, and octane's `memo()` returns a plain function, so `typeof === 'function'` covers every component.",
-        "Upstream's `useLegacyTable` entry (the v8-compat `get*RowModel` shim, its marker factories, and the `Legacy*` type aliases) is NOT ported. It exists to migrate existing React v8 codebases; octane has none, so octane code targets the v9 `useTable` API directly."
+        "A held transition performs Octane's documented committed-state cue render. Raw table-store observers may receive the unchanged committed snapshot once; suspended controlled values are neither published nor written to base atoms."
       ],
-      "ssr": "No SSR-specific surface; table-core is pure computation.",
-      "verified": "2026-08-02"
+      "ssr": "All three pinned SSR cases execute with server compilation. A real SSR/client hydration test preserves row and button identity, updates data interactively, and unmounts the adopted nodes.",
+      "verified": "2026-09-12"
     },
     {
       "name": "@octanejs/tanstack-virtual",
       "version": "0.1.49",
       "category": "Tables",
-      "upstream": { "package": "@tanstack/react-virtual", "version": "3.14.5" },
-      "surface": "Complete 1:1 port: the framework-agnostic `@tanstack/virtual-core` (Virtualizer + observers + windowing math) is reused verbatim; the React adapter (`useVirtualizer`, `useWindowVirtualizer`, incl. `useFlushSync` and the experimental `directDomUpdates` surface) is transcribed onto octane hooks, preserving upstream's force-update + flushSync-on-sync-scroll wiring and layout-effect lifecycle.",
+      "upstream": { "package": "@tanstack/react-virtual", "version": "3.14.12" },
+      "surface": "Complete 3.14.12 hook adapter and direct virtual-core 3.17.10 re-exports, with precise public hook signatures, direct DOM container sizing and end-anchor synchronization. All 26 exports have strict pinned public type probes.",
       "divergences": [
         "octane's `flushSync` called while a flush is already on the stack degrades to a plain call drained by the ambient flush (re-entrancy guard) — sync scroll notifies dispatched from inside a discrete-event flush land at that flush's boundary instead of nested; consumer-invisible, pinned by a conformance test."
       ],
-      "ssr": "SSR-safe: `useIsomorphicLayoutEffect` degrades to `useEffect` without `document`; the first paint windows from `initialRect`/`initialOffset` exactly as upstream. No dedicated SSR tests.",
-      "verified": "2026-08-02"
+      "ssr": "DOM-free initial-offset rendering plus real server/client hydration with retained rows, interactive extent updates and exact observer cleanup.",
+      "verified": "2026-09-12"
     },
     {
       "name": "@octanejs/tauri",

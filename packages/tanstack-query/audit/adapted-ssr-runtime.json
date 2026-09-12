@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "project": "tanstack-query-adapted-ssr",
+  "roots": ["packages/tanstack-query/tests/upstream"],
+  "files": ["packages/tanstack-query/tests/upstream/ssr.test.tsx"],
+  "tests": [
+    {
+      "id": "runtime:50c341966acb22ce",
+      "file": "packages/tanstack-query/tests/upstream/ssr.test.tsx",
+      "fullName": "Server Side Rendering should add initialData to the cache"
+    },
+    {
+      "id": "runtime:20886a70c28c91b1",
+      "file": "packages/tanstack-query/tests/upstream/ssr.test.tsx",
+      "fullName": "Server Side Rendering should add prefetched data to cache"
+    },
+    {
+      "id": "runtime:647c5bb790d908ea",
+      "file": "packages/tanstack-query/tests/upstream/ssr.test.tsx",
+      "fullName": "Server Side Rendering should not trigger fetch"
+    },
+    {
+      "id": "runtime:c1e1b861e0426a55",
+      "file": "packages/tanstack-query/tests/upstream/ssr.test.tsx",
+      "fullName": "Server Side Rendering should return existing data from the cache"
+    },
+    {
+      "id": "runtime:2c8711ba8fa4795e",
+      "file": "packages/tanstack-query/tests/upstream/ssr.test.tsx",
+      "fullName": "Server Side Rendering useInfiniteQuery should return the correct state"
+    },
+    {
+      "id": "runtime:a707d44d416e4a9f",
+      "file": "packages/tanstack-query/tests/upstream/ssr.test.tsx",
+      "fullName": "Server Side Rendering useIsFetching should return 0 after prefetch completes"
+    },
+    {
+      "id": "runtime:71e3014dbda3393f",
+      "file": "packages/tanstack-query/tests/upstream/ssr.test.tsx",
+      "fullName": "Server Side Rendering useMutation should return idle status"
+    },
+    {
+      "id": "runtime:2d93e5ffb52e060d",
+      "file": "packages/tanstack-query/tests/upstream/ssr.test.tsx",
+      "fullName": "Server Side Rendering useMutationState should return empty array"
+    },
+    {
+      "id": "runtime:679bddc1189e49d4",
+      "file": "packages/tanstack-query/tests/upstream/ssr.test.tsx",
+      "fullName": "Server Side Rendering useQueries should return existing data from the cache"
+    }
+  ],
+  "snapshots": 0
+}

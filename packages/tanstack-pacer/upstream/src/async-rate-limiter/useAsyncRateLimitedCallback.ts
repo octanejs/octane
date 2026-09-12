@@ -59,10 +59,10 @@ import type { ReactAsyncRateLimiterOptions } from './useAsyncRateLimiter'
 export function useAsyncRateLimitedCallback<TFn extends AnyAsyncFunction>(
   fn: TFn,
   options: ReactAsyncRateLimiterOptions<TFn, {}>,
-): (...args: Parameters<TFn>) => Promise<ReturnType<TFn>> {
+): (...args: Parameters<TFn>) => Promise<Awaited<ReturnType<TFn>> | undefined> {
   const asyncRateLimitedFn = useAsyncRateLimiter(fn, options).maybeExecute
   return useCallback(
-    (...args) => asyncRateLimitedFn(...args) as Promise<ReturnType<TFn>>,
+    (...args) => asyncRateLimitedFn(...args),
     [asyncRateLimitedFn],
   )
 }

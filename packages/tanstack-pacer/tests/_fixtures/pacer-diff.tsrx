@@ -1,6 +1,9 @@
 import { useState } from 'octane';
 import {
 	useBatcher,
+	useAsyncDebouncedCallback,
+	useAsyncRateLimitedCallback,
+	useAsyncThrottledCallback,
 	useDebouncedCallback,
 	useDebouncedValue,
 	useThrottledCallback,
@@ -120,5 +123,31 @@ export function PacerParity(props: { onPending?: () => void }) {
 		<output id="debounced">{'debounced:' + debounced}</output>
 		<output id="throttled">{'throttled:' + throttled}</output>
 		<output id="batch">{'batch:' + batch}</output>
+	</main>;
+}
+
+export function AsyncCallbackParity() {
+	const [enabled, setEnabled] = useState(true);
+	const [results, setResults] = useState<string[]>([]);
+	const work = async (value: number) => value * 2;
+	const debounce = useAsyncDebouncedCallback(work, { wait: 40, enabled });
+	const limit = useAsyncRateLimitedCallback(work, { limit: 1, window: 100, enabled });
+	const throttle = useAsyncThrottledCallback(work, {
+		wait: 40,
+		leading: true,
+		trailing: false,
+		enabled,
+	});
+	const record = (name: string, promise: Promise<number | undefined>) => {
+		void promise.then(
+			(value) => setResults((previous) => [...previous, name + ':' + String(value)]),
+		);
+	};
+	return <main>
+		<button id="async-disable" onClick={() => setEnabled(false)}>Disable</button>
+		<button id="async-debounce" onClick={() => record('debounce', debounce(2))}>Debounce</button>
+		<button id="async-limit" onClick={() => record('limit', limit(3))}>Limit</button>
+		<button id="async-throttle" onClick={() => record('throttle', throttle(4))}>Throttle</button>
+		<output id="async-results">{results.join(',')}</output>
 	</main>;
 }

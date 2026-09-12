@@ -1,0 +1,158 @@
+[
+  {
+    "name": "useVirtualizer",
+    "kind": "value",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "useWindowVirtualizer",
+    "kind": "value",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "ReactVirtualizer",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "ReactVirtualizerOptions",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "_resetIOSDetectionForTests",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "approxEqual",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "debounce",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "memo",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "notUndefined",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "NoInfer",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "PartialKeys",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "ScrollToOptions",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "Range",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "VirtualItem",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "Rect",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "defaultKeyExtractor",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "defaultRangeExtractor",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "observeElementRect",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "observeWindowRect",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "observeElementOffset",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "observeWindowOffset",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "measureElement",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "windowScroll",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "elementScroll",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "VirtualizerOptions",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "Virtualizer",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  }
+]

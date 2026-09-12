@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "project": "tanstack-virtual-pristine-suite",
+  "roots": ["packages/tanstack-virtual/upstream/tests"],
+  "files": ["packages/tanstack-virtual/upstream/tests/index.test.tsx"],
+  "tests": [
+    {
+      "id": "runtime:f0b9062ab14b3c3f",
+      "file": "packages/tanstack-virtual/upstream/tests/index.test.tsx",
+      "fullName": "should handle count change"
+    },
+    {
+      "id": "runtime:0b095f6b57693d5f",
+      "file": "packages/tanstack-virtual/upstream/tests/index.test.tsx",
+      "fullName": "should handle gap change"
+    },
+    {
+      "id": "runtime:ab4db1a50238a61f",
+      "file": "packages/tanstack-virtual/upstream/tests/index.test.tsx",
+      "fullName": "should handle handle height change"
+    },
+    {
+      "id": "runtime:563cfc78a6be56ef",
+      "file": "packages/tanstack-virtual/upstream/tests/index.test.tsx",
+      "fullName": "should render"
+    },
+    {
+      "id": "runtime:3af51a8a10c375e8",
+      "file": "packages/tanstack-virtual/upstream/tests/index.test.tsx",
+      "fullName": "should render given dynamic size"
+    },
+    {
+      "id": "runtime:c712ec51c1fd4b9c",
+      "file": "packages/tanstack-virtual/upstream/tests/index.test.tsx",
+      "fullName": "should render with overscan"
+    },
+    {
+      "id": "runtime:0d4bd8215f2adbd9",
+      "file": "packages/tanstack-virtual/upstream/tests/index.test.tsx",
+      "fullName": "should use rangeExtractor"
+    }
+  ],
+  "snapshots": 0
+}

@@ -8,6 +8,7 @@ import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 export const runners = new Map([
+	['tanstack-table', { module: './tanstack-table-pristine-runtime.mjs', label: 'TanStack Table' }],
 	['base-ui', { module: './base-ui-pristine-runtime.mjs', label: '@base-ui/react' }],
 	['base-ui-utils', { module: './base-ui-utils-pristine-runtime.mjs', label: '@base-ui/utils' }],
 	['octane-is', { module: './octane-is-pristine-runtime.mjs', label: 'react-is' }],
@@ -20,6 +21,11 @@ export const runners = new Map([
 		{ module: './monaco-editor-pristine-runtime.mjs', label: '@monaco-editor/react' },
 	],
 	['solana-kit', { module: './solana-kit-pristine-runtime.mjs', label: '@solana/react' }],
+	[
+		'tanstack-virtual',
+		{ module: './tanstack-virtual-pristine-runtime.mjs', label: 'TanStack Virtual' },
+	],
+	['tanstack-query', { module: './tanstack-query-pristine-runtime.mjs', label: 'TanStack Query' }],
 	['tanstack-store', { module: './tanstack-store-pristine-runtime.mjs', label: 'TanStack Store' }],
 	['zag', { module: './zag-pristine-runtime.mjs', label: 'Zag' }],
 ]);

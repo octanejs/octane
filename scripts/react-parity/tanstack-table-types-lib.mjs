@@ -62,8 +62,10 @@ function assertionGroups(source, fileName) {
 }
 
 function normalizeSpecifier(specifier) {
-	if (specifier === '@tanstack/react-table' || specifier === '@octanejs/tanstack-table') {
-		return '#tanstack-table-public';
+	for (const root of ['@tanstack/react-table', '@octanejs/tanstack-table']) {
+		if (specifier === root || specifier.startsWith(`${root}/`)) {
+			return `#tanstack-table-public${specifier.slice(root.length)}`;
+		}
 	}
 	return specifier;
 }
@@ -95,6 +97,10 @@ function structuralSource(source, fileName) {
 	})) {
 		transformed = `${transformed.slice(0, replacement.start)}${replacement.value}${transformed.slice(replacement.end)}`;
 	}
+	transformed = transformed.replace(
+		/\bActual\d+\.(AppOctaneTable|LegacyOctaneTable|OctaneTable)\b/g,
+		(value) => value.replace('OctaneTable', 'ReactTable'),
+	);
 	const normalizedFile = ts.createSourceFile(
 		fileName,
 		transformed,

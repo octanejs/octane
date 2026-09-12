@@ -1,8 +1,3 @@
-/**
- * Known public-surface divergence: React Table publishes ./legacy; the Octane
- * binding omits it. Linked to audit/react-parity.json divergence
- * `legacy-migration-subpath`.
- */
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -11,9 +6,8 @@ import { describe, it, expect } from 'vitest';
 const require = createRequire(import.meta.url);
 
 describe('export surface', function () {
-	// OCTANE DIVERGENCE[legacy-migration-subpath][adapted:tanstack-table-legacy-subpath]
 	// @parity-case adapted:tanstack-table-legacy-subpath
-	it('records React ./legacy presence versus Octane omission', function () {
+	it('publishes the pinned legacy migration entrypoint', function () {
 		const reactPackageJson = JSON.parse(
 			readFileSync(require.resolve('@tanstack/react-table/package.json'), 'utf8'),
 		);
@@ -21,6 +15,6 @@ describe('export surface', function () {
 			readFileSync(resolve(__dirname, '../../package.json'), 'utf8'),
 		);
 		expect(reactPackageJson.exports).toHaveProperty('./legacy');
-		expect(octanePackageJson.exports).not.toHaveProperty('./legacy');
+		expect(octanePackageJson.exports).toHaveProperty('./legacy', './src/legacy.ts');
 	});
 });

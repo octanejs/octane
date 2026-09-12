@@ -3,15 +3,18 @@
   "schemaVersion": 1,
   "provenance": {
     "repo": "https://github.com/TanStack/pacer.git",
-    "version": "0.22.1",
-    "commit": "a894009100aeb373965d4121eb92a1af634af012",
+    "version": "0.23.0",
+    "commit": "c75895520669b08dc8946b42e1a6d529ca977230",
     "sourceRoot": "packages/react-pacer/src",
     "testRoot": "packages/react-pacer (no runtime test artifacts)",
     "license": "MIT",
-    "integrity": "sha256:d4055dcec785b5eac078a2c2acde90b80e84e70c0262a174a5065ed92a9be2f0",
-    "verification": "recorded-unverified"
+    "integrity": "sha256:9662c2a241e21e2f3c8f534195516ce5060b4d13b1997fca96daea797be9f3a1",
+    "verification": "verified"
   },
-  "upstreamSuites": { "runtime": "absent", "types": "insufficient" },
+  "upstreamSuites": {
+    "runtime": "absent",
+    "types": "insufficient"
+  },
   "adaptedRoots": {
     "source": {
       "roots": ["packages/tanstack-pacer/src"],
@@ -37,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "c59eb31d459a52db2de19f8e5d45e921ee077693ba852b1e026f18f2a782aba6"
+      "lockfileSha256": "8c6917b3bdc395e057892a96a41d2041b3e2edd2fe8e040870d1dfc07fdbaf4a"
     }
   },
   "lanes": [
@@ -67,7 +70,7 @@
         {
           "path": "packages/tanstack-pacer/tests/_fixtures/pacer.tsrx",
           "role": "support",
-          "sha256": "1b74a76b44d543b3b5bf2d0ab55732e1f2c8da63add69c4db0a2972846e99403"
+          "sha256": "699b84bb436145fd98b3c858172b6a30dc2876be53b4c308a04ed2c6f85c6a16"
         }
       ]
     },
@@ -78,17 +81,17 @@
       "environment": "workspace-node",
       "project": "tanstack-pacer-differential",
       "evidenceOrigin": "repo-authored",
-      "notes": "Runs the same authored scheduler fixture against @octanejs/tanstack-pacer and the pinned React adapter for counter debounce/throttle, batching, teardown, latest-label debounce/throttle, and useDebouncedValue; upstream provides no adapter runtime suite.",
+      "notes": "Same fixture and public interactions against the pinned React adapter: debounce, throttle, batching, teardown, latest values, and executed/disabled async callback results.",
       "files": [
         {
           "path": "packages/tanstack-pacer/audit/upstream.lock.json",
           "role": "support",
-          "sha256": "b28baf875e32e429de4b5909379b1c503626cf16134a65697262f925893092e1"
+          "sha256": "49e05324b7240e1ee1e261240f33daad2598f87bbed17a46ea148826d3943404"
         },
         {
           "path": "packages/tanstack-pacer/tests/differential/parity.test.ts",
           "role": "test",
-          "sha256": "23cafac582371ee392e55b8dd2aa6932150d3334614aad5cb0b98d0c8992f623",
+          "sha256": "0f24f8563ba3cac777bba1cc4e749a47af8a2862859127ff0c625ce1d1221213",
           "cases": [
             {
               "id": "differential:tanstack-pacer-scheduler-lifecycle",
@@ -99,6 +102,11 @@
               "id": "differential:tanstack-pacer-latest-prop-and-value",
               "testName": "matches latest-prop debounce/throttle and useDebouncedValue",
               "fullName": "differential: @octanejs/tanstack-pacer vs @tanstack/react-pacer matches latest-prop debounce/throttle and useDebouncedValue"
+            },
+            {
+              "id": "differential:tanstack-pacer-async-callback-results",
+              "testName": "matches executed and disabled async callback results",
+              "fullName": "async callback return contracts matches executed and disabled async callback results"
             }
           ]
         },
@@ -110,7 +118,7 @@
         {
           "path": "packages/tanstack-pacer/tests/_fixtures/pacer-diff.tsrx",
           "role": "support",
-          "sha256": "d7b13248050f8200dabffbc7b7066660f35db65c0a5cb936243a4f825c2860f9"
+          "sha256": "c3e869899916ce9d1f80b5fff7ebab9d318be721d8a583d5d96388297a6561ee"
         },
         {
           "path": "packages/octane/tests/differential/_rig.ts",
@@ -120,12 +128,12 @@
         {
           "path": "packages/tanstack-pacer/audit/upstream-crosswalk.json",
           "role": "support",
-          "sha256": "e23d09170b42bf8849462470f0011da34d075d815483d423386c30a230da97c4"
+          "sha256": "12cfd33b88d408ee07260b4a7ead27b2426e05777c5de57132d3203d5ef6a674"
         },
         {
           "path": "packages/tanstack-pacer/audit/test-classifications.json",
           "role": "support",
-          "sha256": "29cce0187ae4ffbe1698e560aa617ce22601c2280d74891d0b1e7b41ad1b580e"
+          "sha256": "44de69cc1d5f218940738da7ae9f4601c6744496b14be6040006bd9998474024"
         },
         {
           "path": "scripts/react-parity/tanstack-pacer-controls.test.mjs",
@@ -141,7 +149,7 @@
       "environment": "workspace-node",
       "project": "tanstack-pacer-pristine-types",
       "evidenceOrigin": "repo-authored",
-      "notes": "Runs upstream test:types (tsc over the vendored React adapter source) with pinned React types.",
+      "notes": "Compiles the complete pristine adapter source and independent full public contract probes, including positive and negative async callback assertions. Upstream has no dedicated type-test registrations.",
       "execution": {
         "kind": "typescript",
         "compiler": "tsc",
@@ -151,7 +159,7 @@
         {
           "path": "packages/tanstack-pacer/audit/upstream-types.json",
           "role": "test",
-          "sha256": "170bb8a48d32e209c2a666d02af6b1c6341e573b4524b15a2543ca3ffd1ac910",
+          "sha256": "91b6dafe66d1137ca94f4c1e9dcfe6cd420fd8af2cfb03541dce69cd656c9a01",
           "cases": [
             {
               "id": "types:pristine-upstream",
@@ -163,17 +171,32 @@
         {
           "path": "packages/tanstack-pacer/typetests/pristine/tsconfig.json",
           "role": "support",
-          "sha256": "dcc663adaf508ebcfab8b23c8eee2298ba99ce81e6002bd2bf8fb2d0564f754d"
+          "sha256": "123d76bbf8aaf2abe5a2efd2306a7a87f0ecb8b0e8099ef56517d3f0b576f2e3"
         },
         {
           "path": "packages/tanstack-pacer/audit/type-parity.json",
           "role": "support",
-          "sha256": "69df399efce5979648c766c2937b940d3b72d39103bf78b0a42920ac5a10b601"
+          "sha256": "334436ac034b0642b4c10c53a72e308adec33203f0d1dbe7b6c9861eaa2214a7"
         },
         {
           "path": "packages/tanstack-pacer/typetests/assertions.md",
           "role": "support",
-          "sha256": "976cee99ebe0974528be5bd5a23719101fd5b36599099b1d913f812ae814edb9"
+          "sha256": "d7464ba40277141a126a49340b773392a050430a9a6b562afd198bec9611b48a"
+        },
+        {
+          "path": "packages/tanstack-pacer/typetests/pristine/public-contracts.test-d.ts",
+          "role": "support",
+          "sha256": "629c8ef1e21f5861a0d0b2caf0aada338dbb59ec1845fd2c0d962ee329a9642b"
+        },
+        {
+          "path": "packages/tanstack-pacer/typetests/pristine/async-callbacks.test-d.ts",
+          "role": "support",
+          "sha256": "a5542331d8eb1ca1d5a442d81594f80aa4159fc64df4621ddde62913aae3af13"
+        },
+        {
+          "path": "packages/tanstack-pacer/typetests/expected-contracts.d.ts",
+          "role": "support",
+          "sha256": "7d88267ac2d0db9be630987366ce85d4f162faf74e364ffbd35aea2e5d1e2e1d"
         }
       ]
     },
@@ -184,7 +207,7 @@
       "environment": "workspace-node",
       "project": "tanstack-pacer-adapted-types",
       "evidenceOrigin": "repo-authored",
-      "notes": "Compiles the complete Octane adapter source through tsrx-tsc (one-for-one with upstream test:types). Ordinary typetests/octane-only holds accept/reject setter probes outside required parity ownership.",
+      "notes": "Compiles the complete adapted adapter source and independent full public contract probes, including positive and negative async callback assertions. Upstream has no dedicated type-test registrations.",
       "execution": {
         "kind": "typescript",
         "compiler": "tsrx-tsc",
@@ -194,7 +217,7 @@
         {
           "path": "packages/tanstack-pacer/audit/adapted-types.json",
           "role": "test",
-          "sha256": "14731b2e220c1a33f2a2ca3d7cc2c9ad54dc47aed9eddef2a2c243804f02f488",
+          "sha256": "5cb4f720be1671701b9a63cadfa08f765ca839de7977562d63b988819d60efc3",
           "cases": [
             {
               "id": "types:adapted-octane",
@@ -206,17 +229,98 @@
         {
           "path": "packages/tanstack-pacer/typetests/adapted/tsconfig.json",
           "role": "support",
-          "sha256": "a8a63fc38c15b755f6b9cfd534032c30d9703fdab6cb4397e5a6565a8fdce3bc"
+          "sha256": "422c84ba902a3166b11515bd6c3279e9b35818bee9db14456f1c7e7f66850e58"
         },
         {
           "path": "packages/tanstack-pacer/audit/type-parity.json",
           "role": "support",
-          "sha256": "69df399efce5979648c766c2937b940d3b72d39103bf78b0a42920ac5a10b601"
+          "sha256": "334436ac034b0642b4c10c53a72e308adec33203f0d1dbe7b6c9861eaa2214a7"
         },
         {
           "path": "packages/tanstack-pacer/typetests/assertions.md",
           "role": "support",
-          "sha256": "976cee99ebe0974528be5bd5a23719101fd5b36599099b1d913f812ae814edb9"
+          "sha256": "d7464ba40277141a126a49340b773392a050430a9a6b562afd198bec9611b48a"
+        },
+        {
+          "path": "packages/tanstack-pacer/typetests/adapted/public-contracts.test-d.ts",
+          "role": "support",
+          "sha256": "cef4245fe38b20f14f19c90686582d18383148e85db3d062cd04f999870b973e"
+        },
+        {
+          "path": "packages/tanstack-pacer/typetests/adapted/async-callbacks.test-d.ts",
+          "role": "support",
+          "sha256": "ab05b7c4e4ec55c2262a0be40c76d1f3cc484a56b741591a75f8ed2c88e41753"
+        },
+        {
+          "path": "packages/tanstack-pacer/typetests/expected-contracts.d.ts",
+          "role": "support",
+          "sha256": "7d88267ac2d0db9be630987366ce85d4f162faf74e364ffbd35aea2e5d1e2e1d"
+        }
+      ]
+    },
+    {
+      "id": "tanstack-pacer-conformance",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tanstack-pacer",
+      "notes": "Octane-specific scheduler/store identity, owning cleanup, nested provider isolation, real SSR and DOM adoption, plus direct neutral-core identity.",
+      "files": [
+        {
+          "path": "packages/tanstack-pacer/tests/pacer.test.ts",
+          "role": "test",
+          "sha256": "6955b06421565d87cd7568e92f70a76147dc3b916907f4fde1f01db65effe44e",
+          "cases": [
+            {
+              "id": "conformance:pacer-neutral-core",
+              "testName": "re-exports the real framework-independent TanStack Pacer core",
+              "fullName": "@octanejs/tanstack-pacer re-exports the real framework-independent TanStack Pacer core"
+            }
+          ]
+        },
+        {
+          "path": "packages/tanstack-pacer/tests/lifecycle.test.ts",
+          "role": "test",
+          "sha256": "25d59abc49d3420a23ba449e21820153a76bab3e6ade8a073719da447c5010f4",
+          "cases": [
+            {
+              "id": "conformance:pacer-scheduler-ownership",
+              "testName": "preserves every scheduler store through renders and tears each owner down once",
+              "fullName": "Pacer scheduler identity and ownership preserves every scheduler store through renders and tears each owner down once"
+            },
+            {
+              "id": "conformance:pacer-nested-providers",
+              "testName": "isolates nested defaults and updates the owning provider",
+              "fullName": "Pacer scheduler identity and ownership isolates nested defaults and updates the owning provider"
+            }
+          ]
+        },
+        {
+          "path": "packages/tanstack-pacer/tests/ssr-hydration.test.ts",
+          "role": "test",
+          "sha256": "5734bb51c4a033ee3eaea4087a1e8d1c7e81eaf05b2a5242669eb07a82326498",
+          "cases": [
+            {
+              "id": "conformance:pacer-hydration",
+              "testName": "adopts server output and keeps disabled callbacks interactive",
+              "fullName": "Pacer async callbacks across SSR and hydration adopts server output and keeps disabled callbacks interactive"
+            }
+          ]
+        },
+        {
+          "path": "packages/tanstack-pacer/tests/_fixtures/pacer.tsrx",
+          "role": "support",
+          "sha256": "699b84bb436145fd98b3c858172b6a30dc2876be53b4c308a04ed2c6f85c6a16"
+        },
+        {
+          "path": "packages/tanstack-pacer/tests/_fixtures/pacer-diff.tsrx",
+          "role": "support",
+          "sha256": "c3e869899916ce9d1f80b5fff7ebab9d318be721d8a583d5d96388297a6561ee"
+        },
+        {
+          "path": "packages/octane/tests/_hydration-ssr.ts",
+          "role": "support",
+          "sha256": "73948bca18a1e7546fe653d243a4507ddae941710e38f4dfbb4aa093a483fecc"
         }
       ]
     }

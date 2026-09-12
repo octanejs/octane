@@ -1,0 +1,31 @@
+diff --git a/tests/upstream/useMutation.test.tsx b/tests/upstream/useMutation.test.tsx
+--- a/tests/upstream/useMutation.test.tsx
++++ b/tests/upstream/useMutation.test.tsx
+@@ -1322,6 +1322,9 @@ describe('useMutation', () => {
+     const err = new Error('Expected mock error. All is well!')
+     err.stack = ''
+ 
++    // OCTANE DIVERGENCE[native-query-test-harness]: assert the caught error through the public boundary callback;
++    // React's console argument layout is not an Octane error contract.
++    const caughtErrors: unknown[] = []
+     const consoleMock = vi
+       .spyOn(console, 'error')
+       .mockImplementation(() => undefined)
+@@ -1342,7 +1345,7 @@ describe('useMutation', () => {
+ 
+     const { getByText, queryByText } = renderWithClient(
+       queryClient,
+-      <ErrorBoundary
++      <ErrorBoundary onError={(error) => caughtErrors.push(error)}
+         fallbackRender={() => (
+           <div>
+             <span>error</span>
+@@ -1358,7 +1361,7 @@ describe('useMutation', () => {
+     await vi.advanceTimersByTimeAsync(0)
+     expect(queryByText('error')).not.toBeNull()
+ 
+-    expect(consoleMock.mock.calls[0]?.[1]).toBe(err)
++    expect(caughtErrors[0]).toBe(err)
+ 
+     consoleMock.mockRestore()
+   })

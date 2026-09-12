@@ -1,0 +1,328 @@
+{
+  "runtimeDependencies": ["@octanejs/tanstack-store", "@tanstack/pacer", "octane"],
+  "adaptedSources": [
+    {
+      "packageName": "@tanstack/react-pacer",
+      "paths": [
+        "src/async-batcher/index.ts",
+        "src/async-batcher/useAsyncBatchedCallback.ts",
+        "src/async-batcher/useAsyncBatcher.ts",
+        "src/async-debouncer/index.ts",
+        "src/async-debouncer/useAsyncDebouncedCallback.ts",
+        "src/async-debouncer/useAsyncDebouncer.ts",
+        "src/async-queuer/index.ts",
+        "src/async-queuer/useAsyncQueuedState.ts",
+        "src/async-queuer/useAsyncQueuer.ts",
+        "src/async-rate-limiter/index.ts",
+        "src/async-rate-limiter/useAsyncRateLimitedCallback.ts",
+        "src/async-rate-limiter/useAsyncRateLimiter.ts",
+        "src/async-retryer/index.ts",
+        "src/async-throttler/index.ts",
+        "src/async-throttler/useAsyncThrottledCallback.ts",
+        "src/async-throttler/useAsyncThrottler.ts",
+        "src/batcher/index.ts",
+        "src/batcher/useBatchedCallback.ts",
+        "src/batcher/useBatcher.ts",
+        "src/debouncer/index.ts",
+        "src/debouncer/useDebouncedCallback.ts",
+        "src/debouncer/useDebouncedState.ts",
+        "src/debouncer/useDebouncedValue.ts",
+        "src/debouncer/useDebouncer.ts",
+        "src/index.ts",
+        "src/internal.ts",
+        "src/provider/PacerProvider.tsrx",
+        "src/provider/context.ts",
+        "src/provider/index.ts",
+        "src/queuer/index.ts",
+        "src/queuer/useQueuedState.ts",
+        "src/queuer/useQueuedValue.ts",
+        "src/queuer/useQueuer.ts",
+        "src/rate-limiter/index.ts",
+        "src/rate-limiter/useRateLimitedCallback.ts",
+        "src/rate-limiter/useRateLimitedState.ts",
+        "src/rate-limiter/useRateLimitedValue.ts",
+        "src/rate-limiter/useRateLimiter.ts",
+        "src/throttler/index.ts",
+        "src/throttler/useThrottledCallback.ts",
+        "src/throttler/useThrottledState.ts",
+        "src/throttler/useThrottledValue.ts",
+        "src/throttler/useThrottler.ts",
+        "src/types/index.ts",
+        "src/utils/index.ts"
+      ]
+    }
+  ],
+  "sourceLedger": [
+    {
+      "path": "src/async-batcher/index.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-pacer",
+      "sha256": "5515b09d8d24dc4c8080cd0e028fe534ae963ac911ad18d65a523c6d0c637c84"
+    },
+    {
+      "path": "src/async-batcher/useAsyncBatchedCallback.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-pacer",
+      "sha256": "d48e71e344aa90bc795d084066e8fa7c360cde8fcc1f8607192f7ccfdd919030"
+    },
+    {
+      "path": "src/async-batcher/useAsyncBatcher.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-pacer",
+      "sha256": "89b4aeac1c83622677a8f59e86a9a24766940b0254388ebd7d80c47dcdb08295"
+    },
+    {
+      "path": "src/async-debouncer/index.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-pacer",
+      "sha256": "e65211212f5a1ef9de5ffa6847b3372a95a0c897da07e31fdea28a4877c12924"
+    },
+    {
+      "path": "src/async-debouncer/useAsyncDebouncedCallback.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-pacer",
+      "sha256": "4b8e8f2caa8602c48250f51f47db8d20eb672809cfafd6ea64989b7fc525eea5"
+    },
+    {
+      "path": "src/async-debouncer/useAsyncDebouncer.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-pacer",
+      "sha256": "9f7a8ed2e4af78553817ec2f90a6067ad27030a9f746e15bf112e644ddb69f6c"
+    },
+    {
+      "path": "src/async-queuer/index.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-pacer",
+      "sha256": "81ef64b42af53b93bda33ccbc063fb3e977136c26e7f1c85b03b1c6d80c61c5e"
+    },
+    {
+      "path": "src/async-queuer/useAsyncQueuedState.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-pacer",
+      "sha256": "683cd14ef9b7173a47a200c8329bfc0a09231363b9daa496d2b2293e32f60d6a"
+    },
+    {
+      "path": "src/async-queuer/useAsyncQueuer.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-pacer",
+      "sha256": "133135b22ac7021e1fad6e68728085e2189638668f1ea7b7688a3d635bf55484"
+    },
+    {
+      "path": "src/async-rate-limiter/index.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-pacer",
+      "sha256": "d516e638d0add693c4e623c460ac40263eba12963689983273d0c98136c651eb"
+    },
+    {
+      "path": "src/async-rate-limiter/useAsyncRateLimitedCallback.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-pacer",
+      "sha256": "946c97ce9b954a0912ca6d37e9fe312bda9bcdc9cf45c38cde8d635e1b75d9cb"
+    },
+    {
+      "path": "src/async-rate-limiter/useAsyncRateLimiter.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-pacer",
+      "sha256": "d170d445ca392c299b7a915e27c4585e5d9a59bf7818a30fd720c8b4ec7bfaef"
+    },
+    {
+      "path": "src/async-retryer/index.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-pacer",
+      "sha256": "3daaaacc62ddadc21703b6e867ed3c827b162a3ee7bd96850e37e1e5c8553e50"
+    },
+    {
+      "path": "src/async-throttler/index.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-pacer",
+      "sha256": "32341508b3f6f85801b970ade3dc879bc7e45ca2e8fbed0d82323348f59340ff"
+    },
+    {
+      "path": "src/async-throttler/useAsyncThrottledCallback.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-pacer",
+      "sha256": "a3f990adc406ce79d90e223e4847c7c5ac0dbdb594bf45ce12c4dc434bd821be"
+    },
+    {
+      "path": "src/async-throttler/useAsyncThrottler.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-pacer",
+      "sha256": "ebbe35cd3f42703bf0a76c45828d2cedba144e40770d1f6d20e2bb44ee86ae93"
+    },
+    {
+      "path": "src/batcher/index.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-pacer",
+      "sha256": "336431d7dfcf6362a52425a65e692aa094ef031123bca94711d7634fcc88d80d"
+    },
+    {
+      "path": "src/batcher/useBatchedCallback.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-pacer",
+      "sha256": "94d939853e2d0f0b30a3062d2c24edebba9ca52e608bbd8e0fc164e5a09c5781"
+    },
+    {
+      "path": "src/batcher/useBatcher.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-pacer",
+      "sha256": "de4a0be62ab4cc747d2003306368eb351617324cb5d159a86f3e721c40ed3419"
+    },
+    {
+      "path": "src/debouncer/index.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-pacer",
+      "sha256": "4c2e21e7dec676719ea48c30b38dd0e1fc6d7550ea7bfe982f62dacda031125e"
+    },
+    {
+      "path": "src/debouncer/useDebouncedCallback.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-pacer",
+      "sha256": "64439bbb17da7d944af6cca8c30e254a39663bafe64b246034d18dd826b6598d"
+    },
+    {
+      "path": "src/debouncer/useDebouncedState.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-pacer",
+      "sha256": "85f1f3b00f355c62ff1690cbde494020bf9cfcfed2051ee1af5298f799fde56a"
+    },
+    {
+      "path": "src/debouncer/useDebouncedValue.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-pacer",
+      "sha256": "5142900414b20945cd99dbd024c7bc43e8bc336da12aa4560bf040add9ba048b"
+    },
+    {
+      "path": "src/debouncer/useDebouncer.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-pacer",
+      "sha256": "a52e35517023fa30d1b082bfcf19d7cf1c8a1d43dd194c08c3c531d764719219"
+    },
+    {
+      "path": "src/index.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-pacer",
+      "sha256": "87910122406c5a87598573fb2ccbfa2033d11298cb620411a4f5091d79635ab4"
+    },
+    {
+      "path": "src/internal.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-pacer",
+      "sha256": "3576b614e2eb080fc12e03eb749bcacdea1dc436cd0f1744ffcda7c45aa8ed34"
+    },
+    {
+      "path": "src/provider/PacerProvider.tsrx",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-pacer",
+      "sha256": "053a5322bee60359dd0d354c685984690cf8c36750754e387af0952e99678eba"
+    },
+    {
+      "path": "src/provider/context.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-pacer",
+      "sha256": "94a607305db1a5b300ab63dbe18fcdca7c5ee354d2a33be2173abb0d9295f2e1"
+    },
+    {
+      "path": "src/provider/index.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-pacer",
+      "sha256": "58df8aeeb938b432350f4110b21194d8f9cee057250c9f26fae4b16712443b6f"
+    },
+    {
+      "path": "src/queuer/index.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-pacer",
+      "sha256": "9833401b35cb4b0843205b0b1fc6baa4919a00fa5c42790f9cd76245a982ce9f"
+    },
+    {
+      "path": "src/queuer/useQueuedState.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-pacer",
+      "sha256": "1a540cf8bec5ac04c26b7b28baf7ff42fc3c639ae88ec5b44f3bdc3bfe9ba39d"
+    },
+    {
+      "path": "src/queuer/useQueuedValue.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-pacer",
+      "sha256": "044a583cf0c69e4cbb50978e086b258ecc8c09a6103ad752ca2eb941de40b3e5"
+    },
+    {
+      "path": "src/queuer/useQueuer.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-pacer",
+      "sha256": "cd533c67b1d6ab34ee4a392fed810821a412c73a42cd6c3c9a40122413084942"
+    },
+    {
+      "path": "src/rate-limiter/index.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-pacer",
+      "sha256": "d75fa61151f2f846d289a2195bb198498ffd0572cf890285d1f713ea5ad1eebe"
+    },
+    {
+      "path": "src/rate-limiter/useRateLimitedCallback.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-pacer",
+      "sha256": "154577ac8bc155b75ebd6ea9bcd4d81913c56c43db4a7fddc826dbf70285e57c"
+    },
+    {
+      "path": "src/rate-limiter/useRateLimitedState.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-pacer",
+      "sha256": "3edd682bc79a62fdbdf08313bd5058f6cb313174e1fe89523b0bce12a1b06d98"
+    },
+    {
+      "path": "src/rate-limiter/useRateLimitedValue.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-pacer",
+      "sha256": "32eb7740086d0fafed7aa5e7dd690556723aff593b89fd3b3e6b2a90386d39dc"
+    },
+    {
+      "path": "src/rate-limiter/useRateLimiter.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-pacer",
+      "sha256": "6ef2276b1011ad7686550792c490b89aff8430df19c7b2963cf342a66aed4c12"
+    },
+    {
+      "path": "src/throttler/index.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-pacer",
+      "sha256": "cece68cee89d7c8937b4c87f187f0b7cd71b2c550afb6fd53476c0b2d9da7620"
+    },
+    {
+      "path": "src/throttler/useThrottledCallback.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-pacer",
+      "sha256": "5bfc9a222df161a4b9ba473aaf7616ba41db2b8e3aabb8b747191e7c091bbd5d"
+    },
+    {
+      "path": "src/throttler/useThrottledState.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-pacer",
+      "sha256": "35b668936060fc6f7457e0726718bd7085c27034581b1e8930caff6e88ded48e"
+    },
+    {
+      "path": "src/throttler/useThrottledValue.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-pacer",
+      "sha256": "a9b6f5d4e372971d3c61fa6ed3b4c030d39fc8bf80b46c4f35e4d80618635c7f"
+    },
+    {
+      "path": "src/throttler/useThrottler.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-pacer",
+      "sha256": "35aca2c2fa4ba4999e34141704f65662c090fe44db18b2128685f5e14904d45e"
+    },
+    {
+      "path": "src/types/index.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-pacer",
+      "sha256": "afa0fb1b555d182358feea86bfb91cedf42b607470222c7303c6188d88c9a9ac"
+    },
+    {
+      "path": "src/utils/index.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-pacer",
+      "sha256": "115701cc7adec27cfbc8ed4aeaa7d35fd2277ec31575a74e660d0bf92ddbc530"
+    }
+  ],
+  "reimplementedDependencies": []
+}

@@ -3,7 +3,10 @@ import { createRequire } from 'node:module';
 import { gunzipSync } from 'node:zlib';
 import { parseTarArchive, verifyIntegrity } from './preflight-lib.mjs';
 import path from 'node:path';
-import { publicCompatibilityExport } from './public-compatibility.mjs';
+import {
+	publicCompatibilityDeclarations,
+	publicCompatibilityExport,
+} from './public-compatibility.mjs';
 import ts from 'typescript';
 import { validateUpstreamLock, verifyPristineTree } from './materialize-lib.mjs';
 
@@ -76,11 +79,28 @@ export function pinnedPublicEntries(packageDirectory, node) {
 		visit(source);
 	}
 	for (const [subpath, target] of Object.entries(manifest.exports)) {
-		const file = target?.import?.types ?? target?.types ?? target?.default?.types;
-		if (typeof file !== 'string') continue;
+		if (subpath === './package.json') continue;
+		let file = target?.import?.types ?? target?.types ?? target?.default?.types;
+		if (typeof file !== 'string') {
+			const request = subpath === '.' ? manifest.name : manifest.name + subpath.slice(1);
+			const resolved = ts.resolveModuleName(
+				request,
+				path.join(packageDirectory, '__public_type_witness__.ts'),
+				{ moduleResolution: ts.ModuleResolutionKind.Bundler, module: ts.ModuleKind.ESNext },
+				ts.sys,
+			).resolvedModule?.resolvedFileName;
+			if (!resolved || !/\.d\.[cm]?ts$/.test(resolved))
+				throw new Error(`Public export has no pinned declaration: ${subpath}`);
+			file = './' + path.relative(installedRoot, resolved).split(path.sep).join('/');
+		}
 		if (!published.files.has(`package/${file.slice(2)}`))
 			throw new Error(`Public export points outside the pinned declarations: ${file}`);
 		const specifier = subpath === '.' ? node.binding : node.binding + subpath.slice(1);
+		entries.set(specifier, path.resolve(installedRoot, file));
+	}
+	for (const [specifier, file] of publicCompatibilityDeclarations(node.binding)) {
+		if (!published.files.has(`package/${file}`))
+			throw new Error(`Compatibility witness is absent from the pinned declarations: ${file}`);
 		entries.set(specifier, path.resolve(installedRoot, file));
 	}
 	return entries;
@@ -96,10 +116,33 @@ export function pinnedPublicExport(entries, program, checker, specifier, name) {
 		if (symbol.flags & ts.SymbolFlags.Alias) symbol = checker.getAliasedSymbol(symbol);
 		symbol = checker.getExportsOfModule(symbol).find((entry) => entry.name === part);
 	}
+	if (compatibility?.constraintIndex !== undefined) {
+		if (symbol?.flags & ts.SymbolFlags.Alias) symbol = checker.getAliasedSymbol(symbol);
+		const declaration = symbol?.declarations?.find(
+			(node) => node.typeParameters?.[compatibility.constraintIndex]?.constraint,
+		);
+		const constraint = declaration?.typeParameters?.[compatibility.constraintIndex]?.constraint;
+		if (!constraint) return undefined;
+		const type = checker.getTypeFromTypeNode(constraint);
+		const projection = checker.getIndexTypeOfType(type, ts.IndexKind.String);
+		if (!projection) return undefined;
+		return {
+			flags: ts.SymbolFlags.Transient,
+			name,
+			declarations: projection.aliasSymbol?.declarations ?? projection.symbol?.declarations ?? [],
+			projectedPublicType: projection,
+			projectedPublicArguments:
+				projection.aliasTypeArguments ??
+				(projection.objectFlags & ts.ObjectFlags.Reference
+					? checker.getTypeArguments(projection)
+					: []),
+		};
+	}
 	return symbol;
 }
 
 export function publicSymbolType(symbol, checker) {
+	if (symbol.projectedPublicType) return symbol.projectedPublicType;
 	if (symbol.flags & ts.SymbolFlags.Alias) symbol = checker.getAliasedSymbol(symbol);
 	const declaration = symbol.valueDeclaration ?? symbol.declarations?.[0];
 	return symbol.flags & (ts.SymbolFlags.TypeAlias | ts.SymbolFlags.Interface)
@@ -134,10 +177,71 @@ function rendererElement(type) {
 	);
 }
 
-function reactRenderable(type) {
+function reactRenderable(type, checker, depth = 0) {
+	// Declaration emit can expand ReactNode while preserving its exact union.
+	// Recover the canonical symbol only through a real React element declaration.
+	if (type?.isUnion?.()) {
+		const parts = [...type.types];
+		const seen = new Set();
+		for (let index = 0; index < parts.length; index++) {
+			const part = parts[index];
+			if (seen.has(part)) continue;
+			seen.add(part);
+			if (part.isUnion?.()) parts.push(...part.types);
+			parts.push(
+				...(part.aliasTypeArguments ??
+					(part.objectFlags & ts.ObjectFlags.Reference ? checker.getTypeArguments(part) : [])),
+			);
+			const declaration = (part.aliasSymbol ?? part.symbol)?.declarations?.find((node) =>
+				/\/@types\/react\/index\.d\.ts$/.test(node.getSourceFile().fileName.replaceAll('\\', '/')),
+			);
+			if (!declaration) continue;
+			const module = checker.getSymbolAtLocation(declaration.getSourceFile());
+			const symbol =
+				module && checker.getExportsOfModule(module).find((symbol) => symbol.name === 'ReactNode');
+			if (!symbol) continue;
+			const canonical = checker.getDeclaredTypeOfSymbol(symbol);
+			if (
+				checker.isTypeAssignableTo(canonical, type) &&
+				type.types.every((member) => {
+					if (member.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown)) return false;
+					if (checker.isTypeAssignableTo(member, canonical)) return true;
+					const args =
+						member.objectFlags & ts.ObjectFlags.Reference ? checker.getTypeArguments(member) : [];
+					return (
+						depth < 4 &&
+						member.symbol?.name === 'Promise' &&
+						member.symbol.declarations?.some((node) => node.getSourceFile().hasNoDefaultLib) &&
+						args.length === 1 &&
+						reactRenderable(args[0], checker, depth + 1)
+					);
+				})
+			)
+				return true;
+		}
+	}
+
 	return (
 		['ReactNode', 'ReactElement', 'Element'].includes(name(type)) &&
 		declarationFiles(type).some((file) => /\/@types\/react\/index\.d\.ts$/.test(file))
+	);
+}
+
+function declaresReactNode(node, checker) {
+	if (!node) return false;
+	if (ts.isParenthesizedTypeNode(node)) return declaresReactNode(node.type, checker);
+	if (ts.isUnionTypeNode(node))
+		return node.types.some((child) => declaresReactNode(child, checker));
+	if (!ts.isTypeReferenceNode(node)) return false;
+	let symbol = checker.getSymbolAtLocation(node.typeName);
+	if (symbol?.flags & ts.SymbolFlags.Alias) symbol = checker.getAliasedSymbol(symbol);
+	return (
+		symbol?.name === 'ReactNode' &&
+		symbol.declarations?.some((declaration) =>
+			/\/@types\/react\/index\.d\.ts$/.test(
+				declaration.getSourceFile().fileName.replaceAll('\\', '/'),
+			),
+		)
 	);
 }
 
@@ -162,6 +266,13 @@ function corresponding(type, witness, checker) {
 					original,
 					original.valueDeclaration ?? original.declarations?.[0] ?? declaration,
 				);
+				const callable = (value) =>
+					value.isUnion?.()
+						? value.types.some(callable)
+						: checker.getSignaturesOfType(value, ts.SignatureKind.Call).length > 0;
+				// Optional callback props distinguish otherwise identical intersection
+				// branches (for example a string header versus a render callback).
+				if (callable(left) !== callable(right)) result -= 20;
 				if (left.isLiteral?.() && right.isLiteral?.())
 					result += left.value === right.value ? 20 : -100;
 				if (
@@ -180,13 +291,16 @@ function corresponding(type, witness, checker) {
 		if (name(actual) && name(actual) === name(expected)) result += 10;
 		const calls = checker.getSignaturesOfType(actual, ts.SignatureKind.Call);
 		const otherCalls = checker.getSignaturesOfType(expected, ts.SignatureKind.Call);
+		if (calls.length && !otherCalls.length) return -1_000_000;
 		if (
 			calls.length &&
 			otherCalls.length &&
 			calls[0].parameters.length === otherCalls[0].parameters.length
 		)
 			result += 10;
-		if (depth && actual.flags & ts.TypeFlags.Object && expected.flags & ts.TypeFlags.Object) {
+		// Intersection aliases retain generic arguments too. Ignoring them makes
+		// Options<Error> and Options<unknown> tie, rejecting an unchanged union.
+		if (depth && objectLike(actual) && objectLike(expected)) {
 			const args =
 				actual.aliasTypeArguments ??
 				(actual.objectFlags & ts.ObjectFlags.Reference ? checker.getTypeArguments(actual) : []);
@@ -273,7 +387,9 @@ export function newOpaquePublicType(
 			witness &&
 			((witness.flags & ts.TypeFlags.Any && witness.intrinsicName !== 'error') ||
 				(type.flags & ts.TypeFlags.Unknown &&
-					(witness.flags & ts.TypeFlags.Unknown || reactRenderable(witness))))
+					(witness.flags & ts.TypeFlags.Unknown ||
+						reactRenderable(witness, checker) ||
+						declaresReactNode(options.witnessTypeNode, checker))))
 		)
 			return null;
 		return `${trail} [${checker.typeToString(type)} versus ${witness ? checker.typeToString(witness) : 'missing witness'}; witness=${name(witness)}]`;
@@ -281,9 +397,11 @@ export function newOpaquePublicType(
 	if (witness?.flags & ts.TypeFlags.Any && witness.intrinsicName !== 'error') return null;
 	if (
 		rendererElement(type) &&
-		(reactRenderable(witness) || (witness?.isUnion?.() && witness.types.some(reactRenderable)))
+		(reactRenderable(witness, checker) ||
+			(witness?.isUnion?.() && witness.types.some((part) => reactRenderable(part, checker))))
 	)
 		return null;
+	if (type === witness) return null;
 	if (type === witness) return null;
 	const nativeRefs = referenceTargets(type, checker);
 	const upstreamRefs = nativeRefs?.length ? referenceTargets(witness, checker) : null;
@@ -307,6 +425,7 @@ export function newOpaquePublicType(
 			? newOpaquePublicType(constraint, witness, checker, seen, `${trail}.constraint`, options)
 			: null;
 	}
+
 	witness = corresponding(type, witness, checker);
 	if (Array.isArray(witness))
 		return newOpaquePublicType(type, witness, checker, seen, trail, options);
@@ -314,8 +433,12 @@ export function newOpaquePublicType(
 	if (visited.has(witness)) return null;
 	visited.add(witness);
 	seen.set(type, visited);
-	const check = (child, expected, suffix) =>
-		child && newOpaquePublicType(child, expected, checker, seen, `${trail}.${suffix}`, options);
+	const check = (child, expected, suffix, witnessTypeNode) =>
+		child &&
+		newOpaquePublicType(child, expected, checker, seen, `${trail}.${suffix}`, {
+			...options,
+			witnessTypeNode,
+		});
 	if (type.flags & ts.TypeFlags.TypeParameter) {
 		for (const [label, get] of [
 			['constraint', (t) => checker.getBaseConstraintOfType(t)],
@@ -380,9 +503,15 @@ export function newOpaquePublicType(
 	}
 	for (const kind of [ts.SignatureKind.Call, ts.SignatureKind.Construct]) {
 		const signatures = checker.getSignaturesOfType(type, kind);
+
 		const expected = witness ? checker.getSignaturesOfType(witness, kind) : [];
 		for (const [index, signature] of signatures.entries()) {
-			const counterpart = expected[index];
+			const matching = expected.filter(
+				(candidate) =>
+					candidate.parameters.length === signature.parameters.length &&
+					(candidate.typeParameters?.length ?? 0) === (signature.typeParameters?.length ?? 0),
+			);
+			const counterpart = matching.length === 1 ? matching[0] : expected[index];
 			for (const [i, parameter] of (signature.getTypeParameters() ?? []).entries()) {
 				const failure = check(
 					parameter,
@@ -395,6 +524,7 @@ export function newOpaquePublicType(
 				checker.getReturnTypeOfSignature(signature),
 				counterpart && checker.getReturnTypeOfSignature(counterpart),
 				`signature${index}.return`,
+				counterpart?.declaration?.type,
 			);
 			if (failure) return failure;
 			for (const [i, parameter] of signature.parameters.entries()) {
@@ -465,6 +595,7 @@ export function newOpaquePublicType(
 				checker.getTypeOfSymbolAtLocation(property, declaration),
 				expected && checker.getTypeOfSymbolAtLocation(expected, expectedDeclaration ?? declaration),
 				property.name,
+				expectedDeclaration?.type,
 			);
 			if (failure) return failure;
 		}
@@ -485,16 +616,43 @@ export function newOpaquePublicSymbol(symbol, witness, checker, options = {}) {
 	if (symbol.flags & ts.SymbolFlags.Alias) symbol = checker.getAliasedSymbol(symbol);
 	if (witness?.flags & ts.SymbolFlags.Alias) witness = checker.getAliasedSymbol(witness);
 	for (const declaration of symbol.declarations ?? []) {
-		const original = witness?.declarations?.find(
-			(candidate) => candidate.kind === declaration.kind,
+		// Source implementations may carry a wider private rest signature after
+		// public overloads. Only the overload declarations form the exported API.
+		if (
+			ts.isFunctionDeclaration(declaration) &&
+			declaration.body &&
+			symbol.declarations.some((other) => ts.isFunctionDeclaration(other) && !other.body)
+		)
+			continue;
+		const candidates =
+			witness?.declarations?.filter(
+				(candidate) =>
+					candidate.kind === declaration.kind ||
+					((ts.isInterfaceDeclaration(declaration) || ts.isTypeAliasDeclaration(declaration)) &&
+						(ts.isInterfaceDeclaration(candidate) || ts.isTypeAliasDeclaration(candidate))),
+			) ?? [];
+		const parameters = declaration.typeParameters ?? [];
+		const sameArity = candidates.filter(
+			(candidate) => (candidate.typeParameters?.length ?? 0) === parameters.length,
 		);
+		const original =
+			sameArity.find((candidate) =>
+				parameters.every(
+					(parameter, index) => parameter.name.text === candidate.typeParameters[index].name.text,
+				),
+			) ??
+			sameArity[0] ??
+			candidates[0];
+
 		for (const [i, parameter] of (declaration.typeParameters ?? []).entries()) {
 			for (const key of ['constraint', 'default']) {
 				if (!parameter[key]) continue;
 				const expected = original?.typeParameters?.[i]?.[key];
 				const failure = newOpaquePublicType(
 					checker.getTypeFromTypeNode(parameter[key]),
-					expected && checker.getTypeFromTypeNode(expected),
+					key === 'default' && witness?.projectedPublicArguments?.[i]
+						? witness.projectedPublicArguments[i]
+						: expected && checker.getTypeFromTypeNode(expected),
 					checker,
 					new Map(),
 					`export.generic${i}.${key}`,

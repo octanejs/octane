@@ -30,6 +30,7 @@ export type {
 	AnyUseBaseQueryOptions,
 	UseBaseQueryOptions,
 	UsePrefetchQueryOptions,
+	UsePrefetchInfiniteQueryOptions,
 	AnyUseQueryOptions,
 	UseQueryOptions,
 	AnyUseSuspenseQueryOptions,

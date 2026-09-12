@@ -1,3 +1,5 @@
+// Bundlers replace this expression; no Node ambient types are required.
+declare const process: { env: { NODE_ENV?: string } };
 import { InfiniteQueryObserver, QueryObserver, skipToken } from '@tanstack/query-core';
 import type { DefaultError, InfiniteData, QueryClient, QueryKey } from '@tanstack/query-core';
 import { useBaseQuery } from './useBaseQuery';
@@ -63,7 +65,13 @@ export function useSuspenseInfiniteQuery(options: any, ...rest: any[]): any {
 		}
 	}
 	return useBaseQuery(
-		{ ...options, enabled: true, suspense: true, throwOnError: defaultThrowOnError },
+		{
+			...options,
+			enabled: true,
+			suspense: true,
+			throwOnError: defaultThrowOnError,
+			placeholderData: undefined,
+		},
 		InfiniteQueryObserver,
 		user[0],
 		slot,

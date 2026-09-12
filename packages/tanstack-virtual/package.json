@@ -13,7 +13,7 @@
       ]
     }
   },
-  "description": "TanStack Virtual bindings for the octane renderer — reuses the framework-agnostic @tanstack/virtual-core and swaps the React adapter (useVirtualizer, useWindowVirtualizer) for an octane port.",
+  "description": "TanStack Virtual bindings for the octane renderer \u2014 reuses the framework-agnostic @tanstack/virtual-core and swaps the React adapter (useVirtualizer, useWindowVirtualizer) for an octane port.",
   "author": {
     "name": "Dominic Gannaway",
     "email": "dg@domgan.com"
@@ -31,27 +31,40 @@
   "types": "src/index.ts",
   "files": [
     "src",
-    "README.md"
+    "README.md",
+    "LICENSE.upstream",
+    "LICENSE",
+    "UPSTREAM.md"
   ],
   "exports": {
     ".": "./src/index.ts"
   },
   "scripts": {
-    "test": "vitest run"
+    "test": "vitest run --root ../.. --project tanstack-virtual --project tanstack-virtual-adapted --project tanstack-virtual-differential --project tanstack-virtual-ssr"
   },
   "dependencies": {
-    "@tanstack/virtual-core": "catalog:default"
+    "@tanstack/virtual-core": "3.17.10"
   },
   "peerDependencies": {
     "octane": "workspace:^0.1.51 || ^0.2.0"
   },
   "devDependencies": {
-    "@tanstack/react-virtual": "catalog:default",
+    "@tanstack/react-virtual": "3.14.12",
     "@tsrx/react": "catalog:default",
     "esbuild": "catalog:default",
     "octane": "workspace:*",
     "react": "catalog:default",
     "react-dom": "catalog:default",
-    "vitest": "catalog:default"
+    "vitest": "catalog:default",
+    "@octanejs/testing-library": "workspace:*",
+    "@testing-library/react": "catalog:default",
+    "@testing-library/jest-dom": "catalog:default",
+    "@babel/core": "catalog:default",
+    "babel-plugin-react-compiler": "catalog:default",
+    "@playwright/test": "catalog:default",
+    "@types/react": "catalog:default",
+    "@types/react-dom": "catalog:default",
+    "resize-observer-polyfill": "1.5.1",
+    "vite": "catalog:default"
   }
 }

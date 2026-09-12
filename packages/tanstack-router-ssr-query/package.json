@@ -16,7 +16,8 @@
     "typecheck": "tsrx-tsc --noEmit -p tsconfig.octane.json"
   },
   "dependencies": {
-    "@tanstack/router-ssr-query-core": "1.169.1"
+    "@tanstack/router-ssr-query-core": "1.169.1",
+    "@tanstack/query-core": "catalog:default"
   },
   "peerDependencies": {
     "@octanejs/tanstack-query": "workspace:*",

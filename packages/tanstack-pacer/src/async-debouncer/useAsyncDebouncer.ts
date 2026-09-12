@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'octane';
+import { isChildrenBlock, useEffect, useMemo, useState } from 'octane';
+import type { OctaneNode } from 'octane';
 import { AsyncDebouncer } from '@tanstack/pacer/async-debouncer';
 import { shallow } from '@octanejs/tanstack-store';
 import { useDefaultPacerOptions } from '../provider/context';
@@ -30,8 +31,8 @@ export interface ReactAsyncDebouncer<TFn extends AnyAsyncFunction, TSelected = {
 	 */
 	Subscribe: <TSelected>(props: {
 		selector: (state: AsyncDebouncerState<TFn>) => TSelected;
-		children: ((state: TSelected) => unknown) | unknown;
-	}) => unknown;
+		children: ((state: TSelected) => OctaneNode) | OctaneNode;
+	}) => OctaneNode;
 	/**
 	 * Reactive state selected by the hook's `selector` (empty object without one).
 	 */
@@ -78,7 +79,7 @@ export function useAsyncDebouncer<TFn extends AnyAsyncFunction, TSelected = {}>(
 
 		asyncDebouncerInstance.Subscribe = function Subscribe<TSelected>(props: {
 			selector: (state: AsyncDebouncerState<TFn>) => TSelected;
-			children: ((state: TSelected) => unknown) | unknown;
+			children: ((state: TSelected) => OctaneNode) | OctaneNode;
 		}) {
 			const selected = useSelectorSlot(
 				asyncDebouncerInstance.store,
@@ -87,8 +88,8 @@ export function useAsyncDebouncer<TFn extends AnyAsyncFunction, TSelected = {}>(
 				subscribeSlot,
 			);
 
-			return typeof props.children === 'function'
-				? (props.children as (state: TSelected) => unknown)(selected)
+			return typeof props.children === 'function' && !isChildrenBlock(props.children)
+				? (props.children as (state: TSelected) => OctaneNode)(selected)
 				: props.children;
 		};
 

@@ -1,0 +1,1280 @@
+[
+  {
+    "name": "AnyUseBaseQueryOptions",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "AnyUseInfiniteQueryOptions",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "AnyUseMutationOptions",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "AnyUseQueryOptions",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "AnyUseSuspenseInfiniteQueryOptions",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "AnyUseSuspenseQueryOptions",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "DefinedInitialDataInfiniteOptions",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "DefinedInitialDataOptions",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "DefinedUseInfiniteQueryResult",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "DefinedUseQueryResult",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "HydrationBoundary",
+    "kind": "value",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "HydrationBoundaryProps",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "IsRestoringProvider",
+    "kind": "value",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "QueriesOptions",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "QueriesResults",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "QueryClientContext",
+    "kind": "value",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "QueryClientProvider",
+    "kind": "value",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "QueryClientProviderProps",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "QueryErrorClearResetFunction",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "QueryErrorIsResetFunction",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "QueryErrorResetBoundary",
+    "kind": "value",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "QueryErrorResetBoundaryFunction",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "QueryErrorResetBoundaryProps",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "QueryErrorResetFunction",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "SuspenseQueriesOptions",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "SuspenseQueriesResults",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "UndefinedInitialDataInfiniteOptions",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "UndefinedInitialDataOptions",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "UnusedSkipTokenInfiniteOptions",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "UnusedSkipTokenOptions",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "UseBaseMutationResult",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "UseBaseQueryOptions",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "UseBaseQueryResult",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "UseInfiniteQueryOptions",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "UseInfiniteQueryResult",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "UseMutateAsyncFunction",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "UseMutateFunction",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "UseMutationOptions",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "UseMutationResult",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "UsePrefetchInfiniteQueryOptions",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "UsePrefetchQueryOptions",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "UseQueryOptions",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "UseQueryResult",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "UseSuspenseInfiniteQueryOptions",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "UseSuspenseInfiniteQueryResult",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "UseSuspenseQueryOptions",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "UseSuspenseQueryResult",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "infiniteQueryOptions",
+    "kind": "value",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "mutationOptions",
+    "kind": "value",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "queryOptions",
+    "kind": "value",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "useInfiniteQuery",
+    "kind": "value",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "useIsFetching",
+    "kind": "value",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "useIsMutating",
+    "kind": "value",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "useIsRestoring",
+    "kind": "value",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "useMutation",
+    "kind": "value",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "useMutationState",
+    "kind": "value",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "usePrefetchInfiniteQuery",
+    "kind": "value",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "usePrefetchQuery",
+    "kind": "value",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "useQueries",
+    "kind": "value",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "useQuery",
+    "kind": "value",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "useQueryClient",
+    "kind": "value",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "useQueryErrorResetBoundary",
+    "kind": "value",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "useSuspenseInfiniteQuery",
+    "kind": "value",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "useSuspenseQueries",
+    "kind": "value",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "useSuspenseQuery",
+    "kind": "value",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "AnyDataTag",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "CancelOptions",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "CancelledError",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "DataTag",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "DefaultError",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "DefaultOptions",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "DefaultedInfiniteQueryObserverOptions",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "DefaultedQueryObserverOptions",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "DefinedInfiniteQueryObserverResult",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "DefinedQueryObserverResult",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "DehydrateOptions",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "DehydratedState",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "DistributiveOmit",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "EnsureInfiniteQueryDataOptions",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "EnsureQueryDataOptions",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "FetchInfiniteQueryOptions",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "FetchNextPageOptions",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "FetchPreviousPageOptions",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "FetchQueryOptions",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "FetchStatus",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "GetNextPageParamFunction",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "GetPreviousPageParamFunction",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "HydrateOptions",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "InferDataFromTag",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "InferErrorFromTag",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "InfiniteData",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "InfiniteQueryExecuteOptions",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "InfiniteQueryObserver",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "InfiniteQueryObserverBaseResult",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "InfiniteQueryObserverLoadingErrorResult",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "InfiniteQueryObserverLoadingResult",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "InfiniteQueryObserverOptions",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "InfiniteQueryObserverPendingResult",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "InfiniteQueryObserverPlaceholderResult",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "InfiniteQueryObserverRefetchErrorResult",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "InfiniteQueryObserverResult",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "InfiniteQueryObserverSuccessResult",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "InfiniteQueryPageParamsOptions",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "InitialDataFunction",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "InitialPageParam",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "InvalidateOptions",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "InvalidateQueryFilters",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "ManagedTimerId",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "MutateFunction",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "MutateFunctionRest",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "MutateOptions",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "Mutation",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "MutationCache",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "MutationCacheConfig",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "MutationCacheNotifyEvent",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "MutationFilters",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "MutationFunction",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "MutationFunctionContext",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "MutationKey",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "MutationMeta",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "MutationObserver",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "MutationObserverBaseResult",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "MutationObserverErrorResult",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "MutationObserverIdleResult",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "MutationObserverLoadingResult",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "MutationObserverOptions",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "MutationObserverResult",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "MutationObserverSuccessResult",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "MutationOptions",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "MutationScope",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "MutationState",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "MutationStatus",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "NetworkMode",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "NonUndefinedGuard",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "NotifyEvent",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "NotifyEventType",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "NotifyOnChangeProps",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "OmitKeyof",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "Override",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "PlaceholderDataFunction",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "QueriesObserver",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "QueriesObserverOptions",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "QueriesPlaceholderDataFunction",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "Query",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "QueryBooleanOption",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "QueryCache",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "QueryCacheConfig",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "QueryCacheNotifyEvent",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "QueryClient",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "QueryClientConfig",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "QueryExecuteOptions",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "QueryFilters",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "QueryFunction",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "QueryFunctionContext",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "QueryKey",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "QueryKeyHashFunction",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "QueryKeyWithDataTag",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "QueryMeta",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "QueryObserver",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "QueryObserverBaseResult",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "QueryObserverLoadingErrorResult",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "QueryObserverLoadingResult",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "QueryObserverOptions",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "QueryObserverPendingResult",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "QueryObserverPlaceholderResult",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "QueryObserverRefetchErrorResult",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "QueryObserverResult",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "QueryObserverSuccessResult",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "QueryOptions",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "QueryPersister",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "QueryState",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "QueryStatus",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "RefetchOptions",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "RefetchQueryFilters",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "Register",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "ResetOptions",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "ResultOptions",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "SetDataOptions",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "SkipToken",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "StaleTime",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "StaleTimeFunction",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "ThrowOnError",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "TimeoutCallback",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "TimeoutProvider",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "UnsetMarker",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "Updater",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "WithRequired",
+    "kind": "type",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "dataTagErrorSymbol",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "dataTagSymbol",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "defaultScheduler",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "defaultShouldDehydrateMutation",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "defaultShouldDehydrateQuery",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "dehydrate",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "dehydrateQuery",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "environmentManager",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "experimental_streamedQuery",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "focusManager",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "hashKey",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "hydrate",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "isCancelledError",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "isServer",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "keepPreviousData",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "matchMutation",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "matchQuery",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "noop",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "notifyManager",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "onlineManager",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "partialMatchKey",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "replaceEqualDeep",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "shouldThrowError",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "skipToken",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "timeoutManager",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  },
+  {
+    "name": "unsetMarker",
+    "kind": "value",
+    "classification": "reused-framework-neutral",
+    "localEvidence": "tests/types/public-contracts.test-d.ts"
+  }
+]

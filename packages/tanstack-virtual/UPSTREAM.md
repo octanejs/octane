@@ -1,59 +1,60 @@
 # Upstream
 
 - Repository: https://github.com/TanStack/virtual
-- Release tag: `@tanstack/react-virtual@3.14.5`
-- Commit: `151e9f47abd4ef2d3b11936c04be8908e6bd0607`
-- Package: `@tanstack/react-virtual@3.14.5`
+- Package: `@tanstack/react-virtual@3.14.12`
+- Release commit: `df47889fc87af0b5ff46a9805820f60cff6828ff`
 - Source root: `packages/react-virtual/src`
-- Test root: `packages/react-virtual/tests` and `packages/react-virtual/e2e`
-- License: MIT
-- npm tarball SHA-256: `e93b937aa9cdc910ab9dddae1c342acee8c2d45b5574298383e204b5a94b718e`
+- Test roots: `packages/react-virtual/tests` and `packages/react-virtual/e2e`
+- License: MIT; exact root license in `LICENSE.upstream`
+- npm artifact SHA-256: `61a7b5feaecaff7b44527675b24df7bb102ef09327b314e2f770e786b2a8412e`
+- Runtime dependency: `@tanstack/virtual-core@3.17.10`, imported directly
 
-The tagged repository contains a jsdom Vitest suite under
-`packages/react-virtual/tests` and Playwright browser suites under
-`packages/react-virtual/e2e`. The published npm artifact omits those suites;
-npm-tarball omission is not evidence that the canonical tagged suite is absent.
-This binding therefore records `upstreamSuites.runtime` as `present` and
-`upstreamSuites.types` as `absent` (the pin has `test:types: tsc` package
-typecheck only — no dedicated type-test harness). Provenance stays
-`recorded-unverified` until pristine upstream and one-for-one adapted
-full-suite lanes can execute under `verified` provenance.
+## Source boundary
 
-Until then, the required differential lane executes four same-fixture
-React/Octane scenarios under `react-parity:check`. Ordinary CI keeps
-Octane-only nested-flush, SSR, and harness-setup contracts. Real-layout
-browser coverage remains an explicit gap pending adapted e2e ownership.
+`audit/upstream.lock.json` pins all 41 files in the upstream package, including
+its complete source, unit tests and browser fixtures. The immutable source and
+artifact are test inputs and are excluded from publication. The binding adapts
+the React hook implementation; `src/internal.ts` supplies native slot handling.
+The core's public implementation is consumed from its package.
 
-## Upstream test-suite disposition
+The adapter grows the direct-DOM container before `_willUpdate` restores an
+end-anchored scroll position. Otherwise the browser clamps a prepend's new scroll
+offset against the old container height. Both positioning modes have a browser
+regression with the old adapter as the failing control, the same current core,
+and assertions on scroll extent, offset and retained row identity. Public hook
+signatures also exclude the compiler's internal trailing slot argument.
 
-Every artifact under `packages/react-virtual/tests` and
-`packages/react-virtual/e2e` at the pin.
+## Executable coverage
 
-### Runtime (jsdom)
+The exact release contains seven unit registrations and 35 browser registrations,
+including expanded positioning-mode cases. `audit/registrations.json` and
+`audit/crosswalk.json` account for all 42. `materialize run` regenerates the Octane
+adaptation using only the mechanical rewrites in the lock. No upstream runtime
+assertions are removed or relaxed.
 
-| Upstream artifact | Disposition |
-| --- | --- |
-| `tests/index.test.tsx` | Present at the pin; not yet executed under pristine/adapted lanes. Cases: `should render`, `should render with overscan`, `should render given dynamic size`, `should use rangeExtractor`, `should handle count change`, `should handle handle height change`. Partial same-scenario coverage today is the repo-authored differential lane (`tests/differential/parity.test.ts`), not a one-for-one adaptation of this file. |
-| `tests/test-setup.ts` | Present at the pin; Vitest/`@testing-library` + `ResizeObserver` setup for the jsdom suite. Not adapted; Octane differential uses `tests/_setup.ts` instead. |
+| Suite | React | Octane |
+| --- | --- | --- |
+| Unit | Seven unchanged cases | Seven mechanically adapted cases |
+| Chromium | All 35 unchanged browser cases | All 35 adapted cases plus two direct-DOM prepend regressions |
+| Dedicated upstream type cases | None at this release | None to materialize |
+| Authored strict public type probes | All 26 exports with negative controls | The same contracts and negative controls |
 
-### Runtime (Playwright e2e)
+Browser coverage includes cached measurements while hidden, chat prepend/append
+and streaming behavior, both direct-DOM positioning modes, dynamic measurement,
+scroll anchoring, smooth scrolling and stale item keys. The pristine compiler
+fixture runs Babel's React Compiler. Its native counterpart runs Octane's
+compiler and checks the same visible rows, style positions and render-count
+bounds; this is not a claim that React Compiler compiles Octane applications.
+Vite and Rolldown use explicit compilation settings because the pinned monorepo
+configuration extends files outside the copied package. Test inputs remain intact.
 
-| Upstream artifact | Disposition |
-| --- | --- |
-| `e2e/app/test/cached-measurements.spec.ts` | Present; deferred — needs real-layout browser ownership. Case: `preserves item sizes when list is hidden with useCachedMeasurements`. |
-| `e2e/app/test/chat.spec.ts` | Present; deferred. Cases: chat-mode history prepend/append/follow/stream pin behavior (4). |
-| `e2e/app/test/direct-dom-updates.spec.ts` | Present; deferred. Cases: container sizing, scroll without per-pixel re-renders, large-scroll re-render, missing `containerRef` (4). |
-| `e2e/app/test/measure-element.spec.ts` | Present; deferred. Case: expand → collapse → delete → expand positioning. |
-| `e2e/app/test/react-compiler.spec.ts` | Present; deferred. Cases: initial render, scroll update, incremental scroll (3). |
-| `e2e/app/test/scroll-anchor.spec.ts` | Present; deferred. Case: anchored item stability into unmeasured items. |
-| `e2e/app/test/scroll.spec.ts` | Present; deferred. Cases: scroll to index/last/0 and `initialOffset` (4). |
-| `e2e/app/test/smooth-scroll.spec.ts` | Present; deferred. Cases: smooth scroll targets, alignments, sequential, interrupt (7). |
-| `e2e/app/test/stale-index.spec.ts` | Present; deferred. Case: no stale `getItemKey` after removals. |
-| `e2e/app/**` (fixtures, Vite/Playwright config, HTML shells) | Present; support for the deferred e2e suite — not adapted. |
+The browser wrapper checks every expanded test identity, zero skipped or failed
+cases, the process exit status and the complete report. Required parity lanes
+also execute the four existing React/Octane differential scenarios, native
+conformance, strict type programs and SSR/hydration. Hydration uses a real server
+compile and a separately compiled client tree, retains the existing rows and
+button, updates the extent and verifies observer disposal.
 
-### Types
-
-No `__typetest__` / `*.test-d.ts` harness ships under `packages/react-virtual` at
-the pin. `test:types` runs `tsc` over the package itself. Octane package
-declaration probes live in `typetests/public-api.test-d.ts` and are not parity
-type evidence.
+The only retained runtime divergence is Octane's nested `flushSync` behavior,
+recorded with its executable case in `audit/react-parity.json`. Browser render
+counts are deterministic performance guards; no wall-clock speedup is claimed.

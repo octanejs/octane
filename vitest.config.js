@@ -1,3 +1,5 @@
+import tanstackTableAdapted from './packages/tanstack-table/tests/vitest.adapted.config.ts';
+import tanstackTableAdaptedSSR from './packages/tanstack-table/tests/vitest.adapted-ssr.config.ts';
 import { realpathSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, isAbsolute, relative, resolve } from 'node:path';
@@ -14,6 +16,9 @@ import { threeRenderers as THREE_RENDERERS } from './packages/three/src/config.t
 import { inkRenderers as INK_RENDERERS } from './packages/ink/src/config.ts';
 import { websiteMdxOptions } from './website/mdx-options.ts';
 import { ensureMaterializedUpstream } from './scripts/react-port/ensure-materialized.mjs';
+import tanstackVirtualAdapted from './packages/tanstack-virtual/tests/vitest.adapted.config.ts';
+import tanstackQueryAdaptedSSR from './packages/tanstack-query/tests/vitest.adapted-ssr.config.ts';
+import tanstackQueryAdapted from './packages/tanstack-query/tests/vitest.adapted.config.ts';
 import baseUIAdapted from './packages/base-ui/tests/vitest.config.ts';
 import baseUIUtilsAdapted from './packages/base-ui-utils/tests/vitest.config.ts';
 import baseUIPristine from './packages/base-ui/tests/vitest.pristine.config.ts';
@@ -603,6 +608,51 @@ export default defineConfig({
 		// `--silent=passed-only` overrides this default.
 		silent: true,
 		projects: [
+			{ ...tanstackVirtualAdapted, testExecution: { group: 'react-parity' } },
+			{ ...tanstackTableAdapted, testExecution: { group: 'react-parity' } },
+			{ ...tanstackTableAdaptedSSR, testExecution: { group: 'react-parity' } },
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'tanstack-table-pristine',
+					include: ['packages/tanstack-table/tests/upstream-original.test.ts'],
+					environment: 'node',
+				},
+			},
+			{ ...tanstackQueryAdapted, testExecution: { group: 'react-parity' } },
+			{ ...tanstackQueryAdaptedSSR, testExecution: { group: 'react-parity' } },
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'tanstack-query-pristine',
+					include: ['packages/tanstack-query/tests/upstream-original.test.ts'],
+					environment: 'node',
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'tanstack-virtual-pristine',
+					include: ['packages/tanstack-virtual/tests/upstream-original.test.ts'],
+					environment: 'node',
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'tanstack-virtual-adapted-browser',
+					include: ['packages/tanstack-virtual/tests/browser-parity.test.ts'],
+					environment: 'node',
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'tanstack-virtual-pristine-browser',
+					include: ['packages/tanstack-virtual/tests/browser-original.test.ts'],
+					environment: 'node',
+				},
+			},
 			...reactCompatSpikeProjects,
 			...reactCompatProjects,
 			...reactCompatSSRProjects,
@@ -1641,6 +1691,14 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: {
+					group: 'react-parity',
+					include: [
+						'packages/tanstack-pacer/tests/lifecycle.test.ts',
+						'packages/tanstack-pacer/tests/pacer.test.ts',
+						'packages/tanstack-pacer/tests/ssr-hydration.test.ts',
+					],
+				},
 				test: {
 					name: 'tanstack-pacer',
 					include: [
@@ -2314,18 +2372,22 @@ export default defineConfig({
 				},
 			},
 			{
-				// Mixed project: conformance + package tests stay in ordinary shards;
-				// parity-legacy-api is owned by react-parity so it executes once via
-				// react-parity:check (same file-granular pattern as apollo-client/livestore).
+				// Focused hydration and export cases belong to parity; other conformance runs normally.
 				testExecution: {
 					group: 'react-parity',
-					include: ['packages/tanstack-table/tests/conformance/parity-legacy-api.test.ts'],
+					include: [
+						'packages/tanstack-table/tests/ssr-hydration.test.ts',
+						'packages/tanstack-table/tests/conformance/parity-legacy-api.test.ts',
+					],
 				},
 				test: {
 					name: 'tanstack-table',
 					include: ['packages/tanstack-table/tests/**/*.test.ts'],
 					environment: 'jsdom',
-					exclude: ['packages/tanstack-table/tests/differential/**/*.test.ts'],
+					exclude: [
+						'packages/tanstack-table/tests/differential/**/*.test.ts',
+						'packages/tanstack-table/tests/upstream-original.test.ts',
+					],
 					// Same differential precompile, but for table fixtures: also rewrites
 					// `@octanejs/tanstack-table` → `@tanstack/react-table` so the React side
 					// runs the real react-table adapter over the SAME table-core.
@@ -2423,15 +2485,28 @@ export default defineConfig({
 				},
 			},
 			{
-				// Ordinary package suite: nested-flush and other Octane-only contracts
-				// stay here. Provenance is recorded-unverified, so nothing is
-				// react-parity-owned until a verified harness can execute it.
+				// Required conformance files run in parity CI; other package tests
+				// remain in the ordinary shards.
+				testExecution: {
+					group: 'react-parity',
+					include: [
+						'packages/tanstack-virtual/tests/conformance/core.test.ts',
+						'packages/tanstack-virtual/tests/conformance/dynamic.test.ts',
+						'packages/tanstack-virtual/tests/conformance/nested-flush.test.ts',
+						'packages/tanstack-virtual/tests/conformance/parity.test.ts',
+						'packages/tanstack-virtual/tests/conformance/window.test.ts',
+						'packages/tanstack-virtual/tests/ssr-hydration.test.ts',
+					],
+				},
 				test: {
 					name: 'tanstack-virtual',
 					include: ['packages/tanstack-virtual/tests/**/*.test.ts'],
 					environment: 'jsdom',
 					exclude: [
 						'packages/tanstack-virtual/tests/differential/**/*.test.ts',
+						'packages/tanstack-virtual/tests/upstream-original.test.ts',
+						'packages/tanstack-virtual/tests/browser-parity.test.ts',
+						'packages/tanstack-virtual/tests/browser-original.test.ts',
 						'packages/tanstack-virtual/tests/ssr/**/*.test.ts',
 					],
 					// jsdom affordances virtual-core needs (no-op ResizeObserver,
@@ -2607,6 +2682,20 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: {
+					group: 'react-parity',
+					include: [
+						'packages/tanstack-query/tests/conformance/adapted-suspense.test.ts',
+						'packages/tanstack-query/tests/conformance/boundaries.test.ts',
+						'packages/tanstack-query/tests/conformance/exports.test.ts',
+						'packages/tanstack-query/tests/conformance/extra.test.ts',
+						'packages/tanstack-query/tests/conformance/followups.test.ts',
+						'packages/tanstack-query/tests/conformance/parity.test.ts',
+						'packages/tanstack-query/tests/conformance/query.test.ts',
+						'packages/tanstack-query/tests/conformance/suspense.test.ts',
+						'packages/tanstack-query/tests/conformance/transition-suspense.test.ts',
+					],
+				},
 				test: {
 					name: 'tanstack-query',
 					include: ['packages/tanstack-query/tests/conformance/**/*.test.ts'],
@@ -6949,8 +7038,11 @@ export default defineConfig({
 				},
 			},
 			{
-				// This lane remains optional while its provenance is unverified, so ordinary
-				// shards must retain it until the manifest promotes it to required evidence.
+				// Required Query differential lane.
+				testExecution: {
+					group: 'react-parity',
+					include: ['packages/tanstack-query/tests/differential/parity.test.ts'],
+				},
 				test: {
 					name: 'tanstack-query-differential',
 					include: ['packages/tanstack-query/tests/differential/**/*.test.ts'],
@@ -6976,6 +7068,10 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: {
+					group: 'react-parity',
+					include: ['packages/tanstack-query/tests/ssr/server.test.ts'],
+				},
 				test: {
 					name: 'tanstack-query-ssr',
 					include: ['packages/tanstack-query/tests/ssr/**/*.test.ts'],
@@ -7185,8 +7281,11 @@ export default defineConfig({
 				},
 			},
 			{
-				// Octane-only SSR contract — no React SSR counterpart, so it stays in
-				// ordinary shards rather than react-parity ownership.
+				// Required Octane SSR conformance lane.
+				testExecution: {
+					group: 'react-parity',
+					include: ['packages/tanstack-virtual/tests/ssr/server.test.ts'],
+				},
 				test: {
 					name: 'tanstack-virtual-ssr',
 					include: ['packages/tanstack-virtual/tests/ssr/**/*.test.ts'],

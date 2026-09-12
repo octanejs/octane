@@ -21,7 +21,7 @@
   },
   {
     "path": "async-debouncer/useAsyncDebouncedCallback.ts",
-    "sha256": "c1a40995fe7e4853891cd0d6d3ab2d0752833fe60067156097c7db84c0ae3104",
+    "sha256": "da185348de39fc86f3da3c97ee99c98dd616c79a49bb37253c5d7103cb15e1c6",
     "assertionGroups": []
   },
   {
@@ -51,7 +51,7 @@
   },
   {
     "path": "async-rate-limiter/useAsyncRateLimitedCallback.ts",
-    "sha256": "caa42b9ff936a71602511831c6646d48f9835fe945a7c47197eeab2dbd93c1e2",
+    "sha256": "9a9747bf27dd1abe287fa10327965067b7d65225dde72539b08e8dce94ac2e14",
     "assertionGroups": []
   },
   {
@@ -71,7 +71,7 @@
   },
   {
     "path": "async-throttler/useAsyncThrottledCallback.ts",
-    "sha256": "c6e5fe8d3fb2ba287f30a5cf872526276b911223fc7cb76a6d3e7da845610884",
+    "sha256": "925af232c48371a80605b7af1f82517e31a446e2b85da6f50efee5e2634e5de7",
     "assertionGroups": []
   },
   {

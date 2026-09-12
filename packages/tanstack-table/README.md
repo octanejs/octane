@@ -104,7 +104,7 @@ opt in lower down with `table.Subscribe`:
 
 ## Strong-mode snapshot boundaries
 
-This binding is pinned to `@tanstack/react-table@9.0.0-beta.58`. In that v9
+This binding is pinned to `@tanstack/react-table@9.2.4`. In that v9
 adapter, `useTable` returns a reactive wrapper whose `state` and `options` are
 fresh for the current render, while table-core row, header, and column objects
 remain stable live objects. A compatibility component may read their methods
@@ -217,3 +217,13 @@ v9 `useTable` API directly.
 Current scope, known divergences, and verification status are tracked in the
 generated [bindings status table](../../docs/bindings-status.md), sourced from
 this package's [`status.json`](./status.json).
+
+## Legacy migration
+
+Import `useLegacyTable`, row-model marker factories and the `Legacy*` types from
+`@octanejs/tanstack-table/legacy` when migrating v8 options. New tables use the
+v9 `useTable` feature API. The native instance type is `LegacyOctaneTable`.
+
+Controlled options are staged during render and published after commit. During a
+held transition, raw store observers can receive the unchanged committed snapshot
+from Octane's pending-cue render; suspended state is never published.

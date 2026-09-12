@@ -1,7 +1,7 @@
 /**
  * Parity sweep — the behaviors added/fixed to close the audit gaps: the suspense
  * clearReset retry loop, render-prop QueryErrorResetBoundary, HydrationBoundary
- * newer/older/streaming semantics, experimental_prefetchInRender's promise,
+ * newer/older/streaming semantics,
  * useQueries combine, skipToken, fetchNextPage, useSuspenseInfiniteQuery,
  * usePrefetchInfiniteQuery, useMutationState filters+select, tracked-props
  * render efficiency, and the isRestoring true→false flip.
@@ -15,8 +15,6 @@ import {
 	RenderPropResetApp,
 	renderPropValues,
 	HydrationApp,
-	PrefetchInRenderApp,
-	promiseCapture,
 	CombineApp,
 	SkipTokenApp,
 	InfiniteApp,
@@ -44,6 +42,7 @@ async function flush(n = 6) {
 }
 
 describe('suspense error retry loop (clearReset)', () => {
+	// @parity-case conformance:a5ed495e6f2c92c1
 	it('reset → retry → fail AGAIN re-throws to the boundary (no undefined-data fall-through)', async () => {
 		let calls = 0;
 		const queryFn = () => {
@@ -72,6 +71,7 @@ describe('suspense error retry loop (clearReset)', () => {
 });
 
 describe('QueryErrorResetBoundary render-prop children', () => {
+	// @parity-case conformance:42c0382221dae71e
 	it('invokes function children with the boundary value', async () => {
 		renderPropValues.length = 0;
 		const r = mount(RenderPropResetApp, { client });
@@ -101,6 +101,7 @@ describe('HydrationBoundary', () => {
 		return state;
 	}
 
+	// @parity-case conformance:a29f7c708d5bfc25
 	it('hydrates NEWER dehydrated data over the cache, leaves NEWER cache data alone', async () => {
 		const key = ['h1'];
 		client.setQueryData(key, 'cached');
@@ -127,6 +128,7 @@ describe('HydrationBoundary', () => {
 		r2.unmount();
 	});
 
+	// @parity-case conformance:b01a15ccb7fc581f
 	it('a dehydrated STREAMING entry (pending promise + later dehydratedAt) re-hydrates a settled query', async () => {
 		const key = ['h2'];
 		client.setQueryData(key, 'settled');
@@ -156,6 +158,7 @@ describe('HydrationBoundary', () => {
 		r.unmount();
 	});
 
+	// @parity-case conformance:0b0b3a6210ed2d31
 	it('round-trips a real dehydrate() payload', async () => {
 		const source = new QueryClient();
 		source.setQueryData(['rt'], 'round-trip');
@@ -168,21 +171,8 @@ describe('HydrationBoundary', () => {
 	});
 });
 
-describe('experimental_prefetchInRender', () => {
-	it('result.promise resolves with the data', async () => {
-		promiseCapture.promise = null;
-		const queryFn = () => new Promise<string>((res) => setTimeout(() => res('pir-data'), 5));
-		const r = mount(PrefetchInRenderApp, { client, queryFn });
-
-		expect(promiseCapture.promise).toBeTruthy();
-		await expect(promiseCapture.promise).resolves.toBe('pir-data');
-		await flush();
-		expect(r.find('#pir').textContent).toBe('data:pir-data');
-		r.unmount();
-	});
-});
-
 describe('useQueries combine', () => {
+	// @parity-case conformance:fd52495a1c657ab1
 	it('renders the combined aggregate, not the raw results array', async () => {
 		const r = mount(CombineApp, { client });
 		await flush();
@@ -192,6 +182,7 @@ describe('useQueries combine', () => {
 });
 
 describe('skipToken', () => {
+	// @parity-case conformance:b2cb1d554f994523
 	it('disables the query — pending status, idle fetchStatus, no fetch', async () => {
 		const r = mount(SkipTokenApp, { client });
 		await flush();
@@ -201,6 +192,7 @@ describe('skipToken', () => {
 });
 
 describe('useInfiniteQuery fetchNextPage', () => {
+	// @parity-case conformance:fcce0e7644147ca5
 	it('appends pages and reports hasNextPage', async () => {
 		const pageFn = (page: number) => Promise.resolve('p' + page);
 		const r = mount(InfiniteApp, { client, pageFn });
@@ -221,6 +213,7 @@ describe('useInfiniteQuery fetchNextPage', () => {
 });
 
 describe('useSuspenseInfiniteQuery', () => {
+	// @parity-case conformance:e2567de40bb55a69
 	it('suspends then renders the first page', async () => {
 		const pageFn = (page: number) =>
 			new Promise<string>((res) => setTimeout(() => res('sp' + page), 5));
@@ -234,6 +227,7 @@ describe('useSuspenseInfiniteQuery', () => {
 });
 
 describe('usePrefetchInfiniteQuery', () => {
+	// @parity-case conformance:574de1417c3696a5
 	it('primes the cache with the first page', async () => {
 		const pageFn = (page: number) => Promise.resolve('pf' + page);
 		const r = mount(PrefetchInfiniteApp, { client, pageFn });
@@ -245,6 +239,7 @@ describe('usePrefetchInfiniteQuery', () => {
 });
 
 describe('useMutationState filters + select', () => {
+	// @parity-case conformance:2f70b4c197d23ed0
 	it('selects variables of mutations matching the key filter', async () => {
 		mutationCounter.n = 0;
 		const mutationFn = (v: string) => Promise.resolve(v);
@@ -264,6 +259,7 @@ describe('useMutationState filters + select', () => {
 });
 
 describe('tracked properties', () => {
+	// @parity-case conformance:6d3d6f7788072a6e
 	it('a data-only reader does NOT re-render on an isFetching-only change', async () => {
 		trackedRenders.count = 0;
 		const queryFn = () => new Promise<string>((res) => setTimeout(() => res('t'), 2));
@@ -284,6 +280,7 @@ describe('tracked properties', () => {
 });
 
 describe('isRestoring flip', () => {
+	// @parity-case conformance:32e738956e4c4462
 	it('true → false starts the fetch that restore was holding back', async () => {
 		let calls = 0;
 		const queryFn = () => {

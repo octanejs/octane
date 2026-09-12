@@ -1,18 +1,18 @@
 # TanStack React Pacer upstream ledger
 
-`@octanejs/tanstack-pacer` targets `@tanstack/react-pacer@0.22.1` from
+`@octanejs/tanstack-pacer` targets `@tanstack/react-pacer@0.23.0` from
 `https://github.com/TanStack/pacer.git`.
 
 ## Immutable pin
 
-- Tag: `@tanstack/react-pacer@0.22.1`
-- Resolved commit: `a894009100aeb373965d4121eb92a1af634af012`
-- npm archive SHA-256: `d4055dcec785b5eac078a2c2acde90b80e84e70c0262a174a5065ed92a9be2f0`
-- npm lock integrity: `sha512-CenQqK0GluSPIrnsG1yuD7w5uMSQ/4lI9AcGEFxBrRd66r260boWcYRIsS5+eHtXb238FoZYhKmJPGlhRzmHRw==`
-- Supported range: exactly `0.22.1`
+- Tag: `@tanstack/react-pacer@0.23.0`
+- Resolved commit: `c75895520669b08dc8946b42e1a6d529ca977230`
+- npm archive SHA-256: `9662c2a241e21e2f3c8f534195516ce5060b4d13b1997fca96daea797be9f3a1`
+- npm lock integrity: `sha512-Ec3h+kT8kYlpGb1M8F7836q+udE/M2RmE8KLr1rhs+UDBgvxjfmyR2bIUeaDEe9Zn1YXNI986RbErXyr5fEJIg==`
+- Supported range: exactly `0.23.0`
 - License: MIT
 - React oracle: exact `react@19.2.7`, `react-dom@19.2.7`, `@types/react@19.2.17`, and `@types/react-dom@19.2.3` via the `tanstack-pacer-react-oracle` catalog
-- Framework-neutral core: exact `@tanstack/pacer@0.21.1`, reused by both adapters
+- Framework-neutral core: exact `@tanstack/pacer@0.22.0`, reused by both adapters
 
 ## Source, exports, and suites
 
@@ -26,8 +26,7 @@ compile lanes still run.
 
 `audit/upstream-crosswalk.json` accounts for all 16 published entrypoints and every adapter
 value/type export plus each core `export *` re-export, with a disposition and evidence pointer per
-row. The binding reuses the exact framework-neutral core. With absent upstream runtime tests,
-provenance is `recorded-unverified`: a repo-authored adapted-octane suite plus a React/Octane differential cover a representative scheduler lifecycle, while nearly every export remains `surface-present-unverified`.
+row. The binding reuses the exact framework-neutral core. All adapter source files retain the complete structural crosswalk. Independently authored strict type probes consume all public entrypoints, while runtime differential scenarios cover scheduler results and lifecycle. Upstream suite absence is preserved rather than represented as an upstream test pass.
 
 ## Type lanes
 
@@ -54,3 +53,15 @@ and asserting intermediate observable DOM. `tests/pacer.test.ts` and
 This representative scheduler lifecycle does not exhaustively prove every sync/async hook family,
 provider, render-prop subscription, state/value helper, or option combination; those remain
 surface-present via the crosswalk without additional runtime cases.
+
+## Source boundary
+
+The 43 upstream source modules are adapted into 45 owned modules; the provider context and slot helper are separate Octane modules. The complete 51-file immutable adapter tree is unpublished and verified by audit/upstream.lock.json. The upstream MIT license is retained byte-exact as LICENSE.upstream. All framework-neutral scheduler implementation comes directly from @tanstack/pacer 0.22.0, and Store comes through @octanejs/tanstack-store. React is test-only. The npm artifact is hash-verified for public declaration comparison and excluded from publication.
+
+## Updated contracts
+
+The three async callback helpers return Promise<Awaited<ReturnType<TFn>> | undefined>, including suppressed executions. The paired runtime fixture checks completed values and disabled results; separate positive/negative programs reproduce the old nested-promise defect. Subscribe renderables use OctaneNode, whose opaque renderer contract intentionally differs from ReactNode.
+
+The public probes compare framework-neutral exports to their pinned declarations. Adapter probes compare scheduler members, selected state, and callbacks; renderer-specific Subscribe/children and onUnmount members are covered by the complete source transformation crosswalk and runtime ownership scenarios rather than compared as React element types. All ten scheduler families preserve store identity through renders and invoke their owning teardown once. Nested provider defaults remain isolated, and the real SSR compiler produces HTML that hydration adopts while callbacks stay interactive.
+
+Native Subscribe accepts both compiled template children and render-prop callbacks. Compiled blocks are passed back to the renderer; callbacks receive the selected state. The children-block regression checks updates and DOM identity.

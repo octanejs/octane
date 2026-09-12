@@ -25,6 +25,51 @@
       "path": "packages/tanstack-pacer/typetests/octane-only/setter-types.test-d.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Accept/reject evidence for local Dispatch/SetStateAction aliases; kept in an ordinary typecheck project because upstream test:types is compile-only and has no assertion counterpart. Executed by root bindings:typecheck via typetests/octane-only/tsconfig.json."
+    },
+    {
+      "path": "packages/tanstack-pacer/tests/lifecycle.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Independent public type, scheduler ownership, provider or hydration observation; no upstream test registration is claimed."
+    },
+    {
+      "path": "packages/tanstack-pacer/tests/ssr-hydration.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Independent public type, scheduler ownership, provider or hydration observation; no upstream test registration is claimed."
+    },
+    {
+      "path": "packages/tanstack-pacer/tests/types/async-callbacks.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Independent public type, scheduler ownership, provider or hydration observation; no upstream test registration is claimed."
+    },
+    {
+      "path": "packages/tanstack-pacer/tests/types/public-contracts.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Independent public type, scheduler ownership, provider or hydration observation; no upstream test registration is claimed."
+    },
+    {
+      "path": "packages/tanstack-pacer/typetests/adapted/async-callbacks.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Independent public type, scheduler ownership, provider or hydration observation; no upstream test registration is claimed."
+    },
+    {
+      "path": "packages/tanstack-pacer/typetests/adapted/public-contracts.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Independent public type, scheduler ownership, provider or hydration observation; no upstream test registration is claimed."
+    },
+    {
+      "path": "packages/tanstack-pacer/typetests/pristine/async-callbacks.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Independent public type, scheduler ownership, provider or hydration observation; no upstream test registration is claimed."
+    },
+    {
+      "path": "packages/tanstack-pacer/typetests/pristine/public-contracts.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Independent public type, scheduler ownership, provider or hydration observation; no upstream test registration is claimed."
+    },
+    {
+      "path": "packages/tanstack-pacer/tests/children-block.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Compiled template children remain renderer-owned; genuine render-prop callbacks receive selected state. Checks updates and survivor identity."
     }
   ]
 }

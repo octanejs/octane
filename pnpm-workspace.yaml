@@ -271,8 +271,8 @@ catalogs:
     '@tanstack/devtools-event-bus': 0.4.2
     '@tanstack/devtools-event-client': 0.5.0
     '@tanstack/history': 1.162.0
-    '@tanstack/query-core': ^5.101.3
-    '@tanstack/react-query': ^5.101.3
+    '@tanstack/query-core': ^5.102.8
+    '@tanstack/react-query': ^5.102.8
     '@tanstack/react-router': 1.170.18
     '@tanstack/react-store': ^0.11.1
     '@tanstack/react-table': 8.21.3
@@ -618,6 +618,8 @@ minimumReleaseAgeExclude:
   - '@tsrx/react-runtime@0.1.7'
   - '@tsrx/solid-runtime@0.1.7'
   - cn@0.2.6
+  - '@tanstack/react-virtual@3.14.12'
+  - '@tanstack/virtual-core@3.17.10'
 
 # Changesets 2.31.1 assumes npm's error shape and crashes on pnpm 11 duplicate
 # publish errors. Remove this backport once the fix ships on Changesets' stable line.

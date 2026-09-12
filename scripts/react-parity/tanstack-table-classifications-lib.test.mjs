@@ -31,9 +31,9 @@ async function fixture() {
 test('verifies the tanstack-table classification ledger including type tests', function () {
 	const root = fileURLToPath(new URL('../..', import.meta.url));
 	assert.deepEqual(verifyTanstackTableTestClassifications(root), {
-		tests: 11,
-		pristineTypes: 1,
-		adaptedTypes: 1,
+		tests: 17,
+		pristineTypes: 2,
+		adaptedTypes: 2,
 	});
 });
 

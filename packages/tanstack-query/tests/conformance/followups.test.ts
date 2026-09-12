@@ -32,6 +32,7 @@ async function flush() {
 }
 
 describe('useInfiniteQuery', () => {
+	// @parity-case conformance:f165617264a7297f
 	it('loads the first page', async () => {
 		const r = mount(Infinite, { client });
 		expect(r.find('#status').textContent).toBe('pending');
@@ -42,6 +43,7 @@ describe('useInfiniteQuery', () => {
 });
 
 describe('useQueries', () => {
+	// @parity-case conformance:cf4083baef5b2612
 	it('runs multiple queries and combines their results', async () => {
 		const r = mount(Queries, { client });
 		await flush();
@@ -51,6 +53,7 @@ describe('useQueries', () => {
 });
 
 describe('useIsFetching', () => {
+	// @parity-case conformance:0b9605470700de6b
 	it('reports 1 while fetching and 0 once settled', async () => {
 		let resolveFn: (v: string) => void = () => {};
 		const queryFn = () => new Promise<string>((res) => (resolveFn = res));
@@ -65,6 +68,7 @@ describe('useIsFetching', () => {
 });
 
 describe('useIsMutating / useMutationState', () => {
+	// @parity-case conformance:33f6e25f1a2b4ded
 	it('reports 1 while a mutation is pending, then 0', async () => {
 		let resolveFn: (v: string) => void = () => {};
 		const mutationFn = () => new Promise<string>((res) => (resolveFn = res));
@@ -81,6 +85,7 @@ describe('useIsMutating / useMutationState', () => {
 });
 
 describe('usePrefetchQuery', () => {
+	// @parity-case conformance:1802ff7691803bc4
 	it('prefetches into the cache', async () => {
 		const r = mount(Prefetch, { client });
 		await flush();
@@ -90,6 +95,7 @@ describe('usePrefetchQuery', () => {
 });
 
 describe('HydrationBoundary', () => {
+	// @parity-case conformance:1e6e1b8a6ec9186c
 	it('hydrates dehydrated state into the client before children read it', async () => {
 		const source = new QueryClient();
 		await source.prefetchQuery({ queryKey: ['h'], queryFn: () => Promise.resolve('hydrated') });
@@ -103,6 +109,7 @@ describe('HydrationBoundary', () => {
 });
 
 describe('useSuspenseQuery', () => {
+	// @parity-case conformance:80e9ebc08c390323
 	it('suspends (fallback), then renders the guaranteed data', async () => {
 		let resolveFn: (v: string) => void = () => {};
 		const queryFn = () => new Promise<string>((res) => (resolveFn = res));
@@ -118,6 +125,7 @@ describe('useSuspenseQuery', () => {
 		r.unmount();
 	});
 
+	// @parity-case conformance:4ac0c99df4c76af3
 	it('keeps sequential queries suspended until each query has data', async () => {
 		let resolveA: (value: string) => void = () => {};
 		let resolveB: (value: string) => void = () => {};

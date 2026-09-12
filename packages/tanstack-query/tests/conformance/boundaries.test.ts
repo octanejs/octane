@@ -22,6 +22,7 @@ async function flush() {
 }
 
 describe('IsRestoring', () => {
+	// @parity-case conformance:dbabb39767540afc
 	it('does NOT subscribe/fetch while restoring', async () => {
 		let called = 0;
 		const queryFn = () => {
@@ -35,6 +36,7 @@ describe('IsRestoring', () => {
 		r.unmount();
 	});
 
+	// @parity-case conformance:260bf545599de1ba
 	it('fetches normally when not restoring', async () => {
 		let called = 0;
 		const queryFn = () => {
@@ -50,6 +52,7 @@ describe('IsRestoring', () => {
 });
 
 describe('QueryErrorResetBoundary', () => {
+	// @parity-case conformance:322729744a4c0656
 	it('reset() lets the query retry instead of re-throwing', async () => {
 		let calls = 0;
 		const queryFn = () => {
