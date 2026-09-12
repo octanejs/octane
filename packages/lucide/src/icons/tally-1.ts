@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const Tally1 = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/tally-1';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default Tally1;

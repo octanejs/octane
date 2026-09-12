@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const TrianglesCenterlineDashedVertical = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/triangles-centerline-dashed-vertical';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default TrianglesCenterlineDashedVertical;

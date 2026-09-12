@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const CreditCardCheck = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/credit-card-check';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default CreditCardCheck;

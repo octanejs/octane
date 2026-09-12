@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const SquareUserRound = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/square-user-round';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default SquareUserRound;

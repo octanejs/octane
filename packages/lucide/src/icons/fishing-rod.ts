@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const FishingRod = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/fishing-rod';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default FishingRod;

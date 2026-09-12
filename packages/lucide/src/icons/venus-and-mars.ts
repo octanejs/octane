@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const VenusAndMars = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/venus-and-mars';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default VenusAndMars;

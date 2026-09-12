@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const PowerOff = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/power-off';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default PowerOff;

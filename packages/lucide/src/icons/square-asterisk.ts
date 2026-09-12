@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const SquareAsterisk = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/square-asterisk';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default SquareAsterisk;

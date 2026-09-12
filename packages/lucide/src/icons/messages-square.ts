@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const MessagesSquare = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/messages-square';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default MessagesSquare;

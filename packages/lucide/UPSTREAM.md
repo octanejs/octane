@@ -11,7 +11,9 @@ Exact npm artifact integrity and shipped license fingerprints are recorded in
 The current adapter supports object-form custom icons, nested nodes, rectangular
 view boxes, aliases, provider `nonScalingStroke`, and complete dynamic icon data.
 Custom legacy names now use the supplied class token, matching Lucide 1.45.0.
-Direct dynamic modules expose `__iconData` in place of the old `__iconNode`.
+Direct dynamic modules expose `__iconData` and retain `__iconNode` as a deprecated
+alias for its node array. The existing `CircleEuroSign` root, namespace, per-icon
+and dynamic imports remain aliases for the renamed `CircleEuro` icon.
 
 ## Historical implementation pin
 
@@ -83,7 +85,7 @@ not establish exhaustive parity for the generated package surface.
 ## Current maintenance evidence
 
 Generation and export checks cover 1,834 canonical icons, their aliases and all
-2,098 dynamic names. Every canonical glyph is rendered against the current React
+2,098 current dynamic names plus the retained `circle-euro-sign` alias. Every canonical glyph is rendered against the current React
 oracle with default and non-scaling stroke props. Shared fixtures additionally
 cover custom rectangular data and provider overrides. Direct strict public type
 probes reject conflicting icon/view-box representations and malformed props.

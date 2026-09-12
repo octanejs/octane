@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const ShieldCogCorner = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/shield-cog-corner';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default ShieldCogCorner;

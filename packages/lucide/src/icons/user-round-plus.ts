@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const UserRoundPlus = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/user-round-plus';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default UserRoundPlus;

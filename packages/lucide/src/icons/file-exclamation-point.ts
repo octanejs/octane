@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const FileExclamationPoint = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/file-exclamation-point';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default FileExclamationPoint;

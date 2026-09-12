@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const AlignHorizontalDistributeStart = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/align-horizontal-distribute-start';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default AlignHorizontalDistributeStart;

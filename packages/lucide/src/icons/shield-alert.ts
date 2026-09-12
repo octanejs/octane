@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const ShieldAlert = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/shield-alert';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default ShieldAlert;

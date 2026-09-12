@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const ReceiptPoundSterling = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/receipt-pound-sterling';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default ReceiptPoundSterling;

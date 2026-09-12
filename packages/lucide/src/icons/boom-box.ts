@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const BoomBox = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/boom-box';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default BoomBox;

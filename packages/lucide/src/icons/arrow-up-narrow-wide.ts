@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const ArrowUpNarrowWide = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/arrow-up-narrow-wide';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default ArrowUpNarrowWide;

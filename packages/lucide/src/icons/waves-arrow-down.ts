@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const WavesArrowDown = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/waves-arrow-down';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default WavesArrowDown;

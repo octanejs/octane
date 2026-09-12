@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const CircleChevronRight = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/circle-chevron-right';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default CircleChevronRight;

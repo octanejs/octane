@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const ArrowBigUpDash = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/arrow-big-up-dash';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default ArrowBigUpDash;

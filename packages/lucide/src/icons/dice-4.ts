@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const Dice4 = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/dice-4';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default Dice4;

@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const FileSliders = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/file-sliders';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default FileSliders;

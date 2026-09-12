@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const ImageUp = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/image-up';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default ImageUp;

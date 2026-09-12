@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const PanelTopDashed = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/panel-top-dashed';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default PanelTopDashed;

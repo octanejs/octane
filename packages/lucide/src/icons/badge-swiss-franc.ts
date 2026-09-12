@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const BadgeSwissFranc = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/badge-swiss-franc';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default BadgeSwissFranc;

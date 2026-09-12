@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const Telescope = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/telescope';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default Telescope;

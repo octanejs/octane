@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const AlignHorizontalSpaceAround = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/align-horizontal-space-around';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default AlignHorizontalSpaceAround;

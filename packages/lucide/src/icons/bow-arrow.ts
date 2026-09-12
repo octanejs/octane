@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const BowArrow = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/bow-arrow';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default BowArrow;

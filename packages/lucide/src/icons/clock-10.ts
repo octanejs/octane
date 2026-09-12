@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const Clock10 = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/clock-10';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default Clock10;

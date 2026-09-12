@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const MoveUpLeft = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/move-up-left';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default MoveUpLeft;

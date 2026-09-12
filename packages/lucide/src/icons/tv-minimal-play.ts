@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const TvMinimalPlay = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/tv-minimal-play';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default TvMinimalPlay;

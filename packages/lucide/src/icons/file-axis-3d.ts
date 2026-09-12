@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const FileAxis3d = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/file-axis-3d';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default FileAxis3d;

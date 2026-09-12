@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const InspectionPanel = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/inspection-panel';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default InspectionPanel;

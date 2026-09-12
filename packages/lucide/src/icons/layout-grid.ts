@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const LayoutGrid = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/layout-grid';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default LayoutGrid;

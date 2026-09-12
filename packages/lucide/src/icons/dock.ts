@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const Dock = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/dock';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default Dock;

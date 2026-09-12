@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const Folder = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/folder';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default Folder;

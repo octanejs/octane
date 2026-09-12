@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const ArrowUpZA = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/arrow-up-z-a';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default ArrowUpZA;

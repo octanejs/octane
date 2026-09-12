@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const Volume2 = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/volume-2';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default Volume2;

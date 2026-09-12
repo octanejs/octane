@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const ConciergeBell = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/concierge-bell';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default ConciergeBell;

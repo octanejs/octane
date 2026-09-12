@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const BatteryWarning = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/battery-warning';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default BatteryWarning;

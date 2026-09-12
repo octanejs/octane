@@ -1835,3 +1835,4 @@ export { default as ZodiacTaurus } from './zodiac-taurus';
 export { default as ZodiacVirgo } from './zodiac-virgo';
 export { default as ZoomIn } from './zoom-in';
 export { default as ZoomOut } from './zoom-out';
+export { default as CircleEuroSign } from './circle-euro';

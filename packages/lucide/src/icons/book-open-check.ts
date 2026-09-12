@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const BookOpenCheck = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/book-open-check';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default BookOpenCheck;

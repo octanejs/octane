@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const SquareArrowRightExit = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/square-arrow-right-exit';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default SquareArrowRightExit;

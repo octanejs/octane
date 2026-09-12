@@ -61,14 +61,18 @@
       "htmlSha256": "89fa1fab7b208ea71e8fdae33d62fb4d533d471928d6e187759fa8635989c319"
     },
     "after": {
-      "raw": 3312,
-      "gzip": 1636,
-      "brotli": 1483,
-      "medianMs": 17.748125000000016,
-      "p25Ms": 17.441332999999986,
-      "p75Ms": 19.668292000000008,
+      "raw": 3322,
+      "gzip": 1644,
+      "brotli": 1491,
+      "medianMs": 18.633415999999983,
+      "p25Ms": 18.292374999999993,
+      "p75Ms": 20.783749999999998,
       "htmlSha256": "89fa1fab7b208ea71e8fdae33d62fb4d533d471928d6e187759fa8635989c319"
     },
-    "interpretation": "The named bundle grows by 487 gzip bytes for the current framework-neutral builder. CPU sample ranges overlap; no speedup or slowdown is established. Markup and icon/React reachability controls pass."
-  }
+    "interpretation": "The named bundle grows by 495 gzip bytes for the current framework-neutral builder. CPU sample ranges overlap; no speedup or slowdown is established. Markup and icon/React reachability controls pass."
+  },
+  "compatibility": [
+    "CircleEuroSign, CircleEuroSignIcon and LucideCircleEuroSign remain aliases for CircleEuro, including the icons namespace, direct subpath and dynamic import.",
+    "__iconNode remains a deprecated alias for __iconData.node on generated icon modules."
+  ]
 }

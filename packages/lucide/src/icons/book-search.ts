@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const BookSearch = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/book-search';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default BookSearch;

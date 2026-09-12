@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const Share2 = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/share-2';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default Share2;

@@ -2103,6 +2103,7 @@ const dynamicIconImports = {
 	'zodiac-virgo': () => import('./icons/zodiac-virgo'),
 	'zoom-in': () => import('./icons/zoom-in'),
 	'zoom-out': () => import('./icons/zoom-out'),
+	'circle-euro-sign': () => import('./icons/circle-euro'),
 } as const;
 
 export type IconName = keyof typeof dynamicIconImports;

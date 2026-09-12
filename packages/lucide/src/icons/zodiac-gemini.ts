@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const ZodiacGemini = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/zodiac-gemini';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default ZodiacGemini;

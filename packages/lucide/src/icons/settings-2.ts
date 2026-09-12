@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const Settings2 = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/settings-2';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default Settings2;

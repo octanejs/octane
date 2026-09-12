@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const AlarmClockCheck = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/alarm-clock-check';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default AlarmClockCheck;

@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const Videotape = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/videotape';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default Videotape;

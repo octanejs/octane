@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const ChartNoAxesColumnIncreasing = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/chart-no-axes-column-increasing';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default ChartNoAxesColumnIncreasing;

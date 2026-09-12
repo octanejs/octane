@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const Beer = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/beer';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default Beer;

@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const TableCellsMerge = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/table-cells-merge';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default TableCellsMerge;

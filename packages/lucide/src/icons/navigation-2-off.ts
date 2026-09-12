@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const Navigation2Off = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/navigation-2-off';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default Navigation2Off;

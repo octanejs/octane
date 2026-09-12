@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const PersonStanding = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/person-standing';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default PersonStanding;

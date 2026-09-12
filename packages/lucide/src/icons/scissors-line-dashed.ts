@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const ScissorsLineDashed = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/scissors-line-dashed';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default ScissorsLineDashed;

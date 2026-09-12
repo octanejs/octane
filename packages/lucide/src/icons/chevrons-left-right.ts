@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const ChevronsLeftRight = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/chevrons-left-right';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default ChevronsLeftRight;

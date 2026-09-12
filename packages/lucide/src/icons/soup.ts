@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const Soup = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/soup';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default Soup;

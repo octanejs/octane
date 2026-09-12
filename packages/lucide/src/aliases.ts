@@ -4460,3 +4460,7 @@ export { default as ArrowDown01Icon, default as LucideArrowDown01 } from './icon
 export { default as ArrowDown10Icon, default as LucideArrowDown10 } from './icons/arrow-down-1-0';
 export { default as ArrowUp01Icon, default as LucideArrowUp01 } from './icons/arrow-up-0-1';
 export { default as ArrowUp10Icon, default as LucideArrowUp10 } from './icons/arrow-up-1-0';
+export {
+	default as CircleEuroSignIcon,
+	default as LucideCircleEuroSign,
+} from './icons/circle-euro';

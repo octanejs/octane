@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const Cigarette = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/cigarette';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default Cigarette;

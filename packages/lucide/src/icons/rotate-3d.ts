@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const Rotate3d = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/rotate-3d';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default Rotate3d;

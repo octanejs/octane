@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const Ribbon = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/ribbon';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default Ribbon;

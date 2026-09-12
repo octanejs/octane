@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const CalendarCheck2 = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/calendar-check-2';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default CalendarCheck2;

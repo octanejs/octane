@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const FileTypeCorner = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/file-type-corner';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default FileTypeCorner;

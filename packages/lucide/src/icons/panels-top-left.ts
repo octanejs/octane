@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const PanelsTopLeft = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/panels-top-left';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default PanelsTopLeft;

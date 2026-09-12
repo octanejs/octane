@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const RectangleVertical = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/rectangle-vertical';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default RectangleVertical;

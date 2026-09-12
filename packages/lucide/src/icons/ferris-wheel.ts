@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const FerrisWheel = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/ferris-wheel';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default FerrisWheel;

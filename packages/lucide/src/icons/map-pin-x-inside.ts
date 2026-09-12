@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const MapPinXInside = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/map-pin-x-inside';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default MapPinXInside;

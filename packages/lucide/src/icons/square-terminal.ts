@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const SquareTerminal = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/square-terminal';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default SquareTerminal;

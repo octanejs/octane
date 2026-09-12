@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const StickyNote = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/sticky-note';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default StickyNote;

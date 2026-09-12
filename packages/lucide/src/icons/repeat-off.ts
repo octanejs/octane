@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const RepeatOff = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/repeat-off';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default RepeatOff;

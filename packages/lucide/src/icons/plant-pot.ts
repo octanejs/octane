@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const PlantPot = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/plant-pot';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default PlantPot;

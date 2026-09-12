@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const Maximize2 = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/maximize-2';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default Maximize2;

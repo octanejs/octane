@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const SquareSplitVertical = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/square-split-vertical';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default SquareSplitVertical;

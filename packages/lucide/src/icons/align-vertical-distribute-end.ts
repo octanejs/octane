@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const AlignVerticalDistributeEnd = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/align-vertical-distribute-end';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default AlignVerticalDistributeEnd;

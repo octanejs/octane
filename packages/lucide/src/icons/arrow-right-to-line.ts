@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const ArrowRightToLine = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/arrow-right-to-line';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default ArrowRightToLine;

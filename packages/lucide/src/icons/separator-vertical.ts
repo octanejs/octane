@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const SeparatorVertical = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/separator-vertical';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default SeparatorVertical;

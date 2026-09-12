@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const PictureInPicture = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/picture-in-picture';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default PictureInPicture;

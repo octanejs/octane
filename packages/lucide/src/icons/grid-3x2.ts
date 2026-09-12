@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const Grid3x2 = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/grid-3x2';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default Grid3x2;

@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const RockingChair = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/rocking-chair';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default RockingChair;

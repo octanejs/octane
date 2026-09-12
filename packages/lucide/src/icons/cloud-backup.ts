@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const CloudBackup = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/cloud-backup';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default CloudBackup;

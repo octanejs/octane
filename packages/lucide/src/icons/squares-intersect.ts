@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const SquaresIntersect = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/squares-intersect';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default SquaresIntersect;

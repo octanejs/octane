@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const BriefcaseConveyorBelt = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/briefcase-conveyor-belt';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default BriefcaseConveyorBelt;

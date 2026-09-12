@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const PanelRightDashed = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/panel-right-dashed';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default PanelRightDashed;

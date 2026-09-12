@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const Columns3Cog = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/columns-3-cog';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default Columns3Cog;

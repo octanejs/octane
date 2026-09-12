@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const SquareDashedKanban = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/square-dashed-kanban';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default SquareDashedKanban;

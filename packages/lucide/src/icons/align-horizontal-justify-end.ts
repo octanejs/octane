@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const AlignHorizontalJustifyEnd = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/align-horizontal-justify-end';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default AlignHorizontalJustifyEnd;

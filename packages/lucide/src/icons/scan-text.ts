@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const ScanText = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/scan-text';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default ScanText;

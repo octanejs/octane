@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const CalendarRange = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/calendar-range';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default CalendarRange;

@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const LineDotRightHorizontal = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/line-dot-right-horizontal';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default LineDotRightHorizontal;

@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const ScanHeart = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/scan-heart';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default ScanHeart;

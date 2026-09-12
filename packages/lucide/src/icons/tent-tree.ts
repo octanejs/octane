@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const TentTree = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/tent-tree';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default TentTree;

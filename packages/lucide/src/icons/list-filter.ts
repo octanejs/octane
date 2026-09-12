@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const ListFilter = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/list-filter';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default ListFilter;

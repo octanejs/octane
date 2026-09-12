@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const HousePlus = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/house-plus';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default HousePlus;

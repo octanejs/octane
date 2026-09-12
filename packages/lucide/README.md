@@ -46,6 +46,10 @@ export function App() @{
 }
 ```
 
+The existing `CircleEuroSign` / `circle-euro-sign` imports remain available as
+aliases for `CircleEuro`. Dynamic modules retain the older `__iconNode` export
+alongside `__iconData`.
+
 Per-icon imports are available as `@octanejs/lucide/icons/camera`. `Icon` and
 `createLucideIcon` support custom icon data in the same shape as Lucide React.
 Pass `{ name, node, aliases, size }` or `{ name, node, aliases, width, height }`

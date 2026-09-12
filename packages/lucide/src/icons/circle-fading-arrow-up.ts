@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const CircleFadingArrowUp = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/circle-fading-arrow-up';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default CircleFadingArrowUp;

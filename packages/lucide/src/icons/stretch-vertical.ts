@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const StretchVertical = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/stretch-vertical';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default StretchVertical;

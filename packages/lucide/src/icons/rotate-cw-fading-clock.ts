@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const RotateCwFadingClock = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/rotate-cw-fading-clock';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default RotateCwFadingClock;

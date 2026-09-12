@@ -75,7 +75,8 @@ describe('@octanejs/lucide — current public icon data', () => {
 describe('@octanejs/lucide — complete glyph catalog', () => {
 	it('matches every canonical React icon with default and non-scaling strokes', () => {
 		for (const [name, Component] of Object.entries(icons)) {
-			const ReactComponent = reactIcons[name as keyof typeof reactIcons];
+			const ReactComponent =
+				reactIcons[(name === 'CircleEuroSign' ? 'CircleEuro' : name) as keyof typeof reactIcons];
 			for (const props of [{}, { nonScalingStroke: true, size: 32, strokeWidth: 3 }]) {
 				expect(
 					renderToStaticMarkup(Component, props).html,

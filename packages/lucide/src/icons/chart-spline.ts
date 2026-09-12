@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const ChartSpline = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/chart-spline';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default ChartSpline;

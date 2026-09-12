@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const DoorClosed = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/door-closed';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default DoorClosed;

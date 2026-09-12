@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const CircleArrowOutUpRight = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/circle-arrow-out-up-right';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default CircleArrowOutUpRight;

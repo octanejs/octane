@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const PlayingCardsFan = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/playing-cards-fan';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default PlayingCardsFan;

@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const MessageCircleHeart = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/message-circle-heart';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default MessageCircleHeart;

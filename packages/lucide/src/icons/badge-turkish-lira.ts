@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const BadgeTurkishLira = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/badge-turkish-lira';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default BadgeTurkishLira;

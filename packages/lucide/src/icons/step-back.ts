@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const StepBack = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/step-back';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default StepBack;

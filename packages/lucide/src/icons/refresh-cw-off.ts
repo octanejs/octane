@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const RefreshCwOff = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/refresh-cw-off';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default RefreshCwOff;

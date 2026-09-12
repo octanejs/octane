@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const ZodiacCapricorn = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/zodiac-capricorn';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default ZodiacCapricorn;

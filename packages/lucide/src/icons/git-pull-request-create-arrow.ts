@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const GitPullRequestCreateArrow = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/git-pull-request-create-arrow';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default GitPullRequestCreateArrow;

@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const BadgeQuestionMark = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/badge-question-mark';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default BadgeQuestionMark;

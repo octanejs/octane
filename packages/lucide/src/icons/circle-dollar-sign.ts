@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const CircleDollarSign = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/circle-dollar-sign';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default CircleDollarSign;

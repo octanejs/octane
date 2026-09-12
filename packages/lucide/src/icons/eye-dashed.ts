@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const EyeDashed = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/eye-dashed';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default EyeDashed;

@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const SignpostBig = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/signpost-big';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default SignpostBig;

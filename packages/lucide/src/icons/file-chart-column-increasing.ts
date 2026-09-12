@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const FileChartColumnIncreasing = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/file-chart-column-increasing';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default FileChartColumnIncreasing;

@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const Tags = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/tags';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default Tags;

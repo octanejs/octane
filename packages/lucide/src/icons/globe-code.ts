@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const GlobeCode = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/globe-code';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default GlobeCode;

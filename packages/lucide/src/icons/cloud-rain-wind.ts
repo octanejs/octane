@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const CloudRainWind = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/cloud-rain-wind';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default CloudRainWind;

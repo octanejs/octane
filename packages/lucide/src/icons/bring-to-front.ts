@@ -7,4 +7,6 @@ import createLucideIcon from '../createLucideIcon';
 const BringToFront = createLucideIcon(iconData);
 
 export { default as __iconData } from '@lucide/icons/icons/bring-to-front';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default BringToFront;
