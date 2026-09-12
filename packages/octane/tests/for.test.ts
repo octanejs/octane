@@ -117,7 +117,11 @@ describe('manual keyed lists', () => {
 			for (const input of inputs) input.value = `typed:${input.value}`;
 			current = initial.toReversed();
 			view.update(ManualList, { items: current, getKey });
-			expect(view.findAll('input')).toEqual(inputs.toReversed());
+			const reversed = view.findAll('input') as HTMLInputElement[];
+			for (let i = 0; i < reversed.length; i++) {
+				expect(reversed[i]).toBe(inputs[inputs.length - 1 - i]);
+				expect(reversed[i].value).toBe(`typed:${current[i].label}`);
+			}
 
 			current = [initial[2], { id: 'new', label: 'new' }, initial[0]];
 			failKey = true;
@@ -141,6 +145,74 @@ describe('manual keyed lists', () => {
 			]);
 			expect(calls.length).toBeGreaterThan(0);
 			expect(calls.every((args) => args.length === 2)).toBe(true);
+		} finally {
+			view.unmount();
+		}
+	});
+
+	it('retains edited inputs across mixed-key middle reorders and later replacements', () => {
+		type Row = { id: string; key: unknown };
+		type Props = { items: Row[] };
+		const ManualList: ComponentBody<Props> = (props, scope) => {
+			const parent = hostComponent(scope, 0, 'div', null);
+			forBlock(
+				scope,
+				1,
+				parent,
+				props.items,
+				(item) => item.key,
+				(item, rowScope) => {
+					hostComponent(rowScope, 0, 'input', { 'data-id': item.id, defaultValue: item.id });
+				},
+			);
+		};
+		const initial: Row[] = ['a', {}, 2, undefined, Symbol('e'), 'f'].map((key, index) => ({
+			id: String.fromCharCode(97 + index),
+			key,
+		}));
+		const view = mount(ManualList, { items: initial });
+		try {
+			const original = view.findAll('input') as HTMLInputElement[];
+			const survivors = new Map(initial.map((item, index) => [item, original[index]]));
+			for (const input of original) input.value = `typed:${input.value}`;
+			const added: Row = { id: 'g', key: {} };
+			const reordered = [initial[0], initial[3], added, initial[1], initial[4], initial[5]];
+			view.update(ManualList, { items: reordered });
+			const middle = view.findAll('input') as HTMLInputElement[];
+			expect(middle.map((input) => input.getAttribute('data-id'))).toEqual([
+				'a',
+				'd',
+				'g',
+				'b',
+				'e',
+				'f',
+			]);
+			for (let i = 0; i < reordered.length; i++) {
+				const before = survivors.get(reordered[i]);
+				if (before !== undefined) {
+					expect(middle[i]).toBe(before);
+					expect(middle[i].value).toBe(`typed:${reordered[i].id}`);
+				} else {
+					expect(middle[i].value).toBe('g');
+				}
+			}
+			expect(original[2].isConnected).toBe(false);
+			const replacements: Row[] = [
+				{ id: 'x', key: {} },
+				{ id: 'y', key: 'y' },
+				{ id: 'z', key: 9 },
+			];
+			view.update(ManualList, { items: replacements });
+			const replaced = view.findAll('input') as HTMLInputElement[];
+			expect(replaced.map((input) => input.value)).toEqual(['x', 'y', 'z']);
+			for (const input of middle) expect(input.isConnected).toBe(false);
+			for (const input of replaced) input.value = `typed:${input.value}`;
+			view.update(ManualList, { items: replacements.toReversed() });
+			const reversed = view.findAll('input') as HTMLInputElement[];
+			for (let i = 0; i < reversed.length; i++) {
+				expect(reversed[i]).toBe(replaced[replaced.length - 1 - i]);
+				expect(reversed[i].value).toBe(`typed:${replacements[replacements.length - 1 - i].id}`);
+			}
 		} finally {
 			view.unmount();
 		}

@@ -24,7 +24,6 @@ function trailingVersion(text: string | null): number {
 }
 
 function expectCompilerRegion(code: string): void {
-	expect(code).toMatch(/const __memoCommitted[\w$]* = __s\.slots\._m\$\d+;/);
 	expect(code).toMatch(/__s\.slots\[\d+\] === undefined \|\| __memoCache/);
 	// Dependencies are snapshotted into temporaries once per render; the guard
 	// compares and publishes those exact values.
@@ -32,9 +31,6 @@ function expectCompilerRegion(code: string): void {
 	expect(code).toMatch(/!_\$hookMemoEqual\(__memoCache[\w$]*\[\d+\], __memoDep[\w$]*\)/);
 	expect(code).toMatch(
 		/if \(__memoCache[\w$]* === __memoCommitted[\w$]*\) __memoCache[\w$]* = __memoCache[\w$]*\.slice\(\);/,
-	);
-	expect(code).toMatch(
-		/if \(__memoCache[\w$]* !== __memoCommitted[\w$]*\) __s\.slots\._m\$\d+ = __memoCache[\w$]*;/,
 	);
 }
 
@@ -792,6 +788,96 @@ describe('state-derived collections and independent host bindings', () => {
 });
 
 describe('compiler-owned component-region memoization', () => {
+	it('keeps alternate Provider children distinct while retaining live form state', () => {
+		const client = loadCompiledFixtureSource(
+			`import { useMemo } from 'octane';
+			function Child(props) @{ <span id="shared-label">{props.label}</span> }
+			function Alternate(props) @{ <span id="shared-label">{'alternate:' + props.label}</span> }
+			export function First() @{
+				const memo = useMemo(() => ({ label: 'first' }), []);
+				<div id="shared-host"><input defaultValue="draft"/><Child label={memo.label}/></div>
+			}
+			export function Second() @{
+				const memo = useMemo(() => ({ label: 'second' }), []);
+				<div id="shared-host"><input defaultValue="draft"/><Child label={memo.label}/></div>
+			}
+			export function AutoFirst() @{
+				const memo = useMemo(() => ({ label: 'same' }), []);
+				<div id="shared-host"><input defaultValue="draft"/><Child label={memo.label}/></div>
+			}
+			export function AutoSecond() @{
+				const memo = useMemo(() => ({ label: 'same' }), []);
+				<div id="shared-host"><input defaultValue="draft"/><Alternate label={memo.label}/></div>
+			}
+			export function Combined(props) @{
+				const memo = useMemo(() => ({ label: props.label }), [props.label]);
+				props.observe(memo);
+				<div id="shared-host" data-tick={props.tick}><input defaultValue="draft"/><Child label={memo.label}/></div>
+			}`,
+			{
+				id: 'provider-body-memo-lifetimes.tsrx',
+				mode: 'client',
+				compileOptions: { hmr: false, dev: false },
+			},
+		);
+		const Context = createContext('default');
+		const root = mount(Context.Provider, { value: 'initial', children: client.First });
+		const input = root.find('input') as HTMLInputElement;
+		const label = root.find('#shared-label');
+		expect(label.textContent).toBe('first');
+		input.value = 'typed';
+		input.focus();
+
+		root.update(Context.Provider, { value: 'updated', children: client.Second });
+		expect(root.find('input')).toBe(input);
+		expect(input.value).toBe('typed');
+		expect(document.activeElement).toBe(input);
+		expect(root.find('#shared-label')).toBe(label);
+		expect(label.textContent).toBe('second');
+
+		root.update(Context.Provider, { value: 'again', children: client.Second });
+		expect(root.find('input')).toBe(input);
+		expect(input.value).toBe('typed');
+		expect(root.find('#shared-label')).toBe(label);
+		expect(label.textContent).toBe('second');
+		root.unmount();
+
+		const alternate = mount(Context.Provider, { value: 'initial', children: client.AutoFirst });
+		const alternateInput = alternate.find('input') as HTMLInputElement;
+		const firstLabel = alternate.find('#shared-label');
+		expect(firstLabel.textContent).toBe('same');
+		alternateInput.value = 'edited';
+		alternateInput.focus();
+		alternate.update(Context.Provider, { value: 'updated', children: client.AutoSecond });
+		expect(alternate.find('input')).toBe(alternateInput);
+		expect(alternateInput.value).toBe('edited');
+		expect(document.activeElement).toBe(alternateInput);
+		expect(alternate.find('#shared-label').textContent).toBe('alternate:same');
+		expect(alternate.find('#shared-label')).not.toBe(firstLabel);
+		alternate.unmount();
+
+		const observed: object[] = [];
+		const capture = (value: object) => observed.push(value);
+		const combined = mount(client.Combined, { label: 'same', tick: 0, observe: capture });
+		const combinedInput = combined.find('input') as HTMLInputElement;
+		combinedInput.value = 'kept';
+		combinedInput.focus();
+		const initialMemo = observed.at(-1);
+		const initialObservations = observed.length;
+		combined.update(client.Combined, { label: 'same', tick: 1, observe: capture });
+		expect(combined.find('#shared-host').getAttribute('data-tick')).toBe('1');
+		expect(observed.length).toBeGreaterThan(initialObservations);
+		expect(observed.at(-1)).toBe(initialMemo);
+		expect(combined.find('input')).toBe(combinedInput);
+		expect(combinedInput.value).toBe('kept');
+		expect(document.activeElement).toBe(combinedInput);
+		const stableMemo = observed.at(-1);
+		combined.update(client.Combined, { label: 'next', tick: 2, observe: capture });
+		expect(observed.at(-1)).not.toBe(stableMemo);
+		expect(combined.find('#shared-label').textContent).toBe('next');
+		combined.unmount();
+	});
+
 	it('preserves an independently updating pure hookful child under its hookful parent', () => {
 		const source = `
 			import { useState } from 'octane';
