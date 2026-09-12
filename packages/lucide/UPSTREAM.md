@@ -1,11 +1,19 @@
 # Lucide React upstream
 
-`@octanejs/lucide` ports the React-facing layer from
-[`lucide-react@1.24.0`](https://github.com/lucide-icons/lucide/releases/tag/1.24.0)
-while generating SVG geometry from the matching framework-neutral
-`@lucide/icons` package.
+`@octanejs/lucide` tracks the published `lucide-react@1.45.0` API and consumes
+`@lucide/icons@1.45.0` as an ordinary framework-neutral dependency. SVG geometry
+and display attributes come from its public icon data and `@lucide/icons/build`
+API. The Octane descriptor bridge, context and dynamic-loader lifecycle are
+maintained locally; this update copies no new React implementation or tests.
+Exact npm artifact integrity and shipped license fingerprints are recorded in
+`audit/release-compatibility.json`.
 
-## Immutable pin
+The current adapter supports object-form custom icons, nested nodes, rectangular
+view boxes, aliases, provider `nonScalingStroke`, and complete dynamic icon data.
+Custom legacy names now use the supplied class token, matching Lucide 1.45.0.
+Direct dynamic modules expose `__iconData` in place of the old `__iconNode`.
+
+## Historical implementation pin
 
 - Package: `lucide-react@1.24.0`
 - Tag and commit: `1.24.0` / `b5b5d95933790a311aa6b7ed232fc8469934acdf`
@@ -14,7 +22,7 @@ while generating SVG geometry from the matching framework-neutral
 - Test root: `packages/lucide-react/tests`
 - License: ISC
 - npm archive SHA-256: `ecff662abb2131f6c2dcd00ba4cce1f78bdd2495e7d607f6d2f4fcb9b3e4a58d`
-- Supported upstream range: exactly `1.24.0`
+- Original source release: exactly `1.24.0`; current dependency/oracle: `1.45.0`
 - React oracle: `react@19.2.7` and `react-dom@19.2.7`
 
 The npm archive publishes compiled ESM/CJS runtime, declarations, dynamic
@@ -70,3 +78,18 @@ The `lucide-runtime-differential` lane compiles the same icon-gallery and
  provided, accessible, custom, and loaded output after matching
 interactions. Exact test identity selection is fail-closed. These two cases do
 not establish exhaustive parity for the generated package surface.
+
+
+## Current maintenance evidence
+
+Generation and export checks cover 1,834 canonical icons, their aliases and all
+2,098 dynamic names. Every canonical glyph is rendered against the current React
+oracle with default and non-scaling stroke props. Shared fixtures additionally
+cover custom rectangular data and provider overrides. Direct strict public type
+probes reject conflicting icon/view-box representations and malformed props.
+Hydration retains the SVG host and supports live prop updates; native ref/event
+and out-of-order dynamic-import tests cover owned lifecycle behavior.
+
+These checks do not replace the historical unvendored upstream suite with a
+claim of exhaustive test parity. The historical provenance and its
+`recorded-unverified` state are retained.

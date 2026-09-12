@@ -8,3 +8,4 @@ export { default as CircleAlert } from '../../src/icons/circle-alert.js';
 export { default as Search } from '../../src/icons/search.js';
 export { default as Icon } from '../../src/Icon.js';
 export { LucideProvider } from '../../src/context.js';
+export { default as createLucideIcon } from '../../src/createLucideIcon.js';

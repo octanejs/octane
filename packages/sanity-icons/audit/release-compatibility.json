@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "releases": [
+    {
+      "package": "@sanity/icons",
+      "version": "5.2.2",
+      "license": "MIT",
+      "repository": {
+        "url": "git+https://github.com/sanity-io/ui.git",
+        "type": "git",
+        "directory": "packages/icons"
+      },
+      "integrity": "sha512-v+5dMjYJ6pC4x8IS/4O/GvQBet5GqsXsqJxBiiS6WHZt21EgntpW+q5hxU3dO4q/njiyR8O1JsdLAs3NranoXA==",
+      "gitHead": null,
+      "archiveSha256": "90375c505a3d906093875d461191a5e2a45f55a5ead953dac84944d247e2bb09",
+      "licenses": [
+        {
+          "path": "package/LICENSE",
+          "sha256": "2cee1b7201e1df5f3d5e5be80741cf567b1dac2fa011c665a1975916238d4d1c"
+        }
+      ],
+      "tarball": "https://registry.npmjs.org/@sanity/icons/-/icons-5.2.2.tgz"
+    }
+  ],
+  "sourceCopy": "No new upstream implementation or tests copied. Historical attribution retained.",
+  "validation": [
+    "All 236 generated subpaths and package exports match byte-for-byte when generated from @sanity/icons@5.2.2.",
+    "All 237 JS files differ only in component function names; all 237 declaration bodies and public exports are unchanged."
+  ],
+  "limitations": "This dependency maintenance does not claim exhaustive upstream test-suite parity.",
+  "sourceComparison": {
+    "files": 474,
+    "javascript": 237,
+    "declarations": 237,
+    "allEquivalent": true,
+    "changes": "JavaScript adds names to forwardRef component functions. Declarations move unchanged public definitions from trailing export lists to direct export declarations.",
+    "oldArchiveSha256": "6824fd549c22c76c9dadd47ec1c192cdfd674815cfc009a09d23b2bf447b8bd2",
+    "comparisonReceiptSha256": "60f8186b0fdec52e33a66365d3b4c010f5b60ea5a5fda9155d810730d813131d"
+  }
+}

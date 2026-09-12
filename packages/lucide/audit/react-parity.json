@@ -11,10 +11,21 @@
     "integrity": "sha256:ecff662abb2131f6c2dcd00ba4cce1f78bdd2495e7d607f6d2f4fcb9b3e4a58d",
     "verification": "recorded-unverified"
   },
-  "upstreamSuites": { "runtime": "present", "types": "absent" },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "absent"
+  },
   "adaptedRoots": {
-    "source": { "roots": ["packages/lucide/src"], "include": ["\\.ts$"], "exclude": [] },
-    "tests": { "roots": ["packages/lucide/tests"], "include": ["\\.test\\.ts$"], "exclude": [] }
+    "source": {
+      "roots": ["packages/lucide/src"],
+      "include": ["\\.ts$"],
+      "exclude": []
+    },
+    "tests": {
+      "roots": ["packages/lucide/tests"],
+      "include": ["\\.test\\.ts$"],
+      "exclude": []
+    }
   },
   "adaptedRuntimeSummary": {
     "inventoryEntries": 0,
@@ -29,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "8b22926b6186369bfc8ca72aedb69b7853160e5ab762b1a36e1a61bf24f6c322"
+      "lockfileSha256": "18527ec92bf53f0984017c1b159198f5397578d3bb0cd8940075bcbd0838ecf6"
     }
   },
   "lanes": [
@@ -40,34 +51,34 @@
       "environment": "workspace-node",
       "project": "lucide-differential",
       "evidenceOrigin": "repo-authored",
-      "notes": "Runs the same icon-gallery and dynamic-icon fixtures against lucide-react 1.24.0 on React and @octanejs/lucide on Octane, comparing named, provided, accessible, custom, and loaded output. Transient fallback timing is excluded because either runtime may resolve first.",
+      "notes": "Runs the same icon-gallery and dynamic-icon fixtures against lucide-react 1.45.0 on React and @octanejs/lucide on Octane, comparing named, provided, accessible, custom, and loaded output. Transient fallback timing is excluded because either runtime may resolve first. Includes object-form rectangular icons and non-scaling provider overrides.",
       "files": [
         {
           "path": "packages/lucide/tests/differential/parity.test.ts",
           "role": "test",
-          "sha256": "6aa5f3674fc7a91ef3d9656846e023296b16fa2db2cd0d4e9660a12ade1f59d0",
+          "sha256": "aafc0f7d4d1de7868fb72ebcbb3fb777d5428e38aedbf4ee268a4138ae4db4f3",
           "cases": [
             {
               "id": "differential:lucide-icons",
               "testName": "renders named, provided, accessible, and custom icons identically",
-              "fullName": "differential: @octanejs/lucide vs lucide-react@1.24.0 renders named, provided, accessible, and custom icons identically"
+              "fullName": "differential: @octanejs/lucide vs lucide-react@1.45.0 renders named, provided, accessible, and custom icons identically"
             },
             {
               "id": "differential:lucide-dynamic",
               "testName": "loads a dynamic icon identically",
-              "fullName": "differential: @octanejs/lucide vs lucide-react@1.24.0 loads a dynamic icon identically"
+              "fullName": "differential: @octanejs/lucide vs lucide-react@1.45.0 loads a dynamic icon identically"
             }
           ]
         },
         {
           "path": "packages/lucide/tests/_fixtures/icons.tsrx",
           "role": "support",
-          "sha256": "0d38592e84a8bac96e94697d97db59a1e7984b945e34fab9574870dc5437bd67"
+          "sha256": "7a85bdbfc0d1fa52c780c447dd2991f7a532d1834fea23a87b3d2443fac4166f"
         },
         {
           "path": "packages/lucide/tests/_fixtures/icons-runtime.ts",
           "role": "support",
-          "sha256": "0d3e1b68b897154d3dc8ae090307e1768a52aa4bb61b2cb46037b7e97c707bf9"
+          "sha256": "88cb759cf55c6b1f0004900178bd56a3cd8a8b5725558e5c1db852bc35cffb9f"
         },
         {
           "path": "packages/lucide/tests/_fixtures/dynamic.tsrx",
@@ -77,12 +88,12 @@
         {
           "path": "packages/lucide/tests/differential/_setup.ts",
           "role": "support",
-          "sha256": "ede9d977d2edca69030bb3f1bdc01abe0b4426315fd2b798985ceaed155e2fff"
+          "sha256": "f5962eb27a20bc42ad1263fa921c1c430b69dfe10bea9b320f43f1402b99faee"
         },
         {
           "path": "packages/lucide/audit/test-classifications.json",
           "role": "support",
-          "sha256": "66f3a0c5ca606af969e3d1973cb679eba2e04b262cd58f2cbb8e438937e68663"
+          "sha256": "f00edc345a5519daed87ffa3260fe2ce724c8af89f2b896aaf43984b6b53b53d"
         },
         {
           "path": "packages/octane/tests/differential/_rig.ts",

@@ -7,20 +7,30 @@ import { Camera as ReactCamera } from 'lucide-react';
 
 describe('@octanejs/lucide — hydration', () => {
 	it('adopts the server-rendered SVG host', () => {
-		const props = { size: 32, color: 'purple', className: 'hydrated', 'aria-label': 'Camera' };
+		const props = {
+			size: 32,
+			color: 'purple',
+			nonScalingStroke: true,
+			className: 'hydrated',
+			'aria-label': 'Camera',
+		};
 		const container = document.createElement('div');
 		container.innerHTML = renderReactToString(createReactElement(ReactCamera, props));
 		document.body.appendChild(container);
 		const serverSvg = container.querySelector('svg')!;
+		const serverPath = serverSvg.querySelector('path')!;
+		expect(serverPath.getAttribute('vector-effect')).toBe('non-scaling-stroke');
 		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
 
 		const root = hydrateRoot(container, Camera, props);
 		expect(container.querySelector('svg')).toBe(serverSvg);
 		expect(container.querySelectorAll('svg')).toHaveLength(1);
 		expect(error).not.toHaveBeenCalled();
-		flushSync(() => root.render(Camera, { ...props, color: 'green' }));
+		flushSync(() => root.render(Camera, { ...props, color: 'green', nonScalingStroke: false }));
 		expect(container.querySelector('svg')).toBe(serverSvg);
 		expect(serverSvg.getAttribute('stroke')).toBe('green');
+		expect(serverSvg.querySelector('path')).toBe(serverPath);
+		expect(serverPath.hasAttribute('vector-effect')).toBe(false);
 
 		root.unmount();
 		expect(container.querySelector('svg')).toBeNull();

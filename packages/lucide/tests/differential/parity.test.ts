@@ -14,7 +14,7 @@ await Promise.all([
 	preloadDifferentialFixture(DYNAMIC_FIXTURE, CACHE),
 ]);
 
-describe('differential: @octanejs/lucide vs lucide-react@1.24.0', () => {
+describe('differential: @octanejs/lucide vs lucide-react@1.45.0', () => {
 	// @parity-case differential:lucide-icons
 	it('renders named, provided, accessible, and custom icons identically', async () => {
 		const differential = await mountDifferential(ICONS_FIXTURE, 'IconGallery', undefined, CACHE);

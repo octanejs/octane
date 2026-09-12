@@ -1,4 +1,4 @@
-// Generated from lucide-react@1.24.0 and @lucide/icons@1.24.0.
+// Generated from lucide-react@1.45.0 and @lucide/icons@1.45.0.
 // Run `pnpm lucide:generate`; do not edit by hand.
 
 export {
@@ -107,6 +107,13 @@ export {
 	default as LucideBetweenHorizontalStart,
 } from './icons/between-horizontal-start';
 export {
+	default as BookBookmarkIcon,
+	default as BookMarked,
+	default as BookMarkedIcon,
+	default as LucideBookBookmark,
+	default as LucideBookMarked,
+} from './icons/book-bookmark';
+export {
 	default as BookDashedIcon,
 	default as BookTemplate,
 	default as BookTemplateIcon,
@@ -121,6 +128,13 @@ export {
 	default as LucideCurlyBraces,
 } from './icons/braces';
 export {
+	default as Building2,
+	default as Building2Icon,
+	default as BuildingComplexIcon,
+	default as LucideBuilding2,
+	default as LucideBuildingComplex,
+} from './icons/building-complex';
+export {
 	default as CaptionsIcon,
 	default as LucideCaptions,
 	default as LucideSubtitles,
@@ -128,19 +142,19 @@ export {
 	default as SubtitlesIcon,
 } from './icons/captions';
 export {
-	default as BarChartHorizontalBig,
-	default as BarChartHorizontalBigIcon,
-	default as ChartBarBigIcon,
-	default as LucideBarChartHorizontalBig,
-	default as LucideChartBarBig,
-} from './icons/chart-bar-big';
-export {
 	default as AreaChart,
 	default as AreaChartIcon,
 	default as ChartAreaIcon,
 	default as LucideAreaChart,
 	default as LucideChartArea,
 } from './icons/chart-area';
+export {
+	default as BarChartHorizontalBig,
+	default as BarChartHorizontalBigIcon,
+	default as ChartBarBigIcon,
+	default as LucideBarChartHorizontalBig,
+	default as LucideChartBarBig,
+} from './icons/chart-bar-big';
 export {
 	default as BarChartHorizontal,
 	default as BarChartHorizontalIcon,
@@ -219,19 +233,19 @@ export {
 	default as ScatterChartIcon,
 } from './icons/chart-scatter';
 export {
-	default as AlertCircle,
-	default as AlertCircleIcon,
-	default as CircleAlertIcon,
-	default as LucideAlertCircle,
-	default as LucideCircleAlert,
-} from './icons/circle-alert';
-export {
 	default as ArrowDownCircle,
 	default as ArrowDownCircleIcon,
 	default as CircleArrowDownIcon,
 	default as LucideArrowDownCircle,
 	default as LucideCircleArrowDown,
 } from './icons/circle-arrow-down';
+export {
+	default as AlertCircle,
+	default as AlertCircleIcon,
+	default as CircleAlertIcon,
+	default as LucideAlertCircle,
+	default as LucideCircleAlert,
+} from './icons/circle-alert';
 export {
 	default as ArrowLeftCircle,
 	default as ArrowLeftCircleIcon,
@@ -247,6 +261,13 @@ export {
 	default as LucideCircleArrowOutDownLeft,
 } from './icons/circle-arrow-out-down-left';
 export {
+	default as ArrowUpLeftFromCircle,
+	default as ArrowUpLeftFromCircleIcon,
+	default as CircleArrowOutUpLeftIcon,
+	default as LucideArrowUpLeftFromCircle,
+	default as LucideCircleArrowOutUpLeft,
+} from './icons/circle-arrow-out-up-left';
+export {
 	default as ArrowDownRightFromCircle,
 	default as ArrowDownRightFromCircleIcon,
 	default as CircleArrowOutDownRightIcon,
@@ -254,12 +275,12 @@ export {
 	default as LucideCircleArrowOutDownRight,
 } from './icons/circle-arrow-out-down-right';
 export {
-	default as ArrowUpLeftFromCircle,
-	default as ArrowUpLeftFromCircleIcon,
-	default as CircleArrowOutUpLeftIcon,
-	default as LucideArrowUpLeftFromCircle,
-	default as LucideCircleArrowOutUpLeft,
-} from './icons/circle-arrow-out-up-left';
+	default as ArrowUpRightFromCircle,
+	default as ArrowUpRightFromCircleIcon,
+	default as CircleArrowOutUpRightIcon,
+	default as LucideArrowUpRightFromCircle,
+	default as LucideCircleArrowOutUpRight,
+} from './icons/circle-arrow-out-up-right';
 export {
 	default as ArrowRightCircle,
 	default as ArrowRightCircleIcon,
@@ -268,19 +289,19 @@ export {
 	default as LucideCircleArrowRight,
 } from './icons/circle-arrow-right';
 export {
-	default as ArrowUpCircle,
-	default as ArrowUpCircleIcon,
-	default as CircleArrowUpIcon,
-	default as LucideArrowUpCircle,
-	default as LucideCircleArrowUp,
-} from './icons/circle-arrow-up';
-export {
 	default as CheckCircle,
 	default as CheckCircleIcon,
 	default as CircleCheckBigIcon,
 	default as LucideCheckCircle,
 	default as LucideCircleCheckBig,
 } from './icons/circle-check-big';
+export {
+	default as ArrowUpCircle,
+	default as ArrowUpCircleIcon,
+	default as CircleArrowUpIcon,
+	default as LucideArrowUpCircle,
+	default as LucideCircleArrowUp,
+} from './icons/circle-arrow-up';
 export {
 	default as CheckCircle2,
 	default as CheckCircle2Icon,
@@ -302,13 +323,6 @@ export {
 	default as LucideChevronLeftCircle,
 	default as LucideCircleChevronLeft,
 } from './icons/circle-chevron-left';
-export {
-	default as ArrowUpRightFromCircle,
-	default as ArrowUpRightFromCircleIcon,
-	default as CircleArrowOutUpRightIcon,
-	default as LucideArrowUpRightFromCircle,
-	default as LucideCircleArrowOutUpRight,
-} from './icons/circle-arrow-out-up-right';
 export {
 	default as ChevronRightCircle,
 	default as ChevronRightCircleIcon,
@@ -366,19 +380,19 @@ export {
 	default as PauseCircleIcon,
 } from './icons/circle-pause';
 export {
-	default as CirclePlayIcon,
-	default as LucideCirclePlay,
-	default as LucidePlayCircle,
-	default as PlayCircle,
-	default as PlayCircleIcon,
-} from './icons/circle-play';
-export {
 	default as CirclePercentIcon,
 	default as LucideCirclePercent,
 	default as LucidePercentCircle,
 	default as PercentCircle,
 	default as PercentCircleIcon,
 } from './icons/circle-percent';
+export {
+	default as CirclePlayIcon,
+	default as LucideCirclePlay,
+	default as LucidePlayCircle,
+	default as PlayCircle,
+	default as PlayCircleIcon,
+} from './icons/circle-play';
 export {
 	default as CirclePlusIcon,
 	default as LucideCirclePlus,
@@ -411,19 +425,19 @@ export {
 	default as LucideCircleSlashed,
 } from './icons/circle-slash-2';
 export {
-	default as CircleUserRoundIcon,
-	default as LucideCircleUserRound,
-	default as LucideUserCircle2,
-	default as UserCircle2,
-	default as UserCircle2Icon,
-} from './icons/circle-user-round';
-export {
 	default as CircleStopIcon,
 	default as LucideCircleStop,
 	default as LucideStopCircle,
 	default as StopCircle,
 	default as StopCircleIcon,
 } from './icons/circle-stop';
+export {
+	default as CircleUserRoundIcon,
+	default as LucideCircleUserRound,
+	default as LucideUserCircle2,
+	default as UserCircle2,
+	default as UserCircle2Icon,
+} from './icons/circle-user-round';
 export {
 	default as CircleUserIcon,
 	default as LucideCircleUser,
@@ -533,6 +547,55 @@ export {
 	default as MoreHorizontalIcon,
 } from './icons/ellipsis';
 export {
+	default as Angry,
+	default as AngryIcon,
+	default as FaceAngryIcon,
+	default as LucideAngry,
+	default as LucideFaceAngry,
+} from './icons/face-angry';
+export {
+	default as Annoyed,
+	default as AnnoyedIcon,
+	default as FaceExpressionlessIcon,
+	default as LucideAnnoyed,
+	default as LucideFaceExpressionless,
+} from './icons/face-expressionless';
+export {
+	default as FaceGrinningIcon,
+	default as Laugh,
+	default as LaughIcon,
+	default as LucideFaceGrinning,
+	default as LucideLaugh,
+} from './icons/face-grinning';
+export {
+	default as FaceSlightlyFrowningIcon,
+	default as Frown,
+	default as FrownIcon,
+	default as LucideFaceSlightlyFrowning,
+	default as LucideFrown,
+} from './icons/face-slightly-frowning';
+export {
+	default as FaceNeutralIcon,
+	default as LucideFaceNeutral,
+	default as LucideMeh,
+	default as Meh,
+	default as MehIcon,
+} from './icons/face-neutral';
+export {
+	default as FaceSlightlySmilingPlusIcon,
+	default as LucideFaceSlightlySmilingPlus,
+	default as LucideSmilePlus,
+	default as SmilePlus,
+	default as SmilePlusIcon,
+} from './icons/face-slightly-smiling-plus';
+export {
+	default as FaceSlightlySmilingIcon,
+	default as LucideFaceSlightlySmiling,
+	default as LucideSmile,
+	default as Smile,
+	default as SmileIcon,
+} from './icons/face-slightly-smiling';
+export {
 	default as FileAxis3D,
 	default as FileAxis3DIcon,
 	default as FileAxis3dIcon,
@@ -547,19 +610,19 @@ export {
 	default as LucideFileBadge2,
 } from './icons/file-badge';
 export {
-	default as FileBracesIcon,
-	default as FileJson,
-	default as FileJsonIcon,
-	default as LucideFileBraces,
-	default as LucideFileJson,
-} from './icons/file-braces';
-export {
 	default as FileBracesCornerIcon,
 	default as FileJson2,
 	default as FileJson2Icon,
 	default as LucideFileBracesCorner,
 	default as LucideFileJson2,
 } from './icons/file-braces-corner';
+export {
+	default as FileBracesIcon,
+	default as FileJson,
+	default as FileJsonIcon,
+	default as LucideFileBraces,
+	default as LucideFileJson,
+} from './icons/file-braces';
 export {
 	default as FileBarChart,
 	default as FileBarChartIcon,
@@ -568,19 +631,19 @@ export {
 	default as LucideFileChartColumnIncreasing,
 } from './icons/file-chart-column-increasing';
 export {
-	default as FileChartLineIcon,
-	default as FileLineChart,
-	default as FileLineChartIcon,
-	default as LucideFileChartLine,
-	default as LucideFileLineChart,
-} from './icons/file-chart-line';
-export {
 	default as FileBarChart2,
 	default as FileBarChart2Icon,
 	default as FileChartColumnIcon,
 	default as LucideFileBarChart2,
 	default as LucideFileChartColumn,
 } from './icons/file-chart-column';
+export {
+	default as FileChartLineIcon,
+	default as FileLineChart,
+	default as FileLineChartIcon,
+	default as LucideFileChartLine,
+	default as LucideFileLineChart,
+} from './icons/file-chart-line';
 export {
 	default as FileChartPieIcon,
 	default as FilePieChart,
@@ -704,19 +767,19 @@ export {
 	default as LucideFileTypeCorner,
 } from './icons/file-type-corner';
 export {
-	default as FileVideo2,
-	default as FileVideo2Icon,
-	default as FileVideoCameraIcon,
-	default as LucideFileVideo2,
-	default as LucideFileVideoCamera,
-} from './icons/file-video-camera';
-export {
 	default as FileX2,
 	default as FileX2Icon,
 	default as FileXCornerIcon,
 	default as LucideFileX2,
 	default as LucideFileXCorner,
 } from './icons/file-x-corner';
+export {
+	default as FileVideo2,
+	default as FileVideo2Icon,
+	default as FileVideoCameraIcon,
+	default as LucideFileVideo2,
+	default as LucideFileVideoCamera,
+} from './icons/file-video-camera';
 export {
 	default as FolderCog2,
 	default as FolderCog2Icon,
@@ -902,6 +965,13 @@ export {
 	default as MessageCircleQuestionMarkIcon,
 } from './icons/message-circle-question-mark';
 export {
+	default as LucideMicSignal,
+	default as LucidePodcast,
+	default as MicSignalIcon,
+	default as Podcast,
+	default as PodcastIcon,
+} from './icons/mic-signal';
+export {
 	default as LucideMic2,
 	default as LucideMicVocal,
 	default as Mic2,
@@ -951,13 +1021,6 @@ export {
 	default as PanelBottomInactiveIcon,
 } from './icons/panel-bottom-dashed';
 export {
-	default as LucidePanelLeftClose,
-	default as LucideSidebarClose,
-	default as PanelLeftCloseIcon,
-	default as SidebarClose,
-	default as SidebarCloseIcon,
-} from './icons/panel-left-close';
-export {
 	default as LucidePanelLeftDashed,
 	default as LucidePanelLeftInactive,
 	default as PanelLeftDashedIcon,
@@ -965,12 +1028,12 @@ export {
 	default as PanelLeftInactiveIcon,
 } from './icons/panel-left-dashed';
 export {
-	default as LucidePanelLeft,
-	default as LucideSidebar,
-	default as PanelLeftIcon,
-	default as Sidebar,
-	default as SidebarIcon,
-} from './icons/panel-left';
+	default as LucidePanelLeftClose,
+	default as LucideSidebarClose,
+	default as PanelLeftCloseIcon,
+	default as SidebarClose,
+	default as SidebarCloseIcon,
+} from './icons/panel-left-close';
 export {
 	default as LucidePanelLeftOpen,
 	default as LucideSidebarOpen,
@@ -978,6 +1041,13 @@ export {
 	default as SidebarOpen,
 	default as SidebarOpenIcon,
 } from './icons/panel-left-open';
+export {
+	default as LucidePanelLeft,
+	default as LucideSidebar,
+	default as PanelLeftIcon,
+	default as Sidebar,
+	default as SidebarIcon,
+} from './icons/panel-left';
 export {
 	default as LucidePanelRightDashed,
 	default as LucidePanelRightInactive,
@@ -1034,6 +1104,13 @@ export {
 	default as Rotate3DIcon,
 	default as Rotate3dIcon,
 } from './icons/rotate-3d';
+export {
+	default as History,
+	default as HistoryIcon,
+	default as LucideHistory,
+	default as LucideRotateCcwClock,
+	default as RotateCcwClockIcon,
+} from './icons/rotate-ccw-clock';
 export {
 	default as LucideRows,
 	default as LucideRows2,
@@ -1098,19 +1175,19 @@ export {
 	default as SquareActivityIcon,
 } from './icons/square-activity';
 export {
-	default as ArrowDownRightSquare,
-	default as ArrowDownRightSquareIcon,
-	default as LucideArrowDownRightSquare,
-	default as LucideSquareArrowDownRight,
-	default as SquareArrowDownRightIcon,
-} from './icons/square-arrow-down-right';
-export {
 	default as ArrowDownLeftSquare,
 	default as ArrowDownLeftSquareIcon,
 	default as LucideArrowDownLeftSquare,
 	default as LucideSquareArrowDownLeft,
 	default as SquareArrowDownLeftIcon,
 } from './icons/square-arrow-down-left';
+export {
+	default as ArrowDownRightSquare,
+	default as ArrowDownRightSquareIcon,
+	default as LucideArrowDownRightSquare,
+	default as LucideSquareArrowDownRight,
+	default as SquareArrowDownRightIcon,
+} from './icons/square-arrow-down-right';
 export {
 	default as ArrowDownSquare,
 	default as ArrowDownSquareIcon,
@@ -1119,12 +1196,12 @@ export {
 	default as SquareArrowDownIcon,
 } from './icons/square-arrow-down';
 export {
-	default as ArrowDownRightFromSquare,
-	default as ArrowDownRightFromSquareIcon,
-	default as LucideArrowDownRightFromSquare,
-	default as LucideSquareArrowOutDownRight,
-	default as SquareArrowOutDownRightIcon,
-} from './icons/square-arrow-out-down-right';
+	default as ArrowLeftSquare,
+	default as ArrowLeftSquareIcon,
+	default as LucideArrowLeftSquare,
+	default as LucideSquareArrowLeft,
+	default as SquareArrowLeftIcon,
+} from './icons/square-arrow-left';
 export {
 	default as ArrowDownLeftFromSquare,
 	default as ArrowDownLeftFromSquareIcon,
@@ -1133,12 +1210,12 @@ export {
 	default as SquareArrowOutDownLeftIcon,
 } from './icons/square-arrow-out-down-left';
 export {
-	default as ArrowLeftSquare,
-	default as ArrowLeftSquareIcon,
-	default as LucideArrowLeftSquare,
-	default as LucideSquareArrowLeft,
-	default as SquareArrowLeftIcon,
-} from './icons/square-arrow-left';
+	default as ArrowDownRightFromSquare,
+	default as ArrowDownRightFromSquareIcon,
+	default as LucideArrowDownRightFromSquare,
+	default as LucideSquareArrowOutDownRight,
+	default as SquareArrowOutDownRightIcon,
+} from './icons/square-arrow-out-down-right';
 export {
 	default as ArrowUpLeftFromSquare,
 	default as ArrowUpLeftFromSquareIcon,
@@ -1161,19 +1238,19 @@ export {
 	default as SquareArrowRightIcon,
 } from './icons/square-arrow-right';
 export {
-	default as ArrowUpLeftSquare,
-	default as ArrowUpLeftSquareIcon,
-	default as LucideArrowUpLeftSquare,
-	default as LucideSquareArrowUpLeft,
-	default as SquareArrowUpLeftIcon,
-} from './icons/square-arrow-up-left';
-export {
 	default as ArrowUpRightSquare,
 	default as ArrowUpRightSquareIcon,
 	default as LucideArrowUpRightSquare,
 	default as LucideSquareArrowUpRight,
 	default as SquareArrowUpRightIcon,
 } from './icons/square-arrow-up-right';
+export {
+	default as ArrowUpLeftSquare,
+	default as ArrowUpLeftSquareIcon,
+	default as LucideArrowUpLeftSquare,
+	default as LucideSquareArrowUpLeft,
+	default as SquareArrowUpLeftIcon,
+} from './icons/square-arrow-up-left';
 export {
 	default as ArrowUpSquare,
 	default as ArrowUpSquareIcon,
@@ -1196,12 +1273,12 @@ export {
 	default as SquareBottomDashedScissorsIcon,
 } from './icons/square-bottom-dashed-scissors';
 export {
-	default as FlipVertical,
-	default as FlipVerticalIcon,
-	default as LucideFlipVertical,
-	default as LucideSquareCenterlineDashedVertical,
-	default as SquareCenterlineDashedVerticalIcon,
-} from './icons/square-centerline-dashed-vertical';
+	default as Album,
+	default as AlbumIcon,
+	default as LucideAlbum,
+	default as LucideSquareBookmark,
+	default as SquareBookmarkIcon,
+} from './icons/square-bookmark';
 export {
 	default as FlipHorizontal,
 	default as FlipHorizontalIcon,
@@ -1209,6 +1286,13 @@ export {
 	default as LucideSquareCenterlineDashedHorizontal,
 	default as SquareCenterlineDashedHorizontalIcon,
 } from './icons/square-centerline-dashed-horizontal';
+export {
+	default as FlipVertical,
+	default as FlipVerticalIcon,
+	default as LucideFlipVertical,
+	default as LucideSquareCenterlineDashedVertical,
+	default as SquareCenterlineDashedVerticalIcon,
+} from './icons/square-centerline-dashed-vertical';
 export {
 	default as GanttChartSquare,
 	default as GanttChartSquareIcon,
@@ -1234,19 +1318,19 @@ export {
 	default as SquareCheckIcon,
 } from './icons/square-check';
 export {
-	default as ChevronLeftSquare,
-	default as ChevronLeftSquareIcon,
-	default as LucideChevronLeftSquare,
-	default as LucideSquareChevronLeft,
-	default as SquareChevronLeftIcon,
-} from './icons/square-chevron-left';
-export {
 	default as ChevronDownSquare,
 	default as ChevronDownSquareIcon,
 	default as LucideChevronDownSquare,
 	default as LucideSquareChevronDown,
 	default as SquareChevronDownIcon,
 } from './icons/square-chevron-down';
+export {
+	default as ChevronLeftSquare,
+	default as ChevronLeftSquareIcon,
+	default as LucideChevronLeftSquare,
+	default as LucideSquareChevronLeft,
+	default as SquareChevronLeftIcon,
+} from './icons/square-chevron-left';
 export {
 	default as ChevronRightSquare,
 	default as ChevronRightSquareIcon,
@@ -1321,6 +1405,13 @@ export {
 	default as SquareEqualIcon,
 } from './icons/square-equal';
 export {
+	default as FunctionSquare,
+	default as FunctionSquareIcon,
+	default as LucideFunctionSquare,
+	default as LucideSquareFunction,
+	default as SquareFunctionIcon,
+} from './icons/square-function';
+export {
 	default as KanbanSquare,
 	default as KanbanSquareIcon,
 	default as LucideKanbanSquare,
@@ -1335,19 +1426,12 @@ export {
 	default as SquareLibraryIcon,
 } from './icons/square-library';
 export {
-	default as FunctionSquare,
-	default as FunctionSquareIcon,
-	default as LucideFunctionSquare,
-	default as LucideSquareFunction,
-	default as SquareFunctionIcon,
-} from './icons/square-function';
-export {
-	default as LucideMinusSquare,
-	default as LucideSquareMinus,
-	default as MinusSquare,
-	default as MinusSquareIcon,
-	default as SquareMinusIcon,
-} from './icons/square-minus';
+	default as LucideMSquare,
+	default as LucideSquareM,
+	default as MSquare,
+	default as MSquareIcon,
+	default as SquareMIcon,
+} from './icons/square-m';
 export {
 	default as LucideMenuSquare,
 	default as LucideSquareMenu,
@@ -1356,12 +1440,12 @@ export {
 	default as SquareMenuIcon,
 } from './icons/square-menu';
 export {
-	default as LucideMSquare,
-	default as LucideSquareM,
-	default as MSquare,
-	default as MSquareIcon,
-	default as SquareMIcon,
-} from './icons/square-m';
+	default as LucideMinusSquare,
+	default as LucideSquareMinus,
+	default as MinusSquare,
+	default as MinusSquareIcon,
+	default as SquareMinusIcon,
+} from './icons/square-minus';
 export {
 	default as Inspect,
 	default as InspectIcon,
@@ -1384,6 +1468,13 @@ export {
 	default as SquareParkingIcon,
 } from './icons/square-parking';
 export {
+	default as LucidePercentSquare,
+	default as LucideSquarePercent,
+	default as PercentSquare,
+	default as PercentSquareIcon,
+	default as SquarePercentIcon,
+} from './icons/square-percent';
+export {
 	default as Edit,
 	default as EditIcon,
 	default as LucideEdit,
@@ -1396,13 +1487,6 @@ export {
 	default as PenSquareIcon,
 	default as SquarePenIcon,
 } from './icons/square-pen';
-export {
-	default as LucidePercentSquare,
-	default as LucideSquarePercent,
-	default as PercentSquare,
-	default as PercentSquareIcon,
-	default as SquarePercentIcon,
-} from './icons/square-percent';
 export {
 	default as LucidePiSquare,
 	default as LucideSquarePi,
@@ -1425,13 +1509,6 @@ export {
 	default as SquarePilcrowIcon,
 } from './icons/square-pilcrow';
 export {
-	default as LucidePlusSquare,
-	default as LucideSquarePlus,
-	default as PlusSquare,
-	default as PlusSquareIcon,
-	default as SquarePlusIcon,
-} from './icons/square-plus';
-export {
 	default as LucidePowerSquare,
 	default as LucideSquarePower,
 	default as PowerSquare,
@@ -1445,6 +1522,13 @@ export {
 	default as ScissorsSquareIcon,
 	default as SquareScissorsIcon,
 } from './icons/square-scissors';
+export {
+	default as LucidePlusSquare,
+	default as LucideSquarePlus,
+	default as PlusSquare,
+	default as PlusSquareIcon,
+	default as SquarePlusIcon,
+} from './icons/square-plus';
 export {
 	default as LucideSigmaSquare,
 	default as LucideSquareSigma,
@@ -1474,19 +1558,19 @@ export {
 	default as SquareSplitVerticalIcon,
 } from './icons/square-split-vertical';
 export {
-	default as LucideSquareUserRound,
-	default as LucideUserSquare2,
-	default as SquareUserRoundIcon,
-	default as UserSquare2,
-	default as UserSquare2Icon,
-} from './icons/square-user-round';
-export {
 	default as LucideSquareTerminal,
 	default as LucideTerminalSquare,
 	default as SquareTerminalIcon,
 	default as TerminalSquare,
 	default as TerminalSquareIcon,
 } from './icons/square-terminal';
+export {
+	default as LucideSquareUserRound,
+	default as LucideUserSquare2,
+	default as SquareUserRoundIcon,
+	default as UserSquare2,
+	default as UserSquare2Icon,
+} from './icons/square-user-round';
 export {
 	default as LucideSquareUser,
 	default as LucideUserSquare,
@@ -1561,6 +1645,13 @@ export {
 	default as TramFrontIcon,
 } from './icons/tram-front';
 export {
+	default as LucideTrash,
+	default as LucideTrash2,
+	default as Trash2,
+	default as Trash2Icon,
+	default as TrashIcon,
+} from './icons/trash';
+export {
 	default as LucidePalmtree,
 	default as LucideTreePalm,
 	default as Palmtree,
@@ -1574,6 +1665,20 @@ export {
 	default as LucideTriangleAlert,
 	default as TriangleAlertIcon,
 } from './icons/triangle-alert';
+export {
+	default as FlipHorizontal2,
+	default as FlipHorizontal2Icon,
+	default as LucideFlipHorizontal2,
+	default as LucideTrianglesCenterlineDashedHorizontal,
+	default as TrianglesCenterlineDashedHorizontalIcon,
+} from './icons/triangles-centerline-dashed-horizontal';
+export {
+	default as FlipVertical2,
+	default as FlipVertical2Icon,
+	default as LucideFlipVertical2,
+	default as LucideTrianglesCenterlineDashedVertical,
+	default as TrianglesCenterlineDashedVerticalIcon,
+} from './icons/triangles-centerline-dashed-vertical';
 export {
 	default as LucideTv2,
 	default as LucideTvMinimal,
@@ -1610,19 +1715,19 @@ export {
 	default as UserRoundMinusIcon,
 } from './icons/user-round-minus';
 export {
-	default as LucideUserPlus2,
-	default as LucideUserRoundPlus,
-	default as UserPlus2,
-	default as UserPlus2Icon,
-	default as UserRoundPlusIcon,
-} from './icons/user-round-plus';
-export {
 	default as LucideUserRoundX,
 	default as LucideUserX2,
 	default as UserRoundXIcon,
 	default as UserX2,
 	default as UserX2Icon,
 } from './icons/user-round-x';
+export {
+	default as LucideUserPlus2,
+	default as LucideUserRoundPlus,
+	default as UserPlus2,
+	default as UserPlus2Icon,
+	default as UserRoundPlusIcon,
+} from './icons/user-round-plus';
 export {
 	default as LucideUser2,
 	default as LucideUserRound,
@@ -1631,19 +1736,19 @@ export {
 	default as UserRoundIcon,
 } from './icons/user-round';
 export {
-	default as LucideUsers2,
-	default as LucideUsersRound,
-	default as Users2,
-	default as Users2Icon,
-	default as UsersRoundIcon,
-} from './icons/users-round';
-export {
 	default as ForkKnifeCrossed,
 	default as ForkKnifeCrossedIcon,
 	default as LucideForkKnifeCrossed,
 	default as LucideUtensilsCrossed,
 	default as UtensilsCrossedIcon,
 } from './icons/utensils-crossed';
+export {
+	default as LucideUsers2,
+	default as LucideUsersRound,
+	default as Users2,
+	default as Users2Icon,
+	default as UsersRoundIcon,
+} from './icons/users-round';
 export {
 	default as ForkKnife,
 	default as ForkKnifeIcon,
@@ -1673,14 +1778,14 @@ export {
 	default as WavesIcon,
 } from './icons/waves-horizontal';
 export { default as AArrowDownIcon, default as LucideAArrowDown } from './icons/a-arrow-down';
-export { default as AArrowUpIcon, default as LucideAArrowUp } from './icons/a-arrow-up';
 export { default as ALargeSmallIcon, default as LucideALargeSmall } from './icons/a-large-small';
 export {
 	default as AccessibilityIcon,
 	default as LucideAccessibility,
 } from './icons/accessibility';
-export { default as ActivityIcon, default as LucideActivity } from './icons/activity';
+export { default as AArrowUpIcon, default as LucideAArrowUp } from './icons/a-arrow-up';
 export { default as AdIcon, default as LucideAd } from './icons/ad';
+export { default as ActivityIcon, default as LucideActivity } from './icons/activity';
 export { default as AirVentIcon, default as LucideAirVent } from './icons/air-vent';
 export { default as AirplayIcon, default as LucideAirplay } from './icons/airplay';
 export {
@@ -1688,24 +1793,23 @@ export {
 	default as LucideAlarmClockOff,
 } from './icons/alarm-clock-off';
 export { default as AlarmClockIcon, default as LucideAlarmClock } from './icons/alarm-clock';
-export { default as AlarmSmokeIcon, default as LucideAlarmSmoke } from './icons/alarm-smoke';
-export { default as AlbumIcon, default as LucideAlbum } from './icons/album';
 export {
 	default as AlignCenterHorizontalIcon,
 	default as LucideAlignCenterHorizontal,
 } from './icons/align-center-horizontal';
+export { default as AlarmSmokeIcon, default as LucideAlarmSmoke } from './icons/alarm-smoke';
 export {
 	default as AlignCenterVerticalIcon,
 	default as LucideAlignCenterVertical,
 } from './icons/align-center-vertical';
 export {
-	default as AlignEndHorizontalIcon,
-	default as LucideAlignEndHorizontal,
-} from './icons/align-end-horizontal';
-export {
 	default as AlignEndVerticalIcon,
 	default as LucideAlignEndVertical,
 } from './icons/align-end-vertical';
+export {
+	default as AlignEndHorizontalIcon,
+	default as LucideAlignEndHorizontal,
+} from './icons/align-end-horizontal';
 export {
 	default as AlignHorizontalDistributeCenterIcon,
 	default as LucideAlignHorizontalDistributeCenter,
@@ -1763,13 +1867,13 @@ export {
 	default as LucideAlignVerticalJustifyCenter,
 } from './icons/align-vertical-justify-center';
 export {
-	default as AlignVerticalJustifyEndIcon,
-	default as LucideAlignVerticalJustifyEnd,
-} from './icons/align-vertical-justify-end';
-export {
 	default as AlignVerticalJustifyStartIcon,
 	default as LucideAlignVerticalJustifyStart,
 } from './icons/align-vertical-justify-start';
+export {
+	default as AlignVerticalJustifyEndIcon,
+	default as LucideAlignVerticalJustifyEnd,
+} from './icons/align-vertical-justify-end';
 export {
 	default as AlignVerticalSpaceAroundIcon,
 	default as LucideAlignVerticalSpaceAround,
@@ -1782,13 +1886,12 @@ export { default as AmbulanceIcon, default as LucideAmbulance } from './icons/am
 export { default as AmpersandIcon, default as LucideAmpersand } from './icons/ampersand';
 export { default as AmpersandsIcon, default as LucideAmpersands } from './icons/ampersands';
 export { default as AmphoraIcon, default as LucideAmphora } from './icons/amphora';
+export { default as AngleIcon, default as LucideAngle } from './icons/angle';
 export { default as AnchorIcon, default as LucideAnchor } from './icons/anchor';
-export { default as AngryIcon, default as LucideAngry } from './icons/angry';
-export { default as AnnoyedIcon, default as LucideAnnoyed } from './icons/annoyed';
-export { default as AntennaIcon, default as LucideAntenna } from './icons/antenna';
 export { default as AnvilIcon, default as LucideAnvil } from './icons/anvil';
-export { default as ApertureIcon, default as LucideAperture } from './icons/aperture';
+export { default as AntennaIcon, default as LucideAntenna } from './icons/antenna';
 export { default as AppWindowMacIcon, default as LucideAppWindowMac } from './icons/app-window-mac';
+export { default as ApertureIcon, default as LucideAperture } from './icons/aperture';
 export { default as AppWindowIcon, default as LucideAppWindow } from './icons/app-window';
 export { default as AppleIcon, default as LucideApple } from './icons/apple';
 export {
@@ -1838,13 +1941,13 @@ export {
 	default as LucideArrowDownRight,
 } from './icons/arrow-down-right';
 export {
-	default as ArrowDownToDotIcon,
-	default as LucideArrowDownToDot,
-} from './icons/arrow-down-to-dot';
-export {
 	default as ArrowDownToLineIcon,
 	default as LucideArrowDownToLine,
 } from './icons/arrow-down-to-line';
+export {
+	default as ArrowDownToDotIcon,
+	default as LucideArrowDownToDot,
+} from './icons/arrow-down-to-dot';
 export { default as ArrowDownUpIcon, default as LucideArrowDownUp } from './icons/arrow-down-up';
 export { default as ArrowDownIcon, default as LucideArrowDown } from './icons/arrow-down';
 export {
@@ -1855,11 +1958,11 @@ export {
 	default as ArrowLeftRightIcon,
 	default as LucideArrowLeftRight,
 } from './icons/arrow-left-right';
+export { default as ArrowLeftIcon, default as LucideArrowLeft } from './icons/arrow-left';
 export {
 	default as ArrowLeftToLineIcon,
 	default as LucideArrowLeftToLine,
 } from './icons/arrow-left-to-line';
-export { default as ArrowLeftIcon, default as LucideArrowLeft } from './icons/arrow-left';
 export {
 	default as ArrowRightFromLineIcon,
 	default as LucideArrowRightFromLine,
@@ -1888,11 +1991,11 @@ export {
 	default as ArrowUpToLineIcon,
 	default as LucideArrowUpToLine,
 } from './icons/arrow-up-to-line';
+export { default as ArrowUpIcon, default as LucideArrowUp } from './icons/arrow-up';
 export {
 	default as ArrowUpWideNarrowIcon,
 	default as LucideArrowUpWideNarrow,
 } from './icons/arrow-up-wide-narrow';
-export { default as ArrowUpIcon, default as LucideArrowUp } from './icons/arrow-up';
 export {
 	default as ArrowsUpFromLineIcon,
 	default as LucideArrowsUpFromLine,
@@ -1900,6 +2003,11 @@ export {
 export { default as AsteriskIcon, default as LucideAsterisk } from './icons/asterisk';
 export { default as AstroidIcon, default as LucideAstroid } from './icons/astroid';
 export { default as AtSignIcon, default as LucideAtSign } from './icons/at-sign';
+export {
+	default as AudioLinesOffIcon,
+	default as LucideAudioLinesOff,
+} from './icons/audio-lines-off';
+export { default as AudioLinesXIcon, default as LucideAudioLinesX } from './icons/audio-lines-x';
 export { default as AtomIcon, default as LucideAtom } from './icons/atom';
 export { default as AudioLinesIcon, default as LucideAudioLines } from './icons/audio-lines';
 export {
@@ -1910,8 +2018,8 @@ export { default as AwardIcon, default as LucideAward } from './icons/award';
 export { default as AxeIcon, default as LucideAxe } from './icons/axe';
 export { default as BabyIcon, default as LucideBaby } from './icons/baby';
 export { default as BackpackIcon, default as LucideBackpack } from './icons/backpack';
-export { default as BadgeCentIcon, default as LucideBadgeCent } from './icons/badge-cent';
 export { default as BadgeAlertIcon, default as LucideBadgeAlert } from './icons/badge-alert';
+export { default as BadgeCentIcon, default as LucideBadgeCent } from './icons/badge-cent';
 export {
 	default as BadgeDollarSignIcon,
 	default as LucideBadgeDollarSign,
@@ -1926,45 +2034,45 @@ export {
 	default as BadgeJapaneseYenIcon,
 	default as LucideBadgeJapaneseYen,
 } from './icons/badge-japanese-yen';
-export { default as BadgeMinusIcon, default as LucideBadgeMinus } from './icons/badge-minus';
 export { default as BadgePercentIcon, default as LucideBadgePercent } from './icons/badge-percent';
+export { default as BadgeMinusIcon, default as LucideBadgeMinus } from './icons/badge-minus';
 export { default as BadgePlusIcon, default as LucideBadgePlus } from './icons/badge-plus';
 export {
 	default as BadgePoundSterlingIcon,
 	default as LucideBadgePoundSterling,
 } from './icons/badge-pound-sterling';
 export {
+	default as BadgeSwissFrancIcon,
+	default as LucideBadgeSwissFranc,
+} from './icons/badge-swiss-franc';
+export {
 	default as BadgeRussianRubleIcon,
 	default as LucideBadgeRussianRuble,
 } from './icons/badge-russian-ruble';
 export {
-	default as BadgeSwissFrancIcon,
-	default as LucideBadgeSwissFranc,
-} from './icons/badge-swiss-franc';
-export { default as BadgeXIcon, default as LucideBadgeX } from './icons/badge-x';
-export {
 	default as BadgeTurkishLiraIcon,
 	default as LucideBadgeTurkishLira,
 } from './icons/badge-turkish-lira';
+export { default as BadgeXIcon, default as LucideBadgeX } from './icons/badge-x';
 export { default as BadgeIcon, default as LucideBadge } from './icons/badge';
-export { default as BaggageClaimIcon, default as LucideBaggageClaim } from './icons/baggage-claim';
 export { default as BalloonIcon, default as LucideBalloon } from './icons/balloon';
+export { default as BaggageClaimIcon, default as LucideBaggageClaim } from './icons/baggage-claim';
 export { default as BanIcon, default as LucideBan } from './icons/ban';
 export { default as BananaIcon, default as LucideBanana } from './icons/banana';
-export { default as BandageIcon, default as LucideBandage } from './icons/bandage';
 export {
 	default as BanknoteArrowDownIcon,
 	default as LucideBanknoteArrowDown,
 } from './icons/banknote-arrow-down';
+export { default as BandageIcon, default as LucideBandage } from './icons/bandage';
 export {
 	default as BanknoteArrowUpIcon,
 	default as LucideBanknoteArrowUp,
 } from './icons/banknote-arrow-up';
+export { default as BanknoteXIcon, default as LucideBanknoteX } from './icons/banknote-x';
 export {
 	default as BanknoteCheckIcon,
 	default as LucideBanknoteCheck,
 } from './icons/banknote-check';
-export { default as BanknoteXIcon, default as LucideBanknoteX } from './icons/banknote-x';
 export { default as BanknoteIcon, default as LucideBanknote } from './icons/banknote';
 export { default as BarcodeIcon, default as LucideBarcode } from './icons/barcode';
 export { default as BarrelIcon, default as LucideBarrel } from './icons/barrel';
@@ -1975,11 +2083,11 @@ export {
 	default as LucideBatteryCharging,
 } from './icons/battery-charging';
 export { default as BatteryFullIcon, default as LucideBatteryFull } from './icons/battery-full';
-export { default as BatteryLowIcon, default as LucideBatteryLow } from './icons/battery-low';
 export {
 	default as BatteryMediumIcon,
 	default as LucideBatteryMedium,
 } from './icons/battery-medium';
+export { default as BatteryLowIcon, default as LucideBatteryLow } from './icons/battery-low';
 export { default as BatteryPlusIcon, default as LucideBatteryPlus } from './icons/battery-plus';
 export {
 	default as BatteryWarningIcon,
@@ -1988,22 +2096,22 @@ export {
 export { default as BatteryIcon, default as LucideBattery } from './icons/battery';
 export { default as BeakerIcon, default as LucideBeaker } from './icons/beaker';
 export { default as BeanOffIcon, default as LucideBeanOff } from './icons/bean-off';
-export { default as BeanIcon, default as LucideBean } from './icons/bean';
 export { default as BedDoubleIcon, default as LucideBedDouble } from './icons/bed-double';
-export { default as BedSingleIcon, default as LucideBedSingle } from './icons/bed-single';
+export { default as BeanIcon, default as LucideBean } from './icons/bean';
 export { default as BedIcon, default as LucideBed } from './icons/bed';
+export { default as BedSingleIcon, default as LucideBedSingle } from './icons/bed-single';
 export { default as BeefOffIcon, default as LucideBeefOff } from './icons/beef-off';
 export { default as BeefIcon, default as LucideBeef } from './icons/beef';
 export { default as BeerOffIcon, default as LucideBeerOff } from './icons/beer-off';
 export { default as BeerIcon, default as LucideBeer } from './icons/beer';
 export { default as BellCheckIcon, default as LucideBellCheck } from './icons/bell-check';
 export { default as BellDotIcon, default as LucideBellDot } from './icons/bell-dot';
-export { default as BellElectricIcon, default as LucideBellElectric } from './icons/bell-electric';
 export { default as BellMinusIcon, default as LucideBellMinus } from './icons/bell-minus';
+export { default as BellElectricIcon, default as LucideBellElectric } from './icons/bell-electric';
 export { default as BellOffIcon, default as LucideBellOff } from './icons/bell-off';
 export { default as BellPlusIcon, default as LucideBellPlus } from './icons/bell-plus';
-export { default as BellRingIcon, default as LucideBellRing } from './icons/bell-ring';
 export { default as BellIcon, default as LucideBell } from './icons/bell';
+export { default as BellRingIcon, default as LucideBellRing } from './icons/bell-ring';
 export {
 	default as BetweenVerticalEndIcon,
 	default as LucideBetweenVerticalEnd,
@@ -2013,9 +2121,9 @@ export {
 	default as LucideBetweenVerticalStart,
 } from './icons/between-vertical-start';
 export { default as BicepsFlexedIcon, default as LucideBicepsFlexed } from './icons/biceps-flexed';
-export { default as BikeIcon, default as LucideBike } from './icons/bike';
 export { default as BinaryIcon, default as LucideBinary } from './icons/binary';
 export { default as BinocularsIcon, default as LucideBinoculars } from './icons/binoculars';
+export { default as BikeIcon, default as LucideBike } from './icons/bike';
 export { default as BiohazardIcon, default as LucideBiohazard } from './icons/biohazard';
 export { default as BirdIcon, default as LucideBird } from './icons/bird';
 export { default as BirdhouseIcon, default as LucideBirdhouse } from './icons/birdhouse';
@@ -2024,26 +2132,26 @@ export { default as BlendIcon, default as LucideBlend } from './icons/blend';
 export { default as BlenderIcon, default as LucideBlender } from './icons/blender';
 export { default as BlindsIcon, default as LucideBlinds } from './icons/blinds';
 export { default as BlocksIcon, default as LucideBlocks } from './icons/blocks';
+export { default as BluetoothOffIcon, default as LucideBluetoothOff } from './icons/bluetooth-off';
 export {
 	default as BluetoothConnectedIcon,
 	default as LucideBluetoothConnected,
 } from './icons/bluetooth-connected';
+export { default as BoldIcon, default as LucideBold } from './icons/bold';
 export {
 	default as BluetoothSearchingIcon,
 	default as LucideBluetoothSearching,
 } from './icons/bluetooth-searching';
-export { default as BluetoothOffIcon, default as LucideBluetoothOff } from './icons/bluetooth-off';
 export { default as BluetoothIcon, default as LucideBluetooth } from './icons/bluetooth';
-export { default as BoldIcon, default as LucideBold } from './icons/bold';
-export { default as BombIcon, default as LucideBomb } from './icons/bomb';
 export { default as BoltIcon, default as LucideBolt } from './icons/bolt';
+export { default as BombIcon, default as LucideBomb } from './icons/bomb';
 export { default as BoneFractureIcon, default as LucideBoneFracture } from './icons/bone-fracture';
-export { default as BoneIcon, default as LucideBone } from './icons/bone';
 export { default as BookAIcon, default as LucideBookA } from './icons/book-a';
+export { default as BoneIcon, default as LucideBone } from './icons/bone';
 export { default as BookAlertIcon, default as LucideBookAlert } from './icons/book-alert';
 export { default as BookAudioIcon, default as LucideBookAudio } from './icons/book-audio';
-export { default as BookCheckIcon, default as LucideBookCheck } from './icons/book-check';
 export { default as BookCopyIcon, default as LucideBookCopy } from './icons/book-copy';
+export { default as BookCheckIcon, default as LucideBookCheck } from './icons/book-check';
 export { default as BookDownIcon, default as LucideBookDown } from './icons/book-down';
 export {
 	default as BookHeadphonesIcon,
@@ -2053,7 +2161,6 @@ export { default as BookHeartIcon, default as LucideBookHeart } from './icons/bo
 export { default as BookImageIcon, default as LucideBookImage } from './icons/book-image';
 export { default as BookKeyIcon, default as LucideBookKey } from './icons/book-key';
 export { default as BookLockIcon, default as LucideBookLock } from './icons/book-lock';
-export { default as BookMarkedIcon, default as LucideBookMarked } from './icons/book-marked';
 export { default as BookMinusIcon, default as LucideBookMinus } from './icons/book-minus';
 export {
 	default as BookOpenCheckIcon,
@@ -2067,40 +2174,40 @@ export { default as BookTextIcon, default as LucideBookText } from './icons/book
 export { default as BookTypeIcon, default as LucideBookType } from './icons/book-type';
 export { default as BookUp2Icon, default as LucideBookUp2 } from './icons/book-up-2';
 export { default as BookUpIcon, default as LucideBookUp } from './icons/book-up';
-export { default as BookUserIcon, default as LucideBookUser } from './icons/book-user';
 export { default as BookXIcon, default as LucideBookX } from './icons/book-x';
+export { default as BookUserIcon, default as LucideBookUser } from './icons/book-user';
 export { default as BookIcon, default as LucideBook } from './icons/book';
 export {
 	default as BookmarkCheckIcon,
 	default as LucideBookmarkCheck,
 } from './icons/bookmark-check';
+export { default as BookmarkOffIcon, default as LucideBookmarkOff } from './icons/bookmark-off';
 export {
 	default as BookmarkMinusIcon,
 	default as LucideBookmarkMinus,
 } from './icons/bookmark-minus';
-export { default as BookmarkOffIcon, default as LucideBookmarkOff } from './icons/bookmark-off';
 export { default as BookmarkPlusIcon, default as LucideBookmarkPlus } from './icons/bookmark-plus';
 export { default as BookmarkXIcon, default as LucideBookmarkX } from './icons/bookmark-x';
-export { default as BoomBoxIcon, default as LucideBoomBox } from './icons/boom-box';
 export { default as BookmarkIcon, default as LucideBookmark } from './icons/bookmark';
 export {
 	default as BotMessageSquareIcon,
 	default as LucideBotMessageSquare,
 } from './icons/bot-message-square';
 export { default as BotOffIcon, default as LucideBotOff } from './icons/bot-off';
+export { default as BoomBoxIcon, default as LucideBoomBox } from './icons/boom-box';
 export { default as BotIcon, default as LucideBot } from './icons/bot';
 export { default as BottleWineIcon, default as LucideBottleWine } from './icons/bottle-wine';
-export { default as BoxIcon, default as LucideBox } from './icons/box';
 export { default as BowArrowIcon, default as LucideBowArrow } from './icons/bow-arrow';
+export { default as BoxIcon, default as LucideBox } from './icons/box';
 export { default as BoxesIcon, default as LucideBoxes } from './icons/boxes';
 export { default as BracketsIcon, default as LucideBrackets } from './icons/brackets';
 export { default as BrainCircuitIcon, default as LucideBrainCircuit } from './icons/brain-circuit';
 export { default as BrainCogIcon, default as LucideBrainCog } from './icons/brain-cog';
+export { default as BrainIcon, default as LucideBrain } from './icons/brain';
 export {
 	default as BrickWallFireIcon,
 	default as LucideBrickWallFire,
 } from './icons/brick-wall-fire';
-export { default as BrainIcon, default as LucideBrain } from './icons/brain';
 export {
 	default as BrickWallShieldIcon,
 	default as LucideBrickWallShield,
@@ -2114,26 +2221,35 @@ export {
 	default as BriefcaseConveyorBeltIcon,
 	default as LucideBriefcaseConveyorBelt,
 } from './icons/briefcase-conveyor-belt';
+export { default as BriefcaseIcon, default as LucideBriefcase } from './icons/briefcase';
+export { default as BridgeIcon, default as LucideBridge } from './icons/bridge';
 export {
 	default as BriefcaseMedicalIcon,
 	default as LucideBriefcaseMedical,
 } from './icons/briefcase-medical';
-export { default as BriefcaseIcon, default as LucideBriefcase } from './icons/briefcase';
 export { default as BringToFrontIcon, default as LucideBringToFront } from './icons/bring-to-front';
 export { default as BroccoliIcon, default as LucideBroccoli } from './icons/broccoli';
+export {
+	default as BroomSparklesIcon,
+	default as LucideBroomSparkles,
+} from './icons/broom-sparkles';
+export { default as BroomIcon, default as LucideBroom } from './icons/broom';
+export { default as BrushIcon, default as LucideBrush } from './icons/brush';
 export {
 	default as BrushCleaningIcon,
 	default as LucideBrushCleaning,
 } from './icons/brush-cleaning';
-export { default as BrushIcon, default as LucideBrush } from './icons/brush';
 export { default as BubblesIcon, default as LucideBubbles } from './icons/bubbles';
 export { default as BugOffIcon, default as LucideBugOff } from './icons/bug-off';
 export { default as BugPlayIcon, default as LucideBugPlay } from './icons/bug-play';
-export { default as Building2Icon, default as LucideBuilding2 } from './icons/building-2';
 export { default as BugIcon, default as LucideBug } from './icons/bug';
+export {
+	default as BuildingComplexPlusIcon,
+	default as LucideBuildingComplexPlus,
+} from './icons/building-complex-plus';
 export { default as BuildingIcon, default as LucideBuilding } from './icons/building';
-export { default as BusFrontIcon, default as LucideBusFront } from './icons/bus-front';
 export { default as BusIcon, default as LucideBus } from './icons/bus';
+export { default as BusFrontIcon, default as LucideBusFront } from './icons/bus-front';
 export { default as CableCarIcon, default as LucideCableCar } from './icons/cable-car';
 export { default as CableIcon, default as LucideCable } from './icons/cable';
 export { default as CakeSliceIcon, default as LucideCakeSlice } from './icons/cake-slice';
@@ -2157,30 +2273,34 @@ export {
 	default as LucideCalendarCheck,
 } from './icons/calendar-check';
 export {
+	default as CalendarChevronsRightIcon,
+	default as LucideCalendarChevronsRight,
+} from './icons/calendar-chevrons-right';
+export {
 	default as CalendarClockIcon,
 	default as LucideCalendarClock,
 } from './icons/calendar-clock';
 export { default as CalendarCogIcon, default as LucideCalendarCog } from './icons/calendar-cog';
-export { default as CalendarFoldIcon, default as LucideCalendarFold } from './icons/calendar-fold';
 export { default as CalendarDaysIcon, default as LucideCalendarDays } from './icons/calendar-days';
+export { default as CalendarFoldIcon, default as LucideCalendarFold } from './icons/calendar-fold';
 export {
 	default as CalendarHeartIcon,
 	default as LucideCalendarHeart,
 } from './icons/calendar-heart';
-export {
-	default as CalendarMinusIcon,
-	default as LucideCalendarMinus,
-} from './icons/calendar-minus';
 export {
 	default as CalendarMinus2Icon,
 	default as LucideCalendarMinus2,
 } from './icons/calendar-minus-2';
 export { default as CalendarOffIcon, default as LucideCalendarOff } from './icons/calendar-off';
 export {
+	default as CalendarMinusIcon,
+	default as LucideCalendarMinus,
+} from './icons/calendar-minus';
+export { default as CalendarPlusIcon, default as LucideCalendarPlus } from './icons/calendar-plus';
+export {
 	default as CalendarPlus2Icon,
 	default as LucideCalendarPlus2,
 } from './icons/calendar-plus-2';
-export { default as CalendarPlusIcon, default as LucideCalendarPlus } from './icons/calendar-plus';
 export {
 	default as CalendarRangeIcon,
 	default as LucideCalendarRange,
@@ -2190,24 +2310,29 @@ export {
 	default as LucideCalendarSearch,
 } from './icons/calendar-search';
 export { default as CalendarSyncIcon, default as LucideCalendarSync } from './icons/calendar-sync';
-export { default as CalendarX2Icon, default as LucideCalendarX2 } from './icons/calendar-x-2';
 export { default as CalendarXIcon, default as LucideCalendarX } from './icons/calendar-x';
+export { default as CalendarX2Icon, default as LucideCalendarX2 } from './icons/calendar-x-2';
 export { default as CalendarIcon, default as LucideCalendar } from './icons/calendar';
 export { default as CalendarsIcon, default as LucideCalendars } from './icons/calendars';
 export { default as CameraOffIcon, default as LucideCameraOff } from './icons/camera-off';
 export { default as CameraIcon, default as LucideCamera } from './icons/camera';
+export { default as CanSodaIcon, default as LucideCanSoda } from './icons/can-soda';
+export { default as CanIcon, default as LucideCan } from './icons/can';
 export { default as CandyCaneIcon, default as LucideCandyCane } from './icons/candy-cane';
-export { default as CandyOffIcon, default as LucideCandyOff } from './icons/candy-off';
 export { default as CandyIcon, default as LucideCandy } from './icons/candy';
+export { default as CandyOffIcon, default as LucideCandyOff } from './icons/candy-off';
 export { default as CannabisOffIcon, default as LucideCannabisOff } from './icons/cannabis-off';
 export { default as CannabisIcon, default as LucideCannabis } from './icons/cannabis';
 export { default as CaptionsOffIcon, default as LucideCaptionsOff } from './icons/captions-off';
+export { default as CarBatteryIcon, default as LucideCarBattery } from './icons/car-battery';
 export { default as CarFrontIcon, default as LucideCarFront } from './icons/car-front';
 export { default as CarTaxiFrontIcon, default as LucideCarTaxiFront } from './icons/car-taxi-front';
 export { default as CarIcon, default as LucideCar } from './icons/car';
 export { default as CaravanIcon, default as LucideCaravan } from './icons/caravan';
 export { default as CardSimIcon, default as LucideCardSim } from './icons/card-sim';
 export { default as CarrotIcon, default as LucideCarrot } from './icons/carrot';
+export { default as CartonOffIcon, default as LucideCartonOff } from './icons/carton-off';
+export { default as CartonIcon, default as LucideCarton } from './icons/carton';
 export { default as CaseLowerIcon, default as LucideCaseLower } from './icons/case-lower';
 export {
 	default as CaseSensitiveIcon,
@@ -2217,17 +2342,17 @@ export { default as CaseUpperIcon, default as LucideCaseUpper } from './icons/ca
 export { default as CassetteTapeIcon, default as LucideCassetteTape } from './icons/cassette-tape';
 export { default as CastIcon, default as LucideCast } from './icons/cast';
 export { default as CastleIcon, default as LucideCastle } from './icons/castle';
-export { default as CctvOffIcon, default as LucideCctvOff } from './icons/cctv-off';
 export { default as CatIcon, default as LucideCat } from './icons/cat';
+export { default as CctvOffIcon, default as LucideCctvOff } from './icons/cctv-off';
 export { default as CctvIcon, default as LucideCctv } from './icons/cctv';
-export {
-	default as ChartBarDecreasingIcon,
-	default as LucideChartBarDecreasing,
-} from './icons/chart-bar-decreasing';
 export {
 	default as ChartBarIncreasingIcon,
 	default as LucideChartBarIncreasing,
 } from './icons/chart-bar-increasing';
+export {
+	default as ChartBarDecreasingIcon,
+	default as LucideChartBarDecreasing,
+} from './icons/chart-bar-decreasing';
 export {
 	default as ChartBarStackedIcon,
 	default as LucideChartBarStacked,
@@ -2241,11 +2366,11 @@ export {
 	default as LucideChartColumnStacked,
 } from './icons/chart-column-stacked';
 export { default as ChartGanttIcon, default as LucideChartGantt } from './icons/chart-gantt';
-export { default as ChartNetworkIcon, default as LucideChartNetwork } from './icons/chart-network';
 export {
 	default as ChartNoAxesColumnDecreasingIcon,
 	default as LucideChartNoAxesColumnDecreasing,
 } from './icons/chart-no-axes-column-decreasing';
+export { default as ChartNetworkIcon, default as LucideChartNetwork } from './icons/chart-network';
 export {
 	default as ChartNoAxesCombinedIcon,
 	default as LucideChartNoAxesCombined,
@@ -2259,9 +2384,9 @@ export { default as CherryIcon, default as LucideCherry } from './icons/cherry';
 export { default as ChessBishopIcon, default as LucideChessBishop } from './icons/chess-bishop';
 export { default as ChessKingIcon, default as LucideChessKing } from './icons/chess-king';
 export { default as ChessKnightIcon, default as LucideChessKnight } from './icons/chess-knight';
-export { default as ChessPawnIcon, default as LucideChessPawn } from './icons/chess-pawn';
 export { default as ChessQueenIcon, default as LucideChessQueen } from './icons/chess-queen';
 export { default as ChessRookIcon, default as LucideChessRook } from './icons/chess-rook';
+export { default as ChessPawnIcon, default as LucideChessPawn } from './icons/chess-pawn';
 export { default as ChevronDownIcon, default as LucideChevronDown } from './icons/chevron-down';
 export { default as ChevronFirstIcon, default as LucideChevronFirst } from './icons/chevron-first';
 export { default as ChevronLastIcon, default as LucideChevronLast } from './icons/chevron-last';
@@ -2290,33 +2415,34 @@ export {
 	default as ChevronsRightIcon,
 	default as LucideChevronsRight,
 } from './icons/chevrons-right';
+export { default as ChevronsUpIcon, default as LucideChevronsUp } from './icons/chevrons-up';
 export {
 	default as ChevronsUpDownIcon,
 	default as LucideChevronsUpDown,
 } from './icons/chevrons-up-down';
-export { default as ChevronsUpIcon, default as LucideChevronsUp } from './icons/chevrons-up';
 export { default as ChurchIcon, default as LucideChurch } from './icons/church';
 export { default as CigaretteOffIcon, default as LucideCigaretteOff } from './icons/cigarette-off';
 export { default as CigaretteIcon, default as LucideCigarette } from './icons/cigarette';
+export {
+	default as CircleDashedCheckIcon,
+	default as LucideCircleDashedCheck,
+} from './icons/circle-dashed-check';
 export { default as CircleDashedIcon, default as LucideCircleDashed } from './icons/circle-dashed';
+export {
+	default as CircleDollarSignIcon,
+	default as LucideCircleDollarSign,
+} from './icons/circle-dollar-sign';
+export {
+	default as CircleDotDashedIcon,
+	default as LucideCircleDotDashed,
+} from './icons/circle-dot-dashed';
 export { default as CircleDotIcon, default as LucideCircleDot } from './icons/circle-dot';
 export {
 	default as CircleEllipsisIcon,
 	default as LucideCircleEllipsis,
 } from './icons/circle-ellipsis';
-export {
-	default as CircleDollarSignIcon,
-	default as LucideCircleDollarSign,
-} from './icons/circle-dollar-sign';
 export { default as CircleEqualIcon, default as LucideCircleEqual } from './icons/circle-equal';
-export {
-	default as CircleDotDashedIcon,
-	default as LucideCircleDotDashed,
-} from './icons/circle-dot-dashed';
-export {
-	default as CircleEuroSignIcon,
-	default as LucideCircleEuroSign,
-} from './icons/circle-euro-sign';
+export { default as CircleEuroIcon, default as LucideCircleEuro } from './icons/circle-euro';
 export {
 	default as CircleFadingArrowUpIcon,
 	default as LucideCircleFadingArrowUp,
@@ -2331,13 +2457,17 @@ export {
 	default as CirclePoundSterlingIcon,
 	default as LucideCirclePoundSterling,
 } from './icons/circle-pound-sterling';
-export { default as CircleSmallIcon, default as LucideCircleSmall } from './icons/circle-small';
 export { default as CircleSlashIcon, default as LucideCircleSlash } from './icons/circle-slash';
+export { default as CircleSmallIcon, default as LucideCircleSmall } from './icons/circle-small';
 export { default as CircleStarIcon, default as LucideCircleStar } from './icons/circle-star';
-export { default as CircleIcon, default as LucideCircle } from './icons/circle';
 export { default as CircuitBoardIcon, default as LucideCircuitBoard } from './icons/circuit-board';
+export { default as CircleIcon, default as LucideCircle } from './icons/circle';
 export { default as CitrusIcon, default as LucideCitrus } from './icons/citrus';
 export { default as ClapperboardIcon, default as LucideClapperboard } from './icons/clapperboard';
+export {
+	default as ClipboardCheckIcon,
+	default as LucideClipboardCheck,
+} from './icons/clipboard-check';
 export {
 	default as ClipboardClockIcon,
 	default as LucideClipboardClock,
@@ -2359,10 +2489,6 @@ export {
 	default as LucideClipboardMinus,
 } from './icons/clipboard-minus';
 export {
-	default as ClipboardCheckIcon,
-	default as LucideClipboardCheck,
-} from './icons/clipboard-check';
-export {
 	default as ClipboardPlusIcon,
 	default as LucideClipboardPlus,
 } from './icons/clipboard-plus';
@@ -2375,12 +2501,12 @@ export { default as ClipboardIcon, default as LucideClipboard } from './icons/cl
 export { default as Clock1Icon, default as LucideClock1 } from './icons/clock-1';
 export { default as Clock10Icon, default as LucideClock10 } from './icons/clock-10';
 export { default as Clock12Icon, default as LucideClock12 } from './icons/clock-12';
-export { default as Clock11Icon, default as LucideClock11 } from './icons/clock-11';
 export { default as Clock2Icon, default as LucideClock2 } from './icons/clock-2';
+export { default as Clock11Icon, default as LucideClock11 } from './icons/clock-11';
 export { default as Clock3Icon, default as LucideClock3 } from './icons/clock-3';
 export { default as Clock4Icon, default as LucideClock4 } from './icons/clock-4';
-export { default as Clock5Icon, default as LucideClock5 } from './icons/clock-5';
 export { default as Clock6Icon, default as LucideClock6 } from './icons/clock-6';
+export { default as Clock5Icon, default as LucideClock5 } from './icons/clock-5';
 export { default as Clock7Icon, default as LucideClock7 } from './icons/clock-7';
 export { default as Clock8Icon, default as LucideClock8 } from './icons/clock-8';
 export { default as Clock9Icon, default as LucideClock9 } from './icons/clock-9';
@@ -2390,27 +2516,27 @@ export {
 	default as LucideClockArrowDown,
 } from './icons/clock-arrow-down';
 export {
-	default as ClockArrowRightIcon,
-	default as LucideClockArrowRight,
-} from './icons/clock-arrow-right';
-export {
 	default as ClockArrowLeftIcon,
 	default as LucideClockArrowLeft,
 } from './icons/clock-arrow-left';
+export {
+	default as ClockArrowRightIcon,
+	default as LucideClockArrowRight,
+} from './icons/clock-arrow-right';
 export { default as ClockArrowUpIcon, default as LucideClockArrowUp } from './icons/clock-arrow-up';
 export { default as ClockCheckIcon, default as LucideClockCheck } from './icons/clock-check';
 export { default as ClockFadingIcon, default as LucideClockFading } from './icons/clock-fading';
-export { default as ClockIcon, default as LucideClock } from './icons/clock';
 export { default as ClockPlusIcon, default as LucideClockPlus } from './icons/clock-plus';
-export { default as CloudAlertIcon, default as LucideCloudAlert } from './icons/cloud-alert';
 export {
 	default as ClosedCaptionIcon,
 	default as LucideClosedCaption,
 } from './icons/closed-caption';
+export { default as CloudAlertIcon, default as LucideCloudAlert } from './icons/cloud-alert';
+export { default as ClockIcon, default as LucideClock } from './icons/clock';
 export { default as CloudBackupIcon, default as LucideCloudBackup } from './icons/cloud-backup';
 export { default as CloudCheckIcon, default as LucideCloudCheck } from './icons/cloud-check';
-export { default as CloudCogIcon, default as LucideCloudCog } from './icons/cloud-cog';
 export { default as CloudDrizzleIcon, default as LucideCloudDrizzle } from './icons/cloud-drizzle';
+export { default as CloudCogIcon, default as LucideCloudCog } from './icons/cloud-cog';
 export { default as CloudFogIcon, default as LucideCloudFog } from './icons/cloud-fog';
 export { default as CloudHailIcon, default as LucideCloudHail } from './icons/cloud-hail';
 export {
@@ -2421,8 +2547,8 @@ export {
 	default as CloudMoonRainIcon,
 	default as LucideCloudMoonRain,
 } from './icons/cloud-moon-rain';
-export { default as CloudMoonIcon, default as LucideCloudMoon } from './icons/cloud-moon';
 export { default as CloudOffIcon, default as LucideCloudOff } from './icons/cloud-off';
+export { default as CloudMoonIcon, default as LucideCloudMoon } from './icons/cloud-moon';
 export {
 	default as CloudRainWindIcon,
 	default as LucideCloudRainWind,
@@ -2430,19 +2556,19 @@ export {
 export { default as CloudRainIcon, default as LucideCloudRain } from './icons/cloud-rain';
 export { default as CloudSnowIcon, default as LucideCloudSnow } from './icons/cloud-snow';
 export { default as CloudSunRainIcon, default as LucideCloudSunRain } from './icons/cloud-sun-rain';
-export { default as CloudSunIcon, default as LucideCloudSun } from './icons/cloud-sun';
 export { default as CloudSyncIcon, default as LucideCloudSync } from './icons/cloud-sync';
-export { default as CloudIcon, default as LucideCloud } from './icons/cloud';
+export { default as CloudSunIcon, default as LucideCloudSun } from './icons/cloud-sun';
 export { default as CloverIcon, default as LucideClover } from './icons/clover';
-export { default as ClubIcon, default as LucideClub } from './icons/club';
 export { default as CloudyIcon, default as LucideCloudy } from './icons/cloudy';
+export { default as CloudIcon, default as LucideCloud } from './icons/cloud';
+export { default as ClubIcon, default as LucideClub } from './icons/club';
 export { default as CodeIcon, default as LucideCode } from './icons/code';
 export { default as CoffeeIcon, default as LucideCoffee } from './icons/coffee';
 export { default as CogIcon, default as LucideCog } from './icons/cog';
 export { default as CoinsIcon, default as LucideCoins } from './icons/coins';
-export { default as Columns4Icon, default as LucideColumns4 } from './icons/columns-4';
 export { default as CombineIcon, default as LucideCombine } from './icons/combine';
 export { default as CommandIcon, default as LucideCommand } from './icons/command';
+export { default as Columns4Icon, default as LucideColumns4 } from './icons/columns-4';
 export { default as CompassIcon, default as LucideCompass } from './icons/compass';
 export { default as ComponentIcon, default as LucideComponent } from './icons/component';
 export { default as ComputerIcon, default as LucideComputer } from './icons/computer';
@@ -2456,15 +2582,19 @@ export { default as ContactIcon, default as LucideContact } from './icons/contac
 export { default as ContainerIcon, default as LucideContainer } from './icons/container';
 export { default as ContrastIcon, default as LucideContrast } from './icons/contrast';
 export { default as CookieIcon, default as LucideCookie } from './icons/cookie';
-export { default as CookingPotIcon, default as LucideCookingPot } from './icons/cooking-pot';
 export { default as CopyCheckIcon, default as LucideCopyCheck } from './icons/copy-check';
-export { default as CopyPlusIcon, default as LucideCopyPlus } from './icons/copy-plus';
+export { default as CookingPotIcon, default as LucideCookingPot } from './icons/cooking-pot';
 export { default as CopyMinusIcon, default as LucideCopyMinus } from './icons/copy-minus';
+export { default as CopyPlusIcon, default as LucideCopyPlus } from './icons/copy-plus';
 export { default as CopySlashIcon, default as LucideCopySlash } from './icons/copy-slash';
-export { default as CopyXIcon, default as LucideCopyX } from './icons/copy-x';
 export { default as CopyIcon, default as LucideCopy } from './icons/copy';
+export { default as CopyXIcon, default as LucideCopyX } from './icons/copy-x';
 export { default as CopyleftIcon, default as LucideCopyleft } from './icons/copyleft';
 export { default as CopyrightIcon, default as LucideCopyright } from './icons/copyright';
+export {
+	default as CornerDownLeftIcon,
+	default as LucideCornerDownLeft,
+} from './icons/corner-down-left';
 export {
 	default as CornerDownRightIcon,
 	default as LucideCornerDownRight,
@@ -2473,10 +2603,6 @@ export {
 	default as CornerLeftDownIcon,
 	default as LucideCornerLeftDown,
 } from './icons/corner-left-down';
-export {
-	default as CornerDownLeftIcon,
-	default as LucideCornerDownLeft,
-} from './icons/corner-down-left';
 export { default as CornerLeftUpIcon, default as LucideCornerLeftUp } from './icons/corner-left-up';
 export {
 	default as CornerRightDownIcon,
@@ -2496,6 +2622,23 @@ export {
 	default as CreativeCommonsIcon,
 	default as LucideCreativeCommons,
 } from './icons/creative-commons';
+export {
+	default as CreditCardCheckIcon,
+	default as LucideCreditCardCheck,
+} from './icons/credit-card-check';
+export {
+	default as CreditCardMinusIcon,
+	default as LucideCreditCardMinus,
+} from './icons/credit-card-minus';
+export {
+	default as CreditCardPlusIcon,
+	default as LucideCreditCardPlus,
+} from './icons/credit-card-plus';
+export {
+	default as CreditCardReaderIcon,
+	default as LucideCreditCardReader,
+} from './icons/credit-card-reader';
+export { default as CreditCardXIcon, default as LucideCreditCardX } from './icons/credit-card-x';
 export { default as CreditCardIcon, default as LucideCreditCard } from './icons/credit-card';
 export { default as CroissantIcon, default as LucideCroissant } from './icons/croissant';
 export { default as CropIcon, default as LucideCrop } from './icons/crop';
@@ -2506,11 +2649,11 @@ export { default as CuboidIcon, default as LucideCuboid } from './icons/cuboid';
 export { default as CupSodaIcon, default as LucideCupSoda } from './icons/cup-soda';
 export { default as CurrencyIcon, default as LucideCurrency } from './icons/currency';
 export { default as CylinderIcon, default as LucideCylinder } from './icons/cylinder';
-export { default as DamIcon, default as LucideDam } from './icons/dam';
 export {
 	default as DatabaseArrowDownIcon,
 	default as LucideDatabaseArrowDown,
 } from './icons/database-arrow-down';
+export { default as DamIcon, default as LucideDam } from './icons/dam';
 export {
 	default as DatabaseArrowUpIcon,
 	default as LucideDatabaseArrowUp,
@@ -2523,11 +2666,11 @@ export {
 	default as DatabaseCheckIcon,
 	default as LucideDatabaseCheck,
 } from './icons/database-check';
+export { default as DatabasePlusIcon, default as LucideDatabasePlus } from './icons/database-plus';
 export {
 	default as DatabaseMinusIcon,
 	default as LucideDatabaseMinus,
 } from './icons/database-minus';
-export { default as DatabasePlusIcon, default as LucideDatabasePlus } from './icons/database-plus';
 export {
 	default as DatabaseSearchIcon,
 	default as LucideDatabaseSearch,
@@ -2536,23 +2679,23 @@ export { default as DatabaseXIcon, default as LucideDatabaseX } from './icons/da
 export { default as DatabaseZapIcon, default as LucideDatabaseZap } from './icons/database-zap';
 export { default as DatabaseIcon, default as LucideDatabase } from './icons/database';
 export {
-	default as DecimalsArrowLeftIcon,
-	default as LucideDecimalsArrowLeft,
-} from './icons/decimals-arrow-left';
-export {
 	default as DecimalsArrowRightIcon,
 	default as LucideDecimalsArrowRight,
 } from './icons/decimals-arrow-right';
+export {
+	default as DecimalsArrowLeftIcon,
+	default as LucideDecimalsArrowLeft,
+} from './icons/decimals-arrow-left';
 export { default as DeleteIcon, default as LucideDelete } from './icons/delete';
 export { default as DessertIcon, default as LucideDessert } from './icons/dessert';
 export { default as DiameterIcon, default as LucideDiameter } from './icons/diameter';
-export { default as DiamondPlusIcon, default as LucideDiamondPlus } from './icons/diamond-plus';
 export { default as DiamondMinusIcon, default as LucideDiamondMinus } from './icons/diamond-minus';
+export { default as DiamondPlusIcon, default as LucideDiamondPlus } from './icons/diamond-plus';
 export { default as DiamondIcon, default as LucideDiamond } from './icons/diamond';
-export { default as Dice2Icon, default as LucideDice2 } from './icons/dice-2';
-export { default as Dice4Icon, default as LucideDice4 } from './icons/dice-4';
 export { default as Dice1Icon, default as LucideDice1 } from './icons/dice-1';
+export { default as Dice2Icon, default as LucideDice2 } from './icons/dice-2';
 export { default as Dice3Icon, default as LucideDice3 } from './icons/dice-3';
+export { default as Dice4Icon, default as LucideDice4 } from './icons/dice-4';
 export { default as Dice5Icon, default as LucideDice5 } from './icons/dice-5';
 export { default as Dice6Icon, default as LucideDice6 } from './icons/dice-6';
 export { default as DicesIcon, default as LucideDices } from './icons/dices';
@@ -2564,9 +2707,10 @@ export { default as DiscIcon, default as LucideDisc } from './icons/disc';
 export { default as DivideIcon, default as LucideDivide } from './icons/divide';
 export { default as DnaOffIcon, default as LucideDnaOff } from './icons/dna-off';
 export { default as DockIcon, default as LucideDock } from './icons/dock';
-export { default as DnaIcon, default as LucideDna } from './icons/dna';
 export { default as DogIcon, default as LucideDog } from './icons/dog';
 export { default as DollarSignIcon, default as LucideDollarSign } from './icons/dollar-sign';
+export { default as DnaIcon, default as LucideDna } from './icons/dna';
+export { default as DomeIcon, default as LucideDome } from './icons/dome';
 export { default as DonutIcon, default as LucideDonut } from './icons/donut';
 export {
 	default as DoorClosedLockedIcon,
@@ -2574,8 +2718,12 @@ export {
 } from './icons/door-closed-locked';
 export { default as DoorClosedIcon, default as LucideDoorClosed } from './icons/door-closed';
 export { default as DoorOpenIcon, default as LucideDoorOpen } from './icons/door-open';
-export { default as DownloadIcon, default as LucideDownload } from './icons/download';
+export {
+	default as DoorStairwellIcon,
+	default as LucideDoorStairwell,
+} from './icons/door-stairwell';
 export { default as DotIcon, default as LucideDot } from './icons/dot';
+export { default as DownloadIcon, default as LucideDownload } from './icons/download';
 export {
 	default as DraftingCompassIcon,
 	default as LucideDraftingCompass,
@@ -2586,39 +2734,45 @@ export { default as DroneIcon, default as LucideDrone } from './icons/drone';
 export { default as DropletOffIcon, default as LucideDropletOff } from './icons/droplet-off';
 export { default as DropletIcon, default as LucideDroplet } from './icons/droplet';
 export { default as DropletsIcon, default as LucideDroplets } from './icons/droplets';
-export { default as DrumIcon, default as LucideDrum } from './icons/drum';
 export { default as DrumstickIcon, default as LucideDrumstick } from './icons/drumstick';
-export { default as EarOffIcon, default as LucideEarOff } from './icons/ear-off';
+export { default as DrumIcon, default as LucideDrum } from './icons/drum';
 export { default as DumbbellIcon, default as LucideDumbbell } from './icons/dumbbell';
-export { default as EarIcon, default as LucideEar } from './icons/ear';
+export { default as EarOffIcon, default as LucideEarOff } from './icons/ear-off';
 export { default as EarthLockIcon, default as LucideEarthLock } from './icons/earth-lock';
+export { default as EarIcon, default as LucideEar } from './icons/ear';
 export { default as EclipseIcon, default as LucideEclipse } from './icons/eclipse';
 export { default as EggFriedIcon, default as LucideEggFried } from './icons/egg-fried';
 export { default as EggOffIcon, default as LucideEggOff } from './icons/egg-off';
 export { default as EggIcon, default as LucideEgg } from './icons/egg';
+export { default as EjectIcon, default as LucideEject } from './icons/eject';
 export { default as EllipseIcon, default as LucideEllipse } from './icons/ellipse';
+export { default as EngineIcon, default as LucideEngine } from './icons/engine';
+export {
+	default as EqualApproximatelyNotIcon,
+	default as LucideEqualApproximatelyNot,
+} from './icons/equal-approximately-not';
 export {
 	default as EqualApproximatelyIcon,
 	default as LucideEqualApproximately,
 } from './icons/equal-approximately';
 export { default as EqualNotIcon, default as LucideEqualNot } from './icons/equal-not';
 export { default as EqualIcon, default as LucideEqual } from './icons/equal';
-export { default as EraserIcon, default as LucideEraser } from './icons/eraser';
-export { default as EthernetPortIcon, default as LucideEthernetPort } from './icons/ethernet-port';
-export { default as EvChargerIcon, default as LucideEvCharger } from './icons/ev-charger';
-export { default as ExpandIcon, default as LucideExpand } from './icons/expand';
 export { default as EuroIcon, default as LucideEuro } from './icons/euro';
+export { default as EthernetPortIcon, default as LucideEthernetPort } from './icons/ethernet-port';
+export { default as EraserIcon, default as LucideEraser } from './icons/eraser';
+export { default as EvChargerIcon, default as LucideEvCharger } from './icons/ev-charger';
 export { default as ExternalLinkIcon, default as LucideExternalLink } from './icons/external-link';
-export { default as EyeClosedIcon, default as LucideEyeClosed } from './icons/eye-closed';
+export { default as ExpandIcon, default as LucideExpand } from './icons/expand';
 export { default as EyeDashedIcon, default as LucideEyeDashed } from './icons/eye-dashed';
+export { default as EyeClosedIcon, default as LucideEyeClosed } from './icons/eye-closed';
+export { default as EyeOffIcon, default as LucideEyeOff } from './icons/eye-off';
 export { default as EyeIcon, default as LucideEye } from './icons/eye';
 export { default as FactoryIcon, default as LucideFactory } from './icons/factory';
-export { default as EyeOffIcon, default as LucideEyeOff } from './icons/eye-off';
-export { default as FastForwardIcon, default as LucideFastForward } from './icons/fast-forward';
 export { default as FanIcon, default as LucideFan } from './icons/fan';
+export { default as FastForwardIcon, default as LucideFastForward } from './icons/fast-forward';
 export { default as FeatherIcon, default as LucideFeather } from './icons/feather';
-export { default as FenceIcon, default as LucideFence } from './icons/fence';
 export { default as FerrisWheelIcon, default as LucideFerrisWheel } from './icons/ferris-wheel';
+export { default as FenceIcon, default as LucideFence } from './icons/fence';
 export { default as FileArchiveIcon, default as LucideFileArchive } from './icons/file-archive';
 export { default as FileBoxIcon, default as LucideFileBox } from './icons/file-box';
 export { default as FileCheckIcon, default as LucideFileCheck } from './icons/file-check';
@@ -2637,17 +2791,17 @@ export { default as FilePlusIcon, default as LucideFilePlus } from './icons/file
 export { default as FileScanIcon, default as LucideFileScan } from './icons/file-scan';
 export { default as FileSearchIcon, default as LucideFileSearch } from './icons/file-search';
 export { default as FileSlidersIcon, default as LucideFileSliders } from './icons/file-sliders';
-export { default as FileStackIcon, default as LucideFileStack } from './icons/file-stack';
 export {
 	default as FileSpreadsheetIcon,
 	default as LucideFileSpreadsheet,
 } from './icons/file-spreadsheet';
+export { default as FileStackIcon, default as LucideFileStack } from './icons/file-stack';
 export { default as FileSymlinkIcon, default as LucideFileSymlink } from './icons/file-symlink';
 export { default as FileTerminalIcon, default as LucideFileTerminal } from './icons/file-terminal';
 export { default as FileTextIcon, default as LucideFileText } from './icons/file-text';
 export { default as FileTypeIcon, default as LucideFileType } from './icons/file-type';
-export { default as FileUserIcon, default as LucideFileUser } from './icons/file-user';
 export { default as FileUpIcon, default as LucideFileUp } from './icons/file-up';
+export { default as FileUserIcon, default as LucideFileUser } from './icons/file-user';
 export { default as FileVolumeIcon, default as LucideFileVolume } from './icons/file-volume';
 export { default as FileXIcon, default as LucideFileX } from './icons/file-x';
 export { default as FileIcon, default as LucideFile } from './icons/file';
@@ -2658,15 +2812,11 @@ export {
 	default as LucideFireExtinguisher,
 } from './icons/fire-extinguisher';
 export { default as FishOffIcon, default as LucideFishOff } from './icons/fish-off';
+export { default as FishSymbolIcon, default as LucideFishSymbol } from './icons/fish-symbol';
 export { default as FishIcon, default as LucideFish } from './icons/fish';
 export { default as FishingHookIcon, default as LucideFishingHook } from './icons/fishing-hook';
-export { default as FishSymbolIcon, default as LucideFishSymbol } from './icons/fish-symbol';
 export { default as FishingRodIcon, default as LucideFishingRod } from './icons/fishing-rod';
 export { default as FlagOffIcon, default as LucideFlagOff } from './icons/flag-off';
-export {
-	default as FlagTriangleLeftIcon,
-	default as LucideFlagTriangleLeft,
-} from './icons/flag-triangle-left';
 export {
 	default as FlagTriangleRightIcon,
 	default as LucideFlagTriangleRight,
@@ -2676,6 +2826,10 @@ export {
 	default as FlameKindlingIcon,
 	default as LucideFlameKindling,
 } from './icons/flame-kindling';
+export {
+	default as FlagTriangleLeftIcon,
+	default as LucideFlagTriangleLeft,
+} from './icons/flag-triangle-left';
 export { default as FlameIcon, default as LucideFlame } from './icons/flame';
 export {
 	default as FlashlightOffIcon,
@@ -2688,16 +2842,8 @@ export {
 } from './icons/flask-conical-off';
 export { default as FlaskConicalIcon, default as LucideFlaskConical } from './icons/flask-conical';
 export { default as FlaskRoundIcon, default as LucideFlaskRound } from './icons/flask-round';
-export {
-	default as FlipHorizontal2Icon,
-	default as LucideFlipHorizontal2,
-} from './icons/flip-horizontal-2';
-export {
-	default as FlipVertical2Icon,
-	default as LucideFlipVertical2,
-} from './icons/flip-vertical-2';
-export { default as Flower2Icon, default as LucideFlower2 } from './icons/flower-2';
 export { default as FlowerIcon, default as LucideFlower } from './icons/flower';
+export { default as Flower2Icon, default as LucideFlower2 } from './icons/flower-2';
 export { default as FocusIcon, default as LucideFocus } from './icons/focus';
 export {
 	default as FoldHorizontalIcon,
@@ -2712,12 +2858,12 @@ export {
 	default as FolderBookmarkIcon,
 	default as LucideFolderBookmark,
 } from './icons/folder-bookmark';
+export { default as FolderCodeIcon, default as LucideFolderCode } from './icons/folder-code';
 export { default as FolderCheckIcon, default as LucideFolderCheck } from './icons/folder-check';
 export { default as FolderClockIcon, default as LucideFolderClock } from './icons/folder-clock';
 export { default as FolderClosedIcon, default as LucideFolderClosed } from './icons/folder-closed';
-export { default as FolderCodeIcon, default as LucideFolderCode } from './icons/folder-code';
-export { default as FolderDotIcon, default as LucideFolderDot } from './icons/folder-dot';
 export { default as FolderDownIcon, default as LucideFolderDown } from './icons/folder-down';
+export { default as FolderDotIcon, default as LucideFolderDot } from './icons/folder-dot';
 export { default as FolderGit2Icon, default as LucideFolderGit2 } from './icons/folder-git-2';
 export { default as FolderGitIcon, default as LucideFolderGit } from './icons/folder-git';
 export { default as FolderHeartIcon, default as LucideFolderHeart } from './icons/folder-heart';
@@ -2732,13 +2878,13 @@ export {
 } from './icons/folder-open-dot';
 export { default as FolderOpenIcon, default as LucideFolderOpen } from './icons/folder-open';
 export { default as FolderOutputIcon, default as LucideFolderOutput } from './icons/folder-output';
-export { default as FolderRootIcon, default as LucideFolderRoot } from './icons/folder-root';
 export { default as FolderPlusIcon, default as LucideFolderPlus } from './icons/folder-plus';
+export { default as FolderRootIcon, default as LucideFolderRoot } from './icons/folder-root';
+export { default as FolderSearchIcon, default as LucideFolderSearch } from './icons/folder-search';
 export {
 	default as FolderSearch2Icon,
 	default as LucideFolderSearch2,
 } from './icons/folder-search-2';
-export { default as FolderSearchIcon, default as LucideFolderSearch } from './icons/folder-search';
 export {
 	default as FolderSymlinkIcon,
 	default as LucideFolderSymlink,
@@ -2747,17 +2893,17 @@ export { default as FolderSyncIcon, default as LucideFolderSync } from './icons/
 export { default as FolderTreeIcon, default as LucideFolderTree } from './icons/folder-tree';
 export { default as FolderUpIcon, default as LucideFolderUp } from './icons/folder-up';
 export { default as FolderXIcon, default as LucideFolderX } from './icons/folder-x';
-export { default as FolderIcon, default as LucideFolder } from './icons/folder';
 export { default as FoldersIcon, default as LucideFolders } from './icons/folders';
+export { default as FolderIcon, default as LucideFolder } from './icons/folder';
 export { default as FootprintsIcon, default as LucideFootprints } from './icons/footprints';
 export { default as ForkliftIcon, default as LucideForklift } from './icons/forklift';
 export { default as FormIcon, default as LucideForm } from './icons/form';
-export { default as ForwardIcon, default as LucideForward } from './icons/forward';
 export { default as FrameIcon, default as LucideFrame } from './icons/frame';
-export { default as FrownIcon, default as LucideFrown } from './icons/frown';
-export { default as FullscreenIcon, default as LucideFullscreen } from './icons/fullscreen';
+export { default as ForwardIcon, default as LucideForward } from './icons/forward';
 export { default as FuelIcon, default as LucideFuel } from './icons/fuel';
+export { default as FullscreenIcon, default as LucideFullscreen } from './icons/fullscreen';
 export { default as FunnelPlusIcon, default as LucideFunnelPlus } from './icons/funnel-plus';
+export { default as GalaxyIcon, default as LucideGalaxy } from './icons/galaxy';
 export {
 	default as GalleryHorizontalEndIcon,
 	default as LucideGalleryHorizontalEnd,
@@ -2770,25 +2916,32 @@ export {
 	default as GalleryThumbnailsIcon,
 	default as LucideGalleryThumbnails,
 } from './icons/gallery-thumbnails';
-export { default as Gamepad2Icon, default as LucideGamepad2 } from './icons/gamepad-2';
-export {
-	default as GalleryVerticalIcon,
-	default as LucideGalleryVertical,
-} from './icons/gallery-vertical';
 export {
 	default as GalleryVerticalEndIcon,
 	default as LucideGalleryVerticalEnd,
 } from './icons/gallery-vertical-end';
 export {
+	default as GalleryVerticalIcon,
+	default as LucideGalleryVertical,
+} from './icons/gallery-vertical';
+export { default as Gamepad2Icon, default as LucideGamepad2 } from './icons/gamepad-2';
+export {
 	default as GamepadDirectionalIcon,
 	default as LucideGamepadDirectional,
 } from './icons/gamepad-directional';
-export { default as GavelIcon, default as LucideGavel } from './icons/gavel';
 export { default as GamepadIcon, default as LucideGamepad } from './icons/gamepad';
+export {
+	default as GapHorizontalIcon,
+	default as LucideGapHorizontal,
+} from './icons/gap-horizontal';
+export { default as GapVerticalIcon, default as LucideGapVertical } from './icons/gap-vertical';
 export { default as GaugeIcon, default as LucideGauge } from './icons/gauge';
 export { default as GemIcon, default as LucideGem } from './icons/gem';
+export { default as GavelIcon, default as LucideGavel } from './icons/gavel';
 export { default as GeorgianLariIcon, default as LucideGeorgianLari } from './icons/georgian-lari';
+export { default as GermIcon, default as LucideGerm } from './icons/germ';
 export { default as GhostIcon, default as LucideGhost } from './icons/ghost';
+export { default as GermOffIcon, default as LucideGermOff } from './icons/germ-off';
 export { default as GiftIcon, default as LucideGift } from './icons/gift';
 export {
 	default as GitBranchMinusIcon,
@@ -2820,13 +2973,13 @@ export {
 	default as LucideGitPullRequestArrow,
 } from './icons/git-pull-request-arrow';
 export {
-	default as GitPullRequestCreateArrowIcon,
-	default as LucideGitPullRequestCreateArrow,
-} from './icons/git-pull-request-create-arrow';
-export {
 	default as GitPullRequestClosedIcon,
 	default as LucideGitPullRequestClosed,
 } from './icons/git-pull-request-closed';
+export {
+	default as GitPullRequestCreateArrowIcon,
+	default as LucideGitPullRequestCreateArrow,
+} from './icons/git-pull-request-create-arrow';
 export {
 	default as GitPullRequestCreateIcon,
 	default as LucideGitPullRequestCreate,
@@ -2841,11 +2994,12 @@ export {
 } from './icons/git-pull-request';
 export { default as GlassWaterIcon, default as LucideGlassWater } from './icons/glass-water';
 export { default as GlassesIcon, default as LucideGlasses } from './icons/glasses';
+export { default as GlobeCodeIcon, default as LucideGlobeCode } from './icons/globe-code';
 export { default as GlobeCheckIcon, default as LucideGlobeCheck } from './icons/globe-check';
 export { default as GlobeLockIcon, default as LucideGlobeLock } from './icons/globe-lock';
-export { default as GlobeOffIcon, default as LucideGlobeOff } from './icons/globe-off';
-export { default as GlobeXIcon, default as LucideGlobeX } from './icons/globe-x';
 export { default as GlobeIcon, default as LucideGlobe } from './icons/globe';
+export { default as GlobeXIcon, default as LucideGlobeX } from './icons/globe-x';
+export { default as GlobeOffIcon, default as LucideGlobeOff } from './icons/globe-off';
 export { default as GoalIcon, default as LucideGoal } from './icons/goal';
 export { default as GpuIcon, default as LucideGpu } from './icons/gpu';
 export {
@@ -2862,21 +3016,21 @@ export { default as GripVerticalIcon, default as LucideGripVertical } from './ic
 export { default as GripIcon, default as LucideGrip } from './icons/grip';
 export { default as GroupIcon, default as LucideGroup } from './icons/group';
 export { default as GuitarIcon, default as LucideGuitar } from './icons/guitar';
-export { default as HamburgerIcon, default as LucideHamburger } from './icons/hamburger';
-export { default as HammerIcon, default as LucideHammer } from './icons/hammer';
-export { default as HandCoinsIcon, default as LucideHandCoins } from './icons/hand-coins';
 export { default as HamIcon, default as LucideHam } from './icons/ham';
+export { default as HammerIcon, default as LucideHammer } from './icons/hammer';
+export { default as HamburgerIcon, default as LucideHamburger } from './icons/hamburger';
+export { default as HandCoinsIcon, default as LucideHandCoins } from './icons/hand-coins';
 export { default as HandFistIcon, default as LucideHandFist } from './icons/hand-fist';
 export { default as HandHeartIcon, default as LucideHandHeart } from './icons/hand-heart';
 export { default as HandMetalIcon, default as LucideHandMetal } from './icons/hand-metal';
 export { default as HandPlatterIcon, default as LucideHandPlatter } from './icons/hand-platter';
-export { default as HandbagIcon, default as LucideHandbag } from './icons/handbag';
+export { default as HandIcon, default as LucideHand } from './icons/hand';
 export { default as HandshakeIcon, default as LucideHandshake } from './icons/handshake';
 export {
 	default as HardDriveDownloadIcon,
 	default as LucideHardDriveDownload,
 } from './icons/hard-drive-download';
-export { default as HandIcon, default as LucideHand } from './icons/hand';
+export { default as HandbagIcon, default as LucideHandbag } from './icons/handbag';
 export {
 	default as HardDriveUploadIcon,
 	default as LucideHardDriveUpload,
@@ -2888,15 +3042,16 @@ export { default as HatGlassesIcon, default as LucideHatGlasses } from './icons/
 export { default as HazeIcon, default as LucideHaze } from './icons/haze';
 export { default as HdIcon, default as LucideHd } from './icons/hd';
 export { default as HdmiPortIcon, default as LucideHdmiPort } from './icons/hdmi-port';
+export { default as Heading1Icon, default as LucideHeading1 } from './icons/heading-1';
 export { default as Heading2Icon, default as LucideHeading2 } from './icons/heading-2';
 export { default as Heading3Icon, default as LucideHeading3 } from './icons/heading-3';
 export { default as Heading4Icon, default as LucideHeading4 } from './icons/heading-4';
-export { default as Heading6Icon, default as LucideHeading6 } from './icons/heading-6';
 export { default as Heading5Icon, default as LucideHeading5 } from './icons/heading-5';
 export { default as HeadingIcon, default as LucideHeading } from './icons/heading';
-export { default as Heading1Icon, default as LucideHeading1 } from './icons/heading-1';
+export { default as Heading6Icon, default as LucideHeading6 } from './icons/heading-6';
 export { default as HeadphoneOffIcon, default as LucideHeadphoneOff } from './icons/headphone-off';
 export { default as HeadphonesIcon, default as LucideHeadphones } from './icons/headphones';
+export { default as HeadsetIcon, default as LucideHeadset } from './icons/headset';
 export { default as HeartCrackIcon, default as LucideHeartCrack } from './icons/heart-crack';
 export {
 	default as HeartHandshakeIcon,
@@ -2905,7 +3060,6 @@ export {
 export { default as HeartMinusIcon, default as LucideHeartMinus } from './icons/heart-minus';
 export { default as HeartOffIcon, default as LucideHeartOff } from './icons/heart-off';
 export { default as HeartPlusIcon, default as LucideHeartPlus } from './icons/heart-plus';
-export { default as HeadsetIcon, default as LucideHeadset } from './icons/headset';
 export { default as HeartPulseIcon, default as LucideHeartPulse } from './icons/heart-pulse';
 export { default as HeartXIcon, default as LucideHeartX } from './icons/heart-x';
 export { default as HeartIcon, default as LucideHeart } from './icons/heart';
@@ -2913,30 +3067,31 @@ export { default as HeaterIcon, default as LucideHeater } from './icons/heater';
 export { default as HelicopterIcon, default as LucideHelicopter } from './icons/helicopter';
 export { default as HexagonIcon, default as LucideHexagon } from './icons/hexagon';
 export { default as HighlighterIcon, default as LucideHighlighter } from './icons/highlighter';
-export { default as HistoryIcon, default as LucideHistory } from './icons/history';
 export { default as HopOffIcon, default as LucideHopOff } from './icons/hop-off';
 export { default as HopIcon, default as LucideHop } from './icons/hop';
 export { default as HospitalIcon, default as LucideHospital } from './icons/hospital';
 export { default as HotelIcon, default as LucideHotel } from './icons/hotel';
+export { default as HourglassCogIcon, default as LucideHourglassCog } from './icons/hourglass-cog';
 export { default as HourglassIcon, default as LucideHourglass } from './icons/hourglass';
 export { default as HouseHeartIcon, default as LucideHouseHeart } from './icons/house-heart';
 export { default as HousePlugIcon, default as LucideHousePlug } from './icons/house-plug';
-export { default as HouseWifiIcon, default as LucideHouseWifi } from './icons/house-wifi';
 export { default as HousePlusIcon, default as LucideHousePlus } from './icons/house-plus';
+export { default as HouseWifiIcon, default as LucideHouseWifi } from './icons/house-wifi';
+export { default as HousesIcon, default as LucideHouses } from './icons/houses';
 export {
 	default as IdCardLanyardIcon,
 	default as LucideIdCardLanyard,
 } from './icons/id-card-lanyard';
 export { default as IdCardIcon, default as LucideIdCard } from './icons/id-card';
-export { default as ImageMinusIcon, default as LucideImageMinus } from './icons/image-minus';
 export { default as ImageDownIcon, default as LucideImageDown } from './icons/image-down';
+export { default as ImageMinusIcon, default as LucideImageMinus } from './icons/image-minus';
+export { default as ImagePlayIcon, default as LucideImagePlay } from './icons/image-play';
 export { default as ImageOffIcon, default as LucideImageOff } from './icons/image-off';
 export { default as ImagePlusIcon, default as LucideImagePlus } from './icons/image-plus';
-export { default as ImagePlayIcon, default as LucideImagePlay } from './icons/image-play';
 export { default as ImageUpIcon, default as LucideImageUp } from './icons/image-up';
 export { default as ImageUpscaleIcon, default as LucideImageUpscale } from './icons/image-upscale';
-export { default as ImagesIcon, default as LucideImages } from './icons/images';
 export { default as ImageIcon, default as LucideImage } from './icons/image';
+export { default as ImagesIcon, default as LucideImages } from './icons/images';
 export { default as ImportIcon, default as LucideImport } from './icons/import';
 export { default as InboxIcon, default as LucideInbox } from './icons/inbox';
 export { default as IndianRupeeIcon, default as LucideIndianRupee } from './icons/indian-rupee';
@@ -2949,17 +3104,18 @@ export {
 export { default as ItalicIcon, default as LucideItalic } from './icons/italic';
 export { default as IterationCcwIcon, default as LucideIterationCcw } from './icons/iteration-ccw';
 export { default as IterationCwIcon, default as LucideIterationCw } from './icons/iteration-cw';
+export { default as IvBagIcon, default as LucideIvBag } from './icons/iv-bag';
 export { default as JapaneseYenIcon, default as LucideJapaneseYen } from './icons/japanese-yen';
 export { default as JoystickIcon, default as LucideJoystick } from './icons/joystick';
 export { default as KanbanIcon, default as LucideKanban } from './icons/kanban';
 export { default as KayakIcon, default as LucideKayak } from './icons/kayak';
 export { default as KeyRoundIcon, default as LucideKeyRound } from './icons/key-round';
 export { default as KeySquareIcon, default as LucideKeySquare } from './icons/key-square';
-export { default as KeyIcon, default as LucideKey } from './icons/key';
 export {
 	default as KeyboardMusicIcon,
 	default as LucideKeyboardMusic,
 } from './icons/keyboard-music';
+export { default as KeyIcon, default as LucideKey } from './icons/key';
 export { default as KeyboardOffIcon, default as LucideKeyboardOff } from './icons/keyboard-off';
 export { default as KeyboardIcon, default as LucideKeyboard } from './icons/keyboard';
 export { default as LampCeilingIcon, default as LucideLampCeiling } from './icons/lamp-ceiling';
@@ -2968,24 +3124,48 @@ export { default as LampFloorIcon, default as LucideLampFloor } from './icons/la
 export { default as LampWallDownIcon, default as LucideLampWallDown } from './icons/lamp-wall-down';
 export { default as LampWallUpIcon, default as LucideLampWallUp } from './icons/lamp-wall-up';
 export { default as LampIcon, default as LucideLamp } from './icons/lamp';
-export { default as LandmarkIcon, default as LucideLandmark } from './icons/landmark';
 export { default as LandPlotIcon, default as LucideLandPlot } from './icons/land-plot';
+export { default as LandmarkIcon, default as LucideLandmark } from './icons/landmark';
 export { default as LanguagesIcon, default as LucideLanguages } from './icons/languages';
 export {
 	default as LaptopMinimalCheckIcon,
 	default as LucideLaptopMinimalCheck,
 } from './icons/laptop-minimal-check';
-export { default as LassoSelectIcon, default as LucideLassoSelect } from './icons/lasso-select';
 export { default as LaptopIcon, default as LucideLaptop } from './icons/laptop';
+export { default as LassoSelectIcon, default as LucideLassoSelect } from './icons/lasso-select';
 export { default as LassoIcon, default as LucideLasso } from './icons/lasso';
-export { default as LaughIcon, default as LucideLaugh } from './icons/laugh';
+export {
+	default as LayerArrowDownIcon,
+	default as LucideLayerArrowDown,
+} from './icons/layer-arrow-down';
+export { default as LayerArrowUpIcon, default as LucideLayerArrowUp } from './icons/layer-arrow-up';
 export { default as Layers2Icon, default as LucideLayers2 } from './icons/layers-2';
+export {
+	default as LayersArrowDownIcon,
+	default as LucideLayersArrowDown,
+} from './icons/layers-arrow-down';
 export { default as LayersMinusIcon, default as LucideLayersMinus } from './icons/layers-minus';
+export {
+	default as LayersArrowUpIcon,
+	default as LucideLayersArrowUp,
+} from './icons/layers-arrow-up';
 export { default as LayersPlusIcon, default as LucideLayersPlus } from './icons/layers-plus';
+export {
+	default as LayoutArrowDownIcon,
+	default as LucideLayoutArrowDown,
+} from './icons/layout-arrow-down';
+export {
+	default as LayoutArrowRightIcon,
+	default as LucideLayoutArrowRight,
+} from './icons/layout-arrow-right';
 export {
 	default as LayoutDashboardIcon,
 	default as LucideLayoutDashboard,
 } from './icons/layout-dashboard';
+export {
+	default as LayoutFreeformIcon,
+	default as LucideLayoutFreeform,
+} from './icons/layout-freeform';
 export { default as LayoutGridIcon, default as LucideLayoutGrid } from './icons/layout-grid';
 export { default as LayoutListIcon, default as LucideLayoutList } from './icons/layout-list';
 export {
@@ -3002,26 +3182,27 @@ export {
 } from './icons/layout-template';
 export { default as LeafIcon, default as LucideLeaf } from './icons/leaf';
 export { default as LeafyGreenIcon, default as LucideLeafyGreen } from './icons/leafy-green';
-export { default as LensConcaveIcon, default as LucideLensConcave } from './icons/lens-concave';
 export { default as LecternIcon, default as LucideLectern } from './icons/lectern';
-export { default as LensConvexIcon, default as LucideLensConvex } from './icons/lens-convex';
+export { default as LensConcaveIcon, default as LucideLensConcave } from './icons/lens-concave';
 export { default as LibraryBigIcon, default as LucideLibraryBig } from './icons/library-big';
+export { default as LensConvexIcon, default as LucideLensConvex } from './icons/lens-convex';
 export { default as LibraryIcon, default as LucideLibrary } from './icons/library';
 export { default as LifeBuoyIcon, default as LucideLifeBuoy } from './icons/life-buoy';
-export { default as LigatureIcon, default as LucideLigature } from './icons/ligature';
 export { default as LightbulbOffIcon, default as LucideLightbulbOff } from './icons/lightbulb-off';
 export { default as LightbulbIcon, default as LucideLightbulb } from './icons/lightbulb';
+export { default as LigatureIcon, default as LucideLigature } from './icons/ligature';
+export { default as LighthouseIcon, default as LucideLighthouse } from './icons/lighthouse';
 export {
 	default as LineDotRightHorizontalIcon,
 	default as LucideLineDotRightHorizontal,
 } from './icons/line-dot-right-horizontal';
 export { default as LineSquiggleIcon, default as LucideLineSquiggle } from './icons/line-squiggle';
-export { default as Link2OffIcon, default as LucideLink2Off } from './icons/link-2-off';
 export { default as LineStyleIcon, default as LucideLineStyle } from './icons/line-style';
+export { default as Link2OffIcon, default as LucideLink2Off } from './icons/link-2-off';
 export { default as Link2Icon, default as LucideLink2 } from './icons/link-2';
 export { default as LinkIcon, default as LucideLink } from './icons/link';
-export { default as ListCheckIcon, default as LucideListCheck } from './icons/list-check';
 export { default as ListChecksIcon, default as LucideListChecks } from './icons/list-checks';
+export { default as ListCheckIcon, default as LucideListCheck } from './icons/list-check';
 export {
 	default as ListChevronsUpDownIcon,
 	default as LucideListChevronsUpDown,
@@ -3030,6 +3211,7 @@ export {
 	default as ListChevronsDownUpIcon,
 	default as LucideListChevronsDownUp,
 } from './icons/list-chevrons-down-up';
+export { default as ListClockIcon, default as LucideListClock } from './icons/list-clock';
 export { default as ListCollapseIcon, default as LucideListCollapse } from './icons/list-collapse';
 export { default as ListEndIcon, default as LucideListEnd } from './icons/list-end';
 export {
@@ -3037,9 +3219,9 @@ export {
 	default as LucideListFilterPlus,
 } from './icons/list-filter-plus';
 export { default as ListFilterIcon, default as LucideListFilter } from './icons/list-filter';
-export { default as ListMinusIcon, default as LucideListMinus } from './icons/list-minus';
 export { default as ListMusicIcon, default as LucideListMusic } from './icons/list-music';
 export { default as ListOrderedIcon, default as LucideListOrdered } from './icons/list-ordered';
+export { default as ListMinusIcon, default as LucideListMinus } from './icons/list-minus';
 export { default as ListPlusIcon, default as LucideListPlus } from './icons/list-plus';
 export { default as ListRestartIcon, default as LucideListRestart } from './icons/list-restart';
 export {
@@ -3051,9 +3233,9 @@ export {
 	default as LucideListSortDescending,
 } from './icons/list-sort-descending';
 export { default as ListStartIcon, default as LucideListStart } from './icons/list-start';
-export { default as ListTodoIcon, default as LucideListTodo } from './icons/list-todo';
 export { default as ListTreeIcon, default as LucideListTree } from './icons/list-tree';
 export { default as ListVideoIcon, default as LucideListVideo } from './icons/list-video';
+export { default as ListTodoIcon, default as LucideListTodo } from './icons/list-todo';
 export { default as ListXIcon, default as LucideListX } from './icons/list-x';
 export { default as ListIcon, default as LucideList } from './icons/list';
 export {
@@ -3072,13 +3254,16 @@ export { default as LogsIcon, default as LucideLogs } from './icons/logs';
 export { default as LollipopIcon, default as LucideLollipop } from './icons/lollipop';
 export { default as LucideLuggage, default as LuggageIcon } from './icons/luggage';
 export { default as LucideMagnet, default as MagnetIcon } from './icons/magnet';
+export { default as LucideMailBadge, default as MailBadgeIcon } from './icons/mail-badge';
 export { default as LucideMailCheck, default as MailCheckIcon } from './icons/mail-check';
 export { default as LucideMailMinus, default as MailMinusIcon } from './icons/mail-minus';
+export { default as LucideMailClock, default as MailClockIcon } from './icons/mail-clock';
+export { default as LucideMailPen, default as MailPenIcon } from './icons/mail-pen';
 export { default as LucideMailOpen, default as MailOpenIcon } from './icons/mail-open';
 export { default as LucideMailPlus, default as MailPlusIcon } from './icons/mail-plus';
 export { default as LucideMailSearch, default as MailSearchIcon } from './icons/mail-search';
-export { default as LucideMailWarning, default as MailWarningIcon } from './icons/mail-warning';
 export { default as LucideMailX, default as MailXIcon } from './icons/mail-x';
+export { default as LucideMailWarning, default as MailWarningIcon } from './icons/mail-warning';
 export { default as LucideMail, default as MailIcon } from './icons/mail';
 export { default as LucideMailbox, default as MailboxIcon } from './icons/mailbox';
 export { default as LucideMails, default as MailsIcon } from './icons/mails';
@@ -3111,14 +3296,13 @@ export { default as LucideMapPinned, default as MapPinnedIcon } from './icons/ma
 export { default as LucideMapPlus, default as MapPlusIcon } from './icons/map-plus';
 export { default as LucideMap, default as MapIcon } from './icons/map';
 export { default as LucideMarsStroke, default as MarsStrokeIcon } from './icons/mars-stroke';
-export { default as LucideMars, default as MarsIcon } from './icons/mars';
 export { default as LucideMartini, default as MartiniIcon } from './icons/martini';
 export { default as LucideMaximize2, default as Maximize2Icon } from './icons/maximize-2';
 export { default as LucideMaximize, default as MaximizeIcon } from './icons/maximize';
+export { default as LucideMars, default as MarsIcon } from './icons/mars';
 export { default as LucideMedal, default as MedalIcon } from './icons/medal';
-export { default as LucideMegaphoneOff, default as MegaphoneOffIcon } from './icons/megaphone-off';
 export { default as LucideMegaphone, default as MegaphoneIcon } from './icons/megaphone';
-export { default as LucideMeh, default as MehIcon } from './icons/meh';
+export { default as LucideMegaphoneOff, default as MegaphoneOffIcon } from './icons/megaphone-off';
 export { default as LucideMemoryStick, default as MemoryStickIcon } from './icons/memory-stick';
 export { default as LucideMenu, default as MenuIcon } from './icons/menu';
 export { default as LucideMerge, default as MergeIcon } from './icons/merge';
@@ -3130,6 +3314,10 @@ export {
 	default as LucideMessageCircleCode,
 	default as MessageCircleCodeIcon,
 } from './icons/message-circle-code';
+export {
+	default as LucideMessageCircleDashedCheck,
+	default as MessageCircleDashedCheckIcon,
+} from './icons/message-circle-dashed-check';
 export {
 	default as LucideMessageCircleDashed,
 	default as MessageCircleDashedIcon,
@@ -3151,13 +3339,13 @@ export {
 	default as MessageCirclePlusIcon,
 } from './icons/message-circle-plus';
 export {
-	default as LucideMessageCircleWarning,
-	default as MessageCircleWarningIcon,
-} from './icons/message-circle-warning';
-export {
 	default as LucideMessageCircleReply,
 	default as MessageCircleReplyIcon,
 } from './icons/message-circle-reply';
+export {
+	default as LucideMessageCircleWarning,
+	default as MessageCircleWarningIcon,
+} from './icons/message-circle-warning';
 export {
 	default as LucideMessageCircleX,
 	default as MessageCircleXIcon,
@@ -3191,25 +3379,25 @@ export {
 	default as MessageSquareHeartIcon,
 } from './icons/message-square-heart';
 export {
-	default as LucideMessageSquareLock,
-	default as MessageSquareLockIcon,
-} from './icons/message-square-lock';
-export {
 	default as LucideMessageSquareMore,
 	default as MessageSquareMoreIcon,
 } from './icons/message-square-more';
+export {
+	default as LucideMessageSquareLock,
+	default as MessageSquareLockIcon,
+} from './icons/message-square-lock';
 export {
 	default as LucideMessageSquareOff,
 	default as MessageSquareOffIcon,
 } from './icons/message-square-off';
 export {
-	default as LucideMessageSquarePlus,
-	default as MessageSquarePlusIcon,
-} from './icons/message-square-plus';
-export {
 	default as LucideMessageSquareQuote,
 	default as MessageSquareQuoteIcon,
 } from './icons/message-square-quote';
+export {
+	default as LucideMessageSquarePlus,
+	default as MessageSquarePlusIcon,
+} from './icons/message-square-plus';
 export {
 	default as LucideMessageSquareReply,
 	default as MessageSquareReplyIcon,
@@ -3219,10 +3407,6 @@ export {
 	default as MessageSquareShareIcon,
 } from './icons/message-square-share';
 export {
-	default as LucideMessageSquareText,
-	default as MessageSquareTextIcon,
-} from './icons/message-square-text';
-export {
 	default as LucideMessageSquareWarning,
 	default as MessageSquareWarningIcon,
 } from './icons/message-square-warning';
@@ -3231,33 +3415,46 @@ export {
 	default as MessageSquareXIcon,
 } from './icons/message-square-x';
 export {
+	default as LucideMessageSquareText,
+	default as MessageSquareTextIcon,
+} from './icons/message-square-text';
+export {
 	default as LucideMessageSquare,
 	default as MessageSquareIcon,
 } from './icons/message-square';
-export { default as LucideMetronome, default as MetronomeIcon } from './icons/metronome';
-export { default as LucideMicOff, default as MicOffIcon } from './icons/mic-off';
+export {
+	default as LucideMessagesCircle,
+	default as MessagesCircleIcon,
+} from './icons/messages-circle';
 export {
 	default as LucideMessagesSquare,
 	default as MessagesSquareIcon,
 } from './icons/messages-square';
+export {
+	default as LucideMicAudioLines,
+	default as MicAudioLinesIcon,
+} from './icons/mic-audio-lines';
+export { default as LucideMetronome, default as MetronomeIcon } from './icons/metronome';
+export { default as LucideMicOff, default as MicOffIcon } from './icons/mic-off';
 export { default as LucideMic, default as MicIcon } from './icons/mic';
 export { default as LucideMicrochip, default as MicrochipIcon } from './icons/microchip';
 export { default as LucideMicroscope, default as MicroscopeIcon } from './icons/microscope';
 export { default as LucideMicrowave, default as MicrowaveIcon } from './icons/microwave';
+export { default as LucideMidiPort, default as MidiPortIcon } from './icons/midi-port';
 export { default as LucideMilestone, default as MilestoneIcon } from './icons/milestone';
 export { default as LucideMilkOff, default as MilkOffIcon } from './icons/milk-off';
 export { default as LucideMilk, default as MilkIcon } from './icons/milk';
+export { default as LucideMinus, default as MinusIcon } from './icons/minus';
 export { default as LucideMinimize2, default as Minimize2Icon } from './icons/minimize-2';
 export { default as LucideMinimize, default as MinimizeIcon } from './icons/minimize';
-export { default as LucideMinus, default as MinusIcon } from './icons/minus';
 export {
 	default as LucideMirrorRectangular,
 	default as MirrorRectangularIcon,
 } from './icons/mirror-rectangular';
 export { default as LucideMirrorRound, default as MirrorRoundIcon } from './icons/mirror-round';
 export { default as LucideMonitorCheck, default as MonitorCheckIcon } from './icons/monitor-check';
-export { default as LucideMonitorCog, default as MonitorCogIcon } from './icons/monitor-cog';
 export { default as LucideMonitorCloud, default as MonitorCloudIcon } from './icons/monitor-cloud';
+export { default as LucideMonitorCog, default as MonitorCogIcon } from './icons/monitor-cog';
 export { default as LucideMonitorDot, default as MonitorDotIcon } from './icons/monitor-dot';
 export { default as LucideMonitorDown, default as MonitorDownIcon } from './icons/monitor-down';
 export { default as LucideMonitorOff, default as MonitorOffIcon } from './icons/monitor-off';
@@ -3273,14 +3470,17 @@ export {
 } from './icons/monitor-speaker';
 export { default as LucideMonitorStop, default as MonitorStopIcon } from './icons/monitor-stop';
 export { default as LucideMonitorUp, default as MonitorUpIcon } from './icons/monitor-up';
-export { default as LucideMonitorX, default as MonitorXIcon } from './icons/monitor-x';
 export { default as LucideMonitor, default as MonitorIcon } from './icons/monitor';
+export { default as LucideMonitorX, default as MonitorXIcon } from './icons/monitor-x';
 export { default as LucideMoonStar, default as MoonStarIcon } from './icons/moon-star';
 export { default as LucideMoon, default as MoonIcon } from './icons/moon';
+export { default as LucideMopSparkles, default as MopSparklesIcon } from './icons/mop-sparkles';
+export { default as LucideMop, default as MopIcon } from './icons/mop';
+export { default as LucideMosque, default as MosqueIcon } from './icons/mosque';
 export { default as LucideMotorbike, default as MotorbikeIcon } from './icons/motorbike';
 export { default as LucideMountainSnow, default as MountainSnowIcon } from './icons/mountain-snow';
-export { default as LucideMouseLeft, default as MouseLeftIcon } from './icons/mouse-left';
 export { default as LucideMountain, default as MountainIcon } from './icons/mountain';
+export { default as LucideMouseLeft, default as MouseLeftIcon } from './icons/mouse-left';
 export { default as LucideMouseOff, default as MouseOffIcon } from './icons/mouse-off';
 export {
 	default as LucideMousePointer2Off,
@@ -3291,16 +3491,18 @@ export {
 	default as MousePointer2Icon,
 } from './icons/mouse-pointer-2';
 export {
-	default as LucideMousePointerClick,
-	default as MousePointerClickIcon,
-} from './icons/mouse-pointer-click';
-export {
 	default as LucideMousePointerBan,
 	default as MousePointerBanIcon,
 } from './icons/mouse-pointer-ban';
+export {
+	default as LucideMousePointerClick,
+	default as MousePointerClickIcon,
+} from './icons/mouse-pointer-click';
 export { default as LucideMousePointer, default as MousePointerIcon } from './icons/mouse-pointer';
 export { default as LucideMouseRight, default as MouseRightIcon } from './icons/mouse-right';
 export { default as LucideMouse, default as MouseIcon } from './icons/mouse';
+export { default as LucideMouth, default as MouthIcon } from './icons/mouth';
+export { default as LucideMouthOff, default as MouthOffIcon } from './icons/mouth-off';
 export {
 	default as LucideMoveDiagonal2,
 	default as MoveDiagonal2Icon,
@@ -3316,21 +3518,21 @@ export {
 	default as LucideMoveHorizontal,
 	default as MoveHorizontalIcon,
 } from './icons/move-horizontal';
+export { default as LucideMoveRight, default as MoveRightIcon } from './icons/move-right';
 export { default as LucideMoveLeft, default as MoveLeftIcon } from './icons/move-left';
 export { default as LucideMoveUpLeft, default as MoveUpLeftIcon } from './icons/move-up-left';
-export { default as LucideMoveRight, default as MoveRightIcon } from './icons/move-right';
 export { default as LucideMoveUpRight, default as MoveUpRightIcon } from './icons/move-up-right';
 export { default as LucideMoveUp, default as MoveUpIcon } from './icons/move-up';
 export { default as LucideMoveVertical, default as MoveVerticalIcon } from './icons/move-vertical';
 export { default as LucideMove, default as MoveIcon } from './icons/move';
 export { default as LucideMusic2, default as Music2Icon } from './icons/music-2';
-export { default as LucideMusic4, default as Music4Icon } from './icons/music-4';
 export { default as LucideMusic3, default as Music3Icon } from './icons/music-3';
-export { default as LucideMusic, default as MusicIcon } from './icons/music';
+export { default as LucideMusic4, default as Music4Icon } from './icons/music-4';
 export {
 	default as LucideNavigation2Off,
 	default as Navigation2OffIcon,
 } from './icons/navigation-2-off';
+export { default as LucideMusic, default as MusicIcon } from './icons/music';
 export { default as LucideNavigation2, default as Navigation2Icon } from './icons/navigation-2';
 export {
 	default as LucideNavigationOff,
@@ -3339,11 +3541,12 @@ export {
 export { default as LucideNavigation, default as NavigationIcon } from './icons/navigation';
 export { default as LucideNetwork, default as NetworkIcon } from './icons/network';
 export { default as LucideNewspaper, default as NewspaperIcon } from './icons/newspaper';
-export { default as LucideNonBinary, default as NonBinaryIcon } from './icons/non-binary';
 export { default as LucideNfc, default as NfcIcon } from './icons/nfc';
+export { default as LucideNonBinary, default as NonBinaryIcon } from './icons/non-binary';
+export { default as LucideNotebookDot, default as NotebookDotIcon } from './icons/notebook-dot';
 export { default as LucideNotebookPen, default as NotebookPenIcon } from './icons/notebook-pen';
-export { default as LucideNotebookText, default as NotebookTextIcon } from './icons/notebook-text';
 export { default as LucideNotebookTabs, default as NotebookTabsIcon } from './icons/notebook-tabs';
+export { default as LucideNotebookText, default as NotebookTextIcon } from './icons/notebook-text';
 export { default as LucideNotebook, default as NotebookIcon } from './icons/notebook';
 export {
 	default as LucideNotepadTextDashed,
@@ -3353,13 +3556,13 @@ export { default as LucideNotepadText, default as NotepadTextIcon } from './icon
 export { default as LucideNutOff, default as NutOffIcon } from './icons/nut-off';
 export { default as LucideNut, default as NutIcon } from './icons/nut';
 export { default as LucideOctagonMinus, default as OctagonMinusIcon } from './icons/octagon-minus';
-export { default as LucideOctagon, default as OctagonIcon } from './icons/octagon';
 export { default as LucideOmega, default as OmegaIcon } from './icons/omega';
+export { default as LucideOctagon, default as OctagonIcon } from './icons/octagon';
 export { default as LucideOption, default as OptionIcon } from './icons/option';
 export { default as LucideOrbit, default as OrbitIcon } from './icons/orbit';
+export { default as LucideOrigami, default as OrigamiIcon } from './icons/origami';
 export { default as LucidePackage2, default as Package2Icon } from './icons/package-2';
 export { default as LucidePackageCheck, default as PackageCheckIcon } from './icons/package-check';
-export { default as LucideOrigami, default as OrigamiIcon } from './icons/origami';
 export { default as LucidePackageMinus, default as PackageMinusIcon } from './icons/package-minus';
 export { default as LucidePackageOpen, default as PackageOpenIcon } from './icons/package-open';
 export { default as LucidePackagePlus, default as PackagePlusIcon } from './icons/package-plus';
@@ -3416,13 +3619,14 @@ export {
 } from './icons/panels-right-bottom';
 export { default as LucidePaperBag, default as PaperBagIcon } from './icons/paper-bag';
 export { default as LucidePaperclip, default as PaperclipIcon } from './icons/paperclip';
+export { default as LucideParasol, default as ParasolIcon } from './icons/parasol';
+export { default as LucidePark, default as ParkIcon } from './icons/park';
 export { default as LucideParentheses, default as ParenthesesIcon } from './icons/parentheses';
 export { default as LucideParkingMeter, default as ParkingMeterIcon } from './icons/parking-meter';
-export { default as LucideParasol, default as ParasolIcon } from './icons/parasol';
 export { default as LucidePartyPopper, default as PartyPopperIcon } from './icons/party-popper';
 export { default as LucidePause, default as PauseIcon } from './icons/pause';
-export { default as LucidePawPrint, default as PawPrintIcon } from './icons/paw-print';
 export { default as LucidePcCase, default as PcCaseIcon } from './icons/pc-case';
+export { default as LucidePawPrint, default as PawPrintIcon } from './icons/paw-print';
 export { default as LucidePenOff, default as PenOffIcon } from './icons/pen-off';
 export { default as LucidePenTool, default as PenToolIcon } from './icons/pen-tool';
 export { default as LucidePencilLine, default as PencilLineIcon } from './icons/pencil-line';
@@ -3464,33 +3668,39 @@ export { default as LucidePi, default as PiIcon } from './icons/pi';
 export { default as LucidePiano, default as PianoIcon } from './icons/piano';
 export { default as LucidePickaxe, default as PickaxeIcon } from './icons/pickaxe';
 export {
-	default as LucidePictureInPicture,
-	default as PictureInPictureIcon,
-} from './icons/picture-in-picture';
-export {
 	default as LucidePictureInPicture2,
 	default as PictureInPicture2Icon,
 } from './icons/picture-in-picture-2';
+export {
+	default as LucidePictureInPicture,
+	default as PictureInPictureIcon,
+} from './icons/picture-in-picture';
 export { default as LucidePiggyBank, default as PiggyBankIcon } from './icons/piggy-bank';
 export { default as LucidePilcrowLeft, default as PilcrowLeftIcon } from './icons/pilcrow-left';
 export { default as LucidePilcrowRight, default as PilcrowRightIcon } from './icons/pilcrow-right';
-export { default as LucidePilcrow, default as PilcrowIcon } from './icons/pilcrow';
 export { default as LucidePillBottle, default as PillBottleIcon } from './icons/pill-bottle';
+export { default as LucidePilcrow, default as PilcrowIcon } from './icons/pilcrow';
 export { default as LucidePill, default as PillIcon } from './icons/pill';
 export { default as LucidePinOff, default as PinOffIcon } from './icons/pin-off';
 export { default as LucidePin, default as PinIcon } from './icons/pin';
 export { default as LucidePipette, default as PipetteIcon } from './icons/pipette';
 export { default as LucidePizza, default as PizzaIcon } from './icons/pizza';
-export { default as LucidePlaneTakeoff, default as PlaneTakeoffIcon } from './icons/plane-takeoff';
 export { default as LucidePlaneLanding, default as PlaneLandingIcon } from './icons/plane-landing';
+export { default as LucidePlaneTakeoff, default as PlaneTakeoffIcon } from './icons/plane-takeoff';
 export { default as LucidePlane, default as PlaneIcon } from './icons/plane';
+export { default as LucidePlantPot, default as PlantPotIcon } from './icons/plant-pot';
 export { default as LucidePlayOff, default as PlayOffIcon } from './icons/play-off';
 export { default as LucidePlay, default as PlayIcon } from './icons/play';
+export { default as LucidePlayingCard, default as PlayingCardIcon } from './icons/playing-card';
+export { default as LucidePlayingCards, default as PlayingCardsIcon } from './icons/playing-cards';
+export {
+	default as LucidePlayingCardsFan,
+	default as PlayingCardsFanIcon,
+} from './icons/playing-cards-fan';
 export { default as LucidePlug2, default as Plug2Icon } from './icons/plug-2';
-export { default as LucidePlug, default as PlugIcon } from './icons/plug';
 export { default as LucidePlus, default as PlusIcon } from './icons/plus';
 export { default as LucidePocketKnife, default as PocketKnifeIcon } from './icons/pocket-knife';
-export { default as LucidePodcast, default as PodcastIcon } from './icons/podcast';
+export { default as LucidePlug, default as PlugIcon } from './icons/plug';
 export { default as LucidePodium, default as PodiumIcon } from './icons/podium';
 export { default as LucidePointerOff, default as PointerOffIcon } from './icons/pointer-off';
 export { default as LucidePointer, default as PointerIcon } from './icons/pointer';
@@ -3503,17 +3713,17 @@ export {
 export { default as LucidePowerOff, default as PowerOffIcon } from './icons/power-off';
 export { default as LucidePower, default as PowerIcon } from './icons/power';
 export { default as LucidePresentation, default as PresentationIcon } from './icons/presentation';
-export { default as LucidePrinterCheck, default as PrinterCheckIcon } from './icons/printer-check';
 export { default as LucidePrinterX, default as PrinterXIcon } from './icons/printer-x';
+export { default as LucidePrinterCheck, default as PrinterCheckIcon } from './icons/printer-check';
 export { default as LucidePrinter, default as PrinterIcon } from './icons/printer';
 export { default as LucideProjector, default as ProjectorIcon } from './icons/projector';
-export { default as LucideProportions, default as ProportionsIcon } from './icons/proportions';
 export { default as LucidePuzzle, default as PuzzleIcon } from './icons/puzzle';
+export { default as LucideProportions, default as ProportionsIcon } from './icons/proportions';
 export { default as LucidePyramid, default as PyramidIcon } from './icons/pyramid';
 export { default as LucideQrCode, default as QrCodeIcon } from './icons/qr-code';
 export { default as LucideQuote, default as QuoteIcon } from './icons/quote';
-export { default as LucideRabbit, default as RabbitIcon } from './icons/rabbit';
 export { default as LucideRadar, default as RadarIcon } from './icons/radar';
+export { default as LucideRabbit, default as RabbitIcon } from './icons/rabbit';
 export { default as LucideRadiation, default as RadiationIcon } from './icons/radiation';
 export { default as LucideRadical, default as RadicalIcon } from './icons/radical';
 export { default as LucideRadioOff, default as RadioOffIcon } from './icons/radio-off';
@@ -3525,8 +3735,8 @@ export { default as LucideRadioTower, default as RadioTowerIcon } from './icons/
 export { default as LucideRadio, default as RadioIcon } from './icons/radio';
 export { default as LucideRadius, default as RadiusIcon } from './icons/radius';
 export { default as LucideRainbow, default as RainbowIcon } from './icons/rainbow';
-export { default as LucideRatio, default as RatioIcon } from './icons/ratio';
 export { default as LucideRat, default as RatIcon } from './icons/rat';
+export { default as LucideRatio, default as RatioIcon } from './icons/ratio';
 export { default as LucideReceiptCent, default as ReceiptCentIcon } from './icons/receipt-cent';
 export { default as LucideReceiptEuro, default as ReceiptEuroIcon } from './icons/receipt-euro';
 export {
@@ -3550,11 +3760,11 @@ export {
 	default as ReceiptSwissFrancIcon,
 } from './icons/receipt-swiss-franc';
 export { default as LucideReceiptText, default as ReceiptTextIcon } from './icons/receipt-text';
+export { default as LucideReceipt, default as ReceiptIcon } from './icons/receipt';
 export {
 	default as LucideReceiptTurkishLira,
 	default as ReceiptTurkishLiraIcon,
 } from './icons/receipt-turkish-lira';
-export { default as LucideReceipt, default as ReceiptIcon } from './icons/receipt';
 export {
 	default as LucideRectangleCircle,
 	default as RectangleCircleIcon,
@@ -3568,12 +3778,12 @@ export {
 	default as RectangleHorizontalIcon,
 } from './icons/rectangle-horizontal';
 export { default as LucideRecycle, default as RecycleIcon } from './icons/recycle';
-export { default as LucideRedo2, default as Redo2Icon } from './icons/redo-2';
-export { default as LucideRedoDot, default as RedoDotIcon } from './icons/redo-dot';
 export {
 	default as LucideRectangleVertical,
 	default as RectangleVerticalIcon,
 } from './icons/rectangle-vertical';
+export { default as LucideRedo2, default as Redo2Icon } from './icons/redo-2';
+export { default as LucideRedoDot, default as RedoDotIcon } from './icons/redo-dot';
 export { default as LucideRedo, default as RedoIcon } from './icons/redo';
 export {
 	default as LucideRefreshCcwDot,
@@ -3582,16 +3792,16 @@ export {
 export { default as LucideRefreshCcw, default as RefreshCcwIcon } from './icons/refresh-ccw';
 export { default as LucideRefreshCwOff, default as RefreshCwOffIcon } from './icons/refresh-cw-off';
 export { default as LucideRefreshCw, default as RefreshCwIcon } from './icons/refresh-cw';
-export { default as LucideRefrigerator, default as RefrigeratorIcon } from './icons/refrigerator';
 export { default as LucideRegex, default as RegexIcon } from './icons/regex';
+export { default as LucideRefrigerator, default as RefrigeratorIcon } from './icons/refrigerator';
 export {
 	default as LucideRemoveFormatting,
 	default as RemoveFormattingIcon,
 } from './icons/remove-formatting';
 export { default as LucideRepeat1, default as Repeat1Icon } from './icons/repeat-1';
 export { default as LucideRepeat2, default as Repeat2Icon } from './icons/repeat-2';
-export { default as LucideRepeatOff, default as RepeatOffIcon } from './icons/repeat-off';
 export { default as LucideRepeat, default as RepeatIcon } from './icons/repeat';
+export { default as LucideRepeatOff, default as RepeatOffIcon } from './icons/repeat-off';
 export { default as LucideReplaceAll, default as ReplaceAllIcon } from './icons/replace-all';
 export { default as LucideReplace, default as ReplaceIcon } from './icons/replace';
 export { default as LucideReplyAll, default as ReplyAllIcon } from './icons/reply-all';
@@ -3599,6 +3809,8 @@ export { default as LucideReply, default as ReplyIcon } from './icons/reply';
 export { default as LucideRewind, default as RewindIcon } from './icons/rewind';
 export { default as LucideRibbon, default as RibbonIcon } from './icons/ribbon';
 export { default as LucideRoad, default as RoadIcon } from './icons/road';
+export { default as LucideRobotArm, default as RobotArmIcon } from './icons/robot-arm';
+export { default as LucideRobotVacuum, default as RobotVacuumIcon } from './icons/robot-vacuum';
 export { default as LucideRocket, default as RocketIcon } from './icons/rocket';
 export { default as LucideRockingChair, default as RockingChairIcon } from './icons/rocking-chair';
 export {
@@ -3616,6 +3828,10 @@ export {
 	default as LucideRotateCwSquare,
 	default as RotateCwSquareIcon,
 } from './icons/rotate-cw-square';
+export {
+	default as LucideRotateCwFadingClock,
+	default as RotateCwFadingClockIcon,
+} from './icons/rotate-cw-fading-clock';
 export { default as LucideRotateCw, default as RotateCwIcon } from './icons/rotate-cw';
 export { default as LucideRouteOff, default as RouteOffIcon } from './icons/route-off';
 export { default as LucideRoute, default as RouteIcon } from './icons/route';
@@ -3639,41 +3855,43 @@ export { default as LucideSatellite, default as SatelliteIcon } from './icons/sa
 export { default as LucideSaudiRiyal, default as SaudiRiyalIcon } from './icons/saudi-riyal';
 export { default as LucideSaveAll, default as SaveAllIcon } from './icons/save-all';
 export { default as LucideSaveCheck, default as SaveCheckIcon } from './icons/save-check';
-export { default as LucideSavePen, default as SavePenIcon } from './icons/save-pen';
 export { default as LucideSaveOff, default as SaveOffIcon } from './icons/save-off';
-export { default as LucideSavePlus, default as SavePlusIcon } from './icons/save-plus';
+export { default as LucideSavePen, default as SavePenIcon } from './icons/save-pen';
 export { default as LucideSave, default as SaveIcon } from './icons/save';
+export { default as LucideSavePlus, default as SavePlusIcon } from './icons/save-plus';
 export { default as LucideScale, default as ScaleIcon } from './icons/scale';
 export { default as LucideScaling, default as ScalingIcon } from './icons/scaling';
 export { default as LucideScanBarcode, default as ScanBarcodeIcon } from './icons/scan-barcode';
+export { default as LucideScanBox, default as ScanBoxIcon } from './icons/scan-box';
 export { default as LucideScanEye, default as ScanEyeIcon } from './icons/scan-eye';
 export { default as LucideScanFace, default as ScanFaceIcon } from './icons/scan-face';
-export { default as LucideScanHeart, default as ScanHeartIcon } from './icons/scan-heart';
 export { default as LucideScanLine, default as ScanLineIcon } from './icons/scan-line';
+export { default as LucideScanHeart, default as ScanHeartIcon } from './icons/scan-heart';
 export { default as LucideScanQrCode, default as ScanQrCodeIcon } from './icons/scan-qr-code';
 export { default as LucideScanSearch, default as ScanSearchIcon } from './icons/scan-search';
+export { default as LucideScanSquare, default as ScanSquareIcon } from './icons/scan-square';
 export { default as LucideScanText, default as ScanTextIcon } from './icons/scan-text';
 export { default as LucideScan, default as ScanIcon } from './icons/scan';
-export { default as LucideSchool, default as SchoolIcon } from './icons/school';
 export {
 	default as LucideScissorsLineDashed,
 	default as ScissorsLineDashedIcon,
 } from './icons/scissors-line-dashed';
-export { default as LucideScooter, default as ScooterIcon } from './icons/scooter';
+export { default as LucideSchool, default as SchoolIcon } from './icons/school';
 export { default as LucideScissors, default as ScissorsIcon } from './icons/scissors';
+export { default as LucideScooter, default as ScooterIcon } from './icons/scooter';
+export { default as LucideScreenShare, default as ScreenShareIcon } from './icons/screen-share';
 export {
 	default as LucideScreenShareOff,
 	default as ScreenShareOffIcon,
 } from './icons/screen-share-off';
-export { default as LucideScreenShare, default as ScreenShareIcon } from './icons/screen-share';
 export { default as LucideScrollText, default as ScrollTextIcon } from './icons/scroll-text';
-export { default as LucideScroll, default as ScrollIcon } from './icons/scroll';
 export { default as LucideSearchAlert, default as SearchAlertIcon } from './icons/search-alert';
+export { default as LucideScroll, default as ScrollIcon } from './icons/scroll';
 export { default as LucideSearchCheck, default as SearchCheckIcon } from './icons/search-check';
 export { default as LucideSearchCode, default as SearchCodeIcon } from './icons/search-code';
 export { default as LucideSearchSlash, default as SearchSlashIcon } from './icons/search-slash';
-export { default as LucideSearchX, default as SearchXIcon } from './icons/search-x';
 export { default as LucideSearch, default as SearchIcon } from './icons/search';
+export { default as LucideSearchX, default as SearchXIcon } from './icons/search-x';
 export { default as LucideSection, default as SectionIcon } from './icons/section';
 export { default as LucideSendToBack, default as SendToBackIcon } from './icons/send-to-back';
 export { default as LucideSend, default as SendIcon } from './icons/send';
@@ -3688,10 +3906,11 @@ export {
 export { default as LucideServerCog, default as ServerCogIcon } from './icons/server-cog';
 export { default as LucideServerCrash, default as ServerCrashIcon } from './icons/server-crash';
 export { default as LucideServerOff, default as ServerOffIcon } from './icons/server-off';
-export { default as LucideServer, default as ServerIcon } from './icons/server';
 export { default as LucideSettings2, default as Settings2Icon } from './icons/settings-2';
-export { default as LucideSettings, default as SettingsIcon } from './icons/settings';
+export { default as LucideServerPlus, default as ServerPlusIcon } from './icons/server-plus';
+export { default as LucideServer, default as ServerIcon } from './icons/server';
 export { default as LucideShapes, default as ShapesIcon } from './icons/shapes';
+export { default as LucideSettings, default as SettingsIcon } from './icons/settings';
 export { default as LucideShare2, default as Share2Icon } from './icons/share-2';
 export { default as LucideShare, default as ShareIcon } from './icons/share';
 export { default as LucideSheet, default as SheetIcon } from './icons/sheet';
@@ -3710,11 +3929,17 @@ export {
 	default as ShieldEllipsisIcon,
 } from './icons/shield-ellipsis';
 export { default as LucideShieldHalf, default as ShieldHalfIcon } from './icons/shield-half';
+export {
+	default as LucideShieldKeyhole,
+	default as ShieldKeyholeIcon,
+} from './icons/shield-keyhole';
+export { default as LucideShieldLock, default as ShieldLockIcon } from './icons/shield-lock';
 export { default as LucideShieldMinus, default as ShieldMinusIcon } from './icons/shield-minus';
 export { default as LucideShieldOff, default as ShieldOffIcon } from './icons/shield-off';
 export { default as LucideShieldPlus, default as ShieldPlusIcon } from './icons/shield-plus';
 export { default as LucideShieldUser, default as ShieldUserIcon } from './icons/shield-user';
 export { default as LucideShield, default as ShieldIcon } from './icons/shield';
+export { default as LucideShipCargo, default as ShipCargoIcon } from './icons/ship-cargo';
 export { default as LucideShipWheel, default as ShipWheelIcon } from './icons/ship-wheel';
 export { default as LucideShip, default as ShipIcon } from './icons/ship';
 export { default as LucideShirt, default as ShirtIcon } from './icons/shirt';
@@ -3723,18 +3948,27 @@ export {
 	default as LucideShoppingBasket,
 	default as ShoppingBasketIcon,
 } from './icons/shopping-basket';
-export { default as LucideShoppingCart, default as ShoppingCartIcon } from './icons/shopping-cart';
+export {
+	default as LucideShoppingCartPlus,
+	default as ShoppingCartPlusIcon,
+} from './icons/shopping-cart-plus';
+export {
+	default as LucideShoppingCartMinus,
+	default as ShoppingCartMinusIcon,
+} from './icons/shopping-cart-minus';
 export { default as LucideShovel, default as ShovelIcon } from './icons/shovel';
+export { default as LucideShoppingCart, default as ShoppingCartIcon } from './icons/shopping-cart';
 export { default as LucideShowerHead, default as ShowerHeadIcon } from './icons/shower-head';
 export { default as LucideShredder, default as ShredderIcon } from './icons/shredder';
+export { default as LucideShrimpOff, default as ShrimpOffIcon } from './icons/shrimp-off';
 export { default as LucideShrimp, default as ShrimpIcon } from './icons/shrimp';
 export { default as LucideShrink, default as ShrinkIcon } from './icons/shrink';
 export { default as LucideShrub, default as ShrubIcon } from './icons/shrub';
 export { default as LucideShuffle, default as ShuffleIcon } from './icons/shuffle';
 export { default as LucideSigma, default as SigmaIcon } from './icons/sigma';
 export { default as LucideSignalHigh, default as SignalHighIcon } from './icons/signal-high';
-export { default as LucideSignalLow, default as SignalLowIcon } from './icons/signal-low';
 export { default as LucideSignalMedium, default as SignalMediumIcon } from './icons/signal-medium';
+export { default as LucideSignalLow, default as SignalLowIcon } from './icons/signal-low';
 export { default as LucideSignalZero, default as SignalZeroIcon } from './icons/signal-zero';
 export { default as LucideSignal, default as SignalIcon } from './icons/signal';
 export { default as LucideSignature, default as SignatureIcon } from './icons/signature';
@@ -3759,8 +3993,6 @@ export {
 	default as SmartphoneNfcIcon,
 } from './icons/smartphone-nfc';
 export { default as LucideSmartphone, default as SmartphoneIcon } from './icons/smartphone';
-export { default as LucideSmilePlus, default as SmilePlusIcon } from './icons/smile-plus';
-export { default as LucideSmile, default as SmileIcon } from './icons/smile';
 export { default as LucideSnail, default as SnailIcon } from './icons/snail';
 export { default as LucideSnowflake, default as SnowflakeIcon } from './icons/snowflake';
 export {
@@ -3782,12 +4014,12 @@ export {
 	default as SplinePointerIcon,
 } from './icons/spline-pointer';
 export { default as LucideSpline, default as SplineIcon } from './icons/spline';
-export { default as LucideSplit, default as SplitIcon } from './icons/split';
 export { default as LucideSpool, default as SpoolIcon } from './icons/spool';
+export { default as LucideSplit, default as SplitIcon } from './icons/split';
 export { default as LucideSportShoe, default as SportShoeIcon } from './icons/sport-shoe';
 export { default as LucideSpotlight, default as SpotlightIcon } from './icons/spotlight';
-export { default as LucideSprayCan, default as SprayCanIcon } from './icons/spray-can';
 export { default as LucideSprout, default as SproutIcon } from './icons/sprout';
+export { default as LucideSprayCan, default as SprayCanIcon } from './icons/spray-can';
 export {
 	default as LucideSquareArrowRightEnter,
 	default as SquareArrowRightEnterIcon,
@@ -3808,6 +4040,15 @@ export {
 	default as LucideSquareDashedTopSolid,
 	default as SquareDashedTopSolidIcon,
 } from './icons/square-dashed-top-solid';
+export {
+	default as LucideSquareDimensions,
+	default as SquareDimensionsIcon,
+} from './icons/square-dimensions';
+export {
+	default as LucideSquareExclamationPoint,
+	default as SquareExclamationPointIcon,
+} from './icons/square-exclamation-point';
+export { default as LucideSquareOff, default as SquareOffIcon } from './icons/square-off';
 export { default as LucideSquarePause, default as SquarePauseIcon } from './icons/square-pause';
 export {
 	default as LucideSquareRadical,
@@ -3821,6 +4062,7 @@ export { default as LucideSquareSquare, default as SquareSquareIcon } from './ic
 export { default as LucideSquareStack, default as SquareStackIcon } from './icons/square-stack';
 export { default as LucideSquareStar, default as SquareStarIcon } from './icons/square-star';
 export { default as LucideSquareStop, default as SquareStopIcon } from './icons/square-stop';
+export { default as LucideSquareText, default as SquareTextIcon } from './icons/square-text';
 export { default as LucideSquare, default as SquareIcon } from './icons/square';
 export {
 	default as LucideSquaresExclude,
@@ -3844,19 +4086,19 @@ export { default as LucideSquirrel, default as SquirrelIcon } from './icons/squi
 export { default as LucideStamp, default as StampIcon } from './icons/stamp';
 export { default as LucideStarCheck, default as StarCheckIcon } from './icons/star-check';
 export { default as LucideStarHalf, default as StarHalfIcon } from './icons/star-half';
-export { default as LucideStarMinus, default as StarMinusIcon } from './icons/star-minus';
 export { default as LucideStarOff, default as StarOffIcon } from './icons/star-off';
+export { default as LucideStarMinus, default as StarMinusIcon } from './icons/star-minus';
 export { default as LucideStarPlus, default as StarPlusIcon } from './icons/star-plus';
 export { default as LucideStarX, default as StarXIcon } from './icons/star-x';
 export { default as LucideStar, default as StarIcon } from './icons/star';
 export { default as LucideStepBack, default as StepBackIcon } from './icons/step-back';
 export { default as LucideStepForward, default as StepForwardIcon } from './icons/step-forward';
+export { default as LucideStethoscope, default as StethoscopeIcon } from './icons/stethoscope';
 export { default as LucideSticker, default as StickerIcon } from './icons/sticker';
 export {
 	default as LucideStickyNoteCheck,
 	default as StickyNoteCheckIcon,
 } from './icons/sticky-note-check';
-export { default as LucideStethoscope, default as StethoscopeIcon } from './icons/stethoscope';
 export {
 	default as LucideStickyNoteMinus,
 	default as StickyNoteMinusIcon,
@@ -3865,14 +4107,14 @@ export {
 	default as LucideStickyNoteOff,
 	default as StickyNoteOffIcon,
 } from './icons/sticky-note-off';
-export { default as LucideStickyNoteX, default as StickyNoteXIcon } from './icons/sticky-note-x';
 export {
 	default as LucideStickyNotePlus,
 	default as StickyNotePlusIcon,
 } from './icons/sticky-note-plus';
+export { default as LucideStickyNoteX, default as StickyNoteXIcon } from './icons/sticky-note-x';
+export { default as LucideStickyNote, default as StickyNoteIcon } from './icons/sticky-note';
 export { default as LucideStickyNotes, default as StickyNotesIcon } from './icons/sticky-notes';
 export { default as LucideStone, default as StoneIcon } from './icons/stone';
-export { default as LucideStickyNote, default as StickyNoteIcon } from './icons/sticky-note';
 export { default as LucideStore, default as StoreIcon } from './icons/store';
 export {
 	default as LucideStretchHorizontal,
@@ -3888,33 +4130,33 @@ export {
 } from './icons/strikethrough';
 export { default as LucideSubscript, default as SubscriptIcon } from './icons/subscript';
 export { default as LucideSummary, default as SummaryIcon } from './icons/summary';
-export { default as LucideSunDim, default as SunDimIcon } from './icons/sun-dim';
 export { default as LucideSunMedium, default as SunMediumIcon } from './icons/sun-medium';
 export { default as LucideSunMoon, default as SunMoonIcon } from './icons/sun-moon';
+export { default as LucideSunDim, default as SunDimIcon } from './icons/sun-dim';
 export { default as LucideSunSnow, default as SunSnowIcon } from './icons/sun-snow';
 export { default as LucideSun, default as SunIcon } from './icons/sun';
+export { default as LucideSunrise, default as SunriseIcon } from './icons/sunrise';
 export { default as LucideSuperscript, default as SuperscriptIcon } from './icons/superscript';
 export { default as LucideSunset, default as SunsetIcon } from './icons/sunset';
-export { default as LucideSunrise, default as SunriseIcon } from './icons/sunrise';
 export { default as LucideSwissFranc, default as SwissFrancIcon } from './icons/swiss-franc';
 export { default as LucideSwitchCamera, default as SwitchCameraIcon } from './icons/switch-camera';
-export { default as LucideSword, default as SwordIcon } from './icons/sword';
 export { default as LucideSwatchBook, default as SwatchBookIcon } from './icons/swatch-book';
 export { default as LucideSwords, default as SwordsIcon } from './icons/swords';
+export { default as LucideSyringe, default as SyringeIcon } from './icons/syringe';
+export { default as LucideTable2, default as Table2Icon } from './icons/table-2';
+export { default as LucideSword, default as SwordIcon } from './icons/sword';
 export {
 	default as LucideTableCellsMerge,
 	default as TableCellsMergeIcon,
 } from './icons/table-cells-merge';
-export { default as LucideSyringe, default as SyringeIcon } from './icons/syringe';
-export { default as LucideTable2, default as Table2Icon } from './icons/table-2';
-export {
-	default as LucideTableCellsSplit,
-	default as TableCellsSplitIcon,
-} from './icons/table-cells-split';
 export {
 	default as LucideTableColumnsSplit,
 	default as TableColumnsSplitIcon,
 } from './icons/table-columns-split';
+export {
+	default as LucideTableCellsSplit,
+	default as TableCellsSplitIcon,
+} from './icons/table-cells-split';
 export {
 	default as LucideTableOfContents,
 	default as TableOfContentsIcon,
@@ -3936,17 +4178,17 @@ export { default as LucideTablet, default as TabletIcon } from './icons/tablet';
 export { default as LucideTablets, default as TabletsIcon } from './icons/tablets';
 export { default as LucideTagPlus, default as TagPlusIcon } from './icons/tag-plus';
 export { default as LucideTagX, default as TagXIcon } from './icons/tag-x';
-export { default as LucideTag, default as TagIcon } from './icons/tag';
 export { default as LucideTags, default as TagsIcon } from './icons/tags';
+export { default as LucideTag, default as TagIcon } from './icons/tag';
 export { default as LucideTally1, default as Tally1Icon } from './icons/tally-1';
 export { default as LucideTally2, default as Tally2Icon } from './icons/tally-2';
-export { default as LucideTally3, default as Tally3Icon } from './icons/tally-3';
 export { default as LucideTally4, default as Tally4Icon } from './icons/tally-4';
 export { default as LucideTally5, default as Tally5Icon } from './icons/tally-5';
+export { default as LucideTally3, default as Tally3Icon } from './icons/tally-3';
 export { default as LucideTangent, default as TangentIcon } from './icons/tangent';
 export { default as LucideTarget, default as TargetIcon } from './icons/target';
-export { default as LucideTelescope, default as TelescopeIcon } from './icons/telescope';
 export { default as LucideTentTree, default as TentTreeIcon } from './icons/tent-tree';
+export { default as LucideTelescope, default as TelescopeIcon } from './icons/telescope';
 export { default as LucideTent, default as TentIcon } from './icons/tent';
 export { default as LucideTerminal, default as TerminalIcon } from './icons/terminal';
 export { default as LucideTestTube, default as TestTubeIcon } from './icons/test-tube';
@@ -3967,9 +4209,10 @@ export {
 	default as LucideThermometerSun,
 	default as ThermometerSunIcon,
 } from './icons/thermometer-sun';
-export { default as LucideThumbsDown, default as ThumbsDownIcon } from './icons/thumbs-down';
 export { default as LucideThermometer, default as ThermometerIcon } from './icons/thermometer';
+export { default as LucideThumbsDown, default as ThumbsDownIcon } from './icons/thumbs-down';
 export { default as LucideThumbsUp, default as ThumbsUpIcon } from './icons/thumbs-up';
+export { default as LucideTicTacToe, default as TicTacToeIcon } from './icons/tic-tac-toe';
 export { default as LucideTicketCheck, default as TicketCheckIcon } from './icons/ticket-check';
 export { default as LucideTicketMinus, default as TicketMinusIcon } from './icons/ticket-minus';
 export {
@@ -3978,19 +4221,24 @@ export {
 } from './icons/ticket-percent';
 export { default as LucideTicketPlus, default as TicketPlusIcon } from './icons/ticket-plus';
 export { default as LucideTicketSlash, default as TicketSlashIcon } from './icons/ticket-slash';
-export { default as LucideTicketX, default as TicketXIcon } from './icons/ticket-x';
 export { default as LucideTicket, default as TicketIcon } from './icons/ticket';
+export { default as LucideTicketX, default as TicketXIcon } from './icons/ticket-x';
 export { default as LucideTicketsPlane, default as TicketsPlaneIcon } from './icons/tickets-plane';
 export { default as LucideTickets, default as TicketsIcon } from './icons/tickets';
 export { default as LucideTimeline, default as TimelineIcon } from './icons/timeline';
+export { default as LucideTimerOff, default as TimerOffIcon } from './icons/timer-off';
 export { default as LucideTimerReset, default as TimerResetIcon } from './icons/timer-reset';
 export { default as LucideTimer, default as TimerIcon } from './icons/timer';
-export { default as LucideTimerOff, default as TimerOffIcon } from './icons/timer-off';
-export { default as LucideToggleRight, default as ToggleRightIcon } from './icons/toggle-right';
 export { default as LucideToggleLeft, default as ToggleLeftIcon } from './icons/toggle-left';
+export { default as LucideToggleRight, default as ToggleRightIcon } from './icons/toggle-right';
 export { default as LucideToilet, default as ToiletIcon } from './icons/toilet';
 export { default as LucideToolCase, default as ToolCaseIcon } from './icons/tool-case';
 export { default as LucideToolbox, default as ToolboxIcon } from './icons/toolbox';
+export {
+	default as LucideToothbrushSparkles,
+	default as ToothbrushSparklesIcon,
+} from './icons/toothbrush-sparkles';
+export { default as LucideToothbrush, default as ToothbrushIcon } from './icons/toothbrush';
 export { default as LucideTornado, default as TornadoIcon } from './icons/tornado';
 export { default as LucideTorus, default as TorusIcon } from './icons/torus';
 export { default as LucideTouchpadOff, default as TouchpadOffIcon } from './icons/touchpad-off';
@@ -4000,6 +4248,7 @@ export { default as LucideTowerControl, default as TowerControlIcon } from './ic
 export { default as LucideToyBrick, default as ToyBrickIcon } from './icons/toy-brick';
 export { default as LucideTractor, default as TractorIcon } from './icons/tractor';
 export { default as LucideTrafficCone, default as TrafficConeIcon } from './icons/traffic-cone';
+export { default as LucideTrailer, default as TrailerIcon } from './icons/trailer';
 export {
 	default as LucideTrainFrontTunnel,
 	default as TrainFrontTunnelIcon,
@@ -4007,15 +4256,14 @@ export {
 export { default as LucideTrainFront, default as TrainFrontIcon } from './icons/train-front';
 export { default as LucideTrainTrack, default as TrainTrackIcon } from './icons/train-track';
 export { default as LucideTransgender, default as TransgenderIcon } from './icons/transgender';
-export { default as LucideTrash2, default as Trash2Icon } from './icons/trash-2';
-export { default as LucideTrash, default as TrashIcon } from './icons/trash';
+export { default as LucideTrashOff, default as TrashOffIcon } from './icons/trash-off';
 export {
 	default as LucideTreeDeciduous,
 	default as TreeDeciduousIcon,
 } from './icons/tree-deciduous';
 export { default as LucideTreePine, default as TreePineIcon } from './icons/tree-pine';
-export { default as LucideTrees, default as TreesIcon } from './icons/trees';
 export { default as LucideTrendingDown, default as TrendingDownIcon } from './icons/trending-down';
+export { default as LucideTrees, default as TreesIcon } from './icons/trees';
 export {
 	default as LucideTrendingUpDown,
 	default as TrendingUpDownIcon,
@@ -4038,24 +4286,24 @@ export {
 export { default as LucideTruck, default as TruckIcon } from './icons/truck';
 export { default as LucideTurkishLira, default as TurkishLiraIcon } from './icons/turkish-lira';
 export { default as LucideTurntable, default as TurntableIcon } from './icons/turntable';
-export { default as LucideTurtle, default as TurtleIcon } from './icons/turtle';
 export {
 	default as LucideTvMinimalPlay,
 	default as TvMinimalPlayIcon,
 } from './icons/tv-minimal-play';
 export { default as LucideTv, default as TvIcon } from './icons/tv';
+export { default as LucideTurtle, default as TurtleIcon } from './icons/turtle';
 export { default as LucideTypeOutline, default as TypeOutlineIcon } from './icons/type-outline';
 export { default as LucideType, default as TypeIcon } from './icons/type';
 export { default as LucideUmbrellaOff, default as UmbrellaOffIcon } from './icons/umbrella-off';
-export { default as LucideUmbrella, default as UmbrellaIcon } from './icons/umbrella';
 export { default as LucideUnderline, default as UnderlineIcon } from './icons/underline';
+export { default as LucideUmbrella, default as UmbrellaIcon } from './icons/umbrella';
 export { default as LucideUndo2, default as Undo2Icon } from './icons/undo-2';
 export { default as LucideUndoDot, default as UndoDotIcon } from './icons/undo-dot';
-export { default as LucideUndo, default as UndoIcon } from './icons/undo';
 export {
 	default as LucideUnfoldHorizontal,
 	default as UnfoldHorizontalIcon,
 } from './icons/unfold-horizontal';
+export { default as LucideUndo, default as UndoIcon } from './icons/undo';
 export {
 	default as LucideUnfoldVertical,
 	default as UnfoldVerticalIcon,
@@ -4065,33 +4313,44 @@ export { default as LucideUnlink2, default as Unlink2Icon } from './icons/unlink
 export { default as LucideUnlink, default as UnlinkIcon } from './icons/unlink';
 export { default as LucideUnplug, default as UnplugIcon } from './icons/unplug';
 export { default as LucideUpload, default as UploadIcon } from './icons/upload';
+export { default as LucideUsbCPort, default as UsbCPortIcon } from './icons/usb-c-port';
 export { default as LucideUsb, default as UsbIcon } from './icons/usb';
 export { default as LucideUserCheck, default as UserCheckIcon } from './icons/user-check';
+export { default as LucideUserGroup, default as UserGroupIcon } from './icons/user-group';
 export { default as LucideUserCog, default as UserCogIcon } from './icons/user-cog';
 export { default as LucideUserKey, default as UserKeyIcon } from './icons/user-key';
 export { default as LucideUserLock, default as UserLockIcon } from './icons/user-lock';
-export { default as LucideUserMinus, default as UserMinusIcon } from './icons/user-minus';
-export { default as LucideUserPlus, default as UserPlusIcon } from './icons/user-plus';
 export { default as LucideUserPen, default as UserPenIcon } from './icons/user-pen';
+export { default as LucideUserPlus, default as UserPlusIcon } from './icons/user-plus';
+export { default as LucideUserMinus, default as UserMinusIcon } from './icons/user-minus';
 export {
 	default as LucideUserRoundArrowLeft,
 	default as UserRoundArrowLeftIcon,
 } from './icons/user-round-arrow-left';
 export { default as LucideUserRoundKey, default as UserRoundKeyIcon } from './icons/user-round-key';
+export {
+	default as LucideUserRoundGroup,
+	default as UserRoundGroupIcon,
+} from './icons/user-round-group';
 export { default as LucideUserRoundPen, default as UserRoundPenIcon } from './icons/user-round-pen';
 export {
 	default as LucideUserRoundSearch,
 	default as UserRoundSearchIcon,
 } from './icons/user-round-search';
 export { default as LucideUserSearch, default as UserSearchIcon } from './icons/user-search';
+export { default as LucideUserShield, default as UserShieldIcon } from './icons/user-shield';
 export { default as LucideUserStar, default as UserStarIcon } from './icons/user-star';
-export { default as LucideUser, default as UserIcon } from './icons/user';
 export { default as LucideUserX, default as UserXIcon } from './icons/user-x';
+export { default as LucideUser, default as UserIcon } from './icons/user';
 export { default as LucideUsers, default as UsersIcon } from './icons/users';
 export { default as LucideUtilityPole, default as UtilityPoleIcon } from './icons/utility-pole';
 export { default as LucideVan, default as VanIcon } from './icons/van';
 export { default as LucideVariable, default as VariableIcon } from './icons/variable';
 export { default as LucideVault, default as VaultIcon } from './icons/vault';
+export {
+	default as LucideVectorPolygon,
+	default as VectorPolygonIcon,
+} from './icons/vector-polygon';
 export { default as LucideVectorSquare, default as VectorSquareIcon } from './icons/vector-square';
 export { default as LucideVegan, default as VeganIcon } from './icons/vegan';
 export { default as LucideVenetianMask, default as VenetianMaskIcon } from './icons/venetian-mask';
@@ -4101,44 +4360,47 @@ export { default as LucideVibrateOff, default as VibrateOffIcon } from './icons/
 export { default as LucideVibrate, default as VibrateIcon } from './icons/vibrate';
 export { default as LucideVideoOff, default as VideoOffIcon } from './icons/video-off';
 export { default as LucideVideo, default as VideoIcon } from './icons/video';
-export { default as LucideVideotape, default as VideotapeIcon } from './icons/videotape';
-export { default as LucideVoicemail, default as VoicemailIcon } from './icons/voicemail';
 export { default as LucideView, default as ViewIcon } from './icons/view';
-export { default as LucideVolleyball, default as VolleyballIcon } from './icons/volleyball';
+export { default as LucideVideotape, default as VideotapeIcon } from './icons/videotape';
+export { default as LucideVirusOff, default as VirusOffIcon } from './icons/virus-off';
+export { default as LucideVirus, default as VirusIcon } from './icons/virus';
+export { default as LucideVoicemail, default as VoicemailIcon } from './icons/voicemail';
 export { default as LucideVolume1, default as Volume1Icon } from './icons/volume-1';
+export { default as LucideVolleyball, default as VolleyballIcon } from './icons/volleyball';
 export { default as LucideVolume2, default as Volume2Icon } from './icons/volume-2';
 export { default as LucideVolumeOff, default as VolumeOffIcon } from './icons/volume-off';
 export { default as LucideVolumeX, default as VolumeXIcon } from './icons/volume-x';
-export { default as LucideVote, default as VoteIcon } from './icons/vote';
 export { default as LucideVolume, default as VolumeIcon } from './icons/volume';
+export { default as LucideVote, default as VoteIcon } from './icons/vote';
 export { default as LucideWalletCards, default as WalletCardsIcon } from './icons/wallet-cards';
 export { default as LucideWallet, default as WalletIcon } from './icons/wallet';
 export { default as LucideWallpaper, default as WallpaperIcon } from './icons/wallpaper';
-export { default as LucideWand, default as WandIcon } from './icons/wand';
 export { default as LucideWarehouse, default as WarehouseIcon } from './icons/warehouse';
+export { default as LucideWand, default as WandIcon } from './icons/wand';
 export {
 	default as LucideWashingMachine,
 	default as WashingMachineIcon,
 } from './icons/washing-machine';
 export { default as LucideWatch, default as WatchIcon } from './icons/watch';
+export { default as LucideWavesArrowUp, default as WavesArrowUpIcon } from './icons/waves-arrow-up';
 export {
 	default as LucideWavesArrowDown,
 	default as WavesArrowDownIcon,
 } from './icons/waves-arrow-down';
-export { default as LucideWavesArrowUp, default as WavesArrowUpIcon } from './icons/waves-arrow-up';
-export { default as LucideWavesLadder, default as WavesLadderIcon } from './icons/waves-ladder';
 export {
 	default as LucideWavesVertical,
 	default as WavesVerticalIcon,
 } from './icons/waves-vertical';
+export { default as LucideWavesLadder, default as WavesLadderIcon } from './icons/waves-ladder';
 export { default as LucideWaypoints, default as WaypointsIcon } from './icons/waypoints';
-export { default as LucideWebcam, default as WebcamIcon } from './icons/webcam';
 export { default as LucideWebcamOff, default as WebcamOffIcon } from './icons/webcam-off';
+export { default as LucideWebcam, default as WebcamIcon } from './icons/webcam';
 export { default as LucideWebhookOff, default as WebhookOffIcon } from './icons/webhook-off';
 export { default as LucideWebhook, default as WebhookIcon } from './icons/webhook';
 export { default as LucideWeightTilde, default as WeightTildeIcon } from './icons/weight-tilde';
 export { default as LucideWeight, default as WeightIcon } from './icons/weight';
 export { default as LucideWheatOff, default as WheatOffIcon } from './icons/wheat-off';
+export { default as LucideWhistle, default as WhistleIcon } from './icons/whistle';
 export { default as LucideWheat, default as WheatIcon } from './icons/wheat';
 export { default as LucideWholeWord, default as WholeWordIcon } from './icons/whole-word';
 export { default as LucideWifiCog, default as WifiCogIcon } from './icons/wifi-cog';
@@ -4155,15 +4417,15 @@ export {
 } from './icons/wind-arrow-down';
 export { default as LucideWind, default as WindIcon } from './icons/wind';
 export { default as LucideWine, default as WineIcon } from './icons/wine';
+export { default as LucideWorkflow, default as WorkflowIcon } from './icons/workflow';
 export { default as LucideWineOff, default as WineOffIcon } from './icons/wine-off';
 export { default as LucideWorm, default as WormIcon } from './icons/worm';
-export { default as LucideWorkflow, default as WorkflowIcon } from './icons/workflow';
 export { default as LucideWrenchOff, default as WrenchOffIcon } from './icons/wrench-off';
 export { default as LucideWrench, default as WrenchIcon } from './icons/wrench';
 export { default as LucideXLineTop, default as XLineTopIcon } from './icons/x-line-top';
 export { default as LucideZapOff, default as ZapOffIcon } from './icons/zap-off';
-export { default as LucideZap, default as ZapIcon } from './icons/zap';
 export { default as LucideX, default as XIcon } from './icons/x';
+export { default as LucideZap, default as ZapIcon } from './icons/zap';
 export {
 	default as LucideZodiacAquarius,
 	default as ZodiacAquariusIcon,
@@ -4186,13 +4448,13 @@ export {
 	default as LucideZodiacSagittarius,
 	default as ZodiacSagittariusIcon,
 } from './icons/zodiac-sagittarius';
+export { default as LucideZodiacTaurus, default as ZodiacTaurusIcon } from './icons/zodiac-taurus';
+export { default as LucideZodiacVirgo, default as ZodiacVirgoIcon } from './icons/zodiac-virgo';
+export { default as LucideZoomIn, default as ZoomInIcon } from './icons/zoom-in';
 export {
 	default as LucideZodiacScorpio,
 	default as ZodiacScorpioIcon,
 } from './icons/zodiac-scorpio';
-export { default as LucideZodiacVirgo, default as ZodiacVirgoIcon } from './icons/zodiac-virgo';
-export { default as LucideZodiacTaurus, default as ZodiacTaurusIcon } from './icons/zodiac-taurus';
-export { default as LucideZoomIn, default as ZoomInIcon } from './icons/zoom-in';
 export { default as LucideZoomOut, default as ZoomOutIcon } from './icons/zoom-out';
 export { default as ArrowDown01Icon, default as LucideArrowDown01 } from './icons/arrow-down-0-1';
 export { default as ArrowDown10Icon, default as LucideArrowDown10 } from './icons/arrow-down-1-0';

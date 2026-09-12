@@ -1,4 +1,4 @@
-// Generated from lucide-react@1.24.0 and @lucide/icons@1.24.0.
+// Generated from lucide-react@1.45.0 and @lucide/icons@1.45.0.
 // Run `pnpm lucide:generate`; do not edit by hand.
 
-export { default } from './square-split-horizontal';
+export { default, __iconData } from './square-split-horizontal';

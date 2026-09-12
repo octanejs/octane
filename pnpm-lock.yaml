@@ -197,8 +197,8 @@ catalogs:
       specifier: 0.4.0
       version: 0.4.0
     '@lucide/icons':
-      specifier: 1.24.0
-      version: 1.24.0
+      specifier: 1.45.0
+      version: 1.45.0
     '@mapbox/point-geometry':
       specifier: 1.1.0
       version: 1.1.0
@@ -293,8 +293,8 @@ catalogs:
       specifier: 2.2.1
       version: 2.2.1
     '@sanity/icons':
-      specifier: 5.2.1
-      version: 5.2.1
+      specifier: 5.2.2
+      version: 5.2.2
     '@sanity/logos':
       specifier: 2.2.5
       version: 2.2.5
@@ -758,8 +758,8 @@ catalogs:
       specifier: 13.4.1
       version: 13.4.1
     lucide-react:
-      specifier: 1.24.0
-      version: 1.24.0
+      specifier: 1.45.0
+      version: 1.45.0
     mapbox-gl:
       specifier: 3.9.0
       version: 3.9.0
@@ -6664,7 +6664,7 @@ importers:
     dependencies:
       '@lucide/icons':
         specifier: catalog:default
-        version: 1.24.0
+        version: 1.45.0
     devDependencies:
       '@tsrx/react':
         specifier: catalog:default
@@ -6674,7 +6674,7 @@ importers:
         version: 0.28.1
       lucide-react:
         specifier: catalog:default
-        version: 1.24.0(react@19.2.7)
+        version: 1.45.0(react@19.2.7)
       octane:
         specifier: workspace:*
         version: link:../octane
@@ -7941,7 +7941,7 @@ importers:
     devDependencies:
       '@sanity/icons':
         specifier: catalog:default
-        version: 5.2.1(react@19.2.7)
+        version: 5.2.2(react@19.2.7)
       '@tsrx/react':
         specifier: catalog:default
         version: 0.2.71(react@19.2.7)
@@ -8193,7 +8193,7 @@ importers:
         version: 0.28.1
       lucide-react:
         specifier: catalog:default
-        version: 1.24.0(react@19.2.7)
+        version: 1.45.0(react@19.2.7)
       octane:
         specifier: workspace:*
         version: link:../octane
@@ -14785,8 +14785,8 @@ packages:
       '@standard-schema/spec': ^1.1.0
       effect: ^3.21.2
 
-  '@lucide/icons@1.24.0':
-    resolution: {integrity: sha512-Wmmhr4kYD2u+dzMKQKavMN7CLHpXDqCkVKBDxmW29JFnApmTXjjoeNurXHlDvqvYqTYKLVJyV+3jW5Hi/UcmGw==}
+  '@lucide/icons@1.45.0':
+    resolution: {integrity: sha512-YiCragzJXRsUNbrk9S/fsz1XQoOJsJdnF2XEmNpNHp/u3+rJVOeGTW8rmDLpbCpm8BW0GDRADRNiCu9qnfIJeg==}
 
   '@lynx-js/cache-events-webpack-plugin@0.2.0':
     resolution: {integrity: sha512-f903x00MMmWB9yIyvACAoe4im0T58JHpKnypV/ccI2gp477RJoCgXPne2x8Obgo3fTOIMHpmNMdnxFW1ej9olQ==}
@@ -18097,8 +18097,8 @@ packages:
   '@sanity/eventsource@5.0.4':
     resolution: {integrity: sha512-NT6XrTJePJd7q1ZdTqB3NsTyNNOe9R2zMkg4Hlkqwb0LL6UmekVamAD46yjSJ+HbRyXAKLl1Rb65xZBdzC1f8Q==}
 
-  '@sanity/icons@5.2.1':
-    resolution: {integrity: sha512-P5gY1HRungh4RgCcypdIpu/SKoTwRBTttpbHntZjdW1MO3MK6xEOs+pbAzSARyhh22OcN9PkBBEYk2FL34BvfQ==}
+  '@sanity/icons@5.2.2':
+    resolution: {integrity: sha512-v+5dMjYJ6pC4x8IS/4O/GvQBet5GqsXsqJxBiiS6WHZt21EgntpW+q5hxU3dO4q/njiyR8O1JsdLAs3NranoXA==}
     engines: {node: '>=20.19 <22 || >=22.12'}
     peerDependencies:
       react: ^18 || ^19
@@ -27708,13 +27708,13 @@ packages:
   lru-cache@5.1.1:
     resolution: {integrity: sha512-KpNARQA3Iwv+jTA0utUVVbrh+Jlrr1Fv0e56GGzAFOXN7dk/FviaDW8LHmK52DlcH4WP2n6gI8vN1aesBFgo9w==}
 
-  lucide-react@1.24.0:
-    resolution: {integrity: sha512-YT6mBD8lGKkg4nM39enlm94/sfJIiW0YKUT60fBy4YK8tai31ylg1VhGNWxkpSKHo9UagfnZqwIff3HTDQwXeA==}
+  lucide-react@1.25.0:
+    resolution: {integrity: sha512-/mdJTRbiwcLOQ1NZZK1amZF9rIZyvO18D6r9TngE6TG1NmqHgFuT4eE7Xrkm9UsXMbBJD1NlfwHVltCDWHrOTw==}
     peerDependencies:
       react: ^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0
 
-  lucide-react@1.25.0:
-    resolution: {integrity: sha512-/mdJTRbiwcLOQ1NZZK1amZF9rIZyvO18D6r9TngE6TG1NmqHgFuT4eE7Xrkm9UsXMbBJD1NlfwHVltCDWHrOTw==}
+  lucide-react@1.45.0:
+    resolution: {integrity: sha512-yH1ubCAduho9UR7oJhRXIQXogksRILBiTuZC4/bQIGeB9JOkxMlSuEHyyZpo1Z3S0yWJO2KTSUZbjiNvVxeOUw==}
     peerDependencies:
       react: ^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0
 
@@ -40061,7 +40061,7 @@ snapshots:
       '@standard-schema/spec': 1.1.0
       effect: 3.21.3
 
-  '@lucide/icons@1.24.0': {}
+  '@lucide/icons@1.45.0': {}
 
   '@lynx-js/cache-events-webpack-plugin@0.2.0':
     dependencies:
@@ -44773,7 +44773,7 @@ snapshots:
       event-source-polyfill: 1.0.31
       eventsource: 2.0.2
 
-  '@sanity/icons@5.2.1(react@19.2.7)':
+  '@sanity/icons@5.2.2(react@19.2.7)':
     dependencies:
       react: 19.2.7
 
@@ -47975,7 +47975,7 @@ snapshots:
 
   '@tsrx/ripple@0.1.65':
     dependencies:
-      '@tsrx/core': 0.1.69
+      '@tsrx/core': 0.1.71
       esrap: 2.3.2
       is-reference: 3.0.3
       source-map: 0.7.6
@@ -58505,13 +58505,13 @@ snapshots:
     dependencies:
       yallist: 3.1.1
 
-  lucide-react@1.24.0(react@19.2.7):
-    dependencies:
-      react: 19.2.7
-
   lucide-react@1.25.0(react@19.2.3):
     dependencies:
       react: 19.2.3
+
+  lucide-react@1.45.0(react@19.2.7):
+    dependencies:
+      react: 19.2.7
 
   luxon@3.7.2: {}
 

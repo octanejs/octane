@@ -17,7 +17,7 @@ const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SRC_ROOT = join(PACKAGE_ROOT, 'src');
 const ICONS_OUT = join(SRC_ROOT, 'icons');
 const CHECK = process.argv.includes('--check');
-const EXPECTED_VERSION = '1.24.0';
+const EXPECTED_VERSION = '1.45.0';
 
 const reactManifestPath = require.resolve('lucide-react/package.json');
 const reactRoot = dirname(reactManifestPath);
@@ -58,7 +58,7 @@ const allReactModules = readdirSync(reactIcons)
 
 const expected = new Map();
 const generatedHeader =
-	'// Generated from lucide-react@1.24.0 and @lucide/icons@1.24.0.\n' +
+	'// Generated from lucide-react@1.45.0 and @lucide/icons@1.45.0.\n' +
 	'// Run `pnpm lucide:generate`; do not edit by hand.\n\n';
 
 for (const { name, path } of canonical) {
@@ -67,10 +67,8 @@ for (const { name, path } of canonical) {
 		generatedHeader +
 			`import iconData from '@lucide/icons/icons/${path}';\n` +
 			`import createLucideIcon from '../createLucideIcon';\n` +
-			`import type { IconNode } from '../types';\n\n` +
-			`const __iconNode = iconData.node as IconNode;\n` +
-			`const ${name} = createLucideIcon(iconData.name, __iconNode);\n\n` +
-			`export { __iconNode };\n` +
+			`\nconst ${name} = createLucideIcon(iconData);\n\n` +
+			`export { default as __iconData } from '@lucide/icons/icons/${path}';\n` +
 			`export default ${name};\n`,
 	);
 }
@@ -84,7 +82,7 @@ for (const path of allReactModules) {
 	}
 	expected.set(
 		join(ICONS_OUT, `${path}.ts`),
-		generatedHeader + `export { default } from './${target}';\n`,
+		generatedHeader + `export { default, __iconData } from './${target}';\n`,
 	);
 }
 

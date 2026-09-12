@@ -15,11 +15,12 @@ export function LucideProvider({
 	color,
 	strokeWidth,
 	absoluteStrokeWidth,
+	nonScalingStroke,
 	className,
 }: LucideProviderProps) {
 	const value = useMemo(
-		() => ({ size, color, strokeWidth, absoluteStrokeWidth, className }),
-		[size, color, strokeWidth, absoluteStrokeWidth, className],
+		() => ({ size, color, strokeWidth, absoluteStrokeWidth, nonScalingStroke, className }),
+		[size, color, strokeWidth, absoluteStrokeWidth, nonScalingStroke, className],
 		CONTEXT_MEMO_SLOT,
 	);
 	return createElement(LucideContextObject.Provider, { value, children });

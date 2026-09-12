@@ -1,0 +1,74 @@
+{
+  "schemaVersion": 1,
+  "releases": [
+    {
+      "package": "lucide-react",
+      "version": "1.45.0",
+      "license": "ISC",
+      "repository": {
+        "url": "https://github.com/lucide-icons/lucide.git",
+        "type": "git",
+        "directory": "packages/lucide-react"
+      },
+      "integrity": "sha512-yH1ubCAduho9UR7oJhRXIQXogksRILBiTuZC4/bQIGeB9JOkxMlSuEHyyZpo1Z3S0yWJO2KTSUZbjiNvVxeOUw==",
+      "gitHead": null,
+      "archiveSha256": "3ec24f37bcda52e4ceb3da3ee69b1e0071c96d16f75d629c089dcc2be2881197",
+      "licenses": [
+        {
+          "path": "package/LICENSE",
+          "sha256": "b495047bd93a9b06913511076f504daba17d5bbeb3e0650f3bb53a4220329c57"
+        }
+      ],
+      "tarball": "https://registry.npmjs.org/lucide-react/-/lucide-react-1.45.0.tgz"
+    },
+    {
+      "package": "@lucide/icons",
+      "version": "1.45.0",
+      "license": "ISC",
+      "repository": {
+        "url": "https://github.com/lucide-icons/lucide.git",
+        "type": "git",
+        "directory": "packages/lucide"
+      },
+      "integrity": "sha512-YiCragzJXRsUNbrk9S/fsz1XQoOJsJdnF2XEmNpNHp/u3+rJVOeGTW8rmDLpbCpm8BW0GDRADRNiCu9qnfIJeg==",
+      "gitHead": null,
+      "archiveSha256": "78386c58acd192dc50e998e126fcb44290b2fee5ac419a75153cfb0ca6479a80",
+      "licenses": [
+        {
+          "path": "package/LICENSE",
+          "sha256": "b495047bd93a9b06913511076f504daba17d5bbeb3e0650f3bb53a4220329c57"
+        }
+      ],
+      "tarball": "https://registry.npmjs.org/@lucide/icons/-/icons-1.45.0.tgz"
+    }
+  ],
+  "sourceCopy": "No new upstream implementation or tests copied. Historical attribution retained.",
+  "validation": [
+    "All 1834 canonical icons render the same SVG as lucide-react@1.45.0 with default and non-scaling strokes.",
+    "Complete root/alias/dynamic-name export comparisons and generation check.",
+    "Focused data, types, SSR/hydration and lifecycle tests; bounded parity remains explicit."
+  ],
+  "limitations": "This dependency maintenance does not claim exhaustive upstream test-suite parity.",
+  "performance": {
+    "scenario": "One named Camera import, production minification with Octane external; same 1000-icon SSR batch after 1000 warmups, 15 samples.",
+    "before": {
+      "raw": 2035,
+      "gzip": 1149,
+      "brotli": 1023,
+      "medianMs": 17.674833000000035,
+      "p25Ms": 17.382790999999997,
+      "p75Ms": 18.53125,
+      "htmlSha256": "89fa1fab7b208ea71e8fdae33d62fb4d533d471928d6e187759fa8635989c319"
+    },
+    "after": {
+      "raw": 3312,
+      "gzip": 1636,
+      "brotli": 1483,
+      "medianMs": 17.748125000000016,
+      "p25Ms": 17.441332999999986,
+      "p75Ms": 19.668292000000008,
+      "htmlSha256": "89fa1fab7b208ea71e8fdae33d62fb4d533d471928d6e187759fa8635989c319"
+    },
+    "interpretation": "The named bundle grows by 487 gzip bytes for the current framework-neutral builder. CPU sample ranges overlap; no speedup or slowdown is established. Markup and icon/React reachability controls pass."
+  }
+}

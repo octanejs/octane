@@ -1,10 +1,9 @@
 {
   "upstream": {
     "package": "@sanity/icons",
-    "version": "5.2.1",
-    "commit": "e6c37d2d4f7f121254c077b3ae83e199ec0aec9c"
+    "version": "5.2.2"
   },
-  "surface": "Complete @sanity/icons@5.2.1 surface: all generated per-icon subpaths, named and default exports, Icon, icons, IconMap, IconSymbol and IconComponent.",
+  "surface": "Complete @sanity/icons@5.2.2 surface: all generated per-icon subpaths, named and default exports, Icon, icons, IconMap, IconSymbol and IconComponent.",
   "divergences": [
     "Refs are normal Octane ref props rather than React forwardRef wrappers.",
     "Event callbacks receive native DOM events rather than React synthetic events."
@@ -13,7 +12,14 @@
   "verified": "2026-08-24",
   "notes": [
     "The generator renders the official React package to deterministic SVG shells and preserves upstream subpaths.",
-    "The root icons map keeps per-icon lazy imports so root consumers do not eagerly load every glyph."
+    "The root icons map keeps per-icon lazy imports so root consumers do not eagerly load every glyph.",
+    "The 5.2.2 release only names component functions and changes declaration export printing. All 236 generated subpaths remain byte-identical, and declaration bodies/export identities are unchanged. See audit/release-compatibility.json."
   ],
-  "docs": ["docs/sanity-react-port-research.md"]
+  "docs": ["docs/sanity-react-port-research.md"],
+  "provenance": {
+    "package": "@sanity/icons",
+    "version": "5.2.1",
+    "commit": "e6c37d2d4f7f121254c077b3ae83e199ec0aec9c",
+    "notes": "Historical generated SVG source pin. The 5.2.2 oracle produces byte-identical generated bindings; no new geometry or React implementation was copied."
+  }
 }

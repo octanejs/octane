@@ -192,7 +192,7 @@ catalogs:
     '@graphql-typed-document-node/core': ^3.2.0
     '@inertiajs/core': 3.6.1
     '@inertiajs/react': 3.6.1
-    '@lucide/icons': 1.24.0
+    '@lucide/icons': 1.45.0
     '@phosphor-icons/core': 2.1.1
     '@babel/core': 7.29.7
     '@rolldown/plugin-babel': 0.2.3
@@ -254,7 +254,7 @@ catalogs:
     '@portabletext/react': 8.0.1
     '@portabletext/toolkit': 6.0.0
     '@portabletext/types': 4.0.2
-    '@sanity/icons': 5.2.1
+    '@sanity/icons': 5.2.2
     '@sanity/logos': 2.2.5
     '@sanity/client': 7.26.2
     '@sanity/core-loader': 2.2.1
@@ -367,7 +367,7 @@ catalogs:
     monaco-editor: 0.55.1
     lexical: 0.46.0
     lighthouse: 13.4.1
-    lucide-react: 1.24.0
+    lucide-react: 1.45.0
     # Pinned to the release @vis.gl/react-mapbox 8.1.2 develops and tests
     # against, so the port's oracle cannot drift with the registry.
     mapbox-gl: 3.9.0
@@ -618,6 +618,8 @@ minimumReleaseAgeExclude:
   - '@tsrx/react-runtime@0.1.7'
   - '@tsrx/solid-runtime@0.1.7'
   - cn@0.2.6
+  - '@lucide/icons@1.45.0'
+  - lucide-react@1.45.0
 
 # Changesets 2.31.1 assumes npm's error shape and crashes on pnpm 11 duplicate
 # publish errors. Remove this backport once the fix ships on Changesets' stable line.
