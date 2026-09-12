@@ -1219,14 +1219,25 @@ export default defineConfig({
 					],
 				},
 			},
-			{
+			...[
+				['tanstack-db', []],
+				['tanstack-db-differential', ['packages/tanstack-db/tests/differential/parity.test.ts']],
+				['tanstack-db-hydration', ['packages/tanstack-db/tests/ssr-hydration.test.ts']],
+				['tanstack-db-portal', ['packages/tanstack-db/tests/provider-portal.test.ts']],
+			].map(([name, files]) => ({
+				...(files.length ? { testExecution: { group: 'react-parity' } } : {}),
 				test: {
-					name: 'tanstack-db',
-					include: ['packages/tanstack-db/tests/**/*.test.{ts,tsx}'],
-					exclude: [
-						'packages/tanstack-db/tests/upstream/**',
-						'packages/tanstack-db/tests/upstream-original.test.ts',
-					],
+					name,
+					include: files.length ? files : ['packages/tanstack-db/tests/**/*.test.{ts,tsx}'],
+					exclude: files.length
+						? []
+						: [
+								'packages/tanstack-db/tests/differential/parity.test.ts',
+								'packages/tanstack-db/tests/ssr-hydration.test.ts',
+								'packages/tanstack-db/tests/provider-portal.test.ts',
+								'packages/tanstack-db/tests/upstream/**',
+								'packages/tanstack-db/tests/upstream-original.test.ts',
+							],
 					environment: 'jsdom',
 					setupFiles: ['packages/tanstack-db/tests/test-setup.ts'],
 					globalSetup: ['packages/tanstack-db/tests/differential/_setup.ts'],
@@ -1243,7 +1254,7 @@ export default defineConfig({
 						},
 					],
 				},
-			},
+			})),
 			{
 				test: {
 					name: 'jotai',
@@ -2276,15 +2287,35 @@ export default defineConfig({
 					],
 				},
 			},
-			{
-				// Package-authored TanStack AI contracts stay ordinary. Parity owns
-				// only the dedicated differential project below.
+			...[
+				['tanstack-ai', []],
+				[
+					'tanstack-ai-mcp-differential',
+					['packages/tanstack-ai/tests/conformance/mcp-resource.test.tsx'],
+				],
+				['tanstack-ai-hydration', ['packages/tanstack-ai/tests/conformance/ui-hydration.test.ts']],
+				['tanstack-ai-portal', ['packages/tanstack-ai/tests/conformance/ui-lifecycle.test.ts']],
+				['tanstack-ai-input', ['packages/tanstack-ai/tests/conformance/ui-components.test.tsx']],
+			].map(([name, files]) => ({
+				...(files.length ? { testExecution: { group: 'react-parity' } } : {}),
+				// Give each required parity lane its own project and leave the
+				// remaining package contracts in the ordinary project.
 				test: {
-					name: 'tanstack-ai',
-					include: [
-						'packages/tanstack-ai/tests/conformance/**/*.test.ts',
-						'packages/tanstack-ai/tests/conformance/**/*.test.tsx',
-					],
+					name,
+					include: files.length
+						? files
+						: [
+								'packages/tanstack-ai/tests/conformance/**/*.test.ts',
+								'packages/tanstack-ai/tests/conformance/**/*.test.tsx',
+							],
+					exclude: files.length
+						? []
+						: [
+								'packages/tanstack-ai/tests/conformance/mcp-resource.test.tsx',
+								'packages/tanstack-ai/tests/conformance/ui-hydration.test.ts',
+								'packages/tanstack-ai/tests/conformance/ui-lifecycle.test.ts',
+								'packages/tanstack-ai/tests/conformance/ui-components.test.tsx',
+							],
 					environment: 'jsdom',
 					setupFiles: ['packages/tanstack-ai/tests/conformance/test-setup.ts'],
 					globals: false,
@@ -2306,7 +2337,7 @@ export default defineConfig({
 						},
 					],
 				},
-			},
+			})),
 			{
 				test: {
 					name: 'tanstack-ai-ssr',

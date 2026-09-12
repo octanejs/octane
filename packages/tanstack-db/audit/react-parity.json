@@ -889,7 +889,7 @@
       "type": "differential",
       "oracle": "required",
       "environment": "workspace-node",
-      "project": "tanstack-db",
+      "project": "tanstack-db-differential",
       "files": [
         {
           "path": "packages/tanstack-db/tests/differential/parity.test.ts",
@@ -971,7 +971,7 @@
       "type": "adapted-octane",
       "oracle": "required",
       "environment": "workspace-node",
-      "project": "tanstack-db",
+      "project": "tanstack-db-hydration",
       "files": [
         {
           "path": "packages/tanstack-db/tests/ssr-hydration.test.ts",
@@ -1047,7 +1047,7 @@
       "type": "adapted-octane",
       "oracle": "required",
       "environment": "workspace-node",
-      "project": "tanstack-db",
+      "project": "tanstack-db-portal",
       "files": [
         {
           "path": "packages/tanstack-db/tests/provider-portal.test.ts",

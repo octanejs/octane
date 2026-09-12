@@ -46,7 +46,7 @@
   },
   "sideEffects": false,
   "scripts": {
-    "test": "vitest run --root ../.. --project tanstack-db",
+    "test": "vitest run --root ../.. --project tanstack-db --project tanstack-db-differential --project tanstack-db-hydration --project tanstack-db-portal",
     "upstream:check": "node ../../scripts/react-parity/verify-provenance.mjs --package-dir ."
   },
   "dependencies": {

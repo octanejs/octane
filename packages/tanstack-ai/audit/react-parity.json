@@ -1739,7 +1739,7 @@
       "type": "differential",
       "oracle": "required",
       "environment": "workspace-node",
-      "project": "tanstack-ai",
+      "project": "tanstack-ai-mcp-differential",
       "files": [
         {
           "path": "packages/tanstack-ai/tests/conformance/mcp-resource.test.tsx",
@@ -1931,7 +1931,7 @@
       "type": "adapted-octane",
       "oracle": "required",
       "environment": "workspace-node",
-      "project": "tanstack-ai",
+      "project": "tanstack-ai-hydration",
       "files": [
         {
           "path": "packages/tanstack-ai/tests/conformance/ui-hydration.test.ts",
@@ -2122,7 +2122,7 @@
       "type": "adapted-octane",
       "oracle": "required",
       "environment": "workspace-node",
-      "project": "tanstack-ai",
+      "project": "tanstack-ai-portal",
       "files": [
         {
           "path": "packages/tanstack-ai/tests/conformance/ui-lifecycle.test.ts",
@@ -2313,7 +2313,7 @@
       "type": "adapted-octane",
       "oracle": "required",
       "environment": "workspace-node",
-      "project": "tanstack-ai",
+      "project": "tanstack-ai-input",
       "files": [
         {
           "path": "packages/tanstack-ai/tests/conformance/ui-components.test.tsx",

@@ -35,7 +35,7 @@
     "./mcp-apps": "./src/mcp-apps.ts"
   },
   "scripts": {
-    "test": "vitest run --root ../.. --project tanstack-ai --project tanstack-ai-ssr --project tanstack-ai-differential --project tanstack-ai-browser"
+    "test": "vitest run --root ../.. --project tanstack-ai --project tanstack-ai-ssr --project tanstack-ai-differential --project tanstack-ai-browser --project tanstack-ai-mcp-differential --project tanstack-ai-hydration --project tanstack-ai-portal --project tanstack-ai-input"
   },
   "dependencies": {
     "@tanstack/ai": "0.54.0",
