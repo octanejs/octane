@@ -86,7 +86,9 @@ describe('hydrateRoot — mapped-fallback keyed list', () => {
 		flushSync(() => {});
 
 		// Adopted, not rebuilt: the same element instances are still in place.
-		expect([...container.querySelectorAll('li.fallback-row')]).toEqual(rows);
+		const adopted = [...container.querySelectorAll('li.fallback-row')];
+		expect(adopted).toHaveLength(rows.length);
+		for (let index = 0; index < rows.length; index++) expect(adopted[index]).toBe(rows[index]);
 		expect(rows.map((row) => row.textContent)).toEqual(['a', 'b', 'c']);
 		root.unmount();
 	});
@@ -107,8 +109,15 @@ describe('hydrateRoot — mapped-fallback keyed list', () => {
 		const reordered = [...container.querySelectorAll('li.fallback-row')];
 		expect(reordered.map((row) => row.getAttribute('data-id'))).toEqual(['3', '1', '2']);
 		// Survivors keep their identity — the same three nodes, reordered.
-		expect(new Set(reordered)).toEqual(new Set(rows));
-		expect(reordered[0]).toBe(rows[2]);
+		for (const [index, previous] of [2, 0, 1].entries())
+			expect(reordered[index]).toBe(rows[previous]);
+		// A later plain array can re-enter the compiled arm without remounting
+		// the rows that were adopted through the custom-array fallback.
+		flushSync(() => root.render(MappedFallbackList, { items: ITEMS }));
+		const compiled = [...container.querySelectorAll('li.fallback-row')];
+		expect(compiled).toHaveLength(rows.length);
+		for (let index = 0; index < rows.length; index++) expect(compiled[index]).toBe(rows[index]);
+		expect(compiled.map((row) => row.textContent)).toEqual(['a', 'b', 'c']);
 		root.unmount();
 	});
 });

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import * as ServerRuntime from 'octane/server';
 import type { ClassValue } from 'octane/jsx-runtime';
-import { flushSync, hydrateRoot } from '../src/index.js';
+import { createRoot, flushSync, hydrateRoot } from '../src/index.js';
 import { mount } from './_helpers';
 import {
 	DeoptNamespaceSlots,
@@ -10,7 +10,7 @@ import {
 	TemplateClassNamespaces,
 	TemplateNamespaceDestinations,
 } from './_fixtures/svg-deopt.tsrx';
-import { loadServerFixture } from './_server-fixture.js';
+import { loadCompiledFixtureSource, loadServerFixture } from './_server-fixture.js';
 import {
 	activateStreamedMarkup,
 	createPipeableCollector,
@@ -149,6 +149,49 @@ function expectNamespaceClasses(
 }
 
 describe('de-opt SVG namespace', () => {
+	it('reuses an ambiguous template after first mounting in MathML, then SVG and HTML', () => {
+		const { App } = loadCompiledFixtureSource(
+			`export function App({ label }) @{ <a data-label={label}>{label as string}</a> }`,
+			{
+				id: 'template-namespace-cache-order.tsrx',
+				mode: 'client',
+				compileOptions: { hmr: false, dev: false, autoMemo: false },
+			},
+		);
+		const mounted: Element[] = [];
+		for (const [namespace, tag] of [
+			[MATHML_NS, 'math'],
+			[SVG_NS, 'svg'],
+			[HTML_NS, 'div'],
+			[MATHML_NS, 'math'],
+			[SVG_NS, 'svg'],
+			[HTML_NS, 'div'],
+		]) {
+			const container = document.createElementNS(namespace, tag);
+			document.body.appendChild(container);
+			const root = createRoot(container);
+			try {
+				root.render(App, { label: 'first' });
+				const node = container.firstElementChild!;
+				expect(node.namespaceURI).toBe(namespace);
+				expect(node.localName).toBe('a');
+				expect(node.textContent).toBe('first');
+				expect(node.getAttribute('data-label')).toBe('first');
+				for (const previous of mounted) expect(node).not.toBe(previous);
+				mounted.push(node);
+				flushSync(() => root.render(App, { label: 'updated' }));
+				expect(container.firstElementChild).toBe(node);
+				expect(node.namespaceURI).toBe(namespace);
+				expect(node.textContent).toBe('updated');
+				expect(node.getAttribute('data-label')).toBe('updated');
+			} finally {
+				root.unmount();
+				expect(container.childNodes).toHaveLength(0);
+				container.remove();
+			}
+		}
+	});
+
 	it('creates SVG-namespaced elements (incl. case-preserved clipPath) via createElement', () => {
 		const r = mount(SvgViaCreateElement);
 		const svg = r.container.querySelector('svg') as SVGSVGElement;

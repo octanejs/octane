@@ -343,6 +343,8 @@ export interface Scope {
 	// (vs. the old `scope[`_for$N`]` dynamic string keys) keeps the Scope object shape
 	// MONOMORPHIC: bindings no longer mutate the scope's hidden class per component.
 	slots: any[];
+	/** Lazy compiler-owned memo regions, independent of the dense DOM/control slots. */
+	compilerMemo: CompilerMemoRegion | null;
 	/**
 	 * DEV ONLY (set by `dev`-compiled bodies; `undefined` in production): a structured
 	 * hydration source-location table — `{ slotIndex: [line, column] }` — plus `locFile`,
@@ -353,6 +355,17 @@ export interface Scope {
 	locs?: Record<number, [number, number]>;
 	locFile?: string;
 }
+
+// A compiled body normally owns the only region in its Scope. Context Providers
+// and loaded/lazy bodies can run a second body in that same Scope, so their
+// per-body caches live in a lazily allocated overflow Map instead of aliasing.
+// The fixed record keeps all four fields in-object with one stable V8 map.
+type CompilerMemoRegion = {
+	bodyId: number;
+	auto: any[] | undefined;
+	hooks: any[] | undefined;
+	overflow: Map<number, CompilerMemoRegion> | null;
+};
 
 interface ChildScope {
 	// withScope uses Symbol per call-site; componentSlotLite uses its numeric slot
@@ -4261,7 +4274,7 @@ function attachLiveFragmentRef(instance: FragmentInstance): void {
 // single-threaded, so every effect enqueued while the buffer is set belongs to the WIP.
 interface OffscreenCapture {
 	/** Root journals already record render validity without a second subtree set. */
-	rootTransaction?: boolean;
+	rootTransaction: boolean;
 	/** Executed bodies whose output/commit work is reusable only if this capture survives. */
 	renderRoot: Block | null;
 	renderedBlocks: Set<Block> | null;
@@ -4269,16 +4282,16 @@ interface OffscreenCapture {
 	events: PendingEffectEvent[];
 	eventActions: EffectEventCommitAction[];
 	refs: RefAttach[];
-	detaches?: any[];
+	detaches: any[] | undefined;
 	// uSES store-syncs enqueued during this off-screen render (see storeSyncQueue).
 	// Spliced into the live queue on commit, dropped on dispose — a WIP that never
 	// lands must not mutate a committed inst (its inst is fresh anyway, per the
 	// fresh-block render, so dropping is both correct and cheap).
 	stores: StoreInst<any>[];
 	/** Suspense visibility changes become recent only when this capture commits. */
-	suspenseCommits?: Set<TrySlot>;
+	suspenseCommits: Set<TrySlot> | undefined;
 	/** Speculative renderer transactions are released only after commit or discard. */
-	renderCleanups?: Array<(discarded: boolean) => void>;
+	renderCleanups: Array<(discarded: boolean) => void> | undefined;
 }
 let WIP_CAPTURE: OffscreenCapture | null = null;
 // Ordinary roots also capture commit work. Keep their generic publication path
@@ -4309,13 +4322,17 @@ export function scheduleRenderCleanup(
 
 function createOffscreenCapture(): OffscreenCapture {
 	return {
+		rootTransaction: false,
 		renderRoot: null,
 		renderedBlocks: null,
 		effects: [[], [], []],
 		events: [],
 		eventActions: [],
 		refs: [],
+		detaches: undefined,
 		stores: [],
+		suspenseCommits: undefined,
+		renderCleanups: undefined,
 	};
 }
 
@@ -6765,6 +6782,7 @@ class BlockImpl {
 	// Per-scope dense slot array (binding bag + control-flow/component/child slots),
 	// indexed by compile-time slot index. Keeps the scope shape monomorphic.
 	declare slots: any[];
+	declare compilerMemo: CompilerMemoRegion | null;
 	// For-block item bookkeeping.
 	declare forSlot: ForSlot | null;
 	declare prevSibling: Block | null;
@@ -6850,6 +6868,7 @@ class BlockImpl {
 		this.deoptNode = null;
 		this.deoptRefs = false;
 		this.slots = [];
+		this.compilerMemo = null;
 		this.forSlot = null;
 		this.prevSibling = null;
 		this.nextSibling = null;
@@ -6900,6 +6919,7 @@ class ScopeImpl {
 	// Per-scope dense slot array (binding bag + control-flow/component/child slots),
 	// indexed by compile-time slot index. Keeps the scope shape monomorphic.
 	declare slots: any[];
+	declare compilerMemo: CompilerMemoRegion | null;
 
 	constructor(parent: Scope, block: Block) {
 		this.block = block;
@@ -6916,6 +6936,7 @@ class ScopeImpl {
 		this.$$ctxCacheOwner = null;
 		this.mounted = false;
 		this.slots = [];
+		this.compilerMemo = null;
 	}
 }
 
@@ -8263,15 +8284,15 @@ interface StateSlot<T> {
 	value: T;
 	setter: (next: T | ((prev: T) => T)) => void;
 	/** Queued functional work is evaluated in the owner's next render. */
-	updates?: Array<T | ((previous: T) => T)>;
+	updates: Array<T | ((previous: T) => T)> | undefined;
 	/** Promoted transition work folds with the inputs of the rendering owner. */
-	renderTransition?: TransitionActionUpdate<T>;
+	renderTransition: TransitionActionUpdate<T> | undefined;
 	/** An urgent ancestor reads queued urgent operations without consuming the transition. */
-	urgentTransition?: boolean;
+	urgentTransition: boolean | undefined;
 	/** Allocated only for compiler-selected third-tuple consumers. */
-	getter?: () => T;
-	pendingActionBatch?: TransitionActionBatch;
-	pendingActionValue?: T;
+	getter: (() => T) | undefined;
+	pendingActionBatch: TransitionActionBatch | undefined;
+	pendingActionValue: T | undefined;
 }
 
 type StateSetter<T> = (next: T | ((prev: T) => T)) => void;
@@ -8387,6 +8408,12 @@ export function useState<T>(initial?: T | (() => T), slot?: HookSlot): StateTupl
 					__profileSchedule(block, 'state', slot);
 				scheduleRender(block);
 			},
+			updates: undefined,
+			renderTransition: undefined,
+			urgentTransition: undefined,
+			getter: undefined,
+			pendingActionBatch: undefined,
+			pendingActionValue: undefined,
 		};
 		ensureHooks(scope).set(slot, s);
 	}
@@ -8897,14 +8924,14 @@ interface ReducerSlot<S, A> {
 	dispatch: (action: A) => void;
 	reducer: (state: S, action: A) => S;
 	/** Render-phase actions are reduced by the reducer from the replaying render. */
-	renderPhaseActions?: A[];
+	renderPhaseActions: A[] | undefined;
 	/** A promoted Action is reduced with this render's reducer before publication. */
-	renderTransition?: TransitionActionUpdate<S>;
-	urgentTransition?: boolean;
+	renderTransition: TransitionActionUpdate<S> | undefined;
+	urgentTransition: boolean | undefined;
 	/** Allocated only for compiler-selected third-tuple consumers. */
-	getter?: () => S;
-	pendingActionBatch?: TransitionActionBatch;
-	pendingActionValue?: S;
+	getter: (() => S) | undefined;
+	pendingActionBatch: TransitionActionBatch | undefined;
+	pendingActionValue: S | undefined;
 }
 
 type ReducerTuple<S, A> = [S, (action: A) => void, () => S];
@@ -8995,6 +9022,12 @@ export function useReducer<S, A, I = S>(
 					__profileSchedule(block, 'reducer', slot);
 				scheduleRender(block);
 			},
+			renderPhaseActions: undefined,
+			renderTransition: undefined,
+			urgentTransition: undefined,
+			getter: undefined,
+			pendingActionBatch: undefined,
+			pendingActionValue: undefined,
 		};
 		ensureHooks(scope).set(slot, s);
 	} else {
@@ -9290,11 +9323,11 @@ export function useInsertionEffect(fn: EffectFn, deps?: any[] | null, slot?: Hoo
 interface MemoHookEntry<T = any> {
 	deps: any[] | undefined;
 	value: T;
-	warmEpisode?: number;
+	warmEpisode: number | undefined;
 	/** A consumed warm occurrence can return only when this scope is discarded. */
-	warmRecord?: WarmEntry;
-	/** Present only on compiler-owned native-read creation caches. */
-	nativeWitness?: NativeReadWitness | null;
+	warmRecord: WarmEntry | undefined;
+	/** Defined only on compiler-owned native-read creation caches. */
+	nativeWitness: NativeReadWitness | null | undefined;
 }
 
 function memoEntryHit<T>(slot: HookSlot, entry: MemoHookEntry<T>): MemoHookEntry<T> {
@@ -9314,6 +9347,8 @@ function adoptMemoEntry<T>(scope: Scope, slot: HookSlot, deps: any[]): MemoHookE
 		deps,
 		value: adopted.value as T,
 		warmEpisode: CURRENT_WARM_EPISODE,
+		warmRecord: undefined,
+		nativeWitness: undefined,
 	};
 	if (ACTIVE_TRANSITION_ATTEMPT !== null) journalMemoEntry(scope, slot, entry);
 	ensureHooks(scope).set(slot, entry);
@@ -9346,8 +9381,13 @@ function publishMemoEntry<T>(
 	value: T,
 	nativeWitness?: NativeReadWitness | null,
 ): T {
-	const entry: MemoHookEntry<T> = { deps, value };
-	if (nativeWitness !== undefined) entry.nativeWitness = nativeWitness;
+	const entry: MemoHookEntry<T> = {
+		deps,
+		value,
+		warmEpisode: undefined,
+		warmRecord: undefined,
+		nativeWitness,
+	};
 	// The attempt records the replacement both ways: the cue re-render must
 	// dep-hit the old entry (never re-create old-version requests), and the
 	// promoted render must dep-hit this one (never create twice).
@@ -9415,8 +9455,35 @@ export function useCallback<F extends (...args: any[]) => any>(
 /** Compiler-owned intrinsics cannot be shadowed by bindings in an authored body. */
 export const hookMemoEqual = Object.is;
 
+/** @internal The usual compiled body takes the first-region fast path. */
+export function compilerMemoRegion(scope: Scope, bodyId: number): CompilerMemoRegion {
+	const region = scope.compilerMemo;
+	if (region !== null && region.bodyId === bodyId) return region;
+	return createCompilerMemoRegion(scope, bodyId, region);
+}
+
+function createCompilerMemoRegion(
+	scope: Scope,
+	bodyId: number,
+	first: CompilerMemoRegion | null,
+): CompilerMemoRegion {
+	if (first === null)
+		return (scope.compilerMemo = { bodyId, auto: undefined, hooks: undefined, overflow: null });
+	let overflow = first.overflow;
+	if (overflow === null) first.overflow = overflow = new Map();
+	let region = overflow.get(bodyId);
+	if (region === undefined) {
+		region = { bodyId, auto: undefined, hooks: undefined, overflow: null };
+		overflow.set(bodyId, region);
+	}
+	return region;
+}
+
 export function hookMemoCreate(size: number): any[] {
-	return new Array(size).fill(undefined);
+	// Validity cells test for true; invariant callbacks use a nullish check.
+	// A null fill also avoids undefined-double storage becoming holey when the
+	// first published value requires object elements in newer V8 versions.
+	return new Array(size).fill(null);
 }
 
 /** Compiler ABI: publish a successful inline memo computation immediately.
@@ -10256,6 +10323,7 @@ function resetHmrBlock(block: Block): void {
 			block._slots = null;
 			block.refFields = null;
 			block.slots = [];
+			block.compilerMemo = null;
 			block.deoptNode = null;
 		});
 
@@ -10313,6 +10381,7 @@ function resetScopeChildren(scope: Scope): void {
 		scope.effectSlots = null;
 		scope.hooks = null;
 		scope.slots = [];
+		scope.compilerMemo = null;
 		// The compiled ref manifest describes the OUTGOING body's binding bag. A compiled body
 		// re-stamps its own on mount, but the descriptor dialect never does — it would leave the
 		// old manifest pointed at a `childSlot` record, which `detachSubtreeRefs` would then read
@@ -13138,6 +13207,7 @@ function adoptNativeMemoEntry(scope: Scope, slot: HookSlot, deps: any[]): MemoHo
 		deps,
 		value: adopted.value,
 		warmEpisode: CURRENT_WARM_EPISODE,
+		warmRecord: undefined,
 		nativeWitness: adopted.nativeWitness,
 	};
 	if (ACTIVE_TRANSITION_ATTEMPT !== null) journalMemoEntry(scope, slot, entry);
@@ -13716,7 +13786,7 @@ interface LazyTemplateRecord {
 	html: string;
 	ns: 0 | 1 | 2 | 3;
 	frag: number;
-	parsed: Array<Element | undefined>;
+	parsed: Array<Element | null>;
 	/**
 	 * Lazily computed adoption-root descriptor for PROD hydration's parse-free
 	 * root check (see HydrationCapability.cloneLazy): 0 = not computed yet, a
@@ -13770,7 +13840,7 @@ export function template(html: string, ns: number = 0, frag: number = 0): Elemen
 			html,
 			ns: ns === 1 ? 1 : ns === 2 ? 2 : ns === 3 ? 3 : 0,
 			frag,
-			parsed: [],
+			parsed: [null, null, null],
 			root: 0,
 		} satisfies LazyTemplateRecord,
 	} as unknown as Element;
@@ -13845,7 +13915,7 @@ function resolveLazyTemplate(lazy: LazyTemplateRecord): Element {
 		ns = lazy.ns;
 	}
 	let parsed = lazy.parsed[ns];
-	if (parsed === undefined) {
+	if (parsed === null) {
 		parsed = parseTemplate(lazy.html, ns, lazy.frag);
 		lazy.parsed[ns] = parsed;
 	}
@@ -23458,13 +23528,13 @@ interface HostComponentSlot {
 	ref: any;
 	// The props applied last render — diffed against the next render so props/events that
 	// DISAPPEARED get removed (not left stale on the reused element).
-	props?: any;
+	props: any;
 	// Stable delegating children body + its current target (see hostComponent).
-	body?: ComponentBody;
-	latest?: ComponentBody | null;
+	body: ComponentBody | undefined;
+	latest: ComponentBody | null | undefined;
 	// Dedicated sub-scope holding the children's childSlot (slot 0), so the children
 	// reconcile/unmount via the Block tree without stamping a derived key on `scope`.
-	childScope?: Scope;
+	childScope: Scope | undefined;
 }
 
 // Render a host element (`<tag>`) that WRAPS a children render-body, from runtime
@@ -23492,7 +23562,15 @@ export function hostComponent(
 		const el = document.createElement(tag);
 		// The children childSlot exclusively OWNS `el`'s content (owns-parent
 		// mode) — no `<!---->` insertion anchor needed (marker-elision M2).
-		state = { el, anchor: null, ref: undefined };
+		state = {
+			el,
+			anchor: null,
+			ref: undefined,
+			props: undefined,
+			body: undefined,
+			latest: undefined,
+			childScope: undefined,
+		};
 		scope.slots[slot] = state;
 		// Children render into a dedicated sub-scope (registered on `scope.children` so
 		// unmountScope walks into it), keeping the children's slot off `scope` itself.
@@ -23749,8 +23827,9 @@ function deoptWrapperKind(value: any[]): DeoptWrapperKind {
 }
 
 const DEOPT_KEY_STRINGIFY = JSON.stringify;
+const DEOPT_KEY_STRING = String;
 
-function nestedImplicitKeyPrefix(path: readonly (string | number)[]): string | null {
+function nestedDeoptKeyPrefix(path: readonly (string | number)[]): string | null {
 	// Object-valued wrapper keys and custom array serialization may differ for
 	// each leaf. Keep their existing full-key serialization path.
 	if (JSON.stringify !== DEOPT_KEY_STRINGIFY || 'toJSON' in path) return null;
@@ -23758,7 +23837,7 @@ function nestedImplicitKeyPrefix(path: readonly (string | number)[]): string | n
 		const type = typeof path[i];
 		if (type !== 'string' && type !== 'number') return null;
 	}
-	return '[' + JSON.stringify(path) + ',"index",';
+	return '[' + JSON.stringify(path) + ',';
 }
 
 function appendScopedDeoptKey(
@@ -23767,7 +23846,7 @@ function appendScopedDeoptKey(
 	item: any,
 	index: number,
 	key: any,
-	implicitPrefix: string | null | undefined,
+	keyPrefix: string | null | undefined,
 ): string | null | undefined {
 	// Reconciliation keys are internal: top-level implicit positions are numbers,
 	// explicit keys carry a 'k' prefix, and nested paths are JSON strings. These
@@ -23782,20 +23861,30 @@ function appendScopedDeoptKey(
 	// explicit 'k' keys; numeric indices are distinct from both string forms.
 	if (path.length === 0) {
 		outKeys.push(explicit ? 'k' + String(key) : index);
-		return implicitPrefix;
+		return keyPrefix;
 	}
-	// Initialize only for the first implicit leaf: keyed-only wrappers must not
-	// pay for a prefix they cannot reuse. `null` disables caching for this scope;
-	// `undefined` means no implicit leaf has needed its prefix yet.
-	if (!explicit) {
-		if (implicitPrefix === undefined) implicitPrefix = nestedImplicitKeyPrefix(path);
-		if (implicitPrefix !== null && JSON.stringify === DEOPT_KEY_STRINGIFY && !('toJSON' in path)) {
-			outKeys.push(implicitPrefix + index + ']');
-			return implicitPrefix;
+	// Only inert keys can share a wrapper prefix. Keep custom coercion on the
+	// original expression below, including its serializer/callee lookup order.
+	if (
+		keyPrefix !== null &&
+		(!explicit || (typeof key === 'string' && String === DEOPT_KEY_STRING)) &&
+		JSON.stringify === DEOPT_KEY_STRINGIFY &&
+		!('toJSON' in path)
+	) {
+		if (keyPrefix === undefined) keyPrefix = nestedDeoptKeyPrefix(path);
+		if (keyPrefix !== null) {
+			outKeys.push(
+				explicit
+					? keyPrefix + '"key",' + JSON.stringify(String(key)) + ']'
+					: keyPrefix + '"index",' + index + ']',
+			);
+			return keyPrefix;
 		}
 	}
 	outKeys.push(JSON.stringify([path, explicit ? 'key' : 'index', explicit ? String(key) : index]));
-	return implicitPrefix;
+	// A custom serializer may retain or mutate this path, even if it restores
+	// the built-ins before the next sibling. Never reuse its old prefix again.
+	return null;
 }
 
 // Flatten arrays and Fragment descriptors to renderable leaves while retaining
@@ -23813,20 +23902,13 @@ function flattenReactChildContainer(
 ): void {
 	const keyFn = kind === 'fragment' ? deoptKeyPositional : deoptKey;
 	const count = children.length;
-	let implicitPrefix: string | null | undefined = count > 1 ? undefined : null;
+	let keyPrefix: string | null | undefined = count > 1 ? undefined : null;
 	for (let i = 0; i < count; i++) {
 		const item = children[i];
 		if (isFragmentDescriptor(item)) {
 			if (item.ref != null || hasOwnProp.call(item.props, 'ref')) {
 				outItems.push(fragmentRefDescriptor(item));
-				implicitPrefix = appendScopedDeoptKey(
-					outKeys,
-					path,
-					item,
-					i,
-					keyFn(item, i),
-					implicitPrefix,
-				);
+				keyPrefix = appendScopedDeoptKey(outKeys, path, item, i, keyFn(item, i), keyPrefix);
 				continue;
 			}
 			const nested = fragmentDescriptorChildren(item);
@@ -23859,7 +23941,7 @@ function flattenReactChildContainer(
 			continue;
 		}
 		outItems.push(item);
-		implicitPrefix = appendScopedDeoptKey(outKeys, path, item, i, keyFn(item, i), implicitPrefix);
+		keyPrefix = appendScopedDeoptKey(outKeys, path, item, i, keyFn(item, i), keyPrefix);
 	}
 }
 
@@ -25310,6 +25392,8 @@ function renderPreparedChildList(
 			env: undefined,
 			adopt: null,
 			plainDeopt: false,
+			mappedNative: undefined,
+			selectionItems: undefined,
 		};
 		if (upgradeArmed) {
 			state.forSlot.adopt = buildDeoptAdoptQueue(upgradeChildren, state.start, state.end!);
@@ -32742,9 +32826,10 @@ interface ForSlot {
 	// focus, input state survive — React parity) instead of rebuilding.
 	// Consumed and nulled within the same render.
 	adopt: Array<{ key: any; node: Node }> | null;
-	// Present only on a childSlot owned by the compiler's guarded map ABI.
+	// Set only on a childSlot owned by the compiler's guarded map ABI.
 	// Keeps descriptor↔compiled adoption off every ordinary descriptor list.
-	mappedNative?: boolean;
+	// Undefined means the arm has not been selected; false is a selected fallback.
+	mappedNative: boolean | undefined;
 	// True when this de-opt list's items render through the plain `deoptItemBody`
 	// — no compiled map body, no mapped fallback wrapper. `mountItem` needs the
 	// fact but must NOT name `deoptItemBody` to get it: a live identity
@@ -32757,9 +32842,9 @@ interface ForSlot {
 	// one hidden class; only childSlot ever stamps or reads it, because only
 	// childSlot passes mountItem the de-opt sentinel.
 	plainDeopt: boolean;
-	// Present only when the compiler proved a keyed equality selection. Identity
+	// Set only when the compiler proved a keyed equality selection. Identity
 	// gates the two-row update without retaining extra state on ordinary lists.
-	selectionItems?: ArrayLike<any>;
+	selectionItems: ArrayLike<any> | undefined;
 }
 
 export function forBlock<T>(
@@ -32848,6 +32933,8 @@ export function forBlock<T>(
 			// sentinel — but both ForSlot literals declare it so every slot shares
 			// one hidden class and the stamp in childSlot transitions nothing.
 			plainDeopt: false,
+			mappedNative: undefined,
+			selectionItems: undefined,
 		};
 		parentScope.slots[slotKey] = state;
 		registerSlot(parentScope, state);
@@ -33916,7 +34003,7 @@ function reconcileKeyed<T>(
 
 	// ── General case: both middles non-empty. Partition + LIS-move.
 	const newMidLen = newEnd - prefixLen + 1;
-	const newKeys: any[] = new Array(newMidLen);
+	const newKeys: any[] = [];
 	const newKeysToIdx = new Map<any, number>(); // key → MIDDLE-RELATIVE index (0..newMidLen-1)
 	for (let i = 0; i < newMidLen; i++) {
 		const key = readListKey(keySource, items[prefixLen + i], prefixLen + i, normalizeKey);

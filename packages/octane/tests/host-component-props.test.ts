@@ -23,6 +23,58 @@ const HostBody = (props: any, scope: any): void => {
 };
 
 describe('hostComponent — reused host and children', () => {
+	it('accepts callable children after an empty mount and releases them when removed', () => {
+		const refs: string[] = [];
+		const hostRef = (element: Element | null) => {
+			if (element !== null) {
+				refs.push('attach');
+				return () => refs.push('detach');
+			}
+		};
+		const Host: ComponentBody<{ label: string | null; attached: boolean }> = (props, scope) => {
+			hostComponent(
+				scope,
+				0,
+				'section',
+				props.attached ? { ref: hostRef, 'data-label': props.label } : null,
+				props.label === null
+					? null
+					: () => createElement('input', { defaultValue: props.label, 'aria-label': props.label }),
+			);
+		};
+		const r = mount(Host, { label: null, attached: false });
+		try {
+			const section = r.find('section');
+			expect(section.childNodes).toHaveLength(0);
+			expect(refs).toEqual([]);
+			r.update(Host, { label: 'first', attached: true });
+			const input = r.find('input') as HTMLInputElement;
+			input.value = 'typed';
+			input.focus();
+			expect(refs).toEqual(['attach']);
+			r.update(Host, { label: 'second', attached: true });
+			expect(r.find('section')).toBe(section);
+			expect(r.find('input')).toBe(input);
+			expect(input.value).toBe('typed');
+			expect(input.getAttribute('aria-label')).toBe('second');
+			expect(document.activeElement).toBe(input);
+			r.update(Host, { label: null, attached: false });
+			expect(r.find('section')).toBe(section);
+			expect(section.childNodes).toHaveLength(0);
+			expect(section.hasAttribute('data-label')).toBe(false);
+			expect(input.isConnected).toBe(false);
+			expect(refs).toEqual(['attach', 'detach']);
+			r.update(Host, { label: 'third', attached: true });
+			const fresh = r.find('input') as HTMLInputElement;
+			expect(fresh).not.toBe(input);
+			expect(fresh.value).toBe('third');
+			r.unmount();
+			expect(refs).toEqual(['attach', 'detach', 'attach', 'detach']);
+		} finally {
+			r.unmount();
+		}
+	});
+
 	it('renders the value returned by callable children', () => {
 		const host: ComponentBody<{ label: string }> = (props, scope) => {
 			hostComponent(scope, 0, 'section', null, () =>
