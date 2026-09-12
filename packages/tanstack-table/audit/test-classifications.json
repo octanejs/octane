@@ -60,6 +60,11 @@
       "path": "packages/tanstack-table/tests/ssr-hydration.test.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Real server/client twins verify adoption, updates, retained row/button identity and unmount."
+    },
+    {
+      "path": "packages/tanstack-table/tests/children-block.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Compiled template children remain renderer-owned; genuine render-prop callbacks receive selected state. Checks updates and survivor identity."
     }
   ]
 }

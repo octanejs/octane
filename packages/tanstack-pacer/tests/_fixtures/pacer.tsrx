@@ -143,3 +143,27 @@ export function NestedPacerProviders(props: { wait: number }) {
 		</PacerProvider>
 	</main>;
 }
+
+export function SchedulerChildren(props: { kind: number; revision: number }) @{
+	const schedulers = [
+		useBatcher((items: number[]) => items.length, {}),
+		useDebouncer((value: number) => value, { wait: 40 }),
+		useQueuer((value: number) => value, {}),
+		useRateLimiter((value: number) => value, { limit: 1, window: 100 }),
+		useThrottler((value: number) => value, { wait: 40 }),
+		useAsyncBatcher(async (items: number[]) => items.length, {}),
+		useAsyncDebouncer(async (value: number) => value, { wait: 40 }),
+		useAsyncQueuer(async (value: number) => value, {}),
+		useAsyncRateLimiter(async (value: number) => value, { limit: 1, window: 100 }),
+		useAsyncThrottler(async (value: number) => value, { wait: 40 }),
+	];
+	const Subscribe = schedulers[props.kind]!.Subscribe;
+	<main>
+		<Subscribe selector={() => props.revision}>
+			<span id="template">{String(props.revision)}</span>
+		</Subscribe>
+		<Subscribe selector={() => props.revision}>
+			{(selected: number) => <output id="callback">{String(selected)}</output>}
+		</Subscribe>
+	</main>
+}

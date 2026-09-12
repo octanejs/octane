@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "ae04465442755655f0585371461fa1ad23633ff2b9047c215928577a4fc91412"
+      "lockfileSha256": "8c6917b3bdc395e057892a96a41d2041b3e2edd2fe8e040870d1dfc07fdbaf4a"
     }
   },
   "lanes": [
@@ -70,7 +70,7 @@
         {
           "path": "packages/tanstack-pacer/tests/_fixtures/pacer.tsrx",
           "role": "support",
-          "sha256": "7b04cf92c6afafc43fd8774a042ccdfc1ae9576ec311e4b97e2e937a16178bec"
+          "sha256": "699b84bb436145fd98b3c858172b6a30dc2876be53b4c308a04ed2c6f85c6a16"
         }
       ]
     },
@@ -133,7 +133,7 @@
         {
           "path": "packages/tanstack-pacer/audit/test-classifications.json",
           "role": "support",
-          "sha256": "17986a373e2eefbda15dc3d34dfe488f54a4c3df3d9581ef5e67ff05597c30b5"
+          "sha256": "44de69cc1d5f218940738da7ae9f4601c6744496b14be6040006bd9998474024"
         },
         {
           "path": "scripts/react-parity/tanstack-pacer-controls.test.mjs",
@@ -310,7 +310,7 @@
         {
           "path": "packages/tanstack-pacer/tests/_fixtures/pacer.tsrx",
           "role": "support",
-          "sha256": "7b04cf92c6afafc43fd8774a042ccdfc1ae9576ec311e4b97e2e937a16178bec"
+          "sha256": "699b84bb436145fd98b3c858172b6a30dc2876be53b4c308a04ed2c6f85c6a16"
         },
         {
           "path": "packages/tanstack-pacer/tests/_fixtures/pacer-diff.tsrx",

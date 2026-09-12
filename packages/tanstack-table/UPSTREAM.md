@@ -13,7 +13,7 @@ The complete released adapter source and tests are byte-pinned under `upstream/`
 by `audit/upstream.lock.json`. Source/tests and the verified npm artifact are
 unpublished. The shared pristine runner executes all 34 original React tests;
 materialized native lanes cover all 31 client cases and all three SSR cases.
-Five authored differential scenarios and 40 native conformance cases cover
+Five authored differential scenarios and 41 native conformance cases cover
 state, subscriptions, contexts, memoization, component identity and real hydration.
 
 There are no dedicated upstream type-test registrations. Both strict type lanes
@@ -35,3 +35,5 @@ Octane has no class components; memo remains a plain callable and refs are props
 Table 9.2.4 preserves zero and empty-string renderables, adds the legacy migration
 entrypoint and uses the core render-phase source with post-commit publication.
 The source ledger and closure cover every shipped source/type file.
+
+Native Subscribe accepts both compiled template children and render-prop callbacks. Compiled blocks are passed back to the renderer; callbacks receive the selected state. The children-block regression checks updates and DOM identity.

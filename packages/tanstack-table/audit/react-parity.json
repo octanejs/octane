@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "ae04465442755655f0585371461fa1ad23633ff2b9047c215928577a4fc91412"
+      "lockfileSha256": "8c6917b3bdc395e057892a96a41d2041b3e2edd2fe8e040870d1dfc07fdbaf4a"
     }
   },
   "lanes": [
@@ -468,7 +468,7 @@
         {
           "path": "packages/tanstack-table/tests/_fixtures/hydration.tsrx",
           "role": "support",
-          "sha256": "9447ae0c0880ff071b4a25f3fd24c2e2135caab26c3b8db39ac289a1889ca90d"
+          "sha256": "7dc0e85cb6c406bb7f60e3a4691f18348552d972a1742d6e004cc5723b8bf563"
         }
       ]
     }

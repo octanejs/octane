@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'octane';
+import { isChildrenBlock, useEffect, useMemo, useState } from 'octane';
 import type { OctaneNode } from 'octane';
 import { AsyncBatcher } from '@tanstack/pacer/async-batcher';
 import { shallow } from '@octanejs/tanstack-store';
@@ -81,7 +81,7 @@ export function useAsyncBatcher<TValue, TSelected = {}>(
 				subscribeSlot,
 			);
 
-			return typeof props.children === 'function'
+			return typeof props.children === 'function' && !isChildrenBlock(props.children)
 				? (props.children as (state: TSelected) => OctaneNode)(selected)
 				: props.children;
 		};

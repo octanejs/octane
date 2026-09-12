@@ -15,7 +15,7 @@
     "path": "src/Subscribe.tsrx",
     "origin": "adapted",
     "packageName": "@tanstack/react-table",
-    "sha256": "1c145badd67ed2364689d910a5e04e7efc9efe573022b1e7d20fe2dacfc3127a"
+    "sha256": "6edb786f0442d407403ecbe336f3a5e3f5251eb5799cfe013bbc26599363b958"
   },
   {
     "path": "src/createTableHook.tsrx",

@@ -26,3 +26,15 @@ export function HydratedTable() @{
 		</table>
 	</section>
 }
+
+export function TableChildren(props: { revision: number }) @{
+	const table = useTable({ features, columns, data: [{ name: String(props.revision) }] });
+	<main>
+		<table.Subscribe selector={() => props.revision}>
+			<span id="template">{String(props.revision)}</span>
+		</table.Subscribe>
+		<table.Subscribe selector={() => props.revision}>
+			{(selected: number) => <output id="callback">{String(selected)}</output>}
+		</table.Subscribe>
+	</main>
+}

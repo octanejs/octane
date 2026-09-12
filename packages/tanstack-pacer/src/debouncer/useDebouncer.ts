@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'octane';
+import { isChildrenBlock, useEffect, useMemo, useState } from 'octane';
 import type { OctaneNode } from 'octane';
 import { Debouncer } from '@tanstack/pacer/debouncer';
 import { shallow } from '@octanejs/tanstack-store';
@@ -88,7 +88,7 @@ export function useDebouncer<TFn extends AnyFunction, TSelected = {}>(
 				subscribeSlot,
 			);
 
-			return typeof props.children === 'function'
+			return typeof props.children === 'function' && !isChildrenBlock(props.children)
 				? (props.children as (state: TSelected) => OctaneNode)(selected)
 				: props.children;
 		};
