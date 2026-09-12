@@ -310,16 +310,41 @@ describe('streamed server-function results', () => {
 		}
 	});
 
-	it('does not disclose a private server exception', async () => {
-		const fetch = endpoint(() => {
-			throw new Error('private token and database details');
-		});
-		try {
-			await expect(__serverRpc('deadbeef', [], {}, true)).rejects.toThrow('Server function failed');
-		} finally {
-			fetch.mockRestore();
-		}
-	});
+	it.each(['before any value', 'after a yielded value'])(
+		'keeps completed server work uncertain when delivery fails %s',
+		async (phase) => {
+			const saved: string[] = [];
+			const fetch = endpoint(
+				phase === 'before any value'
+					? () => {
+							saved.push('saved');
+							throw new Error('private token and database details');
+						}
+					: async function* () {
+							saved.push('saved');
+							yield 'first';
+							throw new Error('private token and database details');
+						},
+			);
+			try {
+				let result = __serverRpc('deadbeef', [], {}, true);
+				if (phase === 'after a yielded value') {
+					const values = (await result) as AsyncIterable<string>;
+					const iterator = values[Symbol.asyncIterator]();
+					await expect(iterator.next()).resolves.toEqual({ value: 'first', done: false });
+					result = iterator.next();
+				}
+				await expect(result).rejects.toMatchObject({
+					message: 'Server function failed',
+					code: 'OCTANE_RPC_UNCERTAIN',
+				});
+				expect(saved).toEqual(['saved']);
+				expect(fetch).toHaveBeenCalledTimes(1);
+			} finally {
+				fetch.mockRestore();
+			}
+		},
+	);
 
 	it('includes stalled response headers in the invocation deadline', async () => {
 		vi.useFakeTimers();

@@ -15781,7 +15781,14 @@ export function bindSignalText(
 	value: unknown,
 	site: string,
 	onlyChild = false,
+	seededText: 1 | undefined = undefined,
 ): unknown {
+	// Only the compiler's fresh native template placeholder is already owned.
+	// Hydration still goes through htext to adopt and advance the server cursor.
+	if (previous === undefined && onlyChild && seededText === 1 && activeHydration() === null) {
+		const text = getFirstChild(position);
+		if (text instanceof Text) previous = text;
+	}
 	const prior = previous as DirectSignalBinding | undefined;
 	return bindDirectSignal(
 		scope,

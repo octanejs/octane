@@ -170,6 +170,39 @@ describe('direct signal child bindings', () => {
 	);
 
 	it.each([false, true])(
+		'preserves an initial signal text node through scalar and signal updates (dev=%s)',
+		async (dev) => {
+			const id = `/src/initial-signal-text-${dev}.tsrx`;
+			const client = loadCompiledFixtureSource(
+				'export function App(props) @{ <div>{props.value as string}</div> }',
+				{ id, mode: 'client', compileOptions: { dev } },
+			);
+			const owner = createScope({ scopeKey: id });
+			const value$ = owner.signal$('value', 'initial');
+			const container = document.createElement('div');
+			document.body.append(container);
+			root = createRoot(container, { signalOwner: owner });
+			root.render(client.App, { value: value$ });
+			const host = container.querySelector('div')!;
+			const text = host.firstChild;
+			expect(host.textContent).toBe('initial');
+			expect(text?.nodeType).toBe(3);
+			value$.set('updated');
+			await Promise.resolve();
+			expect(host.textContent).toBe('updated');
+			flushSync(() => root!.render(client.App, { value: '' }));
+			expect(host.textContent).toBe('');
+			expect(host.firstChild).toBe(text);
+			flushSync(() => root!.render(client.App, { value: value$ }));
+			expect(host.textContent).toBe('updated');
+			expect(host.firstChild).toBe(text);
+			root.unmount();
+			root = undefined;
+			owner.dispose();
+		},
+	);
+
+	it.each([false, true])(
 		'keeps committed spread subscriptions after an abandoned render (dev=%s)',
 		async (dev) => {
 			const source = `import { signal$ } from 'octane/signals';

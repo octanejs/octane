@@ -24723,6 +24723,7 @@ function directSignalBindingArgs(bind, host, previous) {
 			bind.expr,
 			b.literal(bind.signalSite, JSON.stringify(bind.signalSite)),
 			b.literal(bind.kind === 'textOnlyChild'),
+			...(bind.seededText ? [b.literal(1)] : []),
 		];
 	}
 	if (bind.kind === 'styleProperty') {
@@ -27277,11 +27278,7 @@ function emitElementHtml(
 				txtChild.expression,
 				'binding',
 			);
-			const seededText =
-				!binding.signalDirect &&
-				tag !== 'template' &&
-				!tag.includes('-') &&
-				!directPropNames.has('is');
+			const seededText = tag !== 'template' && !tag.includes('-') && !directPropNames.has('is');
 			bindings.push({ ...binding, seededText });
 			// A nonempty placeholder survives the HTML parser as one Text node. The
 			// mount writes its actual value before the cloned host is inserted, so
@@ -27289,7 +27286,6 @@ function emitElementHtml(
 			// puts parser children under .content rather than .firstChild. Custom
 			// element constructors can inspect children while the host is cloned;
 			// preserve the old empty template and create/append mount for them.
-			// Direct signal bindings own their text creation and also start empty.
 			if (seededText) {
 				appendTemplatePart(html, ' ', 'text');
 			}
