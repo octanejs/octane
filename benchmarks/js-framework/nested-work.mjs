@@ -21,6 +21,7 @@ await context.addInitScript(() => {
 	const counts = {
 		nestedImplicitJson: 0,
 		nestedExplicitJson: 0,
+		explicitValueJson: 0,
 		flatImplicitJson: 0,
 		pathOnlyJson: 0,
 	};
@@ -34,6 +35,8 @@ await context.addInitScript(() => {
 			}
 		} else if (Array.isArray(value) && value.length === 2 && value[0] === 'wrapper') {
 			counts.pathOnlyJson++;
+		} else if (typeof value === 'string' && (value === '0' || /^row-\d+$/.test(value))) {
+			counts.explicitValueJson++;
 		}
 		return Reflect.apply(original, this, [value, ...rest]);
 	};
@@ -116,6 +119,18 @@ try {
 			versions[kind] = 1;
 			for (const other of kinds) check(other, versions[other], before[other]);
 		}
+		work.explicitReorder = observe('reorder-explicit');
+		const reordered = Array.from(lists().explicit.children);
+		const expectedReordered = [...before.explicit.slice(0, -1).reverse(), before.explicit.at(-1)];
+		if (
+			lists().explicit.getAttribute('data-version') !== '2' ||
+			reordered.length !== expectedReordered.length ||
+			reordered.some((row, index) => row !== expectedReordered[index])
+		) {
+			throw new Error('keyed reorder changed row identity or order');
+		}
+		work.explicitRestore = observe('restore-explicit');
+		for (const kind of kinds) check(kind, versions[kind], before[kind]);
 		const nextHtml = kinds.map((kind) => lists()[kind].innerHTML).join('|');
 		if (html !== nextHtml) throw new Error('visible HTML changed on unrelated updates');
 		for (const input of inputs) {
@@ -180,19 +195,26 @@ try {
 	assert.equal(semantic.rows.nested, ROWS + 2);
 	assert.equal(semantic.rows.flat, ROWS + 1);
 	assert.equal(semantic.rows.explicit, ROWS + 2);
-	assert.equal(semantic.work.explicit.nestedImplicitJson, 0);
-	assert.equal(semantic.work.explicit.nestedExplicitJson, ROWS + 1);
-	assert.equal(
-		semantic.work.explicit.pathOnlyJson,
-		0,
-		'fully keyed siblings need no implicit prefix',
-	);
+	const expectedExplicitTuples = Number(process.env.WORK_EXPECT_EXPLICIT_TUPLES ?? ROWS + 1);
+	const expectedExplicitValues = Number(process.env.WORK_EXPECT_EXPLICIT_VALUES ?? 0);
+	const expectedExplicitPath = Number(process.env.WORK_EXPECT_EXPLICIT_PATH ?? 0);
+	for (const kind of ['explicit', 'explicitReorder', 'explicitRestore']) {
+		assert.equal(semantic.work[kind].nestedImplicitJson, 0);
+		assert.equal(semantic.work[kind].nestedExplicitJson, expectedExplicitTuples);
+		assert.equal(semantic.work[kind].explicitValueJson, expectedExplicitValues);
+		assert.equal(semantic.work[kind].pathOnlyJson, expectedExplicitPath);
+	}
 	assert.equal(semantic.work.flat.pathOnlyJson, 0, 'flat siblings need no nested prefix');
+	assert.equal(semantic.work.flat.nestedExplicitJson, 0, 'flat keys need no nested encoding');
+	assert.equal(semantic.work.flat.explicitValueJson, 0, 'flat keys need no scalar encoding');
+	const expectedMixedExplicitTuples = Number(process.env.WORK_EXPECT_MIXED_EXPLICIT_TUPLES ?? 1);
+	const expectedMixedExplicitValues = Number(process.env.WORK_EXPECT_MIXED_EXPLICIT_VALUES ?? 0);
 	assert.equal(
 		semantic.work.nested.nestedExplicitJson,
-		1,
-		'nested explicit key retains exact encoding',
+		expectedMixedExplicitTuples,
+		'mixed nested explicit key retains exact encoding',
 	);
+	assert.equal(semantic.work.nested.explicitValueJson, expectedMixedExplicitValues);
 	assert.equal(semantic.work.nested.flatImplicitJson, 0);
 	assert.equal(
 		semantic.work.flat.nestedImplicitJson,
