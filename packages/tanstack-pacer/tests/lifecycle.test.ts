@@ -1,6 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { flushEffects, mount } from '../../octane/tests/_helpers';
-import { SchedulerLifecycle, NestedPacerProviders } from './_fixtures/pacer.tsrx';
+import {
+	SchedulerLifecycle,
+	NestedPacerProviders,
+	SubscribeBlockChildren,
+	SubscribeRenderProp,
+} from './_fixtures/pacer.tsrx';
 
 afterEach(() => document.body.replaceChildren());
 
@@ -46,6 +51,35 @@ describe('Pacer scheduler identity and ownership', () => {
 			result.update(NestedPacerProviders, { wait: 60 });
 			expect(result.find('#outer').textContent).toBe('60:true');
 			expect(result.find('#inner').textContent).toBe('80:true');
+		} finally {
+			result.unmount();
+		}
+	});
+});
+
+describe('Pacer Subscribe children', () => {
+	it('renders compiled block children without invoking them as render props', () => {
+		const result = mount(SubscribeBlockChildren, {});
+		try {
+			expect(result.find('#batcher-block').textContent).toBe('ok');
+			expect(result.find('#debouncer-block').textContent).toBe('ok');
+			expect(result.find('#queuer-block').textContent).toBe('ok');
+			expect(result.find('#limiter-block').textContent).toBe('ok');
+			expect(result.find('#throttler-block').textContent).toBe('ok');
+			expect(result.find('#async-batcher-block').textContent).toBe('ok');
+			expect(result.find('#async-debouncer-block').textContent).toBe('ok');
+			expect(result.find('#async-queuer-block').textContent).toBe('ok');
+			expect(result.find('#async-limiter-block').textContent).toBe('ok');
+			expect(result.find('#async-throttler-block').textContent).toBe('ok');
+		} finally {
+			result.unmount();
+		}
+	});
+
+	it('still calls a genuine render-prop child with the selected snapshot', () => {
+		const result = mount(SubscribeRenderProp, {});
+		try {
+			expect(result.find('#rp-child').textContent).toBe('idle');
 		} finally {
 			result.unmount();
 		}

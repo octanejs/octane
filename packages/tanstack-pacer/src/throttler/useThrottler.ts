@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'octane';
+import { useEffect, useMemo, useState, isChildrenBlock } from 'octane';
 import type { OctaneNode } from 'octane';
 import { Throttler } from '@tanstack/pacer/throttler';
 import { shallow } from '@octanejs/tanstack-store';
@@ -85,7 +85,7 @@ export function useThrottler<TFn extends AnyFunction, TSelected = {}>(
 				subscribeSlot,
 			);
 
-			return typeof props.children === 'function'
+			return typeof props.children === 'function' && !isChildrenBlock(props.children)
 				? (props.children as (state: TSelected) => OctaneNode)(selected)
 				: props.children;
 		};

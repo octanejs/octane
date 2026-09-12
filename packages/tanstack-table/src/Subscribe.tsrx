@@ -2,6 +2,7 @@
 // (`useSelector`); the compiler assigns its call-site slot. The types live in
 // `./types` so the `.tsrx.d.ts` sidecar only restates the signature.
 import { shallow, useSelector } from '@octanejs/tanstack-store';
+import { isChildrenBlock } from 'octane';
 import type { SubscribeComponent, SubscribeProps } from './types';
 
 // A `@{ … }` body cannot carry preceding overload signatures (TS2384), so the
@@ -19,7 +20,7 @@ function SubscribeImpl(props: SubscribeProps<any, any, any>) @{
 	);
 
 	<>
-		{typeof props.children === 'function'
+		{typeof props.children === 'function' && !isChildrenBlock(props.children)
 			? (props.children as (state: unknown) => unknown)(selected)
 			: props.children}
 	</>

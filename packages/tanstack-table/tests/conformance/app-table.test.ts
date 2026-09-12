@@ -9,6 +9,7 @@ import {
 	AppTableFixture,
 	AppTableWithSelector,
 	OrphanTableConsumer,
+	SubscribeBlockChildren,
 	captured,
 } from '../_fixtures/app-table.tsrx';
 
@@ -84,5 +85,12 @@ describe('createTableHook', () => {
 
 	it('throws a helpful error when a table component is used outside AppTable', () => {
 		expect(() => mount(OrphanTableConsumer, {})).toThrow(/must be used within an `AppTable`/);
+	});
+
+	it('renders compiled Subscribe block children without invoking them as render props', async () => {
+		const r = mount(SubscribeBlockChildren, {});
+		await flush();
+		expect(r.find('#table-block').textContent).toBe('ok');
+		r.unmount();
 	});
 });

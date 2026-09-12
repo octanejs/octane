@@ -143,3 +143,62 @@ export function NestedPacerProviders(props: { wait: number }) {
 		</PacerProvider>
 	</main>;
 }
+
+// Dual-mode `Subscribe` children compiled from `.tsrx` are tagged block
+// functions. Invoking them as render props throws (`reading 'block'`).
+export function SubscribeBlockChildren() @{
+	const batcher = useBatcher((items: number[]) => items.length);
+	const debouncer = useDebouncer((value: number) => value, { wait: 40 });
+	const queuer = useQueuer((value: number) => value);
+	const limiter = useRateLimiter((value: number) => value, { limit: 1, window: 100 });
+	const throttler = useThrottler((value: number) => value, { wait: 40 });
+	const asyncBatcher = useAsyncBatcher(async (items: number[]) => items.length);
+	const asyncDebouncer = useAsyncDebouncer(async (value: number) => value, { wait: 40 });
+	const asyncQueuer = useAsyncQueuer(async (value: number) => value);
+	const asyncLimiter = useAsyncRateLimiter(async (value: number) => value, {
+		limit: 1,
+		window: 100,
+	});
+	const asyncThrottler = useAsyncThrottler(async (value: number) => value, { wait: 40 });
+	<div>
+		<batcher.Subscribe selector={(state) => state.size}>
+			<span id="batcher-block">ok</span>
+		</batcher.Subscribe>
+		<debouncer.Subscribe selector={(state) => state.isPending}>
+			<span id="debouncer-block">ok</span>
+		</debouncer.Subscribe>
+		<queuer.Subscribe selector={(state) => state.size}>
+			<span id="queuer-block">ok</span>
+		</queuer.Subscribe>
+		<limiter.Subscribe selector={(state) => state.rejectionCount}>
+			<span id="limiter-block">ok</span>
+		</limiter.Subscribe>
+		<throttler.Subscribe selector={(state) => state.isPending}>
+			<span id="throttler-block">ok</span>
+		</throttler.Subscribe>
+		<asyncBatcher.Subscribe selector={(state) => state.size}>
+			<span id="async-batcher-block">ok</span>
+		</asyncBatcher.Subscribe>
+		<asyncDebouncer.Subscribe selector={(state) => state.isExecuting}>
+			<span id="async-debouncer-block">ok</span>
+		</asyncDebouncer.Subscribe>
+		<asyncQueuer.Subscribe selector={(state) => state.size}>
+			<span id="async-queuer-block">ok</span>
+		</asyncQueuer.Subscribe>
+		<asyncLimiter.Subscribe selector={(state) => state.rejectionCount}>
+			<span id="async-limiter-block">ok</span>
+		</asyncLimiter.Subscribe>
+		<asyncThrottler.Subscribe selector={(state) => state.isExecuting}>
+			<span id="async-throttler-block">ok</span>
+		</asyncThrottler.Subscribe>
+	</div>
+}
+
+export function SubscribeRenderProp() @{
+	const debouncer = useDebouncer((value: number) => value, { wait: 40 });
+	<debouncer.Subscribe selector={(state) => state.isPending}>
+		{(pending: boolean) => <span id="rp-child">
+			{pending ? 'pending' : 'idle'}
+		</span>}
+	</debouncer.Subscribe>
+}

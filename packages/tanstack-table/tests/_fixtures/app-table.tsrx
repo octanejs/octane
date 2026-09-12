@@ -133,3 +133,12 @@ export function OrphanTableConsumer() @{
 		<RowCount />
 	</div>
 }
+
+// Dual-mode `Subscribe` children compiled from `.tsrx` are tagged block
+// functions. Invoking them as render props throws (`reading 'block'`).
+export function SubscribeBlockChildren() @{
+	const table = useAppTable({ data, columns: columns as any });
+	<table.Subscribe selector={(state) => state.sorting}>
+		<span id="table-block">ok</span>
+	</table.Subscribe>
+}
