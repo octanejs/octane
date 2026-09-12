@@ -1,0 +1,2006 @@
+{
+  "schemaVersion": 1,
+  "project": "tanstack-query-adapted",
+  "roots": ["packages/tanstack-query/tests/upstream"],
+  "files": [
+    "packages/tanstack-query/tests/upstream/HydrationBoundary.test.tsx",
+    "packages/tanstack-query/tests/upstream/QueryClientProvider.test.tsx",
+    "packages/tanstack-query/tests/upstream/QueryResetErrorBoundary.test.tsx",
+    "packages/tanstack-query/tests/upstream/fine-grained-persister.test.tsx",
+    "packages/tanstack-query/tests/upstream/infiniteQueryOptions.test.tsx",
+    "packages/tanstack-query/tests/upstream/mutationOptions.test.tsx",
+    "packages/tanstack-query/tests/upstream/queryOptions.test.tsx",
+    "packages/tanstack-query/tests/upstream/ssr-hydration.test.tsx",
+    "packages/tanstack-query/tests/upstream/suspense.test.tsx",
+    "packages/tanstack-query/tests/upstream/transition.test.tsx",
+    "packages/tanstack-query/tests/upstream/useInfiniteQuery.test.tsx",
+    "packages/tanstack-query/tests/upstream/useIsFetching.test.tsx",
+    "packages/tanstack-query/tests/upstream/useMutation.test.tsx",
+    "packages/tanstack-query/tests/upstream/useMutationState.test.tsx",
+    "packages/tanstack-query/tests/upstream/usePrefetchInfiniteQuery.test.tsx",
+    "packages/tanstack-query/tests/upstream/usePrefetchQuery.test.tsx",
+    "packages/tanstack-query/tests/upstream/useQueries.test.tsx",
+    "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+    "packages/tanstack-query/tests/upstream/useSuspenseInfiniteQuery.test.tsx",
+    "packages/tanstack-query/tests/upstream/useSuspenseQueries.test.tsx",
+    "packages/tanstack-query/tests/upstream/useSuspenseQuery.test.tsx"
+  ],
+  "tests": [
+    {
+      "id": "runtime:e4df79c1a53aaa42",
+      "file": "packages/tanstack-query/tests/upstream/HydrationBoundary.test.tsx",
+      "fullName": "React hydration ReactQueryCacheProvider with hydration support should hydrate new but not existing queries if transition is aborted"
+    },
+    {
+      "id": "runtime:dee0a27ec328097f",
+      "file": "packages/tanstack-query/tests/upstream/HydrationBoundary.test.tsx",
+      "fullName": "React hydration ReactQueryCacheProvider with hydration support should hydrate new queries if queries change"
+    },
+    {
+      "id": "runtime:1244d0ef83b56c9d",
+      "file": "packages/tanstack-query/tests/upstream/HydrationBoundary.test.tsx",
+      "fullName": "React hydration ReactQueryCacheProvider with hydration support should hydrate queries to new cache if cache changes"
+    },
+    {
+      "id": "runtime:811b5ffbb8477133",
+      "file": "packages/tanstack-query/tests/upstream/HydrationBoundary.test.tsx",
+      "fullName": "React hydration should handle state without queries property gracefully"
+    },
+    {
+      "id": "runtime:a58a0a882388898a",
+      "file": "packages/tanstack-query/tests/upstream/HydrationBoundary.test.tsx",
+      "fullName": "React hydration should hydrate queries to the cache on context"
+    },
+    {
+      "id": "runtime:b9b551d9633e2524",
+      "file": "packages/tanstack-query/tests/upstream/HydrationBoundary.test.tsx",
+      "fullName": "React hydration should hydrate queries to the cache on custom context"
+    },
+    {
+      "id": "runtime:d9220ac33b34ac6d",
+      "file": "packages/tanstack-query/tests/upstream/HydrationBoundary.test.tsx",
+      "fullName": "React hydration should not hydrate queries if state is not an object"
+    },
+    {
+      "id": "runtime:666318eee4993d75",
+      "file": "packages/tanstack-query/tests/upstream/HydrationBoundary.test.tsx",
+      "fullName": "React hydration should not hydrate queries if state is null"
+    },
+    {
+      "id": "runtime:611a7d57d10a028f",
+      "file": "packages/tanstack-query/tests/upstream/HydrationBoundary.test.tsx",
+      "fullName": "React hydration should not hydrate queries if state is undefined"
+    },
+    {
+      "id": "runtime:85e0dec64de0bfc7",
+      "file": "packages/tanstack-query/tests/upstream/HydrationBoundary.test.tsx",
+      "fullName": "React hydration should not infinite loop when hydrating promises that resolve to errors"
+    },
+    {
+      "id": "runtime:8ebd58a2fe3ffcc9",
+      "file": "packages/tanstack-query/tests/upstream/HydrationBoundary.test.tsx",
+      "fullName": "React hydration should not refetch when query has enabled set to false"
+    },
+    {
+      "id": "runtime:fca42eae7fec5987",
+      "file": "packages/tanstack-query/tests/upstream/HydrationBoundary.test.tsx",
+      "fullName": "React hydration should not refetch when query has staleTime set to Infinity"
+    },
+    {
+      "id": "runtime:9b5a071d03a78322",
+      "file": "packages/tanstack-query/tests/upstream/QueryClientProvider.test.tsx",
+      "fullName": "QueryClientProvider allows multiple caches to be partitioned"
+    },
+    {
+      "id": "runtime:cd148c0e90ec7b86",
+      "file": "packages/tanstack-query/tests/upstream/QueryClientProvider.test.tsx",
+      "fullName": "QueryClientProvider sets a specific cache for all queries to use"
+    },
+    {
+      "id": "runtime:9e03f2267eff2c7b",
+      "file": "packages/tanstack-query/tests/upstream/QueryClientProvider.test.tsx",
+      "fullName": "QueryClientProvider useQueryClient should throw an error if no query client has been set"
+    },
+    {
+      "id": "runtime:3b410127b149789d",
+      "file": "packages/tanstack-query/tests/upstream/QueryClientProvider.test.tsx",
+      "fullName": "QueryClientProvider uses defaultOptions for queries when they don't provide their own config"
+    },
+    {
+      "id": "runtime:c2751fd505a0d082",
+      "file": "packages/tanstack-query/tests/upstream/QueryResetErrorBoundary.test.tsx",
+      "fullName": "QueryErrorResetBoundary useQueries should retry fetch if the reset error boundary has been reset"
+    },
+    {
+      "id": "runtime:89c48c6c00c5e338",
+      "file": "packages/tanstack-query/tests/upstream/QueryResetErrorBoundary.test.tsx",
+      "fullName": "QueryErrorResetBoundary useQueries with suspense should retry fetch if the reset error boundary has been reset"
+    },
+    {
+      "id": "runtime:2250affdc02e65a8",
+      "file": "packages/tanstack-query/tests/upstream/QueryResetErrorBoundary.test.tsx",
+      "fullName": "QueryErrorResetBoundary useQuery should never render the component while the query is in error state"
+    },
+    {
+      "id": "runtime:9afc30ed2fb12a3f",
+      "file": "packages/tanstack-query/tests/upstream/QueryResetErrorBoundary.test.tsx",
+      "fullName": "QueryErrorResetBoundary useQuery should not retry fetch if the reset error boundary has not been reset"
+    },
+    {
+      "id": "runtime:2fe357313e74a92a",
+      "file": "packages/tanstack-query/tests/upstream/QueryResetErrorBoundary.test.tsx",
+      "fullName": "QueryErrorResetBoundary useQuery should not retry fetch if the reset error boundary has not been reset after a previous reset"
+    },
+    {
+      "id": "runtime:6027da8f2898e8b7",
+      "file": "packages/tanstack-query/tests/upstream/QueryResetErrorBoundary.test.tsx",
+      "fullName": "QueryErrorResetBoundary useQuery should not throw error if query is disabled"
+    },
+    {
+      "id": "runtime:a8d1ae4ae2343341",
+      "file": "packages/tanstack-query/tests/upstream/QueryResetErrorBoundary.test.tsx",
+      "fullName": "QueryErrorResetBoundary useQuery should not throw error if query is disabled, and refetch if query becomes enabled again"
+    },
+    {
+      "id": "runtime:cb38bd114d2bee3d",
+      "file": "packages/tanstack-query/tests/upstream/QueryResetErrorBoundary.test.tsx",
+      "fullName": "QueryErrorResetBoundary useQuery should refetch after error when staleTime is Infinity and previous data exists (#9728)"
+    },
+    {
+      "id": "runtime:64fc92ad858e46c7",
+      "file": "packages/tanstack-query/tests/upstream/QueryResetErrorBoundary.test.tsx",
+      "fullName": "QueryErrorResetBoundary useQuery should render children"
+    },
+    {
+      "id": "runtime:26d7c0caac16aa72",
+      "file": "packages/tanstack-query/tests/upstream/QueryResetErrorBoundary.test.tsx",
+      "fullName": "QueryErrorResetBoundary useQuery should retry fetch if the reset error boundary has been reset"
+    },
+    {
+      "id": "runtime:ef769b9a72c27891",
+      "file": "packages/tanstack-query/tests/upstream/QueryResetErrorBoundary.test.tsx",
+      "fullName": "QueryErrorResetBoundary useQuery should retry fetch if the reset error boundary has been reset and the query contains data from a previous fetch"
+    },
+    {
+      "id": "runtime:11c0c608f479aebb",
+      "file": "packages/tanstack-query/tests/upstream/QueryResetErrorBoundary.test.tsx",
+      "fullName": "QueryErrorResetBoundary useQuery should show error boundary when using tracked queries even though we do not track the error field"
+    },
+    {
+      "id": "runtime:d7ac1d76f4945f66",
+      "file": "packages/tanstack-query/tests/upstream/QueryResetErrorBoundary.test.tsx",
+      "fullName": "QueryErrorResetBoundary useQuery should throw again on error after the reset error boundary has been reset"
+    },
+    {
+      "id": "runtime:5a03bc3707da5542",
+      "file": "packages/tanstack-query/tests/upstream/QueryResetErrorBoundary.test.tsx",
+      "fullName": "QueryErrorResetBoundary useQuery should throw error if query is disabled and manually refetch"
+    },
+    {
+      "id": "runtime:3b31843298f026b4",
+      "file": "packages/tanstack-query/tests/upstream/fine-grained-persister.test.tsx",
+      "fullName": "fine grained persister should restore query state from persister and not refetch"
+    },
+    {
+      "id": "runtime:c010c231aa2f2775",
+      "file": "packages/tanstack-query/tests/upstream/fine-grained-persister.test.tsx",
+      "fullName": "fine grained persister should restore query state from persister and refetch"
+    },
+    {
+      "id": "runtime:3f55d07eda4c8d00",
+      "file": "packages/tanstack-query/tests/upstream/fine-grained-persister.test.tsx",
+      "fullName": "fine grained persister should store query state to persister after fetch"
+    },
+    {
+      "id": "runtime:72ffe71537ca6eb7",
+      "file": "packages/tanstack-query/tests/upstream/infiniteQueryOptions.test.tsx",
+      "fullName": "infiniteQueryOptions should return the object received as a parameter without any modification."
+    },
+    {
+      "id": "runtime:69a61abfca0905b6",
+      "file": "packages/tanstack-query/tests/upstream/mutationOptions.test.tsx",
+      "fullName": "mutationOptions should return the number of fetching mutations when used with queryClient.isMutating"
+    },
+    {
+      "id": "runtime:dd1e51da743fb5d9",
+      "file": "packages/tanstack-query/tests/upstream/mutationOptions.test.tsx",
+      "fullName": "mutationOptions should return the number of fetching mutations when used with queryClient.isMutating (filter mutationOpt1.mutationKey)"
+    },
+    {
+      "id": "runtime:9bb13a01535dff6c",
+      "file": "packages/tanstack-query/tests/upstream/mutationOptions.test.tsx",
+      "fullName": "mutationOptions should return the number of fetching mutations when used with queryClient.isMutating (with mutationKey in mutationOptions)"
+    },
+    {
+      "id": "runtime:be4dec29b709c801",
+      "file": "packages/tanstack-query/tests/upstream/mutationOptions.test.tsx",
+      "fullName": "mutationOptions should return the number of fetching mutations when used with queryClient.isMutating (without mutationKey in mutationOptions)"
+    },
+    {
+      "id": "runtime:e2d21510fa169fb0",
+      "file": "packages/tanstack-query/tests/upstream/mutationOptions.test.tsx",
+      "fullName": "mutationOptions should return the number of fetching mutations when used with useIsMutating"
+    },
+    {
+      "id": "runtime:b41958a22f3d6e6a",
+      "file": "packages/tanstack-query/tests/upstream/mutationOptions.test.tsx",
+      "fullName": "mutationOptions should return the number of fetching mutations when used with useIsMutating (filter mutationOpts1.mutationKey)"
+    },
+    {
+      "id": "runtime:3d607f65c708fdb1",
+      "file": "packages/tanstack-query/tests/upstream/mutationOptions.test.tsx",
+      "fullName": "mutationOptions should return the number of fetching mutations when used with useIsMutating (with mutationKey in mutationOptions)"
+    },
+    {
+      "id": "runtime:08df7a0ae234d33c",
+      "file": "packages/tanstack-query/tests/upstream/mutationOptions.test.tsx",
+      "fullName": "mutationOptions should return the number of fetching mutations when used with useIsMutating (without mutationKey in mutationOptions)"
+    },
+    {
+      "id": "runtime:e651dc07a52b1c2e",
+      "file": "packages/tanstack-query/tests/upstream/mutationOptions.test.tsx",
+      "fullName": "mutationOptions should return the number of fetching mutations when used with useMutationState"
+    },
+    {
+      "id": "runtime:10f4ac4511b202c7",
+      "file": "packages/tanstack-query/tests/upstream/mutationOptions.test.tsx",
+      "fullName": "mutationOptions should return the number of fetching mutations when used with useMutationState (filter mutationOpt1.mutationKey)"
+    },
+    {
+      "id": "runtime:b56360e20b92b41b",
+      "file": "packages/tanstack-query/tests/upstream/mutationOptions.test.tsx",
+      "fullName": "mutationOptions should return the number of fetching mutations when used with useMutationState (with mutationKey in mutationOptions)"
+    },
+    {
+      "id": "runtime:8744ef642f3421cc",
+      "file": "packages/tanstack-query/tests/upstream/mutationOptions.test.tsx",
+      "fullName": "mutationOptions should return the number of fetching mutations when used with useMutationState (without mutationKey in mutationOptions)"
+    },
+    {
+      "id": "runtime:663b6a1b4ea76b4d",
+      "file": "packages/tanstack-query/tests/upstream/mutationOptions.test.tsx",
+      "fullName": "mutationOptions should return the object received as a parameter without any modification (with mutationKey in mutationOptions)"
+    },
+    {
+      "id": "runtime:fd3aac815c068377",
+      "file": "packages/tanstack-query/tests/upstream/mutationOptions.test.tsx",
+      "fullName": "mutationOptions should return the object received as a parameter without any modification (without mutationKey in mutationOptions)"
+    },
+    {
+      "id": "runtime:e9a990fbb30b2ce0",
+      "file": "packages/tanstack-query/tests/upstream/queryOptions.test.tsx",
+      "fullName": "queryOptions should return the object received as a parameter without any modification."
+    },
+    {
+      "id": "runtime:7a27063872adfac0",
+      "file": "packages/tanstack-query/tests/upstream/ssr-hydration.test.tsx",
+      "fullName": "Server side rendering with de/rehydration should not mismatch on error"
+    },
+    {
+      "id": "runtime:da11eacdc58857e2",
+      "file": "packages/tanstack-query/tests/upstream/ssr-hydration.test.tsx",
+      "fullName": "Server side rendering with de/rehydration should not mismatch on queries that were not prefetched"
+    },
+    {
+      "id": "runtime:e54601d32c392d57",
+      "file": "packages/tanstack-query/tests/upstream/ssr-hydration.test.tsx",
+      "fullName": "Server side rendering with de/rehydration should not mismatch on success"
+    },
+    {
+      "id": "runtime:32ad46596cb8118b",
+      "file": "packages/tanstack-query/tests/upstream/suspense.test.tsx",
+      "fullName": "Suspense Timer Tests should enforce minimum staleTime of 1000ms when using suspense with function"
+    },
+    {
+      "id": "runtime:174921ee0c036960",
+      "file": "packages/tanstack-query/tests/upstream/suspense.test.tsx",
+      "fullName": "Suspense Timer Tests should enforce minimum staleTime of 1000ms when using suspense with number"
+    },
+    {
+      "id": "runtime:1360291bc6ff6fb7",
+      "file": "packages/tanstack-query/tests/upstream/suspense.test.tsx",
+      "fullName": "Suspense Timer Tests should enforce minimum staleTime when undefined is provided"
+    },
+    {
+      "id": "runtime:b18d0e4dc8ef645a",
+      "file": "packages/tanstack-query/tests/upstream/suspense.test.tsx",
+      "fullName": "Suspense Timer Tests should preserve staleTime when function returns static"
+    },
+    {
+      "id": "runtime:b15bd0e2de9b7bc3",
+      "file": "packages/tanstack-query/tests/upstream/suspense.test.tsx",
+      "fullName": "Suspense Timer Tests should preserve staleTime when value is static"
+    },
+    {
+      "id": "runtime:e2fec9babb30e404",
+      "file": "packages/tanstack-query/tests/upstream/suspense.test.tsx",
+      "fullName": "Suspense Timer Tests should respect staleTime when function returns value greater than 1000ms"
+    },
+    {
+      "id": "runtime:07ea037cf32cce2a",
+      "file": "packages/tanstack-query/tests/upstream/suspense.test.tsx",
+      "fullName": "Suspense Timer Tests should respect staleTime when value is greater than 1000ms"
+    },
+    {
+      "id": "runtime:6ab519d70cfadfa6",
+      "file": "packages/tanstack-query/tests/upstream/transition.test.tsx",
+      "fullName": "react transitions should keep values of old key around with startTransition"
+    },
+    {
+      "id": "runtime:c233a4ad3ca47ba3",
+      "file": "packages/tanstack-query/tests/upstream/transition.test.tsx",
+      "fullName": "react transitions should keep values of old key around with useDeferredValue"
+    },
+    {
+      "id": "runtime:803792a1c0c4a07e",
+      "file": "packages/tanstack-query/tests/upstream/useInfiniteQuery.test.tsx",
+      "fullName": "useInfiniteQuery should be able to fetch a previous page"
+    },
+    {
+      "id": "runtime:75ee699d116581c3",
+      "file": "packages/tanstack-query/tests/upstream/useInfiniteQuery.test.tsx",
+      "fullName": "useInfiniteQuery should be able to refetch when providing page params automatically"
+    },
+    {
+      "id": "runtime:d3c29748615b5015",
+      "file": "packages/tanstack-query/tests/upstream/useInfiniteQuery.test.tsx",
+      "fullName": "useInfiniteQuery should be able to reverse the data"
+    },
+    {
+      "id": "runtime:25231d1bdb390209",
+      "file": "packages/tanstack-query/tests/upstream/useInfiniteQuery.test.tsx",
+      "fullName": "useInfiniteQuery should be able to select a new result and not cause infinite renders"
+    },
+    {
+      "id": "runtime:1a119aadec2f1e88",
+      "file": "packages/tanstack-query/tests/upstream/useInfiniteQuery.test.tsx",
+      "fullName": "useInfiniteQuery should be able to select a part of the data"
+    },
+    {
+      "id": "runtime:363c8dcb3f419174",
+      "file": "packages/tanstack-query/tests/upstream/useInfiniteQuery.test.tsx",
+      "fullName": "useInfiniteQuery should be able to set new pages with the query client"
+    },
+    {
+      "id": "runtime:84000cbe52e64b9e",
+      "file": "packages/tanstack-query/tests/upstream/useInfiniteQuery.test.tsx",
+      "fullName": "useInfiniteQuery should build fresh cursors on refetch"
+    },
+    {
+      "id": "runtime:ccd148343fb53ecb",
+      "file": "packages/tanstack-query/tests/upstream/useInfiniteQuery.test.tsx",
+      "fullName": "useInfiniteQuery should cancel the query function when there are no more subscriptions"
+    },
+    {
+      "id": "runtime:fe080159b4ec3b5c",
+      "file": "packages/tanstack-query/tests/upstream/useInfiniteQuery.test.tsx",
+      "fullName": "useInfiniteQuery should compute hasNextPage correctly for falsy getFetchMore return value on refetching"
+    },
+    {
+      "id": "runtime:cc6a6ab4bf7c21cf",
+      "file": "packages/tanstack-query/tests/upstream/useInfiniteQuery.test.tsx",
+      "fullName": "useInfiniteQuery should compute hasNextPage correctly for falsy getFetchMore return value using initialData"
+    },
+    {
+      "id": "runtime:b3321c6198c0b800",
+      "file": "packages/tanstack-query/tests/upstream/useInfiniteQuery.test.tsx",
+      "fullName": "useInfiniteQuery should compute hasNextPage correctly using initialData"
+    },
+    {
+      "id": "runtime:37f57c07d3363e9f",
+      "file": "packages/tanstack-query/tests/upstream/useInfiniteQuery.test.tsx",
+      "fullName": "useInfiniteQuery should keep fetching first page when not loaded yet and triggering fetch more"
+    },
+    {
+      "id": "runtime:2b75c59526f82c9a",
+      "file": "packages/tanstack-query/tests/upstream/useInfiniteQuery.test.tsx",
+      "fullName": "useInfiniteQuery should keep the previous data when placeholderData is set"
+    },
+    {
+      "id": "runtime:3dee16bb1b57b32d",
+      "file": "packages/tanstack-query/tests/upstream/useInfiniteQuery.test.tsx",
+      "fullName": "useInfiniteQuery should not cancel an ongoing fetchNextPage request when another fetchNextPage is invoked if `cancelRefetch: false` is used"
+    },
+    {
+      "id": "runtime:c28778eba615d980",
+      "file": "packages/tanstack-query/tests/upstream/useInfiniteQuery.test.tsx",
+      "fullName": "useInfiniteQuery should not throw when fetchNextPage returns an error"
+    },
+    {
+      "id": "runtime:8571047f85cf4d28",
+      "file": "packages/tanstack-query/tests/upstream/useInfiniteQuery.test.tsx",
+      "fullName": "useInfiniteQuery should not use selected data when computing hasNextPage"
+    },
+    {
+      "id": "runtime:657ce74bedcb6f10",
+      "file": "packages/tanstack-query/tests/upstream/useInfiniteQuery.test.tsx",
+      "fullName": "useInfiniteQuery should only refetch the first page when initialData is provided"
+    },
+    {
+      "id": "runtime:b823fd918f875a12",
+      "file": "packages/tanstack-query/tests/upstream/useInfiniteQuery.test.tsx",
+      "fullName": "useInfiniteQuery should return the correct states for a successful query"
+    },
+    {
+      "id": "runtime:59bedc5c24898d4f",
+      "file": "packages/tanstack-query/tests/upstream/useInfiniteQuery.test.tsx",
+      "fullName": "useInfiniteQuery should return the correct states when fetchNextPage fails"
+    },
+    {
+      "id": "runtime:c78b21f377e90ebe",
+      "file": "packages/tanstack-query/tests/upstream/useInfiniteQuery.test.tsx",
+      "fullName": "useInfiniteQuery should return the correct states when fetchPreviousPage fails"
+    },
+    {
+      "id": "runtime:1c60870234114805",
+      "file": "packages/tanstack-query/tests/upstream/useInfiniteQuery.test.tsx",
+      "fullName": "useInfiniteQuery should return the correct states when refetch fails"
+    },
+    {
+      "id": "runtime:599666b8a6bf1b6b",
+      "file": "packages/tanstack-query/tests/upstream/useInfiniteQuery.test.tsx",
+      "fullName": "useInfiniteQuery should set hasNextPage to false if getNextPageParam returns undefined"
+    },
+    {
+      "id": "runtime:c1ac86db2758f422",
+      "file": "packages/tanstack-query/tests/upstream/useInfiniteQuery.test.tsx",
+      "fullName": "useInfiniteQuery should silently cancel an ongoing fetchNextPage request when another fetchNextPage is invoked"
+    },
+    {
+      "id": "runtime:57ff34325907ffd6",
+      "file": "packages/tanstack-query/tests/upstream/useInfiniteQuery.test.tsx",
+      "fullName": "useInfiniteQuery should silently cancel any ongoing fetch when fetching more"
+    },
+    {
+      "id": "runtime:d062bae69d5e606f",
+      "file": "packages/tanstack-query/tests/upstream/useInfiniteQuery.test.tsx",
+      "fullName": "useInfiniteQuery should stop fetching additional pages when the component is unmounted and AbortSignal is consumed"
+    },
+    {
+      "id": "runtime:41cf04e6a08d5b40",
+      "file": "packages/tanstack-query/tests/upstream/useInfiniteQuery.test.tsx",
+      "fullName": "useInfiniteQuery should use provided custom queryClient"
+    },
+    {
+      "id": "runtime:7b381c456ca20b52",
+      "file": "packages/tanstack-query/tests/upstream/useIsFetching.test.tsx",
+      "fullName": "useIsFetching should be able to filter"
+    },
+    {
+      "id": "runtime:07d80375805971c8",
+      "file": "packages/tanstack-query/tests/upstream/useIsFetching.test.tsx",
+      "fullName": "useIsFetching should not update state while rendering"
+    },
+    {
+      "id": "runtime:140966546a416019",
+      "file": "packages/tanstack-query/tests/upstream/useIsFetching.test.tsx",
+      "fullName": "useIsFetching should show the correct fetching state when mounted after a query"
+    },
+    {
+      "id": "runtime:4cdb8fa4d7cb67e1",
+      "file": "packages/tanstack-query/tests/upstream/useIsFetching.test.tsx",
+      "fullName": "useIsFetching should update as queries start and stop fetching"
+    },
+    {
+      "id": "runtime:7e98addaa40a2634",
+      "file": "packages/tanstack-query/tests/upstream/useIsFetching.test.tsx",
+      "fullName": "useIsFetching should use provided custom queryClient"
+    },
+    {
+      "id": "runtime:dd759cb6bd86ec8d",
+      "file": "packages/tanstack-query/tests/upstream/useMutation.test.tsx",
+      "fullName": "useMutation should be able to call `onError` and `onSettled` after each failed mutate"
+    },
+    {
+      "id": "runtime:915ce05d5b218287",
+      "file": "packages/tanstack-query/tests/upstream/useMutation.test.tsx",
+      "fullName": "useMutation should be able to call `onError` callback after failed mutate"
+    },
+    {
+      "id": "runtime:32bbca6824b86564",
+      "file": "packages/tanstack-query/tests/upstream/useMutation.test.tsx",
+      "fullName": "useMutation should be able to call `onError` callback after failed mutateAsync"
+    },
+    {
+      "id": "runtime:82a4cee1bbe1ad78",
+      "file": "packages/tanstack-query/tests/upstream/useMutation.test.tsx",
+      "fullName": "useMutation should be able to call `onSettled` callback after mutate"
+    },
+    {
+      "id": "runtime:35761428efa26ee4",
+      "file": "packages/tanstack-query/tests/upstream/useMutation.test.tsx",
+      "fullName": "useMutation should be able to call `onSettled` callback after mutateAsync"
+    },
+    {
+      "id": "runtime:37d89ecc132ff9f5",
+      "file": "packages/tanstack-query/tests/upstream/useMutation.test.tsx",
+      "fullName": "useMutation should be able to call `onSuccess` and `onSettled` after each successful mutate"
+    },
+    {
+      "id": "runtime:9c569785d1393c60",
+      "file": "packages/tanstack-query/tests/upstream/useMutation.test.tsx",
+      "fullName": "useMutation should be able to call `onSuccess` callback after successful mutate"
+    },
+    {
+      "id": "runtime:dbf704c3ada09840",
+      "file": "packages/tanstack-query/tests/upstream/useMutation.test.tsx",
+      "fullName": "useMutation should be able to call `onSuccess` callback after successful mutateAsync"
+    },
+    {
+      "id": "runtime:66ef01ae11ac58c0",
+      "file": "packages/tanstack-query/tests/upstream/useMutation.test.tsx",
+      "fullName": "useMutation should be able to chain mutateAsync calls sequentially"
+    },
+    {
+      "id": "runtime:c762dfdc40cb7c65",
+      "file": "packages/tanstack-query/tests/upstream/useMutation.test.tsx",
+      "fullName": "useMutation should be able to override the error callbacks when using mutate"
+    },
+    {
+      "id": "runtime:b560b8b7a365610f",
+      "file": "packages/tanstack-query/tests/upstream/useMutation.test.tsx",
+      "fullName": "useMutation should be able to override the error callbacks when using mutateAsync"
+    },
+    {
+      "id": "runtime:e8eac387b21d08f0",
+      "file": "packages/tanstack-query/tests/upstream/useMutation.test.tsx",
+      "fullName": "useMutation should be able to override the settled callbacks when using mutate"
+    },
+    {
+      "id": "runtime:a5e91a8a3cc670d8",
+      "file": "packages/tanstack-query/tests/upstream/useMutation.test.tsx",
+      "fullName": "useMutation should be able to override the useMutation success callbacks"
+    },
+    {
+      "id": "runtime:c1b1aa72bdc5796e",
+      "file": "packages/tanstack-query/tests/upstream/useMutation.test.tsx",
+      "fullName": "useMutation should be able to reset `data`"
+    },
+    {
+      "id": "runtime:a4ddf3405de4bf14",
+      "file": "packages/tanstack-query/tests/upstream/useMutation.test.tsx",
+      "fullName": "useMutation should be able to reset `error`"
+    },
+    {
+      "id": "runtime:e79ba3d33249485f",
+      "file": "packages/tanstack-query/tests/upstream/useMutation.test.tsx",
+      "fullName": "useMutation should be able to retry a failed mutation"
+    },
+    {
+      "id": "runtime:d2f08332ab0b384e",
+      "file": "packages/tanstack-query/tests/upstream/useMutation.test.tsx",
+      "fullName": "useMutation should be able to retry a mutation when online"
+    },
+    {
+      "id": "runtime:ac05ae188f5b77de",
+      "file": "packages/tanstack-query/tests/upstream/useMutation.test.tsx",
+      "fullName": "useMutation should be able to run multiple mutateAsync calls in parallel with Promise.all"
+    },
+    {
+      "id": "runtime:80fca01147e84ade",
+      "file": "packages/tanstack-query/tests/upstream/useMutation.test.tsx",
+      "fullName": "useMutation should be able to throw an error when throwOnError is a function that returns true"
+    },
+    {
+      "id": "runtime:fd222f0ad0d6a110",
+      "file": "packages/tanstack-query/tests/upstream/useMutation.test.tsx",
+      "fullName": "useMutation should be able to throw an error when throwOnError is set to true"
+    },
+    {
+      "id": "runtime:b1dfac498121d55e",
+      "file": "packages/tanstack-query/tests/upstream/useMutation.test.tsx",
+      "fullName": "useMutation should be able to use mutation defaults"
+    },
+    {
+      "id": "runtime:742cd08f4d617922",
+      "file": "packages/tanstack-query/tests/upstream/useMutation.test.tsx",
+      "fullName": "useMutation should call cache callbacks when unmounted"
+    },
+    {
+      "id": "runtime:8f1ba34b9f2a36a2",
+      "file": "packages/tanstack-query/tests/upstream/useMutation.test.tsx",
+      "fullName": "useMutation should call mutate callbacks only for the last observer"
+    },
+    {
+      "id": "runtime:5008f5e9e346c018",
+      "file": "packages/tanstack-query/tests/upstream/useMutation.test.tsx",
+      "fullName": "useMutation should call mutate callbacks when useMutation has no callbacks"
+    },
+    {
+      "id": "runtime:2945f6905b04e4a9",
+      "file": "packages/tanstack-query/tests/upstream/useMutation.test.tsx",
+      "fullName": "useMutation should call mutate error callbacks when useMutation has no callbacks"
+    },
+    {
+      "id": "runtime:c26115f0cc8aa2a7",
+      "file": "packages/tanstack-query/tests/upstream/useMutation.test.tsx",
+      "fullName": "useMutation should call mutateAsync callbacks when useMutation has no callbacks"
+    },
+    {
+      "id": "runtime:c61b0b97731318be",
+      "file": "packages/tanstack-query/tests/upstream/useMutation.test.tsx",
+      "fullName": "useMutation should call mutateAsync error callbacks when useMutation has no callbacks"
+    },
+    {
+      "id": "runtime:54ab423e40d7e989",
+      "file": "packages/tanstack-query/tests/upstream/useMutation.test.tsx",
+      "fullName": "useMutation should call onMutate even if paused"
+    },
+    {
+      "id": "runtime:6ec781216950ffe4",
+      "file": "packages/tanstack-query/tests/upstream/useMutation.test.tsx",
+      "fullName": "useMutation should call only mutate onError when useMutation has no callbacks"
+    },
+    {
+      "id": "runtime:325ebe2f6b4aa957",
+      "file": "packages/tanstack-query/tests/upstream/useMutation.test.tsx",
+      "fullName": "useMutation should call only mutate onSettled when useMutation has no callbacks"
+    },
+    {
+      "id": "runtime:b5d9d25bfe055a93",
+      "file": "packages/tanstack-query/tests/upstream/useMutation.test.tsx",
+      "fullName": "useMutation should call only mutate onSuccess when useMutation has no callbacks"
+    },
+    {
+      "id": "runtime:633dd00ded3a2dc5",
+      "file": "packages/tanstack-query/tests/upstream/useMutation.test.tsx",
+      "fullName": "useMutation should call only mutateAsync onError when useMutation has no callbacks"
+    },
+    {
+      "id": "runtime:807ef2dccd2d9257",
+      "file": "packages/tanstack-query/tests/upstream/useMutation.test.tsx",
+      "fullName": "useMutation should call only mutateAsync onSettled when useMutation has no callbacks"
+    },
+    {
+      "id": "runtime:f1ed9ee800bbd83f",
+      "file": "packages/tanstack-query/tests/upstream/useMutation.test.tsx",
+      "fullName": "useMutation should call only mutateAsync onSuccess when useMutation has no callbacks"
+    },
+    {
+      "id": "runtime:c0775b7ad2f30dd6",
+      "file": "packages/tanstack-query/tests/upstream/useMutation.test.tsx",
+      "fullName": "useMutation should go to error state if onError callback errors"
+    },
+    {
+      "id": "runtime:1d9074efac42b04e",
+      "file": "packages/tanstack-query/tests/upstream/useMutation.test.tsx",
+      "fullName": "useMutation should go to error state if onSettled callback errors"
+    },
+    {
+      "id": "runtime:86444565358284dc",
+      "file": "packages/tanstack-query/tests/upstream/useMutation.test.tsx",
+      "fullName": "useMutation should go to error state if onSuccess callback errors"
+    },
+    {
+      "id": "runtime:a20b81184d3fab23",
+      "file": "packages/tanstack-query/tests/upstream/useMutation.test.tsx",
+      "fullName": "useMutation should handle Promise.all rejection when one parallel mutateAsync call fails"
+    },
+    {
+      "id": "runtime:28bb97e393ea3b8d",
+      "file": "packages/tanstack-query/tests/upstream/useMutation.test.tsx",
+      "fullName": "useMutation should handle conditional error with retry using mutate"
+    },
+    {
+      "id": "runtime:c4fb981f2781730e",
+      "file": "packages/tanstack-query/tests/upstream/useMutation.test.tsx",
+      "fullName": "useMutation should handle error in chained mutateAsync calls"
+    },
+    {
+      "id": "runtime:2935d62d36f34bf3",
+      "file": "packages/tanstack-query/tests/upstream/useMutation.test.tsx",
+      "fullName": "useMutation should handle partial failure in parallel mutateAsync calls with Promise.allSettled"
+    },
+    {
+      "id": "runtime:b63ad532147e99ef",
+      "file": "packages/tanstack-query/tests/upstream/useMutation.test.tsx",
+      "fullName": "useMutation should not change state if unmounted"
+    },
+    {
+      "id": "runtime:87756ac524b6c386",
+      "file": "packages/tanstack-query/tests/upstream/useMutation.test.tsx",
+      "fullName": "useMutation should not retry mutations while offline"
+    },
+    {
+      "id": "runtime:a42eb59f8f5192c0",
+      "file": "packages/tanstack-query/tests/upstream/useMutation.test.tsx",
+      "fullName": "useMutation should not throw an error when throwOnError is a function that returns false"
+    },
+    {
+      "id": "runtime:e7c24c402e11d8d8",
+      "file": "packages/tanstack-query/tests/upstream/useMutation.test.tsx",
+      "fullName": "useMutation should not throw an error when throwOnError is not set"
+    },
+    {
+      "id": "runtime:9cd2768f432387a8",
+      "file": "packages/tanstack-query/tests/upstream/useMutation.test.tsx",
+      "fullName": "useMutation should not throw an error when throwOnError is set to false"
+    },
+    {
+      "id": "runtime:c066b4f0b63fbc90",
+      "file": "packages/tanstack-query/tests/upstream/useMutation.test.tsx",
+      "fullName": "useMutation should optimistically go to paused state if offline"
+    },
+    {
+      "id": "runtime:28c8202dc267dbfe",
+      "file": "packages/tanstack-query/tests/upstream/useMutation.test.tsx",
+      "fullName": "useMutation should pass meta to mutation on error"
+    },
+    {
+      "id": "runtime:c84269247a8bef57",
+      "file": "packages/tanstack-query/tests/upstream/useMutation.test.tsx",
+      "fullName": "useMutation should pass meta to mutation on success"
+    },
+    {
+      "id": "runtime:7a0cab541fd4a15c",
+      "file": "packages/tanstack-query/tests/upstream/useMutation.test.tsx",
+      "fullName": "useMutation should set correct values for `failureReason` and `failureCount` on multiple mutate calls"
+    },
+    {
+      "id": "runtime:c23bf615242169ab",
+      "file": "packages/tanstack-query/tests/upstream/useMutation.test.tsx",
+      "fullName": "useMutation should set error message from mutate callbacks when mutation fails"
+    },
+    {
+      "id": "runtime:8d96618fe235ca96",
+      "file": "packages/tanstack-query/tests/upstream/useMutation.test.tsx",
+      "fullName": "useMutation should set success message from mutate callbacks when mutation succeeds"
+    },
+    {
+      "id": "runtime:cda692f739825ed0",
+      "file": "packages/tanstack-query/tests/upstream/useMutation.test.tsx",
+      "fullName": "useMutation should support optimistic update and rollback on error"
+    },
+    {
+      "id": "runtime:7ecd8c84e300e5ec",
+      "file": "packages/tanstack-query/tests/upstream/useMutation.test.tsx",
+      "fullName": "useMutation should support optimistic update on success"
+    },
+    {
+      "id": "runtime:64208de93898d37b",
+      "file": "packages/tanstack-query/tests/upstream/useMutation.test.tsx",
+      "fullName": "useMutation should use provided custom queryClient"
+    },
+    {
+      "id": "runtime:0b972e5a3935cd95",
+      "file": "packages/tanstack-query/tests/upstream/useMutationState.test.tsx",
+      "fullName": "useIsMutating should filter correctly by mutationKey"
+    },
+    {
+      "id": "runtime:1af9a566c587444b",
+      "file": "packages/tanstack-query/tests/upstream/useMutationState.test.tsx",
+      "fullName": "useIsMutating should filter correctly by predicate"
+    },
+    {
+      "id": "runtime:81fadc2b59fa3cc2",
+      "file": "packages/tanstack-query/tests/upstream/useMutationState.test.tsx",
+      "fullName": "useIsMutating should return the number of fetching mutations"
+    },
+    {
+      "id": "runtime:bcbdd1332320bb55",
+      "file": "packages/tanstack-query/tests/upstream/useMutationState.test.tsx",
+      "fullName": "useIsMutating should use provided custom queryClient"
+    },
+    {
+      "id": "runtime:96233fb68052853a",
+      "file": "packages/tanstack-query/tests/upstream/useMutationState.test.tsx",
+      "fullName": "useMutationState should return variables after calling mutate"
+    },
+    {
+      "id": "runtime:9d1d563eee6ad8da",
+      "file": "packages/tanstack-query/tests/upstream/usePrefetchInfiniteQuery.test.tsx",
+      "fullName": "usePrefetchInfiniteQuery should not create an endless loop when using inside a suspense boundary"
+    },
+    {
+      "id": "runtime:4a6f82aec6c81c01",
+      "file": "packages/tanstack-query/tests/upstream/usePrefetchInfiniteQuery.test.tsx",
+      "fullName": "usePrefetchInfiniteQuery should not display fallback if the query cache is already populated"
+    },
+    {
+      "id": "runtime:da13af454bbf2fb3",
+      "file": "packages/tanstack-query/tests/upstream/usePrefetchInfiniteQuery.test.tsx",
+      "fullName": "usePrefetchInfiniteQuery should prefetch an infinite query if query state does not exist"
+    },
+    {
+      "id": "runtime:0bbab5f0908b0ba9",
+      "file": "packages/tanstack-query/tests/upstream/usePrefetchQuery.test.tsx",
+      "fullName": "usePrefetchQuery should be able to recover from errors and try fetching again"
+    },
+    {
+      "id": "runtime:39288e4ec037b0a0",
+      "file": "packages/tanstack-query/tests/upstream/usePrefetchQuery.test.tsx",
+      "fullName": "usePrefetchQuery should let errors fall through and not refetch failed queries"
+    },
+    {
+      "id": "runtime:66e9d1312378ec7a",
+      "file": "packages/tanstack-query/tests/upstream/usePrefetchQuery.test.tsx",
+      "fullName": "usePrefetchQuery should not create a suspense waterfall if prefetch is fired"
+    },
+    {
+      "id": "runtime:5f50b3f4c6611943",
+      "file": "packages/tanstack-query/tests/upstream/usePrefetchQuery.test.tsx",
+      "fullName": "usePrefetchQuery should not create an endless loop when using inside a suspense boundary"
+    },
+    {
+      "id": "runtime:3befc9c7ddf7b8e4",
+      "file": "packages/tanstack-query/tests/upstream/usePrefetchQuery.test.tsx",
+      "fullName": "usePrefetchQuery should not prefetch query if query state exists"
+    },
+    {
+      "id": "runtime:2c6e0e6f82dd7d79",
+      "file": "packages/tanstack-query/tests/upstream/usePrefetchQuery.test.tsx",
+      "fullName": "usePrefetchQuery should prefetch query if query state does not exist"
+    },
+    {
+      "id": "runtime:73e63240cbebeabd",
+      "file": "packages/tanstack-query/tests/upstream/useQueries.test.tsx",
+      "fullName": "useQueries should combine queries"
+    },
+    {
+      "id": "runtime:a4649f997354d821",
+      "file": "packages/tanstack-query/tests/upstream/useQueries.test.tsx",
+      "fullName": "useQueries should not cause infinite re-renders when removing last query"
+    },
+    {
+      "id": "runtime:e3bb9f2de2d5ba07",
+      "file": "packages/tanstack-query/tests/upstream/useQueries.test.tsx",
+      "fullName": "useQueries should not fetch for the duration of the restoring period when isRestoring is true"
+    },
+    {
+      "id": "runtime:21f7349e5eb8e845",
+      "file": "packages/tanstack-query/tests/upstream/useQueries.test.tsx",
+      "fullName": "useQueries should not fetch queries with different durations for the duration of the restoring period when isRestoring is true"
+    },
+    {
+      "id": "runtime:ea392913e8ab7519",
+      "file": "packages/tanstack-query/tests/upstream/useQueries.test.tsx",
+      "fullName": "useQueries should not have infinite render loops with empty queries (#6645)"
+    },
+    {
+      "id": "runtime:152fcdff4c0fd462",
+      "file": "packages/tanstack-query/tests/upstream/useQueries.test.tsx",
+      "fullName": "useQueries should not have stale closures with combine (#6648)"
+    },
+    {
+      "id": "runtime:f045b4e8da28393c",
+      "file": "packages/tanstack-query/tests/upstream/useQueries.test.tsx",
+      "fullName": "useQueries should not optimistically show fetching when unsubscribed"
+    },
+    {
+      "id": "runtime:8fc6e03e311ab659",
+      "file": "packages/tanstack-query/tests/upstream/useQueries.test.tsx",
+      "fullName": "useQueries should not re-render if combine returns a stable reference"
+    },
+    {
+      "id": "runtime:d2b9c23503e2c2b5",
+      "file": "packages/tanstack-query/tests/upstream/useQueries.test.tsx",
+      "fullName": "useQueries should not re-run stable combine on unrelated re-render"
+    },
+    {
+      "id": "runtime:bff4d032d515d9d8",
+      "file": "packages/tanstack-query/tests/upstream/useQueries.test.tsx",
+      "fullName": "useQueries should not return new instances when called without queries"
+    },
+    {
+      "id": "runtime:446ad46dac3c2c7c",
+      "file": "packages/tanstack-query/tests/upstream/useQueries.test.tsx",
+      "fullName": "useQueries should only call combine with query results"
+    },
+    {
+      "id": "runtime:a1499d0b659252e9",
+      "file": "packages/tanstack-query/tests/upstream/useQueries.test.tsx",
+      "fullName": "useQueries should optimize combine if it is a stable reference"
+    },
+    {
+      "id": "runtime:2cc34256b7f8270f",
+      "file": "packages/tanstack-query/tests/upstream/useQueries.test.tsx",
+      "fullName": "useQueries should re-render once combine returns a different reference"
+    },
+    {
+      "id": "runtime:88e33477c1db34e0",
+      "file": "packages/tanstack-query/tests/upstream/useQueries.test.tsx",
+      "fullName": "useQueries should re-run combine if the functional reference changes"
+    },
+    {
+      "id": "runtime:4ea61523661b92e1",
+      "file": "packages/tanstack-query/tests/upstream/useQueries.test.tsx",
+      "fullName": "useQueries should return correct results when queries count changes with stable combine reference"
+    },
+    {
+      "id": "runtime:87d4141f83a90cc8",
+      "file": "packages/tanstack-query/tests/upstream/useQueries.test.tsx",
+      "fullName": "useQueries should return the correct states"
+    },
+    {
+      "id": "runtime:d6c9ae19f1894374",
+      "file": "packages/tanstack-query/tests/upstream/useQueries.test.tsx",
+      "fullName": "useQueries should synchronously track properties of all observer even if a property (isLoading) is only accessed on one observer (#7000)"
+    },
+    {
+      "id": "runtime:4ea6238ec17d3975",
+      "file": "packages/tanstack-query/tests/upstream/useQueries.test.tsx",
+      "fullName": "useQueries should throw error if in one of queries' queryFn rejects with a falsy error and throwOnError is in use"
+    },
+    {
+      "id": "runtime:bdba49b5dd575c5b",
+      "file": "packages/tanstack-query/tests/upstream/useQueries.test.tsx",
+      "fullName": "useQueries should throw error if in one of queries' queryFn throws and throwOnError function resolves to true"
+    },
+    {
+      "id": "runtime:7a5814636b74c6d9",
+      "file": "packages/tanstack-query/tests/upstream/useQueries.test.tsx",
+      "fullName": "useQueries should throw error if in one of queries' queryFn throws and throwOnError is in use"
+    },
+    {
+      "id": "runtime:c3dab2a3f58d0fa6",
+      "file": "packages/tanstack-query/tests/upstream/useQueries.test.tsx",
+      "fullName": "useQueries should track properties correctly with combine"
+    },
+    {
+      "id": "runtime:04b89c4b04e490a2",
+      "file": "packages/tanstack-query/tests/upstream/useQueries.test.tsx",
+      "fullName": "useQueries should track property access through combine function"
+    },
+    {
+      "id": "runtime:250607b09a4fede8",
+      "file": "packages/tanstack-query/tests/upstream/useQueries.test.tsx",
+      "fullName": "useQueries should track results"
+    },
+    {
+      "id": "runtime:12f49217cdb1f245",
+      "file": "packages/tanstack-query/tests/upstream/useQueries.test.tsx",
+      "fullName": "useQueries should use provided custom queryClient"
+    },
+    {
+      "id": "runtime:d793d63ddbaa9917",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery data should persist when enabled is changed to false"
+    },
+    {
+      "id": "runtime:aca9108dfd521cdc",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery errorUpdateCount should increased on each fetch failure"
+    },
+    {
+      "id": "runtime:7fb736707ba5c7e8",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery networkMode always always queries should not pause retries"
+    },
+    {
+      "id": "runtime:3bb228aa410dbc37",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery networkMode always always queries should start fetching even if you are offline"
+    },
+    {
+      "id": "runtime:8fda3fadb67cd723",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery networkMode offlineFirst offlineFirst queries should start fetching if you are offline, but pause retries"
+    },
+    {
+      "id": "runtime:23e30c01332f2b7d",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery networkMode online online queries should fetch if paused and we go online even if already unmounted when refetch was not cancelled"
+    },
+    {
+      "id": "runtime:006a7d9dc20726c1",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery networkMode online online queries should not fetch if paused and we go online when cancelled and no refetchOnReconnect"
+    },
+    {
+      "id": "runtime:cd5338ed1f57d37c",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery networkMode online online queries should not fetch if paused initial load and we go online after unmount"
+    },
+    {
+      "id": "runtime:1f57902703a09a7f",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery networkMode online online queries should not get stuck in fetching state when pausing multiple times"
+    },
+    {
+      "id": "runtime:a1821186f1bdb083",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery networkMode online online queries should not refetch if you are offline"
+    },
+    {
+      "id": "runtime:48523eb78105fc35",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery networkMode online online queries should not refetch if you are offline and refocus"
+    },
+    {
+      "id": "runtime:a6237a5dbce7b64b",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery networkMode online online queries should not refetch while already paused"
+    },
+    {
+      "id": "runtime:ebe06e42765b46dc",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery networkMode online online queries should not refetch while already paused if data is in the cache"
+    },
+    {
+      "id": "runtime:61cdad2120a9dba5",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery networkMode online online queries should not start fetching if you are offline"
+    },
+    {
+      "id": "runtime:20a3bc4bcca46f0c",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery networkMode online online queries should pause retries if you are offline"
+    },
+    {
+      "id": "runtime:cdefef7d8607d758",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery networkMode online online queries should re-fetch if paused and we go online even if already unmounted (because not cancelled)"
+    },
+    {
+      "id": "runtime:73ce92e87667b665",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery notifyOnChangeProps function should not re-render when change props are not actively being tracked"
+    },
+    {
+      "id": "runtime:e522bfae2dec1c6f",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery notifyOnChangeProps function should not re-render when it should only re-render on data changes and the data did not change"
+    },
+    {
+      "id": "runtime:c6701b8267f5f735",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery notifyOnChangeProps should not re-render when it should only re-render on data changes and the data did not change"
+    },
+    {
+      "id": "runtime:814af9b39ee9ffa9",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery notifyOnChangeProps should not re-render when it should only re-render only data change and the selected data did not change"
+    },
+    {
+      "id": "runtime:564f7cd9828ea1c3",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery placeholder data function result should run through select"
+    },
+    {
+      "id": "runtime:c3ad623ef7151df0",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery placeholder data should run through select"
+    },
+    {
+      "id": "runtime:7445061cd45819a5",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery select should always return the correct state"
+    },
+    {
+      "id": "runtime:39f3e827279446ac",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery select should only run when dependencies change if memoized"
+    },
+    {
+      "id": "runtime:ce872a2d1846f983",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery select should structurally share data"
+    },
+    {
+      "id": "runtime:1704564c116bfeab",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery setQueryData - should respect updatedAt"
+    },
+    {
+      "id": "runtime:d5985272b63368e3",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should accept an empty string as query key"
+    },
+    {
+      "id": "runtime:9a546106694792ca",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should accept an object as query key"
+    },
+    {
+      "id": "runtime:883f86b0626b70da",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should allow enabled: true and queryFn: skipToken"
+    },
+    {
+      "id": "runtime:4310a83797ba9d03",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should allow to set default data value"
+    },
+    {
+      "id": "runtime:702c031f66d61b8f",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should always fetch if refetchOnMount is set to always"
+    },
+    {
+      "id": "runtime:463620681fffeff1",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should always re-render if we are tracking props but not using any"
+    },
+    {
+      "id": "runtime:b85c691054726942",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should batch re-renders"
+    },
+    {
+      "id": "runtime:9233c346a0917847",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should be able to remove a query"
+    },
+    {
+      "id": "runtime:e879e36490117a3c",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should be able to select a part of the data with select"
+    },
+    {
+      "id": "runtime:f3a1e135ee340d6e",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should be able to select a part of the data with select in object syntax"
+    },
+    {
+      "id": "runtime:31f5b51cfb4ad672",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should be able to set different stale times for a query"
+    },
+    {
+      "id": "runtime:2ab1a44cb043deaa",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should be able to watch a query without providing a query function"
+    },
+    {
+      "id": "runtime:6c048b9f004ec43b",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should be in \"pending\" state by default"
+    },
+    {
+      "id": "runtime:1d26b91654002b4f",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should be notified of updates between create and subscribe"
+    },
+    {
+      "id": "runtime:5db116b46c6787c8",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should calculate focus behavior for `refetchOnWindowFocus` depending on function"
+    },
+    {
+      "id": "runtime:c951047e05095b41",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should cancel an ongoing fetch when refetch is called (cancelRefetch=true) if we have data already"
+    },
+    {
+      "id": "runtime:3eb6f49a3c44717e",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should cancel the query function when there are no more subscriptions"
+    },
+    {
+      "id": "runtime:c1be3d79ae1eabc7",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should cancel the query if the signal was consumed and there are no more subscriptions"
+    },
+    {
+      "id": "runtime:7eed3e124976bcef",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should console.error when there is no queryFn"
+    },
+    {
+      "id": "runtime:a4c8ad423504978e",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should continue retries when observers unmount and remount while waiting for a retry (#3031)"
+    },
+    {
+      "id": "runtime:b757aa0e1bbbcc3e",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should continue retry after focus regain"
+    },
+    {
+      "id": "runtime:56162a245d31d593",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should create a new query when refetching a removed query"
+    },
+    {
+      "id": "runtime:457aed206b31b744",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should extract retryDelay from error"
+    },
+    {
+      "id": "runtime:25855ebcea99311b",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should fetch if \"initial data updated at\" is exactly 0"
+    },
+    {
+      "id": "runtime:c3cea89f0b3d2706",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should fetch if initial data is set"
+    },
+    {
+      "id": "runtime:5cf5631c03eeec27",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should fetch if initial data updated at is older than stale time"
+    },
+    {
+      "id": "runtime:ae894022c815c4ca",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should fetch on mount when a query was already created with setQueryData"
+    },
+    {
+      "id": "runtime:d4d8ffbd506baec2",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should fetch when refetchOnMount is false and nothing has been fetched yet"
+    },
+    {
+      "id": "runtime:93e7e737185c3108",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should handle throwOnError function based on actual error state"
+    },
+    {
+      "id": "runtime:643363b5c19ac89e",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should hash query keys that contain bigints given a supported query hash function"
+    },
+    {
+      "id": "runtime:85ce1c30405cbff0",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should have no error in pending state when refetching after error occurred"
+    },
+    {
+      "id": "runtime:cf1f6ed42618599d",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should have status=error on mount when a query has failed"
+    },
+    {
+      "id": "runtime:3fd8f16500477b0e",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should init to status:pending, fetchStatus:idle when enabled is false"
+    },
+    {
+      "id": "runtime:4137ca5280c4a64e",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should initialize state properly, when initialData is falsy"
+    },
+    {
+      "id": "runtime:c8d3e8486297dff2",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should keep initial data when the query key changes"
+    },
+    {
+      "id": "runtime:6fdd58753d0f8318",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should keep the previous data on disabled query when placeholderData is set"
+    },
+    {
+      "id": "runtime:d4acf90a2ad66779",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should keep the previous data on disabled query when placeholderData is set and switching query key multiple times"
+    },
+    {
+      "id": "runtime:f9d65546847e82e7",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should keep the previous data when placeholderData is set"
+    },
+    {
+      "id": "runtime:dea2981933715e71",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should keep the previous data when placeholderData is set and cache is used"
+    },
+    {
+      "id": "runtime:029735811f3ecd91",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should keep the previous data when placeholderData is set and select fn transform is used"
+    },
+    {
+      "id": "runtime:8cf6ecc6710aa8a6",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should keep the previous queryKey (from prevQuery) between multiple pending queries when placeholderData is set and select fn transform is used"
+    },
+    {
+      "id": "runtime:836bfe950f09fc53",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should mark query as fetching, when using initialData"
+    },
+    {
+      "id": "runtime:de1ce2efda52e893",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should not call retryOnMount callback when the query has data"
+    },
+    {
+      "id": "runtime:e0b459d51a3b6aba",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should not cancel an ongoing fetch when refetch is called (cancelRefetch=true) if we do not have data yet"
+    },
+    {
+      "id": "runtime:dfcf162be2eb8d7b",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should not cancel an ongoing fetch when refetch is called with cancelRefetch=false if we have data already"
+    },
+    {
+      "id": "runtime:154034b1fc1c0f20",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should not cause an infinite render loop when using unstable callback ref"
+    },
+    {
+      "id": "runtime:91a772f95eef426f",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should not cause memo churn when data does not change"
+    },
+    {
+      "id": "runtime:153b0bf01eee3ba2",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should not fetch for the duration of the restoring period when isRestoring is true"
+    },
+    {
+      "id": "runtime:21f90efde2e78b13",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should not fetch if initial data is set with a stale time"
+    },
+    {
+      "id": "runtime:064fb9dc4596a67d",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should not fetch when refetchOnMount is false and data has been fetched already"
+    },
+    {
+      "id": "runtime:1e90d3960a207026",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should not fetch when switching to a disabled query"
+    },
+    {
+      "id": "runtime:2a465c8bc3ff2608",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should not get into an infinite loop when removing a query with gcTime 0 and rerendering"
+    },
+    {
+      "id": "runtime:59daba87e3dafbd4",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should not interval fetch with a refetchInterval of 0"
+    },
+    {
+      "id": "runtime:69e7e19c46d0c086",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should not override initial data in dependent queries"
+    },
+    {
+      "id": "runtime:4ca5f7545ae914e8",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should not re-run a stable select when it re-renders if selector throws an error"
+    },
+    {
+      "id": "runtime:03b24afbb7634a56",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should not refetch disabled query when invalidated with invalidateQueries"
+    },
+    {
+      "id": "runtime:6d5ac407bbd47981",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should not refetch fresh query on focus when `refetchOnWindowFocus` is set to `true`"
+    },
+    {
+      "id": "runtime:5e2112d1fecc7be9",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should not refetch if not stale after a prefetch"
+    },
+    {
+      "id": "runtime:b7917f9e5e165d35",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should not refetch query on focus when `enabled` is set to `false`"
+    },
+    {
+      "id": "runtime:0aa3b17c45752e12",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should not refetch stale query on focus when `refetchOnWindowFocus` is set to `false`"
+    },
+    {
+      "id": "runtime:a4246b7533193db0",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should not refetch stale query on focus when `refetchOnWindowFocus` is set to a function that returns `false`"
+    },
+    {
+      "id": "runtime:f4104a86572b923b",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should not retry if retry function `false`"
+    },
+    {
+      "id": "runtime:7f58441ae79871fb",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should not retry on mount when throwOnError function returns true"
+    },
+    {
+      "id": "runtime:e1cb4b6d16603bed",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should not schedule garbage collection, if gcTimeout is set to `Infinity`"
+    },
+    {
+      "id": "runtime:cd2505faad4afe7e",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should not show initial data from next query if placeholderData is set"
+    },
+    {
+      "id": "runtime:c38d728009dd1ee4",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should not update disabled query when refetching with refetchQueries"
+    },
+    {
+      "id": "runtime:7641617ceb80d119",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should only call the query hash function once each render"
+    },
+    {
+      "id": "runtime:16d2d6197b479fa5",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should pass the query to retryOnMount callback"
+    },
+    {
+      "id": "runtime:7306c0be2bc3ee16",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should pick up a query when re-mounting with gcTime 0"
+    },
+    {
+      "id": "runtime:7517b9e7994dfd8a",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should pick up an initialPromise"
+    },
+    {
+      "id": "runtime:9adc120fcb1afcea",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should re-render disabled observers when other observers trigger a query (#8741)"
+    },
+    {
+      "id": "runtime:e23307e5b55520af",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should re-render when a query becomes stale"
+    },
+    {
+      "id": "runtime:ff24be280e47651f",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should refetch after focus regain"
+    },
+    {
+      "id": "runtime:37cf4da609672e7f",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should refetch fresh query on focus when `refetchOnWindowFocus` is set to `always`"
+    },
+    {
+      "id": "runtime:aee85ee0a565e13f",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should refetch fresh query when refetchOnMount is set to always"
+    },
+    {
+      "id": "runtime:2a397969adf2663b",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should refetch if any query instance becomes enabled"
+    },
+    {
+      "id": "runtime:10cbf16f24a41f2a",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should refetch if stale after a prefetch"
+    },
+    {
+      "id": "runtime:6afc22eee7489e7a",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should refetch in an interval depending on function result"
+    },
+    {
+      "id": "runtime:b9cc838222cc421d",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should refetch stale query when refetchOnMount is set to true"
+    },
+    {
+      "id": "runtime:a324d5d0ff8fe023",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should refetch when changed enabled to true in error state"
+    },
+    {
+      "id": "runtime:60f9ddfe0be575d5",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should refetch when query key changed when previous status is error"
+    },
+    {
+      "id": "runtime:5160f163a5571ae0",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should refetch when query key changed when switching between erroneous queries"
+    },
+    {
+      "id": "runtime:b677837d37961d1b",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should refetch when quickly switching to a failed query"
+    },
+    {
+      "id": "runtime:4651ab8edcc8f67b",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should render latest data even if react has discarded certain renders"
+    },
+    {
+      "id": "runtime:8b4a75fb8b413598",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should reset failureCount on successful fetch"
+    },
+    {
+      "id": "runtime:5b12259287e7fe40",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should respect skipToken and refetch when skipToken is taken away"
+    },
+    {
+      "id": "runtime:502201233f5c3468",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should restart when observers unmount and remount while waiting for a retry when query was cancelled in between (#3031)"
+    },
+    {
+      "id": "runtime:48fbb35b4008fd33",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should retry failed initialPromise on the client"
+    },
+    {
+      "id": "runtime:75b1c4badfac79cd",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should retry on mount when throwOnError returns false"
+    },
+    {
+      "id": "runtime:2e6fcb600f4428c5",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should retry specified number of times"
+    },
+    {
+      "id": "runtime:325d12b7f0bbad39",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should return correct optimistic result when fetching after error"
+    },
+    {
+      "id": "runtime:be22585670d67f88",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should return the correct states for a successful query"
+    },
+    {
+      "id": "runtime:ed91e3c24cb50da5",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should return the correct states for an unsuccessful query"
+    },
+    {
+      "id": "runtime:169ae9992dbc0867",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should reuse same data object reference when queryKey changes and placeholderData is present"
+    },
+    {
+      "id": "runtime:6b25a624408c1971",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should reuse same data object reference when queryKey changes back to some cached data"
+    },
+    {
+      "id": "runtime:5ead9263ca1c02d2",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should schedule garbage collection, if gcTimeout is not set to infinity"
+    },
+    {
+      "id": "runtime:57579a33d8f4e8b2",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should set isFetchedAfterMount to true after a query has been fetched"
+    },
+    {
+      "id": "runtime:060be568d355f283",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should set status to error if queryFn throws"
+    },
+    {
+      "id": "runtime:e0fdc25094625c36",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should set status to error instead of throwing when error should not be thrown"
+    },
+    {
+      "id": "runtime:bb12bdc96e7353e0",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should share equal data structures between query results"
+    },
+    {
+      "id": "runtime:8893b5a832dfd141",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should show placeholderData between multiple pending queries when select fn transform is used"
+    },
+    {
+      "id": "runtime:74d53e4c0286f23f",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should show the correct data when switching keys with initialData, placeholderData & staleTime"
+    },
+    {
+      "id": "runtime:aa79c7e6e1a5a2ad",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should start with status pending, fetchStatus idle if enabled is false"
+    },
+    {
+      "id": "runtime:3ac6687487b6657d",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should support dependent queries via the enable config option"
+    },
+    {
+      "id": "runtime:6c54f19b0b72f5c1",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should support enabled:false in query object syntax"
+    },
+    {
+      "id": "runtime:ec98418eec89a36c",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should throw an error when a selector throws"
+    },
+    {
+      "id": "runtime:5d805e19bdf6d312",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should throw error if queryFn rejects with a falsy error and throwOnError is in use"
+    },
+    {
+      "id": "runtime:270977f82b7cdcc3",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should throw error if queryFn throws and throwOnError is in use"
+    },
+    {
+      "id": "runtime:65ae26dfdbbca402",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should throw error instead of setting status when error should be thrown"
+    },
+    {
+      "id": "runtime:effb19c2725daa9c",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should throw in case of bad arguments to enhance DevX"
+    },
+    {
+      "id": "runtime:d97d19b83d833940",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should track properties and only re-render when a tracked property changes"
+    },
+    {
+      "id": "runtime:ffada8facdaa366d",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should transition to error state when placeholderData is set"
+    },
+    {
+      "id": "runtime:84cd3b3ab2c65d5c",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should update data upon interval changes"
+    },
+    {
+      "id": "runtime:0a501a333d3f4e79",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should update query options"
+    },
+    {
+      "id": "runtime:9ce0f5b6817c2a08",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should update query stale state and refetch when invalidated with invalidateQueries"
+    },
+    {
+      "id": "runtime:a3e43902d7edd9bb",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should update query state and not refetch when resetting a disabled query with resetQueries"
+    },
+    {
+      "id": "runtime:6d1b7376d92a9d63",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should update query state and refetch when reset with resetQueries"
+    },
+    {
+      "id": "runtime:cfbbb31b281b0624",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should update with data if we observe no properties and throwOnError"
+    },
+    {
+      "id": "runtime:dada033169d08500",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should use placeholder data even for disabled queries"
+    },
+    {
+      "id": "runtime:129ce90f92cc6a8f",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should use placeholder data while the query loads"
+    },
+    {
+      "id": "runtime:82edd6a25631603b",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should use prefetched data for dependent query"
+    },
+    {
+      "id": "runtime:0e539a4e5b818978",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should use provided custom queryClient"
+    },
+    {
+      "id": "runtime:3fb146329719ae66",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should use query function from hook when the existing query does not have a query function"
+    },
+    {
+      "id": "runtime:f773d803391f2bb5",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery should use the correct query function when components use different configurations"
+    },
+    {
+      "id": "runtime:8234f138f1b8c15a",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery subscribed should be able to toggle subscribed"
+    },
+    {
+      "id": "runtime:5f8d9739f1815de3",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery subscribed should not be attached to the query when subscribed is false"
+    },
+    {
+      "id": "runtime:480c7353c3bedbf1",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery subscribed should not optimistically show fetching when unsubscribed"
+    },
+    {
+      "id": "runtime:3fe68500aeec04a4",
+      "file": "packages/tanstack-query/tests/upstream/useQuery.test.tsx",
+      "fullName": "useQuery subscribed should not re-render when data is added to the cache when subscribed is false"
+    },
+    {
+      "id": "runtime:08067fe2619d3176",
+      "file": "packages/tanstack-query/tests/upstream/useSuspenseInfiniteQuery.test.tsx",
+      "fullName": "useSuspenseInfiniteQuery should log an error when skipToken is passed as queryFn"
+    },
+    {
+      "id": "runtime:66a4487855b4206c",
+      "file": "packages/tanstack-query/tests/upstream/useSuspenseInfiniteQuery.test.tsx",
+      "fullName": "useSuspenseInfiniteQuery should log an error when skipToken is used in development environment"
+    },
+    {
+      "id": "runtime:79a05b305a3bbf67",
+      "file": "packages/tanstack-query/tests/upstream/useSuspenseInfiniteQuery.test.tsx",
+      "fullName": "useSuspenseInfiniteQuery should not log an error when skipToken is used in production environment"
+    },
+    {
+      "id": "runtime:14d16b2f1d098f16",
+      "file": "packages/tanstack-query/tests/upstream/useSuspenseInfiniteQuery.test.tsx",
+      "fullName": "useSuspenseInfiniteQuery should return the correct states for a successful infinite query"
+    },
+    {
+      "id": "runtime:e236645b833ba143",
+      "file": "packages/tanstack-query/tests/upstream/useSuspenseInfiniteQuery.test.tsx",
+      "fullName": "useSuspenseInfiniteQuery should still suspense if queryClient has placeholderData config"
+    },
+    {
+      "id": "runtime:04c2f400d5c5e0a2",
+      "file": "packages/tanstack-query/tests/upstream/useSuspenseQueries.test.tsx",
+      "fullName": "useSuspenseQueries gc (with fake timers) should gc when unmounted while fetching with low gcTime (#8159)"
+    },
+    {
+      "id": "runtime:b9d7740d7e494c24",
+      "file": "packages/tanstack-query/tests/upstream/useSuspenseQueries.test.tsx",
+      "fullName": "useSuspenseQueries should handle duplicate query keys without infinite loops"
+    },
+    {
+      "id": "runtime:ae192d80a480c893",
+      "file": "packages/tanstack-query/tests/upstream/useSuspenseQueries.test.tsx",
+      "fullName": "useSuspenseQueries should keep previous data when wrapped in a transition"
+    },
+    {
+      "id": "runtime:601b65eae95d089e",
+      "file": "packages/tanstack-query/tests/upstream/useSuspenseQueries.test.tsx",
+      "fullName": "useSuspenseQueries should log an error when skipToken is passed as queryFn"
+    },
+    {
+      "id": "runtime:2820ac2483111064",
+      "file": "packages/tanstack-query/tests/upstream/useSuspenseQueries.test.tsx",
+      "fullName": "useSuspenseQueries should log an error when skipToken is used in development environment"
+    },
+    {
+      "id": "runtime:958108fa57b9f602",
+      "file": "packages/tanstack-query/tests/upstream/useSuspenseQueries.test.tsx",
+      "fullName": "useSuspenseQueries should not break suspense when queries change without resolving"
+    },
+    {
+      "id": "runtime:6f90655ed2e61ae6",
+      "file": "packages/tanstack-query/tests/upstream/useSuspenseQueries.test.tsx",
+      "fullName": "useSuspenseQueries should not call combine while reset queries are pending again"
+    },
+    {
+      "id": "runtime:dd83165667525378",
+      "file": "packages/tanstack-query/tests/upstream/useSuspenseQueries.test.tsx",
+      "fullName": "useSuspenseQueries should not log an error when skipToken is used in production environment"
+    },
+    {
+      "id": "runtime:8c5cb224efac201b",
+      "file": "packages/tanstack-query/tests/upstream/useSuspenseQueries.test.tsx",
+      "fullName": "useSuspenseQueries should not request old data inside transitions (issue #6486)"
+    },
+    {
+      "id": "runtime:221560768ed941e6",
+      "file": "packages/tanstack-query/tests/upstream/useSuspenseQueries.test.tsx",
+      "fullName": "useSuspenseQueries should not suspend and not refetch when all queries have fresh cached data"
+    },
+    {
+      "id": "runtime:6b070a3aba52743a",
+      "file": "packages/tanstack-query/tests/upstream/useSuspenseQueries.test.tsx",
+      "fullName": "useSuspenseQueries should not suspend and only refetch the stale query when one query has fresh and the other has stale cached data"
+    },
+    {
+      "id": "runtime:bbb312d10bc53cc4",
+      "file": "packages/tanstack-query/tests/upstream/useSuspenseQueries.test.tsx",
+      "fullName": "useSuspenseQueries should not suspend and only refetch the stale query when one query has stale and the other has fresh cached data"
+    },
+    {
+      "id": "runtime:1c5a2fbc0abac694",
+      "file": "packages/tanstack-query/tests/upstream/useSuspenseQueries.test.tsx",
+      "fullName": "useSuspenseQueries should not suspend but refetch when all queries have stale cached data"
+    },
+    {
+      "id": "runtime:9e3a77979fa22473",
+      "file": "packages/tanstack-query/tests/upstream/useSuspenseQueries.test.tsx",
+      "fullName": "useSuspenseQueries should not suspend on mount if query has been already fetched"
+    },
+    {
+      "id": "runtime:7fbeb8fef33bb37d",
+      "file": "packages/tanstack-query/tests/upstream/useSuspenseQueries.test.tsx",
+      "fullName": "useSuspenseQueries should only call combine after resolving"
+    },
+    {
+      "id": "runtime:2e9a6bcebb620216",
+      "file": "packages/tanstack-query/tests/upstream/useSuspenseQueries.test.tsx",
+      "fullName": "useSuspenseQueries should only suspend queries that are pending when the faster query already has data"
+    },
+    {
+      "id": "runtime:b85ff25a258a1860",
+      "file": "packages/tanstack-query/tests/upstream/useSuspenseQueries.test.tsx",
+      "fullName": "useSuspenseQueries should only suspend queries that are pending when the slower query already has data"
+    },
+    {
+      "id": "runtime:e1494799cbc93e28",
+      "file": "packages/tanstack-query/tests/upstream/useSuspenseQueries.test.tsx",
+      "fullName": "useSuspenseQueries should resolve queries"
+    },
+    {
+      "id": "runtime:abac7f390f42e830",
+      "file": "packages/tanstack-query/tests/upstream/useSuspenseQueries.test.tsx",
+      "fullName": "useSuspenseQueries should show error boundary even with gcTime:0 (#7853)"
+    },
+    {
+      "id": "runtime:a77f0f6f7be9170b",
+      "file": "packages/tanstack-query/tests/upstream/useSuspenseQueries.test.tsx",
+      "fullName": "useSuspenseQueries should still suspense if queryClient has placeholderData config"
+    },
+    {
+      "id": "runtime:7196ee6da0512d4d",
+      "file": "packages/tanstack-query/tests/upstream/useSuspenseQueries.test.tsx",
+      "fullName": "useSuspenseQueries should suspend all queries in parallel"
+    },
+    {
+      "id": "runtime:8e7383d9f3601d6a",
+      "file": "packages/tanstack-query/tests/upstream/useSuspenseQueries.test.tsx",
+      "fullName": "useSuspenseQueries should suspend on mount"
+    },
+    {
+      "id": "runtime:152f73f3cd15aad8",
+      "file": "packages/tanstack-query/tests/upstream/useSuspenseQueries.test.tsx",
+      "fullName": "useSuspenseQueries should suspend on offline when query changes, and data should not be undefined"
+    },
+    {
+      "id": "runtime:b7778fd7bb40c5b7",
+      "file": "packages/tanstack-query/tests/upstream/useSuspenseQueries.test.tsx",
+      "fullName": "useSuspenseQueries should suspend only once per queries change"
+    },
+    {
+      "id": "runtime:00b7e60987c7db41",
+      "file": "packages/tanstack-query/tests/upstream/useSuspenseQueries.test.tsx",
+      "fullName": "useSuspenseQueries should throw error when a queryFn rejects with a falsy error"
+    },
+    {
+      "id": "runtime:3b9696e74349f5ab",
+      "file": "packages/tanstack-query/tests/upstream/useSuspenseQueries.test.tsx",
+      "fullName": "useSuspenseQueries should throw error when queryKey changes and new query fails"
+    },
+    {
+      "id": "runtime:51574426a1a40cda",
+      "file": "packages/tanstack-query/tests/upstream/useSuspenseQueries.test.tsx",
+      "fullName": "useSuspenseQueries shouldn't unmount before all promises fetched"
+    },
+    {
+      "id": "runtime:1d50f9a5a8620112",
+      "file": "packages/tanstack-query/tests/upstream/useSuspenseQuery.test.tsx",
+      "fullName": "useSuspenseQuery should NOT release suspense when setQueryData is called with undefined"
+    },
+    {
+      "id": "runtime:806f0c9c4ca97ede",
+      "file": "packages/tanstack-query/tests/upstream/useSuspenseQuery.test.tsx",
+      "fullName": "useSuspenseQuery should error caught in error boundary without infinite loop"
+    },
+    {
+      "id": "runtime:29729a87f25d3fc6",
+      "file": "packages/tanstack-query/tests/upstream/useSuspenseQuery.test.tsx",
+      "fullName": "useSuspenseQuery should error caught in error boundary without infinite loop when query keys changed"
+    },
+    {
+      "id": "runtime:98707ff990ab7571",
+      "file": "packages/tanstack-query/tests/upstream/useSuspenseQuery.test.tsx",
+      "fullName": "useSuspenseQuery should log an error when skipToken is passed as queryFn"
+    },
+    {
+      "id": "runtime:a681191de6ae608d",
+      "file": "packages/tanstack-query/tests/upstream/useSuspenseQuery.test.tsx",
+      "fullName": "useSuspenseQuery should log an error when skipToken is used in development environment"
+    },
+    {
+      "id": "runtime:ea98e6f009f64e95",
+      "file": "packages/tanstack-query/tests/upstream/useSuspenseQuery.test.tsx",
+      "fullName": "useSuspenseQuery should not call the queryFn twice when used in Suspense mode"
+    },
+    {
+      "id": "runtime:8f224ce3b712294c",
+      "file": "packages/tanstack-query/tests/upstream/useSuspenseQuery.test.tsx",
+      "fullName": "useSuspenseQuery should not log an error when skipToken is used in production environment"
+    },
+    {
+      "id": "runtime:33a3b388bf1f5862",
+      "file": "packages/tanstack-query/tests/upstream/useSuspenseQuery.test.tsx",
+      "fullName": "useSuspenseQuery should not throw background errors to the error boundary"
+    },
+    {
+      "id": "runtime:8ae603803fbbbd75",
+      "file": "packages/tanstack-query/tests/upstream/useSuspenseQuery.test.tsx",
+      "fullName": "useSuspenseQuery should properly refresh data when refetchInterval is set"
+    },
+    {
+      "id": "runtime:5b80b137ccf8ceae",
+      "file": "packages/tanstack-query/tests/upstream/useSuspenseQuery.test.tsx",
+      "fullName": "useSuspenseQuery should release suspense when setQueryData is called before component mounts"
+    },
+    {
+      "id": "runtime:6fbc5c19993e42ed",
+      "file": "packages/tanstack-query/tests/upstream/useSuspenseQuery.test.tsx",
+      "fullName": "useSuspenseQuery should release suspense when setQueryData is called while fetch is in-flight"
+    },
+    {
+      "id": "runtime:76396ffad92e62ed",
+      "file": "packages/tanstack-query/tests/upstream/useSuspenseQuery.test.tsx",
+      "fullName": "useSuspenseQuery should release suspense when streamedQuery receives first chunk"
+    },
+    {
+      "id": "runtime:60bd88a9f18fb55a",
+      "file": "packages/tanstack-query/tests/upstream/useSuspenseQuery.test.tsx",
+      "fullName": "useSuspenseQuery should remove query instance when component unmounted"
+    },
+    {
+      "id": "runtime:c696324a41e239a4",
+      "file": "packages/tanstack-query/tests/upstream/useSuspenseQuery.test.tsx",
+      "fullName": "useSuspenseQuery should render the correct amount of times in Suspense mode"
+    },
+    {
+      "id": "runtime:62d7351e91506b05",
+      "file": "packages/tanstack-query/tests/upstream/useSuspenseQuery.test.tsx",
+      "fullName": "useSuspenseQuery should render the correct amount of times in Suspense mode when gcTime is set to 0"
+    },
+    {
+      "id": "runtime:aff65880c5f2ba26",
+      "file": "packages/tanstack-query/tests/upstream/useSuspenseQuery.test.tsx",
+      "fullName": "useSuspenseQuery should reset error state if new component instances are mounted"
+    },
+    {
+      "id": "runtime:4fdfd3dc03c34d82",
+      "file": "packages/tanstack-query/tests/upstream/useSuspenseQuery.test.tsx",
+      "fullName": "useSuspenseQuery should retry fetch if the reset error boundary has been reset"
+    },
+    {
+      "id": "runtime:dc76013ba2d088c1",
+      "file": "packages/tanstack-query/tests/upstream/useSuspenseQuery.test.tsx",
+      "fullName": "useSuspenseQuery should retry fetch if the reset error boundary has been reset with global hook"
+    },
+    {
+      "id": "runtime:255d9342c022e81e",
+      "file": "packages/tanstack-query/tests/upstream/useSuspenseQuery.test.tsx",
+      "fullName": "useSuspenseQuery should return the correct states for a successful infinite query"
+    },
+    {
+      "id": "runtime:281233dd21f1be83",
+      "file": "packages/tanstack-query/tests/upstream/useSuspenseQuery.test.tsx",
+      "fullName": "useSuspenseQuery should set staleTime when having passed a function"
+    },
+    {
+      "id": "runtime:7cdfd9f9e9315fd7",
+      "file": "packages/tanstack-query/tests/upstream/useSuspenseQuery.test.tsx",
+      "fullName": "useSuspenseQuery should still suspense if queryClient has placeholderData config"
+    },
+    {
+      "id": "runtime:2e8650ef901c59ea",
+      "file": "packages/tanstack-query/tests/upstream/useSuspenseQuery.test.tsx",
+      "fullName": "useSuspenseQuery should suspend when switching to a new query"
+    },
+    {
+      "id": "runtime:52531adb5d330545",
+      "file": "packages/tanstack-query/tests/upstream/useSuspenseQuery.test.tsx",
+      "fullName": "useSuspenseQuery should throw errors to the error boundary by default"
+    },
+    {
+      "id": "runtime:b0b8b06503cfe824",
+      "file": "packages/tanstack-query/tests/upstream/useSuspenseQuery.test.tsx",
+      "fullName": "useSuspenseQuery should throw select errors to the error boundary by default"
+    }
+  ],
+  "snapshots": 0
+}

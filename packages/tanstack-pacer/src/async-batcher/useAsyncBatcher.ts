@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'octane';
+import type { OctaneNode } from 'octane';
 import { AsyncBatcher } from '@tanstack/pacer/async-batcher';
 import { shallow } from '@octanejs/tanstack-store';
 import { useDefaultPacerOptions } from '../provider/context';
@@ -29,8 +30,8 @@ export interface ReactAsyncBatcher<TValue, TSelected = {}> extends Omit<
 	 */
 	Subscribe: <TSelected>(props: {
 		selector: (state: AsyncBatcherState<TValue>) => TSelected;
-		children: ((state: TSelected) => unknown) | unknown;
-	}) => unknown;
+		children: ((state: TSelected) => OctaneNode) | OctaneNode;
+	}) => OctaneNode;
 	/**
 	 * Reactive state selected by the hook's `selector` (empty object without one).
 	 */
@@ -71,7 +72,7 @@ export function useAsyncBatcher<TValue, TSelected = {}>(
 
 		asyncBatcherInstance.Subscribe = function Subscribe<TSelected>(props: {
 			selector: (state: AsyncBatcherState<TValue>) => TSelected;
-			children: ((state: TSelected) => unknown) | unknown;
+			children: ((state: TSelected) => OctaneNode) | OctaneNode;
 		}) {
 			const selected = useSelectorSlot(
 				asyncBatcherInstance.store,
@@ -81,7 +82,7 @@ export function useAsyncBatcher<TValue, TSelected = {}>(
 			);
 
 			return typeof props.children === 'function'
-				? (props.children as (state: TSelected) => unknown)(selected)
+				? (props.children as (state: TSelected) => OctaneNode)(selected)
 				: props.children;
 		};
 

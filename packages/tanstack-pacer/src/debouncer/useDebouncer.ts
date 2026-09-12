@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'octane';
+import type { OctaneNode } from 'octane';
 import { Debouncer } from '@tanstack/pacer/debouncer';
 import { shallow } from '@octanejs/tanstack-store';
 import { useDefaultPacerOptions } from '../provider/context';
@@ -29,8 +30,8 @@ export interface ReactDebouncer<TFn extends AnyFunction, TSelected = {}> extends
 	 */
 	Subscribe: <TSelected>(props: {
 		selector: (state: DebouncerState<TFn>) => TSelected;
-		children: ((state: TSelected) => unknown) | unknown;
-	}) => unknown;
+		children: ((state: TSelected) => OctaneNode) | OctaneNode;
+	}) => OctaneNode;
 	/**
 	 * Reactive state selected by the hook's `selector` (empty object without one).
 	 */
@@ -78,7 +79,7 @@ export function useDebouncer<TFn extends AnyFunction, TSelected = {}>(
 
 		debouncerInstance.Subscribe = function Subscribe<TSelected>(props: {
 			selector: (state: DebouncerState<TFn>) => TSelected;
-			children: ((state: TSelected) => unknown) | unknown;
+			children: ((state: TSelected) => OctaneNode) | OctaneNode;
 		}) {
 			const selected = useSelectorSlot(
 				debouncerInstance.store,
@@ -88,7 +89,7 @@ export function useDebouncer<TFn extends AnyFunction, TSelected = {}>(
 			);
 
 			return typeof props.children === 'function'
-				? (props.children as (state: TSelected) => unknown)(selected)
+				? (props.children as (state: TSelected) => OctaneNode)(selected)
 				: props.children;
 		};
 

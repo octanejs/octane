@@ -31,6 +31,7 @@ beforeEach(() => {
 });
 
 describe('core (ports of upstream index.test.tsx)', () => {
+	// @parity-case conformance:120a798674b125f2
 	it('renders the initial window from initialRect + rect observer + estimateSize', async () => {
 		// Per react-virtual tests/index.test.tsx "should render": viewport 200,
 		// size 50, default overscan 1 → rows 0–4, row 5 absent.
@@ -41,6 +42,7 @@ describe('core (ports of upstream index.test.tsx)', () => {
 		r.unmount();
 	});
 
+	// @parity-case conformance:a816f6efb07b5f5a
 	it('mounts with exactly two renders (initial + rect-notify)', async () => {
 		// Per upstream's render-count pin (renderer called 2x).
 		const r = mount(BasicList, {});
@@ -49,6 +51,7 @@ describe('core (ports of upstream index.test.tsx)', () => {
 		r.unmount();
 	});
 
+	// @parity-case conformance:3397367449501c3c
 	it('honors overscan: 0', async () => {
 		// Per upstream "should render with overscan".
 		const r = mount(BasicList, { overscan: 0 });
@@ -57,6 +60,7 @@ describe('core (ports of upstream index.test.tsx)', () => {
 		r.unmount();
 	});
 
+	// @parity-case conformance:2c65a10435a9d547
 	it('honors a custom rangeExtractor', async () => {
 		// Per upstream "should use rangeExtractor".
 		const r = mount(BasicList, { rangeExtractor: () => [0, 1] });
@@ -65,6 +69,7 @@ describe('core (ports of upstream index.test.tsx)', () => {
 		r.unmount();
 	});
 
+	// @parity-case conformance:b1c968a90bcd6756
 	it('re-windows on count change', async () => {
 		// Per upstream "should handle count change" (10 ⇄ 200 via #count-swap).
 		const r = mount(BasicList, { count: 10 });
@@ -78,6 +83,7 @@ describe('core (ports of upstream index.test.tsx)', () => {
 		r.unmount();
 	});
 
+	// @parity-case conformance:a1ed56cccfcd0dc0
 	it('re-windows on viewport size change (captured rect-cb re-invoke)', async () => {
 		// Per upstream "should handle height change".
 		const r = mount(BasicList, {});
@@ -96,6 +102,7 @@ describe('core (ports of upstream index.test.tsx)', () => {
 });
 
 describe('state wiring + scrolling', () => {
+	// @parity-case conformance:c51e5d3f884780bf
 	it('keeps the virtualizer instance stable across unrelated re-renders', async () => {
 		const r = mount(BasicList, {});
 		await flush();
@@ -107,6 +114,7 @@ describe('state wiring + scrolling', () => {
 		r.unmount();
 	});
 
+	// @parity-case conformance:406501eec651c49f
 	it('getTotalSize() = count × estimateSize', async () => {
 		const r = mount(BasicList, {});
 		await flush();
@@ -114,6 +122,7 @@ describe('state wiring + scrolling', () => {
 		r.unmount();
 	});
 
+	// @parity-case conformance:694eb94d5d01cdfd
 	it('scroll shifts the window at both edges and back', async () => {
 		const r = mount(BasicList, {});
 		await flush();
@@ -129,6 +138,7 @@ describe('state wiring + scrolling', () => {
 		r.unmount();
 	});
 
+	// @parity-case conformance:5ca7cd325175fd85
 	it('positions items at start = index × size (API and rendered transform)', async () => {
 		const r = mount(BasicList, {});
 		await flush();
@@ -140,6 +150,7 @@ describe('state wiring + scrolling', () => {
 		r.unmount();
 	});
 
+	// @parity-case conformance:78bcf0367436d931
 	it('scrollToOffset lands via the scrollTo shim', async () => {
 		const r = mount(BasicList, {});
 		await flush();
@@ -152,6 +163,7 @@ describe('state wiring + scrolling', () => {
 		r.unmount();
 	});
 
+	// @parity-case conformance:c667d9aa39a18eeb
 	it('scrollToIndex aligns start and center', async () => {
 		const r = mount(BasicList, {});
 		await flush();
@@ -172,6 +184,7 @@ describe('state wiring + scrolling', () => {
 		r.unmount();
 	});
 
+	// @parity-case conformance:38558f50febefab0
 	it('preserves getVirtualItems() identity across unrelated re-renders', async () => {
 		const r = mount(BasicList, {});
 		await flush();
@@ -189,6 +202,7 @@ describe('state wiring + scrolling', () => {
 		r.unmount();
 	});
 
+	// @parity-case conformance:b7a3cbb78ab59a47
 	it('passes (instance, sync) through to the user onChange', async () => {
 		const r = mount(BasicList, { isScrollingResetDelay: 5 });
 		await flush();
@@ -203,6 +217,7 @@ describe('state wiring + scrolling', () => {
 		r.unmount();
 	});
 
+	// @parity-case conformance:afc34ee8464675cf
 	it('flips isScrolling true, then resets after isScrollingResetDelay', async () => {
 		const r = mount(BasicList, { isScrollingResetDelay: 5 });
 		await flush();
@@ -214,6 +229,7 @@ describe('state wiring + scrolling', () => {
 		r.unmount();
 	});
 
+	// @parity-case conformance:3a5fc20e17dc00cd
 	it('detaches listeners on unmount (no onChange, no throw)', async () => {
 		const r = mount(BasicList, {});
 		await flush();
@@ -233,6 +249,7 @@ describe('state wiring + scrolling', () => {
 });
 
 describe('horizontal', () => {
+	// @parity-case conformance:babaa50e9cd6282e
 	it('windows by width and shifts on scrollLeft', async () => {
 		const r = mount(HorizontalList, {});
 		await flush();

@@ -1,0 +1,116 @@
+{
+  "runtimeDependencies": ["@octanejs/tanstack-store", "@tanstack/table-core", "octane"],
+  "adaptedSources": [
+    {
+      "packageName": "@tanstack/react-table",
+      "paths": [
+        "package.json",
+        "src/FlexRender.ts",
+        "src/Subscribe.tsrx",
+        "src/createTableHook.tsrx",
+        "src/createTableHookContexts.ts",
+        "src/experimental-worker-plugin.ts",
+        "src/flex-render.ts",
+        "src/index.ts",
+        "src/legacy.ts",
+        "src/reactivity.ts",
+        "src/static-functions.ts",
+        "src/types.ts",
+        "src/useLegacyTable.tsrx",
+        "src/useTable.tsrx"
+      ]
+    }
+  ],
+  "sourceLedger": [
+    {
+      "path": "package.json",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-table",
+      "sha256": "a56894c771c73e1e60cf576d36b645e18aa8715d9205cc592d8615dffcb8d004"
+    },
+    {
+      "path": "src/FlexRender.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-table",
+      "sha256": "06aab04256716ba8a82df079871971403cf50f5c0c2eb3556d45cf314816b219"
+    },
+    {
+      "path": "src/Subscribe.tsrx",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-table",
+      "sha256": "1c145badd67ed2364689d910a5e04e7efc9efe573022b1e7d20fe2dacfc3127a"
+    },
+    {
+      "path": "src/createTableHook.tsrx",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-table",
+      "sha256": "f685a52694c037c7b5b3d852719f02b17b70dcb1f038de13b27558cb2dc0988d"
+    },
+    {
+      "path": "src/createTableHookContexts.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-table",
+      "sha256": "5b8250e43e31f098b2418095aaad08f3f9aadc8ed9c2602a25bd55d4c04aef8f"
+    },
+    {
+      "path": "src/experimental-worker-plugin.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-table",
+      "sha256": "b48d0419dd21594f9577b4056b7068ed2528b897ffd8d55b08168d923158848b"
+    },
+    {
+      "path": "src/flex-render.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-table",
+      "sha256": "41838ad15529480e4b47f99cb6394fbdd6e8f308728862d4fb62b0a19976e80d"
+    },
+    {
+      "path": "src/index.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-table",
+      "sha256": "fd15d8d42105012f0b30eeae66d31f15e3d3e2cb055f103cb3013ca045c4391a"
+    },
+    {
+      "path": "src/internal.ts",
+      "origin": "authored",
+      "sha256": "86731c4f9a7e18327376141f96f92e12ac7fddcdd4a77402f4d3dc7f120c2c36"
+    },
+    {
+      "path": "src/legacy.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-table",
+      "sha256": "e6c4c82d95086b158e6f14559580fdd12106af454f441738d94b7bf933a834a3"
+    },
+    {
+      "path": "src/reactivity.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-table",
+      "sha256": "55acb24941f9cbdf1be496c60d385d92549fe315eef77763aa29afd5ee7f50cb"
+    },
+    {
+      "path": "src/static-functions.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-table",
+      "sha256": "0aece62304bc935c92fc72b67b30e04f2be3c19f3f783d7663b1723bb9030c90"
+    },
+    {
+      "path": "src/types.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-table",
+      "sha256": "8369df5155a9b6f156b60a1441bd582afd2bcf657776755f65a69b37cb55075f"
+    },
+    {
+      "path": "src/useLegacyTable.tsrx",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-table",
+      "sha256": "da3cd6c674ca7b1cbc4bf2616adc306de4f9c4952b9ed6ad5831e074eb795bd1"
+    },
+    {
+      "path": "src/useTable.tsrx",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-table",
+      "sha256": "7a74df7b94ccd6cad7328f08e05f1379dedd7284718c5a7c7111a3e7c26cba9b"
+    }
+  ],
+  "reimplementedDependencies": []
+}

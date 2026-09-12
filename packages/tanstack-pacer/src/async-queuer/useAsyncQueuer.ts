@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'octane';
+import type { OctaneNode } from 'octane';
 import { AsyncQueuer } from '@tanstack/pacer/async-queuer';
 import { shallow } from '@octanejs/tanstack-store';
 import { useDefaultPacerOptions } from '../provider/context';
@@ -29,8 +30,8 @@ export interface ReactAsyncQueuer<TValue, TSelected = {}> extends Omit<
 	 */
 	Subscribe: <TSelected>(props: {
 		selector: (state: AsyncQueuerState<TValue>) => TSelected;
-		children: ((state: TSelected) => unknown) | unknown;
-	}) => unknown;
+		children: ((state: TSelected) => OctaneNode) | OctaneNode;
+	}) => OctaneNode;
 	/**
 	 * Reactive state selected by the hook's `selector` (empty object without one).
 	 */
@@ -71,7 +72,7 @@ export function useAsyncQueuer<TValue, TSelected = {}>(
 
 		asyncQueuerInstance.Subscribe = function Subscribe<TSelected>(props: {
 			selector: (state: AsyncQueuerState<TValue>) => TSelected;
-			children: ((state: TSelected) => unknown) | unknown;
+			children: ((state: TSelected) => OctaneNode) | OctaneNode;
 		}) {
 			const selected = useSelectorSlot(
 				asyncQueuerInstance.store,
@@ -81,7 +82,7 @@ export function useAsyncQueuer<TValue, TSelected = {}>(
 			);
 
 			return typeof props.children === 'function'
-				? (props.children as (state: TSelected) => unknown)(selected)
+				? (props.children as (state: TSelected) => OctaneNode)(selected)
 				: props.children;
 		};
 

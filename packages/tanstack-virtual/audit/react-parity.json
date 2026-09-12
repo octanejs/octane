@@ -3,15 +3,18 @@
   "schemaVersion": 1,
   "provenance": {
     "repo": "https://github.com/TanStack/virtual.git",
-    "version": "@tanstack/react-virtual@3.14.5",
-    "commit": "151e9f47abd4ef2d3b11936c04be8908e6bd0607",
+    "version": "3.14.12",
+    "commit": "df47889fc87af0b5ff46a9805820f60cff6828ff",
     "sourceRoot": "packages/react-virtual/src",
     "testRoot": "packages/react-virtual/tests",
     "license": "MIT",
-    "integrity": "sha256:e93b937aa9cdc910ab9dddae1c342acee8c2d45b5574298383e204b5a94b718e",
-    "verification": "recorded-unverified"
+    "integrity": "sha256:61a7b5feaecaff7b44527675b24df7bb102ef09327b314e2f770e786b2a8412e",
+    "verification": "verified"
   },
-  "upstreamSuites": { "runtime": "present", "types": "absent" },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "absent"
+  },
   "adaptedRoots": {
     "source": {
       "roots": ["packages/tanstack-virtual/src"],
@@ -19,14 +22,14 @@
       "exclude": ["\\.d\\.ts$"]
     },
     "tests": {
-      "roots": ["packages/tanstack-virtual/tests/differential"],
-      "include": ["parity\\.test\\.ts$"],
+      "roots": ["packages/tanstack-virtual/tests/upstream/unit"],
+      "include": ["\\.test\\.tsx$"],
       "exclude": []
     }
   },
   "adaptedRuntimeSummary": {
-    "inventoryEntries": 0,
-    "uniqueIdentities": 0,
+    "inventoryEntries": 7,
+    "uniqueIdentities": 7,
     "duplicateEntriesWithinLanes": 0,
     "identitiesSharedAcrossLanes": 0
   },
@@ -37,10 +40,395 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "c59eb31d459a52db2de19f8e5d45e921ee077693ba852b1e026f18f2a782aba6"
+      "lockfileSha256": "ae04465442755655f0585371461fa1ad23633ff2b9047c215928577a4fc91412"
     }
   },
   "lanes": [
+    {
+      "id": "tanstack-virtual-pristine-unit",
+      "type": "pristine-upstream",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tanstack-virtual-pristine",
+      "notes": "All seven pinned unit registrations. Browser registrations execute in their separate required lanes.",
+      "evidenceOrigin": "upstream-suite",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/tanstack-virtual/audit/pristine-wrapper-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/tanstack-virtual/audit/pristine-wrapper-runtime.json",
+          "role": "support",
+          "sha256": "141bc6bc66a9dd2cc8fe4f8643322493cd771317bd33a0fbe2b88e72ac41924b"
+        },
+        {
+          "path": "packages/tanstack-virtual/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "a11efcb279eb033b39106698ad161fdf71eec47bfbf5e9765f6c2208d649c030"
+        },
+        {
+          "path": "packages/tanstack-virtual/audit/provenance.json",
+          "role": "support",
+          "sha256": "1f4028c530744d75f8a9bc8e99ad899d3a00ecf60d02f964ccae566005f0cb39"
+        },
+        {
+          "path": "packages/tanstack-virtual/audit/registrations.json",
+          "role": "support",
+          "sha256": "8e27573009ac5943952d2fb52d91679f89b031916e600c212ff3c11ed6dd8b75"
+        },
+        {
+          "path": "packages/tanstack-virtual/audit/crosswalk.json",
+          "role": "support",
+          "sha256": "43da45752dfa4f65e8c333409a308b1e6ce00ee0ec96dbf11a8a0b925270daf5"
+        },
+        {
+          "path": "packages/tanstack-virtual/tests/upstream-original.test.ts",
+          "role": "support",
+          "sha256": "ecd2d878b44326db99336fa3d811faf628ffe58963db1b2e5d16fc951000d186"
+        },
+        {
+          "path": "packages/tanstack-virtual/audit/pristine-runtime.json",
+          "role": "support",
+          "sha256": "01c5847e4ed642fedf97c31589879cec0081d64a5afcaccc0a0403d90bf3f4d4"
+        },
+        {
+          "path": "packages/tanstack-virtual/tests/upstream-vitest.config.ts",
+          "role": "support",
+          "sha256": "8e8e8b477351af4c3451fe9aeda9b4909cc3e099661deb602187d8a1ab6c9759"
+        },
+        {
+          "path": "packages/tanstack-virtual/audit/pristine-suite.json",
+          "role": "support",
+          "sha256": "18984ff06ca5808a0439ed4944594266818036a1b8044e810fdf482f193a016f"
+        },
+        {
+          "path": "scripts/react-parity/tanstack-virtual-pristine-runtime.mjs",
+          "role": "support",
+          "sha256": "4cda04e5a266fb52f8e54469eb79e95d6864839647c26cfa29a1f4965f00baa5"
+        },
+        {
+          "path": "scripts/react-parity/pristine-suite-lib.mjs",
+          "role": "support",
+          "sha256": "d34ffc2dca00e6eef7dcaf5bc002024cc511f32dd20c681547555af520438bbb"
+        }
+      ]
+    },
+    {
+      "id": "tanstack-virtual-pristine-browser",
+      "type": "pristine-upstream",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tanstack-virtual-browser",
+      "notes": "Executes the complete browser suite in Chromium and compares every observed file, expanded test title and result. The native lane also checks both end-anchor regressions.",
+      "files": [
+        {
+          "path": "packages/tanstack-virtual/tests/browser-parity.test.ts",
+          "role": "test",
+          "sha256": "2ce68ba0cb0abe65a43cd6d28de9bab7ee5040009bb9ad55f302338b75edadfc",
+          "cases": [
+            {
+              "id": "pristine:virtual-original-browser-suite",
+              "testName": "runs all 35 pinned Virtual browser cases unchanged against React",
+              "fullName": "runs all 35 pinned Virtual browser cases unchanged against React"
+            }
+          ]
+        },
+        {
+          "path": "packages/tanstack-virtual/audit/pristine-browser.json",
+          "role": "support",
+          "sha256": "b2f63a52fac364d230870f78479671dfa5a687a546df0d343b17286388983299"
+        },
+        {
+          "path": "packages/tanstack-virtual/tests/browser-playwright.config.ts",
+          "role": "support",
+          "sha256": "a9b0c54450afb1ccb55e73dac41060086b3f0a0de00da7c33e92beb1808227ee"
+        },
+        {
+          "path": "packages/tanstack-virtual/tests/browser-vite.config.ts",
+          "role": "support",
+          "sha256": "23ba7d859b5c8aa47ff044ecd583e0142f546bb445049d2f1414a0a87865ae69"
+        },
+        {
+          "path": "scripts/react-parity/tanstack-virtual-pristine-runtime.mjs",
+          "role": "support",
+          "sha256": "4cda04e5a266fb52f8e54469eb79e95d6864839647c26cfa29a1f4965f00baa5"
+        },
+        {
+          "path": "scripts/react-parity/playwright-full-runner.mjs",
+          "role": "support",
+          "sha256": "23bfcd3ad08ac13b98aa002a8c55fb05f986d98096f557f716c9124e1df2da65"
+        },
+        {
+          "path": "packages/tanstack-virtual/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "a11efcb279eb033b39106698ad161fdf71eec47bfbf5e9765f6c2208d649c030"
+        },
+        {
+          "path": "packages/tanstack-virtual/audit/provenance.json",
+          "role": "support",
+          "sha256": "1f4028c530744d75f8a9bc8e99ad899d3a00ecf60d02f964ccae566005f0cb39"
+        },
+        {
+          "path": "packages/tanstack-virtual/audit/registrations.json",
+          "role": "support",
+          "sha256": "8e27573009ac5943952d2fb52d91679f89b031916e600c212ff3c11ed6dd8b75"
+        },
+        {
+          "path": "packages/tanstack-virtual/audit/crosswalk.json",
+          "role": "support",
+          "sha256": "43da45752dfa4f65e8c333409a308b1e6ce00ee0ec96dbf11a8a0b925270daf5"
+        }
+      ]
+    },
+    {
+      "id": "tanstack-virtual-pristine-types",
+      "type": "pristine-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tanstack-virtual-pristine-types",
+      "notes": "The pin has no dedicated type-test suite. Strict authored probes compare all 26 exports and negative controls with immutable upstream declarations.",
+      "evidenceOrigin": "repo-authored",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsc",
+        "project": "packages/tanstack-virtual/typetests/pristine/tsconfig.json"
+      },
+      "files": [
+        {
+          "path": "packages/tanstack-virtual/typetests/pristine/tsconfig.json",
+          "role": "test",
+          "sha256": "0bdc6c99e6448f4f73d884a5a3294bf5c6a97ae51b2ee58449643fb45d1c4a6c",
+          "cases": [
+            {
+              "id": "types:virtual-pristine",
+              "testName": "complete Virtual public contract",
+              "fullName": "complete Virtual public contract"
+            }
+          ]
+        },
+        {
+          "path": "packages/tanstack-virtual/typetests/pristine/public-contracts.test-d.ts",
+          "role": "support",
+          "sha256": "459f7d044f5dfeb3c109df25f8df5dc76cc1529fb9b47f16b59362aad7bbb5c1"
+        },
+        {
+          "path": "packages/tanstack-virtual/typetests/expected-contracts.d.ts",
+          "role": "support",
+          "sha256": "a394b365d146cfdf23af10ae25660b3bbceec6a65f3496855ea6061f70814cda"
+        },
+        {
+          "path": "packages/tanstack-virtual/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "a11efcb279eb033b39106698ad161fdf71eec47bfbf5e9765f6c2208d649c030"
+        },
+        {
+          "path": "packages/tanstack-virtual/audit/provenance.json",
+          "role": "support",
+          "sha256": "1f4028c530744d75f8a9bc8e99ad899d3a00ecf60d02f964ccae566005f0cb39"
+        },
+        {
+          "path": "packages/tanstack-virtual/audit/registrations.json",
+          "role": "support",
+          "sha256": "8e27573009ac5943952d2fb52d91679f89b031916e600c212ff3c11ed6dd8b75"
+        },
+        {
+          "path": "packages/tanstack-virtual/audit/crosswalk.json",
+          "role": "support",
+          "sha256": "43da45752dfa4f65e8c333409a308b1e6ce00ee0ec96dbf11a8a0b925270daf5"
+        }
+      ]
+    },
+    {
+      "id": "tanstack-virtual-adapted-unit",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tanstack-virtual-adapted",
+      "notes": "All seven pinned unit registrations. Browser registrations execute in their separate required lanes.",
+      "evidenceOrigin": "upstream-suite",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/tanstack-virtual/audit/adapted-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/tanstack-virtual/audit/adapted-runtime.json",
+          "role": "support",
+          "sha256": "119ab3adb5d43f5989070e37df8f47c895cc6909db9bd3d4ca356da2f4f4b0d5"
+        },
+        {
+          "path": "packages/tanstack-virtual/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "a11efcb279eb033b39106698ad161fdf71eec47bfbf5e9765f6c2208d649c030"
+        },
+        {
+          "path": "packages/tanstack-virtual/audit/provenance.json",
+          "role": "support",
+          "sha256": "1f4028c530744d75f8a9bc8e99ad899d3a00ecf60d02f964ccae566005f0cb39"
+        },
+        {
+          "path": "packages/tanstack-virtual/audit/registrations.json",
+          "role": "support",
+          "sha256": "8e27573009ac5943952d2fb52d91679f89b031916e600c212ff3c11ed6dd8b75"
+        },
+        {
+          "path": "packages/tanstack-virtual/audit/crosswalk.json",
+          "role": "support",
+          "sha256": "43da45752dfa4f65e8c333409a308b1e6ce00ee0ec96dbf11a8a0b925270daf5"
+        },
+        {
+          "path": "packages/tanstack-virtual/tests/vitest.adapted.config.ts",
+          "role": "support",
+          "sha256": "01a10e1d67d586a19064796c06318d8c6ac9883305eb60e054080479455385f7"
+        }
+      ]
+    },
+    {
+      "id": "tanstack-virtual-adapted-browser",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tanstack-virtual-browser",
+      "notes": "Executes the complete browser suite in Chromium and compares every observed file, expanded test title and result. The native lane also checks both end-anchor regressions.",
+      "files": [
+        {
+          "path": "packages/tanstack-virtual/tests/browser-parity.test.ts",
+          "role": "test",
+          "sha256": "2ce68ba0cb0abe65a43cd6d28de9bab7ee5040009bb9ad55f302338b75edadfc",
+          "cases": [
+            {
+              "id": "adapted:virtual-browser-suite",
+              "testName": "runs all 35 adapted Virtual browser cases and both direct DOM prepend regressions",
+              "fullName": "runs all 35 adapted Virtual browser cases and both direct DOM prepend regressions"
+            }
+          ]
+        },
+        {
+          "path": "packages/tanstack-virtual/audit/adapted-browser.json",
+          "role": "support",
+          "sha256": "cd7d1f7f1aefbe9756e6f708614740d57396d8d24bff6e78c874196213810ad6"
+        },
+        {
+          "path": "packages/tanstack-virtual/tests/browser-playwright.config.ts",
+          "role": "support",
+          "sha256": "a9b0c54450afb1ccb55e73dac41060086b3f0a0de00da7c33e92beb1808227ee"
+        },
+        {
+          "path": "packages/tanstack-virtual/tests/browser-vite.config.ts",
+          "role": "support",
+          "sha256": "23ba7d859b5c8aa47ff044ecd583e0142f546bb445049d2f1414a0a87865ae69"
+        },
+        {
+          "path": "scripts/react-parity/tanstack-virtual-pristine-runtime.mjs",
+          "role": "support",
+          "sha256": "4cda04e5a266fb52f8e54469eb79e95d6864839647c26cfa29a1f4965f00baa5"
+        },
+        {
+          "path": "scripts/react-parity/playwright-full-runner.mjs",
+          "role": "support",
+          "sha256": "23bfcd3ad08ac13b98aa002a8c55fb05f986d98096f557f716c9124e1df2da65"
+        },
+        {
+          "path": "packages/tanstack-virtual/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "a11efcb279eb033b39106698ad161fdf71eec47bfbf5e9765f6c2208d649c030"
+        },
+        {
+          "path": "packages/tanstack-virtual/audit/provenance.json",
+          "role": "support",
+          "sha256": "1f4028c530744d75f8a9bc8e99ad899d3a00ecf60d02f964ccae566005f0cb39"
+        },
+        {
+          "path": "packages/tanstack-virtual/audit/registrations.json",
+          "role": "support",
+          "sha256": "8e27573009ac5943952d2fb52d91679f89b031916e600c212ff3c11ed6dd8b75"
+        },
+        {
+          "path": "packages/tanstack-virtual/audit/crosswalk.json",
+          "role": "support",
+          "sha256": "43da45752dfa4f65e8c333409a308b1e6ce00ee0ec96dbf11a8a0b925270daf5"
+        },
+        {
+          "path": "packages/tanstack-virtual/tests/browser-contracts/prepend.spec.ts",
+          "role": "support",
+          "sha256": "23e1560d79329c267fa2ecc6fdf3cd300c96d55fb65b7c30fa0ebd721bd885a7"
+        },
+        {
+          "path": "packages/tanstack-virtual/tests/_fixtures/direct-prepend.tsrx",
+          "role": "support",
+          "sha256": "1c90fd6dd3dc102e1d9b74d53903137576c434eec9f9199ace59ea9e7f31fd9f"
+        },
+        {
+          "path": "packages/tanstack-virtual/tests/browser-fixtures/prepend/main.ts",
+          "role": "support",
+          "sha256": "1d2061f64e0e50643cda977cbdd08fcd954ea64cf76161a77c357cb4ce31c3db"
+        },
+        {
+          "path": "packages/tanstack-virtual/tests/browser-fixtures/prepend/index.html",
+          "role": "support",
+          "sha256": "15f770d92d95fa91f40e107b21bcada5255d9f6ed4dce33f5df6827a204dafce"
+        }
+      ]
+    },
+    {
+      "id": "tanstack-virtual-adapted-types",
+      "type": "adapted-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tanstack-virtual-adapted-types",
+      "notes": "The pin has no dedicated type-test suite. Strict authored probes compare all 26 exports and negative controls with immutable upstream declarations.",
+      "evidenceOrigin": "repo-authored",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsrx-tsc",
+        "project": "packages/tanstack-virtual/typetests/adapted/tsconfig.json"
+      },
+      "files": [
+        {
+          "path": "packages/tanstack-virtual/typetests/adapted/tsconfig.json",
+          "role": "test",
+          "sha256": "36490de2a83039a9c44b9c263f1a82128c5aab8b5850d16afa5a23ad4655c787",
+          "cases": [
+            {
+              "id": "types:virtual-adapted",
+              "testName": "complete Virtual public contract",
+              "fullName": "complete Virtual public contract"
+            }
+          ]
+        },
+        {
+          "path": "packages/tanstack-virtual/typetests/adapted/public-contracts.test-d.ts",
+          "role": "support",
+          "sha256": "b1dbbaa4b202a8e1c6c038139582a407eac512eeabe107998ac7d687892540bc"
+        },
+        {
+          "path": "packages/tanstack-virtual/typetests/expected-contracts.d.ts",
+          "role": "support",
+          "sha256": "a394b365d146cfdf23af10ae25660b3bbceec6a65f3496855ea6061f70814cda"
+        },
+        {
+          "path": "packages/tanstack-virtual/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "a11efcb279eb033b39106698ad161fdf71eec47bfbf5e9765f6c2208d649c030"
+        },
+        {
+          "path": "packages/tanstack-virtual/audit/provenance.json",
+          "role": "support",
+          "sha256": "1f4028c530744d75f8a9bc8e99ad899d3a00ecf60d02f964ccae566005f0cb39"
+        },
+        {
+          "path": "packages/tanstack-virtual/audit/registrations.json",
+          "role": "support",
+          "sha256": "8e27573009ac5943952d2fb52d91679f89b031916e600c212ff3c11ed6dd8b75"
+        },
+        {
+          "path": "packages/tanstack-virtual/audit/crosswalk.json",
+          "role": "support",
+          "sha256": "43da45752dfa4f65e8c333409a308b1e6ce00ee0ec96dbf11a8a0b925270daf5"
+        }
+      ]
+    },
     {
       "id": "tanstack-virtual-runtime-differential",
       "type": "differential",
@@ -48,7 +436,7 @@
       "environment": "workspace-node",
       "project": "tanstack-virtual-differential",
       "evidenceOrigin": "repo-authored",
-      "notes": "Required same-fixture React/Octane windowing scenarios. Provenance stays recorded-unverified until pristine upstream and one-for-one adapted full-suite lanes exist; react-parity:check still executes this required lane. Vitest project is wholly react-parity-owned via testExecution.",
+      "notes": "Four same-fixture core/hook scenarios against the pinned 3.14.12 React adapter.",
       "files": [
         {
           "path": "packages/tanstack-virtual/tests/differential/parity.test.ts",
@@ -113,17 +501,228 @@
           "sha256": "98085e53308052da1ffa7980e533f40b751ca337db51d6ec5e4a00681421ab8e"
         }
       ]
-    }
-  ],
-  "ordinaryEvidence": [
+    },
     {
-      "path": "packages/tanstack-virtual/tests/conformance/nested-flush.test.ts",
-      "sha256": "24b49b238ffd6e3aeaf0b377e622be275fd2cc9f9f9a035cb5de00b16cbeac37",
-      "cases": [
+      "id": "tanstack-virtual-conformance",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tanstack-virtual",
+      "notes": "Observed core identity, refs, windowing, teardown, direct DOM render counts and real server/client hydration contracts.",
+      "files": [
         {
-          "id": "conformance:nested-flush-sync-scroll",
-          "testName": "sync scroll update inside a discrete-event flush still lands (flushSync degradation)",
-          "fullName": "state wiring + scrolling sync scroll update inside a discrete-event flush still lands (flushSync degradation)"
+          "path": "packages/tanstack-virtual/tests/ssr-hydration.test.ts",
+          "role": "test",
+          "sha256": "d3f08a70f03f340e8ec34eecc473acce2b643983abab8b47d0fa892869c06144",
+          "cases": [
+            {
+              "id": "conformance:virtual-hydration",
+              "testName": "adopts the initial virtual rows, updates their extent and disposes the observer",
+              "fullName": "adopts the initial virtual rows, updates their extent and disposes the observer"
+            }
+          ]
+        },
+        {
+          "path": "packages/tanstack-virtual/tests/conformance/core.test.ts",
+          "role": "test",
+          "sha256": "a78c1609471557f94fd5c147bb3d8d42646b7d17185f027b17679675c4c97af6",
+          "cases": [
+            {
+              "id": "conformance:120a798674b125f2",
+              "testName": "renders the initial window from initialRect + rect observer + estimateSize",
+              "fullName": "core (ports of upstream index.test.tsx) renders the initial window from initialRect + rect observer + estimateSize"
+            },
+            {
+              "id": "conformance:a816f6efb07b5f5a",
+              "testName": "mounts with exactly two renders (initial + rect-notify)",
+              "fullName": "core (ports of upstream index.test.tsx) mounts with exactly two renders (initial + rect-notify)"
+            },
+            {
+              "id": "conformance:3397367449501c3c",
+              "testName": "honors overscan: 0",
+              "fullName": "core (ports of upstream index.test.tsx) honors overscan: 0"
+            },
+            {
+              "id": "conformance:2c65a10435a9d547",
+              "testName": "honors a custom rangeExtractor",
+              "fullName": "core (ports of upstream index.test.tsx) honors a custom rangeExtractor"
+            },
+            {
+              "id": "conformance:b1c968a90bcd6756",
+              "testName": "re-windows on count change",
+              "fullName": "core (ports of upstream index.test.tsx) re-windows on count change"
+            },
+            {
+              "id": "conformance:a1ed56cccfcd0dc0",
+              "testName": "re-windows on viewport size change (captured rect-cb re-invoke)",
+              "fullName": "core (ports of upstream index.test.tsx) re-windows on viewport size change (captured rect-cb re-invoke)"
+            },
+            {
+              "id": "conformance:c51e5d3f884780bf",
+              "testName": "keeps the virtualizer instance stable across unrelated re-renders",
+              "fullName": "state wiring + scrolling keeps the virtualizer instance stable across unrelated re-renders"
+            },
+            {
+              "id": "conformance:406501eec651c49f",
+              "testName": "getTotalSize() = count × estimateSize",
+              "fullName": "state wiring + scrolling getTotalSize() = count × estimateSize"
+            },
+            {
+              "id": "conformance:694eb94d5d01cdfd",
+              "testName": "scroll shifts the window at both edges and back",
+              "fullName": "state wiring + scrolling scroll shifts the window at both edges and back"
+            },
+            {
+              "id": "conformance:5ca7cd325175fd85",
+              "testName": "positions items at start = index × size (API and rendered transform)",
+              "fullName": "state wiring + scrolling positions items at start = index × size (API and rendered transform)"
+            },
+            {
+              "id": "conformance:78bcf0367436d931",
+              "testName": "scrollToOffset lands via the scrollTo shim",
+              "fullName": "state wiring + scrolling scrollToOffset lands via the scrollTo shim"
+            },
+            {
+              "id": "conformance:c667d9aa39a18eeb",
+              "testName": "scrollToIndex aligns start and center",
+              "fullName": "state wiring + scrolling scrollToIndex aligns start and center"
+            },
+            {
+              "id": "conformance:38558f50febefab0",
+              "testName": "preserves getVirtualItems() identity across unrelated re-renders",
+              "fullName": "state wiring + scrolling preserves getVirtualItems() identity across unrelated re-renders"
+            },
+            {
+              "id": "conformance:b7a3cbb78ab59a47",
+              "testName": "passes (instance, sync) through to the user onChange",
+              "fullName": "state wiring + scrolling passes (instance, sync) through to the user onChange"
+            },
+            {
+              "id": "conformance:afc34ee8464675cf",
+              "testName": "flips isScrolling true, then resets after isScrollingResetDelay",
+              "fullName": "state wiring + scrolling flips isScrolling true, then resets after isScrollingResetDelay"
+            },
+            {
+              "id": "conformance:3a5fc20e17dc00cd",
+              "testName": "detaches listeners on unmount (no onChange, no throw)",
+              "fullName": "state wiring + scrolling detaches listeners on unmount (no onChange, no throw)"
+            },
+            {
+              "id": "conformance:babaa50e9cd6282e",
+              "testName": "windows by width and shifts on scrollLeft",
+              "fullName": "horizontal windows by width and shifts on scrollLeft"
+            }
+          ]
+        },
+        {
+          "path": "packages/tanstack-virtual/tests/conformance/dynamic.test.ts",
+          "role": "test",
+          "sha256": "5b5fbb339e3c37f123ba02c34ef2661acbcddc8b21d43465b1290ac69de3832d",
+          "cases": [
+            {
+              "id": "conformance:c2230e906b178675",
+              "testName": "measures rendered items via data-size (refs attach before _willUpdate)",
+              "fullName": "measureElement option measures rendered items via data-size (refs attach before _willUpdate)"
+            },
+            {
+              "id": "conformance:6d6a4b0f1f0c29f6",
+              "testName": "resizeItem shifts downstream starts and the total size",
+              "fullName": "measureElement option resizeItem shifts downstream starts and the total size"
+            },
+            {
+              "id": "conformance:45962fea7cc71cb9",
+              "testName": "measure() drops the cache back to estimates",
+              "fullName": "measureElement option measure() drops the cache back to estimates"
+            },
+            {
+              "id": "conformance:bae22fd6fc583a8f",
+              "testName": "measures newly revealed items on a programmatic scroll",
+              "fullName": "measureElement option measures newly revealed items on a programmatic scroll"
+            },
+            {
+              "id": "conformance:368c3cf3e84d4192",
+              "testName": "reads element offsetHeight when no measureElement option is given",
+              "fullName": "default measureElement codepath reads element offsetHeight when no measureElement option is given"
+            },
+            {
+              "id": "conformance:46209b27161f5dbb",
+              "testName": "writes container size + item transforms directly; skips re-renders for range-stable scrolls",
+              "fullName": "directDomUpdates writes container size + item transforms directly; skips re-renders for range-stable scrolls"
+            }
+          ]
+        },
+        {
+          "path": "packages/tanstack-virtual/tests/conformance/nested-flush.test.ts",
+          "role": "test",
+          "sha256": "24b49b238ffd6e3aeaf0b377e622be275fd2cc9f9f9a035cb5de00b16cbeac37",
+          "cases": [
+            {
+              "id": "conformance:nested-flush-sync-scroll",
+              "testName": "sync scroll update inside a discrete-event flush still lands (flushSync degradation)",
+              "fullName": "state wiring + scrolling sync scroll update inside a discrete-event flush still lands (flushSync degradation)"
+            }
+          ]
+        },
+        {
+          "path": "packages/tanstack-virtual/tests/conformance/parity.test.ts",
+          "role": "test",
+          "sha256": "a58fe089205768f3bd2566b63eb6d3a47c00c2b067a3ccf0999005655ae76dd8",
+          "cases": [
+            {
+              "id": "conformance:2a092f067b89d860",
+              "testName": "provides every runtime export of real @tanstack/react-virtual",
+              "fullName": "export surface provides every runtime export of real @tanstack/react-virtual"
+            },
+            {
+              "id": "conformance:ce6f858c51ca95e3",
+              "testName": "re-exports the same @tanstack/virtual-core module instance",
+              "fullName": "export surface re-exports the same @tanstack/virtual-core module instance"
+            }
+          ]
+        },
+        {
+          "path": "packages/tanstack-virtual/tests/conformance/window.test.ts",
+          "role": "test",
+          "sha256": "ee69d5bbc5791ad6a8f5709e66882b8bcf66a06666f42b522817d3043378f28e",
+          "cases": [
+            {
+              "id": "conformance:103ef876c99af74b",
+              "testName": "windows from the native 1024×768 jsdom viewport",
+              "fullName": "useWindowVirtualizer windows from the native 1024×768 jsdom viewport"
+            },
+            {
+              "id": "conformance:6e0aee886ac505db",
+              "testName": "shifts the window on window scroll",
+              "fullName": "useWindowVirtualizer shifts the window on window scroll"
+            },
+            {
+              "id": "conformance:1569a866a7ff2929",
+              "testName": "honors initialOffset on mount (no scroll event needed)",
+              "fullName": "useWindowVirtualizer honors initialOffset on mount (no scroll event needed)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tanstack-virtual-ssr-conformance",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tanstack-virtual-ssr",
+      "notes": "Observed core identity, refs, windowing, teardown, direct DOM render counts and real server/client hydration contracts.",
+      "files": [
+        {
+          "path": "packages/tanstack-virtual/tests/ssr/server.test.ts",
+          "role": "test",
+          "sha256": "c440f3b304efcda2659c90d4e162e3f1f0d165cd3dd06bd6231039233e1cb090",
+          "cases": [
+            {
+              "id": "conformance:8f3bfdb02ed17db2",
+              "testName": "renders the initial offset window without a DOM",
+              "fullName": "@octanejs/tanstack-virtual SSR renders the initial offset window without a DOM"
+            }
+          ]
         }
       ]
     }
@@ -141,5 +740,6 @@
       "owner": "@octanejs/tanstack-virtual",
       "reviewCondition": "Review if Octane gains true nested flushSync or the adapter stops calling flushSync on sync scroll notifies."
     }
-  ]
+  ],
+  "materializedTests": "packages/tanstack-virtual"
 }

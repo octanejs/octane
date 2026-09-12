@@ -618,6 +618,8 @@ minimumReleaseAgeExclude:
   - '@tsrx/react-runtime@0.1.7'
   - '@tsrx/solid-runtime@0.1.7'
   - cn@0.2.6
+  - '@tanstack/react-virtual@3.14.12'
+  - '@tanstack/virtual-core@3.17.10'
 
 # Changesets 2.31.1 assumes npm's error shape and crashes on pnpm 11 duplicate
 # publish errors. Remove this backport once the fix ships on Changesets' stable line.

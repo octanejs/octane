@@ -1,14 +1,18 @@
 {
-  "upstream": { "package": "@tanstack/react-table", "version": "9.0.0-beta.58" },
-  "surface": "Complete port of the v9 adapter: the framework-agnostic `@tanstack/table-core` (constructTable + every tree-shakeable feature and row model) is reused verbatim, and the adapter — `useTable`, `Subscribe`, `flexRender`/`FlexRender`, `createTableHook`, `createTableHookContexts` — is transcribed onto octane hooks. Table state lives in TanStack Store atoms via the `coreReactivityFeature` bindings, and `useSelector` drives re-renders from the selected slice. Every store primitive (hooks, `createAtom`, `batch`, `shallow`, and the atom/store types) is imported from @octanejs/tanstack-store, which re-exports all of @tanstack/store — the binding takes no direct dependency on the store core, so there is only one path to it and atom identity cannot be split across duplicate copies.",
+  "upstream": {
+    "package": "@tanstack/react-table",
+    "version": "9.2.4"
+  },
+  "surface": "TanStack Table 9.2.4 adapter using table-core 9.2.4 and the existing Octane Store integration. Covers useTable, Subscribe, FlexRender/flexRender, createTableHook, scoped contexts and the legacy migration hook/markers/types. Root, flex-render, legacy, static-functions, experimental-worker-plugin and package.json imports remain available. Core algorithms and worker helpers are imported directly.",
   "divergences": [
-    "`flexRender`'s class-component and `react.memo`/`forwardRef` exotic-component branches are dropped — octane has no class components or forwardRef, and octane's `memo()` returns a plain function, so `typeof === 'function'` covers every component.",
-    "Upstream's `useLegacyTable` entry (the v8-compat `get*RowModel` shim, its marker factories, and the `Legacy*` type aliases) is NOT ported. It exists to migrate existing React v8 codebases; octane has none, so octane code targets the v9 `useTable` API directly."
+    "`flexRender`'s class-component and `react.memo`/`forwardRef` exotic-component branches are dropped \u2014 octane has no class components or forwardRef, and octane's `memo()` returns a plain function, so `typeof === 'function'` covers every component.",
+    "A held transition performs Octane's documented committed-state cue render. Raw table-store observers may receive the unchanged committed snapshot once; suspended controlled values are neither published nor written to base atoms."
   ],
-  "ssr": "No SSR-specific surface; table-core is pure computation.",
+  "ssr": "All three pinned SSR cases execute with server compilation. A real SSR/client hydration test preserves row and button identity, updates data interactively, and unmounts the adopted nodes.",
   "notes": [
-    "`useTable` and `useAppTable` end in an OPTIONAL `selector` parameter, so both split the compiler-injected trailing hook slot off their rest args (see src/internal.ts) — otherwise `useTable(options)` would read the slot symbol as the selector.",
-    "Column sizing/resizing and pinning/ordering drag interactions are untested-by-interaction (the differential rig has no mousemove driver); their state APIs are table-core computation reused verbatim."
+    "`useTable` and `useAppTable` end in an OPTIONAL `selector` parameter, so both split the compiler-injected trailing hook slot off their rest args (see src/internal.ts) \u2014 otherwise `useTable(options)` would read the slot symbol as the selector.",
+    "Column sizing/resizing and pinning/ordering drag interactions are untested-by-interaction (the differential rig has no mousemove driver); their state APIs are table-core computation reused verbatim.",
+    "The full copied boundary is the released React adapter package: 34 runtime cases (31 client and 3 SSR), with strict full-source and public type probes. Neutral table-core internals and repository example applications outside this package are not vendored."
   ],
-  "verified": "2026-08-02"
+  "verified": "2026-09-12"
 }

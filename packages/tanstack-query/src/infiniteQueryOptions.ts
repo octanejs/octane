@@ -1,12 +1,11 @@
-// Verbatim port of @tanstack/react-query's infiniteQueryOptions.ts — a typed identity helper
 import type {
-	DataTag,
 	DefaultError,
 	InfiniteData,
 	InitialDataFunction,
 	NonUndefinedGuard,
 	OmitKeyof,
 	QueryKey,
+	QueryKeyWithDataTag,
 	SkipToken,
 } from '@tanstack/query-core';
 import type { UseInfiniteQueryOptions } from './types';
@@ -61,9 +60,8 @@ export function infiniteQueryOptions<
 	TPageParam = unknown,
 >(
 	options: DefinedInitialDataInfiniteOptions<TQueryFnData, TError, TData, TQueryKey, TPageParam>,
-): DefinedInitialDataInfiniteOptions<TQueryFnData, TError, TData, TQueryKey, TPageParam> & {
-	queryKey: DataTag<TQueryKey, InfiniteData<TQueryFnData>, TError>;
-};
+): DefinedInitialDataInfiniteOptions<TQueryFnData, TError, TData, TQueryKey, TPageParam> &
+	QueryKeyWithDataTag<TQueryKey, InfiniteData<TQueryFnData>, TError>;
 
 export function infiniteQueryOptions<
 	TQueryFnData,
@@ -73,9 +71,8 @@ export function infiniteQueryOptions<
 	TPageParam = unknown,
 >(
 	options: UnusedSkipTokenInfiniteOptions<TQueryFnData, TError, TData, TQueryKey, TPageParam>,
-): UnusedSkipTokenInfiniteOptions<TQueryFnData, TError, TData, TQueryKey, TPageParam> & {
-	queryKey: DataTag<TQueryKey, InfiniteData<TQueryFnData>, TError>;
-};
+): UnusedSkipTokenInfiniteOptions<TQueryFnData, TError, TData, TQueryKey, TPageParam> &
+	QueryKeyWithDataTag<TQueryKey, InfiniteData<TQueryFnData>, TError>;
 
 export function infiniteQueryOptions<
 	TQueryFnData,
@@ -85,9 +82,8 @@ export function infiniteQueryOptions<
 	TPageParam = unknown,
 >(
 	options: UndefinedInitialDataInfiniteOptions<TQueryFnData, TError, TData, TQueryKey, TPageParam>,
-): UndefinedInitialDataInfiniteOptions<TQueryFnData, TError, TData, TQueryKey, TPageParam> & {
-	queryKey: DataTag<TQueryKey, InfiniteData<TQueryFnData>, TError>;
-};
+): UndefinedInitialDataInfiniteOptions<TQueryFnData, TError, TData, TQueryKey, TPageParam> &
+	QueryKeyWithDataTag<TQueryKey, InfiniteData<TQueryFnData>, TError>;
 
 export function infiniteQueryOptions(options: unknown) {
 	return options;

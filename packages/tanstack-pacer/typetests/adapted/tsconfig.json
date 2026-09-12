@@ -9,7 +9,7 @@
     "moduleResolution": "bundler",
     "allowSyntheticDefaultImports": true,
     "allowImportingTsExtensions": true,
-    "skipLibCheck": true,
+    "skipLibCheck": false,
     "strict": true,
     "types": ["node"],
     "paths": {
@@ -19,5 +19,10 @@
       "octane": ["../../../octane/src/index.ts"]
     }
   },
-  "include": ["../../src/**/*.ts", "../../src/**/*.tsrx"]
+  "include": ["../../src/**/*.ts", "../../src/**/*.tsrx", "./*.ts"],
+  "reactPortEvidence": {
+    "gate": "upstream-types-adapted",
+    "upstreamRegistrations": [],
+    "publicMode": "pinned"
+  }
 }

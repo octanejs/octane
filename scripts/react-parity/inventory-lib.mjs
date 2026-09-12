@@ -469,13 +469,21 @@ function loopContexts(source, tokens, pairs, staticCounts) {
 		}
 	};
 	for (let index = 0; index < tokens.length; index++) {
+		const forHeader = index + (tokens[index + 1]?.value === 'await' ? 2 : 1);
 		if (
 			tokens[index].value === 'for' &&
 			tokens[index - 1]?.value !== '.' &&
-			tokens[index + 1]?.value === '('
+			tokens[forHeader]?.value === '('
 		) {
-			const headerEnd = pairs.get(index + 1);
-			if (headerEnd !== undefined) addBody('for', index, headerEnd + 1, tokens.length);
+			const headerEnd = pairs.get(forHeader);
+			if (headerEnd !== undefined)
+				addBody(
+					'for',
+					index,
+					headerEnd + 1,
+					tokens.length,
+					staticCounts.get(tokens[index].start) ?? null,
+				);
 		}
 		if (
 			tokens[index].value === 'forEach' &&
@@ -503,6 +511,21 @@ function eachInvocation(tokens, pairs, startIndex, staticCounts) {
 	let conditional = null;
 	while (tokens[cursor]?.value === '.' && tokens[cursor + 1]?.type === 'identifier') {
 		const modifier = tokens[cursor + 1].value;
+		if (
+			[
+				'describe',
+				'beforeEach',
+				'afterEach',
+				'beforeAll',
+				'afterAll',
+				'step',
+				'use',
+				'extend',
+				'info',
+				'setTimeout',
+			].includes(modifier)
+		)
+			return { invocationOpen: null, modifiers, each: null, conditional: null };
 		cursor += 2;
 		if (modifier === 'each') {
 			each = true;
@@ -525,6 +548,16 @@ function eachInvocation(tokens, pairs, startIndex, staticCounts) {
 				cursor = conditionClose + 1;
 			}
 		}
+	}
+	// Type arguments describe the matrix, not runtime arguments or registrars.
+	if (tokens[cursor]?.value === '<') {
+		let depth = 0;
+		do {
+			if (tokens[cursor]?.value === '<') depth++;
+			else if (tokens[cursor]?.value === '>') depth--;
+			cursor++;
+		} while (depth > 0 && cursor < tokens.length);
+		if (depth !== 0) return { invocationOpen: null, modifiers, each: null, conditional: null };
 	}
 	if (!each)
 		return {
@@ -669,9 +702,76 @@ function directRegistrarAliases(source) {
 	return aliases;
 }
 
+// Used only by reviewed, hash-pinned helper profiles. Each declared wrapper
+// registers one case per call; its internal registrar branches are not cases.
+function pinnedRegistrarWrappers(source, wrappers) {
+	const calls = new Map();
+	const bodies = [];
+	if (!wrappers.length) return { calls, bodies };
+	const file = ts.createSourceFile(
+		'wrappers.tsx',
+		source,
+		ts.ScriptTarget.Latest,
+		true,
+		ts.ScriptKind.TSX,
+	);
+	const host = ts.createCompilerHost({ noLib: true });
+	host.getSourceFile = (name) => (name === file.fileName ? file : undefined);
+	const checker = ts
+		.createProgram([file.fileName], { noLib: true, noResolve: true }, host)
+		.getTypeChecker();
+	for (const wrapper of wrappers) {
+		const fail = () => {
+			throw new Error(`Cannot inventory pinned registrar wrapper ${wrapper.name}`);
+		};
+		const declarations = [];
+		const references = [];
+		const visit = (node) => {
+			if (
+				ts.isVariableDeclaration(node) &&
+				ts.isIdentifier(node.name) &&
+				node.name.text === wrapper.name
+			)
+				declarations.push(node);
+			if (ts.isIdentifier(node) && node.text === wrapper.name) references.push(node);
+			ts.forEachChild(node, visit);
+		};
+		visit(file);
+		const declaration = declarations[0];
+		const fn = declaration?.initializer;
+		if (
+			declarations.length !== 1 ||
+			!(declaration.parent.flags & ts.NodeFlags.Const) ||
+			!fn ||
+			!(ts.isArrowFunction(fn) || ts.isFunctionExpression(fn)) ||
+			!Number.isInteger(wrapper.titleArgument) ||
+			wrapper.titleArgument < 0 ||
+			wrapper.titleArgument >= fn.parameters.length
+		)
+			fail();
+		const symbol = checker.getSymbolAtLocation(declaration.name);
+		for (const reference of references) {
+			if (reference === declaration.name) continue;
+			const call = reference.parent;
+			if (
+				checker.getSymbolAtLocation(reference) !== symbol ||
+				!ts.isCallExpression(call) ||
+				call.expression !== reference ||
+				call.arguments.length !== fn.parameters.length ||
+				call.arguments.some(ts.isSpreadElement) ||
+				(reference.pos >= fn.body.pos && reference.end <= fn.body.end)
+			)
+				fail();
+			calls.set(reference.getStart(file), wrapper.titleArgument);
+		}
+		bodies.push({ start: fn.body.getStart(file), end: fn.body.end });
+	}
+	return { calls, bodies };
+}
+
 export function extractTestCases(
 	source,
-	{ file = '<unknown>', helperExpansions = DEFAULT_HELPER_EXPANSIONS } = {},
+	{ file = '<unknown>', helperExpansions = DEFAULT_HELPER_EXPANSIONS, registrarWrappers = [] } = {},
 ) {
 	if (file.endsWith('.coffee')) return extractCoffeeScriptTestCases(source, file);
 	const { tokens, comments } = tokenizeJavaScript(source);
@@ -681,16 +781,23 @@ export function extractTestCases(
 	const loops = loopContexts(source, tokens, pairs, staticCounts);
 	const nodeSubtestOffsets = nodeSubtestRegistrarOffsets(source, file);
 	const aliases = directRegistrarAliases(source);
+	const wrappers = pinnedRegistrarWrappers(source, registrarWrappers);
 	const cases = [];
 	const occurrences = new Map();
 	for (let index = 0; index < tokens.length; index++) {
 		const token = tokens[index];
 		const name = token.value;
+		if (wrappers.bodies.some((body) => token.start >= body.start && token.start < body.end))
+			continue;
 		const isNamespacedDirect =
 			(NAMESPACED_DIRECT_REGISTRARS.has(name) || nodeSubtestOffsets.has(token.start)) &&
 			tokens[index - 1]?.value === '.' &&
 			tokens[index - 2]?.type === 'identifier';
-		const isDirect = DIRECT_REGISTRARS.has(name) || isNamespacedDirect || aliases.has(name);
+		const isDirect =
+			DIRECT_REGISTRARS.has(name) ||
+			isNamespacedDirect ||
+			aliases.has(name) ||
+			wrappers.calls.has(token.start);
 		const isGated = GATED_REGISTRARS.has(name);
 		const helper = Object.hasOwn(helperExpansions, name) ? helperExpansions[name] : undefined;
 		if (!isDirect && !isGated && !helper) continue;
@@ -711,7 +818,7 @@ export function extractTestCases(
 		const close = pairs.get(parsed.invocationOpen);
 		if (close === undefined) continue;
 		const args = splitArguments(tokens, parsed.invocationOpen, close);
-		const titleRange = args[isGated ? 1 : 0];
+		const titleRange = args[wrappers.calls.get(token.start) ?? (isGated ? 1 : 0)];
 		if (!titleRange) continue;
 		const declaredTitle = literalFromRange(tokens, titleRange);
 		const titleExpression =

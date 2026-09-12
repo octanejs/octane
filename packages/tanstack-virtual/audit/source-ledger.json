@@ -1,0 +1,13 @@
+[
+  {
+    "path": "src/index.ts",
+    "origin": "adapted",
+    "packageName": "@tanstack/react-virtual",
+    "sha256": "74d6ead8ab12fadc7a0e0588869ec771245f55cccd982dbfa7bc0866b2e0c6d1"
+  },
+  {
+    "path": "src/internal.ts",
+    "origin": "authored",
+    "sha256": "ffca6ddc94112aa8639f25cbe7fc6df224b6f6775534e0076459114f2faf6d77"
+  }
+]

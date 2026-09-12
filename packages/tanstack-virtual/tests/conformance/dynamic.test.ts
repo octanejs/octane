@@ -33,6 +33,7 @@ afterEach(() => {
 });
 
 describe('measureElement option', () => {
+	// @parity-case conformance:c2230e906b178675
 	it('measures rendered items via data-size (refs attach before _willUpdate)', async () => {
 		// Also pins the commit ordering: measureElement refs must be attached
 		// before the layout-effect pass reads the elementsCache — the FIRST
@@ -54,6 +55,7 @@ describe('measureElement option', () => {
 		r.unmount();
 	});
 
+	// @parity-case conformance:6d6a4b0f1f0c29f6
 	it('resizeItem shifts downstream starts and the total size', async () => {
 		const r = mount(DynamicList, {});
 		await flush();
@@ -69,6 +71,7 @@ describe('measureElement option', () => {
 		r.unmount();
 	});
 
+	// @parity-case conformance:45962fea7cc71cb9
 	it('measure() drops the cache back to estimates', async () => {
 		const r = mount(DynamicList, {});
 		await flush();
@@ -85,6 +88,7 @@ describe('measureElement option', () => {
 		r.unmount();
 	});
 
+	// @parity-case conformance:bae22fd6fc583a8f
 	it('measures newly revealed items on a programmatic scroll', async () => {
 		// scrollToOffset sets core's scrollState, so items revealed by the
 		// scroll measure IMMEDIATELY at ref time. (A natural scroll defers
@@ -106,6 +110,7 @@ describe('measureElement option', () => {
 });
 
 describe('default measureElement codepath', () => {
+	// @parity-case conformance:368c3cf3e84d4192
 	it('reads element offsetHeight when no measureElement option is given', async () => {
 		// virtual-core 3.17.3's default measureElement falls back to
 		// offsetWidth/offsetHeight (no RO entry in jsdom) — stub the prototype
@@ -130,6 +135,7 @@ describe('default measureElement codepath', () => {
 });
 
 describe('directDomUpdates', () => {
+	// @parity-case conformance:46209b27161f5dbb
 	it('writes container size + item transforms directly; skips re-renders for range-stable scrolls', async () => {
 		const r = mount(DirectList, {});
 		await flush();

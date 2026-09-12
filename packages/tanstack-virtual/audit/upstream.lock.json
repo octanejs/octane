@@ -1,0 +1,273 @@
+{
+  "schemaVersion": 1,
+  "identity": {
+    "packageName": "@tanstack/react-virtual",
+    "version": "3.14.12",
+    "repository": {
+      "owner": "TanStack",
+      "repo": "virtual",
+      "subdirectory": "packages/react-virtual"
+    },
+    "commit": "df47889fc87af0b5ff46a9805820f60cff6828ff",
+    "integrity": "sha512-EOJkBss/FRqzFrCpX8M96lIh+ZMc0jPt0LILhxWQ3tOHQ3XdVvuE0jceS2yZXpDtayNfpjeg2EnuYPm90CxIlA=="
+  },
+  "license": {
+    "spdx": "MIT",
+    "evidence": [
+      {
+        "path": "LICENSE",
+        "sha256": "a405ee70c632bb938acb7ac5f210e814409b3760ea9d2329d8ed8ffcfd11a0e7"
+      }
+    ],
+    "notices": []
+  },
+  "scopes": [],
+  "adaptedMappings": [
+    {
+      "fromRoot": "tests",
+      "toRoot": "tests/upstream/unit"
+    },
+    {
+      "fromRoot": "e2e/app",
+      "toRoot": "tests/upstream/browser"
+    }
+  ],
+  "adaptedRewrites": [
+    {
+      "find": "'react'",
+      "replace": "'octane'"
+    },
+    {
+      "find": "import React from 'octane'",
+      "replace": "import * as React from 'octane'"
+    },
+    {
+      "find": "'@testing-library/react'",
+      "replace": "'@octanejs/testing-library'"
+    },
+    {
+      "find": "'react-dom/client'",
+      "replace": "'octane'"
+    },
+    {
+      "find": "import ReactDOM from 'octane'",
+      "replace": "import * as ReactDOM from 'octane'"
+    },
+    {
+      "find": "'@tanstack/react-virtual'",
+      "replace": "'@octanejs/tanstack-virtual'"
+    },
+    {
+      "find": "'../src/index'",
+      "replace": "'../../../src/index'"
+    }
+  ],
+  "files": [
+    {
+      "path": "CHANGELOG.md",
+      "gitBlob": "f633d0634dac23c7dcefce0fe88460deca18c4f6",
+      "size": 11712
+    },
+    {
+      "path": "e2e/app/cached-measurements/index.html",
+      "gitBlob": "56f418f6160aa7a0cb6ef6787e809856f902964a",
+      "size": 187
+    },
+    {
+      "path": "e2e/app/cached-measurements/main.tsx",
+      "gitBlob": "57c02899e8c459078fa5a9bbec7436c31e41dfac",
+      "size": 2038
+    },
+    {
+      "path": "e2e/app/chat-resize/index.html",
+      "gitBlob": "56f418f6160aa7a0cb6ef6787e809856f902964a",
+      "size": 187
+    },
+    {
+      "path": "e2e/app/chat-resize/main.tsx",
+      "gitBlob": "2eb5dcbaafcca6bc08b701ff91b4351431c295a2",
+      "size": 2636
+    },
+    {
+      "path": "e2e/app/chat/index.html",
+      "gitBlob": "56f418f6160aa7a0cb6ef6787e809856f902964a",
+      "size": 187
+    },
+    {
+      "path": "e2e/app/chat/main.tsx",
+      "gitBlob": "e30fe0d757bbade821ad06d5c3411bd84a921c8e",
+      "size": 3931
+    },
+    {
+      "path": "e2e/app/direct-dom-updates/index.html",
+      "gitBlob": "56f418f6160aa7a0cb6ef6787e809856f902964a",
+      "size": 187
+    },
+    {
+      "path": "e2e/app/direct-dom-updates/main.tsx",
+      "gitBlob": "79c8b84a680906ac7f094ccd1060be582314a7a3",
+      "size": 2188
+    },
+    {
+      "path": "e2e/app/measure-element/index.html",
+      "gitBlob": "56f418f6160aa7a0cb6ef6787e809856f902964a",
+      "size": 187
+    },
+    {
+      "path": "e2e/app/measure-element/main.tsx",
+      "gitBlob": "6775b39fc35ebd91924b5eda1d41b2cc7d6e26da",
+      "size": 3235
+    },
+    {
+      "path": "e2e/app/react-compiler-vite.config.ts",
+      "gitBlob": "59ec35a0446f6a0ab1ef39bfe75b585c4b13d752",
+      "size": 717
+    },
+    {
+      "path": "e2e/app/react-compiler/index.html",
+      "gitBlob": "56f418f6160aa7a0cb6ef6787e809856f902964a",
+      "size": 187
+    },
+    {
+      "path": "e2e/app/react-compiler/main.tsx",
+      "gitBlob": "3c8f7d3bcb586651a454c67aa76134211f94c62b",
+      "size": 2665
+    },
+    {
+      "path": "e2e/app/scroll-anchor/index.html",
+      "gitBlob": "56f418f6160aa7a0cb6ef6787e809856f902964a",
+      "size": 187
+    },
+    {
+      "path": "e2e/app/scroll-anchor/main.tsx",
+      "gitBlob": "5fb4f6884ad920922bdb6c634fa70ae5991cf9c8",
+      "size": 1750
+    },
+    {
+      "path": "e2e/app/scroll/index.html",
+      "gitBlob": "56f418f6160aa7a0cb6ef6787e809856f902964a",
+      "size": 187
+    },
+    {
+      "path": "e2e/app/scroll/main.tsx",
+      "gitBlob": "1a2f9eacbefa5e101640029ce424e79b32a5987d",
+      "size": 2272
+    },
+    {
+      "path": "e2e/app/smooth-scroll/index.html",
+      "gitBlob": "56f418f6160aa7a0cb6ef6787e809856f902964a",
+      "size": 187
+    },
+    {
+      "path": "e2e/app/smooth-scroll/main.tsx",
+      "gitBlob": "565d48c36111ecd5c69cc6cfd9de49ea027173b9",
+      "size": 3216
+    },
+    {
+      "path": "e2e/app/stale-index/index.html",
+      "gitBlob": "56f418f6160aa7a0cb6ef6787e809856f902964a",
+      "size": 187
+    },
+    {
+      "path": "e2e/app/stale-index/main.tsx",
+      "gitBlob": "13fe85e19d128ddbe5560ef76a16a6d66ec92b28",
+      "size": 2727
+    },
+    {
+      "path": "e2e/app/test/cached-measurements.spec.ts",
+      "gitBlob": "26eb4e623c3f5a797aa56cba4d1bdc42c2d71d20",
+      "size": 1325
+    },
+    {
+      "path": "e2e/app/test/chat.spec.ts",
+      "gitBlob": "ed2075a39d9c7245006eb3ebd5a777536c08bd53",
+      "size": 5743
+    },
+    {
+      "path": "e2e/app/test/direct-dom-updates.spec.ts",
+      "gitBlob": "71b7f8dcd8117c5731b74fffa6bcc066399de11c",
+      "size": 4617
+    },
+    {
+      "path": "e2e/app/test/measure-element.spec.ts",
+      "gitBlob": "6973fdbb557a3d2ae15c615a66cda6a7fdfc28b4",
+      "size": 1670
+    },
+    {
+      "path": "e2e/app/test/react-compiler.spec.ts",
+      "gitBlob": "4d861174c4b8349e2cf9db21b65434ef8f4ffdef",
+      "size": 2899
+    },
+    {
+      "path": "e2e/app/test/scroll-anchor.spec.ts",
+      "gitBlob": "2b87b1fadfbdf7b3246beb263f7356b8b945c6f9",
+      "size": 4289
+    },
+    {
+      "path": "e2e/app/test/scroll.spec.ts",
+      "gitBlob": "4e0506c4d53db89a2930d53695e22ec5f071bae6",
+      "size": 4336
+    },
+    {
+      "path": "e2e/app/test/smooth-scroll.spec.ts",
+      "gitBlob": "d8650db9124c0d9bcf74460ac46248d830bfb900",
+      "size": 4865
+    },
+    {
+      "path": "e2e/app/test/stale-index.spec.ts",
+      "gitBlob": "fcf7d93e89a0672e219480fdf8cb79a2cc4513c9",
+      "size": 1274
+    },
+    {
+      "path": "e2e/app/tsconfig.json",
+      "gitBlob": "ad08d6c2bc3e0921fabb54c8322566b0eccbbbd8",
+      "size": 303
+    },
+    {
+      "path": "e2e/app/vite.config.ts",
+      "gitBlob": "505279170bc29371c27c9bedb047de37982a9647",
+      "size": 1258
+    },
+    {
+      "path": "eslint.config.js",
+      "gitBlob": "8ce6ad05fcd0e480793cdacb88feb5a82cf02c41",
+      "size": 94
+    },
+    {
+      "path": "package.json",
+      "gitBlob": "e119d77d102acd84c01fa7df15053bfe242f2d46",
+      "size": 1890
+    },
+    {
+      "path": "playwright.config.ts",
+      "gitBlob": "8ee2fb7cd38ceda63b5ecac6b8d6cf9cb7a309ad",
+      "size": 1229
+    },
+    {
+      "path": "src/index.tsx",
+      "gitBlob": "737ad53fc0a0d8fc893430633d3ca4077159f65a",
+      "size": 10062
+    },
+    {
+      "path": "tests/index.test.tsx",
+      "gitBlob": "dc6da3347d062f6b75d2bae8e72ad3cf97f3d63a",
+      "size": 4925
+    },
+    {
+      "path": "tests/test-setup.ts",
+      "gitBlob": "8355c2e495f9352fbaa251920e4d97643b395a14",
+      "size": 318
+    },
+    {
+      "path": "tsconfig.json",
+      "gitBlob": "81932e76996ffbd3e400ff47b093e86e650ff99c",
+      "size": 150
+    },
+    {
+      "path": "vite.config.ts",
+      "gitBlob": "be9dae208282e450c923215540e303ef98b468a2",
+      "size": 526
+    }
+  ],
+  "fingerprint": "f5c9c87d0643fcff4860e1f27174cee1f9da437527de669ea6ae09127c3e6cbf"
+}

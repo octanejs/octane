@@ -1,0 +1,287 @@
+# @tanstack/react-virtual
+
+## 3.14.12
+
+### Patch Changes
+
+- Updated dependencies [[`ab3278c`](https://github.com/TanStack/virtual/commit/ab3278cbe7b9a895ecdde263ad3c55c868b85d74)]:
+  - @tanstack/virtual-core@3.17.10
+
+## 3.14.11
+
+### Patch Changes
+
+- Updated dependencies [[`4a0adf3`](https://github.com/TanStack/virtual/commit/4a0adf3e3ba46968e0e6ba66471253e467babe55)]:
+  - @tanstack/virtual-core@3.17.9
+
+## 3.14.10
+
+### Patch Changes
+
+- Updated dependencies [[`a0a411e`](https://github.com/TanStack/virtual/commit/a0a411e06f7334a063422de35d59b12b264b3573), [`d2cf98b`](https://github.com/TanStack/virtual/commit/d2cf98beea1696c7187c06b57c9e724d1957963c)]:
+  - @tanstack/virtual-core@3.17.8
+
+## 3.14.9
+
+### Patch Changes
+
+- Updated dependencies [[`a5417b4`](https://github.com/TanStack/virtual/commit/a5417b4b0d3c82876747bb9635db7239c28d3e44)]:
+  - @tanstack/virtual-core@3.17.7
+
+## 3.14.8
+
+### Patch Changes
+
+- [#1237](https://github.com/TanStack/virtual/pull/1237) [`aa536e7`](https://github.com/TanStack/virtual/commit/aa536e7746a88d9f55ca8a4b50d2f548a888fea6) - Fix a gap at the top of the list after an end-anchored prepend in `directDomUpdates` mode. The prepend grows the total size and bumps `scrollOffset` to the new bottom in the same pass, but the size container's height was written _after_ `_willUpdate` synced the scroll position — so the browser clamped the `scrollTop` write to the stale (shorter) `scrollHeight`, leaving whitespace at the top until the next scroll. The container is now grown before the scroll sync. Only affected `directDomUpdates` mode (React-rendered sizers receive their height during render).
+
+- Updated dependencies [[`7ae32b5`](https://github.com/TanStack/virtual/commit/7ae32b55887fd044a48c788546cd940279b338e0)]:
+  - @tanstack/virtual-core@3.17.6
+
+## 3.14.7
+
+### Patch Changes
+
+- Updated dependencies [[`1e3b908`](https://github.com/TanStack/virtual/commit/1e3b908705e04e45be2615f2277580cb09f5cdef), [`7dcfc07`](https://github.com/TanStack/virtual/commit/7dcfc07b877479697124157d3124c09537b87a75)]:
+  - @tanstack/virtual-core@3.17.5
+
+## 3.14.6
+
+### Patch Changes
+
+- Updated dependencies [[`6cbecd8`](https://github.com/TanStack/virtual/commit/6cbecd887df56faaee3b6a81a1aae8049de0671e), [`d49cc52`](https://github.com/TanStack/virtual/commit/d49cc526fe248be7b5ad97ec6ac814db8271b0d0), [`cf7834d`](https://github.com/TanStack/virtual/commit/cf7834daade953fea5dfd2ab5685c15771ca300a)]:
+  - @tanstack/virtual-core@3.17.4
+
+## 3.14.5
+
+### Patch Changes
+
+- Updated dependencies [[`767ead4`](https://github.com/TanStack/virtual/commit/767ead46e4fab761fd6e15bcf281486042723152), [`bc8643b`](https://github.com/TanStack/virtual/commit/bc8643b7579e10e512654f58269de13d98b48781)]:
+  - @tanstack/virtual-core@3.17.3
+
+## 3.14.4
+
+### Patch Changes
+
+- Updated dependencies [[`b04f9ee`](https://github.com/TanStack/virtual/commit/b04f9ee48f0812e89156c1dac1fa58277cc32464), [`37be284`](https://github.com/TanStack/virtual/commit/37be28427ba52399ce8884e0006933e83f2645e9)]:
+  - @tanstack/virtual-core@3.17.2
+
+## 3.14.3
+
+### Patch Changes
+
+- [#1201](https://github.com/TanStack/virtual/pull/1201) [`2ba5eb6`](https://github.com/TanStack/virtual/commit/2ba5eb60f108f4ba9b2bd9570bbd41f9ce618438) - Make `directDomUpdates` a no-op for direct DOM writes when `containerRef` is omitted. Previously the virtualizer still wrote item positions while never sizing the container (a broken half-state). Now omitting `containerRef` skips all direct writes while still skipping re-renders, letting consumers own the DOM updates themselves (e.g. in `onChange`).
+
+- Updated dependencies [[`ef69ea3`](https://github.com/TanStack/virtual/commit/ef69ea31738caa2819142e922efa03d3c408e25c)]:
+  - @tanstack/virtual-core@3.17.1
+
+## 3.14.2
+
+### Patch Changes
+
+- Updated dependencies [[`c0b84c8`](https://github.com/TanStack/virtual/commit/c0b84c83f03de1244649f9838a408faf75ed29c9), [`fbf3bdb`](https://github.com/TanStack/virtual/commit/fbf3bdbe38a2b1bf22c65a89752b7b9c07a77266)]:
+  - @tanstack/virtual-core@3.17.0
+
+## 3.14.1
+
+### Patch Changes
+
+- Updated dependencies [[`c746841`](https://github.com/TanStack/virtual/commit/c7468416354c203cd7cc952da5997073394224fb)]:
+  - @tanstack/virtual-core@3.16.1
+
+## 3.14.0
+
+### Minor Changes
+
+- Add opt-in direct DOM updates for scroll positioning with `directDomUpdates`, `directDomUpdatesMode`, and `containerRef`. ([#1180](https://github.com/TanStack/virtual/pull/1180))
+
+## 3.13.26
+
+### Patch Changes
+
+- Updated dependencies [[`fc992ab`](https://github.com/TanStack/virtual/commit/fc992ab00a15166311b79bd7580736cf01e8cc1a)]:
+  - @tanstack/virtual-core@3.16.0
+
+## 3.13.25
+
+### Patch Changes
+
+- Replace the `useReducer(() => ({}), {})` force-rerender pattern with an ([#1168](https://github.com/TanStack/virtual/pull/1168))
+  incrementing number counter. Same semantics (every dispatch changes the
+  reducer state, forcing a render); zero per-dispatch object allocation.
+  Trivial individual cost, but eliminates one steady-state GC source on
+  scroll-heavy apps.
+- Updated dependencies [[`99355ad`](https://github.com/TanStack/virtual/commit/99355ad1eceee6270efaa26e51f535d8d7c31ac2), [`99355ad`](https://github.com/TanStack/virtual/commit/99355ad1eceee6270efaa26e51f535d8d7c31ac2), [`99355ad`](https://github.com/TanStack/virtual/commit/99355ad1eceee6270efaa26e51f535d8d7c31ac2), [`99355ad`](https://github.com/TanStack/virtual/commit/99355ad1eceee6270efaa26e51f535d8d7c31ac2), [`99355ad`](https://github.com/TanStack/virtual/commit/99355ad1eceee6270efaa26e51f535d8d7c31ac2), [`99355ad`](https://github.com/TanStack/virtual/commit/99355ad1eceee6270efaa26e51f535d8d7c31ac2), [`99355ad`](https://github.com/TanStack/virtual/commit/99355ad1eceee6270efaa26e51f535d8d7c31ac2)]:
+  - @tanstack/virtual-core@3.15.0
+
+## 3.13.24
+
+### Patch Changes
+
+- Updated dependencies [[`97a204d`](https://github.com/TanStack/virtual/commit/97a204dc5526669114458685552b7569b60d2940)]:
+  - @tanstack/virtual-core@3.14.0
+
+## 3.13.23
+
+### Patch Changes
+
+- Updated dependencies [[`7ece2d5`](https://github.com/TanStack/virtual/commit/7ece2d5d4249b7e703c68ac497ae5545c54e7c67)]:
+  - @tanstack/virtual-core@3.13.23
+
+## 3.13.22
+
+### Patch Changes
+
+- Updated dependencies [[`54d771a`](https://github.com/TanStack/virtual/commit/54d771a7d4c74f6968e8132b5a85f3e04682376a), [`d3416c3`](https://github.com/TanStack/virtual/commit/d3416c386c6446957f413db2eef3211f5fdf3b5f)]:
+  - @tanstack/virtual-core@3.13.22
+
+## 3.13.21
+
+### Patch Changes
+
+- Updated dependencies [[`be89e29`](https://github.com/TanStack/virtual/commit/be89e293ea01654df6334dc6473b65eebed13e51)]:
+  - @tanstack/virtual-core@3.13.21
+
+## 3.13.20
+
+### Patch Changes
+
+- Updated dependencies [[`ff83e94`](https://github.com/TanStack/virtual/commit/ff83e949408ba8a714436fa10cafc3725a56274b)]:
+  - @tanstack/virtual-core@3.13.20
+
+## 3.13.19
+
+### Patch Changes
+
+- Updated dependencies [[`843109c`](https://github.com/TanStack/virtual/commit/843109c5bf780591a762f9767f3808fd15e3f94e)]:
+  - @tanstack/virtual-core@3.13.19
+
+## 3.13.18
+
+### Patch Changes
+
+- Updated dependencies [[`9067574`](https://github.com/TanStack/virtual/commit/9067574f1a0178d30e27bcac70853bdcbf437fec)]:
+  - @tanstack/virtual-core@3.13.18
+
+## 3.13.17
+
+### Patch Changes
+
+- Updated dependencies [[`21d9a46`](https://github.com/TanStack/virtual/commit/21d9a46eac034cb4299872891694965bceed526d)]:
+  - @tanstack/virtual-core@3.13.17
+
+## 3.13.16
+
+### Patch Changes
+
+- Updated dependencies [[`db6df21`](https://github.com/TanStack/virtual/commit/db6df212ed83dd7e4eb6450d1340c95475667b7b)]:
+  - @tanstack/virtual-core@3.13.16
+
+## 3.13.15
+
+### Patch Changes
+
+- feat(react-virtual): add `useFlushSync` option ([#1100](https://github.com/TanStack/virtual/pull/1100))
+
+  Adds a React-specific `useFlushSync` option to control whether `flushSync` is used for synchronous scroll correction during measurement.
+
+  The default behavior remains unchanged (`useFlushSync: true`) to preserve the best scrolling experience.
+  Disabling it avoids the React 19 warning about calling `flushSync` during render, at the cost of potentially increased visible whitespace during fast scrolling with dynamically sized items.
+
+- Updated dependencies [[`5a273bf`](https://github.com/TanStack/virtual/commit/5a273bf0c0bc0255ca172929f021c3b6e50cb69d)]:
+  - @tanstack/virtual-core@3.13.15
+
+## 3.13.14
+
+### Patch Changes
+
+- Updated dependencies [[`6d9274c`](https://github.com/TanStack/virtual/commit/6d9274c3f0a9e64450b5829872079a65277bc654)]:
+  - @tanstack/virtual-core@3.13.14
+
+## 3.13.13
+
+### Patch Changes
+
+- Fix: Notify framework when count changes to update getTotalSize() ([#1085](https://github.com/TanStack/virtual/pull/1085))
+
+  Fixed an issue where `getTotalSize()` would return stale values when the `count` option changed (e.g., during filtering or search operations). The virtualizer now automatically notifies the framework when measurement-affecting options change, ensuring the UI updates correctly without requiring manual `useMemo` workarounds.
+
+  **Before**: When filtering items, the list container would maintain its previous height, causing excessive blank space (when count decreased) or inaccessible items (when count increased).
+
+  **After**: Height updates automatically when count changes, providing the correct user experience.
+
+  This fix applies to all framework adapters and has minimal performance impact (< 0.1ms per change).
+
+- Updated dependencies [[`2542c5a`](https://github.com/TanStack/virtual/commit/2542c5a3d6820cea956fa3b4f94c42e3526a8d68), [`96e32a6`](https://github.com/TanStack/virtual/commit/96e32a6ffc125743a0172ea4e0fe37ac29c4187b)]:
+  - @tanstack/virtual-core@3.13.13
+
+## 3.13.12
+
+### Patch Changes
+
+- chore(react-virtual): fix vite e2e build ([#1030](https://github.com/TanStack/virtual/pull/1030))
+
+- Updated dependencies [[`d21ed98`](https://github.com/TanStack/virtual/commit/d21ed98da3470b9986c9a028ed70fdf0d6189ab4)]:
+  - @tanstack/virtual-core@3.13.12
+
+## 3.13.11
+
+### Patch Changes
+
+- Updated dependencies [[`73fa867`](https://github.com/TanStack/virtual/commit/73fa86752599a4bffba51ec8e4ff2f8cb8283010)]:
+  - @tanstack/virtual-core@3.13.11
+
+## 3.13.10
+
+### Patch Changes
+
+- Updated dependencies [[`b3b7e7d`](https://github.com/TanStack/virtual/commit/b3b7e7dc8b25daeebbd2da61b3b7ae3448babbdb)]:
+  - @tanstack/virtual-core@3.13.10
+
+## 3.13.9
+
+### Patch Changes
+
+- Updated dependencies [[`9e33cdb`](https://github.com/TanStack/virtual/commit/9e33cdb1c8780c2f455aafc11a0aeea58b71fc69)]:
+  - @tanstack/virtual-core@3.13.9
+
+## 3.13.8
+
+### Patch Changes
+
+- Updated dependencies [[`60719f6`](https://github.com/TanStack/virtual/commit/60719f61b589d6f9d886e4f7c093217f6d693faf)]:
+  - @tanstack/virtual-core@3.13.8
+
+## 3.13.7
+
+### Patch Changes
+
+- Updated dependencies [[`e2d93c2`](https://github.com/TanStack/virtual/commit/e2d93c2dcde9ccf60f658e56edccd8d05aefeee6)]:
+  - @tanstack/virtual-core@3.13.7
+
+## 3.13.6
+
+### Patch Changes
+
+- Updated dependencies [[`042616f`](https://github.com/TanStack/virtual/commit/042616f39ced842470db0b4b40fca77f22454b7f)]:
+  - @tanstack/virtual-core@3.13.6
+
+## 3.13.5
+
+### Patch Changes
+
+- Updated dependencies [[`51656d9`](https://github.com/TanStack/virtual/commit/51656d94a2469a065e631f25ffc8ec0288d9f5ec)]:
+  - @tanstack/virtual-core@3.13.5
+
+## 3.13.4
+
+### Patch Changes
+
+- Updated dependencies [[`514b62d`](https://github.com/TanStack/virtual/commit/514b62d04974c2fd59fc8a68ed40f4c1a1547dd2), [`f03d814`](https://github.com/TanStack/virtual/commit/f03d8142c03ea0f5816161a4dad38ca35469841c)]:
+  - @tanstack/virtual-core@3.13.4
+
+## 3.13.3
+
+### Patch Changes
+
+- Updated dependencies [[`02ef309`](https://github.com/TanStack/virtual/commit/02ef3097de4a14ed4077ace2ca901dc411bf81c1)]:
+  - @tanstack/virtual-core@3.13.3

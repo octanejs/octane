@@ -25,7 +25,7 @@ export function flexRender<TProps extends object>(
 	Comp: Renderable<TProps>,
 	props: TProps,
 ): OctaneNode {
-	return !Comp
+	return Comp === null || Comp === undefined
 		? null
 		: typeof Comp === 'function'
 			? createElement(Comp as ComponentBody<TProps>, props)

@@ -43,3 +43,134 @@ for (const [name, source, expected] of [
 		assert.equal(cases[0].estimatedRegistrations, expected);
 	});
 }
+
+for (const [name, declaration, expression, expected] of [
+	[
+		'imported product',
+		"import combinate from 'combinate'; const clickTarget = ['link', 'button'] as const;",
+		'combinate({opts:[{fn:()=>true},{fn:()=>false},{disabled:true},{enabled:true}],clickTarget})',
+		8,
+	],
+	[
+		'renamed import',
+		"import product from 'combinate'; const clickTarget = ['link', 'button'];",
+		'product({opts:[{fn:()=>true},{fn:()=>false}],clickTarget})',
+		4,
+	],
+	[
+		'shadowed helper',
+		"import combinate from 'combinate'; function f(combinate) {",
+		'combinate({x:[1,2]})',
+		null,
+	],
+	['local helper', 'const combinate = arbitraryFunction;', 'combinate({x:[1,2]})', null],
+	['different module', "import combinate from 'another-module';", 'combinate({x:[1,2]})', null],
+	[
+		'unknown dimension',
+		"import combinate from 'combinate';",
+		'combinate({x:unknownRows,y:[1,2]})',
+		null,
+	],
+	[
+		'mutated dimension',
+		"import combinate from 'combinate'; const x=[1,2]; x.push(3);",
+		'combinate({x,y:[1,2]})',
+		null,
+	],
+	[
+		'escaping dimension',
+		"import combinate from 'combinate'; const x=[1,2]; modify(x);",
+		'combinate({x,y:[1,2]})',
+		null,
+	],
+	[
+		'dimension escaping through object',
+		"import combinate from 'combinate'; const x=[1,2]; modify({x});",
+		'combinate({x,y:[1,2]})',
+		null,
+	],
+	['dynamic key', "import combinate from 'combinate';", 'combinate({[key]:[1,2]})', null],
+	[
+		'prototype key',
+		"import combinate from 'combinate';",
+		'combinate({__proto__:[1,2],x:[1]})',
+		null,
+	],
+	[
+		'spread object',
+		"import combinate from 'combinate';",
+		'combinate({...dimensions,x:[1,2]})',
+		null,
+	],
+	['duplicate key', "import combinate from 'combinate';", 'combinate({x:[1,2],"x":[3]})', null],
+	[
+		'getter dimension',
+		"import combinate from 'combinate';",
+		'combinate({get x(){return [1,2]}})',
+		null,
+	],
+	['empty dimension', "import combinate from 'combinate';", 'combinate({x:[],y:[1,2]})', null],
+	[
+		'oversize product',
+		"import combinate from 'combinate';",
+		`combinate({x:[${Array(101).fill(1)}],y:[${Array(100).fill(1)}]})`,
+		null,
+	],
+]) {
+	test(`inventory handles combinate ${name}`, () => {
+		const source = `${declaration} const rows = ${expression}; it.each(rows)('case', () => {}); ${name === 'shadowed helper' ? '}' : ''}`;
+		const cases = extractTestCases(source);
+		assert.equal(cases.length, 1);
+		assert.equal(cases[0].estimatedRegistrations, expected);
+	});
+}
+
+for (const [name, source, expected] of [
+	[
+		'literal for-of',
+		"for (const mode of ['position','transform'] as const) { test.describe(`mode=${mode}`, () => { test('positions', () => {}); }); }",
+		2,
+	],
+	[
+		'const for-of',
+		"const modes = ['position','transform']; for (const mode of modes) { test('positions', () => {}); }",
+		2,
+	],
+	[
+		'nested for-of',
+		"for (const x of [1,2]) { for (const y of [1,2,3]) { test('positions', () => {}); } }",
+		6,
+	],
+	[
+		'mutated for-of input',
+		"const modes = ['position','transform']; for (const mode of modes) { modes.pop(); test('positions', () => {}); }",
+		null,
+	],
+	[
+		'escaping for-of input',
+		"const modes = ['position','transform']; modify(modes); for (const mode of modes) { test('positions', () => {}); }",
+		null,
+	],
+	[
+		'for-of early exit',
+		"for (const mode of ['position','transform']) { if (condition) break; test('positions', () => {}); }",
+		null,
+	],
+	[
+		'for-of skipped iteration',
+		"for (const mode of ['position','transform']) { if (condition) continue; test('positions', () => {}); }",
+		null,
+	],
+	[
+		'async iterator',
+		"for await (const mode of ['position','transform']) { test('positions', () => {}); }",
+		null,
+	],
+	['dynamic for-of', "for (const mode of getModes()) { test('positions', () => {}); }", null],
+]) {
+	test(`inventory handles ${name}`, () => {
+		const cases = extractTestCases(source);
+		assert.equal(cases.length, 1);
+		assert.equal(cases[0].estimatedRegistrations, expected);
+	});
+}

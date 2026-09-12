@@ -196,3 +196,7 @@ packages/shadcn/tests/differential/base-upstream/
 
 # Immutable React Stately 3.49 source and tests.
 packages/aria/upstream/
+
+# Generated browser build output and Playwright run metadata.
+packages/tanstack-virtual/.browser-dist/
+packages/tanstack-virtual/.browser-results/

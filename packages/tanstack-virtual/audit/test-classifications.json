@@ -30,7 +30,7 @@
     {
       "path": "packages/tanstack-virtual/tests/differential/parity.test.ts",
       "disposition": "react-octane-differential",
-      "oracle": "Runs four exact windowing, horizontal, measurement, and window-scroll scenarios against @tanstack/react-virtual@3.14.5."
+      "oracle": "Runs four exact windowing, horizontal, measurement, and window-scroll scenarios against @tanstack/react-virtual@3.14.12."
     },
     {
       "path": "packages/tanstack-virtual/tests/differential/setup.test.ts",
@@ -46,6 +46,21 @@
       "path": "packages/tanstack-virtual/typetests/public-api.test-d.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Octane-only declaration coverage for the published virtualizer surface; upstream has no dedicated type-test harness, so this is not parity type evidence."
+    },
+    {
+      "path": "packages/tanstack-virtual/tests/upstream-original.test.ts",
+      "disposition": "pristine-upstream-suite",
+      "reason": "Runs and verifies all seven unchanged upstream unit registrations."
+    },
+    {
+      "path": "packages/tanstack-virtual/tests/browser-parity.test.ts",
+      "disposition": "pristine-and-adapted-browser-suites",
+      "reason": "Runs every pinned Chromium registration in both renderers, plus two native prepend regressions; compares exact identities and passing results."
+    },
+    {
+      "path": "packages/tanstack-virtual/tests/ssr-hydration.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks real SSR/client hydration, surviving nodes, updates and observer cleanup."
     }
   ]
 }

@@ -8,8 +8,16 @@
     "moduleResolution": "bundler",
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
-    "skipLibCheck": true,
-    "strict": true
+    "skipLibCheck": false,
+    "strict": true,
+    "paths": {
+      "@tanstack/react-pacer": ["../../upstream/src/index.ts"]
+    }
   },
-  "include": ["../../upstream/src/**/*.ts", "../../upstream/src/**/*.tsx"]
+  "include": ["../../upstream/src/**/*.ts", "../../upstream/src/**/*.tsx", "./*.ts"],
+  "reactPortEvidence": {
+    "gate": "upstream-types-pristine",
+    "upstreamRegistrations": [],
+    "publicMode": "pinned"
+  }
 }

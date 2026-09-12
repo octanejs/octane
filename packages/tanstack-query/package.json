@@ -31,27 +31,40 @@
   "types": "src/index.ts",
   "files": [
     "src",
-    "README.md"
+    "README.md",
+    "UPSTREAM.md",
+    "LICENSE.upstream"
   ],
   "exports": {
     ".": "./src/index.ts"
   },
   "scripts": {
-    "test": "vitest run"
+    "test": "vitest run --root ../.. --project tanstack-query --project tanstack-query-adapted --project tanstack-query-adapted-ssr --project tanstack-query-differential --project tanstack-query-ssr",
+    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json",
+    "upstream:verify": "node ../../scripts/react-parity/verify-provenance.mjs --package-dir ."
   },
   "dependencies": {
-    "@tanstack/query-core": "catalog:default"
+    "@tanstack/query-core": "5.102.8"
   },
   "peerDependencies": {
     "octane": "workspace:^0.1.51 || ^0.2.0"
   },
   "devDependencies": {
-    "@tanstack/react-query": "catalog:default",
+    "@tanstack/react-query": "5.102.8",
     "@tsrx/react": "catalog:default",
     "esbuild": "catalog:default",
     "octane": "workspace:*",
     "react": "catalog:default",
     "react-dom": "catalog:default",
-    "vitest": "catalog:default"
+    "vitest": "catalog:default",
+    "@testing-library/react": "catalog:default",
+    "@testing-library/react-render-stream": "2.0.2",
+    "@testing-library/jest-dom": "catalog:default",
+    "react-error-boundary": "4.1.2",
+    "@octanejs/testing-library": "workspace:*",
+    "@octanejs/react-error-boundary": "workspace:*",
+    "@types/react": "catalog:default",
+    "@types/react-dom": "catalog:default",
+    "@tanstack/query-persist-client-core": "5.102.8"
   }
 }

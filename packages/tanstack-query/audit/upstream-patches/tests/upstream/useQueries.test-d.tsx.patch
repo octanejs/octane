@@ -1,0 +1,73 @@
+diff --git a/tests/upstream/useQueries.test-d.tsx b/tests/upstream/useQueries.test-d.tsx
+--- a/tests/upstream/useQueries.test-d.tsx
++++ b/tests/upstream/useQueries.test-d.tsx
+@@ -181,8 +181,12 @@ describe('useQueries', () => {
+       const key2 = queryKey()
+       const key3 = queryKey()
+ 
+-      // @ts-expect-error (Page component is not rendered)
+       function Page() {
++        // OCTANE DIVERGENCE[native-query-test-harness]: this program checks authored renderer source without
++        // the upstream noUnusedLocals lint rule. Keep a real invalid-query
++        // negative control here instead of an unused-component diagnostic.
++        // @ts-expect-error query keys must be arrays
++        useQueries({ queries: [{ queryKey: 1 }] })
+         const result1 = useQueries<
+           [[number], [string], [Array<string>, boolean]]
+         >({
+@@ -294,8 +298,12 @@ describe('useQueries', () => {
+       const key2 = queryKey()
+       const key3 = queryKey()
+ 
+-      // @ts-expect-error (Page component is not rendered)
+       function Page() {
++        // OCTANE DIVERGENCE[native-query-test-harness]: this program checks authored renderer source without
++        // the upstream noUnusedLocals lint rule. Keep a real invalid-query
++        // negative control here instead of an unused-component diagnostic.
++        // @ts-expect-error query keys must be arrays
++        useQueries({ queries: [{ queryKey: 1 }] })
+         const result1 = useQueries<
+           [
+             { queryFnData: number },
+@@ -445,8 +453,12 @@ describe('useQueries', () => {
+     })
+ 
+     it('should return correct types when passing through queryOptions', () => {
+-      // @ts-expect-error (Page component is not rendered)
+       function Page() {
++        // OCTANE DIVERGENCE[native-query-test-harness]: this program checks authored renderer source without
++        // the upstream noUnusedLocals lint rule. Keep a real invalid-query
++        // negative control here instead of an unused-component diagnostic.
++        // @ts-expect-error query keys must be arrays
++        useQueries({ queries: [{ queryKey: 1 }] })
+         // data and results types are correct when using queryOptions
+         const result4 = useQueries({
+           queries: [
+@@ -485,8 +497,12 @@ describe('useQueries', () => {
+       type BizError = { code: number }
+       const throwOnError = (_error: BizError) => true
+ 
+-      // @ts-expect-error (Page component is not rendered)
+       function Page() {
++        // OCTANE DIVERGENCE[native-query-test-harness]: this program checks authored renderer source without
++        // the upstream noUnusedLocals lint rule. Keep a real invalid-query
++        // negative control here instead of an unused-component diagnostic.
++        // @ts-expect-error query keys must be arrays
++        useQueries({ queries: [{ queryKey: 1 }] })
+         // Array.map preserves TQueryFnData
+         const result1 = useQueries({
+           queries: Array(50).map((_, i) => ({
+@@ -816,8 +832,12 @@ describe('useQueries', () => {
+         })
+       }
+ 
+-      // @ts-expect-error (Page component is not rendered)
+       function Page() {
++        // OCTANE DIVERGENCE[native-query-test-harness]: this program checks authored renderer source without
++        // the upstream noUnusedLocals lint rule. Keep a real invalid-query
++        // negative control here instead of an unused-component diagnostic.
++        // @ts-expect-error query keys must be arrays
++        useQueries({ queries: [{ queryKey: 1 }] })
+         const result = useQueries({
+           queries: [
+             {

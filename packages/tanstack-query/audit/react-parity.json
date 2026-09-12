@@ -3,15 +3,18 @@
   "schemaVersion": 1,
   "provenance": {
     "repo": "https://github.com/TanStack/query.git",
-    "version": "@tanstack/react-query@5.101.3",
-    "commit": "172ea730d03564a6f3df995b50c42d6ccad9b603",
+    "version": "5.102.8",
+    "commit": "2969edf32f7e0c48e2a108d84712d6e01edfde21",
     "sourceRoot": "packages/react-query/src",
     "testRoot": "packages/react-query/src/__tests__",
     "license": "MIT",
-    "integrity": "sha256:1effc6149825d93d72c8a735d9790ee7cb4d96fa149749c7eb2bba39c180755f",
-    "verification": "recorded-unverified"
+    "integrity": "sha256:885a94ab724af465ce463c2100669d5229b0a4227c306fe2a9e9e7314fc9a587",
+    "verification": "verified"
   },
-  "upstreamSuites": { "runtime": "present", "types": "present" },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "present"
+  },
   "adaptedRoots": {
     "source": {
       "roots": ["packages/tanstack-query/src"],
@@ -19,14 +22,14 @@
       "exclude": ["\\.d\\.ts$"]
     },
     "tests": {
-      "roots": ["packages/tanstack-query/tests"],
-      "include": ["\\.test\\.ts$"],
+      "roots": ["packages/tanstack-query/tests/upstream"],
+      "include": ["\\.test\\.(?:ts|tsx)$"],
       "exclude": []
     }
   },
   "adaptedRuntimeSummary": {
-    "inventoryEntries": 0,
-    "uniqueIdentities": 0,
+    "inventoryEntries": 404,
+    "uniqueIdentities": 404,
     "duplicateEntriesWithinLanes": 0,
     "identitiesSharedAcrossLanes": 0
   },
@@ -37,18 +40,434 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "c59eb31d459a52db2de19f8e5d45e921ee077693ba852b1e026f18f2a782aba6"
+      "lockfileSha256": "ae04465442755655f0585371461fa1ad23633ff2b9047c215928577a4fc91412"
     }
   },
   "lanes": [
     {
+      "id": "tanstack-query-pristine-upstream",
+      "type": "pristine-upstream",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tanstack-query-pristine",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Runs all 404 runtime registrations unchanged against React.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/tanstack-query/audit/pristine-wrapper-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/tanstack-query/audit/pristine-wrapper-runtime.json",
+          "role": "support",
+          "sha256": "3501aa283abc4a9e62f5e0606b6e6ff0b7dda2239e3a0e9a089c9b534b3bb88a"
+        },
+        {
+          "path": "packages/tanstack-query/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "f27252171b9f4ffaa7adc6a31e145f7705a88b5b5ede09498041f967614becb3"
+        },
+        {
+          "path": "packages/tanstack-query/audit/provenance.json",
+          "role": "support",
+          "sha256": "784f17d523df1e2914d4b7c258b3a2a4b07ff5215fd2efd59b13deda809e4a4d"
+        },
+        {
+          "path": "packages/tanstack-query/audit/registrations.json",
+          "role": "support",
+          "sha256": "8a819ba101a509a8c03c66ed137db82e631e873017578c3a9ddeb5a269ff22ac"
+        },
+        {
+          "path": "packages/tanstack-query/audit/crosswalk.json",
+          "role": "support",
+          "sha256": "b562ab00b4eaed0a6b3201b1fc2b9191da6622ef79d88cb63d25eb9433ca018d"
+        },
+        {
+          "path": "packages/tanstack-query/audit/upstream-patches/tests/upstream/QueryResetErrorBoundary.test.tsx.patch",
+          "role": "support",
+          "sha256": "98869892981f3b4da62a831cef2d74a1e6204d97351377a279d8de2f644f5060"
+        },
+        {
+          "path": "packages/tanstack-query/audit/upstream-patches/tests/upstream/ssr-hydration.test.tsx.patch",
+          "role": "support",
+          "sha256": "98739d9c50c731fd71110b461a41dfaad46470d5b743c8e576195218e9421ba7"
+        },
+        {
+          "path": "packages/tanstack-query/audit/upstream-patches/tests/upstream/ssr.test.tsx.patch",
+          "role": "support",
+          "sha256": "17c3ed84b83f2ea740923db660035dfdbbfe8839b3e02e6b8121ba896a02eba2"
+        },
+        {
+          "path": "packages/tanstack-query/audit/upstream-patches/tests/upstream/useInfiniteQuery.test.tsx.patch",
+          "role": "support",
+          "sha256": "b33975660ca14117d70fad153b8da6721753092e35cb0d5b48945b8ca0f3197c"
+        },
+        {
+          "path": "packages/tanstack-query/audit/upstream-patches/tests/upstream/useMutation.test.tsx.patch",
+          "role": "support",
+          "sha256": "5a2977740d75ae042eb785c1e4ffb4c37eaf9ad6e32b322e87afe6ff104b8d55"
+        },
+        {
+          "path": "packages/tanstack-query/audit/upstream-patches/tests/upstream/useQueries.test-d.tsx.patch",
+          "role": "support",
+          "sha256": "f111062b8c84073ab8d825aa4feadde0b1519364c4b1d75de2d7148ba1576a1d"
+        },
+        {
+          "path": "packages/tanstack-query/audit/upstream-patches/tests/upstream/useQuery.test.tsx.patch",
+          "role": "support",
+          "sha256": "09d5b6c8dccf147436c69d62ee2303b4c83a4564e4fc5b72512e6bbbb9dd3aad"
+        },
+        {
+          "path": "packages/tanstack-query/audit/upstream-patches/tests/upstream/useSuspenseQueries.test.tsx.patch",
+          "role": "support",
+          "sha256": "15864c2555e90751d3c7f7c8777f0e74c886b1d23a2cdda529ab49b83c462103"
+        },
+        {
+          "path": "packages/tanstack-query/audit/upstream-patches/tests/upstream/useSuspenseQuery.test.tsx.patch",
+          "role": "support",
+          "sha256": "bd0668d2eddd12ea422f8f1125892f9e47946830d30f40734e4eed8b548025c3"
+        },
+        {
+          "path": "packages/tanstack-query/audit/pristine-runtime.json",
+          "role": "support",
+          "sha256": "2db216771149b288043c899bc91764fd93dbc67545c80d410986b01457cac88d"
+        },
+        {
+          "path": "packages/tanstack-query/tests/upstream-original.test.ts",
+          "role": "support",
+          "sha256": "a2b7019333e639794292adbcc153f42b36906f5c445378619ee7c8012a12dfb2"
+        },
+        {
+          "path": "packages/tanstack-query/tests/upstream-vitest.config.ts",
+          "role": "support",
+          "sha256": "a589f71b441aee2fcaa3b0e6c34afd03e9a18d63118e53443bc0a3a72a6dc2b9"
+        },
+        {
+          "path": "packages/tanstack-query/audit/pristine-suite.json",
+          "role": "support",
+          "sha256": "b6282ee2d88d88f693ac6500600f30931423373f9edcbb7c684c0eaedb2bfbc6"
+        },
+        {
+          "path": "scripts/react-parity/tanstack-query-pristine-runtime.mjs",
+          "role": "support",
+          "sha256": "9b25cccf6ef2c1db2c77d9c55d242e32cdf3192f25da19833ec1e4a68ceb7d18"
+        },
+        {
+          "path": "scripts/react-parity/pristine-suite-lib.mjs",
+          "role": "support",
+          "sha256": "d34ffc2dca00e6eef7dcaf5bc002024cc511f32dd20c681547555af520438bbb"
+        }
+      ]
+    },
+    {
+      "id": "tanstack-query-adapted-upstream",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tanstack-query-adapted",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Runs the lock-generated Octane adaptation; reviewed patches account for renderer-specific harness behavior.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/tanstack-query/audit/adapted-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/tanstack-query/audit/adapted-runtime.json",
+          "role": "support",
+          "sha256": "be217fa6524e403ad5b199a31bbe673ab4d88a94ff5dec2c3c7a7a6324288b71"
+        },
+        {
+          "path": "packages/tanstack-query/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "f27252171b9f4ffaa7adc6a31e145f7705a88b5b5ede09498041f967614becb3"
+        },
+        {
+          "path": "packages/tanstack-query/audit/provenance.json",
+          "role": "support",
+          "sha256": "784f17d523df1e2914d4b7c258b3a2a4b07ff5215fd2efd59b13deda809e4a4d"
+        },
+        {
+          "path": "packages/tanstack-query/audit/registrations.json",
+          "role": "support",
+          "sha256": "8a819ba101a509a8c03c66ed137db82e631e873017578c3a9ddeb5a269ff22ac"
+        },
+        {
+          "path": "packages/tanstack-query/audit/crosswalk.json",
+          "role": "support",
+          "sha256": "b562ab00b4eaed0a6b3201b1fc2b9191da6622ef79d88cb63d25eb9433ca018d"
+        },
+        {
+          "path": "packages/tanstack-query/audit/upstream-patches/tests/upstream/QueryResetErrorBoundary.test.tsx.patch",
+          "role": "support",
+          "sha256": "98869892981f3b4da62a831cef2d74a1e6204d97351377a279d8de2f644f5060"
+        },
+        {
+          "path": "packages/tanstack-query/audit/upstream-patches/tests/upstream/ssr-hydration.test.tsx.patch",
+          "role": "support",
+          "sha256": "98739d9c50c731fd71110b461a41dfaad46470d5b743c8e576195218e9421ba7"
+        },
+        {
+          "path": "packages/tanstack-query/audit/upstream-patches/tests/upstream/ssr.test.tsx.patch",
+          "role": "support",
+          "sha256": "17c3ed84b83f2ea740923db660035dfdbbfe8839b3e02e6b8121ba896a02eba2"
+        },
+        {
+          "path": "packages/tanstack-query/audit/upstream-patches/tests/upstream/useInfiniteQuery.test.tsx.patch",
+          "role": "support",
+          "sha256": "b33975660ca14117d70fad153b8da6721753092e35cb0d5b48945b8ca0f3197c"
+        },
+        {
+          "path": "packages/tanstack-query/audit/upstream-patches/tests/upstream/useMutation.test.tsx.patch",
+          "role": "support",
+          "sha256": "5a2977740d75ae042eb785c1e4ffb4c37eaf9ad6e32b322e87afe6ff104b8d55"
+        },
+        {
+          "path": "packages/tanstack-query/audit/upstream-patches/tests/upstream/useQueries.test-d.tsx.patch",
+          "role": "support",
+          "sha256": "f111062b8c84073ab8d825aa4feadde0b1519364c4b1d75de2d7148ba1576a1d"
+        },
+        {
+          "path": "packages/tanstack-query/audit/upstream-patches/tests/upstream/useQuery.test.tsx.patch",
+          "role": "support",
+          "sha256": "09d5b6c8dccf147436c69d62ee2303b4c83a4564e4fc5b72512e6bbbb9dd3aad"
+        },
+        {
+          "path": "packages/tanstack-query/audit/upstream-patches/tests/upstream/useSuspenseQueries.test.tsx.patch",
+          "role": "support",
+          "sha256": "15864c2555e90751d3c7f7c8777f0e74c886b1d23a2cdda529ab49b83c462103"
+        },
+        {
+          "path": "packages/tanstack-query/audit/upstream-patches/tests/upstream/useSuspenseQuery.test.tsx.patch",
+          "role": "support",
+          "sha256": "bd0668d2eddd12ea422f8f1125892f9e47946830d30f40734e4eed8b548025c3"
+        },
+        {
+          "path": "packages/tanstack-query/tests/vitest.adapted.config.ts",
+          "role": "support",
+          "sha256": "70c7898d6cdb33d4476f09504a93da766a192986b611bf7281af09a9cf9b7545"
+        },
+        {
+          "path": "packages/tanstack-query/tests/adapted-setup.ts",
+          "role": "support",
+          "sha256": "cb79b7de7cb9492b7d502f485ad6d80147794fbdc24fd5ab5e45f5cfa9e56d4b"
+        },
+        {
+          "path": "packages/tanstack-query/tests/_fixtures/upstream-hydration.tsrx",
+          "role": "support",
+          "sha256": "6f592ce2d5ea4c23b3c955deae4bd806df7712c6ca65118ffd5a705c4934da0a"
+        }
+      ]
+    },
+    {
+      "id": "tanstack-query-adapted-ssr-upstream",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tanstack-query-adapted-ssr",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Runs the lock-generated Octane adaptation; reviewed patches account for renderer-specific harness behavior.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/tanstack-query/audit/adapted-ssr-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/tanstack-query/audit/adapted-ssr-runtime.json",
+          "role": "support",
+          "sha256": "7b60ce7df5122728cd798e557d42352e035794e31dc1cf8fefb4b70566fb87fd"
+        },
+        {
+          "path": "packages/tanstack-query/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "f27252171b9f4ffaa7adc6a31e145f7705a88b5b5ede09498041f967614becb3"
+        },
+        {
+          "path": "packages/tanstack-query/audit/provenance.json",
+          "role": "support",
+          "sha256": "784f17d523df1e2914d4b7c258b3a2a4b07ff5215fd2efd59b13deda809e4a4d"
+        },
+        {
+          "path": "packages/tanstack-query/audit/registrations.json",
+          "role": "support",
+          "sha256": "8a819ba101a509a8c03c66ed137db82e631e873017578c3a9ddeb5a269ff22ac"
+        },
+        {
+          "path": "packages/tanstack-query/audit/crosswalk.json",
+          "role": "support",
+          "sha256": "b562ab00b4eaed0a6b3201b1fc2b9191da6622ef79d88cb63d25eb9433ca018d"
+        },
+        {
+          "path": "packages/tanstack-query/audit/upstream-patches/tests/upstream/QueryResetErrorBoundary.test.tsx.patch",
+          "role": "support",
+          "sha256": "98869892981f3b4da62a831cef2d74a1e6204d97351377a279d8de2f644f5060"
+        },
+        {
+          "path": "packages/tanstack-query/audit/upstream-patches/tests/upstream/ssr-hydration.test.tsx.patch",
+          "role": "support",
+          "sha256": "98739d9c50c731fd71110b461a41dfaad46470d5b743c8e576195218e9421ba7"
+        },
+        {
+          "path": "packages/tanstack-query/audit/upstream-patches/tests/upstream/ssr.test.tsx.patch",
+          "role": "support",
+          "sha256": "17c3ed84b83f2ea740923db660035dfdbbfe8839b3e02e6b8121ba896a02eba2"
+        },
+        {
+          "path": "packages/tanstack-query/audit/upstream-patches/tests/upstream/useInfiniteQuery.test.tsx.patch",
+          "role": "support",
+          "sha256": "b33975660ca14117d70fad153b8da6721753092e35cb0d5b48945b8ca0f3197c"
+        },
+        {
+          "path": "packages/tanstack-query/audit/upstream-patches/tests/upstream/useMutation.test.tsx.patch",
+          "role": "support",
+          "sha256": "5a2977740d75ae042eb785c1e4ffb4c37eaf9ad6e32b322e87afe6ff104b8d55"
+        },
+        {
+          "path": "packages/tanstack-query/audit/upstream-patches/tests/upstream/useQueries.test-d.tsx.patch",
+          "role": "support",
+          "sha256": "f111062b8c84073ab8d825aa4feadde0b1519364c4b1d75de2d7148ba1576a1d"
+        },
+        {
+          "path": "packages/tanstack-query/audit/upstream-patches/tests/upstream/useQuery.test.tsx.patch",
+          "role": "support",
+          "sha256": "09d5b6c8dccf147436c69d62ee2303b4c83a4564e4fc5b72512e6bbbb9dd3aad"
+        },
+        {
+          "path": "packages/tanstack-query/audit/upstream-patches/tests/upstream/useSuspenseQueries.test.tsx.patch",
+          "role": "support",
+          "sha256": "15864c2555e90751d3c7f7c8777f0e74c886b1d23a2cdda529ab49b83c462103"
+        },
+        {
+          "path": "packages/tanstack-query/audit/upstream-patches/tests/upstream/useSuspenseQuery.test.tsx.patch",
+          "role": "support",
+          "sha256": "bd0668d2eddd12ea422f8f1125892f9e47946830d30f40734e4eed8b548025c3"
+        },
+        {
+          "path": "packages/tanstack-query/tests/vitest.adapted.config.ts",
+          "role": "support",
+          "sha256": "70c7898d6cdb33d4476f09504a93da766a192986b611bf7281af09a9cf9b7545"
+        },
+        {
+          "path": "packages/tanstack-query/tests/adapted-setup.ts",
+          "role": "support",
+          "sha256": "cb79b7de7cb9492b7d502f485ad6d80147794fbdc24fd5ab5e45f5cfa9e56d4b"
+        },
+        {
+          "path": "packages/tanstack-query/tests/_fixtures/upstream-hydration.tsrx",
+          "role": "support",
+          "sha256": "6f592ce2d5ea4c23b3c955deae4bd806df7712c6ca65118ffd5a705c4934da0a"
+        },
+        {
+          "path": "packages/tanstack-query/tests/vitest.adapted-ssr.config.ts",
+          "role": "support",
+          "sha256": "bbe15c99496848b0f0657dcc3b2e806089ddd76c37485ec70f7cdc9b2eece8b3"
+        }
+      ]
+    },
+    {
+      "id": "tanstack-query-pristine-types",
+      "type": "pristine-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tanstack-query-pristine-types",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Strictly compiles all 167 pinned type registrations, including negative controls; only non-behavioral unused-function checks differ in the adapted suite.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsc",
+        "project": "packages/tanstack-query/tsconfig.pristine.json"
+      },
+      "files": [
+        {
+          "path": "packages/tanstack-query/tsconfig.pristine.json",
+          "role": "test",
+          "sha256": "2de61aa1e23e00daf96738926141a21123ff25a73e70b75c570c6c05d8b9eeaf",
+          "cases": [
+            {
+              "id": "types:tanstack-query-pristine-types",
+              "testName": "complete Query 5.102.8 pristine type suite",
+              "fullName": "complete Query 5.102.8 pristine type suite"
+            }
+          ]
+        },
+        {
+          "path": "packages/tanstack-query/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "f27252171b9f4ffaa7adc6a31e145f7705a88b5b5ede09498041f967614becb3"
+        },
+        {
+          "path": "packages/tanstack-query/audit/provenance.json",
+          "role": "support",
+          "sha256": "784f17d523df1e2914d4b7c258b3a2a4b07ff5215fd2efd59b13deda809e4a4d"
+        },
+        {
+          "path": "packages/tanstack-query/audit/registrations.json",
+          "role": "support",
+          "sha256": "8a819ba101a509a8c03c66ed137db82e631e873017578c3a9ddeb5a269ff22ac"
+        },
+        {
+          "path": "packages/tanstack-query/audit/crosswalk.json",
+          "role": "support",
+          "sha256": "b562ab00b4eaed0a6b3201b1fc2b9191da6622ef79d88cb63d25eb9433ca018d"
+        }
+      ]
+    },
+    {
+      "id": "tanstack-query-adapted-types",
+      "type": "adapted-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tanstack-query-adapted-types",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Strictly compiles all 167 pinned type registrations, including negative controls; only non-behavioral unused-function checks differ in the adapted suite.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsrx-tsc",
+        "project": "packages/tanstack-query/tsconfig.adapted.json"
+      },
+      "files": [
+        {
+          "path": "packages/tanstack-query/tsconfig.adapted.json",
+          "role": "test",
+          "sha256": "aa741f3dfca4b29bd8ad70c5cf1b9e6d1e6d58125fad5f54796fedf3f6ce36a1",
+          "cases": [
+            {
+              "id": "types:tanstack-query-adapted-types",
+              "testName": "complete Query 5.102.8 adapted type suite",
+              "fullName": "complete Query 5.102.8 adapted type suite"
+            }
+          ]
+        },
+        {
+          "path": "packages/tanstack-query/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "f27252171b9f4ffaa7adc6a31e145f7705a88b5b5ede09498041f967614becb3"
+        },
+        {
+          "path": "packages/tanstack-query/audit/provenance.json",
+          "role": "support",
+          "sha256": "784f17d523df1e2914d4b7c258b3a2a4b07ff5215fd2efd59b13deda809e4a4d"
+        },
+        {
+          "path": "packages/tanstack-query/audit/registrations.json",
+          "role": "support",
+          "sha256": "8a819ba101a509a8c03c66ed137db82e631e873017578c3a9ddeb5a269ff22ac"
+        },
+        {
+          "path": "packages/tanstack-query/audit/crosswalk.json",
+          "role": "support",
+          "sha256": "b562ab00b4eaed0a6b3201b1fc2b9191da6622ef79d88cb63d25eb9433ca018d"
+        }
+      ]
+    },
+    {
       "id": "tanstack-query-runtime-differential",
       "type": "differential",
-      "oracle": "optional",
+      "oracle": "required",
       "environment": "workspace-node",
       "project": "tanstack-query-differential",
       "evidenceOrigin": "repo-authored",
-      "notes": "Runs exact cached query, asynchronous query, and mutation scenarios against @tanstack/react-query@5.101.3. Optional while provenance remains recorded-unverified, so ordinary Vitest shards retain this project until the lane becomes required evidence.",
+      "notes": "Runs cached query, asynchronous query and mutation scenarios against the exact 5.102.8 React adapter.",
       "files": [
         {
           "path": "packages/tanstack-query/tests/differential/parity.test.ts",
@@ -90,43 +509,345 @@
       ]
     },
     {
-      "id": "tanstack-query-adapted-types",
-      "type": "adapted-types",
-      "oracle": "optional",
+      "id": "tanstack-query-conformance",
+      "type": "adapted-octane",
+      "oracle": "required",
       "environment": "workspace-node",
-      "project": "tanstack-query-adapted-types",
-      "evidenceOrigin": "repo-authored",
-      "notes": "Runs the checked Octane generic query inference and cache lookup contract. Optional while provenance remains recorded-unverified and pristine/adapted type suites from the canonical tag are not registered.",
-      "execution": {
-        "kind": "typescript",
-        "compiler": "tsrx-tsc",
-        "project": "packages/tanstack-query/typetests/tsconfig.json"
-      },
+      "project": "tanstack-query",
+      "notes": "Octane-specific cache identity, subscriptions, suspense/transition replay, teardown and server snapshots.",
       "files": [
         {
-          "path": "packages/tanstack-query/audit/adapted-types.json",
+          "path": "packages/tanstack-query/tests/conformance/adapted-suspense.test.ts",
           "role": "test",
-          "sha256": "6d1563f95a35a13d96882d28d1f39503b02aaf4efdf4e68252b685e41f4d9d67",
+          "sha256": "4f31b7c8138cd8b0ebc38f1824f046568fc7b70907364583121a19297e98c77f",
           "cases": [
             {
-              "id": "types:tanstack-query-public-api",
-              "testName": "generic query inference and cache lookup",
-              "fullName": "generic query inference and cache lookup"
+              "id": "conformance:568093c25d813cc1",
+              "testName": "shows @pending while loading, then the data",
+              "fullName": "suspense query shows @pending while loading, then the data"
             }
           ]
         },
         {
-          "path": "packages/tanstack-query/typetests/public-api.test-d.ts",
-          "role": "support",
-          "sha256": "cc3353fa75d55fd170cb70d87c802e98c9cc65e3a8ee871c2ef8a6abe6347277"
+          "path": "packages/tanstack-query/tests/conformance/boundaries.test.ts",
+          "role": "test",
+          "sha256": "65785e5c8f8b31e498d3eba01304ba3a437f7ffd52d3d7c586bf23633567b1af",
+          "cases": [
+            {
+              "id": "conformance:dbabb39767540afc",
+              "testName": "does NOT subscribe/fetch while restoring",
+              "fullName": "IsRestoring does NOT subscribe/fetch while restoring"
+            },
+            {
+              "id": "conformance:260bf545599de1ba",
+              "testName": "fetches normally when not restoring",
+              "fullName": "IsRestoring fetches normally when not restoring"
+            },
+            {
+              "id": "conformance:322729744a4c0656",
+              "testName": "reset() lets the query retry instead of re-throwing",
+              "fullName": "QueryErrorResetBoundary reset() lets the query retry instead of re-throwing"
+            }
+          ]
         },
         {
-          "path": "packages/tanstack-query/typetests/tsconfig.json",
-          "role": "support",
-          "sha256": "2f9f73a560e301d0a647f7c80c7a4f35f25ecb4c135b7ee1a0dcf70a33bdf7a1"
+          "path": "packages/tanstack-query/tests/conformance/exports.test.ts",
+          "role": "test",
+          "sha256": "59d02112170ca674ef7e8d164ddb874c9d23b4863d8f2b09e14d703716e8dabf",
+          "cases": [
+            {
+              "id": "conformance:ed65a673b703c4d5",
+              "testName": "provides EVERY runtime export of real @tanstack/react-query",
+              "fullName": "@octanejs/tanstack-query export surface provides EVERY runtime export of real @tanstack/react-query"
+            },
+            {
+              "id": "conformance:faebadce5e76e931",
+              "testName": "exports nothing upstream keeps private (no accidental superset)",
+              "fullName": "@octanejs/tanstack-query export surface exports nothing upstream keeps private (no accidental superset)"
+            },
+            {
+              "id": "conformance:bf462b644232c67a",
+              "testName": "option helper exports are identity helpers like @tanstack/react-query",
+              "fullName": "@octanejs/tanstack-query export surface option helper exports are identity helpers like @tanstack/react-query"
+            }
+          ]
+        },
+        {
+          "path": "packages/tanstack-query/tests/conformance/extra.test.ts",
+          "role": "test",
+          "sha256": "db368e8a63291d6681a3a5542ff63a8d458330d2b354b716e4649a67ac2ce4b9",
+          "cases": [
+            {
+              "id": "conformance:96547de4a6f815d5",
+              "testName": "swaps the query and refetches when the key changes",
+              "fullName": "query-key change swaps the query and refetches when the key changes"
+            },
+            {
+              "id": "conformance:e5a7fffe1c1b839f",
+              "testName": "drops the query observer on unmount (no leak)",
+              "fullName": "unmount unsubscribes the observer drops the query observer on unmount (no leak)"
+            },
+            {
+              "id": "conformance:4d71125b12c26935",
+              "testName": "useQuery(options, client) resolves the passed client",
+              "fullName": "explicit client (no provider) useQuery(options, client) resolves the passed client"
+            },
+            {
+              "id": "conformance:8e7b1a61f425f8ec",
+              "testName": "calls client.mount() on mount and client.unmount() on unmount",
+              "fullName": "QueryClientProvider mounts/unmounts the client calls client.mount() on mount and client.unmount() on unmount"
+            }
+          ]
+        },
+        {
+          "path": "packages/tanstack-query/tests/conformance/followups.test.ts",
+          "role": "test",
+          "sha256": "0daa8a10b855ba238bce203c7e4be999b514a7d8416766b5a8c87ae6338aa324",
+          "cases": [
+            {
+              "id": "conformance:f165617264a7297f",
+              "testName": "loads the first page",
+              "fullName": "useInfiniteQuery loads the first page"
+            },
+            {
+              "id": "conformance:cf4083baef5b2612",
+              "testName": "runs multiple queries and combines their results",
+              "fullName": "useQueries runs multiple queries and combines their results"
+            },
+            {
+              "id": "conformance:0b9605470700de6b",
+              "testName": "reports 1 while fetching and 0 once settled",
+              "fullName": "useIsFetching reports 1 while fetching and 0 once settled"
+            },
+            {
+              "id": "conformance:33f6e25f1a2b4ded",
+              "testName": "reports 1 while a mutation is pending, then 0",
+              "fullName": "useIsMutating / useMutationState reports 1 while a mutation is pending, then 0"
+            },
+            {
+              "id": "conformance:1802ff7691803bc4",
+              "testName": "prefetches into the cache",
+              "fullName": "usePrefetchQuery prefetches into the cache"
+            },
+            {
+              "id": "conformance:1e6e1b8a6ec9186c",
+              "testName": "hydrates dehydrated state into the client before children read it",
+              "fullName": "HydrationBoundary hydrates dehydrated state into the client before children read it"
+            },
+            {
+              "id": "conformance:80e9ebc08c390323",
+              "testName": "suspends (fallback), then renders the guaranteed data",
+              "fullName": "useSuspenseQuery suspends (fallback), then renders the guaranteed data"
+            },
+            {
+              "id": "conformance:4ac0c99df4c76af3",
+              "testName": "keeps sequential queries suspended until each query has data",
+              "fullName": "useSuspenseQuery keeps sequential queries suspended until each query has data"
+            }
+          ]
+        },
+        {
+          "path": "packages/tanstack-query/tests/conformance/parity.test.ts",
+          "role": "test",
+          "sha256": "23df159978bec3d0c72c95f5f31be117adb067f832d19df38ef3fc5d0e2421e6",
+          "cases": [
+            {
+              "id": "conformance:a5ed495e6f2c92c1",
+              "testName": "reset → retry → fail AGAIN re-throws to the boundary (no undefined-data fall-through)",
+              "fullName": "suspense error retry loop (clearReset) reset → retry → fail AGAIN re-throws to the boundary (no undefined-data fall-through)"
+            },
+            {
+              "id": "conformance:42c0382221dae71e",
+              "testName": "invokes function children with the boundary value",
+              "fullName": "QueryErrorResetBoundary render-prop children invokes function children with the boundary value"
+            },
+            {
+              "id": "conformance:a29f7c708d5bfc25",
+              "testName": "hydrates NEWER dehydrated data over the cache, leaves NEWER cache data alone",
+              "fullName": "HydrationBoundary hydrates NEWER dehydrated data over the cache, leaves NEWER cache data alone"
+            },
+            {
+              "id": "conformance:b01a15ccb7fc581f",
+              "testName": "a dehydrated STREAMING entry (pending promise + later dehydratedAt) re-hydrates a settled query",
+              "fullName": "HydrationBoundary a dehydrated STREAMING entry (pending promise + later dehydratedAt) re-hydrates a settled query"
+            },
+            {
+              "id": "conformance:0b0b3a6210ed2d31",
+              "testName": "round-trips a real dehydrate() payload",
+              "fullName": "HydrationBoundary round-trips a real dehydrate() payload"
+            },
+            {
+              "id": "conformance:fd52495a1c657ab1",
+              "testName": "renders the combined aggregate, not the raw results array",
+              "fullName": "useQueries combine renders the combined aggregate, not the raw results array"
+            },
+            {
+              "id": "conformance:b2cb1d554f994523",
+              "testName": "disables the query — pending status, idle fetchStatus, no fetch",
+              "fullName": "skipToken disables the query — pending status, idle fetchStatus, no fetch"
+            },
+            {
+              "id": "conformance:fcce0e7644147ca5",
+              "testName": "appends pages and reports hasNextPage",
+              "fullName": "useInfiniteQuery fetchNextPage appends pages and reports hasNextPage"
+            },
+            {
+              "id": "conformance:e2567de40bb55a69",
+              "testName": "suspends then renders the first page",
+              "fullName": "useSuspenseInfiniteQuery suspends then renders the first page"
+            },
+            {
+              "id": "conformance:574de1417c3696a5",
+              "testName": "primes the cache with the first page",
+              "fullName": "usePrefetchInfiniteQuery primes the cache with the first page"
+            },
+            {
+              "id": "conformance:2f70b4c197d23ed0",
+              "testName": "selects variables of mutations matching the key filter",
+              "fullName": "useMutationState filters + select selects variables of mutations matching the key filter"
+            },
+            {
+              "id": "conformance:6d3d6f7788072a6e",
+              "testName": "a data-only reader does NOT re-render on an isFetching-only change",
+              "fullName": "tracked properties a data-only reader does NOT re-render on an isFetching-only change"
+            },
+            {
+              "id": "conformance:32e738956e4c4462",
+              "testName": "true → false starts the fetch that restore was holding back",
+              "fullName": "isRestoring flip true → false starts the fetch that restore was holding back"
+            }
+          ]
+        },
+        {
+          "path": "packages/tanstack-query/tests/conformance/query.test.ts",
+          "role": "test",
+          "sha256": "4866c34ecef2b8f54976fbba68dd681a83b3f293ed5b91d21f1c01f0049bb92a",
+          "cases": [
+            {
+              "id": "conformance:0ded035c4aa94922",
+              "testName": "pending -> success",
+              "fullName": "useQuery lifecycle (via QueryClientProvider) pending -> success"
+            },
+            {
+              "id": "conformance:4f4f4ffe44244f05",
+              "testName": "pending -> error (retry disabled)",
+              "fullName": "useQuery lifecycle (via QueryClientProvider) pending -> error (retry disabled)"
+            },
+            {
+              "id": "conformance:89de76a78d6909f7",
+              "testName": "resolves the client provided by QueryClientProvider",
+              "fullName": "useQueryClient resolves the client provided by QueryClientProvider"
+            },
+            {
+              "id": "conformance:d07d05fa8332f6c1",
+              "testName": "idle -> pending -> success on mutate()",
+              "fullName": "useMutation lifecycle idle -> pending -> success on mutate()"
+            }
+          ]
+        },
+        {
+          "path": "packages/tanstack-query/tests/conformance/suspense.test.ts",
+          "role": "test",
+          "sha256": "cc8a442a6035971da779897ab3d525dbbaa2b82ca14256297f990d6180127bd4",
+          "cases": [
+            {
+              "id": "conformance:628d806d9707980d",
+              "testName": "shows @catch when the suspense query errors",
+              "fullName": "suspense query shows @catch when the suspense query errors"
+            },
+            {
+              "id": "conformance:182bb67f7cee96dc",
+              "testName": "works with octane’s <Suspense> component (not just @try)",
+              "fullName": "suspense query works with octane’s <Suspense> component (not just @try)"
+            },
+            {
+              "id": "conformance:e0f7e8f4dc4c97a3",
+              "testName": "supports useSuspenseQueries for multiple suspense queries",
+              "fullName": "suspense query supports useSuspenseQueries for multiple suspense queries"
+            }
+          ]
+        },
+        {
+          "path": "packages/tanstack-query/tests/conformance/transition-suspense.test.ts",
+          "role": "test",
+          "sha256": "1b23ca84fd5b9e15042baa77bb223bd62065bca88633eaca2fca308b610b72c7",
+          "cases": [
+            {
+              "id": "conformance:c1e0561f0da086ba",
+              "testName": "value=1 committed; transition to value=2 holds value=1 until value=2 resolves",
+              "fullName": "useSuspenseQuery — transition keeps prior content, no fallback flash (React parity) value=1 committed; transition to value=2 holds value=1 until value=2 resolves"
+            },
+            {
+              "id": "conformance:6592b3cc7d15f45c",
+              "testName": "an urgent key change supersedes a held transition and reveals fallback",
+              "fullName": "useSuspenseQuery — transition keeps prior content, no fallback flash (React parity) an urgent key change supersedes a held transition and reveals fallback"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tanstack-query-ssr-conformance",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tanstack-query-ssr",
+      "notes": "Octane-specific cache identity, subscriptions, suspense/transition replay, teardown and server snapshots.",
+      "files": [
+        {
+          "path": "packages/tanstack-query/tests/ssr/server.test.ts",
+          "role": "test",
+          "sha256": "3468cc0e2816ced2d9ca2213cfdf61a0281850de080da94598c2d7d7919bf5d0",
+          "cases": [
+            {
+              "id": "conformance:b5da73a77105311a",
+              "testName": "renders initial query data without a DOM",
+              "fullName": "@octanejs/tanstack-query SSR renders initial query data without a DOM"
+            }
+          ]
         }
       ]
     }
   ],
-  "divergences": []
+  "divergences": [
+    {
+      "id": "native-query-test-harness",
+      "caseIds": [
+        "runtime:20886a70c28c91b1",
+        "runtime:29729a87f25d3fc6",
+        "runtime:2c8711ba8fa4795e",
+        "runtime:2d93e5ffb52e060d",
+        "runtime:3b9696e74349f5ab",
+        "runtime:50c341966acb22ce",
+        "runtime:5ead9263ca1c02d2",
+        "runtime:62d7351e91506b05",
+        "runtime:647c5bb790d908ea",
+        "runtime:657ce74bedcb6f10",
+        "runtime:679bddc1189e49d4",
+        "runtime:6f90655ed2e61ae6",
+        "runtime:71e3014dbda3393f",
+        "runtime:7a27063872adfac0",
+        "runtime:806f0c9c4ca97ede",
+        "runtime:a707d44d416e4a9f",
+        "runtime:aff65880c5f2ba26",
+        "runtime:c1e1b861e0426a55",
+        "runtime:c696324a41e239a4",
+        "runtime:cb38bd114d2bee3d",
+        "runtime:da11eacdc58857e2",
+        "runtime:e1cb4b6d16603bed",
+        "runtime:e54601d32c392d57",
+        "runtime:fd222f0ad0d6a110",
+        "types:tanstack-query-adapted-types"
+      ],
+      "upstreamResult": "React tests observe StrictMode replay, React console argument formatting, render-stream snapshots, global timer counts, React SSR strings and JSX hydration markers. Five type checks expect unused component diagnostics.",
+      "octaneResult": "The same query/cache/error and visible-state assertions run with native hook slots, captured error-boundary callbacks, explicit state snapshots, query-core timeoutManager observation, server RenderResult.html and compiled server/client twins. Hydration checks preserve the existing text node. Five adapted type checks assert an invalid query key instead of unused source diagnostics.",
+      "rationale": "Renderer-owned replay counts, error logging, timers, server result containers and unused-local diagnostics differ from the query contracts. The immutable pristine suites retain every original assertion; the reviewed patches preserve the externally observable query behavior and complete case inventory.",
+      "classification": "renderer-test-harness",
+      "consumerImpact": "Error delivery, query results, cache identity, suspense outcomes and hydrated DOM behavior are preserved. React-specific replay counts and diagnostic formatting are not Octane contracts.",
+      "migrationGuidance": "Use Octane error-boundary callbacks, native server result objects and observable committed query states. Do not depend on React StrictMode double invocation or internal logging argument positions.",
+      "owner": "@octanejs/tanstack-query",
+      "reviewCondition": "Review these adaptations when the upstream test harness changes or Octane changes its error, suspense, SSR or type-checking contracts."
+    }
+  ],
+  "materializedTests": "packages/tanstack-query"
 }

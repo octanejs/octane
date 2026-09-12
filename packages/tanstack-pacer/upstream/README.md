@@ -1,5 +1,19 @@
 <div align="center">
-  <img src="./media/header_pacer.png" >
+  <picture>
+    <source
+      media="(prefers-color-scheme: dark)"
+      srcset="https://tanstack.com/api/readme/pacer.png?theme=dark"
+    />
+    <source
+      media="(prefers-color-scheme: light)"
+      srcset="https://tanstack.com/api/readme/pacer.png"
+    />
+    <img
+      src="https://tanstack.com/api/readme/pacer.png"
+      alt="TanStack Pacer"
+      width="900"
+    />
+  </picture>
 </div>
 
 <br />
@@ -29,8 +43,9 @@
 </div>
 
 <div align="center">
-  
+
 ### [Become a Sponsor!](https://github.com/sponsors/tannerlinsley/)
+
 </div>
 
 # TanStack Pacer

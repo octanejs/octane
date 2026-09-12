@@ -3,12 +3,17 @@
 // `./types`, so the `.tsrx.d.ts` sidecar only restates this signature.
 import { shallow, useSelector } from '@octanejs/tanstack-store';
 import { constructTable } from '@tanstack/table-core';
-import { useMemo, useState } from 'octane';
+import { useLayoutEffect, useMemo, useState } from 'octane';
+import { createRenderPhaseSource } from '@tanstack/table-core/reactivity';
+import {
+	table_setOptions,
+	table_publishExternalState,
+} from '@tanstack/table-core/static-functions';
 import { FlexRender } from './FlexRender';
 import { splitSlot } from './internal';
 import { octaneReactivity } from './reactivity';
 import { Subscribe } from './Subscribe.tsrx';
-import type { RowData, TableFeatures, TableOptions, TableState } from '@tanstack/table-core';
+import type { Table, RowData, TableFeatures, TableOptions, TableState } from '@tanstack/table-core';
 import type { OctaneTable } from './types';
 
 /**
@@ -40,6 +45,15 @@ export function useTable<
 	TSelected = TableState<TFeatures>,
 >(
 	tableOptions: TableOptions<TFeatures, TData>,
+	selector?: (state: TableState<TFeatures>) => TSelected,
+): OctaneTable<TFeatures, TData, TSelected>;
+
+export function useTable<
+	TFeatures extends TableFeatures,
+	TData extends RowData,
+	TSelected = TableState<TFeatures>,
+>(
+	tableOptions: TableOptions<TFeatures, TData>,
 	// `selector` is optional, so the compiler-injected call-site slot would land
 	// in it (`useTable(options)` compiles to `useTable(options, slot)`). Take the
 	// rest args and split the slot off before reading the selector.
@@ -48,7 +62,7 @@ export function useTable<
 	const [user] = splitSlot(rest);
 	const selector = user[0] as ((state: TableState<TFeatures>) => TSelected) | undefined;
 
-	const [table] = useState(() => {
+	const [{ table, rootSource }] = useState(() => {
 		// Explicit type arguments skip generic inference from the spread object (a
 		// type-check hot spot); the spread only adds the octane reactivity binding
 		// to `features`.
@@ -72,19 +86,26 @@ export function useTable<
 
 		tableInstance.FlexRender = FlexRender;
 
-		return tableInstance;
+		return {
+			table: tableInstance,
+			rootSource: createRenderPhaseSource<TableState<TFeatures>>(tableInstance.store, shallow),
+		};
 	});
 
-	// Sync options on every render, so partially-controlled state and fresh
-	// closures (onStateChange, columns, data) land before any read below.
-	table.setOptions(
-		(prev) => ({
-			...prev,
-			...tableOptions,
-		}),
-	);
-
-	const state = useSelector(table.store, selector, { compare: shallow });
+	const coreTable = table as unknown as Table<TFeatures, TData>;
+	// Stage render reads without publishing speculative controlled state.
+	table_setOptions(coreTable, (prev) => ({ ...prev, ...tableOptions }), {
+		syncExternalState: false,
+	});
+	const controlledState = coreTable.options.state;
+	const renderSnapshot = rootSource.get();
+	const state = useSelector(rootSource, selector, { compare: shallow });
+	// Octane effects are excluded from SSR. Explicit null runs every commit,
+	// matching upstream's uninferred omitted dependency array.
+	useLayoutEffect(() => {
+		rootSource.markCommitted(renderSnapshot);
+		table_publishExternalState(coreTable, controlledState ?? null, shallow);
+	}, null);
 
 	// A fresh object every render is deliberate: `state` and `options` must be
 	// the values read during THIS render, and the compiler needs a stable

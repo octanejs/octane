@@ -34,7 +34,7 @@
     {
       "path": "packages/tanstack-table/tests/conformance/parity-legacy-api.test.ts",
       "disposition": "react-octane-differential",
-      "oracle": "Same-scenario package-export check: @tanstack/react-table publishes ./legacy and @octanejs/tanstack-table omits it (pins divergence legacy-migration-subpath)."
+      "oracle": "Same-scenario package export comparison confirms both pinned adapters publish the legacy subpath."
     },
     {
       "path": "packages/tanstack-table/tests/conformance/parity.test.ts",
@@ -44,7 +44,7 @@
     {
       "path": "packages/tanstack-table/tests/differential/parity.test.ts",
       "disposition": "react-octane-differential",
-      "oracle": "Runs five exact table scenarios against @tanstack/react-table@9.0.0-beta.58."
+      "oracle": "Runs five exact table scenarios against @tanstack/react-table@9.2.4."
     },
     {
       "path": "packages/tanstack-table/typetests/adapted/types.test-d.ts",
@@ -54,7 +54,12 @@
     {
       "path": "packages/tanstack-table/typetests/pristine/types.test-d.ts",
       "disposition": "pristine-types",
-      "oracle": "Repo-authored pristine public-surface type probes compiled with tsc against @tanstack/react-table@9.0.0-beta.58 (tanstack-table-pristine-types lane)."
+      "oracle": "Repo-authored pristine public-surface type probes compiled with tsc against @tanstack/react-table@9.2.4 (tanstack-table-pristine-types lane)."
+    },
+    {
+      "path": "packages/tanstack-table/tests/ssr-hydration.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Real server/client twins verify adoption, updates, retained row/button identity and unmount."
     }
   ]
 }

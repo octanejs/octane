@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'octane';
+import type { OctaneNode } from 'octane';
 import { RateLimiter } from '@tanstack/pacer/rate-limiter';
 import { shallow } from '@octanejs/tanstack-store';
 import { useDefaultPacerOptions } from '../provider/context';
@@ -29,8 +30,8 @@ export interface ReactRateLimiter<TFn extends AnyFunction, TSelected = {}> exten
 	 */
 	Subscribe: <TSelected>(props: {
 		selector: (state: RateLimiterState) => TSelected;
-		children: ((state: TSelected) => unknown) | unknown;
-	}) => unknown;
+		children: ((state: TSelected) => OctaneNode) | OctaneNode;
+	}) => OctaneNode;
 	/**
 	 * Reactive state selected by the hook's `selector` (empty object without one).
 	 */
@@ -77,7 +78,7 @@ export function useRateLimiter<TFn extends AnyFunction, TSelected = {}>(
 
 		rateLimiterInstance.Subscribe = function Subscribe<TSelected>(props: {
 			selector: (state: RateLimiterState) => TSelected;
-			children: ((state: TSelected) => unknown) | unknown;
+			children: ((state: TSelected) => OctaneNode) | OctaneNode;
 		}) {
 			const selected = useSelectorSlot(
 				rateLimiterInstance.store,
@@ -87,7 +88,7 @@ export function useRateLimiter<TFn extends AnyFunction, TSelected = {}>(
 			);
 
 			return typeof props.children === 'function'
-				? (props.children as (state: TSelected) => unknown)(selected)
+				? (props.children as (state: TSelected) => OctaneNode)(selected)
 				: props.children;
 		};
 

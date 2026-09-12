@@ -173,12 +173,7 @@ export function structuralSource(source, fileName, { mergeProviderContext = fals
 	text = text.replace(/\bReactNode\b/g, 'NODE').replace(/\bOctaneNode\b/g, 'NODE');
 	text = text.replace(/\bFunctionComponent\b/g, 'FC');
 	text = text.replace(/useSelectorSlot\s*\(/g, 'useSelector(');
-	text = text.replace(
-		/:\s*\(\(state: TSelected\) => unknown\) \| unknown/g,
-		': ((state: TSelected) => NODE) | NODE',
-	);
 	text = text.replace(/=>\s*ReturnType<\s*FC\s*>/g, '=> NODE');
-	text = text.replace(/=>\s*unknown\b/g, '=> NODE');
 	text = text.replace(
 		/\(props\.children as \(state: TSelected\) => [^)]+\)\s*\(/g,
 		'props.children(',

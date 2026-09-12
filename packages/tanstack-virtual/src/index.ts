@@ -59,6 +59,8 @@ export type ReactVirtualizerOptions<
 	 * positions and the container size directly to the DOM, and only
 	 * re-renders when the visible index range or `isScrolling` changes. See
 	 * upstream @tanstack/react-virtual docs for the layout requirements.
+	 * Set this flag and directDomUpdatesMode at mount; toggling either later
+	 * can leave stale inline styles on the items and container.
 	 */
 	directDomUpdates?: boolean;
 	/** How `directDomUpdates` positions items: `'transform'` (default) or `'position'`. */
@@ -83,11 +85,7 @@ function useVirtualizerBase<TScrollElement extends Element | Window, TItemElemen
 		directDomUpdates = false,
 		directDomUpdatesMode = 'transform',
 		...options
-	}: VirtualizerOptions<TScrollElement, TItemElement> & {
-		useFlushSync?: boolean;
-		directDomUpdates?: boolean;
-		directDomUpdatesMode?: 'position' | 'transform';
-	},
+	}: ReactVirtualizerOptions<TScrollElement, TItemElement>,
 	slot: symbol | undefined,
 ): ReactVirtualizer<TScrollElement, TItemElement> {
 	const rerender = useReducer<number, void, number>((x) => x + 1, 0, subSlot(slot, 'uvb:r'))[1];
@@ -106,7 +104,7 @@ function useVirtualizerBase<TScrollElement extends Element | Window, TItemElemen
 	directRef.current.enabled = directDomUpdates;
 	directRef.current.mode = directDomUpdatesMode;
 
-	const applyDirectStyles = (instance: Virtualizer<TScrollElement, TItemElement>) => {
+	const applyContainerSize = (instance: Virtualizer<TScrollElement, TItemElement>) => {
 		const state = directRef.current;
 		if (!state.enabled || !state.container) return;
 		const totalSize = instance.getTotalSize();
@@ -115,6 +113,12 @@ function useVirtualizerBase<TScrollElement extends Element | Window, TItemElemen
 			const sizeAxis = instance.options.horizontal ? 'width' : 'height';
 			state.container.style[sizeAxis] = `${totalSize}px`;
 		}
+	};
+
+	const applyDirectStyles = (instance: Virtualizer<TScrollElement, TItemElement>) => {
+		const state = directRef.current;
+		if (!state.enabled || !state.container) return;
+		applyContainerSize(instance);
 		const horizontal = !!instance.options.horizontal;
 		const useTransform = state.mode === 'transform';
 		const posAxis = horizontal ? 'left' : 'top';
@@ -196,7 +200,16 @@ function useVirtualizerBase<TScrollElement extends Element | Window, TItemElemen
 	instance.setOptions(resolvedOptions);
 
 	useIsomorphicLayoutEffect(() => instance._didMount(), [], subSlot(slot, 'uvb:m'));
-	useIsomorphicLayoutEffect(() => instance._willUpdate(), undefined, subSlot(slot, 'uvb:w'));
+	useIsomorphicLayoutEffect(
+		() => {
+			// Grow the scroll extent before core synchronizes an end-anchored prepend;
+			// the browser otherwise clamps the new offset to the old container size.
+			applyContainerSize(instance);
+			return instance._willUpdate();
+		},
+		undefined,
+		subSlot(slot, 'uvb:w'),
+	);
 	useIsomorphicLayoutEffect(
 		() => {
 			applyDirectStyles(instance);
@@ -227,6 +240,13 @@ export function useVirtualizer<TScrollElement extends Element, TItemElement exte
 		ReactVirtualizerOptions<TScrollElement, TItemElement>,
 		'observeElementRect' | 'observeElementOffset' | 'scrollToFn'
 	>,
+): ReactVirtualizer<TScrollElement, TItemElement>;
+
+export function useVirtualizer<TScrollElement extends Element, TItemElement extends Element>(
+	options: PartialKeys<
+		ReactVirtualizerOptions<TScrollElement, TItemElement>,
+		'observeElementRect' | 'observeElementOffset' | 'scrollToFn'
+	>,
 	...rest: unknown[]
 ): ReactVirtualizer<TScrollElement, TItemElement> {
 	const [, slot] = splitSlot(rest);
@@ -240,6 +260,13 @@ export function useVirtualizer<TScrollElement extends Element, TItemElement exte
 		slot,
 	);
 }
+
+export function useWindowVirtualizer<TItemElement extends Element>(
+	options: PartialKeys<
+		ReactVirtualizerOptions<Window, TItemElement>,
+		'getScrollElement' | 'observeElementRect' | 'observeElementOffset' | 'scrollToFn'
+	>,
+): ReactVirtualizer<Window, TItemElement>;
 
 export function useWindowVirtualizer<TItemElement extends Element>(
 	options: PartialKeys<

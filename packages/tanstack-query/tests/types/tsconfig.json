@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "skipLibCheck": false,
+    "types": ["node"],
+    "paths": {
+      "@octanejs/tanstack-query": ["../../src/index.ts"]
+    }
+  },
+  "include": ["./*.test-d.ts", "../../src/**/*.ts", "../../src/**/*.tsrx"],
+  "exclude": ["node_modules"],
+  "reactPortEvidence": {
+    "gate": "public-types",
+    "publicMode": "pinned"
+  }
+}

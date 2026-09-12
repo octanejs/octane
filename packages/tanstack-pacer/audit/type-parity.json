@@ -9,7 +9,7 @@
     "extension: .tsx -> .tsrx for provider/PacerProvider",
     "setter-types: React.Dispatch/React.SetStateAction -> local Dispatch/SetStateAction (+ internal import)",
     "selector-slots: useSelector -> useSelectorSlot with Symbol.for call-site slots",
-    "renderable types: ReactNode/FunctionComponent -> OctaneNode/unknown in Subscribe signatures",
+    "renderable types: ReactNode/FunctionComponent -> OctaneNode in Subscribe signatures",
     "provider split: context helpers extracted to adapted-only provider/context.ts",
     "adapted-only modules: internal.ts and provider/context.ts"
   ],

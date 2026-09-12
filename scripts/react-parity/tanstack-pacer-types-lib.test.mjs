@@ -262,3 +262,18 @@ test('path maps cover the complete upstream source suite under enforced transfor
 		}),
 	);
 });
+
+test('requires the renderer alias instead of an unclassified unknown Subscribe contract', async (t) => {
+	const value = await fixture();
+	t.after(() => rm(value.root, { recursive: true, force: true }));
+	const file = join(value.root, 'adapted/debouncer/useDebouncer.ts');
+	const source = await readFile(file, 'utf8');
+	await writeFile(
+		file,
+		source.replace(/=> OctaneNode/g, '=> unknown').replace(/\| OctaneNode;/g, '| unknown;'),
+	);
+	assert.throws(
+		() => buildTypeInventory(value.root, value.config),
+		/outside the permitted transformations/,
+	);
+});

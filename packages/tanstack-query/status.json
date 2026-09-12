@@ -1,10 +1,15 @@
 {
-  "upstream": { "package": "@tanstack/react-query", "version": "5.101.3" },
-  "surface": "Complete: 58/58 runtime exports plus the full TypeScript surface; the export surface is byte-identical to upstream in both directions (locked by test), and `@tanstack/query-core` is re-exported verbatim.",
+  "upstream": {
+    "package": "@tanstack/react-query",
+    "version": "5.102.8"
+  },
+  "surface": "Complete published root adapter and neutral core re-exports. Exact runtime export comparison, 213 public value/type probes, 404 pristine and 404 adapted runtime registrations, and 167 pristine/adapted type registrations.",
   "divergences": [
-    "Suspense integrates via octane's `use(thenable)` rather than throwing a promise (observable behavior matches)."
+    "Native compiler-assigned hook slots and retained suspense promises preserve observer ownership across replay.",
+    "Native renderer types replace React renderables and context types.",
+    "Upstream React-only StrictMode/render-stream, console formatting, render counts, timer observation and SSR harnesses are adapted with committed patches."
   ],
-  "ssr": "`HydrationBoundary` is fully ported (including streaming `promise`/`dehydratedAt` re-hydration), and initial query data is covered by a DOM-free Octane server-render test; dedicated streaming server entries remain open.",
-  "verified": "2026-08-02",
+  "ssr": "Nine adapted upstream server cases, three real server/client hydration cases with surviving DOM identity, and the DOM-free Octane conformance scenario. No separate React streaming entry is published by this adapter.",
+  "verified": "2026-09-12",
   "docs": ["docs/tanstack-parity-audit.md"]
 }

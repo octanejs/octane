@@ -1,12 +1,17 @@
 {
-  "upstream": { "package": "@tanstack/react-virtual", "version": "3.14.5" },
-  "surface": "Complete 1:1 port: the framework-agnostic `@tanstack/virtual-core` (Virtualizer + observers + windowing math) is reused verbatim; the React adapter (`useVirtualizer`, `useWindowVirtualizer`, incl. `useFlushSync` and the experimental `directDomUpdates` surface) is transcribed onto octane hooks, preserving upstream's force-update + flushSync-on-sync-scroll wiring and layout-effect lifecycle.",
+  "upstream": {
+    "package": "@tanstack/react-virtual",
+    "version": "3.14.12"
+  },
+  "surface": "Complete 3.14.12 hook adapter and direct virtual-core 3.17.10 re-exports, with precise public hook signatures, direct DOM container sizing and end-anchor synchronization. All 26 exports have strict pinned public type probes.",
   "divergences": [
-    "octane's `flushSync` called while a flush is already on the stack degrades to a plain call drained by the ambient flush (re-entrancy guard) — sync scroll notifies dispatched from inside a discrete-event flush land at that flush's boundary instead of nested; consumer-invisible, pinned by a conformance test."
+    "octane's `flushSync` called while a flush is already on the stack degrades to a plain call drained by the ambient flush (re-entrancy guard) \u2014 sync scroll notifies dispatched from inside a discrete-event flush land at that flush's boundary instead of nested; consumer-invisible, pinned by a conformance test."
   ],
-  "ssr": "SSR-safe: `useIsomorphicLayoutEffect` degrades to `useEffect` without `document`; the first paint windows from `initialRect`/`initialOffset` exactly as upstream. No dedicated SSR tests.",
+  "ssr": "DOM-free initial-offset rendering plus real server/client hydration with retained rows, interactive extent updates and exact observer cleanup.",
   "notes": [
-    "Smooth scrolling (`behavior: 'smooth'`) and the default ResizeObserver measurement path are untestable in jsdom (no layout); their code is verbatim upstream/virtual-core. Tests drive rects via the public `initialRect`/`observeElementRect`/`measureElement` options, mirroring upstream's own harness."
+    "All seven upstream unit cases and all 35 browser cases execute against React and Octane. Two additional browser cases verify direct-DOM prepends in position and transform modes.",
+    "The pristine compiler fixture runs React Compiler; the native counterpart runs the Octane compiler and preserves the same browser assertions.",
+    "Real Chromium covers smooth scrolling and measurement paths. Render-count guards are deterministic; no wall-clock performance claim is made."
   ],
-  "verified": "2026-08-02"
+  "verified": "2026-09-12"
 }

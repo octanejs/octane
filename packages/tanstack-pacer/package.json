@@ -6,7 +6,7 @@
   "engines": {
     "node": ">=22.22.2"
   },
-  "description": "TanStack Pacer bindings for Octane — debouncing, throttling, rate limiting, queuing, and batching hooks over the framework-agnostic @tanstack/pacer core.",
+  "description": "TanStack Pacer bindings for Octane \u2014 debouncing, throttling, rate limiting, queuing, and batching hooks over the framework-agnostic @tanstack/pacer core.",
   "author": {
     "name": "Dominic Gannaway",
     "email": "dg@domgan.com"
@@ -46,11 +46,12 @@
     "./utils": "./src/utils/index.ts"
   },
   "scripts": {
-    "test": "vitest run --project tanstack-pacer",
-    "typecheck": "tsrx-tsc --noEmit && tsrx-tsc --noEmit -p typetests/octane-only/tsconfig.json"
+    "test": "vitest run --root ../.. --project tanstack-pacer --project tanstack-pacer-adapted --project tanstack-pacer-differential --project tanstack-pacer-parity-audit",
+    "typecheck": "tsrx-tsc --noEmit && tsrx-tsc --noEmit -p typetests/octane-only/tsconfig.json && tsrx-tsc --noEmit -p tests/types/tsconfig.json",
+    "upstream:verify": "node ../../scripts/react-parity/verify-provenance.mjs --package-dir ."
   },
   "dependencies": {
-    "@tanstack/pacer": "0.21.1"
+    "@tanstack/pacer": "0.22.0"
   },
   "peerDependencies": {
     "@octanejs/tanstack-store": "workspace:*",
@@ -58,8 +59,8 @@
   },
   "devDependencies": {
     "@octanejs/tanstack-store": "workspace:*",
-    "@tanstack/react-pacer": "0.22.1",
-    "@tanstack/react-store": "0.11.0",
+    "@tanstack/react-pacer": "0.23.0",
+    "@tanstack/react-store": "0.11.1",
     "@tsrx/react": "catalog:default",
     "@types/react": "catalog:tanstack-pacer-react-oracle",
     "@types/react-dom": "catalog:tanstack-pacer-react-oracle",

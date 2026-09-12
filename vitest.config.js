@@ -1,3 +1,5 @@
+import tanstackTableAdapted from './packages/tanstack-table/tests/vitest.adapted.config.ts';
+import tanstackTableAdaptedSSR from './packages/tanstack-table/tests/vitest.adapted-ssr.config.ts';
 import { realpathSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, isAbsolute, relative, resolve } from 'node:path';
@@ -14,6 +16,9 @@ import { threeRenderers as THREE_RENDERERS } from './packages/three/src/config.t
 import { inkRenderers as INK_RENDERERS } from './packages/ink/src/config.ts';
 import { websiteMdxOptions } from './website/mdx-options.ts';
 import { ensureMaterializedUpstream } from './scripts/react-port/ensure-materialized.mjs';
+import tanstackVirtualAdapted from './packages/tanstack-virtual/tests/vitest.adapted.config.ts';
+import tanstackQueryAdaptedSSR from './packages/tanstack-query/tests/vitest.adapted-ssr.config.ts';
+import tanstackQueryAdapted from './packages/tanstack-query/tests/vitest.adapted.config.ts';
 import baseUIAdapted from './packages/base-ui/tests/vitest.config.ts';
 import baseUIUtilsAdapted from './packages/base-ui-utils/tests/vitest.config.ts';
 import baseUIPristine from './packages/base-ui/tests/vitest.pristine.config.ts';
@@ -603,6 +608,43 @@ export default defineConfig({
 		// `--silent=passed-only` overrides this default.
 		silent: true,
 		projects: [
+			{ ...tanstackVirtualAdapted, testExecution: { group: 'react-parity' } },
+			{ ...tanstackTableAdapted, testExecution: { group: 'react-parity' } },
+			{ ...tanstackTableAdaptedSSR, testExecution: { group: 'react-parity' } },
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'tanstack-table-pristine',
+					include: ['packages/tanstack-table/tests/upstream-original.test.ts'],
+					environment: 'node',
+				},
+			},
+			{ ...tanstackQueryAdapted, testExecution: { group: 'react-parity' } },
+			{ ...tanstackQueryAdaptedSSR, testExecution: { group: 'react-parity' } },
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'tanstack-query-pristine',
+					include: ['packages/tanstack-query/tests/upstream-original.test.ts'],
+					environment: 'node',
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'tanstack-virtual-pristine',
+					include: ['packages/tanstack-virtual/tests/upstream-original.test.ts'],
+					environment: 'node',
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'tanstack-virtual-browser',
+					include: ['packages/tanstack-virtual/tests/browser-parity.test.ts'],
+					environment: 'node',
+				},
+			},
 			...reactCompatSpikeProjects,
 			...reactCompatProjects,
 			...reactCompatSSRProjects,
@@ -2314,18 +2356,22 @@ export default defineConfig({
 				},
 			},
 			{
-				// Mixed project: conformance + package tests stay in ordinary shards;
-				// parity-legacy-api is owned by react-parity so it executes once via
-				// react-parity:check (same file-granular pattern as apollo-client/livestore).
+				// Focused hydration and export cases belong to parity; other conformance runs normally.
 				testExecution: {
 					group: 'react-parity',
-					include: ['packages/tanstack-table/tests/conformance/parity-legacy-api.test.ts'],
+					include: [
+						'packages/tanstack-table/tests/ssr-hydration.test.ts',
+						'packages/tanstack-table/tests/conformance/parity-legacy-api.test.ts',
+					],
 				},
 				test: {
 					name: 'tanstack-table',
 					include: ['packages/tanstack-table/tests/**/*.test.ts'],
 					environment: 'jsdom',
-					exclude: ['packages/tanstack-table/tests/differential/**/*.test.ts'],
+					exclude: [
+						'packages/tanstack-table/tests/differential/**/*.test.ts',
+						'packages/tanstack-table/tests/upstream-original.test.ts',
+					],
 					// Same differential precompile, but for table fixtures: also rewrites
 					// `@octanejs/tanstack-table` → `@tanstack/react-table` so the React side
 					// runs the real react-table adapter over the SAME table-core.
@@ -2432,6 +2478,8 @@ export default defineConfig({
 					environment: 'jsdom',
 					exclude: [
 						'packages/tanstack-virtual/tests/differential/**/*.test.ts',
+						'packages/tanstack-virtual/tests/upstream-original.test.ts',
+						'packages/tanstack-virtual/tests/browser-parity.test.ts',
 						'packages/tanstack-virtual/tests/ssr/**/*.test.ts',
 					],
 					// jsdom affordances virtual-core needs (no-op ResizeObserver,

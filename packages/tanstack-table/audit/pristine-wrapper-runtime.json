@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "project": "tanstack-table-pristine",
+  "roots": ["packages/tanstack-table/tests"],
+  "files": ["packages/tanstack-table/tests/upstream-original.test.ts"],
+  "tests": [
+    {
+      "id": "runtime:c829671609d47534",
+      "file": "packages/tanstack-table/tests/upstream-original.test.ts",
+      "fullName": "runs all 34 pinned Table runtime registrations unchanged"
+    }
+  ],
+  "snapshots": 0
+}

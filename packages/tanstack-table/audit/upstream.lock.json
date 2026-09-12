@@ -1,0 +1,224 @@
+{
+  "schemaVersion": 1,
+  "identity": {
+    "packageName": "@tanstack/react-table",
+    "version": "9.2.4",
+    "repository": {
+      "owner": "TanStack",
+      "repo": "table",
+      "subdirectory": "packages/react-table"
+    },
+    "commit": "d01c01bedbab0ff6c2641f18b2fc9a11545d9bf6",
+    "integrity": "sha512-Rzp1Q4e0/nIgEjmISYR5HeEgLTNtrG+C7NFZf/AbCxPO5hg+zC3yNGwcoECigUk8SFzzvhXbd2rFdtP2ZiGrfA=="
+  },
+  "license": {
+    "spdx": "MIT",
+    "evidence": [
+      {
+        "path": "LICENSE",
+        "sha256": "9db3f8ddd7031ab264b99bec49c221155d0c8649b53dd4aa007f2041d36cdf5f"
+      }
+    ],
+    "notices": []
+  },
+  "scopes": [],
+  "adaptedMappings": [
+    {
+      "fromRoot": "tests",
+      "toRoot": "tests/upstream"
+    }
+  ],
+  "adaptedRewrites": [
+    {
+      "find": "'react'",
+      "replace": "'octane'"
+    },
+    {
+      "find": "'@testing-library/react'",
+      "replace": "'@octanejs/testing-library'"
+    },
+    {
+      "find": "'@tanstack/react-store'",
+      "replace": "'@octanejs/tanstack-store'"
+    },
+    {
+      "find": "'react-dom/server'",
+      "replace": "'octane/server'"
+    },
+    {
+      "find": "'../src'",
+      "replace": "'../../src'"
+    },
+    {
+      "find": "'../src/useTable'",
+      "replace": "'../../src/useTable.tsrx'"
+    },
+    {
+      "find": "'../src/useLegacyTable'",
+      "replace": "'../../src/useLegacyTable.tsrx'"
+    }
+  ],
+  "files": [
+    {
+      "path": "CHANGELOG.md",
+      "gitBlob": "96d00832fe0c1e74995a53deba28323fefb97583",
+      "size": 2009
+    },
+    {
+      "path": "eslint.config.js",
+      "gitBlob": "47b863260f33ad10b7482a2afd9bcc379bec58a6",
+      "size": 995
+    },
+    {
+      "path": "package.json",
+      "gitBlob": "7860bb6f93322a7b7eb6fd91e6f257b214494245",
+      "size": 1830
+    },
+    {
+      "path": "README.md",
+      "gitBlob": "f9ec9e8e2879b98d9cff04e62ac0929d8d1f1a12",
+      "size": 7231
+    },
+    {
+      "path": "skills/create-table-hook/SKILL.md",
+      "gitBlob": "1ef3a5418fcbb87631e07b074c7917c6e9b38e4c",
+      "size": 5512
+    },
+    {
+      "path": "skills/getting-started/SKILL.md",
+      "gitBlob": "3247557a586ee9ca24856a96982c910c84b7ae37",
+      "size": 4249
+    },
+    {
+      "path": "skills/migrate-v8-to-v9/SKILL.md",
+      "gitBlob": "fc8007e2281efaff0dd08e70a80dd9d79b665282",
+      "size": 18676
+    },
+    {
+      "path": "skills/table-state/SKILL.md",
+      "gitBlob": "a34fc82def602627448124b0feed7bfa4fffe6c2",
+      "size": 8748
+    },
+    {
+      "path": "skills/with-tanstack-query/SKILL.md",
+      "gitBlob": "0711cdc405824e3df1ea643329b89dd6d9c218b1",
+      "size": 4439
+    },
+    {
+      "path": "skills/with-tanstack-virtual/SKILL.md",
+      "gitBlob": "0f82028322140d06436359e849316b77d2d58884",
+      "size": 4999
+    },
+    {
+      "path": "src/createTableHook.tsx",
+      "gitBlob": "cceefdb70aa4e3fb27839d6147a4034627848ad8",
+      "size": 40890
+    },
+    {
+      "path": "src/createTableHookContexts.tsx",
+      "gitBlob": "927ab60f54376d86b233f863d01f181435af73ed",
+      "size": 5919
+    },
+    {
+      "path": "src/experimental-worker-plugin.ts",
+      "gitBlob": "fe6241f2eca18492fb52bb0d22b03351f0a5c323",
+      "size": 64
+    },
+    {
+      "path": "src/flex-render.ts",
+      "gitBlob": "07f3e0486d626c9734b71502f5b5e04dc744f368",
+      "size": 29
+    },
+    {
+      "path": "src/FlexRender.tsx",
+      "gitBlob": "80662f348afb6bce323d7ae666a72790df893d2d",
+      "size": 3873
+    },
+    {
+      "path": "src/index.ts",
+      "gitBlob": "32ca86ec8a49db8abd2610fea79520233585c64b",
+      "size": 198
+    },
+    {
+      "path": "src/legacy.ts",
+      "gitBlob": "740e80afd7912aff17e1ae34b1db08ca92589ff2",
+      "size": 174
+    },
+    {
+      "path": "src/reactivity.ts",
+      "gitBlob": "fdc9e174df05e95be33ec7fb6fb7dbc95c67049f",
+      "size": 881
+    },
+    {
+      "path": "src/static-functions.ts",
+      "gitBlob": "e0cb951593916bfe429dae9f3956398ba4f6a945",
+      "size": 54
+    },
+    {
+      "path": "src/Subscribe.ts",
+      "gitBlob": "24b617bf8a51eb4d24989aa9102b53b4e5ad9b2f",
+      "size": 4954
+    },
+    {
+      "path": "src/useLegacyTable.ts",
+      "gitBlob": "ec07bf25f9e7ded424a4d58bf9b7f8373ca637ba",
+      "size": 16395
+    },
+    {
+      "path": "src/useTable.ts",
+      "gitBlob": "7e4a839d6ee651345f2c83358d54e0b9096d300e",
+      "size": 7926
+    },
+    {
+      "path": "tests/adapterReactivity.test.tsx",
+      "gitBlob": "3fe4e247248c1f4ec11d6f0f83c9878f19b1f19b",
+      "size": 16707
+    },
+    {
+      "path": "tests/createTableHook.test.tsx",
+      "gitBlob": "d5f7fe966e3066338f33ea619d9ba534208b89c7",
+      "size": 7186
+    },
+    {
+      "path": "tests/expandedAutoResetLoop.test.tsx",
+      "gitBlob": "b1b01d62765929baf07bd5beb8a324e665cf7a5d",
+      "size": 6392
+    },
+    {
+      "path": "tests/ssr.test.tsx",
+      "gitBlob": "0c762ef00e1b54205f44981335819227f0a45785",
+      "size": 4886
+    },
+    {
+      "path": "tests/test-setup.ts",
+      "gitBlob": "ffc0b9a9632167b7d074e14bd5144c0682466648",
+      "size": 65
+    },
+    {
+      "path": "tests/useLegacyTable.test.tsx",
+      "gitBlob": "827ddc8416f23d81054049b23c86d710309adb88",
+      "size": 4810
+    },
+    {
+      "path": "tests/useTable.test.tsx",
+      "gitBlob": "6505e12508d98f154d4061b38cccf11bb5e12bb9",
+      "size": 22911
+    },
+    {
+      "path": "tsconfig.json",
+      "gitBlob": "84562bb4a7b9c8e928c8680fd3cc192657480fe5",
+      "size": 155
+    },
+    {
+      "path": "tsdown.config.ts",
+      "gitBlob": "96666987151478ddcb0a6516111178c9a1032a75",
+      "size": 417
+    },
+    {
+      "path": "vite.config.ts",
+      "gitBlob": "5e0a28ed74df4cebf637fa8cabbc19a26a26c4d5",
+      "size": 326
+    }
+  ],
+  "fingerprint": "76b80493bebf3bc0cf73441d13b8355b8faa89002f17c7ed7a4d6422396eaa13"
+}

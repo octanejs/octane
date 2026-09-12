@@ -7,6 +7,7 @@ import {
 import { Batcher, Debouncer, Throttler } from '@octanejs/tanstack-pacer';
 
 describe('@octanejs/tanstack-pacer', () => {
+	// @parity-case conformance:pacer-neutral-core
 	it('re-exports the real framework-independent TanStack Pacer core', function () {
 		expect(Batcher).toBe(CoreBatcher);
 		expect(Debouncer).toBe(CoreDebouncer);
