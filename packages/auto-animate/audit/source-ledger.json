@@ -1,0 +1,13 @@
+[
+  {
+    "path": "src/index.ts",
+    "sha256": "04a5c2febf2717612f74db7efd8c39a070f3360ea4413eff67d42d6ea3598f8d",
+    "origin": "authored"
+  },
+  {
+    "path": "src/react/index.tsrx",
+    "sha256": "64503debd3c1bcfcb2eed0c2e74d5d4194caaa2aed95a8fc7032cd3fbbe44edd",
+    "origin": "adapted",
+    "packageName": "@formkit/auto-animate"
+  }
+]
