@@ -1,5 +1,5 @@
+import { isChildrenBlock, type OctaneNode } from 'octane';
 import { useChatContext } from './chat.tsrx';
-import type { OctaneNode } from 'octane';
 
 export interface ToolApprovalProps {
 	/** Tool call ID */
@@ -91,7 +91,9 @@ export function ToolApproval({
 	// Render prop pattern
 	if (children) {
 		return <>
-			{children(renderProps)}
+			{typeof children === 'function' && !isChildrenBlock(children)
+				? children(renderProps)
+				: children}
 		</>;
 	}
 

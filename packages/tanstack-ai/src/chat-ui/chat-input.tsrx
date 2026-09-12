@@ -1,4 +1,4 @@
-import { useRef, useState } from 'octane';
+import { isChildrenBlock, useRef, useState } from 'octane';
 import { useChatContext } from './chat.tsrx';
 import type { OctaneNode, RefObject } from 'octane';
 
@@ -90,7 +90,9 @@ export function ChatInput({
 	// Render prop pattern
 	if (children) {
 		return <>
-			{children(renderProps)}
+			{typeof children === 'function' && !isChildrenBlock(children)
+				? children(renderProps)
+				: children}
 		</>;
 	}
 

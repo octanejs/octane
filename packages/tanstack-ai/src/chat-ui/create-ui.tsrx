@@ -1,6 +1,6 @@
 // Bundlers replace this local declaration's guarded development check.
 declare const process: { env: { NODE_ENV?: string } };
-import { createContext, memo, useContext } from 'octane';
+import { createContext, isChildrenBlock, memo, useContext } from 'octane';
 import type { ComponentProps, ComponentType, Context, OctaneNode } from 'octane';
 import {
 	automaticPartsForMessage,
@@ -469,9 +469,13 @@ function createChatUIImpl<
 		const chat = useChatContext();
 		const messages = readMessages(chat);
 		const interrupts = readInterrupts(chat);
-		if (children) return <>
-			{children(messages)}
-		</>;
+		if (children) {
+			return <>
+				{typeof children === 'function' && !isChildrenBlock(children)
+					? children(messages)
+					: children}
+			</>;
+		}
 		return <>
 			{messages.map(
 				(message) =>
@@ -523,9 +527,13 @@ function createChatUIImpl<
 				interrupts,
 				inlineToolNames: names,
 			});
-			if (children) return <>
-				{children(selected.parts)}
-			</>;
+			if (children) {
+				return <>
+					{typeof children === 'function' && !isChildrenBlock(children)
+						? children(selected.parts)
+						: children}
+				</>;
+			}
 			return <MessageRenderContext.Provider value={{ message, interrupts, inlineToolNames: names }}>
 				<MessageComponent message={message} Parts={Parts} />
 			</MessageRenderContext.Provider>;
@@ -629,7 +637,11 @@ function createChatUIImpl<
 				}).parts[0];
 		if (!selected) return null;
 		return <PartContext.Provider value={selected}>
-			{children ? (children(mixPart(selected))) : <SelectedPartInner selected={selected} />}
+			{children
+				? (typeof children === 'function' && !isChildrenBlock(children)
+					? children(mixPart(selected))
+					: children)
+				: <SelectedPartInner selected={selected} />}
 		</PartContext.Provider>;
 	}
 
@@ -646,9 +658,13 @@ function createChatUIImpl<
 			interrupts: readInterrupts(chat),
 			inlineToolNames,
 		});
-		if (children) return <>
-			{children(selected.interrupts)}
-		</>;
+		if (children) {
+			return <>
+				{typeof children === 'function' && !isChildrenBlock(children)
+					? children(selected.interrupts)
+					: children}
+			</>;
+		}
 		return <>
 			{selected.interrupts.map(
 				(interrupt) => <Interrupt key={interrupt.id} interrupt={interrupt} />,
@@ -686,7 +702,11 @@ function createChatUIImpl<
 			children?: (mixed: ChatUIInterrupt & InterruptMixins<TOptions>) => OctaneNode;
 		}) {
 			return <InterruptContext.Provider value={interrupt}>
-				{children ? (children(mixInterrupt(interrupt))) : <InterruptInner interrupt={interrupt} />}
+				{children
+					? (typeof children === 'function' && !isChildrenBlock(children)
+						? children(mixInterrupt(interrupt))
+						: children)
+					: <InterruptInner interrupt={interrupt} />}
 			</InterruptContext.Provider>;
 		},
 	);
