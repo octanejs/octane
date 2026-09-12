@@ -554,11 +554,15 @@
       "name": "@octanejs/jotai",
       "version": "0.1.49",
       "category": "State Management",
-      "upstream": { "package": "jotai", "version": "2.20.2" },
-      "surface": "Complete 1:1 port: the framework-agnostic vanilla core (`jotai/vanilla`, `/vanilla/utils`, `/vanilla/internals`) is reused verbatim; the React layer (`Provider`, `useStore`, `useAtom`, `useAtomValue`, `useSetAtom`) and `react/utils` (`useResetAtom`, `useReducerAtom`, `useAtomCallback`, `useHydrateAtoms`) are ported onto octane hooks, preserving upstream's useReducer force-update + effect-subscription implementation, async atoms via octane's `use()`.",
-      "divergences": [],
-      "ssr": "No SSR-specific surface; `useHydrateAtoms` is ported and usable for hydration seeding; no dedicated SSR tests.",
-      "verified": "2026-08-02"
+      "upstream": { "package": "jotai", "version": "3.0.0" },
+      "surface": "Jotai 3 runtime surface: imported vanilla atoms, stores, utilities and internals; ported Provider, useStore, useAtom, useSetAtom, useAtomValue, useAtomValueRaw, useAtomValueRawSync and four hook utilities.",
+      "divergences": [
+        "Octane hook call-site slots are forwarded through composed hooks.",
+        "React class error-boundary test fixtures use Octane functional ErrorBoundary components.",
+        "Commit-count test hooks run in component setup and use explicit every-render effects to preserve the upstream observation boundary."
+      ],
+      "ssr": "Server rendering and hydration are tested for both raw hooks with request-local stores, no server subscriptions, adopted DOM, client updates and teardown.",
+      "verified": "2026-09-12"
     },
     {
       "name": "@octanejs/lexical",

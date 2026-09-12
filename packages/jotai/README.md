@@ -1,6 +1,6 @@
 # @octanejs/jotai
 
-[jotai](https://github.com/pmndrs/jotai) for the [octane](https://github.com/octanejs/octane) UI framework.
+Jotai 3 atoms and stores for Octane. The package imports Jotai's vanilla core and ports its React hooks and provider to Octane.
 
 ## Installation
 
@@ -9,89 +9,48 @@ npm install @octanejs/jotai
 pnpm add @octanejs/jotai
 ```
 
-jotai separates a framework-agnostic **vanilla core** (`atom`, `createStore`,
-`getDefaultStore` + all of `vanilla/utils`) from a small **React binding**
-(`Provider`, `useStore`, `useAtom`, `useAtomValue`, `useSetAtom`). This package
-reuses the vanilla core unchanged (re-exported verbatim from `jotai/vanilla`) and
-reimplements only the binding on octane's hooks — deliberately preserving
-upstream's implementation shape (a force-update `useReducer` + effect
-subscription, not `useSyncExternalStore`), so re-render behavior matches jotai on
-React. The public surface matches jotai 1:1 — existing jotai code works by
-changing the import.
-
 ```tsx
-// before
-import { atom, useAtom } from 'jotai';
-// after
 import { atom, useAtom } from '@octanejs/jotai';
 
 const countAtom = atom(0);
 
 function Counter() @{
   const [count, setCount] = useAtom(countAtom);
-  <button onClick={() => setCount((c) => c + 1)}>count is {count as string}</button>
+  <button onClick={() => setCount((value) => value + 1)}>{count as string}</button>
 }
 ```
 
 ## Entry points
 
-| import | what you get | notes |
-| --- | --- | --- |
-| `@octanejs/jotai` | `atom`, `createStore`, `getDefaultStore`, `Provider`, `useStore`, `useAtom`, `useAtomValue`, `useSetAtom` | vanilla verbatim + the octane-bound binding |
-| `@octanejs/jotai/vanilla` | `atom`, `createStore`, `getDefaultStore` + types | re-exported verbatim from jotai |
-| `@octanejs/jotai/vanilla/utils` | `RESET`, `atomWithReset`, `atomWithStorage`, `atomWithReducer`, `atomFamily`, `selectAtom`, `splitAtom`, `loadable`, `unwrap`, … | re-exported verbatim (all framework-agnostic) |
-| `@octanejs/jotai/vanilla/internals` | `INTERNAL_*` store building blocks | re-exported verbatim; unstable by upstream contract |
-| `@octanejs/jotai/react` | `Provider`, `useStore`, `useAtom`, `useAtomValue`, `useSetAtom` | the binding, ported to octane hooks |
-| `@octanejs/jotai/react/utils` | `useResetAtom`, `useAtomCallback`, `useHydrateAtoms`, `useReducerAtom` | ported to octane hooks |
-| `@octanejs/jotai/utils` | everything from `vanilla/utils` + `react/utils` | mirror of `jotai/utils` |
+| Import | Surface |
+| --- | --- |
+| `@octanejs/jotai` | Vanilla atoms/stores, `Provider`, `useStore`, `useAtom`, `useSetAtom`, `useAtomValue`, `useAtomValueRaw`, `useAtomValueRawSync` |
+| `@octanejs/jotai/react` | Provider and hooks |
+| `@octanejs/jotai/react/utils` | `useResetAtom`, `useReducerAtom`, `useAtomCallback`, `useHydrateAtoms` |
+| `@octanejs/jotai/vanilla` | Direct re-exports of `jotai/vanilla` |
+| `@octanejs/jotai/vanilla/utils` | Direct re-exports of `jotai/vanilla/utils` |
+| `@octanejs/jotai/vanilla/internals` | Upstream's unstable store building blocks |
+| `@octanejs/jotai/utils` | Vanilla utilities and hook utilities |
 
-`jotai/babel/*` (React-specific compile-time plugins) is not shipped.
+Framework-neutral callers can import directly from `jotai/vanilla` and `jotai/vanilla/utils`. These imports share the same atoms and stores with the Octane binding.
 
-## How it works
+## Jotai 3 migration
 
-octane keys hooks by a compiler-injected per-call-site `Symbol`, appended as the
-last argument of every `use*` call. The hooks here **forward** that slot to the
-base hooks they compose (deriving a stable sub-slot per composed base hook), so
-`useAtom(a)` and `useAtom(b)` in one component — or the same atom used twice —
-stay independent, exactly like distinct call sites in React.
+- `useAtomValueRaw` returns the atom value without unwrapping promises or suspending. It subscribes through an effect.
+- `useAtomValueRawSync` also returns the raw value and uses `useSyncExternalStore` for synchronous store consistency.
+- `useAtomValue` and `useAtom` retain Suspense integration. Their obsolete `delay` option is removed.
+- `loadable` is removed. Use the retained `unwrap` utility or read raw promise values for non-suspending reads.
+- `atomFamily` moves to `jotai-family`; install that package and import `atomFamily` directly from it.
+- The atom read function's `setSelf` option is removed. Its replacement depends on the use case; see the [upstream migration guide](https://github.com/pmndrs/jotai/blob/89d4fddd1949628e50952fc8ac1b09786248dfca/docs/guides/migrating-to-v3.mdx).
+- Upstream's internal store API advances from Rev3 to Rev4. It remains unstable.
+- The existing `INTERNAL_InferAtomTuples` type remains available from both utility entry points for compatibility.
 
-The binding is a line-for-line port of `jotai/react`: a reader holds a
-`[value, store, atom]` tuple in a force-update reducer and subscribes to the
-store in an effect. That means the same observable behavior as jotai on React,
-including:
+Readers no longer force a second render immediately after subscribing. `useSetAtom` still does not subscribe the writer. Hook slots are forwarded to keep multiple atom hooks in one component independent.
 
-- **`useSetAtom` never re-renders the writer.** A component that only writes an
-  atom doesn't subscribe to it.
-- **Derived atoms bail out.** A dependency write that recomputes to an
-  `Object.is`-equal value never notifies readers.
-- **Readers mount with two renders** (the subscription effect re-checks the
-  value after subscribing) — same as upstream.
+## Async atoms and server rendering
 
-## Async atoms + Suspense
+`useAtomValue` unwraps Jotai's stable continuable promises through Octane's `use()`. Use a Suspense boundary for pending values. Both raw hooks preserve the promise as a value.
 
-An atom whose value is a promise suspends the reader through octane's `use()`
-(React-19 parity) on jotai's identity-stable *continuable promise*. Use a
-suspense boundary (`@try { } @pending { } @catch (e) { }` or `<Suspense>`), or
-skip suspending entirely with the vanilla `loadable`/`unwrap` escape hatches:
+Create a store per server request and pass it to `Provider`. Server rendering does not mount atom subscriptions. The hydration conformance test checks reuse of the server DOM, live client updates, and subscription teardown.
 
-```tsx
-const userAtom = atom(async () => (await fetch('/api/user')).json());
-
-function Profile() @{
-  <div>
-    @try {
-      <UserName />
-    } @pending {
-      <span>loading…</span>
-    } @catch (e) {
-      <span>failed: {(e as Error).message}</span>
-    }
-  </div>
-}
-```
-
-## Status
-
-Current scope, known divergences, and verification status are tracked in the
-generated [bindings status table](../../docs/bindings-status.md), sourced from
-this package's [`status.json`](./status.json).
+See [UPSTREAM.md](./UPSTREAM.md) for the immutable source pin, API crosswalk, test adaptation, and recorded evidence.

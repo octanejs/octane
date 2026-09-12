@@ -214,11 +214,16 @@ describe('useStore resolution + Provider scoping', () => {
 });
 
 describe('export surface', () => {
-	it('provides every runtime export of real jotai (all six public modules)', async () => {
+	it('provides every runtime export of real jotai (all seven public modules)', async () => {
 		const pairs: [string, object, object][] = [
 			['jotai', await import('jotai'), binding],
 			['jotai/vanilla', await import('jotai/vanilla'), await import('@octanejs/jotai/vanilla')],
 			['jotai/react', await import('jotai/react'), await import('@octanejs/jotai/react')],
+			[
+				'jotai/vanilla/internals',
+				await import('jotai/vanilla/internals'),
+				await import('@octanejs/jotai/vanilla/internals'),
+			],
 			['jotai/utils', await import('jotai/utils'), await import('@octanejs/jotai/utils')],
 			[
 				'jotai/vanilla/utils',
@@ -233,9 +238,7 @@ describe('export surface', () => {
 		];
 		for (const [name, real, port] of pairs) {
 			const upstream = Object.keys(real).sort();
-			const ported = new Set(Object.keys(port));
-			const missing = upstream.filter((key) => !ported.has(key));
-			expect(missing, `missing exports in port of ${name}`).toEqual([]);
+			expect(Object.keys(port).sort(), `exports in port of ${name}`).toEqual(upstream);
 		}
 	});
 });

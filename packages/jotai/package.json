@@ -13,7 +13,7 @@
       ]
     }
   },
-  "description": "jotai bindings for the octane renderer — reuses jotai's framework-agnostic vanilla atoms/store and swaps the React binding for an octane port of jotai/react.",
+  "description": "jotai bindings for the octane renderer \u2014 reuses jotai's framework-agnostic vanilla atoms/store and swaps the React binding for an octane port of jotai/react.",
   "author": {
     "name": "Dominic Gannaway",
     "email": "dg@domgan.com"
@@ -31,7 +31,10 @@
   "types": "src/index.ts",
   "files": [
     "src",
-    "README.md"
+    "README.md",
+    "UPSTREAM.md",
+    "LICENSE",
+    "LICENSE.upstream"
   ],
   "exports": {
     ".": "./src/index.ts",
@@ -43,7 +46,10 @@
     "./utils": "./src/utils.ts"
   },
   "scripts": {
-    "test": "vitest run"
+    "test": "vitest run --root ../.. --config vitest.config.js --project jotai --project jotai-differential --project jotai-pristine",
+    "upstream:check": "node ../../scripts/react-port/materialize.mjs run --check --package-dir .",
+    "upstream:test": "node ../../scripts/react-parity/run-pristine.mjs jotai",
+    "upstream:verify": "node ../../scripts/react-parity/verify-provenance.mjs --package-dir ."
   },
   "dependencies": {
     "jotai": "catalog:default"
@@ -57,6 +63,17 @@
     "octane": "workspace:*",
     "react": "catalog:default",
     "react-dom": "catalog:default",
-    "vitest": "catalog:default"
+    "vitest": "catalog:default",
+    "@octanejs/testing-library": "workspace:*",
+    "@testing-library/react": "catalog:default",
+    "@testing-library/jest-dom": "catalog:default",
+    "rxjs": "catalog:default",
+    "wonka": "6.3.6",
+    "jest-leak-detector": "30.5.1",
+    "@types/node": "catalog:default",
+    "vite": "catalog:default",
+    "typescript": "6.0.3",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.7"
   }
 }

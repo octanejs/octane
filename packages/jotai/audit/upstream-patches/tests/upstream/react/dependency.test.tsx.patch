@@ -1,0 +1,31 @@
+diff --git a/tests/upstream/react/dependency.test.tsx b/tests/upstream/react/dependency.test.tsx
+--- a/tests/upstream/react/dependency.test.tsx
++++ b/tests/upstream/react/dependency.test.tsx
+@@ -25,10 +25,12 @@ it('works with 2 level dependencies', () => {
+     const [count, setCount] = useAtom(countAtom)
+     const [doubledCount] = useAtom(doubledAtom)
+     const [tripledCount] = useAtom(tripledAtom)
++    // OCTANE DIVERGENCE[component-commit-observation]: observe the owning component commit, outside the child template scope.
++    const commitCount = useCommitCount()
+     return (
+       <>
+         <div>
+-          commits: {useCommitCount()}, count: {count}, doubled: {doubledCount},
++          commits: {commitCount}, count: {count}, doubled: {doubledCount},
+           tripled: {tripledCount}
+         </div>
+         <button onClick={() => setCount((c) => c + 1)}>button</button>
+@@ -322,10 +324,12 @@ it('derived atom to update base atom in callback', () => {
+   const Counter = () => {
+     const [count, setCount] = useAtom(countAtom)
+     const [doubledCount, dispatch] = useAtom(doubledAtom)
++    // OCTANE DIVERGENCE[component-commit-observation]: observe the owning component commit, outside the child template scope.
++    const commitCount = useCommitCount()
+     return (
+       <>
+         <div>
+-          commits: {useCommitCount()}, count: {count}, doubled: {doubledCount}
++          commits: {commitCount}, count: {count}, doubled: {doubledCount}
+         </div>
+         <button onClick={() => dispatch(() => setCount((c) => c + 1))}>
+           button

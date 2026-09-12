@@ -3,22 +3,33 @@
   "schemaVersion": 1,
   "provenance": {
     "repo": "https://github.com/pmndrs/jotai.git",
-    "version": "2.20.2",
-    "commit": "5c4ca26b0db5571114be58393e17854a771f7790",
+    "version": "3.0.0",
+    "commit": "89d4fddd1949628e50952fc8ac1b09786248dfca",
     "sourceRoot": "src",
     "testRoot": "tests",
     "license": "MIT",
-    "integrity": "sha256:52c820bc338cbbcc1b58c7758c9603b61ca9fc17526adecd84045a15e91c0157",
-    "verification": "recorded-unverified"
+    "integrity": "sha256:dc9cfb4c901424eea4be448048a274c56472ab0956ee4e4e7d1623bc98e4ef00",
+    "verification": "verified"
   },
-  "upstreamSuites": { "runtime": "present", "types": "present" },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "present"
+  },
   "adaptedRoots": {
-    "source": { "roots": ["packages/jotai/src"], "include": ["\\.(?:ts|tsrx)$"], "exclude": [] },
-    "tests": { "roots": ["packages/jotai/tests"], "include": ["\\.test\\.ts$"], "exclude": [] }
+    "source": {
+      "roots": ["packages/jotai/src"],
+      "include": ["\\.(?:ts|tsrx)$"],
+      "exclude": []
+    },
+    "tests": {
+      "roots": ["packages/jotai/tests/upstream"],
+      "include": ["\\.test\\.(?:ts|tsx)$"],
+      "exclude": []
+    }
   },
   "adaptedRuntimeSummary": {
-    "inventoryEntries": 0,
-    "uniqueIdentities": 0,
+    "inventoryEntries": 404,
+    "uniqueIdentities": 404,
     "duplicateEntriesWithinLanes": 0,
     "identitiesSharedAcrossLanes": 0
   },
@@ -29,10 +40,232 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "8b22926b6186369bfc8ca72aedb69b7853160e5ab762b1a36e1a61bf24f6c322"
+      "lockfileSha256": "fde50b3df170bc44776b24fe6d46064abb9ad01f998e928884b198ca3584ad71"
     }
   },
   "lanes": [
+    {
+      "id": "jotai-pristine-upstream",
+      "type": "pristine-upstream",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "jotai-pristine",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Runs all 404 pinned Jotai 3 registrations in the pristine runtime. No skipped or omitted cases.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/jotai/audit/pristine-wrapper-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/jotai/audit/pristine-wrapper-runtime.json",
+          "role": "support",
+          "sha256": "440e8dda469b91800d357ed6c1302ea641dbb226b5bfd49fc5ed8d5fb7a73fb7"
+        },
+        {
+          "path": "packages/jotai/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "5e3b68db9d036f54990f61dcb8ce71e471c06875face813b3f34bb9662ab009d"
+        },
+        {
+          "path": "packages/jotai/audit/provenance.json",
+          "role": "support",
+          "sha256": "72658eb2a5b3410e88d3a4d6cd0ce6897a7e8d002ab8ea2e3e9afc17d88de38c"
+        },
+        {
+          "path": "packages/jotai/audit/registrations.json",
+          "role": "support",
+          "sha256": "baf58ded497dfcdd6c3c35c9ee9179491695028b32071bbd5c854f88680004c7"
+        },
+        {
+          "path": "packages/jotai/audit/crosswalk.json",
+          "role": "support",
+          "sha256": "643d21f477b3d65d7a02ba6b0d070806d5f9272c845d14c1e66fcf419ef6a576"
+        },
+        {
+          "path": "packages/jotai/audit/pristine-runtime.json",
+          "role": "support",
+          "sha256": "e89de5e7d19fae71c2c4fde8e11731769df4a090c25343a4d1eb8dd9a1da3a2c"
+        },
+        {
+          "path": "packages/jotai/tests/upstream-original.test.ts",
+          "role": "support",
+          "sha256": "d90bf811ee88901f994a9139ac1d1bd2cbb19d065398d4eaf5504d49cd4f863f"
+        },
+        {
+          "path": "packages/jotai/tests/upstream-vitest.config.ts",
+          "role": "support",
+          "sha256": "1b2089cbdc084b4784ec2cee91425a4b5f3fd5809c207436bab29c3aa2de72ae"
+        },
+        {
+          "path": "packages/jotai/audit/pristine-suite.json",
+          "role": "support",
+          "sha256": "ece6a45fe3cf11b10099c30c55cedbc9439c9f2fc5e3630a808e9de97c34b48b"
+        },
+        {
+          "path": "scripts/react-parity/jotai-pristine-runtime.mjs",
+          "role": "support",
+          "sha256": "e6da803df0d5082078219b1eb347c4cfc82a712b57dfed7ce04a7df8337f9b15"
+        },
+        {
+          "path": "scripts/react-parity/pristine-suite-lib.mjs",
+          "role": "support",
+          "sha256": "d34ffc2dca00e6eef7dcaf5bc002024cc511f32dd20c681547555af520438bbb"
+        }
+      ]
+    },
+    {
+      "id": "jotai-adapted-upstream",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "jotai",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Runs all 404 pinned Jotai 3 registrations in the adapted runtime. No skipped or omitted cases.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/jotai/audit/adapted-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/jotai/audit/adapted-runtime.json",
+          "role": "support",
+          "sha256": "e8204927785f6b543a61d2cd906c5ee54ab46b700abf4c99889bf136d5aeead9"
+        },
+        {
+          "path": "packages/jotai/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "5e3b68db9d036f54990f61dcb8ce71e471c06875face813b3f34bb9662ab009d"
+        },
+        {
+          "path": "packages/jotai/audit/provenance.json",
+          "role": "support",
+          "sha256": "72658eb2a5b3410e88d3a4d6cd0ce6897a7e8d002ab8ea2e3e9afc17d88de38c"
+        },
+        {
+          "path": "packages/jotai/audit/registrations.json",
+          "role": "support",
+          "sha256": "baf58ded497dfcdd6c3c35c9ee9179491695028b32071bbd5c854f88680004c7"
+        },
+        {
+          "path": "packages/jotai/audit/crosswalk.json",
+          "role": "support",
+          "sha256": "643d21f477b3d65d7a02ba6b0d070806d5f9272c845d14c1e66fcf419ef6a576"
+        },
+        {
+          "path": "packages/jotai/audit/upstream-patches/tests/upstream/react/async.test.tsx.patch",
+          "role": "support",
+          "sha256": "e479834e4060ab0fb6ac5049bbe182057605683f1d1e16cfb3b7f823833e3fc8"
+        },
+        {
+          "path": "packages/jotai/audit/upstream-patches/tests/upstream/react/basic.test.tsx.patch",
+          "role": "support",
+          "sha256": "71959745a379a54d4eb0b983611bb5d0faf09d36a487748f77e19d5d40b2afab"
+        },
+        {
+          "path": "packages/jotai/audit/upstream-patches/tests/upstream/react/dependency.test.tsx.patch",
+          "role": "support",
+          "sha256": "401865cccf07358674019a95d30c4c77825c0558b6177bf63484e69c921d852b"
+        },
+        {
+          "path": "packages/jotai/audit/upstream-patches/tests/upstream/react/error.test.tsx.patch",
+          "role": "support",
+          "sha256": "ba2960013b7c657d05423a10f9c0419e418a329459ccc45460280530d196d728"
+        },
+        {
+          "path": "packages/jotai/audit/upstream-patches/tests/upstream/react/useAtomValue.test.tsx.patch",
+          "role": "support",
+          "sha256": "1dd48192fa629330947d2657eb793fae8b3b0d44a79fa3c80c4112a2fa6337ab"
+        },
+        {
+          "path": "packages/jotai/audit/upstream-patches/tests/upstream/react/useAtomValueRaw.test.tsx.patch",
+          "role": "support",
+          "sha256": "11781a5669f0b5a421c446550c7e112e9e8ad1efbe18e23e015869741471cb73"
+        },
+        {
+          "path": "packages/jotai/audit/upstream-patches/tests/upstream/react/vanilla-utils/atomWithObservable.test.tsx.patch",
+          "role": "support",
+          "sha256": "1c2b041880a5b7afe2e649fa82a4209c2b1235b270c17498a82e084d74cbdfea"
+        },
+        {
+          "path": "packages/jotai/audit/upstream-patches/tests/upstream/react/vanilla-utils/splitAtom.test.tsx.patch",
+          "role": "support",
+          "sha256": "811429864183e89702c589d68fb6ce5a7c315cef89dd74cbcc283fbd9d4ea9c9"
+        },
+        {
+          "path": "packages/jotai/audit/upstream-patches/tests/upstream/test-utils.ts.patch",
+          "role": "support",
+          "sha256": "95358c10c21c412c964b3c9b435c3c48bc18b8ad23a258d2557adee224d719fc"
+        }
+      ]
+    },
+    {
+      "id": "jotai-pristine-types",
+      "type": "pristine-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "jotai-pristine-types",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Compiles every pinned type-test registration and the hydration utility negative controls with strict checking.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsc",
+        "project": "packages/jotai/tsconfig.pristine.json",
+        "compilerBins": ["packages/jotai/node_modules/typescript/bin/tsc"]
+      },
+      "files": [
+        {
+          "path": "packages/jotai/tsconfig.pristine.json",
+          "role": "test",
+          "sha256": "c36401b4fcddd9db86c9657d9b6930aa366f96671865b5e97d08db3da773b33c",
+          "cases": [
+            {
+              "id": "types:jotai-pristine-types",
+              "testName": "complete Jotai 3 pristine type suite",
+              "fullName": "complete Jotai 3 pristine type suite"
+            }
+          ]
+        },
+        {
+          "path": "packages/jotai/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "5e3b68db9d036f54990f61dcb8ce71e471c06875face813b3f34bb9662ab009d"
+        }
+      ]
+    },
+    {
+      "id": "jotai-adapted-types",
+      "type": "adapted-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "jotai-adapted-types",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Compiles every pinned type-test registration and the hydration utility negative controls with strict checking.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsrx-tsc",
+        "project": "packages/jotai/tsconfig.adapted.json"
+      },
+      "files": [
+        {
+          "path": "packages/jotai/tsconfig.adapted.json",
+          "role": "test",
+          "sha256": "534c3ea55e29456db85ccd452c866c312354819ec7c32ab5f12b1e400bd297bc",
+          "cases": [
+            {
+              "id": "types:jotai-adapted-types",
+              "testName": "complete Jotai 3 adapted type suite",
+              "fullName": "complete Jotai 3 adapted type suite"
+            }
+          ]
+        },
+        {
+          "path": "packages/jotai/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "5e3b68db9d036f54990f61dcb8ce71e471c06875face813b3f34bb9662ab009d"
+        }
+      ]
+    },
     {
       "id": "jotai-runtime-differential",
       "type": "differential",
@@ -40,7 +273,7 @@
       "environment": "workspace-node",
       "project": "jotai-differential",
       "evidenceOrigin": "repo-authored",
-      "notes": "Runs the same four .tsrx fixtures against jotai 2.20.2 on React and @octanejs/jotai on Octane, comparing primitive and derived atoms, setters, provider scopes, splitAtom lists, and async atom resolution after identical interactions.",
+      "notes": "Runs the same four .tsrx fixtures against jotai 3.0.0 on React and @octanejs/jotai on Octane, comparing primitive and derived atoms, setters, provider scopes, splitAtom lists, and async atom resolution after identical interactions.",
       "files": [
         {
           "path": "packages/jotai/tests/differential/parity.test.ts",
@@ -64,8 +297,8 @@
             },
             {
               "id": "differential:jotai-async-atom",
-              "testName": "AsyncApp: pending fallback → resolved value, byte-identical at both steps",
-              "fullName": "differential: @octanejs/jotai vs real jotai on React AsyncApp: pending fallback → resolved value, byte-identical at both steps"
+              "testName": "AsyncApp: pending fallback \u2192 resolved value, byte-identical at both steps",
+              "fullName": "differential: @octanejs/jotai vs real jotai on React AsyncApp: pending fallback \u2192 resolved value, byte-identical at both steps"
             }
           ]
         },
@@ -97,7 +330,7 @@
         {
           "path": "packages/jotai/audit/test-classifications.json",
           "role": "support",
-          "sha256": "a9cf762a1aa9ecde1b31471d1f08a81bfa24f2464461b458b885c10e7c9f897e"
+          "sha256": "b339cafb6e2e03f28a8c988967e20e1f0f6bae8d5c958978830eec8242762bdb"
         },
         {
           "path": "packages/octane/tests/differential/_rig.ts",
@@ -105,7 +338,190 @@
           "sha256": "364c0595b08b26343fa3cd9ff7ddbdaa5fd227cfcd390437aa67ae9a173ebe1b"
         }
       ]
+    },
+    {
+      "id": "jotai-hydration",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "jotai",
+      "notes": "Octane-specific SSR subscription exclusion, DOM adoption and client teardown.",
+      "files": [
+        {
+          "path": "packages/jotai/tests/conformance/hydration.test.ts",
+          "role": "test",
+          "sha256": "79d20aa3ad1dfa627ff3b4f50f4e49f15d36a60cf0f835c14cd7a193883f67e7",
+          "cases": [
+            {
+              "id": "conformance:jotai-hydration",
+              "testName": "renders both raw hooks without subscribing on the server and hydrates live store state",
+              "fullName": "renders both raw hooks without subscribing on the server and hydrates live store state"
+            }
+          ]
+        }
+      ]
     }
   ],
-  "divergences": []
+  "divergences": [
+    {
+      "id": "component-commit-observation",
+      "caseIds": [
+        "runtime:b5cc857df7aa88b3",
+        "runtime:73895493bbd19683",
+        "runtime:0ede181305f657af",
+        "runtime:e2cd3c53064664e4",
+        "runtime:be6551ff5b1f1a2c",
+        "runtime:f037ad6b9e6610ee",
+        "runtime:7f5a46c6e9258c8e",
+        "runtime:eeb1e0da8d62f910",
+        "runtime:c80365c2d949f2df",
+        "runtime:74de2b2b64727321",
+        "runtime:a4ef9aa2d7a213bb",
+        "runtime:db31879913ac3df8",
+        "runtime:9ca7285e5d108268",
+        "runtime:67152338efe05be6",
+        "runtime:39b3889941fe67b6",
+        "runtime:4cfe9d44c71210e1",
+        "runtime:85e8f723cecf127c",
+        "runtime:23be7db06e2a01b0",
+        "runtime:afd92adb7ae8ba2f",
+        "runtime:4e81e52612271a3f",
+        "runtime:8b1eacaad8249591",
+        "runtime:497c6345098bf75e",
+        "runtime:3cdba96c1ea4eedc",
+        "runtime:e7fb7354de2e5189",
+        "runtime:d0db28e0962c9cf2",
+        "runtime:3523c18d925cf1f6",
+        "runtime:7ca03090f5e5fd5c",
+        "runtime:36474e18029f1ada",
+        "runtime:8074583a399dd2d0",
+        "runtime:cffe4f682f20528c",
+        "runtime:c6c21b63a3555115",
+        "runtime:3d4bd840903fd309",
+        "runtime:61361a85482d21a0",
+        "runtime:3ab88e6924abc77b",
+        "runtime:5e27db37d1fe466c",
+        "runtime:f53c632a258fbb1c",
+        "runtime:1aa2677d535d3b5e",
+        "runtime:77cfb92800b95b27",
+        "runtime:c4a7becba26e8bb8",
+        "runtime:6317dc036afdfdb9",
+        "runtime:3c9a0f5ca02a81dd",
+        "runtime:d7c38b7d8701af00",
+        "runtime:cc54f83b2de8eca3",
+        "runtime:dd0627b1abbc6f70",
+        "runtime:0b816a7231a981c7",
+        "runtime:16f875a8de92db09",
+        "runtime:3676e96c510c1681",
+        "runtime:875dcc67db2da6fb",
+        "runtime:cac09d8168d1145d",
+        "runtime:b3bb91d0688798f3",
+        "runtime:661a19b5f6779ebc",
+        "runtime:72d7545d31d34086",
+        "runtime:06c096d43c0671ce",
+        "runtime:583fce4efeb1c5b3",
+        "runtime:b299414ccde553c9",
+        "runtime:571e84b5e8c6478f",
+        "runtime:676ee0923a0c57c7",
+        "runtime:ccaef8c190538acc",
+        "runtime:efe3bd69c182cdee",
+        "runtime:419ed81c0c80b678",
+        "runtime:a83b670ffb9ee769",
+        "runtime:8f46cf604623677c",
+        "runtime:9a58221e929821cb",
+        "runtime:2508c3de42a3623c",
+        "runtime:c74b2fef42b272c3",
+        "runtime:13e36b6836548bf2",
+        "runtime:a0c7aa665048d61f",
+        "runtime:a7079b61176ebac4",
+        "runtime:da9db69325765e75",
+        "runtime:3349d7892085d7f3",
+        "runtime:16a2a1c4023ee218",
+        "runtime:1e2c6412ae72f76c",
+        "runtime:9ff86a5e192446b8",
+        "runtime:96300ffc1a0dfea3",
+        "runtime:a8c02dc43dd203bb",
+        "runtime:51fe53d8589def6d",
+        "runtime:560bc3a12a39c952",
+        "runtime:388c807d93e2dac3",
+        "runtime:6b9966371be08a9a",
+        "runtime:86ed19c126bb5606",
+        "runtime:e337b761c94eee74",
+        "runtime:1b5f64cff3e19885",
+        "runtime:5b53167709fc1c5c",
+        "runtime:ab26e3dbb6aeae7b",
+        "runtime:d2f0716b42bf56be",
+        "runtime:291e4421f919fd6b",
+        "runtime:00a0ec53baa4a9b0",
+        "runtime:6c21a53454bff981"
+      ],
+      "upstreamResult": "React counts commits in the component effect.",
+      "octaneResult": "Octane counts the same owner commits from setup with an explicit every-render effect.",
+      "rationale": "Preserve owner identity across Octane JSX child scopes.",
+      "classification": "rendering",
+      "consumerImpact": "The upstream observable assertions remain unchanged.",
+      "migrationGuidance": "Use Octane hooks in component setup and functional error boundaries.",
+      "owner": "@octanejs/jotai",
+      "reviewCondition": "Review when Octane hook scopes or error-boundary contracts change."
+    },
+    {
+      "id": "functional-error-boundary",
+      "caseIds": [
+        "runtime:bc1601fdb357e983",
+        "runtime:b4cc1e9c5708b9f6",
+        "runtime:8d79936e30d1698c",
+        "runtime:f8ae9610a6ea0502",
+        "runtime:e6f9fb393dbb789d",
+        "runtime:29adfd3d9d822cf3",
+        "runtime:cdbde3ddd7a71390",
+        "runtime:c287baddf9a937a4",
+        "runtime:8df848547c2bd17b",
+        "runtime:85f46798bfb6ecd4",
+        "runtime:c8d199bafccabd77",
+        "runtime:0b7462a900de2765",
+        "runtime:00ade9825529f811",
+        "runtime:177e5c76aa0adf39",
+        "runtime:b3f37865c7370a5b",
+        "runtime:44a4de588e77fe2d",
+        "runtime:4e6da0d5f7933eea",
+        "runtime:cc83b8ce2b26ae85",
+        "runtime:afeef7cd2e64574e",
+        "runtime:2067cdabc0a3cb6d",
+        "runtime:6f7dad130ec545ba",
+        "runtime:cc393a2e52e42bb8",
+        "runtime:9df5e8f509e5379e",
+        "runtime:30cbd8d7d07f3878",
+        "runtime:9c96fac450b27aa8",
+        "runtime:ed00553fe1587b63",
+        "runtime:01a01d4880f5dc79",
+        "runtime:9077e48d1aa69f9f",
+        "runtime:9f277431b9c5a306",
+        "runtime:bf25da5c5d57d79c",
+        "runtime:4ce16e3e1a60e6c5",
+        "runtime:c21878a8884ec27e",
+        "runtime:fc038509a64c1ae8",
+        "runtime:d8a7b50d97ae589f",
+        "runtime:ee8da8ff9ddc55a5",
+        "runtime:d97d57c19a32679e",
+        "runtime:7be50234746c84fe",
+        "runtime:e01c0256984c0aff",
+        "runtime:4597362704d88b62",
+        "runtime:ba2604fc5db9466d",
+        "runtime:444a29365b0af3b8",
+        "runtime:6a986fa36847e5ad",
+        "runtime:641236e283fd9d6f",
+        "runtime:f54cd905d9b92714",
+        "runtime:5b95f27cfaca06f1"
+      ],
+      "upstreamResult": "React class boundaries catch errors and offer retry.",
+      "octaneResult": "Octane functional ErrorBoundary components preserve fallback and retry assertions.",
+      "rationale": "Octane does not support React class components.",
+      "classification": "rendering",
+      "consumerImpact": "The upstream observable assertions remain unchanged.",
+      "migrationGuidance": "Use Octane hooks in component setup and functional error boundaries.",
+      "owner": "@octanejs/jotai",
+      "reviewCondition": "Review when Octane hook scopes or error-boundary contracts change."
+    }
+  ],
+  "materializedTests": "packages/jotai"
 }

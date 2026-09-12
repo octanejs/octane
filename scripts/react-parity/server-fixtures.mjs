@@ -10,6 +10,9 @@ export function octaneServerFixtures(root) {
 		name: 'octane-server-fixtures',
 		enforce: 'pre',
 		resolveId(id, importer) {
+			if (importer?.startsWith(prefix) && /^octane(?:\/|$)/.test(id)) {
+				return this.resolve(id, importer.slice(prefix.length, -'.js'.length), { skipSelf: true });
+			}
 			if (!id.endsWith('?octane-ssr')) return;
 			if (!importer || !id.startsWith('.'))
 				throw new Error('Server fixtures require a relative authored module.');

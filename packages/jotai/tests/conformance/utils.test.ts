@@ -1,19 +1,13 @@
 /**
  * @octanejs/jotai/utils conformance — the four ported react/utils hooks
  * (useResetAtom, useAtomCallback, useHydrateAtoms, useReducerAtom) plus smoke
- * coverage that the verbatim vanilla utils (atomFamily, splitAtom,
+ * coverage that the verbatim vanilla utils (splitAtom,
  * atomWithReducer, atomWithStorage) compose with the ported binding inside
  * octane components.
  */
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { atom, createStore, getDefaultStore } from '@octanejs/jotai';
-import {
-	atomFamily,
-	atomWithReducer,
-	atomWithReset,
-	atomWithStorage,
-	splitAtom,
-} from '@octanejs/jotai/utils';
+import { atomWithReducer, atomWithReset, atomWithStorage, splitAtom } from '@octanejs/jotai/utils';
 import { mount, nextPaint } from '../_helpers';
 import { TwoAtoms } from '../_fixtures/atoms.tsrx';
 import {
@@ -155,19 +149,6 @@ describe('useReducerAtom (deprecated)', () => {
 });
 
 describe('vanilla utils inside octane components', () => {
-	it('atomFamily members stay independent', async () => {
-		const family = atomFamily((id: number) => atom(id * 10));
-		const r = mount(TwoAtoms, { a: family(0), b: family(1) });
-		await flush();
-		expect(r.find('#two').textContent).toBe('a=0 b=10');
-
-		r.click('#bump-a');
-		await flush();
-		expect(r.find('#two').textContent).toBe('a=1 b=10');
-		expect(family(0)).toBe(family(0)); // memoized member identity
-		r.unmount();
-	});
-
 	it('atomWithReducer dispatches actions through the setter', async () => {
 		const count = atomWithReducer(0, (v: number, a: { type: string }) =>
 			a.type === 'inc' ? v + 1 : v,

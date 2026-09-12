@@ -20,6 +20,11 @@
       "path": "packages/jotai/tests/differential/parity.test.ts",
       "disposition": "react-octane-differential",
       "oracle": "Runs every declared scenario against pinned jotai and @octanejs/jotai through the shared differential rig."
+    },
+    {
+      "path": "packages/jotai/tests/conformance/hydration.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Verifies SSR subscription exclusion, hydration DOM adoption, updates and teardown."
     }
   ]
 }

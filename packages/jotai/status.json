@@ -1,13 +1,201 @@
 {
-  "upstream": { "package": "jotai", "version": "2.20.2" },
-  "surface": "Complete 1:1 port: the framework-agnostic vanilla core (`jotai/vanilla`, `/vanilla/utils`, `/vanilla/internals`) is reused verbatim; the React layer (`Provider`, `useStore`, `useAtom`, `useAtomValue`, `useSetAtom`) and `react/utils` (`useResetAtom`, `useReducerAtom`, `useAtomCallback`, `useHydrateAtoms`) are ported onto octane hooks, preserving upstream's useReducer force-update + effect-subscription implementation, async atoms via octane's `use()`.",
-  "divergences": [],
-  "ssr": "No SSR-specific surface; `useHydrateAtoms` is ported and usable for hydration seeding; no dedicated SSR tests.",
-  "provenance": {
-    "source": "https://github.com/pmndrs/jotai/tree/5c4ca26b0db5571114be58393e17854a771f7790",
-    "license": "MIT",
-    "commit": "5c4ca26b0db5571114be58393e17854a771f7790",
-    "verification": "recorded-unverified"
+  "upstream": {
+    "package": "jotai",
+    "version": "3.0.0"
   },
-  "verified": "2026-08-02"
+  "surface": "Jotai 3 runtime surface: imported vanilla atoms, stores, utilities and internals; ported Provider, useStore, useAtom, useSetAtom, useAtomValue, useAtomValueRaw, useAtomValueRawSync and four hook utilities.",
+  "divergences": [
+    "Octane hook call-site slots are forwarded through composed hooks.",
+    "React class error-boundary test fixtures use Octane functional ErrorBoundary components.",
+    "Commit-count test hooks run in component setup and use explicit every-render effects to preserve the upstream observation boundary."
+  ],
+  "ssr": "Server rendering and hydration are tested for both raw hooks with request-local stores, no server subscriptions, adopted DOM, client updates and teardown.",
+  "provenance": {
+    "source": "https://github.com/pmndrs/jotai/tree/89d4fddd1949628e50952fc8ac1b09786248dfca",
+    "license": "MIT",
+    "commit": "89d4fddd1949628e50952fc8ac1b09786248dfca",
+    "verification": "verified"
+  },
+  "verified": "2026-09-12",
+  "surfaces": [
+    {
+      "entrypoint": ".",
+      "exports": ["*"],
+      "ownership": "imported",
+      "files": ["src/index.ts", "src/vanilla.ts"],
+      "dependency": {
+        "package": "jotai",
+        "version": "catalog:default"
+      },
+      "evidence": ["tests/conformance/binding.test.ts", "tests/types/public.ts"]
+    },
+    {
+      "entrypoint": ".",
+      "exports": [
+        "Provider",
+        "useStore",
+        "useAtom",
+        "useAtomValue",
+        "useAtomValueRaw",
+        "useAtomValueRawSync",
+        "useSetAtom"
+      ],
+      "ownership": "copied",
+      "files": [
+        "src/internal.ts",
+        "src/react.ts",
+        "src/react/Provider.tsrx",
+        "src/react/continuablePromise.ts",
+        "src/react/store.ts",
+        "src/react/useAtom.ts",
+        "src/react/useAtomValue.ts",
+        "src/react/useAtomValueRaw.ts",
+        "src/react/useAtomValueRawSync.ts",
+        "src/react/useSetAtom.ts",
+        "src/react/utils.ts"
+      ],
+      "dependency": {
+        "package": "jotai",
+        "version": "3.0.0"
+      },
+      "upstreamPaths": ["src", "tests", "package.json", "tsconfig.json", "vitest.config.mts"],
+      "evidence": ["tests/conformance/binding.test.ts", "tests/types/public.ts"]
+    },
+    {
+      "entrypoint": "./vanilla",
+      "exports": ["*"],
+      "ownership": "imported",
+      "files": ["src/vanilla.ts"],
+      "dependency": {
+        "package": "jotai",
+        "version": "catalog:default"
+      },
+      "evidence": ["tests/conformance/binding.test.ts", "tests/types/public.ts"]
+    },
+    {
+      "entrypoint": "./vanilla/utils",
+      "exports": ["*"],
+      "ownership": "imported",
+      "files": ["src/vanilla/utils.ts"],
+      "dependency": {
+        "package": "jotai",
+        "version": "catalog:default"
+      },
+      "evidence": ["tests/conformance/binding.test.ts", "tests/types/public.ts"]
+    },
+    {
+      "entrypoint": "./vanilla/internals",
+      "exports": ["*"],
+      "ownership": "imported",
+      "files": ["src/vanilla/internals.ts"],
+      "dependency": {
+        "package": "jotai",
+        "version": "catalog:default"
+      },
+      "evidence": ["tests/conformance/binding.test.ts", "tests/types/public.ts"]
+    },
+    {
+      "entrypoint": "./react",
+      "exports": [
+        "Provider",
+        "useStore",
+        "useAtom",
+        "useAtomValue",
+        "useAtomValueRaw",
+        "useAtomValueRawSync",
+        "useSetAtom"
+      ],
+      "ownership": "copied",
+      "files": [
+        "src/internal.ts",
+        "src/react.ts",
+        "src/react/Provider.tsrx",
+        "src/react/continuablePromise.ts",
+        "src/react/store.ts",
+        "src/react/useAtom.ts",
+        "src/react/useAtomValue.ts",
+        "src/react/useAtomValueRaw.ts",
+        "src/react/useAtomValueRawSync.ts",
+        "src/react/useSetAtom.ts",
+        "src/react/utils.ts"
+      ],
+      "dependency": {
+        "package": "jotai",
+        "version": "3.0.0"
+      },
+      "upstreamPaths": ["src", "tests", "package.json", "tsconfig.json", "vitest.config.mts"],
+      "evidence": ["tests/conformance/binding.test.ts", "tests/types/public.ts"]
+    },
+    {
+      "entrypoint": "./react/utils",
+      "exports": [
+        "useAtomCallback",
+        "useHydrateAtoms",
+        "useReducerAtom",
+        "useResetAtom",
+        "INTERNAL_InferAtomTuples"
+      ],
+      "ownership": "copied",
+      "files": [
+        "src/internal.ts",
+        "src/react.ts",
+        "src/react/Provider.tsrx",
+        "src/react/continuablePromise.ts",
+        "src/react/store.ts",
+        "src/react/useAtom.ts",
+        "src/react/useAtomValue.ts",
+        "src/react/useAtomValueRaw.ts",
+        "src/react/useAtomValueRawSync.ts",
+        "src/react/useSetAtom.ts",
+        "src/react/utils.ts"
+      ],
+      "dependency": {
+        "package": "jotai",
+        "version": "3.0.0"
+      },
+      "upstreamPaths": ["src", "tests", "package.json", "tsconfig.json", "vitest.config.mts"],
+      "evidence": ["tests/conformance/binding.test.ts", "tests/types/public.ts"]
+    },
+    {
+      "entrypoint": "./utils",
+      "exports": ["*"],
+      "ownership": "imported",
+      "files": ["src/utils.ts", "src/vanilla/utils.ts"],
+      "dependency": {
+        "package": "jotai",
+        "version": "catalog:default"
+      },
+      "evidence": ["tests/conformance/binding.test.ts", "tests/types/public.ts"]
+    },
+    {
+      "entrypoint": "./utils",
+      "exports": [
+        "useAtomCallback",
+        "useHydrateAtoms",
+        "useReducerAtom",
+        "useResetAtom",
+        "INTERNAL_InferAtomTuples"
+      ],
+      "ownership": "copied",
+      "files": [
+        "src/internal.ts",
+        "src/react.ts",
+        "src/react/Provider.tsrx",
+        "src/react/continuablePromise.ts",
+        "src/react/store.ts",
+        "src/react/useAtom.ts",
+        "src/react/useAtomValue.ts",
+        "src/react/useAtomValueRaw.ts",
+        "src/react/useAtomValueRawSync.ts",
+        "src/react/useSetAtom.ts",
+        "src/react/utils.ts"
+      ],
+      "dependency": {
+        "package": "jotai",
+        "version": "3.0.0"
+      },
+      "upstreamPaths": ["src", "tests", "package.json", "tsconfig.json", "vitest.config.mts"],
+      "evidence": ["tests/conformance/binding.test.ts", "tests/types/public.ts"]
+    }
+  ]
 }

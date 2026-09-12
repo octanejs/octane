@@ -196,3 +196,7 @@ packages/shadcn/tests/differential/base-upstream/
 
 # Immutable React Stately 3.49 source and tests.
 packages/aria/upstream/
+
+# Byte-exact Jotai 3 source and test evidence.
+packages/jotai/upstream/
+packages/jotai/tests/upstream/

@@ -1,0 +1,2022 @@
+[
+  {
+    "id": "react-case-v1:3f4dff1c599a7094fd5d",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/abortable.test.tsx"
+  },
+  {
+    "id": "react-case-v1:211802cbcd4746ac666d",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/abortable.test.tsx"
+  },
+  {
+    "id": "react-case-v1:075d2d26b1cfe8b888de",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/abortable.test.tsx"
+  },
+  {
+    "id": "react-case-v1:fa0424cf5a3b4b968c68",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/abortable.test.tsx"
+  },
+  {
+    "id": "react-case-v1:cc124ddc1f147b8d15fb",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/async.test.tsx"
+  },
+  {
+    "id": "react-case-v1:ad88f7ab0226f050a5ac",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/async.test.tsx"
+  },
+  {
+    "id": "react-case-v1:e5e515ad9bfc1b6b60c3",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/async.test.tsx"
+  },
+  {
+    "id": "react-case-v1:8a05027e7fbf76f9c207",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/async.test.tsx"
+  },
+  {
+    "id": "react-case-v1:9d564acd31b772b222d9",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/async.test.tsx"
+  },
+  {
+    "id": "react-case-v1:fbf578febddc5573dd6d",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/async.test.tsx"
+  },
+  {
+    "id": "react-case-v1:dca484596124540fd94e",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/async.test.tsx"
+  },
+  {
+    "id": "react-case-v1:16e53fcb532f68ab21e2",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/async.test.tsx"
+  },
+  {
+    "id": "react-case-v1:59a27116ae6139540f00",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/async.test.tsx"
+  },
+  {
+    "id": "react-case-v1:1315ac48886ad2a728be",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/async.test.tsx"
+  },
+  {
+    "id": "react-case-v1:8e59e37d497cf8d87b07",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/async.test.tsx"
+  },
+  {
+    "id": "react-case-v1:10503b18675cb77fe5ef",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/async.test.tsx"
+  },
+  {
+    "id": "react-case-v1:a318da21286356cec58f",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/async.test.tsx"
+  },
+  {
+    "id": "react-case-v1:20c7e66a2753d7970f24",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/async.test.tsx"
+  },
+  {
+    "id": "react-case-v1:c29e8d146ca220415078",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/async.test.tsx"
+  },
+  {
+    "id": "react-case-v1:9c3dd065fef2e8bcc883",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/async.test.tsx"
+  },
+  {
+    "id": "react-case-v1:69a6fc70d27994384b07",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/async.test.tsx"
+  },
+  {
+    "id": "react-case-v1:14a8578108d4f41a23e5",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/async.test.tsx"
+  },
+  {
+    "id": "react-case-v1:1f9d1cda03534a97b850",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/async.test.tsx"
+  },
+  {
+    "id": "react-case-v1:5fbe6c0f48740e0495b3",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/async.test.tsx"
+  },
+  {
+    "id": "react-case-v1:7905c07a6435dfd7d3b8",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/async.test.tsx"
+  },
+  {
+    "id": "react-case-v1:618bab8fb37d0ad88f25",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/async.test.tsx"
+  },
+  {
+    "id": "react-case-v1:d6bc1760b5720b470d9e",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/async.test.tsx"
+  },
+  {
+    "id": "react-case-v1:10c87dfcd5b656a58c4f",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/async.test.tsx"
+  },
+  {
+    "id": "react-case-v1:b3221809d96c87ff0440",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/async.test.tsx"
+  },
+  {
+    "id": "react-case-v1:4a6602c710b715cd6bd4",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/async2.test.tsx"
+  },
+  {
+    "id": "react-case-v1:85be1da3e1233fd2b54c",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/async2.test.tsx"
+  },
+  {
+    "id": "react-case-v1:c49c1cf813a39f8dd5a1",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/async2.test.tsx"
+  },
+  {
+    "id": "react-case-v1:b3069c84da67d269b4b5",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/async2.test.tsx"
+  },
+  {
+    "id": "react-case-v1:e1ae58686c275128afe6",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/async2.test.tsx"
+  },
+  {
+    "id": "react-case-v1:b20b06e164dfb9d28702",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/async2.test.tsx"
+  },
+  {
+    "id": "react-case-v1:c126a475526d09380894",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/async2.test.tsx"
+  },
+  {
+    "id": "react-case-v1:d1bf1e62880563e4ebbc",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/basic.test.tsx"
+  },
+  {
+    "id": "react-case-v1:62f24c3d29f60be7b7a7",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/basic.test.tsx"
+  },
+  {
+    "id": "react-case-v1:7e0bca2befd999a860e8",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/basic.test.tsx"
+  },
+  {
+    "id": "react-case-v1:8af5c00ebb971b63306a",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/basic.test.tsx"
+  },
+  {
+    "id": "react-case-v1:585bbaadcc921425728a",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/basic.test.tsx"
+  },
+  {
+    "id": "react-case-v1:7c4125702e973b7c91e8",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/basic.test.tsx"
+  },
+  {
+    "id": "react-case-v1:f740570fdbdb7b0a8cf4",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/basic.test.tsx"
+  },
+  {
+    "id": "react-case-v1:cc07e8b6d29f88968ba3",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/basic.test.tsx"
+  },
+  {
+    "id": "react-case-v1:ca000ba49179f279688b",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/basic.test.tsx"
+  },
+  {
+    "id": "react-case-v1:b02db91a53982c76a9be",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/basic.test.tsx"
+  },
+  {
+    "id": "react-case-v1:d1d0e047575b6b7835a3",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/basic.test.tsx"
+  },
+  {
+    "id": "react-case-v1:8c1dfa902d4fdee03315",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/basic.test.tsx"
+  },
+  {
+    "id": "react-case-v1:360f36a8da5966e8fd7d",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/basic.test.tsx"
+  },
+  {
+    "id": "react-case-v1:0219d76c9eef3344802c",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/basic.test.tsx"
+  },
+  {
+    "id": "react-case-v1:f2648820de8ee4d7d1ea",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/basic.test.tsx"
+  },
+  {
+    "id": "react-case-v1:4e3f5de885b53dcccb08",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/basic.test.tsx"
+  },
+  {
+    "id": "react-case-v1:c6be39a81fd7c8aa54e6",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/basic.test.tsx"
+  },
+  {
+    "id": "react-case-v1:9fb7510964a4b471300f",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/basic.test.tsx"
+  },
+  {
+    "id": "react-case-v1:8749a64ab1106b1fca30",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/basic.test.tsx"
+  },
+  {
+    "id": "react-case-v1:349af03a1917f7461a6f",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/basic.test.tsx"
+  },
+  {
+    "id": "react-case-v1:76c8212cd9a70f8104f2",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/basic.test.tsx"
+  },
+  {
+    "id": "react-case-v1:266d8a506785111a72c5",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/basic.test.tsx"
+  },
+  {
+    "id": "react-case-v1:47b8aaecf03f2535069b",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/basic.test.tsx"
+  },
+  {
+    "id": "react-case-v1:6618fa9171d6e3b37ed3",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/basic.test.tsx"
+  },
+  {
+    "id": "react-case-v1:7d07daef115c39b273cd",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/basic.test.tsx"
+  },
+  {
+    "id": "react-case-v1:154fdf568ce944960691",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/basic.test.tsx"
+  },
+  {
+    "id": "react-case-v1:21a42fdae3ce18ded8f3",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/basic.test.tsx"
+  },
+  {
+    "id": "react-case-v1:affbfd731434dfba9a0f",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/dependency.test.tsx"
+  },
+  {
+    "id": "react-case-v1:f4a8eebd9fd2d8ff0bcc",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/dependency.test.tsx"
+  },
+  {
+    "id": "react-case-v1:c8a02c636ec9bdab30ea",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/dependency.test.tsx"
+  },
+  {
+    "id": "react-case-v1:451109f66c4ee5ab71b6",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/dependency.test.tsx"
+  },
+  {
+    "id": "react-case-v1:9906b9e4db65f477b214",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/dependency.test.tsx"
+  },
+  {
+    "id": "react-case-v1:c74b082a4bada7b37eb6",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/dependency.test.tsx"
+  },
+  {
+    "id": "react-case-v1:19ab6a1fabd7bd40aa80",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/dependency.test.tsx"
+  },
+  {
+    "id": "react-case-v1:9f596b974d99981b9d3e",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/dependency.test.tsx"
+  },
+  {
+    "id": "react-case-v1:5510ce35a938dff84624",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/dependency.test.tsx"
+  },
+  {
+    "id": "react-case-v1:da87bda45e6f592cc0b1",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/dependency.test.tsx"
+  },
+  {
+    "id": "react-case-v1:900700e2247f64999e4a",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/dependency.test.tsx"
+  },
+  {
+    "id": "react-case-v1:3fd7e71d32a28fa3f632",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/dependency.test.tsx"
+  },
+  {
+    "id": "react-case-v1:a54a2699e5c247558552",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/dependency.test.tsx"
+  },
+  {
+    "id": "react-case-v1:87a5410dd2c645ce4578",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/dependency.test.tsx"
+  },
+  {
+    "id": "react-case-v1:fc7afa4462950462cec4",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/dependency.test.tsx"
+  },
+  {
+    "id": "react-case-v1:9cecd011f13b8c051e0d",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/dependency.test.tsx"
+  },
+  {
+    "id": "react-case-v1:2e058593655d523ab07d",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/dependency.test.tsx"
+  },
+  {
+    "id": "react-case-v1:7441b721d2a0e7472e4f",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/dependency.test.tsx"
+  },
+  {
+    "id": "react-case-v1:c35adec01742090e1fd0",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/dependency.test.tsx"
+  },
+  {
+    "id": "react-case-v1:1d93d25a9630ef8d33a2",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/dependency.test.tsx"
+  },
+  {
+    "id": "react-case-v1:ff1062f59eb83b528951",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/dependency.test.tsx"
+  },
+  {
+    "id": "react-case-v1:e8e828e4fc0433a5265c",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/error.test.tsx"
+  },
+  {
+    "id": "react-case-v1:942db8e048b4eaa41e02",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/error.test.tsx"
+  },
+  {
+    "id": "react-case-v1:42b55226b2eccc5a0adc",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/error.test.tsx"
+  },
+  {
+    "id": "react-case-v1:95af188e3c04b28275e4",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/error.test.tsx"
+  },
+  {
+    "id": "react-case-v1:f09772fa3f5626f1fed7",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/error.test.tsx"
+  },
+  {
+    "id": "react-case-v1:908dd2ae476f3b43410c",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/error.test.tsx"
+  },
+  {
+    "id": "react-case-v1:e1e6e20d1641174ac957",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/error.test.tsx"
+  },
+  {
+    "id": "react-case-v1:3cfbbf5ea6fa27c42b44",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/error.test.tsx"
+  },
+  {
+    "id": "react-case-v1:6c75f6e357a359004ea1",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/error.test.tsx"
+  },
+  {
+    "id": "react-case-v1:99f6d64d6cba8671fba9",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/error.test.tsx"
+  },
+  {
+    "id": "react-case-v1:4f9e93388827801c828c",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/error.test.tsx"
+  },
+  {
+    "id": "react-case-v1:e07f8a43d7c8f888aaba",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/error.test.tsx"
+  },
+  {
+    "id": "react-case-v1:716283cd9f3143ee5798",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/error.test.tsx"
+  },
+  {
+    "id": "react-case-v1:13f1360d23c4b54a0cfd",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/error.test.tsx"
+  },
+  {
+    "id": "react-case-v1:21ca7678fd20cfab8e2d",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/items.test.tsx"
+  },
+  {
+    "id": "react-case-v1:f279032a4d6f0969c2d9",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/items.test.tsx"
+  },
+  {
+    "id": "react-case-v1:8107fe987a916a408cb1",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/onmount.test.tsx"
+  },
+  {
+    "id": "react-case-v1:a854c67f10c784d6391c",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/onmount.test.tsx"
+  },
+  {
+    "id": "react-case-v1:48b00225cd2d7d80daeb",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/onmount.test.tsx"
+  },
+  {
+    "id": "react-case-v1:6cd64f42bf31518a5c05",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/onmount.test.tsx"
+  },
+  {
+    "id": "react-case-v1:1d505ed96299f39b1ac0",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/onmount.test.tsx"
+  },
+  {
+    "id": "react-case-v1:81c6e2c7c1e4d96b9511",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/onmount.test.tsx"
+  },
+  {
+    "id": "react-case-v1:d133560eed4115592741",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/onmount.test.tsx"
+  },
+  {
+    "id": "react-case-v1:452a83f4c077faaf35a9",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/onmount.test.tsx"
+  },
+  {
+    "id": "react-case-v1:1011dc7dd9238b895b10",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/onmount.test.tsx"
+  },
+  {
+    "id": "react-case-v1:cc1e41052cd48fa621e0",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/onmount.test.tsx"
+  },
+  {
+    "id": "react-case-v1:76b5b89cb9668709876a",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/optimization.test.tsx"
+  },
+  {
+    "id": "react-case-v1:5a40fd01a6910c41b9cd",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/optimization.test.tsx"
+  },
+  {
+    "id": "react-case-v1:aa3655a3d2178bb95f8c",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/optimization.test.tsx"
+  },
+  {
+    "id": "react-case-v1:1c07cb38772cebfb3817",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/optimization.test.tsx"
+  },
+  {
+    "id": "react-case-v1:21213230ad1564c5f262",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/optimization.test.tsx"
+  },
+  {
+    "id": "react-case-v1:27d19bb30d0c215e41d8",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/provider.test.tsx"
+  },
+  {
+    "id": "react-case-v1:cd74e7dc9dd070373041",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/provider.test.tsx"
+  },
+  {
+    "id": "react-case-v1:e240b81fb6ad9d13fe23",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/provider.test.tsx"
+  },
+  {
+    "id": "react-case-v1:fa636dffccdbb9694ba4",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/transition.test.tsx"
+  },
+  {
+    "id": "react-case-v1:84fc48486289e43fa7bb",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/transition.test.tsx"
+  },
+  {
+    "id": "react-case-v1:662f414a1417322944b5",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/types.test.tsx"
+  },
+  {
+    "id": "react-case-v1:6d36520c4dad913e75e4",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/types.test.tsx"
+  },
+  {
+    "id": "react-case-v1:f5dfcdfa3b7ebc70ef74",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/types.test.tsx"
+  },
+  {
+    "id": "react-case-v1:c69829727209d4afcb4b",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/types.test.tsx"
+  },
+  {
+    "id": "react-case-v1:7b8b875241b4f8cbf7ac",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/types.test.tsx"
+  },
+  {
+    "id": "react-case-v1:75c9711883a61c37ae64",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/useAtomValue.test.tsx"
+  },
+  {
+    "id": "react-case-v1:dc7abdc44bf2cd0b2bbb",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/useAtomValue.test.tsx"
+  },
+  {
+    "id": "react-case-v1:9bcc87aed945ce7a5466",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/useAtomValue.test.tsx"
+  },
+  {
+    "id": "react-case-v1:ee9b757d1d83c62a0096",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/useAtomValue.test.tsx"
+  },
+  {
+    "id": "react-case-v1:7e20a4f013dd0aab7c2a",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/useAtomValueRaw.test.tsx"
+  },
+  {
+    "id": "react-case-v1:d0c34dd0e44643f647ca",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/useAtomValueRaw.test.tsx"
+  },
+  {
+    "id": "react-case-v1:909f0bf6a39a490bbac5",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/useAtomValueRaw.test.tsx"
+  },
+  {
+    "id": "react-case-v1:4a2fb8dd5fae2e90a86c",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/useAtomValueRaw.test.tsx"
+  },
+  {
+    "id": "react-case-v1:6085386dbc3c8b2b6510",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/useAtomValueRaw.test.tsx"
+  },
+  {
+    "id": "react-case-v1:97ce70f8154b2f79af5a",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/useAtomValueRaw.test.tsx"
+  },
+  {
+    "id": "react-case-v1:1e6bca206f21bd280de3",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/useAtomValueRawSync.test.tsx"
+  },
+  {
+    "id": "react-case-v1:cf5b38fc7b465e652166",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/useAtomValueRawSync.test.tsx"
+  },
+  {
+    "id": "react-case-v1:a300c727ba93017036fe",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/useAtomValueRawSync.test.tsx"
+  },
+  {
+    "id": "react-case-v1:eb4e6e96619a19adf85c",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/useAtomValueRawSync.test.tsx"
+  },
+  {
+    "id": "react-case-v1:fcd16080a1bec5e9fa3c",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/useAtomValueRawSync.test.tsx"
+  },
+  {
+    "id": "react-case-v1:b2cd1909352dfd37693e",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/useAtomValueRawSync.test.tsx"
+  },
+  {
+    "id": "react-case-v1:abf8ceaa663b3ed599a8",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/useSetAtom.test.tsx"
+  },
+  {
+    "id": "react-case-v1:107eb77bdbfebce247ad",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/useSetAtom.test.tsx"
+  },
+  {
+    "id": "react-case-v1:b7e71a443685fa2d15f0",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/useSetAtom.test.tsx"
+  },
+  {
+    "id": "react-case-v1:3e46663a97bd84eea959",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/utils/types.test.tsx"
+  },
+  {
+    "id": "react-case-v1:c5a0016b1e8240e176dd",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/utils/useAtomCallback.test.tsx"
+  },
+  {
+    "id": "react-case-v1:5bb55faf32af1e57963e",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/utils/useAtomCallback.test.tsx"
+  },
+  {
+    "id": "react-case-v1:1e93b07aafab99ed62bf",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/utils/useAtomCallback.test.tsx"
+  },
+  {
+    "id": "react-case-v1:3b9d9bae111618e8b1f4",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/utils/useAtomCallback.test.tsx"
+  },
+  {
+    "id": "react-case-v1:243c7994906d47aa734b",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/utils/useHydrateAtoms.test.tsx"
+  },
+  {
+    "id": "react-case-v1:7da5713e78dd58a79a90",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/utils/useHydrateAtoms.test.tsx"
+  },
+  {
+    "id": "react-case-v1:faed79851c16476a94dd",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/utils/useHydrateAtoms.test.tsx"
+  },
+  {
+    "id": "react-case-v1:5833eb611da78c999d37",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/utils/useHydrateAtoms.test.tsx"
+  },
+  {
+    "id": "react-case-v1:3670f3919c3a09e63663",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/utils/useHydrateAtoms.test.tsx"
+  },
+  {
+    "id": "react-case-v1:80cb1bba9af408a618d5",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/utils/useHydrateAtoms.test.tsx"
+  },
+  {
+    "id": "react-case-v1:24a81e10edbc899393ab",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/utils/useHydrateAtoms.test.tsx"
+  },
+  {
+    "id": "react-case-v1:588450ecf217a2256186",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/utils/useHydrateAtoms.test.tsx"
+  },
+  {
+    "id": "react-case-v1:12402d7e345942668ffe",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/utils/useReducerAtom.test.tsx"
+  },
+  {
+    "id": "react-case-v1:a4d21a74135faa7cb5e8",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/utils/useReducerAtom.test.tsx"
+  },
+  {
+    "id": "react-case-v1:81bcd8838302abe51d32",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/utils/useReducerAtom.test.tsx"
+  },
+  {
+    "id": "react-case-v1:476e795352d9147dd67a",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/utils/useResetAtom.test.tsx"
+  },
+  {
+    "id": "react-case-v1:daef28f251d6cde5ca21",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/utils/useResetAtom.test.tsx"
+  },
+  {
+    "id": "react-case-v1:0710a80d4e89a3449467",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/utils/useResetAtom.test.tsx"
+  },
+  {
+    "id": "react-case-v1:e7588f1c585ca588a87a",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/utils/useResetAtom.test.tsx"
+  },
+  {
+    "id": "react-case-v1:89ccbace5187fa73a805",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/atomWithDefault.test.tsx"
+  },
+  {
+    "id": "react-case-v1:fa777a69e37dc86c74ae",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/atomWithDefault.test.tsx"
+  },
+  {
+    "id": "react-case-v1:c88bea1d320fcb9e5547",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/atomWithDefault.test.tsx"
+  },
+  {
+    "id": "react-case-v1:08cbdea321c90997e008",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/atomWithDefault.test.tsx"
+  },
+  {
+    "id": "react-case-v1:6c0d6ddf19f36176916c",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/atomWithDefault.test.tsx"
+  },
+  {
+    "id": "react-case-v1:f483ca1b47fc9a6e0f88",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/atomWithObservable.test.tsx"
+  },
+  {
+    "id": "react-case-v1:fdb29654d2336ac937a2",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/atomWithObservable.test.tsx"
+  },
+  {
+    "id": "react-case-v1:e9eca24937188ad2eca2",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/atomWithObservable.test.tsx"
+  },
+  {
+    "id": "react-case-v1:ace8bc3393d880ecc9ed",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/atomWithObservable.test.tsx"
+  },
+  {
+    "id": "react-case-v1:1b8974fb55784aa37bfd",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/atomWithObservable.test.tsx"
+  },
+  {
+    "id": "react-case-v1:077676747ded2bb17530",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/atomWithObservable.test.tsx"
+  },
+  {
+    "id": "react-case-v1:454daaed36ee093c9376",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/atomWithObservable.test.tsx"
+  },
+  {
+    "id": "react-case-v1:33e4ec6f090f6ae1f9ae",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/atomWithObservable.test.tsx"
+  },
+  {
+    "id": "react-case-v1:418c2fe55160e8b19525",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/atomWithObservable.test.tsx"
+  },
+  {
+    "id": "react-case-v1:17f46531bd8b7ec7ac83",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/atomWithObservable.test.tsx"
+  },
+  {
+    "id": "react-case-v1:a3eef208b4cc33bd5302",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/atomWithObservable.test.tsx"
+  },
+  {
+    "id": "react-case-v1:89376219d35e6db3b190",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/atomWithObservable.test.tsx"
+  },
+  {
+    "id": "react-case-v1:3399bf7d3f89cb3b4d55",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/atomWithObservable.test.tsx"
+  },
+  {
+    "id": "react-case-v1:da9f2cd67c380e60ab6d",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/atomWithObservable.test.tsx"
+  },
+  {
+    "id": "react-case-v1:d06b668645c28d35d916",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/atomWithObservable.test.tsx"
+  },
+  {
+    "id": "react-case-v1:9a1baa304e88fd9fa196",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/atomWithObservable.test.tsx"
+  },
+  {
+    "id": "react-case-v1:c7d17ceb255ee3ff3226",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/atomWithObservable.test.tsx"
+  },
+  {
+    "id": "react-case-v1:8ddeb1282b39038c2338",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/atomWithObservable.test.tsx"
+  },
+  {
+    "id": "react-case-v1:a8056f82af1830d1f7b2",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/atomWithObservable.test.tsx"
+  },
+  {
+    "id": "react-case-v1:0a306b5d46eeaed2070e",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/atomWithObservable.test.tsx"
+  },
+  {
+    "id": "react-case-v1:625d411ef1a25ca863e4",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/atomWithObservable.test.tsx"
+  },
+  {
+    "id": "react-case-v1:e81b35a7badfb77ab190",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/atomWithObservable.test.tsx"
+  },
+  {
+    "id": "react-case-v1:6be28b861d911efc580c",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/atomWithObservable.test.tsx"
+  },
+  {
+    "id": "react-case-v1:f2c23e28f7e84540d5eb",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/atomWithObservable.test.tsx"
+  },
+  {
+    "id": "react-case-v1:bd055a58f4d870c4762f",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/atomWithObservable.test.tsx"
+  },
+  {
+    "id": "react-case-v1:6d11881e0e292de3a67b",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/atomWithObservable.test.tsx"
+  },
+  {
+    "id": "react-case-v1:dd41331924c6fdf5cab8",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/atomWithObservable.test.tsx"
+  },
+  {
+    "id": "react-case-v1:823d7e88ddc92d78b164",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/atomWithReducer.test.tsx"
+  },
+  {
+    "id": "react-case-v1:8644e73446a11ab1faa6",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/atomWithReducer.test.tsx"
+  },
+  {
+    "id": "react-case-v1:138f0b358bde57663927",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/atomWithRefresh.test.tsx"
+  },
+  {
+    "id": "react-case-v1:b0de4048c962462b4fb2",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/atomWithRefresh.test.tsx"
+  },
+  {
+    "id": "react-case-v1:7a4c58e235b74b77bd32",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/atomWithRefresh.test.tsx"
+  },
+  {
+    "id": "react-case-v1:dff7c9ec4a897ce00e7a",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/atomWithStorage.test.tsx"
+  },
+  {
+    "id": "react-case-v1:cf15fff5815531e293b1",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/atomWithStorage.test.tsx"
+  },
+  {
+    "id": "react-case-v1:8f5eb0d8ebf76fe2b259",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/atomWithStorage.test.tsx"
+  },
+  {
+    "id": "react-case-v1:66140a7fe5d7fa15d198",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/atomWithStorage.test.tsx"
+  },
+  {
+    "id": "react-case-v1:e9f28b2760dd04fd2fda",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/atomWithStorage.test.tsx"
+  },
+  {
+    "id": "react-case-v1:4861aade97c7c32eb8ed",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/atomWithStorage.test.tsx"
+  },
+  {
+    "id": "react-case-v1:73ef7e239e0304eea291",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/atomWithStorage.test.tsx"
+  },
+  {
+    "id": "react-case-v1:76bf80e9098407c6da1d",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/atomWithStorage.test.tsx"
+  },
+  {
+    "id": "react-case-v1:e5ee60deeaff820c1443",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/atomWithStorage.test.tsx"
+  },
+  {
+    "id": "react-case-v1:d2d6bce3ab982cf045a8",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/atomWithStorage.test.tsx"
+  },
+  {
+    "id": "react-case-v1:1fce404651358eaee11f",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/atomWithStorage.test.tsx"
+  },
+  {
+    "id": "react-case-v1:8e3e4fd7e1af6dbdfcd2",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/atomWithStorage.test.tsx"
+  },
+  {
+    "id": "react-case-v1:b9848b02759b22c78016",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/atomWithStorage.test.tsx"
+  },
+  {
+    "id": "react-case-v1:db91100e086d4ee2f4c8",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/atomWithStorage.test.tsx"
+  },
+  {
+    "id": "react-case-v1:549520420149b3ff74d1",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/atomWithStorage.test.tsx"
+  },
+  {
+    "id": "react-case-v1:8babf7fd814000466ad2",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/atomWithStorage.test.tsx"
+  },
+  {
+    "id": "react-case-v1:78089226f2904b04b1f9",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/atomWithStorage.test.tsx"
+  },
+  {
+    "id": "react-case-v1:3d2655bba5c3e7e665aa",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/atomWithStorage.test.tsx"
+  },
+  {
+    "id": "react-case-v1:52900842fc3368d459e4",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/atomWithStorage.test.tsx"
+  },
+  {
+    "id": "react-case-v1:afc66f4e7f7b01e5863d",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/atomWithStorage.test.tsx"
+  },
+  {
+    "id": "react-case-v1:86bf244060e016f23a2f",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/atomWithStorage.test.tsx"
+  },
+  {
+    "id": "react-case-v1:aa2ef946ded8d69656b9",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/atomWithStorage.test.tsx"
+  },
+  {
+    "id": "react-case-v1:98a6bbb87c60723b8809",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/atomWithStorage.test.tsx"
+  },
+  {
+    "id": "react-case-v1:950c269bcdff25a7d008",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/atomWithStorage.test.tsx"
+  },
+  {
+    "id": "react-case-v1:d110894c17361fbe3e96",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/atomWithStorage.test.tsx"
+  },
+  {
+    "id": "react-case-v1:6c51df545deba11f286f",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/freezeAtom.test.tsx"
+  },
+  {
+    "id": "react-case-v1:af0358bf9cdd82f2d9ee",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/freezeAtom.test.tsx"
+  },
+  {
+    "id": "react-case-v1:fcd583d4ce91ca7cd50d",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/freezeAtom.test.tsx"
+  },
+  {
+    "id": "react-case-v1:20fd9e3b3a8076ae1fb5",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/freezeAtom.test.tsx"
+  },
+  {
+    "id": "react-case-v1:c2a9256564d5829fe96c",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/selectAtom.test.tsx"
+  },
+  {
+    "id": "react-case-v1:e7ac3bf151e3239d9235",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/selectAtom.test.tsx"
+  },
+  {
+    "id": "react-case-v1:b9ea4e8def2bda39717c",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/selectAtom.test.tsx"
+  },
+  {
+    "id": "react-case-v1:bd5d54f7a202a4e9b940",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/splitAtom.test.tsx"
+  },
+  {
+    "id": "react-case-v1:1baa26623e41c4a16e92",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/splitAtom.test.tsx"
+  },
+  {
+    "id": "react-case-v1:95e3006e8daeb1a4a5b4",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/splitAtom.test.tsx"
+  },
+  {
+    "id": "react-case-v1:b1f1c3704ad8c487d335",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/splitAtom.test.tsx"
+  },
+  {
+    "id": "react-case-v1:f11c15a2a2013fc6e270",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/splitAtom.test.tsx"
+  },
+  {
+    "id": "react-case-v1:40a72e6a2cfee1a42a1c",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/splitAtom.test.tsx"
+  },
+  {
+    "id": "react-case-v1:1fb78cffa485aecc5514",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/splitAtom.test.tsx"
+  },
+  {
+    "id": "react-case-v1:7c1389ad7fb0951c2f42",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/splitAtom.test.tsx"
+  },
+  {
+    "id": "react-case-v1:d04b76dfd45c5b902be5",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/react/vanilla-utils/splitAtom.test.tsx"
+  },
+  {
+    "id": "react-case-v1:7b79780b63efffdf96e2",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/basic.test.tsx"
+  },
+  {
+    "id": "react-case-v1:c627b3e84acc12022649",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/basic.test.tsx"
+  },
+  {
+    "id": "react-case-v1:7164d2115db57e5a07df",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/basic.test.tsx"
+  },
+  {
+    "id": "react-case-v1:269927526391ce173811",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/dependency.test.tsx"
+  },
+  {
+    "id": "react-case-v1:2a0583e7dba88cee7e77",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/dependency.test.tsx"
+  },
+  {
+    "id": "react-case-v1:d3cef080d4f460694fbc",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/dependency.test.tsx"
+  },
+  {
+    "id": "react-case-v1:2a385b04eba4a4623e75",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/dependency.test.tsx"
+  },
+  {
+    "id": "react-case-v1:dc3c394f8fe2391c419a",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/dependency.test.tsx"
+  },
+  {
+    "id": "react-case-v1:0debf268f856b77eefdf",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/dependency.test.tsx"
+  },
+  {
+    "id": "react-case-v1:3f9f1e1c3ecd2b19e094",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/dependency.test.tsx"
+  },
+  {
+    "id": "react-case-v1:b7f99891128a5e5a5b79",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/dependency.test.tsx"
+  },
+  {
+    "id": "react-case-v1:e658804037c0daf1cfec",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/dependency.test.tsx"
+  },
+  {
+    "id": "react-case-v1:d5c3a63d87a311d57607",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/dependency.test.tsx"
+  },
+  {
+    "id": "react-case-v1:afc9c3aef8aee09d809e",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/dependency.test.tsx"
+  },
+  {
+    "id": "react-case-v1:71a4a730ec485311df6e",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/dependency.test.tsx"
+  },
+  {
+    "id": "react-case-v1:1c56ef833c681229bdd7",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/dependency.test.tsx"
+  },
+  {
+    "id": "react-case-v1:bd1b415e78303274639d",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/dependency.test.tsx"
+  },
+  {
+    "id": "react-case-v1:e51bde0653112638d220",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/dependency.test.tsx"
+  },
+  {
+    "id": "react-case-v1:8826ed230bfe51186c5f",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/dependency.test.tsx"
+  },
+  {
+    "id": "react-case-v1:a28e394ca1076ea7ca37",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/derive.test.tsx"
+  },
+  {
+    "id": "react-case-v1:1fc01878d6d56aa1b4f8",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/derive.test.tsx"
+  },
+  {
+    "id": "react-case-v1:e9c5be49a73f3063b70a",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/derive.test.tsx"
+  },
+  {
+    "id": "react-case-v1:23380a5374863f109476",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/derive.test.tsx"
+  },
+  {
+    "id": "react-case-v1:5657fd31257f01cb7885",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/effect.test.ts"
+  },
+  {
+    "id": "react-case-v1:7af057b344438ed434d7",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/effect.test.ts"
+  },
+  {
+    "id": "react-case-v1:8cfe6ab49ebebb87791a",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/effect.test.ts"
+  },
+  {
+    "id": "react-case-v1:614df3263900862d8c6d",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/effect.test.ts"
+  },
+  {
+    "id": "react-case-v1:1b0c159012362ee66bd2",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/effect.test.ts"
+  },
+  {
+    "id": "react-case-v1:078d2fb45f237d6be49d",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/internals.test.tsx"
+  },
+  {
+    "id": "react-case-v1:2f9172687016f79bcfd6",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/internals.test.tsx"
+  },
+  {
+    "id": "react-case-v1:ce51bcca750d7f7d1daf",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/internals.test.tsx"
+  },
+  {
+    "id": "react-case-v1:0ecda27038bc41835bd3",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/internals.test.tsx"
+  },
+  {
+    "id": "react-case-v1:e1dca5a9d7fbbc6e1cd9",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/internals.test.tsx"
+  },
+  {
+    "id": "react-case-v1:e6c7ae32cf0d5e297310",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/internals.test.tsx"
+  },
+  {
+    "id": "react-case-v1:ca23f845e6eb44783593",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/internals.test.tsx"
+  },
+  {
+    "id": "react-case-v1:fe5a076d6d3c14f40d70",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/internals.test.tsx"
+  },
+  {
+    "id": "react-case-v1:1d857cf3eeed7fc680c3",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/internals.test.tsx"
+  },
+  {
+    "id": "react-case-v1:50f9c811c1d1c576dbf4",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/internals.test.tsx"
+  },
+  {
+    "id": "react-case-v1:07a722d367453da7ae14",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/internals.test.tsx"
+  },
+  {
+    "id": "react-case-v1:6e474472da4eff3dd454",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/internals.test.tsx"
+  },
+  {
+    "id": "react-case-v1:69190e96a6ba47db2389",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/internals.test.tsx"
+  },
+  {
+    "id": "react-case-v1:b87f1d6fbfdf5d00e86a",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/internals.test.tsx"
+  },
+  {
+    "id": "react-case-v1:2bced1148cc6946ff01a",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/internals.test.tsx"
+  },
+  {
+    "id": "react-case-v1:bc8e10df5901f8632abf",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/internals.test.tsx"
+  },
+  {
+    "id": "react-case-v1:2e36ba68d9b4f1416d1b",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/internals.test.tsx"
+  },
+  {
+    "id": "react-case-v1:b152626dacea50144b32",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/memoryleaks.test.ts"
+  },
+  {
+    "id": "react-case-v1:51d452f505c943b5f27f",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/memoryleaks.test.ts"
+  },
+  {
+    "id": "react-case-v1:bd71788feeafe83f2fa1",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/memoryleaks.test.ts"
+  },
+  {
+    "id": "react-case-v1:68d20d50a020b11f69e3",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/memoryleaks.test.ts"
+  },
+  {
+    "id": "react-case-v1:583cab530748c933ee3e",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/memoryleaks.test.ts"
+  },
+  {
+    "id": "react-case-v1:7b1fedc2681215afcd1a",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/memoryleaks.test.ts"
+  },
+  {
+    "id": "react-case-v1:1c4b55826d4746ba1075",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/memoryleaks.test.ts"
+  },
+  {
+    "id": "react-case-v1:9afb0aef1afb2515b82a",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/memoryleaks.test.ts"
+  },
+  {
+    "id": "react-case-v1:b10d0cd675a6eba376e3",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/memoryleaks.test.ts"
+  },
+  {
+    "id": "react-case-v1:872f9029f7623dcf426b",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/memoryleaks.test.ts"
+  },
+  {
+    "id": "react-case-v1:8160a04532ef1dc811e7",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/store.test.tsx"
+  },
+  {
+    "id": "react-case-v1:a458df6d5c5189c3e8a0",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/store.test.tsx"
+  },
+  {
+    "id": "react-case-v1:c70f6fc05aced5f32cde",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/store.test.tsx"
+  },
+  {
+    "id": "react-case-v1:efd5c2ad8f76e44c9b5d",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/store.test.tsx"
+  },
+  {
+    "id": "react-case-v1:f9b13d84db5d624f8a7e",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/store.test.tsx"
+  },
+  {
+    "id": "react-case-v1:e9cad3004ad0504d0740",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/store.test.tsx"
+  },
+  {
+    "id": "react-case-v1:f23a44aa26ab711df8c7",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/store.test.tsx"
+  },
+  {
+    "id": "react-case-v1:8404f717f8a10b67950a",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/store.test.tsx"
+  },
+  {
+    "id": "react-case-v1:6865a21d3fab5befa87b",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/store.test.tsx"
+  },
+  {
+    "id": "react-case-v1:56e3ab30388e92e49e72",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/store.test.tsx"
+  },
+  {
+    "id": "react-case-v1:32eb7d3772bed78e6f78",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/store.test.tsx"
+  },
+  {
+    "id": "react-case-v1:1df89b879bb51946d7aa",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/store.test.tsx"
+  },
+  {
+    "id": "react-case-v1:3dcc0757d33b0a4022eb",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/store.test.tsx"
+  },
+  {
+    "id": "react-case-v1:cd9f0b37e9ff9cc0ae71",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/store.test.tsx"
+  },
+  {
+    "id": "react-case-v1:7b908764efd7e5d22d3a",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/store.test.tsx"
+  },
+  {
+    "id": "react-case-v1:9efbcb50ac82fa1a9843",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/store.test.tsx"
+  },
+  {
+    "id": "react-case-v1:b556ccf89c8b49aa02cb",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/store.test.tsx"
+  },
+  {
+    "id": "react-case-v1:05313f61371fa37bdcd2",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/store.test.tsx"
+  },
+  {
+    "id": "react-case-v1:170de80c0f23fd0776fe",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/store.test.tsx"
+  },
+  {
+    "id": "react-case-v1:29b69ddb4cb931f6edc5",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/store.test.tsx"
+  },
+  {
+    "id": "react-case-v1:0071d8e942c9b11c5e58",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/store.test.tsx"
+  },
+  {
+    "id": "react-case-v1:556490052d25d2e66557",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/store.test.tsx"
+  },
+  {
+    "id": "react-case-v1:5137c46121a63e205421",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/store.test.tsx"
+  },
+  {
+    "id": "react-case-v1:5fe5b98dd60a3088b09b",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/store.test.tsx"
+  },
+  {
+    "id": "react-case-v1:14fd49b73c2cd2ce754e",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/store.test.tsx"
+  },
+  {
+    "id": "react-case-v1:def7370838d1dd37883c",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/store.test.tsx"
+  },
+  {
+    "id": "react-case-v1:11faed9c535611a19f25",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/store.test.tsx"
+  },
+  {
+    "id": "react-case-v1:96bc9e72c0efad12f16b",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/store.test.tsx"
+  },
+  {
+    "id": "react-case-v1:8717574a69464dd8cded",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/store.test.tsx"
+  },
+  {
+    "id": "react-case-v1:3c1719e81b55761772d3",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/store.test.tsx"
+  },
+  {
+    "id": "react-case-v1:2288fa5e8ed604424529",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/store.test.tsx"
+  },
+  {
+    "id": "react-case-v1:ec867a17d4e2a0653c42",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/store.test.tsx"
+  },
+  {
+    "id": "react-case-v1:5b259def119e7cad9623",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/store.test.tsx"
+  },
+  {
+    "id": "react-case-v1:f1b10119a9c16604bcd7",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/store.test.tsx"
+  },
+  {
+    "id": "react-case-v1:bee5bb46e6091d1e13d7",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/store.test.tsx"
+  },
+  {
+    "id": "react-case-v1:502c2122d2143f4f2fc2",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/store.test.tsx"
+  },
+  {
+    "id": "react-case-v1:f34846c1dc6ef1260e15",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/store.test.tsx"
+  },
+  {
+    "id": "react-case-v1:6960c16dbd8f3e6efcfe",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/store.test.tsx"
+  },
+  {
+    "id": "react-case-v1:0bec54628ff2365b77b7",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/store.test.tsx"
+  },
+  {
+    "id": "react-case-v1:93b386fddff007bfa2da",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/store.test.tsx"
+  },
+  {
+    "id": "react-case-v1:81fd387a1978d8e60ca2",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/store.test.tsx"
+  },
+  {
+    "id": "react-case-v1:20d73392610da4936a2d",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/store.test.tsx"
+  },
+  {
+    "id": "react-case-v1:fdfc229987c341dfff14",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/store.test.tsx"
+  },
+  {
+    "id": "react-case-v1:fb3da198e24c33a1f399",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/store.test.tsx"
+  },
+  {
+    "id": "react-case-v1:3d66c4e4bcfad9f31f5e",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/store.test.tsx"
+  },
+  {
+    "id": "react-case-v1:8cfa062dc0a9646ce613",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/store.test.tsx"
+  },
+  {
+    "id": "react-case-v1:19c58d8679a81fbd0358",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/store.test.tsx"
+  },
+  {
+    "id": "react-case-v1:33677052e7436a030959",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/store.test.tsx"
+  },
+  {
+    "id": "react-case-v1:c58cb55538cc3e65ef61",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/store.test.tsx"
+  },
+  {
+    "id": "react-case-v1:0cb683a3e463149f848e",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/store.test.tsx"
+  },
+  {
+    "id": "react-case-v1:7839c9dab882b30ae12f",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/store.test.tsx"
+  },
+  {
+    "id": "react-case-v1:cf14553f9baa5310e266",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/store.test.tsx"
+  },
+  {
+    "id": "react-case-v1:fc8fa66cb21cd8674a10",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/store.test.tsx"
+  },
+  {
+    "id": "react-case-v1:350c42d43603afdd5632",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/store.test.tsx"
+  },
+  {
+    "id": "react-case-v1:37b76ad7bea33bec8ecf",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/store.test.tsx"
+  },
+  {
+    "id": "react-case-v1:ecd31ce6d855fc244fb4",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/store.test.tsx"
+  },
+  {
+    "id": "react-case-v1:d083c1f7eab27a3e0f22",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/store.test.tsx"
+  },
+  {
+    "id": "react-case-v1:30b320fc6cec2fe9f6d8",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/store.test.tsx"
+  },
+  {
+    "id": "react-case-v1:61dc80a92baec769b543",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/store.test.tsx"
+  },
+  {
+    "id": "react-case-v1:6577c5d13cf998cf3284",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/store.test.tsx"
+  },
+  {
+    "id": "react-case-v1:2cbc6660afd350b61f63",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/store.test.tsx"
+  },
+  {
+    "id": "react-case-v1:8e12b653fd22578c94f5",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/store.test.tsx"
+  },
+  {
+    "id": "react-case-v1:6af58fd80775e29025d8",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/store.test.tsx"
+  },
+  {
+    "id": "react-case-v1:e1cb396259c92ab210b0",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/store.test.tsx"
+  },
+  {
+    "id": "react-case-v1:2ad0294f739d7cb83259",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/store.test.tsx"
+  },
+  {
+    "id": "react-case-v1:93c208ff495af37bb80d",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/store.test.tsx"
+  },
+  {
+    "id": "react-case-v1:4b2be5f639d649a7d8b6",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/store.test.tsx"
+  },
+  {
+    "id": "react-case-v1:3b423028e4f7e0116ff2",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/store.test.tsx"
+  },
+  {
+    "id": "react-case-v1:2de0af4b7d08de06f0a7",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/store.test.tsx"
+  },
+  {
+    "id": "react-case-v1:9f365eabffa1fd08f809",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/storedev.test.tsx"
+  },
+  {
+    "id": "react-case-v1:f1bec3f7d401e20cac23",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/storedev.test.tsx"
+  },
+  {
+    "id": "react-case-v1:44619f2bef367c2c43af",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/storedev.test.tsx"
+  },
+  {
+    "id": "react-case-v1:a857b6d192474766909c",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/storedev.test.tsx"
+  },
+  {
+    "id": "react-case-v1:316a79428b9775c7e28a",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/storedev.test.tsx"
+  },
+  {
+    "id": "react-case-v1:6ffa49381b25871aab3f",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/storedev.test.tsx"
+  },
+  {
+    "id": "react-case-v1:8fcde0d9a10517228e6f",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/types.test.tsx"
+  },
+  {
+    "id": "react-case-v1:4786a24fb0480bee8612",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/types.test.tsx"
+  },
+  {
+    "id": "react-case-v1:228034d654dd190902d7",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/types.test.tsx"
+  },
+  {
+    "id": "react-case-v1:42858e08ac9b705b0cb1",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/utils/atomWithDefault.test.ts"
+  },
+  {
+    "id": "react-case-v1:539f13f2c5c96cbb0f5f",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/utils/atomWithDefault.test.ts"
+  },
+  {
+    "id": "react-case-v1:4f4b256fd3799ffb5e96",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/utils/atomWithDefault.test.ts"
+  },
+  {
+    "id": "react-case-v1:8670352a4097b9c7a22c",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/utils/atomWithDefault.test.ts"
+  },
+  {
+    "id": "react-case-v1:542c403d1737cb7d08ac",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/utils/atomWithDefault.test.ts"
+  },
+  {
+    "id": "react-case-v1:bcfb94d3596102d6f7fa",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/utils/atomWithDefault.test.ts"
+  },
+  {
+    "id": "react-case-v1:6397070f42505436d4c6",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/utils/atomWithDefault.test.ts"
+  },
+  {
+    "id": "react-case-v1:31371c83739bf8ce60b4",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/utils/atomWithLazy.test.ts"
+  },
+  {
+    "id": "react-case-v1:8da0699bf288afa30516",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/utils/atomWithLazy.test.ts"
+  },
+  {
+    "id": "react-case-v1:e43386039e3b0e3ec83d",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/utils/atomWithLazy.test.ts"
+  },
+  {
+    "id": "react-case-v1:07968e5a57e39919a2f6",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/utils/atomWithRefresh.test.ts"
+  },
+  {
+    "id": "react-case-v1:81e6e0ec4f7f6043778d",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/utils/atomWithReset.test.ts"
+  },
+  {
+    "id": "react-case-v1:b4673c686a9911d27eb1",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/utils/atomWithReset.test.ts"
+  },
+  {
+    "id": "react-case-v1:d2a20ab4abacaafe1813",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/utils/atomWithReset.test.ts"
+  },
+  {
+    "id": "react-case-v1:e8b818d3c6dbff80fef7",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/utils/types.test.tsx"
+  },
+  {
+    "id": "react-case-v1:ed9aaf536cd21718741d",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/utils/types.test.tsx"
+  },
+  {
+    "id": "react-case-v1:ec3114a6356c7b241c35",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/utils/unwrap.test.ts"
+  },
+  {
+    "id": "react-case-v1:03496fcf2d92409e8d03",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/utils/unwrap.test.ts"
+  },
+  {
+    "id": "react-case-v1:3c84e6b4f27f28f6a886",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/utils/unwrap.test.ts"
+  },
+  {
+    "id": "react-case-v1:85d0b5ccaf61f8ec0129",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/utils/unwrap.test.ts"
+  },
+  {
+    "id": "react-case-v1:ddefe8628d152f7360e6",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/utils/unwrap.test.ts"
+  },
+  {
+    "id": "react-case-v1:76bdbd81a471b090fdc1",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/utils/unwrap.test.ts"
+  },
+  {
+    "id": "react-case-v1:e75816629b4987c23cfb",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/utils/unwrap.test.ts"
+  },
+  {
+    "id": "react-case-v1:d06bdf95d90689e3bda9",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/utils/unwrap.test.ts"
+  },
+  {
+    "id": "react-case-v1:1b7fead08f80fc448254",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/utils/unwrap.test.ts"
+  },
+  {
+    "id": "react-case-v1:552fc786568906e70c41",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/utils/unwrap.test.ts"
+  },
+  {
+    "id": "react-case-v1:2805d1ad3359577795ab",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/utils/unwrap.test.ts"
+  },
+  {
+    "id": "react-case-v1:0446d9fda453faf02609",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/utils/unwrap.test.ts"
+  },
+  {
+    "id": "react-case-v1:886938f94c1a3d49788c",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/vanilla/utils/unwrap.test.ts"
+  }
+]
