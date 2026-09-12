@@ -12,9 +12,9 @@ bisection. The public hook API and explicit dependency semantics do not change.
 ## Tier A — authored and auto-generated useMemo/useCallback
 
 Memo calls in proven render-scope bodies (the `localHookSlots` numeric-slot
-proof) become inline regions over a per-body flat cell array stored as a non-index property
-on `__s.slots` (`_k$N` — same trick as autoMemo's `_m$N`; named properties
-leave the slots array's packed elements kind alone). Layout per site:
+proof) become inline regions over a per-body flat cell array held in the scope's lazy
+compiler memo record. Its fixed `auto` and `hooks` fields hold this body's
+cells independently of the dense DOM/control slots. Layout per site:
 `[initFlag, dep0..depK-1, value]`; the array is pre-sized and `.fill`ed so
 conditional sites can't punch elements-kind holes. Expression bodies and
 single-return factories also lower in nested expressions, destructuring and

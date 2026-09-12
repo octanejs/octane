@@ -1138,6 +1138,7 @@ function importSpecifierPair(entry) {
 // compiled components and authored runtime imports retain their stable shape.
 // New compiler-only helpers use the private, renderer-specific ABI instead.
 const HOOK_MEMO_RUNTIME_HELPERS = new Set([
+	'compilerMemoRegion',
 	'hookMemoCreate',
 	'hookMemoEqual',
 	'hookMemoPublish',
@@ -9192,15 +9193,14 @@ function compileInternal(
 		currentAutoMemoCacheName: null, // collision-free local bound to the body's cache array
 		currentAutoMemoCommittedName: null, // committed cache snapshot (copy-on-write source)
 		currentAutoCalculatedRenderableRefs: null, // proven non-escaping calculation holes, inherited by lexical child bodies
-		nextAutoMemoCacheId: 0, // unique non-index slots property per compiled render function
+		nextAutoMemoCacheId: 0, // per-compiled-body id in the scope's lazy memo regions
 		inlineHookMemo: inlineHookMemoEnabled, // de-callbacked useMemo/useCallback + pu creations
 		hasSlotMemoCandidates: false, // skip the final AST pass when no path-aware site survived
 		_puInlineLowering: false, // true only while a body pipeline ends in inlineHookMemoPass
 		currentHookMemoOffset: 0, // flat hook-memo cell offset for the body being emitted
-		currentHookMemoCacheProperty: null, // per-body `_k$N` slots property for the cell array
+		currentHookMemoBodyId: null, // non-null while compiling a body with inline hook cells
 		currentHookMemoNames: null, // lazily allocated flat-cache and expression-temp locals
 		currentHookMemoOwnerSafe: false, // own scope permits compiler-introduced bindings
-		nextHookMemoCacheId: 0, // unique non-index slots property per compiled render function
 		currentInvariantLocals: null, // Set<string> of component-lifetime-stable local values
 		currentEventInvariantLocals: null, // Set<string> safe to retain in native event slots
 		currentDirtyBindingStates: null, // proven primitive state identities inherited by JSX arms
@@ -13997,16 +13997,16 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 		ctx,
 		compactStateOwnerCache ? `_mp${ctx.nextAutoMemoCacheId}` : '__memoCommitted',
 	);
-	const autoMemoCacheProperty = `_m$${ctx.nextAutoMemoCacheId++}`;
+	const memoRegionId = ctx.nextAutoMemoCacheId++;
 	ctx.currentAutoMemoOffset = 0;
 	ctx.currentAutoMemoCacheName = autoMemoCacheName;
 	ctx.currentAutoMemoCommittedName = autoMemoCommittedName;
 	const prevHookMemoOffset = ctx.currentHookMemoOffset;
-	const prevHookMemoCacheProperty = ctx.currentHookMemoCacheProperty;
+	const prevHookMemoBodyId = ctx.currentHookMemoBodyId;
 	const prevHookMemoNames = ctx.currentHookMemoNames;
 	const prevHookMemoOwnerSafe = ctx.currentHookMemoOwnerSafe;
 	ctx.currentHookMemoOffset = 0;
-	ctx.currentHookMemoCacheProperty = `_k$${ctx.nextHookMemoCacheId++}`;
+	ctx.currentHookMemoBodyId = memoRegionId;
 	ctx.currentHookMemoNames = null;
 
 	// Body splitting. Two shapes to handle:
@@ -14351,10 +14351,28 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 
 	const bodyStatements = [];
 	const autoMemoSize = ctx.currentAutoMemoOffset;
-	const slotsMember = (prop) => b.member(b.member(b.id('__s'), 'slots'), prop);
+	const hookMemoSize = ctx.currentHookMemoOffset;
+	const memoRegionName =
+		autoMemoSize > 0 || hookMemoSize > 0 ? allocCompilerName(ctx, '__memoRegion') : null;
+	const memoCell = (name) => b.member(b.id(memoRegionName), name);
+	if (memoRegionName !== null) {
+		bodyStatements.push(
+			inheritOriginLoc(
+				b.const(
+					memoRegionName,
+					b.call(
+						requireRuntimeForContext(ctx, 'compilerMemoRegion'),
+						b.id('__s'),
+						b.literal(memoRegionId),
+					),
+				),
+				node,
+			),
+		);
+	}
 	if (autoMemoSize > 0) {
 		bodyStatements.push(
-			inheritOriginLoc(b.const(autoMemoCommittedName, slotsMember(autoMemoCacheProperty)), node),
+			inheritOriginLoc(b.const(autoMemoCommittedName, memoCell('auto')), node),
 			inheritOriginLoc(
 				b.let(
 					autoMemoCacheName,
@@ -14372,18 +14390,17 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 	// suspension. Miss-side runtime publication also records the previous/next
 	// site during a held transition. Allocate through the runtime so authored
 	// bindings named Array or undefined cannot change the cache representation.
-	const hookMemoSize = ctx.currentHookMemoOffset;
 	if (hookMemoSize > 0) {
 		const hkName = hookMemoNames(ctx).cache;
 		bodyStatements.push(
-			inheritOriginLoc(b.let(hkName, slotsMember(ctx.currentHookMemoCacheProperty)), node),
+			inheritOriginLoc(b.let(hkName, memoCell('hooks')), node),
 			inheritOriginLoc(
 				b.if(
 					b.binary('===', b.id(hkName), b.void0),
 					b.stmt(
 						b.assignment(
 							'=',
-							slotsMember(ctx.currentHookMemoCacheProperty),
+							memoCell('hooks'),
 							b.assignment(
 								'=',
 								b.id(hkName),
@@ -14520,7 +14537,7 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 			inheritOriginLoc(
 				b.if(
 					b.binary('!==', b.id(autoMemoCacheName), b.id(autoMemoCommittedName)),
-					b.stmt(b.assignment('=', slotsMember(autoMemoCacheProperty), b.id(autoMemoCacheName))),
+					b.stmt(b.assignment('=', memoCell('auto'), b.id(autoMemoCacheName))),
 					null,
 				),
 				node,
@@ -14549,7 +14566,7 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 	ctx.currentAutoMemoCacheName = prevAutoMemoCacheName;
 	ctx.currentAutoMemoCommittedName = prevAutoMemoCommittedName;
 	ctx.currentHookMemoOffset = prevHookMemoOffset;
-	ctx.currentHookMemoCacheProperty = prevHookMemoCacheProperty;
+	ctx.currentHookMemoBodyId = prevHookMemoBodyId;
 	ctx.currentHookMemoNames = prevHookMemoNames;
 	ctx.currentHookMemoOwnerSafe = prevHookMemoOwnerSafe;
 	ctx.currentMapTemps = prevMapTemps;
@@ -16992,10 +17009,10 @@ function markHookSlotLocality(root, enabled) {
 //
 // De-callbacks useMemo/useCallback in proven render-scope bodies: instead of allocating an
 // arrow + a deps array every render and paying a hooks-map lookup, each site
-// becomes an inline region over a per-body flat cell array stored as a
-// non-index property on `__s.slots` (`_k$N`, the same trick as autoMemo's
-// `_m$N` — named properties don't disturb the slots array's packed elements
-// kind). Layout per site: [initFlag, dep0..depK-1, value].
+// becomes an inline region over a per-body flat cell array in the scope's
+// lazy compilerMemo record. The record is independent of the dense DOM slots
+// array; its fixed auto and hooks fields hold the two cell arrays respectively.
+// Layout per hook site: [initFlag, dep0..depK-1, value].
 //
 // Unlike the autoMemo region cache this one publishes IMMEDIATELY: the runtime
 // hooks map these regions replace
@@ -17469,7 +17486,7 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 			!canLowerClientMemo(call, name) ||
 			localSlotMarks.get(call) !== true ||
 			!ctx.currentHookMemoOwnerSafe ||
-			ctx.currentHookMemoCacheProperty === null
+			ctx.currentHookMemoBodyId === null
 		) {
 			return null;
 		}
