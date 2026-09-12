@@ -175,31 +175,33 @@ describe('attributes', () => {
 		r.unmount();
 	});
 
-	it('specializes only safe data attributes whose values are proven strings', () => {
-		const specialized = compile(
-			`export function C(p) @{ <div data-key={'' + p.id} /> }`,
-			'data-string.tsrx',
-			{ dev: false },
-		).code;
-		expect(specialized).toContain('setStringData');
-		expect(specialized).not.toContain('setAttribute');
-
-		const generic = compile(
-			`export function C(p) @{ <div data-key={p.id} aria-label={'' + p.id} /> }`,
-			'data-generic.tsrx',
-			{ dev: false },
-		).code;
-		expect(generic).toContain('setAttribute');
-		expect(generic).not.toContain('setStringData');
-
-		const narrow = compile(
-			`export function C(p) @{ <button disabled={p.disabled} aria-label={p.label} /> }`,
-			'attributes-narrow.tsrx',
-			{ dev: false },
-		).code;
-		expect(narrow).toContain('setBooleanAttribute');
-		expect(narrow).toContain('setAriaAttribute');
-		expect(narrow).not.toContain('setAttribute');
+	it('preserves unknown data values beside native boolean and ARIA attributes in production output', () => {
+		const { C } = loadCompiledFixtureSource(
+			`export function C(p) @{ <button data-key={p.value} disabled={p.value} aria-label={p.value} /> }`,
+			{
+				id: '/production-data-values.tsrx',
+				mode: 'client',
+				compileOptions: { dev: false, hmr: false },
+			},
+		);
+		const r = mount(C, { value: false });
+		const button = r.find('button');
+		try {
+			for (const value of [false, true, 0, 2, 'text']) {
+				r.update(C, { value });
+				expect(button.getAttribute('data-key')).toBe(String(value));
+				expect(button.getAttribute('aria-label')).toBe(String(value));
+				expect(button.hasAttribute('disabled')).toBe(Boolean(value));
+			}
+			for (const value of [null, undefined, Symbol('removed'), () => 'removed']) {
+				r.update(C, { value });
+				expect(button.hasAttribute('data-key')).toBe(false);
+				expect(button.hasAttribute('aria-label')).toBe(false);
+				expect(button.hasAttribute('disabled')).toBe(false);
+			}
+		} finally {
+			r.unmount();
+		}
 	});
 
 	it('bakes static aria-* boolean literals as enumerated "true"/"false"', () => {
