@@ -13786,7 +13786,7 @@ interface LazyTemplateRecord {
 	html: string;
 	ns: 0 | 1 | 2 | 3;
 	frag: number;
-	parsed: Array<Element | null>;
+	parsed: Array<Node | null>;
 	/**
 	 * Lazily computed adoption-root descriptor for PROD hydration's parse-free
 	 * root check (see HydrationCapability.cloneLazy): 0 = not computed yet, a
@@ -13799,7 +13799,26 @@ interface LazyTemplateRecord {
 
 const LAZY_TEMPLATE = Symbol('octane.lazy-template');
 
-function parseTemplate(html: string, ns: 0 | 1 | 2, frag: number): Element {
+// The parser needs a wrapper to establish foreign-content namespaces and to
+// retain HTML fragment roots. Transfer ordinary children once while caching
+// the template; every later clone can insert the native fragment in one call.
+// Custom elements keep the wrapper: their connectedCallback can synchronously
+// inspect which earlier siblings have already joined the live parent.
+function fragmentTemplate(wrapper: Element): Node {
+	for (const descendant of wrapper.querySelectorAll('*')) {
+		if (descendant.localName.includes('-') || descendant.hasAttribute('is')) {
+			(wrapper as any).__oct_frag = true;
+			return wrapper;
+		}
+	}
+	const fragment = document.createDocumentFragment();
+	let child: Node | null;
+	while ((child = wrapper.firstChild) !== null) fragment.appendChild(child);
+	(fragment as any).__oct_frag = true;
+	return fragment;
+}
+
+function parseTemplate(html: string, ns: 0 | 1 | 2, frag: number): Node {
 	initDomOperations();
 	const t = document.createElement('template');
 	if (ns === 0) {
@@ -13813,7 +13832,7 @@ function parseTemplate(html: string, ns: 0 | 1 | 2, frag: number): Element {
 		// for clone() to SKIP the structural hydration check — there is no 1:1 server
 		// node to compare the wrapper against.
 		if (root.nodeType === 1 && root.localName === 'octane-frag') {
-			(root as any).__oct_frag = true;
+			return fragmentTemplate(root);
 		}
 		return root;
 	}
@@ -13827,8 +13846,7 @@ function parseTemplate(html: string, ns: 0 | 1 | 2, frag: number): Element {
 	t.innerHTML = `<${wrap}>${html}</${wrap}>`;
 	const wrapEl = t.content.firstChild as Element;
 	if (frag) {
-		(wrapEl as any).__oct_frag = true;
-		return wrapEl;
+		return fragmentTemplate(wrapEl);
 	}
 	return wrapEl.firstChild as Element;
 }
@@ -13905,7 +13923,7 @@ function lazyRootMatches(server: Node, lazy: LazyTemplateRecord): boolean {
  * Resolve a lazy compiler template token to its parsed (and per-namespace
  * cached) root for the namespace in effect at the current render site.
  */
-function resolveLazyTemplate(lazy: LazyTemplateRecord): Element {
+function resolveLazyTemplate(lazy: LazyTemplateRecord): Node {
 	let ns: 0 | 1 | 2;
 	if (lazy.ns === 3) {
 		const inherited =
@@ -14823,6 +14841,10 @@ export function clone<T extends Node>(node: T, loc?: string, partialStyles?: str
  */
 export function drainFrag(root: Node, parent: Node, anchor: Node | null): void {
 	if (activeHydration() !== null && (root as any).__oct_vfrag === true) return;
+	if (root.nodeType === 11) {
+		parent.insertBefore(root, anchor);
+		return;
+	}
 	let c: Node | null;
 	while ((c = getFirstChild(root)) !== null) parent.insertBefore(c, anchor);
 }
@@ -14907,19 +14929,27 @@ function isAttributeParserNormalizedMatch(server: string | null, client: string)
 }
 
 /**
- * Compiler-emitted for a single-text-child binding's mount. Normally creates the
- * text node and appends it; while hydrating, ADOPTS the element's existing
- * (server-rendered) text node so the DOM isn't rebuilt. The prev-value the
+ * Compiler-emitted for a single-text-child binding's mount. Reuses the cloned
+ * template's text placeholder only when the compiler explicitly seeded one,
+ * otherwise preserves baseline create/append semantics; while hydrating, ADOPTS the existing server
+ * text node so the DOM isn't rebuilt. The prev-value the
  * compiler seeds alongside this makes the first update a no-op when the client
  * value matches the server text (avoiding a mismatch re-render).
  */
-export function htext(el: Node, value: unknown): Text {
+export function htext(el: Node, value: unknown, seeded: 1 | undefined = undefined): Text {
 	// Coerce here (mirrors setText) rather than at every call site — keeps the
 	// per-text-hole mount codegen to a bare `htext(el, _v)`. Mount-once, so folding
 	// the coercion in costs nothing on the hot update path.
 	const text = coerceText(value);
 	const hydration = activeHydration();
 	if (hydration !== null) return hydration.htext(el, text);
+	if (seeded === 1) {
+		const first = getFirstChild(el);
+		if (first !== null && first.nodeType === 3) {
+			(first as Text).nodeValue = text;
+			return first as Text;
+		}
+	}
 	const t = document.createTextNode(text);
 	el.appendChild(t);
 	return t;
@@ -14946,8 +14976,7 @@ export function htextSwap(posNode: Node | null, value: unknown): Text {
 	// Fresh mount: posNode is the `<!>` placeholder — replace it in place.
 	const t = document.createTextNode(text);
 	const parent = posNode!.parentNode!;
-	parent.insertBefore(t, posNode);
-	parent.removeChild(posNode!);
+	parent.replaceChild(t, posNode!);
 	return t;
 }
 
@@ -15159,6 +15188,28 @@ export function setAttributeIfChanged(
 ): unknown {
 	if (previous === value) return previous;
 	setAttribute(el, name, value);
+	return value;
+}
+
+export function setPlainAttributeIfChanged(
+	value: unknown,
+	previous: unknown,
+	el: Element,
+	name: string,
+): unknown {
+	if (previous === value) return previous;
+	setPlainAttribute(el, name, value);
+	return value;
+}
+
+export function setURLAttributeIfChanged(
+	value: unknown,
+	previous: unknown,
+	el: Element,
+	name: string,
+): unknown {
+	if (previous === value) return previous;
+	setURLAttribute(el, name, value);
 	return value;
 }
 
@@ -16608,8 +16659,51 @@ function devValidateHostProps(el: Element, props: Record<string, unknown>): void
 }
 
 /**
- * Compiler-only fast path for a statically named `data-*` attribute whose
- * expression is proven to be a string at authoring time. Runtime values still
+ * Compiler-admitted native scalar attribute: the name is valid, already aliased,
+ * unnamespaced and has no property/boolean/numeric/URL semantics. Keep the
+ * generic development route even for production-compiled code loaded in dev.
+ */
+export function setPlainAttribute(el: Element, name: string, value: unknown): void {
+	if (process.env.NODE_ENV !== 'production') return setAttribute(el, name, value);
+	const type = typeof value;
+	const next =
+		value == null || type === 'boolean' || type === 'function' || type === 'symbol'
+			? null
+			: String(value);
+	const hydration = activeHydration();
+	if (hydration !== null && !hydration.allowAttribute(el, name, next)) return;
+	if (TRANSITION_JOURNAL !== null) journalAttr(el, name);
+	if (next === null) el.removeAttribute(name);
+	else el.setAttribute(name, next);
+}
+
+/** Same scalar contract for a statically proven, unnamespaced native URL sink. */
+export function setURLAttribute(el: Element, name: string, value: unknown): void {
+	if (process.env.NODE_ENV !== 'production') return setAttribute(el, name, value);
+	const type = typeof value;
+	let next =
+		value == null || type === 'boolean' || type === 'function' || type === 'symbol'
+			? null
+			: String(value);
+	if (next !== null) {
+		if (
+			next === '' &&
+			(name === 'src' ||
+				(name === 'href' && el.nodeName !== 'A' && el.nodeName !== 'AREA') ||
+				(name === 'data' && el.nodeName === 'OBJECT'))
+		)
+			next = null;
+		else next = sanitizeURL(next);
+	}
+	const hydration = activeHydration();
+	if (hydration !== null && !hydration.allowAttribute(el, name, next)) return;
+	if (TRANSITION_JOURNAL !== null) journalAttr(el, name);
+	if (next === null) el.removeAttribute(name);
+	else el.setAttribute(name, next);
+}
+
+/**
+ * Compiler-only fast path for a statically named `data-*` attribute. Runtime values still
  * follow the generic data-attribute contract: nullish/function/symbol remove,
  * while booleans, numbers and objects stringify. This matters when an `as
  * string` assertion or an external typed value is inaccurate at runtime. The
@@ -17268,18 +17362,11 @@ function isHostPropIdentityKey(name: string): boolean {
 	return isEventKey(name);
 }
 
-function normalizedHostProp(
-	el: Element,
-	rawName: string,
-): readonly [identity: string, name: string] {
-	if (rawName === 'class' || rawName === 'className') return ['class', 'class'];
+function normalizedHostProp(el: Element, rawName: string): string {
+	if (rawName === 'class' || rawName === 'className') return 'class';
 	const actionName = formActionAttributeName(el, rawName);
-	if (actionName !== null) return [actionName, actionName];
-	if (isHostPropIdentityKey(rawName)) return [rawName, rawName];
-	let name = rawName;
-	if (!isHtmlCustomElement(el)) name = ATTRIBUTE_ALIASES.get(name) ?? name;
-	const identity = el.namespaceURI === 'http://www.w3.org/1999/xhtml' ? name.toLowerCase() : name;
-	return [identity, name];
+	if (actionName !== null) return actionName;
+	return isHtmlCustomElement(el) ? rawName : (ATTRIBUTE_ALIASES.get(rawName) ?? rawName);
 }
 
 /**
@@ -17304,7 +17391,7 @@ export function setHostPropSources(
 	hasNestedChildren = false,
 ): Record<string, unknown> {
 	interface PropWriter {
-		rawName: string;
+		name: string;
 		value: unknown;
 		firstOrder: number;
 		lastOrder: number;
@@ -17316,12 +17403,12 @@ export function setHostPropSources(
 		if (typeof rawName !== 'string') return;
 		const order = sourceOrder++;
 		const previous = props.get(rawName);
-		props.set(rawName, {
-			rawName,
-			value,
-			firstOrder: previous?.firstOrder ?? order,
-			lastOrder: order,
-		});
+		if (previous !== undefined) {
+			previous.value = value;
+			previous.lastOrder = order;
+		} else {
+			props.set(rawName, { name: rawName, value, firstOrder: order, lastOrder: order });
+		}
 	}
 
 	for (const source of sources) {
@@ -17345,51 +17432,50 @@ export function setHostPropSources(
 		}
 	}
 
-	const values = new Map<
-		string,
-		readonly [name: string, value: unknown, firstOrder: number, lastOrder: number]
-	>();
+	// Source reads are complete. Reuse each raw writer as its normalized winner;
+	// neither Map escapes this call, and no second per-key tuple is needed.
+	const values = new Map<string, PropWriter>();
+	const html = el.namespaceURI === 'http://www.w3.org/1999/xhtml';
 	let needsWinningOrderSort = false;
 	for (const writer of props.values()) {
-		if (writer.rawName === 'key') continue;
-		const [identity, name] = normalizedHostProp(el, writer.rawName);
+		const rawName = writer.name;
+		if (rawName === 'key') continue;
+		const identityKey = isHostPropIdentityKey(rawName);
+		const name = identityKey ? rawName : normalizedHostProp(el, rawName);
+		const identity = html && !identityKey ? name.toLowerCase() : name;
 		const previous = values.get(identity);
 		if (previous !== undefined) {
-			if (previous[3] >= writer.lastOrder) continue;
-			// Map order already matches firstOrder unless a later raw alias replaces
-			// an earlier normalized identity without moving its Map entry.
+			if (previous.lastOrder >= writer.lastOrder) continue;
+			// A winning alias can have a later first insertion than this Map entry.
 			needsWinningOrderSort = true;
 		}
-		values.set(identity, [
-			process.env.NODE_ENV !== 'production' &&
-			(writer.rawName === 'tabIndex' || writer.rawName === 'htmlFor')
-				? writer.rawName
-				: name,
-			writer.value,
-			writer.firstOrder,
-			writer.lastOrder,
-		]);
+		writer.name =
+			process.env.NODE_ENV !== 'production' && (rawName === 'tabIndex' || rawName === 'htmlFor')
+				? rawName
+				: name;
+		values.set(identity, writer);
 	}
 	if (classMerges !== null) {
 		for (const extra of classMerges) {
-			const [identity, name] = normalizedHostProp(el, extra.rawName);
-			const previous = values.get(identity);
+			const previous = values.get('class');
 			if (previous !== undefined) {
-				values.set(identity, [
-					previous[0],
-					mergeClass(previous[1], extra.value),
-					previous[2],
-					extra.order,
-				]);
-				continue;
+				previous.value = mergeClass(previous.value, extra.value);
+				previous.lastOrder = extra.order;
+			} else {
+				values.set('class', {
+					name: 'class',
+					value: extra.value,
+					firstOrder: extra.order,
+					lastOrder: extra.order,
+				});
 			}
-			values.set(identity, [name, extra.value, extra.order, extra.order]);
 		}
 	}
 	const resolved: Record<string, unknown> = Object.create(null);
-	const ordered = [...values.values()];
-	if (needsWinningOrderSort) ordered.sort((a, b) => a[2] - b[2]);
-	for (const [name, value] of ordered) resolved[name] = value;
+	const ordered = needsWinningOrderSort
+		? [...values.values()].sort((a, b) => a.firstOrder - b.firstOrder)
+		: values.values();
+	for (const { name, value } of ordered) resolved[name] = value;
 	const formHost =
 		el.localName === 'input' || el.localName === 'textarea' || el.localName === 'select';
 	setSpread(el, resolved, prev, scope, true, formHost);
@@ -17556,9 +17642,12 @@ export function setSpread(
 			);
 			continue;
 		}
+		// Styles/raw HTML above still need their setters for stable object values.
+		// Controlled fields reassert live DOM drift; other unchanged props need no
+		// event-name parsing or custom-element routing.
+		if (v === pv && !isControlledHostProp(el, k)) continue;
 		const ev = eventSlot(k, el);
 		if (ev) {
-			if (v === pv) continue;
 			// Lazy-delegate any event we haven't seen — the compiler can't predict
 			// event names that arrive dynamically through spread. Capture-phase
 			// handlers (`onXxxCapture`) register their own capture-phase listener.
@@ -17574,10 +17663,6 @@ export function setSpread(
 			);
 			continue;
 		}
-		// Controlled `value`/`checked` bypass the identity skip — they must
-		// reassert every commit (the DOM may have drifted; the helper's own
-		// DOM-diff makes the call cheap).
-		if (v === pv && !isControlledHostProp(el, k)) continue;
 		// React only honors autoFocus from the final props of the element's mount.
 		// An absent initial spread must not turn a later update into a mount.
 		if (prev !== undefined && k === 'autoFocus' && !isHtmlCustomElement(el)) continue;
@@ -17712,6 +17797,33 @@ function rootIdentifierPrefix(block: Block): string {
 	return block.idState.prefix;
 }
 
+// Head attributes are reapplied even when an object-valued prop has the same
+// identity: its coercion may have changed, or outside code may have edited the
+// live head. Compare the final scalar value, retaining neither user objects nor
+// a stale authored-value cache. Common metadata names need no property, alias,
+// namespace, or URL routing, and equal values avoid native attribute mutation.
+function setHeadAttribute(el: Element, name: string, value: unknown): void {
+	switch (name) {
+		case 'name':
+		case 'content':
+		case 'lang':
+		case 'media':
+		case 'id':
+		case 'title':
+		case 'type':
+			break;
+		default:
+			return setAttribute(el, name, value);
+	}
+	const next = coerceAttrValue(el, name, value);
+	const hydration = activeHydration();
+	if (hydration !== null && !hydration.allowAttribute(el, name, next)) return;
+	if (el.getAttribute(name) === next) return;
+	if (TRANSITION_JOURNAL !== null) journalAttr(el, name);
+	if (next === null) el.removeAttribute(name);
+	else el.setAttribute(name, next);
+}
+
 export function headBlock(
 	scope: Scope,
 	slot: number,
@@ -17792,7 +17904,7 @@ export function headBlock(
 				continue;
 			}
 			names.push(k);
-			setAttribute(el, k, attrs[k]);
+			setHeadAttribute(el, k, attrs[k]);
 		}
 		state.attrNames = names;
 	} else {
@@ -18070,7 +18182,22 @@ export function evtNu(d: HandlerBundle, fn: any, args: any[]): void {
 // each root container when `createRoot` runs, and to each portal target when
 // the portal mounts. This matches ReactDOM 17+ behaviour: events scoped to
 // the React-owned subtrees, no document-level pollution.
-const _delegated = new Set<string>();
+interface DelegatedEventType {
+	name: string;
+	bubbleKey: string;
+	captureKey: string;
+	flags: number;
+}
+const EVENT_BUBBLE = 1;
+const EVENT_CAPTURE = 2;
+const EVENT_NATIVE_CAPTURE = 4;
+const EVENT_TARGET_ONLY = 8;
+const EVENT_DISCRETE = 16;
+const EVENT_RESTORE = 32;
+const EVENT_DISABLED_MOUSE = 64;
+const EVENT_DISABLED_ENTER = 128;
+const EVENT_CUSTOM_NATIVE_ONLY = 256;
+const _delegated = new Map<string, DelegatedEventType>();
 
 // Active delegation targets (createRoot containers + portal targets). A
 // portal target may host multiple portals; the refcount tracks how many
@@ -18165,7 +18292,7 @@ function prepareDelegatedEvent(event: Event, listener: Node): EventTarget[] | un
 // bubbling types always have a capture observer to snapshot root membership;
 // only these names also run a logical capture queue. Non-bubbling families share
 // one native capture callback for their capture and emulated bubble queues.
-const _delegatedCapture = new Set<string>();
+const _delegatedCapture = new Map<string, DelegatedEventType>();
 
 // Non-bubbling events must be delegated in the CAPTURE phase so the single root
 // listener still sees them (the capture phase reaches the root even when the event
@@ -18266,7 +18393,9 @@ export function delegateEvents(eventNames: string[]): void {
 	for (let i = 0; i < eventNames.length; i++) {
 		const name = eventNames[i];
 		if (_delegated.has(name)) continue;
-		_delegated.add(name);
+		const type = _delegatedCapture.get(name) ?? createDelegatedEventType(name);
+		type.flags |= EVENT_BUBBLE;
+		_delegated.set(name, type);
 		// Pre-seed the handler-slot key: the dispatch walk polls `$$<type>` on
 		// EVERY logical ancestor of every delegated event, and most of them carry
 		// no handler (see initDomOperations, trick 2).
@@ -18302,7 +18431,9 @@ export function delegateCaptureEvents(eventNames: string[]): void {
 	for (let i = 0; i < eventNames.length; i++) {
 		const name = eventNames[i];
 		if (_delegatedCapture.has(name)) continue;
-		_delegatedCapture.add(name);
+		const type = _delegated.get(name) ?? createDelegatedEventType(name);
+		type.flags |= EVENT_CAPTURE;
+		_delegatedCapture.set(name, type);
 		// Same seeding rationale as delegateEvents (the capture walk polls
 		// `$$capture:<type>` along the built path).
 		if (canSeed) seedExpando(Element.prototype, CAPTURE_PREFIX + name);
@@ -18336,7 +18467,7 @@ function registerDelegationTarget(target: Node, root = false): void {
 		if ((target as any).onclick == null && (target as any).nodeType === 1) {
 			(target as any).onclick = noop;
 		}
-		for (const name of _delegated) {
+		for (const name of _delegated.keys()) {
 			target.addEventListener(
 				name,
 				dispatchDelegated,
@@ -18350,7 +18481,7 @@ function registerDelegationTarget(target: Node, root = false): void {
 				);
 			}
 		}
-		for (const name of _delegatedCapture) {
+		for (const name of _delegatedCapture.keys()) {
 			if (_delegated.has(name)) continue;
 			target.addEventListener(
 				name,
@@ -18370,11 +18501,11 @@ function unregisterDelegationTarget(target: Node, root = false): void {
 	if (!prev) return;
 	if (prev === 1) {
 		_delegationTargets.delete(target);
-		for (const name of _delegated) {
+		for (const name of _delegated.keys()) {
 			target.removeEventListener(name, dispatchDelegated, delegatedCapture(name));
 			if (!delegatedCapture(name)) target.removeEventListener(name, dispatchDelegatedCapture, true);
 		}
-		for (const name of _delegatedCapture) {
+		for (const name of _delegatedCapture.keys()) {
 			target.removeEventListener(
 				name,
 				delegatedCapture(name) ? dispatchDelegated : dispatchDelegatedCapture,
@@ -18471,6 +18602,32 @@ const DISCRETE_EVENTS = new Set<string>([
  */
 let _dispatchDepth = 0;
 
+// Registration pays name parsing and category lookups once. Both native phases
+// share this record, including capture handlers registered after a root mounts.
+function createDelegatedEventType(name: string): DelegatedEventType {
+	return {
+		name,
+		bubbleKey: '$$' + name,
+		captureKey: CAPTURE_PREFIX + name,
+		flags:
+			(delegatedCapture(name) ? EVENT_NATIVE_CAPTURE : 0) |
+			(TARGET_ONLY_DELEGATED.has(name) ? EVENT_TARGET_ONLY : 0) |
+			(DISCRETE_EVENTS.has(name) ? EVENT_DISCRETE : 0) |
+			(RESTORE_EVENTS.has(name) ? EVENT_RESTORE : 0) |
+			(name === 'click' ||
+			name === 'dblclick' ||
+			name === 'mousedown' ||
+			name === 'mousemove' ||
+			name === 'mouseup'
+				? EVENT_DISABLED_MOUSE
+				: 0) |
+			(name === 'mouseenter' ? EVENT_DISABLED_ENTER : 0) |
+			(name === 'invalid' || EMULATED_BUBBLING_EVENTS.includes(name)
+				? EVENT_CUSTOM_NATIVE_ONLY
+				: 0),
+	};
+}
+
 // A bubble version closes capture-only flush fallbacks without retaining a DOM
 // path or a dispatch-completed flag on the Event. The same Event may be dispatched
 // again synchronously; every native delivery must start a fresh logical walk.
@@ -18481,19 +18638,38 @@ const DELEGATED_BUBBLE_VERSION = /* @__PURE__ */ Symbol('octane.bubbleVersion');
 // native stopImmediatePropagation must not abort an already-running logical queue.
 // These temporary methods still operate on the original browser Event, and the
 // exact prior own descriptors are restored before control returns to native code.
-const PROPAGATION_FLAGS = /* @__PURE__ */ Symbol('octane.propagationFlags');
-const NATIVE_STOP_PROPAGATION = /* @__PURE__ */ Symbol('octane.stopPropagation');
-const NATIVE_STOP_IMMEDIATE = /* @__PURE__ */ Symbol('octane.stopImmediatePropagation');
+interface DelegatedEventFrame {
+	event: Event | null;
+	flags: number;
+	stop: (() => void) | null;
+	immediate: (() => void) | null;
+	currentTarget: EventTarget | null;
+}
+// Private state belongs to the active logical phases, not to the native Event.
+// Nested dispatch reuses another frame; clearing it releases every Event/DOM
+// reference. Public method/accessor shadows still restore their exact lifetime.
+const DELEGATED_EVENT_FRAMES: DelegatedEventFrame[] = [];
+let delegatedEventFrameDepth = 0;
+
+function delegatedFrameFor(event: Event): DelegatedEventFrame | undefined {
+	for (let index = delegatedEventFrameDepth - 1; index >= 0; index--) {
+		const frame = DELEGATED_EVENT_FRAMES[index];
+		if (frame.event === event) return frame;
+	}
+}
+
 function stopDelegatedPropagation(this: Event): void {
-	if ((this as any)[PROPAGATION_FLAGS] !== undefined) (this as any)[PROPAGATION_FLAGS] |= 1;
-	const stop = (this as any)[NATIVE_STOP_PROPAGATION] || this.stopPropagation;
+	const frame = delegatedFrameFor(this);
+	if (frame !== undefined) frame.flags |= 1;
+	const stop = frame?.stop || this.stopPropagation;
 	// A consumer may retain the method and call it after native dispatch. The
 	// temporary dispatch state is gone then, but the restored native method lives on.
 	(stop === stopDelegatedPropagation ? Event.prototype.stopPropagation : stop).call(this);
 }
 function stopImmediateNativePropagation(this: Event): void {
-	if ((this as any)[PROPAGATION_FLAGS] !== undefined) (this as any)[PROPAGATION_FLAGS] |= 2;
-	const stop = (this as any)[NATIVE_STOP_IMMEDIATE] || this.stopImmediatePropagation;
+	const frame = delegatedFrameFor(this);
+	if (frame !== undefined) frame.flags |= 2;
+	const stop = frame?.immediate || this.stopImmediatePropagation;
 	(stop === stopImmediateNativePropagation ? Event.prototype.stopImmediatePropagation : stop).call(
 		this,
 	);
@@ -18528,14 +18704,21 @@ function beginDelegatedPropagation(
 	event: Event,
 	stop: PropertyDescriptor | undefined,
 	immediate: PropertyDescriptor | undefined | null,
-): void {
-	(event as any)[PROPAGATION_FLAGS] = 0;
-	(event as any)[NATIVE_STOP_PROPAGATION] = event.stopPropagation;
+): DelegatedEventFrame {
+	let frame = DELEGATED_EVENT_FRAMES[delegatedEventFrameDepth];
+	if (frame === undefined) {
+		frame = { event: null, flags: 0, stop: null, immediate: null, currentTarget: null };
+		DELEGATED_EVENT_FRAMES.push(frame);
+	}
+	delegatedEventFrameDepth++;
+	frame.event = event;
+	frame.flags = 0;
+	frame.stop = event.stopPropagation;
 	installPropagationMethod(event, 'stopPropagation', stop, STOP_PROPAGATION_DESCRIPTOR);
 	// Only emulated bubbling needs to distinguish a native immediate stop before
 	// starting another logical phase. Ordinary browser phases leave it untouched.
 	if (immediate !== null) {
-		(event as any)[NATIVE_STOP_IMMEDIATE] = event.stopImmediatePropagation;
+		frame.immediate = event.stopImmediatePropagation;
 		installPropagationMethod(
 			event,
 			'stopImmediatePropagation',
@@ -18543,6 +18726,7 @@ function beginDelegatedPropagation(
 			STOP_IMMEDIATE_DESCRIPTOR,
 		);
 	}
+	return frame;
 }
 
 function endDelegatedPropagation(
@@ -18550,23 +18734,24 @@ function endDelegatedPropagation(
 	stop: PropertyDescriptor | undefined,
 	immediate: PropertyDescriptor | undefined | null,
 ): void {
+	const frame = DELEGATED_EVENT_FRAMES[--delegatedEventFrameDepth];
+	frame.event = null;
+	frame.stop = null;
+	frame.immediate = null;
+	frame.currentTarget = null;
 	if (stop === undefined) delete (event as any).stopPropagation;
 	else Object.defineProperty(event, 'stopPropagation', stop);
 	if (immediate !== null) {
 		if (immediate === undefined) delete (event as any).stopImmediatePropagation;
 		else Object.defineProperty(event, 'stopImmediatePropagation', immediate);
-		delete (event as any)[NATIVE_STOP_IMMEDIATE];
 	}
-	delete (event as any)[PROPAGATION_FLAGS];
-	delete (event as any)[NATIVE_STOP_PROPAGATION];
 }
 
 // A receiver-specific target lets one accessor survive nested native dispatch.
-const CURRENT_TARGET_NODE = /* @__PURE__ */ Symbol('octane.currentTarget');
 const CURRENT_TARGET_DESCRIPTOR: PropertyDescriptor = {
 	configurable: true,
-	get(this: Event): EventTarget | null {
-		return (this as any)[CURRENT_TARGET_NODE] as EventTarget | null;
+	get(this: Event): EventTarget | null | undefined {
+		return delegatedFrameFor(this)?.currentTarget;
 	},
 };
 // Synchronous nested delegated walks borrow disjoint frames from this one stack.
@@ -18575,15 +18760,11 @@ const CAPTURE_PATH: any[] = [];
 // separate frame, and clearing the frame releases all node/handler references.
 const CAPTURE_SLOTS: EventSlot[] = [];
 
-function snapshotDelegatedSlots(base: number, key: string, event: Event): void {
-	const type = event.type;
+function snapshotDelegatedSlots(base: number, type: DelegatedEventType, capture: boolean): void {
+	const key = capture ? type.captureKey : type.bubbleKey;
 	const suppressDisabled =
-		type === 'click' ||
-		type === 'dblclick' ||
-		type === 'mousedown' ||
-		type === 'mousemove' ||
-		type === 'mouseup' ||
-		(type === 'mouseenter' && key[2] !== 'c');
+		(type.flags & EVENT_DISABLED_MOUSE) !== 0 ||
+		(!capture && (type.flags & EVENT_DISABLED_ENTER) !== 0);
 	for (let index = base; index < CAPTURE_PATH.length; index++) {
 		const node = CAPTURE_PATH[index];
 		const slot = node[key] as EventSlot;
@@ -18728,6 +18909,8 @@ function buildDelegatedPath(event: Event, listener: Node, path = event.composedP
 	const output = CAPTURE_PATH;
 	const base = output.length;
 	const epoch = (event as any)[EVENT_ROOT_EPOCH] ?? eventRootEpoch;
+	// Portal teardown after capture cannot erase the current event's logical route.
+	const mayHavePortal = portalEventTargetCount !== 0 || epoch !== eventRootEpoch;
 	const listenerIndex = path.indexOf(listener);
 	if (listenerIndex < 0) return 0;
 	// The usual application has one unchanged public root and no portals. It
@@ -18737,7 +18920,7 @@ function buildDelegatedPath(event: Event, listener: Node, path = event.composedP
 		let i = 0;
 		for (; i < listenerIndex; i++) {
 			const node = eventPathNode(path[i]);
-			if (node === null || node.$$portalParent != null) break;
+			if (node === null || (mayHavePortal && node.$$portalParent != null)) break;
 			output.push(node);
 		}
 		if (i === listenerIndex) return output.length - base;
@@ -18769,7 +18952,7 @@ function buildDelegatedPath(event: Event, listener: Node, path = event.composedP
 			}
 
 			output.push(node);
-			const logicalParent = node.$$portalParent;
+			const logicalParent = mayHavePortal ? node.$$portalParent : undefined;
 			if (logicalParent != null) {
 				// Use the actual portal container, NOT composedPath's next item:
 				// a direct portal child can be slotted, making that next item a
@@ -18932,8 +19115,8 @@ function reportListenerError(err: unknown): void {
 // publish after the dispatching script yields. Non-discrete events keep microtask
 // batching too; they must not be staged with an unrelated async Action merely
 // because they do not flush synchronously here.
-function maybeFlushDiscrete(type: string): void {
-	if (_dispatchDepth === 0 && DISCRETE_EVENTS.has(type) && pendingRestores.length > 0) {
+function maybeFlushDiscrete(type: DelegatedEventType): void {
+	if (_dispatchDepth === 0 && (type.flags & EVENT_DISCRETE) !== 0 && pendingRestores.length > 0) {
 		// Commit handler-scheduled work first, so the controlled restore below
 		// compares the DOM against the values the handlers just rendered.
 		if (!inFlush && hasPendingWork()) {
@@ -18955,23 +19138,22 @@ function maybeFlushDiscrete(type: string): void {
 	}
 	// Clear after the click's own handlers (and its outermost flush, when this is
 	// not a nested dispatch), including canceled/eventless activations.
-	if (type === 'click') activationCheckable = null;
+	if (type.name === 'click') activationCheckable = null;
 }
 
-function finishCaptureDispatch(event: Event): void {
-	const type = event.type;
-	if (!event.bubbles || event.cancelBubble || !_delegated.has(type)) {
-		if (event.bubbles && _delegated.has(type)) maybeEnqueueRestore(event);
+function finishCaptureDispatch(event: Event, type: DelegatedEventType): void {
+	if (!event.bubbles || event.cancelBubble || (type.flags & EVENT_BUBBLE) === 0) {
+		if (event.bubbles && (type.flags & EVENT_BUBBLE) !== 0) maybeEnqueueRestore(event, type);
 		maybeFlushDiscrete(type);
 		return;
 	}
-	if (!DISCRETE_EVENTS.has(type)) return;
+	if ((type.flags & EVENT_DISCRETE) === 0) return;
 	// A missed bubble can leave a restore queued by a nested event in capture.
 	// The target itself may also become controlled in a native listener below
 	// this root, so retain the fallback for form controls even when $$ctrl is
 	// not armed yet. Other events have no controlled work to finish here.
 	if (pendingRestores.length === 0) {
-		if (!RESTORE_EVENTS.has(type)) return;
+		if ((type.flags & EVENT_RESTORE) === 0) return;
 		const tag = (event.target as Element | null)?.localName;
 		if (tag !== 'input' && tag !== 'textarea' && tag !== 'select') return;
 	}
@@ -18981,7 +19163,7 @@ function finishCaptureDispatch(event: Event): void {
 		// (controlled restores and their sync flush). When a native listener stops
 		// the event below its root, close that window here instead.
 		if ((event as any)[DELEGATED_BUBBLE_VERSION] === bubbleVersion) {
-			maybeEnqueueRestore(event);
+			maybeEnqueueRestore(event, type);
 			maybeFlushDiscrete(type);
 		}
 	};
@@ -19003,12 +19185,13 @@ function finishCaptureDispatch(event: Event): void {
 }
 
 function dispatchDelegated(this: Node, event: Event): void {
-	const nativeCapture = delegatedCapture(event.type);
+	const type = _delegated.get(event.type) ?? _delegatedCapture.get(event.type);
+	if (type === undefined) return;
+	const nativeCapture = (type.flags & EVENT_NATIVE_CAPTURE) !== 0;
 	let path = nativeCapture ? prepareDelegatedEvent(event, this) : undefined;
 	(event as any)[DELEGATED_BUBBLE_VERSION] = ((event as any)[DELEGATED_BUBBLE_VERSION] || 0) + 1;
-	maybeEnqueueRestore(event);
-	const key = '$$' + event.type;
-	const targetOnly = TARGET_ONLY_DELEGATED.has(event.type);
+	maybeEnqueueRestore(event, type);
+	const targetOnly = (type.flags & EVENT_TARGET_ONLY) !== 0;
 	_dispatchDepth++;
 	const node = event.target as any;
 	// A submit dispatch targeting a form opens the manual-action useFormStatus
@@ -19024,38 +19207,39 @@ function dispatchDelegated(this: Node, event: Event): void {
 	const pathBase = CAPTURE_PATH.length;
 	let stop: PropertyDescriptor | undefined;
 	let propagationStarted = false;
+	let frame: DelegatedEventFrame;
 	try {
 		// Non-bubbling families share one native capture callback. Run the logical
 		// capture queue first, independent of module registration order, and honor
 		// a stop within that phase before starting the emulated bubble queue.
-		if (nativeCapture && _delegatedCapture.has(event.type)) {
+		if (nativeCapture && (type.flags & EVENT_CAPTURE) !== 0) {
 			path ??= event.composedPath();
-			if (dispatchDelegatedCapture.call(this, event, path)) return;
+			if (dispatchDelegatedCapture.call(this, event, path, type)) return;
 		}
-		if (!_delegated.has(event.type)) return;
+		if ((type.flags & EVENT_BUBBLE) === 0) return;
 		// Custom elements receive known nonbubbling events through authored
 		// capture handlers only. They do not install the native target listener
 		// that makes these built-in host events propagate in the bubble queue.
 		if (
 			node?.nodeType === 1 &&
 			isHtmlCustomElement(node) &&
-			(event.type === 'invalid' || EMULATED_BUBBLING_EVENTS.includes(event.type))
+			(type.flags & EVENT_CUSTOM_NATIVE_ONLY) !== 0
 		)
 			return;
 		buildDelegatedPath(event, this, path);
-		snapshotDelegatedSlots(pathBase, key, event);
+		snapshotDelegatedSlots(pathBase, type, false);
 		stop = Object.getOwnPropertyDescriptor(event, 'stopPropagation');
 		propagationStarted = true;
-		beginDelegatedPropagation(event, stop, null);
+		frame = beginDelegatedPropagation(event, stop, null);
 		for (let i = pathBase; i < CAPTURE_PATH.length; i++) {
 			const current = CAPTURE_PATH[i];
 			// Target-only native families never transfer a handler to a root boundary.
 			if (targetOnly && current !== event.target) break;
 			const slot = CAPTURE_SLOTS[i];
 			if (slot != null) {
-				setCurrentTarget(event, current);
+				setCurrentTarget(event, current, frame);
 				fireEventSlot(slot, event);
-				if (((event as any)[PROPAGATION_FLAGS] & 1) !== 0) break;
+				if ((frame.flags & 1) !== 0) break;
 			}
 			if (targetOnly) break;
 		}
@@ -19086,42 +19270,48 @@ function dispatchDelegated(this: Node, event: Event): void {
 			reportListenerError(error);
 		}
 		_dispatchDepth--;
-		maybeFlushDiscrete(event.type);
+		maybeFlushDiscrete(type);
 	}
 }
 
 // Capture runs only this native listener's segment, in reverse path order.
 // Returning whether this queue stopped native propagation lets the shared
 // non-bubbling listener decide whether it may start its emulated bubble queue.
-function dispatchDelegatedCapture(this: Node, event: Event, path?: EventTarget[]): boolean {
+function dispatchDelegatedCapture(
+	this: Node,
+	event: Event,
+	path?: EventTarget[],
+	type = _delegated.get(event.type) ?? _delegatedCapture.get(event.type),
+): boolean {
 	path ??= prepareDelegatedEvent(event, this);
-	if (!_delegatedCapture.has(event.type)) return false;
+	if (type === undefined || (type.flags & EVENT_CAPTURE) === 0) return false;
 	path ??= event.composedPath();
-	if (!event.bubbles || !_delegated.has(event.type)) maybeEnqueueRestore(event);
-	const key = CAPTURE_PREFIX + event.type;
+	if (!event.bubbles || (type.flags & EVENT_BUBBLE) === 0) maybeEnqueueRestore(event, type);
 	const pathBase = CAPTURE_PATH.length;
 	buildDelegatedPath(event, this, path);
-	snapshotDelegatedSlots(pathBase, key, event);
+	snapshotDelegatedSlots(pathBase, type, true);
 	const stop = Object.getOwnPropertyDescriptor(event, 'stopPropagation');
-	const immediate = delegatedCapture(event.type)
-		? Object.getOwnPropertyDescriptor(event, 'stopImmediatePropagation')
-		: null;
+	const immediate =
+		(type.flags & EVENT_NATIVE_CAPTURE) !== 0
+			? Object.getOwnPropertyDescriptor(event, 'stopImmediatePropagation')
+			: null;
 	const wasCancelled = event.cancelBubble;
 	let stopped = false;
 	_dispatchDepth++;
 	const nativeBatch = beginNativeEventBatch(event);
+	let frame: DelegatedEventFrame | undefined;
 	try {
-		beginDelegatedPropagation(event, stop, immediate);
+		frame = beginDelegatedPropagation(event, stop, immediate);
 		for (let i = CAPTURE_PATH.length - 1; i >= pathBase; i--) {
 			const slot = CAPTURE_SLOTS[i];
 			if (slot != null) {
-				setCurrentTarget(event, CAPTURE_PATH[i]);
+				setCurrentTarget(event, CAPTURE_PATH[i], frame);
 				fireEventSlot(slot, event);
-				if (((event as any)[PROPAGATION_FLAGS] & 1) !== 0) break;
+				if ((frame.flags & 1) !== 0) break;
 			}
 		}
 	} finally {
-		stopped = (event as any)[PROPAGATION_FLAGS] !== 0 || (!wasCancelled && event.cancelBubble);
+		stopped = frame?.flags !== 0 || (!wasCancelled && event.cancelBubble);
 		CAPTURE_PATH.length = pathBase;
 		CAPTURE_SLOTS.length = pathBase;
 		endDelegatedPropagation(event, stop, immediate);
@@ -19130,14 +19320,14 @@ function dispatchDelegatedCapture(this: Node, event: Event, path?: EventTarget[]
 			endNativeEventBatch(
 				event,
 				nativeBatch,
-				event.bubbles && !event.cancelBubble && _delegated.has(event.type),
+				event.bubbles && !event.cancelBubble && (type.flags & EVENT_BUBBLE) !== 0,
 				reportListenerError,
 			);
 		} catch (error) {
 			reportListenerError(error);
 		}
 		_dispatchDepth--;
-		finishCaptureDispatch(event);
+		finishCaptureDispatch(event, type);
 	}
 	return stopped;
 }
@@ -19150,14 +19340,17 @@ function noop(): void {}
 // measurement/indexOf). Native `currentTarget` is the listener's attach node (our
 // delegation ROOT), so shadow it with a configurable own property during each handler and
 // remove the shadow after the walk (restoring native semantics).
-function setCurrentTarget(event: Event, node: EventTarget | null): void {
-	(event as any)[CURRENT_TARGET_NODE] = node;
+function setCurrentTarget(
+	event: Event,
+	node: EventTarget | null,
+	frame: DelegatedEventFrame,
+): void {
+	frame.currentTarget = node;
 	Object.defineProperty(event, 'currentTarget', CURRENT_TARGET_DESCRIPTOR);
 }
 function clearCurrentTarget(event: Event): void {
 	// Deleting the own property re-exposes Event.prototype's native getter.
 	delete (event as any).currentTarget;
-	delete (event as any)[CURRENT_TARGET_NODE];
 }
 
 // ---------------------------------------------------------------------------
@@ -20743,9 +20936,9 @@ function isControlledHostProp(el: Element, name: string): boolean {
  * form control and the event can carry a user edit (see RESTORE_EVENTS).
  * Called by both delegated dispatchers, right after their dispatch stamp.
  */
-function maybeEnqueueRestore(event: Event): void {
+function maybeEnqueueRestore(event: Event, type: DelegatedEventType): void {
 	const t = event.target as any;
-	if (t === null || t.$$ctrl === undefined || !RESTORE_EVENTS.has(event.type)) return;
+	if (t === null || t.$$ctrl === undefined || (type.flags & EVENT_RESTORE) === 0) return;
 	const ctrl = t.$$ctrl as ControlledState;
 	if (event.type === 'input' && ctrl.compositionEndTask !== undefined) {
 		const inputEvent = event as InputEvent;
@@ -20869,6 +21062,7 @@ function registerPortalEventRange(target: Node, portal: PortalSlot): void {
 		ranges = new Set();
 		_portalEventRanges.set(target, ranges);
 		portalEventTargetCount++;
+		eventRootEpoch++;
 	}
 	ranges.add(portal);
 	(portal.start as PortalEventBoundary).$$portalEventRange = portal;
@@ -20886,6 +21080,7 @@ function unregisterPortalEventRange(target: Node, portal: PortalSlot): void {
 	if (ranges.size === 0) {
 		_portalEventRanges.delete(target);
 		portalEventTargetCount--;
+		eventRootEpoch++;
 	}
 }
 

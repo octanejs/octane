@@ -402,6 +402,9 @@ const SUITES = [
 			...(name === 'event-delegation' || name === 'external-store-fanout'
 				? [{ label: 'work', script: 'work.mjs', args: () => [] }]
 				: []),
+			...(name === 'event-delegation'
+				? [{ label: 'dispatch-work', script: 'dispatch-work.mjs', args: () => [] }]
+				: []),
 		],
 	})),
 	{
@@ -1000,6 +1003,15 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: () => [] }],
 	},
 	{
+		// Production static attributes and live head reapplication, with exact
+		// generic routing/write counts; timing runs use an uninstrumented bundle.
+		name: 'dom-attributes',
+		cwd: 'dom-attributes',
+		servers: [],
+		iter: { normal: 1, quick: 1 },
+		runs: [{ script: 'run.mjs', args: () => [] }],
+	},
+	{
 		// Transition/hook hot paths: useTransition cycles, functional updaters,
 		// suspended hold + release, urgent dispatch, delegated clicks, and an
 		// urgent update beside a queued transition. Deterministic creation-event
@@ -1015,6 +1027,15 @@ const SUITES = [
 		// compiled source and DOM/event controls for every dependency change.
 		name: 'template-call-memo',
 		cwd: 'template-call-memo',
+		servers: [],
+		iter: { normal: 1, quick: 1 },
+		runs: [{ script: 'run.mjs', args: () => [] }],
+	},
+	{
+		// Production template clone/mount work for keyed multi-root and text
+		// bindings, with visible DOM and survivor identity controls.
+		name: 'dom-template-mount',
+		cwd: 'dom-template-mount',
 		servers: [],
 		iter: { normal: 1, quick: 1 },
 		runs: [{ script: 'run.mjs', args: () => [] }],
@@ -1172,6 +1193,15 @@ const SUITES = [
 		servers: [],
 		iter: { normal: 1, quick: 1 },
 		runs: [{ script: 'run-size.mjs', args: () => [] }],
+	},
+	{
+		// Production spread resolution: executed allocation expressions under
+		// client/SSR semantic controls; untouched timing is a separate manual run.
+		name: 'spread-hosts',
+		cwd: 'dom-events',
+		servers: [],
+		iter: { normal: 1, quick: 1 },
+		runs: [{ script: 'spread.mjs', args: () => [] }],
 	},
 ];
 
