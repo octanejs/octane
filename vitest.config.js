@@ -3610,7 +3610,14 @@ export default defineConfig({
 					globals: false,
 					testTimeout: 60_000,
 					hookTimeout: 60_000,
-					server: { deps: { inline: ['@react-three/fiber'] } },
+					server: {
+						deps: {
+							inline: ['@react-three/fiber'],
+							// Execute production bundles with Node's native import semantics,
+							// including Rsbuild's file-URL requests for split server chunks.
+							external: [/\/octane-three-ssr-[^/]+\/dist-(?:vite|rsbuild)\/server\//],
+						},
+					},
 				},
 				plugins: [octane({ renderers: THREE_RENDERERS })],
 				resolve: { alias: THREE_ALIASES, dedupe: ['react', 'react-dom', 'three'] },

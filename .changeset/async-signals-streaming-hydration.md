@@ -24,3 +24,6 @@ and verify the published streaming bootstrap subpath and inline script export.
 
 Keep individual and batched server calls on the page's origin when an authored
 base element points to another origin.
+
+Keep reusable DOM, CSS, and component prop types scalar while allowing direct
+signal bindings at native JSX sites, preserving existing binding consumers.

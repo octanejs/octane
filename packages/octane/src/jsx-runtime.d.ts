@@ -56,8 +56,8 @@ export interface OctaneElement<P = any> extends ElementDescriptor<P> {}
 
 type SignalProperties<P> = { [K in keyof P]: P[K] | SignalHandle<P[K]> };
 
-export interface CSSProperties extends SignalProperties<React.CSSProperties> {
-	cssFloat?: React.CSSProperties['float'] | SignalHandle<React.CSSProperties['float']>;
+export interface CSSProperties extends React.CSSProperties {
+	cssFloat?: React.CSSProperties['float'];
 }
 
 export type ClassValue =
@@ -141,21 +141,42 @@ type UnboundProps =
 	| 'defaultChecked'
 	| 'dangerouslySetInnerHTML'
 	| 'suppressContentEditableWarning'
-	| 'suppressHydrationWarning';
+	| 'suppressHydrationWarning'
+	| 'suppressNativeChangeWarning'
+	| '__octaneNativeChangeDiagnostic'
+	| 'ref'
+	| 'key'
+	| 'children';
 
 /** Octane's attribute transform over one React attribute interface. */
-type Transformed<P, T> = SignalProperties<
-	Omit<P, ReactSyntheticProps | UnboundProps | 'className' | 'style' | 'children'>
-> &
-	Pick<P, Extract<keyof P, UnboundProps>> &
+type Transformed<P, T> = Omit<P, ReactSyntheticProps | 'className' | 'style' | 'children'> &
 	NativeEventHandlers<P, T & EventTarget> & {
-		class?: ClassValue | SignalHandle<ClassValue>;
-		className?: ClassValue | SignalHandle<ClassValue>;
-		for?: string | SignalHandle<string>;
-		xmlns?: string | SignalHandle<string>;
+		class?: ClassValue;
+		className?: ClassValue;
+		for?: string;
+		xmlns?: string;
 		style?: string | CSSProperties;
 		children?: unknown;
 	};
+
+type BoundStyle<S> = S extends object ? SignalProperties<S> : S;
+
+/**
+ * Only a host JSX site installs direct bindings. Keep reusable attribute and
+ * component-prop types scalar: their consumers may read values imperatively.
+ * A component can explicitly opt in with SignalHandle or this JSX namespace.
+ */
+type BoundIntrinsicProps<P> = {
+	[K in keyof P]: K extends UnboundProps | ReactSyntheticProps
+		? P[K]
+		: K extends 'style'
+			? BoundStyle<P[K]>
+			: P[K] | SignalHandle<P[K]>;
+};
+
+type BoundIntrinsicElements = {
+	[K in keyof Octane.JSX.IntrinsicElements]: BoundIntrinsicProps<Octane.JSX.IntrinsicElements[K]>;
+};
 
 declare namespace Octane {
 	type Key = string | number | bigint;
@@ -613,7 +634,15 @@ declare namespace Octane {
 	}
 }
 
-export import JSX = Octane.JSX;
+/** Automatic JSX runtime types include the host's direct signal bindings. */
+export namespace JSX {
+	type ElementType = Octane.JSX.ElementType;
+	interface Element extends Octane.JSX.Element {}
+	interface ElementChildrenAttribute extends Octane.JSX.ElementChildrenAttribute {}
+	interface IntrinsicAttributes extends Octane.JSX.IntrinsicAttributes {}
+	interface IntrinsicClassAttributes<T> extends Octane.JSX.IntrinsicClassAttributes<T> {}
+	interface IntrinsicElements extends BoundIntrinsicElements {}
+}
 export { Octane };
 
 // The automatic-runtime entry points, for type resolution only — octane's

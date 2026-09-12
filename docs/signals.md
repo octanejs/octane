@@ -207,6 +207,8 @@ Live retained results remain valid only while every contributing data owner is a
 
 ## TSRX components and existing hooks
 
+Native JSX attributes and individual object-style properties accept signal handles. Reusable types such as `CSSProperties`, `HTMLAttributes`, `SVGProps`, `ComponentProps`, and `JSX` imported from `octane` keep their scalar value types, so components can read and calculate with those values. Components that accept handles must declare that capability explicitly with `SignalHandle<T>`, or use the binding-aware `JSX.IntrinsicElements` types from `octane/jsx-runtime` when forwarding host props.
+
 `useSignal$` is available from `octane/signals/client`; server compilation selects `octane/signals/server`. It uses the existing compiler-assigned hook slot and the real component scope's cleanup:
 
 ```tsrx

@@ -96,6 +96,7 @@ export const BENCHMARK_SUITES = [
 	'react-hosted-islands',
 	'ssr-throughput',
 	'streaming-ssr',
+	'conversation-streaming',
 	'ssr-http',
 	'streaming-backpressure',
 	'ssr-workerd',

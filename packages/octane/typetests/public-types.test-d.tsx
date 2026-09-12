@@ -1,5 +1,7 @@
 /** @jsxImportSource octane */
 import { createElement, memo } from 'octane';
+import type * as React from 'react';
+import type { Octane } from 'octane/jsx-runtime';
 import type {
 	ComponentProps,
 	ComponentPropsWithoutRef,
@@ -17,6 +19,7 @@ import type {
 	ReactNode,
 	Ref,
 	SetStateAction,
+	SVGProps,
 } from 'octane';
 
 const View: FC<PropsWithChildren<{ label: string }>> = (props) =>
@@ -86,3 +89,20 @@ const MemoExplicit = memo<{ label: string }>(
 const explicitElement = <MemoExplicit label="preserved" />;
 // @ts-expect-error Explicit prop type arguments keep required props.
 const badExplicitElement = <MemoExplicit />;
+
+// Reusable prop types describe plain values a component may inspect, while
+// automatic host JSX separately accepts live signal bindings.
+declare const publicWidth: CSSProperties['width'];
+const reusableWidth: React.CSSProperties['width'] = publicWidth;
+declare const publicId: HTMLAttributes<HTMLElement>['id'];
+const reusableId: string | undefined = publicId;
+declare const publicFill: SVGProps<SVGPathElement>['fill'];
+const reusableFill: string | undefined = publicFill;
+declare const publicValue: ComponentProps<'input'>['value'];
+const reusableValue: React.InputHTMLAttributes<HTMLInputElement>['value'] = publicValue;
+declare const publicIntrinsicValue: JSX.IntrinsicElements['input']['value'];
+const reusableIntrinsicValue: React.InputHTMLAttributes<HTMLInputElement>['value'] =
+	publicIntrinsicValue;
+declare const namespaceIntrinsicValue: Octane.JSX.IntrinsicElements['input']['value'];
+const reusableNamespaceValue: React.InputHTMLAttributes<HTMLInputElement>['value'] =
+	namespaceIntrinsicValue;
