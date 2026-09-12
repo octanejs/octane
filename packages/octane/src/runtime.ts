@@ -23748,8 +23748,9 @@ function deoptWrapperKind(value: any[]): DeoptWrapperKind {
 }
 
 const DEOPT_KEY_STRINGIFY = JSON.stringify;
+const DEOPT_KEY_STRING = String;
 
-function nestedImplicitKeyPrefix(path: readonly (string | number)[]): string | null {
+function nestedDeoptKeyPrefix(path: readonly (string | number)[]): string | null {
 	// Object-valued wrapper keys and custom array serialization may differ for
 	// each leaf. Keep their existing full-key serialization path.
 	if (JSON.stringify !== DEOPT_KEY_STRINGIFY || 'toJSON' in path) return null;
@@ -23757,7 +23758,7 @@ function nestedImplicitKeyPrefix(path: readonly (string | number)[]): string | n
 		const type = typeof path[i];
 		if (type !== 'string' && type !== 'number') return null;
 	}
-	return '[' + JSON.stringify(path) + ',"index",';
+	return '[' + JSON.stringify(path) + ',';
 }
 
 function appendScopedDeoptKey(
@@ -23766,7 +23767,7 @@ function appendScopedDeoptKey(
 	item: any,
 	index: number,
 	key: any,
-	implicitPrefix: string | null | undefined,
+	keyPrefix: string | null | undefined,
 ): string | null | undefined {
 	// Reconciliation keys are internal: top-level implicit positions are numbers,
 	// explicit keys carry a 'k' prefix, and nested paths are JSON strings. These
@@ -23781,20 +23782,30 @@ function appendScopedDeoptKey(
 	// explicit 'k' keys; numeric indices are distinct from both string forms.
 	if (path.length === 0) {
 		outKeys.push(explicit ? 'k' + String(key) : index);
-		return implicitPrefix;
+		return keyPrefix;
 	}
-	// Initialize only for the first implicit leaf: keyed-only wrappers must not
-	// pay for a prefix they cannot reuse. `null` disables caching for this scope;
-	// `undefined` means no implicit leaf has needed its prefix yet.
-	if (!explicit) {
-		if (implicitPrefix === undefined) implicitPrefix = nestedImplicitKeyPrefix(path);
-		if (implicitPrefix !== null && JSON.stringify === DEOPT_KEY_STRINGIFY && !('toJSON' in path)) {
-			outKeys.push(implicitPrefix + index + ']');
-			return implicitPrefix;
+	// Only inert keys can share a wrapper prefix. Keep custom coercion on the
+	// original expression below, including its serializer/callee lookup order.
+	if (
+		keyPrefix !== null &&
+		(!explicit || (typeof key === 'string' && String === DEOPT_KEY_STRING)) &&
+		JSON.stringify === DEOPT_KEY_STRINGIFY &&
+		!('toJSON' in path)
+	) {
+		if (keyPrefix === undefined) keyPrefix = nestedDeoptKeyPrefix(path);
+		if (keyPrefix !== null) {
+			outKeys.push(
+				explicit
+					? keyPrefix + '"key",' + JSON.stringify(String(key)) + ']'
+					: keyPrefix + '"index",' + index + ']',
+			);
+			return keyPrefix;
 		}
 	}
 	outKeys.push(JSON.stringify([path, explicit ? 'key' : 'index', explicit ? String(key) : index]));
-	return implicitPrefix;
+	// A custom serializer may retain or mutate this path, even if it restores
+	// the built-ins before the next sibling. Never reuse its old prefix again.
+	return null;
 }
 
 // Flatten arrays and Fragment descriptors to renderable leaves while retaining
@@ -23812,20 +23823,13 @@ function flattenReactChildContainer(
 ): void {
 	const keyFn = kind === 'fragment' ? deoptKeyPositional : deoptKey;
 	const count = children.length;
-	let implicitPrefix: string | null | undefined = count > 1 ? undefined : null;
+	let keyPrefix: string | null | undefined = count > 1 ? undefined : null;
 	for (let i = 0; i < count; i++) {
 		const item = children[i];
 		if (isFragmentDescriptor(item)) {
 			if (item.ref != null || hasOwnProp.call(item.props, 'ref')) {
 				outItems.push(fragmentRefDescriptor(item));
-				implicitPrefix = appendScopedDeoptKey(
-					outKeys,
-					path,
-					item,
-					i,
-					keyFn(item, i),
-					implicitPrefix,
-				);
+				keyPrefix = appendScopedDeoptKey(outKeys, path, item, i, keyFn(item, i), keyPrefix);
 				continue;
 			}
 			const nested = fragmentDescriptorChildren(item);
@@ -23858,7 +23862,7 @@ function flattenReactChildContainer(
 			continue;
 		}
 		outItems.push(item);
-		implicitPrefix = appendScopedDeoptKey(outKeys, path, item, i, keyFn(item, i), implicitPrefix);
+		keyPrefix = appendScopedDeoptKey(outKeys, path, item, i, keyFn(item, i), keyPrefix);
 	}
 }
 

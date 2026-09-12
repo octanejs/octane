@@ -177,15 +177,18 @@ The opt-in `nested` mode uses three independent 1,000-row descriptor lists throu
 the same compiled `.tsrx` child hole. One list is wrapped in a same-kind array
 with a top-level sibling, giving its implicit leaves a real nested path; the
 second stays flat as a no-work control. A third uses the nested shape with every
-row explicitly keyed, checking that an implicit prefix is never prepared for
-fully keyed siblings. Each also contains a separate explicit key `"0"`; in the
+row explicitly keyed, measuring whether its siblings reuse one wrapper prefix.
+Each also contains a separate explicit key `"0"`; in the
 first two modes it sits beside implicit index zero. An unrelated update uses a
 different, prebuilt descriptor generation, so descriptor construction is outside timing.
 The gate checks order, complete inner HTML, survivor DOM identity, typed
-uncontrolled inputs, and focus. A `JSON.stringify` observer installed before
+uncontrolled inputs, and focus. It also reverses and restores the fully keyed
+siblings, checking exact survivor identity and order through both operations.
+A `JSON.stringify` observer installed before
 the production module loads reports calls for nested implicit identities,
-nested explicit keys, and any shared wrapper-path serialization. Observation
-finishes in a separate browser context before the clean timing run.
+full nested explicit tuples, individual explicit key JSON escaping, and shared
+wrapper-path serialization. Observation finishes in a separate browser context
+before the clean timing run.
 
 From the repository root, build the separate fixture while the runtime is at
 the baseline revision. This uses the normal minified production build:
@@ -199,19 +202,42 @@ cd benchmarks/js-framework/octane-tsrx
 From a second terminal at the repository root, record the baseline:
 
 ```bash
-WORK_MODE=nested WORK_EXPECT_NESTED_JSON=1000 WORK_EXPECT_PATH_JSON=0 TARGET_URL=http://127.0.0.1:5317/nested-work.html WORK_JSON=/tmp/nested-baseline.json node benchmarks/js-framework/style-work.mjs 30
+WORK_MODE=nested WORK_EXPECT_NESTED_JSON=0 WORK_EXPECT_PATH_JSON=1 WORK_EXPECT_MIXED_EXPLICIT_TUPLES=1 WORK_EXPECT_MIXED_EXPLICIT_VALUES=0 WORK_EXPECT_EXPLICIT_TUPLES=1001 WORK_EXPECT_EXPLICIT_VALUES=0 WORK_EXPECT_EXPLICIT_PATH=0 TARGET_URL=http://127.0.0.1:5317/nested-work.html WORK_JSON=/tmp/nested-baseline.json node benchmarks/js-framework/style-work.mjs 30
 ```
 
 After a runtime change, build with `--outDir dist/nested-work-candidate`, serve
 that directory on port 5318, and run the same command with
 `WORK_EXPECT_NESTED_JSON=0`, `WORK_EXPECT_PATH_JSON=1`, `TARGET_URL=http://127.0.0.1:5318/nested-work.html`,
-and `WORK_EXPECTED_HTML_SHA` set to the baseline output's `htmlSha`. Keep both
-built bundles and servers fixed; repeat the identical runner in A–B–B–A order
+`WORK_EXPECT_EXPLICIT_TUPLES=0`, `WORK_EXPECT_EXPLICIT_VALUES=1001`,
+`WORK_EXPECT_EXPLICIT_PATH=1`, `WORK_EXPECT_MIXED_EXPLICIT_TUPLES=0`,
+`WORK_EXPECT_MIXED_EXPLICIT_VALUES=1`, and `WORK_EXPECTED_HTML_SHA` set to the
+baseline output's `htmlSha`. Keep both built bundles and servers fixed; repeat
+the identical runner in A–B–B–A order
 for timing comparisons. Each of 30 samples measures eight toggled updates,
-dividing the elapsed time by eight. The flat and fully explicit lists measure
-how much general browser load changes between runs. Absolute timing differences inside this
-control's variation are inconclusive; the untimed JSON call counts and
-observable state are deterministic gates.
+dividing the elapsed time by eight. The flat and mostly implicit nested lists
+measure browser load and any cost shifted to the existing implicit path. Timing
+differences within the control variation are inconclusive; the JSON call counts
+and observable state are deterministic gates.
+
+On 2026-09-12 (Darwin arm64, Node 26.4.0), the frozen baseline and candidate
+production bundles passed the same HTML, DOM identity, input, focus, and reorder
+checks (`htmlSha` `64dd26ca…9427d92ed1650`). Per update, the fully keyed list
+changed from 1,001 full tuple JSON calls to one wrapper-path JSON call and 1,001
+scalar key JSON calls. The implicit list retained one path JSON call and no
+implicit tuple calls; the flat list made none. Bundle JS grew from 166,305 to
+166,409 bytes (+104); `gzip -n` grew from 53,557 to 53,586 bytes (+29).
+
+| Run | Fully keyed median / p95 (ms) | Nested implicit median / p95 (ms) | Flat median / p95 (ms) |
+| --- | ---: | ---: | ---: |
+| Baseline A1 | 0.550 / 0.575 | 0.550 / 0.575 | 0.500 / 0.550 |
+| Candidate B1 | 0.5625 / 0.6000 | 0.5500 / 0.6000 | 0.5125 / 0.5500 |
+| Candidate B2 | 0.5750 / 0.6125 | 0.5625 / 0.6000 | 0.5125 / 0.5500 |
+| Baseline A2 | 0.5500 / 0.6000 | 0.5375 / 0.5875 | 0.5000 / 0.5250 |
+
+The fully keyed median divided by the flat control was 1.10/1.10 for A1/A2
+and 1.10/1.12 for B1/B2. This fixture establishes less repeated wrapper-path
+serialization, but its timings do not establish a latency gain. These timings
+are environment-specific, and each row uses 30 samples of eight updates.
 
 ### List key callback work (opt-in)
 
