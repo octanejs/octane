@@ -3,8 +3,12 @@ import { render } from '@solidjs/web';
 import { initialConversations, nextReply, userMessage, segText } from './data.js';
 
 // Streaming-chat fixture (Solid 2.0) — shared DOM/API contract with the
-// sibling apps (see ../../README.md). Same immutable streaming model over
-// createSignal; `flush()` after every set commits inside the timed window.
+// sibling apps (see ../../README.md). Fastest-version authoring (the
+// js-framework `solid-next` pattern): immutable signal structure for
+// conversations/messages (cheap mounts and switches — no proxy graph), with
+// ONE PER-MESSAGE `done` SIGNAL driving the streaming path — a pump tick is
+// a single signal write that re-renders only the streaming message's segment
+// text, instead of rebuilding the message subtree per token.
 // Class STRINGS throughout (the 2.0-beta's classList is inert — same finding
 // as the TodoMVC column).
 
@@ -14,10 +18,20 @@ function ChatApp() {
 	const [draft, setDraft] = createSignal('');
 	const [streamingId, setStreamingId] = createSignal(null);
 
+	// The streaming message carries a live `done` signal; settled messages
+	// keep their plain `done` field (never changes again).
+	const arm = (msg) => {
+		const [done, setDone] = createSignal(msg.done);
+		msg.doneSig = done;
+		msg.setDone = setDone;
+		return msg;
+	};
+	const doneOf = (m) => (m.doneSig !== undefined ? m.doneSig() : m.done);
+
 	const send = () => {
 		const text = draft().trim();
 		if (text === '') return;
-		const reply = nextReply();
+		const reply = arm(nextReply());
 		setConvs((cs) =>
 			cs.map((c, i) =>
 				i === active() ? { ...c, messages: [...c.messages, userMessage(text), reply] } : c,
@@ -33,14 +47,9 @@ function ChatApp() {
 		if (sid === null) return 0;
 		const msg = convs()[active()].messages.find((m) => m.id === sid);
 		if (msg === undefined) return 0;
-		const done = Math.min(msg.total, msg.done + k);
-		setConvs((cs) =>
-			cs.map((c, i) =>
-				i === active()
-					? { ...c, messages: c.messages.map((m) => (m.id === sid ? { ...m, done } : m)) }
-					: c,
-			),
-		);
+		const done = Math.min(msg.total, msg.doneSig() + k);
+		msg.setDone(done);
+		msg.done = done; // keep the plain field settled for post-stream reads
 		if (done === msg.total) setStreamingId(null);
 		flush();
 		return msg.total - done;
@@ -69,9 +78,8 @@ function ChatApp() {
 									setActive(c.id);
 									flush();
 								}}
-							>
-								{c.title}
-							</button>
+								textContent={c.title}
+							/>
 						)}
 					</For>
 				</nav>
@@ -85,10 +93,10 @@ function ChatApp() {
 									{(s) => (
 										<Show
 											when={s.type === 'code'}
-											fallback={<p class="text">{segText(s, m.done)}</p>}
+											fallback={<p class="text" textContent={segText(s, doneOf(m))} />}
 										>
 											<pre class="code">
-												<code>{segText(s, m.done)}</code>
+												<code textContent={segText(s, doneOf(m))} />
 											</pre>
 										</Show>
 									)}

@@ -1,40 +1,39 @@
-import { For, createStore, reconcile } from 'solid-js';
+import { For, createStore } from 'solid-js';
 import { bindSetData } from './ops.js';
 import { makeData, DB_COUNT } from './data.js';
 
-// dbmon table authored idiomatically for Solid 2.0, following Ryan Carniato's
-// solid-dbmon: a plain `createStore` of the rows + `reconcile` on each tick.
-// `reconcile(next, "id")(draft.rows)` diffs the next dataset into the store by id
-// inside the setter's draft callback, so unchanged rows keep their identity (no
-// row re-render) and only the changed leaf signals (count / class / a query's
-// elapsed+class) update — Solid's fine-grained model. `<For>` keys the list and
-// moves nodes on a sort. dbmon is a known worst case for fine-grained reconcile
-// (every tick is a fresh, non-reference-checkable object graph it must deep-diff).
-// The shared ops driver feeds `reconcile` the same seeded data, so the rendered
-// DOM matches the other frameworks exactly.
+// dbmon table authored in the Solid 2.0 SHALLOW-STORE idiom. Each tick hands
+// the framework a fresh, non-reference-checkable row array, so a deep
+// `reconcile` would diff every leaf of every row; `shallow: true` instead
+// keeps the row records RAW and makes the array slot the reactive unit. The
+// list is keyed by id and each row receives an ACCESSOR: replacing the slot
+// (same id, new object) re-runs that row's grouped effect, which reads the
+// fresh raw row and writes the changed cells — no per-leaf signals, no
+// row-object rebuild, and `<For>` still moves nodes on a sort. The shared ops
+// driver feeds the same seeded data, so the DOM matches the other frameworks.
 
 export default function App() {
-	// Seed value-identical to the shared ops `_current` (same makeData(…, 0, 1)).
-	const [state, setState] = createStore({ rows: makeData(DB_COUNT, 0, 1) });
+	const [state, setState] = createStore({ rows: makeData(DB_COUNT, 0, 1) }, { shallow: true });
+	// Shallow idiom: replace the slot; keyed For + item accessors do retention.
 	bindSetData((d) =>
 		setState((s) => {
-			reconcile(d, 'id')(s.rows);
+			s.rows = d;
 		}),
 	);
 
 	return (
 		<table class="dbmon">
 			<tbody>
-				<For each={state.rows}>
-					{(db) => (
+				<For each={state.rows} keyed={(r) => r.id}>
+					{(row) => (
 						<tr>
-							<td class="dbname">{db.name}</td>
-							<td class={db.countClass}>{db.count}</td>
-							<td class={db.queries[0].className}>{db.queries[0].elapsed}</td>
-							<td class={db.queries[1].className}>{db.queries[1].elapsed}</td>
-							<td class={db.queries[2].className}>{db.queries[2].elapsed}</td>
-							<td class={db.queries[3].className}>{db.queries[3].elapsed}</td>
-							<td class={db.queries[4].className}>{db.queries[4].elapsed}</td>
+							<td class="dbname" textContent={row().name} />
+							<td class={row().countClass} textContent={row().count} />
+							<td class={row().queries[0].className} textContent={row().queries[0].elapsed} />
+							<td class={row().queries[1].className} textContent={row().queries[1].elapsed} />
+							<td class={row().queries[2].className} textContent={row().queries[2].elapsed} />
+							<td class={row().queries[3].className} textContent={row().queries[3].elapsed} />
+							<td class={row().queries[4].className} textContent={row().queries[4].elapsed} />
 						</tr>
 					)}
 				</For>

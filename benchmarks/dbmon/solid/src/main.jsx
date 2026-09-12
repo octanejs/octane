@@ -3,6 +3,9 @@ import { flush } from 'solid-js';
 import App from './App.jsx';
 import { tickFull, tickPartial, remount, sortRows } from './ops.js';
 
+// Measurement-local: ?node=1 flips the driver to the node-delivery prototype.
+globalThis.__PATCH_NODE__ = new URLSearchParams(location.search).has("node");
+
 const target = document.getElementById('main');
 let dispose = null;
 
