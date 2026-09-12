@@ -475,8 +475,8 @@ export interface ExpectedCoreContracts {
 	isCollectionOptions: 1;
 	CollectionOptions:
 		| 'id'
-		| typeof import('/Users/jonwheeler/Documents/octane-contributions/octane/.worktrees/bindings-tanstack-router-db-ai-20260912/node_modules/.pnpm/@tanstack+db@0.9.0_typescript@5.9.3/node_modules/@tanstack/db/dist/esm/collection-options').collectionOptionsBrand
-		| typeof import('/Users/jonwheeler/Documents/octane-contributions/octane/.worktrees/bindings-tanstack-router-db-ai-20260912/node_modules/.pnpm/@tanstack+db@0.9.0_typescript@5.9.3/node_modules/@tanstack/db/dist/esm/collection-options').collectionOptionsFactory;
+		| typeof import('../node_modules/@tanstack/db/dist/esm/collection-options').collectionOptionsBrand
+		| typeof import('../node_modules/@tanstack/db/dist/esm/collection-options').collectionOptionsFactory;
 	CollectionMaterializeOptions: 'initialData';
 	DehydratedCollectionRow: 'metadata' | 'value' | 'key';
 	DehydratedCollectionChunk: 'collectionId' | 'rows' | 'syncMeta';
@@ -1050,7 +1050,7 @@ export interface ExpectedCoreContracts {
 		| 'defaultStringCollation';
 	LiveQueryCollectionUtils:
 		| string
-		| typeof import('/Users/jonwheeler/Documents/octane-contributions/octane/.worktrees/bindings-tanstack-router-db-ai-20260912/node_modules/.pnpm/@tanstack+db@0.9.0_typescript@5.9.3/node_modules/@tanstack/db/dist/esm/query/live/internal').LIVE_QUERY_INTERNAL;
+		| typeof import('../node_modules/@tanstack/db/dist/esm/query/live/internal').LIVE_QUERY_INTERNAL;
 	UnhashableQueryIRError: 'name' | 'message' | 'path' | 'reason' | 'stack' | 'cause';
 	canonicalizeQueryIR: 1;
 	getLoadSubsetDemandKey: 1;

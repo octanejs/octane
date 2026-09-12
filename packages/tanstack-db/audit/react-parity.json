@@ -767,7 +767,7 @@
         {
           "path": "packages/tanstack-db/typetests/expected-core-contracts.d.ts",
           "role": "support",
-          "sha256": "38a5bd7d6e468514d650e16c0fea713c5b2f8e672b1d2ff86ab1a956b582fe7b"
+          "sha256": "36e911b86a6bc561b186156b41f85a3b8869dea4bab977db24372ee5d9622131"
         }
       ],
       "evidenceOrigin": "repo-authored",
