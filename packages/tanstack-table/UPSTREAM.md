@@ -9,6 +9,8 @@
 - npm tarball SHA-256: `c9e40b73d195b76f81e1602513e96d7ab03eac0e0611da86e05cc144f629b8ab`
 - npm integrity: `sha512-Rzp1Q4e0/nIgEjmISYR5HeEgLTNtrG+C7NFZf/AbCxPO5hg+zC3yNGwcoECigUk8SFzzvhXbd2rFdtP2ZiGrfA==`
 
+## Source boundary
+
 The complete released adapter source and tests are byte-pinned under `upstream/`
 by `audit/upstream.lock.json`. Source/tests and the verified npm artifact are
 unpublished. The shared pristine runner executes all 34 original React tests;

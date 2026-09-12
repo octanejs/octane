@@ -26,7 +26,7 @@
       "path": "package.json",
       "origin": "adapted",
       "packageName": "@tanstack/react-table",
-      "sha256": "a56894c771c73e1e60cf576d36b645e18aa8715d9205cc592d8615dffcb8d004"
+      "sha256": "cd4698f7665af89c61198a1991e447f8c9e7e4569f55fb868b22484e0d0751ba"
     },
     {
       "path": "src/FlexRender.ts",

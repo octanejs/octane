@@ -9,6 +9,8 @@
 - npm artifact SHA-256: `61a7b5feaecaff7b44527675b24df7bb102ef09327b314e2f770e786b2a8412e`
 - Runtime dependency: `@tanstack/virtual-core@3.17.10`, imported directly
 
+## Source boundary
+
 `audit/upstream.lock.json` pins all 41 files in the upstream package, including
 its complete source, unit tests and browser fixtures. The immutable source and
 artifact are test inputs and are excluded from publication. The binding adapts

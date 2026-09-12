@@ -33,7 +33,8 @@
     "src",
     "README.md",
     "UPSTREAM.md",
-    "LICENSE.upstream"
+    "LICENSE.upstream",
+    "LICENSE"
   ],
   "exports": {
     ".": "./src/index.ts"

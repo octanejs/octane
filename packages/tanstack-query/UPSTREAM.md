@@ -6,6 +6,8 @@
 - Source and tests: `packages/react-query/src`, including `src/__tests__`
 - License: MIT; exact upstream text ships as `LICENSE.upstream`.
 
+## Source boundary
+
 `audit/upstream.lock.json` pins every regular file in the package, the complete
 source/test subtree, and root license. The two monorepo configuration symlinks
 are excluded; neither contains adapter implementation or test registrations.
