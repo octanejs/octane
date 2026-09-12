@@ -223,7 +223,7 @@
         {
           "path": "packages/textarea-autosize/tests/ssr/react-contract.test.ts",
           "role": "test",
-          "sha256": "5dae604942e7a8c91920bbf15b0ea31d2333a2b3bf1054d561313d9136232b9b",
+          "sha256": "e025b7c0bfaa762a7457beed30da5d7f263bbea6a07d15c30498a85a09e39a12",
           "cases": [
             {
               "id": "ssr:react-contract",

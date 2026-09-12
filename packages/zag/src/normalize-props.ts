@@ -1,5 +1,5 @@
 import { createNormalizer } from '@zag-js/types';
-import type { JSX } from 'octane/jsx-runtime';
+import type { JSX } from 'octane';
 
 export type PropTypes = JSX.IntrinsicElements & {
 	element: JSX.IntrinsicElements['div'];

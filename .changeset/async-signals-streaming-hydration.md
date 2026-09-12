@@ -6,6 +6,8 @@
 '@octanejs/rspack-plugin': patch
 '@octanejs/rsbuild-plugin': patch
 '@octanejs/adapter-cloudflare': patch
+'@octanejs/zag': patch
+'@octanejs/to-print': patch
 ---
 
 Add owner-bound signal declarations, async derivations and keyed streams, direct native signal bindings, and independent hydration infrastructure. Add request-local server-call context, bounded streamed RPC, and explicitly batched independent reads. Preserve operation identity and cancellation boundaries across navigation and uncertain acknowledgements.
@@ -27,3 +29,5 @@ base element points to another origin.
 
 Keep reusable DOM, CSS, and component prop types scalar while allowing direct
 signal bindings at native JSX sites, preserving existing binding consumers.
+Use scalar public props for Zag's state-machine normalization results and
+to-print's imperative iframe options.

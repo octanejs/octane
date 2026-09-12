@@ -22,6 +22,7 @@ import { EventEmitter, once } from 'node:events';
 import { createServer as createHttpServer, type IncomingMessage, type Server } from 'node:http';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { build, createServer, type ViteDevServer } from 'vite';
+import type { Locator } from 'playwright';
 import { createTempProject } from '../../octane/tests/_temp-project.js';
 import { createNodeServer } from '../../app-core/src/server/node-http.js';
 
@@ -740,6 +741,41 @@ describe('production SSR build', { timeout: 30_000 }, () => {
 				);
 				expect(parentAsset).toBeTruthy();
 				const page = await browser.newPage({ extraHTTPHeaders: { 'x-fixture-viewer': engine } });
+				// WebKit can pause animation frames while the streamed document is
+				// still loading. Check actionability without its rAF-based locator
+				// stability wait, then send a real pointer event to the visible control.
+				const clickControl = async (control: Locator) => {
+					await control.waitFor({ state: 'visible' });
+					await expect.poll(() => control.isEnabled()).toBe(true);
+					let previous: { x: number; y: number; width: number; height: number } | undefined;
+					const point = { x: 0, y: 0 };
+					await expect
+						.poll(async () => {
+							const bounds = await control.boundingBox();
+							if (bounds === null) return false;
+							const stable =
+								previous !== undefined &&
+								Object.entries(bounds).every(
+									([key, value]) =>
+										Number.isFinite(value) && value === previous![key as keyof typeof bounds],
+								);
+							previous = bounds;
+							point.x = bounds.x + bounds.width / 2;
+							point.y = bounds.y + bounds.height / 2;
+							return (
+								stable &&
+								bounds.width > 0 &&
+								bounds.height > 0 &&
+								(await control.evaluate(
+									(node, position) =>
+										node.contains(document.elementFromPoint(position.x, position.y)),
+									point,
+								))
+							);
+						})
+						.toBe(true);
+					await page.mouse.click(point.x, point.y);
+				};
 				const errors: string[] = [];
 				page.on('pageerror', (error) => errors.push(String(error)));
 				let releaseParent!: () => void;
@@ -759,11 +795,7 @@ describe('production SSR build', { timeout: 30_000 }, () => {
 					const input = page.getByRole('textbox', { name: 'Message' });
 					await input.waitFor();
 					const original = await input.elementHandle();
-					// WebKit's locator stability wait can await document completion;
-					// this response intentionally retains its live result channel.
-					const bounds = await input.boundingBox();
-					expect(bounds).not.toBeNull();
-					await page.mouse.click(bounds!.x + bounds!.width / 2, bounds!.y + bounds!.height / 2);
+					await clickControl(input);
 					await input.fill('draft typed before the parent');
 					await expect.poll(() => input.inputValue()).toBe('draft typed before the parent');
 					// A derived read proves that code adopted the early
@@ -804,15 +836,15 @@ describe('production SSR build', { timeout: 30_000 }, () => {
 							batches.push(request.url());
 					});
 					await input.fill('one accepted operation');
-					await page.getByRole('button', { name: 'Send message' }).click();
+					await clickControl(page.getByRole('button', { name: 'Send message' }));
 					await expect
 						.poll(() => page.getByText('Message accepted.', { exact: true }).count())
 						.toBe(1);
 					await input.fill('next draft for A');
-					await page.getByRole('button', { name: 'Conversation B', exact: true }).click();
+					await clickControl(page.getByRole('button', { name: 'Conversation B', exact: true }));
 					await expect.poll(() => input.inputValue()).toBe('');
 					await input.fill('separate draft for B');
-					await page.getByRole('button', { name: 'Conversation A', exact: true }).click();
+					await clickControl(page.getByRole('button', { name: 'Conversation A', exact: true }));
 					await expect.poll(() => input.inputValue()).toBe('next draft for A');
 					await expect
 						.poll(() =>
@@ -820,7 +852,7 @@ describe('production SSR build', { timeout: 30_000 }, () => {
 						)
 						.toBe(1);
 					expect(await page.locator('[data-conversation="A"] [data-turn]').count()).toBe(1);
-					await page.getByRole('button', { name: 'Check last operation' }).click();
+					await clickControl(page.getByRole('button', { name: 'Check last operation' }));
 					await expect
 						.poll(() => page.getByRole('status').textContent())
 						.toMatch(/^Operation complete,/);

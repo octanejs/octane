@@ -420,6 +420,12 @@ function userAppEvalSubmission() {
 				return this.resolve(source, importer, { ...resolveOptions, skipSelf: true });
 			}
 
+			// The trusted SSR grader needs compiler helpers without a package link.
+			// Keep this after the candidate allowlist so submissions cannot import them.
+			if (source === 'octane/internal/server') {
+				return resolve(import.meta.dirname, 'packages/octane/src/internal/server.ts');
+			}
+
 			if (!source.startsWith(USER_APP_EVAL_PREFIX)) {
 				const frameworkEntry = USER_APP_EVAL_ALLOWED_IMPORTS.get(source);
 				return typeof frameworkEntry === 'string' ? frameworkEntry : null;
