@@ -330,7 +330,7 @@
         {
           "path": "packages/jotai/audit/test-classifications.json",
           "role": "support",
-          "sha256": "b339cafb6e2e03f28a8c988967e20e1f0f6bae8d5c958978830eec8242762bdb"
+          "sha256": "2f3ab0d0fef608d326ac20ec433280d7df7030e5b6d0c400e34cb7d56de3cc95"
         },
         {
           "path": "packages/octane/tests/differential/_rig.ts",
@@ -344,7 +344,7 @@
       "type": "adapted-octane",
       "oracle": "required",
       "environment": "workspace-node",
-      "project": "jotai",
+      "project": "jotai-hydration",
       "notes": "Octane-specific SSR subscription exclusion, DOM adoption and client teardown.",
       "files": [
         {

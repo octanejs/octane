@@ -1181,13 +1181,14 @@ export default defineConfig({
 					exclude: [
 						'packages/jotai/tests/differential/**/*.test.ts',
 						'packages/jotai/tests/upstream-original.test.ts',
+						'packages/jotai/tests/conformance/hydration.test.ts',
 					],
 					setupFiles: ['packages/jotai/tests/upstream/setup.ts'],
 					// Same differential precompile, but for jotai fixtures: also rewrites
 					// `@octanejs/jotai` → `jotai` so the React side runs real jotai.
 					globals: true,
 				},
-				plugins: [octaneServerFixtures(import.meta.dirname), octane()],
+				plugins: [octane()],
 				// `@octanejs/jotai` is the package under test; alias the public name (and
 				// its subpaths) to source so fixtures import it exactly as a consumer
 				// would (and the differential React side rewrites the same specifiers to
@@ -1203,6 +1204,24 @@ export default defineConfig({
 						{
 							find: /^@octanejs\/jotai\/(.*)$/,
 							replacement: resolve(import.meta.dirname, 'packages/jotai/src') + '/$1.ts',
+						},
+					],
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'jotai-hydration',
+					include: ['packages/jotai/tests/conformance/hydration.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octaneServerFixtures(import.meta.dirname), octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/jotai$/,
+							replacement: resolve(import.meta.dirname, 'packages/jotai/src/index.ts'),
 						},
 					],
 				},

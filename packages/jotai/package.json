@@ -46,7 +46,7 @@
     "./utils": "./src/utils.ts"
   },
   "scripts": {
-    "test": "vitest run --root ../.. --config vitest.config.js --project jotai --project jotai-differential --project jotai-pristine",
+    "test": "vitest run --root ../.. --config vitest.config.js --project jotai --project jotai-differential --project jotai-pristine --project jotai-hydration",
     "upstream:check": "node ../../scripts/react-port/materialize.mjs run --check --package-dir .",
     "upstream:test": "node ../../scripts/react-parity/run-pristine.mjs jotai",
     "upstream:verify": "node ../../scripts/react-parity/verify-provenance.mjs --package-dir ."

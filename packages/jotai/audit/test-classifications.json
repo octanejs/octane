@@ -25,6 +25,11 @@
       "path": "packages/jotai/tests/conformance/hydration.test.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Verifies SSR subscription exclusion, hydration DOM adoption, updates and teardown."
+    },
+    {
+      "path": "packages/jotai/tests/upstream-original.test.ts",
+      "disposition": "unmodified-upstream-suite-wrapper",
+      "oracle": "Runs all 404 runtime registrations from the immutable Jotai 3.0.0 source on React, checking exact discovered identities and pass results."
     }
   ]
 }
