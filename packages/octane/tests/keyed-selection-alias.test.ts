@@ -112,7 +112,10 @@ describe('keyed selection with an authored row-key local', () => {
 			rendered.update(KeyAliasTable, { ...props, selected: 2 });
 			const updated = [items[2]!, { ...items[1]!, label: 'Beta updated' }, items[0]!];
 			rendered.update(KeyAliasTable, { ...props, items: updated, selected: 1 });
-			expect(tableRows(rendered.container)).toEqual(original.toReversed());
+			const reordered = tableRows(rendered.container);
+			expect(reordered).toHaveLength(original.length);
+			for (let index = 0; index < original.length; index++)
+				expect(reordered[index]).toBe(original[original.length - index - 1]);
 			expect(rendered.findAll('.pick').map((node) => node.textContent)).toEqual([
 				'Gamma',
 				'Beta updated',
@@ -127,7 +130,10 @@ describe('keyed selection with an authored row-key local', () => {
 				items: [updated[0]!, updated[2]!],
 				selected: 2,
 			});
-			expect(tableRows(rendered.container)).toEqual([original[2], original[0]]);
+			const remaining = tableRows(rendered.container);
+			expect(remaining).toHaveLength(2);
+			expect(remaining[0]).toBe(original[2]);
+			expect(remaining[1]).toBe(original[0]);
 			expect(selectedLabels(rendered.container)).toEqual([]);
 			rendered.update(KeyAliasTable, { ...props, items: [], selected: null });
 			expect(tableRows(rendered.container)).toEqual([]);

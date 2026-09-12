@@ -4574,13 +4574,16 @@ describe('mixed DOM and universal ownership', () => {
 			// owner. A later context update proves its bridge still points live.
 			for (const callback of scheduled.splice(0)) callback();
 			mounted.update(UniversalBoundaryFixture, { ...props, theme: 'light' });
-			expect(container.children).toEqual([host]);
+			expect(container.children).toHaveLength(1);
+			expect(container.children[0]).toBe(host);
 			expect(host.props).toMatchObject({ theme: 'light', value: 'ready' });
 		} finally {
 			mounted.unmount();
 			root.unmount();
 		}
+		for (const callback of scheduled.splice(0)) callback();
 		expect(container.children).toEqual([]);
+		expect(container.instanceCount).toBe(0);
 	});
 
 	it('does not transfer abandoned root suspension ownership to replacement props', async () => {

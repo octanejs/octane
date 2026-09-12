@@ -93,6 +93,118 @@ dependency tree. Keep those dependencies, hashes, and runner options identical
 for a before/after comparison. A nonstandard parser loader must be disclosed
 with the result.
 
+## Compiler cache shapes
+
+The `compiler-cache-shapes` target is a separate production fixture. It enables
+both `autoMemo` and `inlineHookMemo` and compiles without HMR or development
+metadata. The runner parses the compiled source to count reads and writes of
+named `_m$N`/`_k$N` properties on `__s.slots`, plus calls to the private
+`compilerMemoRegion` helper. The committed ratio guards require zero named
+reads and writes. The ordinary flat component must make zero region calls.
+These are deterministic source observations, not measured V8 object shapes.
+
+The clean production bundle also mounts combined hook/auto regions, each region
+alone, two alternate compiled bodies, and a flat control. An unrelated visible
+tick and a changed label must update while input DOM identity, typed text, and
+focus survive. A Context Provider switches its child compiled body with the
+same live input and label node; this checks the rare shared-scope overflow path.
+The semantic snapshot must match the frozen baseline. The target does not
+assume cache storage details in its behavioral assertions.
+
+To compare against an archived source tree with dependencies supplied by the
+current checkout:
+
+```bash
+OCTANE_MEMO_ROOT=/private/tmp/981-object-shapes-baseline \
+  OCTANE_MEMO_EXTERNAL_ROOT="$PWD" \
+  BENCH_JSON=/private/tmp/981-object-shapes-hook-frozen-baseline.json \
+  node benchmarks/hook-memo/run.mjs
+BENCH_JSON=/private/tmp/981-object-shapes-hook-candidate.json \
+  node benchmarks/hook-memo/run.mjs
+node benchmarks/bench.mjs --ratios hook-memo
+```
+
+On the frozen `fa11c1055` source and the candidate, Node 26.4.0,
+`@tsrx/core` 0.1.71, and esbuild 0.28.1 observed:
+
+| Production source metric | Frozen base | Candidate |
+| --- | ---: | ---: |
+| Named memo reads on `__s.slots` | 10 | 0 |
+| Named memo writes on `__s.slots` | 10 | 0 |
+| Memo-region helper call sites | 0 | 6 |
+| Helper calls in flat control | 0 | 0 |
+| Compiled fixture minified / gzip bytes | 4,070 / 1,252 | 4,044 / 1,238 |
+| Tree-shaken bundle minified / gzip bytes | 185,914 / 59,097 | 186,371 / 59,207 |
+
+Both runs used fixture SHA256
+`30a16a2b34e5c5217458e53cf286782ff5f3113077a8989b5b536886fd6c9478`
+and entry SHA256
+`1da6d1d36546e2cf9a86ad647f3369d3675929c3fbcb15a4dd6437d01e07d2c9`.
+Their DOM, input, focus, and identity controls produced the same semantic
+snapshot SHA256 `39c9e293b0f041760b59508bc827d2a8de9b1f499b57344e8edab63556a40ee7`.
+
+The two bundles also include simultaneous runtime object-shape edits, so their
+457-byte minified and 110-byte gzip differences cannot be attributed solely to
+the compiler cache change. The compiled fixture alone shrank 26 minified and
+14 gzip bytes. No wall-clock or garbage-collection improvement is inferred.
+An A→B→A Provider-child switch exposing stale cached content already occurs
+with the frozen base and is tracked separately; this fixture covers the one-way
+switch and repeat B render only.
+
+### Cache memory and common render operations
+
+The opt-in profile builds a second production entry with one extra runtime
+export (`hostComponent`) solely to obtain an actual lightweight `Scope` record.
+It is excluded from the regular source and bundle byte target. Build the two
+immutable bundles from the same fixture and runner, then inspect them:
+
+```bash
+OCTANE_MEMO_ROOT=/private/tmp/981-object-shapes-baseline \
+  OCTANE_MEMO_EXTERNAL_ROOT="$PWD" \
+  BENCH_SHAPE_ARTIFACT=/private/tmp/cache-shape-base.mjs \
+  node benchmarks/hook-memo/run.mjs
+BENCH_SHAPE_ARTIFACT=/private/tmp/cache-shape-candidate.mjs \
+  node benchmarks/hook-memo/run.mjs
+node benchmarks/hook-memo/cache-shapes-profile.mjs memory /private/tmp/cache-shape-base.mjs /private/tmp/cache-shape-base-memory.json
+node benchmarks/hook-memo/cache-shapes-profile.mjs memory /private/tmp/cache-shape-candidate.mjs /private/tmp/cache-shape-candidate-memory.json
+node benchmarks/hook-memo/cache-shapes-profile.mjs timing /private/tmp/cache-shape-base.mjs /private/tmp/cache-shape-candidate.mjs /private/tmp/cache-shape-timing.json
+```
+
+The profile imports each immutable bundle in a separate process. Memory mode
+uses V8's heap snapshot after a real production mount, reporting each sampled
+record's own bytes plus its direct property/array-elements backing. It does not
+include nested DOM or closure retention. The sample's Block and slot array,
+including both compiler-owned memo cell arrays, total **1,072 → 1,096 bytes**:
+the fixed record costs 56 bytes, replacing 40 bytes of named slot-property
+backing, while the Block itself gains 8 bytes. Flat Block plus slots are
+**776 → 784 bytes**; lightweight Scope plus its empty slots are **232 → 240
+bytes**. Both builds keep fast Block, Scope, and slot-array maps. The new field
+costs 8 bytes on every Block and Scope, and a memo-bearing Block costs 24 bytes
+more in this direct graph. A rare second body in the same scope also allocates
+an overflow Map, which these single-body byte totals exclude.
+
+As container alternatives using the same live memo cell arrays, a four-field
+fixed object was 56 bytes and fast, a packed four-entry JSArray was 80 bytes,
+and `Object.create(null)` plus two named properties was 184 bytes with slow
+properties on Node 26.4.0 / V8 14.6. The array/object choice was checked with
+separate-process ABBA happy-dom samples of actual `createRoot`, mount, update,
+and unmount. The flat control and combined memo body both update visible DOM;
+typed text, input identity, and focus survive. Six warmed tuple-to-object pairs
+gave median update time 1.90 → 2.05 µs for flat and 2.63 → 2.75 µs for combined;
+the combined/flat normalized ratio was 0.97. Mount medians were 32.98 → 35.54
+µs for flat and 39.58 → 38.20 µs for combined. A separate frozen-base to
+isolated fixed-object comparison measured median update 2.02 → 1.94 µs flat
+and 2.87 → 2.47 µs combined; mount 35.41 → 32.60 µs flat and 41.78 → 35.21
+µs combined. Per-sample ranges overlap and host conditions vary, so these
+timings do not establish a speedup. The fixed object was selected for its
+measured 24-byte container saving over the tuple.
+
+The unified `--ratios hook-memo` run checks the two new cache-shape guards, both
+of which pass. Eight older hook-allocation ratio guards currently breach with
+the frozen base and candidate identically (for example, eligible hit function
+expressions are 704 in both). Those inherited guard failures are independent
+of the memo cache storage layout.
+
 The observer's own copy-on-write and counting control can be run with:
 
 ```bash

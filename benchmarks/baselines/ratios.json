@@ -3103,6 +3103,22 @@
     "note": "Same-run clean tree-shaken application plus Octane runtime: closure-free lowering must stay within 2% gzip of the runtime-form control. No instrumentation contributes to these bytes."
   },
   {
+    "suite": "hook-memo",
+    "op": "named_reads",
+    "target": "compiler-cache-shapes",
+    "reference": "cache-shape-reference",
+    "maxRatio": 0,
+    "note": "Production compiler output for hook and automatic memo regions must not read named _m$N or _k$N properties from the dense DOM/control slot array. The fixture also exercises flat and shared-scope Provider controls."
+  },
+  {
+    "suite": "hook-memo",
+    "op": "named_writes",
+    "target": "compiler-cache-shapes",
+    "reference": "cache-shape-reference",
+    "maxRatio": 0,
+    "note": "Production compiler output must not publish hook or automatic memo regions through dynamically added named properties on the slot array."
+  },
+  {
     "suite": "transition-hooks",
     "op": "cycle_renders",
     "target": "octane",

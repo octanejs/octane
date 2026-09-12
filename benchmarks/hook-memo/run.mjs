@@ -65,6 +65,8 @@ const APP_FILES = [
 	path.join(ROOT, 'returned-jsx.tsx'),
 	path.join(ROOT, 'manual-hooks.ts'),
 ];
+const SHAPE_FILE = path.join(ROOT, 'cache-shapes.tsrx');
+const SHAPE_ENTRY = path.join(ROOT, 'cache-shapes-entry.mjs');
 const val = (score) => ({ score, median: score, min: score, samples: 1 });
 const bytes = (source) => Buffer.byteLength(source);
 const gzipBytes = (source) => gzipSync(source, { level: zlibConstants.Z_BEST_COMPRESSION }).length;
@@ -131,9 +133,9 @@ function octaneRequest(request) {
 	return path.resolve(OCTANE_ROOT, target);
 }
 
-async function bundleApplication(sources, outfile) {
+async function bundleApplication(sources, outfile, entry = path.join(ROOT, 'entry.mjs')) {
 	const result = await build({
-		entryPoints: [path.join(ROOT, 'entry.mjs')],
+		entryPoints: [entry],
 		absWorkingDir: REPO,
 		outfile,
 		bundle: true,
@@ -403,6 +405,152 @@ function codeSizes(sources, cleanBundle) {
 	};
 }
 
+function compileCacheShapes() {
+	const source = fs.readFileSync(SHAPE_FILE, 'utf8');
+	const output = compile(source, SHAPE_FILE, {
+		mode: 'client',
+		hmr: false,
+		dev: false,
+		autoMemo: true,
+		inlineHookMemo: true,
+	});
+	assert.equal(output.diagnostics.length, 0, 'cache-shape fixture emitted diagnostics');
+	return new Map([[SHAPE_FILE, output.code]]);
+}
+
+// A source-level ABI observation, deliberately separate from behavioral tests.
+// AST membership counts emitted named reads/writes on the DOM slot array and
+// cache-region calls; neither result depends on formatting or minified names.
+function compilerCacheShapeCounts(source) {
+	const ast = parseModule(source, SHAPE_FILE + '.js');
+	const result = { named_reads: 0, named_writes: 0, region_calls: 0, flat_region_calls: 0 };
+	const owner = [];
+	function walk(node, parent = null) {
+		if (!node || typeof node !== 'object') return;
+		if (Array.isArray(node)) {
+			for (const child of node) walk(child, parent);
+			return;
+		}
+		const isFunction = /^(?:FunctionDeclaration|FunctionExpression|ArrowFunctionExpression)$/.test(
+			node.type,
+		);
+		if (isFunction) owner.push(node.id?.name ?? null);
+		if (node.type === 'MemberExpression') {
+			const target = node.object;
+			const property = node.property?.name;
+			if (
+				target?.type === 'MemberExpression' &&
+				target.object?.name === '__s' &&
+				target.property?.name === 'slots' &&
+				/^_[mk]\$\d+$/.test(property ?? '')
+			) {
+				if (parent?.type === 'AssignmentExpression' && parent.left === node) result.named_writes++;
+				else result.named_reads++;
+			}
+		}
+		if (
+			node.type === 'CallExpression' &&
+			node.callee?.type === 'Identifier' &&
+			/\$compilerMemoRegion$/.test(node.callee.name)
+		) {
+			result.region_calls++;
+			if (owner.includes('Flat')) result.flat_region_calls++;
+		}
+		for (const [key, value] of Object.entries(node)) {
+			if (key === 'loc' || key === 'metadata' || key === 'comments' || key[0] === '_') continue;
+			if (value && typeof value === 'object') {
+				if (Array.isArray(value)) for (const child of value) walk(child, node);
+				else walk(value, node);
+			}
+		}
+		if (isFunction) owner.pop();
+	}
+	walk(ast);
+	return result;
+}
+
+function exerciseCacheShapes(bundle) {
+	const cases = [
+		['Combined', 'data-tick', ''],
+		['Alternate', 'data-tick', 'other:'],
+		['AutoOnly', 'data-tick', ''],
+		['HookOnly', 'output', ''],
+		['Flat', 'output', ''],
+	];
+	const snapshots = [];
+	for (const [name, tickPlace, prefix] of cases) {
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		const root = bundle.createRoot(container);
+		const render = (label, tick) =>
+			bundle.flushSync(() => root.render(bundle[name], { label, tick }));
+		const checkTick = (expected) => {
+			const visible =
+				tickPlace === 'output'
+					? container.querySelector('output')?.textContent
+					: container.querySelector('#cache-host')?.getAttribute('data-tick');
+			assert.equal(visible, String(expected), `${name}: unrelated tick is visible`);
+		};
+		render('alpha', 0);
+		const input = container.querySelector('input');
+		const labelNode = container.querySelector('#cache-label');
+		assert.equal(labelNode?.textContent, prefix + 'alpha');
+		checkTick(0);
+		input.value = 'typed';
+		input.focus();
+		render('alpha', 1);
+		checkTick(1);
+		assert.equal(container.querySelector('input'), input);
+		assert.equal(container.querySelector('#cache-label'), labelNode);
+		assert.equal(input.value, 'typed');
+		assert.equal(document.activeElement, input);
+		assert.equal(labelNode.textContent, prefix + 'alpha');
+		render('beta', 2);
+		checkTick(2);
+		assert.equal(container.querySelector('input'), input);
+		assert.equal(container.querySelector('#cache-label'), labelNode);
+		assert.equal(input.value, 'typed');
+		assert.equal(labelNode.textContent, prefix + 'beta');
+		snapshots.push([name, container.innerHTML, input.value]);
+		root.unmount();
+		assert.equal(container.innerHTML, '');
+		container.remove();
+	}
+	const container = document.createElement('div');
+	document.body.appendChild(container);
+	const root = bundle.createRoot(container);
+	const Context = bundle.createContext('default');
+	bundle.flushSync(() =>
+		root.render(Context.Provider, { value: 'initial', children: bundle.ProviderFirst }),
+	);
+	const input = container.querySelector('input');
+	const labelNode = container.querySelector('#cache-label');
+	assert.equal(labelNode?.textContent, 'first');
+	input.value = 'retained';
+	input.focus();
+	bundle.flushSync(() =>
+		root.render(Context.Provider, { value: 'changed', children: bundle.ProviderSecond }),
+	);
+	assert.equal(container.querySelector('input'), input);
+	assert.equal(container.querySelector('#cache-label'), labelNode);
+	assert.equal(input.value, 'retained');
+	assert.equal(document.activeElement, input);
+	assert.equal(labelNode.textContent, 'second');
+	bundle.flushSync(() =>
+		root.render(Context.Provider, { value: 'again', children: bundle.ProviderSecond }),
+	);
+	assert.equal(container.querySelector('input'), input);
+	assert.equal(container.querySelector('#cache-label'), labelNode);
+	assert.equal(input.value, 'retained');
+	assert.equal(document.activeElement, input);
+	assert.equal(labelNode.textContent, 'second');
+	snapshots.push(['ProviderFirst→ProviderSecond', container.innerHTML, input.value]);
+	root.unmount();
+	assert.equal(container.innerHTML, '');
+	container.remove();
+	return snapshots;
+}
+
 function withoutCallbackNames(snapshot) {
 	return Object.fromEntries(
 		Object.entries(snapshot).map(([name, value]) => [
@@ -534,11 +682,53 @@ try {
 			);
 		}
 	}
+	const shapeSources = compileCacheShapes();
+	const shapeCode = shapeSources.get(SHAPE_FILE);
+	const shapeFile = path.join(tempDir, 'cache-shapes-clean.mjs');
+	const { code: shapeBundle } = await bundleApplication(shapeSources, shapeFile, SHAPE_ENTRY);
+	fs.writeFileSync(shapeFile, shapeBundle);
+	if (process.env.BENCH_SHAPE_ARTIFACT) {
+		const artifact = path.resolve(process.env.BENCH_SHAPE_ARTIFACT);
+		const { code: profileBundle } = await bundleApplication(
+			shapeSources,
+			artifact,
+			path.join(ROOT, 'cache-shapes-profile-entry.mjs'),
+		);
+		fs.writeFileSync(artifact, profileBundle);
+	}
+	const shapeSnapshot = exerciseCacheShapes(await import(pathToFileURL(shapeFile).href));
+	const shapeCounts = compilerCacheShapeCounts(shapeCode);
+	assert.equal(shapeCounts.flat_region_calls, 0, 'flat control gained compiler memo work');
+	const shapeSizes = codeSizes(shapeSources, shapeBundle);
+	const shapeOps = {
+		...Object.fromEntries(Object.entries(shapeSizes).map(([key, value]) => [key, val(value)])),
+		...Object.fromEntries(Object.entries(shapeCounts).map(([key, value]) => [key, val(value)])),
+	};
+	const shapeHash = createHash('sha256').update(JSON.stringify(shapeSnapshot)).digest('hex');
+	targets.push({
+		name: 'compiler-cache-shapes',
+		ops: shapeOps,
+		meta: {
+			fixtureSha256: createHash('sha256').update(fs.readFileSync(SHAPE_FILE)).digest('hex'),
+			entrySha256: createHash('sha256').update(fs.readFileSync(SHAPE_ENTRY)).digest('hex'),
+			semanticsSha256: shapeHash,
+			snapshot: shapeSnapshot,
+			counts: shapeCounts,
+		},
+	});
+	console.log(
+		`cache-shapes: ${shapeCounts.named_reads} named reads, ${shapeCounts.named_writes} named writes, ${shapeCounts.region_calls} region calls; semantics ${shapeHash}`,
+	);
 	const payload = {
 		suite: 'hook-memo',
 		iterations: 1,
 		targets: [
 			...targets,
+			{
+				name: 'cache-shape-reference',
+				ops: { named_reads: val(1), named_writes: val(1) },
+				meta: { description: 'One named array property per source-level cache access.' },
+			},
 			{
 				name: 'one-per-render',
 				ops: onePerRender,

@@ -22,6 +22,52 @@ describe('inline hook-memo behavior', () => {
 	for (const inlineHookMemo of [false, true]) {
 		const compileOptions = { hmr: false, dev: false, autoMemo: false, inlineHookMemo };
 
+		it(`initializes nullish results and callbacks, including a later conditional memo (inline=${inlineHookMemo})`, () => {
+			const { App } = loadCompiledFixtureSource(
+				`import { useCallback, useMemo } from 'octane';
+				export function App({ enabled, tick, observe, mark }) @{
+					const empty = useMemo(() => (mark('undefined'), undefined), []);
+					const nullable = useMemo(() => (mark('null'), null), []);
+					const callback = useCallback(() => 'ready', []);
+					const late = enabled && useMemo(() => (mark('late'), { label: 'later' }), []);
+					observe({ empty, nullable, callback, late });
+					<p>{tick + ':' + String(empty) + ':' + String(nullable) + ':' + callback() + ':' + (late ? late.label : 'off')}</p>
+				}`,
+				{ id: 'memo-empty-results.tsrx', mode: 'client', compileOptions },
+			);
+			const log = createLog();
+			const observed: Array<{
+				empty: undefined;
+				nullable: null;
+				callback: () => string;
+				late: false | { label: string };
+			}> = [];
+			const shared = {
+				mark: log.push,
+				observe: (value: (typeof observed)[number]) => observed.push(value),
+			};
+			const view = mount(App, { ...shared, enabled: false, tick: 0 });
+			try {
+				expect(view.html()).toBe('<p>0:undefined:null:ready:off</p>');
+				expect(log.drain()).toEqual(['undefined', 'null']);
+				const callback = observed[0].callback;
+				view.update(App, { ...shared, enabled: true, tick: 1 });
+				expect(view.html()).toBe('<p>1:undefined:null:ready:later</p>');
+				expect(log.drain()).toEqual(['late']);
+				const late = observed[1].late;
+				view.update(App, { ...shared, enabled: false, tick: 2 });
+				view.update(App, { ...shared, enabled: true, tick: 3 });
+				expect(view.html()).toBe('<p>3:undefined:null:ready:later</p>');
+				expect(log.drain()).toEqual([]);
+				expect(observed[3].empty).toBeUndefined();
+				expect(observed[3].nullable).toBeNull();
+				expect(observed[3].callback).toBe(callback);
+				expect(observed[3].late).toBe(late);
+			} finally {
+				view.unmount();
+			}
+		});
+
 		it(`preserves an ordinary factory's invocation scope (inline=${inlineHookMemo})`, () => {
 			const { App } = loadCompiledFixtureSource(
 				`import { useMemo } from 'octane';
