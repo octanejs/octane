@@ -1,22 +1,18 @@
 import { createElement } from 'octane';
 import Icon from './Icon';
-import { mergeClasses, toKebabCase, toPascalCase } from './shared';
-import type { IconNode, LucideIcon, LucideProps } from './types';
+import { toPascalCase } from './shared';
+import type { IconNode, LucideIcon, LucideIconData, LucideProps } from './types';
 
-export function createLucideIcon(iconName: string, iconNode: IconNode): LucideIcon {
-	const Component = ({ className, ref, ...props }: LucideProps) =>
-		createElement(Icon, {
-			ref,
-			iconNode,
-			className: mergeClasses(
-				`lucide-${toKebabCase(toPascalCase(iconName))}`,
-				`lucide-${iconName}`,
-				className as string,
-			),
-			...props,
-		});
-
-	Component.displayName = toPascalCase(iconName);
+export function createLucideIcon(icon: LucideIconData): LucideIcon;
+export function createLucideIcon(name: string, node: IconNode, aliases?: string[]): LucideIcon;
+export function createLucideIcon(
+	icon: LucideIconData | string,
+	node: IconNode = [],
+	aliases: string[] = [],
+): LucideIcon {
+	const data: LucideIconData = typeof icon === 'string' ? { name: icon, node, aliases } : icon;
+	const Component = (props: LucideProps) => createElement(Icon, { ...props, icon: data });
+	Component.displayName = data.name ? toPascalCase(data.name) : 'Icon';
 	return Component;
 }
 

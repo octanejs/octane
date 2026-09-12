@@ -591,8 +591,8 @@
       "name": "@octanejs/lucide",
       "version": "0.1.47",
       "category": "Icons",
-      "upstream": { "package": "lucide-react", "version": "1.24.0" },
-      "surface": "Complete against the published `lucide-react@1.24.0` runtime surface: every canonical icon and alias, the `icons` namespace, `Icon`, `createLucideIcon`, `LucideProvider`, `useLucideContext`, `DynamicIcon`, `iconNames`, `dynamicIconImports`, and per-icon subpath imports.",
+      "upstream": { "package": "lucide-react", "version": "1.45.0" },
+      "surface": "Complete against the published `lucide-react@1.45.0` runtime surface: every canonical icon and alias, the `icons` namespace, `Icon`, `createLucideIcon`, `LucideProvider`, `useLucideContext`, `DynamicIcon`, `iconNames`, `dynamicIconImports`, and per-icon subpath imports.",
       "divergences": [
         "Icon refs are normal Octane `ref` props rather than React `forwardRef` components.",
         "Event callbacks receive native DOM events rather than React synthetic events."
@@ -938,12 +938,8 @@
       "name": "@octanejs/sanity-icons",
       "version": "0.1.2",
       "category": "Sanity Content",
-      "upstream": {
-        "package": "@sanity/icons",
-        "version": "5.2.1",
-        "commit": "e6c37d2d4f7f121254c077b3ae83e199ec0aec9c"
-      },
-      "surface": "Complete @sanity/icons@5.2.1 surface: all generated per-icon subpaths, named and default exports, Icon, icons, IconMap, IconSymbol and IconComponent.",
+      "upstream": { "package": "@sanity/icons", "version": "5.2.2" },
+      "surface": "Complete @sanity/icons@5.2.2 surface: all generated per-icon subpaths, named and default exports, Icon, icons, IconMap, IconSymbol and IconComponent.",
       "divergences": [
         "Refs are normal Octane ref props rather than React forwardRef wrappers.",
         "Event callbacks receive native DOM events rather than React synthetic events."

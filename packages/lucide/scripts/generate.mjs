@@ -17,7 +17,7 @@ const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SRC_ROOT = join(PACKAGE_ROOT, 'src');
 const ICONS_OUT = join(SRC_ROOT, 'icons');
 const CHECK = process.argv.includes('--check');
-const EXPECTED_VERSION = '1.24.0';
+const EXPECTED_VERSION = '1.45.0';
 
 const reactManifestPath = require.resolve('lucide-react/package.json');
 const reactRoot = dirname(reactManifestPath);
@@ -58,7 +58,7 @@ const allReactModules = readdirSync(reactIcons)
 
 const expected = new Map();
 const generatedHeader =
-	'// Generated from lucide-react@1.24.0 and @lucide/icons@1.24.0.\n' +
+	'// Generated from lucide-react@1.45.0 and @lucide/icons@1.45.0.\n' +
 	'// Run `pnpm lucide:generate`; do not edit by hand.\n\n';
 
 for (const { name, path } of canonical) {
@@ -67,10 +67,10 @@ for (const { name, path } of canonical) {
 		generatedHeader +
 			`import iconData from '@lucide/icons/icons/${path}';\n` +
 			`import createLucideIcon from '../createLucideIcon';\n` +
-			`import type { IconNode } from '../types';\n\n` +
-			`const __iconNode = iconData.node as IconNode;\n` +
-			`const ${name} = createLucideIcon(iconData.name, __iconNode);\n\n` +
-			`export { __iconNode };\n` +
+			`\nconst ${name} = createLucideIcon(iconData);\n\n` +
+			`export { default as __iconData } from '@lucide/icons/icons/${path}';\n` +
+			`/** @deprecated Use __iconData.node. */\n` +
+			`export const __iconNode = iconData.node;\n` +
 			`export default ${name};\n`,
 	);
 }
@@ -84,14 +84,28 @@ for (const path of allReactModules) {
 	}
 	expected.set(
 		join(ICONS_OUT, `${path}.ts`),
-		generatedHeader + `export { default } from './${target}';\n`,
+		generatedHeader + `export { default, __iconData, __iconNode } from './${target}';\n`,
 	);
 }
+
+// Preserve the published Octane import when upstream renames the canonical icon.
+const compatibilityAlias = {
+	name: 'CircleEuroSign',
+	path: 'circle-euro-sign',
+	target: 'circle-euro',
+};
+if (!canonicalByPath.has(compatibilityAlias.target))
+	throw new Error('Missing compatibility alias target');
+expected.set(
+	join(ICONS_OUT, `${compatibilityAlias.path}.ts`),
+	generatedHeader +
+		`export { default, __iconData, __iconNode } from './${compatibilityAlias.target}';\n`,
+);
 
 const indexText =
 	generatedHeader +
 	canonical.map(({ name, path }) => `export { default as ${name} } from './${path}';`).join('\n') +
-	'\n';
+	`\nexport { default as ${compatibilityAlias.name} } from './${compatibilityAlias.target}';\n`;
 expected.set(join(ICONS_OUT, 'index.ts'), indexText);
 
 const aliasLines = [];
@@ -111,6 +125,10 @@ for (const match of rootSource.matchAll(
 		);
 	}
 }
+
+aliasLines.push(
+	`export { default as CircleEuroSignIcon, default as LucideCircleEuroSign } from './icons/${compatibilityAlias.target}';`,
+);
 
 expected.set(
 	join(SRC_ROOT, 'aliases.ts'),
@@ -132,6 +150,8 @@ for (const match of dynamicSource.matchAll(
 if (dynamicEntries.length < canonical.length) {
 	throw new Error(`Parsed only ${dynamicEntries.length} dynamic Lucide icon names`);
 }
+
+dynamicEntries.push({ name: compatibilityAlias.path, path: compatibilityAlias.target });
 
 const dynamicText =
 	generatedHeader +

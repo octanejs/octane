@@ -7,9 +7,19 @@
       "reason": "Checks the generated Octane package bundle and React-runtime exclusion; it is not counted as React parity evidence."
     },
     {
+      "path": "packages/lucide/tests/data.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks custom icon data and live provider override behavior through the public Octane binding."
+    },
+    {
       "path": "packages/lucide/tests/differential/parity.test.ts",
       "disposition": "react-octane-differential",
       "oracle": "Runs every declared scenario against pinned lucide-react and @octanejs/lucide through the shared differential rig."
+    },
+    {
+      "path": "packages/lucide/tests/dynamic.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks that an older asynchronous import cannot replace the latest requested icon."
     },
     {
       "path": "packages/lucide/tests/exports.test.ts",
@@ -30,6 +40,11 @@
       "path": "packages/lucide/tests/ssr/server.test.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Checks Octane server rendering; it is not counted as React parity evidence."
+    },
+    {
+      "path": "packages/lucide/typetests/public-api.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks strict public icon-data, representation, stroke and SVG-ref types, including negative probes."
     }
   ]
 }
