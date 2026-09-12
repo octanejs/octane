@@ -5,10 +5,12 @@ import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
 	CLIENT_REFERENCE_MANIFEST_FILENAME,
+	INDEPENDENT_HYDRATION_MANIFEST_FILENAME,
 	createClientReferenceManifest,
 	createOctaneCompiler,
 } from 'octane/compiler/bundler';
 import { installCssModuleConstants } from './css-module-constants.js';
+import { createStreamedSignalHmrRuntimeModule } from './streamed-signals-hmr.js';
 import {
 	getOctaneRspackBuildInfo,
 	inferRspackEnvironment,
@@ -234,16 +236,17 @@ function visitClientReferenceModules(
 	inheritedChunks,
 	visit,
 	seen = new Set(),
+	executableModule = module,
 ) {
 	if (!module || seen.has(module)) return;
 	seen.add(module);
 	const chunks = moduleChunks(compilation, module, inheritedChunks);
-	visit(module, chunks);
+	visit(module, chunks, executableModule);
 	for (const child of iterable(module.modules)) {
-		visitClientReferenceModules(compilation, child, chunks, visit, seen);
+		visitClientReferenceModules(compilation, child, chunks, visit, seen, module);
 	}
 	if (module.rootModule) {
-		visitClientReferenceModules(compilation, module.rootModule, chunks, visit, seen);
+		visitClientReferenceModules(compilation, module.rootModule, chunks, visit, seen, module);
 	}
 }
 
@@ -277,6 +280,158 @@ function emitClientReferenceManifest(compiler, compilation) {
 		CLIENT_REFERENCE_MANIFEST_FILENAME,
 		new compiler.webpack.sources.RawSource(source),
 	);
+}
+
+function emitIndependentHydrationManifest(compiler, compilation, mode) {
+	const modules = collectIndependentHydrationModules(compilation);
+	const widgets = {};
+	for (const { template, target } of independentHydrationTargets(modules)) {
+		const activationChunks = new Set(target.chunks);
+		for (const chunk of target.chunks) {
+			for (const referenced of iterable(chunk?.getAllReferencedChunks?.())) {
+				activationChunks.add(referenced);
+			}
+		}
+		const files = [...activationChunks]
+			.flatMap((chunk) => [...iterable(chunk.files), ...iterable(chunk.auxiliaryFiles)])
+			.map(String);
+		widgets[template.boundaryId] = {
+			version: 1,
+			boundaryId: template.boundaryId,
+			// Rspack chunks are runtime payloads, not native module namespaces. The
+			// initial runtime module below owns the actual chunk-load + require closure.
+			moduleId: template.boundaryId,
+			exportName: template.exportName,
+			captureSchema: template.captureSchema,
+			hookSeed: template.hookSeed,
+			idSeed: template.idSeed,
+			signalSites: template.signalSites,
+			styles: [...new Set(files.filter((file) => /\.css(?:\?|$)/.test(file)))].sort(),
+			parentDependencies: false,
+		};
+	}
+	const records = Object.fromEntries(
+		Object.entries(widgets).sort(([left], [right]) => left.localeCompare(right)),
+	);
+	// Match the native __webpack_hash__ value captured by the executing entry.
+	// A widget-schema hash does not fence changes elsewhere in its client graph.
+	const buildId = compilation.hash;
+	if (typeof buildId !== 'string' || !buildId) {
+		throw new Error('Octane client build has no completed compilation hash.');
+	}
+	const independentHydration = Object.keys(records).length !== 0;
+	compilation.emitAsset(
+		'octane-client-build.json',
+		new compiler.webpack.sources.RawSource(
+			JSON.stringify(
+				{ version: 1, buildId, mode, capabilities: { independentHydration } },
+				null,
+				2,
+			) + '\n',
+		),
+	);
+	if (!independentHydration) return;
+	compilation.emitAsset(
+		INDEPENDENT_HYDRATION_MANIFEST_FILENAME,
+		new compiler.webpack.sources.RawSource(
+			JSON.stringify({ version: 1, buildId, widgets: records }, null, 2) + '\n',
+		),
+	);
+}
+
+function collectIndependentHydrationModules(compilation) {
+	const modules = [];
+	for (const topLevelModule of iterable(compilation.modules)) {
+		visitClientReferenceModules(
+			compilation,
+			topLevelModule,
+			[],
+			(module, chunks, executableModule) => {
+				const info = getOctaneRspackBuildInfo(module);
+				if (info !== null) modules.push({ module, executableModule, info, chunks });
+			},
+			new Set(),
+		);
+	}
+	return modules;
+}
+
+function independentHydrationTargets(modules) {
+	const targets = [];
+	for (const { info } of modules) {
+		for (const template of info.independentWidgets ?? []) {
+			const query = template.request.slice(template.request.indexOf('?'));
+			const candidates = modules.filter(
+				(candidate) =>
+					candidate.info.canonicalId === template.moduleId &&
+					candidate.info.resourceQuery?.includes(query),
+			);
+			const target =
+				candidates.find(
+					(candidate) =>
+						candidate.executableModule != null && candidate.executableModule !== candidate.module,
+				) ?? candidates[0];
+			if (target === undefined) {
+				throw new Error(
+					`Octane independent Hydrate ${JSON.stringify(template.boundaryId)} has no emitted activation chunk.`,
+				);
+			}
+			targets.push({ template, target });
+		}
+	}
+	return targets;
+}
+
+function independentHydrationRuntimeModule(compiler, compilation) {
+	const { RuntimeGlobals, RuntimeModule } = compiler.webpack;
+	return class OctaneIndependentHydrationRuntimeModule extends RuntimeModule {
+		constructor() {
+			super('octane independent hydration loaders');
+			this.fullHash = true;
+		}
+
+		generate() {
+			const registrations = [];
+			const seen = new Set();
+			for (const { template, target } of independentHydrationTargets(
+				collectIndependentHydrationModules(compilation),
+			)) {
+				if (seen.has(template.boundaryId)) continue;
+				seen.add(template.boundaryId);
+				const candidates = [target.executableModule, target.module, target.module?.rootModule];
+				const executable = candidates.find(
+					(module) => module != null && compilation.chunkGraph.getModuleId(module) != null,
+				);
+				if (executable === undefined) {
+					throw new Error(
+						`Octane independent Hydrate ${JSON.stringify(template.boundaryId)} has no executable Rspack module.`,
+					);
+				}
+				const moduleId = compilation.chunkGraph.getModuleId(executable);
+				const activationChunks = new Set(target.chunks);
+				for (const chunk of target.chunks) {
+					for (const referenced of iterable(chunk?.getAllReferencedChunks?.())) {
+						activationChunks.add(referenced);
+					}
+				}
+				const chunkIds = [...activationChunks]
+					.filter((chunk) => chunk !== this.chunk && chunk?.id != null)
+					.map((chunk) => chunk.id)
+					.sort((left, right) => String(left).localeCompare(String(right)));
+				const load =
+					chunkIds.length === 0
+						? 'Promise.resolve()'
+						: `Promise.all(${JSON.stringify(chunkIds)}.map(${RuntimeGlobals.ensureChunk}))`;
+				registrations.push(
+					`${RuntimeGlobals.global}.__OCTANE_INDEPENDENT_MODULES__[${JSON.stringify(template.boundaryId)}] = function() { return ${load}.then(function() { return ${RuntimeGlobals.require}(${JSON.stringify(moduleId)}); }); };`,
+				);
+			}
+			return [
+				`${RuntimeGlobals.global}.__OCTANE_INDEPENDENT_MODULES__ ||= Object.create(null);`,
+				...registrations,
+			].join('\n');
+		}
+	};
 }
 
 function defineMatchesBoolean(value, expected) {
@@ -515,12 +670,56 @@ export class OctaneRspackPlugin {
 			addDependencies(compilation.fileDependencies, current.dependencies);
 			addDependencies(compilation.missingDependencies, current.missingDependencies);
 			if (environment === 'client') {
+				const IndependentHydrationRuntimeModule = independentHydrationRuntimeModule(
+					compiler,
+					compilation,
+				);
+				compilation.hooks.additionalTreeRuntimeRequirements?.tap(
+					PLUGIN_NAME,
+					(chunk, runtimeRequirements) => {
+						if (!chunk.hasRuntime?.()) return;
+						const modules = collectIndependentHydrationModules(compilation);
+						const featureModules = modules.filter(
+							({ info }) =>
+								info.streamedSignals === true || (info.independentWidgets?.length ?? 0) > 0,
+						);
+						if (
+							featureModules.length > 0 &&
+							compiler.options.plugins.some(
+								(plugin) => plugin instanceof compiler.webpack.HotModuleReplacementPlugin,
+							)
+						) {
+							runtimeRequirements.add(compiler.webpack.RuntimeGlobals.interceptModuleExecution);
+							runtimeRequirements.add(compiler.webpack.RuntimeGlobals.moduleCache);
+							runtimeRequirements.add(compiler.webpack.RuntimeGlobals.global);
+							compilation.addRuntimeModule(
+								chunk,
+								createStreamedSignalHmrRuntimeModule(compiler, compilation, featureModules),
+							);
+						}
+						if (independentHydrationTargets(modules).length === 0) {
+							return;
+						}
+						runtimeRequirements.add(compiler.webpack.RuntimeGlobals.ensureChunk);
+						runtimeRequirements.add(compiler.webpack.RuntimeGlobals.global);
+						runtimeRequirements.add(compiler.webpack.RuntimeGlobals.require);
+						compilation.addRuntimeModule(chunk, new IndependentHydrationRuntimeModule());
+					},
+				);
 				compilation.hooks.processAssets.tap(
 					{
 						name: PLUGIN_NAME,
 						stage: compiler.webpack.Compilation.PROCESS_ASSETS_STAGE_REPORT,
 					},
-					() => emitClientReferenceManifest(compiler, compilation),
+					() => {
+						emitClientReferenceManifest(compiler, compilation);
+						emitIndependentHydrationManifest(
+							compiler,
+							compilation,
+							this.options.clientBuildMode ??
+								(compiler.options.mode === 'development' ? 'development' : 'production'),
+						);
+					},
 				);
 			}
 		});

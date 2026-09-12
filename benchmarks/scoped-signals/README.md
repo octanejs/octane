@@ -50,10 +50,11 @@ dependency-resolution override, not a substitute engine or an installation step.
 
 ### Bounded trace retention
 
-The renderer-free trace workload measures the production scope's trace-event retention
-with tracing disabled, before a maximum-size trace fills, and after small and
-maximum-size traces wrap. Setup, inspection, and exact retained-sequence checks stay
-outside timed intervals so unrelated signal graph work does not hide retention cost.
+The renderer-free trace workload checks disabled tracing without timing it, then
+measures the production scope's trace-event retention before a maximum-size trace
+fills and after small and maximum-size traces wrap. Setup, inspection, and exact
+retained-sequence checks stay outside timed intervals so unrelated signal graph
+work does not hide retention cost.
 
 ```bash
 node benchmarks/scoped-signals/run-trace.mjs 8
@@ -134,7 +135,11 @@ browser and async-specific experiments described in the implementation plan.
 `run-bundles.mjs` compares `createRoot` exported from `octane` and
 `renderToString` exported from `octane/server` with an archived baseline. It
 also measures the current `createScope`/`query` engine export and the optional
-`useSignal$` client/server exports independently. These are source-entry export
+`useSignal$` client/server exports independently. A plain state-module case
+declares `signal$`, `derived$`, and `query$`, transforms it through the public
+`octane/compiler/bundler` hook-slot path, and bundles the actual compiler output.
+A separate case retains the automatic streamed-signal bootstrap and document
+lifecycle exports. Both must remain renderer-free. These are entry/compiled-state
 costs, not compiled `.tsrx` applications or incremental hook costs in an app.
 
 Prepare an archive containing `packages/octane/src`,
@@ -160,18 +165,26 @@ gzip-9, and Brotli-11 bytes; exact loaded-source and bundle hashes; each input's
 retained bytes; and the command, toolchain, package manifests, and lockfile
 hashes. Baseline source bytes must match their Git blobs. If the archive root
 also contains `source.tar`, its hash is recorded.
+The compiled state case additionally records its exact authored/transformed
+sources, compiler options, and hashes of the local compiler implementation.
 
 Boundary assertions inspect the complete resolved graph, including inputs
 removed by tree shaking: ordinary entries must not import Alien or the scoped
 engine; the independent engine must not import a renderer, compiler, React,
-or DevTools; native hook entries must include the correct runtime and Alien
+or DevTools. The compiled plain-state and automatic stream-bootstrap entries
+have the same resolved-graph prohibition, including renderer imports that emit
+zero bytes after tree shaking. This prevents an apparently small export-only
+measurement from hiding a renderer dependency introduced by compilation or
+automatic owner initialization. Native hook entries must include the correct runtime and Alien
 3.2.0. Ordinary runtime exports can resolve their optional native adapters, but
 the emitted-byte check requires all client/server adapter, collector, inspection,
 and retry implementations to tree-shake to zero bytes. The read/event protocol
 and empty server seed map remain separate, measured seams. All exported
 functions must load, the empty server render must agree,
-and a small engine write/subscription/disposal smoke must pass. These checks do
-not establish DOM or native rendering behavior. The runner reuses exact input
+and a small engine write/subscription/disposal smoke must pass. The compiled
+state case also checks derived updates, async query completion, and fresh values
+after retiring an owner. These checks do not establish browser capture, streamed
+handoff, or native rendering behavior. The runner reuses exact input
 bytes across builds and fails if those files change during the run.
 
 Historical reports retain the status recorded at their measured revision.
@@ -194,6 +207,8 @@ BENCH_JSON=/private/tmp/scoped-signals-async-retention.json node benchmarks/scop
   --tooling-root=/absolute/path/to/tooling-package \
   --snapshots=/private/tmp/new-scoped-signals-retention-directory \
   --cycles=1000
+BENCH_JSON=/private/tmp/scoped-signals-derived-retention.json node benchmarks/scoped-signals/run-async-retention.mjs \
+  --tooling-root=/absolute/path/to/tooling-package --api=derived --cycles=1000
 node --test benchmarks/scoped-signals/inspect-async-retainers.test.mjs
 ```
 
@@ -202,12 +217,17 @@ creates a fresh local temporary directory. The runner starts a separate worker
 with `--expose-gc`, so the measured process does not retain the bundler or the
 offline heap scanner. It snapshots after event-loop turns and three explicit
 collections at cycle 0, 100, and 1,000. One live scope with two requests is a
-positive control. Later checkpoints retire and drop that scope while all
+positive control. `--api=derived` runs the same producers through public unified
+`derived$` declarations and `runWithSignalOwner`, instead of the default
+`query`/`scope.asyncSignal$` path. Its positive control has the same four nodes
+and one iterator but no query request records. Later checkpoints retire and drop that scope while all
 producer promises remain reachable, then release the external promise array.
 
 The scanner records strong paths, excluding weak edges, and verifies that it
 can identify the positive-control scope, four signal nodes, two requests, two
-active attempts, and every marked external promise. Counts of revoked attempt
+active attempts for the query path, and every marked external promise. The
+derived path requires zero query records and retains the same owner/node/iterator
+checks. Counts of revoked attempt
 records deliberately exclude V8 object-allocation templates by requiring a
 real `settled` Promise and resolver closure. Their separate template count
 remains in the report. Primitive heap size changes are diagnostic only: the

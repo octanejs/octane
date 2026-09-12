@@ -1,6 +1,61 @@
 export { condition } from './condition.js';
+export { decodeSignalValue } from '../data-encoding.js';
 export type { HydrationCondition } from './condition.js';
-export { initializeHydrationEventCapture } from './event-capture.js';
+export {
+	applyHydrationControlCandidate,
+	captureHydrationControlCandidate,
+	initializeHydrationEventCapture,
+	type HydrationControlCandidate,
+	type HydrationControlCandidateValue,
+} from './event-capture.js';
+export {
+	bootstrapIndependentHydration,
+	registerIndependentHydrationIsland,
+	type IndependentHydrateActivationContext,
+	type IndependentHydrateActivator,
+	type IndependentHydrateBootstrapOptions,
+	type IndependentHydrateRegistration,
+	type IndependentHydrateLifecycle,
+} from './independent-island.js';
+export {
+	createIndependentHydrateManifest,
+	isIndependentHydrateManifest,
+	serializeIndependentHydrateManifest,
+	type IndependentHydrateBuildRecord,
+	type IndependentHydrateCapture,
+	type IndependentHydrateManifest,
+	type IndependentHydrateManifestTemplate,
+} from '../independent-hydration-protocol.js';
+export {
+	createStreamedRegionReceiver,
+	StreamedReceiverError,
+	type HistoricalFrameLease,
+	type StreamedFrameDisposition,
+	type StreamedRegionReceiver,
+	type StreamedRegionReceiverOptions,
+	type StreamedRegionRegistration,
+	type StreamedResultConsumer,
+} from './stream-receiver.js';
+export {
+	installStreamedRendererGlobal,
+	readStreamedRendererResponse,
+	STREAMED_RENDERER_RECEIVER,
+	type StreamedRendererGlobal,
+	type StreamedRendererDeliveryOptions,
+	type StreamedRendererReadOptions,
+} from './stream-delivery.js';
+export {
+	decodeStreamedRendererFrame,
+	encodeStreamedRendererFrameForScript,
+	isStreamFrameIdentity,
+	isStreamedRendererFrame,
+	sameStreamFrameIdentity,
+	streamFrameIdentityKey,
+	type StreamedRegionPlacementFrame,
+	type StreamedRendererFrame,
+	type StreamedSignalResultFrame,
+	type StreamFrameIdentity,
+} from '../streamed-signals-protocol.js';
 export { idle } from './idle.js';
 export type { IdleHydrationOptions } from './idle.js';
 export { interaction } from './interaction.js';

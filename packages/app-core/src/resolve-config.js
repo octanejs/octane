@@ -223,6 +223,26 @@ export function resolveOctaneConfig(raw, options = {}) {
 		throw new Error('[octane] server.rpc.allowedOrigins must be an array.');
 	}
 	const allowedRpcOrigins = [...new Set((rawRpc?.allowedOrigins ?? []).map(normalize_rpc_origin))];
+	if (rawRpc?.resultLimits !== undefined) {
+		const limits = rawRpc.resultLimits;
+		if (limits === null || typeof limits !== 'object' || Array.isArray(limits)) {
+			throw new Error('[octane] server.rpc.resultLimits must be an object.');
+		}
+		for (const [key, value] of Object.entries(limits)) {
+			if (
+				!['maxFrameBytes', 'maxTotalBytes', 'timeoutMs'].includes(key) ||
+				!Number.isSafeInteger(value) ||
+				value <= 0
+			) {
+				throw new Error(
+					'[octane] server.rpc.resultLimits requires positive integer frame, total, and timeout limits.',
+				);
+			}
+		}
+		if ((limits.maxFrameBytes ?? 1048576) > (limits.maxTotalBytes ?? 16777216)) {
+			throw new Error('[octane] server.rpc.resultLimits frame limit exceeds the total limit.');
+		}
+	}
 
 	// ------------------------------------------------------------------
 	// Apply defaults
@@ -253,6 +273,7 @@ export function resolveOctaneConfig(raw, options = {}) {
 			rpc: {
 				allowedOrigins: allowedRpcOrigins,
 				maxBodyBytes: rawRpc?.maxBodyBytes ?? DEFAULT_RPC_MAX_BODY_BYTES,
+				...(rawRpc?.resultLimits === undefined ? {} : { resultLimits: { ...rawRpc.resultLimits } }),
 			},
 		},
 	};

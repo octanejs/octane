@@ -37,9 +37,47 @@ export const BUNDLE_CASES = [
 		platform: 'node',
 		baseline: false,
 	},
+	{
+		id: 'compiled-plain-signals',
+		request: 'octane/signals',
+		exports: ['exercise'],
+		platform: 'browser',
+		baseline: false,
+		compilePlain: true,
+		rendererFree: true,
+	},
+	{
+		id: 'streamed-signals-bootstrap',
+		request: 'octane/hydration/streamed-signals',
+		exports: ['bootstrapStreamedSignalHydration', 'installSignalDocumentLifecycle'],
+		platform: 'browser',
+		baseline: false,
+		rendererFree: true,
+	},
 ];
 
 export function entrySource(scenario) {
+	if (scenario.compilePlain) {
+		return `import { signal$, derived$, query$, runWithSignalOwner, retireSignalOwnerIdentity } from 'octane/signals';
+const count$ = signal$(1);
+const double$ = derived$(() => count$.get() * 2);
+const result$ = query$(() => count$.get(), async (value) => value * 3);
+export async function exercise() {
+  const owner = { scopeKey: 'compiled-plain-bundle' };
+  const read = (callback) => runWithSignalOwner(owner, callback);
+  try {
+    const initial = read(() => double$.get());
+    read(() => count$.set(2));
+    const updated = read(() => double$.get());
+    try { read(() => result$.get()); } catch (pending) {
+      if (typeof pending?.then !== 'function') throw pending;
+      await pending;
+    }
+    return { initial, updated, result: read(() => result$.get()) };
+  } finally { retireSignalOwnerIdentity(owner); }
+}
+`;
+	}
 	return `export { ${scenario.exports.join(', ')} } from ${JSON.stringify(scenario.request)};\n`;
 }
 
@@ -90,13 +128,17 @@ export function verifyBundleInputs(scenario, inputs) {
 			assert.equal(input.package.version, '3.2.0', `${scenario.id}: wrong Alien Signals version`);
 		}
 	}
-	if (scenario.id === 'engine') {
+	if (scenario.id === 'engine' || scenario.rendererFree) {
 		const renderer = names.filter((name) =>
 			/\/src\/(?:runtime(?:\.server)?\.[jt]s$|server\/|react\/|internal\/|[^/]*devtools[^/]*\.[jt]s$)/.test(
 				name,
 			),
 		);
-		assert.deepEqual(renderer, [], 'engine: renderer or DevTools reached the independent engine');
+		assert.deepEqual(
+			renderer,
+			[],
+			`${scenario.id}: renderer or DevTools reached the independent engine`,
+		);
 	}
 	if (scenario.id === 'native-client' || scenario.id === 'native-server') {
 		const suffix = scenario.id === 'native-client' ? '/src/runtime.ts' : '/src/runtime.server.ts';

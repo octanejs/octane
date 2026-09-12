@@ -1,6 +1,17 @@
-/** Nominal marker for the native signal API; it has no runtime payload. */
-export declare const SIGNAL_HANDLE: unique symbol;
-export declare const QUERY_REQUEST: unique symbol;
+/** Runtime brands for signal handles and legacy query requests. */
+export const SIGNAL_HANDLE: unique symbol = Symbol.for('octane.signal-handle') as any;
+export const SIGNAL_BINDING_READ: unique symbol = Symbol.for('octane.signal-binding-read') as any;
+export const SIGNAL_BINDING_SUBSCRIBE: unique symbol = Symbol.for(
+	'octane.signal-binding-subscribe',
+) as any;
+export const SIGNAL_BINDING_IDENTITY: unique symbol = Symbol.for(
+	'octane.signal-binding-identity',
+) as any;
+export const QUERY_REQUEST: unique symbol = Symbol.for('octane.query-request') as any;
+export const SIGNAL_OWNER_RESOLVE: unique symbol = Symbol.for('octane.signal-owner-resolve') as any;
+
+/** A query selector result that deliberately selects no request. */
+export const skip: unique symbol = Symbol.for('octane.query-skip') as any;
 
 export type ConnectionState = 'none' | 'connecting' | 'open' | 'closed';
 
@@ -14,19 +25,31 @@ interface SnapshotActivity {
 export type SignalSnapshot<T> = SnapshotActivity &
 	(
 		| { readonly status: 'ready'; readonly value: T }
+		| { readonly status: 'idle' }
 		| { readonly status: 'pending' }
 		| { readonly status: 'error'; readonly error: unknown }
 	);
 
 export interface SignalHandle<T> {
-	readonly [SIGNAL_HANDLE]: T;
+	readonly [SIGNAL_HANDLE]: true;
+	readonly [SIGNAL_BINDING_READ]: () => T;
+	/** @internal Observe invalidation without running user code during render. */
+	readonly [SIGNAL_BINDING_SUBSCRIBE]: (notify: () => void) => () => void;
+	readonly [SIGNAL_BINDING_IDENTITY]: () => SignalBindingIdentity;
 	readonly key: string;
+	readonly kind: 'signal' | 'derived' | 'async';
 	get(): T;
 	latest(): T | undefined;
 	latest<F>(fallback: F): T | F;
 	snapshot(): SignalSnapshot<T>;
 	/** Subscriptions do not deliver an initial notification. */
 	subscribe(notify: () => void): () => void;
+}
+
+/** Stable renderer-facing identity for a direct signal binding. */
+export interface SignalBindingIdentity {
+	readonly scope: 'document' | 'instance';
+	readonly nodeKey: string;
 }
 
 export interface WritableSignal<T> extends SignalHandle<T> {
@@ -38,13 +61,43 @@ export interface DerivedSignal<T> extends SignalHandle<T> {
 	readonly kind: 'derived';
 }
 
+export interface AttemptRead {
+	<T>(handle$: SignalHandle<T>): Promise<T>;
+}
+
+export interface DerivedContext {
+	readonly signal: AbortSignal;
+	readonly read: AttemptRead;
+}
+
+export interface DerivedOptions {
+	/** Assert that the computation returns synchronously and skip async-shape detection. */
+	readonly sync?: boolean;
+}
+
+export interface QueryOptions {
+	readonly kind?: 'promise' | 'stream';
+}
+
+export type DerivedCompute<T> = (
+	context: DerivedContext,
+) => T | PromiseLike<T | AsyncIterable<T>> | AsyncIterable<T>;
+
+export type QueryLoadResult<T> = T | PromiseLike<T | AsyncIterable<T>> | AsyncIterable<T>;
+
 export interface Resource<T> extends SignalHandle<T> {
 	readonly kind: 'async';
 	retry(options?: { pending?: boolean }): void;
 }
 
-export interface QueryContext {
+export interface QuerySignal<T> extends Resource<T> {
+	refetch(): void;
+	reset(): void;
+}
+
+export interface QueryContext<T = unknown> {
 	readonly signal: AbortSignal;
+	readonly previous?: T;
 }
 
 export interface QueryRequest<T> {
@@ -117,7 +170,7 @@ export interface ScopeInspection {
 	readonly nodes: readonly {
 		readonly key: string;
 		readonly kind: 'signal' | 'derived' | 'async';
-		readonly status: 'ready' | 'pending' | 'error' | 'unevaluated';
+		readonly status: 'idle' | 'ready' | 'pending' | 'error' | 'unevaluated';
 		readonly revision: number;
 		readonly subscribers: number;
 		readonly retained: boolean;
@@ -145,7 +198,7 @@ export interface Scope {
 		key: string,
 		compute: (() => T) & (T extends PromiseLike<unknown> ? never : unknown),
 	): DerivedSignal<T>;
-	asyncSignal$<T>(key: string, describe: () => QueryRequest<T>): Resource<T>;
+	asyncSignal$<T>(key: string, describe: () => QueryRequest<T> | typeof skip): Resource<T>;
 	get<T>(handle$: SignalHandle<T>): T;
 	set<T>(handle$: WritableSignal<T>, value: T | ((previous: T) => T)): void;
 	isPending(read: () => unknown): boolean;
@@ -156,3 +209,49 @@ export interface Scope {
 	inspect(): ScopeInspection;
 	dispose(): void;
 }
+
+export interface OwnerBoundSignal<T> extends SignalHandle<T> {
+	readonly [SIGNAL_OWNER_RESOLVE]: (owner: Scope) => SignalHandle<T>;
+}
+
+export interface SignalOwnerEnvironment {
+	current(): SignalOwner | null;
+	run<T>(owner: SignalOwner, callback: () => T): T;
+	capture(owner: SignalOwner): <T>(callback: () => T) => T;
+}
+
+/** A renderer identity is mapped lazily to a Scope only when signals are used. */
+export interface SignalOwnerIdentity {
+	readonly scopeKey: string;
+}
+
+export interface SignalRendererOwnerIdentity extends SignalOwnerIdentity {
+	readonly documentOwner: SignalOwner;
+	readonly instanceOwner: object;
+	readonly instanceKey: string;
+}
+
+export type SignalOwner = Scope | SignalOwnerIdentity | SignalRendererOwnerIdentity;
+
+export interface OptimisticSignal<T> extends WritableSignal<T> {}
+
+export interface ActionUncertain {
+	readonly status: 'uncertain';
+	readonly operationId: string;
+}
+
+export interface ActionOperation {
+	readonly id: string;
+	readonly key: string;
+	readonly status: 'pending' | 'confirmed' | 'rejected' | 'uncertain';
+	set<T>(signal$: OptimisticSignal<T>, value: T | ((previous: T) => T)): void;
+	adopt<T>(value: T): void;
+	/** Remove only this operation's intent after a definitive rejection. */
+	reject(): void;
+	uncertain(): ActionUncertain;
+	until(read: () => unknown, options?: { timeout?: number }): Promise<void>;
+}
+
+export type SignalAction<F extends (operation: ActionOperation, ...args: any[]) => any> = (
+	...args: F extends (operation: ActionOperation, ...args: infer A) => any ? A : never
+) => ReturnType<F>;

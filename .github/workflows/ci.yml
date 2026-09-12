@@ -661,12 +661,12 @@ jobs:
         with:
           bun-version: 1.3.14
 
-      - name: Install Playwright Chromium for package and Astro coverage
+      - name: Install Playwright Chromium and WebKit for package and Astro coverage
         id: install_heavy_node_chromium
         if: ${{ !cancelled() && steps.install_heavy_node_dependencies.outcome == 'success' }}
         run: |
           bash scripts/ci-apt-https.sh
-          pnpm --filter website exec playwright install --with-deps chromium
+          pnpm --filter website exec playwright install --with-deps chromium webkit
 
       # Keep each former lane as a named step, and let independent suites run
       # after a sibling failure when their own prerequisites are still valid.

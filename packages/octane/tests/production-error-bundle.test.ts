@@ -160,11 +160,12 @@ async function executeNativeCompilerErrors(
 ): Promise<readonly { name: string; message: string }[]> {
 	const runtime = surface === 'client' ? './runtime.ts' : './runtime.server.ts';
 	const contents = `
-		import { enableNativeReadCollection, beginNativeReadScope } from ${JSON.stringify(runtime)};
+		import { enableNativeReadCollection, beginNativeReadScope, ${surface === 'client' ? 'enableSignalBindings' : 'enableServerSignalBindings'} } from ${JSON.stringify(runtime)};
 		${surface === 'server' ? "import { useSignal$ } from './signals/server.ts';" : ''}
 		const failures = [
 			() => enableNativeReadCollection(0),
 			() => beginNativeReadScope(undefined, 0),
+			() => ${surface === 'client' ? 'enableSignalBindings' : 'enableServerSignalBindings'}(0),
 			${surface === 'server' ? "() => useSignal$(() => { throw new Error('unexpected initialization'); })," : ''}
 		];
 		export const errors = failures.map((fail) => {
@@ -306,15 +307,21 @@ describe('production error bundles', () => {
 			const messages = [
 				'Unsupported native-read compiler/runtime version.',
 				'Unsupported native-read compiler/runtime version.',
+				surface === 'client'
+					? 'Unsupported Octane signal binding ABI.'
+					: 'Unsupported Octane server signal binding ABI.',
 				...(surface === 'server' ? ['useSignal$ requires an active server component.'] : []),
 			];
-			expect(development).toEqual(messages.map((message) => ({ name: 'Error', message })));
+			expect(development).toEqual(
+				messages.map((message, index) => ({ name: index === 2 ? 'TypeError' : 'Error', message })),
+			);
+			const codes = surface === 'client' ? [58, 58, 65] : [58, 58, 71, 59];
 			expect(production).toHaveLength(messages.length);
 			for (const [index, error] of production.entries()) {
-				expect(error.name).toBe('Error');
+				expect(error.name).toBe(index === 2 ? 'TypeError' : 'Error');
 				const url = decodedErrorUrl(error.message);
-				expect(url.pathname).toBe(index < 2 ? '/errors/58' : '/errors/59');
-				expect(url.searchParams.getAll('args[]')).toEqual(index < 2 ? [] : ['useSignal$']);
+				expect(url.pathname).toBe(`/errors/${codes[index]}`);
+				expect(url.searchParams.getAll('args[]')).toEqual(index < 3 ? [] : ['useSignal$']);
 				expect(error.message).not.toContain(messages[index]);
 			}
 		},

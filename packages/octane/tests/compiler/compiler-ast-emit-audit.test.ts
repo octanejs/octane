@@ -174,6 +174,8 @@ describe('compiler AST emit architecture', () => {
 			'TemplatePart',
 			'Text',
 			'asset',
+			// Independent hydration capture codec descriptors are protocol records, not AST.
+			'json',
 		]);
 		const violations: string[] = [];
 

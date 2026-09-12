@@ -2140,6 +2140,41 @@
       "message": "Multiple errors were thrown during act.",
       "runtime": ["client"],
       "status": "active"
+    },
+    "65": {
+      "message": "Unsupported Octane signal binding ABI.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "66": {
+      "message": "An independent Hydrate boundary cannot change ownership after mount.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "67": {
+      "message": "Signal control identity mismatch for \"%s\".",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "68": {
+      "message": "A signal control cannot join values from different document owners.",
+      "runtime": ["server"],
+      "status": "active"
+    },
+    "69": {
+      "message": "Independent Hydrate requires a build manifest in RenderOptions.",
+      "runtime": ["server"],
+      "status": "active"
+    },
+    "70": {
+      "message": "Independent Hydrate activation chunk is missing from the build manifest.",
+      "runtime": ["server"],
+      "status": "active"
+    },
+    "71": {
+      "message": "Unsupported Octane server signal binding ABI.",
+      "runtime": ["server"],
+      "status": "active"
     }
   }
 }

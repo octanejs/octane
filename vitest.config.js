@@ -5433,6 +5433,11 @@ export default defineConfig({
 					include: ['packages/rsbuild-plugin-octane/tests/**/*.test.ts'],
 					environment: 'node',
 					globals: false,
+					// Execute production artifacts with Node's native ESM loader. Vite's
+					// module runner rewrites Rspack's file-URL chunk imports as root paths.
+					server: {
+						deps: { external: [/\/octane-rsbuild-[^/]+\/(?:dist|build)\/server\//] },
+					},
 				},
 			},
 			{

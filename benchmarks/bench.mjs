@@ -681,6 +681,16 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
+		// Real compiled application: a public shell and independently streamed
+		// conversation/history behind one authorization dependency. Browser
+		// partial-hydration observations are an explicit companion invocation.
+		name: 'conversation-streaming',
+		cwd: 'conversation-streaming',
+		servers: [],
+		iter: { normal: 30, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
 		// Raw streaming API over REAL HTTP, cold and warm: fresh-process import
 		// cost, spawn→listen→first-byte cold TTFB, and warm shell/total/throughput
 		// for octane renderToPipeableStream vs React Fizz behind one identical

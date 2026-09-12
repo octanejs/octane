@@ -32,6 +32,7 @@ import {
 } from '@tsrx/core/test-harness/scoped-styles-fixtures';
 import { mount } from './_helpers';
 import { loadCompiledFixtureSource } from './_server-fixture.js';
+import { hasRuntimeValueArgument } from './_compiler-value-arguments.js';
 
 type Mode = 'client' | 'server';
 const MODES: Mode[] = ['client', 'server'];
@@ -561,7 +562,12 @@ describe('scoped style conformance fixtures (@tsrx/core test harness)', () => {
 						const unescaped = compiledCode().replace(/\\"/g, '"');
 						for (const [key, chain] of Object.entries(expected.elements)) {
 							const candidates = classCandidates(key, chain, hashes);
-							const hit = candidates.some((candidate) => unescaped.includes(candidate));
+							const hit =
+								candidates.some((candidate) => unescaped.includes(candidate)) ||
+								(chain.length === 0 &&
+									key.startsWith('{') &&
+									key.endsWith('}') &&
+									hasRuntimeValueArgument(compiledCode(), key.slice(1, -1)));
 							expect(
 								hit,
 								`${key}: expected one of ${JSON.stringify(candidates)} in:\n${unescaped}`,

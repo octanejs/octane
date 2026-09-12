@@ -47,11 +47,11 @@ deterministic `setTimeout` schedule:
   chunk framing.
 - **all-fast** — every card resolves at ~1ms. Data latency shrinks, so
   per-chunk engine overhead is more visible; this is the throughput scenario
-  (**renders/sec**, sequential, from mean `totalTime` — the ~1ms timer floor
-  is included and identical for all targets).
+  (**renders/sec**, sequential, from the selected-window `totalTime` score —
+  the ~1ms timer floor is included and identical for all targets).
 
-Three additional **Octane-only CPU controls** reuse the exact compiled page:
-`cpu-10` and `cpu-100` release 10 or 100 cards immediately after the consumer
+Four additional **Octane-only CPU controls** reuse the exact compiled page:
+`cpu-10`, `cpu-100`, and `cpu-800` release 10, 100, or 800 cards immediately after the consumer
 accepts the shell; `cpu-waves-50` releases 50 cards in reverse-discovery groups
 of five, advancing the producer when each response chunk is accepted. No data
 timers are added. The runtime's normal coalescing, full passes, serialization,
@@ -59,12 +59,17 @@ and consumer acceptance remain in the measurement. These cases isolate
 per-component/per-boundary cost from a network or timer floor; they do not
 represent application token-streaming latency or a cross-framework comparison.
 
-## Metrics (medians over the iteration count, after 5 warmup renders)
+## Metrics
 
-- **shellTTFB** — first non-empty chunk. The user-visible "shell on the wire"
-  latency.
+Timing scores use the shared selected-window mean, with medians and other
+distribution statistics reported separately. Runs discard five warmup renders,
+capped at the requested iteration count; fewer than five samples use the median
+as their score.
+
+- **shellTTFB** — first non-empty chunk delivered to the in-process consumer.
+  This does not measure HTTP or network latency.
 - **totalTime** — the destination's `end()` (stream close). For staggered this
-  is ≈ 50ms + engine tail; for all-fast it's nearly pure engine work.
+  is ≈ 50ms + engine tail; all-fast includes its ~1ms data timer floor.
 - **chunkCount** — median number of non-empty chunks per render. This is a
   *shape* diagnostic, not a score: more chunks ⇒ finer-grained delivery.
 - **bytesTotal** — total payload written (includes each framework's swap

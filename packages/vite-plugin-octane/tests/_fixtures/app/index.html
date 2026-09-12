@@ -6,10 +6,13 @@
 		<script nonce="fixture-nonce">
 			const observer = new MutationObserver(() => {
 				const hydrationEntry = document.querySelector('[data-octane-hydrate]');
-				const source = hydrationEntry?.getAttribute('src');
+				const sourceAttribute = hydrationEntry?.hasAttribute('src')
+					? 'src'
+					: 'data-octane-hydrate-src';
+				const source = hydrationEntry?.getAttribute(sourceAttribute);
 				if (!source) return;
 				observer.disconnect();
-				hydrationEntry.src = new URL(source, location.href).href;
+				hydrationEntry.setAttribute(sourceAttribute, new URL(source, location.href).href);
 				for (const resource of document.querySelectorAll('link[href]')) {
 					const href = resource.getAttribute('href');
 					if (href) resource.href = new URL(href, location.href).href;

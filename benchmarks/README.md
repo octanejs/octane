@@ -84,7 +84,7 @@ suites reuse it. Collected results land in `benchmarks/results/<suite>.json`
 Some suites need no preview servers: **news**, **hydration-interactivity**, and
 the three runtime-stress suites vite-build and time each target themselves (the
 runner loops their per-target invocations and merges them),
-**ssr-throughput**, **streaming-ssr**, **lynx-list**, **universal-leaf-update**,
+**ssr-throughput**, **streaming-ssr**, **conversation-streaming**, **lynx-list**, **universal-leaf-update**,
 **universal-object-teardown**,
 **universal-template-events**, **universal-native-hover**, **universal-owner-drafts**,
 **universal-hook-slot**,
@@ -270,6 +270,7 @@ internally, get their own baseline and guard namespace.
 | `portal-swarm` | portal-swarm | Octane + reference frameworks | portal render/dispatch |
 | `ssr-throughput` | ssr-throughput | none (Node-only) | comparative news SSR including Inferno + Octane-only stress fixtures |
 | `streaming-ssr` | streaming-ssr | none (Node-only) | streaming targets incl. Inferno and Preact; Svelte N/A |
+| `conversation-streaming` | conversation-streaming | none (production app, Node runner; optional WebKit runner) | public shell, shared auth, independent conversation/history SSR and composer activation |
 | `ssr-http` | ssr-http | none (boots its own node:http hosts) | raw streaming API over real HTTP: fresh-process import cost, cold spawn→listen→first-byte, warm shell/total/throughput across the streaming-ssr fixtures |
 | `streaming-backpressure` | streaming-backpressure | none (builds) | real one-byte Node Writable pressure, delayed drains, three concurrent destinations, and public-stream abort across supported renderers |
 | `ssr-workerd` | ssr-workerd | none (boots workerd via miniflare) | streaming SSR inside the real Cloudflare Workers runtime: cold isolate→first-byte, warm shell/total, worker-script bytes (octane vs Fizz edge, plus the vite-plugin + adapter-cloudflare deployment shape) |

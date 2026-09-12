@@ -21,7 +21,49 @@
  * should call them.
  */
 
-export { executeServerFunction } from './rpc.js';
+export { executeServerFunction, executeServerFunctionStream } from './rpc.js';
+export { earlySignalBootstrapScript, type EarlySignalBootstrapOptions } from './early-signals.js';
+export {
+	batchServerCalls,
+	executeServerFunctionBatch,
+	type ServerCallBatchOptions,
+	type ServerBatchMember,
+} from './rpc-batch.js';
+export type { ServerResultLimits } from '../server-rpc-protocol.js';
+export {
+	createStreamedRegionPlacementFrame,
+	type StreamedRegionPlacementOptions,
+} from './streamed-region.js';
+export {
+	createAutomaticStreamedSignalInjection,
+	createStreamedRendererFrameStream,
+	createStreamedSignalInjection,
+	createStreamedSignalResultFrames,
+	streamedRendererFrameScript,
+	type StreamedRendererLimits,
+	type AutomaticStreamedSignalInjection,
+	type AutomaticStreamedSignalOptions,
+	type StreamedSignalResultOptions,
+} from './streamed-signals.js';
+// Engine-free request-owner bridge. Metaframeworks install this on their
+// existing async context without retaining the signal graph in signal-free
+// server bundles.
+export {
+	installSignalOwnerEnvironment,
+	retireSignalOwnerIdentity,
+} from '../signals/owner-context.js';
+export type { SignalOwner, SignalOwnerEnvironment } from '../signals/types.js';
+export {
+	__registerServerFunction,
+	__serverCall,
+	__setServerCallContextSource,
+	type ServerCallContext,
+	type ServerCallContextSource,
+	type ServerCallHost,
+	type ServerCallOptions,
+	type ServerFunction,
+	type ServerFunctionTarget,
+} from '../server-call.js';
 export { version } from '../version.js';
 export { StrictMode, unstable_batchedUpdates } from '../compatibility.js';
 
@@ -149,7 +191,11 @@ export {
 	ssrStyle,
 	ssrClass,
 	ssrAttrs,
+	ssrSignalValue,
+	ssrSignalControlValue,
+	ssrSignalControlAttrs,
 	ssrSnapshotSpread,
+	enableServerSignalBindings,
 	ssrSpread,
 	ssrInnerHtml,
 	ssrScriptInnerHtml,

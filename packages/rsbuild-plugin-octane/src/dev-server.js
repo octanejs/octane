@@ -5,6 +5,8 @@ import { nodeRequestToWebRequest, sendWebResponse } from '@octanejs/app-core/nod
 
 import { isRsbuildOwnedUrl } from './html.js';
 
+const INDEPENDENT_HYDRATION_MANIFEST_FILENAME = 'octane-independent-hydration.json';
+
 /**
  * @typedef {{
  *   manifest: import('@octanejs/app-core/production').ServerManifest,
@@ -25,6 +27,35 @@ function collectAssetPaths(stats) {
 		paths.add('/' + asset.name.replace(/^\/+/, ''));
 	}
 	return paths;
+}
+
+/** @param {import('@rspack/core').Stats} stats */
+function readIndependentHydrationManifest(stats) {
+	const asset = stats.compilation.getAsset?.(INDEPENDENT_HYDRATION_MANIFEST_FILENAME);
+	if (!asset) return null;
+	const source = asset.source.source();
+	return JSON.parse(typeof source === 'string' ? source : Buffer.from(source).toString('utf8'));
+}
+
+/** @param {import('@rspack/core').Stats} stats */
+function readClientBuild(stats) {
+	const asset = stats.compilation.getAsset?.('octane-client-build.json');
+	if (!asset) throw new Error('The Octane client build metadata is missing.');
+	const source = asset.source.source();
+	const metadata = JSON.parse(
+		typeof source === 'string' ? source : Buffer.from(source).toString('utf8'),
+	);
+	if (
+		metadata?.version !== 1 ||
+		metadata.buildId !== stats.hash ||
+		metadata.mode !== 'development' ||
+		typeof metadata.capabilities?.independentHydration !== 'boolean'
+	) {
+		throw new Error(
+			'The Octane client build metadata is incompatible with this development compilation.',
+		);
+	}
+	return metadata;
 }
 
 /**
@@ -54,7 +85,7 @@ export function createOctaneDevMiddleware(options) {
 
 	let assetHash = '';
 	let assetPaths = new Set();
-	/** @type {WeakMap<object, { html: string, handler: (request: Request) => Promise<Response> }>} */
+	/** @type {WeakMap<object, { html: string, assetHash: string, handler: (request: Request) => Promise<Response> }>} */
 	const handlerCache = new WeakMap();
 
 	return async function octaneDevMiddleware(request, response, next) {
@@ -69,6 +100,7 @@ export function createOctaneDevMiddleware(options) {
 				return;
 			}
 			const clientStats = await clientApi.getStats();
+			if (clientStats.hasErrors()) throw new Error('The Octane client compilation failed.');
 			if (clientStats.hash !== assetHash) {
 				assetHash = clientStats.hash ?? '';
 				assetPaths = collectAssetPaths(clientStats);
@@ -92,13 +124,24 @@ export function createOctaneDevMiddleware(options) {
 
 			const html = await clientApi.getTransformedHtml(options.clientEntry);
 			let cached = handlerCache.get(typedBundle.manifest);
-			if (!cached || cached.html !== html) {
+			if (!cached || cached.html !== html || cached.assetHash !== assetHash) {
+				const independentHydration = readIndependentHydrationManifest(clientStats);
+				const clientBuild = readClientBuild(clientStats);
+				if (independentHydration !== null && independentHydration.buildId !== clientBuild.buildId) {
+					throw new Error(
+						'The Octane independent widget metadata belongs to another client build.',
+					);
+				}
 				cached = {
 					html,
-					handler: createHandler(typedBundle.manifest, {
-						...typedBundle.rendererDeps,
-						htmlTemplate: html,
-					}),
+					assetHash,
+					handler: createHandler(
+						{ ...typedBundle.manifest, independentHydration, clientBuild },
+						{
+							...typedBundle.rendererDeps,
+							htmlTemplate: html,
+						},
+					),
 				};
 				handlerCache.set(typedBundle.manifest, cached);
 			}

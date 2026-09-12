@@ -40,6 +40,12 @@ import {
 	withDeferredImports,
 } from '@tsrx/core';
 import { parseModule } from '#octane/compiler-parser';
+import {
+	collectServerFunctionNodes,
+	serverContextTypeImports,
+	serverFunctionContextIndex,
+	unwrapServerFunctionInitializer,
+} from './server-context.js';
 import { createStyleScopePass } from './style-scopes.js';
 import { decodeHTMLStrict } from 'entities';
 import { print as esrapPrint } from 'esrap';
@@ -92,7 +98,9 @@ import {
 	wrapNativeReadScope,
 	wrapNativeWarmScope,
 } from './native-read-codegen.js';
-import { createTextTypeFactsLookup } from './text-type-facts.js';
+import { createTextTypeFactsLookup, normalizeTextTypeFilename } from './text-type-facts.js';
+import { lowerSignalDeclarations } from './signal-declarations.js';
+import { lowerSignalAttemptReads } from './signal-attempt-reads.js';
 import { collectProvenContextBindings, isProvenContextUse } from './context-use.js';
 import { applyCssModuleConstants } from './css-module-constants.js';
 import { assertUniversalRuntimeTarget, normalizeUniversalRuntime } from './universal-runtime.js';
@@ -504,6 +512,168 @@ function attrBindingUpdateHelper(bind, inlineBindingGuards = false) {
 		default:
 			return helper;
 	}
+}
+
+// Direct signal bindings are an explicitly narrow syntax surface. A capability
+// identifier/member keeps its `$` suffix when passed through props or a local
+// alias; compiler-owned facade calls have already been rewritten to `__*At` by
+// lowerSignalDeclarations. `.get()` is deliberately absent: it is a scalar
+// read and opts out of targeted binding/two-way control behavior.
+function isDirectSignalHandleExpression(node) {
+	while (
+		node &&
+		(node.type === 'TSAsExpression' ||
+			node.type === 'TSTypeAssertion' ||
+			node.type === 'TSNonNullExpression' ||
+			node.type === 'ChainExpression')
+	) {
+		node = node.expression;
+	}
+	if (!node) return false;
+	if (node.type === 'Identifier') return node.name.endsWith('$');
+	if (node.type === 'MemberExpression' || node.type === 'OptionalMemberExpression') {
+		const name = node.computed
+			? node.property?.type === 'Literal' && typeof node.property.value === 'string'
+				? node.property.value
+				: null
+			: node.property?.name;
+		return typeof name === 'string' && name.endsWith('$');
+	}
+	if (node.type === 'CallExpression' || node.type === 'OptionalCallExpression') {
+		const callee = node.callee;
+		const name =
+			callee?.type === 'Identifier'
+				? callee.name
+				: callee?.type === 'MemberExpression' || callee?.type === 'OptionalMemberExpression'
+					? callee.computed
+						? callee.property?.value
+						: callee.property?.name
+					: null;
+		return /^_?\$?__(?:signal|derived|query)At$/.test(name ?? '');
+	}
+	return false;
+}
+
+function canCarryDirectSignalHandle(node) {
+	if (!node || node.metadata?.octane_string_child || node.metadata?.octane_primitive_text_child) {
+		return false;
+	}
+	if (
+		node.type === 'TSAsExpression' ||
+		node.type === 'TSTypeAssertion' ||
+		node.type === 'TSNonNullExpression' ||
+		node.type === 'ParenthesizedExpression' ||
+		node.type === 'ChainExpression'
+	) {
+		return canCarryDirectSignalHandle(node.expression);
+	}
+	if (node.type === 'ConditionalExpression') {
+		return (
+			canCarryDirectSignalHandle(node.consequent) || canCarryDirectSignalHandle(node.alternate)
+		);
+	}
+	if (node.type === 'LogicalExpression') {
+		return canCarryDirectSignalHandle(node.left) || canCarryDirectSignalHandle(node.right);
+	}
+	if (node.type === 'SequenceExpression') {
+		return canCarryDirectSignalHandle(node.expressions.at(-1));
+	}
+	if (
+		(node.type === 'CallExpression' || node.type === 'OptionalCallExpression') &&
+		(node.callee?.type === 'MemberExpression' ||
+			node.callee?.type === 'OptionalMemberExpression') &&
+		(node.callee.computed
+			? node.callee.property?.type === 'Literal' && node.callee.property.value === 'get'
+			: node.callee.property?.name === 'get')
+	) {
+		return false;
+	}
+	return ![
+		'Literal',
+		'TemplateLiteral',
+		'UnaryExpression',
+		'BinaryExpression',
+		'UpdateExpression',
+		'ObjectExpression',
+		'ArrayExpression',
+		'FunctionExpression',
+		'ArrowFunctionExpression',
+		'ClassExpression',
+		'JSXElement',
+		'JSXFragment',
+	].includes(node.type);
+}
+
+function spreadContainsDirectSignalHandle(node) {
+	if (isDirectSignalHandleExpression(node)) return true;
+	while (
+		node &&
+		(node.type === 'TSAsExpression' ||
+			node.type === 'TSTypeAssertion' ||
+			node.type === 'TSNonNullExpression')
+	) {
+		node = node.expression;
+	}
+	if (node?.type === 'ObjectExpression') {
+		return (node.properties ?? []).some((property) => {
+			if (property.type === 'SpreadElement' || property.type === 'SpreadProperty') {
+				return spreadContainsDirectSignalHandle(property.argument);
+			}
+			return spreadContainsDirectSignalHandle(property.value);
+		});
+	}
+	if (node?.type === 'ArrayExpression') {
+		return (node.elements ?? []).some(spreadContainsDirectSignalHandle);
+	}
+	return false;
+}
+
+function directSignalSite(ctx, componentName, node, kind = 'binding') {
+	const position = node?.start ?? `${node?.loc?.start?.line ?? 0}:${node?.loc?.start?.column ?? 0}`;
+	return `${kind === 'input' ? 'i' : 'b'}:${strongHash(
+		`octane:signal-${kind}-site:1\0${normalizeTextTypeFilename(ctx.filename) ?? ctx.filename}\0${componentName}\0${position}`,
+	)}`;
+}
+
+function componentInvocationSite(ctx, componentName, node) {
+	const position = node?.start ?? `${node?.loc?.start?.line ?? 0}:${node?.loc?.start?.column ?? 0}`;
+	return `c:${strongHash(
+		`octane:component-invocation-site:1\0${normalizeTextTypeFilename(ctx.filename) ?? ctx.filename}\0${componentName}\0${position}`,
+	)}`;
+}
+
+function markDirectSignalBinding(binding, ctx, componentName, origin, kind) {
+	if (!canCarryDirectSignalHandle(binding.expr)) return binding;
+	ctx.signalBindingsUsed = true;
+	return {
+		...binding,
+		signalDirect: true,
+		signalSite: directSignalSite(ctx, componentName, origin, kind),
+	};
+}
+
+function ssrSignalValue(node, ctx, origin, capability = false) {
+	if (!(capability ? canCarryDirectSignalHandle(node) : isDirectSignalHandleExpression(node))) {
+		return node;
+	}
+	ctx.signalBindingsUsed = true;
+	ctx.runtimeNeeded.add('ssrSignalValue');
+	return ssrCall('ssrSignalValue', [node], origin ?? node);
+}
+
+function ssrSignalStyleObject(node, ctx, origin) {
+	if (node?.type !== 'ObjectExpression') return node;
+	let changed = false;
+	const properties = (node.properties ?? []).map((property) => {
+		if (property.type === 'SpreadElement' || property.type === 'SpreadProperty') {
+			return property;
+		}
+		const value = ssrSignalValue(property.value, ctx, origin ?? property, true);
+		if (value === property.value) return property;
+		changed = true;
+		return { ...property, value };
+	});
+	return changed ? { ...node, properties } : node;
 }
 
 /**
@@ -1209,6 +1379,15 @@ const NATIVE_READ_RUNTIME_HELPERS = new Set([
 	'nativeCreateScopedElement',
 ]);
 const INTERNAL_CLIENT_RUNTIME_HELPERS = new Set([
+	'enableSignalBindings',
+	'createElementAt',
+	'bindSignalText',
+	'bindSignalChild',
+	'bindSignalAttribute',
+	'bindSignalStyleProperty',
+	'bindSignalValue',
+	'bindSignalChecked',
+	'bindSignalHostPropSources',
 	'replaceRef',
 	'queueOwnRefDetach',
 	'setPlainAttribute',
@@ -1229,6 +1408,11 @@ const INTERNAL_CLIENT_RUNTIME_HELPERS = new Set([
 	...NATIVE_READ_RUNTIME_HELPERS,
 ]);
 const INTERNAL_SERVER_RUNTIME_HELPERS = new Set([
+	'enableServerSignalBindings',
+	'createElementAt',
+	'ssrSignalValue',
+	'ssrSignalControlValue',
+	'ssrSignalControlAttrs',
 	'ssrSpreadContent',
 	...NATIVE_READ_RUNTIME_HELPERS,
 ]);
@@ -7760,21 +7944,6 @@ function identifierName(node) {
 	return null;
 }
 
-function unwrapServerFunctionInitializer(node) {
-	let current = node;
-	while (
-		current &&
-		(current.type === 'TSAsExpression' ||
-			current.type === 'TSSatisfiesExpression' ||
-			current.type === 'TSNonNullExpression' ||
-			current.type === 'TypeCastExpression' ||
-			current.type === 'ParenthesizedExpression')
-	) {
-		current = current.expression;
-	}
-	return current;
-}
-
 function collectServerFunctionBindings(statements) {
 	const functions = new Set();
 	const aliases = new Map();
@@ -7937,6 +8106,8 @@ function analyzeServerModule(ast, filename) {
 	const statements = declaration.body?.body || [];
 	validateServerModuleIsolation(ast, declaration, filename);
 	const functionBindings = collectServerFunctionBindings(statements);
+	const functionNodes = collectServerFunctionNodes(statements);
+	const contextImports = serverContextTypeImports(statements);
 	for (const statement of statements) {
 		if (statement.type === 'ExportDefaultDeclaration') {
 			throw new Error('`module server` does not support default exports; use named functions.');
@@ -7993,7 +8164,15 @@ function analyzeServerModule(ast, filename) {
 		}
 	}
 
-	return { declaration, imports, exports, filename };
+	const contexts = new Map();
+	for (const [exported, local] of exports) {
+		const fn = functionNodes.get(local);
+		if (fn === undefined) continue;
+		const contextIndex = serverFunctionContextIndex(fn, contextImports, filename);
+		if (contextIndex !== -1) contexts.set(exported, contextIndex);
+	}
+
+	return { declaration, imports, exports, contexts, filename };
 }
 
 /**
@@ -8011,15 +8190,19 @@ function emitServerModuleClientStubs(info, ctx) {
 			if (!imported || !local) continue;
 			ctx.runtimeNeeded.add('__serverRpc');
 			const hash = strongHash(info.filename + '#' + imported);
+			const contextIndex = info.contexts.get(imported);
+			const rpcArgs =
+				contextIndex === undefined
+					? [b.literal(hash, JSON.stringify(hash)), b.id('args')]
+					: [
+							b.literal(hash, JSON.stringify(hash)),
+							b.call(b.member(b.id('args'), 'slice'), b.literal(0), b.literal(contextIndex)),
+							b.member(b.id('args'), b.literal(contextIndex), true),
+							b.literal(true, 'true'),
+						];
 			nodes.push(
 				inheritOriginLoc(
-					b.const(
-						local,
-						b.arrow(
-							[b.rest(b.id('args'))],
-							b.call('_$__serverRpc', b.literal(hash, JSON.stringify(hash)), b.id('args')),
-						),
-					),
+					b.const(local, b.arrow([b.rest(b.id('args'))], b.call('_$__serverRpc', ...rpcArgs))),
 					specifier,
 				),
 			);
@@ -8086,13 +8269,29 @@ function emitServerModuleServerNodes(info, ctx) {
 		...namespaceBody,
 	];
 	for (const [exported, local] of info.exports) {
+		const contextIndex = info.contexts.get(exported);
+		let value = b.id(local);
+		if (contextIndex !== undefined) {
+			ctx.runtimeNeeded.add('__registerServerFunction');
+			const hash = strongHash(info.filename + '#' + exported);
+			value = b.call(
+				'_$__registerServerFunction',
+				value,
+				b.literal(contextIndex),
+				b.object([
+					b.prop('init', b.id('id'), b.literal(hash, JSON.stringify(hash))),
+					b.prop('init', b.id('module'), b.literal(info.filename, JSON.stringify(info.filename))),
+					b.prop('init', b.id('export'), b.literal(exported, JSON.stringify(exported))),
+				]),
+			);
+		}
 		serverStatements.push(
 			inheritOriginLoc(
 				b.stmt(
 					b.assignment(
 						'=',
 						b.member(b.id('server'), b.literal(exported, JSON.stringify(exported)), true),
-						b.id(local),
+						value,
 					),
 				),
 				origin,
@@ -8735,7 +8934,7 @@ export function compile(source, filename, options) {
 // always validates authored source and only exposes the hydrate slice that the
 // same compilation already prepared for production void-export classification.
 export function compileForBundler(source, filename, options) {
-	const metadata = { hydrateAst: null, cssModuleConstantImports: [] };
+	const metadata = { hydrateAst: null, cssModuleConstantImports: [], independentWidgets: [] };
 	const result = compileAuthored(source, filename, options, metadata);
 	return { result, ...metadata };
 }
@@ -8755,9 +8954,11 @@ function compileAuthored(source, filename, options, bundlerMetadata) {
 	assertNativeReadDiagnostics(analyzedAst, source, cleanFilename, options);
 	const strongModeEnabled =
 		assertStrongMode(analyzedAst, source, cleanFilename, options)?.enabled === true;
-	if (bundlerMetadata !== null) bundlerMetadata.hydrateAst = analyzedAst;
+	const attemptAst = lowerSignalAttemptReads(analyzedAst);
+	const signalAst = lowerSignalDeclarations(attemptAst, cleanFilename);
+	if (bundlerMetadata !== null) bundlerMetadata.hydrateAst = signalAst;
 	const textTypedAst = applyStringChildProofs(
-		analyzedAst,
+		signalAst,
 		source,
 		cleanFilename,
 		options?.textTypeFacts,
@@ -8781,7 +8982,7 @@ function compileAuthored(source, filename, options, bundlerMetadata) {
 		constantAst,
 		mode,
 		bundlerMetadata,
-		textTypedAst !== analyzedAst,
+		textTypedAst !== signalAst,
 		strongModeEnabled,
 	);
 }
@@ -8874,6 +9075,7 @@ function compileInternal(
 				).diagnostics;
 			if (bundlerMetadata !== null) {
 				bundlerMetadata.hydrateAst = hydratePreparation.ast;
+				bundlerMetadata.independentWidgets = hydratePreparation.independentWidgets ?? [];
 			}
 			const compiled = compileInternal(
 				source,
@@ -9223,6 +9425,7 @@ function compileInternal(
 		ownedCssInjections: new Set(),
 		componentOwners: [],
 		currentComponentOwner: null,
+		signalBindingsUsed: ast._octaneSignalDeclarations === true,
 		currentComponentLocals: null, // Set<string> while compiling a component body; null otherwise
 		currentMapTemps: null, // receiver/method temps owned by the current emitted function
 		currentAutoMemoOffset: 0, // flat compiler-cache cell offset for the body being emitted
@@ -10324,6 +10527,13 @@ function compileInternal(
 		ctx.runtimeNeeded.add('__vtSeen');
 		vtHintNodes.push(inheritOriginLoc(b.stmt(b.call(rtAlias('__vtSeen'))), moduleOrigin));
 	}
+	const signalBindingNodes = [];
+	if (ctx.signalBindingsUsed) {
+		ctx.runtimeNeeded.add('enableSignalBindings');
+		signalBindingNodes.push(
+			inheritOriginLoc(b.stmt(b.call('_$enableSignalBindings', b.literal(1))), moduleOrigin),
+		);
+	}
 
 	// All remaining authored memo sites have now received their real hook slots.
 	// Lower callable helpers, returned-JSX functions, explicit-slot calls and
@@ -10332,6 +10542,7 @@ function compileInternal(
 	// accidentally import DOM memo helpers for a universal renderer's scope.
 	let moduleBody = [
 		...nativeReadActivationNodes(ctx, moduleOrigin),
+		...signalBindingNodes,
 		...vtHintNodes,
 		...delegateNodes,
 		...styleNodes,
@@ -10384,9 +10595,12 @@ function compileInternal(
 	};
 	const printed = printNodeWithMap(program, ctx);
 
-	/** @type {{ code: string, map: any, diagnostics: any, inspect?: any, __universalSourceMapComposed?: boolean }} */
+	/** @type {{ code: string, map: any, diagnostics: any, inspect?: any, streamedSignals?: true, __universalSourceMapComposed?: boolean }} */
 	const result = {
 		code: printed.code,
+		...(ast._octaneSignalDeclarations === true || ctx.nativeReads
+			? { streamedSignals: true }
+			: null),
 		map: {
 			version: 3,
 			sources: [ctx.mapSourceName],
@@ -10507,6 +10721,7 @@ function compileServer(
 		nativeModuleStyles: options?.nativeReads === true && hasModuleStyleMaps(ast.body),
 		hmr: false, // SSR never hot-swaps in place; client/server production slot shapes stay aligned
 		dev: !!(options && options.dev),
+		signalBindingsUsed: ast._octaneSignalDeclarations === true,
 		// SSR MIRROR of the parallel-`use()` pipeline (docs/suspense-parallel-use-
 		// plan.md Phase 5): the same memoize (Pass A) + hoist/batch (Pass B)
 		// transforms run on server bodies, emitting `_$puMemo`/`_$puBatch` — the
@@ -10685,12 +10900,28 @@ function compileServer(
 	// the flush may register `hookSlots` as a needed runtime import.
 	flushTailHookSymbols(ctx);
 	const nativeActivation = nativeReadActivationNodes(ctx, ctx._moduleOrigin);
+	const signalActivation = [];
+	if (ctx.signalBindingsUsed) {
+		ctx.runtimeNeeded.add('enableServerSignalBindings');
+		signalActivation.push(
+			inheritOriginLoc(
+				b.stmt(b.call('_$enableServerSignalBindings', b.literal(1))),
+				ctx._moduleOrigin,
+			),
+		);
+	}
 	const runtimeImportNodes = buildRuntimeImportNodes(ctx, 'octane/server', ctx._moduleOrigin);
 	const helperNodes = hoistedHelperNodes(ctx);
 	const program = {
 		type: 'Program',
 		sourceType: 'module',
-		body: [...runtimeImportNodes, ...nativeActivation, ...helperNodes, ...bodyNodes],
+		body: [
+			...runtimeImportNodes,
+			...nativeActivation,
+			...signalActivation,
+			...helperNodes,
+			...bodyNodes,
+		],
 		metadata: { path: [] },
 		start: ast.start,
 		end: ast.end,
@@ -10699,6 +10930,9 @@ function compileServer(
 	const printed = printNodeWithMap(program, ctx);
 	const result = {
 		code: printed.code,
+		...(ast._octaneSignalDeclarations === true || ctx.nativeReads
+			? { streamedSignals: true }
+			: null),
 		map: {
 			version: 3,
 			sources: [ctx.mapSourceName],
@@ -11179,7 +11413,10 @@ function textAdjacencyKind(node, ctx) {
 	if (node.type !== 'Text') return 'other';
 	const lit = staticTextLiteral(node.expression);
 	if (lit !== null) return lit === '' ? 'empty' : 'static';
-	return isKnownTextChildExpression(node.expression, ctx.knownStringChildLocals) ? 'dyn' : 'other';
+	return isDirectSignalHandleExpression(node.expression) ||
+		isKnownTextChildExpression(node.expression, ctx.knownStringChildLocals)
+		? 'dyn'
+		: 'other';
 }
 
 // Does the child at `i` have a text-producing sibling next to it (looking
@@ -11486,7 +11723,10 @@ function ssrEmitNode(
 			// primitive to text) — mirrors Ripple's `{expr}` vs `{expr as string}`.
 			// rewriteHookCalls: a `use(thenable)` in this hole bypasses the setup
 			// rewrite, so key it here too (else it collides with sibling/nested use()).
-			if (isKnownTextChildExpression(expr, ctx.knownStringChildLocals)) {
+			if (
+				isDirectSignalHandleExpression(expr) ||
+				isKnownTextChildExpression(expr, ctx.knownStringChildLocals)
+			) {
 				// ssrTextPre = ssrText + the runtime leading-'\n' protection (the value
 				// isn't known at compile time here).
 				const fn =
@@ -11496,7 +11736,8 @@ function ssrEmitNode(
 							? 'ssrTextPre'
 							: 'ssrText';
 				ctx.runtimeNeeded.add(fn);
-				return ssrCall(fn, [resolveStyleExpr(rewriteHookCalls(expr, ctx, name), cssHash)], node);
+				const value = resolveStyleExpr(rewriteHookCalls(expr, ctx, name), cssHash);
+				return ssrCall(fn, [ssrSignalValue(value, ctx, node, true)], node);
 			}
 			// rewriteJsxValues lowers any JSX embedded in the expression (e.g.
 			// `{cond && <div/>}`, a ternary, a `.map(x => <Row/>)`) to printable
@@ -11692,6 +11933,34 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 	const firstSpreadIdx = attrs.findIndex(
 		(a) => a.type === 'SpreadAttribute' || a.type === 'JSXSpreadAttribute',
 	);
+	const hostSignalSite = directSignalSite(ctx, name, node, 'binding');
+	let directSignalControlSite = null;
+	const markDirectControl = (expression, origin) => {
+		if (!canCarryDirectSignalHandle(expression)) return expression;
+		const site =
+			firstSpreadIdx === -1 ? directSignalSite(ctx, name, node, 'input') : hostSignalSite;
+		if (directSignalControlSite === null) {
+			if (directAttributeIdentities.has('data-octane-input')) {
+				throw new Error(
+					'`data-octane-input` is reserved for compiler-owned writable signal controls.',
+				);
+			}
+			directSignalControlSite = site;
+			bakeLit(` data-octane-input="${escapeAttr(site)}"`, 'data-octane-input', null, null);
+		}
+		ctx.signalBindingsUsed = true;
+		ctx.runtimeNeeded.add('ssrSignalControlValue');
+		return ssrCall('ssrSignalControlValue', [expression, b.literal(site)], origin);
+	};
+	if (firstSpreadIdx !== -1 && (tag === 'input' || tag === 'textarea' || tag === 'select')) {
+		directSignalControlSite = hostSignalSite;
+		if (directAttributeIdentities.has('data-octane-input')) {
+			throw new Error(
+				'`data-octane-input` is reserved for compiler-owned writable signal controls.',
+			);
+		}
+		bakeLit(` data-octane-input="${escapeAttr(hostSignalSite)}"`, 'data-octane-input', null, null);
+	}
 	// Customized built-ins suppress native unknown-property diagnostics based on
 	// the final `is` prop, regardless of where that prop appears in JSX. Resolve
 	// directly authored DEV hosts through the existing whole-element attribute
@@ -11822,10 +12091,20 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 		const attr = attrs[attrI];
 		if (attr.type === 'SpreadAttribute' || attr.type === 'JSXSpreadAttribute') {
 			ensureAttrPart();
+			ctx.signalBindingsUsed = true;
 			ctx.runtimeNeeded.add('ssrAttrs');
 			ctx.runtimeNeeded.add('ssrSnapshotSpread');
 			const tmp = bindAttributeEvaluation(
-				ssrCall('ssrSnapshotSpread', [tsrxExprNode(attr.argument, ctx, name, inlinedSubs)], attr),
+				ssrCall(
+					'ssrSnapshotSpread',
+					[
+						tsrxExprNode(attr.argument, ctx, name, inlinedSubs),
+						...(tag === 'input' || tag === 'textarea' || tag === 'select'
+							? [b.literal(hostSignalSite)]
+							: []),
+					],
+					attr,
+				),
 			);
 			if (resolveFormControlsAcrossSpreads) {
 				if (tag !== 'textarea' && formControlPart === -1) {
@@ -11939,10 +12218,13 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 			const ctlInner =
 				val == null ? null : val.type === 'JSXExpressionContainer' ? val.expression : val;
 			if (tag === 'input') {
-				const ctlExpr =
+				let ctlExpr =
 					ctlInner === null
 						? inheritOriginLoc(b.literal(true, 'true'), attr)
 						: tsrxExprNode(ctlInner, ctx, name, inlinedSubs);
+				if (attrName === 'value' || attrName === 'checked') {
+					ctlExpr = markDirectControl(ctlExpr, attr);
+				}
 				if (formControlPart === -1) {
 					flush();
 					formControlPart = parts.length;
@@ -11957,11 +12239,12 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 			}
 			// textarea / select: value/defaultValue never serialize as attributes —
 			// captured for the content position (textarea) / projection scope (select).
-			const ctlExpr = bindAttributeEvaluation(
+			let ctlExpr =
 				ctlInner === null
 					? inheritOriginLoc(b.literal(true, 'true'), attr)
-					: tsrxExprNode(ctlInner, ctx, name, inlinedSubs),
-			);
+					: tsrxExprNode(ctlInner, ctx, name, inlinedSubs);
+			if (attrName === 'value') ctlExpr = markDirectControl(ctlExpr, attr);
+			ctlExpr = bindAttributeEvaluation(ctlExpr);
 			if (resolveFormControlsAcrossSpreads) {
 				if (tag === 'select' && formControlPart === -1) {
 					flush();
@@ -11970,6 +12253,9 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 				}
 				formControlSources.push(ssrDirectSource(ctx, attrName, ctlExpr, attr));
 			} else if (attrName === 'value') {
+				if (directSignalControlSite !== null) {
+					formControlSources.push(ssrDirectSource(ctx, attrName, ctlExpr, attr));
+				}
 				ctlValue = ctlExpr;
 				ctlValueAttr = attr;
 			} else {
@@ -12092,7 +12378,7 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 					val.type === 'JSXExpressionContainer' ? val.expression : val,
 					cssHash,
 				);
-				attrExpr = tsrxExprNode(attrInner, ctx, name, inlinedSubs);
+				attrExpr = ssrSignalValue(tsrxExprNode(attrInner, ctx, name, inlinedSubs), ctx, attr, true);
 			}
 			attrSources.push(
 				ssrDirectSource(
@@ -12134,6 +12420,13 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 		let inner = val.type === 'JSXExpressionContainer' ? val.expression : val;
 
 		if (attrName === 'style') {
+			if (isDirectSignalHandleExpression(inner)) {
+				throw new Error(
+					'Direct signal style objects cannot install property-targeted bindings. ' +
+						'Use fixed style properties such as `style={{ color: color$ }}`, or use `.get()` ' +
+						'for a one-way whole-style value.',
+				);
+			}
 			inner = resolveStyleExpr(inner, cssHash);
 			if (!isAfterSpread && inner.type === 'Literal' && typeof inner.value === 'string') {
 				bakeLit(` style="${escapeAttr(inner.value)}"`, attrName, attr.name, inner);
@@ -12155,7 +12448,11 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 			parts.push(
 				ssrCall(
 					'ssrStyle',
-					[bindAttributeEvaluation(tsrxExprNode(inner, ctx, name, inlinedSubs))],
+					[
+						bindAttributeEvaluation(
+							ssrSignalStyleObject(tsrxExprNode(inner, ctx, name, inlinedSubs), ctx, attr),
+						),
+					],
 					attr,
 				),
 			);
@@ -12240,7 +12537,9 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 		flush();
 		ctx.runtimeNeeded.add('ssrAttr');
 		registerAttrLoweringOrigin(ctx, attr.name, 'ssrAttr', attrName);
-		const valueExpr = bindAttributeEvaluation(tsrxExprNode(inner, ctx, name, inlinedSubs));
+		const valueExpr = bindAttributeEvaluation(
+			ssrSignalValue(tsrxExprNode(inner, ctx, name, inlinedSubs), ctx, attr, true),
+		);
 		if (
 			devFormActionSources !== null &&
 			(attrName === 'type' ||
@@ -12269,10 +12568,18 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 			),
 		);
 	}
+	let signalControlAttrs = null;
+	if (directSignalControlSite !== null) {
+		ctx.runtimeNeeded.add('ssrSignalControlAttrs');
+		signalControlAttrs = ssrCall('ssrSignalControlAttrs', [b.array(formControlSources)], node);
+	}
 	if (formControlPart !== -1) {
 		if (tag === 'input') {
 			ctx.runtimeNeeded.add('ssrInputAttrs');
-			const inputAttrs = ssrCall('ssrInputAttrs', [b.array(formControlSources)], node);
+			let inputAttrs = ssrCall('ssrInputAttrs', [b.array(formControlSources)], node);
+			if (signalControlAttrs !== null) {
+				inputAttrs = inheritOriginLoc(b.binary('+', inputAttrs, signalControlAttrs), node);
+			}
 			// React serializes/coerces ordinary attributes before projecting the
 			// effective checked/value state. Expressions and spread getters have
 			// already run into temps in authored order; move only this serialization
@@ -12283,8 +12590,18 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 			parts.push(inputAttrs);
 		} else {
 			ctx.runtimeNeeded.add('ssrSelectAttrs');
-			parts[formControlPart] = ssrCall('ssrSelectAttrs', [b.array(formControlSources)], node);
+			const selectAttrs = ssrCall('ssrSelectAttrs', [b.array(formControlSources)], node);
+			parts[formControlPart] =
+				signalControlAttrs === null
+					? selectAttrs
+					: inheritOriginLoc(b.binary('+', selectAttrs, signalControlAttrs), node);
 		}
+	} else if (signalControlAttrs !== null) {
+		// Textarea values live in content; a direct select value lives in its
+		// option scope. Neither needs a form-attribute slot, but both still need
+		// the winning writable identity on the opening tag for early edits.
+		flush();
+		parts.push(signalControlAttrs);
 	}
 	if (attrPart !== -1) {
 		ctx.runtimeNeeded.add('ssrAttrs');
@@ -12602,6 +12919,7 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 
 function ssrEmitComponent(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs) {
 	registerOriginAlias(ctx, node.closingElement?.name, node.id || node.openingElement?.name);
+	const invocationSite = componentInvocationSite(ctx, name, node);
 	// M3 inherit-range: consume the body-root flag ONCE, before this component's
 	// props/children compile below (they recurse into ssrEmitNodes/ssrCompileSub
 	// and must not inherit it). Set by ssrCompileBody only for the sole
@@ -12761,11 +13079,11 @@ function ssrEmitComponent(node, ctx, name, inlinedSubs, parentNs, cssHash, compo
 		// The direct mode-only Activity was lowered to ActivityStatement. Richer
 		// Activity configs and generic explicit-key + spread sites keep one ordered
 		// element config, matching createElement without changing simple call sites.
-		ctx.runtimeNeeded.add('createElement');
+		ctx.runtimeNeeded.add('createElementAt');
 		ctx.runtimeNeeded.add('ssrChild');
 		const descriptor = ssrCall(
-			'createElement',
-			[compExpr, inheritOriginLoc(b.object(propNodes), node)],
+			'createElementAt',
+			[b.literal(invocationSite), compExpr, inheritOriginLoc(b.object(propNodes), node)],
 			node,
 		);
 		const child = ssrCall('ssrChild', [descriptor, b.id('__s')], node);
@@ -12785,12 +13103,16 @@ function ssrEmitComponent(node, ctx, name, inlinedSubs, parentNs, cssHash, compo
 		args.push(
 			b.literal(componentNs, JSON.stringify(componentNs)),
 			b.literal(inherit, inherit ? 'true' : 'false'),
+			keyExpr ?? undefinedNode(),
+			b.literal(invocationSite),
 		);
-		if (keyExpr !== null) args.push(keyExpr);
-	} else if (keyExpr !== null) {
-		args.push(b.literal(inherit, inherit ? 'true' : 'false'), keyExpr);
-	} else if (inherit) {
-		args.push(b.literal(true, 'true'));
+	} else {
+		args.push(
+			b.literal(inherit, inherit ? 'true' : 'false'),
+			keyExpr ?? undefinedNode(),
+			undefinedNode(),
+			b.literal(invocationSite),
+		);
 	}
 	return ssrCall(helper, args, node);
 }
@@ -13412,6 +13734,14 @@ function ssrControlKey(kind, node) {
 // renderer component so its template scopes and hydration range both survive.
 function ssrEmitTsrxExpression(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs) {
 	const expr = node.expression;
+	if (isDirectSignalHandleExpression(expr)) {
+		ctx.runtimeNeeded.add('ssrText');
+		return ssrCall(
+			'ssrText',
+			[ssrSignalValue(resolveStyleExpr(rewriteHookCalls(expr, ctx, name), cssHash), ctx, node)],
+			node,
+		);
+	}
 	if (node.returnedJsxValue === true && requiresTemplateNormalization(expr, 'html', true, ctx)) {
 		// A returned JSX value that contains template-only syntax is one compiled
 		// renderer on the client (rather than a descriptor array whose value
@@ -13436,7 +13766,19 @@ function ssrEmitTsrxExpression(node, ctx, name, inlinedSubs, parentNs, cssHash, 
 		);
 		inlinedSubs.push(sub.fn);
 		ctx.runtimeNeeded.add('ssrComponent');
-		return ssrCall('ssrComponent', [b.id('__s'), b.id(sub.fnName), b.object([])], node);
+		return ssrCall(
+			'ssrComponent',
+			[
+				b.id('__s'),
+				b.id(sub.fnName),
+				b.object([]),
+				b.literal(false),
+				undefinedNode(),
+				undefinedNode(),
+				b.literal(componentInvocationSite(ctx, name, node)),
+			],
+			node,
+		);
 	}
 	if (
 		expr &&
@@ -19090,9 +19432,17 @@ function lowerHostFragment(
 	} else {
 		ctx.hoistedHelpers.push(renderer);
 	}
-	ctx.runtimeNeeded.add('createElement');
+	ctx.runtimeNeeded.add('createElementAt');
 	// The fragment-renderer call maps to the authored fragment root.
-	return inheritOriginLoc(b.call('_$createElement', b.id(fragName), b.object(holeProps)), node);
+	return inheritOriginLoc(
+		b.call(
+			'_$createElementAt',
+			b.literal(componentInvocationSite(ctx, '<fragment>', node)),
+			b.id(fragName),
+			b.object(holeProps),
+		),
+		node,
+	);
 }
 
 /**
@@ -19397,7 +19747,7 @@ function serverValueDirectiveFold(
 				directive,
 			),
 		);
-		ctx.runtimeNeeded.add('createElement');
+		ctx.runtimeNeeded.add('createElementAt');
 		// The wrapper call stands where the directive was authored, and every printed
 		// node needs an origin (assertNodeLocs). Inside a component body the enclosing
 		// statement supplied one; a module-level statement does not.
@@ -19409,7 +19759,12 @@ function serverValueDirectiveFold(
 			);
 		}
 		return inheritOriginLoc(
-			b.call('_$createElement', b.id(wrapperName), b.object(descriptorProps)),
+			b.call(
+				'_$createElementAt',
+				b.literal(componentInvocationSite(ctx, '<fragment>', directive)),
+				b.id(wrapperName),
+				b.object(descriptorProps),
+			),
 			directive,
 		);
 	};
@@ -19950,6 +20305,7 @@ function jsxElementToCreateElement(node, ctx, eagerRoot = false) {
 	const nameNode = node.openingElement?.name || node.id;
 	const activity = isActivityLongForm(node, ctx);
 	const componentTag = activity || isComponentTag(node);
+	const invocationSite = componentTag ? componentInvocationSite(ctx, '<value>', node) : null;
 	// Host (lowercase) tag → string literal (`'li'`) for the de-opt renderer;
 	// component (capitalized / member / dynamic) → the identifier/member ref.
 	const compNode = activity
@@ -20150,13 +20506,30 @@ function jsxElementToCreateElement(node, ctx, eagerRoot = false) {
 			? requireRuntimeForContext(ctx, 'nativeCreateScopedElement')
 			: rtAlias('createScopedElement');
 		const readChildren = inheritOriginLoc(b.arrow([], memoizedChildrenBody ?? childrenValue), node);
-		descriptor = inheritOriginLoc(b.call(scopedElement, compNode, propsNode, readChildren), node);
+		descriptor = inheritOriginLoc(
+			b.call(
+				scopedElement,
+				compNode,
+				propsNode,
+				readChildren,
+				...(invocationSite === null ? [] : [b.literal(invocationSite)]),
+			),
+			node,
+		);
 	} else {
-		ctx.runtimeNeeded.add('createElement');
+		ctx.runtimeNeeded.add(componentTag ? 'createElementAt' : 'createElement');
 		// Remaining scaffolding (callee, props object, spread/diagnostic wrappers,
 		// static-content literals) maps to the authored JSX element.
 		descriptor = inheritOriginLoc(
-			b.call('_$createElement', compNode, propsNode, ...loweredChildren),
+			componentTag
+				? b.call(
+						'_$createElementAt',
+						b.literal(invocationSite),
+						compNode,
+						propsNode,
+						...loweredChildren,
+					)
+				: b.call('_$createElement', compNode, propsNode, ...loweredChildren),
 			node,
 		);
 	}
@@ -22853,14 +23226,21 @@ function planJsx(
 		// htext/htextSwap/setAttribute (which only have the element) can report `file:line:col`.
 		if (_locStamped && b.kind !== 'text') stampHostLoc(elVar, b.path, undefined);
 		else if (_locStamped) stampHostLoc(ensureVar(b.path), b.path, undefined);
-		if (b.kind === 'text' || b.kind === 'textOnlyChild') ctx.runtimeNeeded.add('setText');
-		if (b.kind === 'text') ctx.runtimeNeeded.add('htextSwap');
-		if (b.kind === 'textOnlyChild') ctx.runtimeNeeded.add('htext');
+		const signalHelper = directSignalBindingHelper(b);
+		if (signalHelper !== null) {
+			ctx.runtimeNeeded.add(signalHelper);
+			registerAttrLoweringOrigin(ctx, b.nameOrigin, signalHelper, b.name);
+		}
+		if (!b.signalDirect && (b.kind === 'text' || b.kind === 'textOnlyChild')) {
+			ctx.runtimeNeeded.add('setText');
+		}
+		if (!b.signalDirect && b.kind === 'text') ctx.runtimeNeeded.add('htextSwap');
+		if (!b.signalDirect && b.kind === 'textOnlyChild') ctx.runtimeNeeded.add('htext');
 		// Mounts use the unconditional writer; reactive scalar bindings use either
 		// that writer behind an inline guard or its compact comparison helper.
 		// Claim both authored-name tokens when both paths exist, and do not retain
 		// a mount-only import for deferred writes.
-		const attrHelper = attrBindingHelper(b);
+		const attrHelper = b.signalDirect ? null : attrBindingHelper(b);
 		if (attrHelper !== null) {
 			if (b.kind === 'class' && b.fresh && (!b.deferred || (!b.mountOnly && inlineBindingGuards)))
 				ctx.runtimeNeeded.add('normalizeClass');
@@ -22878,8 +23258,11 @@ function planJsx(
 		if (b.kind === 'dangerCommit') ctx.runtimeNeeded.add('setDangerouslySetInnerHTMLSources');
 		if (b.kind === 'formCommit') ctx.runtimeNeeded.add('setFormControlSources');
 		if (b.kind === 'hostCommit') {
-			ctx.runtimeNeeded.add('setHostPropSources');
-			ctx.runtimeNeeded.add('queueOwnRefDetach');
+			if (b.signalHostSources) ctx.runtimeNeeded.add('bindSignalHostPropSources');
+			else {
+				ctx.runtimeNeeded.add('setHostPropSources');
+				ctx.runtimeNeeded.add('queueOwnRefDetach');
+			}
 		}
 		// A commit-phase collector takes the element's props as one grouped call,
 		// so each source's name literal — not the shared helper — is what claims
@@ -23535,7 +23918,10 @@ function planJsx(
 		const org = cc.origin ?? planOrigin;
 		const hostExpr = () => hostNodeFor(`_compHost$${cc.id}`);
 		if (cc.hostChildrenBinding != null) {
-			const props = () => bagFieldNode(bag, `_host$${cc.hostChildrenBinding.id}`);
+			const props = () => {
+				const host = bagFieldNode(bag, `_host$${cc.hostChildrenBinding.id}`);
+				return cc.hostChildrenBinding.signalHostSources ? b.member(host, 'resolved') : host;
+			};
 			cc.valueExpr = b.conditional(
 				propertyIsEnumerableCall(props(), 'children'),
 				b.member(props(), 'children'),
@@ -23550,6 +23936,38 @@ function planJsx(
 		// component calls; only the emitted runtime call differs.
 		if (cc.isChild) {
 			const V = () => b.id('_v');
+			const childAnchor = anchorNodeFor(cc, 'compAnchor');
+			if (!noTemplate && cc.signalSite != null && (ctx.signalBindingsUsed || ctx.nativeReads)) {
+				ctx.signalBindingsUsed = true;
+				ctx.runtimeNeeded.add('bindSignalChild');
+				const tokenKey = `_sigch$${cc.id}`;
+				bag.constField(tokenKey, b.literal(null));
+				pushAfterStmt(
+					cc.id,
+					org,
+					b.stmt(
+						b.assignment(
+							'=',
+							bagFieldNode(bag, tokenKey),
+							b.call(
+								'_$bindSignalChild',
+								b.id('__s'),
+								bagFieldNode(bag, tokenKey),
+								b.literal(slotIndex),
+								hostExpr(),
+								cc.valueExpr,
+								b.literal(cc.signalSite),
+								childAnchor ?? b.literal(null),
+								cc.anchorVar ? b.literal(true) : undefinedNode(),
+								undefinedNode(),
+								cc.coalesceRange ? b.literal(true) : undefinedNode(),
+								cc.onlyChildText ? b.literal(true) : undefinedNode(),
+							),
+						),
+					),
+				);
+				continue;
+			}
 			// MARKERLESS only-child renderable: append a primitive as a single Text
 			// node (no `<!>`, no slot state). Either the shared helper or the inline
 			// row guard compares its cached value/node before the ordinary child path.
@@ -23656,7 +24074,6 @@ function planJsx(
 			}
 			// Anchor node (null = append into an in-template element host) — see
 			// anchorNodeFor.
-			const childAnchor = anchorNodeFor(cc, 'compAnchor');
 			if (noTemplate) {
 				// No bag to cache on → the small `textSlot` wrapper (fast inline for a
 				// primitive into a text slot; delegates to `childSlot` otherwise).
@@ -23741,14 +24158,16 @@ function planJsx(
 				liteMemo ? 'componentSlotLite' : cc.voidComponent ? 'componentSlotVoid' : 'componentSlot',
 			);
 			const memoAnchor = anchorNodeFor(cc, 'compAnchor');
-			const trailing = memoAnchor ? [memoAnchor] : [];
-			if (!liteMemo && cc.inheritRange) {
-				if (trailing.length === 0) trailing.push(undefinedNode());
-				trailing.push(undefinedNode(), undefinedNode(), b.literal(true));
-			} else if (!liteMemo && cc.singleRoot) {
-				if (trailing.length === 0) trailing.push(undefinedNode());
-				trailing.push(undefinedNode(), b.literal(true));
-			}
+			const trailing = liteMemo
+				? [memoAnchor ?? undefinedNode(), b.literal(cc.invocationSite)]
+				: [
+						memoAnchor ?? undefinedNode(),
+						undefinedNode(),
+						cc.singleRoot ? b.literal(true) : undefinedNode(),
+						cc.inheritRange ? b.literal(true) : undefinedNode(),
+						undefinedNode(),
+						b.literal(cc.invocationSite),
+					];
 			const witnessMiss = cc.autoMemoWitnesses.length
 				? witnessMissChain(cc.autoMemoWitnesses)
 				: null;
@@ -23809,6 +24228,8 @@ function planJsx(
 						undefinedNode(),
 						undefinedNode(),
 						b.literal(true),
+						undefinedNode(),
+						b.literal(cc.invocationSite),
 					),
 				),
 			);
@@ -23835,7 +24256,8 @@ function planJsx(
 						hostExpr(),
 						cc.compNode,
 						cc.propsExpr,
-						...(liteAnchor ? [liteAnchor] : []),
+						liteAnchor ?? undefinedNode(),
+						b.literal(cc.invocationSite),
 					),
 				),
 			);
@@ -23848,37 +24270,14 @@ function planJsx(
 		// unmount move the slot DOM along with the block; an element host with
 		// no in-template anchor can safely append).
 		const compAnchor = anchorNodeFor(cc, 'compAnchor');
-		const trailing = [];
-		let anchorFilled = false;
-		if (compAnchor) {
-			trailing.push(compAnchor);
-			anchorFilled = true;
-		}
-		// key arg is positional AFTER anchor in componentSlot's signature. When a
-		// key is present but anchor isn't, supply `undefined` for the anchor slot
-		// so the key lands in the right argument position — the runtime's
-		// `anchor ?? null` still routes through appendChild as before.
-		if (cc.keyExpr != null) {
-			if (!anchorFilled) {
-				trailing.push(undefinedNode());
-				anchorFilled = true;
-			}
-			trailing.push(cc.keyExpr);
-		}
-		// singleRoot is the 8th positional arg (after anchor, key). It's gated on
-		// no-key, so backfill anchor + key placeholders to land it in the right
-		// slot. `true` = proven same-module single-element root; `2` = the
-		// cross-module sentinel (runtime checks the callee's $$singleRoot stamp).
-		if (cc.singleRoot || cc.maybeSingleRoot) {
-			if (!anchorFilled) {
-				trailing.push(undefinedNode());
-				anchorFilled = true;
-			}
-			trailing.push(undefinedNode(), cc.singleRoot ? b.literal(true) : b.literal(2));
-		}
-		// Persist key ownership separately from the current key VALUE so
-		// `key={undefined}` remains an independent reconciliation boundary.
-		if (cc.keyExpr != null) trailing.push(undefinedNode(), undefinedNode(), b.literal(true));
+		const trailing = [
+			compAnchor ?? undefinedNode(),
+			cc.keyExpr ?? undefinedNode(),
+			cc.singleRoot ? b.literal(true) : cc.maybeSingleRoot ? b.literal(2) : undefinedNode(),
+			undefinedNode(),
+			cc.keyExpr != null ? b.literal(true) : undefinedNode(),
+			b.literal(cc.invocationSite),
+		];
 		pushAfterStmt(
 			cc.id,
 			org,
@@ -24280,9 +24679,11 @@ function emitDeferredMount(bind, elVar, bag) {
 	// Whole-object styles diff on `_sty`; grouped styles use it only as a
 	// first-render marker. Each grouped property keeps a scalar previous value.
 	bag.constField(
-		bind.kind === 'style' || bind.kind === 'styleProperties'
-			? `_sty$${bind.id}`
-			: `_prev$${bind.id}`,
+		bind.signalDirect
+			? `_sig$${bind.id}`
+			: bind.kind === 'style' || bind.kind === 'styleProperties'
+				? `_sty$${bind.id}`
+				: `_prev$${bind.id}`,
 		bind.kind === 'styleProperty' || bind.kind === 'styleProperties' ? 'style-unset' : 'undefined',
 	);
 	if (bind.kind === 'styleProperties') {
@@ -24305,6 +24706,51 @@ function bindingOrigin(bind) {
 	return bind.expr && bind.expr.loc ? bind.expr : bind.origin;
 }
 
+function directSignalBindingHelper(bind) {
+	if (!bind.signalDirect) return null;
+	if (bind.kind === 'text' || bind.kind === 'textOnlyChild') return 'bindSignalText';
+	if (bind.kind === 'styleProperty') return 'bindSignalStyleProperty';
+	if (bind.kind === 'value' || bind.kind === 'selectValue') return 'bindSignalValue';
+	if (bind.kind === 'checked' || bind.kind === 'checkedCheckable') return 'bindSignalChecked';
+	return 'bindSignalAttribute';
+}
+
+function directSignalBindingArgs(bind, host, previous) {
+	const common = [b.id('__s'), previous, host];
+	if (bind.kind === 'text' || bind.kind === 'textOnlyChild') {
+		return [
+			...common,
+			bind.expr,
+			b.literal(bind.signalSite, JSON.stringify(bind.signalSite)),
+			b.literal(bind.kind === 'textOnlyChild'),
+		];
+	}
+	if (bind.kind === 'styleProperty') {
+		return [
+			...common,
+			inheritOriginLoc(b.literal(bind.name), bind.propertyOrigin),
+			bind.expr,
+			inheritOriginLoc(b.literal(bind.staticCss), bind.staticOrigin),
+			b.literal(bind.signalSite, JSON.stringify(bind.signalSite)),
+		];
+	}
+	if (
+		bind.kind === 'value' ||
+		bind.kind === 'selectValue' ||
+		bind.kind === 'checked' ||
+		bind.kind === 'checkedCheckable'
+	) {
+		return [...common, bind.expr, b.literal(bind.signalSite, JSON.stringify(bind.signalSite))];
+	}
+	return [
+		...common,
+		attrLoweringToken(b.literal(bind.name), bind),
+		bind.expr,
+		b.literal(bind.signalSite, JSON.stringify(bind.signalSite)),
+		b.literal(bind.kind, JSON.stringify(bind.kind)),
+	];
+}
+
 function emitBindingMount(bind, elVar, bag) {
 	if (bind.deferred) return emitDeferredMount(bind, elVar, bag);
 	const org = bindingOrigin(bind);
@@ -24319,6 +24765,24 @@ function emitBindingMount(bind, elVar, bag) {
 	// name; everything else in the call maps to the value expression.
 	const callee = () => attrLoweringToken(b.id(`_$${attrBindingHelper(bind)}`), bind);
 	const nameLit = () => attrLoweringToken(b.literal(bind.name), bind);
+	const signalHelper = directSignalBindingHelper(bind);
+	if (signalHelper !== null) {
+		return st(
+			b.block([
+				...mountHost(),
+				b.stmt(
+					b.assignment(
+						'=',
+						local(`_sig$${bind.id}`),
+						b.call(
+							attrLoweringToken(b.id(`_$${signalHelper}`), bind),
+							...directSignalBindingArgs(bind, el(), undefinedNode()),
+						),
+					),
+				),
+			]),
+		);
+	}
 	// `suppressHydrationWarning`: stamp a JS flag (NOT a DOM attribute) the runtime reads to
 	// keep the server value + skip the warning on a hydration mismatch for this element.
 	if (bind.kind === 'suppress') {
@@ -24344,7 +24808,13 @@ function emitBindingMount(bind, elVar, bag) {
 	if (bind.kind === 'formDiagnostic') {
 		const args = [el(), b.literal(bind.diagnosticKind)];
 		if (bind.selectedBinding !== undefined) {
-			args.push(b.arrow([], bagFieldNode(bag, `_prev$${bind.selectedBinding.id}`)));
+			const selected = bind.selectedBinding;
+			args.push(
+				b.arrow(
+					[],
+					bagFieldNode(bag, `${selected.signalDirect ? '_sig' : '_prev'}$${selected.id}`),
+				),
+			);
 		}
 		return st(b.stmt(b.call('_$queueFormAuthoringDiagnostic', ...args)));
 	}
@@ -24422,6 +24892,28 @@ function emitBindingMount(bind, elVar, bag) {
 			const sources = commitSourceRows(bind.sources, (binding, spread) =>
 				b.id(bag.local(`${spread ? '_sp' : '_prev'}$${binding.id}`)),
 			);
+			if (bind.signalHostSources) {
+				return st(
+					b.block([
+						...hostMount,
+						b.stmt(
+							b.assignment(
+								'=',
+								propsLocal,
+								b.call(
+									'_$bindSignalHostPropSources',
+									b.id('__s'),
+									undefinedNode(),
+									el(),
+									sources,
+									b.literal(bind.signalSite, JSON.stringify(bind.signalSite)),
+									b.literal(bind.hasNestedChildren === true),
+								),
+							),
+						),
+					]),
+				);
+			}
 			// The cleanup closure reads the bag through the captured `_b` — the bag
 			// exists by the time any cleanup runs (committed at mount end), and the
 			// `_host$` field is re-written by updates, so the read must be live.
@@ -24705,6 +25197,21 @@ function emitBindingUpdate(bind, bag, inlineBindingGuards = false) {
 	const callee = () =>
 		attrLoweringToken(b.id(`_$${attrBindingUpdateHelper(bind, inlineBindingGuards)}`), bind);
 	const nameLit = () => attrLoweringToken(b.literal(bind.name), bind);
+	const signalHelper = directSignalBindingHelper(bind);
+	if (signalHelper !== null) {
+		return st(
+			b.stmt(
+				b.assignment(
+					'=',
+					F('_sig'),
+					b.call(
+						attrLoweringToken(b.id(`_$${signalHelper}`), bind),
+						...directSignalBindingArgs(bind, F('_el'), F('_sig')),
+					),
+				),
+			),
+		);
+	}
 	switch (bind.kind) {
 		case 'nativeChangeRuntime': {
 			return st(b.stmt(b.call('_$queueNativeChangeDiagnostic', F('_el'))));
@@ -24775,6 +25282,25 @@ function emitBindingUpdate(bind, bag, inlineBindingGuards = false) {
 			const sources = commitSourceRows(bind.sources, (binding, spread) =>
 				bagFieldNode(bag, `${spread ? '_sp' : '_prev'}$${binding.id}`),
 			);
+			if (bind.signalHostSources) {
+				return st(
+					b.stmt(
+						b.assignment(
+							'=',
+							F('_host'),
+							b.call(
+								'_$bindSignalHostPropSources',
+								b.id('__s'),
+								F('_host'),
+								F('_el'),
+								sources,
+								b.literal(bind.signalSite, JSON.stringify(bind.signalSite)),
+								b.literal(bind.hasNestedChildren === true),
+							),
+						),
+					),
+				);
+			}
 			return st(
 				b.stmt(
 					b.assignment(
@@ -25346,14 +25872,25 @@ function emitNodeHtml(
 	cssHash = null,
 ) {
 	if (node.type === 'Text') {
-		if (isKnownTextChildExpression(node.expression, ctx.knownStringChildLocals)) {
-			bindings.push({
-				id: bindings.length,
-				kind: 'text',
-				expr: resolveStyleExpr(node.expression, cssHash),
-				path: path.slice(0, -1),
-				childIndex: path[path.length - 1],
-			});
+		if (
+			isDirectSignalHandleExpression(node.expression) ||
+			isKnownTextChildExpression(node.expression, ctx.knownStringChildLocals)
+		) {
+			bindings.push(
+				markDirectSignalBinding(
+					{
+						id: bindings.length,
+						kind: 'text',
+						expr: resolveStyleExpr(node.expression, cssHash),
+						path: path.slice(0, -1),
+						childIndex: path[path.length - 1],
+					},
+					ctx,
+					componentName,
+					node.expression,
+					'binding',
+				),
+			);
 			return templatePart('<!>', 'anchor');
 		}
 		// Bare `{expr}` (no string cast) → RENDERABLE hole at a top-level / multi-
@@ -25372,6 +25909,29 @@ function emitNodeHtml(
 	// cannot represent a Fragment ref or template-only control flow in that body.
 	// Ordinary root portals keep their existing descriptor/childSlot lowering.
 	if (node.type === 'TSRXExpression') {
+		if (isDirectSignalHandleExpression(node.expression)) {
+			bindings.push(
+				markDirectSignalBinding(
+					{
+						id: bindings.length,
+						kind: 'text',
+						expr: tsrxExprNode(
+							resolveStyleExpr(node.expression, cssHash),
+							ctx,
+							componentName,
+							inlinedSubs,
+						),
+						path: path.slice(0, -1),
+						childIndex: path[path.length - 1],
+					},
+					ctx,
+					componentName,
+					node.expression,
+					'binding',
+				),
+			);
+			return templatePart('<!>', 'anchor');
+		}
 		const fragmentBindings = ctx._fragRefStack;
 		if (
 			isCreatePortalCall(node.expression) &&
@@ -25732,11 +26292,19 @@ function emitElementHtml(
 		(tag === 'select' &&
 			directPropNames.has('multiple') &&
 			(directPropNames.has('value') || directPropNames.has('defaultValue')));
+	const hasDirectSignalStyle = attrs.some((attr) => {
+		if (attr.type !== 'Attribute' && attr.type !== 'JSXAttribute') return false;
+		if (normalizeJsxAttrName(jsxAttrRawName(attr), tag, hostNs) !== 'style') return false;
+		const value = attr.value;
+		const inner = value?.type === 'JSXExpressionContainer' ? value.expression : value;
+		return spreadContainsDirectSignalHandle(inner);
+	});
 	const resolveHostPropsAcrossSources =
 		firstSpreadIdx !== -1 ||
 		hasDuplicateDirectProp ||
 		hasDirectFormCascade ||
-		resolveDevCustomizedHost;
+		resolveDevCustomizedHost ||
+		hasDirectSignalStyle;
 	const hostClientSources = [];
 	let directChildrenClientBinding = null;
 	let hostCommitClientBinding = null;
@@ -25777,6 +26345,28 @@ function emitElementHtml(
 		typeWriters.length === 1 &&
 		(staticInputType === 'checkbox' || staticInputType === 'radio');
 	const attrTemplate = createTemplateIr();
+	let directSignalControlSite = null;
+	const ensureDirectControlSite = (site) => {
+		if (directSignalControlSite !== null) return;
+		if (directPropNames.has('data-octane-input')) {
+			throw new Error(
+				'`data-octane-input` is reserved for compiler-owned writable signal controls.',
+			);
+		}
+		directSignalControlSite = site;
+		appendTemplatePart(attrTemplate, ` data-octane-input="${escapeAttr(site)}"`, 'attribute', null);
+	};
+	const markDirectControl = (binding, expression, origin) => {
+		if (!canCarryDirectSignalHandle(expression)) return binding;
+		const site = directSignalSite(ctx, componentName, node, 'input');
+		ensureDirectControlSite(site);
+		ctx.signalBindingsUsed = true;
+		return { ...binding, signalDirect: true, signalSite: site };
+	};
+	const hostSignalSite = directSignalSite(ctx, componentName, node, 'binding');
+	if (firstSpreadIdx !== -1 && (tag === 'input' || tag === 'textarea' || tag === 'select')) {
+		ensureDirectControlSite(hostSignalSite);
+	}
 	let sawRef = false;
 	for (let attrI = 0; attrI < attrs.length; attrI++) {
 		const attr = attrs[attrI];
@@ -25838,6 +26428,13 @@ function emitElementHtml(
 						inner,
 						ctx.inspect,
 					);
+				}
+				if (
+					(tag === 'input' || tag === 'textarea' || tag === 'select') &&
+					(rawAttrName === 'value' || (tag === 'input' && rawAttrName === 'checked')) &&
+					isDirectSignalHandleExpression(inner)
+				) {
+					ensureDirectControlSite(hostSignalSite);
 				}
 				expr = tsrxExprNode(inner, ctx, componentName, inlinedSubs);
 			}
@@ -26030,19 +26627,17 @@ function emitElementHtml(
 			resolveFormControlsAcrossSpreads &&
 			(ctlKind !== null || (tag === 'select' && attrName === 'multiple'))
 		) {
+			const sourceExpr =
+				val == null
+					? b.literal(true, 'true', attr)
+					: val.type === 'JSXExpressionContainer'
+						? val.expression
+						: val;
 			const binding = {
 				id: bindings.length,
 				kind: 'formValue',
 				name: attrName,
-				expr:
-					val == null
-						? b.literal(true, 'true', attr)
-						: tsrxExprNode(
-								val.type === 'JSXExpressionContainer' ? val.expression : val,
-								ctx,
-								componentName,
-								inlinedSubs,
-							),
+				expr: tsrxExprNode(sourceExpr, ctx, componentName, inlinedSubs),
 				path,
 			};
 			bindings.push(binding);
@@ -26060,22 +26655,28 @@ function emitElementHtml(
 			} else if (ctlKind === 'checked' && leanChecked) {
 				ctlKind = 'checkedCheckable';
 			}
-			bindings.push({
+			const sourceExpr =
+				val == null
+					? b.literal(true, 'true', attr)
+					: val.type === 'JSXExpressionContainer'
+						? val.expression
+						: val;
+			const binding = {
 				id: bindings.length,
 				kind: ctlKind,
-				expr:
-					val == null
-						? b.literal(true, 'true', attr)
-						: tsrxExprNode(
-								val.type === 'JSXExpressionContainer' ? val.expression : val,
-								ctx,
-								componentName,
-								inlinedSubs,
-							),
+				expr: tsrxExprNode(sourceExpr, ctx, componentName, inlinedSubs),
 				path,
 				ns: hostNs,
 				nameOrigin: attr.name,
-			});
+			};
+			bindings.push(
+				ctlKind === 'value' ||
+					ctlKind === 'selectValue' ||
+					ctlKind === 'checked' ||
+					ctlKind === 'checkedCheckable'
+					? markDirectControl(binding, sourceExpr, attr)
+					: binding,
+			);
 			continue;
 		}
 		// `autoFocus` never bakes/writes an attribute — React parity: the
@@ -26132,6 +26733,13 @@ function emitElementHtml(
 		// template (unless we're after a spread, which would clobber it); a fixed
 		// literal prefix plus dynamic suffix can avoid a whole-object diff.
 		if (attrName === 'style') {
+			if (isDirectSignalHandleExpression(inner)) {
+				throw new Error(
+					'Direct signal style objects cannot install property-targeted bindings. ' +
+						'Use fixed style properties such as `style={{ color: color$ }}`, or use `.get()` ' +
+						'for a one-way whole-style value.',
+				);
+			}
 			if (!isAfterSpread && inner.type === 'Literal' && typeof inner.value === 'string') {
 				const chunk = ` style="${escapeAttr(inner.value)}"`;
 				appendBakedAttribute(attrTemplate, chunk, attrName, attr.name, inner, ctx.inspect);
@@ -26171,7 +26779,32 @@ function emitElementHtml(
 					for (const entry of mixed.dynamics) {
 						registerAttrLoweringOrigin(ctx, entry.key, null, entry.name);
 					}
-					if (mixed.dynamics.length === 1) {
+					if (mixed.dynamics.some((entry) => isDirectSignalHandleExpression(entry.value))) {
+						for (let i = 0; i < mixed.dynamics.length; i++) {
+							const entry = mixed.dynamics[i];
+							const value = tsrxExprNode(entry.value, ctx, componentName, inlinedSubs);
+							bindings.push(
+								markDirectSignalBinding(
+									{
+										id: bindings.length,
+										kind: 'styleProperty',
+										name: entry.name,
+										expr: value,
+										path,
+										ns: hostNs,
+										nameOrigin: attr.name,
+										propertyOrigin: entry.key,
+										staticOrigin: inner,
+										staticCss: i === 0 ? mixed.css : '',
+									},
+									ctx,
+									componentName,
+									entry.value,
+									'binding',
+								),
+							);
+						}
+					} else if (mixed.dynamics.length === 1) {
 						const entry = mixed.dynamics[0];
 						bindings.push({
 							id: bindings.length,
@@ -26330,7 +26963,7 @@ function emitElementHtml(
 		} else if (attrName === 'class') {
 			// (`className` was already normalized to `class` above.)
 			const scalar = firstSpreadIdx === -1 ? scalarStateClass(inner, ctx) : null;
-			bindings.push({
+			const binding = {
 				id: bindings.length,
 				kind: 'class',
 				expr: scalar === null ? expr : tsrxExprNode(scalar, ctx, componentName, inlinedSubs),
@@ -26338,7 +26971,9 @@ function emitElementHtml(
 				ns: hostNs,
 				fresh: scalar === null && isFreshBindingExpr(inner),
 				nameOrigin: attr.name,
-			});
+				name: 'class',
+			};
+			bindings.push(markDirectSignalBinding(binding, ctx, componentName, inner, 'binding'));
 		} else if (
 			(tag === 'form' && attrName === 'action') ||
 			((tag === 'button' || tag === 'input') &&
@@ -26363,15 +26998,23 @@ function emitElementHtml(
 			// namespace, URL, controlled-form, and validity routing. Their value
 			// contract is uniform across native/custom HTML, SVG, and MathML:
 			// nullish removes and everything else stringifies.
-			bindings.push({
-				id: bindings.length,
-				kind: 'ariaAttr',
-				name: attrName,
-				expr,
-				path,
-				ns: hostNs,
-				nameOrigin: attr.name,
-			});
+			bindings.push(
+				markDirectSignalBinding(
+					{
+						id: bindings.length,
+						kind: 'ariaAttr',
+						name: attrName,
+						expr,
+						path,
+						ns: hostNs,
+						nameOrigin: attr.name,
+					},
+					ctx,
+					componentName,
+					inner,
+					'binding',
+				),
+			);
 		} else if (
 			!((hostNs === 'html' || hostNs === 'opaque') && tag.includes('-')) &&
 			BOOLEAN_ATTR_PROPS.has(attrName.toLowerCase())
@@ -26379,15 +27022,23 @@ function emitElementHtml(
 			// Exact native boolean props all share the canonical presence contract.
 			// The lowercase name is the final DOM spelling (including camelCase JSX
 			// aliases such as allowFullScreen -> allowfullscreen).
-			bindings.push({
-				id: bindings.length,
-				kind: 'booleanAttr',
-				name: attrName.toLowerCase(),
-				expr,
-				path,
-				ns: hostNs,
-				nameOrigin: attr.name,
-			});
+			bindings.push(
+				markDirectSignalBinding(
+					{
+						id: bindings.length,
+						kind: 'booleanAttr',
+						name: attrName.toLowerCase(),
+						expr,
+						path,
+						ns: hostNs,
+						nameOrigin: attr.name,
+					},
+					ctx,
+					componentName,
+					inner,
+					'binding',
+				),
+			);
 		} else if (
 			/^data-[a-z][a-z0-9_-]*$/.test(attrName) &&
 			isKnownStringExpression(inner, ctx.knownStringLocals)
@@ -26398,33 +27049,56 @@ function emitElementHtml(
 			// data attribute in HTML, SVG, and MathML, so destination-opaque component
 			// templates can retain this specialization. Production also admits unknown
 			// scalar data values through staticAttributeWriter below.
-			bindings.push({
-				id: bindings.length,
-				kind: 'stringData',
-				name: attrName,
-				expr,
-				path,
-				ns: hostNs,
-				nameOrigin: attr.name,
-			});
+			bindings.push(
+				markDirectSignalBinding(
+					{
+						id: bindings.length,
+						kind: 'stringData',
+						name: attrName,
+						expr,
+						path,
+						ns: hostNs,
+						nameOrigin: attr.name,
+					},
+					ctx,
+					componentName,
+					inner,
+					'binding',
+				),
+			);
 		} else {
 			const writer = ctx.dev ? null : staticAttributeWriter(tag, attrName);
-			bindings.push({
-				id: bindings.length,
-				kind: 'attr',
-				attributeHelper: writer?.helper,
-				name:
-					ctx.dev && (rawAttrName === 'tabIndex' || rawAttrName === 'htmlFor')
-						? rawAttrName
-						: (writer?.name ?? attrName),
-				expr,
-				path,
-				ns: hostNs,
-				nameOrigin: attr.name,
-			});
+			bindings.push(
+				markDirectSignalBinding(
+					{
+						id: bindings.length,
+						kind: 'attr',
+						attributeHelper: writer?.helper,
+						name:
+							ctx.dev && (rawAttrName === 'tabIndex' || rawAttrName === 'htmlFor')
+								? rawAttrName
+								: (writer?.name ?? attrName),
+						expr,
+						path,
+						ns: hostNs,
+						nameOrigin: attr.name,
+					},
+					ctx,
+					componentName,
+					inner,
+					'binding',
+				),
+			);
 		}
 	}
 	if (resolveHostPropsAcrossSources) {
+		const signalHostSources =
+			firstSpreadIdx !== -1 ||
+			hasDirectSignalStyle ||
+			hostClientSources.some(
+				(source) => !source.spread && canCarryDirectSignalHandle(source.binding.expr),
+			);
+		if (signalHostSources) ctx.signalBindingsUsed = true;
 		hostCommitClientBinding = {
 			id: bindings.length,
 			kind: 'hostCommit',
@@ -26432,6 +27106,8 @@ function emitElementHtml(
 			origin: node,
 			sources: hostClientSources,
 			hasNestedChildren: hasNestedJsxChildren,
+			signalHostSources,
+			signalSite: signalHostSources ? hostSignalSite : null,
 		};
 		bindings.push(hostCommitClientBinding);
 	} else if (resolveDangerouslySetInnerHTMLAcrossSpreads) {
@@ -26507,13 +27183,16 @@ function emitElementHtml(
 		}
 	}
 	if (
+		!VOID_ELEMENTS.has(tag) &&
 		!hasNestedJsxChildren &&
 		(hostCommitClientBinding !== null || directChildrenClientBinding !== null)
 	) {
 		compCalls.push({
 			id: ctx.nextHelperId++,
 			loc: devLoc(ctx, node),
+			origin: node,
 			isChild: true,
+			signalSite: directSignalSite(ctx, componentName, node, 'binding'),
 			hostPath: path,
 			onlyChildText: true,
 			potentialDangerouslySetInnerHTML,
@@ -26582,21 +27261,35 @@ function emitElementHtml(
 						]
 					: null;
 			appendTemplatePart(html, escaped, 'text', origins);
-		} else if (isKnownTextChildExpression(txtChild.expression, ctx.knownStringChildLocals)) {
-			const seededText = tag !== 'template' && !tag.includes('-') && !directPropNames.has('is');
-			bindings.push({
-				id: bindings.length,
-				kind: 'textOnlyChild',
-				expr: resolveStyleExpr(txtChild.expression, cssHash),
-				path,
-				seededText,
-			});
+		} else if (
+			isDirectSignalHandleExpression(txtChild.expression) ||
+			isKnownTextChildExpression(txtChild.expression, ctx.knownStringChildLocals)
+		) {
+			const binding = markDirectSignalBinding(
+				{
+					id: bindings.length,
+					kind: 'textOnlyChild',
+					expr: resolveStyleExpr(txtChild.expression, cssHash),
+					path,
+				},
+				ctx,
+				componentName,
+				txtChild.expression,
+				'binding',
+			);
+			const seededText =
+				!binding.signalDirect &&
+				tag !== 'template' &&
+				!tag.includes('-') &&
+				!directPropNames.has('is');
+			bindings.push({ ...binding, seededText });
 			// A nonempty placeholder survives the HTML parser as one Text node. The
 			// mount writes its actual value before the cloned host is inserted, so
 			// even an empty value retains one stable text binding node. <template>
 			// puts parser children under .content rather than .firstChild. Custom
 			// element constructors can inspect children while the host is cloned;
 			// preserve the old empty template and create/append mount for them.
+			// Direct signal bindings own their text creation and also start empty.
 			if (seededText) {
 				appendTemplatePart(html, ' ', 'text');
 			}
@@ -26765,17 +27458,28 @@ function emitElementHtml(
 					appendTemplatePart(html, escaped, 'text', origins);
 					prevBakedText = true;
 					if (!prevBaked) childIdx++;
-				} else if (isKnownTextChildExpression(child.expression, ctx.knownStringChildLocals)) {
-					bindings.push({
-						id: bindings.length,
-						kind: 'text',
-						expr: resolveStyleExpr(child.expression, cssHash),
-						path,
-						childIndex: childIdx,
-						// A text-producing neighbour → the server emits a `<!-- -->`
-						// separator here; the walk must be hole-aware (see hasHoles).
-						adjacentText: hasTextNeighbor(adjKinds, childI),
-					});
+				} else if (
+					isDirectSignalHandleExpression(child.expression) ||
+					isKnownTextChildExpression(child.expression, ctx.knownStringChildLocals)
+				) {
+					bindings.push(
+						markDirectSignalBinding(
+							{
+								id: bindings.length,
+								kind: 'text',
+								expr: resolveStyleExpr(child.expression, cssHash),
+								path,
+								childIndex: childIdx,
+								// A text-producing neighbour → the server emits a `<!-- -->`
+								// separator here; the walk must be hole-aware (see hasHoles).
+								adjacentText: hasTextNeighbor(adjKinds, childI),
+							},
+							ctx,
+							componentName,
+							child.expression,
+							'binding',
+						),
+					);
 					appendTemplatePart(html, '<!>', 'anchor'); // placeholder we'll replace at mount
 					childIdx++;
 				} else {
@@ -26964,14 +27668,30 @@ function emitElementHtml(
 					ifCalls.push(ic);
 					appendTemplatePart(html, '<!>', 'anchor');
 					childIdx++;
-				} else if (isKnownTextChildExpression(expr, ctx.knownStringChildLocals)) {
-					bindings.push({
-						id: bindings.length,
-						kind: 'text',
-						expr: tsrxExprNode(resolveStyleExpr(expr, cssHash), ctx, componentName, inlinedSubs),
-						path,
-						childIndex: childIdx,
-					});
+				} else if (
+					isDirectSignalHandleExpression(expr) ||
+					isKnownTextChildExpression(expr, ctx.knownStringChildLocals)
+				) {
+					bindings.push(
+						markDirectSignalBinding(
+							{
+								id: bindings.length,
+								kind: 'text',
+								expr: tsrxExprNode(
+									resolveStyleExpr(expr, cssHash),
+									ctx,
+									componentName,
+									inlinedSubs,
+								),
+								path,
+								childIndex: childIdx,
+							},
+							ctx,
+							componentName,
+							expr,
+							'binding',
+						),
+					);
 					appendTemplatePart(html, '<!>', 'anchor');
 					childIdx++;
 				} else {
@@ -27559,6 +28279,7 @@ function makeChildCall(expr, ctx, componentName, inlinedSubs, cssHash, parentNs 
 		loc: devLoc(ctx, expr),
 		origin: expr,
 		isChild: true,
+		signalSite: directSignalSite(ctx, componentName, expr, 'binding'),
 		valueExpr: tsrxExprNode(
 			resolveStyleExpr(rewriteChildHoleValue(expr, ctx), cssHash),
 			ctx,
@@ -27768,6 +28489,7 @@ function makeCompCall(
 	cssHash = null,
 ) {
 	const id = ctx.nextHelperId++;
+	const invocationSite = componentInvocationSite(ctx, componentName, node);
 	const compName = tagBindingName(node);
 	const staticFragmentRenderer = node.openingElement?.metadata?.staticFragmentRenderer;
 	const activityDescriptor = isActivityLongForm(node, ctx);
@@ -27911,14 +28633,17 @@ function makeCompCall(
 	// The props object as a node; the call-site emit embeds it directly.
 	const propsExpr = staticFragmentRenderer?.props ?? inheritOriginLoc(b.object(propNodes), node);
 	if (descriptorConfig) {
-		ctx.runtimeNeeded.add('createElement');
+		ctx.runtimeNeeded.add('createElementAt');
 		return {
 			id,
 			loc: devLoc(ctx, node),
 			origin: node,
 			isChild: true,
 			anchorlessAppendSafe: true,
-			valueExpr: inheritOriginLoc(b.call('_$createElement', compNode, propsExpr), node),
+			valueExpr: inheritOriginLoc(
+				b.call('_$createElementAt', b.literal(invocationSite), compNode, propsExpr),
+				node,
+			),
 		};
 	}
 
@@ -28094,6 +28819,7 @@ function makeCompCall(
 
 	return {
 		id,
+		invocationSite,
 		compNode,
 		propsExpr,
 		hostPath: null,

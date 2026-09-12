@@ -38,6 +38,10 @@ type ServerErrorArguments = {
 	58: [];
 	59: [unknown];
 	60: [];
+	68: [];
+	69: [];
+	70: [];
+	71: [];
 };
 
 export function formatServerError<Code extends keyof ServerErrorArguments>(
@@ -170,6 +174,23 @@ export function formatServerError<Code extends keyof ServerErrorArguments>(
 					'A component suspended without a Suspense boundary during synchronous server rendering. Use prerender() or a streaming renderer to await it.',
 					args,
 				);
+			case 68:
+				return formatDevErrorMessage(
+					'A signal control cannot join values from different document owners.',
+					args,
+				);
+			case 69:
+				return formatDevErrorMessage(
+					'Independent Hydrate requires a build manifest in RenderOptions.',
+					args,
+				);
+			case 70:
+				return formatDevErrorMessage(
+					'Independent Hydrate activation chunk is missing from the build manifest.',
+					args,
+				);
+			case 71:
+				return formatDevErrorMessage('Unsupported Octane server signal binding ABI.', args);
 			default:
 				return formatUnknownDevErrorMessage(code);
 		}

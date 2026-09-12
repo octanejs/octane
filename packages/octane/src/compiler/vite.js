@@ -19,6 +19,7 @@ import * as nodePath from 'node:path';
 import { parseModule } from '@tsrx/core';
 import {
 	CLIENT_REFERENCE_MANIFEST_FILENAME,
+	INDEPENDENT_HYDRATION_MANIFEST_FILENAME,
 	cleanModuleId,
 	createClientReferenceManifest,
 	createOctaneCompiler,
@@ -40,6 +41,7 @@ const PROFILE_DEFINE = '__OCTANE_PROFILE_ENABLED__';
 const VOID_EXPORTS_META = 'octane:void-component-exports';
 const DESCRIPTOR_CHILDREN_EXPORTS_META = 'octane:descriptor-children-exports';
 const CLIENT_REFERENCE_META = 'octane:client-reference';
+const INDEPENDENT_WIDGETS_META = 'octane:independent-widgets';
 const DESCRIPTOR_PREFLIGHT_AUTHORITY = Symbol('octane.descriptor-preflight');
 
 function realRoot(path) {
@@ -66,6 +68,77 @@ function clientReferenceManifest(context, bundle) {
 		}
 	}
 	return createClientReferenceManifest(entries);
+}
+
+function independentWidgetManifest(context, bundle, clientBuildId) {
+	if (
+		clientBuildId !== undefined &&
+		(typeof clientBuildId !== 'string' || clientBuildId.length === 0)
+	) {
+		throw new Error('Octane client build identity must be a non-empty string.');
+	}
+	const chunks = Object.values(bundle).filter((output) => output.type === 'chunk');
+	const chunksByFile = new Map(chunks.map((chunk) => [chunk.fileName, chunk]));
+	const collectStyles = (chunk, seen = new Set()) => {
+		if (seen.has(chunk.fileName)) return [];
+		seen.add(chunk.fileName);
+		const styles = [...(chunk.viteMetadata?.importedCss ?? [])];
+		for (const imported of [...(chunk.imports ?? []), ...(chunk.dynamicImports ?? [])]) {
+			const dependency = chunksByFile.get(imported);
+			if (dependency !== undefined) styles.push(...collectStyles(dependency, seen));
+		}
+		return styles;
+	};
+	const widgets = {};
+	for (const sourceChunk of chunks) {
+		for (const sourceModuleId of Object.keys(sourceChunk.modules ?? {})) {
+			const templates = context.getModuleInfo(sourceModuleId)?.meta?.[INDEPENDENT_WIDGETS_META];
+			if (!Array.isArray(templates)) continue;
+			for (const template of templates) {
+				const query = template.request.slice(template.request.indexOf('?'));
+				const entry = chunks.find((chunk) =>
+					Object.keys(chunk.modules ?? {}).some(
+						(moduleId) =>
+							cleanModuleId(moduleId) === cleanModuleId(sourceModuleId) && moduleId.includes(query),
+					),
+				);
+				if (entry === undefined) {
+					throw new Error(
+						`Octane independent Hydrate ${JSON.stringify(template.boundaryId)} has no emitted activation chunk.`,
+					);
+				}
+				widgets[template.boundaryId] = {
+					version: 1,
+					boundaryId: template.boundaryId,
+					moduleId: entry.fileName,
+					exportName: template.exportName,
+					captureSchema: template.captureSchema,
+					hookSeed: template.hookSeed,
+					idSeed: template.idSeed,
+					signalSites: template.signalSites,
+					styles: [...new Set(collectStyles(entry))].sort(),
+					parentDependencies: false,
+				};
+			}
+		}
+	}
+	const records = Object.fromEntries(
+		Object.entries(widgets).sort(([left], [right]) => left.localeCompare(right)),
+	);
+	const buildId =
+		clientBuildId ??
+		nodeCrypto
+			.createHash('sha256')
+			.update(
+				JSON.stringify(
+					chunks
+						.map((chunk) => [chunk.fileName, chunk.code])
+						.sort(([a], [b]) => a.localeCompare(b)),
+				),
+			)
+			.digest('base64url')
+			.slice(0, 16);
+	return { version: 1, buildId, widgets: records };
 }
 
 function voidImportKey(request, imported) {
@@ -813,13 +886,43 @@ export function octane(options = {}) {
 		},
 		generateBundle(_outputOptions, bundle) {
 			if (!emitClientReferenceManifest) return;
-			const manifest = clientReferenceManifest(this, bundle);
-			if (Object.keys(manifest.references).length === 0) return;
+			const clientReferences = clientReferenceManifest(this, bundle);
+			if (Object.keys(clientReferences.references).length > 0) {
+				this.emitFile({
+					type: 'asset',
+					fileName: CLIENT_REFERENCE_MANIFEST_FILENAME,
+					source: JSON.stringify(clientReferences, null, 2) + '\n',
+				});
+			}
+			const independentWidgets = independentWidgetManifest(
+				this,
+				bundle,
+				options.__clientBuildId?.(),
+			);
 			this.emitFile({
 				type: 'asset',
-				fileName: CLIENT_REFERENCE_MANIFEST_FILENAME,
-				source: JSON.stringify(manifest, null, 2) + '\n',
+				fileName: 'octane-client-build.json',
+				source:
+					JSON.stringify(
+						{
+							version: 1,
+							buildId: independentWidgets.buildId,
+							mode: 'production',
+							capabilities: {
+								independentHydration: Object.keys(independentWidgets.widgets).length > 0,
+							},
+						},
+						null,
+						2,
+					) + '\n',
 			});
+			if (Object.keys(independentWidgets.widgets).length > 0) {
+				this.emitFile({
+					type: 'asset',
+					fileName: INDEPENDENT_HYDRATION_MANIFEST_FILENAME,
+					source: JSON.stringify(independentWidgets, null, 2) + '\n',
+				});
+			}
 		},
 		async resolveId(source, importer, resolveOptions) {
 			if (!resolveOptions?.ssr) return null;
@@ -931,6 +1034,7 @@ export function octane(options = {}) {
 							}),
 				});
 				if (result === null) {
+					options.__onIndependentWidgets?.(id, environment, [], false);
 					if (propagatedExports.length === 0) return null;
 					return {
 						code,
@@ -943,10 +1047,19 @@ export function octane(options = {}) {
 					};
 				}
 				cssImports?.consume(result.cssModuleConstantImports);
+				options.__onIndependentWidgets?.(
+					id,
+					environment,
+					Array.isArray(result.independentWidgets) ? result.independentWidgets : [],
+					result.streamedSignals === true,
+				);
 				for (const dependency of result.dependencies) this.addWatchFile?.(dependency);
 				const meta = {};
 				if (result.clientReference !== undefined) {
 					meta[CLIENT_REFERENCE_META] = result.clientReference;
+				}
+				if (Array.isArray(result.independentWidgets) && result.independentWidgets.length > 0) {
+					meta[INDEPENDENT_WIDGETS_META] = result.independentWidgets;
 				}
 				if (result.kind === 'compile' && Array.isArray(result.voidComponentExports)) {
 					meta[VOID_EXPORTS_META] = {

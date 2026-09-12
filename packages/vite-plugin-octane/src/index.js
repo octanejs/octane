@@ -9,7 +9,13 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { createRequire } from 'node:module';
 
 import { octane as octaneCompiler } from 'octane/compiler/vite';
-import { handleRpcRequest as handleServerRpcRequest } from '@octanejs/app-core';
+import { INDEPENDENT_HYDRATION_MANIFEST_FILENAME } from 'octane/compiler/bundler';
+import {
+	createServerCallHost,
+	handleRpcRequest as handleServerRpcRequest,
+	runServerRequest,
+	setRequestContextSource,
+} from '@octanejs/app-core';
 
 import { createRouter } from './server/router.js';
 import { createContext, runMiddlewareChain } from './server/middleware.js';
@@ -35,6 +41,7 @@ import {
 	write_project_generated_file,
 } from './project-codegen.js';
 import { createClientAssetMap } from './client-assets.js';
+import { createClientBuildState } from './client-build.js';
 
 import { patch_global_fetch, is_rpc_request } from '@ripple-ts/adapter/rpc';
 
@@ -72,6 +79,27 @@ const requireFromPlugin = createRequire(import.meta.url);
 // Mirrors octane/compiler/vite's full-compiler surface. Keeping this list in
 // sync is especially important for production `module server` discovery.
 const OCTANE_EXTENSIONS = ['.tsrx', '.tsx'];
+
+/** Preserve Vite's HTML asset URL contract for the separately emitted entry.
+ * @param {string} filename @param {string} htmlFile @param {ResolvedConfig} config
+ */
+function hydrationEntryUrl(filename, htmlFile, config) {
+	const hostId = path.relative(config.root, htmlFile).split(path.sep).join('/');
+	let relative = config.base === '' || config.base === './';
+	const rendered = config.experimental.renderBuiltUrl?.(filename, {
+		hostId,
+		hostType: 'html',
+		type: 'asset',
+		ssr: false,
+	});
+	if (typeof rendered === 'string') return rendered;
+	if (rendered?.runtime) {
+		throw new Error('[@octanejs/vite-plugin] Runtime asset URLs are not supported in HTML.');
+	}
+	if (typeof rendered?.relative === 'boolean') relative = rendered.relative;
+	if (relative) return './' + path.posix.relative(path.posix.dirname(hostId), filename);
+	return decodeURI(config.base).replace(/\/$/, '') + '/' + filename;
+}
 
 /**
  * @param {string} file_name
@@ -164,6 +192,22 @@ function getDevAsyncContext(config) {
 }
 
 /**
+ * Load the compiler-selected server signal ownership hooks through Vite so the
+ * same SSR module instance that owns signal declarations supplies the ambient
+ * owner environment and retirement implementation.
+ *
+ * @param {import('vite').ViteDevServer} vite
+ * @returns {Promise<import('@octanejs/app-core').SignalRequestHooks>}
+ */
+async function loadDevSignalRequestHooks(vite) {
+	const serverRuntime = await vite.ssrLoadModule('octane/server');
+	return {
+		install: serverRuntime.installSignalOwnerEnvironment,
+		retire: serverRuntime.retireSignalOwnerIdentity,
+	};
+}
+
+/**
  * @param {ResolvedOctaneConfig | null} config
  * @returns {boolean}
  */
@@ -210,7 +254,7 @@ function collect_hydrate_module_paths(config) {
  *
  * PRODUCTION (`vite build`, when octane.config.ts has routes): the client
  * build is redirected to `{outDir}/client` with a manifest, the hydrate entry
- * is injected into index.html (so Vite bundles + hashes it), and closeBundle
+ * is emitted independently and linked from built index.html, and closeBundle
  * runs a second, `ssr: true` build of a generated server entry to
  * `{outDir}/server/entry.js`. Node-target adapters get the existing bootable
  * `handler`/`nodeHandler` module; webworker-target adapters get an importable
@@ -237,6 +281,7 @@ export function octane(inlineOptions = {}) {
 	let isBuild = false;
 	/** @type {boolean} Is this the SSR sub-build closeBundle launches? */
 	let isSSRBuild = false;
+	let clientBuildWritten = false;
 	/**
 	 * Config dependencies that select Strong mode or compiler renderers. A
 	 * change requires a server restart because the neutral compiler snapshots
@@ -254,6 +299,28 @@ export function octane(inlineOptions = {}) {
 	let staticEntryFiles = Object.create(null);
 	/** @type {Set<string>} Vite-root paths of modules containing `module server` */
 	const serverModuleModules = new Set();
+	/** @type {ViteDevServer | undefined} */
+	let devServer;
+	const clientBuild = createClientBuildState((buildId) => {
+		if (!devServer) return;
+		const clientGraph = devServer.environments.client.moduleGraph;
+		const entry = clientGraph.getModuleById(RESOLVED_VIRTUAL_HYDRATE_ID);
+		if (entry) clientGraph.invalidateModule(entry);
+		devServer.ws.send('octane:independent-hydration', { buildId, enabled: false });
+		devServer.ws.send({ type: 'full-reload' });
+	});
+
+	/** @param {string} id @param {string} _environment @param {{boundaryId: string, request: string}[]} templates @param {boolean} streamedSignals */
+	function recordIndependentHydration(id, _environment, templates, streamedSignals) {
+		const enabled = clientBuild.metadata().capabilities.independentHydration;
+		clientBuild.record(root, id, templates, streamedSignals);
+		if (!enabled && clientBuild.metadata().capabilities.independentHydration) {
+			devServer?.ws.send('octane:independent-hydration', {
+				buildId: clientBuild.buildId,
+				enabled: true,
+			});
+		}
+	}
 
 	/**
 	 * Load declarative app config early enough for the compiler plugin's own
@@ -393,9 +460,23 @@ export function octane(inlineOptions = {}) {
 		 */
 		buildStart() {
 			if (!isBuild || isSSRBuild || !has_route_config(buildOctaneConfig)) return;
+			clientBuildWritten = false;
+			clientBuild.begin();
 			serverModuleModules.clear();
 			staticEntries = collect_hydrate_module_paths(buildOctaneConfig);
 			staticEntryFiles = Object.create(null);
+			// An HTML import would be coalesced with the user's module scripts.
+			// Keep a native entry facade so only hydration can activate mid-stream.
+			this.emitFile({
+				type: 'chunk',
+				id: VIRTUAL_HYDRATE_ID,
+				name: 'octane-hydrate',
+				preserveSignature: 'strict',
+			});
+		},
+
+		writeBundle() {
+			clientBuildWritten = true;
 		},
 
 		/**
@@ -404,6 +485,40 @@ export function octane(inlineOptions = {}) {
 		 */
 		generateBundle(_options, bundle) {
 			if (!isBuild || isSSRBuild || !has_route_config(buildOctaneConfig)) return;
+			const hydrationEntry = Object.values(bundle).find(
+				(output) =>
+					output.type === 'chunk' && output.facadeModuleId === RESOLVED_VIRTUAL_HYDRATE_ID,
+			);
+			if (!hydrationEntry || hydrationEntry.type !== 'chunk') {
+				this.error('The Octane hydration entry must retain its own emitted facade.');
+			}
+			const staticModules = new Set();
+			/** @param {string} id */
+			const visitModule = (id) => {
+				if (staticModules.has(id)) return;
+				staticModules.add(id);
+				for (const imported of this.getModuleInfo(id)?.importedIds ?? []) visitModule(imported);
+			};
+			visitModule(RESOLVED_VIRTUAL_HYDRATE_ID);
+			const visitedChunks = new Set();
+			/** @param {{fileName: string, modules: Record<string, {renderedLength: number}>, imports: string[]}} chunk */
+			const validateChunk = (chunk) => {
+				if (visitedChunks.has(chunk.fileName)) return;
+				visitedChunks.add(chunk.fileName);
+				for (const [id, module] of Object.entries(chunk.modules)) {
+					if (module.renderedLength !== 0 && !staticModules.has(id)) {
+						this.error(
+							`Octane hydration chunking would execute an unrelated module early: ${id}. ` +
+								'Keep the hydration entry and its static dependencies separate from user entries.',
+						);
+					}
+				}
+				for (const filename of chunk.imports) {
+					const imported = bundle[filename];
+					if (imported?.type === 'chunk') validateChunk(imported);
+				}
+			};
+			validateChunk(hydrationEntry);
 			const entryByModuleId = new Map(
 				staticEntries.map((moduleId) => {
 					const file = path.resolve(root, moduleId.startsWith('/') ? `.${moduleId}` : moduleId);
@@ -463,6 +578,8 @@ export function octane(inlineOptions = {}) {
 					create_client_entry_source({
 						configPath: to_vite_root_import(getOctaneConfigPath(root), root),
 						staticEntries: entries,
+						clientBuildId: clientBuild.buildId,
+						devClientBuild: !isBuild,
 					}),
 				);
 				return fs.readFileSync(file, 'utf-8');
@@ -494,6 +611,13 @@ export function octane(inlineOptions = {}) {
 		 * @param {ViteDevServer} vite
 		 */
 		configureServer(vite) {
+			devServer = vite;
+			vite.ws.on('octane:independent-hydration', (_data, client) => {
+				client.send('octane:independent-hydration', {
+					buildId: clientBuild.buildId,
+					enabled: clientBuild.metadata().capabilities.independentHydration,
+				});
+			});
 			if (compilerConfigWatchFiles.size > 0) {
 				vite.watcher.add([...compilerConfigWatchFiles]);
 			}
@@ -616,26 +740,45 @@ export function octane(inlineOptions = {}) {
 
 						const request = nodeRequestToWebRequest(req);
 						const context = createContext(request, freshMatch.params);
+						Object.defineProperty(context, 'clientBuild', { get: () => clientBuild.metadata() });
 						const globalMiddlewares = octaneConfig.middlewares;
-
-						let response;
-						if (freshMatch.route.type === 'render') {
-							response = await runMiddlewareChain(
+						const asyncContext = getDevAsyncContext(octaneConfig);
+						setRequestContextSource(asyncContext);
+						const signalOwners = await loadDevSignalRequestHooks(vite);
+						const origin = new URL(request.url).origin;
+						const response = await runServerRequest(
+							asyncContext,
+							{
+								origin,
 								context,
-								globalMiddlewares,
-								freshMatch.route.before || [],
-								async () =>
-									handleRenderRoute(
-										/** @type {RenderRoute} */ (freshMatch.route),
+								serverCallHost: createServerCallHost(context, {
+									asyncContext,
+									middlewares: globalMiddlewares,
+									origin,
+								}),
+							},
+							signalOwners,
+							async () => {
+								if (freshMatch.route.type === 'render') {
+									return runMiddlewareChain(
 										context,
-										vite,
-										octaneConfig ?? undefined,
-									),
-								[],
-							);
-						} else {
-							response = await handleServerRoute(freshMatch.route, context, globalMiddlewares);
-						}
+										globalMiddlewares,
+										freshMatch.route.before || [],
+										async () =>
+											handleRenderRoute(
+												/** @type {RenderRoute} */ (freshMatch.route),
+												context,
+												vite,
+												octaneConfig ?? undefined,
+												clientBuild.independentHydration(),
+												() => clientBuild.metadata(),
+											),
+										[],
+									);
+								}
+								return handleServerRoute(freshMatch.route, context, globalMiddlewares);
+							},
+						);
 
 						await sendWebResponse(res, response);
 					} catch (error) {
@@ -675,6 +818,21 @@ export function octane(inlineOptions = {}) {
 					await server.restart();
 					return [];
 				}
+				if (has_route_config(octaneConfig)) clientBuild.noteHotUpdate();
+				if (
+					has_route_config(octaneConfig) &&
+					clientBuild.hasStatefulModules &&
+					(modules.length > 0 || is_octane_module_path(file))
+				) {
+					clientBuild.invalidate(file);
+					const entry = this.environment.moduleGraph.getModuleById(RESOLVED_VIRTUAL_HYDRATE_ID);
+					if (entry) this.environment.moduleGraph.invalidateModule(entry);
+					const ssrModules = server.environments.ssr?.moduleGraph.getModulesByFile(file);
+					if (ssrModules)
+						for (const mod of ssrModules) server.environments.ssr.moduleGraph.invalidateModule(mod);
+					this.environment.hot.send({ type: 'full-reload' });
+					return [];
+				}
 				if (modules.length > 0 && modules.every((m) => m.isSelfAccepting)) return;
 				if (!is_octane_module_path(file)) return;
 
@@ -691,19 +849,29 @@ export function octane(inlineOptions = {}) {
 		},
 
 		/**
-		 * Production client build: inject the hydrate entry into index.html so
-		 * Vite bundles it into the html chunk graph (the built template then
-		 * carries the hashed script tag — the production server injects nothing
-		 * per-request). `order: 'pre'` is required: Vite's build-html plugin
-		 * collects module scripts BEFORE default-order transforms run, so a
-		 * post-injected script would ship unbundled. Dev never runs this branch:
-		 * the dev middleware injects `/@id/virtual:octane-hydrate` itself.
+		 * Link the already hashed, independent entry after Vite rewrites HTML
+		 * module scripts. Its identity marker survives and no user script becomes
+		 * part of an early streaming activation. Dev injects its virtual URL in
+		 * middleware and does not enter this branch.
 		 */
 		transformIndexHtml: {
-			order: 'pre',
-			handler(html) {
+			order: 'post',
+			handler(html, context) {
 				if (!isBuild || isSSRBuild || !has_route_config(buildOctaneConfig)) return html;
-				return injectHydrationEntry(html, VIRTUAL_HYDRATE_ID, HYDRATION_NONCE_PLACEHOLDER);
+				const entries = Object.values(context.bundle ?? {}).filter(
+					(output) =>
+						output.type === 'chunk' && output.facadeModuleId === RESOLVED_VIRTUAL_HYDRATE_ID,
+				);
+				if (entries.length !== 1 || entries[0].type !== 'chunk') {
+					throw new Error(
+						'Built HTML must identify exactly one independent Octane hydration entry.',
+					);
+				}
+				return injectHydrationEntry(
+					html,
+					hydrationEntryUrl(entries[0].fileName, context.filename, config),
+					HYDRATION_NONCE_PLACEHOLDER,
+				);
 			},
 		},
 
@@ -717,7 +885,8 @@ export function octane(inlineOptions = {}) {
 		 * dir would shadow the SSR handler at `/` on filesystem-first platforms.
 		 */
 		async closeBundle() {
-			if (!isBuild || isSSRBuild || !has_route_config(buildOctaneConfig)) return;
+			if (!isBuild || isSSRBuild || !clientBuildWritten || !has_route_config(buildOctaneConfig))
+				return;
 			const cfg = /** @type {ResolvedOctaneConfig} */ (buildOctaneConfig);
 			const webWorkerServer = cfg.adapter?.serverTarget === 'webworker';
 
@@ -743,6 +912,40 @@ export function octane(inlineOptions = {}) {
 			}
 
 			const clientAssetMap = createClientAssetMap(clientManifest, staticEntries, staticEntryFiles);
+			const completedClientBuild = JSON.parse(
+				fs.readFileSync(path.join(clientOutDir, 'octane-client-build.json'), 'utf8'),
+			);
+			if (
+				completedClientBuild?.version !== 1 ||
+				completedClientBuild.buildId !== clientBuild.buildId ||
+				completedClientBuild.mode !== 'production' ||
+				typeof completedClientBuild.capabilities?.independentHydration !== 'boolean'
+			) {
+				throw new Error('[@octanejs/vite-plugin] Incompatible completed client build metadata.');
+			}
+			const independentHydrationPath = path.join(
+				clientOutDir,
+				INDEPENDENT_HYDRATION_MANIFEST_FILENAME,
+			);
+			const independentHydrationManifest = fs.existsSync(independentHydrationPath)
+				? JSON.parse(fs.readFileSync(independentHydrationPath, 'utf-8'))
+				: null;
+			if (
+				independentHydrationManifest !== null &&
+				independentHydrationManifest.buildId !== completedClientBuild.buildId
+			) {
+				throw new Error(
+					'[@octanejs/vite-plugin] Independent hydration and client build metadata disagree.',
+				);
+			}
+			if (
+				completedClientBuild.capabilities.independentHydration &&
+				independentHydrationManifest === null
+			) {
+				throw new Error(
+					'[@octanejs/vite-plugin] Client build is missing independent hydration metadata.',
+				);
+			}
 
 			// The manifest was only needed here; leaving .vite/ in dist/client would
 			// publish source file paths through the static server.
@@ -762,6 +965,8 @@ export function octane(inlineOptions = {}) {
 					rootBoundary: cfg.rootBoundary,
 					rpcModulePaths: [...serverModuleModules],
 					clientAssetMap,
+					clientBuild: completedClientBuild,
+					independentHydrationManifest,
 					...(webWorkerServer ? { mode: 'webworker' } : null),
 					// The virtual entry has no filesystem importer, so resolve app-core
 					// from this package before handing source to Vite. This also works
@@ -843,6 +1048,16 @@ export function octane(inlineOptions = {}) {
 			if (fs.existsSync(clientHtml)) {
 				fs.renameSync(clientHtml, path.join(serverOutDir, 'index.html'));
 			}
+			fs.renameSync(
+				path.join(clientOutDir, 'octane-client-build.json'),
+				path.join(serverOutDir, 'octane-client-build.json'),
+			);
+			if (independentHydrationManifest !== null) {
+				fs.renameSync(
+					independentHydrationPath,
+					path.join(serverOutDir, INDEPENDENT_HYDRATION_MANIFEST_FILENAME),
+				);
+			}
 
 			console.log(`[@octanejs/vite-plugin] Server build complete: ${path.join(outDir, 'server')}`);
 			if (!webWorkerServer) {
@@ -886,9 +1101,14 @@ export function octane(inlineOptions = {}) {
 	 *   requireDirective?: boolean,
 	 *   renderers?: import('@octanejs/app-core').ExperimentalRendererConfigOptions,
 	 *   cssModuleConstants?: import('octane/compiler/vite').OctaneVitePluginOptions['cssModuleConstants'],
+	 *   __onIndependentWidgets?: (id: string, environment: string, templates: any[], streamedSignals: boolean) => void,
+	 *   __clientBuildId?: () => string,
 	 * }}
 	 */
-	const compilerOptions = {};
+	const compilerOptions = {
+		__onIndependentWidgets: recordIndependentHydration,
+		__clientBuildId: () => clientBuild.buildId,
+	};
 	if (inlineOptions.hmr !== undefined) compilerOptions.hmr = inlineOptions.hmr;
 	// Explicit `profile` wins; otherwise `devtools: true` opts into the
 	// command-aware `'auto'` signal the compiler resolves to DEV-only profiling.
@@ -969,6 +1189,7 @@ async function handleRpcRequest(req, res, vite, trustProxy, config) {
 	try {
 		const webRequest = nodeRequestToWebRequest(req);
 		const asyncContext = getDevAsyncContext(config);
+		const signalOwners = await loadDevSignalRequestHooks(vite);
 
 		const response = await handleServerRpcRequest(webRequest, {
 			async resolveFunction(hash) {
@@ -989,11 +1210,21 @@ async function handleRpcRequest(req, res, vite, trustProxy, config) {
 				const [filePath, funcName] = moduleInfo;
 				return { module: filePath, export: funcName };
 			},
-			async executeServerFunction(fn, body) {
+			async executeServerFunction(fn, body, context) {
 				const { executeServerFunction } = await vite.ssrLoadModule('octane/server');
-				return executeServerFunction(fn, body);
+				return executeServerFunction(fn, body, context);
 			},
+			async streamServerFunction(fn, body, context, limits) {
+				const { executeServerFunctionStream } = await vite.ssrLoadModule('octane/server');
+				return executeServerFunctionStream(fn, body, context, limits);
+			},
+			async batchServerFunctions(body, invoke, limits) {
+				const { executeServerFunctionBatch } = await vite.ssrLoadModule('octane/server');
+				return executeServerFunctionBatch(body, invoke, limits);
+			},
+			resultLimits: config?.server?.rpc?.resultLimits,
 			asyncContext,
+			signalOwners,
 			trustProxy,
 			middlewares: config?.middlewares ?? [],
 			allowedOrigins: config?.server?.rpc?.allowedOrigins,

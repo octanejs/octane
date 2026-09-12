@@ -5,7 +5,7 @@ import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 import { validateNativeSignalNames } from '../../src/compiler/native-read-types.js';
 
-const TYPES = fileURLToPath(new URL('../../src/signals/types.ts', import.meta.url));
+const SIGNALS = fileURLToPath(new URL('../../src/signals/index.ts', import.meta.url));
 const OCTANE = fileURLToPath(new URL('../../src/index.ts', import.meta.url));
 const CLIENT_HOOKS = fileURLToPath(new URL('../../src/signals/client.ts', import.meta.url));
 const SERVER_HOOKS = fileURLToPath(new URL('../../src/signals/server.ts', import.meta.url));
@@ -31,7 +31,7 @@ function fixture(source: string, otherFiles: Record<string, string> = {}) {
 		skipLibCheck: true,
 		types: [],
 		paths: {
-			'octane/signals': [TYPES],
+			'octane/signals': [SIGNALS],
 			octane: [OCTANE],
 			'octane/signals/client': [CLIENT_HOOKS],
 			'octane/signals/server': [SERVER_HOOKS],
@@ -69,6 +69,14 @@ function fixture(source: string, otherFiles: Record<string, string> = {}) {
 }
 
 describe('optional native signal type validation', () => {
+	it('follows owner-facade return types through the nominal handle brand', () => {
+		const result = fixture(`import { signal$ } from 'octane/signals';
+const value = signal$(1);`);
+		expect(result.diagnostics.map((diagnostic) => diagnostic.code)).toContain(
+			'OCTANE_NATIVE_SIGNAL_NAME',
+		);
+	});
+
 	it.each(['client', 'server'])(
 		'recognizes handles imported only through the real %s local hook entry',
 		(entry) => {
@@ -77,7 +85,7 @@ const value = useSignal$(1);
 const value$ = useSignal$(1);
 const read = value$.get;
 `);
-			expect(result.names).toEqual(['value', 'read']);
+			expect(result.names).toEqual(['value']);
 		},
 	);
 
@@ -89,7 +97,7 @@ const read$ = task$.get;
 const cached = useMemo(task$.get, []);
 const everyRender = useMemo(read$, null);
 `);
-		expect(result.names).toEqual(['read']);
+		expect(result.names).toEqual([]);
 		expect(
 			result.diagnostics.filter((diagnostic) => diagnostic.code === 'OCTANE_NATIVE_MEMO_READ'),
 		).toHaveLength(1);
@@ -107,7 +115,7 @@ export { task as exportedTask };
 export declare const task$: Resource<number>;`,
 			},
 		);
-		expect(result.names).toEqual(['task', 'other', 'exportedTask']);
+		expect(result.names).toEqual([]);
 	});
 
 	it('follows native aliases through annotations, destructuring, unions, and generic constraints', () => {
@@ -119,7 +127,7 @@ const [item] = [task$];
 declare const optional: Task | undefined;
 function expose<T extends Task>(value: T): T { return value; }
 `);
-		expect(result.names).toEqual(['typed', 'renamed', 'item', 'optional', 'expose', 'value']);
+		expect(result.names).toEqual(['expose']);
 	});
 
 	it('checks declared fields, method returns, object properties, and assigned properties', () => {
@@ -133,7 +141,7 @@ class Model {
 const bag = { task: task$ };
 bag.task = task$;
 `);
-		expect(result.names).toEqual(['task', 'task', 'current', 'create', 'task', 'task']);
+		expect(result.names).toEqual(['current', 'create']);
 	});
 
 	it('checks factories and synchronous accessors without labeling sampled numbers', () => {
@@ -215,7 +223,7 @@ const namespace = Octane.useMemo(() => task$.snapshot());
 		const result = fixture(`import { read$ as read } from './reader'; const sample = read();`, {
 			'reader.ts': `${PRELUDE}export function read$() { return task$.get(); }`,
 		});
-		expect(result.names).toEqual(['read']);
+		expect(result.names).toEqual([]);
 	});
 
 	it('rejects a stale SourceFile from another Program', () => {

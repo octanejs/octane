@@ -1,5 +1,5 @@
+import { loadCompiledFixtureSource } from './_server-fixture.js';
 import { describe, it, expect } from 'vitest';
-import { compile } from 'octane/compiler';
 import * as RT from 'octane/server';
 import { prerender } from 'octane/static';
 
@@ -129,13 +129,11 @@ export function Runaway() @{
 `;
 
 function evalServer(source: string): Record<string, any> {
-	let { code } = compile(source, 'render-phase-state.tsrx', { mode: 'server' });
-	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]octane(?:\/server)?['"];?/g,
-		(_m: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
-	);
-	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
-	return new Function('__rt', '__exports', code + '\nreturn __exports;')(RT, {});
+	return loadCompiledFixtureSource(source, {
+		id: 'render-phase-state.tsrx',
+		mode: 'server',
+		compileOptions: { mode: 'server' },
+	});
 }
 
 const mod = evalServer(SRC);

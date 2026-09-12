@@ -74,6 +74,7 @@ describe('native signal server output and adoption', () => {
 	for (const deferredIsland of [false, true]) {
 		it(`preserves an early controlled-input edit during ${deferredIsland ? 'island' : 'root'} adoption`, async () => {
 			const model = state$('native-controlled-' + deferredIsland, 'server value');
+			const length$ = model.scope.derived$('length', () => String(model.value$.get().length));
 			const when = condition(false);
 			const Server = deferredIsland
 				? server.DeferredControlledSignalHydration
@@ -81,21 +82,30 @@ describe('native signal server output and adoption', () => {
 			const Client = deferredIsland
 				? client.DeferredControlledSignalHydration
 				: client.ControlledSignalHydration;
-			const props = { ...model, when };
-			container.innerHTML = renderToString(Server, props).html;
+			const props = { ...model, length$, when };
+			container.innerHTML = renderToString(Server, props, { signalOwner: model.scope }).html;
 			const input = container.querySelector('input')!;
+			const output = container.querySelector('output')!;
+			expect(output.textContent).toBe('Characters: 12');
+			expect(output.title).toBe('12');
 			input.value = 'entered before hydration';
 			input.focus();
 			input.setSelectionRange(4, 11);
 			model.scope.set(model.value$, input.value);
 			await act(() => {
-				root = hydrateRoot(container, Client, props);
+				root = hydrateRoot(container, Client, props, { signalOwner: model.scope });
 			});
-			if (deferredIsland)
+			if (deferredIsland) {
+				expect(output.textContent).toBe('Characters: 12');
+				expect(output.title).toBe('12');
 				await act(() => root!.render(Client, { ...props, when: condition(true) }));
+			}
 			expect(container.querySelector('input')).toBe(input);
+			expect(container.querySelector('output')).toBe(output);
 			expect(input.value).toBe('entered before hydration');
 			expect(model.scope.get(model.value$)).toBe('entered before hydration');
+			expect(output.textContent).toBe('Characters: 24');
+			expect(output.title).toBe('24');
 			expect(document.activeElement).toBe(input);
 			expect([input.selectionStart, input.selectionEnd]).toEqual([4, 11]);
 			await act(() => {
@@ -104,6 +114,8 @@ describe('native signal server output and adoption', () => {
 			});
 			expect(model.scope.get(model.value$)).toBe('typed after adoption');
 			expect(input.value).toBe('typed after adoption');
+			expect(output.textContent).toBe('Characters: 20');
+			expect(output.title).toBe('20');
 		});
 	}
 

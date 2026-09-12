@@ -1161,4 +1161,99 @@ export function App() @{
 		expect(identifierCallCount(server.code, 'sharedFallback')).toBe(1);
 		expect(identifierCallCount(server.code, 'dynamicOptions')).toBe(1);
 	});
+
+	it('emits a stable strict-independent island template and parent-free activation module', () => {
+		const source = `
+import { Hydrate } from 'octane';
+import { choose } from './actions';
+export function App(props) @{
+  <Hydrate independent when={props.ready}>
+    <button class="choice" onClick={() => choose(props.city)}>{props.city as string}</button>
+    <style>.choice { color: red; }</style>
+  </Hydrate>
+}
+`;
+		const instance = compiler();
+		const client = instance.transform(source, FILE, { environment: 'client' })!;
+		const server = instance.transform(source, FILE, { environment: 'server' })!;
+		const fresh = compiler().transform(source, FILE, { environment: 'client' })!;
+
+		expect(client.independentWidgets).toEqual(server.independentWidgets);
+		expect(client.independentWidgets).toEqual(fresh.independentWidgets);
+		expect(client.independentWidgets).toEqual([
+			expect.objectContaining({
+				version: 1,
+				boundaryId: expect.stringMatching(/^w:[a-f0-9]+$/),
+				moduleId: '/src/App.tsrx',
+				exportName: 'default',
+				request: './App.tsrx?octane-hydrate=0',
+				captureSchema: [{ name: 'props', type: 'json' }],
+				parentDependencies: false,
+			}),
+		]);
+		expect(dynamicImports(client.code)).toEqual(new Set(['./App.tsrx?octane-hydrate=0']));
+		expect(client.code).toContain('__independent');
+		expect(client.code).toContain('__independentLoad');
+		expect(client.code).not.toContain('__data');
+		expect(server.code).toContain('__independent');
+		expect(dynamicImports(server.code)).toEqual(new Set());
+
+		const child = instance.transform(source, `${FILE}?octane-hydrate=0`, {
+			environment: 'client',
+		})!;
+		expect(child.code).toContain('createIndependentHydrateActivator');
+		expect(child.code).toContain('export default');
+		expect(child.code).toContain('.choice.tsrx-');
+	});
+
+	it('rejects independent ownership that is dynamic, spread-coupled, or split-disabled', () => {
+		for (const [source, code] of [
+			[
+				`import { Hydrate } from 'octane'; export function App(props) @{ <Hydrate independent={props.independent} when={true}><b /></Hydrate> }`,
+				'OCTANE_HYDRATE_INDEPENDENT_LITERAL',
+			],
+			[
+				`import { Hydrate } from 'octane'; export function App(props) @{ <Hydrate independent when={true} {...props}><b /></Hydrate> }`,
+				'OCTANE_HYDRATE_INDEPENDENT_SPREAD',
+			],
+			[
+				`import { Hydrate } from 'octane'; export function App() @{ <Hydrate independent split={false} when={true}><b /></Hydrate> }`,
+				'OCTANE_HYDRATE_INDEPENDENT_SPLIT',
+			],
+		] as const) {
+			let thrown: unknown;
+			try {
+				compiler().transform(source, FILE, { environment: 'client' });
+			} catch (error) {
+				thrown = error;
+			}
+			expect(thrown).toMatchObject({ code });
+		}
+	});
+
+	it('rejects parent lifecycle captures but permits callbacks over serializable inputs', () => {
+		const parentOwned = `
+import { Hydrate, useRef } from 'octane';
+export function App() @{
+  const mapRef = useRef(null);
+  <Hydrate independent when={true}><button onClick={() => mapRef.current?.focus()}>focus</button></Hydrate>
+}
+`;
+		let thrown: unknown;
+		try {
+			compiler().transform(parentOwned, FILE, { environment: 'client' });
+		} catch (error) {
+			thrown = error;
+		}
+		expect(thrown).toMatchObject({ code: 'OCTANE_HYDRATE_INDEPENDENT_OWNER_CAPTURE' });
+
+		const serializable = `
+import { Hydrate } from 'octane';
+import { choose } from './actions';
+export function App(props) @{
+  <Hydrate independent when={true}><button onClick={() => choose(props.city)}>{props.city as string}</button></Hydrate>
+}
+`;
+		expect(() => compiler().transform(serializable, FILE, { environment: 'client' })).not.toThrow();
+	});
 });

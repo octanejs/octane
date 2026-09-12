@@ -1,5 +1,12 @@
 import { decodeSignalValue, encodeSignalValue } from './encoding.js';
-import { ScopeDisposedError, SignalFrameError, SignalSerializationError } from './errors.js';
+import { DerivedBinding } from './computations.js';
+import {
+	ScopeDisposedError,
+	SignalFrameError,
+	SignalSerializationError,
+	SignalStreamError,
+} from './errors.js';
+import { sameStreamFrameIdentity } from '../streamed-signals-protocol.js';
 import {
 	ScopedNode,
 	assertAlive,
@@ -39,14 +46,21 @@ import {
 	type ResourceBinding,
 } from './requests.js';
 import type {
+	StreamFrameIdentity,
+	StreamedSignalResultFrame,
+} from '../streamed-signals-protocol.js';
+import type {
 	AdoptionFrame,
 	DerivedSignal,
+	DerivedCompute,
+	DerivedOptions,
 	QueryRequest,
 	Resource,
 	Scope,
 	ScopeInspection,
 	ScopeOptions,
 	ScopeSeed,
+	skip,
 	SignalHandle,
 	SignalSeedEntry,
 	SignalTraceEvent,
@@ -167,6 +181,14 @@ export class ScopeImpl implements Scope, GraphOwner {
 	readonly requests = new Map<string, RequestEntry>();
 	readonly queryDefinitions = new Map<string, QueryDefinition>();
 	readonly resources = new Map<ScopedNode, ResourceBinding>();
+	readonly streamedSelections = new Map<string, StreamFrameIdentity>();
+	readonly streamedFrames = new Map<string, StreamedSignalResultFrame[]>();
+	readonly streamedFailures = new Map<string, { identity: StreamFrameIdentity; error: Error }>();
+	private readonly streamedReady = new Map<
+		string,
+		{ identity: StreamFrameIdentity; ready(): void }
+	>();
+	readonly derivedBindings = new Map<ScopedNode, DerivedBinding<unknown>>();
 	readonly frames = new Set<AdoptionFrameImpl>();
 	private readonly seedEntries: Map<string, DecodedSeedEntry>;
 	private readonly traceLimit: number;
@@ -174,6 +196,54 @@ export class ScopeImpl implements Scope, GraphOwner {
 	private sequence = 0;
 	private lifetime = 0;
 	private disposed = false;
+	readBarrier: Promise<void> | undefined;
+
+	/** Internal document lifecycle: mark every owner before cancellation runs user code. */
+	suspendReads(): void {
+		if (this.disposed || this.readBarrier === undefined) return;
+		for (const key of this.streamedSelections.keys()) {
+			// A completed pre-activation result is already useful data, even if
+			// its descriptor has not executed yet. Only unfinished channels expire.
+			if (this.streamedFrames.get(key)?.at(-1)?.kind === 'complete') continue;
+			this.streamedSelections.delete(key);
+			this.streamedFrames.delete(key);
+			this.streamedReady.delete(key);
+		}
+		this.streamedFailures.clear();
+		for (const entry of this.requests.values()) entry.stopAttempt();
+		for (const binding of this.derivedBindings.values()) binding.suspend();
+	}
+
+	resumeReads(): void {
+		if (this.disposed || this.readBarrier !== undefined) return;
+		signalBatch(() => {
+			// Refresh descriptions first: cancellation callbacks may have selected a
+			// different key. Only entries still retained by consumers may restart.
+			for (const [node, binding] of this.resources) {
+				refreshNode(node);
+				const identity = this.streamedSelections.get(node.key);
+				if (
+					identity &&
+					this.streamedFrames.has(node.key) &&
+					binding.bindStreamedSelection(identity)
+				) {
+					this.flushStreamedResult(node, binding);
+				}
+			}
+			for (const entry of this.requests.values()) {
+				if (this.readBarrier !== undefined) break;
+				if (
+					!entry.active &&
+					!entry.state.snapshot.complete &&
+					entry.state.snapshot.status !== 'error' &&
+					entry.consumers.size
+				) {
+					entry.start(entry.state.snapshot.status !== 'ready');
+				}
+			}
+			for (const binding of this.derivedBindings.values()) binding.resume();
+		});
+	}
 
 	constructor(
 		private readonly key: string,
@@ -201,11 +271,15 @@ export class ScopeImpl implements Scope, GraphOwner {
 		return this.disposed;
 	}
 
-	private createNode<T>(key: string, kind: ScopedNode['kind']): ScopedNode<T> {
+	private createNode<T>(
+		key: string,
+		kind: ScopedNode['kind'],
+		allowDuringRead = false,
+	): ScopedNode<T> {
 		assertAlive(this);
 		// Component-local hook initialization is an allocation in its existing
 		// render lifetime, never a write to an already committed signal.
-		if (this.seedable) assertWritable();
+		if (this.seedable && !allowDuringRead) assertWritable();
 		requireKey(key, 'Signal key');
 		if (this.nodes.has(key))
 			throw new TypeError(`Signal key "${key}" already exists in this scope.`);
@@ -218,6 +292,19 @@ export class ScopeImpl implements Scope, GraphOwner {
 		const node = new ScopedNode<T>(this, key, kind);
 		this.nodes.set(key, node);
 		return node;
+	}
+
+	private declaredNode<T>(key: string, kind: ScopedNode['kind']): [ScopedNode<T>, boolean] {
+		assertAlive(this);
+		requireKey(key, 'Signal key');
+		const existing = this.nodes.get(key);
+		if (existing) {
+			if (existing.kind !== kind) {
+				throw new TypeError(`Signal key "${key}" already has kind "${existing.kind}".`);
+			}
+			return [existing as ScopedNode<T>, false];
+		}
+		return [this.createNode<T>(key, kind, true), true];
 	}
 
 	private initialSeed(key: string): DecodedSeedEntry | undefined {
@@ -254,6 +341,18 @@ export class ScopeImpl implements Scope, GraphOwner {
 		return node as WritableSignal<T>;
 	}
 
+	createSignalDeclaration<T>(key: string, initial: T, preferInitial = false): WritableSignal<T> {
+		const [node, created] = this.declaredNode<T>(key, 'signal');
+		if (!created) return node as WritableSignal<T>;
+		const seed = this.initialSeed(key) ?? this.retainedSeed(key);
+		node.state = readyState(seed && !preferInitial ? (seed.value as T) : initial);
+		node.lastState = node.state;
+		node.last = (node.state.snapshot as { value: T }).value;
+		node.hasLast = true;
+		this.consumeSeed(key);
+		return node as WritableSignal<T>;
+	}
+
 	derived$<T>(
 		key: string,
 		compute: (() => T) & (T extends PromiseLike<unknown> ? never : unknown),
@@ -269,7 +368,22 @@ export class ScopeImpl implements Scope, GraphOwner {
 		return node as DerivedSignal<T>;
 	}
 
-	asyncSignal$<T>(key: string, describe: () => QueryRequest<T>): Resource<T> {
+	createDerivedDeclaration<T>(
+		key: string,
+		compute: DerivedCompute<T>,
+		options?: DerivedOptions,
+	): DerivedSignal<T> {
+		if (typeof compute !== 'function') throw new TypeError('derived$ requires a function.');
+		const [node, created] = this.declaredNode<T>(key, 'derived');
+		if (!created) return node as DerivedSignal<T>;
+		const binding = new DerivedBinding(this, node, compute, options);
+		this.derivedBindings.set(node, binding as DerivedBinding<unknown>);
+		this.initializeRetention(node);
+		this.consumeSeed(key);
+		return node as DerivedSignal<T>;
+	}
+
+	asyncSignal$<T>(key: string, describe: () => QueryRequest<T> | typeof skip): Resource<T> {
 		if (typeof describe !== 'function') throw new TypeError('asyncSignal$ requires a description.');
 		const node = this.createNode<T>(key, 'async');
 		const seed = this.initialSeed(key);
@@ -279,9 +393,157 @@ export class ScopeImpl implements Scope, GraphOwner {
 			const binding = initializeResource(this, node, describe, seed, retained);
 			this.resources.set(node, binding);
 			refreshNode(node);
+			this.flushStreamedResult(node, binding);
 		});
 		this.consumeSeed(key);
 		return node as Resource<T>;
+	}
+
+	createResourceDeclaration<T>(
+		key: string,
+		describe: () => QueryRequest<T> | typeof skip,
+	): Resource<T> {
+		if (typeof describe !== 'function') throw new TypeError('query$ requires a description.');
+		const [node, created] = this.declaredNode<T>(key, 'async');
+		if (!created) return node as Resource<T>;
+		const seed = this.initialSeed(key);
+		const retained = this.retainedSeed(key);
+		this.initializeRetention(node);
+		signalBatch(() => {
+			const binding = initializeResource(this, node, describe, seed, retained);
+			this.resources.set(node, binding);
+			refreshNode(node);
+			this.flushStreamedResult(node, binding);
+		});
+		this.consumeSeed(key);
+		return node as Resource<T>;
+	}
+
+	bindStreamedSelection(identity: StreamFrameIdentity): boolean {
+		assertAlive(this);
+		const node = this.nodes.get(identity.nodeKey);
+		if (node && node.kind !== 'async') return false;
+		const previous = this.streamedSelections.get(identity.nodeKey);
+		if (previous && !sameStreamFrameIdentity(previous, identity)) {
+			this.streamedFrames.delete(identity.nodeKey);
+			this.streamedFailures.delete(identity.nodeKey);
+			this.streamedReady.delete(identity.nodeKey);
+		}
+		this.streamedSelections.set(identity.nodeKey, identity);
+		if (!node) return true;
+		return this.resources.get(node)?.bindStreamedSelection(identity) === true;
+	}
+
+	isStreamedSelectionPending(identity: StreamFrameIdentity): boolean {
+		const selected = this.streamedSelections.get(identity.nodeKey);
+		const node = this.nodes.get(identity.nodeKey);
+		return (
+			!this.retired &&
+			selected !== undefined &&
+			sameStreamFrameIdentity(selected, identity) &&
+			node?.kind === 'async' &&
+			this.resources.get(node)?.isStreamedSelectionReady(selected) === false
+		);
+	}
+
+	whenStreamedSelectionReady(identity: StreamFrameIdentity, ready: () => void): () => void {
+		const node = this.nodes.get(identity.nodeKey);
+		if (node && this.resources.get(node)?.isStreamedSelectionReady(identity)) return () => {};
+		const registration = { identity, ready };
+		this.streamedReady.set(identity.nodeKey, registration);
+		return () => {
+			if (this.streamedReady.get(identity.nodeKey) === registration)
+				this.streamedReady.delete(identity.nodeKey);
+		};
+	}
+
+	streamedSelectionReady(binding: ResourceBinding): void {
+		if (this.readBarrier !== undefined || this.retired) return;
+		this.flushStreamedResult(binding.node, binding);
+		const registration = this.streamedReady.get(binding.node.key);
+		if (registration && binding.isStreamedSelectionReady(registration.identity)) {
+			this.streamedReady.delete(binding.node.key);
+			registration.ready();
+		}
+	}
+
+	retainCompletedStreamedResult(
+		identity: StreamFrameIdentity,
+		frames: StreamedSignalResultFrame[],
+	): boolean {
+		if (!this.isStreamedSelectionPending(identity) || frames.at(-1)?.kind !== 'complete')
+			return false;
+		const previous = this.streamedFrames.get(identity.nodeKey);
+		if (previous?.at(-1)?.kind === 'complete') return false;
+		let sequence = previous?.length ?? 0;
+		for (const frame of frames) {
+			if (!sameStreamFrameIdentity(identity, frame.identity) || frame.sequence !== sequence++)
+				return false;
+		}
+		if (previous) previous.push(...frames);
+		else this.streamedFrames.set(identity.nodeKey, frames);
+		return true;
+	}
+
+	discardCompletedStreamedSelection(identity: StreamFrameIdentity): void {
+		if (
+			this.streamedSelections.get(identity.nodeKey) !== identity ||
+			this.streamedFrames.get(identity.nodeKey)?.at(-1)?.kind !== 'complete'
+		)
+			return;
+		this.streamedFrames.delete(identity.nodeKey);
+		this.streamedSelections.delete(identity.nodeKey);
+		this.streamedReady.delete(identity.nodeKey);
+		this.streamedFailures.delete(identity.nodeKey);
+	}
+
+	acceptStreamedResult(frame: StreamedSignalResultFrame): boolean {
+		assertAlive(this);
+		const selected = this.streamedSelections.get(frame.identity.nodeKey);
+		if (!selected || !sameStreamFrameIdentity(selected, frame.identity)) return false;
+		const node = this.nodes.get(frame.identity.nodeKey);
+		if (!node) {
+			let frames = this.streamedFrames.get(frame.identity.nodeKey);
+			if (!frames) this.streamedFrames.set(frame.identity.nodeKey, (frames = []));
+			frames.push(frame);
+			return true;
+		}
+		if (node.kind !== 'async') return false;
+		return this.resources.get(node)?.acceptStreamed(frame) === true;
+	}
+
+	failStreamedResult(identity: StreamFrameIdentity, error: Error): boolean {
+		assertAlive(this);
+		const selected = this.streamedSelections.get(identity.nodeKey);
+		if (!selected || !sameStreamFrameIdentity(selected, identity)) return false;
+		const node = this.nodes.get(identity.nodeKey);
+		if (!node) {
+			this.streamedFailures.set(identity.nodeKey, { identity, error });
+			return true;
+		}
+		if (node.kind !== 'async') return false;
+		return this.resources.get(node)?.failStreamed(identity, error) === true;
+	}
+
+	private flushStreamedResult(node: ScopedNode, binding: ResourceBinding): void {
+		if (this.readBarrier !== undefined) return;
+		const identity = this.streamedSelections.get(node.key);
+		if (!identity || !binding.isStreamedSelectionReady(identity)) return;
+		const frames = this.streamedFrames.get(node.key);
+		if (frames) {
+			this.streamedFrames.delete(node.key);
+			for (const frame of frames) {
+				if (!binding.acceptStreamed(frame)) {
+					binding.failStreamed(identity, new SignalStreamError('identity'));
+					break;
+				}
+			}
+		}
+		const failure = this.streamedFailures.get(node.key);
+		if (failure) {
+			this.streamedFailures.delete(node.key);
+			binding.failStreamed(failure.identity, failure.error);
+		}
 	}
 
 	private own<T>(handle$: SignalHandle<T>): ScopedNode<T> {
@@ -293,7 +555,8 @@ export class ScopeImpl implements Scope, GraphOwner {
 	}
 
 	get<T>(handle$: SignalHandle<T>): T {
-		return strictValue(readNode(this.own(handle$)));
+		const node = this.own(handle$);
+		return strictValue(readNode(node), node.key);
 	}
 
 	set<T>(handle$: WritableSignal<T>, value: T | ((previous: T) => T)): void {
@@ -495,6 +758,12 @@ export class ScopeImpl implements Scope, GraphOwner {
 			this.lifetime++;
 			for (const resource of this.resources.values()) resource.dispose();
 			this.resources.clear();
+			this.streamedSelections.clear();
+			this.streamedFrames.clear();
+			this.streamedFailures.clear();
+			this.streamedReady.clear();
+			for (const binding of this.derivedBindings.values()) binding.dispose();
+			this.derivedBindings.clear();
 			this.requests.clear();
 			this.queryDefinitions.clear();
 			for (const frame of this.frames) frame.release();
@@ -651,6 +920,78 @@ export function createScope(options: ScopeOptions): Scope {
 /** Only the native hook adapter may create a component-owned, non-serializable scope. */
 export function createLocalScope(scopeKey: string): Scope {
 	return new ScopeImpl(scopeKey, { scopeKey }, false);
+}
+
+export function createDeclaredSignalCell<T>(
+	owner: Scope,
+	key: string,
+	initial: T,
+	preferInitial = false,
+): WritableSignal<T> {
+	if (!(owner instanceof ScopeImpl)) throw new TypeError('A direct signal needs an Octane scope.');
+	return owner.createSignalDeclaration(key, initial, preferInitial);
+}
+
+export function createDeclaredDerivedCell<T>(
+	owner: Scope,
+	key: string,
+	compute: DerivedCompute<T>,
+	options?: DerivedOptions,
+): DerivedSignal<T> {
+	if (!(owner instanceof ScopeImpl))
+		throw new TypeError('A direct derived signal needs an Octane scope.');
+	return owner.createDerivedDeclaration(key, compute, options);
+}
+
+export function createDeclaredResourceCell<T>(
+	owner: Scope,
+	key: string,
+	describe: () => QueryRequest<T> | typeof skip,
+): Resource<T> {
+	if (!(owner instanceof ScopeImpl)) throw new TypeError('A direct query needs an Octane scope.');
+	return owner.createResourceDeclaration(key, describe);
+}
+
+export function adoptResourceValue<T>(
+	handle$: SignalHandle<T>,
+	requestKey: string | undefined,
+	value: T,
+): boolean {
+	if (!(handle$ instanceof ScopedNode) || !(handle$.owner instanceof ScopeImpl)) return false;
+	const binding = handle$.owner.resources.get(handle$);
+	return binding ? binding.adopt(requestKey, value) : false;
+}
+
+/** @internal Return the concrete owner for a proven runtime handle. */
+export function getSignalScope(handle$: SignalHandle<unknown>): Scope | undefined {
+	return handle$ instanceof ScopedNode && handle$.owner instanceof ScopeImpl
+		? handle$.owner
+		: undefined;
+}
+
+/** @internal Exact selection generation used to pin an optimistic query write. */
+export function getResourceSelectionAuthority(handle$: SignalHandle<unknown>): object | undefined {
+	if (!(handle$ instanceof ScopedNode) || !(handle$.owner instanceof ScopeImpl)) return;
+	return handle$.owner.resources.get(handle$)?.authority;
+}
+
+/** @internal Bind receiver-owned selection authority before result delivery. */
+export function bindScopeStreamedSelection(owner: Scope, identity: StreamFrameIdentity): boolean {
+	return owner instanceof ScopeImpl ? owner.bindStreamedSelection(identity) : false;
+}
+
+/** @internal Publish a receiver-validated result into an exact current request. */
+export function acceptScopeStreamedResult(owner: Scope, frame: StreamedSignalResultFrame): boolean {
+	return owner instanceof ScopeImpl ? owner.acceptStreamedResult(frame) : false;
+}
+
+/** @internal Fail one exact streamed attempt after receiver timeout or rejection. */
+export function failScopeStreamedResult(
+	owner: Scope,
+	identity: StreamFrameIdentity,
+	error: Error,
+): boolean {
+	return owner instanceof ScopeImpl ? owner.failStreamedResult(identity, error) : false;
 }
 
 export { startSignalBatch, endSignalBatch };

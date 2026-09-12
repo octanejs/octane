@@ -45,6 +45,9 @@ import {
 	HYDRATE_ID_COUNT_ATTR,
 	HYDRATE_STREAM_TOKEN_ATTR,
 	HYDRATE_SEED_ATTR,
+	INDEPENDENT_HYDRATE_MANIFEST_ATTR,
+	HYDRATE_INDEPENDENT_ATTR,
+	SIGNAL_CONTROL_ATTR,
 	STREAM_BOUNDARY_ATTR,
 	STREAM_SEGMENT_ATTR,
 	STREAM_SEED_ATTR,
@@ -63,6 +66,12 @@ import {
 	// static-markup emission of `ssrEmitElement`.
 	VOID_ELEMENTS,
 } from './constants.js';
+import {
+	createIndependentHydrateManifest,
+	serializeIndependentHydrateManifest,
+	type IndependentHydrateBuildRecord,
+	type IndependentHydrateManifestTemplate,
+} from './independent-hydration-protocol.js';
 import { hasOwnProp } from './has-own.js';
 import { headOwnershipSuffix } from './head-ownership.js';
 import { resourceHintWarning } from './resource-hint-diagnostics.js';
@@ -80,6 +89,7 @@ import {
 	unsupportedAttributeCoercionWarning,
 } from './host-property-diagnostics.js';
 import type { HydrateProps, HydrationStrategy } from './hydration/types.js';
+import { streamedSignalBootstrapJs } from './server/early-signals.js';
 import {
 	applyElementDefaultProps,
 	childElementKey,
@@ -123,9 +133,94 @@ import {
 	type NativeSeedReads,
 	type NativeSignalManifest,
 } from './signals/native-read-seeds.js';
+import {
+	captureSignalOwner,
+	currentSignalOwner,
+	enterSynchronousSignalOwner,
+	retireSignalOwnerIdentity,
+	restoreSynchronousSignalOwner,
+	runWithSignalOwner,
+} from './signals/owner-context.js';
+import {
+	runWithServerSignalQueryAttemptObserver,
+	type ServerSignalQueryAttempt,
+} from './signals/query-attempt-observer.js';
+import {
+	SIGNAL_BINDING_IDENTITY,
+	SIGNAL_HANDLE,
+	type SignalBindingIdentity,
+	type SignalHandle,
+	type SignalOwner,
+	type SignalRendererOwnerIdentity,
+} from './signals/types.js';
 export { EXTERNAL_HYDRATION_PROMISE, HYDRATION_RANGE_BOUNDARY, normalizeClass };
 export { validateNativeReadWitness };
 export type { NativeSignalManifest };
+
+function isSignalHandle(value: unknown): value is SignalHandle<unknown> {
+	return (
+		(typeof value === 'object' || typeof value === 'function') &&
+		value !== null &&
+		(value as SignalHandle<unknown>)[SIGNAL_HANDLE] === true
+	);
+}
+
+function readSignalBinding(handle: SignalHandle<unknown>): unknown {
+	// Server bindings must contribute their historical value to the hydration
+	// snapshot. Only client bindings bypass the component-wide read collector.
+	return handle.get();
+}
+
+function isWritableSignal(value: unknown): value is SignalHandle<unknown> & {
+	readonly kind: 'signal';
+	set(value: unknown): void;
+} {
+	return (
+		isSignalHandle(value) && value.kind === 'signal' && typeof (value as any).set === 'function'
+	);
+}
+
+/** @internal Compiler target for strict server reads of a direct signal binding. */
+export function ssrSignalValue(value: unknown): unknown {
+	return isSignalHandle(value) ? readSignalBinding(value) : value;
+}
+
+const SSR_SIGNAL_CONTROL = /* @__PURE__ */ Symbol('octane.ssr-signal-control');
+
+interface SsrSignalControlValue {
+	readonly [SSR_SIGNAL_CONTROL]: true;
+	readonly value: unknown;
+	readonly site: string;
+	readonly owner: SignalRendererOwnerIdentity;
+	readonly binding: SignalBindingIdentity;
+}
+
+function isSsrSignalControlValue(value: unknown): value is SsrSignalControlValue {
+	return (
+		typeof value === 'object' &&
+		value !== null &&
+		(value as SsrSignalControlValue)[SSR_SIGNAL_CONTROL] === true
+	);
+}
+
+function unwrapSsrSignalControlValue(value: unknown): unknown {
+	return isSsrSignalControlValue(value) ? value.value : value;
+}
+
+/** @internal Preserve a writable control's identity until the final JSX winner is known. */
+export function ssrSignalControlValue(value: unknown, site: string): unknown {
+	if (!isWritableSignal(value)) return ssrSignalValue(value);
+	const owner = currentSignalOwner();
+	if (owner === null || !('documentOwner' in owner)) return readSignalBinding(value);
+	if (RESOLVED !== null) RESOLVED.hasSignalControls = true;
+	return {
+		[SSR_SIGNAL_CONTROL]: true,
+		value: readSignalBinding(value),
+		site,
+		owner,
+		binding: value[SIGNAL_BINDING_IDENTITY](),
+	} satisfies SsrSignalControlValue;
+}
 
 const NATIVE_ARRAY_MAP = Array.prototype.map;
 const NATIVE_REFLECT_APPLY = Reflect.apply;
@@ -310,6 +405,12 @@ const ACTIVE_PU_WARM_PLANS: Array<() => void> = [];
 let CURRENT_PU_WARM_CLAIMS: Set<object> | null = null;
 let ID_COUNTER = 0;
 let ID_PREFIX = '';
+let SIGNAL_INSTANCE_PREFIX = '';
+let SIGNAL_COMPONENT_INSTANCE_KEY = '';
+let SIGNAL_CONTROL_SITE = '';
+// List arms extend this value by copying; resets need no per-component array.
+const EMPTY_SIGNAL_LIST_KEYS: readonly string[] = [];
+let SIGNAL_LIST_KEYS = EMPTY_SIGNAL_LIST_KEYS;
 interface InjectedStyle {
 	css: string;
 	nonce?: string;
@@ -457,6 +558,7 @@ interface Job {
 	props: any;
 	parentScope: SSRScope | null;
 	frame: Frame;
+	signalInstanceKey: string;
 }
 let SUSPENDED: { promise: PromiseLike<unknown>; key: string }[] | null = null;
 let RESOLVED: ResolvedMap | null = null;
@@ -703,6 +805,8 @@ interface ElementDescriptor {
 	// `createElement(type, props, ...children)` children for the host form; `null`
 	// for the component-value form (children flow through the component's props).
 	children: any;
+	/** @internal Compiler-stable component invocation identity. */
+	__octaneInvocationSite?: string;
 }
 
 // Scoped descriptors keep their ordinary public shape while deferring child
@@ -760,6 +864,13 @@ const SCOPED_VALUE_PROPERTIES: PropertyDescriptorMap = {
 		enumerable: true,
 		get(this: DeferredValue) {
 			return this[SCOPED_VALUE_RESOLVER]().children;
+		},
+	},
+	__octaneInvocationSite: {
+		configurable: true,
+		enumerable: false,
+		get(this: DeferredValue) {
+			return this[SCOPED_VALUE_RESOLVER]().__octaneInvocationSite;
 		},
 	},
 };
@@ -974,6 +1085,11 @@ function scopedValueDescriptor(resolve: () => ElementDescriptor): ElementDescrip
 	Object.defineProperty(descriptor, 'key', SCOPED_VALUE_PROPERTIES.key);
 	Object.defineProperty(descriptor, 'ref', SCOPED_VALUE_PROPERTIES.ref);
 	Object.defineProperty(descriptor, 'children', SCOPED_VALUE_PROPERTIES.children);
+	Object.defineProperty(
+		descriptor,
+		'__octaneInvocationSite',
+		SCOPED_VALUE_PROPERTIES.__octaneInvocationSite,
+	);
 	if (process.env.NODE_ENV !== 'production') Object.freeze(descriptor);
 	return descriptor;
 }
@@ -983,6 +1099,7 @@ export function createScopedElement(
 	type: ServerEntryComponent | string | typeof Fragment | typeof Activity,
 	props: any,
 	readChildren: () => unknown,
+	invocationSite?: string,
 ): ElementDescriptor {
 	const src = (props ?? null) as any;
 	const key = hasElementConfigKey(src) ? '' + src.key : null;
@@ -1001,7 +1118,7 @@ export function createScopedElement(
 		}
 		return resolvedChildren;
 	};
-	return scopedElementDescriptor(type, copiedProps, key, children);
+	return scopedElementDescriptor(type, copiedProps, key, children, invocationSite);
 }
 
 /** @internal Native child deferral with evidence on every resolving scope. */
@@ -1009,6 +1126,7 @@ export function nativeCreateScopedElement(
 	type: ServerEntryComponent | string | typeof Fragment | typeof Activity,
 	props: any,
 	readChildren: () => unknown,
+	invocationSite?: string,
 ): ElementDescriptor {
 	const src = (props ?? null) as any;
 	const key = hasElementConfigKey(src) ? '' + src.key : null;
@@ -1018,6 +1136,7 @@ export function nativeCreateScopedElement(
 		copiedProps,
 		key,
 		createNativeServerScopedResolver(readChildren),
+		invocationSite,
 	);
 }
 
@@ -1026,6 +1145,7 @@ function scopedElementDescriptor(
 	copiedProps: any,
 	key: string | null,
 	children: () => unknown,
+	invocationSite?: string,
 ): ElementDescriptor {
 	setScopedChildrenResolver(copiedProps, children);
 	SCOPED_ELEMENT_PROPS.add(copiedProps);
@@ -1036,6 +1156,7 @@ function scopedElementDescriptor(
 		key,
 		ref: copiedProps.ref !== undefined ? copiedProps.ref : null,
 	} as ElementDescriptor;
+	if (invocationSite !== undefined) descriptor.__octaneInvocationSite = invocationSite;
 	Object.defineProperty(descriptor, 'children', SCOPED_CHILDREN_PROPERTY);
 	setScopedChildrenResolver(descriptor, children);
 	return finalizeElementDescriptor(descriptor);
@@ -1050,6 +1171,25 @@ export function createElement(
 	type: ServerEntryComponent | string | typeof Fragment | typeof Activity,
 	props?: any,
 	...children: any[]
+): ElementDescriptor {
+	return createElementInternal(undefined, type, props, children);
+}
+
+/** @internal Compiler-authored element descriptor with stable invocation identity. */
+export function createElementAt(
+	invocationSite: string,
+	type: ServerEntryComponent | string | typeof Fragment | typeof Activity,
+	props?: any,
+	...children: any[]
+): ElementDescriptor {
+	return createElementInternal(invocationSite, type, props, children);
+}
+
+function createElementInternal(
+	invocationSite: string | undefined,
+	type: ServerEntryComponent | string | typeof Fragment | typeof Activity,
+	props: any,
+	children: any[],
 ): ElementDescriptor {
 	if (typeof type === 'function' && isRendererContext(type)) {
 		registerServerRendererContextProvider(renderServerContextProvider);
@@ -1066,14 +1206,16 @@ export function createElement(
 	if (children.length > 0) p.children = kids;
 	applyElementDefaultProps(type, p);
 	kids = p.children;
-	return finalizeElementDescriptor({
+	const descriptor: ElementDescriptor = {
 		$$kind: ELEMENT_TAG,
 		type,
 		props: p,
 		key,
 		ref: p.ref !== undefined ? p.ref : null,
 		children: kids ?? null,
-	});
+	};
+	if (invocationSite !== undefined) descriptor.__octaneInvocationSite = invocationSite;
+	return finalizeElementDescriptor(descriptor);
 }
 
 // Multiple createElement children and compiler-lowered shorthand fragments are
@@ -1413,6 +1555,8 @@ export function cloneElement(
 			children: kids ?? null,
 		};
 	}
+	if (element.__octaneInvocationSite !== undefined)
+		descriptor.__octaneInvocationSite = element.__octaneInvocationSite;
 	return finalizeElementDescriptor(descriptor);
 }
 
@@ -1756,16 +1900,37 @@ export function ssrTextPre(v: unknown): string {
 // with a distinct non-null children field need a repaired props object.
 function ssrComponentDescriptor(d: ElementDescriptor, scope: SSRScope): string {
 	if (SCOPED_ELEMENT_PROPS.has(d.props)) {
-		return ssrComponent(scope, d.type as ServerComponent, d.props);
+		return ssrComponent(
+			scope,
+			d.type as ServerComponent,
+			d.props,
+			undefined,
+			d.key ?? undefined,
+			undefined,
+			d.__octaneInvocationSite,
+		);
 	}
 	const children = d.children;
 	if (children == null || children === d.props?.children) {
-		return ssrComponent(scope, d.type as ServerComponent, d.props);
+		return ssrComponent(
+			scope,
+			d.type as ServerComponent,
+			d.props,
+			undefined,
+			d.key ?? undefined,
+			undefined,
+			d.__octaneInvocationSite,
+		);
 	}
-	return ssrComponent(scope, d.type as ServerComponent, {
-		...d.props,
-		children,
-	});
+	return ssrComponent(
+		scope,
+		d.type as ServerComponent,
+		{ ...d.props, children },
+		undefined,
+		d.key ?? undefined,
+		undefined,
+		d.__octaneInvocationSite,
+	);
 }
 
 /**
@@ -1776,6 +1941,12 @@ function ssrComponentDescriptor(d: ElementDescriptor, scope: SSRScope): string {
  * `{x as string}` / literals / `+`-concats to `ssrText`, everything else here.
  */
 export function ssrChild(v: unknown, scope: SSRScope): string {
+	if (isSignalHandle(v)) {
+		SERVER_SIGNAL_BINDINGS_ENABLED = true;
+		ensureServerSignalOwner();
+		const owner = serverSignalOwner(null)!;
+		v = runWithSignalOwner(owner, () => readSignalBinding(v as SignalHandle<unknown>));
+	}
 	if (probingDangerHtmlChild(v)) return '';
 	return ssrChildValue(v, scope, true);
 }
@@ -2369,7 +2540,13 @@ function withAsyncListScope<T>(kind: string, fn: () => T): T {
 export function ssrControl<T>(siteKey: string, fn: () => T): T {
 	const frame = FRAME;
 	const occurrence = frame === null ? 0 : nextFrameOccurrence(frame, '@control:' + siteKey);
-	return withAsyncIdentity('control:' + siteKey, occurrence, fn);
+	const previousSignalControl = SIGNAL_CONTROL_SITE;
+	SIGNAL_CONTROL_SITE = siteKey;
+	try {
+		return withAsyncIdentity('control:' + siteKey, occurrence, fn);
+	} finally {
+		SIGNAL_CONTROL_SITE = previousSignalControl;
+	}
 }
 
 /** Compiler-emitted identity membrane for one arm/item inside ssrControl. */
@@ -2382,6 +2559,15 @@ export function ssrArm<T>(armKey: unknown, fn: () => T): T {
 	// keyed solely by armKey, so a stable primitive/object key keeps its identity
 	// when an @for reorders between streaming passes.
 	const fallbackPosition = ASYNC_SCOPE + '|@arm-position:' + occurrence;
+	if (SERVER_SIGNAL_BINDINGS_ENABLED && SIGNAL_CONTROL_SITE.charCodeAt(0) === 102) {
+		const previousSignalKeys = SIGNAL_LIST_KEYS;
+		SIGNAL_LIST_KEYS = [...previousSignalKeys, signalIdentityKey(armKey)];
+		try {
+			return withAsyncIdentity('arm', armKey, fn, false, fallbackPosition);
+		} finally {
+			SIGNAL_LIST_KEYS = previousSignalKeys;
+		}
+	}
 	return withAsyncIdentity('arm', armKey, fn, false, fallbackPosition);
 }
 
@@ -3067,7 +3253,10 @@ export function ssrClass(sources: Array<[boolean, unknown]>): string {
  * string keys participate, and getters run once at the spread's authored
  * evaluation position before later direct prop expressions.
  */
-export function ssrSnapshotSpread(obj: unknown): Record<string, unknown> | null {
+export function ssrSnapshotSpread(
+	obj: unknown,
+	controlSite?: string,
+): Record<string, unknown> | null {
 	if (obj == null) return null;
 	const source = Object(obj) as Record<PropertyKey, unknown>;
 	const snapshot: Record<string, unknown> = Object.create(null);
@@ -3076,8 +3265,26 @@ export function ssrSnapshotSpread(obj: unknown): Record<string, unknown> | null 
 	// authored position; retain only string keys after performing each read.
 	for (const key of Reflect.ownKeys(source)) {
 		if (!Object.prototype.propertyIsEnumerable.call(source, key)) continue;
-		const value = source[key];
-		if (typeof key === 'string') snapshot[key] = value;
+		let value = source[key];
+		if (typeof key !== 'string') continue;
+		if (
+			controlSite !== undefined &&
+			(key === 'value' || key === 'checked') &&
+			isWritableSignal(value)
+		) {
+			value = ssrSignalControlValue(value, controlSite);
+		} else if (isSignalHandle(value)) value = readSignalBinding(value);
+		else if (key === 'style' && value !== null && typeof value === 'object') {
+			let style: Record<string, unknown> | undefined;
+			for (const name of Object.keys(value)) {
+				const current = (value as Record<string, unknown>)[name];
+				if (!isSignalHandle(current)) continue;
+				style ??= { ...(value as Record<string, unknown>) };
+				style[name] = readSignalBinding(current);
+			}
+			if (style !== undefined) value = style;
+		}
+		snapshot[key] = value;
 	}
 	return snapshot;
 }
@@ -3323,12 +3530,14 @@ export function ssrFormAuthoringDiagnostics(
  * (the generic ssrAttr would DROP a false boolean); only nullish omits.
  */
 export function ssrValueAttr(v: unknown): string {
+	v = unwrapSsrSignalControlValue(v);
 	if (v == null || typeof v === 'function' || typeof v === 'symbol') return '';
 	return ' value="' + escapeAttr(typeof v === 'string' ? v : String(v)) + '"';
 }
 
 /** The `checked` attribute (presence semantics; mirrors setChecked's `!!v`). */
 export function ssrCheckedAttr(v: unknown): string {
+	v = unwrapSsrSignalControlValue(v);
 	return v == null || !v ? '' : ' checked';
 }
 
@@ -3345,10 +3554,10 @@ export function ssrInputAttrs(
 	const props = resolveFormControlSources(sources);
 	if (process.env.NODE_ENV !== 'production') {
 		devValidateSsrFormProps('input', {
-			value: props.value,
-			defaultValue: props.defaultValue,
-			checked: props.checked,
-			defaultChecked: props.defaultChecked,
+			value: unwrapSsrSignalControlValue(props.value),
+			defaultValue: unwrapSsrSignalControlValue(props.defaultValue),
+			checked: unwrapSsrSignalControlValue(props.checked),
+			defaultChecked: unwrapSsrSignalControlValue(props.defaultChecked),
 		});
 	}
 	return (
@@ -3358,6 +3567,32 @@ export function ssrInputAttrs(
 }
 
 type SsrFormControlSource = readonly [isSpread: boolean, sourceOrName: unknown, value?: unknown];
+
+/** @internal Join the final writable control winners to the baked control-site key. */
+export function ssrSignalControlAttrs(sources: readonly SsrFormControlSource[]): string {
+	const props = resolveFormControlSources(sources);
+	const controls: Array<readonly [string, string, 'value' | 'checked']> = [];
+	let ownerKey: string | undefined;
+	const record = (value: unknown, channel: 'value' | 'checked'): void => {
+		if (!isSsrSignalControlValue(value)) return;
+		const documentKey = value.owner.documentOwner.scopeKey;
+		if (ownerKey !== undefined && ownerKey !== documentKey) {
+			throw new Error(formatServerError(68));
+		}
+		ownerKey = documentKey;
+		controls.push([
+			value.binding.scope === 'document' ? '' : value.owner.instanceKey,
+			value.binding.nodeKey,
+			channel,
+		]);
+	};
+	record(props.value, 'value');
+	record(props.checked, 'checked');
+	if (controls.length === 0) return '';
+	return (
+		' ' + SIGNAL_CONTROL_ATTR + '="' + escapeAttr(JSON.stringify([1, ownerKey, controls])) + '"'
+	);
+}
 
 interface ResolvedFormControlSources {
 	value: unknown;
@@ -3429,6 +3664,7 @@ function resolveFormControlSources(
  * Mirrors the client's toControlledString (booleans/numbers stringify).
  */
 export function ssrTextareaValue(v: unknown): string {
+	v = unwrapSsrSignalControlValue(v);
 	if (v == null) return '';
 	const s = escapeHtml(typeof v === 'string' ? v : String(v));
 	return s.charCodeAt(0) === 10 ? '\n' + s : s;
@@ -3445,8 +3681,8 @@ export function ssrTextareaValueSources(
 	const props = resolveFormControlSources(sources);
 	if (process.env.NODE_ENV !== 'production') {
 		devValidateSsrFormProps('textarea', {
-			value: props.value,
-			defaultValue: props.defaultValue,
+			value: unwrapSsrSignalControlValue(props.value),
+			defaultValue: unwrapSsrSignalControlValue(props.defaultValue),
 		});
 	}
 	const value = props.value ?? props.defaultValue;
@@ -3484,6 +3720,8 @@ export function ssrSelectScope(
 	multiple: unknown,
 	children: () => string,
 ): string {
+	value = unwrapSsrSignalControlValue(value);
+	defaultValue = unwrapSsrSignalControlValue(defaultValue);
 	if (process.env.NODE_ENV !== 'production') {
 		devValidateSsrFormProps('select', { value, defaultValue, multiple });
 	}
@@ -3988,9 +4226,89 @@ function replayUpdatedComponentBody(
 		hp.occ = new Map();
 		rewindComponentReplayState(snapshot, scope, frame);
 		ACTIVE_PU_WARM_PLANS.length = warmPlanCheckpoint;
-		out = comp(props ?? {}, scope, undefined);
+		out = invokeServerSignalComponent(comp, props, scope, frame);
 	} while (hp.update);
 	return out;
+}
+
+function signalIdentityKey(value: unknown): string {
+	if (value === null) return 'null';
+	const kind = typeof value;
+	return kind === 'string' || kind === 'number' || kind === 'bigint' || kind === 'boolean'
+		? kind.charCodeAt(0).toString(36) + ':' + String(value)
+		: kind === 'undefined'
+			? 'u:'
+			: 'o:' + String(value);
+}
+
+function serverStructuralSignalInstanceKey(
+	invocationSite: string | undefined,
+	key: unknown,
+): string {
+	// Match the client's concatenated JSON segments without re-escaping the
+	// complete ancestor path at every component invocation.
+	return (
+		SIGNAL_COMPONENT_INSTANCE_KEY +
+		JSON.stringify([
+			invocationSite ?? 'legacy',
+			SIGNAL_LIST_KEYS,
+			key != null ? signalIdentityKey(key) : '',
+		])
+	);
+}
+
+function serverSignalOwner(_frame: Frame | null): SignalRendererOwnerIdentity | undefined {
+	const resolved = RESOLVED!;
+	if (resolved.signalOwner === undefined || resolved.signalInstances === undefined) return;
+	const instanceKey =
+		SIGNAL_COMPONENT_INSTANCE_KEY || JSON.stringify([SIGNAL_INSTANCE_PREFIX, 'root']);
+	let owner = resolved.signalInstances.get(instanceKey);
+	if (owner === undefined) {
+		owner = Object.freeze({
+			scopeKey: resolved.signalOwner.scopeKey,
+			documentOwner: resolved.signalOwner,
+			instanceOwner: Object.freeze({}),
+			instanceKey,
+		});
+		resolved.signalInstances.set(instanceKey, owner);
+	}
+	return owner;
+}
+
+function ensureServerSignalOwner(): void {
+	const resolved = RESOLVED!;
+	if (resolved.signalOwner !== undefined && resolved.signalInstances !== undefined) return;
+	const ambient = currentSignalOwner();
+	resolved.signalOwner =
+		ambient === null
+			? Object.freeze({ scopeKey: 'octane:document' })
+			: isRendererSignalOwner(ambient)
+				? ambient.documentOwner
+				: ambient;
+	resolved.ownedSignalOwner = ambient === null;
+	resolved.signalInstances = new Map();
+}
+
+function invokeServerSignalComponent(
+	comp: ServerComponent,
+	props: any,
+	scope: SSRScope,
+	frame: Frame | null,
+): unknown {
+	const owner = serverSignalOwner(frame);
+	if (owner === undefined) return comp(props ?? {}, scope, undefined);
+	const invoke = () => comp(props ?? {}, scope, undefined);
+	const observe = (RESOLVED?.resourceOptions as StreamOptions | undefined)?.injection
+		?.observeSignalAttempt;
+	return runWithSignalOwner(owner, () =>
+		observe === undefined
+			? invoke()
+			: runWithServerSignalQueryAttemptObserver(
+					owner,
+					(attempt) => observe(attempt, captureSignalOwner(owner)),
+					invoke,
+				),
+	);
 }
 
 function invokeComponentBody(
@@ -4006,7 +4324,7 @@ function invokeComponentBody(
 	HOOK_PASS = hp;
 	try {
 		ACTIVE_PU_WARM_PLANS.length = warmPlanCheckpoint;
-		let out: unknown = comp(props ?? {}, scope, undefined);
+		let out: unknown = invokeServerSignalComponent(comp, props, scope, frame);
 		if (hp.update) {
 			out = replayUpdatedComponentBody(comp, props, scope, frame, hp, snapshot, warmPlanCheckpoint);
 		}
@@ -4017,6 +4335,24 @@ function invokeComponentBody(
 		ACTIVE_PU_WARM_PLANS.length = warmPlanCheckpoint;
 		HOOK_PASS = prevHP;
 	}
+}
+
+function captureServerComponentContext() {
+	// Keep the restore state off the recursive component stack. Constructing this
+	// envelope in its own completed call also avoids retaining its initializer slots.
+	return {
+		scope: CURRENT_SCOPE,
+		frame: FRAME,
+		comp: CURRENT_COMP,
+		props: CURRENT_PROPS,
+		parent: CURRENT_PARENT_SCOPE,
+		asyncScope: ASYNC_SCOPE,
+		signalInstance: SIGNAL_COMPONENT_INSTANCE_KEY,
+		signalControl: SIGNAL_CONTROL_SITE,
+		signalListKeys: SIGNAL_LIST_KEYS,
+		owner: undefined as SignalRendererOwnerIdentity | undefined,
+		previousOwner: undefined as SignalOwner | null | undefined,
+	};
 }
 
 // Render a component body under an explicit frame, tracking it as the innermost
@@ -4034,14 +4370,10 @@ function renderComponentFramed(
 	// is still created (use() path keys / seed order unchanged); the client's
 	// componentSlot(inherit) borrows the parent range instead of adopting.
 	inherit?: boolean,
+	instanceKey?: string,
 ): string {
-	const prevScope = CURRENT_SCOPE;
-	const prevFrame = FRAME;
-	const prevComp = CURRENT_COMP;
-	const prevProps = CURRENT_PROPS;
-	const prevParent = CURRENT_PARENT_SCOPE;
-	const prevAsyncScope = ASYNC_SCOPE;
-	const parentScope = parent ?? prevScope;
+	const previous = captureServerComponentContext();
+	const parentScope = parent ?? previous.scope;
 	const scope = ssrScope(parentScope);
 	CURRENT_SCOPE = scope;
 	FRAME = frame;
@@ -4049,6 +4381,9 @@ function renderComponentFramed(
 	CURRENT_PROPS = props;
 	CURRENT_PARENT_SCOPE = parentScope;
 	ASYNC_SCOPE = frame.asyncScope;
+	if (instanceKey !== undefined) SIGNAL_COMPONENT_INSTANCE_KEY = instanceKey;
+	SIGNAL_CONTROL_SITE = '';
+	SIGNAL_LIST_KEYS = EMPTY_SIGNAL_LIST_KEYS;
 	const nativeToken = NATIVE_READ_COLLECTOR === null ? -1 : beginActiveNativeReadScope(scope);
 	let nativeCompleted = false;
 	try {
@@ -4072,7 +4407,22 @@ function renderComponentFramed(
 		HOOK_PASS = hookPass;
 		try {
 			ACTIVE_PU_WARM_PLANS.length = warmPlanCheckpoint;
-			out = comp(props ?? {}, scope, undefined);
+			previous.owner = serverSignalOwner(frame);
+			if (previous.owner === undefined) {
+				out = comp(props ?? {}, scope, undefined);
+			} else if (
+				(RESOLVED?.resourceOptions as StreamOptions | undefined)?.injection
+					?.observeSignalAttempt !== undefined ||
+				(previous.previousOwner = enterSynchronousSignalOwner(previous.owner)) === undefined
+			) {
+				out = invokeServerSignalComponent(comp, props, scope, frame);
+			} else {
+				try {
+					out = comp(props ?? {}, scope, undefined);
+				} finally {
+					restoreSynchronousSignalOwner(previous.previousOwner);
+				}
+			}
 			if (hookPass.update) {
 				out = replayUpdatedComponentBody(
 					comp,
@@ -4101,12 +4451,15 @@ function renderComponentFramed(
 		throw normalizeThrownServerThenable(error);
 	} finally {
 		if (nativeToken >= 0) NATIVE_READ_COLLECTOR!.endScope(nativeToken, nativeCompleted);
-		CURRENT_SCOPE = prevScope;
-		FRAME = prevFrame;
-		CURRENT_COMP = prevComp;
-		CURRENT_PROPS = prevProps;
-		CURRENT_PARENT_SCOPE = prevParent;
-		ASYNC_SCOPE = prevAsyncScope;
+		CURRENT_SCOPE = previous.scope;
+		FRAME = previous.frame;
+		CURRENT_COMP = previous.comp;
+		CURRENT_PROPS = previous.props;
+		CURRENT_PARENT_SCOPE = previous.parent;
+		ASYNC_SCOPE = previous.asyncScope;
+		SIGNAL_COMPONENT_INSTANCE_KEY = previous.signalInstance;
+		SIGNAL_CONTROL_SITE = previous.signalControl;
+		SIGNAL_LIST_KEYS = previous.signalListKeys;
 	}
 }
 
@@ -4124,6 +4477,7 @@ export function ssrComponent(
 	inherit?: boolean,
 	key?: unknown,
 	identityScoped?: boolean,
+	invocationSite?: string,
 ): string {
 	// A runtime-resolved Activity is a symbol, not a callable component. Keep its
 	// original identity for async keys, then use the stable cold body below. A
@@ -4134,6 +4488,9 @@ export function ssrComponent(
 	// this small string-rendering wrapper does not retain the client Activity engine.
 	const activity = comp === Activity;
 	if (activity && key === undefined) key = props?.key;
+	const signalInstanceKey = SERVER_SIGNAL_BINDINGS_ENABLED
+		? serverStructuralSignalInstanceKey(invocationSite, key)
+		: undefined;
 	// Component recursion is one of SSR's hottest and deepest paths. Install the
 	// same async-identity membrane inline instead of recursing back through
 	// ssrComponent from two wrapper callbacks. Besides avoiding callback overhead,
@@ -4232,7 +4589,14 @@ export function ssrComponent(
 		// namespace through arbitrary wrapper chains; an explicitly compiled host
 		// transition (`<svg>`, `<math>`, or `<foreignObject>`) overrides it for the
 		// next component frame through ssrComponentNS.
-		return renderComponentFramed(comp as ServerComponent, props, parent, frame, inherit);
+		return renderComponentFramed(
+			comp as ServerComponent,
+			props,
+			parent,
+			frame,
+			inherit,
+			signalInstanceKey,
+		);
 	} finally {
 		if (identityScoped !== true) ASYNC_SCOPE = previousIdentityScope;
 	}
@@ -4248,11 +4612,12 @@ export function ssrComponentNS(
 	namespace: 'html' | 'svg' | 'mathml',
 	inherit?: boolean,
 	key?: unknown,
+	invocationSite?: string,
 ): string {
 	const previous = NEXT_COMPONENT_NAMESPACE;
 	NEXT_COMPONENT_NAMESPACE = namespace;
 	try {
-		return ssrComponent(parent, comp, props, inherit, key);
+		return ssrComponent(parent, comp, props, inherit, key, undefined, invocationSite);
 	} finally {
 		NEXT_COMPONENT_NAMESPACE = previous;
 	}
@@ -4288,6 +4653,68 @@ function streamTokenForPendingHtml(html: string): string | null {
 	return stream !== null && html.includes(STREAM_BOUNDARY_ATTR + '="' + stream.token + '-')
 		? stream.token
 		: null;
+}
+
+type InternalHydrateProps = HydrateProps & {
+	readonly __independent?: {
+		readonly manifestTemplate: IndependentHydrateManifestTemplate;
+		readonly captures: readonly unknown[];
+	};
+};
+
+function ssrIndependentHydrateSidecar(props: InternalHydrateProps, instanceId: string): string {
+	const independent = props.__independent;
+	if (independent === undefined) return '';
+	const registry = RESOLVED?.resourceOptions?.independentHydration;
+	if (registry === undefined) {
+		throw new Error(formatServerError(69));
+	}
+	const build = registry.resolve(independent.manifestTemplate.boundaryId);
+	if (build === undefined) {
+		throw new Error(formatServerError(70));
+	}
+	const manifest = createIndependentHydrateManifest(
+		independent.manifestTemplate,
+		independent.captures,
+		instanceId,
+		registry.buildId,
+		build,
+	);
+	return (
+		'<script type="application/json" ' +
+		INDEPENDENT_HYDRATE_MANIFEST_ATTR +
+		NONCE_ATTR +
+		'>' +
+		serializeIndependentHydrateManifest(manifest) +
+		'</script>'
+	);
+}
+
+function withServerIndependentIdentity<T>(prefix: string, idSeed: number, render: () => T): T {
+	const previous = SIGNAL_INSTANCE_PREFIX;
+	const previousInstance = SIGNAL_COMPONENT_INSTANCE_KEY;
+	const previousControl = SIGNAL_CONTROL_SITE;
+	const previousListKeys = SIGNAL_LIST_KEYS;
+	const previousIdPrefix = ID_PREFIX;
+	const previousIdCounter = ID_COUNTER;
+	SIGNAL_INSTANCE_PREFIX = prefix;
+	SIGNAL_COMPONENT_INSTANCE_KEY = JSON.stringify([prefix, 'root']);
+	SIGNAL_CONTROL_SITE = '';
+	SIGNAL_LIST_KEYS = EMPTY_SIGNAL_LIST_KEYS;
+	ID_PREFIX = prefix + '-';
+	ID_COUNTER = idSeed;
+	try {
+		return render();
+	} finally {
+		SIGNAL_INSTANCE_PREFIX = previous;
+		SIGNAL_COMPONENT_INSTANCE_KEY = previousInstance;
+		SIGNAL_CONTROL_SITE = previousControl;
+		SIGNAL_LIST_KEYS = previousListKeys;
+		ID_PREFIX = previousIdPrefix;
+		// The island hydrates in its own deterministic namespace. The parent
+		// still reserves the IDs consumed here when it adopts the outer wrapper.
+		ID_COUNTER = previousIdCounter + ID_COUNTER - idSeed;
+	}
 }
 
 /** Serialize runtime-owned and strategy-supplied attributes for `<Hydrate>`. */
@@ -4391,7 +4818,8 @@ const PermanentStaticHydrate = /* @__PURE__ */ markComponentFlags(
 );
 
 const hydrate = /* @__PURE__ */ markComponentFlags(
-	function Hydrate(props: HydrateProps, scope: SSRScope): string {
+	function Hydrate(rawProps: HydrateProps, scope: SSRScope): string {
+		const props = rawProps as InternalHydrateProps;
 		const id = useId();
 		// The client always creates an HTMLDivElement. Force the same namespace for
 		// SSR children and attribute semantics instead of inheriting SVG/MathML from
@@ -4419,16 +4847,25 @@ const hydrate = /* @__PURE__ */ markComponentFlags(
 						let children: string;
 						let nativeReads: NativeSeedReads | null = null;
 						try {
-							children = ssrBlock(
-								ssrTry(
-									scope,
-									'jsx-hydrate',
-									(_arg, childScope) => ssrChildrenHtml(props.children, childScope),
-									null,
-									null,
-									'html',
-								),
-							);
+							const renderChildren = () =>
+								ssrBlock(
+									ssrTry(
+										scope,
+										'jsx-hydrate',
+										(_arg, childScope) => ssrChildrenHtml(props.children, childScope),
+										null,
+										null,
+										'html',
+									),
+								);
+							children =
+								props.__independent === undefined
+									? renderChildren()
+									: withServerIndependentIdentity(
+											id,
+											props.__independent.manifestTemplate.idSeed,
+											renderChildren,
+										);
 						} finally {
 							nativeReads = finishNativeSeedCapture(nativeCapture, previousNativeReads, false);
 						}
@@ -4460,8 +4897,21 @@ const hydrate = /* @__PURE__ */ markComponentFlags(
 							: NATIVE_READ_COLLECTOR?.serialize(nativeReads);
 						const nativeSidecar =
 							nativeSeeds === undefined ? '' : serializeNativeSignalSeeds(nativeSeeds, NONCE_ATTR);
+						const independentSidecar = permanentStaticAncestor
+							? ''
+							: ssrIndependentHydrateSidecar(props, id);
 
-						return '<div' + attrs + '>' + children + seedSidecar + nativeSidecar + '</div>';
+						return (
+							'<div' +
+							attrs +
+							(props.__independent === undefined ? '' : ' ' + HYDRATE_INDEPENDENT_ATTR + '=""') +
+							'>' +
+							children +
+							seedSidecar +
+							nativeSidecar +
+							independentSidecar +
+							'</div>'
+						);
 					}),
 				'html',
 			),
@@ -4862,6 +5312,7 @@ function normalizeThrownServerThenable(error: unknown): unknown {
 			props: CURRENT_PROPS,
 			parentScope: CURRENT_PARENT_SCOPE,
 			frame,
+			signalInstanceKey: SIGNAL_COMPONENT_INSTANCE_KEY,
 		});
 	}
 	return SSR_SUSPENSE;
@@ -5261,6 +5712,7 @@ export function use<T>(
 			props: CURRENT_PROPS,
 			parentScope: CURRENT_PARENT_SCOPE,
 			frame,
+			signalInstanceKey: SIGNAL_COMPONENT_INSTANCE_KEY,
 		});
 	}
 	throw SSR_SUSPENSE;
@@ -5562,6 +6014,7 @@ export function puBatch(thenables: unknown[], warm?: () => void): void {
 			props: CURRENT_PROPS,
 			parentScope: CURRENT_PARENT_SCOPE,
 			frame,
+			signalInstanceKey: SIGNAL_COMPONENT_INSTANCE_KEY,
 		});
 	}
 	throw SSR_SUSPENSE;
@@ -5812,6 +6265,7 @@ export function lazy<C>(load: () => PromiseLike<{ default: C } | C>): C & { disp
 				props: CURRENT_PROPS,
 				parentScope: CURRENT_PARENT_SCOPE,
 				frame,
+				signalInstanceKey: SIGNAL_COMPONENT_INSTANCE_KEY,
 			});
 		}
 		throw SSR_SUSPENSE;
@@ -6587,6 +7041,24 @@ export interface RenderResult {
 
 /** Options accepted by the buffered render entry points (React-shaped subset). */
 export interface RenderOptions {
+	/** The host already emitted earlySignalBootstrapScript before interactive HTML. */
+	earlySignalBootstrap?: 'external';
+	/** Shared request/account data owner borrowed across sibling SSR regions. */
+	signalOwner?: SignalOwner;
+	/** Automatically publish query attempts into the pre-module streamed receiver. */
+	streamedSignals?: {
+		readonly buildId: string;
+		readonly documentId: string;
+		readonly selectionGeneration?: number;
+		readonly maxFrameBytes?: number;
+		readonly maxTotalBytes?: number;
+		readonly timeoutMs?: number;
+	};
+	/** Compiler/bundler records for strict independently activated Hydrate boundaries. */
+	independentHydration?: {
+		readonly buildId: string;
+		readonly resolve: (templateBoundaryId: string) => IndependentHydrateBuildRecord | undefined;
+	};
 	/** Caller-controlled namespace for `useId`; use distinct prefixes for sibling roots. */
 	identifierPrefix?: string;
 	/** Called with any error thrown during the render (before it propagates). */
@@ -6797,6 +7269,11 @@ type ResolvedMap = Map<string, SuspenseOutcome> & {
 	resourceOptions?: RenderOptions | null;
 	/** Optional renderer resources; allocated only by a participating adapter. */
 	resources?: ServerRenderResources;
+	/** One request/account owner shared by every pass and streamed region. */
+	signalOwner?: SignalOwner;
+	ownedSignalOwner?: boolean;
+	signalInstances?: Map<string, SignalRendererOwnerIdentity>;
+	hasSignalControls?: boolean;
 	/** Render-local stable ids for non-primitive and long string control/list keys. */
 	asyncIdentities: Map<unknown, number>;
 	/** Cross-pass fallback ids for transient object keys at one lexical position. */
@@ -6827,9 +7304,36 @@ type ResolvedMap = Map<string, SuspenseOutcome> & {
 		touched?: Set<PromiseLike<unknown>>;
 	};
 };
+
+// Server signal ownership is compiler-selected. Signal-free programs avoid
+// consulting the host async context and allocate no owner or instance map.
+let SERVER_SIGNAL_BINDINGS_ENABLED = false;
+
+/** @internal Compiler/runtime server signal capability version 1. */
+export function enableServerSignalBindings(abi = 1): void {
+	if (abi !== 1) throw new TypeError(formatServerError(71));
+	SERVER_SIGNAL_BINDINGS_ENABLED = true;
+}
+
+function isRendererSignalOwner(owner: SignalOwner): owner is SignalRendererOwnerIdentity {
+	return 'documentOwner' in owner;
+}
+
 function newResolvedMap(resourceOptions?: RenderOptions | null): ResolvedMap {
 	const m = new Map() as ResolvedMap;
 	if (resourceOptions !== undefined) m.resourceOptions = resourceOptions;
+	if (SERVER_SIGNAL_BINDINGS_ENABLED || resourceOptions?.signalOwner !== undefined) {
+		const ambient = currentSignalOwner();
+		const configured = resourceOptions?.signalOwner ?? ambient;
+		m.signalOwner =
+			configured === undefined || configured === null
+				? Object.freeze({ scopeKey: 'octane:document' })
+				: isRendererSignalOwner(configured)
+					? configured.documentOwner
+					: configured;
+		m.ownedSignalOwner = configured === undefined || configured === null;
+		m.signalInstances = new Map();
+	}
 	m.asyncIdentities = new Map();
 	m.asyncPositionIdentities = new Map();
 	m.nextAsyncIdentity = 0;
@@ -6890,6 +7394,13 @@ function releaseServerRenderResources(resolved: ResolvedMap): void {
 	// Native thenable settlement callbacks can retain this cache after an abort.
 	// They must not also keep a completed request's options or foreign resources.
 	resolved.resourceOptions = undefined;
+	if (resolved.signalInstances !== undefined) {
+		for (const owner of resolved.signalInstances.values()) retireSignalOwnerIdentity(owner);
+		resolved.signalInstances.clear();
+	}
+	if (resolved.ownedSignalOwner && resolved.signalOwner !== undefined) {
+		retireSignalOwnerIdentity(resolved.signalOwner);
+	}
 	if (resources !== undefined) resolved.resources = undefined;
 	if (resources === undefined || resources.finished) return;
 	resources.finished = true;
@@ -6924,6 +7435,7 @@ interface FullPassResult {
 	 *  diffed the same way so late-discovered resources ride the wave chunks. */
 	sheets: Map<string, { precedence: string; html: string }> | null;
 	signals?: NativeSignalManifest;
+	hasSignalControls: boolean;
 }
 
 // Snapshot / install / restore the module globals around ONE synchronous pass
@@ -6940,6 +7452,10 @@ interface Ambient {
 	warmClaims: Set<object> | null;
 	id: number;
 	idPrefix: string;
+	signalInstancePrefix: string;
+	signalComponentInstanceKey: string;
+	signalControlSite: string;
+	signalListKeys: readonly string[];
 	css: Map<string, InjectedStyle> | null;
 	nonceAttr: string;
 	markers: boolean;
@@ -6972,6 +7488,10 @@ function saveAmbient(): Ambient {
 		warmClaims: CURRENT_PU_WARM_CLAIMS,
 		id: ID_COUNTER,
 		idPrefix: ID_PREFIX,
+		signalInstancePrefix: SIGNAL_INSTANCE_PREFIX,
+		signalComponentInstanceKey: SIGNAL_COMPONENT_INSTANCE_KEY,
+		signalControlSite: SIGNAL_CONTROL_SITE,
+		signalListKeys: SIGNAL_LIST_KEYS,
 		css: CSS,
 		nonceAttr: NONCE_ATTR,
 		markers: MARKERS,
@@ -7024,6 +7544,10 @@ function restoreAmbient(a: Ambient): void {
 	CURRENT_PU_WARM_CLAIMS = a.warmClaims;
 	ID_COUNTER = a.id;
 	ID_PREFIX = a.idPrefix;
+	SIGNAL_INSTANCE_PREFIX = a.signalInstancePrefix;
+	SIGNAL_COMPONENT_INSTANCE_KEY = a.signalComponentInstanceKey;
+	SIGNAL_CONTROL_SITE = a.signalControlSite;
+	SIGNAL_LIST_KEYS = a.signalListKeys;
 	CSS = a.css;
 	NONCE_ATTR = a.nonceAttr;
 	MARKERS = a.markers;
@@ -7077,6 +7601,10 @@ function runFullFramedPass(
 	CURRENT_PU_WARM_CLAIMS = null;
 	ID_COUNTER = 0;
 	ID_PREFIX = identifierPrefix;
+	SIGNAL_INSTANCE_PREFIX = identifierPrefix;
+	SIGNAL_COMPONENT_INSTANCE_KEY = JSON.stringify([identifierPrefix, 'root']);
+	SIGNAL_CONTROL_SITE = '';
+	SIGNAL_LIST_KEYS = EMPTY_SIGNAL_LIST_KEYS;
 	NONCE_ATTR = nonceAttr;
 	ASYNC_SCOPE = '';
 	MARKERS = markers;
@@ -7181,6 +7709,7 @@ function runFullFramedPass(
 		vtCandidates,
 		cssEntries: cssMap,
 		sheets: headBuf.sheets,
+		hasSignalControls: resolved.hasSignalControls === true,
 	};
 	if (signals !== undefined) result.signals = signals;
 	return result;
@@ -7206,6 +7735,10 @@ function runDiscoveryRound(
 	CURRENT_PU_WARM_CLAIMS = null;
 	ID_COUNTER = 0;
 	ID_PREFIX = identifierPrefix;
+	SIGNAL_INSTANCE_PREFIX = identifierPrefix;
+	SIGNAL_COMPONENT_INSTANCE_KEY = JSON.stringify([identifierPrefix, 'root']);
+	SIGNAL_CONTROL_SITE = '';
+	SIGNAL_LIST_KEYS = EMPTY_SIGNAL_LIST_KEYS;
 	NONCE_ATTR = '';
 	ASYNC_SCOPE = '';
 	MARKERS = true;
@@ -7253,7 +7786,14 @@ function runDiscoveryRound(
 				namespace: undefined,
 			};
 			try {
-				renderComponentFramed(job.comp, job.props, job.parentScope, frame);
+				renderComponentFramed(
+					job.comp,
+					job.props,
+					job.parentScope,
+					frame,
+					undefined,
+					job.signalInstanceKey,
+				);
 			} catch (err) {
 				// A bare (@try-less) use() in the job body rethrows SSR_SUSPENSE; the
 				// thenable is already queued. A REAL error is DISCARDED here, not
@@ -7603,10 +8143,21 @@ function passToResult(
 	pass: FullPassResult,
 	nonceAttr: string,
 	separateHead: boolean = false,
+	independentHydration: boolean = false,
+	externalSignalBootstrap: boolean = false,
 ): RenderResult {
 	let body = pass.body;
 	if (pass.serial.length > 0) body += serializeSuspenseSeeds(pass.serial, nonceAttr);
 	if (pass.signals !== undefined) body += serializeNativeSignalSeeds(pass.signals, nonceAttr);
+	if (!externalSignalBootstrap && (pass.hasSignalControls || independentHydration)) {
+		body +=
+			'<script ' +
+			STREAM_SCRIPT_ATTR +
+			nonceAttr +
+			'>' +
+			streamedSignalBootstrapJs(independentHydration) +
+			'</script>';
+	}
 	// Unclaimed view-transition arm candidates strip at emission (see vtSsrStrip).
 	// Stripping the two channels separately equals stripping the folded string:
 	// no match spans the join. On body-only renders, `head + html` remains
@@ -7626,6 +8177,74 @@ function passToResult(
 	return result;
 }
 
+async function collectBufferedInjection(
+	injection: StreamInjectionSource,
+	signal: AbortSignal | undefined,
+): Promise<string> {
+	let revision = 0;
+	let wake: (() => void) | undefined;
+	let settled = false;
+	let failed = false;
+	let failure: unknown;
+	const notify = (): void => {
+		revision++;
+		const resume = wake;
+		wake = undefined;
+		resume?.();
+	};
+	const unsubscribe = injection.subscribe(notify);
+	signal?.addEventListener('abort', notify, { once: true });
+	injection.done.then(
+		() => {
+			settled = true;
+			notify();
+		},
+		(error) => {
+			failed = true;
+			failure = error;
+			settled = true;
+			notify();
+		},
+	);
+	let html = '';
+	try {
+		injection.renderComplete?.();
+		for (;;) {
+			signal?.throwIfAborted();
+			const chunk = injection.take();
+			if (chunk !== '') {
+				html += chunk;
+				injection.accepted?.();
+				continue;
+			}
+			if (settled) {
+				if (failed) throw failure;
+				return html;
+			}
+			const observed = revision;
+			await new Promise<void>((resolve) => {
+				wake = resolve;
+				if (settled || revision !== observed) {
+					wake = undefined;
+					resolve();
+				}
+			});
+		}
+	} finally {
+		unsubscribe();
+		signal?.removeEventListener('abort', notify);
+	}
+}
+
+function insertBufferedInjection(pass: FullPassResult, injection: string): void {
+	if (injection === '') return;
+	const tailStart = documentTailStart(pass.body);
+	pass.body =
+		tailStart === -1
+			? pass.body + injection
+			: pass.body.slice(0, tailStart) + injection + pass.body.slice(tailStart);
+}
+
 /**
  * React `react-dom/static` `prerender` — await ALL data (Suspense boundaries
  * resolve to their success arm), then return the complete `{ html, css }`. Use
@@ -7643,14 +8262,53 @@ export async function prerender(
 		options ??= props;
 		props = { value: entryComponent };
 	}
-	const nonceAttr = nonceAttrOf(options);
-	const resolved = newResolvedMap(options ?? null);
+	const preparedOptions = needsAutomaticSignalInjection(options)
+		? await prepareAutomaticSignalInjection(options as StreamOptions)
+		: options;
+	const injection = (preparedOptions as StreamOptions | undefined)?.injection;
+	const cancelRender = injection === undefined ? undefined : new AbortController();
+	// The producer's deadline can expire while the render is still suspended.
+	// Abort the renderer's own guarded waits rather than abandoning a raced render.
+	injection?.done.then(NOOP, (error) => cancelRender!.abort(error));
+	const renderOptions =
+		cancelRender === undefined
+			? preparedOptions
+			: {
+					...preparedOptions,
+					signal:
+						preparedOptions?.signal === undefined
+							? cancelRender.signal
+							: AbortSignal.any([preparedOptions.signal, cancelRender.signal]),
+				};
+	const nonceAttr = nonceAttrOf(renderOptions);
+	const resolved = newResolvedMap(renderOptions ?? null);
 	try {
+		const pass = await runBuffered(component, props, renderOptions, nonceAttr, resolved);
+		if (injection !== undefined) {
+			try {
+				insertBufferedInjection(
+					pass,
+					await collectBufferedInjection(injection, renderOptions?.signal),
+				);
+			} catch (error) {
+				renderOptions?.onError?.(error);
+				throw error;
+			}
+		}
 		return passToResult(
-			await runBuffered(component, props, options, nonceAttr, resolved),
+			pass,
 			nonceAttr,
-			options?.headChannel === 'separate',
+			renderOptions?.headChannel === 'separate',
+			renderOptions?.independentHydration !== undefined,
+			renderOptions?.earlySignalBootstrap === 'external',
 		);
+	} catch (error) {
+		try {
+			injection?.cancel?.(error);
+		} catch {
+			// Cleanup cannot replace the render failure or request's abort reason.
+		}
+		throw error;
 	} finally {
 		releaseServerRenderResources(resolved);
 	}
@@ -7873,7 +8531,13 @@ export function renderToString(
 	} finally {
 		releaseServerRenderResources(resolved);
 	}
-	return passToResult(pass, nonceAttr, options?.headChannel === 'separate');
+	return passToResult(
+		pass,
+		nonceAttr,
+		options?.headChannel === 'separate',
+		options?.independentHydration !== undefined,
+		options?.earlySignalBootstrap === 'external',
+	);
 }
 
 /**
@@ -8734,11 +9398,28 @@ interface StreamSink {
  * construction.
  */
 export interface StreamInjectionSource {
+	/** @internal Pending query authority must precede shell-time module execution. */
+	takeInitialSelections?(): string;
+	/** This source emits validated renderer frames and needs the pre-module mailbox. */
+	readonly streamedRenderer?: true;
+	/** @internal Automatic query-attempt sink installed by streamedSignals. */
+	readonly observeSignalAttempt?: (
+		attempt: ServerSignalQueryAttempt,
+		run: <T>(callback: () => T) => T,
+	) => void;
 	/**
 	 * Pull all queued HTML (concatenated, verbatim). Called at emission
 	 * boundaries and after `subscribe` notifications; return '' when empty.
 	 */
 	take(): string;
+	/**
+	 * Optional transport acknowledgement for demand-driven producers. Called
+	 * after the string returned by take() has been accepted by the renderer's
+	 * sink. A producer may defer its next iterator pull until this callback.
+	 */
+	accepted?(): void;
+	/** Release this response's producer when rendering fails or its request is canceled. */
+	cancel?(reason: unknown): void;
 	/**
 	 * The source notifies when new HTML is queued; the renderer then drains
 	 * promptly — even while the render itself is idle awaiting `done`.
@@ -8764,6 +9445,12 @@ export interface StreamInjectionSource {
 
 export interface StreamOptions extends RenderOptions {
 	onShellReady?: () => void;
+	/**
+	 * The initial shell uses signals requiring activation before document EOF.
+	 * Called before shell publication, after its query authority is serialized.
+	 * Feature-free renders do not call this hook.
+	 */
+	onEarlyHydrationReady?: () => void;
 	onShellError?: (err: unknown) => void;
 	onAllReady?: () => void;
 	/**
@@ -8782,6 +9469,25 @@ export interface StreamOptions extends RenderOptions {
 	onHeadReady?: (head: string) => void;
 	/** Merge externally-produced HTML into the stream (see StreamInjectionSource). */
 	injection?: StreamInjectionSource;
+}
+
+function needsAutomaticSignalInjection(options: RenderOptions | undefined): boolean {
+	return (
+		options?.streamedSignals !== undefined &&
+		(options as StreamOptions | undefined)?.injection?.observeSignalAttempt === undefined
+	);
+}
+
+async function prepareAutomaticSignalInjection(options: StreamOptions): Promise<StreamOptions> {
+	const config = options.streamedSignals!;
+	const { createAutomaticStreamedSignalInjection } = await import('./server/streamed-signals.js');
+	return {
+		...options,
+		injection: createAutomaticStreamedSignalInjection(
+			{ ...config, nonce: options.nonce },
+			options.injection,
+		),
+	};
 }
 
 function withStream<T>(stream: StreamState | null, fn: () => T): T {
@@ -9098,7 +9804,14 @@ async function runStream(
 			return;
 		}
 		if (!html) return;
-		return write(html, false, rememberUnaccepted);
+		const written = write(html, false, rememberUnaccepted);
+		if (written === undefined) {
+			injection.accepted?.();
+			return;
+		}
+		return (written as Promise<void>).then(() => {
+			injection.accepted?.();
+		});
 	};
 	const recoveryInjection: (() => Promise<string>) | undefined =
 		injection === undefined
@@ -9354,10 +10067,32 @@ async function runStream(
 	}
 	if (pass.serial.length > 0) shell += serializeSuspenseSeeds(pass.serial, nonceAttr);
 	if (pass.signals !== undefined) shell += serializeNativeSignalSeeds(pass.signals, nonceAttr);
+	if (
+		options?.earlySignalBootstrap !== 'external' &&
+		(injection?.streamedRenderer === true ||
+			pass.hasSignalControls ||
+			options?.independentHydration !== undefined)
+	) {
+		shell +=
+			'<script ' +
+			STREAM_SCRIPT_ATTR +
+			nonceAttr +
+			'>' +
+			streamedSignalBootstrapJs(options?.independentHydration !== undefined) +
+			'</script>';
+	}
+	if (injection?.takeInitialSelections !== undefined) shell += injection.takeInitialSelections();
 	const anyPending = stream.boundaries.size > 0;
 	if (anyPending)
 		shell += '<script ' + STREAM_SCRIPT_ATTR + nonceAttr + '>' + streamRuntimeJs() + '</script>';
 	try {
+		if (
+			injection?.streamedRenderer === true ||
+			pass.hasSignalControls ||
+			options?.independentHydration !== undefined
+		) {
+			options?.onEarlyHydrationReady?.();
+		}
 		const shellWrite = write(pass.vtCandidates ? vtSsrStrip(shell) : shell);
 		if (shellWrite !== undefined) await shellWrite;
 	} catch (err) {
@@ -9809,10 +10544,8 @@ export function renderToPipeableStream(
 		finishEnd();
 	};
 	let started = false;
-	const startRender = (): void => {
-		if (started) return;
-		started = true;
-		const renderOptions = { ...options, signal: controller.signal };
+	const beginRender = (preparedOptions: StreamOptions | undefined): void => {
+		const renderOptions = { ...preparedOptions, signal: controller.signal };
 		const resolved = newResolvedMap(renderOptions);
 		void runStream(
 			component,
@@ -9838,11 +10571,6 @@ export function renderToPipeableStream(
 				},
 				fatal() {
 					releaseServerRenderResources(resolved);
-					// Once the shell exists, abort/error degradation is a terminal
-					// completion of the pipeable request. Fizz fires onAllReady after its
-					// recovery instructions have been accepted even though onError also
-					// reported the reason; consumers use this callback to end surrounding
-					// document work in both success and aborted paths.
 					options?.onAllReady?.();
 					flushEnd();
 				},
@@ -9853,6 +10581,18 @@ export function renderToPipeableStream(
 			options?.onError?.(err);
 			flushEnd();
 		});
+	};
+	const startRender = (): void => {
+		if (started) return;
+		started = true;
+		if (needsAutomaticSignalInjection(options)) {
+			void prepareAutomaticSignalInjection(options!).then(beginRender, (error) => {
+				shellFailure = { error };
+				options?.onShellError?.(error);
+				options?.onError?.(error);
+				flushEnd();
+			});
+		} else beginRender(options);
 	};
 	// Fizz callbacks never run before the caller receives the `{ pipe, abort }`
 	// handle. Starting from a microtask preserves that ordering when the caller
@@ -9913,6 +10653,11 @@ export function renderToReadableStream(
 	if (typeof entryComponent !== 'function') {
 		options ??= props;
 		props = { value: entryComponent };
+	}
+	if (needsAutomaticSignalInjection(options)) {
+		return prepareAutomaticSignalInjection(options!).then((prepared) =>
+			renderToReadableStream(component, props, prepared),
+		);
 	}
 	return new Promise((resolveShell, rejectShell) => {
 		const encoder = new TextEncoder();

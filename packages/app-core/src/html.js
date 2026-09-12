@@ -5,6 +5,7 @@ export {
 	getContextNonce,
 	injectHydrationEntry,
 	nonceAttribute,
+	prepareStreamingHydrationTemplate,
 	splitSsrTemplate,
 	validateSsrTemplate,
 } from './server/html-template.js';

@@ -26,6 +26,7 @@ import { parseModule } from './parser.browser.js';
 
 import {
 	analyzeTsrx,
+	builders as b,
 	createJsxTransform,
 	createVolarMappingsResult,
 	dedupeMappings,
@@ -36,6 +37,12 @@ import { analyzeNativeChangeDiagnostics } from './native-change-diagnostics.js';
 import { analyzeStrongMode } from './strong-mode.js';
 import { analyzeNativeReadDiagnostics, nativeReadOptions } from './native-read-diagnostics.js';
 import { jsxImportSourcePragmaModule } from './pragma.js';
+import { inheritHookMemoOrigin } from './inline-hook-memo.js';
+import {
+	collectServerFunctionNodes,
+	serverContextTypeImports,
+	serverFunctionContextIndex,
+} from './server-context.js';
 import {
 	DOM_RENDERER_MODULE,
 	normalizeRendererConfig,
@@ -100,6 +107,118 @@ const OCTANE_PLATFORM = {
 };
 
 const octaneTransform = createJsxTransform(OCTANE_PLATFORM);
+
+/**
+ * A trusted final context belongs to the implementation, not its RPC caller.
+ * Project only those boundary value imports before the shared type-only print;
+ * the namespace and ordinary function/type aliases retain their authored types.
+ * Recognition is shared with runtime registration so editor and wire arity agree.
+ */
+function projectServerContextCalls(ast, filename) {
+	const declaration = ast.body.find(
+		(node) =>
+			node.type === 'TSModuleDeclaration' &&
+			node.kind === 'module' &&
+			!node.declare &&
+			(node.id?.name ?? node.id?.value) === 'server',
+	);
+	if (!Array.isArray(declaration?.body?.body)) return ast;
+	const statements = declaration.body.body;
+	const functions = collectServerFunctionNodes(statements);
+	const imports = serverContextTypeImports(statements);
+	const contextExports = new Set();
+	const add = (exported, local) => {
+		const fn = functions.get(local);
+		if (fn === undefined) return;
+		try {
+			if (serverFunctionContextIndex(fn, imports, filename) !== -1) contextExports.add(exported);
+		} catch {
+			// Invalid/incomplete declarations stay checkable as authored. Runtime
+			// compilation owns the final-context placement diagnostic.
+		}
+	};
+	for (const statement of statements) {
+		if (statement.type !== 'ExportNamedDeclaration' || statement.exportKind === 'type') continue;
+		const node = statement.declaration;
+		if (node?.type === 'FunctionDeclaration') add(node.id?.name, node.id?.name);
+		if (node?.type === 'VariableDeclaration') {
+			for (const item of node.declarations) add(item.id?.name, item.id?.name);
+		}
+		for (const specifier of statement.specifiers ?? []) {
+			if (specifier.exportKind !== 'type') {
+				add(specifier.exported.name ?? specifier.exported.value, specifier.local.name);
+			}
+		}
+	}
+	if (contextExports.size === 0) return ast;
+	const names = new Set();
+	const collectNames = (node) => {
+		if (!node || typeof node !== 'object') return;
+		if (Array.isArray(node)) {
+			for (const child of node) collectNames(child);
+			return;
+		}
+		if (node.type === 'Identifier') names.add(node.name);
+		for (const key in node) {
+			if (key !== 'metadata' && key !== 'loc' && key !== 'parent') collectNames(node[key]);
+		}
+	};
+	collectNames(ast);
+	let helper = '__octane_ServerFunction';
+	while (names.has(helper)) helper += '_';
+	let changed = false;
+	const body = [];
+	for (const statement of ast.body) {
+		if (
+			statement.type !== 'ImportDeclaration' ||
+			statement.source.value !== 'server' ||
+			statement.importKind === 'type'
+		) {
+			body.push(statement);
+			continue;
+		}
+		const retained = [];
+		for (const specifier of statement.specifiers) {
+			if (
+				specifier.type !== 'ImportSpecifier' ||
+				specifier.importKind === 'type' ||
+				!contextExports.has(specifier.imported.name ?? specifier.imported.value)
+			) {
+				retained.push(specifier);
+				continue;
+			}
+			changed = true;
+			const reference = () =>
+				b.member(
+					b.id('server'),
+					{ ...specifier.imported },
+					specifier.imported.type !== 'Identifier',
+				);
+			body.push(
+				inheritHookMemoOrigin(
+					b.const(
+						{ ...specifier.local },
+						b.ts_as(
+							b.ts_as(reference(), b.ts_keyword_type('unknown')),
+							b.ts_type_reference(
+								b.id(helper),
+								b.ts_type_parameter_instantiation([b.ts_type_query(reference())]),
+							),
+						),
+					),
+					specifier,
+				),
+			);
+		}
+		if (retained.length > 0) body.push({ ...statement, specifiers: retained });
+	}
+	return changed
+		? {
+				...ast,
+				body: [b.imports([['ServerFunction', helper]], 'octane/server', [], 'type'), ...body],
+			}
+		: ast;
+}
 
 const octaneTransformWithAuthoredSuspense = createJsxTransform({
 	...OCTANE_PLATFORM,
@@ -290,7 +409,7 @@ export function compileToVolarMappings(source, filename, options) {
 	// original parse, and replacement nodes keep authored locations so
 	// mappings/hover still work.
 	const transform = selectOctaneTransform(ast);
-	const transformed = transform(ast, source, filename, {
+	const transformed = transform(projectServerContextCalls(ast, filename), source, filename, {
 		collect: true,
 		loose: !!options?.loose,
 		// @tsrx/core routes `typeOnly: true` to its TSX esrap language with
@@ -529,7 +648,7 @@ export function compileTypesInspection(source, filename, options) {
 		? null
 		: createRendererTypePragma(renderer, ast);
 	const transform = selectOctaneTransform(ast);
-	const transformed = transform(ast, source, filename, {
+	const transformed = transform(projectServerContextCalls(ast, filename), source, filename, {
 		collect: true,
 		loose: true,
 		typeOnly: true,

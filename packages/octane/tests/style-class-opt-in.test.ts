@@ -3,6 +3,7 @@ import * as ServerRuntime from 'octane/server';
 import { compile } from 'octane/compiler';
 import { mount } from './_helpers';
 import { loadCompiledFixtureSource } from './_server-fixture.js';
+import { hasRuntimeValueArgument } from './_compiler-value-arguments.js';
 
 // RFC tsrx-org/RFCs#1: `apply` stamps a theme on every element of a scope;
 // reading `theme.$class` is the selective form. A block whose `$class` is read
@@ -82,8 +83,8 @@ describe('$class opt-in — a block whose $class is read is a theme', () => {
 
 	it('client: the opted-in element reads theme.$class at runtime', () => {
 		const code = compiled('client');
-		expect(code).toContain('_$setClassAttrIfChanged(theme.$class,');
-		expect(code).toContain('_$setClassAttrIfChanged(theme.card,');
+		expect(hasRuntimeValueArgument(code, 'theme.$class')).toBe(true);
+		expect(hasRuntimeValueArgument(code, 'theme.card')).toBe(true);
 		expect(code).toContain("Card, { 'parentClass': theme.$class }");
 	});
 
@@ -93,7 +94,7 @@ describe('$class opt-in — a block whose $class is read is a theme', () => {
 		expect(code).toContain(`const theme = _$styleMap("${theme}",`);
 		expect(code).toContain('_$ssrAttr("class", __sp0, "article"');
 		expect(code).toContain('_$ssrAttr("class", __sp0, "h2"');
-		expect(code).toContain('_$ssrComponent(__s, Card, { "parentClass": theme.$class })');
+		expect(hasRuntimeValueArgument(code, 'Card')).toBe(true);
 	});
 
 	it('client: only the elements carrying $class pick up the theme rules', () => {

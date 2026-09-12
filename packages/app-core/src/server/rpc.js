@@ -13,6 +13,8 @@ import { derive_origin } from '@ripple-ts/adapter/rpc';
 import { DEFAULT_RPC_MAX_BODY_BYTES } from '../constants.js';
 import { createContext, runMiddlewareChain } from './middleware.js';
 import { setRequestContextSource } from './request-context.js';
+import { createServerCallHost, serverCallContext } from './server-calls.js';
+import { runServerRequest } from './signal-owners.js';
 
 const RPC_PATH_PREFIX = '/_$_ripple_rpc_$_/';
 
@@ -25,7 +27,11 @@ const RPC_PATH_PREFIX = '/_$_ripple_rpc_$_/';
 function rpcError(status, message, headers) {
 	return new Response(JSON.stringify({ error: message }), {
 		status,
-		headers: { 'Content-Type': 'application/json; charset=utf-8', ...headers },
+		headers: {
+			'Content-Type': 'application/json; charset=utf-8',
+			'Octane-RPC-Outcome': 'rejected',
+			...headers,
+		},
 	});
 }
 
@@ -74,6 +80,7 @@ function withRpcCors(response, origin) {
 
 	const headers = new Headers(response.headers);
 	headers.set('Access-Control-Allow-Origin', origin);
+	headers.set('Access-Control-Expose-Headers', 'Octane-RPC-Outcome');
 	headers.append('Vary', 'Origin');
 	return new Response(response.body, {
 		status: response.status,
@@ -212,6 +219,53 @@ export async function handleRpcRequest(request, options) {
 	}
 	const browserOrigin = request.headers.get('origin');
 	const corsOrigin = browserOrigin === origin ? null : browserOrigin;
+	if (request.headers.get('accept') === 'application/x-octane-rpc-batch+ndjson') {
+		if (options.batchServerFunctions === undefined || options.streamServerFunction === undefined) {
+			return withRpcCors(rpcError(406, 'Server-call batching is not configured'), corsOrigin);
+		}
+		const payload = await readBoundedRpcBody(
+			request,
+			options.maxBodyBytes ?? DEFAULT_RPC_MAX_BODY_BYTES,
+		);
+		if ('error' in payload) return withRpcCors(payload.error, corsOrigin);
+		try {
+			const stream = await options.batchServerFunctions(
+				payload.body,
+				(member, signal) => {
+					const url = new URL(request.url);
+					url.pathname = RPC_PATH_PREFIX + member.hash;
+					const headers = new Headers(request.headers);
+					headers.set('accept', 'application/x-octane-rpc+ndjson');
+					headers.delete('content-length');
+					// Re-enter the complete boundary for every member, with isolated
+					// authorization state. The batch envelope grants no credentials.
+					return handleRpcRequest(
+						new Request(url, {
+							method: 'POST',
+							headers,
+							body: member.body,
+							signal,
+						}),
+						options,
+					);
+				},
+				{ ...options.resultLimits, signal: request.signal },
+			);
+			return withRpcCors(
+				new Response(stream, {
+					headers: {
+						'Content-Type': 'application/x-octane-rpc-batch+ndjson',
+						'Cache-Control': 'no-store',
+					},
+				}),
+				corsOrigin,
+			);
+		} catch (error) {
+			if (isInvalidRpcPayload(error))
+				return withRpcCors(rpcError(400, 'Invalid server batch arguments'), corsOrigin);
+			throw error;
+		}
+	}
 
 	const context = createContext(request, {}, options.platform);
 	// Name the target before middleware so a policy can authorize per function.
@@ -230,41 +284,123 @@ export async function handleRpcRequest(request, options) {
 		options.platform === undefined
 			? { origin, context }
 			: { origin, platform: options.platform, context };
+	Object.assign(store, {
+		serverCallHost: createServerCallHost(context, {
+			asyncContext: options.asyncContext,
+			middlewares: options.middlewares,
+			origin,
+		}),
+	});
 	setRequestContextSource(options.asyncContext);
+	let invoked = false;
 
 	try {
-		const response = await options.asyncContext.run(store, async () =>
-			runMiddlewareChain(
-				context,
-				options.middlewares ?? [],
-				[],
-				async () => {
-					const fn = await options.resolveFunction(hash);
-					if (fn === null) return rpcError(404, 'RPC function not found');
-					const payload = await readBoundedRpcBody(
-						request,
-						options.maxBodyBytes ?? DEFAULT_RPC_MAX_BODY_BYTES,
-					);
-					if ('error' in payload) return payload.error;
-					try {
-						const result = await options.executeServerFunction(fn, payload.body);
-						return new Response(result, {
-							status: 200,
-							headers: { 'Content-Type': 'application/json; charset=utf-8' },
-						});
-					} catch (error) {
-						if (isInvalidRpcPayload(error)) {
-							return rpcError(400, 'Invalid server function arguments');
+		const response = await runServerRequest(
+			options.asyncContext,
+			store,
+			options.signalOwners,
+			async () =>
+				runMiddlewareChain(
+					context,
+					options.middlewares ?? [],
+					[],
+					async () => {
+						const fn = await options.resolveFunction(hash);
+						if (fn === null) return rpcError(404, 'RPC function not found');
+						const payload = await readBoundedRpcBody(
+							request,
+							options.maxBodyBytes ?? DEFAULT_RPC_MAX_BODY_BYTES,
+						);
+						if ('error' in payload) return payload.error;
+						try {
+							if (request.headers.get('accept') === 'application/x-octane-rpc+ndjson') {
+								if (options.streamServerFunction === undefined) {
+									return rpcError(406, 'Streamed RPC results are not configured');
+								}
+								invoked = true;
+								const stream = await options.streamServerFunction(
+									fn,
+									payload.body,
+									serverCallContext(context),
+									options.resultLimits,
+								);
+								const reader = stream.getReader();
+								return new Response(
+									new ReadableStream(
+										{
+											pull(controller) {
+												return options.asyncContext.run(store, async () => {
+													try {
+														const item = await reader.read();
+														if (item.done) {
+															reader.releaseLock();
+															controller.close();
+														} else controller.enqueue(item.value);
+													} catch (error) {
+														controller.error(error);
+													}
+												});
+											},
+											cancel(reason) {
+												return options.asyncContext.run(store, async () => {
+													try {
+														await reader.cancel(reason);
+													} finally {
+														reader.releaseLock();
+													}
+												});
+											},
+										},
+										{ highWaterMark: 0 },
+									),
+									{
+										headers: {
+											'Content-Type': 'application/x-octane-rpc+ndjson',
+											'Cache-Control': 'no-store',
+										},
+									},
+								);
+							}
+							invoked = true;
+							const result = await options.executeServerFunction(
+								fn,
+								payload.body,
+								serverCallContext(context),
+							);
+							return new Response(result, {
+								status: 200,
+								headers: { 'Content-Type': 'application/json; charset=utf-8' },
+							});
+						} catch (error) {
+							if (isInvalidRpcPayload(error)) {
+								return rpcError(400, 'Invalid server function arguments');
+							}
+							throw error;
 						}
-						throw error;
-					}
-				},
-				[],
-			),
+					},
+					[],
+				),
 		);
+		if (!response.ok && !invoked) {
+			const headers = new Headers(response.headers);
+			headers.set('Octane-RPC-Outcome', 'rejected');
+			return withRpcCors(
+				new Response(response.body, {
+					status: response.status,
+					statusText: response.statusText,
+					headers,
+				}),
+				corsOrigin,
+			);
+		}
 		return withRpcCors(response, corsOrigin);
 	} catch (error) {
 		console.error('[octane] RPC request error:', error);
-		return withRpcCors(rpcError(500, 'Internal Server Error'), corsOrigin);
+		return withRpcCors(
+			rpcError(500, 'Internal Server Error', {
+				'Octane-RPC-Outcome': invoked ? 'uncertain' : 'rejected',
+			}),
+			corsOrigin,
+		);
 	}
 }

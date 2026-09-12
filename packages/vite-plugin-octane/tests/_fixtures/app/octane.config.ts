@@ -1,4 +1,10 @@
-import { defineConfig, RenderRoute, OCTANE_NONCE_STATE_KEY } from '@octanejs/vite-plugin';
+import {
+	defineConfig,
+	RenderRoute,
+	ServerRoute,
+	OCTANE_NONCE_STATE_KEY,
+} from '@octanejs/vite-plugin';
+import { acceptUrlAction, fetchHistory } from './src/conversation-history/server.ts';
 
 export default defineConfig({
 	server: {
@@ -39,6 +45,9 @@ export default defineConfig({
 				return new Response('Unauthorized', { status: 401 });
 			}
 			context.state.set(OCTANE_NONCE_STATE_KEY, 'fixture-nonce');
+			// Deterministic test authentication, not a production identity policy.
+			// Each browser run has separate data; RPC arguments never set viewer.
+			context.viewer = context.request.headers.get('x-fixture-viewer') ?? 'fixture-viewer';
 			const response = await next();
 			const headers = new Headers(response.headers);
 			headers.set(
@@ -59,6 +68,16 @@ export default defineConfig({
 	router: {
 		preHydrate: '/src/pre-hydrate.ts',
 		routes: [
+			new RenderRoute({
+				path: '/conversation-history',
+				entry: ['HistoryApp', '/src/conversation-history/App.tsrx'],
+				before: [acceptUrlAction],
+			}),
+			new ServerRoute({ path: '/conversation-history/frames', handler: fetchHistory }),
+			new RenderRoute({
+				path: '/conversations',
+				entry: ['ConversationApp', '/src/conversation/App.tsrx'],
+			}),
 			new RenderRoute({ path: '/', entry: ['Page', '/src/Page.tsrx'], layout: '/src/Layout.tsrx' }),
 			new RenderRoute({
 				path: '/pages/:slug',

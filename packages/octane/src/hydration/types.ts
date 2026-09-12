@@ -94,6 +94,12 @@ export type HydrateWhen = HydrationStrategy | (() => HydrationStrategy);
 
 type HydrateCommonOptions = {
 	when: HydrateWhen;
+	/**
+	 * Require this boundary to activate without evaluating or hydrating its
+	 * lexical parent. The compiler rejects the boundary when it cannot prove a
+	 * standalone capture, ownership, ID, and style contract.
+	 */
+	independent?: boolean;
 	fallback?: unknown;
 	onHydrated?: () => void;
 };

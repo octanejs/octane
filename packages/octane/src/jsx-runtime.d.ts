@@ -42,6 +42,7 @@
  */
 import type * as React from 'react';
 import type { ElementDescriptor, FragmentInstance } from './index.js';
+import type { SignalHandle } from './signals/types.js';
 
 /**
  * Octane's element type — the analog of React's `ReactElement`, and what a
@@ -53,8 +54,10 @@ import type { ElementDescriptor, FragmentInstance } from './index.js';
  */
 export interface OctaneElement<P = any> extends ElementDescriptor<P> {}
 
-export interface CSSProperties extends React.CSSProperties {
-	cssFloat?: React.CSSProperties['float'];
+type SignalProperties<P> = { [K in keyof P]: P[K] | SignalHandle<P[K]> };
+
+export interface CSSProperties extends SignalProperties<React.CSSProperties> {
+	cssFloat?: React.CSSProperties['float'] | SignalHandle<React.CSSProperties['float']>;
 }
 
 export type ClassValue =
@@ -132,13 +135,24 @@ type ExistingButtonAttribute<
 	Fallback,
 > = K extends keyof React.ButtonHTMLAttributes<T> ? React.ButtonHTMLAttributes<T>[K] : Fallback;
 
+/** Uncontrolled initialization and framework instructions are not live bindings. */
+type UnboundProps =
+	| 'defaultValue'
+	| 'defaultChecked'
+	| 'dangerouslySetInnerHTML'
+	| 'suppressContentEditableWarning'
+	| 'suppressHydrationWarning';
+
 /** Octane's attribute transform over one React attribute interface. */
-type Transformed<P, T> = Omit<P, ReactSyntheticProps | 'className' | 'style' | 'children'> &
+type Transformed<P, T> = SignalProperties<
+	Omit<P, ReactSyntheticProps | UnboundProps | 'className' | 'style' | 'children'>
+> &
+	Pick<P, Extract<keyof P, UnboundProps>> &
 	NativeEventHandlers<P, T & EventTarget> & {
-		class?: ClassValue;
-		className?: ClassValue;
-		for?: string;
-		xmlns?: string;
+		class?: ClassValue | SignalHandle<ClassValue>;
+		className?: ClassValue | SignalHandle<ClassValue>;
+		for?: string | SignalHandle<string>;
+		xmlns?: string | SignalHandle<string>;
 		style?: string | CSSProperties;
 		children?: unknown;
 	};
