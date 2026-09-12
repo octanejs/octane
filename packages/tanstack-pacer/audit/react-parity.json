@@ -176,7 +176,7 @@
         {
           "path": "packages/tanstack-pacer/audit/type-parity.json",
           "role": "support",
-          "sha256": "9e3d8c83d76a31d33e0271f9d461b9b605b0a01cbacfd82810f0dbf0284ac641"
+          "sha256": "334436ac034b0642b4c10c53a72e308adec33203f0d1dbe7b6c9861eaa2214a7"
         },
         {
           "path": "packages/tanstack-pacer/typetests/assertions.md",
@@ -217,7 +217,7 @@
         {
           "path": "packages/tanstack-pacer/audit/adapted-types.json",
           "role": "test",
-          "sha256": "ab51348f0a0c75aec3b8a67ad1a2ae74bc03e876d16a14988cfc23b9f6b1596a",
+          "sha256": "5cb4f720be1671701b9a63cadfa08f765ca839de7977562d63b988819d60efc3",
           "cases": [
             {
               "id": "types:adapted-octane",
@@ -234,7 +234,7 @@
         {
           "path": "packages/tanstack-pacer/audit/type-parity.json",
           "role": "support",
-          "sha256": "9e3d8c83d76a31d33e0271f9d461b9b605b0a01cbacfd82810f0dbf0284ac641"
+          "sha256": "334436ac034b0642b4c10c53a72e308adec33203f0d1dbe7b6c9861eaa2214a7"
         },
         {
           "path": "packages/tanstack-pacer/typetests/assertions.md",

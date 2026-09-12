@@ -277,3 +277,19 @@ test('requires the renderer alias instead of an unclassified unknown Subscribe c
 		/outside the permitted transformations/,
 	);
 });
+
+test('rejects a Subscribe guard on a different value', async (t) => {
+	const value = await fixture();
+	t.after(() => rm(value.root, { recursive: true, force: true }));
+	const file = join(value.root, 'adapted/debouncer/useDebouncer.ts');
+	const source = await readFile(file, 'utf8');
+	assert.ok(source.includes('!isChildrenBlock(props.children)'));
+	await writeFile(
+		file,
+		source.replace('!isChildrenBlock(props.children)', '!isChildrenBlock(props)'),
+	);
+	assert.throws(
+		() => buildTypeInventory(value.root, value.config),
+		/outside the permitted transformations/,
+	);
+});

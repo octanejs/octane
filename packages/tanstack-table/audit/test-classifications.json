@@ -65,6 +65,29 @@
       "path": "packages/tanstack-table/tests/children-block.test.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Compiled template children remain renderer-owned; genuine render-prop callbacks receive selected state. Checks updates and survivor identity."
+    },
+    {
+      "path": "packages/tanstack-table/tests/types/public-contracts.test-d.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Strict public-type contracts with immutable upstream witnesses and negative controls."
+    },
+    {
+      "path": "packages/tanstack-table/typetests/pristine/public-contracts.test-d.ts",
+      "disposition": "pristine-types",
+      "reason": "Strict public-type contracts with immutable upstream witnesses and negative controls.",
+      "oracle": "https://github.com/TanStack/table/tree/d01c01bedbab0ff6c2641f18b2fc9a11545d9bf6/packages/react-table"
+    },
+    {
+      "path": "packages/tanstack-table/typetests/adapted/public-contracts.test-d.ts",
+      "disposition": "adapted-types",
+      "reason": "Strict public-type contracts with immutable upstream witnesses and negative controls.",
+      "oracle": "https://github.com/TanStack/table/tree/d01c01bedbab0ff6c2641f18b2fc9a11545d9bf6/packages/react-table"
+    },
+    {
+      "path": "packages/tanstack-table/tests/upstream-original.test.ts",
+      "disposition": "unmodified-upstream-suite-wrapper",
+      "reason": "Executes and validates every pinned upstream runtime registration unchanged.",
+      "oracle": "https://github.com/TanStack/table/tree/d01c01bedbab0ff6c2641f18b2fc9a11545d9bf6/packages/react-table"
     }
   ]
 }

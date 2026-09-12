@@ -251,7 +251,7 @@
         {
           "path": "packages/tanstack-table/typetests/adapted/public-contracts.test-d.ts",
           "role": "support",
-          "sha256": "5d67fdfe32e385cc39026949cc4f86485f396ede8320ce54df8b5886e8283674"
+          "sha256": "3621d8c98a13c7db1c540e9437dcded14aa634b844351538bcc32a25f1d09427"
         },
         {
           "path": "packages/tanstack-table/typetests/adapted/types.test-d.ts",

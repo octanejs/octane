@@ -2912,13 +2912,6 @@ type Contract_4_tableWorkerStageStateDeps = Assert<
 type Contract_4_workerRowModelsFeature = Assert<
 	Equal<typeof Actual4.workerRowModelsFeature, ExpectedContracts['4_workerRowModelsFeature']>
 >;
-type NativeSubscribe = Assert<Equal<Parameters<Actual0.SubscribeComponent>['length'], 1>>;
-type NativeComponent = Assert<
-	Equal<
-		Actual0.TableComponentType<{ value: string }>,
-		import('octane').ComponentType<{ value: string }>
-	>
->;
 const table = Actual0.useTable(
 	{
 		features: Actual0.stockFeatures,

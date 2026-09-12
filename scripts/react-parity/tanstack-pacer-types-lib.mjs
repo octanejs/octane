@@ -184,6 +184,8 @@ export function structuralSource(source, fileName, { mergeProviderContext = fals
 			.replace(/\bexport interface PacerContextValue\b/g, 'interface PacerContextValue')
 			.replace(/\bexport const PacerContext\b/g, 'const PacerContext');
 	}
+	// Compiled children blocks are callable renderables in Octane.
+	text = text.replace(/\s*&&\s*!isChildrenBlock\(props\.children\)/g, '');
 	text = dropSelectorSlotsAndUseStateTypeArgs(text, fileName);
 
 	const sf = ts.createSourceFile(
@@ -221,6 +223,7 @@ export function structuralSource(source, fileName, { mergeProviderContext = fals
 			if (nb && ts.isNamedImports(nb)) {
 				for (const el of nb.elements) {
 					if (DROP_TYPE_NAMES.has(el.name.text)) continue;
+					if (spec === 'octane' && el.name.text === 'isChildrenBlock') continue;
 					named.push(el.name.text);
 				}
 			}

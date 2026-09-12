@@ -63,18 +63,14 @@
     },
     {
       "path": "packages/tanstack-query/tests/upstream-original.test.ts",
-      "disposition": "pristine-upstream-suite",
-      "reason": "Runs all 404 exact pinned upstream runtime registrations unchanged against React and verifies their identities and passed results."
-    },
-    {
-      "path": "packages/tanstack-query/tests/upstream",
-      "disposition": "adapted-upstream-suite",
-      "reason": "Materializes all 404 upstream runtime and 167 type registrations from the immutable lock. Renderer-specific changes are recorded in the reviewed patches."
+      "disposition": "unmodified-upstream-suite-wrapper",
+      "reason": "Runs all 404 exact pinned upstream runtime registrations unchanged against React and verifies their identities and passed results.",
+      "oracle": "https://github.com/TanStack/query/tree/2969edf32f7e0c48e2a108d84712d6e01edfde21/packages/react-query"
     },
     {
       "path": "packages/tanstack-query/tests/types/public-contracts.test-d.ts",
-      "disposition": "public-type-parity",
-      "reason": "Strict public probes compare all upstream exports with pinned declarations, plus the retained QueryErrorResetBoundaryValue compatibility type; native rendering slots use canonical Octane types."
+      "disposition": "octane-only-type-conformance",
+      "reason": "Strict binding public-type contracts with pinned upstream witnesses and independent negative controls."
     }
   ]
 }
