@@ -8,6 +8,8 @@ import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 export const runners = new Map([
+	['tanstack-ai', { module: './tanstack-ai-pristine-runtime.mjs', label: 'TanStack AI' }],
+	['tanstack-db', { module: './tanstack-db-pristine-runtime.mjs', label: 'TanStack DB' }],
 	['tanstack-table', { module: './tanstack-table-pristine-runtime.mjs', label: 'TanStack Table' }],
 	['base-ui', { module: './base-ui-pristine-runtime.mjs', label: '@base-ui/react' }],
 	['base-ui-utils', { module: './base-ui-utils-pristine-runtime.mjs', label: '@base-ui/utils' }],

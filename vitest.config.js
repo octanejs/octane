@@ -1,3 +1,6 @@
+import tanstackAiAdapted from './packages/tanstack-ai/tests/vitest.adapted.config.ts';
+import tanstackAiAdaptedSSR from './packages/tanstack-ai/tests/vitest.adapted-ssr.config.ts';
+import tanstackDbAdapted from './packages/tanstack-db/tests/vitest.adapted.config.ts';
 import tanstackTableAdapted from './packages/tanstack-table/tests/vitest.adapted.config.ts';
 import tanstackTableAdaptedSSR from './packages/tanstack-table/tests/vitest.adapted-ssr.config.ts';
 import { realpathSync } from 'node:fs';
@@ -608,6 +611,33 @@ export default defineConfig({
 		// `--silent=passed-only` overrides this default.
 		silent: true,
 		projects: [
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'tanstack-ai-browser',
+					include: ['packages/tanstack-ai/tests/browser/**/*.test.ts'],
+					environment: 'node',
+				},
+			},
+			{ ...tanstackAiAdapted, testExecution: { group: 'react-parity' } },
+			{ ...tanstackAiAdaptedSSR, testExecution: { group: 'react-parity' } },
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'tanstack-ai-pristine',
+					include: ['packages/tanstack-ai/tests/upstream-original.test.ts'],
+					environment: 'node',
+				},
+			},
+			{ ...tanstackDbAdapted, testExecution: { group: 'react-parity' } },
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'tanstack-db-pristine',
+					include: ['packages/tanstack-db/tests/upstream-original.test.ts'],
+					environment: 'node',
+				},
+			},
 			{ ...tanstackVirtualAdapted, testExecution: { group: 'react-parity' } },
 			{ ...tanstackTableAdapted, testExecution: { group: 'react-parity' } },
 			{ ...tanstackTableAdaptedSSR, testExecution: { group: 'react-parity' } },
@@ -1192,9 +1222,14 @@ export default defineConfig({
 			{
 				test: {
 					name: 'tanstack-db',
-					include: ['packages/tanstack-db/tests/**/*.test.tsx'],
+					include: ['packages/tanstack-db/tests/**/*.test.{ts,tsx}'],
+					exclude: [
+						'packages/tanstack-db/tests/upstream/**',
+						'packages/tanstack-db/tests/upstream-original.test.ts',
+					],
 					environment: 'jsdom',
 					setupFiles: ['packages/tanstack-db/tests/test-setup.ts'],
+					globalSetup: ['packages/tanstack-db/tests/differential/_setup.ts'],
 					globals: false,
 				},
 				plugins: [octane()],

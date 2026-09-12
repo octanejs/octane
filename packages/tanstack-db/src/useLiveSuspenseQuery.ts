@@ -1,6 +1,9 @@
-import { use, useRef } from 'octane';
 import { splitTrailingSlot, subSlot } from './slot';
+
+import { useRef } from 'octane';
 import { useLiveQuery } from './useLiveQuery';
+import { getLiveQueryResultInfo } from './live-query-internals';
+import type { UseLiveQueryConfig } from './useLiveQuery';
 import type {
 	Collection,
 	Context,
@@ -13,35 +16,22 @@ import type {
 	SingleResult,
 } from '@tanstack/db';
 
-// Shared, already-fulfilled thenable handed to `use()` on the non-suspending
-// paths (see the divergence note in the hook body). It carries the React 19
-// `cache()` "settled thenable" shape (`status: 'fulfilled'`), which Octane's
-// `use()` returns synchronously without instrumentation. A bare
-// `Promise.resolve()` would NOT work: `use()` tags an untagged thenable
-// `'pending'` synchronously (the fulfillment callback runs a microtask later),
-// so its first use would suspend and flash the fallback even though data is
-// ready. Its resolved value is never read — only the settled status matters — so
-// one module-level instance is safe to share across every hook and render.
-const SETTLED: Promise<void> & { status: 'fulfilled'; value: undefined } = Object.assign(
-	Promise.resolve(),
-	{ status: `fulfilled` as const, value: undefined },
-);
-
 /**
  * Create a live query with React Suspense support
  * @param queryFn - Query function that defines what data to fetch
- * @param deps - Array of dependencies that trigger query re-execution when changed
+ * @param deps - Deprecated array of dependencies that trigger query re-execution when changed
  * @returns Object with reactive data and state - data is guaranteed to be defined
  * @throws Promise when data is loading (caught by Suspense boundary)
  * @throws Error when collection fails (caught by Error boundary)
  * @example
  * // Basic usage with Suspense
  * function TodoList() {
- *   const { data } = useLiveSuspenseQuery((q) =>
- *     q.from({ todos: todosCollection })
- *      .where(({ todos }) => eq(todos.completed, false))
- *      .select(({ todos }) => ({ id: todos.id, text: todos.text }))
- *   )
+ *   const { data } = useLiveSuspenseQuery({
+ *     query: (q) =>
+ *       q.from({ todos: todosCollection })
+ *        .where(({ todos }) => eq(todos.completed, false))
+ *        .select(({ todos }) => ({ id: todos.id, text: todos.text }))
+ *   })
  *
  *   return (
  *     <ul>
@@ -68,12 +58,11 @@ const SETTLED: Promise<void> & { status: 'fulfilled'; value: undefined } = Objec
  * // data is guaranteed to be the single item (or undefined if not found)
  *
  * @example
- * // With dependencies that trigger re-suspension
- * const { data } = useLiveSuspenseQuery(
- *   (q) => q.from({ todos: todosCollection })
+ * // Structured captured values are included in derived query identity and trigger re-suspension
+ * const { data } = useLiveSuspenseQuery({
+ *   query: (q) => q.from({ todos: todosCollection })
  *          .where(({ todos }) => gt(todos.priority, minPriority)),
- *   [minPriority] // Re-suspends when minPriority changes
- * )
+ * })
  *
  * @example
  * // With Error boundary
@@ -102,9 +91,9 @@ const SETTLED: Promise<void> & { status: 'fulfilled'; value: undefined } = Objec
  * ✅ **Use conditional rendering instead:**
  * ```ts
  * function Profile({ userId }: { userId: string }) {
- *   const { data } = useLiveSuspenseQuery(
- *     (q) => q.from({ users }).where(({ users }) => eq(users.id, userId))
- *   )
+ *   const { data } = useLiveSuspenseQuery({
+ *     query: (q) => q.from({ users }).where(({ users }) => eq(users.id, userId)),
+ *   })
  *   return <div>{data.name}</div>
  * }
  *
@@ -112,12 +101,9 @@ const SETTLED: Promise<void> & { status: 'fulfilled'; value: undefined } = Objec
  * {userId ? <Profile userId={userId} /> : <div>No user</div>}
  * ```
  *
- * ✅ **Or use useLiveQuery for conditional queries:**
+ * ✅ **For optional inputs, conditionally render a component with complete query inputs:**
  * ```ts
- * const { data, isEnabled } = useLiveQuery(
- *   (q) => userId ? q.from({ users }) : undefined,  // ✅ Supported!
- *   [userId]
- * )
+ * {userId ? <Profile userId={userId} /> : <div>No user</div>}
  * ```
  */
 // Overload 1: Accept query function that always returns QueryBuilder
@@ -132,6 +118,15 @@ export function useLiveSuspenseQuery<TContext extends Context>(
 
 // Overload 2: Accept config object
 export function useLiveSuspenseQuery<TContext extends Context>(
+	config: UseLiveQueryConfig<TContext>,
+): {
+	state: Map<string | number, GetResult<TContext>>;
+	data: InferResultType<TContext>;
+	collection: Collection<GetResult<TContext>, string | number, {}>;
+};
+
+// Overload 3: Accept legacy config object
+export function useLiveSuspenseQuery<TContext extends Context>(
 	config: LiveQueryCollectionConfig<TContext>,
 	deps?: Array<unknown>,
 ): {
@@ -140,7 +135,7 @@ export function useLiveSuspenseQuery<TContext extends Context>(
 	collection: Collection<GetResult<TContext>, string | number, {}>;
 };
 
-// Overload 3: Accept pre-created live query collection
+// Overload 4: Accept pre-created live query collection
 export function useLiveSuspenseQuery<
 	TResult extends object,
 	TKey extends string | number,
@@ -153,7 +148,7 @@ export function useLiveSuspenseQuery<
 	collection: Collection<TResult, TKey, TUtils>;
 };
 
-// Overload 4: Accept pre-created live query collection with singleResult: true
+// Overload 5: Accept pre-created live query collection with singleResult: true
 export function useLiveSuspenseQuery<
 	TResult extends object,
 	TKey extends string | number,
@@ -169,18 +164,21 @@ export function useLiveSuspenseQuery<
 // Implementation - uses useLiveQuery internally and adds Suspense logic
 export function useLiveSuspenseQuery(configOrQueryOrCollection: any, ...rest: Array<unknown>) {
 	const [args, slot] = splitTrailingSlot(rest);
-	const deps = (args[0] as Array<unknown> | undefined) ?? [];
+	const deps = args[0] as Array<unknown> | undefined;
 
-	const promiseRef = useRef<Promise<void> | null>(null, subSlot(slot, `promise-ref`));
-	const collectionRef = useRef<Collection<any, any, any> | null>(null, subSlot(slot, `coll-ref`));
-	const hasBeenReadyRef = useRef(false, subSlot(slot, `ready-ref`));
+	const promiseRef = useRef<Promise<void> | null>(null, subSlot(slot, 'promiseRef'));
+	const collectionRef = useRef<Collection<any, any, any> | null>(
+		null,
+		subSlot(slot, 'collectionRef'),
+	);
+	const hasBeenReadyRef = useRef(false, subSlot(slot, 'hasBeenReadyRef'));
 
-	// Use useLiveQuery to handle collection management and reactivity.
-	// Namespace the nested slot so useLiveQuery's internal refs (e.g. `coll-ref`)
-	// don't alias this wrapper's own refs of the same tag.
-	const result = (useLiveQuery as any)(configOrQueryOrCollection, deps, subSlot(slot, `lq`));
+	// Use useLiveQuery to handle collection management and reactivity
+	// The compiler slot is an internal trailing argument, outside public overloads.
+	const result = (useLiveQuery as any)(configOrQueryOrCollection, deps, subSlot(slot, 'query'));
+	const queryInfo = getLiveQueryResultInfo(result);
 
-	// Reset promise and ready state when collection changes (deps changed)
+	// Reset promise and ready state when query identity changes
 	if (collectionRef.current !== result.collection) {
 		promiseRef.current = null;
 		collectionRef.current = result.collection;
@@ -188,7 +186,7 @@ export function useLiveSuspenseQuery(configOrQueryOrCollection: any, ...rest: Ar
 	}
 
 	// SUSPENSE LOGIC: Throw promise or error based on collection status
-
+	// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
 	if (!result.isEnabled) {
 		// Suspense queries cannot be disabled - this matches TanStack Query's useSuspenseQuery behavior
 		throw new Error(
@@ -200,20 +198,22 @@ export function useLiveSuspenseQuery(configOrQueryOrCollection: any, ...rest: Ar
 		);
 	}
 
-	// It’s not recommended to suspend a render based on a store value returned by useSyncExternalStore.
-	// result.status is the snapshot from syncExternalStore. We read the fresh status from the collection reference instead.
 	const collectionStatus = result.collection.status;
 
 	// Track when we reach ready state
-	if (collectionStatus === `ready`) {
+	if (result.isReady) {
 		hasBeenReadyRef.current = true;
 		promiseRef.current = null;
 	}
 
+	const observerError = queryInfo.observer.getError();
+	if (observerError !== undefined && !hasBeenReadyRef.current) {
+		promiseRef.current = null;
+		throw observerError;
+	}
+
 	// Only throw errors during initial load (before first ready)
-	// After success, errors surface as stale data (matches TanStack Query behavior).
-	// This throw aborts the whole component body (no later hook runs), so it does
-	// not perturb the call-order invariant the `use()` below depends on.
+	// After success, errors surface as stale data (matches TanStack Query behavior)
 	if (collectionStatus === `error` && !hasBeenReadyRef.current) {
 		promiseRef.current = null;
 		// TODO: Once collections hold a reference to their last error object (#671),
@@ -221,23 +221,25 @@ export function useLiveSuspenseQuery(configOrQueryOrCollection: any, ...rest: Ar
 		throw new Error(`Collection "${result.collection.id}" failed to load`);
 	}
 
-	// OCTANE ADAPTATION: consume the preload promise through `use(thenable)`, and call
-	// `use()` UNCONDITIONALLY — exactly once on every path that keeps rendering.
-	//
-	// Upstream react-db throws the preload promise; Octane supports that too.
-	// This binding uses the public hook, whose thenable state is tracked by
-	// dynamic call-order index (the runtime's `__thenableIdx`), like React's
-	// positional `thenableState` — NOT by compiler slot. So skipping `use()` on the
-	// ready / stale-after-error paths would shift the thenable index of any sibling
-	// `use()` or second `useLiveSuspenseQuery` in the same component, which could
-	// then read a neighbor's fulfilled thenable and expose still-pending data as
-	// ready. Handing `use()` an already-resolved thenable when we are not loading
-	// keeps the call count stable and returns synchronously without suspending.
-	// Reusing the `promiseRef` identity lets `use()` dedupe the thenable across the
-	// suspension's replay renders.
-	const isLoading = collectionStatus === `loading` || collectionStatus === `idle`;
-	const preloadPromise = isLoading ? (promiseRef.current ??= result.collection.preload()) : SETTLED;
-	use(preloadPromise);
+	if (!hasBeenReadyRef.current && (result.isLoading || result.isIdle)) {
+		if (queryInfo.client?._isSsrStreamingEnabled() && !queryInfo.queryHash) {
+			const reason = queryInfo.identityError
+				? `${queryInfo.identityError.reason} at ${queryInfo.identityError.path}`
+				: `the query has no stable identity`;
+			throw new Error(
+				`Cannot stream this live query during SSR because ${reason}. Provide an explicit serializable queryKey.`,
+			);
+		}
+
+		// Create or reuse promise for current collection
+		if (!promiseRef.current) {
+			promiseRef.current = queryInfo.observer.preload();
+		}
+		// THROW PROMISE - React Suspense catches this (React 18+ required)
+		// Note: We don't check React version here. In React <18, this will be caught
+		// by an Error Boundary, which provides a reasonable failure mode.
+		throw promiseRef.current;
+	}
 
 	// Return data without status/loading flags (handled by Suspense/ErrorBoundary)
 	// If error after success, return last known good state (stale data)

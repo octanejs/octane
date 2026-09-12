@@ -258,10 +258,10 @@
     "id": "binding-tanstack-db",
     "title": "TanStack DB",
     "packageName": "@octanejs/tanstack-db",
-    "upstreamPackage": "@tanstack/db",
+    "upstreamPackage": "@tanstack/react-db",
     "category": "Data",
     "categoryId": "data",
-    "description": "Use @tanstack/db with Octane.",
+    "description": "Use @tanstack/react-db with Octane.",
     "searchTerms": [],
     "tags": ["database", "collections", "local first"],
     "order": 20

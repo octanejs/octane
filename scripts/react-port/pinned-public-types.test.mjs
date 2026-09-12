@@ -178,7 +178,7 @@ test('matches an inlined generic public contract', () =>
 		null,
 	));
 
-function pinnedFixture(run, { adjacent = false, opaque = false } = {}) {
+function pinnedFixture(run, { adjacent = false, opaque = false, hiddenManifest = false } = {}) {
 	const workspaceRoot = realpathSync(mkdtempSync(path.join(tmpdir(), 'pinned-public-artifact-')));
 	const directory = path.join(workspaceRoot, 'packages/widget');
 	mkdirSync(directory, { recursive: true });
@@ -190,7 +190,7 @@ function pinnedFixture(run, { adjacent = false, opaque = false } = {}) {
 				'.': adjacent
 					? { import: './index.mjs' }
 					: { import: { types: './index.d.mts', default: './index.mjs' } },
-				'./package.json': './package.json',
+				...(hiddenManifest ? {} : { './package.json': './package.json' }),
 			},
 		});
 		const declaration = opaque
@@ -542,4 +542,42 @@ test('pairs overloaded generic declarations and excludes implementation-only typ
 		'interface Feature { run:(input:any)=>void } export declare function value<T>(input:T):void; export declare function value<F extends Feature,T>(input:F, other:T):void;';
 	assert.equal(check(actual, expected), null);
 	assert.match(check(actual, expected.replace('input:any', 'input:string')), /any/);
+});
+
+for (const drift of [false, true]) {
+	test(`authenticates an ESM-only package with private metadata${drift ? ' and rejects changed bytes' : ''}`, () =>
+		pinnedFixture(
+			({ directory, node, put }) => {
+				if (drift) {
+					put('node_modules/mit-widget/index.d.mts', 'export type Changed = string;');
+					assert.throws(
+						() => pinnedPublicEntries(directory, node),
+						/differs from pinned npm bytes/,
+					);
+				} else {
+					assert.equal(
+						pinnedPublicEntries(directory, node).get('@octanejs/widget'),
+						path.join(directory, 'node_modules/mit-widget/index.d.mts'),
+					);
+				}
+			},
+			{ hiddenManifest: true },
+		));
+}
+
+test('compares callable type parameters through their constraints without repeating apparent signatures', () => {
+	assert.equal(
+		check(
+			'type Component<P> = (props: P) => unknown; export declare function value<C extends Component<any>>(component: C): C;',
+			"import type { ComponentType } from 'react'; export declare function value<C extends ComponentType<any> | undefined>(component: C): C;",
+		),
+		null,
+	);
+	assert.match(
+		check(
+			'type Component = (props: { value: any }) => unknown; export declare function value<C extends Component>(component: C): C;',
+			"import type { ReactNode } from 'react'; type Component = ((props: { value: string }) => ReactNode) | undefined; export declare function value<C extends Component>(component: C): C;",
+		),
+		/any/,
+	);
 });

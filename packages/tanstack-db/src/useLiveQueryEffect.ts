@@ -31,7 +31,7 @@ import type { Effect, EffectConfig } from '@tanstack/db';
 export function useLiveQueryEffect<
 	TRow extends object = Record<string, unknown>,
 	TKey extends string | number = string | number,
->(config: EffectConfig<TRow, TKey>, deps?: Array<unknown>): void;
+>(config: EffectConfig<TRow, TKey>, deps?: ReadonlyArray<unknown>): void;
 export function useLiveQueryEffect(config: any, ...rest: Array<unknown>): void {
 	// Parse the optional `deps` array and the compiler-injected trailing slot
 	// together from `...rest`, exactly as useLiveQuery/useLiveInfiniteQuery do.
@@ -40,6 +40,8 @@ export function useLiveQueryEffect(config: any, ...rest: Array<unknown>): void {
 	// `rest` empty and the slot undefined, so every ref/effect below loses its
 	// call-site identity.
 	const [args, slot] = splitTrailingSlot(rest);
+	// Octane reads dependency arrays without mutating them; its runtime ABI types
+	// the array as mutable, while the public React-compatible contract is readonly.
 	const deps = (args[0] as Array<unknown> | undefined) ?? [];
 
 	const configRef = useRef<EffectConfig<any, any>>(config, subSlot(slot, `cfg-ref`));

@@ -1,0 +1,49 @@
+{
+  "compilerOptions": {
+    "module": "esnext",
+    "target": "esnext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "skipLibCheck": false,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "allowImportingTsExtensions": true,
+    "types": ["node"],
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "jsx": "react-jsx",
+    "rootDirs": ["..", "../tests", "../upstream-helpers", "../node_modules/@tanstack"],
+    "jsxImportSource": "octane",
+    "paths": {
+      "@tanstack/db": ["../node_modules/@tanstack/db/src/index.ts"]
+    }
+  },
+  "include": ["../tests/upstream/**/*.test-d.tsx"],
+  "exclude": ["node_modules"],
+  "reactPortEvidence": {
+    "gate": "upstream-types-adapted",
+    "upstreamMode": "materialized",
+    "upstreamRegistrations": [
+      "react-case-v1:01ae2af03fa7d22ddae0",
+      "react-case-v1:02ef7e43ba71bd96f695",
+      "react-case-v1:199afc572fa01f9ef76c",
+      "react-case-v1:420961af9ab39e6683a4",
+      "react-case-v1:4fe5aab615413f5971f9",
+      "react-case-v1:50fcb6a09f380c1e06a5",
+      "react-case-v1:5b5062fb3ac1c6bee807",
+      "react-case-v1:5e59dce6e40ee4a9efff",
+      "react-case-v1:5ff320591840ff0a64ce",
+      "react-case-v1:74951b788886f1b29255",
+      "react-case-v1:77eeea727f23b7cd632d",
+      "react-case-v1:7d3869036f72f02d4c9a",
+      "react-case-v1:893e7695dcf2701bd8b3",
+      "react-case-v1:b8200e0b6f931c884231",
+      "react-case-v1:b8d8b4d5aed9cdfd9b0b",
+      "react-case-v1:d0bbe457de8ffd0c29fc",
+      "react-case-v1:fa04b4cec68ddc86645a",
+      "react-case-v1:fdff32cc8f399e6942c5"
+    ]
+  },
+  "tsrx": {
+    "compiler": "octane/compiler/volar"
+  }
+}

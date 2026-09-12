@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import { describe, expectTypeOf, it } from 'vitest';
 import { toolDefinition } from '@tanstack/ai';
 
@@ -165,12 +166,12 @@ describe('useChat() return type', () => {
 				const guitarTool = toolDefinition({
 					name: 'getGuitar',
 					description: 'Get guitar info',
-					inputSchema: {} as StandardJSONSchemaLike<{ id: string }>,
+					inputSchema: z.object({ id: z.string() }),
 				}).client((input) => ({ id: input.id }));
 				const approvalTool = toolDefinition({
 					name: 'deleteAccount',
 					description: 'Delete an account',
-					inputSchema: {} as StandardJSONSchemaLike<{ accountId: string }>,
+					inputSchema: z.object({ accountId: z.string() }),
 					needsApproval: true,
 				}).client(() => ({ deleted: true }));
 

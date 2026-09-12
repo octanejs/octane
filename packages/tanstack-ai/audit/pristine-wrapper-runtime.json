@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "project": "tanstack-ai-pristine",
+  "roots": ["packages/tanstack-ai/tests"],
+  "files": ["packages/tanstack-ai/tests/upstream-original.test.ts"],
+  "tests": [
+    {
+      "id": "runtime:43da432496c6e3a5",
+      "file": "packages/tanstack-ai/tests/upstream-original.test.ts",
+      "fullName": "runs all 235 pinned AI registrations unchanged"
+    }
+  ],
+  "snapshots": 0
+}

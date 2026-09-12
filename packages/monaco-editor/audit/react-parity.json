@@ -11,7 +11,10 @@
     "integrity": "sha256:46abb7e2335209e445163886b7cd9570d976a5873595e30961f0bee2d28f4974",
     "verification": "verified"
   },
-  "upstreamSuites": { "runtime": "present", "types": "absent" },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "absent"
+  },
   "adaptedRoots": {
     "source": {
       "roots": ["packages/monaco-editor/src"],
@@ -37,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "8c6917b3bdc395e057892a96a41d2041b3e2edd2fe8e040870d1dfc07fdbaf4a"
+      "lockfileSha256": "57dcbd6657cce7470df1124f428731acc5136b8c0188c8b59a96c95dbd7e459e"
     }
   },
   "lanes": [
@@ -77,7 +80,7 @@
         {
           "path": "scripts/react-parity/run-pristine.mjs",
           "role": "support",
-          "sha256": "1a2ea08e67fffe13c9cc013b2430ef74d4d10ff1992f84902ba63d5ac534d11f"
+          "sha256": "62216fd0ac2258a6cf9f8768ef276eae3590e9679e383cc879e3cd5b89e7e356"
         },
         {
           "path": "packages/monaco-editor/tests/upstream-pristine.vitest.config.ts",
@@ -202,7 +205,7 @@
       "environment": "workspace-node",
       "project": "monaco-editor-pristine-types",
       "evidenceOrigin": "repo-authored",
-      "notes": "Port-authored React-oracle type probes (groups 1–6); upstream ships no typetests.",
+      "notes": "Port-authored React-oracle type probes (groups 1\u20136); upstream ships no typetests.",
       "execution": {
         "kind": "typescript",
         "compiler": "tsc",
@@ -258,7 +261,7 @@
       "environment": "workspace-node",
       "project": "monaco-editor-adapted-types",
       "evidenceOrigin": "repo-authored",
-      "notes": "Shared groups 1–6 plus adapted-only groups 7–9 against @octanejs/monaco-editor with tsrx-tsc.",
+      "notes": "Shared groups 1\u20136 plus adapted-only groups 7\u20139 against @octanejs/monaco-editor with tsrx-tsc.",
       "execution": {
         "kind": "typescript",
         "compiler": "tsrx-tsc",
@@ -367,7 +370,7 @@
       "octaneResult": "Internal MonacoContainer accepts Octane ref",
       "rationale": "Octane has no forwardRef; refs are ordinary props.",
       "classification": "intentional-divergence",
-      "consumerImpact": "None — _ref was never public.",
+      "consumerImpact": "None \u2014 _ref was never public.",
       "migrationGuidance": "No consumer change.",
       "owner": "bindings",
       "reviewCondition": "If upstream exports MonacoContainer publicly with _ref."

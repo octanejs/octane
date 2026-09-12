@@ -11,7 +11,10 @@
     "integrity": "sha256:037f857d00462559b9790acc2214c818678eb9d61970d6c394dc26dcfcd1516d",
     "verification": "verified"
   },
-  "upstreamSuites": { "runtime": "present", "types": "absent" },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "absent"
+  },
   "adaptedRoots": {
     "source": {
       "roots": ["packages/zag/src"],
@@ -37,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "8c6917b3bdc395e057892a96a41d2041b3e2edd2fe8e040870d1dfc07fdbaf4a"
+      "lockfileSha256": "57dcbd6657cce7470df1124f428731acc5136b8c0188c8b59a96c95dbd7e459e"
     }
   },
   "lanes": [
@@ -87,7 +90,7 @@
         {
           "path": "scripts/react-parity/run-pristine.mjs",
           "role": "support",
-          "sha256": "1a2ea08e67fffe13c9cc013b2430ef74d4d10ff1992f84902ba63d5ac534d11f"
+          "sha256": "62216fd0ac2258a6cf9f8768ef276eae3590e9679e383cc879e3cd5b89e7e356"
         },
         {
           "path": "packages/zag/tests/upstream-vitest.config.ts",
@@ -108,7 +111,7 @@
       "environment": "workspace-node",
       "project": "zag",
       "evidenceOrigin": "upstream-suite",
-      "notes": "One-for-one adapted @zag-js/react 1.42.0 machine and nested-states suite identities against @octanejs/zag. The inventory generator and react-parity:validate enforce the normalized pristine→adapted crosswalk; StrictMode identities stay pristine-only via audit/runtime-case-dispositions.json.",
+      "notes": "One-for-one adapted @zag-js/react 1.42.0 machine and nested-states suite identities against @octanejs/zag. The inventory generator and react-parity:validate enforce the normalized pristine\u2192adapted crosswalk; StrictMode identities stay pristine-only via audit/runtime-case-dispositions.json.",
       "execution": {
         "kind": "vitest-full",
         "inventory": "packages/zag/audit/adapted-runtime.json"
@@ -251,7 +254,7 @@
       "environment": "workspace-node",
       "project": "zag-adapted-types",
       "evidenceOrigin": "repo-authored",
-      "notes": "Octane public type probes with matching negative controls after the permitted ReactNode→OctaneNode transformation.",
+      "notes": "Octane public type probes with matching negative controls after the permitted ReactNode\u2192OctaneNode transformation.",
       "execution": {
         "kind": "typescript",
         "compiler": "tsrx-tsc",

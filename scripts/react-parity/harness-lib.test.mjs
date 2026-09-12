@@ -1084,6 +1084,11 @@ test('requires explicit type evidence origins and supported compilers', () => {
 			},
 		};
 		assert.doesNotThrow(() => validateManifest(value));
+		if (type === 'pristine-types') {
+			const nativeCompiler = structuredClone(value);
+			nativeCompiler.lanes[0].execution.compiler = 'tsgo';
+			assert.doesNotThrow(() => validateManifest(nativeCompiler));
+		}
 
 		const missingOrigin = structuredClone(value);
 		delete missingOrigin.lanes[0].evidenceOrigin;
@@ -1094,7 +1099,7 @@ test('requires explicit type evidence origins and supported compilers', () => {
 		assert.throws(
 			() => validateManifest(wrongCompiler),
 			new RegExp(
-				`${type} execution must use ${type === 'pristine-types' ? 'tsc' : 'tsc or tsrx-tsc'}`,
+				`${type} execution must use ${type === 'pristine-types' ? 'tsc or tsgo' : 'tsc or tsrx-tsc'}`,
 			),
 		);
 	}

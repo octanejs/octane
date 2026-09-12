@@ -1064,3 +1064,63 @@ describe('union prerequisite graph', () => {
 		assert.match(node.repair, /complete a bounded shipped-source scan/i);
 	});
 });
+
+describe('authored runtime dependencies', () => {
+	test('classifies explicit parent edges without changing immutable upstream metadata', () => {
+		const target = licensedTarget('react-widget', '1.0.0');
+		const before = structuredClone(target);
+		const options = {
+			targets: [target],
+			inventory: fixtureInventory(),
+			runtimeDependencies: ['react-widget=@scope/protocol@2.3.4'],
+		};
+		const pending = planPortGraph(options);
+		assert.deepEqual(pending.nodes['pkg:react-widget'].dependsOn, ['pkg:@scope/protocol']);
+		assert.equal(pending.nodes['pkg:@scope/protocol'].action, 'audit-dependency');
+		assert.equal(pending.nodes['pkg:@scope/protocol'].requested, false);
+		const classified = planPortGraph({
+			...options,
+			dependencyClassifications: { '@scope/protocol': 'framework-neutral' },
+		});
+		assert.equal(classified.nodes['pkg:@scope/protocol'].action, 'reuse-package');
+		assert.deepEqual(classified.nodes['pkg:@scope/protocol'].constraints, [
+			{ range: '2.3.4', via: 'react-widget' },
+		]);
+		assert.deepEqual(target, before);
+		assert.notEqual(
+			classified.fingerprint,
+			planPortGraph({ ...options, runtimeDependencies: [] }).fingerprint,
+		);
+	});
+	test('retains upstream constraints and rejects incompatible authored versions', () => {
+		const graph = planPortGraph({
+			targets: [licensedTarget('react-widget', '1.0.0', { protocol: '^1.0.0' })],
+			inventory: fixtureInventory(),
+			runtimeDependencies: ['react-widget=protocol@2.0.0'],
+			dependencyClassifications: { protocol: 'framework-neutral' },
+		});
+		assert.equal(graph.nodes['pkg:protocol'].action, 'resolve-version-conflict');
+		assert.equal(graph.nodes['pkg:react-widget'].state, 'blocked');
+	});
+	test('rejects unknown parents, unpinned versions, and non-package edges', () => {
+		for (const edge of [
+			'missing=protocol@1.0.0',
+			'react-widget=protocol',
+			'react-widget=protocol@latest',
+			'react-widget=protocol@^1.0.0',
+			'react-widget=https://github.com/example/protocol',
+			'react-widget@1.0.0=protocol@1.0.0',
+		]) {
+			assert.throws(
+				() =>
+					planPortGraph({
+						targets: [licensedTarget('react-widget', '1.0.0')],
+						inventory: fixtureInventory(),
+						runtimeDependencies: [edge],
+					}),
+				/runtime dependency/i,
+				edge,
+			);
+		}
+	});
+});

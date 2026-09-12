@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "artifacts": [
+    {
+      "path": "LICENSE.upstream",
+      "sha256": "9fe9970f409e5b1d2067c0107ac0201761d5fddc53e9b20b66619fb0d2b4122f"
+    },
+    {
+      "path": "upstream-artifact/tanstack-ai-react-0.24.1.tgz",
+      "sha256": "3544abc8e0ef89c5f32601ecbcbc3d62d92648bb046777cf2df9429856ca6c74"
+    }
+  ],
+  "requiredFiles": ["audit/upstream.lock.json", "audit/upstream-helpers.json"],
+  "packageIdentity": {
+    "path": "upstream/package.json",
+    "name": "@tanstack/ai-react",
+    "version": "0.24.1",
+    "license": "MIT"
+  },
+  "unpublishedDirs": [
+    "audit",
+    "tests",
+    "typetests",
+    "upstream",
+    "upstream-artifact",
+    "upstream-helpers"
+  ]
+}

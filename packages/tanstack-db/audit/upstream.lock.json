@@ -2,14 +2,14 @@
   "schemaVersion": 1,
   "identity": {
     "packageName": "@tanstack/react-db",
-    "version": "0.1.96",
+    "version": "0.3.8",
     "repository": {
       "owner": "TanStack",
       "repo": "db",
-      "subdirectory": "packages"
+      "subdirectory": "packages/react-db"
     },
-    "commit": "2c35b5883907b4e9f155f849f92d6ebe0602e0f3",
-    "integrity": "sha512-NIjRiFH9KqNnWRtixFal22KA+9b2ktBxI7TbW7xIVa2/sKOHSxFcPAkz6HEC3V7O9PfDTh3j8aezj02CxjHrLw=="
+    "commit": "667d53307e5b4d281352af642da7364aff04e8b1",
+    "integrity": "sha512-RzsjljPjICaBeBZ9OvnIqXK4JN1f7JC75Nokl9bc0mhTh3VURwDqIoUHI06PGTBnJ0Bx2NPrW2fPXbx9JwZOwQ=="
   },
   "license": {
     "spdx": "MIT",
@@ -21,45 +21,202 @@
     ],
     "notices": []
   },
-  "scopes": ["react-db/package.json", "react-db/src"],
-  "adaptedMappings": [],
-  "adaptedRewrites": [],
+  "scopes": [],
+  "adaptedMappings": [
+    {
+      "fromRoot": "tests",
+      "toRoot": "tests/upstream"
+    }
+  ],
+  "adaptedRewrites": [
+    {
+      "find": "@testing-library/react",
+      "replace": "@octanejs/testing-library"
+    },
+    {
+      "find": "react-dom/client",
+      "replace": "octane"
+    },
+    {
+      "find": "react-dom/server",
+      "replace": "octane/server"
+    },
+    {
+      "find": "'react'",
+      "replace": "'octane'"
+    },
+    {
+      "find": "\"react\"",
+      "replace": "\"octane\""
+    },
+    {
+      "find": "from '../src'",
+      "replace": "from '../../src'"
+    },
+    {
+      "find": "from '../src/",
+      "replace": "from '../../src/"
+    },
+    {
+      "find": "../../src/DbProvider'",
+      "replace": "../../src/DbProvider.tsrx'"
+    },
+    {
+      "find": "../../src/HydrationBoundary'",
+      "replace": "../../src/HydrationBoundary.tsrx'"
+    }
+  ],
   "files": [
     {
-      "path": "react-db/package.json",
-      "gitBlob": "9c84f9ea43afa4d86cbe71de5a40ff876690f78f",
-      "size": 1574
+      "path": "CHANGELOG.md",
+      "gitBlob": "f75c4318390a3f1b7d368d6414c2724821b10b5b",
+      "size": 61285
     },
     {
-      "path": "react-db/src/index.ts",
-      "gitBlob": "96db7e2796a3f7b74abc8d7b27581463646030e5",
-      "size": 454
+      "path": "package.json",
+      "gitBlob": "8dc99a60f84ee1146677a91a74008ce775dcb5b0",
+      "size": 1573
     },
     {
-      "path": "react-db/src/useLiveInfiniteQuery.ts",
-      "gitBlob": "c3d4c629c679ca7d1be703e43e973173c1d69958",
-      "size": 10777
+      "path": "README.md",
+      "gitBlob": "c1637d17ca94386143b6a8943c4b1e1d9d3bd949",
+      "size": 832
     },
     {
-      "path": "react-db/src/useLiveQuery.ts",
-      "gitBlob": "2ada3907701af7c0002eec9aef825a04c69b1133",
-      "size": 15616
+      "path": "skills/react-db/SKILL.md",
+      "gitBlob": "273fad8cbae58da63ff13c6021f6e3073a542cee",
+      "size": 11314
     },
     {
-      "path": "react-db/src/useLiveQueryEffect.ts",
+      "path": "src/DbProvider.tsx",
+      "gitBlob": "f817dd1a2aba29bb1fdbe51a9a18353dd66d1354",
+      "size": 743
+    },
+    {
+      "path": "src/HydrationBoundary.tsx",
+      "gitBlob": "e3fdd0b1db8654fd8579510460464825b9f7682d",
+      "size": 670
+    },
+    {
+      "path": "src/index.ts",
+      "gitBlob": "b616297a83af43540b1663b761dfe8038d82a521",
+      "size": 665
+    },
+    {
+      "path": "src/live-query-internals.ts",
+      "gitBlob": "b68cdf1abcf03c58d2f9482b5a2a1d08bf8a842b",
+      "size": 885
+    },
+    {
+      "path": "src/useLiveInfiniteQuery.ts",
+      "gitBlob": "a55340bea0b5586fa32868f0004dd263ba087556",
+      "size": 11935
+    },
+    {
+      "path": "src/useLiveQuery.ts",
+      "gitBlob": "c9c012646560aa83ce3b1b2e8a5c666ae5b1eeaf",
+      "size": 27697
+    },
+    {
+      "path": "src/useLiveQueryEffect.ts",
       "gitBlob": "ab39558e6a5515b5a3a057080fc643cd574b0531",
       "size": 1929
     },
     {
-      "path": "react-db/src/useLiveSuspenseQuery.ts",
-      "gitBlob": "162bf1f3fe62086bb621e5f57251462de22c6f4c",
-      "size": 7684
+      "path": "src/useLiveSuspenseQuery.ts",
+      "gitBlob": "a4e8dec5b1230d819150a55280eec9972b7f68b9",
+      "size": 8587
     },
     {
-      "path": "react-db/src/usePacedMutations.ts",
+      "path": "src/usePacedMutations.ts",
       "gitBlob": "7fc001e4a6bcc5ac1b0f755d7d59349d077ccb84",
       "size": 4261
+    },
+    {
+      "path": "tests/conformance.test.tsx",
+      "gitBlob": "3916d67b79474c1bc22e88e0272a551cf251cf41",
+      "size": 5931
+    },
+    {
+      "path": "tests/DbProvider.test.tsx",
+      "gitBlob": "59e1a88eb53a49317894aff93b530691ee284590",
+      "size": 762
+    },
+    {
+      "path": "tests/HydrationBoundary.test.tsx",
+      "gitBlob": "1daeac0dc1733645cd8d3b35f3889ed440a37e65",
+      "size": 1776
+    },
+    {
+      "path": "tests/infinite-query-conformance.test.tsx",
+      "gitBlob": "bf7bd198eb6d3bf7b85efb3515e698869e19a34a",
+      "size": 5243
+    },
+    {
+      "path": "tests/test-setup.ts",
+      "gitBlob": "2d717649d549949682a82af395ed1ea3b0e16384",
+      "size": 323
+    },
+    {
+      "path": "tests/useLiveInfiniteQuery.test-d.tsx",
+      "gitBlob": "cca7d10e089ca5175e042f6ef98d2394ccbfb296",
+      "size": 719
+    },
+    {
+      "path": "tests/useLiveInfiniteQuery.test.tsx",
+      "gitBlob": "ab99efcd6b42ca5372bb466cf83c1dbb0e2a5a75",
+      "size": 15698
+    },
+    {
+      "path": "tests/useLiveQuery.eager-onstorechange.test.tsx",
+      "gitBlob": "29f801e8379f949b73d485d4958848772ade3f63",
+      "size": 2589
+    },
+    {
+      "path": "tests/useLiveQuery.strictmode.test.tsx",
+      "gitBlob": "874d0206252fc65f17123738b3d98b0d90dbd87b",
+      "size": 1520
+    },
+    {
+      "path": "tests/useLiveQuery.test-d.tsx",
+      "gitBlob": "c541e71e742cbf84b7407315f38bde52b5e0bea2",
+      "size": 11539
+    },
+    {
+      "path": "tests/useLiveQuery.test.tsx",
+      "gitBlob": "7992efad1c0fe6cf5342e07c319b06ebd8e3689b",
+      "size": 102392
+    },
+    {
+      "path": "tests/useLiveQueryEffect.test.tsx",
+      "gitBlob": "493a53fddcf634756c1720240886deec1db5a903",
+      "size": 5243
+    },
+    {
+      "path": "tests/useLiveSuspenseQuery.test.tsx",
+      "gitBlob": "ef2c3fe49b37304da36369815d84d2f99e614b85",
+      "size": 24026
+    },
+    {
+      "path": "tests/usePacedMutations.test.tsx",
+      "gitBlob": "cbd058c18a9823160dead9c0673cc3382be98e9b",
+      "size": 7050
+    },
+    {
+      "path": "tsconfig.docs.json",
+      "gitBlob": "5a73feb0238807055db149e5f52d331ab1a92578",
+      "size": 142
+    },
+    {
+      "path": "tsconfig.json",
+      "gitBlob": "feba9330f56c824ed346dbf890b7fed76fc352aa",
+      "size": 580
+    },
+    {
+      "path": "vite.config.ts",
+      "gitBlob": "1e193ca2fb8196a850038cea8eacd3bcbb3a26a0",
+      "size": 803
     }
   ],
-  "fingerprint": "18505251265caf7ef77e62fb8a98c1d982479a21a3c00e37d227615cf5216714"
+  "fingerprint": "792e4fd6c985e894372dbeae550ee33bf397725864558bc9d7f02b9363c6c8e5"
 }

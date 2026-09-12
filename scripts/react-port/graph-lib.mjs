@@ -501,6 +501,7 @@ export function planPortGraph({
 	inventory,
 	dependencyClassifications = {},
 	adoptedBindings = [],
+	runtimeDependencies = [],
 }) {
 	const nodes = {};
 	const targetByPackage = new Map();
@@ -585,6 +586,34 @@ export function planPortGraph({
 			);
 			targetNode.dependsOn.push(dependencyNode.id);
 		}
+	}
+
+	// Authored adapters may use neutral SDKs absent from the copied parent's
+	// manifest. Keep these explicit edges separate from immutable upstream facts;
+	// they still pass the same classification and version-conflict checks below.
+	for (const edge of runtimeDependencies) {
+		let parent, dependency;
+		try {
+			const separator = typeof edge === 'string' ? edge.indexOf('=') : -1;
+			if (separator < 1) throw new Error('missing parent');
+			parent = parseInput(edge.slice(0, separator));
+			dependency = parseInput(edge.slice(separator + 1));
+			if (
+				parent.kind !== 'npm' ||
+				parent.selector !== null ||
+				dependency.kind !== 'npm' ||
+				!/^\d+\.\d+\.\d+$/.test(dependency.selector ?? '') ||
+				!targetByPackage.has(parent.packageName)
+			)
+				throw new Error('invalid parent or dependency');
+		} catch {
+			throw new Error(
+				`Invalid runtime dependency ${String(edge)}: use a preflighted parent=package@exact-stable-version.`,
+			);
+		}
+		const dependencyNode = ensureNode(dependency.packageName);
+		dependencyNode.constraints.push({ range: dependency.selector, via: parent.packageName });
+		nodes[`pkg:${parent.packageName}`].dependsOn.push(dependencyNode.id);
 	}
 
 	for (const node of Object.values(nodes)) {

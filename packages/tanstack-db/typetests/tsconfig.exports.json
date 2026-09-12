@@ -1,0 +1,16 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "skipLibCheck": false,
+    "allowImportingTsExtensions": true,
+    "types": ["node"],
+    "paths": {
+      "@octanejs/tanstack-db": ["../src/index.ts"]
+    }
+  },
+  "include": ["./public-export-parity.test-d.tsx"],
+  "exclude": ["node_modules"],
+  "tsrx": {
+    "compiler": "octane/compiler/volar"
+  }
+}

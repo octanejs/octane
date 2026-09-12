@@ -25,6 +25,9 @@ Options:
   --prerequisite <input>     Add a discovered prerequisite without marking it requested
   --classify <package=kind>  Classify a dependency as framework-neutral,
                              react-coupled, reimplemented, or unsupported (repeatable)
+  --runtime-dependency <parent=package@version>
+                             Add an exact stable dependency used by authored code;
+                             classify it separately (repeatable)
   --adopt-binding <package>  Adopt matching partial binding work after provenance review
   --batch <id>               Use a stable batch identifier (derived by default)
   --work-root <directory>    Store state below this directory (default: .react-port-work)
@@ -48,6 +51,7 @@ function parseArguments(arguments_) {
 	let recoverStaleLock = false;
 	const dependencyClassifications = {};
 	const adoptedBindings = [];
+	const runtimeDependencies = [];
 	for (let index = 0; index < arguments_.length; index += 1) {
 		const argument = arguments_[index];
 		if (argument === '-h' || argument === '--help') {
@@ -83,6 +87,13 @@ function parseArguments(arguments_) {
 				);
 			}
 			dependencyClassifications[packageName] = kind;
+			index += 1;
+			continue;
+		}
+		if (argument === '--runtime-dependency') {
+			const dependency = arguments_[index + 1];
+			if (!dependency) throw new Error('--runtime-dependency requires parent=package@version');
+			runtimeDependencies.push(dependency);
 			index += 1;
 			continue;
 		}
@@ -137,6 +148,7 @@ function parseArguments(arguments_) {
 		recoverStaleLock,
 		dependencyClassifications,
 		adoptedBindings,
+		runtimeDependencies,
 		npmProvenance,
 		sourceCheckout,
 	};
@@ -182,6 +194,7 @@ export async function main({ argumentsList = process.argv.slice(2), resolve } = 
 		inventory,
 		dependencyClassifications: parsedArguments.dependencyClassifications,
 		adoptedBindings: parsedArguments.adoptedBindings,
+		runtimeDependencies: parsedArguments.runtimeDependencies,
 	});
 	report.capabilityInventory = {
 		fingerprint: inventory.fingerprint,
