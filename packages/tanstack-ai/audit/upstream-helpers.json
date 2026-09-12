@@ -1,0 +1,27 @@
+{
+  "commit": "0ddaa6cb3c2e948a47dbd19d31c0ad874d176a86",
+  "license": "MIT",
+  "files": [
+    {
+      "path": "upstream-helpers/ai-client/tests/test-utils.ts",
+      "source": "packages/ai-client/tests/test-utils.ts",
+      "gitBlob": "4e127b31232c96ed66534446d5acb84551a1af5e",
+      "sha256": "167d36dddd6ca27db6c65068af43b8f816cc37364dcae25167866d34faf0b9c6",
+      "size": 10839
+    },
+    {
+      "path": "upstream-helpers/ai-client/tests/ui-fixtures.ts",
+      "source": "packages/ai-client/tests/ui-fixtures.ts",
+      "gitBlob": "04c90c6a6a0be5ea7d2b1f2324e5a4cef5be7e4a",
+      "sha256": "25301a3577f03d88c9ae9d043bb02acc8b2894d5254552727b3a13ba3c69e23f",
+      "size": 6614
+    },
+    {
+      "path": "upstream-helpers/ai-client/tests/blob-polyfill.ts",
+      "source": "packages/ai-client/tests/blob-polyfill.ts",
+      "gitBlob": "cc6e3762f3c27886e5a4ca5803021e8fcd5234f4",
+      "sha256": "ba27228bb716e7ade1a22932a55f9b7aa44449836e577f20600f0c567d98c3fe",
+      "size": 1011
+    }
+  ]
+}

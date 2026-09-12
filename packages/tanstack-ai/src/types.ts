@@ -1,24 +1,46 @@
 import type {
 	AnyClientTool,
+	InterruptDefinition,
 	InferSchemaType,
 	ModelMessage,
+	RunAgentResumeItem,
 	SchemaInput,
 } from '@tanstack/ai/client';
 import type {
 	AIDevtoolsDisplayOptions,
+	BoundInterrupts,
 	ChatClientOptions,
 	ChatClientState,
+	ResolvableChatInterrupt,
+	ChatInterruptState,
 	ChatRequestBody,
+	ChatResumeState,
 	ClientContextOptionFromTools,
 	ConnectionStatus,
 	DistributedOmit,
 	InferredClientContext,
 	MultimodalContent,
+	QueueConfig,
+	QueueOption,
+	QueueStrategy,
+	QueuedMessage,
+	SendMessageOptions,
 	UIMessage,
+	WhenBusy,
 } from '@tanstack/ai-client';
 
 // Re-export types from ai-client
-export type { ChatRequestBody, MultimodalContent, UIMessage };
+export type {
+	ChatRequestBody,
+	MultimodalContent,
+	QueueConfig,
+	QueuedMessage,
+	QueueOption,
+	QueueStrategy,
+	SendMessageOptions,
+	UIMessage,
+	WhenBusy,
+};
 
 /**
  * Recursive partial — every property and every nested array element is optional.
@@ -39,11 +61,11 @@ export type DeepPartial<T> =
  * level via `ChatTransport`.
  *
  * This extends ChatClientOptions but omits the state change callbacks that are
- * managed internally by hook state:
- * - `onMessagesChange` - Managed by hook state (exposed as `messages`)
- * - `onLoadingChange` - Managed by hook state (exposed as `isLoading`)
- * - `onErrorChange` - Managed by hook state (exposed as `error`)
- * - `onStatusChange` - Managed by hook state (exposed as `status`)
+ * managed internally by React state:
+ * - `onMessagesChange` - Managed by React state (exposed as `messages`)
+ * - `onLoadingChange` - Managed by React state (exposed as `isLoading`)
+ * - `onErrorChange` - Managed by React state (exposed as `error`)
+ * - `onStatusChange` - Managed by React state (exposed as `status`)
  *
  * All other callbacks (onResponse, onChunk, onFinish, onError) are
  * passed through to the underlying ChatClient and can be used for side effects.
@@ -55,15 +77,16 @@ export type DeepPartial<T> =
  * inference on the client — server-side validation still runs against the
  * schema you pass to `chat({ outputSchema })` on the server route.
  *
- * Changing `connection` or `fetcher` updates the active ChatClient in place,
- * preserving its state. Changing `id` creates a fresh client.
+ * Note: Connection and body changes will recreate the ChatClient instance.
+ * To update these options, remount the component or use a key prop.
  */
 export type UseChatOptions<
 	TTools extends ReadonlyArray<AnyClientTool> = any,
 	TSchema extends SchemaInput | undefined = undefined,
 	TContext = InferredClientContext<TTools>,
+	TInterrupts extends ReadonlyArray<InterruptDefinition<any, any, any, any>> = readonly [],
 > = DistributedOmit<
-	ChatClientOptions<TTools, TContext>,
+	ChatClientOptions<TTools, TContext, TInterrupts>,
 	| 'onMessagesChange'
 	| 'onLoadingChange'
 	| 'onErrorChange'
@@ -71,6 +94,9 @@ export type UseChatOptions<
 	| 'onSubscriptionChange'
 	| 'onConnectionStatusChange'
 	| 'onSessionGeneratingChange'
+	| 'onQueueChange'
+	| 'onResumeStateChange'
+	| 'onRunIdChange'
 	| 'context'
 	| 'devtools'
 > & {
@@ -98,7 +124,12 @@ export type UseChatOptions<
 export type UseChatReturn<
 	TTools extends ReadonlyArray<AnyClientTool> = any,
 	TSchema extends SchemaInput | undefined = undefined,
-> = BaseUseChatReturn<TTools, TSchema extends SchemaInput ? InferSchemaType<TSchema> : unknown> &
+	TInterrupts extends ReadonlyArray<InterruptDefinition<any, any, any, any>> = readonly [],
+> = BaseUseChatReturn<
+	TTools,
+	TSchema extends SchemaInput ? InferSchemaType<TSchema> : unknown,
+	TInterrupts
+> &
 	(TSchema extends SchemaInput
 		? {
 				/**
@@ -117,7 +148,11 @@ export type UseChatReturn<
 			}
 		: Record<never, never>);
 
-interface BaseUseChatReturn<TTools extends ReadonlyArray<AnyClientTool> = any, TData = unknown> {
+interface BaseUseChatReturn<
+	TTools extends ReadonlyArray<AnyClientTool> = any,
+	TData = unknown,
+	TInterrupts extends ReadonlyArray<InterruptDefinition<any, any, any, any>> = readonly [],
+> {
 	/**
 	 * Current messages in the conversation. When `outputSchema` is supplied,
 	 * `messages[i].parts.find(p => p.type === 'structured-output')` is typed
@@ -128,8 +163,23 @@ interface BaseUseChatReturn<TTools extends ReadonlyArray<AnyClientTool> = any, T
 	/**
 	 * Send a message and get a response.
 	 * Can be a simple string or multimodal content with images, audio, etc.
+	 * By default, sends while busy are queued until the run settles successfully
+	 * (`queue: 'drop'` restores the old drop-while-busy behavior).
+	 * Pass `{ whenBusy }` to override the policy for a single send, or
+	 * `{ body }` to merge per-call JSON into this request's `forwardedProps`.
 	 */
-	sendMessage: (content: string | MultimodalContent) => Promise<void>;
+	sendMessage: (content: string | MultimodalContent, options?: SendMessageOptions) => Promise<void>;
+
+	/**
+	 * Pending messages queued while the client is busy (streaming, claiming a
+	 * send, or draining). Separate from `messages` until they drain.
+	 */
+	queue: Array<QueuedMessage>;
+
+	/**
+	 * Cancel a queued message before it drains. No-op if already sent.
+	 */
+	cancelQueued: (id: string) => void;
 
 	/**
 	 * Append a message to the conversation
@@ -154,6 +204,39 @@ interface BaseUseChatReturn<TTools extends ReadonlyArray<AnyClientTool> = any, T
 		id: string; // approval.id, not toolCallId
 		approved: boolean;
 	}) => Promise<void>;
+
+	/**
+	 * The id of the run this client has in flight — one it started or rejoined —
+	 * or `null` when there is none (including while a run sits paused on an
+	 * interrupt, waiting on approval).
+	 *
+	 * A run is one turn of the conversation, so this changes from turn to turn. A
+	 * whole tool loop stays inside one run, while resuming after an interrupt
+	 * continues the turn under a new id — so one user message can produce several
+	 * run ids. Use it to talk to your own server about that run (cancel it, poll
+	 * it, correlate a log line).
+	 */
+	runId: string | null;
+	interrupts: BoundInterrupts<TTools, TInterrupts>;
+	/** @deprecated Use `interrupts`. */
+	pendingInterrupts: BoundInterrupts<TTools, TInterrupts>;
+	interruptErrors: ChatInterruptState<TTools, TInterrupts>['interruptErrors'];
+	resuming: boolean;
+	resolveInterrupts: {
+		(approved: boolean): void;
+		(resolver: (interrupt: ResolvableChatInterrupt<TTools, TInterrupts>) => undefined): void;
+	};
+	cancelInterrupts: () => void;
+	retryInterrupts: () => void;
+	resumeInterruptsUnsafe: (
+		resume: Array<RunAgentResumeItem>,
+		state?: ChatResumeState,
+	) => Promise<boolean>;
+	/** @deprecated Use bound interrupt methods or `resumeInterruptsUnsafe`. */
+	resumeInterrupts: (
+		resume: Array<RunAgentResumeItem>,
+		state?: ChatResumeState,
+	) => Promise<boolean>;
 
 	/**
 	 * Reload the last assistant message

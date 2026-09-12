@@ -14,6 +14,10 @@ import {
 	evaluateApprovedLicense,
 	parseTarArchive,
 	parseInput,
+	pinnedClassFieldNames,
+	pinnedObjectValues,
+	pinnedLiteralRows,
+	expandPinnedStaticArray,
 	resolveRemoteInput,
 	runPreflight,
 	sanitizeForReport,
@@ -914,6 +918,52 @@ export function Wrapper(props: Widget.Props<string>) { return <Widget {...props}
 		assert.ok(typeInventory.registrations.every(({ kind }) => kind === 'type-assertion'));
 		assert.match(typeInventory.registrations[1].title, /invalid/);
 
+		const namedTypeTestBytes = Buffer.from(`import { describe, expectTypeOf, it } from 'vitest';
+import { Widget } from 'react-widget';
+describe('Widget types', () => {
+  it('preserves the required value type', () => { expectTypeOf<Parameters<typeof Widget>[0]['value']>().toEqualTypeOf<string>(); });
+  it('rejects invalid values', () => {
+    // @ts-expect-error Invalid public input.
+    const invalid: Parameters<typeof Widget>[0]['value'] = 123;
+  });
+});
+`);
+		responses.set(
+			`https://api.github.com/repos/example/widgets/git/trees/${tree}?recursive=1`,
+			githubTreeResponse(
+				sourceTree.map((entry) =>
+					entry.path === 'packages/react-widget/quality/widget.behavior.ts'
+						? {
+								...entry,
+								path: 'packages/react-widget/tests/use-widget-types.test.ts',
+								size: namedTypeTestBytes.length,
+								sha: gitBlobSha(namedTypeTestBytes),
+							}
+						: entry,
+				),
+			),
+		);
+		responses.set(
+			'https://api.github.com/repos/example/widgets/git/blobs/test',
+			Response.json({
+				encoding: 'base64',
+				content: namedTypeTestBytes.toString('base64'),
+				size: namedTypeTestBytes.length,
+			}),
+		);
+		const namedTypeResult = await resolveRemoteInput(parseInput(githubInput), githubInput, {
+			fetchImpl,
+		});
+		const namedTypeInventory = namedTypeResult.upstreamTestInventory.find((entry) =>
+			entry.path.endsWith('use-widget-types.test.ts'),
+		);
+		assert.equal(namedTypeInventory.kind, 'type');
+		assert.deepEqual(
+			namedTypeInventory.registrations.map(({ title }) => title),
+			['preserves the required value type', 'rejects invalid values'],
+		);
+		assert.ok(namedTypeInventory.registrations.every(({ kind }) => kind === 'it'));
+
 		const dynamicTestBytes = Buffer.from("test.each(rows)('renders %s', value => value);\n");
 		responses.set(
 			`https://api.github.com/repos/example/widgets/git/trees/${tree}?recursive=1`,
@@ -1200,6 +1250,31 @@ describe('preflight CLI', () => {
 		assert.equal(report.graph.nodes['pkg:fixture-prerequisite'].requested, false);
 	});
 
+	test('passes authored dependency edges through the CLI without inventing upstream facts', () => {
+		const result = spawnSync(
+			process.execPath,
+			[
+				FIXTURE_PREFLIGHT_CLI,
+				'--no-state',
+				'--fixture-evidence',
+				path.join(SCRIPT_DIRECTORY, '__fixtures__/resolved/mit-widget.json'),
+				'--classify',
+				'fixture-core=framework-neutral',
+				'--runtime-dependency',
+				'fixture-widget=@scope/protocol@1.2.3',
+				'--classify',
+				'@scope/protocol=framework-neutral',
+				'fixture-widget@1.0.0',
+			],
+			{ encoding: 'utf8' },
+		);
+		assert.equal(result.status, 0, result.stderr);
+		const report = JSON.parse(result.stdout);
+		assert.ok(report.graph.nodes['pkg:fixture-widget'].dependsOn.includes('pkg:@scope/protocol'));
+		assert.equal(report.graph.nodes['pkg:@scope/protocol'].action, 'reuse-package');
+		assert.equal(report.targets[0].runtimeDependencies['@scope/protocol'], undefined);
+	});
+
 	test('does not let a failed duplicate prerequisite poison licensed requested evidence', () => {
 		const result = spawnSync(
 			process.execPath,
@@ -1264,4 +1339,113 @@ describe('preflight CLI', () => {
 		assert.equal(result.status, 2);
 		assert.match(result.stderr, /unknown option: --fixture-evidence/i);
 	});
+});
+
+test('pinned array inventory derives initialized instance fields and rejects ambiguous shapes', () => {
+	const source = 'export class Api { useMatch = () => {}; useSearch = () => {}; other = 1 }';
+	assert.deepEqual(pinnedClassFieldNames(source, { className: 'Api', propertyPrefix: 'use' }), [
+		'useMatch',
+		'useSearch',
+	]);
+	for (const invalid of [
+		'class Other { useMatch = 1 }',
+		'class Api { useMatch: unknown }',
+		'class Api { static useMatch = 1 }',
+		'class Api { other = 1 }',
+		'class Api { useMatch = 1 } class Api { useSearch = 1 }',
+	])
+		assert.throws(() =>
+			pinnedClassFieldNames(invalid, { className: 'Api', propertyPrefix: 'use' }),
+		);
+});
+
+test('pinned array expansion requires both immutable blobs and the exact expression count', () => {
+	const entry = { path: 'tests/api.test.ts', sha: 'a'.repeat(40) };
+	const sourceEntry = { path: 'src/api.ts', sha: 'b'.repeat(40) };
+	const expansion = {
+		path: entry.path,
+		gitBlob: entry.sha,
+		expression: 'Object.keys(api).filter(key => key.startsWith("use"))',
+		occurrences: 1,
+		source: {
+			path: sourceEntry.path,
+			gitBlob: sourceEntry.sha,
+			className: 'Api',
+			propertyPrefix: 'use',
+		},
+	};
+	const source = `const names = ${expansion.expression};\nit.each(names.map(name => [name]))('%s', () => {});`;
+	const bytes = Buffer.from('class Api { useMatch = () => {}; useSearch = () => {} }');
+	const result = expandPinnedStaticArray(source, entry, expansion, sourceEntry, bytes);
+	assert.equal(
+		result,
+		`const names = ["useMatch","useSearch"];\nit.each(names.map(name => [name]))('%s', () => {});`,
+	);
+	assert.throws(
+		() =>
+			expandPinnedStaticArray(
+				source,
+				{ ...entry, sha: 'c'.repeat(40) },
+				expansion,
+				sourceEntry,
+				bytes,
+			),
+		/source mismatch/,
+	);
+	assert.throws(
+		() =>
+			expandPinnedStaticArray(
+				source,
+				entry,
+				expansion,
+				{ ...sourceEntry, sha: 'c'.repeat(40) },
+				bytes,
+			),
+		/source mismatch/,
+	);
+	assert.throws(
+		() =>
+			expandPinnedStaticArray(source, entry, { ...expansion, occurrences: 2 }, sourceEntry, bytes),
+		/expression count mismatch/,
+	);
+	assert.throws(
+		() =>
+			expandPinnedStaticArray(source, entry, { ...expansion, expression: '' }, sourceEntry, bytes),
+		/Invalid static array/,
+	);
+});
+
+test('pinned object values retain literals and reject dynamic or duplicate properties', () => {
+	assert.deepEqual(
+		pinnedObjectValues("export const options = { a: 'always', b: 'never' } as const", {
+			objectName: 'options',
+		}),
+		['always', 'never'],
+	);
+	for (const source of [
+		'const options = { ...other }',
+		'const options = { a: value }',
+		"const options = { a: 'one', a: 'two' }",
+		"let options = { a: 'one' }",
+		"const options = { [key]: 'one' }",
+	])
+		assert.throws(() => pinnedObjectValues(source, { objectName: 'options' }));
+});
+
+test('pinned literal rows derive a reviewed filter without evaluating source', () => {
+	assert.deepEqual(
+		pinnedLiteralRows("const chars = [['/', '%2F'], [';', '%3B']] as const", {
+			arrayName: 'chars',
+			excludeFirstColumn: ['/'],
+		}),
+		[[';', '%3B']],
+	);
+	assert.throws(
+		() => pinnedLiteralRows('const chars = [[value]]', { arrayName: 'chars' }),
+		/literal strings/,
+	);
+	assert.throws(
+		() => pinnedLiteralRows('const chars = getRows()', { arrayName: 'chars' }),
+		/must be literal/,
+	);
 });

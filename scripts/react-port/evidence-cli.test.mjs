@@ -686,6 +686,17 @@ describe('evidence CLI', () => {
 	test('maps every command gate family to a specific repository command', () => {
 		const node = { bindingDirectory: 'packages/widget' };
 		for (const [gateIds, command] of [
+			[
+				['upstream-types-pristine'],
+				[
+					'pnpm',
+					'exec',
+					'tsgo',
+					'--noEmit',
+					'-p',
+					'packages/widget/typetests/tsconfig.pristine.json',
+				],
+			],
 			[['package-tests'], ['pnpm', '--dir', 'packages/widget', 'test']],
 			[
 				['public-exports'],

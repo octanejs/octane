@@ -97,7 +97,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/stylex` | [`packages/stylex`](../packages/stylex) | framework binding | `0.1.51` | 2 |
 | `@octanejs/swr` | [`packages/swr`](../packages/swr) | framework binding | `0.0.18` | 7 |
 | `@octanejs/syntax-highlighter` | [`packages/syntax-highlighter`](../packages/syntax-highlighter) | framework binding | `0.0.18` | 2634 |
-| `@octanejs/tanstack-ai` | [`packages/tanstack-ai`](../packages/tanstack-ai) | framework binding | `0.0.46` | 1 |
+| `@octanejs/tanstack-ai` | [`packages/tanstack-ai`](../packages/tanstack-ai) | framework binding | `0.0.46` | 3 |
 | `@octanejs/tanstack-db` | [`packages/tanstack-db`](../packages/tanstack-db) | framework binding | `0.0.15` | 1 |
 | `@octanejs/tanstack-devtools` | [`packages/tanstack-devtools`](../packages/tanstack-devtools) | framework binding | `0.0.46` | 1 |
 | `@octanejs/tanstack-form` | [`packages/tanstack-form`](../packages/tanstack-form) | framework binding | `0.0.48` | 1 |

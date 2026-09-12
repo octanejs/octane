@@ -9704,14 +9704,15 @@ function subscribeToStore(
 	inst: StoreInst<any>,
 	subscribe: (cb: () => void) => () => void,
 ): Cleanup {
-	// The store may have mutated between the render read and this subscription
-	// taking effect; re-check immediately so an early notify isn't missed. Uses
-	// inst.getSnapshot, which render already advanced to the latest closure.
-	if (checkStoreChanged(inst)) inst.forceUpdate();
 	// One stable handler across re-subscribes (inst.onStoreChange never changes) —
 	// harmless here since stores key listeners by our Set membership, and the
 	// swap-cleanup removes the old registration before we add the new one.
-	return subscribe(inst.onStoreChange);
+	const unsubscribe = subscribe(inst.onStoreChange);
+	// Subscribing can start synchronous store work without notifying. Re-read
+	// afterward to cover both that change and the render-to-subscribe window.
+	// This remains one check per subscription, with no work on unchanged renders.
+	if (checkStoreChanged(inst)) inst.forceUpdate();
+	return unsubscribe;
 }
 
 /**

@@ -1,0 +1,43 @@
+{
+  "repository": "https://github.com/TanStack/db",
+  "commit": "667d53307e5b4d281352af642da7364aff04e8b1",
+  "license": "MIT",
+  "files": {
+    "packages/db/tests/utils.ts": {
+      "path": "packages/tanstack-db/upstream-helpers/db/tests/utils.ts",
+      "gitBlob": "759173a638b879a53c258d33bfddd0e0f353325a",
+      "sha256": "20662b2782583f4f31338701c6694dcc184fc1144002e9d75e2493a77393dcf4",
+      "bytes": 17570
+    },
+    "packages/db/tests/conformance/contract.ts": {
+      "path": "packages/tanstack-db/upstream-helpers/db/tests/conformance/contract.ts",
+      "gitBlob": "11534231b0223ea75f9c9b248bc36af639db08e9",
+      "sha256": "4497951a2df71547c42a2507e536ea4459f740c3faea66ebca164be14a83275a",
+      "bytes": 6603
+    },
+    "packages/db/tests/conformance/suite.ts": {
+      "path": "packages/tanstack-db/upstream-helpers/db/tests/conformance/suite.ts",
+      "gitBlob": "39759017bcb9f3171e638996d889f41280c6b053",
+      "sha256": "dbce342f44f2b6cd9b662e4572680acc4115a5d9ddb8186179746ee08cfa2dad",
+      "bytes": 24014
+    },
+    "packages/db/tests/conformance/infinite-contract.ts": {
+      "path": "packages/tanstack-db/upstream-helpers/db/tests/conformance/infinite-contract.ts",
+      "gitBlob": "09fd67b37ee26c18296cde2fcf48560c073e5a3b",
+      "sha256": "367cd708682fccce4c6378db99015f9159cc62532831edb70c1d8bc6d36d573a",
+      "bytes": 3196
+    },
+    "packages/db/tests/conformance/infinite-suite.ts": {
+      "path": "packages/tanstack-db/upstream-helpers/db/tests/conformance/infinite-suite.ts",
+      "gitBlob": "829fa6bf44028980422bd0e2016f0c3913d76376",
+      "sha256": "b4eb14b1f1512b2605ae4759895514004a823a1c8c1160bdd6959cd026cefabc",
+      "bytes": 32455
+    },
+    "packages/db/tests/conformance/infinite-on-demand.ts": {
+      "path": "packages/tanstack-db/upstream-helpers/db/tests/conformance/infinite-on-demand.ts",
+      "gitBlob": "0b265b1260336f02cbb087c6a941a2274a272bd6",
+      "sha256": "8d83002efab4c5b77586e3987ff242287a3d47b1ade89d7730610b2852c6d242",
+      "bytes": 1930
+    }
+  }
+}

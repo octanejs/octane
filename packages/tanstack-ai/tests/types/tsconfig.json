@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "module": "esnext",
+    "lib": ["esnext", "dom", "dom.iterable"],
+    "target": "esnext",
+    "jsx": "react-jsx",
+    "noEmit": true,
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "noEmitOnError": true,
+    "noErrorTruncation": true,
+    "allowSyntheticDefaultImports": true,
+    "skipLibCheck": false,
+    "verbatimModuleSyntax": true,
+    "types": ["node"],
+    "strict": true,
+    "jsxImportSource": "octane",
+    "allowImportingTsExtensions": true
+  },
+  "include": ["./*.test-d.tsx", "published-contract.ts"],
+  "exclude": ["node_modules"],
+  "reactPortEvidence": {
+    "gate": "public-types",
+    "publicMode": "pinned"
+  }
+}

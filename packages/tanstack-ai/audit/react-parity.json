@@ -3,15 +3,18 @@
   "schemaVersion": 1,
   "provenance": {
     "repo": "https://github.com/TanStack/ai.git",
-    "version": "@tanstack/ai-react@0.17.0",
-    "commit": "9ca3706513b94764d11ea63c7541b2cf4f3daa20",
+    "version": "0.24.1",
+    "commit": "0ddaa6cb3c2e948a47dbd19d31c0ad874d176a86",
     "sourceRoot": "packages/ai-react/src",
     "testRoot": "packages/ai-react/tests",
     "license": "MIT",
-    "integrity": "sha256:27eea2e78722c51e1f30f8ddf4d193b0ebc79a330dc9d0aa876516828e30cbe6",
-    "verification": "recorded-unverified"
+    "integrity": "sha256:3544abc8e0ef89c5f32601ecbcbc3d62d92648bb046777cf2df9429856ca6c74",
+    "verification": "verified"
   },
-  "upstreamSuites": { "runtime": "present", "types": "absent" },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "present"
+  },
   "adaptedRoots": {
     "source": {
       "roots": ["packages/tanstack-ai/src"],
@@ -19,14 +22,14 @@
       "exclude": ["\\.d\\.ts$"]
     },
     "tests": {
-      "roots": ["packages/tanstack-ai/tests"],
-      "include": ["\\.test\\.ts$"],
+      "roots": ["packages/tanstack-ai/tests/upstream"],
+      "include": ["\\.test\\.tsx?$"],
       "exclude": []
     }
   },
   "adaptedRuntimeSummary": {
-    "inventoryEntries": 0,
-    "uniqueIdentities": 0,
+    "inventoryEntries": 235,
+    "uniqueIdentities": 235,
     "duplicateEntriesWithinLanes": 0,
     "identitiesSharedAcrossLanes": 0
   },
@@ -37,18 +40,1509 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "8c6917b3bdc395e057892a96a41d2041b3e2edd2fe8e040870d1dfc07fdbaf4a"
+      "lockfileSha256": "57dcbd6657cce7470df1124f428731acc5136b8c0188c8b59a96c95dbd7e459e"
     }
   },
   "lanes": [
     {
-      "id": "tanstack-ai-runtime-differential",
+      "id": "tanstack-ai-pristine-runtime",
+      "type": "pristine-upstream",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tanstack-ai-pristine",
+      "files": [
+        {
+          "path": "packages/tanstack-ai/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "ae2a25c9e139f725a769172357bd16b8a21a8f06478b89d0083f830e93620ba0"
+        },
+        {
+          "path": "packages/tanstack-ai/audit/provenance.json",
+          "role": "support",
+          "sha256": "72f82131c0ca4dc67d5be567ea20c6b6da2cb1c0e4014f4bf4e02d984a26415f"
+        },
+        {
+          "path": "packages/tanstack-ai/audit/registrations.json",
+          "role": "support",
+          "sha256": "40639375201585f8dbcb80d14935ad0e8eb0bb43aea3989ee23f62454601025f"
+        },
+        {
+          "path": "packages/tanstack-ai/audit/crosswalk.json",
+          "role": "support",
+          "sha256": "40f87ac54b14b3162845fcf50f05cc5a45e75383297fd51352572f7076a7254e"
+        },
+        {
+          "path": "packages/tanstack-ai/audit/upstream-helpers.json",
+          "role": "support",
+          "sha256": "1ee83b7587437f220e39d7c52ad2ac2cfad05b7a75dccbaad42d0deaecf05d16"
+        },
+        {
+          "path": "packages/tanstack-ai/upstream-helpers/ai-client/tests/blob-polyfill.ts",
+          "role": "support",
+          "sha256": "ba27228bb716e7ade1a22932a55f9b7aa44449836e577f20600f0c567d98c3fe"
+        },
+        {
+          "path": "packages/tanstack-ai/upstream-helpers/ai-client/tests/test-utils.ts",
+          "role": "support",
+          "sha256": "167d36dddd6ca27db6c65068af43b8f816cc37364dcae25167866d34faf0b9c6"
+        },
+        {
+          "path": "packages/tanstack-ai/upstream-helpers/ai-client/tests/ui-fixtures.ts",
+          "role": "support",
+          "sha256": "25301a3577f03d88c9ae9d043bb02acc8b2894d5254552727b3a13ba3c69e23f"
+        },
+        {
+          "path": "packages/tanstack-ai/audit/pristine-runtime.json",
+          "role": "support",
+          "sha256": "9d407b877e7756ca3034afc7ccdaa1150cdaffb7c32c419f3f43cccd1d3a3881"
+        },
+        {
+          "path": "packages/tanstack-ai/audit/pristine-wrapper-runtime.json",
+          "role": "support",
+          "sha256": "cf585f2d4bf84eb2ff467f8792e010ed5106d46ebeebaa12ee347355e5683d8d"
+        },
+        {
+          "path": "packages/tanstack-ai/audit/pristine-suite.json",
+          "role": "support",
+          "sha256": "3fa8f3e5d980756e27b1dd0b98ad95170cf63be56106d87a4887bf3e2ff6132e"
+        },
+        {
+          "path": "packages/tanstack-ai/tests/upstream-original.test.ts",
+          "role": "support",
+          "sha256": "2c708ba16591b3c9125b1b1ce235624bc23a19f8d71bcec4b7fc9d910b55a0ed"
+        },
+        {
+          "path": "packages/tanstack-ai/tests/upstream-vitest.config.ts",
+          "role": "support",
+          "sha256": "a7328be8db67eb7c0f02eee94d97aa93f25d6a78f294b98df6a79a32fe711b66"
+        },
+        {
+          "path": "packages/tanstack-ai/tests/parity-config.ts",
+          "role": "support",
+          "sha256": "4d08de5c1459568bafe5ea9a5869b44b8ee37db1b1c62d79e72cf75b0b094e77"
+        },
+        {
+          "path": "scripts/react-parity/tanstack-ai-pristine-runtime.mjs",
+          "role": "support",
+          "sha256": "2e43ba20d5aab7d3b312aef4bbdfc9005ce6d9702bc4d5211fb40a189bc5a62e"
+        },
+        {
+          "path": "scripts/react-parity/pristine-suite-lib.mjs",
+          "role": "support",
+          "sha256": "d34ffc2dca00e6eef7dcaf5bc002024cc511f32dd20c681547555af520438bbb"
+        }
+      ],
+      "evidenceOrigin": "upstream-suite",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/tanstack-ai/audit/pristine-wrapper-runtime.json"
+      },
+      "notes": "Runs all 235 pinned registrations: 210 runtime and 25 type-test registrations, with strict type execution in separate lanes."
+    },
+    {
+      "id": "tanstack-ai-adapted-runtime",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tanstack-ai-adapted",
+      "files": [
+        {
+          "path": "packages/tanstack-ai/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "ae2a25c9e139f725a769172357bd16b8a21a8f06478b89d0083f830e93620ba0"
+        },
+        {
+          "path": "packages/tanstack-ai/audit/provenance.json",
+          "role": "support",
+          "sha256": "72f82131c0ca4dc67d5be567ea20c6b6da2cb1c0e4014f4bf4e02d984a26415f"
+        },
+        {
+          "path": "packages/tanstack-ai/audit/registrations.json",
+          "role": "support",
+          "sha256": "40639375201585f8dbcb80d14935ad0e8eb0bb43aea3989ee23f62454601025f"
+        },
+        {
+          "path": "packages/tanstack-ai/audit/crosswalk.json",
+          "role": "support",
+          "sha256": "40f87ac54b14b3162845fcf50f05cc5a45e75383297fd51352572f7076a7254e"
+        },
+        {
+          "path": "packages/tanstack-ai/audit/upstream-helpers.json",
+          "role": "support",
+          "sha256": "1ee83b7587437f220e39d7c52ad2ac2cfad05b7a75dccbaad42d0deaecf05d16"
+        },
+        {
+          "path": "packages/tanstack-ai/upstream-helpers/ai-client/tests/blob-polyfill.ts",
+          "role": "support",
+          "sha256": "ba27228bb716e7ade1a22932a55f9b7aa44449836e577f20600f0c567d98c3fe"
+        },
+        {
+          "path": "packages/tanstack-ai/upstream-helpers/ai-client/tests/test-utils.ts",
+          "role": "support",
+          "sha256": "167d36dddd6ca27db6c65068af43b8f816cc37364dcae25167866d34faf0b9c6"
+        },
+        {
+          "path": "packages/tanstack-ai/upstream-helpers/ai-client/tests/ui-fixtures.ts",
+          "role": "support",
+          "sha256": "25301a3577f03d88c9ae9d043bb02acc8b2894d5254552727b3a13ba3c69e23f"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/chat-input.tsrx",
+          "role": "support",
+          "sha256": "5b55ce06d6677b46ca810f3ab4ae800d24c36c6c5e16e78aa864ced3bb5be808"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/chat-message.tsrx",
+          "role": "support",
+          "sha256": "7a14e18ef9f87f2f8261442332757e1c3b1084fb9275f6474eb11baeaf7b6959"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/chat-messages.tsrx",
+          "role": "support",
+          "sha256": "730411bfdccc7fb980b74bbc4094d9320fea361776cf86fc9c3416eafcfe350b"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/chat.tsrx",
+          "role": "support",
+          "sha256": "cbd4f726cd3e51605f462a4a126603785b121d1d3728b6cc8f78401c5714a586"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/create-chat-hook.tsrx",
+          "role": "support",
+          "sha256": "0b5ad275431b6ca05c752042dc8dd8f808eef3fbc76ab28da94c893091e41dcf"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/create-ui-contexts.tsrx",
+          "role": "support",
+          "sha256": "a19036aa0bba92df238738e3f31028a8030c7653a5b2775acbe5d0a0580b7f61"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/create-ui.tsrx",
+          "role": "support",
+          "sha256": "f846c9b781ae653ad01a0a628541dd4771b46788135f70b4a2427f33e18cf435"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/markdown-plugins.ts",
+          "role": "support",
+          "sha256": "c7f459c38658320f13f0d32d6d87383ce8085cbb71bd38b671345000e62bbbd6"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/text-part.tsrx",
+          "role": "support",
+          "sha256": "5ff2c28c86095ddf55d7b618e62f3dcf7c5a99ede0a350362b8f9db9be0b3c67"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/thinking-part.tsrx",
+          "role": "support",
+          "sha256": "a60c0a215d90ff80a74834eec7245279bbe8f17c06868628a97ba279b8c2cd7e"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/tool-approval.tsrx",
+          "role": "support",
+          "sha256": "8427d319c5663fc63bfcda3e539c6da3bcba62840f7bf1c6ec93c14e28f88716"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/tool-result-content.ts",
+          "role": "support",
+          "sha256": "7a65d1c0af3cda50ec65839561b63af2670f8045d9d1bc9222ef132bbed06fc7"
+        },
+        {
+          "path": "packages/tanstack-ai/src/create-chat-hook.tsrx",
+          "role": "support",
+          "sha256": "c2f805de4ae9ddde529cdc11b5c26641b2d3e6912da3d624904a82131e57af4d"
+        },
+        {
+          "path": "packages/tanstack-ai/src/index.ts",
+          "role": "support",
+          "sha256": "c378a4cd4d20a41df0f7b7f57daafbe34f7ec9e56edb406e8eadf21b732366b3"
+        },
+        {
+          "path": "packages/tanstack-ai/src/mcp-app-renderer.tsrx",
+          "role": "support",
+          "sha256": "0f7d8e32eb05f760a7cdbe02d144eb4729dfb11b10443dc16a8ac447064ce012"
+        },
+        {
+          "path": "packages/tanstack-ai/src/mcp-app-resource.tsrx",
+          "role": "support",
+          "sha256": "58697aa8d4f9c411f5facc0137a8d1cd0028cf6942b19aa5bffb00a4cd431334"
+        },
+        {
+          "path": "packages/tanstack-ai/src/mcp-apps.ts",
+          "role": "support",
+          "sha256": "c97ed80527b77dd7fad3e496aba5ce1a074c4ab799f06001711c81e399edac7d"
+        },
+        {
+          "path": "packages/tanstack-ai/src/realtime-types.ts",
+          "role": "support",
+          "sha256": "21a9c3ca7e4e128aeba1809052ffa71eaad052bf29c5fbab06af845eb27456dd"
+        },
+        {
+          "path": "packages/tanstack-ai/src/types.ts",
+          "role": "support",
+          "sha256": "d36ab1d04262fb078b8fba5c37cb9bb7eec791a23b551167b06449576df21480"
+        },
+        {
+          "path": "packages/tanstack-ai/src/ui.ts",
+          "role": "support",
+          "sha256": "14a912af7ddf8fb612a3817e698ea54e89cd32dfa59f28b114ae12d5380146d1"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-audio-recorder.tsrx",
+          "role": "support",
+          "sha256": "fa2cf96539c2fd514b6ff9a29f851b7e517898bbc89a0a4bff1e11dbc2ae14a7"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-byok.tsrx",
+          "role": "support",
+          "sha256": "208bcf8af729cc14813287d52fba78c9ef21241a154c5b4eeb44ea8e9db6d98b"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-chat.tsrx",
+          "role": "support",
+          "sha256": "ef6f8d2004e5600c3face8bdcfbf0db817b842379ec2a0c85ed0bc8e79471f8e"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-generate-audio.tsrx",
+          "role": "support",
+          "sha256": "0f266c543a1ee34430f63a7aba2e78bcf67614fdefff7887230d17742c10d622"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-generate-image.tsrx",
+          "role": "support",
+          "sha256": "ef87a45e45b90ee0fc1295d38a574b7ac4e98fae171f079a56eb1695509fca12"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-generate-speech.tsrx",
+          "role": "support",
+          "sha256": "86a5d4bf12014a4b457587d4245a9bcfc309a32f45e6902b8de803ffe4a16981"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-generate-video.tsrx",
+          "role": "support",
+          "sha256": "b73ac1e4b007af1d0294e22df27b30a28ca1b15dbe9a8d9cf90389889515298f"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-generation.tsrx",
+          "role": "support",
+          "sha256": "a6289a5aea1b5bf7dd76de7e71e64e8d4ce4fdaca4dbfe854de84bc3d7e77f8e"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-mcp-app-bridge.tsrx",
+          "role": "support",
+          "sha256": "f646331a7be4d6ce42681923efc5fafc0aacd187b38edf02ce9ecbe3758d6dde"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-realtime-chat.tsrx",
+          "role": "support",
+          "sha256": "9a008c187b6e768c672a5e115ff8220c4c92deec296ee73f20649401ff1ef229"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-summarize.tsrx",
+          "role": "support",
+          "sha256": "aa5645539a5105618ff7ab545e789d547124cb2fe76621399e2828517dc0a041"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-transcription.tsrx",
+          "role": "support",
+          "sha256": "1576844d4913db1696638d34bded3026da3166f72b72a34c5412e107d6f09061"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-web-mcp-tools.tsrx",
+          "role": "support",
+          "sha256": "c5581b9daa93b701689200dfac09af9994c9a5afa9075923a7aac41fcd4fdd7c"
+        },
+        {
+          "path": "packages/tanstack-ai/audit/adapted-runtime.json",
+          "role": "support",
+          "sha256": "da95a871caeb375780a13892b2476bf11cb1d19853831dbc88f4e0a5d06c2e42"
+        },
+        {
+          "path": "packages/tanstack-ai/tests/vitest.adapted.config.ts",
+          "role": "support",
+          "sha256": "68bb31182c79b96b1bd2c88583a520314b5b730f4d68cddd0dba0de415901fa8"
+        },
+        {
+          "path": "packages/tanstack-ai/tests/parity-config.ts",
+          "role": "support",
+          "sha256": "4d08de5c1459568bafe5ea9a5869b44b8ee37db1b1c62d79e72cf75b0b094e77"
+        },
+        {
+          "path": "packages/tanstack-ai/tests/server-markup.ts",
+          "role": "support",
+          "sha256": "51289e0b89c225965525dcd3d0058c98bea84a63130e4d74c7db479918a8d2c2"
+        },
+        {
+          "path": "packages/tanstack-ai/audit/upstream-patches/tests/upstream/chat-ui/create-ui-types.test.tsx.patch",
+          "role": "support",
+          "sha256": "ba71273cfa2c2bf4593bb75fdf8bb21b3a375256caeab80c607f80b9915ca4ae"
+        }
+      ],
+      "evidenceOrigin": "upstream-suite",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/tanstack-ai/audit/adapted-runtime.json"
+      },
+      "notes": "Runs all 218 registrations assigned to this project without omissions."
+    },
+    {
+      "id": "tanstack-ai-adapted-ssr-runtime",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tanstack-ai-adapted-ssr",
+      "files": [
+        {
+          "path": "packages/tanstack-ai/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "ae2a25c9e139f725a769172357bd16b8a21a8f06478b89d0083f830e93620ba0"
+        },
+        {
+          "path": "packages/tanstack-ai/audit/provenance.json",
+          "role": "support",
+          "sha256": "72f82131c0ca4dc67d5be567ea20c6b6da2cb1c0e4014f4bf4e02d984a26415f"
+        },
+        {
+          "path": "packages/tanstack-ai/audit/registrations.json",
+          "role": "support",
+          "sha256": "40639375201585f8dbcb80d14935ad0e8eb0bb43aea3989ee23f62454601025f"
+        },
+        {
+          "path": "packages/tanstack-ai/audit/crosswalk.json",
+          "role": "support",
+          "sha256": "40f87ac54b14b3162845fcf50f05cc5a45e75383297fd51352572f7076a7254e"
+        },
+        {
+          "path": "packages/tanstack-ai/audit/upstream-helpers.json",
+          "role": "support",
+          "sha256": "1ee83b7587437f220e39d7c52ad2ac2cfad05b7a75dccbaad42d0deaecf05d16"
+        },
+        {
+          "path": "packages/tanstack-ai/upstream-helpers/ai-client/tests/blob-polyfill.ts",
+          "role": "support",
+          "sha256": "ba27228bb716e7ade1a22932a55f9b7aa44449836e577f20600f0c567d98c3fe"
+        },
+        {
+          "path": "packages/tanstack-ai/upstream-helpers/ai-client/tests/test-utils.ts",
+          "role": "support",
+          "sha256": "167d36dddd6ca27db6c65068af43b8f816cc37364dcae25167866d34faf0b9c6"
+        },
+        {
+          "path": "packages/tanstack-ai/upstream-helpers/ai-client/tests/ui-fixtures.ts",
+          "role": "support",
+          "sha256": "25301a3577f03d88c9ae9d043bb02acc8b2894d5254552727b3a13ba3c69e23f"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/chat-input.tsrx",
+          "role": "support",
+          "sha256": "5b55ce06d6677b46ca810f3ab4ae800d24c36c6c5e16e78aa864ced3bb5be808"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/chat-message.tsrx",
+          "role": "support",
+          "sha256": "7a14e18ef9f87f2f8261442332757e1c3b1084fb9275f6474eb11baeaf7b6959"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/chat-messages.tsrx",
+          "role": "support",
+          "sha256": "730411bfdccc7fb980b74bbc4094d9320fea361776cf86fc9c3416eafcfe350b"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/chat.tsrx",
+          "role": "support",
+          "sha256": "cbd4f726cd3e51605f462a4a126603785b121d1d3728b6cc8f78401c5714a586"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/create-chat-hook.tsrx",
+          "role": "support",
+          "sha256": "0b5ad275431b6ca05c752042dc8dd8f808eef3fbc76ab28da94c893091e41dcf"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/create-ui-contexts.tsrx",
+          "role": "support",
+          "sha256": "a19036aa0bba92df238738e3f31028a8030c7653a5b2775acbe5d0a0580b7f61"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/create-ui.tsrx",
+          "role": "support",
+          "sha256": "f846c9b781ae653ad01a0a628541dd4771b46788135f70b4a2427f33e18cf435"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/markdown-plugins.ts",
+          "role": "support",
+          "sha256": "c7f459c38658320f13f0d32d6d87383ce8085cbb71bd38b671345000e62bbbd6"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/text-part.tsrx",
+          "role": "support",
+          "sha256": "5ff2c28c86095ddf55d7b618e62f3dcf7c5a99ede0a350362b8f9db9be0b3c67"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/thinking-part.tsrx",
+          "role": "support",
+          "sha256": "a60c0a215d90ff80a74834eec7245279bbe8f17c06868628a97ba279b8c2cd7e"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/tool-approval.tsrx",
+          "role": "support",
+          "sha256": "8427d319c5663fc63bfcda3e539c6da3bcba62840f7bf1c6ec93c14e28f88716"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/tool-result-content.ts",
+          "role": "support",
+          "sha256": "7a65d1c0af3cda50ec65839561b63af2670f8045d9d1bc9222ef132bbed06fc7"
+        },
+        {
+          "path": "packages/tanstack-ai/src/create-chat-hook.tsrx",
+          "role": "support",
+          "sha256": "c2f805de4ae9ddde529cdc11b5c26641b2d3e6912da3d624904a82131e57af4d"
+        },
+        {
+          "path": "packages/tanstack-ai/src/index.ts",
+          "role": "support",
+          "sha256": "c378a4cd4d20a41df0f7b7f57daafbe34f7ec9e56edb406e8eadf21b732366b3"
+        },
+        {
+          "path": "packages/tanstack-ai/src/mcp-app-renderer.tsrx",
+          "role": "support",
+          "sha256": "0f7d8e32eb05f760a7cdbe02d144eb4729dfb11b10443dc16a8ac447064ce012"
+        },
+        {
+          "path": "packages/tanstack-ai/src/mcp-app-resource.tsrx",
+          "role": "support",
+          "sha256": "58697aa8d4f9c411f5facc0137a8d1cd0028cf6942b19aa5bffb00a4cd431334"
+        },
+        {
+          "path": "packages/tanstack-ai/src/mcp-apps.ts",
+          "role": "support",
+          "sha256": "c97ed80527b77dd7fad3e496aba5ce1a074c4ab799f06001711c81e399edac7d"
+        },
+        {
+          "path": "packages/tanstack-ai/src/realtime-types.ts",
+          "role": "support",
+          "sha256": "21a9c3ca7e4e128aeba1809052ffa71eaad052bf29c5fbab06af845eb27456dd"
+        },
+        {
+          "path": "packages/tanstack-ai/src/types.ts",
+          "role": "support",
+          "sha256": "d36ab1d04262fb078b8fba5c37cb9bb7eec791a23b551167b06449576df21480"
+        },
+        {
+          "path": "packages/tanstack-ai/src/ui.ts",
+          "role": "support",
+          "sha256": "14a912af7ddf8fb612a3817e698ea54e89cd32dfa59f28b114ae12d5380146d1"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-audio-recorder.tsrx",
+          "role": "support",
+          "sha256": "fa2cf96539c2fd514b6ff9a29f851b7e517898bbc89a0a4bff1e11dbc2ae14a7"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-byok.tsrx",
+          "role": "support",
+          "sha256": "208bcf8af729cc14813287d52fba78c9ef21241a154c5b4eeb44ea8e9db6d98b"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-chat.tsrx",
+          "role": "support",
+          "sha256": "ef6f8d2004e5600c3face8bdcfbf0db817b842379ec2a0c85ed0bc8e79471f8e"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-generate-audio.tsrx",
+          "role": "support",
+          "sha256": "0f266c543a1ee34430f63a7aba2e78bcf67614fdefff7887230d17742c10d622"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-generate-image.tsrx",
+          "role": "support",
+          "sha256": "ef87a45e45b90ee0fc1295d38a574b7ac4e98fae171f079a56eb1695509fca12"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-generate-speech.tsrx",
+          "role": "support",
+          "sha256": "86a5d4bf12014a4b457587d4245a9bcfc309a32f45e6902b8de803ffe4a16981"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-generate-video.tsrx",
+          "role": "support",
+          "sha256": "b73ac1e4b007af1d0294e22df27b30a28ca1b15dbe9a8d9cf90389889515298f"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-generation.tsrx",
+          "role": "support",
+          "sha256": "a6289a5aea1b5bf7dd76de7e71e64e8d4ce4fdaca4dbfe854de84bc3d7e77f8e"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-mcp-app-bridge.tsrx",
+          "role": "support",
+          "sha256": "f646331a7be4d6ce42681923efc5fafc0aacd187b38edf02ce9ecbe3758d6dde"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-realtime-chat.tsrx",
+          "role": "support",
+          "sha256": "9a008c187b6e768c672a5e115ff8220c4c92deec296ee73f20649401ff1ef229"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-summarize.tsrx",
+          "role": "support",
+          "sha256": "aa5645539a5105618ff7ab545e789d547124cb2fe76621399e2828517dc0a041"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-transcription.tsrx",
+          "role": "support",
+          "sha256": "1576844d4913db1696638d34bded3026da3166f72b72a34c5412e107d6f09061"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-web-mcp-tools.tsrx",
+          "role": "support",
+          "sha256": "c5581b9daa93b701689200dfac09af9994c9a5afa9075923a7aac41fcd4fdd7c"
+        },
+        {
+          "path": "packages/tanstack-ai/audit/adapted-ssr-runtime.json",
+          "role": "support",
+          "sha256": "d90023c99c5aa8cb179f1baa31099dad85c33bdeece831acda6d3b56a55ed28e"
+        },
+        {
+          "path": "packages/tanstack-ai/tests/vitest.adapted-ssr.config.ts",
+          "role": "support",
+          "sha256": "5f05f647b9ff9dc432645a8c9934c240e933cdf65d6f76727709f797d78e1409"
+        },
+        {
+          "path": "packages/tanstack-ai/tests/parity-config.ts",
+          "role": "support",
+          "sha256": "4d08de5c1459568bafe5ea9a5869b44b8ee37db1b1c62d79e72cf75b0b094e77"
+        },
+        {
+          "path": "packages/tanstack-ai/tests/server-markup.ts",
+          "role": "support",
+          "sha256": "51289e0b89c225965525dcd3d0058c98bea84a63130e4d74c7db479918a8d2c2"
+        },
+        {
+          "path": "packages/tanstack-ai/audit/upstream-patches/tests/upstream/chat-ui/create-ui-types.test.tsx.patch",
+          "role": "support",
+          "sha256": "ba71273cfa2c2bf4593bb75fdf8bb21b3a375256caeab80c607f80b9915ca4ae"
+        }
+      ],
+      "evidenceOrigin": "upstream-suite",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/tanstack-ai/audit/adapted-ssr-runtime.json"
+      },
+      "notes": "Runs all 17 registrations assigned to this project without omissions."
+    },
+    {
+      "id": "tanstack-ai-pristine-types",
+      "type": "pristine-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tanstack-ai-pristine-types",
+      "files": [
+        {
+          "path": "packages/tanstack-ai/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "ae2a25c9e139f725a769172357bd16b8a21a8f06478b89d0083f830e93620ba0"
+        },
+        {
+          "path": "packages/tanstack-ai/audit/provenance.json",
+          "role": "support",
+          "sha256": "72f82131c0ca4dc67d5be567ea20c6b6da2cb1c0e4014f4bf4e02d984a26415f"
+        },
+        {
+          "path": "packages/tanstack-ai/audit/registrations.json",
+          "role": "support",
+          "sha256": "40639375201585f8dbcb80d14935ad0e8eb0bb43aea3989ee23f62454601025f"
+        },
+        {
+          "path": "packages/tanstack-ai/audit/crosswalk.json",
+          "role": "support",
+          "sha256": "40f87ac54b14b3162845fcf50f05cc5a45e75383297fd51352572f7076a7254e"
+        },
+        {
+          "path": "packages/tanstack-ai/audit/upstream-helpers.json",
+          "role": "support",
+          "sha256": "1ee83b7587437f220e39d7c52ad2ac2cfad05b7a75dccbaad42d0deaecf05d16"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/chat-input.tsrx",
+          "role": "support",
+          "sha256": "5b55ce06d6677b46ca810f3ab4ae800d24c36c6c5e16e78aa864ced3bb5be808"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/chat-message.tsrx",
+          "role": "support",
+          "sha256": "7a14e18ef9f87f2f8261442332757e1c3b1084fb9275f6474eb11baeaf7b6959"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/chat-messages.tsrx",
+          "role": "support",
+          "sha256": "730411bfdccc7fb980b74bbc4094d9320fea361776cf86fc9c3416eafcfe350b"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/chat.tsrx",
+          "role": "support",
+          "sha256": "cbd4f726cd3e51605f462a4a126603785b121d1d3728b6cc8f78401c5714a586"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/create-chat-hook.tsrx",
+          "role": "support",
+          "sha256": "0b5ad275431b6ca05c752042dc8dd8f808eef3fbc76ab28da94c893091e41dcf"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/create-ui-contexts.tsrx",
+          "role": "support",
+          "sha256": "a19036aa0bba92df238738e3f31028a8030c7653a5b2775acbe5d0a0580b7f61"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/create-ui.tsrx",
+          "role": "support",
+          "sha256": "f846c9b781ae653ad01a0a628541dd4771b46788135f70b4a2427f33e18cf435"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/markdown-plugins.ts",
+          "role": "support",
+          "sha256": "c7f459c38658320f13f0d32d6d87383ce8085cbb71bd38b671345000e62bbbd6"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/text-part.tsrx",
+          "role": "support",
+          "sha256": "5ff2c28c86095ddf55d7b618e62f3dcf7c5a99ede0a350362b8f9db9be0b3c67"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/thinking-part.tsrx",
+          "role": "support",
+          "sha256": "a60c0a215d90ff80a74834eec7245279bbe8f17c06868628a97ba279b8c2cd7e"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/tool-approval.tsrx",
+          "role": "support",
+          "sha256": "8427d319c5663fc63bfcda3e539c6da3bcba62840f7bf1c6ec93c14e28f88716"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/tool-result-content.ts",
+          "role": "support",
+          "sha256": "7a65d1c0af3cda50ec65839561b63af2670f8045d9d1bc9222ef132bbed06fc7"
+        },
+        {
+          "path": "packages/tanstack-ai/src/create-chat-hook.tsrx",
+          "role": "support",
+          "sha256": "c2f805de4ae9ddde529cdc11b5c26641b2d3e6912da3d624904a82131e57af4d"
+        },
+        {
+          "path": "packages/tanstack-ai/src/index.ts",
+          "role": "support",
+          "sha256": "c378a4cd4d20a41df0f7b7f57daafbe34f7ec9e56edb406e8eadf21b732366b3"
+        },
+        {
+          "path": "packages/tanstack-ai/src/mcp-app-renderer.tsrx",
+          "role": "support",
+          "sha256": "0f7d8e32eb05f760a7cdbe02d144eb4729dfb11b10443dc16a8ac447064ce012"
+        },
+        {
+          "path": "packages/tanstack-ai/src/mcp-app-resource.tsrx",
+          "role": "support",
+          "sha256": "58697aa8d4f9c411f5facc0137a8d1cd0028cf6942b19aa5bffb00a4cd431334"
+        },
+        {
+          "path": "packages/tanstack-ai/src/mcp-apps.ts",
+          "role": "support",
+          "sha256": "c97ed80527b77dd7fad3e496aba5ce1a074c4ab799f06001711c81e399edac7d"
+        },
+        {
+          "path": "packages/tanstack-ai/src/realtime-types.ts",
+          "role": "support",
+          "sha256": "21a9c3ca7e4e128aeba1809052ffa71eaad052bf29c5fbab06af845eb27456dd"
+        },
+        {
+          "path": "packages/tanstack-ai/src/types.ts",
+          "role": "support",
+          "sha256": "d36ab1d04262fb078b8fba5c37cb9bb7eec791a23b551167b06449576df21480"
+        },
+        {
+          "path": "packages/tanstack-ai/src/ui.ts",
+          "role": "support",
+          "sha256": "14a912af7ddf8fb612a3817e698ea54e89cd32dfa59f28b114ae12d5380146d1"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-audio-recorder.tsrx",
+          "role": "support",
+          "sha256": "fa2cf96539c2fd514b6ff9a29f851b7e517898bbc89a0a4bff1e11dbc2ae14a7"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-byok.tsrx",
+          "role": "support",
+          "sha256": "208bcf8af729cc14813287d52fba78c9ef21241a154c5b4eeb44ea8e9db6d98b"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-chat.tsrx",
+          "role": "support",
+          "sha256": "ef6f8d2004e5600c3face8bdcfbf0db817b842379ec2a0c85ed0bc8e79471f8e"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-generate-audio.tsrx",
+          "role": "support",
+          "sha256": "0f266c543a1ee34430f63a7aba2e78bcf67614fdefff7887230d17742c10d622"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-generate-image.tsrx",
+          "role": "support",
+          "sha256": "ef87a45e45b90ee0fc1295d38a574b7ac4e98fae171f079a56eb1695509fca12"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-generate-speech.tsrx",
+          "role": "support",
+          "sha256": "86a5d4bf12014a4b457587d4245a9bcfc309a32f45e6902b8de803ffe4a16981"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-generate-video.tsrx",
+          "role": "support",
+          "sha256": "b73ac1e4b007af1d0294e22df27b30a28ca1b15dbe9a8d9cf90389889515298f"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-generation.tsrx",
+          "role": "support",
+          "sha256": "a6289a5aea1b5bf7dd76de7e71e64e8d4ce4fdaca4dbfe854de84bc3d7e77f8e"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-mcp-app-bridge.tsrx",
+          "role": "support",
+          "sha256": "f646331a7be4d6ce42681923efc5fafc0aacd187b38edf02ce9ecbe3758d6dde"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-realtime-chat.tsrx",
+          "role": "support",
+          "sha256": "9a008c187b6e768c672a5e115ff8220c4c92deec296ee73f20649401ff1ef229"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-summarize.tsrx",
+          "role": "support",
+          "sha256": "aa5645539a5105618ff7ab545e789d547124cb2fe76621399e2828517dc0a041"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-transcription.tsrx",
+          "role": "support",
+          "sha256": "1576844d4913db1696638d34bded3026da3166f72b72a34c5412e107d6f09061"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-web-mcp-tools.tsrx",
+          "role": "support",
+          "sha256": "c5581b9daa93b701689200dfac09af9994c9a5afa9075923a7aac41fcd4fdd7c"
+        },
+        {
+          "path": "packages/tanstack-ai/typetests/tsconfig.pristine.json",
+          "role": "test",
+          "sha256": "17d1960da21aa6aef82c2f5abc92f96c9c5ddefe0418d47628221607c95aa372",
+          "cases": [
+            {
+              "id": "types:ai-pristine",
+              "testName": "AI pristine type contracts",
+              "fullName": "AI pristine type contracts"
+            }
+          ]
+        },
+        {
+          "path": "packages/tanstack-ai/upstream-helpers/ai-client/tests/blob-polyfill.ts",
+          "role": "support",
+          "sha256": "ba27228bb716e7ade1a22932a55f9b7aa44449836e577f20600f0c567d98c3fe"
+        },
+        {
+          "path": "packages/tanstack-ai/upstream-helpers/ai-client/tests/test-utils.ts",
+          "role": "support",
+          "sha256": "167d36dddd6ca27db6c65068af43b8f816cc37364dcae25167866d34faf0b9c6"
+        },
+        {
+          "path": "packages/tanstack-ai/upstream-helpers/ai-client/tests/ui-fixtures.ts",
+          "role": "support",
+          "sha256": "25301a3577f03d88c9ae9d043bb02acc8b2894d5254552727b3a13ba3c69e23f"
+        }
+      ],
+      "evidenceOrigin": "upstream-suite",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsgo",
+        "project": "packages/tanstack-ai/typetests/tsconfig.pristine.json"
+      }
+    },
+    {
+      "id": "tanstack-ai-adapted-types",
+      "type": "adapted-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tanstack-ai-adapted-types",
+      "files": [
+        {
+          "path": "packages/tanstack-ai/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "ae2a25c9e139f725a769172357bd16b8a21a8f06478b89d0083f830e93620ba0"
+        },
+        {
+          "path": "packages/tanstack-ai/audit/provenance.json",
+          "role": "support",
+          "sha256": "72f82131c0ca4dc67d5be567ea20c6b6da2cb1c0e4014f4bf4e02d984a26415f"
+        },
+        {
+          "path": "packages/tanstack-ai/audit/registrations.json",
+          "role": "support",
+          "sha256": "40639375201585f8dbcb80d14935ad0e8eb0bb43aea3989ee23f62454601025f"
+        },
+        {
+          "path": "packages/tanstack-ai/audit/crosswalk.json",
+          "role": "support",
+          "sha256": "40f87ac54b14b3162845fcf50f05cc5a45e75383297fd51352572f7076a7254e"
+        },
+        {
+          "path": "packages/tanstack-ai/audit/upstream-helpers.json",
+          "role": "support",
+          "sha256": "1ee83b7587437f220e39d7c52ad2ac2cfad05b7a75dccbaad42d0deaecf05d16"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/chat-input.tsrx",
+          "role": "support",
+          "sha256": "5b55ce06d6677b46ca810f3ab4ae800d24c36c6c5e16e78aa864ced3bb5be808"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/chat-message.tsrx",
+          "role": "support",
+          "sha256": "7a14e18ef9f87f2f8261442332757e1c3b1084fb9275f6474eb11baeaf7b6959"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/chat-messages.tsrx",
+          "role": "support",
+          "sha256": "730411bfdccc7fb980b74bbc4094d9320fea361776cf86fc9c3416eafcfe350b"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/chat.tsrx",
+          "role": "support",
+          "sha256": "cbd4f726cd3e51605f462a4a126603785b121d1d3728b6cc8f78401c5714a586"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/create-chat-hook.tsrx",
+          "role": "support",
+          "sha256": "0b5ad275431b6ca05c752042dc8dd8f808eef3fbc76ab28da94c893091e41dcf"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/create-ui-contexts.tsrx",
+          "role": "support",
+          "sha256": "a19036aa0bba92df238738e3f31028a8030c7653a5b2775acbe5d0a0580b7f61"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/create-ui.tsrx",
+          "role": "support",
+          "sha256": "f846c9b781ae653ad01a0a628541dd4771b46788135f70b4a2427f33e18cf435"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/markdown-plugins.ts",
+          "role": "support",
+          "sha256": "c7f459c38658320f13f0d32d6d87383ce8085cbb71bd38b671345000e62bbbd6"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/text-part.tsrx",
+          "role": "support",
+          "sha256": "5ff2c28c86095ddf55d7b618e62f3dcf7c5a99ede0a350362b8f9db9be0b3c67"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/thinking-part.tsrx",
+          "role": "support",
+          "sha256": "a60c0a215d90ff80a74834eec7245279bbe8f17c06868628a97ba279b8c2cd7e"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/tool-approval.tsrx",
+          "role": "support",
+          "sha256": "8427d319c5663fc63bfcda3e539c6da3bcba62840f7bf1c6ec93c14e28f88716"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/tool-result-content.ts",
+          "role": "support",
+          "sha256": "7a65d1c0af3cda50ec65839561b63af2670f8045d9d1bc9222ef132bbed06fc7"
+        },
+        {
+          "path": "packages/tanstack-ai/src/create-chat-hook.tsrx",
+          "role": "support",
+          "sha256": "c2f805de4ae9ddde529cdc11b5c26641b2d3e6912da3d624904a82131e57af4d"
+        },
+        {
+          "path": "packages/tanstack-ai/src/index.ts",
+          "role": "support",
+          "sha256": "c378a4cd4d20a41df0f7b7f57daafbe34f7ec9e56edb406e8eadf21b732366b3"
+        },
+        {
+          "path": "packages/tanstack-ai/src/mcp-app-renderer.tsrx",
+          "role": "support",
+          "sha256": "0f7d8e32eb05f760a7cdbe02d144eb4729dfb11b10443dc16a8ac447064ce012"
+        },
+        {
+          "path": "packages/tanstack-ai/src/mcp-app-resource.tsrx",
+          "role": "support",
+          "sha256": "58697aa8d4f9c411f5facc0137a8d1cd0028cf6942b19aa5bffb00a4cd431334"
+        },
+        {
+          "path": "packages/tanstack-ai/src/mcp-apps.ts",
+          "role": "support",
+          "sha256": "c97ed80527b77dd7fad3e496aba5ce1a074c4ab799f06001711c81e399edac7d"
+        },
+        {
+          "path": "packages/tanstack-ai/src/realtime-types.ts",
+          "role": "support",
+          "sha256": "21a9c3ca7e4e128aeba1809052ffa71eaad052bf29c5fbab06af845eb27456dd"
+        },
+        {
+          "path": "packages/tanstack-ai/src/types.ts",
+          "role": "support",
+          "sha256": "d36ab1d04262fb078b8fba5c37cb9bb7eec791a23b551167b06449576df21480"
+        },
+        {
+          "path": "packages/tanstack-ai/src/ui.ts",
+          "role": "support",
+          "sha256": "14a912af7ddf8fb612a3817e698ea54e89cd32dfa59f28b114ae12d5380146d1"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-audio-recorder.tsrx",
+          "role": "support",
+          "sha256": "fa2cf96539c2fd514b6ff9a29f851b7e517898bbc89a0a4bff1e11dbc2ae14a7"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-byok.tsrx",
+          "role": "support",
+          "sha256": "208bcf8af729cc14813287d52fba78c9ef21241a154c5b4eeb44ea8e9db6d98b"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-chat.tsrx",
+          "role": "support",
+          "sha256": "ef6f8d2004e5600c3face8bdcfbf0db817b842379ec2a0c85ed0bc8e79471f8e"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-generate-audio.tsrx",
+          "role": "support",
+          "sha256": "0f266c543a1ee34430f63a7aba2e78bcf67614fdefff7887230d17742c10d622"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-generate-image.tsrx",
+          "role": "support",
+          "sha256": "ef87a45e45b90ee0fc1295d38a574b7ac4e98fae171f079a56eb1695509fca12"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-generate-speech.tsrx",
+          "role": "support",
+          "sha256": "86a5d4bf12014a4b457587d4245a9bcfc309a32f45e6902b8de803ffe4a16981"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-generate-video.tsrx",
+          "role": "support",
+          "sha256": "b73ac1e4b007af1d0294e22df27b30a28ca1b15dbe9a8d9cf90389889515298f"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-generation.tsrx",
+          "role": "support",
+          "sha256": "a6289a5aea1b5bf7dd76de7e71e64e8d4ce4fdaca4dbfe854de84bc3d7e77f8e"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-mcp-app-bridge.tsrx",
+          "role": "support",
+          "sha256": "f646331a7be4d6ce42681923efc5fafc0aacd187b38edf02ce9ecbe3758d6dde"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-realtime-chat.tsrx",
+          "role": "support",
+          "sha256": "9a008c187b6e768c672a5e115ff8220c4c92deec296ee73f20649401ff1ef229"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-summarize.tsrx",
+          "role": "support",
+          "sha256": "aa5645539a5105618ff7ab545e789d547124cb2fe76621399e2828517dc0a041"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-transcription.tsrx",
+          "role": "support",
+          "sha256": "1576844d4913db1696638d34bded3026da3166f72b72a34c5412e107d6f09061"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-web-mcp-tools.tsrx",
+          "role": "support",
+          "sha256": "c5581b9daa93b701689200dfac09af9994c9a5afa9075923a7aac41fcd4fdd7c"
+        },
+        {
+          "path": "packages/tanstack-ai/typetests/tsconfig.adapted.json",
+          "role": "test",
+          "sha256": "384ba86bb6ef1f5e76f1750d5674bba61d0f7f306ddf6657f207bdbf97ec08b3",
+          "cases": [
+            {
+              "id": "types:ai-adapted",
+              "testName": "AI adapted type contracts",
+              "fullName": "AI adapted type contracts"
+            }
+          ]
+        },
+        {
+          "path": "packages/tanstack-ai/upstream-helpers/ai-client/tests/blob-polyfill.ts",
+          "role": "support",
+          "sha256": "ba27228bb716e7ade1a22932a55f9b7aa44449836e577f20600f0c567d98c3fe"
+        },
+        {
+          "path": "packages/tanstack-ai/upstream-helpers/ai-client/tests/test-utils.ts",
+          "role": "support",
+          "sha256": "167d36dddd6ca27db6c65068af43b8f816cc37364dcae25167866d34faf0b9c6"
+        },
+        {
+          "path": "packages/tanstack-ai/upstream-helpers/ai-client/tests/ui-fixtures.ts",
+          "role": "support",
+          "sha256": "25301a3577f03d88c9ae9d043bb02acc8b2894d5254552727b3a13ba3c69e23f"
+        }
+      ],
+      "evidenceOrigin": "upstream-suite",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsrx-tsc",
+        "project": "packages/tanstack-ai/typetests/tsconfig.adapted.json"
+      }
+    },
+    {
+      "id": "tanstack-ai-source-types",
+      "type": "adapted-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tanstack-ai-source-types",
+      "files": [
+        {
+          "path": "packages/tanstack-ai/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "ae2a25c9e139f725a769172357bd16b8a21a8f06478b89d0083f830e93620ba0"
+        },
+        {
+          "path": "packages/tanstack-ai/audit/provenance.json",
+          "role": "support",
+          "sha256": "72f82131c0ca4dc67d5be567ea20c6b6da2cb1c0e4014f4bf4e02d984a26415f"
+        },
+        {
+          "path": "packages/tanstack-ai/audit/registrations.json",
+          "role": "support",
+          "sha256": "40639375201585f8dbcb80d14935ad0e8eb0bb43aea3989ee23f62454601025f"
+        },
+        {
+          "path": "packages/tanstack-ai/audit/crosswalk.json",
+          "role": "support",
+          "sha256": "40f87ac54b14b3162845fcf50f05cc5a45e75383297fd51352572f7076a7254e"
+        },
+        {
+          "path": "packages/tanstack-ai/audit/upstream-helpers.json",
+          "role": "support",
+          "sha256": "1ee83b7587437f220e39d7c52ad2ac2cfad05b7a75dccbaad42d0deaecf05d16"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/chat-input.tsrx",
+          "role": "support",
+          "sha256": "5b55ce06d6677b46ca810f3ab4ae800d24c36c6c5e16e78aa864ced3bb5be808"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/chat-message.tsrx",
+          "role": "support",
+          "sha256": "7a14e18ef9f87f2f8261442332757e1c3b1084fb9275f6474eb11baeaf7b6959"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/chat-messages.tsrx",
+          "role": "support",
+          "sha256": "730411bfdccc7fb980b74bbc4094d9320fea361776cf86fc9c3416eafcfe350b"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/chat.tsrx",
+          "role": "support",
+          "sha256": "cbd4f726cd3e51605f462a4a126603785b121d1d3728b6cc8f78401c5714a586"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/create-chat-hook.tsrx",
+          "role": "support",
+          "sha256": "0b5ad275431b6ca05c752042dc8dd8f808eef3fbc76ab28da94c893091e41dcf"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/create-ui-contexts.tsrx",
+          "role": "support",
+          "sha256": "a19036aa0bba92df238738e3f31028a8030c7653a5b2775acbe5d0a0580b7f61"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/create-ui.tsrx",
+          "role": "support",
+          "sha256": "f846c9b781ae653ad01a0a628541dd4771b46788135f70b4a2427f33e18cf435"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/markdown-plugins.ts",
+          "role": "support",
+          "sha256": "c7f459c38658320f13f0d32d6d87383ce8085cbb71bd38b671345000e62bbbd6"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/text-part.tsrx",
+          "role": "support",
+          "sha256": "5ff2c28c86095ddf55d7b618e62f3dcf7c5a99ede0a350362b8f9db9be0b3c67"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/thinking-part.tsrx",
+          "role": "support",
+          "sha256": "a60c0a215d90ff80a74834eec7245279bbe8f17c06868628a97ba279b8c2cd7e"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/tool-approval.tsrx",
+          "role": "support",
+          "sha256": "8427d319c5663fc63bfcda3e539c6da3bcba62840f7bf1c6ec93c14e28f88716"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/tool-result-content.ts",
+          "role": "support",
+          "sha256": "7a65d1c0af3cda50ec65839561b63af2670f8045d9d1bc9222ef132bbed06fc7"
+        },
+        {
+          "path": "packages/tanstack-ai/src/create-chat-hook.tsrx",
+          "role": "support",
+          "sha256": "c2f805de4ae9ddde529cdc11b5c26641b2d3e6912da3d624904a82131e57af4d"
+        },
+        {
+          "path": "packages/tanstack-ai/src/index.ts",
+          "role": "support",
+          "sha256": "c378a4cd4d20a41df0f7b7f57daafbe34f7ec9e56edb406e8eadf21b732366b3"
+        },
+        {
+          "path": "packages/tanstack-ai/src/mcp-app-renderer.tsrx",
+          "role": "support",
+          "sha256": "0f7d8e32eb05f760a7cdbe02d144eb4729dfb11b10443dc16a8ac447064ce012"
+        },
+        {
+          "path": "packages/tanstack-ai/src/mcp-app-resource.tsrx",
+          "role": "support",
+          "sha256": "58697aa8d4f9c411f5facc0137a8d1cd0028cf6942b19aa5bffb00a4cd431334"
+        },
+        {
+          "path": "packages/tanstack-ai/src/mcp-apps.ts",
+          "role": "support",
+          "sha256": "c97ed80527b77dd7fad3e496aba5ce1a074c4ab799f06001711c81e399edac7d"
+        },
+        {
+          "path": "packages/tanstack-ai/src/realtime-types.ts",
+          "role": "support",
+          "sha256": "21a9c3ca7e4e128aeba1809052ffa71eaad052bf29c5fbab06af845eb27456dd"
+        },
+        {
+          "path": "packages/tanstack-ai/src/types.ts",
+          "role": "support",
+          "sha256": "d36ab1d04262fb078b8fba5c37cb9bb7eec791a23b551167b06449576df21480"
+        },
+        {
+          "path": "packages/tanstack-ai/src/ui.ts",
+          "role": "support",
+          "sha256": "14a912af7ddf8fb612a3817e698ea54e89cd32dfa59f28b114ae12d5380146d1"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-audio-recorder.tsrx",
+          "role": "support",
+          "sha256": "fa2cf96539c2fd514b6ff9a29f851b7e517898bbc89a0a4bff1e11dbc2ae14a7"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-byok.tsrx",
+          "role": "support",
+          "sha256": "208bcf8af729cc14813287d52fba78c9ef21241a154c5b4eeb44ea8e9db6d98b"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-chat.tsrx",
+          "role": "support",
+          "sha256": "ef6f8d2004e5600c3face8bdcfbf0db817b842379ec2a0c85ed0bc8e79471f8e"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-generate-audio.tsrx",
+          "role": "support",
+          "sha256": "0f266c543a1ee34430f63a7aba2e78bcf67614fdefff7887230d17742c10d622"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-generate-image.tsrx",
+          "role": "support",
+          "sha256": "ef87a45e45b90ee0fc1295d38a574b7ac4e98fae171f079a56eb1695509fca12"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-generate-speech.tsrx",
+          "role": "support",
+          "sha256": "86a5d4bf12014a4b457587d4245a9bcfc309a32f45e6902b8de803ffe4a16981"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-generate-video.tsrx",
+          "role": "support",
+          "sha256": "b73ac1e4b007af1d0294e22df27b30a28ca1b15dbe9a8d9cf90389889515298f"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-generation.tsrx",
+          "role": "support",
+          "sha256": "a6289a5aea1b5bf7dd76de7e71e64e8d4ce4fdaca4dbfe854de84bc3d7e77f8e"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-mcp-app-bridge.tsrx",
+          "role": "support",
+          "sha256": "f646331a7be4d6ce42681923efc5fafc0aacd187b38edf02ce9ecbe3758d6dde"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-realtime-chat.tsrx",
+          "role": "support",
+          "sha256": "9a008c187b6e768c672a5e115ff8220c4c92deec296ee73f20649401ff1ef229"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-summarize.tsrx",
+          "role": "support",
+          "sha256": "aa5645539a5105618ff7ab545e789d547124cb2fe76621399e2828517dc0a041"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-transcription.tsrx",
+          "role": "support",
+          "sha256": "1576844d4913db1696638d34bded3026da3166f72b72a34c5412e107d6f09061"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-web-mcp-tools.tsrx",
+          "role": "support",
+          "sha256": "c5581b9daa93b701689200dfac09af9994c9a5afa9075923a7aac41fcd4fdd7c"
+        },
+        {
+          "path": "packages/tanstack-ai/tsconfig.json",
+          "role": "test",
+          "sha256": "a52a616b0bc65459b951942cd7c9c79cd49b6d96cd7b34c6fbad6235ae280d90",
+          "cases": [
+            {
+              "id": "types:ai-source",
+              "testName": "AI source type contracts",
+              "fullName": "AI source type contracts"
+            }
+          ]
+        }
+      ],
+      "evidenceOrigin": "repo-authored",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsrx-tsc",
+        "project": "packages/tanstack-ai/tsconfig.json"
+      }
+    },
+    {
+      "id": "tanstack-ai-public-types",
+      "type": "adapted-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tanstack-ai-public-types",
+      "files": [
+        {
+          "path": "packages/tanstack-ai/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "ae2a25c9e139f725a769172357bd16b8a21a8f06478b89d0083f830e93620ba0"
+        },
+        {
+          "path": "packages/tanstack-ai/audit/provenance.json",
+          "role": "support",
+          "sha256": "72f82131c0ca4dc67d5be567ea20c6b6da2cb1c0e4014f4bf4e02d984a26415f"
+        },
+        {
+          "path": "packages/tanstack-ai/audit/registrations.json",
+          "role": "support",
+          "sha256": "40639375201585f8dbcb80d14935ad0e8eb0bb43aea3989ee23f62454601025f"
+        },
+        {
+          "path": "packages/tanstack-ai/audit/crosswalk.json",
+          "role": "support",
+          "sha256": "40f87ac54b14b3162845fcf50f05cc5a45e75383297fd51352572f7076a7254e"
+        },
+        {
+          "path": "packages/tanstack-ai/audit/upstream-helpers.json",
+          "role": "support",
+          "sha256": "1ee83b7587437f220e39d7c52ad2ac2cfad05b7a75dccbaad42d0deaecf05d16"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/chat-input.tsrx",
+          "role": "support",
+          "sha256": "5b55ce06d6677b46ca810f3ab4ae800d24c36c6c5e16e78aa864ced3bb5be808"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/chat-message.tsrx",
+          "role": "support",
+          "sha256": "7a14e18ef9f87f2f8261442332757e1c3b1084fb9275f6474eb11baeaf7b6959"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/chat-messages.tsrx",
+          "role": "support",
+          "sha256": "730411bfdccc7fb980b74bbc4094d9320fea361776cf86fc9c3416eafcfe350b"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/chat.tsrx",
+          "role": "support",
+          "sha256": "cbd4f726cd3e51605f462a4a126603785b121d1d3728b6cc8f78401c5714a586"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/create-chat-hook.tsrx",
+          "role": "support",
+          "sha256": "0b5ad275431b6ca05c752042dc8dd8f808eef3fbc76ab28da94c893091e41dcf"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/create-ui-contexts.tsrx",
+          "role": "support",
+          "sha256": "a19036aa0bba92df238738e3f31028a8030c7653a5b2775acbe5d0a0580b7f61"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/create-ui.tsrx",
+          "role": "support",
+          "sha256": "f846c9b781ae653ad01a0a628541dd4771b46788135f70b4a2427f33e18cf435"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/markdown-plugins.ts",
+          "role": "support",
+          "sha256": "c7f459c38658320f13f0d32d6d87383ce8085cbb71bd38b671345000e62bbbd6"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/text-part.tsrx",
+          "role": "support",
+          "sha256": "5ff2c28c86095ddf55d7b618e62f3dcf7c5a99ede0a350362b8f9db9be0b3c67"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/thinking-part.tsrx",
+          "role": "support",
+          "sha256": "a60c0a215d90ff80a74834eec7245279bbe8f17c06868628a97ba279b8c2cd7e"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/tool-approval.tsrx",
+          "role": "support",
+          "sha256": "8427d319c5663fc63bfcda3e539c6da3bcba62840f7bf1c6ec93c14e28f88716"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/tool-result-content.ts",
+          "role": "support",
+          "sha256": "7a65d1c0af3cda50ec65839561b63af2670f8045d9d1bc9222ef132bbed06fc7"
+        },
+        {
+          "path": "packages/tanstack-ai/src/create-chat-hook.tsrx",
+          "role": "support",
+          "sha256": "c2f805de4ae9ddde529cdc11b5c26641b2d3e6912da3d624904a82131e57af4d"
+        },
+        {
+          "path": "packages/tanstack-ai/src/index.ts",
+          "role": "support",
+          "sha256": "c378a4cd4d20a41df0f7b7f57daafbe34f7ec9e56edb406e8eadf21b732366b3"
+        },
+        {
+          "path": "packages/tanstack-ai/src/mcp-app-renderer.tsrx",
+          "role": "support",
+          "sha256": "0f7d8e32eb05f760a7cdbe02d144eb4729dfb11b10443dc16a8ac447064ce012"
+        },
+        {
+          "path": "packages/tanstack-ai/src/mcp-app-resource.tsrx",
+          "role": "support",
+          "sha256": "58697aa8d4f9c411f5facc0137a8d1cd0028cf6942b19aa5bffb00a4cd431334"
+        },
+        {
+          "path": "packages/tanstack-ai/src/mcp-apps.ts",
+          "role": "support",
+          "sha256": "c97ed80527b77dd7fad3e496aba5ce1a074c4ab799f06001711c81e399edac7d"
+        },
+        {
+          "path": "packages/tanstack-ai/src/realtime-types.ts",
+          "role": "support",
+          "sha256": "21a9c3ca7e4e128aeba1809052ffa71eaad052bf29c5fbab06af845eb27456dd"
+        },
+        {
+          "path": "packages/tanstack-ai/src/types.ts",
+          "role": "support",
+          "sha256": "d36ab1d04262fb078b8fba5c37cb9bb7eec791a23b551167b06449576df21480"
+        },
+        {
+          "path": "packages/tanstack-ai/src/ui.ts",
+          "role": "support",
+          "sha256": "14a912af7ddf8fb612a3817e698ea54e89cd32dfa59f28b114ae12d5380146d1"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-audio-recorder.tsrx",
+          "role": "support",
+          "sha256": "fa2cf96539c2fd514b6ff9a29f851b7e517898bbc89a0a4bff1e11dbc2ae14a7"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-byok.tsrx",
+          "role": "support",
+          "sha256": "208bcf8af729cc14813287d52fba78c9ef21241a154c5b4eeb44ea8e9db6d98b"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-chat.tsrx",
+          "role": "support",
+          "sha256": "ef6f8d2004e5600c3face8bdcfbf0db817b842379ec2a0c85ed0bc8e79471f8e"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-generate-audio.tsrx",
+          "role": "support",
+          "sha256": "0f266c543a1ee34430f63a7aba2e78bcf67614fdefff7887230d17742c10d622"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-generate-image.tsrx",
+          "role": "support",
+          "sha256": "ef87a45e45b90ee0fc1295d38a574b7ac4e98fae171f079a56eb1695509fca12"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-generate-speech.tsrx",
+          "role": "support",
+          "sha256": "86a5d4bf12014a4b457587d4245a9bcfc309a32f45e6902b8de803ffe4a16981"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-generate-video.tsrx",
+          "role": "support",
+          "sha256": "b73ac1e4b007af1d0294e22df27b30a28ca1b15dbe9a8d9cf90389889515298f"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-generation.tsrx",
+          "role": "support",
+          "sha256": "a6289a5aea1b5bf7dd76de7e71e64e8d4ce4fdaca4dbfe854de84bc3d7e77f8e"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-mcp-app-bridge.tsrx",
+          "role": "support",
+          "sha256": "f646331a7be4d6ce42681923efc5fafc0aacd187b38edf02ce9ecbe3758d6dde"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-realtime-chat.tsrx",
+          "role": "support",
+          "sha256": "9a008c187b6e768c672a5e115ff8220c4c92deec296ee73f20649401ff1ef229"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-summarize.tsrx",
+          "role": "support",
+          "sha256": "aa5645539a5105618ff7ab545e789d547124cb2fe76621399e2828517dc0a041"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-transcription.tsrx",
+          "role": "support",
+          "sha256": "1576844d4913db1696638d34bded3026da3166f72b72a34c5412e107d6f09061"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-web-mcp-tools.tsrx",
+          "role": "support",
+          "sha256": "c5581b9daa93b701689200dfac09af9994c9a5afa9075923a7aac41fcd4fdd7c"
+        },
+        {
+          "path": "packages/tanstack-ai/tests/types/tsconfig.json",
+          "role": "test",
+          "sha256": "5f20a035485bec55ccf3d84f0bc5cb8a9c4f895fe0075f038165db792afef3e3",
+          "cases": [
+            {
+              "id": "types:ai-public",
+              "testName": "AI public type contracts",
+              "fullName": "AI public type contracts"
+            }
+          ]
+        },
+        {
+          "path": "packages/tanstack-ai/tests/types/public-contracts.test-d.tsx",
+          "role": "support",
+          "sha256": "107b085a1db9963cf3bdd925f17e38abebf42ba81510748092682da1f21570b5"
+        },
+        {
+          "path": "packages/tanstack-ai/tests/types/published-contract.ts",
+          "role": "support",
+          "sha256": "682660276b5ccd0ba125cc273822e0d664e59d6c8568ece86c3c8e11193f3941"
+        }
+      ],
+      "evidenceOrigin": "repo-authored",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsrx-tsc",
+        "project": "packages/tanstack-ai/tests/types/tsconfig.json"
+      }
+    },
+    {
+      "id": "tanstack-ai-differential",
       "type": "differential",
       "oracle": "required",
       "environment": "workspace-node",
       "project": "tanstack-ai-differential",
-      "evidenceOrigin": "repo-authored",
-      "notes": "Runs one exact same-fixture streamed-chat scenario against @tanstack/ai-react@0.17.0. Octane adaptation, SSR, and type contracts remain ordinary package tests outside parity evidence until the pinned upstream suite is vendored into pristine / one-for-one adapted lanes.",
       "files": [
         {
           "path": "packages/tanstack-ai/tests/differential/parity.test.ts",
@@ -63,32 +1557,1140 @@
           ]
         },
         {
-          "path": "packages/tanstack-ai/tests/differential/_setup.ts",
-          "role": "support",
-          "sha256": "892a41a3da8ec18e6b937f7f50ee4dc80d4283ddb1e0f443ac122a1e694d2717"
-        },
-        {
           "path": "packages/tanstack-ai/tests/_fixtures/parity.tsrx",
           "role": "support",
           "sha256": "1ab155814f6c94177fb3e8b5f428212e252800c100eeafad2153f662122c5553"
         },
         {
-          "path": "packages/tanstack-ai/audit/test-classifications.json",
+          "path": "packages/tanstack-ai/tests/differential/_setup.ts",
           "role": "support",
-          "sha256": "a27d621e8b5c3cbf12c5a39aa0c717f18681b83867a12bd620a4201e311e1c8a"
+          "sha256": "892a41a3da8ec18e6b937f7f50ee4dc80d4283ddb1e0f443ac122a1e694d2717"
         },
         {
-          "path": "packages/tanstack-ai/audit/upstream-suite-artifacts.json",
+          "path": "packages/tanstack-ai/src/chat-ui/chat-input.tsrx",
           "role": "support",
-          "sha256": "136aa5b733bee17fbab832f7fde32ce265e3a0bd5258e06fe8c81dd1a317373a"
+          "sha256": "5b55ce06d6677b46ca810f3ab4ae800d24c36c6c5e16e78aa864ced3bb5be808"
         },
         {
-          "path": "packages/octane/tests/differential/_rig.ts",
+          "path": "packages/tanstack-ai/src/chat-ui/chat-message.tsrx",
           "role": "support",
-          "sha256": "364c0595b08b26343fa3cd9ff7ddbdaa5fd227cfcd390437aa67ae9a173ebe1b"
+          "sha256": "7a14e18ef9f87f2f8261442332757e1c3b1084fb9275f6474eb11baeaf7b6959"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/chat-messages.tsrx",
+          "role": "support",
+          "sha256": "730411bfdccc7fb980b74bbc4094d9320fea361776cf86fc9c3416eafcfe350b"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/chat.tsrx",
+          "role": "support",
+          "sha256": "cbd4f726cd3e51605f462a4a126603785b121d1d3728b6cc8f78401c5714a586"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/create-chat-hook.tsrx",
+          "role": "support",
+          "sha256": "0b5ad275431b6ca05c752042dc8dd8f808eef3fbc76ab28da94c893091e41dcf"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/create-ui-contexts.tsrx",
+          "role": "support",
+          "sha256": "a19036aa0bba92df238738e3f31028a8030c7653a5b2775acbe5d0a0580b7f61"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/create-ui.tsrx",
+          "role": "support",
+          "sha256": "f846c9b781ae653ad01a0a628541dd4771b46788135f70b4a2427f33e18cf435"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/markdown-plugins.ts",
+          "role": "support",
+          "sha256": "c7f459c38658320f13f0d32d6d87383ce8085cbb71bd38b671345000e62bbbd6"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/text-part.tsrx",
+          "role": "support",
+          "sha256": "5ff2c28c86095ddf55d7b618e62f3dcf7c5a99ede0a350362b8f9db9be0b3c67"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/thinking-part.tsrx",
+          "role": "support",
+          "sha256": "a60c0a215d90ff80a74834eec7245279bbe8f17c06868628a97ba279b8c2cd7e"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/tool-approval.tsrx",
+          "role": "support",
+          "sha256": "8427d319c5663fc63bfcda3e539c6da3bcba62840f7bf1c6ec93c14e28f88716"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/tool-result-content.ts",
+          "role": "support",
+          "sha256": "7a65d1c0af3cda50ec65839561b63af2670f8045d9d1bc9222ef132bbed06fc7"
+        },
+        {
+          "path": "packages/tanstack-ai/src/create-chat-hook.tsrx",
+          "role": "support",
+          "sha256": "c2f805de4ae9ddde529cdc11b5c26641b2d3e6912da3d624904a82131e57af4d"
+        },
+        {
+          "path": "packages/tanstack-ai/src/index.ts",
+          "role": "support",
+          "sha256": "c378a4cd4d20a41df0f7b7f57daafbe34f7ec9e56edb406e8eadf21b732366b3"
+        },
+        {
+          "path": "packages/tanstack-ai/src/mcp-app-renderer.tsrx",
+          "role": "support",
+          "sha256": "0f7d8e32eb05f760a7cdbe02d144eb4729dfb11b10443dc16a8ac447064ce012"
+        },
+        {
+          "path": "packages/tanstack-ai/src/mcp-app-resource.tsrx",
+          "role": "support",
+          "sha256": "58697aa8d4f9c411f5facc0137a8d1cd0028cf6942b19aa5bffb00a4cd431334"
+        },
+        {
+          "path": "packages/tanstack-ai/src/mcp-apps.ts",
+          "role": "support",
+          "sha256": "c97ed80527b77dd7fad3e496aba5ce1a074c4ab799f06001711c81e399edac7d"
+        },
+        {
+          "path": "packages/tanstack-ai/src/realtime-types.ts",
+          "role": "support",
+          "sha256": "21a9c3ca7e4e128aeba1809052ffa71eaad052bf29c5fbab06af845eb27456dd"
+        },
+        {
+          "path": "packages/tanstack-ai/src/types.ts",
+          "role": "support",
+          "sha256": "d36ab1d04262fb078b8fba5c37cb9bb7eec791a23b551167b06449576df21480"
+        },
+        {
+          "path": "packages/tanstack-ai/src/ui.ts",
+          "role": "support",
+          "sha256": "14a912af7ddf8fb612a3817e698ea54e89cd32dfa59f28b114ae12d5380146d1"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-audio-recorder.tsrx",
+          "role": "support",
+          "sha256": "fa2cf96539c2fd514b6ff9a29f851b7e517898bbc89a0a4bff1e11dbc2ae14a7"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-byok.tsrx",
+          "role": "support",
+          "sha256": "208bcf8af729cc14813287d52fba78c9ef21241a154c5b4eeb44ea8e9db6d98b"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-chat.tsrx",
+          "role": "support",
+          "sha256": "ef6f8d2004e5600c3face8bdcfbf0db817b842379ec2a0c85ed0bc8e79471f8e"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-generate-audio.tsrx",
+          "role": "support",
+          "sha256": "0f266c543a1ee34430f63a7aba2e78bcf67614fdefff7887230d17742c10d622"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-generate-image.tsrx",
+          "role": "support",
+          "sha256": "ef87a45e45b90ee0fc1295d38a574b7ac4e98fae171f079a56eb1695509fca12"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-generate-speech.tsrx",
+          "role": "support",
+          "sha256": "86a5d4bf12014a4b457587d4245a9bcfc309a32f45e6902b8de803ffe4a16981"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-generate-video.tsrx",
+          "role": "support",
+          "sha256": "b73ac1e4b007af1d0294e22df27b30a28ca1b15dbe9a8d9cf90389889515298f"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-generation.tsrx",
+          "role": "support",
+          "sha256": "a6289a5aea1b5bf7dd76de7e71e64e8d4ce4fdaca4dbfe854de84bc3d7e77f8e"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-mcp-app-bridge.tsrx",
+          "role": "support",
+          "sha256": "f646331a7be4d6ce42681923efc5fafc0aacd187b38edf02ce9ecbe3758d6dde"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-realtime-chat.tsrx",
+          "role": "support",
+          "sha256": "9a008c187b6e768c672a5e115ff8220c4c92deec296ee73f20649401ff1ef229"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-summarize.tsrx",
+          "role": "support",
+          "sha256": "aa5645539a5105618ff7ab545e789d547124cb2fe76621399e2828517dc0a041"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-transcription.tsrx",
+          "role": "support",
+          "sha256": "1576844d4913db1696638d34bded3026da3166f72b72a34c5412e107d6f09061"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-web-mcp-tools.tsrx",
+          "role": "support",
+          "sha256": "c5581b9daa93b701689200dfac09af9994c9a5afa9075923a7aac41fcd4fdd7c"
+        }
+      ],
+      "evidenceOrigin": "repo-authored"
+    },
+    {
+      "id": "tanstack-ai-mcp-differential",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tanstack-ai-mcp-differential",
+      "files": [
+        {
+          "path": "packages/tanstack-ai/tests/conformance/mcp-resource.test.tsx",
+          "role": "test",
+          "sha256": "274a35664781fa6d6c9d61606ac99eb69241c62e6ddd9d0f20931ecd2472989b",
+          "cases": [
+            {
+              "id": "differential:mcp-resource-protocol-octane",
+              "testName": "Octane initializes the sandbox, routes requests, and rejects messages after teardown",
+              "fullName": "MCP resource public protocol Octane initializes the sandbox, routes requests, and rejects messages after teardown"
+            },
+            {
+              "id": "differential:mcp-resource-protocol-react",
+              "testName": "React initializes the sandbox, routes requests, and rejects messages after teardown",
+              "fullName": "MCP resource public protocol React initializes the sandbox, routes requests, and rejects messages after teardown"
+            }
+          ]
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/chat-input.tsrx",
+          "role": "support",
+          "sha256": "5b55ce06d6677b46ca810f3ab4ae800d24c36c6c5e16e78aa864ced3bb5be808"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/chat-message.tsrx",
+          "role": "support",
+          "sha256": "7a14e18ef9f87f2f8261442332757e1c3b1084fb9275f6474eb11baeaf7b6959"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/chat-messages.tsrx",
+          "role": "support",
+          "sha256": "730411bfdccc7fb980b74bbc4094d9320fea361776cf86fc9c3416eafcfe350b"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/chat.tsrx",
+          "role": "support",
+          "sha256": "cbd4f726cd3e51605f462a4a126603785b121d1d3728b6cc8f78401c5714a586"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/create-chat-hook.tsrx",
+          "role": "support",
+          "sha256": "0b5ad275431b6ca05c752042dc8dd8f808eef3fbc76ab28da94c893091e41dcf"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/create-ui-contexts.tsrx",
+          "role": "support",
+          "sha256": "a19036aa0bba92df238738e3f31028a8030c7653a5b2775acbe5d0a0580b7f61"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/create-ui.tsrx",
+          "role": "support",
+          "sha256": "f846c9b781ae653ad01a0a628541dd4771b46788135f70b4a2427f33e18cf435"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/markdown-plugins.ts",
+          "role": "support",
+          "sha256": "c7f459c38658320f13f0d32d6d87383ce8085cbb71bd38b671345000e62bbbd6"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/text-part.tsrx",
+          "role": "support",
+          "sha256": "5ff2c28c86095ddf55d7b618e62f3dcf7c5a99ede0a350362b8f9db9be0b3c67"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/thinking-part.tsrx",
+          "role": "support",
+          "sha256": "a60c0a215d90ff80a74834eec7245279bbe8f17c06868628a97ba279b8c2cd7e"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/tool-approval.tsrx",
+          "role": "support",
+          "sha256": "8427d319c5663fc63bfcda3e539c6da3bcba62840f7bf1c6ec93c14e28f88716"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/tool-result-content.ts",
+          "role": "support",
+          "sha256": "7a65d1c0af3cda50ec65839561b63af2670f8045d9d1bc9222ef132bbed06fc7"
+        },
+        {
+          "path": "packages/tanstack-ai/src/create-chat-hook.tsrx",
+          "role": "support",
+          "sha256": "c2f805de4ae9ddde529cdc11b5c26641b2d3e6912da3d624904a82131e57af4d"
+        },
+        {
+          "path": "packages/tanstack-ai/src/index.ts",
+          "role": "support",
+          "sha256": "c378a4cd4d20a41df0f7b7f57daafbe34f7ec9e56edb406e8eadf21b732366b3"
+        },
+        {
+          "path": "packages/tanstack-ai/src/mcp-app-renderer.tsrx",
+          "role": "support",
+          "sha256": "0f7d8e32eb05f760a7cdbe02d144eb4729dfb11b10443dc16a8ac447064ce012"
+        },
+        {
+          "path": "packages/tanstack-ai/src/mcp-app-resource.tsrx",
+          "role": "support",
+          "sha256": "58697aa8d4f9c411f5facc0137a8d1cd0028cf6942b19aa5bffb00a4cd431334"
+        },
+        {
+          "path": "packages/tanstack-ai/src/mcp-apps.ts",
+          "role": "support",
+          "sha256": "c97ed80527b77dd7fad3e496aba5ce1a074c4ab799f06001711c81e399edac7d"
+        },
+        {
+          "path": "packages/tanstack-ai/src/realtime-types.ts",
+          "role": "support",
+          "sha256": "21a9c3ca7e4e128aeba1809052ffa71eaad052bf29c5fbab06af845eb27456dd"
+        },
+        {
+          "path": "packages/tanstack-ai/src/types.ts",
+          "role": "support",
+          "sha256": "d36ab1d04262fb078b8fba5c37cb9bb7eec791a23b551167b06449576df21480"
+        },
+        {
+          "path": "packages/tanstack-ai/src/ui.ts",
+          "role": "support",
+          "sha256": "14a912af7ddf8fb612a3817e698ea54e89cd32dfa59f28b114ae12d5380146d1"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-audio-recorder.tsrx",
+          "role": "support",
+          "sha256": "fa2cf96539c2fd514b6ff9a29f851b7e517898bbc89a0a4bff1e11dbc2ae14a7"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-byok.tsrx",
+          "role": "support",
+          "sha256": "208bcf8af729cc14813287d52fba78c9ef21241a154c5b4eeb44ea8e9db6d98b"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-chat.tsrx",
+          "role": "support",
+          "sha256": "ef6f8d2004e5600c3face8bdcfbf0db817b842379ec2a0c85ed0bc8e79471f8e"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-generate-audio.tsrx",
+          "role": "support",
+          "sha256": "0f266c543a1ee34430f63a7aba2e78bcf67614fdefff7887230d17742c10d622"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-generate-image.tsrx",
+          "role": "support",
+          "sha256": "ef87a45e45b90ee0fc1295d38a574b7ac4e98fae171f079a56eb1695509fca12"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-generate-speech.tsrx",
+          "role": "support",
+          "sha256": "86a5d4bf12014a4b457587d4245a9bcfc309a32f45e6902b8de803ffe4a16981"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-generate-video.tsrx",
+          "role": "support",
+          "sha256": "b73ac1e4b007af1d0294e22df27b30a28ca1b15dbe9a8d9cf90389889515298f"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-generation.tsrx",
+          "role": "support",
+          "sha256": "a6289a5aea1b5bf7dd76de7e71e64e8d4ce4fdaca4dbfe854de84bc3d7e77f8e"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-mcp-app-bridge.tsrx",
+          "role": "support",
+          "sha256": "f646331a7be4d6ce42681923efc5fafc0aacd187b38edf02ce9ecbe3758d6dde"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-realtime-chat.tsrx",
+          "role": "support",
+          "sha256": "9a008c187b6e768c672a5e115ff8220c4c92deec296ee73f20649401ff1ef229"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-summarize.tsrx",
+          "role": "support",
+          "sha256": "aa5645539a5105618ff7ab545e789d547124cb2fe76621399e2828517dc0a041"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-transcription.tsrx",
+          "role": "support",
+          "sha256": "1576844d4913db1696638d34bded3026da3166f72b72a34c5412e107d6f09061"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-web-mcp-tools.tsrx",
+          "role": "support",
+          "sha256": "c5581b9daa93b701689200dfac09af9994c9a5afa9075923a7aac41fcd4fdd7c"
+        }
+      ],
+      "evidenceOrigin": "repo-authored"
+    },
+    {
+      "id": "tanstack-ai-hydration",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tanstack-ai-hydration",
+      "files": [
+        {
+          "path": "packages/tanstack-ai/tests/conformance/ui-hydration.test.ts",
+          "role": "test",
+          "sha256": "da9dc579dde2453e1ac9f56e29970e1692cc74b7bd4f6fb371aeb8cd595adab0",
+          "cases": [
+            {
+              "id": "conformance:ai-ui-hydration",
+              "testName": "adopts server-rendered chat widgets and replaces their thread without replacing surviving DOM",
+              "fullName": "adopts server-rendered chat widgets and replaces their thread without replacing surviving DOM"
+            }
+          ]
+        },
+        {
+          "path": "packages/tanstack-ai/tests/_fixtures/ui-lifecycle.tsrx",
+          "role": "support",
+          "sha256": "3f07037f3b23143779331f54d83f8890e95a350081e8d19cd8febb128197fe6b"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/chat-input.tsrx",
+          "role": "support",
+          "sha256": "5b55ce06d6677b46ca810f3ab4ae800d24c36c6c5e16e78aa864ced3bb5be808"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/chat-message.tsrx",
+          "role": "support",
+          "sha256": "7a14e18ef9f87f2f8261442332757e1c3b1084fb9275f6474eb11baeaf7b6959"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/chat-messages.tsrx",
+          "role": "support",
+          "sha256": "730411bfdccc7fb980b74bbc4094d9320fea361776cf86fc9c3416eafcfe350b"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/chat.tsrx",
+          "role": "support",
+          "sha256": "cbd4f726cd3e51605f462a4a126603785b121d1d3728b6cc8f78401c5714a586"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/create-chat-hook.tsrx",
+          "role": "support",
+          "sha256": "0b5ad275431b6ca05c752042dc8dd8f808eef3fbc76ab28da94c893091e41dcf"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/create-ui-contexts.tsrx",
+          "role": "support",
+          "sha256": "a19036aa0bba92df238738e3f31028a8030c7653a5b2775acbe5d0a0580b7f61"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/create-ui.tsrx",
+          "role": "support",
+          "sha256": "f846c9b781ae653ad01a0a628541dd4771b46788135f70b4a2427f33e18cf435"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/markdown-plugins.ts",
+          "role": "support",
+          "sha256": "c7f459c38658320f13f0d32d6d87383ce8085cbb71bd38b671345000e62bbbd6"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/text-part.tsrx",
+          "role": "support",
+          "sha256": "5ff2c28c86095ddf55d7b618e62f3dcf7c5a99ede0a350362b8f9db9be0b3c67"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/thinking-part.tsrx",
+          "role": "support",
+          "sha256": "a60c0a215d90ff80a74834eec7245279bbe8f17c06868628a97ba279b8c2cd7e"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/tool-approval.tsrx",
+          "role": "support",
+          "sha256": "8427d319c5663fc63bfcda3e539c6da3bcba62840f7bf1c6ec93c14e28f88716"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/tool-result-content.ts",
+          "role": "support",
+          "sha256": "7a65d1c0af3cda50ec65839561b63af2670f8045d9d1bc9222ef132bbed06fc7"
+        },
+        {
+          "path": "packages/tanstack-ai/src/create-chat-hook.tsrx",
+          "role": "support",
+          "sha256": "c2f805de4ae9ddde529cdc11b5c26641b2d3e6912da3d624904a82131e57af4d"
+        },
+        {
+          "path": "packages/tanstack-ai/src/index.ts",
+          "role": "support",
+          "sha256": "c378a4cd4d20a41df0f7b7f57daafbe34f7ec9e56edb406e8eadf21b732366b3"
+        },
+        {
+          "path": "packages/tanstack-ai/src/mcp-app-renderer.tsrx",
+          "role": "support",
+          "sha256": "0f7d8e32eb05f760a7cdbe02d144eb4729dfb11b10443dc16a8ac447064ce012"
+        },
+        {
+          "path": "packages/tanstack-ai/src/mcp-app-resource.tsrx",
+          "role": "support",
+          "sha256": "58697aa8d4f9c411f5facc0137a8d1cd0028cf6942b19aa5bffb00a4cd431334"
+        },
+        {
+          "path": "packages/tanstack-ai/src/mcp-apps.ts",
+          "role": "support",
+          "sha256": "c97ed80527b77dd7fad3e496aba5ce1a074c4ab799f06001711c81e399edac7d"
+        },
+        {
+          "path": "packages/tanstack-ai/src/realtime-types.ts",
+          "role": "support",
+          "sha256": "21a9c3ca7e4e128aeba1809052ffa71eaad052bf29c5fbab06af845eb27456dd"
+        },
+        {
+          "path": "packages/tanstack-ai/src/types.ts",
+          "role": "support",
+          "sha256": "d36ab1d04262fb078b8fba5c37cb9bb7eec791a23b551167b06449576df21480"
+        },
+        {
+          "path": "packages/tanstack-ai/src/ui.ts",
+          "role": "support",
+          "sha256": "14a912af7ddf8fb612a3817e698ea54e89cd32dfa59f28b114ae12d5380146d1"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-audio-recorder.tsrx",
+          "role": "support",
+          "sha256": "fa2cf96539c2fd514b6ff9a29f851b7e517898bbc89a0a4bff1e11dbc2ae14a7"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-byok.tsrx",
+          "role": "support",
+          "sha256": "208bcf8af729cc14813287d52fba78c9ef21241a154c5b4eeb44ea8e9db6d98b"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-chat.tsrx",
+          "role": "support",
+          "sha256": "ef6f8d2004e5600c3face8bdcfbf0db817b842379ec2a0c85ed0bc8e79471f8e"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-generate-audio.tsrx",
+          "role": "support",
+          "sha256": "0f266c543a1ee34430f63a7aba2e78bcf67614fdefff7887230d17742c10d622"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-generate-image.tsrx",
+          "role": "support",
+          "sha256": "ef87a45e45b90ee0fc1295d38a574b7ac4e98fae171f079a56eb1695509fca12"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-generate-speech.tsrx",
+          "role": "support",
+          "sha256": "86a5d4bf12014a4b457587d4245a9bcfc309a32f45e6902b8de803ffe4a16981"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-generate-video.tsrx",
+          "role": "support",
+          "sha256": "b73ac1e4b007af1d0294e22df27b30a28ca1b15dbe9a8d9cf90389889515298f"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-generation.tsrx",
+          "role": "support",
+          "sha256": "a6289a5aea1b5bf7dd76de7e71e64e8d4ce4fdaca4dbfe854de84bc3d7e77f8e"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-mcp-app-bridge.tsrx",
+          "role": "support",
+          "sha256": "f646331a7be4d6ce42681923efc5fafc0aacd187b38edf02ce9ecbe3758d6dde"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-realtime-chat.tsrx",
+          "role": "support",
+          "sha256": "9a008c187b6e768c672a5e115ff8220c4c92deec296ee73f20649401ff1ef229"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-summarize.tsrx",
+          "role": "support",
+          "sha256": "aa5645539a5105618ff7ab545e789d547124cb2fe76621399e2828517dc0a041"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-transcription.tsrx",
+          "role": "support",
+          "sha256": "1576844d4913db1696638d34bded3026da3166f72b72a34c5412e107d6f09061"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-web-mcp-tools.tsrx",
+          "role": "support",
+          "sha256": "c5581b9daa93b701689200dfac09af9994c9a5afa9075923a7aac41fcd4fdd7c"
+        }
+      ]
+    },
+    {
+      "id": "tanstack-ai-portal",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tanstack-ai-portal",
+      "files": [
+        {
+          "path": "packages/tanstack-ai/tests/conformance/ui-lifecycle.test.ts",
+          "role": "test",
+          "sha256": "75c836ef5c64460c8bacb0bac6eb0d73e8c25afbb41050b60158c3e28730060c",
+          "cases": [
+            {
+              "id": "conformance:ai-ui-portal-suspense",
+              "testName": "preserves chat context and widget identity through portal suspension and thread replacement",
+              "fullName": "preserves chat context and widget identity through portal suspension and thread replacement"
+            }
+          ]
+        },
+        {
+          "path": "packages/tanstack-ai/tests/_fixtures/ui-lifecycle.tsrx",
+          "role": "support",
+          "sha256": "3f07037f3b23143779331f54d83f8890e95a350081e8d19cd8febb128197fe6b"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/chat-input.tsrx",
+          "role": "support",
+          "sha256": "5b55ce06d6677b46ca810f3ab4ae800d24c36c6c5e16e78aa864ced3bb5be808"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/chat-message.tsrx",
+          "role": "support",
+          "sha256": "7a14e18ef9f87f2f8261442332757e1c3b1084fb9275f6474eb11baeaf7b6959"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/chat-messages.tsrx",
+          "role": "support",
+          "sha256": "730411bfdccc7fb980b74bbc4094d9320fea361776cf86fc9c3416eafcfe350b"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/chat.tsrx",
+          "role": "support",
+          "sha256": "cbd4f726cd3e51605f462a4a126603785b121d1d3728b6cc8f78401c5714a586"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/create-chat-hook.tsrx",
+          "role": "support",
+          "sha256": "0b5ad275431b6ca05c752042dc8dd8f808eef3fbc76ab28da94c893091e41dcf"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/create-ui-contexts.tsrx",
+          "role": "support",
+          "sha256": "a19036aa0bba92df238738e3f31028a8030c7653a5b2775acbe5d0a0580b7f61"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/create-ui.tsrx",
+          "role": "support",
+          "sha256": "f846c9b781ae653ad01a0a628541dd4771b46788135f70b4a2427f33e18cf435"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/markdown-plugins.ts",
+          "role": "support",
+          "sha256": "c7f459c38658320f13f0d32d6d87383ce8085cbb71bd38b671345000e62bbbd6"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/text-part.tsrx",
+          "role": "support",
+          "sha256": "5ff2c28c86095ddf55d7b618e62f3dcf7c5a99ede0a350362b8f9db9be0b3c67"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/thinking-part.tsrx",
+          "role": "support",
+          "sha256": "a60c0a215d90ff80a74834eec7245279bbe8f17c06868628a97ba279b8c2cd7e"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/tool-approval.tsrx",
+          "role": "support",
+          "sha256": "8427d319c5663fc63bfcda3e539c6da3bcba62840f7bf1c6ec93c14e28f88716"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/tool-result-content.ts",
+          "role": "support",
+          "sha256": "7a65d1c0af3cda50ec65839561b63af2670f8045d9d1bc9222ef132bbed06fc7"
+        },
+        {
+          "path": "packages/tanstack-ai/src/create-chat-hook.tsrx",
+          "role": "support",
+          "sha256": "c2f805de4ae9ddde529cdc11b5c26641b2d3e6912da3d624904a82131e57af4d"
+        },
+        {
+          "path": "packages/tanstack-ai/src/index.ts",
+          "role": "support",
+          "sha256": "c378a4cd4d20a41df0f7b7f57daafbe34f7ec9e56edb406e8eadf21b732366b3"
+        },
+        {
+          "path": "packages/tanstack-ai/src/mcp-app-renderer.tsrx",
+          "role": "support",
+          "sha256": "0f7d8e32eb05f760a7cdbe02d144eb4729dfb11b10443dc16a8ac447064ce012"
+        },
+        {
+          "path": "packages/tanstack-ai/src/mcp-app-resource.tsrx",
+          "role": "support",
+          "sha256": "58697aa8d4f9c411f5facc0137a8d1cd0028cf6942b19aa5bffb00a4cd431334"
+        },
+        {
+          "path": "packages/tanstack-ai/src/mcp-apps.ts",
+          "role": "support",
+          "sha256": "c97ed80527b77dd7fad3e496aba5ce1a074c4ab799f06001711c81e399edac7d"
+        },
+        {
+          "path": "packages/tanstack-ai/src/realtime-types.ts",
+          "role": "support",
+          "sha256": "21a9c3ca7e4e128aeba1809052ffa71eaad052bf29c5fbab06af845eb27456dd"
+        },
+        {
+          "path": "packages/tanstack-ai/src/types.ts",
+          "role": "support",
+          "sha256": "d36ab1d04262fb078b8fba5c37cb9bb7eec791a23b551167b06449576df21480"
+        },
+        {
+          "path": "packages/tanstack-ai/src/ui.ts",
+          "role": "support",
+          "sha256": "14a912af7ddf8fb612a3817e698ea54e89cd32dfa59f28b114ae12d5380146d1"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-audio-recorder.tsrx",
+          "role": "support",
+          "sha256": "fa2cf96539c2fd514b6ff9a29f851b7e517898bbc89a0a4bff1e11dbc2ae14a7"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-byok.tsrx",
+          "role": "support",
+          "sha256": "208bcf8af729cc14813287d52fba78c9ef21241a154c5b4eeb44ea8e9db6d98b"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-chat.tsrx",
+          "role": "support",
+          "sha256": "ef6f8d2004e5600c3face8bdcfbf0db817b842379ec2a0c85ed0bc8e79471f8e"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-generate-audio.tsrx",
+          "role": "support",
+          "sha256": "0f266c543a1ee34430f63a7aba2e78bcf67614fdefff7887230d17742c10d622"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-generate-image.tsrx",
+          "role": "support",
+          "sha256": "ef87a45e45b90ee0fc1295d38a574b7ac4e98fae171f079a56eb1695509fca12"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-generate-speech.tsrx",
+          "role": "support",
+          "sha256": "86a5d4bf12014a4b457587d4245a9bcfc309a32f45e6902b8de803ffe4a16981"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-generate-video.tsrx",
+          "role": "support",
+          "sha256": "b73ac1e4b007af1d0294e22df27b30a28ca1b15dbe9a8d9cf90389889515298f"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-generation.tsrx",
+          "role": "support",
+          "sha256": "a6289a5aea1b5bf7dd76de7e71e64e8d4ce4fdaca4dbfe854de84bc3d7e77f8e"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-mcp-app-bridge.tsrx",
+          "role": "support",
+          "sha256": "f646331a7be4d6ce42681923efc5fafc0aacd187b38edf02ce9ecbe3758d6dde"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-realtime-chat.tsrx",
+          "role": "support",
+          "sha256": "9a008c187b6e768c672a5e115ff8220c4c92deec296ee73f20649401ff1ef229"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-summarize.tsrx",
+          "role": "support",
+          "sha256": "aa5645539a5105618ff7ab545e789d547124cb2fe76621399e2828517dc0a041"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-transcription.tsrx",
+          "role": "support",
+          "sha256": "1576844d4913db1696638d34bded3026da3166f72b72a34c5412e107d6f09061"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-web-mcp-tools.tsrx",
+          "role": "support",
+          "sha256": "c5581b9daa93b701689200dfac09af9994c9a5afa9075923a7aac41fcd4fdd7c"
+        }
+      ]
+    },
+    {
+      "id": "tanstack-ai-input",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tanstack-ai-input",
+      "files": [
+        {
+          "path": "packages/tanstack-ai/tests/conformance/ui-components.test.tsx",
+          "role": "test",
+          "sha256": "e6de2ca74c89eecaa64e8cae6a62c9588451f037cccf63d33875c45cdd929134",
+          "cases": [
+            {
+              "id": "conformance:ai-ui-native-input",
+              "testName": "renders markdown and submits the latest native input value on Enter",
+              "fullName": "renders markdown and submits the latest native input value on Enter"
+            }
+          ]
+        },
+        {
+          "path": "packages/tanstack-ai/tests/_fixtures/ui-lifecycle.tsrx",
+          "role": "support",
+          "sha256": "3f07037f3b23143779331f54d83f8890e95a350081e8d19cd8febb128197fe6b"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/chat-input.tsrx",
+          "role": "support",
+          "sha256": "5b55ce06d6677b46ca810f3ab4ae800d24c36c6c5e16e78aa864ced3bb5be808"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/chat-message.tsrx",
+          "role": "support",
+          "sha256": "7a14e18ef9f87f2f8261442332757e1c3b1084fb9275f6474eb11baeaf7b6959"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/chat-messages.tsrx",
+          "role": "support",
+          "sha256": "730411bfdccc7fb980b74bbc4094d9320fea361776cf86fc9c3416eafcfe350b"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/chat.tsrx",
+          "role": "support",
+          "sha256": "cbd4f726cd3e51605f462a4a126603785b121d1d3728b6cc8f78401c5714a586"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/create-chat-hook.tsrx",
+          "role": "support",
+          "sha256": "0b5ad275431b6ca05c752042dc8dd8f808eef3fbc76ab28da94c893091e41dcf"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/create-ui-contexts.tsrx",
+          "role": "support",
+          "sha256": "a19036aa0bba92df238738e3f31028a8030c7653a5b2775acbe5d0a0580b7f61"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/create-ui.tsrx",
+          "role": "support",
+          "sha256": "f846c9b781ae653ad01a0a628541dd4771b46788135f70b4a2427f33e18cf435"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/markdown-plugins.ts",
+          "role": "support",
+          "sha256": "c7f459c38658320f13f0d32d6d87383ce8085cbb71bd38b671345000e62bbbd6"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/text-part.tsrx",
+          "role": "support",
+          "sha256": "5ff2c28c86095ddf55d7b618e62f3dcf7c5a99ede0a350362b8f9db9be0b3c67"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/thinking-part.tsrx",
+          "role": "support",
+          "sha256": "a60c0a215d90ff80a74834eec7245279bbe8f17c06868628a97ba279b8c2cd7e"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/tool-approval.tsrx",
+          "role": "support",
+          "sha256": "8427d319c5663fc63bfcda3e539c6da3bcba62840f7bf1c6ec93c14e28f88716"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/tool-result-content.ts",
+          "role": "support",
+          "sha256": "7a65d1c0af3cda50ec65839561b63af2670f8045d9d1bc9222ef132bbed06fc7"
+        },
+        {
+          "path": "packages/tanstack-ai/src/create-chat-hook.tsrx",
+          "role": "support",
+          "sha256": "c2f805de4ae9ddde529cdc11b5c26641b2d3e6912da3d624904a82131e57af4d"
+        },
+        {
+          "path": "packages/tanstack-ai/src/index.ts",
+          "role": "support",
+          "sha256": "c378a4cd4d20a41df0f7b7f57daafbe34f7ec9e56edb406e8eadf21b732366b3"
+        },
+        {
+          "path": "packages/tanstack-ai/src/mcp-app-renderer.tsrx",
+          "role": "support",
+          "sha256": "0f7d8e32eb05f760a7cdbe02d144eb4729dfb11b10443dc16a8ac447064ce012"
+        },
+        {
+          "path": "packages/tanstack-ai/src/mcp-app-resource.tsrx",
+          "role": "support",
+          "sha256": "58697aa8d4f9c411f5facc0137a8d1cd0028cf6942b19aa5bffb00a4cd431334"
+        },
+        {
+          "path": "packages/tanstack-ai/src/mcp-apps.ts",
+          "role": "support",
+          "sha256": "c97ed80527b77dd7fad3e496aba5ce1a074c4ab799f06001711c81e399edac7d"
+        },
+        {
+          "path": "packages/tanstack-ai/src/realtime-types.ts",
+          "role": "support",
+          "sha256": "21a9c3ca7e4e128aeba1809052ffa71eaad052bf29c5fbab06af845eb27456dd"
+        },
+        {
+          "path": "packages/tanstack-ai/src/types.ts",
+          "role": "support",
+          "sha256": "d36ab1d04262fb078b8fba5c37cb9bb7eec791a23b551167b06449576df21480"
+        },
+        {
+          "path": "packages/tanstack-ai/src/ui.ts",
+          "role": "support",
+          "sha256": "14a912af7ddf8fb612a3817e698ea54e89cd32dfa59f28b114ae12d5380146d1"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-audio-recorder.tsrx",
+          "role": "support",
+          "sha256": "fa2cf96539c2fd514b6ff9a29f851b7e517898bbc89a0a4bff1e11dbc2ae14a7"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-byok.tsrx",
+          "role": "support",
+          "sha256": "208bcf8af729cc14813287d52fba78c9ef21241a154c5b4eeb44ea8e9db6d98b"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-chat.tsrx",
+          "role": "support",
+          "sha256": "ef6f8d2004e5600c3face8bdcfbf0db817b842379ec2a0c85ed0bc8e79471f8e"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-generate-audio.tsrx",
+          "role": "support",
+          "sha256": "0f266c543a1ee34430f63a7aba2e78bcf67614fdefff7887230d17742c10d622"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-generate-image.tsrx",
+          "role": "support",
+          "sha256": "ef87a45e45b90ee0fc1295d38a574b7ac4e98fae171f079a56eb1695509fca12"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-generate-speech.tsrx",
+          "role": "support",
+          "sha256": "86a5d4bf12014a4b457587d4245a9bcfc309a32f45e6902b8de803ffe4a16981"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-generate-video.tsrx",
+          "role": "support",
+          "sha256": "b73ac1e4b007af1d0294e22df27b30a28ca1b15dbe9a8d9cf90389889515298f"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-generation.tsrx",
+          "role": "support",
+          "sha256": "a6289a5aea1b5bf7dd76de7e71e64e8d4ce4fdaca4dbfe854de84bc3d7e77f8e"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-mcp-app-bridge.tsrx",
+          "role": "support",
+          "sha256": "f646331a7be4d6ce42681923efc5fafc0aacd187b38edf02ce9ecbe3758d6dde"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-realtime-chat.tsrx",
+          "role": "support",
+          "sha256": "9a008c187b6e768c672a5e115ff8220c4c92deec296ee73f20649401ff1ef229"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-summarize.tsrx",
+          "role": "support",
+          "sha256": "aa5645539a5105618ff7ab545e789d547124cb2fe76621399e2828517dc0a041"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-transcription.tsrx",
+          "role": "support",
+          "sha256": "1576844d4913db1696638d34bded3026da3166f72b72a34c5412e107d6f09061"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-web-mcp-tools.tsrx",
+          "role": "support",
+          "sha256": "c5581b9daa93b701689200dfac09af9994c9a5afa9075923a7aac41fcd4fdd7c"
+        }
+      ]
+    },
+    {
+      "id": "tanstack-ai-browser",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tanstack-ai-browser",
+      "files": [
+        {
+          "path": "packages/tanstack-ai/tests/browser/chat.browser.test.ts",
+          "role": "test",
+          "sha256": "847bb1ce7622223e719be44f51c2c0307d82689e8a67f52d837c522bf20bfc84",
+          "cases": [
+            {
+              "id": "browser:ai-production-ui",
+              "testName": "ships React-free chat widgets with native input, stable identity, and complete teardown",
+              "fullName": "ships React-free chat widgets with native input, stable identity, and complete teardown"
+            }
+          ]
+        },
+        {
+          "path": "packages/tanstack-ai/tests/_fixtures/browser-ui.tsrx",
+          "role": "support",
+          "sha256": "4939139fa4407c0f685ab35468106d22f26caed8e3f37102445bb3ebf206fb53"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/chat-input.tsrx",
+          "role": "support",
+          "sha256": "5b55ce06d6677b46ca810f3ab4ae800d24c36c6c5e16e78aa864ced3bb5be808"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/chat-message.tsrx",
+          "role": "support",
+          "sha256": "7a14e18ef9f87f2f8261442332757e1c3b1084fb9275f6474eb11baeaf7b6959"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/chat-messages.tsrx",
+          "role": "support",
+          "sha256": "730411bfdccc7fb980b74bbc4094d9320fea361776cf86fc9c3416eafcfe350b"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/chat.tsrx",
+          "role": "support",
+          "sha256": "cbd4f726cd3e51605f462a4a126603785b121d1d3728b6cc8f78401c5714a586"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/create-chat-hook.tsrx",
+          "role": "support",
+          "sha256": "0b5ad275431b6ca05c752042dc8dd8f808eef3fbc76ab28da94c893091e41dcf"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/create-ui-contexts.tsrx",
+          "role": "support",
+          "sha256": "a19036aa0bba92df238738e3f31028a8030c7653a5b2775acbe5d0a0580b7f61"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/create-ui.tsrx",
+          "role": "support",
+          "sha256": "f846c9b781ae653ad01a0a628541dd4771b46788135f70b4a2427f33e18cf435"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/markdown-plugins.ts",
+          "role": "support",
+          "sha256": "c7f459c38658320f13f0d32d6d87383ce8085cbb71bd38b671345000e62bbbd6"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/text-part.tsrx",
+          "role": "support",
+          "sha256": "5ff2c28c86095ddf55d7b618e62f3dcf7c5a99ede0a350362b8f9db9be0b3c67"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/thinking-part.tsrx",
+          "role": "support",
+          "sha256": "a60c0a215d90ff80a74834eec7245279bbe8f17c06868628a97ba279b8c2cd7e"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/tool-approval.tsrx",
+          "role": "support",
+          "sha256": "8427d319c5663fc63bfcda3e539c6da3bcba62840f7bf1c6ec93c14e28f88716"
+        },
+        {
+          "path": "packages/tanstack-ai/src/chat-ui/tool-result-content.ts",
+          "role": "support",
+          "sha256": "7a65d1c0af3cda50ec65839561b63af2670f8045d9d1bc9222ef132bbed06fc7"
+        },
+        {
+          "path": "packages/tanstack-ai/src/create-chat-hook.tsrx",
+          "role": "support",
+          "sha256": "c2f805de4ae9ddde529cdc11b5c26641b2d3e6912da3d624904a82131e57af4d"
+        },
+        {
+          "path": "packages/tanstack-ai/src/index.ts",
+          "role": "support",
+          "sha256": "c378a4cd4d20a41df0f7b7f57daafbe34f7ec9e56edb406e8eadf21b732366b3"
+        },
+        {
+          "path": "packages/tanstack-ai/src/mcp-app-renderer.tsrx",
+          "role": "support",
+          "sha256": "0f7d8e32eb05f760a7cdbe02d144eb4729dfb11b10443dc16a8ac447064ce012"
+        },
+        {
+          "path": "packages/tanstack-ai/src/mcp-app-resource.tsrx",
+          "role": "support",
+          "sha256": "58697aa8d4f9c411f5facc0137a8d1cd0028cf6942b19aa5bffb00a4cd431334"
+        },
+        {
+          "path": "packages/tanstack-ai/src/mcp-apps.ts",
+          "role": "support",
+          "sha256": "c97ed80527b77dd7fad3e496aba5ce1a074c4ab799f06001711c81e399edac7d"
+        },
+        {
+          "path": "packages/tanstack-ai/src/realtime-types.ts",
+          "role": "support",
+          "sha256": "21a9c3ca7e4e128aeba1809052ffa71eaad052bf29c5fbab06af845eb27456dd"
+        },
+        {
+          "path": "packages/tanstack-ai/src/types.ts",
+          "role": "support",
+          "sha256": "d36ab1d04262fb078b8fba5c37cb9bb7eec791a23b551167b06449576df21480"
+        },
+        {
+          "path": "packages/tanstack-ai/src/ui.ts",
+          "role": "support",
+          "sha256": "14a912af7ddf8fb612a3817e698ea54e89cd32dfa59f28b114ae12d5380146d1"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-audio-recorder.tsrx",
+          "role": "support",
+          "sha256": "fa2cf96539c2fd514b6ff9a29f851b7e517898bbc89a0a4bff1e11dbc2ae14a7"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-byok.tsrx",
+          "role": "support",
+          "sha256": "208bcf8af729cc14813287d52fba78c9ef21241a154c5b4eeb44ea8e9db6d98b"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-chat.tsrx",
+          "role": "support",
+          "sha256": "ef6f8d2004e5600c3face8bdcfbf0db817b842379ec2a0c85ed0bc8e79471f8e"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-generate-audio.tsrx",
+          "role": "support",
+          "sha256": "0f266c543a1ee34430f63a7aba2e78bcf67614fdefff7887230d17742c10d622"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-generate-image.tsrx",
+          "role": "support",
+          "sha256": "ef87a45e45b90ee0fc1295d38a574b7ac4e98fae171f079a56eb1695509fca12"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-generate-speech.tsrx",
+          "role": "support",
+          "sha256": "86a5d4bf12014a4b457587d4245a9bcfc309a32f45e6902b8de803ffe4a16981"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-generate-video.tsrx",
+          "role": "support",
+          "sha256": "b73ac1e4b007af1d0294e22df27b30a28ca1b15dbe9a8d9cf90389889515298f"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-generation.tsrx",
+          "role": "support",
+          "sha256": "a6289a5aea1b5bf7dd76de7e71e64e8d4ce4fdaca4dbfe854de84bc3d7e77f8e"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-mcp-app-bridge.tsrx",
+          "role": "support",
+          "sha256": "f646331a7be4d6ce42681923efc5fafc0aacd187b38edf02ce9ecbe3758d6dde"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-realtime-chat.tsrx",
+          "role": "support",
+          "sha256": "9a008c187b6e768c672a5e115ff8220c4c92deec296ee73f20649401ff1ef229"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-summarize.tsrx",
+          "role": "support",
+          "sha256": "aa5645539a5105618ff7ab545e789d547124cb2fe76621399e2828517dc0a041"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-transcription.tsrx",
+          "role": "support",
+          "sha256": "1576844d4913db1696638d34bded3026da3166f72b72a34c5412e107d6f09061"
+        },
+        {
+          "path": "packages/tanstack-ai/src/use-web-mcp-tools.tsrx",
+          "role": "support",
+          "sha256": "c5581b9daa93b701689200dfac09af9994c9a5afa9075923a7aac41fcd4fdd7c"
         }
       ]
     }
   ],
-  "divergences": []
+  "divergences": [],
+  "materializedTests": "packages/tanstack-ai"
 }

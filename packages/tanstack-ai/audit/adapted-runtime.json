@@ -1,0 +1,1122 @@
+{
+  "schemaVersion": 1,
+  "project": "tanstack-ai-adapted",
+  "roots": ["packages/tanstack-ai/tests/upstream"],
+  "files": [
+    "packages/tanstack-ai/tests/upstream/chat-ui/coexistence.test.ts",
+    "packages/tanstack-ai/tests/upstream/chat-ui/create-ui-stability.test.tsx",
+    "packages/tanstack-ai/tests/upstream/chat-ui/create-ui-types.test.tsx",
+    "packages/tanstack-ai/tests/upstream/chat-ui/markdown-plugins.test.ts",
+    "packages/tanstack-ai/tests/upstream/chat-ui/tool-result-content.test.ts",
+    "packages/tanstack-ai/tests/upstream/create-chat-hook-types.test.ts",
+    "packages/tanstack-ai/tests/upstream/create-chat-hook.test.ts",
+    "packages/tanstack-ai/tests/upstream/devtools-name-types.test.ts",
+    "packages/tanstack-ai/tests/upstream/mcp-apps.test.tsx",
+    "packages/tanstack-ai/tests/upstream/use-audio-recorder.test.tsx",
+    "packages/tanstack-ai/tests/upstream/use-byok.test.ts",
+    "packages/tanstack-ai/tests/upstream/use-chat-byok.test.ts",
+    "packages/tanstack-ai/tests/upstream/use-chat-fetcher.test.ts",
+    "packages/tanstack-ai/tests/upstream/use-chat-options-probe.test.ts",
+    "packages/tanstack-ai/tests/upstream/use-chat-persistence-types.test.ts",
+    "packages/tanstack-ai/tests/upstream/use-chat-structured-output.test.ts",
+    "packages/tanstack-ai/tests/upstream/use-chat-types.test.ts",
+    "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+    "packages/tanstack-ai/tests/upstream/use-generation-persistence-types.test.ts",
+    "packages/tanstack-ai/tests/upstream/use-generation.test.ts",
+    "packages/tanstack-ai/tests/upstream/use-mcp-app-bridge.test.ts",
+    "packages/tanstack-ai/tests/upstream/use-web-mcp-tools.test.ts"
+  ],
+  "tests": [
+    {
+      "id": "runtime:3addeead414d57dc",
+      "file": "packages/tanstack-ai/tests/upstream/chat-ui/coexistence.test.ts",
+      "fullName": "public coexistence exports old and new APIs before 1.0"
+    },
+    {
+      "id": "runtime:6cf62b411ef827d7",
+      "file": "packages/tanstack-ai/tests/upstream/chat-ui/create-ui-stability.test.tsx",
+      "fullName": "hands `message` the same `Parts` component across re-renders"
+    },
+    {
+      "id": "runtime:56b90de0ecbf03dc",
+      "file": "packages/tanstack-ai/tests/upstream/chat-ui/create-ui-types.test.tsx",
+      "fullName": "applies the same conditional `Input` rule to createChatHook"
+    },
+    {
+      "id": "runtime:9a76ba237e44d77b",
+      "file": "packages/tanstack-ai/tests/upstream/chat-ui/create-ui-types.test.tsx",
+      "fullName": "exposes `Input` on layout props only when an input component is registered"
+    },
+    {
+      "id": "runtime:a9377d75d2f77f66",
+      "file": "packages/tanstack-ai/tests/upstream/chat-ui/create-ui-types.test.tsx",
+      "fullName": "types tool and interrupt component props from chatOptions"
+    },
+    {
+      "id": "runtime:50fb61f07ce5f661",
+      "file": "packages/tanstack-ai/tests/upstream/chat-ui/markdown-plugins.test.ts",
+      "fullName": "resolveMarkdownPlugins appends user remark plugins after defaults"
+    },
+    {
+      "id": "runtime:44f75e88bc5b2430",
+      "file": "packages/tanstack-ai/tests/upstream/chat-ui/markdown-plugins.test.ts",
+      "fullName": "resolveMarkdownPlugins does not mutate the user-supplied arrays"
+    },
+    {
+      "id": "runtime:4324312c810efe89",
+      "file": "packages/tanstack-ai/tests/upstream/chat-ui/markdown-plugins.test.ts",
+      "fullName": "resolveMarkdownPlugins drops defaults entirely when disableDefaultPlugins is true"
+    },
+    {
+      "id": "runtime:721a4b37b85b438c",
+      "file": "packages/tanstack-ai/tests/upstream/chat-ui/markdown-plugins.test.ts",
+      "fullName": "resolveMarkdownPlugins exposes default constants for documentation/reuse"
+    },
+    {
+      "id": "runtime:81c4b8ba34ea5ac0",
+      "file": "packages/tanstack-ai/tests/upstream/chat-ui/markdown-plugins.test.ts",
+      "fullName": "resolveMarkdownPlugins inserts user rehype plugins before rehype-sanitize so sanitize always runs last"
+    },
+    {
+      "id": "runtime:bb3960d3efbb78c3",
+      "file": "packages/tanstack-ai/tests/upstream/chat-ui/markdown-plugins.test.ts",
+      "fullName": "resolveMarkdownPlugins returns defaults when no user plugins are supplied"
+    },
+    {
+      "id": "runtime:41a0747efc70e4ef",
+      "file": "packages/tanstack-ai/tests/upstream/chat-ui/markdown-plugins.test.ts",
+      "fullName": "resolveMarkdownPlugins returns empty arrays when defaults disabled and no user plugins given"
+    },
+    {
+      "id": "runtime:06b09b2cc512e2c3",
+      "file": "packages/tanstack-ai/tests/upstream/chat-ui/tool-result-content.test.ts",
+      "fullName": "toolResultContentToString concatenates the text parts of array content"
+    },
+    {
+      "id": "runtime:401442b580b7d3af",
+      "file": "packages/tanstack-ai/tests/upstream/chat-ui/tool-result-content.test.ts",
+      "fullName": "toolResultContentToString returns an empty string for an empty array"
+    },
+    {
+      "id": "runtime:e39f67e5ab02cc17",
+      "file": "packages/tanstack-ai/tests/upstream/chat-ui/tool-result-content.test.ts",
+      "fullName": "toolResultContentToString returns an empty string unchanged"
+    },
+    {
+      "id": "runtime:006a845eb7c3a824",
+      "file": "packages/tanstack-ai/tests/upstream/chat-ui/tool-result-content.test.ts",
+      "fullName": "toolResultContentToString returns an empty string when array content has no text parts"
+    },
+    {
+      "id": "runtime:ac06c96bae0896a8",
+      "file": "packages/tanstack-ai/tests/upstream/chat-ui/tool-result-content.test.ts",
+      "fullName": "toolResultContentToString returns string content unchanged"
+    },
+    {
+      "id": "runtime:20c1864585a84e34",
+      "file": "packages/tanstack-ai/tests/upstream/chat-ui/tool-result-content.test.ts",
+      "fullName": "toolResultContentToString skips non-text parts and keeps surrounding text"
+    },
+    {
+      "id": "runtime:e3ae2443043fdd40",
+      "file": "packages/tanstack-ai/tests/upstream/create-chat-hook-types.test.ts",
+      "fullName": "bound useChat infers tool names from factory options"
+    },
+    {
+      "id": "runtime:a89cd1b723f9806b",
+      "file": "packages/tanstack-ai/tests/upstream/create-chat-hook.test.ts",
+      "fullName": "createChatHook creates a chat from factory options"
+    },
+    {
+      "id": "runtime:abc685eea9aa2116",
+      "file": "packages/tanstack-ai/tests/upstream/create-chat-hook.test.ts",
+      "fullName": "createChatHook merges per-call instance overrides"
+    },
+    {
+      "id": "runtime:d2479c2a9edc2f7a",
+      "file": "packages/tanstack-ai/tests/upstream/devtools-name-types.test.ts",
+      "fullName": "React devtools display options limits hook config to the public display-name shape"
+    },
+    {
+      "id": "runtime:87ba041c54e07bcc",
+      "file": "packages/tanstack-ai/tests/upstream/mcp-apps.test.tsx",
+      "fullName": "MCPAppResource display-only mode (no bridge) passes undefined callbacks"
+    },
+    {
+      "id": "runtime:1406a3fd08eb55f4",
+      "file": "packages/tanstack-ai/tests/upstream/mcp-apps.test.tsx",
+      "fullName": "MCPAppResource onCallTool calls bridge.callTool and wraps result in CallToolResult shape"
+    },
+    {
+      "id": "runtime:0b9a6f2c29910d8b",
+      "file": "packages/tanstack-ai/tests/upstream/mcp-apps.test.tsx",
+      "fullName": "MCPAppResource onCallTool coalesces an undefined-serializing result to the string \"null\""
+    },
+    {
+      "id": "runtime:84616390326ce4f4",
+      "file": "packages/tanstack-ai/tests/upstream/mcp-apps.test.tsx",
+      "fullName": "MCPAppResource onCallTool wraps a string result as-is in the text field"
+    },
+    {
+      "id": "runtime:7f807c00f566eb35",
+      "file": "packages/tanstack-ai/tests/upstream/mcp-apps.test.tsx",
+      "fullName": "MCPAppResource onMessage concatenates multiple text content blocks"
+    },
+    {
+      "id": "runtime:c5860f98e583d8f8",
+      "file": "packages/tanstack-ai/tests/upstream/mcp-apps.test.tsx",
+      "fullName": "MCPAppResource onMessage does not call bridge.sendPrompt when there is no text content"
+    },
+    {
+      "id": "runtime:e72f1eb869900a7d",
+      "file": "packages/tanstack-ai/tests/upstream/mcp-apps.test.tsx",
+      "fullName": "MCPAppResource onMessage extracts text content and calls bridge.sendPrompt"
+    },
+    {
+      "id": "runtime:b869cc464e6030c7",
+      "file": "packages/tanstack-ai/tests/upstream/mcp-apps.test.tsx",
+      "fullName": "MCPAppResource onOpenLink calls bridge.openLink with the URL string"
+    },
+    {
+      "id": "runtime:5162609421d642af",
+      "file": "packages/tanstack-ai/tests/upstream/mcp-apps.test.tsx",
+      "fullName": "MCPAppResource passes toolInput when provided"
+    },
+    {
+      "id": "runtime:eeb9869384bedfad",
+      "file": "packages/tanstack-ai/tests/upstream/mcp-apps.test.tsx",
+      "fullName": "MCPAppResource renders AppRenderer with the correct static props"
+    },
+    {
+      "id": "runtime:0553d4c806c95f63",
+      "file": "packages/tanstack-ai/tests/upstream/use-audio-recorder.test.tsx",
+      "fullName": "useAudioRecorder exposes isSupported and toggles isRecording across start/stop"
+    },
+    {
+      "id": "runtime:b2d144658809d174",
+      "file": "packages/tanstack-ai/tests/upstream/use-audio-recorder.test.tsx",
+      "fullName": "useAudioRecorder onComplete transform re-types stop() and recording"
+    },
+    {
+      "id": "runtime:eae39dc985aab1bd",
+      "file": "packages/tanstack-ai/tests/upstream/use-audio-recorder.test.tsx",
+      "fullName": "useAudioRecorder preserves a null returned from onComplete (only undefined keeps the raw recording)"
+    },
+    {
+      "id": "runtime:60d155010d75bfdc",
+      "file": "packages/tanstack-ai/tests/upstream/use-audio-recorder.test.tsx",
+      "fullName": "useAudioRecorder releases the mic and clears isRecording on unmount"
+    },
+    {
+      "id": "runtime:6d5ef38815b5bc25",
+      "file": "packages/tanstack-ai/tests/upstream/use-audio-recorder.test.tsx",
+      "fullName": "useAudioRecorder sets recording to the raw AudioRecording when no onComplete is provided"
+    },
+    {
+      "id": "runtime:c9e3f7279b5c3932",
+      "file": "packages/tanstack-ai/tests/upstream/use-audio-recorder.test.tsx",
+      "fullName": "useAudioRecorder surfaces a getUserMedia rejection through onError and rejects start()"
+    },
+    {
+      "id": "runtime:e9dbc1e62d3903c7",
+      "file": "packages/tanstack-ai/tests/upstream/use-audio-recorder.test.tsx",
+      "fullName": "useAudioRecorder type inference (issue #1001) keeps AudioRecording when options carry no onComplete"
+    },
+    {
+      "id": "runtime:ef305b27fba3ed6a",
+      "file": "packages/tanstack-ai/tests/upstream/use-byok.test.ts",
+      "fullName": "useByok reads the snapshot, remasks after update, and never exposes the raw key"
+    },
+    {
+      "id": "runtime:332262064dfca77e",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat-byok.test.ts",
+      "fullName": "useChat byok stamps x-byok headers and keeps the key out of the body"
+    },
+    {
+      "id": "runtime:036049ab3cfb0ffa",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat-byok.test.ts",
+      "fullName": "useChat byok uses the latest byokProvider after a rerender"
+    },
+    {
+      "id": "runtime:cb9dbb23b45c431a",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat-fetcher.test.ts",
+      "fullName": "useChat — fetcher transport parses an SSE Response returned by the fetcher"
+    },
+    {
+      "id": "runtime:a302b3454352e7b4",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat-fetcher.test.ts",
+      "fullName": "useChat — fetcher transport passes the merged body and full message history to the fetcher"
+    },
+    {
+      "id": "runtime:7b07c29357c68f6f",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat-fetcher.test.ts",
+      "fullName": "useChat — fetcher transport streams text into messages via an AsyncIterable fetcher"
+    },
+    {
+      "id": "runtime:5c4db20a62594c58",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat-fetcher.test.ts",
+      "fullName": "useChat — fetcher transport surfaces fetcher errors as the hook error state"
+    },
+    {
+      "id": "runtime:a9adb8a08d77018d",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat-options-probe.test.ts",
+      "fullName": "UseChatOptions XOR rejects neither / both, accepts exactly one"
+    },
+    {
+      "id": "runtime:78766d5cde30bef4",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat-persistence-types.test.ts",
+      "fullName": "useChat persistence requires a threadId accepts persistence when a threadId is supplied"
+    },
+    {
+      "id": "runtime:3ff7c5f6cf800c9f",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat-persistence-types.test.ts",
+      "fullName": "useChat persistence requires a threadId does not list `id` on UseChatOptions. `threadId` is present"
+    },
+    {
+      "id": "runtime:cdab626f48b70e4b",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat-persistence-types.test.ts",
+      "fullName": "useChat persistence requires a threadId leaves threadId optional for ephemeral chats"
+    },
+    {
+      "id": "runtime:deb3b49ba8e78c55",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat-persistence-types.test.ts",
+      "fullName": "useChat persistence requires a threadId rejects a storage adapter without a threadId"
+    },
+    {
+      "id": "runtime:6f9135b0d0233443",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat-persistence-types.test.ts",
+      "fullName": "useChat persistence requires a threadId rejects persistence: true without a threadId"
+    },
+    {
+      "id": "runtime:22f27fc7ff3ff287",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat-structured-output.test.ts",
+      "fullName": "useChat() without outputSchema — runtime does not break or track structured state when no schema is supplied"
+    },
+    {
+      "id": "runtime:0a1dc7be4a59fd8e",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat-structured-output.test.ts",
+      "fullName": "useChat({ outputSchema }) — initialMessages handling does not leak `final` from a stale initialMessages assistant when no user message exists yet"
+    },
+    {
+      "id": "runtime:5bd371608404667d",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat-structured-output.test.ts",
+      "fullName": "useChat({ outputSchema }) — runtime attaches a structured-output part to the assistant message"
+    },
+    {
+      "id": "runtime:b5bb6e31f3407b45",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat-structured-output.test.ts",
+      "fullName": "useChat({ outputSchema }) — runtime clears `partial` and `final` on clear()"
+    },
+    {
+      "id": "runtime:b053cf28b32cbf65",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat-structured-output.test.ts",
+      "fullName": "useChat({ outputSchema }) — runtime invokes the user's onChunk callback alongside internal tracking"
+    },
+    {
+      "id": "runtime:5edf3ac8297b6075",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat-structured-output.test.ts",
+      "fullName": "useChat({ outputSchema }) — runtime preserves each turn's structured part across multi-turn history"
+    },
+    {
+      "id": "runtime:f15a4f8ce490198c",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat-structured-output.test.ts",
+      "fullName": "useChat({ outputSchema }) — runtime reads `final` as null between sendMessage and the first chunk"
+    },
+    {
+      "id": "runtime:84a33d81ecf77e23",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat-structured-output.test.ts",
+      "fullName": "useChat({ outputSchema }) — runtime resets `partial` and `final` between runs"
+    },
+    {
+      "id": "runtime:3cf0c686ef04dd79",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat-structured-output.test.ts",
+      "fullName": "useChat({ outputSchema }) — runtime updates `partial` progressively and snaps `final` on the terminal event"
+    },
+    {
+      "id": "runtime:83095d80ac0daf85",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat-types.test.ts",
+      "fullName": "useChat() interrupt types preserves approval, generic, and client-tool inference"
+    },
+    {
+      "id": "runtime:1eb1097048783ff0",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat-types.test.ts",
+      "fullName": "useChat() registered generic interrupt types keeps registered and external generic interrupts distinct"
+    },
+    {
+      "id": "runtime:aa5d9b1f4501b317",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat-types.test.ts",
+      "fullName": "useChat() return type with a bare inline tools array (no clientTools / no `as const`) narrows a separately-declared const array (no clientTools / no `as const`)"
+    },
+    {
+      "id": "runtime:a04ab2f60f913e38",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat-types.test.ts",
+      "fullName": "useChat() return type with a bare inline tools array (no clientTools / no `as const`) narrows tool-call parts from a plain array literal"
+    },
+    {
+      "id": "runtime:8e210634fd27beb8",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat-types.test.ts",
+      "fullName": "useChat() return type with outputSchema exposes typed partial + final"
+    },
+    {
+      "id": "runtime:9a6f3594351cd3d4",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat-types.test.ts",
+      "fullName": "useChat() return type with outputSchema options accept outputSchema with the schema type"
+    },
+    {
+      "id": "runtime:df6b4b145eb939f9",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat-types.test.ts",
+      "fullName": "useChat() return type with outputSchema still exposes the base shape (messages, sendMessage, isLoading, …)"
+    },
+    {
+      "id": "runtime:94be975e61b06511",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat-types.test.ts",
+      "fullName": "useChat() return type with typed client tool context requires context matching the tool tuple"
+    },
+    {
+      "id": "runtime:effe379b689ba979",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat-types.test.ts",
+      "fullName": "useChat() return type without outputSchema does NOT expose partial or final"
+    },
+    {
+      "id": "runtime:914d356886c17761",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat-types.test.ts",
+      "fullName": "useChat() return type without outputSchema preserves the base return shape"
+    },
+    {
+      "id": "runtime:e3dea8ba83af1d11",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat append should append a UIMessage"
+    },
+    {
+      "id": "runtime:f2ce66346039288e",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat append should convert and append a ModelMessage"
+    },
+    {
+      "id": "runtime:0061b43c8295298e",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat append should handle errors during append"
+    },
+    {
+      "id": "runtime:576a7a1bae2ac2d0",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat callbacks should call onChunk callback when chunks are received"
+    },
+    {
+      "id": "runtime:5a09fb4195ad6df3",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat callbacks should call onError callback when error occurs"
+    },
+    {
+      "id": "runtime:7220597c454e7193",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat callbacks should call onFinish callback when response finishes"
+    },
+    {
+      "id": "runtime:2734fc245ac15308",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat callbacks should call onResponse callback when response is received"
+    },
+    {
+      "id": "runtime:d665a4289d2c6f06",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat callbacks should ignore user callbacks from an old client after id changes"
+    },
+    {
+      "id": "runtime:67ef7787dfb561f6",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat callbacks should keep callbacks live across StrictMode effect replay for the same client"
+    },
+    {
+      "id": "runtime:c836bfed4aaa70a8",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat callbacks should use the latest onChunk after the parent rerenders with a new callback"
+    },
+    {
+      "id": "runtime:91b9e02ad7dcbe44",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat clear should clear all messages"
+    },
+    {
+      "id": "runtime:0f58d48540b81840",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat clear should maintain client instance after clear"
+    },
+    {
+      "id": "runtime:92b8b58d923e1c42",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat clear should reset to initial state"
+    },
+    {
+      "id": "runtime:023c4aad6541ac3c",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat edge cases and error handling client recreation should not pass previous id messages to a new client id without persisted messages"
+    },
+    {
+      "id": "runtime:245604bb05acc48a",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat edge cases and error handling client recreation should return new client messages during the id change render"
+    },
+    {
+      "id": "runtime:0c51a220ab227c27",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat edge cases and error handling concurrent operations should handle reload during active stream"
+    },
+    {
+      "id": "runtime:e27a06b5671b513d",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat edge cases and error handling concurrent operations should handle stop during sendMessage"
+    },
+    {
+      "id": "runtime:011d2d773b76096f",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat edge cases and error handling concurrent operations should queue and then deliver multiple sendMessage calls in order"
+    },
+    {
+      "id": "runtime:da9660c98a38d58f",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat edge cases and error handling error scenarios should clear error on successful operation"
+    },
+    {
+      "id": "runtime:be67f9feb8944e60",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat edge cases and error handling error scenarios should handle network errors"
+    },
+    {
+      "id": "runtime:53f047ed3c720cfa",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat edge cases and error handling error scenarios should handle stream errors"
+    },
+    {
+      "id": "runtime:d0bd2ff6d664a37a",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat edge cases and error handling multiple hook instances should handle different IDs correctly"
+    },
+    {
+      "id": "runtime:0865c6b356198b15",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat edge cases and error handling multiple hook instances should maintain independent state per instance"
+    },
+    {
+      "id": "runtime:24dc15ac54111956",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat edge cases and error handling multiple hook instances should not have cross-contamination"
+    },
+    {
+      "id": "runtime:4b5694e03516d062",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat edge cases and error handling options changes should handle body changes"
+    },
+    {
+      "id": "runtime:491b7e02206e26b7",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat edge cases and error handling options changes should handle callback changes"
+    },
+    {
+      "id": "runtime:e9f244b6e105069e",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat edge cases and error handling options changes should maintain client instance when options change"
+    },
+    {
+      "id": "runtime:65f7a6263b11bd40",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat edge cases and error handling tool operations should handle addToolApprovalResponse"
+    },
+    {
+      "id": "runtime:5fe73da5db2e16f8",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat edge cases and error handling tool operations should handle addToolResult"
+    },
+    {
+      "id": "runtime:7ca66a07c7a30997",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat edge cases and error handling unmount behavior should not update state after unmount"
+    },
+    {
+      "id": "runtime:33aa5af705cae767",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat edge cases and error handling unmount behavior should stop loading on unmount if active"
+    },
+    {
+      "id": "runtime:543726042b78b98b",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat initialization does not call crypto.randomUUID while rendering useChat"
+    },
+    {
+      "id": "runtime:c60caf5ebfe0312a",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat initialization does not expose delivery-cursor resume/autoResume machinery"
+    },
+    {
+      "id": "runtime:97971e5d3954b8d8",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat initialization does not publish async hydration from an abandoned render"
+    },
+    {
+      "id": "runtime:49b59aeaa40aff88",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat initialization exposes the run id while a send is in flight and clears it after"
+    },
+    {
+      "id": "runtime:28c00d625330e502",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat initialization rejoins an in-flight run on mount without aborting it (live off)"
+    },
+    {
+      "id": "runtime:6f192f9ea2446f8f",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat initialization rejoins under StrictMode remount without aborting the constructor rejoin"
+    },
+    {
+      "id": "runtime:6b539ddc71da0181",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat initialization sends a minted threadId that is not a React useId string"
+    },
+    {
+      "id": "runtime:3443f7830e2644e2",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat initialization should forward synchronous persisted interrupt hydration"
+    },
+    {
+      "id": "runtime:bdc3859312ca8691",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat initialization should generate id if not provided"
+    },
+    {
+      "id": "runtime:9f2648c5b7c925d0",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat initialization should ignore async persisted messages from a previous id"
+    },
+    {
+      "id": "runtime:dfbc6c7426318518",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat initialization should initialize with default state"
+    },
+    {
+      "id": "runtime:57287e81c4c51d12",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat initialization should initialize with persisted messages"
+    },
+    {
+      "id": "runtime:27ed5e82c4d3a305",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat initialization should initialize with provided messages"
+    },
+    {
+      "id": "runtime:f24b59669b1d6664",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat initialization should maintain client instance across re-renders"
+    },
+    {
+      "id": "runtime:10afce48edf75e54",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat initialization should preserve persisted empty messages over provided initial messages"
+    },
+    {
+      "id": "runtime:8eccd57f92bbbab3",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat initialization should subscribe immediately when live is true"
+    },
+    {
+      "id": "runtime:59437ca26ef5ea95",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat initialization should use provided threadId"
+    },
+    {
+      "id": "runtime:04023696d5195047",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat interrupt state awaits onResponse when hydration resumes during activation"
+    },
+    {
+      "id": "runtime:577127fd6dac384d",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat interrupt state delegates every root interrupt control to ChatClient"
+    },
+    {
+      "id": "runtime:c539030692ee52a7",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat interrupt state projects one immutable snapshot with the deprecated pending alias"
+    },
+    {
+      "id": "runtime:ee9d0c886b62bec2",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat multimodal sendMessage should send a multimodal message with audio data and required mimeType"
+    },
+    {
+      "id": "runtime:7968245b1f66dab2",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat multimodal sendMessage should send a multimodal message with document URL"
+    },
+    {
+      "id": "runtime:62f828a6baee8b10",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat multimodal sendMessage should send a multimodal message with document data and required mimeType"
+    },
+    {
+      "id": "runtime:39fe96e4fe241327",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat multimodal sendMessage should send a multimodal message with image URL"
+    },
+    {
+      "id": "runtime:50df4efe6faa4fa1",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat multimodal sendMessage should send a multimodal message with image data and required mimeType"
+    },
+    {
+      "id": "runtime:6090cd84196d9162",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat multimodal sendMessage should send a multimodal message with video URL"
+    },
+    {
+      "id": "runtime:9f1a1e3ed202167d",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat multimodal sendMessage should send a multimodal message with video data and required mimeType"
+    },
+    {
+      "id": "runtime:0c35387703b0af4d",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat multimodal sendMessage should send complex multimodal message with multiple content parts"
+    },
+    {
+      "id": "runtime:0581decb372e36cd",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat multimodal sendMessage should send string content as simple text message via multimodal interface"
+    },
+    {
+      "id": "runtime:8bd262afd703128c",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat multimodal sendMessage should use custom message id when provided in multimodal message"
+    },
+    {
+      "id": "runtime:9ad51d03e52d2529",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat reload should handle errors during reload"
+    },
+    {
+      "id": "runtime:50dafc77d9fd6f76",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat reload should maintain conversation history after reload"
+    },
+    {
+      "id": "runtime:7d28309f22b72927",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat reload should reload the last assistant message"
+    },
+    {
+      "id": "runtime:1129e21ba97eb19a",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat sendMessage should create assistant message from stream chunks"
+    },
+    {
+      "id": "runtime:dbe6e1c3fac36e38",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat sendMessage should handle errors during sendMessage"
+    },
+    {
+      "id": "runtime:ad9ba37375c966e4",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat sendMessage should merge sendMessage options.body into the request"
+    },
+    {
+      "id": "runtime:ab479c552d4c448f",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat sendMessage should not send empty messages"
+    },
+    {
+      "id": "runtime:dea494895681656b",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat sendMessage should queue a message sent while loading and send it after"
+    },
+    {
+      "id": "runtime:217bad50d7f44caf",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat sendMessage should send a message and append it"
+    },
+    {
+      "id": "runtime:2ce2571867a288d5",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat sessionGenerating should expose sessionGenerating and update from stream run events"
+    },
+    {
+      "id": "runtime:bf53b305f26df996",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat sessionGenerating should integrate correctly with live subscription lifecycle"
+    },
+    {
+      "id": "runtime:cab951eb2c4c77b0",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat sessionGenerating should keep receiving live updates and callbacks after live toggles for the same client"
+    },
+    {
+      "id": "runtime:146e34b870cc2f5f",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat sessionGenerating updates resume state from live interrupt chunks without a wrapper call"
+    },
+    {
+      "id": "runtime:310a3b61b65d53c5",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat setMessages should manually set messages"
+    },
+    {
+      "id": "runtime:a1c450b50c0b7031",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat setMessages should replace all existing messages"
+    },
+    {
+      "id": "runtime:c83909e7c9df3965",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat setMessages should update state immediately"
+    },
+    {
+      "id": "runtime:ab57514733c5d90c",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat state synchronization should persist state across re-renders"
+    },
+    {
+      "id": "runtime:2bdca4d903fb7105",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat state synchronization should update error state via onErrorChange callback"
+    },
+    {
+      "id": "runtime:f4a7333f7ebe2534",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat state synchronization should update loading state via onLoadingChange callback"
+    },
+    {
+      "id": "runtime:3a8a3af811c3bbf0",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat state synchronization should update messages via onMessagesChange callback"
+    },
+    {
+      "id": "runtime:5aecf9a12325ee23",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat status should transition through states during generation"
+    },
+    {
+      "id": "runtime:152579e0d7fd14f4",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat stop should be safe to call multiple times"
+    },
+    {
+      "id": "runtime:42a8437dd77506ba",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat stop should clear loading state when stopped"
+    },
+    {
+      "id": "runtime:d3a058cbcef797aa",
+      "file": "packages/tanstack-ai/tests/upstream/use-chat.test.ts",
+      "fullName": "useChat stop should stop current generation"
+    },
+    {
+      "id": "runtime:6858ffcbaf3a721e",
+      "file": "packages/tanstack-ai/tests/upstream/use-generation-persistence-types.test.ts",
+      "fullName": "generation persistence requires a threadId accepts persistence when a threadId is supplied"
+    },
+    {
+      "id": "runtime:ae0372845010d15a",
+      "file": "packages/tanstack-ai/tests/upstream/use-generation-persistence-types.test.ts",
+      "fullName": "generation persistence requires a threadId does not list `id` on hook parameters. `threadId` is present"
+    },
+    {
+      "id": "runtime:6a71392c800f5713",
+      "file": "packages/tanstack-ai/tests/upstream/use-generation-persistence-types.test.ts",
+      "fullName": "generation persistence requires a threadId leaves threadId optional for ephemeral generations"
+    },
+    {
+      "id": "runtime:f441cf1f37cf025e",
+      "file": "packages/tanstack-ai/tests/upstream/use-generation-persistence-types.test.ts",
+      "fullName": "generation persistence requires a threadId rejects `persistence: true` without a threadId"
+    },
+    {
+      "id": "runtime:c91a3ba5adc3ac80",
+      "file": "packages/tanstack-ai/tests/upstream/use-generation-persistence-types.test.ts",
+      "fullName": "generation persistence requires a threadId still infers the onResult transform through the union"
+    },
+    {
+      "id": "runtime:c676b7f412bea121",
+      "file": "packages/tanstack-ai/tests/upstream/use-generation.test.ts",
+      "fullName": "onResult transform infers the raw result type when no onResult is provided"
+    },
+    {
+      "id": "runtime:a040e36eeb9ce3c9",
+      "file": "packages/tanstack-ai/tests/upstream/use-generation.test.ts",
+      "fullName": "onResult transform narrows the wrapper result type to the transform return"
+    },
+    {
+      "id": "runtime:bbe024ecc6f883e2",
+      "file": "packages/tanstack-ai/tests/upstream/use-generation.test.ts",
+      "fullName": "onResult transform should keep previous result when onResult returns null"
+    },
+    {
+      "id": "runtime:5c070e9f384d0f5f",
+      "file": "packages/tanstack-ai/tests/upstream/use-generation.test.ts",
+      "fullName": "onResult transform should transform result from connection stream"
+    },
+    {
+      "id": "runtime:ab06d4631e36ae11",
+      "file": "packages/tanstack-ai/tests/upstream/use-generation.test.ts",
+      "fullName": "onResult transform should transform result when onResult returns a value (fetcher)"
+    },
+    {
+      "id": "runtime:c966b9b3f63a9a01",
+      "file": "packages/tanstack-ai/tests/upstream/use-generation.test.ts",
+      "fullName": "onResult transform should use raw result when onResult returns void"
+    },
+    {
+      "id": "runtime:faf3a9a4a4c9260f",
+      "file": "packages/tanstack-ai/tests/upstream/use-generation.test.ts",
+      "fullName": "onResult transform should work with useGenerateSpeech transform"
+    },
+    {
+      "id": "runtime:b3fcaa74ee387c45",
+      "file": "packages/tanstack-ai/tests/upstream/use-generation.test.ts",
+      "fullName": "useGenerateAudio should generate audio using connection"
+    },
+    {
+      "id": "runtime:a5bbe38e3316b0dd",
+      "file": "packages/tanstack-ai/tests/upstream/use-generation.test.ts",
+      "fullName": "useGenerateAudio should generate audio using fetcher"
+    },
+    {
+      "id": "runtime:f7bce87ae010bb38",
+      "file": "packages/tanstack-ai/tests/upstream/use-generation.test.ts",
+      "fullName": "useGenerateAudio should initialize with default state"
+    },
+    {
+      "id": "runtime:d04a3d98bb2ec885",
+      "file": "packages/tanstack-ai/tests/upstream/use-generation.test.ts",
+      "fullName": "useGenerateImage restores a completed image result from a durable artifact url"
+    },
+    {
+      "id": "runtime:51495ab0ee796186",
+      "file": "packages/tanstack-ai/tests/upstream/use-generation.test.ts",
+      "fullName": "useGenerateImage should expose stop and reset"
+    },
+    {
+      "id": "runtime:c45a005e6f16e311",
+      "file": "packages/tanstack-ai/tests/upstream/use-generation.test.ts",
+      "fullName": "useGenerateImage should generate images using connection"
+    },
+    {
+      "id": "runtime:07e15e4232cc6501",
+      "file": "packages/tanstack-ai/tests/upstream/use-generation.test.ts",
+      "fullName": "useGenerateImage should generate images using fetcher"
+    },
+    {
+      "id": "runtime:3b225e19826b0301",
+      "file": "packages/tanstack-ai/tests/upstream/use-generation.test.ts",
+      "fullName": "useGenerateImage should handle errors"
+    },
+    {
+      "id": "runtime:88298393fc8209c6",
+      "file": "packages/tanstack-ai/tests/upstream/use-generation.test.ts",
+      "fullName": "useGenerateImage should initialize with default state"
+    },
+    {
+      "id": "runtime:b3d2790b30c38cc8",
+      "file": "packages/tanstack-ai/tests/upstream/use-generation.test.ts",
+      "fullName": "useGenerateSpeech restores a completed TTS result from a durable artifact url"
+    },
+    {
+      "id": "runtime:458d237ee04e976a",
+      "file": "packages/tanstack-ai/tests/upstream/use-generation.test.ts",
+      "fullName": "useGenerateSpeech should generate speech using connection"
+    },
+    {
+      "id": "runtime:82edc90363ca7c03",
+      "file": "packages/tanstack-ai/tests/upstream/use-generation.test.ts",
+      "fullName": "useGenerateSpeech should generate speech using fetcher"
+    },
+    {
+      "id": "runtime:55f7e60c43c937bd",
+      "file": "packages/tanstack-ai/tests/upstream/use-generation.test.ts",
+      "fullName": "useGenerateSpeech should initialize with default state"
+    },
+    {
+      "id": "runtime:272db70cce20e26e",
+      "file": "packages/tanstack-ai/tests/upstream/use-generation.test.ts",
+      "fullName": "useGenerateVideo does not auto-fire a video generation on mount from a hydrated running snapshot"
+    },
+    {
+      "id": "runtime:40951c51d1c05a77",
+      "file": "packages/tanstack-ai/tests/upstream/use-generation.test.ts",
+      "fullName": "useGenerateVideo should generate video using fetcher"
+    },
+    {
+      "id": "runtime:5eb46ee55450a27a",
+      "file": "packages/tanstack-ai/tests/upstream/use-generation.test.ts",
+      "fullName": "useGenerateVideo should handle video generation errors"
+    },
+    {
+      "id": "runtime:21f6863603a358c2",
+      "file": "packages/tanstack-ai/tests/upstream/use-generation.test.ts",
+      "fullName": "useGenerateVideo should initialize with default state"
+    },
+    {
+      "id": "runtime:26d18553117af84d",
+      "file": "packages/tanstack-ai/tests/upstream/use-generation.test.ts",
+      "fullName": "useGenerateVideo should stop and reset"
+    },
+    {
+      "id": "runtime:a3d76deb55153072",
+      "file": "packages/tanstack-ai/tests/upstream/use-generation.test.ts",
+      "fullName": "useGenerateVideo should track video job lifecycle via connection"
+    },
+    {
+      "id": "runtime:8d5686be1cec69d5",
+      "file": "packages/tanstack-ai/tests/upstream/use-generation.test.ts",
+      "fullName": "useGeneration cleanup should call stop on unmount during active generation"
+    },
+    {
+      "id": "runtime:58c510d29b88056e",
+      "file": "packages/tanstack-ai/tests/upstream/use-generation.test.ts",
+      "fullName": "useGeneration connection mode should handle stream errors"
+    },
+    {
+      "id": "runtime:ea4eef051a18c522",
+      "file": "packages/tanstack-ai/tests/upstream/use-generation.test.ts",
+      "fullName": "useGeneration connection mode should process stream and extract result"
+    },
+    {
+      "id": "runtime:5b1bb5262eac2860",
+      "file": "packages/tanstack-ai/tests/upstream/use-generation.test.ts",
+      "fullName": "useGeneration fetcher mode should generate a result using fetcher"
+    },
+    {
+      "id": "runtime:4542e49b6f4d7d50",
+      "file": "packages/tanstack-ai/tests/upstream/use-generation.test.ts",
+      "fullName": "useGeneration fetcher mode should handle fetcher errors"
+    },
+    {
+      "id": "runtime:868901e93ae61689",
+      "file": "packages/tanstack-ai/tests/upstream/use-generation.test.ts",
+      "fullName": "useGeneration initialization should initialize with default state"
+    },
+    {
+      "id": "runtime:2361b08589a97bab",
+      "file": "packages/tanstack-ai/tests/upstream/use-generation.test.ts",
+      "fullName": "useGeneration persistence clears resumeState once a streamed run finishes"
+    },
+    {
+      "id": "runtime:a4fcd8c0a1452317",
+      "file": "packages/tanstack-ai/tests/upstream/use-generation.test.ts",
+      "fullName": "useGeneration persistence generates normally under React StrictMode (dispose → remount replay)"
+    },
+    {
+      "id": "runtime:471c366c6e50c838",
+      "file": "packages/tanstack-ai/tests/upstream/use-generation.test.ts",
+      "fullName": "useGeneration persistence repaints a hydrated running snapshot with no joinRun as an interrupted error on mount"
+    },
+    {
+      "id": "runtime:18930406c0b10a37",
+      "file": "packages/tanstack-ai/tests/upstream/use-generation.test.ts",
+      "fullName": "useGeneration persistence repaints status from a hydrated complete snapshot on mount without starting a run"
+    },
+    {
+      "id": "runtime:033ee9471547bc84",
+      "file": "packages/tanstack-ai/tests/upstream/use-generation.test.ts",
+      "fullName": "useGeneration persistence server-driven (persistence: true) hydrates from the connection by threadId without a local store"
+    },
+    {
+      "id": "runtime:9bf68678fa99fbe9",
+      "file": "packages/tanstack-ai/tests/upstream/use-generation.test.ts",
+      "fullName": "useGeneration stop and reset should reset all state"
+    },
+    {
+      "id": "runtime:d3a425fd6d609c55",
+      "file": "packages/tanstack-ai/tests/upstream/use-generation.test.ts",
+      "fullName": "useGeneration stop and reset should stop generation and return to idle"
+    },
+    {
+      "id": "runtime:056a55aa7261d9af",
+      "file": "packages/tanstack-ai/tests/upstream/use-generation.test.ts",
+      "fullName": "useSummarize should initialize with default state"
+    },
+    {
+      "id": "runtime:ff6be75eb0cc35c7",
+      "file": "packages/tanstack-ai/tests/upstream/use-generation.test.ts",
+      "fullName": "useSummarize should summarize text using connection"
+    },
+    {
+      "id": "runtime:aac9736f4765579d",
+      "file": "packages/tanstack-ai/tests/upstream/use-generation.test.ts",
+      "fullName": "useSummarize should summarize text using fetcher"
+    },
+    {
+      "id": "runtime:fc04b76cf448106d",
+      "file": "packages/tanstack-ai/tests/upstream/use-generation.test.ts",
+      "fullName": "useTranscription should initialize with default state"
+    },
+    {
+      "id": "runtime:440537c1343736ac",
+      "file": "packages/tanstack-ai/tests/upstream/use-generation.test.ts",
+      "fullName": "useTranscription should transcribe audio using connection"
+    },
+    {
+      "id": "runtime:b2eba59f6d711363",
+      "file": "packages/tanstack-ai/tests/upstream/use-generation.test.ts",
+      "fullName": "useTranscription should transcribe audio using fetcher"
+    },
+    {
+      "id": "runtime:bb6368b7c8c98d32",
+      "file": "packages/tanstack-ai/tests/upstream/use-mcp-app-bridge.test.ts",
+      "fullName": "useMcpAppBridge invokes the LATEST chat.sendMessage even though the bridge is stable"
+    },
+    {
+      "id": "runtime:f6e6082110d681b8",
+      "file": "packages/tanstack-ai/tests/upstream/use-mcp-app-bridge.test.ts",
+      "fullName": "useMcpAppBridge openLink forwards to the LATEST onLink handler"
+    },
+    {
+      "id": "runtime:e5f8914e093f8f64",
+      "file": "packages/tanstack-ai/tests/upstream/use-mcp-app-bridge.test.ts",
+      "fullName": "useMcpAppBridge openLink returns { isError: true } when no onLink is provided (display-only)"
+    },
+    {
+      "id": "runtime:fc58447b5edbf69e",
+      "file": "packages/tanstack-ai/tests/upstream/use-mcp-app-bridge.test.ts",
+      "fullName": "useMcpAppBridge recreates the bridge when threadId changes"
+    },
+    {
+      "id": "runtime:d5051f95613352dd",
+      "file": "packages/tanstack-ai/tests/upstream/use-mcp-app-bridge.test.ts",
+      "fullName": "useMcpAppBridge returns a STABLE bridge across rerenders with a fresh options object"
+    },
+    {
+      "id": "runtime:b14244d2ea85f8d6",
+      "file": "packages/tanstack-ai/tests/upstream/use-mcp-app-bridge.test.ts",
+      "fullName": "useMcpAppBridge returns a bridge exposing callTool, sendPrompt and openLink"
+    },
+    {
+      "id": "runtime:411f0458716ec922",
+      "file": "packages/tanstack-ai/tests/upstream/use-web-mcp-tools.test.ts",
+      "fullName": "useWebMCPTools does not report aborted pending registrations"
+    },
+    {
+      "id": "runtime:36cecbf7e10a5961",
+      "file": "packages/tanstack-ai/tests/upstream/use-web-mcp-tools.test.ts",
+      "fullName": "useWebMCPTools preserves inferred tool options and required context"
+    },
+    {
+      "id": "runtime:22d623afb490f5b7",
+      "file": "packages/tanstack-ai/tests/upstream/use-web-mcp-tools.test.ts",
+      "fullName": "useWebMCPTools removes registered tools on unmount"
+    },
+    {
+      "id": "runtime:f5b861e8e7dbe92e",
+      "file": "packages/tanstack-ai/tests/upstream/use-web-mcp-tools.test.ts",
+      "fullName": "useWebMCPTools replaces registered tools when options change"
+    },
+    {
+      "id": "runtime:40e08a4bbf01f3da",
+      "file": "packages/tanstack-ai/tests/upstream/use-web-mcp-tools.test.ts",
+      "fullName": "useWebMCPTools replaces registered tools when the list changes"
+    },
+    {
+      "id": "runtime:c06b577f8bf6ae29",
+      "file": "packages/tanstack-ai/tests/upstream/use-web-mcp-tools.test.ts",
+      "fullName": "useWebMCPTools reports asynchronous registration failures"
+    }
+  ],
+  "snapshots": 0
+}

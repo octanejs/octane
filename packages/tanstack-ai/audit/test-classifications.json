@@ -2,14 +2,24 @@
   "schemaVersion": 1,
   "tests": [
     {
+      "path": "packages/tanstack-ai/tests/browser/chat.browser.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Observes native Octane UI, browser, hydration, portal, and lifecycle behavior; full pinned upstream runtime parity is recorded in separate adapted lanes."
+    },
+    {
       "path": "packages/tanstack-ai/tests/conformance/exports.test.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Checks the Octane root export surface; it is not a React runtime oracle."
     },
     {
+      "path": "packages/tanstack-ai/tests/conformance/mcp-resource.test.tsx",
+      "disposition": "react-octane-differential",
+      "oracle": "The same public MCP Apps initialization/tool/input/teardown scenario runs against @mcp-ui/client@7.1.1 and the authored Octane host."
+    },
+    {
       "path": "packages/tanstack-ai/tests/conformance/parity/divergences.test.ts",
       "disposition": "octane-only-framework-contract",
-      "reason": "Authenticates omitted MCP renderer and unavailable auto-resume surfaces as Octane package contracts; ordinary evidence only."
+      "reason": "Checks the native UI/MCP entry points and public hook boundary."
     },
     {
       "path": "packages/tanstack-ai/tests/conformance/parity/use-chat-fetcher.test.ts",
@@ -30,6 +40,21 @@
       "path": "packages/tanstack-ai/tests/conformance/parity/use-realtime-chat.test.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Authenticates Octane realtime option/callback corrections without a pinned React oracle; ordinary package evidence only."
+    },
+    {
+      "path": "packages/tanstack-ai/tests/conformance/ui-components.test.tsx",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Observes native Octane UI, browser, hydration, portal, and lifecycle behavior; full pinned upstream runtime parity is recorded in separate adapted lanes."
+    },
+    {
+      "path": "packages/tanstack-ai/tests/conformance/ui-hydration.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Observes native Octane UI, browser, hydration, portal, and lifecycle behavior; full pinned upstream runtime parity is recorded in separate adapted lanes."
+    },
+    {
+      "path": "packages/tanstack-ai/tests/conformance/ui-lifecycle.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Observes native Octane UI, browser, hydration, portal, and lifecycle behavior; full pinned upstream runtime parity is recorded in separate adapted lanes."
     },
     {
       "path": "packages/tanstack-ai/tests/conformance/use-audio-recorder.test.ts",
@@ -74,12 +99,22 @@
     {
       "path": "packages/tanstack-ai/tests/differential/parity.test.ts",
       "disposition": "react-octane-differential",
-      "oracle": "Runs one exact same-fixture streamed-chat scenario against @tanstack/ai-react@0.17.0."
+      "oracle": "Runs one exact same-fixture streamed-chat scenario against @tanstack/ai-react@0.24.1."
     },
     {
       "path": "packages/tanstack-ai/tests/ssr/server.test.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Checks Octane server rendering; it is not compared with React SSR and is not parity evidence."
+    },
+    {
+      "path": "packages/tanstack-ai/tests/types/public-contracts.test-d.tsx",
+      "disposition": "octane-only-type-conformance",
+      "reason": "Proves the complete native and packed public type surface; pristine type parity is a separate upstream lane."
+    },
+    {
+      "path": "packages/tanstack-ai/tests/upstream-original.test.ts",
+      "disposition": "unmodified-upstream-suite-wrapper",
+      "oracle": "Immutable @tanstack/ai-react@0.24.1 tests at 0ddaa6cb3c2e948a47dbd19d31c0ad874d176a86."
     },
     {
       "path": "packages/tanstack-ai/typetests/native-events.test-d.ts",

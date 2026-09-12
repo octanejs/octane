@@ -21,7 +21,9 @@ type HydrationBinding =
 	| 'tanstack-pacer'
 	| 'tanstack-query'
 	| 'tanstack-virtual'
-	| 'tanstack-table';
+	| 'tanstack-table'
+	| 'tanstack-ai'
+	| 'tanstack-db';
 
 const repositoryRoot = resolve(import.meta.dirname, '../../..');
 
@@ -120,6 +122,14 @@ function bindingAliases(binding: HydrationBinding) {
 	if (binding === 'react-map-gl') {
 		return [{ find: /^@octanejs\/react-map-gl$/, replacement: resolve(source, 'index.ts') }];
 	}
+
+	if (binding === 'tanstack-db')
+		return [{ find: /^@octanejs\/tanstack-db$/, replacement: resolve(source, 'index.ts') }];
+	if (binding === 'tanstack-ai')
+		return [
+			{ find: /^@octanejs\/tanstack-ai$/, replacement: resolve(source, 'index.ts') },
+			{ find: /^@octanejs\/tanstack-ai\/ui$/, replacement: resolve(source, 'ui.ts') },
+		];
 
 	if (binding === 'tanstack-table')
 		return [{ find: /^@octanejs\/tanstack-table$/, replacement: resolve(source, 'index.ts') }];

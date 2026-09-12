@@ -458,8 +458,8 @@ export function validateManifest(manifest, { surfacePolicy } = {}) {
 			fail(
 				`lane ${lane.id} ${lane.execution.kind} execution is only valid for pristine-upstream lanes`,
 			);
-		if (lane.type === 'pristine-types' && lane.execution.compiler !== 'tsc')
-			fail(`lane ${lane.id} pristine-types execution must use tsc`);
+		if (lane.type === 'pristine-types' && !['tsc', 'tsgo'].includes(lane.execution.compiler))
+			fail(`lane ${lane.id} pristine-types execution must use tsc or tsgo`);
 		if (lane.type === 'adapted-types' && !['tsc', 'tsrx-tsc'].includes(lane.execution.compiler))
 			fail(`lane ${lane.id} adapted-types execution must use tsc or tsrx-tsc`);
 		if (!Array.isArray(lane.files) || lane.files.length === 0)

@@ -1551,7 +1551,9 @@ export function assertApprovedGateCommand(
 				`${bindingDirectory}/audit/react-parity.json`,
 			]);
 		} else if (gateId === 'upstream-types-pristine') {
-			approved = isTypeProjectCommand(commandArguments, bindingDirectory, gateId, 'tsc');
+			approved = ['tsc', 'tsgo'].some((compiler) =>
+				isTypeProjectCommand(commandArguments, bindingDirectory, gateId, compiler),
+			);
 		} else if (
 			['upstream-types-adapted', 'authored-source-types', 'public-types'].includes(gateId)
 		) {

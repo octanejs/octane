@@ -917,7 +917,7 @@ function containsInlineTestMarker(source, fileName) {
 
 function extractTypeAssertionGroups(source, file) {
 	if (
-		!/(?:^|\/)(?:typetests|type-tests|test-d)(?:\/|$)|\.(?:spec|test-d|d-test)\.[cm]?tsx?$/i.test(
+		!/(?:^|\/)(?:typetests|type-tests|test-d)(?:\/|$)|\.(?:spec|test-d|d-test)\.[cm]?tsx?$|(?:^|[.-])types?\.test\.[cm]?tsx?$/i.test(
 			file,
 		)
 	) {
@@ -953,6 +953,128 @@ function extractTypeAssertionGroups(source, file) {
 		});
 }
 
+// Derive bounded arrays from reviewed, content-addressed class fields. This is
+// inventory-only parsing: no upstream module or test body is evaluated.
+export function pinnedClassFieldNames(source, { className, propertyPrefix }) {
+	const file = ts.createSourceFile(
+		'pinned.tsx',
+		source,
+		ts.ScriptTarget.Latest,
+		true,
+		ts.ScriptKind.TSX,
+	);
+	const declarations = file.statements.filter(
+		(node) => ts.isClassDeclaration(node) && node.name?.text === className,
+	);
+	if (declarations.length !== 1 || !propertyPrefix)
+		throw new Error('Ambiguous pinned class fields');
+	const names = declarations[0].members.flatMap((member) => {
+		if (
+			!ts.isPropertyDeclaration(member) ||
+			!ts.isIdentifier(member.name) ||
+			!member.name.text.startsWith(propertyPrefix)
+		)
+			return [];
+		if (
+			!member.initializer ||
+			member.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.StaticKeyword)
+		)
+			throw new Error('Pinned inventory requires initialized instance fields');
+		return [member.name.text];
+	});
+	if (names.length === 0 || new Set(names).size !== names.length)
+		throw new Error('Empty or duplicate pinned class fields');
+	return names;
+}
+
+export function pinnedObjectValues(source, { objectName }) {
+	const file = ts.createSourceFile('pinned.ts', source, ts.ScriptTarget.Latest, true);
+	const declarations = file.statements.flatMap((node) =>
+		ts.isVariableStatement(node) && node.declarationList.flags & ts.NodeFlags.Const
+			? node.declarationList.declarations.filter(
+					(declaration) =>
+						ts.isIdentifier(declaration.name) && declaration.name.text === objectName,
+				)
+			: [],
+	);
+	if (declarations.length !== 1) throw new Error('Ambiguous pinned object');
+	let object = declarations[0].initializer;
+	while (object && (ts.isAsExpression(object) || ts.isSatisfiesExpression(object)))
+		object = object.expression;
+	if (!object || !ts.isObjectLiteralExpression(object) || object.properties.length === 0)
+		throw new Error('Pinned inventory requires a nonempty literal object');
+	const keys = new Set();
+	return object.properties.map((property) => {
+		if (
+			!ts.isPropertyAssignment(property) ||
+			!(ts.isIdentifier(property.name) || ts.isStringLiteral(property.name)) ||
+			!ts.isStringLiteral(property.initializer) ||
+			keys.has(property.name.text)
+		)
+			throw new Error('Pinned inventory requires unique literal string properties');
+		keys.add(property.name.text);
+		return property.initializer.text;
+	});
+}
+
+export function expandPinnedStaticArray(source, entry, expansion, sourceEntry, sourceBytes) {
+	if (
+		entry.path !== expansion.path ||
+		entry.sha !== expansion.gitBlob ||
+		sourceEntry.path !== expansion.source.path ||
+		sourceEntry.sha !== expansion.source.gitBlob
+	)
+		throw new Error('Static array profile source mismatch');
+	if (
+		!expansion.expression ||
+		!Number.isSafeInteger(expansion.occurrences) ||
+		expansion.occurrences < 1
+	)
+		throw new Error('Invalid static array profile');
+	const fragments = source.split(expansion.expression);
+	if (fragments.length - 1 !== expansion.occurrences)
+		throw new Error('Static array profile expression count mismatch');
+	const names = expansion.source.arrayName
+		? pinnedLiteralRows(sourceBytes.toString('utf8'), expansion.source)
+		: expansion.source.objectName
+			? pinnedObjectValues(sourceBytes.toString('utf8'), expansion.source)
+			: pinnedClassFieldNames(sourceBytes.toString('utf8'), expansion.source);
+	return fragments.join(JSON.stringify(names));
+}
+
+export function pinnedLiteralRows(source, { arrayName, excludeFirstColumn = [] }) {
+	const file = ts.createSourceFile(
+		'pinned.tsx',
+		source,
+		ts.ScriptTarget.Latest,
+		true,
+		ts.ScriptKind.TSX,
+	);
+	const declarations = file.statements.flatMap((node) =>
+		ts.isVariableStatement(node) && node.declarationList.flags & ts.NodeFlags.Const
+			? node.declarationList.declarations.filter(
+					(declaration) => ts.isIdentifier(declaration.name) && declaration.name.text === arrayName,
+				)
+			: [],
+	);
+	if (declarations.length !== 1) throw new Error('Ambiguous pinned array');
+	let array = declarations[0].initializer;
+	while (array && (ts.isAsExpression(array) || ts.isSatisfiesExpression(array)))
+		array = array.expression;
+	if (!array || !ts.isArrayLiteralExpression(array))
+		throw new Error('Pinned array must be literal');
+	const rows = array.elements.map((row) => {
+		if (
+			!ts.isArrayLiteralExpression(row) ||
+			row.elements.length === 0 ||
+			!row.elements.every(ts.isStringLiteral)
+		)
+			throw new Error('Pinned array rows must contain literal strings');
+		return row.elements.map((value) => value.text);
+	});
+	return rows.filter((row) => !excludeFirstColumn.includes(row[0]));
+}
+
 export async function immutableTestInventory(tree, subdirectory, manifest, options) {
 	const profilePath = new URL(
 		`./profiles/${manifest.name?.replace(/^@/, '').replaceAll('/', '-')}-${manifest.version}.json`,
@@ -967,7 +1089,7 @@ export async function immutableTestInventory(tree, subdirectory, manifest, optio
 			profile.commit !== options.sourceCommit
 		)
 			throw new Error('Test helper profile does not match the immutable package identity');
-		for (const helper of profile.helpers) {
+		for (const helper of profile.helpers ?? []) {
 			const sourceCases = [];
 			for (const module of helper.modules) {
 				const entry = tree.find(
@@ -977,7 +1099,10 @@ export async function immutableTestInventory(tree, subdirectory, manifest, optio
 					throw new Error(`Test helper profile source mismatch: ${module.path}`);
 				const bytes = await fetchGitHubBlob(entry, options);
 				if (!module.registrations) continue;
-				for (const testCase of extractTestCases(bytes.toString('utf8'), { file: entry.path })) {
+				for (const testCase of extractTestCases(bytes.toString('utf8'), {
+					file: entry.path,
+					registrarWrappers: module.registrarWrappers ?? [],
+				})) {
 					if (
 						!Number.isSafeInteger(testCase.estimatedRegistrations) ||
 						testCase.estimatedRegistrations < 1
@@ -1108,7 +1233,23 @@ export async function immutableTestInventory(tree, subdirectory, manifest, optio
 					.join(', ')}`,
 			);
 		}
-		const runtimeCases = extractTestCases(source, {
+		let inventorySource = source;
+		for (const expansion of profile?.staticArrays ?? []) {
+			if (expansion.path !== entry.path) continue;
+			const sourceEntry = tree.find(
+				(candidate) => candidate.path === expansion.source.path && isGitHubRegularBlob(candidate),
+			);
+			if (!sourceEntry || sourceEntry.sha !== expansion.source.gitBlob)
+				throw new Error(`Static array profile source mismatch: ${expansion.source.path}`);
+			inventorySource = expandPinnedStaticArray(
+				inventorySource,
+				entry,
+				expansion,
+				sourceEntry,
+				await fetchGitHubBlob(sourceEntry, options),
+			);
+		}
+		const runtimeCases = extractTestCases(inventorySource, {
 			file: entry.path,
 			...(profile ? { helperExpansions } : {}),
 		});
@@ -1169,7 +1310,7 @@ export async function immutableTestInventory(tree, subdirectory, manifest, optio
 			path: entry.path,
 			kind:
 				typeCases.length > 0 ||
-				/(?:^|\/)(?:typetests|type-tests|test-d)(?:\/|$)|(?:^|[.-])(?:test-d|d-test)\.[cm]?[jt]sx?$/i.test(
+				/(?:^|\/)(?:typetests|type-tests|test-d)(?:\/|$)|(?:^|[.-])(?:test-d|d-test)\.[cm]?[jt]sx?$|(?:^|[.-])types?\.test\.[cm]?tsx?$/i.test(
 					relativePath,
 				)
 					? 'type'

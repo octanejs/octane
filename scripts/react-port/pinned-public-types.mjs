@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync, realpathSync } from 'node:fs';
+import { readFileSync, readdirSync, realpathSync, existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { gunzipSync } from 'node:zlib';
 import { parseTarArchive, verifyIntegrity } from './preflight-lib.mjs';
@@ -50,7 +50,16 @@ export function pinnedPublicEntries(packageDirectory, node) {
 	if (manifest.name !== node.identity.packageName || manifest.version !== node.identity.version)
 		throw new Error('Public declaration artifact has a different package or version');
 	const require = createRequire(path.join(packageDirectory, 'package.json'));
-	const installedRoot = path.dirname(require.resolve(`${node.identity.packageName}/package.json`));
+	// Package metadata need not be a public export, and an ESM-only package
+	// need not expose a require condition. Follow Node's package lookup paths;
+	// the full metadata and declaration byte comparison below remains mandatory.
+	const installedManifest = require.resolve
+		.paths(node.identity.packageName)
+		?.map((directory) => path.join(directory, node.identity.packageName, 'package.json'))
+		.find((file) => existsSync(file));
+	if (!installedManifest)
+		throw new Error(`Pinned public witness is not installed: ${node.identity.packageName}`);
+	const installedRoot = path.dirname(installedManifest);
 	for (const [file, bytes] of published.files) {
 		const installed = path.resolve(installedRoot, file.slice('package/'.length));
 		if (
@@ -452,6 +461,10 @@ export function newOpaquePublicType(
 			);
 			if (failure) return failure;
 		}
+		// The constraint and default describe a type parameter's public contract.
+		// Comparing its apparent members again loses union alternatives (such as
+		// an optional React component) and invents missing signature witnesses.
+		return null;
 	}
 	const arguments_ =
 		type.aliasTypeArguments ??

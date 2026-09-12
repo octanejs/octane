@@ -1,0 +1,1124 @@
+{
+  "$schema": "../../hook-form/audit/react-parity.schema.json",
+  "schemaVersion": 1,
+  "provenance": {
+    "repo": "https://github.com/TanStack/db.git",
+    "version": "0.3.8",
+    "commit": "667d53307e5b4d281352af642da7364aff04e8b1",
+    "sourceRoot": "packages/react-db/src",
+    "testRoot": "packages/react-db/tests",
+    "license": "MIT",
+    "integrity": "sha256:21a9e1d4e9b4f7ccccf0dd9767cb9ea205cdcbf82c15a00e63e72973d3bd910d",
+    "verification": "verified"
+  },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "present"
+  },
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/tanstack-db/src"],
+      "include": ["\\.(?:ts|tsrx)$"],
+      "exclude": ["\\.d\\.ts$"]
+    },
+    "tests": {
+      "roots": ["packages/tanstack-db/tests/upstream"],
+      "include": ["\\.test\\.tsx$"],
+      "exclude": []
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 160,
+    "uniqueIdentities": 160,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@11.15.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "57dcbd6657cce7470df1124f428731acc5136b8c0188c8b59a96c95dbd7e459e"
+    }
+  },
+  "lanes": [
+    {
+      "id": "tanstack-db-pristine-runtime",
+      "type": "pristine-upstream",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tanstack-db-pristine",
+      "files": [
+        {
+          "path": "packages/tanstack-db/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "94f2a177c649649ed70e71c2ba3fbad21714fe10f89e00b2613361d173672513"
+        },
+        {
+          "path": "packages/tanstack-db/audit/provenance.json",
+          "role": "support",
+          "sha256": "5b1d419697913befae5d06950550e8ffa560fd5e8ba1d939f81dd3efdd26756a"
+        },
+        {
+          "path": "packages/tanstack-db/audit/registrations.json",
+          "role": "support",
+          "sha256": "f8ec9b266f692467ea2d8840267cfaa5964a1375f8f31c0bf2b725b7ad291bfc"
+        },
+        {
+          "path": "packages/tanstack-db/audit/crosswalk.json",
+          "role": "support",
+          "sha256": "e5fb28242b240812b2247018ae294b71532debec685179a9cdb3634a926dc7f5"
+        },
+        {
+          "path": "packages/tanstack-db/audit/upstream-helpers.json",
+          "role": "support",
+          "sha256": "427ed8eb20fc7c283c4bbbb9f92772f8a354755f7430c54e826d14ecb0e3ef57"
+        },
+        {
+          "path": "packages/tanstack-db/upstream-helpers/db/tests/conformance/contract.ts",
+          "role": "support",
+          "sha256": "4497951a2df71547c42a2507e536ea4459f740c3faea66ebca164be14a83275a"
+        },
+        {
+          "path": "packages/tanstack-db/upstream-helpers/db/tests/conformance/infinite-contract.ts",
+          "role": "support",
+          "sha256": "367cd708682fccce4c6378db99015f9159cc62532831edb70c1d8bc6d36d573a"
+        },
+        {
+          "path": "packages/tanstack-db/upstream-helpers/db/tests/conformance/infinite-on-demand.ts",
+          "role": "support",
+          "sha256": "8d83002efab4c5b77586e3987ff242287a3d47b1ade89d7730610b2852c6d242"
+        },
+        {
+          "path": "packages/tanstack-db/upstream-helpers/db/tests/conformance/infinite-suite.ts",
+          "role": "support",
+          "sha256": "b4eb14b1f1512b2605ae4759895514004a823a1c8c1160bdd6959cd026cefabc"
+        },
+        {
+          "path": "packages/tanstack-db/upstream-helpers/db/tests/conformance/suite.ts",
+          "role": "support",
+          "sha256": "dbce342f44f2b6cd9b662e4572680acc4115a5d9ddb8186179746ee08cfa2dad"
+        },
+        {
+          "path": "packages/tanstack-db/upstream-helpers/db/tests/utils.ts",
+          "role": "support",
+          "sha256": "20662b2782583f4f31338701c6694dcc184fc1144002e9d75e2493a77393dcf4"
+        },
+        {
+          "path": "packages/tanstack-db/audit/pristine-runtime.json",
+          "role": "support",
+          "sha256": "819bbd01e443f30277782d080dc4505a72df122d377452752c506d6af618748a"
+        },
+        {
+          "path": "packages/tanstack-db/audit/pristine-wrapper-runtime.json",
+          "role": "support",
+          "sha256": "4b2a7cecbb6e95a10bc4553d40e5bc85e594b51cb1678c2835c743b3997a9a49"
+        },
+        {
+          "path": "packages/tanstack-db/audit/pristine-suite.json",
+          "role": "support",
+          "sha256": "1ddff893223ba9d61a9cbc41bf65d2d2f145739f127fea98a3ec0b41dfad6856"
+        },
+        {
+          "path": "packages/tanstack-db/tests/upstream-original.test.ts",
+          "role": "support",
+          "sha256": "93dff68cd3b928ae422bbe17f081f536b8f103a3643278cd93b7366af67b98d2"
+        },
+        {
+          "path": "packages/tanstack-db/tests/upstream-vitest.config.ts",
+          "role": "support",
+          "sha256": "e98968f0b1c90c5eee2e04a90294cad4f97bfdc699502b008daf238cd22202a8"
+        },
+        {
+          "path": "packages/tanstack-db/tests/parity-config.ts",
+          "role": "support",
+          "sha256": "15e99f49539a8e8bd9f40e124e22af0b5af73a1df5678e8f11fd696e7a616e1a"
+        },
+        {
+          "path": "scripts/react-parity/tanstack-db-pristine-runtime.mjs",
+          "role": "support",
+          "sha256": "bdcddb433102006fbdcebc196c19b37f5d0e4c103df1b2770604db8ed35ae9c8"
+        },
+        {
+          "path": "scripts/react-parity/pristine-suite-lib.mjs",
+          "role": "support",
+          "sha256": "d34ffc2dca00e6eef7dcaf5bc002024cc511f32dd20c681547555af520438bbb"
+        }
+      ],
+      "evidenceOrigin": "upstream-suite",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/tanstack-db/audit/pristine-wrapper-runtime.json"
+      },
+      "notes": "Runs all 161 pinned React runtime registrations through the complete-suite wrapper."
+    },
+    {
+      "id": "tanstack-db-adapted-runtime",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tanstack-db-adapted",
+      "files": [
+        {
+          "path": "packages/tanstack-db/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "94f2a177c649649ed70e71c2ba3fbad21714fe10f89e00b2613361d173672513"
+        },
+        {
+          "path": "packages/tanstack-db/audit/provenance.json",
+          "role": "support",
+          "sha256": "5b1d419697913befae5d06950550e8ffa560fd5e8ba1d939f81dd3efdd26756a"
+        },
+        {
+          "path": "packages/tanstack-db/audit/registrations.json",
+          "role": "support",
+          "sha256": "f8ec9b266f692467ea2d8840267cfaa5964a1375f8f31c0bf2b725b7ad291bfc"
+        },
+        {
+          "path": "packages/tanstack-db/audit/crosswalk.json",
+          "role": "support",
+          "sha256": "e5fb28242b240812b2247018ae294b71532debec685179a9cdb3634a926dc7f5"
+        },
+        {
+          "path": "packages/tanstack-db/audit/upstream-helpers.json",
+          "role": "support",
+          "sha256": "427ed8eb20fc7c283c4bbbb9f92772f8a354755f7430c54e826d14ecb0e3ef57"
+        },
+        {
+          "path": "packages/tanstack-db/upstream-helpers/db/tests/conformance/contract.ts",
+          "role": "support",
+          "sha256": "4497951a2df71547c42a2507e536ea4459f740c3faea66ebca164be14a83275a"
+        },
+        {
+          "path": "packages/tanstack-db/upstream-helpers/db/tests/conformance/infinite-contract.ts",
+          "role": "support",
+          "sha256": "367cd708682fccce4c6378db99015f9159cc62532831edb70c1d8bc6d36d573a"
+        },
+        {
+          "path": "packages/tanstack-db/upstream-helpers/db/tests/conformance/infinite-on-demand.ts",
+          "role": "support",
+          "sha256": "8d83002efab4c5b77586e3987ff242287a3d47b1ade89d7730610b2852c6d242"
+        },
+        {
+          "path": "packages/tanstack-db/upstream-helpers/db/tests/conformance/infinite-suite.ts",
+          "role": "support",
+          "sha256": "b4eb14b1f1512b2605ae4759895514004a823a1c8c1160bdd6959cd026cefabc"
+        },
+        {
+          "path": "packages/tanstack-db/upstream-helpers/db/tests/conformance/suite.ts",
+          "role": "support",
+          "sha256": "dbce342f44f2b6cd9b662e4572680acc4115a5d9ddb8186179746ee08cfa2dad"
+        },
+        {
+          "path": "packages/tanstack-db/upstream-helpers/db/tests/utils.ts",
+          "role": "support",
+          "sha256": "20662b2782583f4f31338701c6694dcc184fc1144002e9d75e2493a77393dcf4"
+        },
+        {
+          "path": "packages/tanstack-db/src/DbProvider.tsrx",
+          "role": "support",
+          "sha256": "9d2b96c8118b6a4092f64dea220d551369b96aa85c717684f2bb035bc0b3282b"
+        },
+        {
+          "path": "packages/tanstack-db/src/HydrationBoundary.tsrx",
+          "role": "support",
+          "sha256": "0ddd60f98d13753eba5dd9790be89e0d066b30d0096e009a4ea9313b72b42b56"
+        },
+        {
+          "path": "packages/tanstack-db/src/index.ts",
+          "role": "support",
+          "sha256": "371421a432aa43b000f64244538689ffa8f74de08c9dd2c8a0c9c9bc95dabf35"
+        },
+        {
+          "path": "packages/tanstack-db/src/live-query-internals.ts",
+          "role": "support",
+          "sha256": "0705fb883a9a4b7334a4e78a311e97521dde43dfc5452d8ae4a4dab9a342f1f4"
+        },
+        {
+          "path": "packages/tanstack-db/src/slot.ts",
+          "role": "support",
+          "sha256": "de1f6578feb3bd46cc783a6234d6268bf026427cbc7d2d7b93c2df3c86a335a9"
+        },
+        {
+          "path": "packages/tanstack-db/src/useLiveInfiniteQuery.ts",
+          "role": "support",
+          "sha256": "0af4c6ee53e761431f0d658c524cc72d5b05cb9bfba31149752926a3fe6d1cfe"
+        },
+        {
+          "path": "packages/tanstack-db/src/useLiveQuery.ts",
+          "role": "support",
+          "sha256": "f482717c25cfbdf6c136d2c538e210f1e5440c92eefaa147507b5f2a2eb01f57"
+        },
+        {
+          "path": "packages/tanstack-db/src/useLiveQueryEffect.ts",
+          "role": "support",
+          "sha256": "6d8a3bdfa0b56a940591a9fb77018b1c2fc18ef0c3bd822456df45f7388e9c25"
+        },
+        {
+          "path": "packages/tanstack-db/src/useLiveSuspenseQuery.ts",
+          "role": "support",
+          "sha256": "40605bd5b0308dcba469ad1ad266c80ab9022423e4af70a919f74beeae550472"
+        },
+        {
+          "path": "packages/tanstack-db/src/usePacedMutations.ts",
+          "role": "support",
+          "sha256": "8c062015c8673c70896c8727ee6b9f983372a064fa3f6b02426443de336e02da"
+        },
+        {
+          "path": "packages/tanstack-db/audit/adapted-runtime.json",
+          "role": "support",
+          "sha256": "fbfa2e401d9e87d6a912c7d4eabc8f29257b03afd76bc897dbdb559462766d97"
+        },
+        {
+          "path": "packages/tanstack-db/tests/vitest.adapted.config.ts",
+          "role": "support",
+          "sha256": "96756cdb59c5a86cbe645973dcbb2be8fc455d0f36a61d8fccbcf44d2d1e7d3f"
+        },
+        {
+          "path": "packages/tanstack-db/tests/parity-config.ts",
+          "role": "support",
+          "sha256": "15e99f49539a8e8bd9f40e124e22af0b5af73a1df5678e8f11fd696e7a616e1a"
+        },
+        {
+          "path": "packages/tanstack-db/audit/upstream-patches/tests/upstream/useLiveQuery.strictmode.test.tsx.skip",
+          "role": "support",
+          "sha256": "66d0044fd5d3a0395107cd57263486edb6ee5a2e0cd1cefd33ea104ed32067e7"
+        }
+      ],
+      "evidenceOrigin": "upstream-suite",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/tanstack-db/audit/adapted-runtime.json"
+      },
+      "notes": "All 160 applicable upstream cases; one documented React StrictMode replay exclusion."
+    },
+    {
+      "id": "tanstack-db-pristine-types",
+      "type": "pristine-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tanstack-db-pristine-types",
+      "files": [
+        {
+          "path": "packages/tanstack-db/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "94f2a177c649649ed70e71c2ba3fbad21714fe10f89e00b2613361d173672513"
+        },
+        {
+          "path": "packages/tanstack-db/audit/provenance.json",
+          "role": "support",
+          "sha256": "5b1d419697913befae5d06950550e8ffa560fd5e8ba1d939f81dd3efdd26756a"
+        },
+        {
+          "path": "packages/tanstack-db/audit/registrations.json",
+          "role": "support",
+          "sha256": "f8ec9b266f692467ea2d8840267cfaa5964a1375f8f31c0bf2b725b7ad291bfc"
+        },
+        {
+          "path": "packages/tanstack-db/audit/crosswalk.json",
+          "role": "support",
+          "sha256": "e5fb28242b240812b2247018ae294b71532debec685179a9cdb3634a926dc7f5"
+        },
+        {
+          "path": "packages/tanstack-db/audit/upstream-helpers.json",
+          "role": "support",
+          "sha256": "427ed8eb20fc7c283c4bbbb9f92772f8a354755f7430c54e826d14ecb0e3ef57"
+        },
+        {
+          "path": "packages/tanstack-db/src/DbProvider.tsrx",
+          "role": "support",
+          "sha256": "9d2b96c8118b6a4092f64dea220d551369b96aa85c717684f2bb035bc0b3282b"
+        },
+        {
+          "path": "packages/tanstack-db/src/HydrationBoundary.tsrx",
+          "role": "support",
+          "sha256": "0ddd60f98d13753eba5dd9790be89e0d066b30d0096e009a4ea9313b72b42b56"
+        },
+        {
+          "path": "packages/tanstack-db/src/index.ts",
+          "role": "support",
+          "sha256": "371421a432aa43b000f64244538689ffa8f74de08c9dd2c8a0c9c9bc95dabf35"
+        },
+        {
+          "path": "packages/tanstack-db/src/live-query-internals.ts",
+          "role": "support",
+          "sha256": "0705fb883a9a4b7334a4e78a311e97521dde43dfc5452d8ae4a4dab9a342f1f4"
+        },
+        {
+          "path": "packages/tanstack-db/src/slot.ts",
+          "role": "support",
+          "sha256": "de1f6578feb3bd46cc783a6234d6268bf026427cbc7d2d7b93c2df3c86a335a9"
+        },
+        {
+          "path": "packages/tanstack-db/src/useLiveInfiniteQuery.ts",
+          "role": "support",
+          "sha256": "0af4c6ee53e761431f0d658c524cc72d5b05cb9bfba31149752926a3fe6d1cfe"
+        },
+        {
+          "path": "packages/tanstack-db/src/useLiveQuery.ts",
+          "role": "support",
+          "sha256": "f482717c25cfbdf6c136d2c538e210f1e5440c92eefaa147507b5f2a2eb01f57"
+        },
+        {
+          "path": "packages/tanstack-db/src/useLiveQueryEffect.ts",
+          "role": "support",
+          "sha256": "6d8a3bdfa0b56a940591a9fb77018b1c2fc18ef0c3bd822456df45f7388e9c25"
+        },
+        {
+          "path": "packages/tanstack-db/src/useLiveSuspenseQuery.ts",
+          "role": "support",
+          "sha256": "40605bd5b0308dcba469ad1ad266c80ab9022423e4af70a919f74beeae550472"
+        },
+        {
+          "path": "packages/tanstack-db/src/usePacedMutations.ts",
+          "role": "support",
+          "sha256": "8c062015c8673c70896c8727ee6b9f983372a064fa3f6b02426443de336e02da"
+        },
+        {
+          "path": "packages/tanstack-db/typetests/tsconfig.pristine.json",
+          "role": "test",
+          "sha256": "98cefac7cc0bc98770e1603f779042dcf409998d5d015c1bfd897ed834c13aca",
+          "cases": [
+            {
+              "id": "types:db-pristine",
+              "testName": "DB pristine type contracts",
+              "fullName": "DB pristine type contracts"
+            }
+          ]
+        },
+        {
+          "path": "packages/tanstack-db/upstream-helpers/db/tests/conformance/contract.ts",
+          "role": "support",
+          "sha256": "4497951a2df71547c42a2507e536ea4459f740c3faea66ebca164be14a83275a"
+        },
+        {
+          "path": "packages/tanstack-db/upstream-helpers/db/tests/conformance/infinite-contract.ts",
+          "role": "support",
+          "sha256": "367cd708682fccce4c6378db99015f9159cc62532831edb70c1d8bc6d36d573a"
+        },
+        {
+          "path": "packages/tanstack-db/upstream-helpers/db/tests/conformance/infinite-on-demand.ts",
+          "role": "support",
+          "sha256": "8d83002efab4c5b77586e3987ff242287a3d47b1ade89d7730610b2852c6d242"
+        },
+        {
+          "path": "packages/tanstack-db/upstream-helpers/db/tests/conformance/infinite-suite.ts",
+          "role": "support",
+          "sha256": "b4eb14b1f1512b2605ae4759895514004a823a1c8c1160bdd6959cd026cefabc"
+        },
+        {
+          "path": "packages/tanstack-db/upstream-helpers/db/tests/conformance/suite.ts",
+          "role": "support",
+          "sha256": "dbce342f44f2b6cd9b662e4572680acc4115a5d9ddb8186179746ee08cfa2dad"
+        },
+        {
+          "path": "packages/tanstack-db/upstream-helpers/db/tests/utils.ts",
+          "role": "support",
+          "sha256": "20662b2782583f4f31338701c6694dcc184fc1144002e9d75e2493a77393dcf4"
+        }
+      ],
+      "evidenceOrigin": "upstream-suite",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsc",
+        "project": "packages/tanstack-db/typetests/tsconfig.pristine.json"
+      }
+    },
+    {
+      "id": "tanstack-db-adapted-types",
+      "type": "adapted-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tanstack-db-adapted-types",
+      "files": [
+        {
+          "path": "packages/tanstack-db/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "94f2a177c649649ed70e71c2ba3fbad21714fe10f89e00b2613361d173672513"
+        },
+        {
+          "path": "packages/tanstack-db/audit/provenance.json",
+          "role": "support",
+          "sha256": "5b1d419697913befae5d06950550e8ffa560fd5e8ba1d939f81dd3efdd26756a"
+        },
+        {
+          "path": "packages/tanstack-db/audit/registrations.json",
+          "role": "support",
+          "sha256": "f8ec9b266f692467ea2d8840267cfaa5964a1375f8f31c0bf2b725b7ad291bfc"
+        },
+        {
+          "path": "packages/tanstack-db/audit/crosswalk.json",
+          "role": "support",
+          "sha256": "e5fb28242b240812b2247018ae294b71532debec685179a9cdb3634a926dc7f5"
+        },
+        {
+          "path": "packages/tanstack-db/audit/upstream-helpers.json",
+          "role": "support",
+          "sha256": "427ed8eb20fc7c283c4bbbb9f92772f8a354755f7430c54e826d14ecb0e3ef57"
+        },
+        {
+          "path": "packages/tanstack-db/src/DbProvider.tsrx",
+          "role": "support",
+          "sha256": "9d2b96c8118b6a4092f64dea220d551369b96aa85c717684f2bb035bc0b3282b"
+        },
+        {
+          "path": "packages/tanstack-db/src/HydrationBoundary.tsrx",
+          "role": "support",
+          "sha256": "0ddd60f98d13753eba5dd9790be89e0d066b30d0096e009a4ea9313b72b42b56"
+        },
+        {
+          "path": "packages/tanstack-db/src/index.ts",
+          "role": "support",
+          "sha256": "371421a432aa43b000f64244538689ffa8f74de08c9dd2c8a0c9c9bc95dabf35"
+        },
+        {
+          "path": "packages/tanstack-db/src/live-query-internals.ts",
+          "role": "support",
+          "sha256": "0705fb883a9a4b7334a4e78a311e97521dde43dfc5452d8ae4a4dab9a342f1f4"
+        },
+        {
+          "path": "packages/tanstack-db/src/slot.ts",
+          "role": "support",
+          "sha256": "de1f6578feb3bd46cc783a6234d6268bf026427cbc7d2d7b93c2df3c86a335a9"
+        },
+        {
+          "path": "packages/tanstack-db/src/useLiveInfiniteQuery.ts",
+          "role": "support",
+          "sha256": "0af4c6ee53e761431f0d658c524cc72d5b05cb9bfba31149752926a3fe6d1cfe"
+        },
+        {
+          "path": "packages/tanstack-db/src/useLiveQuery.ts",
+          "role": "support",
+          "sha256": "f482717c25cfbdf6c136d2c538e210f1e5440c92eefaa147507b5f2a2eb01f57"
+        },
+        {
+          "path": "packages/tanstack-db/src/useLiveQueryEffect.ts",
+          "role": "support",
+          "sha256": "6d8a3bdfa0b56a940591a9fb77018b1c2fc18ef0c3bd822456df45f7388e9c25"
+        },
+        {
+          "path": "packages/tanstack-db/src/useLiveSuspenseQuery.ts",
+          "role": "support",
+          "sha256": "40605bd5b0308dcba469ad1ad266c80ab9022423e4af70a919f74beeae550472"
+        },
+        {
+          "path": "packages/tanstack-db/src/usePacedMutations.ts",
+          "role": "support",
+          "sha256": "8c062015c8673c70896c8727ee6b9f983372a064fa3f6b02426443de336e02da"
+        },
+        {
+          "path": "packages/tanstack-db/typetests/tsconfig.adapted.json",
+          "role": "test",
+          "sha256": "c4a919df90778160bb53b457f44ac91f863d707a4d6667ee900bf8ec982a0723",
+          "cases": [
+            {
+              "id": "types:db-adapted",
+              "testName": "DB adapted type contracts",
+              "fullName": "DB adapted type contracts"
+            }
+          ]
+        },
+        {
+          "path": "packages/tanstack-db/upstream-helpers/db/tests/conformance/contract.ts",
+          "role": "support",
+          "sha256": "4497951a2df71547c42a2507e536ea4459f740c3faea66ebca164be14a83275a"
+        },
+        {
+          "path": "packages/tanstack-db/upstream-helpers/db/tests/conformance/infinite-contract.ts",
+          "role": "support",
+          "sha256": "367cd708682fccce4c6378db99015f9159cc62532831edb70c1d8bc6d36d573a"
+        },
+        {
+          "path": "packages/tanstack-db/upstream-helpers/db/tests/conformance/infinite-on-demand.ts",
+          "role": "support",
+          "sha256": "8d83002efab4c5b77586e3987ff242287a3d47b1ade89d7730610b2852c6d242"
+        },
+        {
+          "path": "packages/tanstack-db/upstream-helpers/db/tests/conformance/infinite-suite.ts",
+          "role": "support",
+          "sha256": "b4eb14b1f1512b2605ae4759895514004a823a1c8c1160bdd6959cd026cefabc"
+        },
+        {
+          "path": "packages/tanstack-db/upstream-helpers/db/tests/conformance/suite.ts",
+          "role": "support",
+          "sha256": "dbce342f44f2b6cd9b662e4572680acc4115a5d9ddb8186179746ee08cfa2dad"
+        },
+        {
+          "path": "packages/tanstack-db/upstream-helpers/db/tests/utils.ts",
+          "role": "support",
+          "sha256": "20662b2782583f4f31338701c6694dcc184fc1144002e9d75e2493a77393dcf4"
+        }
+      ],
+      "evidenceOrigin": "upstream-suite",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsrx-tsc",
+        "project": "packages/tanstack-db/typetests/tsconfig.adapted.json"
+      }
+    },
+    {
+      "id": "tanstack-db-source-types",
+      "type": "adapted-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tanstack-db-source-types",
+      "files": [
+        {
+          "path": "packages/tanstack-db/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "94f2a177c649649ed70e71c2ba3fbad21714fe10f89e00b2613361d173672513"
+        },
+        {
+          "path": "packages/tanstack-db/audit/provenance.json",
+          "role": "support",
+          "sha256": "5b1d419697913befae5d06950550e8ffa560fd5e8ba1d939f81dd3efdd26756a"
+        },
+        {
+          "path": "packages/tanstack-db/audit/registrations.json",
+          "role": "support",
+          "sha256": "f8ec9b266f692467ea2d8840267cfaa5964a1375f8f31c0bf2b725b7ad291bfc"
+        },
+        {
+          "path": "packages/tanstack-db/audit/crosswalk.json",
+          "role": "support",
+          "sha256": "e5fb28242b240812b2247018ae294b71532debec685179a9cdb3634a926dc7f5"
+        },
+        {
+          "path": "packages/tanstack-db/audit/upstream-helpers.json",
+          "role": "support",
+          "sha256": "427ed8eb20fc7c283c4bbbb9f92772f8a354755f7430c54e826d14ecb0e3ef57"
+        },
+        {
+          "path": "packages/tanstack-db/src/DbProvider.tsrx",
+          "role": "support",
+          "sha256": "9d2b96c8118b6a4092f64dea220d551369b96aa85c717684f2bb035bc0b3282b"
+        },
+        {
+          "path": "packages/tanstack-db/src/HydrationBoundary.tsrx",
+          "role": "support",
+          "sha256": "0ddd60f98d13753eba5dd9790be89e0d066b30d0096e009a4ea9313b72b42b56"
+        },
+        {
+          "path": "packages/tanstack-db/src/index.ts",
+          "role": "support",
+          "sha256": "371421a432aa43b000f64244538689ffa8f74de08c9dd2c8a0c9c9bc95dabf35"
+        },
+        {
+          "path": "packages/tanstack-db/src/live-query-internals.ts",
+          "role": "support",
+          "sha256": "0705fb883a9a4b7334a4e78a311e97521dde43dfc5452d8ae4a4dab9a342f1f4"
+        },
+        {
+          "path": "packages/tanstack-db/src/slot.ts",
+          "role": "support",
+          "sha256": "de1f6578feb3bd46cc783a6234d6268bf026427cbc7d2d7b93c2df3c86a335a9"
+        },
+        {
+          "path": "packages/tanstack-db/src/useLiveInfiniteQuery.ts",
+          "role": "support",
+          "sha256": "0af4c6ee53e761431f0d658c524cc72d5b05cb9bfba31149752926a3fe6d1cfe"
+        },
+        {
+          "path": "packages/tanstack-db/src/useLiveQuery.ts",
+          "role": "support",
+          "sha256": "f482717c25cfbdf6c136d2c538e210f1e5440c92eefaa147507b5f2a2eb01f57"
+        },
+        {
+          "path": "packages/tanstack-db/src/useLiveQueryEffect.ts",
+          "role": "support",
+          "sha256": "6d8a3bdfa0b56a940591a9fb77018b1c2fc18ef0c3bd822456df45f7388e9c25"
+        },
+        {
+          "path": "packages/tanstack-db/src/useLiveSuspenseQuery.ts",
+          "role": "support",
+          "sha256": "40605bd5b0308dcba469ad1ad266c80ab9022423e4af70a919f74beeae550472"
+        },
+        {
+          "path": "packages/tanstack-db/src/usePacedMutations.ts",
+          "role": "support",
+          "sha256": "8c062015c8673c70896c8727ee6b9f983372a064fa3f6b02426443de336e02da"
+        },
+        {
+          "path": "packages/tanstack-db/tsconfig.json",
+          "role": "test",
+          "sha256": "cf79366bcdafe7dc5b50877a8bdc75132b4c0f45181fbf46b77c4108e8da9925",
+          "cases": [
+            {
+              "id": "types:db-source",
+              "testName": "DB source type contracts",
+              "fullName": "DB source type contracts"
+            }
+          ]
+        }
+      ],
+      "evidenceOrigin": "repo-authored",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsrx-tsc",
+        "project": "packages/tanstack-db/tsconfig.json"
+      }
+    },
+    {
+      "id": "tanstack-db-public-types",
+      "type": "adapted-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tanstack-db-public-types",
+      "files": [
+        {
+          "path": "packages/tanstack-db/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "94f2a177c649649ed70e71c2ba3fbad21714fe10f89e00b2613361d173672513"
+        },
+        {
+          "path": "packages/tanstack-db/audit/provenance.json",
+          "role": "support",
+          "sha256": "5b1d419697913befae5d06950550e8ffa560fd5e8ba1d939f81dd3efdd26756a"
+        },
+        {
+          "path": "packages/tanstack-db/audit/registrations.json",
+          "role": "support",
+          "sha256": "f8ec9b266f692467ea2d8840267cfaa5964a1375f8f31c0bf2b725b7ad291bfc"
+        },
+        {
+          "path": "packages/tanstack-db/audit/crosswalk.json",
+          "role": "support",
+          "sha256": "e5fb28242b240812b2247018ae294b71532debec685179a9cdb3634a926dc7f5"
+        },
+        {
+          "path": "packages/tanstack-db/audit/upstream-helpers.json",
+          "role": "support",
+          "sha256": "427ed8eb20fc7c283c4bbbb9f92772f8a354755f7430c54e826d14ecb0e3ef57"
+        },
+        {
+          "path": "packages/tanstack-db/src/DbProvider.tsrx",
+          "role": "support",
+          "sha256": "9d2b96c8118b6a4092f64dea220d551369b96aa85c717684f2bb035bc0b3282b"
+        },
+        {
+          "path": "packages/tanstack-db/src/HydrationBoundary.tsrx",
+          "role": "support",
+          "sha256": "0ddd60f98d13753eba5dd9790be89e0d066b30d0096e009a4ea9313b72b42b56"
+        },
+        {
+          "path": "packages/tanstack-db/src/index.ts",
+          "role": "support",
+          "sha256": "371421a432aa43b000f64244538689ffa8f74de08c9dd2c8a0c9c9bc95dabf35"
+        },
+        {
+          "path": "packages/tanstack-db/src/live-query-internals.ts",
+          "role": "support",
+          "sha256": "0705fb883a9a4b7334a4e78a311e97521dde43dfc5452d8ae4a4dab9a342f1f4"
+        },
+        {
+          "path": "packages/tanstack-db/src/slot.ts",
+          "role": "support",
+          "sha256": "de1f6578feb3bd46cc783a6234d6268bf026427cbc7d2d7b93c2df3c86a335a9"
+        },
+        {
+          "path": "packages/tanstack-db/src/useLiveInfiniteQuery.ts",
+          "role": "support",
+          "sha256": "0af4c6ee53e761431f0d658c524cc72d5b05cb9bfba31149752926a3fe6d1cfe"
+        },
+        {
+          "path": "packages/tanstack-db/src/useLiveQuery.ts",
+          "role": "support",
+          "sha256": "f482717c25cfbdf6c136d2c538e210f1e5440c92eefaa147507b5f2a2eb01f57"
+        },
+        {
+          "path": "packages/tanstack-db/src/useLiveQueryEffect.ts",
+          "role": "support",
+          "sha256": "6d8a3bdfa0b56a940591a9fb77018b1c2fc18ef0c3bd822456df45f7388e9c25"
+        },
+        {
+          "path": "packages/tanstack-db/src/useLiveSuspenseQuery.ts",
+          "role": "support",
+          "sha256": "40605bd5b0308dcba469ad1ad266c80ab9022423e4af70a919f74beeae550472"
+        },
+        {
+          "path": "packages/tanstack-db/src/usePacedMutations.ts",
+          "role": "support",
+          "sha256": "8c062015c8673c70896c8727ee6b9f983372a064fa3f6b02426443de336e02da"
+        },
+        {
+          "path": "packages/tanstack-db/tests/types/tsconfig.json",
+          "role": "test",
+          "sha256": "031a42a98c0697edf029f64b7ce1cd53e9c96fcd517a662f7e392d9dfc280ce4",
+          "cases": [
+            {
+              "id": "types:db-public",
+              "testName": "DB public type contracts",
+              "fullName": "DB public type contracts"
+            }
+          ]
+        },
+        {
+          "path": "packages/tanstack-db/tests/types/public-contracts.test-d.tsx",
+          "role": "support",
+          "sha256": "68fede1657d90d27ff479a8c9ac91138d22f18bbab56743d8ab89a3a2ec27ab6"
+        },
+        {
+          "path": "packages/tanstack-db/tests/types/core-exports.test-d.ts",
+          "role": "support",
+          "sha256": "973e88c4618d9d95f12029eb60c81d7c718efbdf860369f7309bb4262b1e1df3"
+        },
+        {
+          "path": "packages/tanstack-db/typetests/expected-core-contracts.d.ts",
+          "role": "support",
+          "sha256": "36e911b86a6bc561b186156b41f85a3b8869dea4bab977db24372ee5d9622131"
+        }
+      ],
+      "evidenceOrigin": "repo-authored",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsrx-tsc",
+        "project": "packages/tanstack-db/tests/types/tsconfig.json"
+      }
+    },
+    {
+      "id": "tanstack-db-exports-types",
+      "type": "adapted-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tanstack-db-exports-types",
+      "files": [
+        {
+          "path": "packages/tanstack-db/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "94f2a177c649649ed70e71c2ba3fbad21714fe10f89e00b2613361d173672513"
+        },
+        {
+          "path": "packages/tanstack-db/audit/provenance.json",
+          "role": "support",
+          "sha256": "5b1d419697913befae5d06950550e8ffa560fd5e8ba1d939f81dd3efdd26756a"
+        },
+        {
+          "path": "packages/tanstack-db/audit/registrations.json",
+          "role": "support",
+          "sha256": "f8ec9b266f692467ea2d8840267cfaa5964a1375f8f31c0bf2b725b7ad291bfc"
+        },
+        {
+          "path": "packages/tanstack-db/audit/crosswalk.json",
+          "role": "support",
+          "sha256": "e5fb28242b240812b2247018ae294b71532debec685179a9cdb3634a926dc7f5"
+        },
+        {
+          "path": "packages/tanstack-db/audit/upstream-helpers.json",
+          "role": "support",
+          "sha256": "427ed8eb20fc7c283c4bbbb9f92772f8a354755f7430c54e826d14ecb0e3ef57"
+        },
+        {
+          "path": "packages/tanstack-db/src/DbProvider.tsrx",
+          "role": "support",
+          "sha256": "9d2b96c8118b6a4092f64dea220d551369b96aa85c717684f2bb035bc0b3282b"
+        },
+        {
+          "path": "packages/tanstack-db/src/HydrationBoundary.tsrx",
+          "role": "support",
+          "sha256": "0ddd60f98d13753eba5dd9790be89e0d066b30d0096e009a4ea9313b72b42b56"
+        },
+        {
+          "path": "packages/tanstack-db/src/index.ts",
+          "role": "support",
+          "sha256": "371421a432aa43b000f64244538689ffa8f74de08c9dd2c8a0c9c9bc95dabf35"
+        },
+        {
+          "path": "packages/tanstack-db/src/live-query-internals.ts",
+          "role": "support",
+          "sha256": "0705fb883a9a4b7334a4e78a311e97521dde43dfc5452d8ae4a4dab9a342f1f4"
+        },
+        {
+          "path": "packages/tanstack-db/src/slot.ts",
+          "role": "support",
+          "sha256": "de1f6578feb3bd46cc783a6234d6268bf026427cbc7d2d7b93c2df3c86a335a9"
+        },
+        {
+          "path": "packages/tanstack-db/src/useLiveInfiniteQuery.ts",
+          "role": "support",
+          "sha256": "0af4c6ee53e761431f0d658c524cc72d5b05cb9bfba31149752926a3fe6d1cfe"
+        },
+        {
+          "path": "packages/tanstack-db/src/useLiveQuery.ts",
+          "role": "support",
+          "sha256": "f482717c25cfbdf6c136d2c538e210f1e5440c92eefaa147507b5f2a2eb01f57"
+        },
+        {
+          "path": "packages/tanstack-db/src/useLiveQueryEffect.ts",
+          "role": "support",
+          "sha256": "6d8a3bdfa0b56a940591a9fb77018b1c2fc18ef0c3bd822456df45f7388e9c25"
+        },
+        {
+          "path": "packages/tanstack-db/src/useLiveSuspenseQuery.ts",
+          "role": "support",
+          "sha256": "40605bd5b0308dcba469ad1ad266c80ab9022423e4af70a919f74beeae550472"
+        },
+        {
+          "path": "packages/tanstack-db/src/usePacedMutations.ts",
+          "role": "support",
+          "sha256": "8c062015c8673c70896c8727ee6b9f983372a064fa3f6b02426443de336e02da"
+        },
+        {
+          "path": "packages/tanstack-db/typetests/tsconfig.exports.json",
+          "role": "test",
+          "sha256": "bb24c96ad23a3ca5a8524e5bc19bf7c42724322cae5c70c0a65e6a4a550cf25d",
+          "cases": [
+            {
+              "id": "types:db-exports",
+              "testName": "DB exports type contracts",
+              "fullName": "DB exports type contracts"
+            }
+          ]
+        },
+        {
+          "path": "packages/tanstack-db/typetests/public-export-parity.test-d.tsx",
+          "role": "support",
+          "sha256": "65e07eed30c46fc889cc6f3a0b3577be242b4977ff2b0c9c1c482de19719b3ea"
+        }
+      ],
+      "evidenceOrigin": "repo-authored",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsrx-tsc",
+        "project": "packages/tanstack-db/typetests/tsconfig.exports.json"
+      }
+    },
+    {
+      "id": "tanstack-db-differential",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tanstack-db-differential",
+      "files": [
+        {
+          "path": "packages/tanstack-db/tests/differential/parity.test.ts",
+          "role": "test",
+          "sha256": "7615d456be4b724bc728da1caf38c82110840035fe6488d72d22c7389530d2f9",
+          "cases": [
+            {
+              "id": "differential:db-provider-data",
+              "testName": "matches React for hydrated rows, updates, client replacement and teardown",
+              "fullName": "matches React for hydrated rows, updates, client replacement and teardown"
+            }
+          ]
+        },
+        {
+          "path": "packages/tanstack-db/tests/_fixtures/database.tsrx",
+          "role": "support",
+          "sha256": "82d4c862afbd075e85ee21a389054cfd85b804e5ee06cf9b8c64718f5b1cc47a"
+        },
+        {
+          "path": "packages/tanstack-db/tests/differential/_setup.ts",
+          "role": "support",
+          "sha256": "886f96f68494f65e04ef9d39c55d7497705e8f9f77f13ce30e68e2b3718f6ed5"
+        },
+        {
+          "path": "packages/tanstack-db/src/DbProvider.tsrx",
+          "role": "support",
+          "sha256": "9d2b96c8118b6a4092f64dea220d551369b96aa85c717684f2bb035bc0b3282b"
+        },
+        {
+          "path": "packages/tanstack-db/src/HydrationBoundary.tsrx",
+          "role": "support",
+          "sha256": "0ddd60f98d13753eba5dd9790be89e0d066b30d0096e009a4ea9313b72b42b56"
+        },
+        {
+          "path": "packages/tanstack-db/src/index.ts",
+          "role": "support",
+          "sha256": "371421a432aa43b000f64244538689ffa8f74de08c9dd2c8a0c9c9bc95dabf35"
+        },
+        {
+          "path": "packages/tanstack-db/src/live-query-internals.ts",
+          "role": "support",
+          "sha256": "0705fb883a9a4b7334a4e78a311e97521dde43dfc5452d8ae4a4dab9a342f1f4"
+        },
+        {
+          "path": "packages/tanstack-db/src/slot.ts",
+          "role": "support",
+          "sha256": "de1f6578feb3bd46cc783a6234d6268bf026427cbc7d2d7b93c2df3c86a335a9"
+        },
+        {
+          "path": "packages/tanstack-db/src/useLiveInfiniteQuery.ts",
+          "role": "support",
+          "sha256": "0af4c6ee53e761431f0d658c524cc72d5b05cb9bfba31149752926a3fe6d1cfe"
+        },
+        {
+          "path": "packages/tanstack-db/src/useLiveQuery.ts",
+          "role": "support",
+          "sha256": "f482717c25cfbdf6c136d2c538e210f1e5440c92eefaa147507b5f2a2eb01f57"
+        },
+        {
+          "path": "packages/tanstack-db/src/useLiveQueryEffect.ts",
+          "role": "support",
+          "sha256": "6d8a3bdfa0b56a940591a9fb77018b1c2fc18ef0c3bd822456df45f7388e9c25"
+        },
+        {
+          "path": "packages/tanstack-db/src/useLiveSuspenseQuery.ts",
+          "role": "support",
+          "sha256": "40605bd5b0308dcba469ad1ad266c80ab9022423e4af70a919f74beeae550472"
+        },
+        {
+          "path": "packages/tanstack-db/src/usePacedMutations.ts",
+          "role": "support",
+          "sha256": "8c062015c8673c70896c8727ee6b9f983372a064fa3f6b02426443de336e02da"
+        }
+      ],
+      "evidenceOrigin": "repo-authored"
+    },
+    {
+      "id": "tanstack-db-hydration",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tanstack-db-hydration",
+      "files": [
+        {
+          "path": "packages/tanstack-db/tests/ssr-hydration.test.ts",
+          "role": "test",
+          "sha256": "c284f2dc23f01415528cb7ef2aa4bb8a052080d8b11ef7bc076a3f17d4800325",
+          "cases": [
+            {
+              "id": "conformance:db-hydration",
+              "testName": "adopts database markup and follows hydrated data and provider replacement",
+              "fullName": "adopts database markup and follows hydrated data and provider replacement"
+            }
+          ]
+        },
+        {
+          "path": "packages/tanstack-db/tests/_fixtures/database.tsrx",
+          "role": "support",
+          "sha256": "82d4c862afbd075e85ee21a389054cfd85b804e5ee06cf9b8c64718f5b1cc47a"
+        },
+        {
+          "path": "packages/tanstack-db/src/DbProvider.tsrx",
+          "role": "support",
+          "sha256": "9d2b96c8118b6a4092f64dea220d551369b96aa85c717684f2bb035bc0b3282b"
+        },
+        {
+          "path": "packages/tanstack-db/src/HydrationBoundary.tsrx",
+          "role": "support",
+          "sha256": "0ddd60f98d13753eba5dd9790be89e0d066b30d0096e009a4ea9313b72b42b56"
+        },
+        {
+          "path": "packages/tanstack-db/src/index.ts",
+          "role": "support",
+          "sha256": "371421a432aa43b000f64244538689ffa8f74de08c9dd2c8a0c9c9bc95dabf35"
+        },
+        {
+          "path": "packages/tanstack-db/src/live-query-internals.ts",
+          "role": "support",
+          "sha256": "0705fb883a9a4b7334a4e78a311e97521dde43dfc5452d8ae4a4dab9a342f1f4"
+        },
+        {
+          "path": "packages/tanstack-db/src/slot.ts",
+          "role": "support",
+          "sha256": "de1f6578feb3bd46cc783a6234d6268bf026427cbc7d2d7b93c2df3c86a335a9"
+        },
+        {
+          "path": "packages/tanstack-db/src/useLiveInfiniteQuery.ts",
+          "role": "support",
+          "sha256": "0af4c6ee53e761431f0d658c524cc72d5b05cb9bfba31149752926a3fe6d1cfe"
+        },
+        {
+          "path": "packages/tanstack-db/src/useLiveQuery.ts",
+          "role": "support",
+          "sha256": "f482717c25cfbdf6c136d2c538e210f1e5440c92eefaa147507b5f2a2eb01f57"
+        },
+        {
+          "path": "packages/tanstack-db/src/useLiveQueryEffect.ts",
+          "role": "support",
+          "sha256": "6d8a3bdfa0b56a940591a9fb77018b1c2fc18ef0c3bd822456df45f7388e9c25"
+        },
+        {
+          "path": "packages/tanstack-db/src/useLiveSuspenseQuery.ts",
+          "role": "support",
+          "sha256": "40605bd5b0308dcba469ad1ad266c80ab9022423e4af70a919f74beeae550472"
+        },
+        {
+          "path": "packages/tanstack-db/src/usePacedMutations.ts",
+          "role": "support",
+          "sha256": "8c062015c8673c70896c8727ee6b9f983372a064fa3f6b02426443de336e02da"
+        }
+      ]
+    },
+    {
+      "id": "tanstack-db-portal",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tanstack-db-portal",
+      "files": [
+        {
+          "path": "packages/tanstack-db/tests/provider-portal.test.ts",
+          "role": "test",
+          "sha256": "a621eb6d1dfd060d2a5d62a14b1f1a9f3478d08f65f76c32a7861b0672a2e5fe",
+          "cases": [
+            {
+              "id": "conformance:db-portal",
+              "testName": "preserves logical provider ownership through portal suspension, replacement and errors",
+              "fullName": "preserves logical provider ownership through portal suspension, replacement and errors"
+            }
+          ]
+        },
+        {
+          "path": "packages/tanstack-db/tests/_fixtures/portal.tsrx",
+          "role": "support",
+          "sha256": "97fdedb55fa381731a77303fe0ebe976fd13d15827b66a21f3a0a1e4e69aa326"
+        },
+        {
+          "path": "packages/tanstack-db/src/DbProvider.tsrx",
+          "role": "support",
+          "sha256": "9d2b96c8118b6a4092f64dea220d551369b96aa85c717684f2bb035bc0b3282b"
+        },
+        {
+          "path": "packages/tanstack-db/src/HydrationBoundary.tsrx",
+          "role": "support",
+          "sha256": "0ddd60f98d13753eba5dd9790be89e0d066b30d0096e009a4ea9313b72b42b56"
+        },
+        {
+          "path": "packages/tanstack-db/src/index.ts",
+          "role": "support",
+          "sha256": "371421a432aa43b000f64244538689ffa8f74de08c9dd2c8a0c9c9bc95dabf35"
+        },
+        {
+          "path": "packages/tanstack-db/src/live-query-internals.ts",
+          "role": "support",
+          "sha256": "0705fb883a9a4b7334a4e78a311e97521dde43dfc5452d8ae4a4dab9a342f1f4"
+        },
+        {
+          "path": "packages/tanstack-db/src/slot.ts",
+          "role": "support",
+          "sha256": "de1f6578feb3bd46cc783a6234d6268bf026427cbc7d2d7b93c2df3c86a335a9"
+        },
+        {
+          "path": "packages/tanstack-db/src/useLiveInfiniteQuery.ts",
+          "role": "support",
+          "sha256": "0af4c6ee53e761431f0d658c524cc72d5b05cb9bfba31149752926a3fe6d1cfe"
+        },
+        {
+          "path": "packages/tanstack-db/src/useLiveQuery.ts",
+          "role": "support",
+          "sha256": "f482717c25cfbdf6c136d2c538e210f1e5440c92eefaa147507b5f2a2eb01f57"
+        },
+        {
+          "path": "packages/tanstack-db/src/useLiveQueryEffect.ts",
+          "role": "support",
+          "sha256": "6d8a3bdfa0b56a940591a9fb77018b1c2fc18ef0c3bd822456df45f7388e9c25"
+        },
+        {
+          "path": "packages/tanstack-db/src/useLiveSuspenseQuery.ts",
+          "role": "support",
+          "sha256": "40605bd5b0308dcba469ad1ad266c80ab9022423e4af70a919f74beeae550472"
+        },
+        {
+          "path": "packages/tanstack-db/src/usePacedMutations.ts",
+          "role": "support",
+          "sha256": "8c062015c8673c70896c8727ee6b9f983372a064fa3f6b02426443de336e02da"
+        }
+      ]
+    }
+  ],
+  "divergences": [],
+  "materializedTests": "packages/tanstack-db"
+}

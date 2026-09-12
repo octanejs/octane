@@ -3,16 +3,18 @@
     "strict": true,
     "module": "esnext",
     "target": "es2018",
-    "jsx": "preserve",
+    "jsx": "react-jsx",
     "moduleResolution": "bundler",
     "esModuleInterop": true,
     "lib": ["dom", "dom.iterable", "esnext"],
-    "skipLibCheck": true,
+    "skipLibCheck": false,
     "types": ["node"],
     "noEmit": true,
     "noErrorTruncation": true,
     "noUnusedLocals": false,
-    "noUnusedParameters": false
+    "noUnusedParameters": false,
+    "jsxImportSource": "octane",
+    "allowImportingTsExtensions": true
   },
   "include": ["./**/*.test-d.ts", "./**/*.test-d.tsx", "./__fixtures__/**/*.ts"]
 }

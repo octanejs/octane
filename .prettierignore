@@ -166,6 +166,8 @@ packages/resizable-panels/upstream/
 # deeply generic inline signatures the TSRX Prettier plugin currently mangles;
 # keep the clean source stable until that formatter bug is fixed.
 packages/tanstack-ai/src/*.tsrx
+# The same TSRX formatter bug drops generic instantiation in return types.
+packages/tanstack-ai/src/chat-ui/create-ui.tsrx
 packages/tanstack-ai/src/*.tsrx.d.ts
 packages/tanstack-ai/tests/_fixtures/*.tsrx
 
@@ -200,3 +202,7 @@ packages/aria/upstream/
 # Generated browser build output and Playwright run metadata.
 packages/tanstack-virtual/.browser-dist/
 packages/tanstack-virtual/.browser-results/
+
+packages/tanstack-db/upstream-helpers/
+
+packages/tanstack-ai/upstream-helpers/
