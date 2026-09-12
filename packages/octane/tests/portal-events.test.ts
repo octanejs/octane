@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mount } from './_helpers';
-import { flushSync } from '../src/index.js';
+import { createRoot, createElement, createPortal, flushSync } from '../src/index.js';
 import {
 	BasicPortalClick,
 	CrossPortalBubble,
@@ -32,6 +32,55 @@ function clickIn(target: ParentNode, selector: string): void {
 }
 
 describe('portal — event delegation', () => {
+	it('retains the logical route when the last portal is removed after native capture', () => {
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		const root = createRoot(container);
+		// This independent root keeps the native listener on the shared target
+		// alive after the last portal unmounts during the event's target phase.
+		const targetRoot = createRoot(portalTarget);
+		const log: string[] = [];
+		const render = (show: boolean) =>
+			createElement(
+				'section',
+				{
+					onClickCapture: () => log.push('capture'),
+					onClick: () => log.push('parent'),
+				},
+				show
+					? createPortal(
+							createElement(
+								'button',
+								{
+									onClick: () => log.push('target'),
+								},
+								'portal',
+							),
+							portalTarget,
+						)
+					: null,
+			);
+		try {
+			flushSync(() => root.render(render(true)));
+			const button = portalTarget.querySelector('button')!;
+			button.addEventListener(
+				'click',
+				() => {
+					log.push('native target');
+					flushSync(() => root.render(render(false)));
+				},
+				{ once: true },
+			);
+			button.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+			expect(log).toEqual(['capture', 'native target', 'target', 'parent']);
+			expect(portalTarget.querySelector('button')).toBe(null);
+		} finally {
+			root.unmount();
+			targetRoot.unmount();
+			container.remove();
+		}
+	});
+
 	it('fires click handlers attached INSIDE the portal contents', () => {
 		const r = mount(BasicPortalClick, { target: portalTarget });
 		expect(r.find('.count').textContent).toBe('0');

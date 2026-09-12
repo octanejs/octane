@@ -107,3 +107,15 @@ export function DangerToSpreadChild(props) @{
 export function DynamicVoidChild(props) @{
 	<input id="dynamic-void-child">{props.child}</input>
 }
+
+export function RepeatedAliasSources(props) @{
+	<label {...props.first} {...props.second} htmlFor={props.finalFor}>label</label>
+}
+
+export function StableSpreadSources(props) @{
+	<button {...props.source}>button</button>
+}
+
+export function CustomSpreadSources(props) @{
+	<octane-spread-resolution {...props.source} />
+}

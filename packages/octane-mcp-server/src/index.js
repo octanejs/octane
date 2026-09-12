@@ -122,8 +122,10 @@ export const BENCHMARK_SUITES = [
 	'lynx-bundle-size',
 	'codegen-size',
 	'hook-memo',
+	'dom-attributes',
 	'transition-hooks',
 	'template-call-memo',
+	'dom-template-mount',
 	'compiler-throughput',
 	'tsrx-component-graph',
 	'tsrx-void-memo-aliases',
@@ -141,6 +143,7 @@ export const BENCHMARK_SUITES = [
 	'bundle-reachability',
 	'three-renderer',
 	'three-bundle-size',
+	'spread-hosts',
 ];
 
 const DEFAULT_TIMEOUT_MS = 120_000;

@@ -115,7 +115,7 @@ import {
 	hyphenateStyleName,
 } from '../dom-tables.js';
 import { isDelegatedEventProp } from '../event-names.js';
-import { sanitizeURLAttribute } from '../sanitize-url.js';
+import { sanitizeURLAttribute, shouldSanitizeURLAttribute } from '../sanitize-url.js';
 import {
 	invalidHtmlNestingWithAncestor,
 	invalidHtmlNestingWithParent,
@@ -424,7 +424,7 @@ function attrBindingHelper(bind) {
 	if (controlled !== undefined) return controlled;
 	switch (bind.kind) {
 		case 'attr':
-			return 'setAttribute';
+			return bind.attributeHelper ?? 'setAttribute';
 		case 'stringData':
 			return 'setStringData';
 		case 'booleanAttr':
@@ -446,6 +446,38 @@ function attrBindingHelper(bind) {
 		default:
 			return null;
 	}
+}
+
+// Production-only admission: development keeps the full authored-name diagnostic
+// route. Everything with property, boolean, numeric, namespace, or custom-host
+// semantics retains its existing writer. Aliases are resolved once at compile
+// time; opaque destination namespaces do not change these unnamespaced writes.
+function staticAttributeWriter(tag, name) {
+	if (tag.includes('-') || !/^[a-zA-Z_][a-zA-Z0-9_.-]*$/.test(name)) return null;
+	const lower = name.toLowerCase();
+	if (
+		lower.startsWith('on') ||
+		lower.startsWith('aria-') ||
+		MUST_USE_PROPERTY_PROPS.has(lower) ||
+		BOOLEAN_ATTR_PROPS.has(lower) ||
+		POSITIVE_NUMERIC_ATTR_PROPS.has(lower) ||
+		isEnumeratedBooleanAttr(name) ||
+		/^(?:xmlns|class|classname|style|value|checked|defaultvalue|defaultchecked|autofocus|innertext|textcontent|dangerouslysetinnerhtml|download|capture|rowspan|start|suppresscontenteditablewarning|suppressnativechangewarning|__octanenativechangediagnostic)$/.test(
+			lower,
+		)
+	)
+		return null;
+	const canonical = ATTRIBUTE_ALIASES.get(name) ?? name;
+	if (canonical.includes(':')) return null;
+	if (canonical.startsWith('data-')) {
+		return /^[a-z][a-z0-9_-]*$/.test(canonical.slice(5))
+			? { name: canonical, helper: 'setStringData' }
+			: null;
+	}
+	return {
+		name: canonical,
+		helper: shouldSanitizeURLAttribute(tag, canonical) ? 'setURLAttribute' : 'setPlainAttribute',
+	};
 }
 
 // Shared scalar comparisons retain the ordinary writer's semantics without
@@ -1179,6 +1211,10 @@ const NATIVE_READ_RUNTIME_HELPERS = new Set([
 const INTERNAL_CLIENT_RUNTIME_HELPERS = new Set([
 	'replaceRef',
 	'queueOwnRefDetach',
+	'setPlainAttribute',
+	'setPlainAttributeIfChanged',
+	'setURLAttribute',
+	'setURLAttributeIfChanged',
 	'setAttributeIfChanged',
 	'setStringDataIfChanged',
 	'setBooleanAttributeIfChanged',
@@ -24314,15 +24350,22 @@ function emitBindingMount(bind, elVar, bag) {
 	}
 	switch (bind.kind) {
 		case 'textOnlyChild': {
-			// `htext` creates + appends the text node on a fresh mount, ADOPTS the
-			// server text node when hydrating, and coerces the value itself — so the
-			// mount is a bare `htext(el, _v)`. Seeding `_prev` to the client value
+			// Only compiler-admitted native placeholders may be reused. An old
+			// two-argument caller or an excluded custom/template host must retain
+			// htext's append behavior when a separate Text child already exists.
+			// Hydration adopts the server text in either case. Seeding `_prev` to the client value
 			// makes the first update a no-op when it matches the server text (no
 			// hydration mismatch re-render).
 			return st(
 				b.block([
 					b.const('_v', bind.expr),
-					b.stmt(b.assignment('=', local(`_txt$${bind.id}`), b.call('_$htext', el(), V()))),
+					b.stmt(
+						b.assignment(
+							'=',
+							local(`_txt$${bind.id}`),
+							b.call('_$htext', el(), V(), ...(bind.seededText ? [b.literal(1)] : [])),
+						),
+					),
 					b.stmt(b.assignment('=', local(`_prev$${bind.id}`), V())),
 				]),
 			);
@@ -26353,8 +26396,8 @@ function emitElementHtml(
 			// needs none of setAttribute's alias, coercion, namespace, controlled-property,
 			// or invalid-name machinery. Element.setAttribute applies the same unnamespaced
 			// data attribute in HTML, SVG, and MathML, so destination-opaque component
-			// templates can retain this specialization. Unknown values, cased names, and
-			// every non-data attr retain the generic React-parity path.
+			// templates can retain this specialization. Production also admits unknown
+			// scalar data values through staticAttributeWriter below.
 			bindings.push({
 				id: bindings.length,
 				kind: 'stringData',
@@ -26365,13 +26408,15 @@ function emitElementHtml(
 				nameOrigin: attr.name,
 			});
 		} else {
+			const writer = ctx.dev ? null : staticAttributeWriter(tag, attrName);
 			bindings.push({
 				id: bindings.length,
 				kind: 'attr',
+				attributeHelper: writer?.helper,
 				name:
 					ctx.dev && (rawAttrName === 'tabIndex' || rawAttrName === 'htmlFor')
 						? rawAttrName
-						: attrName,
+						: (writer?.name ?? attrName),
 				expr,
 				path,
 				ns: hostNs,
@@ -26538,13 +26583,23 @@ function emitElementHtml(
 					: null;
 			appendTemplatePart(html, escaped, 'text', origins);
 		} else if (isKnownTextChildExpression(txtChild.expression, ctx.knownStringChildLocals)) {
+			const seededText = tag !== 'template' && !tag.includes('-') && !directPropNames.has('is');
 			bindings.push({
 				id: bindings.length,
 				kind: 'textOnlyChild',
 				expr: resolveStyleExpr(txtChild.expression, cssHash),
 				path,
+				seededText,
 			});
-			// The element stays empty in the template — runtime appends a Text node.
+			// A nonempty placeholder survives the HTML parser as one Text node. The
+			// mount writes its actual value before the cloned host is inserted, so
+			// even an empty value retains one stable text binding node. <template>
+			// puts parser children under .content rather than .firstChild. Custom
+			// element constructors can inspect children while the host is cloned;
+			// preserve the old empty template and create/append mount for them.
+			if (seededText) {
+				appendTemplatePart(html, ' ', 'text');
+			}
 		} else {
 			// Bare `{expr}` (no string cast) → RENDERABLE hole. As the host's SOLE
 			// child it lowers MARKERLESS: a primitive value is appended as a single

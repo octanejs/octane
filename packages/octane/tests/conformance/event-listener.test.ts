@@ -581,6 +581,46 @@ describe('ReactDOMEventListener — native and framework cancellation', () => {
 		}
 	});
 
+	// A retained outer method must still address its own Event while a nested
+	// native dispatch is running another logical queue.
+	it('can stop an outer event through its retained method while another event is active', () => {
+		const log: string[] = [];
+		const outer = new MouseEvent('click', { bubbles: true, detail: 1 });
+		const nativeStop = function (this: Event) {
+			log.push('outer native stop');
+			Event.prototype.stopPropagation.call(this);
+		};
+		Object.defineProperty(outer, 'stopPropagation', {
+			value: nativeStop,
+			configurable: true,
+			writable: false,
+			enumerable: true,
+		});
+		const before = Object.getOwnPropertyDescriptor(outer, 'stopPropagation');
+		let retained!: () => void;
+		const r = mount(PropagationTree, {
+			onTarget: (event) => {
+				const detail = (event as MouseEvent).detail;
+				log.push(`target:${detail}`);
+				if (detail === 1) {
+					retained = event.stopPropagation;
+					r.find('.propagation-target').dispatchEvent(
+						new MouseEvent('click', { bubbles: true, detail: 2 }),
+					);
+				} else retained.call(outer);
+			},
+			onParent: (event) => log.push(`parent:${(event as MouseEvent).detail}`),
+		});
+		try {
+			r.find('.propagation-target').dispatchEvent(outer);
+			expect(log).toEqual(['target:1', 'target:2', 'outer native stop', 'parent:2']);
+			expect(Object.getOwnPropertyDescriptor(outer, 'stopPropagation')).toEqual(before);
+			expect(outer.currentTarget).toBe(null);
+		} finally {
+			r.unmount();
+		}
+	});
+
 	// Native EventTarget permits redispatch after a dispatch returns; logical
 	// propagation state must be scoped to that dispatch, not the Event's lifetime.
 	it('runs both phases again when the same native event is synchronously redispatched', () => {
