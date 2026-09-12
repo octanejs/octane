@@ -11,7 +11,10 @@
     "integrity": "sha256:79faf09d544b1558c0ed01c3b6784b4b0d4e84485a6beb3195ce13dcdbf1e94b",
     "verification": "verified"
   },
-  "upstreamSuites": { "runtime": "absent", "types": "present" },
+  "upstreamSuites": {
+    "runtime": "absent",
+    "types": "present"
+  },
   "adaptedRoots": {
     "source": {
       "roots": ["packages/tanstack-devtools/src"],
@@ -40,7 +43,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "8b22926b6186369bfc8ca72aedb69b7853160e5ab762b1a36e1a61bf24f6c322"
+      "lockfileSha256": "97392a08ae3c71e93dcd6ea7bdce70b5a27652915faed35f51aa25a68f8fd22a"
     }
   },
   "lanes": [
@@ -83,7 +86,7 @@
         {
           "path": "packages/tanstack-devtools/audit/upstream-crosswalk.json",
           "role": "support",
-          "sha256": "314a27c78ed49a97b116c33aeb5405d7f37b9470d05c5f6b6875bd6028969085"
+          "sha256": "2763e211472e731beba409494fb83358488aad038e0b1b58e0e96291812c9f72"
         },
         {
           "path": "packages/tanstack-devtools/audit/test-classifications.json",
@@ -227,12 +230,12 @@
   "ordinaryEvidence": [
     {
       "path": "packages/tanstack-devtools/tests/parity/divergences.test.ts",
-      "sha256": "d6ea15922740825e91827e586e4a3f5a6d8ab7bfe572a0fafd7011742e475f59",
+      "sha256": "bb6df9849d20b5a5d235ab7eae1345927130ce7b0b6d93d91ac8eb6f2c6a0c53",
       "cases": [
         {
           "id": "conformance:tanstack-devtools-core-version",
-          "testName": "records the framework-neutral core version drift",
-          "fullName": "@octanejs/tanstack-devtools divergence contracts records the framework-neutral core version drift"
+          "testName": "records the aligned framework-neutral core versions",
+          "fullName": "@octanejs/tanstack-devtools divergence contracts records the aligned framework-neutral core versions"
         },
         {
           "id": "conformance:tanstack-devtools-octane-type-names",
@@ -251,14 +254,14 @@
     {
       "id": "core-version",
       "caseIds": ["conformance:tanstack-devtools-core-version"],
-      "upstreamResult": "The pinned React adapter publishes with @tanstack/devtools 0.12.4 (from @tanstack/react-devtools package.json).",
-      "octaneResult": "The Octane package resolves @tanstack/devtools from the workspace catalog (currently 0.12.5).",
-      "rationale": "The workspace catalog had advanced before this audit; silently downgrading the shared core is outside this harness PR.",
+      "upstreamResult": "The installed React adapter 0.10.12 uses core 0.14.2; the historical copied-source release 0.10.7 used 0.12.4.",
+      "octaneResult": "The Octane package resolves the same 0.14.2 core from the workspace catalog.",
+      "rationale": "Retain the historical copied-source release identity while the current React oracle and Octane dependency advance together.",
       "classification": "dependency",
-      "consumerImpact": "Core behavior may include patch-level changes beyond the pinned React adapter.",
-      "migrationGuidance": "Review 0.12.4 to 0.12.5 core changes when exact-version parity is required.",
+      "consumerImpact": "The installed React and Octane adapters now share the same core version; this historical mismatch no longer affects the current dependency pair.",
+      "migrationGuidance": "The installed dependency mismatch is resolved; recheck both dependencies on later upgrades.",
       "owner": "@octanejs/tanstack-devtools",
-      "reviewCondition": "Remove when both adapters resolve the same core version."
+      "reviewCondition": "Recheck the installed dependency pair on the next update; retain historical source provenance independently."
     },
     {
       "id": "octane-type-names",

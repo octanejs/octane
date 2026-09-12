@@ -26,7 +26,7 @@ const octaneCore = readInstalledPackage('@tanstack/devtools');
 
 describe('@octanejs/tanstack-devtools divergence contracts', function divergenceSuite() {
 	// @parity-case conformance:tanstack-devtools-core-version
-	it('records the framework-neutral core version drift', function coreVersion() {
+	it('records the aligned framework-neutral core versions', function coreVersion() {
 		const upstreamVersion = upstreamReactDevtools.dependencies['@tanstack/devtools'];
 		const octaneVersion = octaneCore.version;
 		expect(typeof upstreamVersion).toBe('string');
@@ -36,7 +36,7 @@ describe('@octanejs/tanstack-devtools divergence contracts', function divergence
 		expect(crosswalk.coreDependency).toEqual({
 			upstreamVersion,
 			octaneVersion,
-			disposition: 'version-divergence',
+			disposition: 'version-aligned',
 		});
 	});
 

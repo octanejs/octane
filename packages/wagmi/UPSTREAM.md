@@ -49,3 +49,7 @@ To advance the manifest to `verified`, vendor the pinned `packages/react`
 source and tests byte-exactly, inventory and run the pristine runtime/type
 suites, adapt every applicable case, and classify every upstream artifact and
 Octane-authored test.
+
+## Dependency compatibility update (2026-09-12)
+
+The installed oracle is now Wagmi `3.7.7`, with core `3.6.5` and connectors `8.2.0`. Comparing every published React source file with `3.7.4` finds changes only in the unsupported Porto/Tempo entrypoints and the unexported version constant. The existing Octane adapter source and historical provenance above remain unchanged. `audit/release-compatibility.json` records exact archive/file hashes. Package, downstream RainbowKit, security, lifecycle, SSR, differential and type checks validate the existing supported surface; this update does not claim complete upstream coverage.
