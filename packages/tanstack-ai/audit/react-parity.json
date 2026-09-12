@@ -9,7 +9,7 @@
     "testRoot": "packages/ai-react/tests",
     "license": "MIT",
     "integrity": "sha256:3544abc8e0ef89c5f32601ecbcbc3d62d92648bb046777cf2df9429856ca6c74",
-    "verification": "recorded-unverified"
+    "verification": "verified"
   },
   "upstreamSuites": {
     "runtime": "present",
