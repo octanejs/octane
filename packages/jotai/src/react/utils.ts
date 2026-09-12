@@ -128,8 +128,6 @@ type InferAtomTuples<T> = {
 		: never;
 };
 
-// For internal use only
-// This can be changed without notice.
 export type INTERNAL_InferAtomTuples<T> = InferAtomTuples<T>;
 
 const hydratedMap: WeakMap<Store, WeakSet<AnyWritableAtom>> = new WeakMap();

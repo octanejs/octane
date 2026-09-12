@@ -1,0 +1,19 @@
+'use client'
+
+import { useMemo } from 'react'
+import { useSetAtom } from '../../react.js'
+import { atom } from '../../vanilla.js'
+import type { Getter, Setter } from '../../vanilla.js'
+
+type Options = Parameters<typeof useSetAtom>[1]
+
+export function useAtomCallback<Result, Args extends unknown[]>(
+  callback: (get: Getter, set: Setter, ...arg: Args) => Result,
+  options?: Options,
+): (...args: Args) => Result {
+  const anAtom = useMemo(
+    () => atom(null, (get, set, ...args: Args) => callback(get, set, ...args)),
+    [callback],
+  )
+  return useSetAtom(anAtom, options)
+}

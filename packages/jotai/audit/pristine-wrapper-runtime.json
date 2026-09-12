@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "project": "jotai-pristine",
+  "roots": ["packages/jotai/tests"],
+  "files": ["packages/jotai/tests/upstream-original.test.ts"],
+  "tests": [
+    {
+      "id": "runtime:8e4e2264dd144d14",
+      "file": "packages/jotai/tests/upstream-original.test.ts",
+      "fullName": "runs every pinned Jotai 3 registration unchanged"
+    }
+  ],
+  "snapshots": 0
+}

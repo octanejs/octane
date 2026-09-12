@@ -1,0 +1,45 @@
+diff --git a/tests/upstream/react/error.test.tsx b/tests/upstream/react/error.test.tsx
+--- a/tests/upstream/react/error.test.tsx
++++ b/tests/upstream/react/error.test.tsx
+@@ -1,5 +1,5 @@
+ /** @jsxImportSource octane */
+-import { Component, StrictMode, Suspense, useEffect, useState } from 'octane'
++import { ErrorBoundary as OctaneErrorBoundary, StrictMode, Suspense, useEffect, useState } from 'octane'
+ import type { OctaneNode } from 'octane'
+ import { act, fireEvent, render, screen } from '@octanejs/testing-library'
+ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+@@ -25,29 +25,11 @@ afterEach(() => {
+   console.error = consoleError
+ })
+ 
+-class ErrorBoundary extends Component<
+-  { children: OctaneNode },
+-  { hasError: false } | { hasError: true; error: Error }
+-> {
+-  constructor(props: { message?: string; children: OctaneNode }) {
+-    super(props)
+-    this.state = { hasError: false }
+-  }
+-  static getDerivedStateFromError(error: Error) {
+-    return { hasError: true, error }
+-  }
+-  render() {
+-    return this.state.hasError ? (
+-      <div>
+-        Errored: {this.state.error.message}
+-        <button onClick={() => this.setState({ hasError: false })}>
+-          retry
+-        </button>
+-      </div>
+-    ) : (
+-      this.props.children
+-    )
+-  }
++// OCTANE DIVERGENCE[functional-error-boundary]: function boundary preserves catch and retry without React classes.
++function ErrorBoundary({ children }: { children: OctaneNode }) {
++  return <OctaneErrorBoundary fallback={(error: unknown, reset: () => void) => (
++    <div>Errored: {(error as Error).message}<button onClick={reset}>retry</button></div>
++  )}>{children}</OctaneErrorBoundary>
+ }
+ 
+ it('can throw an initial error in read function', () => {

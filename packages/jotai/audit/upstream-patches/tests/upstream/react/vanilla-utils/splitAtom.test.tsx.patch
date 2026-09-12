@@ -1,0 +1,29 @@
+diff --git a/tests/upstream/react/vanilla-utils/splitAtom.test.tsx b/tests/upstream/react/vanilla-utils/splitAtom.test.tsx
+--- a/tests/upstream/react/vanilla-utils/splitAtom.test.tsx
++++ b/tests/upstream/react/vanilla-utils/splitAtom.test.tsx
+@@ -18,9 +18,11 @@ it('no unnecessary updates when updating atoms', () => {
+ 
+   const TaskList = ({ listAtom }: { listAtom: typeof todosAtom }) => {
+     const [atoms, dispatch] = useAtom(splitAtom(listAtom))
++    // OCTANE DIVERGENCE[component-commit-observation]: observe the owning component commit, outside the child template scope.
++    const commitCount = useCommitCount()
+     return (
+       <>
+-        TaskListUpdates: {useCommitCount()}
++        TaskListUpdates: {commitCount}
+         {atoms.map((anAtom) => (
+           <TaskItem
+             key={`${anAtom}`}
+@@ -41,9 +43,11 @@ it('no unnecessary updates when updating atoms', () => {
+     const [value, onChange] = useAtom(itemAtom)
+     const toggle = () =>
+       onChange((value) => ({ ...value, checked: !value.checked }))
++    // OCTANE DIVERGENCE[component-commit-observation]: observe the owning component commit, outside the child template scope.
++    const commitCount = useCommitCount()
+     return (
+       <li>
+-        {value.task} commits: {useCommitCount()}
++        {value.task} commits: {commitCount}
+         <input
+           data-testid={`${value.task}-checkbox`}
+           type="checkbox"

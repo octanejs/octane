@@ -2,14 +2,14 @@
  * @octanejs/jotai async conformance — async atoms suspend through octane's
  * use() on the binding's continuable promise: pending fallback → resolved
  * value, re-suspension when a write installs a new pending promise, async
- * derived chains, the loadable/unwrap escape hatches (no boundary), and
+ * derived chains, the raw/unwrap escape hatches (no boundary), and
  * rejection routing to the boundary's catch.
  */
 import { describe, it, expect } from 'vitest';
 import { atom, getDefaultStore } from '@octanejs/jotai';
-import { loadable, unwrap } from '@octanejs/jotai/utils';
+import { unwrap } from '@octanejs/jotai/utils';
 import { act, mount, nextPaint } from '../_helpers';
-import { AsyncApp, LoadableApp, UnwrapApp } from '../_fixtures/async.tsrx';
+import { AsyncApp, RawPromiseApp, UnwrapApp } from '../_fixtures/async.tsrx';
 
 function deferred<T>() {
 	let resolve!: (v: T) => void;
@@ -106,29 +106,29 @@ describe('async atoms + suspense', () => {
 	});
 });
 
-describe('loadable / unwrap (no suspense boundary)', () => {
-	it('loadable renders loading → hasData without suspending', async () => {
+describe('raw promises / unwrap (no suspense boundary)', () => {
+	it('raw hook renders loading → hasData without suspending', async () => {
 		const d = deferred<number>();
 		const asyncAtom = atom(d.promise);
-		const r = mount(LoadableApp, { loadableAtom: loadable(asyncAtom) });
+		const r = mount(RawPromiseApp, { asyncAtom });
 		await flush();
-		expect(r.find('#loadable').textContent).toBe('loading');
+		expect(r.find('#raw').textContent).toBe('loading');
 
 		d.resolve(3);
 		await flush();
-		expect(r.find('#loadable').textContent).toBe('hasData:3');
+		expect(r.find('#raw').textContent).toBe('hasData:3');
 		r.unmount();
 	});
 
-	it('loadable surfaces a rejection as hasError', async () => {
+	it('raw hook surfaces a rejection as hasError', async () => {
 		const d = deferred<number>();
 		const asyncAtom = atom(d.promise);
-		const r = mount(LoadableApp, { loadableAtom: loadable(asyncAtom) });
+		const r = mount(RawPromiseApp, { asyncAtom });
 		await flush();
 
 		d.reject(new Error('nope'));
 		await flush();
-		expect(r.find('#loadable').textContent).toBe('hasError:nope');
+		expect(r.find('#raw').textContent).toBe('hasError:nope');
 		r.unmount();
 	});
 

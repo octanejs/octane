@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "strict": true,
+    "jsx": "react-jsx",
+    "esModuleInterop": true,
+    "module": "nodenext",
+    "skipLibCheck": true /* FIXME remove this once vite fixes it */,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "verbatimModuleSyntax": true,
+    "declaration": true,
+    "isolatedDeclarations": true,
+    "noEmit": true,
+    "types": ["@testing-library/jest-dom"],
+    "paths": {
+      "jotai": ["./src/index.ts"],
+      "jotai/*": ["./src/*.ts"]
+    }
+  },
+  "include": ["src/**/*", "tests/**/*", "benchmarks/**/*"],
+  "exclude": ["node_modules", "dist"]
+}

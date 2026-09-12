@@ -15,6 +15,7 @@ export const runners = new Map([
 	['draggable', { module: './react-draggable-pristine-runtime.mjs', label: 'react-draggable' }],
 	['floating-ui', { module: './floating-ui-pristine-runtime.mjs', label: '@floating-ui/react' }],
 	['livestore', { module: './livestore-pristine-runtime.mjs', label: 'LiveStore' }],
+	['jotai', { module: './jotai-pristine-runtime.mjs', label: 'Jotai' }],
 	[
 		'monaco-editor',
 		{ module: './monaco-editor-pristine-runtime.mjs', label: '@monaco-editor/react' },
