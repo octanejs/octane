@@ -124,13 +124,13 @@
       "name": "@octanejs/better-auth",
       "version": "0.0.4",
       "category": "Data",
-      "upstream": { "package": "better-auth", "version": "1.6.29" },
+      "upstream": { "package": "better-auth", "version": "1.7.4" },
       "surface": "The public framework-agnostic Better Auth client is reused unchanged. `createAuthClient` converts the built-in session atom and plugin-provided atoms into Octane hooks while preserving endpoint actions, `$fetch`, `$store`, `$ERROR_CODES`, `$Infer`, and plugin inference. The upstream-compatible `useStore` helper is also included.",
       "divergences": [
         "React-framework server helpers such as `better-auth/tanstack-start` are not re-exported; use Better Auth's standard Fetch API handler or an Octane-specific server integration."
       ],
       "ssr": "`useStore` supplies the current Nanostore value as the server snapshot. Better Auth's session atom does not start browser refresh or network activity while rendering on the server.",
-      "verified": "2026-08-17"
+      "verified": "2026-09-12"
     },
     {
       "name": "@octanejs/calendar",
@@ -1210,7 +1210,7 @@
       "name": "@octanejs/tanstack-devtools",
       "version": "0.0.46",
       "category": "Developer Tools",
-      "upstream": { "package": "@tanstack/react-devtools", "version": "0.10.7" },
+      "upstream": { "package": "@tanstack/react-devtools", "version": "0.10.12" },
       "surface": "Surface-present for the pinned adapter's runtime entrypoint, with additive framework-neutral core re-exports. A same-fixture differential covers mount, config synchronization, plugin/title/trigger portals, and teardown. Upstream has no runtime suite; its test:types source compile is recorded as present type evidence with required pristine/adapted type lanes. Provenance is verified; core-version drift and Octane-specific type names/core re-exports stay as explicit divergences.",
       "divergences": [
         "Public adapter types use Octane-prefixed names: `TanStackDevtoolsOctanePlugin` and `TanStackDevtoolsOctaneInit` (upstream: `TanStackDevtoolsReactPlugin` / `TanStackDevtoolsReactInit`).",
@@ -1219,7 +1219,7 @@
         "Plugin/title/trigger content is rendered through a tiny `DevtoolsPortal` component (a createPortal VALUE), because Octane renders a returned portal at any position rather than only as a direct JSX child."
       ],
       "ssr": "Supported and tested: the component renders its absolutely-positioned anchor element through octane/server without a DOM; the core is constructed but never mounted server-side (mount is a client-only effect).",
-      "verified": "2026-08-03"
+      "verified": "2026-09-12"
     },
     {
       "name": "@octanejs/tanstack-form",
@@ -1528,14 +1528,14 @@
       "name": "@octanejs/wagmi",
       "version": "0.0.33",
       "category": "Web3",
-      "upstream": { "package": "wagmi", "version": "3.7.4" },
-      "surface": "WagmiProvider and createConfig over @wagmi/core 3.6.4, with config, connection, connect, disconnect, switch-connection, switch-chain, connectors, connections, chains, balance, contract read/simulate/write, transaction send/wait, and message-signing hooks.",
+      "upstream": { "package": "wagmi", "version": "3.7.7" },
+      "surface": "WagmiProvider and createConfig over @wagmi/core 3.6.5, with config, connection, connect, disconnect, switch-connection, switch-chain, connectors, connections, chains, balance, contract read/simulate/write, transaction send/wait, and message-signing hooks.",
       "divergences": [
         "The binding targets Wagmi v3 names. Deprecated v2 useAccount/useSwitchAccount aliases and hooks outside the documented representative inventory are not exported.",
         "Privileged mutation hooks force retry:false, require a current live connector, cancel before dispatch when the displayed wallet context changed, and quarantine a late success as ActionContextChangedError when account, chain, or connector changed after dispatch.",
         "RainbowKit 2.2.x declares Wagmi v2 peers. Its defining provider/custom-button/modal contracts can be implemented over this v3 surface, proven by the deterministic disconnected-to-connecting-to-connected gate, but the downstream binding must document that peer-range divergence.",
         "The connectors subpath exposes the dependency-free injected and deterministic mock connectors. Vendor connectors and their optional SDKs remain direct application dependencies.",
-        "EIP-1193 event validation, duplicate coalescing, and connector-generation invalidation are delegated unchanged to @wagmi/core 3.6.4. This binding does not add a second provider-event layer or claim independent normalization behavior."
+        "EIP-1193 event validation, duplicate coalescing, and connector-generation invalidation are delegated unchanged to @wagmi/core 3.6.5. This binding does not add a second provider-event layer or claim independent normalization behavior."
       ],
       "ssr": "WagmiProvider supports ssr:true and initialState through @wagmi/core hydrate. parseHydratedState accepts only a versioned, 16 KiB-bounded public-state hint and rejects malformed or privileged material; a hydrated connection is never authority for signing or submission.",
       "verified": "2026-08-02"

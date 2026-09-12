@@ -40,8 +40,8 @@
     "test": "vitest run --root ../.. --project better-auth"
   },
   "dependencies": {
-    "better-auth": "1.6.29",
-    "nanostores": "1.1.1"
+    "better-auth": "1.7.4",
+    "nanostores": "1.5.3"
   },
   "peerDependencies": {
     "octane": "workspace:^0.1.51 || ^0.2.0"

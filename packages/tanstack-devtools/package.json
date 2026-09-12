@@ -41,7 +41,7 @@
   },
   "devDependencies": {
     "@octanejs/testing-library": "workspace:*",
-    "@tanstack/react-devtools": "0.10.7",
+    "@tanstack/react-devtools": "0.10.12",
     "@testing-library/jest-dom": "catalog:default",
     "@tsrx/react": "catalog:default",
     "@types/react": "catalog:tanstack-devtools-react-oracle",

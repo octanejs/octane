@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, lstatSync, readFileSync, realpathSync } from 'node:fs';
+import { existsSync, lstatSync, readFileSync, readlinkSync, realpathSync } from 'node:fs';
 import path from 'node:path';
 import { getBindingPackages } from './workspace-packages.mjs';
 import { readBindingSurfacePolicy } from './binding-surface-policy.mjs';
@@ -73,10 +73,30 @@ function confined(root, relative) {
 	return resolved;
 }
 
-function repositoryIdentity(input) {
+export function repositoryIdentity(input) {
 	let url = typeof input === 'string' ? input : input?.url;
 	requireValue(nonempty(url), 'No repository identity is available');
-	url = url.replace(/^git\+/, '').replace(/^github:/, 'https://github.com/');
+	url = url
+		.replace(/^git\+/, '')
+		.replace(/^github:/, 'https://github.com/')
+		.replace(/^git@github\.com:/, 'ssh://git@github.com/');
+	if (URL.canParse(url)) {
+		const parsed = new URL(url);
+		// Public npm metadata often uses SSH, while isolated acquisition cannot
+		// use the caller's SSH configuration. Preserve the GitHub repository
+		// identity and use its public HTTPS transport; never discard credentials,
+		// a custom port, query or fragment while normalizing it.
+		if (
+			parsed.protocol === 'ssh:' &&
+			parsed.hostname === 'github.com' &&
+			parsed.username === 'git' &&
+			!parsed.password &&
+			!parsed.port &&
+			!parsed.search &&
+			!parsed.hash
+		)
+			url = `https://github.com${parsed.pathname}`;
+	}
 	let directory = typeof input === 'object' ? (input.directory ?? input.subdirectory) : null;
 	if (url.startsWith('https://github.com/')) {
 		const parsed = parseGitHubUrl(new URL(url));
@@ -151,6 +171,36 @@ function packageAt(receipt, packageName, directory) {
 		const manifest = readJson(confined(receipt.checkoutPath, file));
 		return manifest.name === packageName ? [{ manifest, directory: path.posix.dirname(file) }] : [];
 	});
+	if (!directory && matches.length > 1) {
+		// A repository can retain demos or historical npm distributions with the
+		// same name. Prefer its publishing root or its declared source workspace;
+		// directory names and the numerically highest version are not identity.
+		const rootPackage = matches.find(
+			({ directory, manifest }) =>
+				directory === '.' &&
+				manifest.private !== true &&
+				['main', 'module', 'source', 'types', 'exports'].some((key) => manifest[key]),
+		);
+		if (rootPackage) return rootPackage;
+		const rootManifest = existsSync(path.join(receipt.checkoutPath, 'package.json'))
+			? readJson(confined(receipt.checkoutPath, 'package.json'))
+			: {};
+		const workspaces = Array.isArray(rootManifest.workspaces)
+			? rootManifest.workspaces
+			: rootManifest.workspaces?.packages;
+		if (Array.isArray(workspaces) && workspaces.every((pattern) => typeof pattern === 'string')) {
+			const sources = matches.filter(
+				({ directory }) =>
+					workspaces.some(
+						(pattern) => !pattern.startsWith('!') && path.matchesGlob(directory, pattern),
+					) &&
+					!workspaces.some(
+						(pattern) => pattern.startsWith('!') && path.matchesGlob(directory, pattern.slice(1)),
+					),
+			);
+			if (sources.length === 1) return sources[0];
+		}
+	}
 	requireValue(
 		matches.length === 1,
 		`Expected one fetched manifest named ${packageName}; found ${matches.length}`,
@@ -192,9 +242,15 @@ async function registryPackage(packageName, options, cache) {
 async function releaseIdentity(dependency, options, cache) {
 	const { data, fetchedAt } = await registryPackage(dependency.package, options, cache);
 	requireValue(nonempty(dependency.version), `Missing version specifier for ${dependency.package}`);
+	// Historical status labels append an immutable source annotation to a
+	// release version. Keep the full label in versionSpec while comparing the
+	// release independently from the fetched default-branch source below.
+	const annotatedRelease = dependency.version.match(
+		/^(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?)(?: \([a-f0-9]{7,64}\)| \+ [A-Za-z0-9_./-]+@[a-f0-9]{7,64})$/,
+	);
 	const pinnedVersion = selectHighestSatisfyingVersion(
 		Object.keys(data.versions),
-		dependency.version,
+		annotatedRelease?.[1] ?? dependency.version,
 	);
 	requireValue(
 		pinnedVersion,
@@ -239,7 +295,16 @@ function releaseBaseline(release) {
 
 function dependenciesFor(binding, status, policy) {
 	const dependencies = [];
-	if (nonempty(status?.upstream?.package)) dependencies.push({ ...status.upstream });
+	if (nonempty(status?.upstream?.package)) {
+		const upstream = status.upstream;
+		const packages = upstream.package.split(' + ');
+		const versions = typeof upstream.version === 'string' ? upstream.version.split(' / ') : [];
+		if (packages.length > 1 && packages.length === versions.length) {
+			for (const [index, packageName] of packages.entries()) {
+				dependencies.push({ ...upstream, package: packageName, version: versions[index] });
+			}
+		} else dependencies.push({ ...upstream });
+	}
 	for (const surface of policy.surfaces ?? []) {
 		const dependency = surface?.dependency;
 		if (
@@ -277,10 +342,23 @@ function bindingFacts(root, binding, status, policy) {
 		.filter(Boolean)
 		.map((file) => {
 			const absolute = path.join(root, file);
-			requireValue(
-				!lstatSync(absolute).isSymbolicLink(),
-				`Symlink requires manual inspection: ${file}`,
-			);
+			if (lstatSync(absolute).isSymbolicLink()) {
+				const resolved = confined(root, file);
+				const target = path.relative(realpathSync(binding.directory), resolved);
+				requireValue(
+					!target.startsWith('..') && !path.isAbsolute(target),
+					`Symlink target escapes the binding: ${file}`,
+				);
+				// The target's tracked files have their own inventory entries. Hash
+				// the link bytes too, so changing its target invalidates the baseline.
+				const bytes = readlinkSync(absolute, { encoding: 'buffer' });
+				return {
+					path: path.posix.relative(relative, file),
+					bytes: bytes.length,
+					fingerprint: fingerprint(bytes.toString('base64')),
+					symlinkTarget: bytes.toString('utf8'),
+				};
+			}
 			const bytes = readFileSync(confined(root, file));
 			return {
 				path: path.posix.relative(relative, file),

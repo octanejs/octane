@@ -1,10 +1,18 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	symlinkSync,
+	writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
-import { validateAuditReport } from './bindings-audit-lib.mjs';
+import { repositoryIdentity, validateAuditReport } from './bindings-audit-lib.mjs';
 
 const cli = new URL('./bindings-audit.mjs', import.meta.url).href;
 
@@ -738,4 +746,133 @@ test('outputs inside repositories are refused and unusable Octane roots exit one
 	);
 	assert.equal(help.status, 0);
 	assert.match(help.stdout, /origin:"assessment"/);
+});
+
+test('public GitHub SSH metadata uses the same repository identity over HTTPS', () => {
+	for (const url of [
+		'ssh://git@github.com/portabletext/react-portabletext.git',
+		'git+ssh://git@github.com/portabletext/react-portabletext.git',
+		'git@github.com:portabletext/react-portabletext.git',
+	]) {
+		assert.deepEqual(repositoryIdentity({ url, directory: 'packages/react' }), {
+			repositoryUrl: 'https://github.com/portabletext/react-portabletext.git',
+			packageDirectory: 'packages/react',
+		});
+	}
+	const external = 'ssh://git@gitlab.com/group/repo.git';
+	assert.equal(repositoryIdentity(external).repositoryUrl, external);
+	const port = 'ssh://git@github.com:2222/owner/repo.git';
+	assert.equal(repositoryIdentity(port).repositoryUrl, port);
+	assert.throws(
+		() => repositoryIdentity('ssh://git:secret@github.com/owner/repo.git'),
+		/Invalid repository URL/,
+	);
+	assert.throws(
+		() => repositoryIdentity('ssh://git@github.com/owner/repo.git?redirect=other'),
+		/Invalid repository URL/,
+	);
+});
+
+test('the repository root package disambiguates a same-named demo manifest', (t) => {
+	const f = fixture(t);
+	f.write(f.library, 'package.json', { name: 'engine', version: '2.1.0-dev.1', main: 'index.js' });
+	f.write(f.library, 'index.js', 'export const value = 1;');
+	f.commit(f.library);
+	const metadata = structuredClone(f.registry);
+	for (const version of Object.values(metadata.engine.versions))
+		delete version.repository.directory;
+	const result = f.audit(['--binding', 'alpha'], metadata);
+	assert.equal(result.status, 0, result.stderr);
+	assert.equal(JSON.parse(result.stdout).bindings[0].releases[0].packageDirectory, '.');
+});
+
+test('a declared source workspace disambiguates vendored release manifests', (t) => {
+	const f = fixture(t);
+	f.write(f.library, 'package.json', { private: true, workspaces: ['packages/*'] });
+	f.write(f.library, 'website/vendor/engine/package.json', { name: 'engine', version: '1.0.0' });
+	f.commit(f.library);
+	const metadata = structuredClone(f.registry);
+	for (const version of Object.values(metadata.engine.versions))
+		delete version.repository.directory;
+	const result = f.audit(['--binding', 'alpha'], metadata);
+	assert.equal(result.status, 0, result.stderr);
+	const release = JSON.parse(result.stdout).bindings[0].releases[0];
+	assert.equal(release.packageDirectory, 'packages/engine');
+	assert.equal(release.defaultBranchVersion, '2.1.0-dev.1');
+
+	f.write(f.library, 'packages/duplicate/package.json', { name: 'engine', version: '3.0.0' });
+	f.commit(f.library);
+	const ambiguous = f.audit(['--binding', 'alpha'], metadata);
+	assert.equal(ambiguous.status, 2);
+	assert.match(JSON.parse(ambiguous.stdout).bindings[0].failures[0].message, /found 3/);
+});
+
+test('release checks retain source annotations while resolving their exact published version', (t) => {
+	const f = fixture(t);
+	for (const version of ['1.0.0 (abcdef12)', '1.0.0 + master@abcdef12']) {
+		f.write(f.source, 'packages/alpha/status.json', { upstream: { package: 'engine', version } });
+		f.commit(f.source);
+		const result = f.audit(['--binding', 'alpha']);
+		assert.equal(result.status, 0, result.stderr);
+		const release = JSON.parse(result.stdout).bindings[0].releases[0];
+		assert.equal(release.pinnedVersion, '1.0.0');
+		assert.equal(release.versionSpec, version);
+	}
+	f.write(f.source, 'packages/alpha/status.json', {
+		upstream: { package: 'engine', version: '1.0.0 or maybe 2.0.0' },
+	});
+	f.commit(f.source);
+	assert.equal(f.audit(['--binding', 'alpha']).status, 2);
+});
+
+test('fingerprints package-internal fixture symlinks and rejects targets outside the binding', (t) => {
+	const f = fixture(t);
+	f.write(f.source, 'packages/alpha/upstream/__mocks__/fixture.js', 'export const mocked = true;');
+	const link = path.join(f.source, 'packages/alpha/__mocks__');
+	symlinkSync('upstream/__mocks__', link);
+	f.commit(f.source);
+	const result = f.audit(['--binding', 'alpha']);
+	assert.equal(result.status, 0, result.stderr);
+	const files = JSON.parse(result.stdout).bindings[0].facts.files;
+	assert.equal(files.find((file) => file.path === '__mocks__').symlinkTarget, 'upstream/__mocks__');
+	assert.ok(files.find((file) => file.path === 'upstream/__mocks__/fixture.js').fingerprint);
+
+	rmSync(link);
+	symlinkSync('../beta/src', link);
+	f.commit(f.source);
+	const escaped = f.audit(['--binding', 'alpha']);
+	assert.equal(escaped.status, 2);
+	assert.match(
+		JSON.parse(escaped.stdout).bindings[0].failures[0].message,
+		/Symlink target escapes the binding/,
+	);
+});
+
+test('composite upstream labels retain both independently published release checks', (t) => {
+	const f = fixture(t);
+	f.write(f.source, 'packages/alpha/status.json', {
+		upstream: { package: 'engine + other-engine', version: '1.0.0 / 2.0.0' },
+	});
+	f.commit(f.source);
+	const result = f.audit(['--binding', 'alpha']);
+	assert.equal(result.status, 0, result.stderr);
+	assert.deepEqual(
+		JSON.parse(result.stdout).bindings[0].releases.map((release) => [
+			release.package,
+			release.pinnedVersion,
+		]),
+		[
+			['engine', '1.0.0'],
+			['other-engine', '2.0.0'],
+		],
+	);
+	f.write(f.source, 'packages/alpha/status.json', {
+		upstream: { package: 'engine + other-engine', version: '1.0.0' },
+	});
+	f.commit(f.source);
+	assert.equal(
+		f.audit(['--binding', 'alpha']).status,
+		2,
+		'A missing component version is not inferred',
+	);
 });

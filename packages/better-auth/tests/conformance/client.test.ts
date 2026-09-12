@@ -27,6 +27,45 @@ function sessionResponse(name: string) {
 }
 
 describe('createAuthClient', () => {
+	it('hydrates the initial session and keeps later server state authoritative', async () => {
+		const fetch = vi.fn(async () => sessionResponse('Grace'));
+		const client = createAuthClient({
+			baseURL: 'http://localhost/api/auth',
+			fetchOptions: { customFetchImpl: fetch },
+		});
+		const now = new Date();
+		const initialSession = {
+			user: {
+				id: 'user-1',
+				name: 'Ada',
+				email: 'ada@example.com',
+				emailVerified: true,
+				createdAt: now,
+				updatedAt: now,
+			},
+			session: {
+				id: 'session-1',
+				userId: 'user-1',
+				token: 'initial-session',
+				createdAt: now,
+				updatedAt: now,
+				expiresAt: new Date(now.getTime() + 60_000),
+			},
+		};
+		client.hydrateSession(initialSession);
+		const result = mount(SessionReader, { client });
+		try {
+			expect(result.find('#session').textContent).toBe('Ada');
+			await vi.waitFor(() => expect(result.find('#session').textContent).toBe('Grace'));
+			client.hydrateSession(initialSession);
+			await nextPaint();
+			expect(result.find('#session').textContent).toBe('Grace');
+			expect(fetch).toHaveBeenCalledTimes(1);
+		} finally {
+			result.unmount();
+		}
+	});
+
 	// Upstream: better-auth/src/client/react/index.ts (resolved atom hooks).
 	it('reports the session loading and user states', async () => {
 		const fetch = vi.fn(async () => sessionResponse('Ada'));
