@@ -437,11 +437,11 @@ interface Frame {
 	// Arm/list-local child counters. The same component position can be visited
 	// in multiple mutually-exclusive scopes during SSR retries; each scope must
 	// retain its own ordinal just as the client retains a separate Block tree.
-	scopedChildren: Map<string, number> | null;
+	scopedChildren: ScopedCounts | null;
 	// Per-site use() occurrence counter (a use() in an inline @for hits the same
 	// site N times → distinct keys). Lazily allocated (never for a use()-free
 	// component, i.e. the common case).
-	occ: Map<string, number> | null;
+	occ: ScopedCounts | null;
 	// Memoized materialized path ('/seg/seg…'); segs are immutable so it's stable.
 	path: string | null;
 	// Whether this component already registered a discovery job this pass (dedupe
@@ -505,20 +505,54 @@ function asyncFramePath(frame: Frame | null): string {
 	return (frame === null ? '' : framePath(frame)) + ASYNC_SCOPE;
 }
 
+// Scoped counters live in a flat [key, count, …] pair list until they outgrow
+// it: scope keys are long path strings, so a Map pays a full hash of the key on
+// every get/set while a short scan compares them directly (and scopedChildren
+// lookups carry the same ASYNC_SCOPE string object across an arm, which string
+// equality resolves by identity). Frames seeing more distinct scopes than the
+// limit promote to a Map so a pathological fan-out still gets O(1) lookups.
+type ScopedCounts = (string | number)[] | Map<string, number>;
+const SCOPED_COUNTS_ARRAY_LIMIT = 8;
+
+function nextScopedCount(frame: Frame, slot: 'occ' | 'scopedChildren', key: string): number {
+	let counts = frame[slot];
+	if (counts === null) {
+		frame[slot] = [key, 1];
+		return 0;
+	}
+	if (!Array.isArray(counts)) {
+		const next = counts.get(key) ?? 0;
+		counts.set(key, next + 1);
+		return next;
+	}
+	for (let i = 0; i < counts.length; i += 2) {
+		if (counts[i] === key) {
+			const next = counts[i + 1] as number;
+			counts[i + 1] = next + 1;
+			return next;
+		}
+	}
+	if (counts.length === SCOPED_COUNTS_ARRAY_LIMIT * 2) {
+		const promoted = new Map<string, number>();
+		for (let i = 0; i < counts.length; i += 2) {
+			promoted.set(counts[i] as string, counts[i + 1] as number);
+		}
+		promoted.set(key, 1);
+		frame[slot] = promoted;
+		return 0;
+	}
+	counts.push(key, 1);
+	return 0;
+}
+
 function nextFrameOccurrence(frame: Frame, base: string): number {
-	if (frame.occ === null) frame.occ = new Map();
 	const scopedBase = ASYNC_SCOPE === frame.asyncScope ? base : ASYNC_SCOPE + '\0' + base;
-	const next = frame.occ.get(scopedBase) ?? 0;
-	frame.occ.set(scopedBase, next + 1);
-	return next;
+	return nextScopedCount(frame, 'occ', scopedBase);
 }
 
 function nextChildSegment(frame: Frame): number {
 	if (ASYNC_SCOPE === frame.asyncScope) return frame.nextChild++;
-	if (frame.scopedChildren === null) frame.scopedChildren = new Map();
-	const next = frame.scopedChildren.get(ASYNC_SCOPE) ?? 0;
-	frame.scopedChildren.set(ASYNC_SCOPE, next + 1);
-	return next;
+	return nextScopedCount(frame, 'scopedChildren', ASYNC_SCOPE);
 }
 
 function ssrScope(parent: SSRScope | null): SSRScope {
@@ -2525,14 +2559,14 @@ export function ssrAttr(
 	tag?: string,
 	namespace: AttributeNamespace = 'html',
 ): string {
+	// Hoisted env check: each `dev` use would otherwise be a fresh
+	// `process.env` lookup. Must stay the first statement — bundlers only
+	// fold the check into its uses (keeping prod bundles free of dev
+	// warnings) while it syntactically precedes other statements.
+	const dev = process.env.NODE_ENV !== 'production';
 	namespace = resolveAttributeNamespace(namespace);
 	const isCustomTag = namespace === 'html' && tag !== undefined && tag.indexOf('-') !== -1;
-	if (
-		process.env.NODE_ENV !== 'production' &&
-		!isCustomTag &&
-		tag !== undefined &&
-		DEV_SSR_CUSTOM_HOST_DEPTH === 0
-	) {
+	if (dev && !isCustomTag && tag !== undefined && DEV_SSR_CUSTOM_HOST_DEPTH === 0) {
 		const warning = isAriaAttributeName(name)
 			? ariaAttributeWarning(name, tag)
 			: hostPropertyWarning(
@@ -2558,11 +2592,7 @@ export function ssrAttr(
 		}
 		const alias = ATTRIBUTE_ALIASES.get(name);
 		if (alias !== undefined) name = alias;
-		else if (
-			process.env.NODE_ENV !== 'production' &&
-			(tag === 'button' || tag === 'input') &&
-			name === 'formAction'
-		) {
+		else if (dev && (tag === 'button' || tag === 'input') && name === 'formAction') {
 			name = 'formaction';
 		}
 	}
@@ -2615,7 +2645,7 @@ export function ssrAttr(
 		) {
 			return '';
 		}
-		if (process.env.NODE_ENV !== 'production' && !isCustomTag && tag !== undefined) {
+		if (dev && !isCustomTag && tag !== undefined) {
 			if (
 				t === 'function' &&
 				name.length > 2 &&
@@ -2652,7 +2682,7 @@ export function ssrAttr(
 		// the canonical `attr=""` presence form, falsy drops — mirroring the
 		// client's coerceAttrValue byte-for-byte (hydration parity).
 		if (BOOLEAN_ATTR_PROPS.has(lower)) {
-			if (process.env.NODE_ENV !== 'production' && tag !== undefined) {
+			if (dev && tag !== undefined) {
 				const warning = booleanAttributeStringWarning(name, v);
 				if (warning !== null) devWarnSsrAttributeOnce(name, warning);
 			}
@@ -2673,7 +2703,7 @@ export function ssrAttr(
 		// Booleans on non-boolean attributes never serialize (client parity:
 		// `title={true}` removes).
 		if (t === 'boolean') {
-			if (process.env.NODE_ENV !== 'production' && tag !== undefined) {
+			if (dev && tag !== undefined) {
 				devWarnSsrAttributeOnce(
 					name,
 					`Received \`${v}\` for a non-boolean attribute \`${name}\`. ` +
@@ -2693,7 +2723,7 @@ export function ssrAttr(
 	// A plain object has no useful attribute representation. Objects with an
 	// intentional toString retain their normal coercion and stay silent.
 	if (
-		process.env.NODE_ENV !== 'production' &&
+		dev &&
 		!isCustomTag &&
 		tag !== undefined &&
 		t === 'object' &&
@@ -2705,20 +2735,14 @@ export function ssrAttr(
 				'"[object Object]". Pass a string (or a value with a meaningful toString) instead.',
 		);
 	}
-	if (
-		process.env.NODE_ENV !== 'production' &&
-		!isCustomTag &&
-		tag !== undefined &&
-		t === 'number' &&
-		Number.isNaN(v)
-	) {
+	if (dev && !isCustomTag && tag !== undefined && t === 'number' && Number.isNaN(v)) {
 		devWarnSsrAttributeOnce(
 			name,
 			`Received NaN for the \`${name}\` attribute. If this is expected, cast the value to a string.`,
 		);
 	}
 	let s: string;
-	if (process.env.NODE_ENV !== 'production' && !isCustomTag && tag !== undefined) {
+	if (dev && !isCustomTag && tag !== undefined) {
 		try {
 			s = v === true ? '' : String(v);
 		} catch (error) {
@@ -2740,7 +2764,7 @@ export function ssrAttr(
 			(name === 'href' && tag !== undefined && tag !== 'a' && tag !== 'area') ||
 			(name === 'data' && tag === 'object'))
 	) {
-		if (process.env.NODE_ENV !== 'production' && !isCustomTag && tag !== undefined) {
+		if (dev && !isCustomTag && tag !== undefined) {
 			devWarnSsrAttributeOnce('empty:' + name, emptyResourceUrlWarning(name));
 		}
 		return '';
@@ -2750,6 +2774,7 @@ export function ssrAttr(
 }
 
 function styleObjectToCss(obj: Record<string, unknown>): string {
+	const dev = process.env.NODE_ENV !== 'production';
 	let out = '';
 	for (const k in obj) {
 		const val = obj[k];
@@ -2758,7 +2783,7 @@ function styleObjectToCss(obj: Record<string, unknown>): string {
 		if (val == null || typeof val === 'boolean') continue;
 		// React parity: numeric values get `px` (except 0 / unitless / custom props).
 		let serialized: string;
-		if (process.env.NODE_ENV !== 'production' && SSR_NESTING_WARNINGS !== null) {
+		if (dev && SSR_NESTING_WARNINGS !== null) {
 			devWarnStyleProperty(k, val, true);
 			try {
 				serialized = cssStyleValue(k, val);
@@ -2869,6 +2894,7 @@ export function ssrAttrs(
 	namespace: AttributeNamespace = 'html',
 	skipFormControls = false,
 ): string {
+	const dev = process.env.NODE_ENV !== 'production';
 	namespace = resolveAttributeNamespace(namespace);
 	interface PropWriter {
 		name: string;
@@ -2917,7 +2943,7 @@ export function ssrAttrs(
 		}
 	}
 
-	if (process.env.NODE_ENV === 'production' && classMerges === null) {
+	if (!dev && classMerges === null) {
 		let canonical = true;
 		for (const name of props.keys()) {
 			if (
@@ -2978,10 +3004,7 @@ export function ssrAttrs(
 			// an earlier normalized identity without moving its Map entry.
 			needsWinningOrderSort = true;
 		}
-		writer.name =
-			process.env.NODE_ENV !== 'production' && (rawName === 'tabIndex' || rawName === 'htmlFor')
-				? rawName
-				: name;
+		writer.name = dev && (rawName === 'tabIndex' || rawName === 'htmlFor') ? rawName : name;
 		resolved.set(identity, writer);
 	}
 	if (classMerges !== null) {
@@ -3002,12 +3025,9 @@ export function ssrAttrs(
 	}
 
 	let out = '';
-	const ordered =
-		process.env.NODE_ENV !== 'production' || needsWinningOrderSort
-			? [...resolved.values()]
-			: resolved.values();
+	const ordered = dev || needsWinningOrderSort ? [...resolved.values()] : resolved.values();
 	if (needsWinningOrderSort) (ordered as PropWriter[]).sort((a, b) => a.firstOrder - b.firstOrder);
-	if (process.env.NODE_ENV !== 'production') {
+	if (dev) {
 		devValidateSsrAriaProps(
 			(ordered as PropWriter[]).map(({ name }) => name),
 			tag,
@@ -3027,7 +3047,7 @@ export function ssrAttrs(
 		}
 	}
 	if (
-		process.env.NODE_ENV !== 'production' &&
+		dev &&
 		(ordered as PropWriter[]).some(({ name, value }) => name === 'is' && typeof value === 'string')
 	) {
 		DEV_SSR_CUSTOM_HOST_DEPTH++;
@@ -3655,10 +3675,11 @@ export function hookSlots(count: number): number {
 }
 
 interface HookPass {
-	/** Slot → occurrence-indexed records, persisting across this body's passes. */
-	hooks: Map<ServerHookSlot, AnyHookRec[]>;
+	/** Slot → occurrence-indexed records, persisting across this body's passes.
+	 * Allocated on first hook use — most presentational bodies never call one. */
+	hooks: Map<ServerHookSlot, AnyHookRec[]> | null;
 	/** Per-pass occurrence counters (fresh each pass, like Frame.occ). */
-	occ: Map<ServerHookSlot, number>;
+	occ: Map<ServerHookSlot, number> | null;
 	/** A dispatch fired during the current pass → re-invoke the body. */
 	update: boolean;
 }
@@ -3702,10 +3723,12 @@ function hookPosition(slot: unknown): {
 	const hp = HOOK_PASS;
 	if (hp === null) return null;
 	const key = resolveHookSlot(slot);
-	const index = hp.occ.get(key) ?? 0;
-	hp.occ.set(key, index + 1);
-	let list = hp.hooks.get(key);
-	if (list === undefined) hp.hooks.set(key, (list = []));
+	const occ = (hp.occ ??= new Map());
+	const index = occ.get(key) ?? 0;
+	occ.set(key, index + 1);
+	const hooks = (hp.hooks ??= new Map());
+	let list = hooks.get(key);
+	if (list === undefined) hooks.set(key, (list = []));
 	return { hp, list, index };
 }
 
@@ -3813,6 +3836,45 @@ function stateHook<S, A>(
 // Keep the large retry snapshot off the recursive component-call stack. Fizz
 // supports very deep trees; retaining dozens of snapshot locals in
 // invokeComponentBody's live frame would exhaust the JavaScript stack first.
+// Replay snapshots copy ambient collections so a discarded pass can be rewound,
+// yet in the common case every source is empty — share immutable empties rather
+// than allocate a private copy per component invocation. Every consumer only
+// iterates or re-copies them, and null remains the distinct "source absent"
+// state (absent skips the restore; empty still clears what a discarded pass
+// added). The list is frozen so an accidental write fails loudly instead of
+// leaking state into an unrelated snapshot; nothing mutates the maps or sets.
+const EMPTY_SNAPSHOT_MAP: Map<never, never> = new Map<never, never>();
+const EMPTY_SNAPSHOT_SET: Set<never> = new Set<never>();
+const EMPTY_SNAPSHOT_LIST = Object.freeze([]) as never[];
+
+function snapshotMap<K, V>(map: Map<K, V> | null | undefined): Map<K, V> | null {
+	return map == null ? null : map.size === 0 ? EMPTY_SNAPSHOT_MAP : new Map(map);
+}
+function snapshotSet<T>(set: Set<T> | null | undefined): Set<T> | null {
+	return set == null ? null : set.size === 0 ? EMPTY_SNAPSHOT_SET : new Set(set);
+}
+function snapshotList<T>(list: readonly T[] | null | undefined): T[] {
+	return list == null || list.length === 0 ? EMPTY_SNAPSHOT_LIST : list.slice();
+}
+function snapshotVtStack(): Array<{ candidate: VtSsrCandidate; consumed: boolean }> {
+	return VT_SSR_STACK.length === 0
+		? EMPTY_SNAPSHOT_LIST
+		: VT_SSR_STACK.map((candidate) => ({ candidate, consumed: candidate.consumed }));
+}
+function snapshotScopedCounts(counts: ScopedCounts | null | undefined): ScopedCounts | null {
+	if (counts == null) return null;
+	if (Array.isArray(counts)) {
+		return counts.length === 0 ? EMPTY_SNAPSHOT_LIST : counts.slice();
+	}
+	return snapshotMap(counts);
+}
+function restoreScopedCounts(snapshot: ScopedCounts | null): ScopedCounts | null {
+	if (snapshot === null) return null;
+	// Copy, never alias: the live list mutates in place, and a snapshot must
+	// restore identically on every retry that rewinds to it.
+	return Array.isArray(snapshot) ? snapshot.slice() : new Map(snapshot);
+}
+
 function captureComponentReplayState(scope: SSRScope, frame: Frame | null) {
 	const css = CSS;
 	const head = HEAD;
@@ -3828,15 +3890,15 @@ function captureComponentReplayState(scope: SSRScope, frame: Frame | null) {
 		nativeMixed: NATIVE_SERVER_READS?.mixed ?? false,
 		nativeFailures: NATIVE_SERVER_FAILURES,
 		css,
-		cssEntries: css === null ? null : new Map(css),
+		cssEntries: snapshotMap(css),
 		head,
 		headLength: head !== null ? head.html.length : 0,
 		headCharsetLength: head !== null ? head.charset.length : 0,
 		headViewportLength: head !== null ? head.viewport.length : 0,
-		headHints: head === null ? null : new Set(head.hints),
-		headSheets: head === null || head.sheets === null ? null : new Map(head.sheets),
-		headHintHtml: head === null || head.hintHtml === null ? null : new Map(head.hintHtml),
-		headXfer: head === null || head.preloadXfer === null ? null : new Map(head.preloadXfer),
+		headHints: snapshotSet(head?.hints),
+		headSheets: snapshotMap(head?.sheets),
+		headHintHtml: snapshotMap(head?.hintHtml),
+		headXfer: snapshotMap(head?.preloadXfer),
 		serial,
 		serialLength: serial !== null ? serial.length : 0,
 		susp,
@@ -3846,24 +3908,18 @@ function captureComponentReplayState(scope: SSRScope, frame: Frame | null) {
 		context: scope.$$ctxValues,
 		vtTrySeq: VT_SSR_TRY_SEQ,
 		vtHasCandidates: VT_SSR_HAS_CANDIDATES,
-		vtStack: VT_SSR_STACK.map((candidate) => ({
-			candidate,
-			consumed: candidate.consumed,
-		})),
+		vtStack: snapshotVtStack(),
 		stream,
 		streamNextId: stream?.nextId ?? 0,
-		streamActiveTryKeys: stream?.activeTryKeys.slice() ?? [],
-		streamActiveOwnerKeys: stream?.activeOwnerKeys.slice() ?? [],
+		streamActiveTryKeys: snapshotList(stream?.activeTryKeys),
+		streamActiveOwnerKeys: snapshotList(stream?.activeOwnerKeys),
 		streamPassBoundaryCount: stream?.activePassBoundaryKeys?.size ?? 0,
 		asyncScope: ASYNC_SCOPE,
 		streamReplayCheckpoint: stream?.replay?.length ?? 0,
 		frameDeferred: frame?.deferred ?? false,
 		frameNextChild: frame?.nextChild ?? 0,
-		frameScopedChildren:
-			frame?.scopedChildren === null || frame?.scopedChildren === undefined
-				? null
-				: new Map(frame.scopedChildren),
-		frameOccurrences: frame?.occ === null || frame?.occ === undefined ? null : new Map(frame.occ),
+		frameScopedChildren: snapshotScopedCounts(frame?.scopedChildren),
+		frameOccurrences: snapshotScopedCounts(frame?.occ),
 	};
 }
 
@@ -3944,9 +4000,8 @@ function rewindComponentReplayState(
 	if (frame !== null) {
 		frame.deferred = snapshot.frameDeferred;
 		frame.nextChild = snapshot.frameNextChild;
-		frame.scopedChildren =
-			snapshot.frameScopedChildren === null ? null : new Map(snapshot.frameScopedChildren);
-		frame.occ = snapshot.frameOccurrences === null ? null : new Map(snapshot.frameOccurrences);
+		frame.scopedChildren = restoreScopedCounts(snapshot.frameScopedChildren);
+		frame.occ = restoreScopedCounts(snapshot.frameOccurrences);
 	}
 }
 
@@ -3974,7 +4029,7 @@ function replayUpdatedComponentBody(
 			throw new Error(formatServerError(9));
 		}
 		hp.update = false;
-		hp.occ = new Map();
+		hp.occ = null;
 		rewindComponentReplayState(snapshot, scope, frame);
 		ACTIVE_PU_WARM_PLANS.length = warmPlanCheckpoint;
 		out = comp(props ?? {}, scope, undefined);
@@ -3989,7 +4044,7 @@ function invokeComponentBody(
 	frame: Frame | null,
 ): unknown {
 	const prevHP = HOOK_PASS;
-	const hp: HookPass = { hooks: new Map(), occ: new Map(), update: false };
+	const hp: HookPass = { hooks: null, occ: null, update: false };
 	const snapshot = captureComponentReplayState(scope, frame);
 	const warmPlanCheckpoint = ACTIVE_PU_WARM_PLANS.length;
 	HOOK_PASS = hp;
@@ -4054,7 +4109,7 @@ function renderComponentFramed(
 		// their shared loop lives behind a cold branch without charging that extra
 		// frame to normal component nesting.
 		const previousHookPass = HOOK_PASS;
-		const hookPass: HookPass = { hooks: new Map(), occ: new Map(), update: false };
+		const hookPass: HookPass = { hooks: null, occ: null, update: false };
 		const replaySnapshot = captureComponentReplayState(scope, frame);
 		const warmPlanCheckpoint = ACTIVE_PU_WARM_PLANS.length;
 		let out: unknown;
@@ -6991,7 +7046,7 @@ function saveAmbient(): Ambient {
 		nestingWarnings: SSR_NESTING_WARNINGS,
 		vtTrySeq: VT_SSR_TRY_SEQ,
 		vtHasCandidates: VT_SSR_HAS_CANDIDATES,
-		vtStack: VT_SSR_STACK.map((candidate) => ({ candidate, consumed: candidate.consumed })),
+		vtStack: snapshotVtStack(),
 	};
 }
 function restoreAmbient(a: Ambient): void {
@@ -8210,12 +8265,12 @@ export function ssrTry(
 	const armScope = outerAsyncScope + '|@arm:' + siteKey + '#' + occurrence.toString(36) + ':';
 	let entry: StreamBoundary | undefined;
 	const serialStart = SERIAL?.length ?? 0;
-	let ancestorKeys: string[] = [];
-	let ownerKeys: string[] = [];
+	let ancestorKeys: string[] = EMPTY_SNAPSHOT_LIST;
+	let ownerKeys: string[] = EMPTY_SNAPSHOT_LIST;
 	if (stream !== null) {
 		stream.activePassBoundaryKeys?.add(key);
-		ancestorKeys = stream.activeTryKeys.slice();
-		ownerKeys = stream.activeOwnerKeys.slice();
+		ancestorKeys = snapshotList(stream.activeTryKeys);
+		ownerKeys = snapshotList(stream.activeOwnerKeys);
 		entry = stream.boundaries.get(key);
 		if (entry !== undefined) {
 			recordStreamBoundaryMutation(stream, key);
@@ -8346,22 +8401,18 @@ export function ssrTry(
 			const deferredStart = DEFERRED?.length ?? 0;
 			const serialStart = SERIAL?.length ?? 0;
 			const css = CSS;
-			const cssSnapshot = css === null ? null : new Map(css);
+			const cssSnapshot = snapshotMap(css);
 			const head = HEAD;
 			const headHtml = head?.html;
 			const headCharset = head?.charset;
 			const headViewport = head?.viewport;
-			const headHints = head === null ? null : new Set(head.hints);
-			const headSheets = head === null || head.sheets === null ? null : new Map(head.sheets);
-			const headHintHtml = head === null || head.hintHtml === null ? null : new Map(head.hintHtml);
-			const headXfer =
-				head === null || head.preloadXfer === null ? null : new Map(head.preloadXfer);
+			const headHints = snapshotSet(head?.hints);
+			const headSheets = snapshotMap(head?.sheets);
+			const headHintHtml = snapshotMap(head?.hintHtml);
+			const headXfer = snapshotMap(head?.preloadXfer);
 			const vtTrySeq = VT_SSR_TRY_SEQ;
 			const vtHasCandidates = VT_SSR_HAS_CANDIDATES;
-			const vtStack = VT_SSR_STACK.map((candidate) => ({
-				candidate,
-				consumed: candidate.consumed,
-			}));
+			const vtStack = snapshotVtStack();
 			try {
 				fallback = withStream(null, renderFallback);
 			} catch (error) {
