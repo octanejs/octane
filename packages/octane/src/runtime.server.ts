@@ -3647,10 +3647,11 @@ export function hookSlots(count: number): number {
 }
 
 interface HookPass {
-	/** Slot → occurrence-indexed records, persisting across this body's passes. */
-	hooks: Map<ServerHookSlot, AnyHookRec[]>;
+	/** Slot → occurrence-indexed records, persisting across this body's passes.
+	 * Allocated on first hook use — most presentational bodies never call one. */
+	hooks: Map<ServerHookSlot, AnyHookRec[]> | null;
 	/** Per-pass occurrence counters (fresh each pass, like Frame.occ). */
-	occ: Map<ServerHookSlot, number>;
+	occ: Map<ServerHookSlot, number> | null;
 	/** A dispatch fired during the current pass → re-invoke the body. */
 	update: boolean;
 }
@@ -3713,10 +3714,12 @@ function hookPosition(slot: unknown): {
 	const hp = HOOK_PASS;
 	if (hp === null) return null;
 	const key = resolveHookSlot(slot);
-	const index = hp.occ.get(key) ?? 0;
-	hp.occ.set(key, index + 1);
-	let list = hp.hooks.get(key);
-	if (list === undefined) hp.hooks.set(key, (list = []));
+	const occ = (hp.occ ??= new Map());
+	const index = occ.get(key) ?? 0;
+	occ.set(key, index + 1);
+	const hooks = (hp.hooks ??= new Map());
+	let list = hooks.get(key);
+	if (list === undefined) hooks.set(key, (list = []));
 	return { hp, list, index };
 }
 
@@ -3824,6 +3827,32 @@ function stateHook<S, A>(
 // Keep the large retry snapshot off the recursive component-call stack. Fizz
 // supports very deep trees; retaining dozens of snapshot locals in
 // invokeComponentBody's live frame would exhaust the JavaScript stack first.
+// Replay snapshots copy ambient collections so a discarded pass can be rewound,
+// yet in the common case every source is empty — share immutable empties rather
+// than allocate a private copy per component invocation. Every consumer only
+// iterates or re-copies them, and null remains the distinct "source absent"
+// state (absent skips the restore; empty still clears what a discarded pass
+// added). The list is frozen so an accidental write fails loudly instead of
+// leaking state into an unrelated snapshot; nothing mutates the maps or sets.
+const EMPTY_SNAPSHOT_MAP: Map<never, never> = new Map<never, never>();
+const EMPTY_SNAPSHOT_SET: Set<never> = new Set<never>();
+const EMPTY_SNAPSHOT_LIST = Object.freeze([]) as never[];
+
+function snapshotMap<K, V>(map: Map<K, V> | null | undefined): Map<K, V> | null {
+	return map == null ? null : map.size === 0 ? EMPTY_SNAPSHOT_MAP : new Map(map);
+}
+function snapshotSet<T>(set: Set<T> | null | undefined): Set<T> | null {
+	return set == null ? null : set.size === 0 ? EMPTY_SNAPSHOT_SET : new Set(set);
+}
+function snapshotList<T>(list: readonly T[] | null | undefined): T[] {
+	return list == null || list.length === 0 ? EMPTY_SNAPSHOT_LIST : list.slice();
+}
+function snapshotVtStack(): Array<{ candidate: VtSsrCandidate; consumed: boolean }> {
+	return VT_SSR_STACK.length === 0
+		? EMPTY_SNAPSHOT_LIST
+		: VT_SSR_STACK.map((candidate) => ({ candidate, consumed: candidate.consumed }));
+}
+
 function captureComponentReplayState(scope: SSRScope, frame: Frame | null) {
 	const css = CSS;
 	const head = HEAD;
@@ -3839,15 +3868,15 @@ function captureComponentReplayState(scope: SSRScope, frame: Frame | null) {
 		nativeMixed: NATIVE_SERVER_READS?.mixed ?? false,
 		nativeFailures: NATIVE_SERVER_FAILURES,
 		css,
-		cssEntries: css === null ? null : new Map(css),
+		cssEntries: snapshotMap(css),
 		head,
 		headLength: head !== null ? head.html.length : 0,
 		headCharsetLength: head !== null ? head.charset.length : 0,
 		headViewportLength: head !== null ? head.viewport.length : 0,
-		headHints: head === null ? null : new Set(head.hints),
-		headSheets: head === null || head.sheets === null ? null : new Map(head.sheets),
-		headHintHtml: head === null || head.hintHtml === null ? null : new Map(head.hintHtml),
-		headXfer: head === null || head.preloadXfer === null ? null : new Map(head.preloadXfer),
+		headHints: snapshotSet(head?.hints),
+		headSheets: snapshotMap(head?.sheets),
+		headHintHtml: snapshotMap(head?.hintHtml),
+		headXfer: snapshotMap(head?.preloadXfer),
 		serial,
 		serialLength: serial !== null ? serial.length : 0,
 		susp,
@@ -3857,24 +3886,18 @@ function captureComponentReplayState(scope: SSRScope, frame: Frame | null) {
 		context: scope.$$ctxValues,
 		vtTrySeq: VT_SSR_TRY_SEQ,
 		vtHasCandidates: VT_SSR_HAS_CANDIDATES,
-		vtStack: VT_SSR_STACK.map((candidate) => ({
-			candidate,
-			consumed: candidate.consumed,
-		})),
+		vtStack: snapshotVtStack(),
 		stream,
 		streamNextId: stream?.nextId ?? 0,
-		streamActiveTryKeys: stream?.activeTryKeys.slice() ?? [],
-		streamActiveOwnerKeys: stream?.activeOwnerKeys.slice() ?? [],
+		streamActiveTryKeys: snapshotList(stream?.activeTryKeys),
+		streamActiveOwnerKeys: snapshotList(stream?.activeOwnerKeys),
 		streamPassBoundaryCount: stream?.activePassBoundaryKeys?.size ?? 0,
 		asyncScope: ASYNC_SCOPE,
 		streamReplayCheckpoint: stream?.replay?.length ?? 0,
 		frameDeferred: frame?.deferred ?? false,
 		frameNextChild: frame?.nextChild ?? 0,
-		frameScopedChildren:
-			frame?.scopedChildren === null || frame?.scopedChildren === undefined
-				? null
-				: new Map(frame.scopedChildren),
-		frameOccurrences: frame?.occ === null || frame?.occ === undefined ? null : new Map(frame.occ),
+		frameScopedChildren: snapshotMap(frame?.scopedChildren),
+		frameOccurrences: snapshotMap(frame?.occ),
 	};
 }
 
@@ -3985,7 +4008,7 @@ function replayUpdatedComponentBody(
 			throw new Error(formatServerError(9));
 		}
 		hp.update = false;
-		hp.occ = new Map();
+		hp.occ = null;
 		rewindComponentReplayState(snapshot, scope, frame);
 		ACTIVE_PU_WARM_PLANS.length = warmPlanCheckpoint;
 		out = comp(props ?? {}, scope, undefined);
@@ -4000,7 +4023,7 @@ function invokeComponentBody(
 	frame: Frame | null,
 ): unknown {
 	const prevHP = HOOK_PASS;
-	const hp: HookPass = { hooks: new Map(), occ: new Map(), update: false };
+	const hp: HookPass = { hooks: null, occ: null, update: false };
 	const snapshot = captureComponentReplayState(scope, frame);
 	const warmPlanCheckpoint = ACTIVE_PU_WARM_PLANS.length;
 	HOOK_PASS = hp;
@@ -4065,7 +4088,7 @@ function renderComponentFramed(
 		// their shared loop lives behind a cold branch without charging that extra
 		// frame to normal component nesting.
 		const previousHookPass = HOOK_PASS;
-		const hookPass: HookPass = { hooks: new Map(), occ: new Map(), update: false };
+		const hookPass: HookPass = { hooks: null, occ: null, update: false };
 		const replaySnapshot = captureComponentReplayState(scope, frame);
 		const warmPlanCheckpoint = ACTIVE_PU_WARM_PLANS.length;
 		let out: unknown;
@@ -6991,7 +7014,7 @@ function saveAmbient(): Ambient {
 		nestingWarnings: SSR_NESTING_WARNINGS,
 		vtTrySeq: VT_SSR_TRY_SEQ,
 		vtHasCandidates: VT_SSR_HAS_CANDIDATES,
-		vtStack: VT_SSR_STACK.map((candidate) => ({ candidate, consumed: candidate.consumed })),
+		vtStack: snapshotVtStack(),
 	};
 }
 function restoreAmbient(a: Ambient): void {
@@ -8210,12 +8233,12 @@ export function ssrTry(
 	const armScope = outerAsyncScope + '|@arm:' + siteKey + '#' + occurrence.toString(36) + ':';
 	let entry: StreamBoundary | undefined;
 	const serialStart = SERIAL?.length ?? 0;
-	let ancestorKeys: string[] = [];
-	let ownerKeys: string[] = [];
+	let ancestorKeys: string[] = EMPTY_SNAPSHOT_LIST;
+	let ownerKeys: string[] = EMPTY_SNAPSHOT_LIST;
 	if (stream !== null) {
 		stream.activePassBoundaryKeys?.add(key);
-		ancestorKeys = stream.activeTryKeys.slice();
-		ownerKeys = stream.activeOwnerKeys.slice();
+		ancestorKeys = snapshotList(stream.activeTryKeys);
+		ownerKeys = snapshotList(stream.activeOwnerKeys);
 		entry = stream.boundaries.get(key);
 		if (entry !== undefined) {
 			recordStreamBoundaryMutation(stream, key);
@@ -8346,22 +8369,18 @@ export function ssrTry(
 			const deferredStart = DEFERRED?.length ?? 0;
 			const serialStart = SERIAL?.length ?? 0;
 			const css = CSS;
-			const cssSnapshot = css === null ? null : new Map(css);
+			const cssSnapshot = snapshotMap(css);
 			const head = HEAD;
 			const headHtml = head?.html;
 			const headCharset = head?.charset;
 			const headViewport = head?.viewport;
-			const headHints = head === null ? null : new Set(head.hints);
-			const headSheets = head === null || head.sheets === null ? null : new Map(head.sheets);
-			const headHintHtml = head === null || head.hintHtml === null ? null : new Map(head.hintHtml);
-			const headXfer =
-				head === null || head.preloadXfer === null ? null : new Map(head.preloadXfer);
+			const headHints = snapshotSet(head?.hints);
+			const headSheets = snapshotMap(head?.sheets);
+			const headHintHtml = snapshotMap(head?.hintHtml);
+			const headXfer = snapshotMap(head?.preloadXfer);
 			const vtTrySeq = VT_SSR_TRY_SEQ;
 			const vtHasCandidates = VT_SSR_HAS_CANDIDATES;
-			const vtStack = VT_SSR_STACK.map((candidate) => ({
-				candidate,
-				consumed: candidate.consumed,
-			}));
+			const vtStack = snapshotVtStack();
 			try {
 				fallback = withStream(null, renderFallback);
 			} catch (error) {

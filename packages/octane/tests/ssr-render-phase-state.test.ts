@@ -126,6 +126,48 @@ export function Runaway() @{
 	setCount(count + 1);
 	<span>{'Count: ' + count}</span>
 }
+
+function DiscardedArtifacts() @{
+	<>
+		<style>
+			.leaked-pass {
+				--leaked-pass: 1;
+			}
+		</style>
+		<i class="leaked-pass">{'leaked'}</i>
+	</>
+}
+export function RetrySibling(props) @{
+	const [settled, setSettled] = useState(false);
+	if (!settled) {
+		preload('/discarded-' + props.mark + '.css', { as: 'style' });
+		setSettled(true);
+	}
+	<section>
+		@if (!settled) {
+			<DiscardedArtifacts />
+		} @else {
+			<b class="settled">{props.mark}</b>
+		}
+	</section>
+}
+export function PairedRetries() @{
+	<div><RetrySibling mark="a" /><RetrySibling mark="b" /></div>
+}
+// The settled twin: same component/hook/branch shape, converged initial state.
+export function SettledSibling(props) @{
+	const [settled] = useState(true);
+	<section>
+		@if (!settled) {
+			<DiscardedArtifacts />
+		} @else {
+			<b class="settled">{props.mark}</b>
+		}
+	</section>
+}
+export function PairedRef() @{
+	<div><SettledSibling mark="a" /><SettledSibling mark="b" /></div>
+}
 `;
 
 function evalServer(source: string): Record<string, any> {
@@ -181,6 +223,20 @@ describe('SSR render-phase state updates — rewind bookkeeping', () => {
 		expect(html.match(/href="\/shared-render-pass\.css"/g)).toHaveLength(1);
 		expect(css).toContain('--settled-render-pass');
 		expect(css).not.toContain('--discarded-render-pass');
+	});
+
+	it('rewinds collections that were empty when the discarded pass began — sequential retries cannot leak or resurrect artifacts', () => {
+		// Each sibling's first pass is discarded while every captured collection
+		// (scoped CSS, head hints, preload transfers) is still empty, so rewind must
+		// REMOVE what that pass created — restoring "empty" is not enough, and a
+		// snapshot shared across siblings must never carry one sibling's discarded
+		// state into the other's rewind.
+		const { html, css } = RT.renderToString(mod.PairedRetries);
+		expect(html).toBe(RT.renderToString(mod.PairedRef).html);
+		expect(html).not.toContain('leaked-pass');
+		expect(html).not.toContain('discarded-a.css');
+		expect(html).not.toContain('discarded-b.css');
+		expect(css).not.toContain('--leaked-pass');
 	});
 
 	it('throws after 25 passes when a render-phase update never settles', () => {
