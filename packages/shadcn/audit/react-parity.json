@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "8b22926b6186369bfc8ca72aedb69b7853160e5ab762b1a36e1a61bf24f6c322"
+      "lockfileSha256": "91164c02c6f38c2386b86b5cabf2ee914c9cf0ea1fcefa1c8875da9cd5982c9e"
     }
   },
   "lanes": [
@@ -51,12 +51,12 @@
       "environment": "workspace-node",
       "project": "shadcn-differential",
       "evidenceOrigin": "repo-authored",
-      "notes": "Runs five exact same-fixture cases citing pinned shadcn-ui/ui@4baadbc6517070ae8f8feb2c97037adc2b305544 sources under apps/v4/registry/bases/radix/ui/{badge,button,tabs,dialog,dropdown-menu}.tsx. dialog.tsx and dropdown-menu.tsx are import-path-only vendors of those files; badge.tsx, button.tsx, and tabs.tsx are port-selected class-hook adaptations of the same cited sources (plus local icon-placeholder resolution). Local React references are lineage evidence with documented transforms, not the pinned oracle itself.",
+      "notes": "Runs eight exact same-fixture cases. Badge, Button, Tabs, Dialog and DropdownMenu cite pinned shadcn-ui/ui@4baadbc6517070ae8f8feb2c97037adc2b305544 sources under apps/v4/registry/bases/radix/ui/{badge,button,tabs,dialog,dropdown-menu}.tsx; dialog.tsx and dropdown-menu.tsx are import-path-only vendors of those files; badge.tsx, button.tsx, and tabs.tsx are port-selected class-hook adaptations of the same cited sources (plus local icon-placeholder resolution). The three Calendar cases cite apps/v4/registry/bases/radix/ui/calendar.tsx at the current component pin shadcn-ui/ui@7c9eaba1c0a6404c990c144a654792e3313c650d, with the same Nova class-hook resolution the shipped component applies and real react-day-picker@10.0.1 on the React side; they compare mount markup for the plain, dropdown plus week-number, and range configurations and across month navigation. Day selection is excluded: after a day click the two sides diverge on day-picker’s focused day, because upstream’s inline components rebuild the day-button type and its removal clears that state, and because octane emits no blur when a focused node is replaced. Local React references are lineage evidence with documented transforms, not the pinned oracle itself.",
       "files": [
         {
           "path": "packages/shadcn/tests/differential/parity.test.ts",
           "role": "test",
-          "sha256": "e9b18e8e5073e815549eaab5c837d737d455885dc9cf070a86aa1746da1eefc5",
+          "sha256": "1791674a3f0a932594498c262b7215448801554c98e63f41d3d58349c1604bba",
           "cases": [
             {
               "id": "differential:shadcn-badge-runtime",
@@ -67,6 +67,21 @@
               "id": "differential:shadcn-button-runtime",
               "testName": "Button: variants/sizes/disabled + asChild anchor + onClick wiring, byte-identical",
               "fullName": "differential: @octanejs/shadcn vs curated shadcn references on React Button: variants/sizes/disabled + asChild anchor + onClick wiring, byte-identical"
+            },
+            {
+              "id": "differential:shadcn-calendar-runtime",
+              "testName": "Calendar: month grid markup and month navigation, byte-identical",
+              "fullName": "differential: @octanejs/shadcn vs curated shadcn references on React Calendar: month grid markup and month navigation, byte-identical"
+            },
+            {
+              "id": "differential:shadcn-calendar-dropdown-runtime",
+              "testName": "Calendar: dropdown caption and week numbers, byte-identical",
+              "fullName": "differential: @octanejs/shadcn vs curated shadcn references on React Calendar: dropdown caption and week numbers, byte-identical"
+            },
+            {
+              "id": "differential:shadcn-calendar-range-runtime",
+              "testName": "Calendar: range start/middle/end markers, byte-identical",
+              "fullName": "differential: @octanejs/shadcn vs curated shadcn references on React Calendar: range start/middle/end markers, byte-identical"
             },
             {
               "id": "differential:shadcn-tabs-upstream",
@@ -80,8 +95,8 @@
             },
             {
               "id": "differential:shadcn-dropdown-upstream",
-              "testName": "DropdownMenu (non-modal): open, toggle checkbox item, reopen, select item \u2014 byte-identical",
-              "fullName": "differential: @octanejs/shadcn vs curated shadcn references on React DropdownMenu (non-modal): open, toggle checkbox item, reopen, select item \u2014 byte-identical"
+              "testName": "DropdownMenu (non-modal): open, toggle checkbox item, reopen, select item — byte-identical",
+              "fullName": "differential: @octanejs/shadcn vs curated shadcn references on React DropdownMenu (non-modal): open, toggle checkbox item, reopen, select item — byte-identical"
             }
           ]
         },
@@ -94,6 +109,11 @@
           "path": "packages/shadcn/tests/_fixtures/shadcn-diff/button.tsrx",
           "role": "support",
           "sha256": "00225797a73964d47e7650021f01566cee203364cc600aec459ed9f2247ab2cb"
+        },
+        {
+          "path": "packages/shadcn/tests/_fixtures/shadcn-diff/calendar.tsrx",
+          "role": "support",
+          "sha256": "c357826458696ad4a0d371d566c91908ffb60eb5e8ee45c1f99ef4a7ac15135f"
         },
         {
           "path": "packages/shadcn/tests/_fixtures/shadcn-diff/dialog.tsrx",
@@ -113,12 +133,12 @@
         {
           "path": "packages/shadcn/tests/differential/_setup.ts",
           "role": "support",
-          "sha256": "58eb4bdcba11e19441a0eb83bf3ea7b5bddf86b514f1d9394e04268f010fd1a8"
+          "sha256": "a79879554d265517c42ced0813a6f934a434e283e4cfd5e37141cfbe7d74ff7a"
         },
         {
           "path": "packages/shadcn/tests/differential/upstream/index.ts",
           "role": "support",
-          "sha256": "9db6c0a69c172177064bf43c471491d029394f0899ded3fadd0c2d956d9a2a1f"
+          "sha256": "424d82d2b2334a8120106b755e7059cee30472ca646d9778f76e56a9cb60f9de"
         },
         {
           "path": "packages/shadcn/tests/differential/upstream/utils.ts",
@@ -134,6 +154,21 @@
           "path": "packages/shadcn/tests/differential/upstream/button.tsx",
           "role": "support",
           "sha256": "8b4a0016403849ae26d9ef72534baa894a8a5de130c1a7a2379e4eb7748eb509"
+        },
+        {
+          "path": "packages/shadcn/tests/differential/upstream/calendar.tsx",
+          "role": "support",
+          "sha256": "cffe083ee444324f9d7fc149153e44a6634085fdfc8115c5aa5e387689dce91a"
+        },
+        {
+          "path": "packages/shadcn/upstream/base/calendar.tsx",
+          "role": "support",
+          "sha256": "0a492edf3888b88a5505786c48165159285cfde7e6c52eb5e4c2fdc44b09ba21"
+        },
+        {
+          "path": "packages/shadcn/upstream/radix/calendar.tsx",
+          "role": "support",
+          "sha256": "510cd66ea92cfa85832b2106c4fe9ce850b609110925fddb67470cfffe2dac19"
         },
         {
           "path": "packages/shadcn/tests/differential/upstream/dialog.tsx",
@@ -158,7 +193,7 @@
         {
           "path": "packages/shadcn/audit/test-classifications.json",
           "role": "support",
-          "sha256": "396be46ecb983be6ebc2294a06a37eaf1a9d5df54bcff4998e68ef98a9773b27"
+          "sha256": "a9724ec46ae175c8149d04d1be65606b770a45cece853ccaa547c0f6541d33f2"
         },
         {
           "path": "packages/octane/tests/differential/_rig.ts",
@@ -236,7 +271,7 @@
         {
           "path": "packages/shadcn/tests/differential/_setup.ts",
           "role": "support",
-          "sha256": "58eb4bdcba11e19441a0eb83bf3ea7b5bddf86b514f1d9394e04268f010fd1a8"
+          "sha256": "a79879554d265517c42ced0813a6f934a434e283e4cfd5e37141cfbe7d74ff7a"
         },
         {
           "path": "packages/shadcn/upstream/style-nova.css",
@@ -246,7 +281,7 @@
         {
           "path": "packages/shadcn/audit/shadcn-4.21.0.json",
           "role": "support",
-          "sha256": "4da160e4ba1df9223e3370569293cbffe922cfb57c600074a84a5ed49e829e1a"
+          "sha256": "8106efa2144dab9496fb68d1ed6bd1205f002cd4b1e4d93a04fcda9c66c18f1d"
         }
       ]
     }
