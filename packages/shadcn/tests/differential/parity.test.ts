@@ -124,6 +124,7 @@ await Promise.all([
 	preloadDifferentialFixture(fixture('tabs'), CACHE),
 	preloadDifferentialFixture(fixture('dialog'), CACHE),
 	preloadDifferentialFixture(fixture('dropdown-menu'), CACHE),
+	preloadDifferentialFixture(fixture('calendar'), CACHE),
 ]);
 
 describe('differential: @octanejs/shadcn vs curated shadcn references on React', () => {
@@ -148,6 +149,47 @@ describe('differential: @octanejs/shadcn vs curated shadcn references on React',
 			await r.click('#btn');
 			await waitForBoth(i, r, 'button second click', textIs('#btn', 'count:2'));
 		});
+		d.unmount();
+	}, 90_000);
+
+	// Day SELECTION is deliberately not a step in any Calendar case. After a day click the two
+	// sides diverge on day-picker's `focused` day, and neither cause is this component's: upstream
+	// declares its `components` overrides inline, so React rebuilds the day-button type on every
+	// render and the removal of the focused button blurs it, clearing `focused`; octane keeps the
+	// day focused (the shipped component hoists those overrides, and octane does not emit a blur
+	// when a focused node is replaced). Selection, range markers, disabled days, and the focus
+	// effect are asserted against the DOM in calendar.test.ts.
+	//
+	// @parity-case differential:shadcn-calendar-runtime
+	it('Calendar: month grid markup and month navigation, byte-identical', async () => {
+		const d = await mountDifferential(fixture('calendar'), 'CalendarApp', undefined, CACHE);
+		await d.step('mount (January 2024, nothing selected)', () => {});
+		const captionIs = (label: string) => (mount: DiffMount) =>
+			mount.container.querySelector('table[role="grid"]')?.getAttribute('aria-label') === label;
+		await d.step('move to the next month', async (i, r) => {
+			await i.click('.rdp-button_next');
+			await r.click('.rdp-button_next');
+			await waitForBoth(i, r, 'calendar next month', captionIs('February 2024'));
+		});
+		await d.step('move back to the previous month', async (i, r) => {
+			await i.click('.rdp-button_previous');
+			await r.click('.rdp-button_previous');
+			await waitForBoth(i, r, 'calendar previous month', captionIs('January 2024'));
+		});
+		d.unmount();
+	}, 90_000);
+
+	// @parity-case differential:shadcn-calendar-dropdown-runtime
+	it('Calendar: dropdown caption and week numbers, byte-identical', async () => {
+		const d = await mountDifferential(fixture('calendar'), 'CalendarDropdownApp', undefined, CACHE);
+		await d.step('mount (month/year selects, week-number column)', () => {});
+		d.unmount();
+	}, 90_000);
+
+	// @parity-case differential:shadcn-calendar-range-runtime
+	it('Calendar: range start/middle/end markers, byte-identical', async () => {
+		const d = await mountDifferential(fixture('calendar'), 'CalendarRangeApp', undefined, CACHE);
+		await d.step('mount (10th-12th selected)', () => {});
 		d.unmount();
 	}, 90_000);
 

@@ -30,11 +30,44 @@ and omit the RSC directive. With the CLI's default menu color, `transform-menu`
 removes the unused `cn-menu-target` and `cn-menu-translucent` hooks from Select;
 neither shipped source nor its React reference retains those classes.
 
-The coverage table tracks 44 existing families, with 43 Base UI wrappers. It is
+The coverage table tracks 45 existing families, with 44 Base UI wrappers. It is
 not a complete upstream registry inventory. Base UI Sonner and additional
 upstream families such as Combobox remain outside this update. Examples, site
 blocks, questionnaire, and the CLI commands/MCP/schema runtime are also outside
 the binding's component surface.
+
+## Calendar
+
+Calendar is a new family in the Radix and Base UI bases at this pin. Neither base
+has a primitive for it: upstream's `bases/base/ui/calendar.tsx` and
+`bases/radix/ui/calendar.tsx` are the same file over `react-day-picker`, differing
+only in the `ui/button` import and one `ref`. Both pinned sources are preserved in
+`upstream/base/calendar.tsx` and `upstream/radix/calendar.tsx`, with their hashes in
+`audit/shadcn-4.21.0.json`. The Octane sources run on `@octanejs/day-picker`, which
+pins `react-day-picker@10.0.1`, and Nova's three `.cn-calendar*` rules are resolved
+into their class strings, so `--cell-size` and `--cell-radius` are declared by the
+root's own utilities exactly as upstream's style layer declares them.
+
+Two documented divergences, both in `CalendarDayButton` and its overrides:
+
+- The `components` overrides leave the inline object literal: three are module-level
+  and the one closing over `locale` is memoized. Upstream's inline form makes every
+  render a new component type, which remounts all 35 day buttons per selection. The rendered markup is unchanged, and
+  the differential compares against upstream's inline form to prove it.
+- The ref is attached. Upstream's base flavor creates a ref and a
+  `modifiers.focused` effect but never attaches it; only its Radix flavor does.
+  Since the override replaces day-picker's own `DayButton`, which owns that focus
+  call, leaving it unattached would leave keyboard focus dead.
+
+Scope limits worth knowing before extending this family: the differential lane
+covers the Radix source only, because the Base UI source is the same file, and its
+cases compare mount markup plus month navigation. Day selection is excluded, because
+the two sides diverge on day-picker's `focused` day: upstream's inline overrides
+rebuild the day-button type and its removal clears that state, while octane emits no
+blur when a focused node is replaced. Selection, range markers, disabled days, and
+the focus effect are asserted against the DOM in `tests/calendar.test.ts` instead.
+React Aria's calendar is a different component over `react-aria-components` and is
+not ported.
 
 ## Evidence and prior lineage
 

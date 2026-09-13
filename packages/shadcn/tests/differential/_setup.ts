@@ -33,6 +33,7 @@ const CACHE_ROOT = join(__dirname, '.react-cache');
 const UPSTREAM_SUBPATHS: Record<string, string> = {
 	Badge: 'badge',
 	Button: 'button',
+	Calendar: 'calendar',
 	Dialog: 'dialog',
 	DropdownMenu: 'dropdown-menu',
 	Tabs: 'tabs',
@@ -143,6 +144,7 @@ export async function setup(project: TestProject): Promise<void> {
 	compileUpstream(cacheDir, 'badge', '.tsx');
 	compileUpstream(cacheDir, 'button', '.tsx');
 	compileUpstream(cacheDir, 'tabs', '.tsx');
+	compileUpstream(cacheDir, 'calendar', '.tsx');
 	compileUpstream(cacheDir, 'dialog', '.tsx');
 	compileUpstream(cacheDir, 'dropdown-menu', '.tsx');
 	compileUpstream(cacheDir, 'index', '.ts');
