@@ -1,0 +1,78 @@
+[
+  {
+    "path": "src/context.ts",
+    "origin": "adapted",
+    "packageName": "framer-motion",
+    "sha256": "01ec7bf9bac3d35c57e3e4a40ae53c39e972d64d4d8a6cfe32b25543ce13613e"
+  },
+  {
+    "path": "src/engine.ts",
+    "origin": "authored",
+    "sha256": "a631b07915cc1fad70ad4f99aede38167e438675c83fe972afec9dd063041943"
+  },
+  {
+    "path": "src/index.ts",
+    "origin": "authored",
+    "sha256": "03182ca0f9d29966e749efd203eae9e66564f57ec5e55652781e74ff4c18289e"
+  },
+  {
+    "path": "src/layout.ts",
+    "origin": "adapted",
+    "packageName": "framer-motion",
+    "sha256": "66694334dd73516d0baa44e72496c0993512a0983a36cb4ea57933e32c5aa9c1"
+  },
+  {
+    "path": "src/native.ts",
+    "origin": "adapted",
+    "packageName": "framer-motion",
+    "sha256": "7af4bb04071f4160c1fab28e8e67dd5872fdf57dd75a9a7c2d2367faf7e240d1"
+  },
+  {
+    "path": "src/react-m.ts",
+    "origin": "adapted",
+    "packageName": "framer-motion",
+    "sha256": "d112f5ffc03d5600acde5b0e583d59d14cfab983122417acf2d1ba6eede43f01"
+  },
+  {
+    "path": "src/useAnimate.ts",
+    "origin": "adapted",
+    "packageName": "framer-motion",
+    "sha256": "56e7cb687f22e4115b6b2c40456ee9c7f28d46291309e6d9242bfb1ed787743f"
+  },
+  {
+    "path": "src/useMotionValue.ts",
+    "origin": "adapted",
+    "packageName": "framer-motion",
+    "sha256": "e98e6e15c56f6662ead9bbaff8fee1dc0bc6a9b44f4e9622c3361057321e904c"
+  },
+  {
+    "path": "src/useMotionValueEvent.ts",
+    "origin": "adapted",
+    "packageName": "framer-motion",
+    "sha256": "a84e58503352b9ac4c40d6772077350db28e8af02857d0492d01c43c537e78cc"
+  },
+  {
+    "path": "src/useReducedMotion.ts",
+    "origin": "adapted",
+    "packageName": "framer-motion",
+    "sha256": "814e4eb8f662ccb9c44efe93ed176738242b195a328b9f1c7af8a64c98d8590b"
+  },
+  {
+    "path": "src/useScroll.ts",
+    "origin": "adapted",
+    "packageName": "framer-motion",
+    "sha256": "3b1a848790e82b0655b69a065f87984a4d02070180f3ee0f4610b4d2ebe217b7"
+  },
+  {
+    "path": "src/useSpring.ts",
+    "origin": "adapted",
+    "packageName": "framer-motion",
+    "sha256": "7a783f1beed5463492ab3962cb23fc735612ba7bcb3b007fa1a174256b364aa4"
+  },
+  {
+    "path": "src/useTransform.ts",
+    "origin": "adapted",
+    "packageName": "framer-motion",
+    "sha256": "2089661cadfa58de59fb2c32667e34883b68bd475513cb9967072933c6464cba"
+  }
+]

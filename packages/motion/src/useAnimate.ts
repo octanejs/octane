@@ -2,7 +2,7 @@
 // `scope` to an element (`ref={scope}`), then `animate(scope.current, …)` or
 // `animate('selector', …)` (resolved within the scope). Reuses motion's
 // `createScopedAnimate`; the binding just provides a stable scope object + cleanup.
-import { createScopedAnimate } from 'motion';
+import { createScopedAnimate, type AnimationScope } from 'motion';
 import { useState, useEffect } from 'octane';
 
 // Memoized — runs per hook call per render; the cache returns the identical
@@ -18,7 +18,13 @@ function sub(slot: symbol | undefined, tag: string): symbol | undefined {
 	return sym;
 }
 
-export function useAnimate(...args: any[]): [any, any] {
+export function useAnimate<T extends Element = HTMLElement>(): [
+	AnimationScope<T>,
+	ReturnType<typeof createScopedAnimate>,
+];
+export function useAnimate(
+	...args: any[]
+): [AnimationScope, ReturnType<typeof createScopedAnimate>] {
 	const tail = args[args.length - 1];
 	const slot = typeof tail === 'symbol' ? (tail as symbol) : undefined;
 

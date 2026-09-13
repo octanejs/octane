@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { mkdir, mkdtemp, readFile, symlink, unlink, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, symlink, unlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, test } from 'node:test';
@@ -17,6 +17,7 @@ import {
 	validateUpstreamCrosswalk,
 } from './evidence-lib.mjs';
 import { readBindingSurfacePolicy } from '../binding-surface-policy.mjs';
+import { gitBlobSha1, upstreamLockFingerprint } from './materialize-lib.mjs';
 
 const MIT_TEXT = `MIT License
 
@@ -406,6 +407,81 @@ describe('package and closure completion', () => {
 			expectedNoticeHashes: [sha256('Fixture attribution\n')],
 		});
 		assert.equal(result.status, 'passed', result.issues.join('\n'));
+		// A wrapper and its implementation can share one binding. The copied
+		// implementation must still prove its exact identity and source bytes.
+		const originalStatus = JSON.parse(await readFile(path.join(packageDirectory, 'status.json')));
+		const source = await readFile(path.join(packageDirectory, 'src/index.ts'));
+		const sourceLedger = [
+			{ path: 'src/index.ts', origin: 'adapted', packageName: 'widget', sha256: sha256(source) },
+		];
+		await writeFile(
+			path.join(packageDirectory, 'status.json'),
+			JSON.stringify({
+				...originalStatus,
+				upstream: { package: 'widget-wrapper', version: '2.0.0' },
+				surfaces: [
+					{
+						entrypoint: '.',
+						exports: ['widget'],
+						ownership: 'copied',
+						files: ['src/index.ts'],
+						dependency: { package: 'widget', version: '1.0.0' },
+						upstreamPaths: ['src'],
+						evidence: ['tests/widget.test.ts'],
+					},
+				],
+			}),
+		);
+		const identity = {
+			packageName: 'widget',
+			version: '1.0.0',
+			commit: 'a'.repeat(40),
+			integrity: 'sha512-fixture',
+			repository: { owner: 'fixture', repo: 'widget' },
+		};
+		const inspectCopiedIdentity = (expected = identity) =>
+			inspectBindingPackage(packageDirectory, {
+				expectedPackageName: '@octanejs/widget',
+				expectedDirectory: 'packages/widget',
+				identity: expected,
+				expectedLicenseHashes: [sha256(MIT_TEXT)],
+				expectedNoticeHashes: [sha256('Fixture attribution\n')],
+				sourceLedger,
+			});
+		assert.match(inspectCopiedIdentity().issues.join('\n'), /upstream identity/);
+		const lock = {
+			schemaVersion: 1,
+			identity,
+			license: { spdx: 'MIT' },
+			scopes: ['src'],
+			files: [{ path: 'src/index.ts', gitBlob: gitBlobSha1(source), size: source.length }],
+		};
+		lock.fingerprint = upstreamLockFingerprint(lock);
+		await mkdir(path.join(packageDirectory, 'audit'));
+		await mkdir(path.join(packageDirectory, 'upstream/src'), { recursive: true });
+		await writeFile(path.join(packageDirectory, 'audit/upstream.lock.json'), JSON.stringify(lock));
+		await writeFile(path.join(packageDirectory, 'upstream/src/index.ts'), source);
+		const copiedIdentity = inspectCopiedIdentity();
+		assert.equal(copiedIdentity.status, 'passed', copiedIdentity.issues.join('\n'));
+		for (const expected of [
+			{ ...identity, commit: 'b'.repeat(40) },
+			{ ...identity, version: '9.0.0' },
+			{ ...identity, integrity: 'sha512-other' },
+			{ ...identity, repository: { owner: 'other', repo: 'widget' } },
+		]) {
+			assert.match(inspectCopiedIdentity(expected).issues.join('\n'), /upstream identity/);
+		}
+		await writeFile(path.join(packageDirectory, 'upstream/src/index.ts'), 'changed source');
+		assert.match(inspectCopiedIdentity().issues.join('\n'), /upstream identity/);
+		await writeFile(path.join(packageDirectory, 'upstream/src/index.ts'), source);
+		await writeFile(
+			path.join(packageDirectory, 'audit/upstream.lock.json'),
+			JSON.stringify({ ...lock, fingerprint: 'invalid' }),
+		);
+		assert.match(inspectCopiedIdentity().issues.join('\n'), /upstream identity/);
+		await writeFile(path.join(packageDirectory, 'status.json'), JSON.stringify(originalStatus));
+		await rm(path.join(packageDirectory, 'audit'), { recursive: true });
+		await rm(path.join(packageDirectory, 'upstream'), { recursive: true });
 		// Existing packages may use the standard Markdown license filename.
 		const licenseManifestPath = path.join(packageDirectory, 'package.json');
 		const licenseManifest = JSON.parse(await readFile(licenseManifestPath, 'utf8'));

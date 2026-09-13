@@ -13,6 +13,7 @@ type HydrationBinding =
 	| 'formisch'
 	| 'mantine-hooks'
 	| 'monaco-editor'
+	| 'motion'
 	| 'pdf'
 	| 'rainbowkit'
 	| 'react-error-boundary'
@@ -50,8 +51,10 @@ function bindingAliases(binding: HydrationBinding) {
 		];
 	}
 
-	if (binding === 'mantine-hooks') {
-		return [{ find: /^@octanejs\/mantine-hooks$/, replacement: resolve(source, 'index.ts') }];
+	if (binding === 'mantine-hooks' || binding === 'motion') {
+		return [
+			{ find: new RegExp(`^@octanejs/${binding}$`), replacement: resolve(source, 'index.ts') },
+		];
 	}
 
 	if (binding === 'alien-signals') {

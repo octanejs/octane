@@ -4,6 +4,7 @@
 // callback identity changes; unsubscribes on unmount. Reuses MotionValue's `on`,
 // which returns the unsubscribe fn (and, for 'change', stops idle animations).
 import { useInsertionEffect } from 'octane';
+import type { MotionValue, MotionValueEventCallbacks } from 'motion';
 
 // Memoized — runs per hook call per render; the cache returns the identical
 // Symbol.for-interned value without the concat + registry lookup.
@@ -18,6 +19,11 @@ function sub(slot: symbol | undefined, tag: string): symbol | undefined {
 	return sym;
 }
 
+export function useMotionValueEvent<V, E extends keyof MotionValueEventCallbacks<V>>(
+	value: MotionValue<V>,
+	event: E,
+	callback: MotionValueEventCallbacks<V>[E],
+): void;
 export function useMotionValueEvent(...args: any[]): void {
 	const tail = args[args.length - 1];
 	const slot = typeof tail === 'symbol' ? (tail as symbol) : undefined;

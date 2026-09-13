@@ -1,12 +1,15 @@
 // Contexts shared across motion components.
 import { createContext, useContext } from 'octane';
+import type { Transition } from 'motion';
 
 // MotionConfig — global defaults (transition, reduced motion) inherited by every
 // motion element below a `<MotionConfig>`.
 export interface MotionConfigValue {
-	transition?: any;
+	transition?: Transition;
 	reducedMotion?: 'always' | 'never' | 'user';
 	shouldReduceMotion?: boolean;
+	/** Determines which ordinary props reach descendant motion hosts. */
+	isValidProp?: (key: string) => boolean;
 }
 export const MotionConfigContext = createContext<MotionConfigValue>({
 	reducedMotion: 'never',

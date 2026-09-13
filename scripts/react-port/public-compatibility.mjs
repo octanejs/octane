@@ -31,6 +31,14 @@ baseUIAliases.set('useMediaQuery', {
 // not re-export it. The witness must pass the same npm-byte authentication.
 const jotaiHydrationWitness = '@octanejs/jotai#hydration-types';
 export function publicCompatibilityDeclarations(binding) {
+	// motion's root re-exports framer-motion/dom. Keep the React hook declarations
+	// as separate witnesses for the functions implemented by the native binding.
+	if (binding === '@octanejs/motion')
+		return new Map([
+			['@octanejs/motion', 'dist/dom.d.ts'],
+			['@octanejs/motion#react-types', 'dist/index.d.ts'],
+		]);
+
 	if (binding === '@octanejs/tanstack-router')
 		return new Map([
 			['@octanejs/tanstack-router#blocker-types', 'dist/esm/useBlocker.d.ts'],
@@ -47,6 +55,46 @@ export function publicCompatibilityDeclarations(binding) {
 }
 
 export function publicCompatibilityExport(specifier, name) {
+	if (
+		specifier === '@octanejs/motion' &&
+		[
+			'MotionConfigProps',
+			'useAnimate',
+			'useMotionValue',
+			'useMotionValueEvent',
+			'useReducedMotion',
+			'useScroll',
+			'useSpring',
+			'useTransform',
+		].includes(name)
+	)
+		return { specifier: specifier + '#react-types', path: name };
+
+	// Motion's existing native host factories, compiled components, feature
+	// bundles and contexts use Octane's calling convention. Authenticate their
+	// retained contracts against the complete pre-update source receipt.
+	if (
+		specifier === '@octanejs/motion' &&
+		[
+			'motion',
+			'm',
+			'AnimatePresence',
+			'LayoutGroup',
+			'MotionConfig',
+			'LazyMotion',
+			'domAnimation',
+			'domMax',
+			'LayoutGroupProps',
+			'LazyMotionProps',
+			'LayoutGroupContext',
+			'LazyMotionContext',
+			'MotionConfigContext',
+			'VariantContext',
+			'StaggerContext',
+		].includes(name)
+	)
+		return { specifier: specifier + '#prior-binding', path: name };
+
 	// Native SSR compiles an App component with router props in a separate graph.
 	if (
 		specifier === '@octanejs/tanstack-router/ssr/server' &&

@@ -4,7 +4,7 @@
 // Consumers normally use this entry as a namespace:
 //   import * as m from '@octanejs/motion/react-m'
 //   <m.div />
-import { m } from './index';
+import { m } from './native';
 
 export const {
 	a,

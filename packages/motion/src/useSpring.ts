@@ -5,7 +5,7 @@
 //      toward `target` over frames (`value.jump(v)` snaps instantly).
 // Bind the returned MotionValue to a `motion.*` element via `style`, or read it
 // imperatively. Returns the SAME stable MotionValue across renders.
-import { motionValue, attachFollow } from 'motion';
+import { motionValue, attachFollow, type MotionValue } from 'motion';
 import { useState, useInsertionEffect } from 'octane';
 import { isMotionValue } from './useMotionValue';
 
@@ -36,7 +36,13 @@ export interface SpringOptions {
 	skipInitialAnimation?: boolean;
 }
 
-export function useSpring(source: any, ...args: any[]): any {
+export function useSpring(source: number, options?: SpringOptions): MotionValue<number>;
+export function useSpring(source: string, options?: SpringOptions): MotionValue<string>;
+export function useSpring<T extends string | number>(
+	source: MotionValue<T>,
+	options?: SpringOptions,
+): MotionValue<T>;
+export function useSpring(source: any, ...args: any[]): MotionValue {
 	const tail = args[args.length - 1];
 	const slot = typeof tail === 'symbol' ? (tail as symbol) : undefined;
 	// First non-slot arg after `source` is the options object.
@@ -58,7 +64,7 @@ export function useSpring(source: any, ...args: any[]): any {
 	// subscription exists before any descendant can mutate `source` in its own effect.
 	useInsertionEffect(
 		() => attachFollow(value, source, { type: 'spring', ...options }),
-		[JSON.stringify(options)],
+		[source, JSON.stringify(options)],
 		sub(slot, 'attach'),
 	);
 

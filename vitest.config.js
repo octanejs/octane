@@ -7787,7 +7787,7 @@ export default defineConfig({
 				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'motion-upstream',
-					include: ['packages/motion/tests/upstream/**/*.test.ts'],
+					include: ['packages/motion/tests/upstream/**/*.test.{ts,tsx}'],
 					environment: 'jsdom',
 					globals: false,
 				},

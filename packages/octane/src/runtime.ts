@@ -16409,7 +16409,13 @@ function deoptChildNamespace(parent: Node): string | undefined {
 	if (parent.nodeType !== 1) return undefined;
 	const el = parent as Element;
 	if (el.namespaceURI === SVG_NS) return el.localName === 'foreignObject' ? undefined : SVG_NS;
-	if (el.namespaceURI === MATHML_NS) return MATHML_NS;
+	if (el.namespaceURI === MATHML_NS) {
+		if (el.localName === 'annotation-xml') {
+			const encoding = el.getAttribute('encoding')?.toLowerCase();
+			if (encoding === 'text/html' || encoding === 'application/xhtml+xml') return undefined;
+		}
+		return MATHML_NS;
+	}
 	return undefined;
 }
 
@@ -23833,7 +23839,10 @@ export function hostComponent(
 	const block = scope.block;
 	let state = scope.slots[slot] as HostComponentSlot | undefined;
 	if (state === undefined) {
-		const el = document.createElement(tag);
+		// Runtime adapters inherit the actual destination, including SVG portals
+		// and foreignObject children, just like descriptor/string-tag hosts.
+		const ns = inferTagNs(tag, deoptChildNamespace(block.parentNode));
+		const el = ns === undefined ? document.createElement(tag) : document.createElementNS(ns, tag);
 		// The children childSlot exclusively OWNS `el`'s content (owns-parent
 		// mode) — no `<!---->` insertion anchor needed (marker-elision M2).
 		state = {

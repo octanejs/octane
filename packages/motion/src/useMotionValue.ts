@@ -2,7 +2,7 @@
 // `motionValue`). Bind it to a `motion.*` element via `style={{ x: mv }}`; the
 // element subscribes and updates without re-rendering (see the style-binding effect
 // in index.ts).
-import { motionValue } from 'motion';
+import { motionValue, type MotionValue } from 'motion';
 import { useState } from 'octane';
 
 // Memoized tagless sub-slot (single entry per caller slot) — same interned
@@ -16,7 +16,8 @@ function mvSlot(slot: symbol | undefined): symbol | undefined {
 	return sym;
 }
 
-export function useMotionValue<T>(initial: T, ...args: any[]): any {
+export function useMotionValue<T>(initial: T): MotionValue<T>;
+export function useMotionValue<T>(initial: T, ...args: any[]): MotionValue<T> {
 	const tail = args[args.length - 1];
 	const slot = typeof tail === 'symbol' ? (tail as symbol) : undefined;
 	const [mv] = useState(() => motionValue(initial), mvSlot(slot));

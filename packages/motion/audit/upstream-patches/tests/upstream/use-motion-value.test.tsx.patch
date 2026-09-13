@@ -1,0 +1,140 @@
+diff --git a/tests/upstream/use-motion-value.test.tsx b/tests/upstream/use-motion-value.test.tsx
+--- a/tests/upstream/use-motion-value.test.tsx
++++ b/tests/upstream/use-motion-value.test.tsx
+@@ -1,72 +1,64 @@
+-import { motionValue, MotionValue } from "motion-dom"
+-import { motion } from "../../"
+-import { nextMicrotask } from "../../gestures/__tests__/utils"
+-import { render } from "../../jest.setup"
+-import { useMotionValue } from "../use-motion-value"
+-
+-describe("useMotionValue", () => {
+-    it("sets initial value", async () => {
+-        const Component = () => {
+-            const x = useMotionValue(100)
+-            return <motion.div style={{ x }} />
+-        }
+-
+-        const { container } = render(<Component />)
+-        expect(container.firstChild).toHaveStyle("transform: translateX(100px)")
+-    })
+-
+-    it("can be set manually", async () => {
+-        const Component = () => {
+-            const x = useMotionValue(100)
+-
+-            x.set(500)
+-
+-            return <motion.div style={{ x }} />
+-        }
+-
+-        const { container } = render(<Component />)
+-        expect(container.firstChild).toHaveStyle("transform: translateX(500px)")
+-    })
+-
+-    it("accepts new motion values", async () => {
+-        const a = motionValue(0)
+-        const b = motionValue(5)
+-        const Component = ({ x }: { x: MotionValue<number> }) => {
+-            return <motion.div style={{ x }} />
+-        }
+-
+-        const { container, rerender } = render(<Component x={a} />)
+-        expect(container.firstChild).toHaveStyle("transform: none")
+-
+-        rerender(<Component x={b} />)
+-
+-        await nextMicrotask()
+-
+-        expect(container.firstChild).toHaveStyle("transform: translateX(5px)")
+-    })
+-
+-    it("fires callbacks", async () => {
+-        const onChange = vi.fn()
+-        const Component = () => {
+-            const x = useMotionValue(100)
+-            x.on("change", onChange)
+-
+-            x.set(500)
+-
+-            return <motion.div style={{ x }} />
+-        }
+-
+-        render(<Component />)
+-        expect(onChange).toHaveBeenCalled()
+-    })
+-
+-    it("is typed", async () => {
+-        const Component = () => {
+-            const x = useMotionValue(100)
+-            return <motion.div style={{ x }} />
+-        }
+-
+-        const { container } = render(<Component />)
+-        expect(container.firstChild).toHaveStyle("transform: translateX(100px)")
+-    })
+-})
++/** @jsxImportSource octane */
++/**
++ * Adapted from packages/motion/upstream/src/value/__tests__/use-motion-value.test.tsx.
++ */
++import { microtask } from 'motion-dom';
++import { describe, expect, it, vi } from 'vitest';
++
++import { mount } from '../_helpers';
++import {
++	AcceptsValue,
++	FiresCallbacks,
++	InitialValue,
++	ManualSet,
++	motionValue,
++} from '../_fixtures/upstream-use-motion-value.tsrx';
++
++function nextMicrotask(): Promise<void> {
++	return new Promise(function resolveNextMicrotask(resolve) {
++		microtask.postRender(function onPostRender() {
++			resolve();
++		});
++	});
++}
++
++describe('useMotionValue', function useMotionValueSuite() {
++	it('sets initial value', function setsInitialValue() {
++		const r = mount(InitialValue);
++		expect(r.find('#box').style.transform).toBe('translateX(100px)');
++		r.unmount();
++	});
++
++	it('can be set manually', function canBeSetManually() {
++		const r = mount(ManualSet);
++		expect(r.find('#box').style.transform).toBe('translateX(500px)');
++		r.unmount();
++	});
++
++	it('accepts new motion values', async function acceptsNewMotionValues() {
++		const a = motionValue(0);
++		const b = motionValue(5);
++		const r = mount(AcceptsValue, { x: a });
++		// OCTANE DIVERGENCE[motion-zero-transform-serialization][runtime:a6edd8704002ab6c]
++		// Octane materializes a zero translate; React's motion/react reports "none".
++		expect(r.find('#box').style.transform).toBe('translateX(0px)');
++
++		r.update(AcceptsValue, { x: b });
++		await nextMicrotask();
++		expect(r.find('#box').style.transform).toBe('translateX(5px)');
++		r.unmount();
++	});
++
++	it('fires callbacks', function firesCallbacks() {
++		const onChange = vi.fn();
++		const r = mount(FiresCallbacks, { onChange });
++		expect(onChange).toHaveBeenCalled();
++		r.unmount();
++	});
++
++	it('is typed', function isTyped() {
++		const r = mount(InitialValue);
++		expect(r.find('#box').style.transform).toBe('translateX(100px)');
++		r.unmount();
++	});
++});
