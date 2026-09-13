@@ -12,7 +12,7 @@
     }
   },
   "scripts": {
-    "test": "vitest run --root ../.. --project tanstack-router-ssr-query --project tanstack-router-ssr-query-differential",
+    "test": "vitest run --root ../.. --project tanstack-router-ssr-query --project tanstack-router-ssr-query-browser --project tanstack-router-ssr-query-differential",
     "typecheck": "tsrx-tsc --noEmit -p tsconfig.octane.json",
     "upstream:check": "node ../../scripts/react-parity/verify-provenance.mjs --package-dir ."
   },

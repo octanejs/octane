@@ -77,6 +77,11 @@
       "reason": "Checks Octane same-route search updates; it is not same-scenario React execution."
     },
     {
+      "path": "packages/tanstack-router/tests/conformance/scroll-hydration.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Preserves server DOM, edited input, focus, and hydration agreement with scroll restoration enabled or disabled."
+    },
+    {
       "path": "packages/tanstack-router/tests/differential/parity.test.ts",
       "disposition": "react-octane-differential",
       "oracle": "Runs exact initial, multi-navigation, params, active-link, and not-found scenarios against @tanstack/react-router@1.170.35."
@@ -95,6 +100,11 @@
       "path": "packages/tanstack-router/tests/ssr/ssr.test.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Checks the retained Octane adapter SSR behavior cited to TanStack Router PR #7847; it is not a React SSR oracle."
+    },
+    {
+      "path": "packages/tanstack-router/tests/types/all-exports.test-d.ts",
+      "disposition": "octane-only-type-conformance",
+      "reason": "Checks all published Router value/type exports and exact browser-safe client SSR declarations."
     },
     {
       "path": "packages/tanstack-router/tests/types/entrypoints.test-d.ts",

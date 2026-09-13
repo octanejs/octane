@@ -147,7 +147,7 @@ lanes.push({
 	type: 'adapted-octane',
 	oracle: 'required',
 	environment: 'workspace-node',
-	project: 'tanstack-router-ssr-query',
+	project: 'tanstack-router-ssr-query-browser',
 	files: [
 		...[
 			...support,

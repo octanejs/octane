@@ -12,14 +12,29 @@
       "reason": "Authenticates the complete upstream source, entrypoint boundary, absent runtime suite, and published core dependency."
     },
     {
+      "path": "packages/tanstack-router-ssr-query/tests/provider-hydration.browser.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Production Chromium verifies provider hydration, preserved input and DOM, isolated query clients, portal context, live updates, and observer cleanup. Core stream transport remains an imported dependency."
+    },
+    {
       "path": "packages/tanstack-router-ssr-query/tests/ssr-query.test.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Exercises Octane router/query SSR behavior and is not counted as React parity."
     },
     {
-      "path": "packages/tanstack-router-ssr-query/tests/provider-hydration.browser.test.ts",
-      "disposition": "octane-only-framework-contract",
-      "reason": "Production Chromium verifies provider hydration, preserved input and DOM, isolated query clients, portal context, live updates, and observer cleanup. Core stream transport remains an imported dependency."
+      "path": "packages/tanstack-router-ssr-query/tests/types/integration.test-d.ts",
+      "disposition": "octane-only-type-conformance",
+      "reason": "Checks the authored SSR Query public options and setup result with positive and negative consumer contracts."
+    },
+    {
+      "path": "packages/tanstack-router-ssr-query/typetests/adapted/integration.test-d.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Runs the same public integration type assertions against pinned @tanstack/react-router-ssr-query@1.167.2 and the adapted Octane entry."
+    },
+    {
+      "path": "packages/tanstack-router-ssr-query/typetests/pristine/integration.test-d.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Runs the same public integration type assertions against pinned @tanstack/react-router-ssr-query@1.167.2 and the adapted Octane entry."
     }
   ]
 }

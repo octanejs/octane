@@ -85,12 +85,12 @@
         {
           "path": "packages/tanstack-router-ssr-query/audit/test-classifications.json",
           "role": "support",
-          "sha256": "df8d982fb07d8c5fcbe4d158dec7917578fade16acc36564bb42202af5ccbcc4"
+          "sha256": "c67e4434f9c9bb7eb3796d1bf438a462cee9e587c44c47124a254723e0ddce76"
         },
         {
           "path": "scripts/react-parity/tanstack-router-ssr-query-controls.test.mjs",
           "role": "support",
-          "sha256": "1ecafe43b22388449651495a179491c9fd7361babfef803f78dbe93bce2ba07c"
+          "sha256": "81171fc00ebdaa3aa823247664c1d33882c51748a0697560439ece9e0c0ef2b5"
         },
         {
           "path": "packages/tanstack-router-ssr-query/audit/upstream.lock.json",
@@ -120,7 +120,7 @@
         {
           "path": "packages/tanstack-router-ssr-query/scripts/generate-parity.mjs",
           "role": "support",
-          "sha256": "5d9a8cdb40d78aea65777c592dcbe51220b5c704524702c8f1eabe8b973349c8"
+          "sha256": "75f1c2deaf52999231099aa17f70988dd92a31f4441003dcf5a3df27a7cd8744"
         },
         {
           "path": "packages/tanstack-router-ssr-query/src/index.tsrx",
@@ -189,7 +189,7 @@
         {
           "path": "packages/tanstack-router-ssr-query/audit/test-classifications.json",
           "role": "support",
-          "sha256": "df8d982fb07d8c5fcbe4d158dec7917578fade16acc36564bb42202af5ccbcc4"
+          "sha256": "c67e4434f9c9bb7eb3796d1bf438a462cee9e587c44c47124a254723e0ddce76"
         },
         {
           "path": "packages/tanstack-router-ssr-query/audit/authored-lanes.json",
@@ -199,7 +199,7 @@
         {
           "path": "packages/tanstack-router-ssr-query/scripts/generate-parity.mjs",
           "role": "support",
-          "sha256": "5d9a8cdb40d78aea65777c592dcbe51220b5c704524702c8f1eabe8b973349c8"
+          "sha256": "75f1c2deaf52999231099aa17f70988dd92a31f4441003dcf5a3df27a7cd8744"
         },
         {
           "path": "packages/tanstack-router-ssr-query/src/index.tsrx",
@@ -302,7 +302,7 @@
         {
           "path": "packages/tanstack-router-ssr-query/audit/test-classifications.json",
           "role": "support",
-          "sha256": "df8d982fb07d8c5fcbe4d158dec7917578fade16acc36564bb42202af5ccbcc4"
+          "sha256": "c67e4434f9c9bb7eb3796d1bf438a462cee9e587c44c47124a254723e0ddce76"
         },
         {
           "path": "packages/tanstack-router-ssr-query/audit/authored-lanes.json",
@@ -312,7 +312,7 @@
         {
           "path": "packages/tanstack-router-ssr-query/scripts/generate-parity.mjs",
           "role": "support",
-          "sha256": "5d9a8cdb40d78aea65777c592dcbe51220b5c704524702c8f1eabe8b973349c8"
+          "sha256": "75f1c2deaf52999231099aa17f70988dd92a31f4441003dcf5a3df27a7cd8744"
         },
         {
           "path": "packages/tanstack-router-ssr-query/src/index.tsrx.d.ts",
@@ -379,7 +379,7 @@
         {
           "path": "packages/tanstack-router-ssr-query/audit/test-classifications.json",
           "role": "support",
-          "sha256": "df8d982fb07d8c5fcbe4d158dec7917578fade16acc36564bb42202af5ccbcc4"
+          "sha256": "c67e4434f9c9bb7eb3796d1bf438a462cee9e587c44c47124a254723e0ddce76"
         },
         {
           "path": "packages/tanstack-router-ssr-query/audit/authored-lanes.json",
@@ -389,7 +389,7 @@
         {
           "path": "packages/tanstack-router-ssr-query/scripts/generate-parity.mjs",
           "role": "support",
-          "sha256": "5d9a8cdb40d78aea65777c592dcbe51220b5c704524702c8f1eabe8b973349c8"
+          "sha256": "75f1c2deaf52999231099aa17f70988dd92a31f4441003dcf5a3df27a7cd8744"
         },
         {
           "path": "packages/tanstack-router-ssr-query/src/index.tsrx",
@@ -466,7 +466,7 @@
         {
           "path": "packages/tanstack-router-ssr-query/audit/test-classifications.json",
           "role": "support",
-          "sha256": "df8d982fb07d8c5fcbe4d158dec7917578fade16acc36564bb42202af5ccbcc4"
+          "sha256": "c67e4434f9c9bb7eb3796d1bf438a462cee9e587c44c47124a254723e0ddce76"
         },
         {
           "path": "packages/tanstack-router-ssr-query/audit/authored-lanes.json",
@@ -476,7 +476,7 @@
         {
           "path": "packages/tanstack-router-ssr-query/scripts/generate-parity.mjs",
           "role": "support",
-          "sha256": "5d9a8cdb40d78aea65777c592dcbe51220b5c704524702c8f1eabe8b973349c8"
+          "sha256": "75f1c2deaf52999231099aa17f70988dd92a31f4441003dcf5a3df27a7cd8744"
         },
         {
           "path": "packages/tanstack-router-ssr-query/src/index.tsrx",
@@ -553,7 +553,7 @@
         {
           "path": "packages/tanstack-router-ssr-query/audit/test-classifications.json",
           "role": "support",
-          "sha256": "df8d982fb07d8c5fcbe4d158dec7917578fade16acc36564bb42202af5ccbcc4"
+          "sha256": "c67e4434f9c9bb7eb3796d1bf438a462cee9e587c44c47124a254723e0ddce76"
         },
         {
           "path": "packages/tanstack-router-ssr-query/audit/authored-lanes.json",
@@ -563,7 +563,7 @@
         {
           "path": "packages/tanstack-router-ssr-query/scripts/generate-parity.mjs",
           "role": "support",
-          "sha256": "5d9a8cdb40d78aea65777c592dcbe51220b5c704524702c8f1eabe8b973349c8"
+          "sha256": "75f1c2deaf52999231099aa17f70988dd92a31f4441003dcf5a3df27a7cd8744"
         },
         {
           "path": "packages/tanstack-router-ssr-query/src/index.tsrx",
@@ -604,7 +604,7 @@
       "type": "adapted-octane",
       "oracle": "required",
       "environment": "workspace-node",
-      "project": "tanstack-router-ssr-query",
+      "project": "tanstack-router-ssr-query-browser",
       "files": [
         {
           "path": "packages/tanstack-router-ssr-query/audit/upstream.lock.json",
@@ -634,7 +634,7 @@
         {
           "path": "packages/tanstack-router-ssr-query/audit/test-classifications.json",
           "role": "support",
-          "sha256": "df8d982fb07d8c5fcbe4d158dec7917578fade16acc36564bb42202af5ccbcc4"
+          "sha256": "c67e4434f9c9bb7eb3796d1bf438a462cee9e587c44c47124a254723e0ddce76"
         },
         {
           "path": "packages/tanstack-router-ssr-query/audit/authored-lanes.json",
@@ -644,7 +644,7 @@
         {
           "path": "packages/tanstack-router-ssr-query/scripts/generate-parity.mjs",
           "role": "support",
-          "sha256": "5d9a8cdb40d78aea65777c592dcbe51220b5c704524702c8f1eabe8b973349c8"
+          "sha256": "75f1c2deaf52999231099aa17f70988dd92a31f4441003dcf5a3df27a7cd8744"
         },
         {
           "path": "packages/tanstack-router-ssr-query/src/index.tsrx",
