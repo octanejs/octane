@@ -5,7 +5,13 @@ import { Calendar } from '@octanejs/shadcn/base-ui/Calendar';
 import { Calendar as RadixCalendar } from '@octanejs/shadcn/Calendar';
 
 const JANUARY_2024 = new Date(2024, 0, 1);
-const iso = (date: Date | undefined) => (date ? date.toISOString().slice(0, 10) : 'none');
+// day-picker hands back a local-midnight Date and labels its cells with a local `YYYY-MM-DD`, so
+// this formats in local time: `toISOString()` is UTC and reports the previous day east of London.
+const iso = (date: Date | undefined) => date
+	? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(
+			date.getDate(),
+		).padStart(2, '0')}`
+	: 'none';
 
 export function CalendarSingleFixture() @{
 	const [selected, setSelected] = useState<Date | undefined>(undefined);
