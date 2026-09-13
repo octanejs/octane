@@ -8680,13 +8680,17 @@ export default defineConfig({
 				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'colorful-upstream',
-					include: ['packages/colorful/tests/upstream/**/*.test.ts'],
+					include: ['packages/colorful/tests/upstream/**/*.test.{js,ts}'],
 					environment: 'jsdom',
 					globals: false,
 				},
 				plugins: [octane()],
 			},
 			{
+				testExecution: {
+					group: 'react-parity',
+					include: ['packages/colorful/tests/runtime/lifecycle.test.ts'],
+				},
 				test: {
 					name: 'colorful',
 					include: ['packages/colorful/tests/runtime/**/*.test.ts'],
@@ -8707,6 +8711,7 @@ export default defineConfig({
 				plugins: [octane()],
 			},
 			{
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'colorful-hydration',
 					include: ['packages/colorful/tests/hydration/**/*.test.ts'],
@@ -8716,6 +8721,7 @@ export default defineConfig({
 				plugins: [octane()],
 			},
 			{
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'colorful-ssr',
 					include: ['packages/colorful/tests/ssr/**/*.test.ts'],
@@ -8733,7 +8739,7 @@ export default defineConfig({
 				},
 			},
 			{
-				testExecution: { group: 'heavy-browser' },
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'colorful-browser',
 					include: ['packages/colorful/tests/browser/**/*.test.ts'],
@@ -9388,29 +9394,49 @@ export default defineConfig({
 				aliases: SANITY_LOADER_SOURCE_ALIASES,
 				ssr: true,
 			}),
-			octaneSourceTestProject({
-				test: {
-					name: 'thinking-orbs',
-					include: ['packages/thinking-orbs/tests/**/*.test.ts'],
-					exclude: [
-						...configDefaults.exclude,
-						'packages/thinking-orbs/tests/differential/**/*.test.ts',
-					],
-					environment: 'jsdom',
-					globals: false,
+			{
+				testExecution: {
+					group: 'react-parity',
+					include: ['packages/thinking-orbs/tests/conformance/render.test.ts'],
 				},
-				aliases: THINKING_ORBS_SOURCE_ALIASES,
-			}),
-			octaneSourceTestProject({
+				...octaneSourceTestProject({
+					test: {
+						name: 'thinking-orbs',
+						include: ['packages/thinking-orbs/tests/**/*.test.ts'],
+						exclude: [
+							...configDefaults.exclude,
+							'packages/thinking-orbs/tests/differential/**/*.test.ts',
+							'packages/thinking-orbs/tests/browser/**/*.test.ts',
+						],
+						environment: 'jsdom',
+						globals: false,
+					},
+					aliases: THINKING_ORBS_SOURCE_ALIASES,
+				}),
+			},
+			{
+				testExecution: { group: 'react-parity' },
 				test: {
-					name: 'thinking-orbs-differential',
-					include: ['packages/thinking-orbs/tests/differential/**/*.test.ts'],
-					environment: 'jsdom',
-					globalSetup: ['packages/thinking-orbs/tests/differential/_setup.ts'],
-					globals: false,
+					name: 'thinking-orbs-browser',
+					include: ['packages/thinking-orbs/tests/browser/**/*.test.ts'],
+					environment: 'node',
+					testTimeout: 30_000,
+					hookTimeout: 60_000,
 				},
-				aliases: THINKING_ORBS_SOURCE_ALIASES,
-			}),
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				...octaneSourceTestProject({
+					test: {
+						name: 'thinking-orbs-differential',
+						include: ['packages/thinking-orbs/tests/differential/**/*.test.ts'],
+						environment: 'jsdom',
+						globalSetup: ['packages/thinking-orbs/tests/differential/_setup.ts'],
+						globals: false,
+					},
+					aliases: THINKING_ORBS_SOURCE_ALIASES,
+				}),
+			},
 			octaneSourceTestProject({
 				test: {
 					name: 'puck',

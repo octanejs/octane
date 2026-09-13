@@ -24,26 +24,35 @@
   "types": "src/index.ts",
   "files": [
     "src",
-    "README.md"
+    "README.md",
+    "LICENSE",
+    "LICENSE.upstream",
+    "UPSTREAM.md"
   ],
   "sideEffects": false,
   "exports": {
     ".": "./src/index.ts"
   },
   "scripts": {
-    "test": "vitest run",
-    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json"
+    "test": "vitest run --root ../.. --project thinking-orbs --project thinking-orbs-differential --project thinking-orbs-browser",
+    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json && tsrx-tsc --noEmit -p tsconfig.public.json && tsrx-tsc --noEmit -p tsconfig.fixtures.json",
+    "typecheck:pristine": "tsc --noEmit -p tsconfig.pristine.json",
+    "upstream:verify": "node ../../scripts/react-port/materialize.mjs run --package-dir . --check"
   },
   "peerDependencies": {
     "octane": "workspace:^0.1.51 || ^0.2.0"
   },
   "devDependencies": {
     "@tsrx/react": "catalog:default",
+    "@types/react": "catalog:default",
+    "@types/react-dom": "catalog:default",
     "esbuild": "catalog:default",
     "octane": "workspace:*",
     "react": "catalog:default",
     "react-dom": "catalog:default",
-    "thinking-orbs": "catalog:default",
     "vitest": "catalog:default"
+  },
+  "dependencies": {
+    "thinking-orbs": "catalog:default"
   }
 }

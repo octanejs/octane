@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "identity": {
+    "packageName": "thinking-orbs",
+    "version": "0.3.1",
+    "repository": {
+      "owner": "Jakubantalik",
+      "repo": "thinking-orbs",
+      "subdirectory": null
+    },
+    "commit": "bd204b73c9b6660fad7210b1ad48d9dc2adbb89d",
+    "integrity": "sha512-3BG1aeB1RUTxItCml/BBuIz5JRM4kZqGuyx+vouv0fXTtcR9ZNoKjWGneHPx94y74GxgArwJZ1qbJR5dt54kSw=="
+  },
+  "license": {
+    "spdx": "MIT",
+    "evidence": [
+      {
+        "path": "LICENSE",
+        "sha256": "915a283980628a0ca9e7b423ebafc6f3a0fa1e630ff17d34e59034808d92011c"
+      }
+    ],
+    "notices": []
+  },
+  "scopes": ["LICENSE", "src/ThinkingOrb.tsx", "src/theme.ts", "src/types.ts"],
+  "adaptedMappings": [],
+  "adaptedRewrites": [],
+  "files": [
+    {
+      "path": "LICENSE",
+      "gitBlob": "0e9405a2ee75ce720c665c04568fedda3c07906a",
+      "size": 1070
+    },
+    {
+      "path": "src/theme.ts",
+      "gitBlob": "6f1c744a68a56cf4726a97b180d3e5db9c25362f",
+      "size": 2665
+    },
+    {
+      "path": "src/ThinkingOrb.tsx",
+      "gitBlob": "6065218b3bf79d7724cf471a720236355d51eba6",
+      "size": 3465
+    },
+    {
+      "path": "src/types.ts",
+      "gitBlob": "4f60d7ad6ed842496e1326aa9081d65963ba8cbc",
+      "size": 2532
+    }
+  ],
+  "fingerprint": "3f3922f95331f0f72ad7f5569df1fe8544cad0e3768a63695bdf868581123cd7"
+}

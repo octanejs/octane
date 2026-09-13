@@ -19,11 +19,11 @@ function Status() {
 
 ## Compatibility
 
-Pinned to `thinking-orbs@0.2.0`. The framework-neutral canvas engine is reused verbatim; `ThinkingOrb` is reimplemented in `.tsrx`.
+Pinned to `thinking-orbs@0.3.1`. The component and root preset exports use the published `thinking-orbs/engine` dependency. Octane owns the component, theme subscriptions, and animation lifecycle. Renderer-independent frame APIs remain available directly from `thinking-orbs/engine`.
 
 ## Known differences
 
-None documented yet.
+Canvas props use Octane native events. Consumer refs compose with the internal canvas ref, preserving drawing, focus, and cleanup.
 
 ## Tests
 

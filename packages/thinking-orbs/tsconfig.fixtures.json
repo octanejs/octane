@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": [],
+    "skipLibCheck": false
+  },
+  "include": [
+    "tests/browser/harness/main.ts",
+    "tests/browser/harness/app.tsrx",
+    "tests/_fixtures/*.tsrx"
+  ],
+  "exclude": ["node_modules", "upstream", "upstream-artifact"]
+}

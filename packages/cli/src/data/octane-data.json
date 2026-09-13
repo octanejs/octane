@@ -186,13 +186,13 @@
       "name": "@octanejs/colorful",
       "version": "0.0.18",
       "category": "UI Libraries",
-      "upstream": { "package": "react-colorful", "version": "5.8.0" },
-      "surface": "Complete against the published react-colorful 5.8.0 root runtime and type surface: all 14 picker variants, HexColorInput, setNonce, six public color types, controlled updates, mouse/touch/keyboard input, commit callbacks, ARIA state, and automatic closest-root styling.",
+      "upstream": { "package": "react-colorful", "version": "5.8.1" },
+      "surface": "Complete against the published react-colorful 5.8.1 root runtime and type surface: all 14 picker variants, HexColorInput, setNonce, six public color types, controlled updates, mouse/touch/keyboard input, commit callbacks, ARIA state, and automatic closest-root styling.",
       "divergences": [
         "React synthetic event attribute types are represented by Octane native DOM event attributes; observable DOM events and callback values retain the upstream contract."
       ],
       "ssr": "All pickers and HexColorInput render deterministically without browser globals, hydrate by adopting existing nodes, install styles only on the client, and become interactive after hydration.",
-      "verified": "2026-08-03"
+      "verified": "2026-09-13"
     },
     {
       "name": "@octanejs/content-loader",
@@ -314,7 +314,7 @@
       "name": "@octanejs/electron",
       "version": "0.0.30",
       "category": "Desktop Apps",
-      "upstream": { "package": "electron", "version": "43.2.0" },
+      "upstream": { "package": "electron", "version": "44.3.0" },
       "surface": "Process-split Electron bindings: ./main registers ipcMain handlers, ./main/native re-exports main-only Electron APIs (Menu, Tray, session, protocol, BrowserWindow, …), ./preload exposes Electron IPC and desktop helpers via contextBridge, and the renderer entry provides Octane hooks (useInvoke, useInvokeState, useIpcEvent, useNativeTheme, useWindowState) plus promise helpers for app/window/dialog/shell/clipboard/screen. Menu/Tray/session/protocol stay intentional main-only under contextIsolation.",
       "divergences": [
         "There is no React binding upstream; Electron is framework-agnostic, so this package mirrors the React Electron process layout rather than porting a React library.",
@@ -326,7 +326,7 @@
         "Built-in desktop helpers use octane:* IPC channels; apps may allowlist additional channels in preload."
       ],
       "ssr": "Server rendering performs no IPC. useInvokeState renders pending and issues the command on the client after hydration; useIpcEvent and reactive desktop hooks subscribe only on the client. useInvoke without a host rejects with ElectronUnavailableError.",
-      "verified": "2026-08-02"
+      "verified": "2026-09-13"
     },
     {
       "name": "@octanejs/email",
@@ -957,8 +957,8 @@
       "category": "Sanity Content",
       "upstream": {
         "package": "@sanity/react-loader",
-        "version": "2.2.1",
-        "commit": "2e3f5720173acfe67a771d92bb7fc5b51e6ac014"
+        "version": "2.2.2",
+        "commit": "baf6458a64aba4011a484caa7d10019549cde087"
       },
       "surface": "Query-store milestone: createQueryStore, loadQuery, setServerClient, useQuery, useLiveMode, useEncodeDataAttribute, create-data-attribute exports, browser conditions, and the server-only rsc entry.",
       "divergences": [
@@ -967,7 +967,7 @@
         "The ./rsc entry models a server-only Octane environment rather than React Server Component conditions."
       ],
       "ssr": "Supported through loadQuery/setServerClient and the server-only rsc entry; initial query state is SSR-tested.",
-      "verified": "2026-08-24"
+      "verified": "2026-09-13"
     },
     {
       "name": "@octanejs/sanity-logos",
@@ -1384,11 +1384,11 @@
       "name": "@octanejs/thinking-orbs",
       "version": "0.1.2",
       "category": "Animation",
-      "upstream": { "package": "thinking-orbs", "version": "0.2.0" },
+      "upstream": { "package": "thinking-orbs", "version": "0.3.1" },
       "surface": "ThinkingOrb component, resolvePreset, MODE_DRAWS, and public types — nine animation states, two tuned size presets, auto/dark/light theme, reduced-motion static frame.",
       "divergences": [],
       "ssr": "Canvas is client-only; server render emits the canvas element without animation.",
-      "verified": "2026-08-07"
+      "verified": "2026-09-13"
     },
     {
       "name": "@octanejs/three",

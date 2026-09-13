@@ -122,6 +122,19 @@ describe('extractTestCases', () => {
 		assert.equal(matrix[0].parameterization.confidence, 'exact');
 	});
 
+	test('preserves signed numeric parameters without coercing unknown nested values', () => {
+		const numeric = extractTestCases(`test.each([[-1], [+2]])('size %d', () => {});`);
+		assert.deepEqual(
+			numeric.map(({ title }) => title),
+			['size -1', 'size 2'],
+		);
+		const unresolved = extractTestCases(`test.each([[getSize()], [2]])('size %d', () => {});`);
+		assert.equal(unresolved.length, 1);
+		assert.equal(unresolved[0].estimatedRegistrations, 2);
+		assert.equal(unresolved[0].parameterization.row, null);
+		assert.match(unresolved[0].manualReviewReason, /parameter values/);
+	});
+
 	test('multiplies registrations inside a static describe.each matrix', () => {
 		const cases = extractTestCases(`
 			describe.each(['button', 'input'])('%s', tag => {

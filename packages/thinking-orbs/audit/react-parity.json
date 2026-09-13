@@ -1,0 +1,229 @@
+{
+  "schemaVersion": 1,
+  "provenance": {
+    "repo": "https://github.com/Jakubantalik/thinking-orbs.git",
+    "version": "0.3.1",
+    "commit": "bd204b73c9b6660fad7210b1ad48d9dc2adbb89d",
+    "sourceRoot": "src",
+    "testRoot": "scripts",
+    "license": "MIT",
+    "integrity": "sha256:286ef57f8fdae90a930b92fd270e3dfd16f8ed310292391869563018e6509431",
+    "verification": "verified"
+  },
+  "upstreamSuites": {
+    "runtime": "absent",
+    "types": "absent"
+  },
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/thinking-orbs/src"],
+      "include": ["\\.(?:ts|tsrx)$"],
+      "exclude": []
+    },
+    "tests": {
+      "roots": ["packages/thinking-orbs/tests"],
+      "include": ["\\.(?:test|test-d)\\.ts$"],
+      "exclude": []
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 0,
+    "uniqueIdentities": 0,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@11.15.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "718704dbbc0b2547eda6280150dfcb7ee357bd84595b3374af7d2b8f4e7b0878"
+    }
+  },
+  "lanes": [
+    {
+      "id": "thinking-orbs-differential",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "thinking-orbs-differential",
+      "files": [
+        {
+          "path": "packages/thinking-orbs/tests/differential/parity.test.ts",
+          "role": "test",
+          "sha256": "103afb3f47abe798ad4440990d01e8c306e530d456791bb6c3251d13429a4e30",
+          "cases": [
+            {
+              "id": "thinking-orbs:differential:1",
+              "testName": "matches mount markup for avatar and inline presets",
+              "fullName": "differential: @octanejs/thinking-orbs vs thinking-orbs@0.3.1 matches mount markup for avatar and inline presets"
+            }
+          ]
+        },
+        {
+          "path": "packages/thinking-orbs/tests/differential/_setup.ts",
+          "role": "support",
+          "sha256": "5009230f1be9dcb6e41b68c435487910d865f41d4d2bf3b386ea4486651f2e38"
+        },
+        {
+          "path": "packages/thinking-orbs/tests/_fixtures/thinking-orbs-diff.tsrx",
+          "role": "support",
+          "sha256": "b6aa25bfd93e38aab1cbdf5bd9cf14335cb6bd693a29e73080032c9c28b53c00"
+        }
+      ],
+      "evidenceOrigin": "repo-authored"
+    },
+    {
+      "id": "thinking-orbs-refs",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "thinking-orbs",
+      "files": [
+        {
+          "path": "packages/thinking-orbs/tests/conformance/render.test.ts",
+          "role": "test",
+          "sha256": "8b75c301ee751483f0d4fdb99f781d089bf81af0ec052ae3cd3c10f150e80797",
+          "cases": [
+            {
+              "id": "thinking-orbs:refs:1",
+              "testName": "preserves canvas initialization and focus when a consumer supplies a ref",
+              "fullName": "@octanejs/thinking-orbs \u2014 render contract preserves canvas initialization and focus when a consumer supplies a ref"
+            },
+            {
+              "id": "thinking-orbs:refs:2",
+              "testName": "renders an accessible canvas for a shipped state preset",
+              "fullName": "@octanejs/thinking-orbs \u2014 render contract renders an accessible canvas for a shipped state preset"
+            }
+          ]
+        },
+        {
+          "path": "packages/thinking-orbs/tests/_fixtures/ref-probe.tsrx",
+          "role": "support",
+          "sha256": "fd5106eb90a38b51529bd9524f1966b6fd7e0573b453bff9a9b11f6353eb8b07"
+        },
+        {
+          "path": "packages/thinking-orbs/tests/_fixtures/render-probe.tsrx",
+          "role": "support",
+          "sha256": "e18a8555bd7996a16c774e97f24b567f2ac8d9ddbd05d0aef74956ef75200798"
+        }
+      ]
+    },
+    {
+      "id": "thinking-orbs-browser",
+      "type": "browser",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "thinking-orbs-browser",
+      "files": [
+        {
+          "path": "packages/thinking-orbs/tests/browser/parity.browser.test.ts",
+          "role": "test",
+          "sha256": "fefbd95302ca0be4c7aa3a084c6b7f5f221925fd7168b68a266d2c75d82ad9ba",
+          "cases": [
+            {
+              "id": "thinking-orbs:browser:1",
+              "testName": "hydrates retained canvases and preserves pixels, refs, native events and keyed identity through updates",
+              "fullName": "Thinking Orbs browser parity hydrates retained canvases and preserves pixels, refs, native events and keyed identity through updates"
+            },
+            {
+              "id": "thinking-orbs:browser:2",
+              "testName": "stops drawing when paused and after an animated canvas is unmounted",
+              "fullName": "Thinking Orbs browser parity stops drawing when paused and after an animated canvas is unmounted"
+            }
+          ]
+        },
+        {
+          "path": "packages/thinking-orbs/tests/browser/harness/app.tsrx",
+          "role": "support",
+          "sha256": "365c4cb3beb2f0e698ca42a7ba293a6ed79b362db38686b4ced06f8b54a52bda"
+        },
+        {
+          "path": "packages/thinking-orbs/tests/browser/harness/index.html",
+          "role": "support",
+          "sha256": "dc575412d668732f3f51cebf021a0207210d02c88a167b13a38c2a053672751d"
+        },
+        {
+          "path": "packages/thinking-orbs/tests/browser/harness/main.ts",
+          "role": "support",
+          "sha256": "7b6db06032bf33fb3c231a37e481b18b5aa0f4b449ff17c0aae6a7f10e53839d"
+        },
+        {
+          "path": "packages/octane/tests/_hydration-ssr.ts",
+          "role": "support",
+          "sha256": "e11c0b8f32b029ef31751a705a6321fa1428bd18496497e0771dc18a25e7ed58"
+        }
+      ],
+      "notes": "Real Chromium canvas comparisons against React across all states, sizes and explicit themes; SSR hydration preserves nodes; native events, focus, refs, keyed moves, pause/resume and unmount cleanup."
+    },
+    {
+      "id": "thinking-orbs-pristine-types",
+      "type": "pristine-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "thinking-orbs-pristine-types",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Authored positive and negative probes for all root exports; immutable upstream inventory contains no type test suite.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsc",
+        "project": "packages/thinking-orbs/tsconfig.pristine.json"
+      },
+      "files": [
+        {
+          "path": "packages/thinking-orbs/tests/types/pristine.test-d.ts",
+          "role": "test",
+          "sha256": "ae48c6eec4fdceb9f70a7a89c9efda64c9d3876932af350e63ad13d81856812d",
+          "cases": [
+            {
+              "id": "thinking-orbs:types:pristine",
+              "testName": "complete pristine public type contract",
+              "fullName": "complete pristine public type contract"
+            }
+          ]
+        },
+        {
+          "path": "packages/thinking-orbs/tsconfig.pristine.json",
+          "role": "support",
+          "sha256": "3ec9918a97e944d5241dd2ab584650e59e860d96913599e25d02bb79abdd7501"
+        }
+      ]
+    },
+    {
+      "id": "thinking-orbs-adapted-types",
+      "type": "adapted-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "thinking-orbs-adapted-types",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Authored positive and negative probes for all root exports; immutable upstream inventory contains no type test suite.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsrx-tsc",
+        "project": "packages/thinking-orbs/tsconfig.adapted.json"
+      },
+      "files": [
+        {
+          "path": "packages/thinking-orbs/tests/types/public.test-d.ts",
+          "role": "test",
+          "sha256": "e11e6da14c2aad8daf0c861fb94931a0aa4723f539db707f92432a8731fbe2fd",
+          "cases": [
+            {
+              "id": "thinking-orbs:types:adapted",
+              "testName": "complete adapted public type contract",
+              "fullName": "complete adapted public type contract"
+            }
+          ]
+        },
+        {
+          "path": "packages/thinking-orbs/tsconfig.adapted.json",
+          "role": "support",
+          "sha256": "a770671afb3a3044f1fd6feec569ef7be97c51897bfb6d731b135a14fe426d9b"
+        }
+      ]
+    }
+  ],
+  "divergences": []
+}

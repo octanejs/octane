@@ -1,8 +1,7 @@
-// Ported from thinking-orbs@0.2.0 src/ThinkingOrb.tsx
+// Ported from thinking-orbs@0.3.1 src/ThinkingOrb.tsx
 // (https://github.com/Jakubantalik/thinking-orbs).
 import { useEffect, useRef } from 'octane';
-import { MODE_DRAWS } from './engine/registry';
-import { resolvePreset } from './presets';
+import { MODE_DRAWS, resolvePreset } from 'thinking-orbs/engine';
 import { useReducedMotion, useResolvedDark } from './theme';
 import type { ThinkingOrbProps } from './types';
 
@@ -25,6 +24,7 @@ export function ThinkingOrb({
 	speed = 1,
 	paused = false,
 	style,
+	ref: consumerRef,
 	'aria-label': ariaLabel,
 	...rest
 }: ThinkingOrbProps) {
@@ -100,7 +100,7 @@ export function ThinkingOrb({
 	}, [state, size, dark, speed, paused, reduced]);
 
 	return <canvas
-		ref={ref}
+		ref={[ref, consumerRef]}
 		role="img"
 		aria-label={ariaLabel ?? LABELS[state]}
 		style={{ width: size, height: size, display: 'block', ...style }}

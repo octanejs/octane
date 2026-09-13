@@ -18,6 +18,7 @@ describe('@octanejs/colorful — server rendering', () => {
 		expect(first.html).not.toContain('<style');
 	});
 
+	// @parity-case adapted:react-colorful-hydration-markup
 	it('renders the hydration fixture', () => {
 		const result = renderToString(HydrationHex, { onChange: () => {} });
 		expect(result.html).toContain('data-testid="hex"');

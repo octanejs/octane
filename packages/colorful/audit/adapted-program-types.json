@@ -113,7 +113,7 @@
   },
   {
     "path": "types.ts",
-    "sha256": "28bff32503c30399cfd6d56fbb22f228ed180851dc29f1d3b941d339b585b2a5"
+    "sha256": "950143d777b9f6c62d069cafc3c89502a1a64b117a833e492ceebb315980737e"
   },
   {
     "path": "utils/clamp.ts",
@@ -125,7 +125,7 @@
   },
   {
     "path": "utils/convert.ts",
-    "sha256": "e7090dd0d5bbd72c44c1a6562d9a5896d6d790f0031b18fd4418ecac1f347313"
+    "sha256": "fa13c85cbccfb1ab51f2f8fc5974cf6f2eb1c729c6a95332b15628b3e8155d17"
   },
   {
     "path": "utils/format.ts",

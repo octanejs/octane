@@ -2,11 +2,11 @@
   "schemaVersion": 1,
   "release": {
     "package": "react-colorful",
-    "version": "5.8.0",
-    "tag": "v5.8.0",
-    "npmIntegrity": "sha512-Wy9OzPfjSN9bF12OB8N7UQvlsZ0I+7wHxpN+bV5BjNQGxOj6IiwkRjevJK9yOBjJWGQvAaf1OXtn8rUeEatAng==",
-    "npmShasum": "9bc89aac3e8c847b503489614e2d28227b36641f",
-    "commit": "d914e7647c40a8bbdb286985176e769d76061732",
+    "version": "5.8.1",
+    "tag": "v5.8.1",
+    "npmIntegrity": "sha512-oz68bhsnFWnpDf1ZR8daiQbYpXUnM2h2J6hl9Zg2rTpM/DU6vCqe1E+CpqmqLnJucMZetHZeifSAfJ+geN9lcA==",
+    "npmShasum": "a6ef2a3946e6903883b142720dda80c72f24267f",
+    "commit": "8506e8c4b777e0056ce3567dc3a06ced143034bc",
     "license": "MIT"
   },
   "publicSurface": {
@@ -49,98 +49,103 @@
     },
     {
       "path": "npm/dist/components/HexAlphaColorPicker.d.ts",
-      "bytes": 188,
-      "sha256": "98ebb2a95249996290c91f8cf3ff79b763eff7dc408bff4b50d683e99ba0b7b6"
+      "bytes": 191,
+      "sha256": "8f57d45fd0344f2a7623f5147c1f28c7e6e88aa6db751364c62e539a4831d142"
     },
     {
       "path": "npm/dist/components/HexColorInput.d.ts",
-      "bytes": 376,
-      "sha256": "243c74e5973b2cfa67394e1a76d975d69b2ad5146e2aafb493b44b7f5a5e87cc"
+      "bytes": 386,
+      "sha256": "ca479df45986616170717f47fe66758b5071c6b36d3d73adba702aa9bafa9a8b"
     },
     {
       "path": "npm/dist/components/HexColorPicker.d.ts",
-      "bytes": 183,
-      "sha256": "93ee916c7ae66f5174b637a112fc7b8dff33a794a2d56df8db8aa6a6c3bc92cf"
+      "bytes": 186,
+      "sha256": "5c9eddbb12d7fdd14db53fc7bfe890121bb73e845d9e376657a4db41b119ffb9"
     },
     {
       "path": "npm/dist/components/HslColorPicker.d.ts",
-      "bytes": 195,
-      "sha256": "6d7b735c5aaba695591a8b4b6f956a8f5cc9d3eda35f956cd802ff2b0286d53a"
+      "bytes": 198,
+      "sha256": "cf307d4a3a44f2491c9e68623453282c551eae4ae6f30edf1d4d24185ff991f1"
     },
     {
       "path": "npm/dist/components/HslStringColorPicker.d.ts",
-      "bytes": 189,
-      "sha256": "068f7448d1de065c9670ac3d6b90e68962feeb93efb63a4cd1552a68b5b2dfbd"
+      "bytes": 192,
+      "sha256": "34c459d69e6b63a2be4980701b6d6b49cdde8e1b0d240df3bcaa4f7b8ef9bf94"
     },
     {
       "path": "npm/dist/components/HslaColorPicker.d.ts",
-      "bytes": 198,
-      "sha256": "3f374acefd8ca5c91a19477bd6949614b07055b26225afc6861b2ede851bcb5b"
+      "bytes": 201,
+      "sha256": "9364d443405fda3fce16295a6a49934796d5e798ea1c71cb1a44bfffb584c52e"
     },
     {
       "path": "npm/dist/components/HslaStringColorPicker.d.ts",
-      "bytes": 190,
-      "sha256": "9eb2239d3dfcdfea74054b54c44c7545edbd73731d2993a9f9a3e71673e1ed42"
+      "bytes": 193,
+      "sha256": "37ba48823bbf18694d901283f8ba2971b1613a22cef00ee19a547c8a821d8b7d"
     },
     {
       "path": "npm/dist/components/HsvColorPicker.d.ts",
-      "bytes": 195,
-      "sha256": "bf4c115726a351387bbf7496e163b28aa39172fe594ae8bdb1513047d795d764"
+      "bytes": 198,
+      "sha256": "da3d301104882b104e0198b6a8c4051c375212b33b147637895ce00addeaac4c"
     },
     {
       "path": "npm/dist/components/HsvStringColorPicker.d.ts",
-      "bytes": 189,
-      "sha256": "f8ede947f461afd37024352017761ce27e9bdddaffd0393ac4682ed0d22cf611"
+      "bytes": 192,
+      "sha256": "32070d3c8bcc76d20f8976a2cd03679ff943ef870b713674c40cd415c282df0a"
     },
     {
       "path": "npm/dist/components/HsvaColorPicker.d.ts",
-      "bytes": 198,
-      "sha256": "dc21dc3199469dce30218e96f2451efb33c4787246308b2b8461eb825075249b"
+      "bytes": 201,
+      "sha256": "53d5bb821cbdf50e790c97f410b360913d5a1fca88de269b650429019773b2d9"
     },
     {
       "path": "npm/dist/components/HsvaStringColorPicker.d.ts",
-      "bytes": 190,
-      "sha256": "83b95913e25b27672b8c4e528c92965230c9d9524ef348587662632dccdc1401"
+      "bytes": 193,
+      "sha256": "c8a3046d0e0e9d3c02bb774adf0cc8b8344a372a65651e3b31005448606c49c0"
     },
     {
       "path": "npm/dist/components/RgbColorPicker.d.ts",
-      "bytes": 195,
-      "sha256": "9849c46e6a1effe39e9478870783851a889a8edee024ca3679b0b69dcb36eb47"
+      "bytes": 198,
+      "sha256": "cea2cca7fa4d55bd80530a7dda61027b4ccbd51720e1cf2abb90e344efe6dd29"
     },
     {
       "path": "npm/dist/components/RgbStringColorPicker.d.ts",
-      "bytes": 189,
-      "sha256": "7760bce1a69e0e3c7ea388fcab73be84c98c864bf25c865bd481daee34c503f8"
+      "bytes": 192,
+      "sha256": "262a99b65d54cdf333bdf3e706243cf89fd6d71c7df54fa3c827c62771d00a8b"
     },
     {
       "path": "npm/dist/components/RgbaColorPicker.d.ts",
-      "bytes": 198,
-      "sha256": "6717f9fe90fc48da70d33067b301bac254b35542b634307d1597320760a1a832"
+      "bytes": 201,
+      "sha256": "e9e49de9c0c0fdfc68e9ecd34176e0692ca4bb7320e161cc24d26f33eb2cdd4c"
     },
     {
       "path": "npm/dist/components/RgbaStringColorPicker.d.ts",
-      "bytes": 190,
-      "sha256": "7971e30a211be5e4e7e77fe55ca2db193880032aa26cd33e62db01fdcbfbc30b"
+      "bytes": 193,
+      "sha256": "ad13712d7ce5e567683574cd06aca8821f5a04678f68297d4ee031f778c5dfc1"
     },
     {
       "path": "npm/dist/index.d.ts",
-      "bytes": 1153,
-      "sha256": "41bd03a30a315f8e500f9e4d610d68290d73b0e98128e5e3f4ad062762b2b3b5"
+      "bytes": 1170,
+      "sha256": "9d184135c46aed7563a5b39cd3bb09ea31ec148a543e99bb117416c183620579"
     },
     {
       "path": "npm/dist/types.d.ts",
-      "bytes": 1372,
-      "sha256": "49c9dcaf68d362b6c24f1a17ee5b26335044a59c0992e3f192c2d41ddaa4cddf"
+      "bytes": 1417,
+      "sha256": "f3519f5526c0746b4ae36ac8dff4e3a8b1a221b13620a042fcc2e850f130bcc5"
     },
     {
       "path": "npm/dist/utils/nonce.d.ts",
-      "bytes": 533,
-      "sha256": "1308a35e0418c7b3feedbac638c9d099daee9b2c5a853c9d929bd59c7e272794"
+      "bytes": 544,
+      "sha256": "ea3cb69dd466671fa43c24addb233c5f736773f45fada49532d0caae4a6a68e6"
     },
     {
       "path": "npm/package.json",
-      "bytes": 5802,
-      "sha256": "24bc3ab00382c35e92359f4210d2636e53eb7384bc950f010a035779a4a2bd2b"
+      "bytes": 5804,
+      "sha256": "4941cad6494279869b1f3584f0666ade9a3cac19355c0081eb5f2defdc40a544"
+    },
+    {
+      "path": "npm/react-colorful-5.8.1.tgz",
+      "bytes": 105271,
+      "sha256": "d9c8f10496989e50ba18a4898b5a44185ca84f573b654688c29492aca16d8e76"
     },
     {
       "path": "tag/ACKNOWLEDGMENTS",
@@ -159,8 +164,8 @@
     },
     {
       "path": "tag/package.json",
-      "bytes": 5738,
-      "sha256": "16cd2530b726ef556225e83ce20dab19b6e33834a5c932671efed9cc37359bab"
+      "bytes": 5804,
+      "sha256": "4941cad6494279869b1f3584f0666ade9a3cac19355c0081eb5f2defdc40a544"
     },
     {
       "path": "tag/src/components/HexAlphaColorPicker.tsx",
@@ -329,8 +334,8 @@
     },
     {
       "path": "tag/src/utils/convert.ts",
-      "bytes": 5907,
-      "sha256": "91472af7a296d74dec5e3f9818b662a3e3f8a097db568dc432844938481086e3"
+      "bytes": 6067,
+      "sha256": "f12901263fdabddff789e5b253d59523d606a8ce6ea45520f3e9f12aef410d87"
     },
     {
       "path": "tag/src/utils/format.ts",
@@ -364,8 +369,8 @@
     },
     {
       "path": "tag/tests/components.test.js",
-      "bytes": 20456,
-      "sha256": "916fc3ee12b83adbcdb5bd0668fe6a449e5060d820a7435f85ff15eda279fbef"
+      "bytes": 22084,
+      "sha256": "175b3a34f15a31fb73780def06365a40198ccb08fa9e704b687a009bcc07ea91"
     },
     {
       "path": "tag/tests/csp.test.js",
@@ -379,8 +384,8 @@
     },
     {
       "path": "tag/tests/utils.test.js",
-      "bytes": 10097,
-      "sha256": "03c6e433d2b60eb543e69f2c5b15f947105244ba576d5ff662c70d697c491584"
+      "bytes": 10720,
+      "sha256": "3406c41a6db54f9f8dff282e0d6bfa5e465929954bd1b5954c7b1b52d0247601"
     },
     {
       "path": "tag/tsconfig.build.json",
@@ -503,105 +508,123 @@
       "name": "Changes alpha channel value after an interaction"
     },
     {
-      "id": "tag/tests/components.test.js::Uses #rrggbbaa format if alpha channel value is less than 1",
+      "id": "tag/tests/components.test.js::Doesn't change RGB channels when only alpha is changed",
       "file": "tag/tests/components.test.js",
       "line": 314,
+      "name": "Doesn't change RGB channels when only alpha is changed"
+    },
+    {
+      "id": "tag/tests/components.test.js::Doesn't change RGB string channels when only alpha is changed",
+      "file": "tag/tests/components.test.js",
+      "line": 329,
+      "name": "Doesn't change RGB string channels when only alpha is changed"
+    },
+    {
+      "id": "tag/tests/components.test.js::Doesn't change HEX color channels when only alpha is changed",
+      "file": "tag/tests/components.test.js",
+      "line": 344,
+      "name": "Doesn't change HEX color channels when only alpha is changed"
+    },
+    {
+      "id": "tag/tests/components.test.js::Uses #rrggbbaa format if alpha channel value is less than 1",
+      "file": "tag/tests/components.test.js",
+      "line": 357,
       "name": "Uses #rrggbbaa format if alpha channel value is less than 1"
     },
     {
       "id": "tag/tests/components.test.js::Doesn't react on mouse events after a touch interaction",
       "file": "tag/tests/components.test.js",
-      "line": 329,
+      "line": 372,
       "name": "Doesn't react on mouse events after a touch interaction"
     },
     {
       "id": "tag/tests/components.test.js::Captures arrow keys only",
       "file": "tag/tests/components.test.js",
-      "line": 345,
+      "line": 388,
       "name": "Captures arrow keys only"
     },
     {
       "id": "tag/tests/components.test.js::Changes saturation with arrow keys",
       "file": "tag/tests/components.test.js",
-      "line": 372,
+      "line": 415,
       "name": "Changes saturation with arrow keys"
     },
     {
       "id": "tag/tests/components.test.js::Changes hue with arrow keys",
       "file": "tag/tests/components.test.js",
-      "line": 389,
+      "line": 432,
       "name": "Changes hue with arrow keys"
     },
     {
       "id": "tag/tests/components.test.js::Changes alpha with arrow keys",
       "file": "tag/tests/components.test.js",
-      "line": 403,
+      "line": 446,
       "name": "Changes alpha with arrow keys"
     },
     {
       "id": "tag/tests/components.test.js::Ignores keyboard commands if the pointer is already on a saturation edge",
       "file": "tag/tests/components.test.js",
-      "line": 419,
+      "line": 462,
       "name": "Ignores keyboard commands if the pointer is already on a saturation edge"
     },
     {
       "id": "tag/tests/components.test.js::Ignores keyboard commands if the pointer is already on a alpha edge",
       "file": "tag/tests/components.test.js",
-      "line": 438,
+      "line": 481,
       "name": "Ignores keyboard commands if the pointer is already on a alpha edge"
     },
     {
       "id": "tag/tests/components.test.js::Sets proper `aria-valuetext` attribute value",
       "file": "tag/tests/components.test.js",
-      "line": 456,
+      "line": 499,
       "name": "Sets proper `aria-valuetext` attribute value"
     },
     {
       "id": "tag/tests/components.test.js::Accepts any valid `div` attributes",
       "file": "tag/tests/components.test.js",
-      "line": 478,
+      "line": 521,
       "name": "Accepts any valid `div` attributes"
     },
     {
       "id": "tag/tests/components.test.js::Supports any event that a regular div does",
       "file": "tag/tests/components.test.js",
-      "line": 484,
+      "line": 527,
       "name": "Supports any event that a regular div does"
     },
     {
       "id": "tag/tests/components.test.js::Renders `HexColorInput` component properly",
       "file": "tag/tests/components.test.js",
-      "line": 492,
+      "line": 535,
       "name": "Renders `HexColorInput` component properly"
     },
     {
       "id": "tag/tests/components.test.js::Fires `onChange` when user changes `HexColorInput` value",
       "file": "tag/tests/components.test.js",
-      "line": 500,
+      "line": 543,
       "name": "Fires `onChange` when user changes `HexColorInput` value"
     },
     {
       "id": "tag/tests/components.test.js::Fires custom `onBlur` when `HexColorInput` has lost focus",
       "file": "tag/tests/components.test.js",
-      "line": 510,
+      "line": 553,
       "name": "Fires custom `onBlur` when `HexColorInput` has lost focus"
     },
     {
       "id": "tag/tests/components.test.js::Displays `#` prefix in `HexColorInput` if `prefixed` is turned on",
       "file": "tag/tests/components.test.js",
-      "line": 520,
+      "line": 563,
       "name": "Displays `#` prefix in `HexColorInput` if `prefixed` is turned on"
     },
     {
       "id": "tag/tests/components.test.js::Allows to enter `#rgba` and `#rrggbbaa` in `HexColorInput` if `alpha` is turned on",
       "file": "tag/tests/components.test.js",
-      "line": 529,
+      "line": 572,
       "name": "Allows to enter `#rgba` and `#rrggbbaa` in `HexColorInput` if `alpha` is turned on"
     },
     {
       "id": "tag/tests/components.test.js::Does not allow to enter `#rrggbbaa` in `HexColorInput` if `alpha` is turned off",
       "file": "tag/tests/components.test.js",
-      "line": 541,
+      "line": 584,
       "name": "Does not allow to enter `#rrggbbaa` in `HexColorInput` if `alpha` is turned off"
     },
     {
@@ -671,111 +694,117 @@
       "name": "Converts HSVA to RGBA"
     },
     {
-      "id": "tag/tests/utils.test.js::Converts RGBA to HSVA",
+      "id": "tag/tests/utils.test.js::Converts RGBA to HSVA and back without losing precision",
       "file": "tag/tests/utils.test.js",
       "line": 103,
+      "name": "Converts RGBA to HSVA and back without losing precision"
+    },
+    {
+      "id": "tag/tests/utils.test.js::Converts RGBA to HSVA",
+      "file": "tag/tests/utils.test.js",
+      "line": 113,
       "name": "Converts RGBA to HSVA"
     },
     {
       "id": "tag/tests/utils.test.js::Converts RGB string to HSVA",
       "file": "tag/tests/utils.test.js",
-      "line": 109,
+      "line": 119,
       "name": "Converts RGB string to HSVA"
     },
     {
       "id": "tag/tests/utils.test.js::Converts HSVA to RGB string",
       "file": "tag/tests/utils.test.js",
-      "line": 116,
+      "line": 131,
       "name": "Converts HSVA to RGB string"
     },
     {
       "id": "tag/tests/utils.test.js::Converts HSVA to RGBA string",
       "file": "tag/tests/utils.test.js",
-      "line": 121,
+      "line": 136,
       "name": "Converts HSVA to RGBA string"
     },
     {
       "id": "tag/tests/utils.test.js::Converts RGBA string to HSVA",
       "file": "tag/tests/utils.test.js",
-      "line": 126,
+      "line": 141,
       "name": "Converts RGBA string to HSVA"
     },
     {
       "id": "tag/tests/utils.test.js::Converts HSVA to HSVA string",
       "file": "tag/tests/utils.test.js",
-      "line": 132,
+      "line": 147,
       "name": "Converts HSVA to HSVA string"
     },
     {
       "id": "tag/tests/utils.test.js::Converts HSVA to HSV string",
       "file": "tag/tests/utils.test.js",
-      "line": 138,
+      "line": 153,
       "name": "Converts HSVA to HSV string"
     },
     {
       "id": "tag/tests/utils.test.js::Converts HSV string to HSVA",
       "file": "tag/tests/utils.test.js",
-      "line": 143,
+      "line": 158,
       "name": "Converts HSV string to HSVA"
     },
     {
       "id": "tag/tests/utils.test.js::Converts HSVA string to HSVA",
       "file": "tag/tests/utils.test.js",
-      "line": 151,
+      "line": 166,
       "name": "Converts HSVA string to HSVA"
     },
     {
       "id": "tag/tests/utils.test.js::Rounds HSVA",
       "file": "tag/tests/utils.test.js",
-      "line": 156,
+      "line": 171,
       "name": "Rounds HSVA"
     },
     {
       "id": "tag/tests/utils.test.js::Trims alpha-channel",
       "file": "tag/tests/utils.test.js",
-      "line": 163,
+      "line": 178,
       "name": "Trims alpha-channel"
     },
     {
       "id": "tag/tests/utils.test.js::Compares two HEX colors",
       "file": "tag/tests/utils.test.js",
-      "line": 169,
+      "line": 184,
       "name": "Compares two HEX colors"
     },
     {
       "id": "tag/tests/utils.test.js::Compares two object colors",
       "file": "tag/tests/utils.test.js",
-      "line": 176,
+      "line": 191,
       "name": "Compares two object colors"
     },
     {
       "id": "tag/tests/utils.test.js::Compares two string colors",
       "file": "tag/tests/utils.test.js",
-      "line": 183,
+      "line": 198,
       "name": "Compares two string colors"
     },
     {
       "id": "tag/tests/utils.test.js::Validates HEX colors",
       "file": "tag/tests/utils.test.js",
-      "line": 189,
+      "line": 204,
       "name": "Validates HEX colors"
     },
     {
       "id": "tag/tests/utils.test.js::Formats a class name",
       "file": "tag/tests/utils.test.js",
-      "line": 206,
+      "line": 221,
       "name": "Formats a class name"
     },
     {
       "id": "tag/tests/utils.test.js::Rounds a number",
       "file": "tag/tests/utils.test.js",
-      "line": 212,
+      "line": 227,
       "name": "Rounds a number"
     },
     {
       "id": "tag/tests/utils.test.js::Clamps a number between bounds",
       "file": "tag/tests/utils.test.js",
-      "line": 223,
+      "line": 238,
       "name": "Clamps a number between bounds"
     }
   ],
@@ -887,6 +916,24 @@
       "disposition": "adapted-and-executable",
       "evidence": "tests/upstream/components.test.ts::Changes alpha channel value after an interaction",
       "adaptedDigest": "cda38c86b92404e8f6c488f2fa6372f2906d5026c8d12b211e093ccd988b3052"
+    },
+    {
+      "upstream": "tag/tests/components.test.js::Doesn't change RGB channels when only alpha is changed",
+      "disposition": "adapted-and-executable",
+      "evidence": "tests/upstream/components.test.ts::Doesn't change RGB channels when only alpha is changed",
+      "adaptedDigest": "c734553d26f211d53253c33823a0cc37f9c8ca6ac877e0a097052d5caad1bc0d"
+    },
+    {
+      "upstream": "tag/tests/components.test.js::Doesn't change RGB string channels when only alpha is changed",
+      "disposition": "adapted-and-executable",
+      "evidence": "tests/upstream/components.test.ts::Doesn't change RGB string channels when only alpha is changed",
+      "adaptedDigest": "7dc59edcfd579c4dafac616a61daf1ffd56df1742cbffe061289dfa7543c4ddb"
+    },
+    {
+      "upstream": "tag/tests/components.test.js::Doesn't change HEX color channels when only alpha is changed",
+      "disposition": "adapted-and-executable",
+      "evidence": "tests/upstream/components.test.ts::Doesn't change HEX color channels when only alpha is changed",
+      "adaptedDigest": "0c1a212adc3fb4947e223efdcaed2d0e66ba6c744ecb249613e3d75dec45d6ed"
     },
     {
       "upstream": "tag/tests/components.test.js::Uses #rrggbbaa format if alpha channel value is less than 1",
@@ -1005,164 +1052,170 @@
     {
       "upstream": "tag/tests/utils.test.js::Converts HEX to HSVA",
       "disposition": "adapted-and-executable",
-      "evidence": "tests/upstream/utils.test.ts::Converts HEX to HSVA",
-      "adaptedDigest": "ada9887148dda0a31a7b08c6f2908489f115f6d6849315840905c241a456c19e"
+      "evidence": "tests/upstream/generated/utils.test.js::Converts HEX to HSVA",
+      "adaptedDigest": "925c60da99853f4302c43cca90485a7f12834ade1ed67520452b074a5ad0fd2e"
     },
     {
       "upstream": "tag/tests/utils.test.js::Converts shorthand HEX to HSVA",
       "disposition": "adapted-and-executable",
-      "evidence": "tests/upstream/utils.test.ts::Converts shorthand HEX to HSVA",
-      "adaptedDigest": "c67be4fa9e1eca7df550814fd44b5785fc33b170126c94c671892277d88b5ce8"
+      "evidence": "tests/upstream/generated/utils.test.js::Converts shorthand HEX to HSVA",
+      "adaptedDigest": "0f94ae4d42c2b25d2cda0bfa58394f554f9b75e2f591cd9023a6a8ae185cad64"
     },
     {
       "upstream": "tag/tests/utils.test.js::Converts HSVA to HEX",
       "disposition": "adapted-and-executable",
-      "evidence": "tests/upstream/utils.test.ts::Converts HSVA to HEX",
-      "adaptedDigest": "743be3c7c313d0da244fa1652a70eba918e0e175b26d119ad6db167ba06aa7b1"
+      "evidence": "tests/upstream/generated/utils.test.js::Converts HSVA to HEX",
+      "adaptedDigest": "2505ec601f343bc468e6b57099e39c87f9299225712ea4220aa3689e01f6dd67"
     },
     {
       "upstream": "tag/tests/utils.test.js::Converts HSVA to HSLA",
       "disposition": "adapted-and-executable",
-      "evidence": "tests/upstream/utils.test.ts::Converts HSVA to HSLA",
-      "adaptedDigest": "56bb07e3edb70433a7fcb7fab524824e4e0cae2b6e1bf0363dca0a33137542c2"
+      "evidence": "tests/upstream/generated/utils.test.js::Converts HSVA to HSLA",
+      "adaptedDigest": "5f71128606ee7eb6b032553a5f742b75d3a4681a14470df248d2637936ae694b"
     },
     {
       "upstream": "tag/tests/utils.test.js::Converts HSLA to HSVA",
       "disposition": "adapted-and-executable",
-      "evidence": "tests/upstream/utils.test.ts::Converts HSLA to HSVA",
-      "adaptedDigest": "72d822e7c2c5ccb47b4f750363dd4d273189b7d2d08b461d4b17f4fa82a35748"
+      "evidence": "tests/upstream/generated/utils.test.js::Converts HSLA to HSVA",
+      "adaptedDigest": "f50a980b92a9d1deecca2bef7baf247b851a2d8df72c14ca91571a198059c7bc"
     },
     {
       "upstream": "tag/tests/utils.test.js::Converts HSVA to HSL string",
       "disposition": "adapted-and-executable",
-      "evidence": "tests/upstream/utils.test.ts::Converts HSVA to HSL string",
-      "adaptedDigest": "71f626392836b723f01e80fd6a81e8f56dc7b996a250a505e1566a19185bf5ce"
+      "evidence": "tests/upstream/generated/utils.test.js::Converts HSVA to HSL string",
+      "adaptedDigest": "f6c2beeb524f8541e9849dca3ae79d01c81abb6cb34f946f06dec69078b02351"
     },
     {
       "upstream": "tag/tests/utils.test.js::Converts HSL string to HSVA",
       "disposition": "adapted-and-executable",
-      "evidence": "tests/upstream/utils.test.ts::Converts HSL string to HSVA",
-      "adaptedDigest": "dba4432165b6d6b55945a8200dbbce4d49d1050cd9a05079f14b38a18b13b539"
+      "evidence": "tests/upstream/generated/utils.test.js::Converts HSL string to HSVA",
+      "adaptedDigest": "ea7a00771113eb62424ec50af002df451f0e72bf2adeffa8d6e504028da7d789"
     },
     {
       "upstream": "tag/tests/utils.test.js::Converts HSLA string to HSVA",
       "disposition": "adapted-and-executable",
-      "evidence": "tests/upstream/utils.test.ts::Converts HSLA string to HSVA",
-      "adaptedDigest": "0042674baea871e4c7d306f4b81a64496f6046d4bd5622d420c24ecd30d2c2a8"
+      "evidence": "tests/upstream/generated/utils.test.js::Converts HSLA string to HSVA",
+      "adaptedDigest": "94dc8b2d1928c026c398a7c17ff1229772b8f407800754227b1cd6731140a90a"
     },
     {
       "upstream": "tag/tests/utils.test.js::Converts HSVA to RGBA",
       "disposition": "adapted-and-executable",
-      "evidence": "tests/upstream/utils.test.ts::Converts HSVA to RGBA",
-      "adaptedDigest": "fc830d32b647e34fcda67e558cd3317aeff423b2e96e6ad2ec1569a4477e7db3"
+      "evidence": "tests/upstream/generated/utils.test.js::Converts HSVA to RGBA",
+      "adaptedDigest": "8b2f41ea82a25abba1899bcce588fb5ab54bbc40bb21355ba8c9d6d5deba8f6a"
+    },
+    {
+      "upstream": "tag/tests/utils.test.js::Converts RGBA to HSVA and back without losing precision",
+      "disposition": "adapted-and-executable",
+      "evidence": "tests/upstream/generated/utils.test.js::Converts RGBA to HSVA and back without losing precision",
+      "adaptedDigest": "25bb1543094a3adcfa864d61f22575e66f6b7e423708dec4dbab897be699b473"
     },
     {
       "upstream": "tag/tests/utils.test.js::Converts RGBA to HSVA",
       "disposition": "adapted-and-executable",
-      "evidence": "tests/upstream/utils.test.ts::Converts RGBA to HSVA",
-      "adaptedDigest": "89a0b5a5fd3e45d1f6f10568c10a40af6947a74b761b8e37777bf4f5b55c7a36"
+      "evidence": "tests/upstream/generated/utils.test.js::Converts RGBA to HSVA",
+      "adaptedDigest": "07c4d2eedf5eda6c905d0076de1cc4aac7df34804f52767311ea5aea6eea64c5"
     },
     {
       "upstream": "tag/tests/utils.test.js::Converts RGB string to HSVA",
       "disposition": "adapted-and-executable",
-      "evidence": "tests/upstream/utils.test.ts::Converts RGB string to HSVA",
-      "adaptedDigest": "d91ae6709a8a31d63ac5581892432a8d1f8804230c46739e9334e757146fa8f0"
+      "evidence": "tests/upstream/generated/utils.test.js::Converts RGB string to HSVA",
+      "adaptedDigest": "f630f7ff261132f15b67e214a58b7e268bf058f9767b4b8e449174956658726e"
     },
     {
       "upstream": "tag/tests/utils.test.js::Converts HSVA to RGB string",
       "disposition": "adapted-and-executable",
-      "evidence": "tests/upstream/utils.test.ts::Converts HSVA to RGB string",
-      "adaptedDigest": "6514fc917e5f8283a6989c39c3f5ee0197c67e854b5a3af1c0a6ffc940db835e"
+      "evidence": "tests/upstream/generated/utils.test.js::Converts HSVA to RGB string",
+      "adaptedDigest": "a2a87f20d96b455889f47599359af0f06ac38ab6205a8ec00bc469b7cd7e31e3"
     },
     {
       "upstream": "tag/tests/utils.test.js::Converts HSVA to RGBA string",
       "disposition": "adapted-and-executable",
-      "evidence": "tests/upstream/utils.test.ts::Converts HSVA to RGBA string",
-      "adaptedDigest": "6cd55f4ec61c959c9bf066233523dc7e813f7d9544d111c13431b04febc8d818"
+      "evidence": "tests/upstream/generated/utils.test.js::Converts HSVA to RGBA string",
+      "adaptedDigest": "ac07cb305701552c4b8264b3174c272162e7f93929b0ee2a5f2ad48b9148b57c"
     },
     {
       "upstream": "tag/tests/utils.test.js::Converts RGBA string to HSVA",
       "disposition": "adapted-and-executable",
-      "evidence": "tests/upstream/utils.test.ts::Converts RGBA string to HSVA",
-      "adaptedDigest": "fdfacf205cdfc5503f8a495e6f3de64ce6b633a3e94ae039483eb1ac76396cec"
+      "evidence": "tests/upstream/generated/utils.test.js::Converts RGBA string to HSVA",
+      "adaptedDigest": "0567b496c55a724959c3b00e8006617dab1d08a403e450873d38967153c0a830"
     },
     {
       "upstream": "tag/tests/utils.test.js::Converts HSVA to HSVA string",
       "disposition": "adapted-and-executable",
-      "evidence": "tests/upstream/utils.test.ts::Converts HSVA to HSVA string",
-      "adaptedDigest": "74494aec377891889e58e5cbd8ee08735a03718fb2bc314684e016baffb1efe4"
+      "evidence": "tests/upstream/generated/utils.test.js::Converts HSVA to HSVA string",
+      "adaptedDigest": "873f1b3de54e888031c935eee49437d75f5e03fe4d843fea25b3280d9fa817ba"
     },
     {
       "upstream": "tag/tests/utils.test.js::Converts HSVA to HSV string",
       "disposition": "adapted-and-executable",
-      "evidence": "tests/upstream/utils.test.ts::Converts HSVA to HSV string",
-      "adaptedDigest": "69330b79e54ceb3613cd0bae646bf1ce1b3faeee6ef2a325319bf4f6d7800c92"
+      "evidence": "tests/upstream/generated/utils.test.js::Converts HSVA to HSV string",
+      "adaptedDigest": "a78cc3e374dfb49565a03cbcc52343a4d1c7b28a7c7715b83c39a8c577dac27a"
     },
     {
       "upstream": "tag/tests/utils.test.js::Converts HSV string to HSVA",
       "disposition": "adapted-and-executable",
-      "evidence": "tests/upstream/utils.test.ts::Converts HSV string to HSVA",
-      "adaptedDigest": "64a88884e8d45e1ba55748637f61e7d1d807f8a8d8cc5f17a5e4e91672d4ae1f"
+      "evidence": "tests/upstream/generated/utils.test.js::Converts HSV string to HSVA",
+      "adaptedDigest": "b79da8d45fa8bc722c0560743b5d5861742b00aa421c0a38738214db94585978"
     },
     {
       "upstream": "tag/tests/utils.test.js::Converts HSVA string to HSVA",
       "disposition": "adapted-and-executable",
-      "evidence": "tests/upstream/utils.test.ts::Converts HSVA string to HSVA",
-      "adaptedDigest": "8fce94df494388d7d174aef4d6a3a28175f4ab8ebb4f67aa8d5203d99f058b35"
+      "evidence": "tests/upstream/generated/utils.test.js::Converts HSVA string to HSVA",
+      "adaptedDigest": "2ed6be988623a8b17e2b4d9cbacc290045caadc22e9fbcaeee49c0ba909592a2"
     },
     {
       "upstream": "tag/tests/utils.test.js::Rounds HSVA",
       "disposition": "adapted-and-executable",
-      "evidence": "tests/upstream/utils.test.ts::Rounds HSVA",
-      "adaptedDigest": "ac986535b07695a5a3f2e8fbc9b277dfa014d15097721c429d15be96a613ea74"
+      "evidence": "tests/upstream/generated/utils.test.js::Rounds HSVA",
+      "adaptedDigest": "b771b0cf6ec609760bacb46f34b79b3871772485704d34e9e5452ba352a20a64"
     },
     {
       "upstream": "tag/tests/utils.test.js::Trims alpha-channel",
       "disposition": "adapted-and-executable",
-      "evidence": "tests/upstream/utils.test.ts::Trims alpha-channel",
-      "adaptedDigest": "d51f0cfd4df700ca8876c8a9319ddc3b22b9935fa69aeb67df351d07f43b1161"
+      "evidence": "tests/upstream/generated/utils.test.js::Trims alpha-channel",
+      "adaptedDigest": "26bb3f7a11930e08f0e0b191a39b8ad0abf804e4a24ced300f7d2ff2fde5bf16"
     },
     {
       "upstream": "tag/tests/utils.test.js::Compares two HEX colors",
       "disposition": "adapted-and-executable",
-      "evidence": "tests/upstream/utils.test.ts::Compares two HEX colors",
-      "adaptedDigest": "1b71c41bd37ab31b167a5d98d37fe474175530b3145087a262252f0c40b998ba"
+      "evidence": "tests/upstream/generated/utils.test.js::Compares two HEX colors",
+      "adaptedDigest": "c79c909c95c4a28088d533822e9d0bca8169915f974d1bc8c1cb9ff42948ea6d"
     },
     {
       "upstream": "tag/tests/utils.test.js::Compares two object colors",
       "disposition": "adapted-and-executable",
-      "evidence": "tests/upstream/utils.test.ts::Compares two object colors",
-      "adaptedDigest": "aae1750abbe851653b2a0cc79afd96e95f06b923bf42310d50311db5a175b786"
+      "evidence": "tests/upstream/generated/utils.test.js::Compares two object colors",
+      "adaptedDigest": "e8bcf3603973e286010273c5ab0bc612b2b670e8adb29169fbb7d68d0a203844"
     },
     {
       "upstream": "tag/tests/utils.test.js::Compares two string colors",
       "disposition": "adapted-and-executable",
-      "evidence": "tests/upstream/utils.test.ts::Compares two string colors",
-      "adaptedDigest": "3aa8312005a0bd317dbc0176af26b67f4ef97c0f14c295cf8eecd3eaedf71213"
+      "evidence": "tests/upstream/generated/utils.test.js::Compares two string colors",
+      "adaptedDigest": "a071e2c49bc31cc08ce3d12222bb7a476c51c8c4b863c9ddc80afcfbecd7ceaa"
     },
     {
       "upstream": "tag/tests/utils.test.js::Validates HEX colors",
       "disposition": "adapted-and-executable",
-      "evidence": "tests/upstream/utils.test.ts::Validates HEX colors",
-      "adaptedDigest": "53a2c0b769d16c3b35c1e649cd8a535a11310c7e007ca00a88cecf8da6c81a00"
+      "evidence": "tests/upstream/generated/utils.test.js::Validates HEX colors",
+      "adaptedDigest": "7bc61c315811eb6b651acbba22170c6515aaa9a18773bc701fc44f3558de341d"
     },
     {
       "upstream": "tag/tests/utils.test.js::Formats a class name",
       "disposition": "adapted-and-executable",
-      "evidence": "tests/upstream/utils.test.ts::Formats a class name",
-      "adaptedDigest": "a9eb25fcdc863a2fcf0f10c7093707be8e422a26988ea9b5107aa68bce18e844"
+      "evidence": "tests/upstream/generated/utils.test.js::Formats a class name",
+      "adaptedDigest": "7999aa26b48ca32ebfe4f15f9c3a1ba896cfc95b405773b5eab4b9cfb72214d9"
     },
     {
       "upstream": "tag/tests/utils.test.js::Rounds a number",
       "disposition": "adapted-and-executable",
-      "evidence": "tests/upstream/utils.test.ts::Rounds a number",
-      "adaptedDigest": "c9e5941e2a155d5734202bf75e492cc63dfa177f4813c1fe263f66ff73dd16aa"
+      "evidence": "tests/upstream/generated/utils.test.js::Rounds a number",
+      "adaptedDigest": "7382b605aae8155a75d5c2b174efc87f955fd0c3d523e11a83cb79dab777390a"
     },
     {
       "upstream": "tag/tests/utils.test.js::Clamps a number between bounds",
       "disposition": "adapted-and-executable",
-      "evidence": "tests/upstream/utils.test.ts::Clamps a number between bounds",
-      "adaptedDigest": "d4d078a8d9038dc20ce457d4a40856ba45958d8f5abf2e3f3485f332fbf5ad6e"
+      "evidence": "tests/upstream/generated/utils.test.js::Clamps a number between bounds",
+      "adaptedDigest": "e715ad8b179742ce58a45a5d8b7888c1892b0df8920cf38a47c9dba80adf6ec1"
     }
   ]
 }

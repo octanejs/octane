@@ -2,18 +2,17 @@
   "schemaVersion": 1,
   "identity": {
     "packageName": "react-colorful",
-    "version": "5.8.0",
+    "version": "5.8.1",
     "repository": {
       "owner": "omgovich",
       "repo": "react-colorful",
       "subdirectory": null
     },
-    "commit": "d914e7647c40a8bbdb286985176e769d76061732",
-    "integrity": "sha512-Wy9OzPfjSN9bF12OB8N7UQvlsZ0I+7wHxpN+bV5BjNQGxOj6IiwkRjevJK9yOBjJWGQvAaf1OXtn8rUeEatAng=="
+    "commit": "8506e8c4b777e0056ce3567dc3a06ced143034bc",
+    "integrity": "sha512-oz68bhsnFWnpDf1ZR8daiQbYpXUnM2h2J6hl9Zg2rTpM/DU6vCqe1E+CpqmqLnJucMZetHZeifSAfJ+geN9lcA=="
   },
   "license": {
     "spdx": "MIT",
-    "declaration": "manifest",
     "evidence": [
       {
         "path": "LICENSE",
@@ -36,12 +35,25 @@
     {
       "fromRoot": "tests/__snapshots__",
       "toRoot": "tests/upstream/tag/snapshots"
+    },
+    {
+      "fromRoot": "tests",
+      "toRoot": "tests/upstream/generated",
+      "include": "^utils\\.test\\.js$"
     }
   ],
   "adaptedRewrites": [
     {
       "find": "https://goo.gl/fbAQLP",
       "replace": "https://jestjs.io/docs/snapshot-testing"
+    },
+    {
+      "find": "../src/",
+      "replace": "../../../src/"
+    },
+    {
+      "find": "// HEX",
+      "replace": "import { expect, it } from 'vitest';\n\n// HEX"
     }
   ],
   "files": [
@@ -57,8 +69,8 @@
     },
     {
       "path": "package.json",
-      "gitBlob": "30de70f7592a6ef2bd4da0a8ff19575f8a658697",
-      "size": 5738
+      "gitBlob": "eee910c79785d7fa9647b8fec4f81ba849e68e48",
+      "size": 5804
     },
     {
       "path": "README.md",
@@ -232,8 +244,8 @@
     },
     {
       "path": "src/utils/convert.ts",
-      "gitBlob": "2d35b38e096338488f2a26a6bb0d241bae72c8eb",
-      "size": 5907
+      "gitBlob": "470faf366d6028c23954d1e51f41f7776fbb6d09",
+      "size": 6067
     },
     {
       "path": "src/utils/format.ts",
@@ -267,8 +279,8 @@
     },
     {
       "path": "tests/components.test.js",
-      "gitBlob": "b1a04f088f3b43cf2adca366b29f3f61ca006d2b",
-      "size": 20456
+      "gitBlob": "e3b716b3cdb436d5dc3eb4436b111a58b33b7c17",
+      "size": 22084
     },
     {
       "path": "tests/csp.test.js",
@@ -282,8 +294,8 @@
     },
     {
       "path": "tests/utils.test.js",
-      "gitBlob": "1243e66bbb977074e33b788bf6ac951f86c5b0c7",
-      "size": 10097
+      "gitBlob": "ff7d43c6b2f96692d2f08687c133e8c4f6fe237f",
+      "size": 10720
     },
     {
       "path": "tsconfig.build.json",
@@ -296,5 +308,5 @@
       "size": 308
     }
   ],
-  "fingerprint": "e7902e41159e9d904a2579d9cc4608565652670a3cbc963aff042f2a19e6b331"
+  "fingerprint": "9488ea851b7468aa143e2c9d5e17d6f4b92eff96e6318e8e134af5ba1d1c3fcc"
 }

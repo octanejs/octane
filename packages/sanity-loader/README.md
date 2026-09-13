@@ -1,7 +1,7 @@
 # @octanejs/sanity-loader
 
 Sanity query loading, Live Mode, and Content Source Map hooks for Octane. It is
-the Octane counterpart to `@sanity/react-loader@2.2.1` and delegates the data
+the Octane counterpart to `@sanity/react-loader@2.2.2` and delegates the data
 layer to Sanity's framework-neutral `@sanity/core-loader` package.
 
 ```sh

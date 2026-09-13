@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": [],
+    "skipLibCheck": false
+  },
+  "include": ["tests/types/public.test-d.ts"],
+  "exclude": ["node_modules", "upstream", "upstream-artifact"],
+  "reactPortEvidence": {
+    "gate": "public-types",
+    "publicMode": "pinned"
+  }
+}

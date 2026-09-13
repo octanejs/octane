@@ -23,6 +23,7 @@ import {
 	sanitizeForReport,
 	validateArchiveEntries,
 	verifyIntegrity,
+	verifyNonTestArtifact,
 } from './preflight-lib.mjs';
 
 test('conventional test discovery excludes fixture modules beside runnable suites', () => {
@@ -320,7 +321,7 @@ function makeTar(files) {
 	return makeTarEntries(Object.entries(files).map(([name, value]) => ({ name, value })));
 }
 
-function packageRootResolverFixture(files, repositoryDirectory) {
+function packageRootResolverFixture(files, repositoryDirectory, manifestOverrides = {}) {
 	const commit = '1'.repeat(40);
 	const tree = '2'.repeat(40);
 	const manifest = {
@@ -334,6 +335,7 @@ function packageRootResolverFixture(files, repositoryDirectory) {
 			...(repositoryDirectory ? { directory: repositoryDirectory } : {}),
 		},
 		scripts: { test: 'vitest run' },
+		...manifestOverrides,
 	};
 	const tarball = gzipSync(
 		makeTar({ 'package/package.json': JSON.stringify(manifest), 'package/LICENSE': MIT_TEXT }),
@@ -383,6 +385,53 @@ function packageRootResolverFixture(files, repositoryDirectory) {
 		throw new Error(`Unexpected fixture request ${url}`);
 	};
 }
+
+test('discovers a root Playwright configuration even when npm invokes a wrapper script', async () => {
+	const input = 'react-root-discovery@1.0.0';
+	const fetchImpl = packageRootResolverFixture(
+		(manifest) => ({
+			'package.json': manifest,
+			LICENSE: MIT_TEXT,
+			'playwright.config.ts': "export default { testDir: './browser' };",
+			'browser/widget.spec.ts': "test('renders', () => {});",
+			'browser/helpers.ts': 'export const fixture = true;',
+			'outside/unrelated.spec.ts': "test('not selected', () => {});",
+		}),
+		null,
+		{ scripts: { test: './run-tests.sh' } },
+	);
+	const result = await resolveRemoteInput(parseInput(input), input, { fetchImpl });
+	assert.deepEqual(
+		result.upstreamTestInventory.map(({ path }) => path),
+		['browser/widget.spec.ts'],
+	);
+});
+
+test('large unrelated Git blobs do not consume the downloaded artifact byte budget', async () => {
+	const input = 'react-root-discovery@1.0.0';
+	const fetchFixture = packageRootResolverFixture((manifest) => ({
+		'package.json': manifest,
+		LICENSE: MIT_TEXT,
+		'tests/widget.test.ts': "test('renders', () => {});",
+	}));
+	const fetchImpl = async (url, options) => {
+		const response = await fetchFixture(url, options);
+		if (!String(url).includes('/git/trees/')) return response;
+		const tree = await response.json();
+		tree.tree.push({
+			path: 'docs/demo-video.mp4',
+			type: 'blob',
+			mode: '100644',
+			size: 512 * 1024 * 1024,
+			sha: '3'.repeat(40),
+			url: 'https://api.github.com/never-download-this-blob',
+		});
+		return Response.json(tree);
+	};
+	const result = await resolveRemoteInput(parseInput(input), input, { fetchImpl });
+	assert.equal(result.status, 'licensed');
+	assert.equal(result.upstreamTestInventory.length, 1);
+});
 
 test('resolves an omitted npm directory from the immutable package name and scopes its tests', async () => {
 	const input = 'react-root-discovery@1.0.0';
@@ -1572,4 +1621,114 @@ test('pinned literal rows derive a reviewed filter without evaluating source', (
 		() => pinnedLiteralRows('const chars = getRows()', { arrayName: 'chars' }),
 		/must be literal/,
 	);
+});
+
+test('immutable test discovery follows bounded shared config imports outside the package directory', async () => {
+	const input = 'react-root-discovery@1.0.0';
+	const fetchImpl = packageRootResolverFixture(
+		(manifest) => ({
+			'package.json': { private: true },
+			'packages/widget/package.json': manifest,
+			LICENSE: MIT_TEXT,
+			'packages/widget/jest.config.js': `const base = require('../../shared/jest'); module.exports = { ...base };`,
+			'shared/jest.js': `throw new Error('must not run'); module.exports = { testMatch: ['tests/**/*-test.ts'], testPathIgnorePatterns: ['helper'] };`,
+			'packages/widget/tests/widget-test.ts': "test('renders', () => {});",
+			'packages/widget/tests/helper-test.ts': 'export const helper = true;',
+			'packages/widget/tests/unrelated.test.ts': "test('excluded', () => {});",
+		}),
+		'packages/widget',
+		{ scripts: { test: 'jest' } },
+	);
+	const result = await resolveRemoteInput(parseInput(input), input, { fetchImpl });
+	assert.deepEqual(
+		result.upstreamTestInventory.map(({ path }) => path),
+		['packages/widget/tests/widget-test.ts'],
+	);
+});
+
+test('uses immutable repository Vitest defaults for a workspace package', async () => {
+	const input = 'react-root-discovery@1.0.0';
+	const fetchImpl = packageRootResolverFixture(
+		(manifest) => ({
+			'package.json': { private: true, devDependencies: { vitest: '^5.0.0' } },
+			'packages/widget/package.json': manifest,
+			LICENSE: MIT_TEXT,
+			'packages/widget/vitest.config.ts': `import { configDefaults } from 'vitest/config'; export default { test: { exclude: [...configDefaults.exclude, 'src/index.test.ts'] } };`,
+			'packages/widget/src/index.test.ts': 'export const helper = true;',
+			'packages/widget/src/widget.test.ts': "test('renders', () => {});",
+		}),
+		'packages/widget',
+	);
+	const result = await resolveRemoteInput(parseInput(input), input, { fetchImpl });
+	assert.deepEqual(
+		result.upstreamTestInventory.map(({ path }) => path),
+		['packages/widget/src/widget.test.ts'],
+	);
+});
+
+test('shared configuration traversal rejects graphs exceeding the bounded file budget', async () => {
+	const input = 'react-root-discovery@1.0.0';
+	const fetchImpl = packageRootResolverFixture((manifest) => ({
+		'package.json': manifest,
+		LICENSE: MIT_TEXT,
+		'vitest.config.ts': `import base from './shared/config0'; export default base;`,
+		...Object.fromEntries(
+			Array.from({ length: 65 }, (_, index) => [
+				`shared/config${index}.ts`,
+				index < 64
+					? `import base from './config${index + 1}'; export default base;`
+					: `export default { test: { include: [] } };`,
+			]),
+		),
+	}));
+	await assert.rejects(
+		() => resolveRemoteInput(parseInput(input), input, { fetchImpl }),
+		/configuration exceeds the file limit/,
+	);
+});
+
+test('a configuration import does not hide an independently selected runtime suite', async () => {
+	const input = 'react-root-discovery@1.0.0';
+	const fetchImpl = packageRootResolverFixture((manifest) => ({
+		'package.json': manifest,
+		LICENSE: MIT_TEXT,
+		'vitest.config.ts': `import './tests/widget.test'; export default { test: { include: ['tests/*.test.ts'] } };`,
+		'tests/widget.test.ts': "test('renders', () => {});",
+	}));
+	const result = await resolveRemoteInput(parseInput(input), input, { fetchImpl });
+	assert.deepEqual(
+		result.upstreamTestInventory.map(({ path }) => path),
+		['tests/widget.test.ts'],
+	);
+});
+
+test('non-test dispositions require an exact reviewed blob and cannot suppress registrations', () => {
+	const source =
+		"import {writeFileSync} from 'node:fs'; writeFileSync('golden.json', JSON.stringify({samples:[0,1]}));";
+	const entry = { path: 'scripts/extract-spec.ts', sha: gitBlobSha(Buffer.from(source)) };
+	const disposition = {
+		path: entry.path,
+		gitBlob: entry.sha,
+		reason: 'Generates geometry vectors; it contains no runtime or type assertions.',
+	};
+	assert.doesNotThrow(() => verifyNonTestArtifact(source, entry, disposition));
+	assert.throws(
+		() => verifyNonTestArtifact(source, entry, { ...disposition, gitBlob: '0'.repeat(40) }),
+		/mismatch/,
+	);
+	assert.throws(
+		() => verifyNonTestArtifact(source, entry, { ...disposition, reason: '' }),
+		/reason/,
+	);
+	for (const source of [
+		"test('real test', () => {});",
+		"it.each(values)('dynamic', () => {});",
+		'expectTypeOf<string>().toEqualTypeOf<string>();',
+	]) {
+		const entry = { path: disposition.path, sha: gitBlobSha(Buffer.from(source)) };
+		assert.throws(
+			() => verifyNonTestArtifact(source, entry, { ...disposition, gitBlob: entry.sha }),
+			/contains.*(registration|assertion)/,
+		);
+	}
 });

@@ -18,6 +18,7 @@ type HydrationBinding =
 	| 'select'
 	| 'solana-kit'
 	| 'testing-library'
+	| 'thinking-orbs'
 	| 'tanstack-pacer'
 	| 'tanstack-query'
 	| 'tanstack-virtual'
@@ -29,6 +30,8 @@ const repositoryRoot = resolve(import.meta.dirname, '../../..');
 
 function bindingAliases(binding: HydrationBinding) {
 	const source = resolve(repositoryRoot, 'packages', binding, 'src');
+	if (binding === 'thinking-orbs')
+		return [{ find: /^@octanejs\/thinking-orbs$/, replacement: resolve(source, 'index.ts') }];
 	if (binding === 'alien-signals') {
 		return [{ find: /^@octanejs\/alien-signals$/, replacement: resolve(source, 'index.ts') }];
 	}

@@ -3,9 +3,14 @@
 This binding targets Electron's process-split consumer layout, pinned for types
 and local development at:
 
-- package: `electron@43.2.0`
+- package: `electron@44.3.0`
 - advertised peer range: `electron >= 33.0.0`
 - there is no React binding upstream; Electron is framework-agnostic
+
+The clipboard bridge accepts synchronous hosts from earlier Electron releases
+and the asynchronous clipboard API introduced in Electron 44. Renderer promises
+wait for native writes to complete and propagate write failures. Clipboard access
+remains in the main process and is exposed through the preload bridge.
 
 ## Source boundary
 

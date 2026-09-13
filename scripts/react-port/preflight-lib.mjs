@@ -13,7 +13,11 @@ import {
 import { decodePathPart, parseGitHubUrl, parseInput } from './input-lib.mjs';
 import { fingerprint, sanitizeForReport, stableStringify } from './report-lib.mjs';
 import { selectHighestSatisfyingVersion } from './version-lib.mjs';
-import { configuredTestSelectors, selectedByTestConfiguration } from './test-discovery.mjs';
+import {
+	configuredTestSelectors,
+	resolveConfigurationImport,
+	selectedByTestConfiguration,
+} from './test-discovery.mjs';
 
 const SUPPORTED_INTEGRITY_ALGORITHMS = ['sha512', 'sha384', 'sha256'];
 
@@ -49,7 +53,7 @@ const MAX_SOURCE_FILES = 4_000;
 const MAX_SOURCE_BYTES = 64 * 1024 * 1024;
 const TEST_SOURCE_PATTERN = /\.(?:[cm]?[jt]sx?|coffee)$/i;
 const TEST_CONFIG_PATTERN =
-	/^(?:(?:vitest|vite|jest|karma|mocha|ava|webpack)\.config|test(?:s)?\.config)\.[cm]?[jt]s$/i;
+	/^(?:(?:vitest|vite|jest|playwright|karma|mocha|ava|webpack)\.config|test(?:s)?\.config)\.[cm]?[jt]s$/i;
 const MAX_UPSTREAM_TEST_FILES = 500;
 const MAX_UPSTREAM_TEST_BYTES = 16 * 1024 * 1024;
 
@@ -765,7 +769,7 @@ export function conventionalTestPath(relativePath, { runner } = {}) {
 	) {
 		return false;
 	}
-	if (runner === 'vitest' || runner === 'jest') {
+	if (runner === 'vitest' || runner === 'jest' || runner === 'playwright') {
 		return (
 			/(?:^|[.-])(?:test|spec|test-d|d-test)\.[cm]?[jt]sx?$/.test(baseName) ||
 			segments.some((segment) => ['typetests', 'type-tests', 'test-d'].includes(segment)) ||
@@ -1080,6 +1084,43 @@ export function pinnedLiteralRows(source, { arrayName, excludeFirstColumn = [] }
 	return rows.filter((row) => !excludeFirstColumn.includes(row[0]));
 }
 
+export function verifyNonTestArtifact(source, entry, disposition) {
+	if (
+		disposition.path !== entry.path ||
+		disposition.gitBlob !== entry.sha ||
+		createHash('sha1')
+			.update(`blob ${Buffer.byteLength(source)}\0`)
+			.update(source)
+			.digest('hex') !== entry.sha
+	)
+		throw new Error(`Non-test artifact profile source mismatch: ${entry.path}`);
+	if (typeof disposition.reason !== 'string' || disposition.reason.trim().length < 20)
+		throw new Error(`Non-test artifact disposition requires a precise reason: ${entry.path}`);
+	const file = ts.createSourceFile(entry.path, source, ts.ScriptTarget.Latest, true);
+	function containsAssertion(node) {
+		if (ts.isCallExpression(node)) {
+			let callee = node.expression;
+			while (ts.isPropertyAccessExpression(callee) || ts.isCallExpression(callee))
+				callee = callee.expression;
+			if (
+				ts.isIdentifier(callee) &&
+				/^(?:expect(?:Type|TypeOf)?|assert(?:Type)?)$/.test(callee.text)
+			)
+				return true;
+		}
+		return ts.forEachChild(node, containsAssertion) ?? false;
+	}
+	if (
+		containsAssertion(file) ||
+		findPossibleUnexpandedRegistrars(source).length ||
+		extractTestCases(source, { file: entry.path }).length ||
+		extractTypeAssertionGroups(source, entry.path).length
+	)
+		throw new Error(
+			`Non-test artifact contains a test registration or type assertion: ${entry.path}`,
+		);
+}
+
 export async function immutableTestInventory(tree, subdirectory, manifest, options) {
 	const profilePath = new URL(
 		`./profiles/${manifest.name?.replace(/^@/, '').replaceAll('/', '-')}-${manifest.version}.json`,
@@ -1161,7 +1202,7 @@ export async function immutableTestInventory(tree, subdirectory, manifest, optio
 			(relativePath !== null && explicitConfigurationPaths.includes(relativePath))
 		);
 	});
-	const runner = ['vitest', 'jest'].find(
+	const runner = ['vitest', 'jest', 'playwright'].find(
 		(name) =>
 			Object.values(testScripts).some((command) => new RegExp(`\\b${name}\\b`).test(command)) ||
 			configurationEntries.some((entry) => path.posix.basename(entry.path).startsWith(`${name}.`)),
@@ -1176,8 +1217,46 @@ export async function immutableTestInventory(tree, subdirectory, manifest, optio
 		...manifestSelections.testFiles,
 	]);
 	const inlineSourcePatterns = new Set(manifestSelections.inlineSources);
+	let vitestVersion = manifest.devDependencies?.vitest ?? manifest.dependencies?.vitest;
+	if (
+		!vitestVersion &&
+		subdirectory &&
+		configurationEntries.some((entry) => path.posix.basename(entry.path).startsWith('vitest.'))
+	) {
+		const rootManifest = tree.find(
+			(entry) => entry.path === 'package.json' && isGitHubRegularBlob(entry),
+		);
+		if (rootManifest) {
+			const root = parseJsonFile(
+				await fetchGitHubBlob(rootManifest, options),
+				'Repository package.json',
+			);
+			vitestVersion = root.devDependencies?.vitest ?? root.dependencies?.vitest;
+		}
+	}
+	const configurationSources = new Map();
+	const sourceEntriesByPath = new Map(
+		tree.filter(isGitHubRegularBlob).map((entry) => [entry.path, entry]),
+	);
+	let configurationBytes = 0;
+	async function readConfiguration(entry) {
+		if (configurationSources.has(entry.path)) return;
+		if (configurationSources.size >= 64)
+			throw new Error('Immutable upstream configuration exceeds the file limit');
+		const bytes = await fetchGitHubBlob(entry, options);
+		configurationBytes += bytes.length;
+		if (configurationBytes > 4 * 1024 * 1024)
+			throw new Error('Immutable upstream configuration exceeds the byte limit');
+		const source = bytes.toString('utf8');
+		configurationSources.set(entry.path, source);
+		for (const specifier of collectModuleSpecifiers([[entry.path, bytes]])) {
+			const imported = resolveConfigurationImport(entry.path, specifier, sourceEntriesByPath);
+			if (imported) await readConfiguration(sourceEntriesByPath.get(imported));
+		}
+	}
+	for (const entry of configurationEntries) await readConfiguration(entry);
 	for (const entry of configurationEntries) {
-		const source = (await fetchGitHubBlob(entry, options)).toString('utf8');
+		const source = configurationSources.get(entry.path);
 		const configurationRunner =
 			['vitest', 'jest', 'playwright'].find((name) =>
 				path.posix.basename(entry.path).startsWith(`${name}.`),
@@ -1185,6 +1264,8 @@ export async function immutableTestInventory(tree, subdirectory, manifest, optio
 		selectors.push(
 			...configuredTestSelectors(source, entry.path, {
 				runner: configurationRunner,
+				modules: configurationSources,
+				vitestVersion,
 				scope: subdirectory ?? '',
 			}),
 		);
@@ -1195,6 +1276,8 @@ export async function immutableTestInventory(tree, subdirectory, manifest, optio
 		for (const pattern of selections.inlineSources) inlineSourcePatterns.add(pattern);
 	}
 	const configuredTestPatterns = [...configurationPatterns];
+	if (runner === 'playwright' && selectors.length === 0)
+		selectors.push({ runner, scope: subdirectory ?? '', root: '', fileName: 'package.json' });
 	const configuredInlineSourcePatterns = [...inlineSourcePatterns];
 	const configurationEntryPaths = new Set(configurationEntries.map((entry) => entry.path));
 	const candidateEntries = tree.flatMap((entry) => {
@@ -1264,6 +1347,11 @@ export async function immutableTestInventory(tree, subdirectory, manifest, optio
 	)) {
 		const source =
 			candidateSources.get(entry.path) ?? (await fetchGitHubBlob(entry, options)).toString('utf8');
+		const nonTest = profile?.nonTestFiles?.find((file) => file.path === entry.path);
+		if (nonTest) {
+			verifyNonTestArtifact(source, entry, nonTest);
+			continue;
+		}
 		const possibleRegistrars = findPossibleUnexpandedRegistrars(source);
 		if (possibleRegistrars.length > 0) {
 			throw new Error(
@@ -1690,7 +1778,14 @@ async function resolveGitHubSource(repository, ref, options) {
 			type: entry.type === 'tree' ? 'directory' : 'file',
 			size: entry.size ?? 0,
 		}));
-	validateArchiveEntries(sourceEntries, { maxFiles: 50_000 });
+	// A recursive Git tree is bounded metadata, not a downloaded archive. Large
+	// unrelated assets are never fetched; fetchGitHubBlob and the test inventory
+	// enforce the byte limits on the evidence we actually read.
+	validateArchiveEntries(sourceEntries, {
+		maxFiles: 50_000,
+		maxFileBytes: Number.MAX_SAFE_INTEGER,
+		maxTotalBytes: Number.MAX_SAFE_INTEGER,
+	});
 
 	let manifestPath = repository.subdirectory
 		? `${repository.subdirectory}/package.json`

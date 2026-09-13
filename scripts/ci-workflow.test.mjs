@@ -764,7 +764,6 @@ describe('CI workflow aggregation', () => {
 			.split(/\s+/);
 		for (const browserRoot of [
 			'playground/octane/tests/doom',
-			'packages/colorful/tests/browser',
 			'packages/dropzone/tests/probes/browser',
 			'packages/octane/tests/browser',
 			'packages/pdf/tests/feasibility/pdfjs.browser.test.ts',
@@ -773,6 +772,7 @@ describe('CI workflow aggregation', () => {
 			assert.ok(discovered.includes(browserRoot));
 		}
 		for (const browserRoot of [
+			'packages/colorful/tests/browser',
 			'packages/draggable/tests/browser',
 			'packages/drei/tests/browser',
 			'packages/input-otp/tests/browser',

@@ -10,7 +10,7 @@ const CACHE = resolve(__dirname, '.react-cache');
 
 await Promise.all([preloadDifferentialFixture(FIXTURE, CACHE)]);
 
-describe('differential: @octanejs/colorful vs react-colorful@5.8.0', () => {
+describe('differential: @octanejs/colorful vs react-colorful@5.8.1', () => {
 	// @parity-case differential:react-colorful-controlled
 	it('matches controlled picker markup, input edits, and keyboard color updates', async () => {
 		const differential = await mountDifferential(
