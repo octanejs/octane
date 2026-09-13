@@ -484,6 +484,22 @@ describe('SSR Phase 1 — semantics', () => {
 			'😀\ud800&\udfff<\u0000>',
 			'😀\ud800&amp;\udfff&lt;\u0000&gt;',
 		],
+		// Boundary inputs at and around 32 chars plus long strings whose only
+		// escapable char is late — covers both sides of escapeHtml's length-keyed
+		// pre-scan and each of its detection disjuncts.
+		['a 31-char string ending in >', 'a'.repeat(30) + '>', 'a'.repeat(30) + '&gt;'],
+		['a 32-char string ending in >', 'a'.repeat(31) + '>', 'a'.repeat(31) + '&gt;'],
+		['a 32-char string ending in <', 'a'.repeat(31) + '<', 'a'.repeat(31) + '&lt;'],
+		[
+			'a long string whose only escapable char is a late &',
+			'word '.repeat(10) + '& done',
+			'word '.repeat(10) + '&amp; done',
+		],
+		[
+			'a long string needing no escape',
+			'long string without anything sensitive, padded past the threshold',
+			'long string without anything sensitive, padded past the threshold',
+		],
 	])('escapes %s identically in buffered and static markup', (_label, value, expected) => {
 		const expectedMarkup = `<span>${expected}</span>`;
 		expect(RT.renderToString(basic.Counter, { n: value }).html).toBe(expectedMarkup);
