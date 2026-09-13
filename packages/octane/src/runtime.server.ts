@@ -3695,8 +3695,8 @@ interface NativeLocalHookRec {
 type AnyHookRec = HookRec | LinkedHookRec<any, any> | MemoHookRec | RefHookRec | NativeLocalHookRec;
 type ServerHookSlot = symbol | string | number;
 
-// Server twin of the client helper/custom-hook ABI. Modules reserve a range
-// only when globally composable Symbol descriptions are required.
+// Server twin of the client slot ABI. Modules reserve disjoint ranges for
+// numeric base-hook identities and globally composable Symbol descriptions.
 let nextHookSlot = 0;
 export function hookSlots(count: number): number {
 	const base = nextHookSlot;

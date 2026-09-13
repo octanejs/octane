@@ -6535,5 +6535,72 @@
     "reference": "events-custom-known-and-unknown-updates-work",
     "maxRatio": 0,
     "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "body-ownership",
+    "op": "stale_output_count",
+    "target": "octane",
+    "reference": "reference",
+    "maxRatio": 0,
+    "note": "Independent Provider bodies, lazy body switches and nested scoped context must render current output."
+  },
+  {
+    "suite": "body-ownership",
+    "op": "map_memo_hits",
+    "target": "octane",
+    "reference": "reference",
+    "maxRatio": 0,
+    "note": "Unchanged independently compiled body retains ordinary hook memo values."
+  },
+  {
+    "suite": "body-ownership",
+    "op": "inline_memo_hits",
+    "target": "octane",
+    "reference": "reference",
+    "maxRatio": 0,
+    "note": "Unchanged independently compiled body retains inline hook memo values."
+  },
+  {
+    "suite": "body-ownership",
+    "op": "lazy_memo_hits",
+    "target": "octane",
+    "reference": "reference",
+    "maxRatio": 0,
+    "note": "Same resolved lazy body retains its hook memo values."
+  },
+  {
+    "suite": "body-ownership",
+    "op": "context_unchanged_resolutions",
+    "target": "octane",
+    "reference": "reference",
+    "maxRatio": 0,
+    "note": "Stable scoped context values retain cached resolution across ordinary updates."
+  },
+  {
+    "suite": "body-ownership",
+    "op": "map_body_computations",
+    "target": "octane",
+    "reference": "reference",
+    "maxRatio": 1,
+    "note": "Each independent module owns one ordinary memo computation across repeated body switches.",
+    "minRatio": 1
+  },
+  {
+    "suite": "body-ownership",
+    "op": "inline_body_computations",
+    "target": "octane",
+    "reference": "reference",
+    "maxRatio": 1,
+    "note": "Each independent module owns one inline memo computation across repeated body switches.",
+    "minRatio": 1
+  },
+  {
+    "suite": "body-ownership",
+    "op": "context_changed_resolutions",
+    "target": "octane",
+    "reference": "reference",
+    "maxRatio": 1,
+    "note": "Changed context recomputes the nested scoped value once per requested value.",
+    "minRatio": 1
   }
 ]

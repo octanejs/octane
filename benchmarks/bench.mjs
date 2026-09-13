@@ -1007,6 +1007,15 @@ const SUITES = [
 	},
 
 	{
+		// Same-source production body ownership and context cache controls.
+		name: 'body-ownership',
+		cwd: 'hook-memo',
+		servers: [],
+		iter: { normal: 1, quick: 1 },
+		runs: [{ script: 'body-ownership.mjs', args: () => [] }],
+	},
+
+	{
 		// Production static attributes and live head reapplication, with exact
 		// generic routing/write counts; timing runs use an uninstrumented bundle.
 		name: 'dom-attributes',
