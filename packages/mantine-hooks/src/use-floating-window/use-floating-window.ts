@@ -2,12 +2,6 @@
 import type { RefCallback } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'octane';
 
-function useRefValue<T>(value: T) {
-	const ref = useRef(value);
-	ref.current = value;
-	return ref;
-}
-
 interface FloatingWindowPositionConfig {
 	top?: number;
 	left?: number;
@@ -80,10 +74,14 @@ export function useFloatingWindow<T extends HTMLElement>(
 	const initialized = useRef(false);
 	const previousUserSelect = useRef('');
 	const previousWebkitUserSelect = useRef('');
-	const enabledRef = useRefValue(options.enabled);
-	const onPositionChangeRef = useRefValue(options.onPositionChange);
-	const onDragStartRef = useRefValue(options.onDragStart);
-	const onDragEndRef = useRefValue(options.onDragEnd);
+	const enabledRef = useRef(options.enabled);
+	const onPositionChangeRef = useRef(options.onPositionChange);
+	const onDragStartRef = useRef(options.onDragStart);
+	const onDragEndRef = useRef(options.onDragEnd);
+	enabledRef.current = options.enabled;
+	onPositionChangeRef.current = options.onPositionChange;
+	onDragStartRef.current = options.onDragStart;
+	onDragEndRef.current = options.onDragEnd;
 
 	const setDragging = useCallback((value: boolean) => {
 		setIsDragging(value);

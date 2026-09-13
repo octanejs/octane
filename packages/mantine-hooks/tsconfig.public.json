@@ -1,0 +1,8 @@
+{
+  "extends": "./tsconfig.json",
+  "include": ["tests/types/**/*.ts", "tests/types/**/*.tsx", "typetests/public.test-d.ts"],
+  "reactPortEvidence": {
+    "gate": "public-types",
+    "publicMode": "pinned"
+  }
+}

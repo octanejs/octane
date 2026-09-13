@@ -24,6 +24,8 @@
 // module-global "current scope" (mirroring the client's CURRENT_SCOPE) is safe.
 // ---------------------------------------------------------------------------
 
+import { resolveHookPath } from './hook-slot-cache.js';
+
 import {
 	BLOCK_OPEN,
 	BLOCK_CLOSE,
@@ -3666,22 +3668,6 @@ const HOOK_SLOT_PATH: ServerHookSlot[] = [];
 // Key for slot-less hook calls outside any withSlot (plain call-order keying).
 const NO_SLOT = '@state';
 
-function appendHookSlotPath(key: string, slot: ServerHookSlot): string {
-	let type: string;
-	let value: string;
-	if (typeof slot === 'number') {
-		type = 'n';
-		value = String(slot);
-	} else if (typeof slot === 'symbol') {
-		type = 's';
-		value = slot.description ?? '';
-	} else {
-		type = 't';
-		value = slot;
-	}
-	return key + type + value.length + ':' + value;
-}
-
 function resolveHookSlot(slot: unknown): ServerHookSlot {
 	const own: ServerHookSlot | undefined =
 		typeof slot === 'symbol' || typeof slot === 'string' || typeof slot === 'number'
@@ -3691,10 +3677,7 @@ function resolveHookSlot(slot: unknown): ServerHookSlot {
 	if (depth === 0) return own ?? NO_SLOT;
 	if (own === undefined && depth === 1) return HOOK_SLOT_PATH[0];
 
-	let key = '@octane:hook:';
-	for (let i = 0; i < depth; i++) key = appendHookSlotPath(key, HOOK_SLOT_PATH[i]);
-	if (own !== undefined) key = appendHookSlotPath(key, own);
-	return Symbol.for(key);
+	return resolveHookPath(HOOK_SLOT_PATH, own, false, true);
 }
 
 // React's cap (and message shape): a dispatch that fires unconditionally during
@@ -6179,18 +6162,29 @@ export function useTransition(): [boolean, (fn: () => void | Promise<unknown>) =
 	return [false, NOOP];
 }
 
-export function useDeferredValue<T>(value: T, ...rest: any[]): T {
+export function useDeferredValue<T>(value: T, ...rest: any[]): T;
+export function useDeferredValue<T>(
+	value: T,
+	initialValueOrSlot: unknown = undefined,
+	_slot?: unknown,
+): T {
 	// Optional initialValue precedes the trailing slot symbol.
-	return rest.length >= 2 ? (rest[0] as T) : value;
+	return arguments.length >= 3 ? (initialValueOrSlot as T) : value;
 }
 
 export function useSyncExternalStore<T>(
 	_subscribe: unknown,
 	getSnapshot: () => T,
 	...rest: any[]
+): T;
+export function useSyncExternalStore<T>(
+	_subscribe: unknown,
+	getSnapshot: () => T,
+	serverSnapshotOrSlot: unknown = undefined,
+	_slot?: unknown,
 ): T {
 	// `getServerSnapshot` (if provided) precedes the trailing slot symbol.
-	const getServerSnapshot = rest.length >= 2 ? (rest[0] as () => T) : undefined;
+	const getServerSnapshot = arguments.length >= 4 ? (serverSnapshotOrSlot as () => T) : undefined;
 	return getServerSnapshot ? getServerSnapshot() : getSnapshot();
 }
 

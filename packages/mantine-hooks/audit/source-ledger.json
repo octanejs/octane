@@ -1,0 +1,577 @@
+[
+  {
+    "path": "src/index.ts",
+    "origin": "adapted",
+    "sha256": "d16548ea2b8c554bb29ffa66c8db78814016d7d67b9d6a10fcdd20bab841b03f",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/internal.ts",
+    "origin": "authored",
+    "sha256": "544daf7def3f0ba738485785ce4d4238888e7c4e17df8db167b0b07a9fde75e8"
+  },
+  {
+    "path": "src/use-click-outside/use-click-outside.ts",
+    "origin": "adapted",
+    "sha256": "30dc39bfc23bca6e79923e66929b7cdaeb6a98e0ab0639574f5d891344020ee3",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-clipboard/use-clipboard.ts",
+    "origin": "adapted",
+    "sha256": "559afc614ae4ca33b307493d0c0abda162c14403d0dce94e40455fdebc3eeb7d",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-collapse/use-collapse.ts",
+    "origin": "adapted",
+    "sha256": "376e06058fb0e8a0a9c3c3f3f6383f38bb461f66c6749caac9fbb53ef063a5cb",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-collapse/use-horizontal-collapse.ts",
+    "origin": "adapted",
+    "sha256": "9cb6eb1669cdb25216a588a528a0f5a27cebdb34238adafb78fbbbe3b5a8f0cd",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-color-scheme/use-color-scheme.ts",
+    "origin": "adapted",
+    "sha256": "2fe2ed9a57c73fb3ce27c83a0bc30dbaa35768106bc4d0e066b1e6624603b454",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-counter/use-counter.ts",
+    "origin": "adapted",
+    "sha256": "3dfdaf1fd1384dd68028d81cd3b19f8eefd05030fae6590f5cba65a2d3e602f7",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-debounced-callback/use-debounced-callback.ts",
+    "origin": "adapted",
+    "sha256": "eb42ee1a80a3124a1316a788d7739549d14d6b4e7fcc0d4658f458d31f74ca6f",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-debounced-state/use-debounced-state.ts",
+    "origin": "adapted",
+    "sha256": "938cdf9d09cf1e2c028c1a58a4dc366d934d09e1b4d0eb2ef043a3483f1ba33c",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-debounced-value/use-debounced-value.ts",
+    "origin": "adapted",
+    "sha256": "23f6f388f78693e0cebfb0d312ccda31814cb37a4ced587d6e3a2b0c2ba94e19",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-did-update/use-did-update.ts",
+    "origin": "adapted",
+    "sha256": "78beb7f1c57a22ef72febe59643dd636d4eaec76f0420e0bbc5ab9fc48025592",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-disclosure/use-disclosure.ts",
+    "origin": "adapted",
+    "sha256": "6a7ec00da088c9b5a0fa272e66eb3ea7d6fe7c5ac4816b2fe720bd222a64df2b",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-document-title/use-document-title.ts",
+    "origin": "adapted",
+    "sha256": "ce067bf0b015b17f6271ca41c06721d39bcf1e51a314cce19050b1eae8e25ae6",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-document-visibility/use-document-visibility.ts",
+    "origin": "adapted",
+    "sha256": "b9f41a5f67d14915b34d04f3a385fc55f3e9b7bdb9c4b2717870ecc040e0e192",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-drag/use-drag.ts",
+    "origin": "adapted",
+    "sha256": "aba86166027cabc8d2c603013072f91e5dc525f9d5e2fbeca061bcec6e0fd741",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-event-listener/use-event-listener.ts",
+    "origin": "adapted",
+    "sha256": "c2868e23fbab30f7d055e4847704a9d61b6998f947aea15c456dca8a321485d1",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-eye-dropper/use-eye-dropper.ts",
+    "origin": "adapted",
+    "sha256": "7dd795fbc1d3d28b004a0a43febc07b95c936413f7fc6128b60a7eab784fb557",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-favicon/use-favicon.ts",
+    "origin": "adapted",
+    "sha256": "a5916bc9f39afef846356f90c3ee2eaedc0febe2650ae40ed5f529d86917fb70",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-fetch/use-fetch.ts",
+    "origin": "adapted",
+    "sha256": "1c3c3e997d0f52f397f1c9cabde397921efdb86fc04851b7cf40324270e9fdd5",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-file-dialog/use-file-dialog.ts",
+    "origin": "adapted",
+    "sha256": "c346e882cd201b8464864f8dd6857d47503a325db6b356a8e9ed9ec8023da103",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-floating-window/use-floating-window.ts",
+    "origin": "adapted",
+    "sha256": "c50bddc3950b953d7178153cfa9e673a21e792f84f210a384f72a81b0d1ace1f",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-focus-return/use-focus-return.ts",
+    "origin": "adapted",
+    "sha256": "d0d8dbfd890665ba78c4e9a0361d763d831ad17315b4b049f9cbb6c38e6f03ad",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-focus-trap/scope-tab.ts",
+    "origin": "adapted",
+    "sha256": "bc3bffb25796f2f004c989ef6a1bc7fe36f2280434124744413d62e435e0084d",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-focus-trap/tabbable.ts",
+    "origin": "adapted",
+    "sha256": "d3b4162d61580842ffcfd6ec01a5c1ad467c29efb49e3bb39480c6282319f034",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-focus-trap/use-focus-trap.ts",
+    "origin": "adapted",
+    "sha256": "4cd69c9fcb585fc64c9ba08643985c2f35ede55f8b6ef6a04a52821546d8a8a5",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-focus-within/use-focus-within.ts",
+    "origin": "adapted",
+    "sha256": "e437b77b9b2a11600438b7bb540643e4aa72d248c7b237d2f066d971cc8ac3b2",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-force-update/use-force-update.ts",
+    "origin": "adapted",
+    "sha256": "8bba30a2b0136697d34c3c22d8b8cc57f24ae83fc06cdc78e49c6f22c2bb6bf8",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-fullscreen/use-fullscreen.ts",
+    "origin": "adapted",
+    "sha256": "60416e895518eface9f0eabe4cac956449c4d51a7e102f9eb4de932524ec0274",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-hash/use-hash.ts",
+    "origin": "adapted",
+    "sha256": "aa809603ecf175cbc64cb953f02f362f20b5e44bb3294578047cc90a7750bbab",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-headroom/use-headroom.ts",
+    "origin": "adapted",
+    "sha256": "77015b41e8fbe06aace36cd21e5264dcf08e5c64c67732cd97b97f5150e6fd17",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-hotkeys/parse-hotkey.ts",
+    "origin": "adapted",
+    "sha256": "d0893c14b2cf0d8ccd5138e8125df7e3c55235af2ed3d8f6ca3bab994d9e5836",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-hotkeys/use-hotkeys.ts",
+    "origin": "adapted",
+    "sha256": "104cc00a7e57de1c128048c02171ea55d5cc62f78fe661de0c6c8d1bd719e299",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-hover/use-hover.ts",
+    "origin": "adapted",
+    "sha256": "e22a0a8baf8ab9abaa3dee5d8334b7238f7344687565cb167ecd32084d02bcec",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-id/use-id.ts",
+    "origin": "adapted",
+    "sha256": "f18200944eaaa88463e26d547ded5b8849a2546b6d545d7f3ad998791f64b58d",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-idle/use-idle.ts",
+    "origin": "adapted",
+    "sha256": "a3eb30564dd5fcf01d5432881f068457594349618c41bcf11388dbbaf7446946",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-in-viewport/use-in-viewport.ts",
+    "origin": "adapted",
+    "sha256": "5f94076840b3894ac3d402349b862a2de1b51ba78e35ec29d830445933856c6e",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-input-state/use-input-state.ts",
+    "origin": "adapted",
+    "sha256": "bb76757e3a27a63b3ab11044be6eeac220d8083ee5de2203001f30a8edb4287b",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-intersection/use-intersection.ts",
+    "origin": "adapted",
+    "sha256": "0ce25f02a0bb7187033d80aa739d834a0cd8d6467a3ad70ae92772ee8a12f6b0",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-interval/use-interval.ts",
+    "origin": "adapted",
+    "sha256": "2b1e45069f4ecf64deaec8df4560dc14f1d42b77101bc37c4c6a9562fb48b414",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-is-first-render/use-is-first-render.ts",
+    "origin": "adapted",
+    "sha256": "278aee510bbc199fa8eb2e409779063bf05fbdcc1490acb1caca4a7b2a02e3f6",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-isomorphic-effect/use-isomorphic-effect.ts",
+    "origin": "adapted",
+    "sha256": "2c4f1bf9a83657847eb160c5776ff4f78e300a0026adea2abdab4d5a9c9befe6",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-list-state/use-list-state.ts",
+    "origin": "adapted",
+    "sha256": "f31e242ad76e93d8a94492572ab979047e4228052dc8f99bc17c04343bc0eb3f",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-local-storage/create-storage.ts",
+    "origin": "adapted",
+    "sha256": "a6d60568b2e696e4f2acb3d836b21861e33bef1e0719bbac34fd2fa4239c8be6",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-local-storage/use-local-storage.ts",
+    "origin": "adapted",
+    "sha256": "cb0beb4ece441e03496937c3184867bb5089ddce2a7c9c994a4b70074296a719",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-logger/use-logger.ts",
+    "origin": "adapted",
+    "sha256": "a8607ec976b9b846eec146e6585d64108378a1234c82b67307286ab2a0798e50",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-long-press/use-long-press.ts",
+    "origin": "adapted",
+    "sha256": "984c490513f1fe9a6c63f01c8e89dd2a8c74d4268093dbd4e6bd646a7e513976",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-map/use-map.ts",
+    "origin": "adapted",
+    "sha256": "557cb4ed7fe991c6b7a3e1899a712578f9a9c44b8d7ef5d6fcf38bed8165bd22",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-mask/use-mask.ts",
+    "origin": "adapted",
+    "sha256": "d5a95166b2215a591f97d1f68dfc9dd739b7efc18eae20720ee0ffa3a63abaf3",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-media-query/use-media-query.ts",
+    "origin": "adapted",
+    "sha256": "7ff220a06933b939aa8e05b972f3c0eb93787f9deb8fe21b4919e7f800a21299",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-merged-ref/use-merged-ref.ts",
+    "origin": "adapted",
+    "sha256": "ca6d0fe069acfd51400624d8b4a6a0237c0504812f133dee54b62ec96776feba",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-mounted/use-mounted.ts",
+    "origin": "adapted",
+    "sha256": "3bcd61238644ec78fefe862de1902d3fdfd0011df7049415656fe1afbedca226",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-mouse/use-mouse.ts",
+    "origin": "adapted",
+    "sha256": "2cd91942a126a966ecab9e245d4b257aef3a82fc6cbf37615abf25ec7d9586f5",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-move/use-move.ts",
+    "origin": "adapted",
+    "sha256": "2f130a335e670ee77b94cace0890a08a6906130a3418c18738d566fb265f67d4",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-mutation-observer/use-mutation-observer.ts",
+    "origin": "adapted",
+    "sha256": "0587c133d39760a5f7dbc9d473ca586a1972e966e8dfcf38025916123534e883",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-network/use-network.ts",
+    "origin": "adapted",
+    "sha256": "111884479df4403cf038e1af2bb7e202de365e468289205b04567e201895c81f",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-orientation/use-orientation.ts",
+    "origin": "adapted",
+    "sha256": "9975ac09a6967224419bae09ef68060c75a50ba9b112068a8b19be4b6425e5c3",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-os/use-os.ts",
+    "origin": "adapted",
+    "sha256": "fc62cd1ac665bedf15b4ffdb5866804b2cf3a36c3a5d2a32d5c7a2a648eea63d",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-page-leave/use-page-leave.ts",
+    "origin": "adapted",
+    "sha256": "02170709c042487b8f4b47bf335516a528f54a770647c62cfdbd474492ea720e",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-pagination/use-pagination.ts",
+    "origin": "adapted",
+    "sha256": "0dfcbe8de9a219b1b87e39ce20281494be72b0fb3f0a229eece4132ec54c243b",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-previous/use-previous.ts",
+    "origin": "adapted",
+    "sha256": "541b863c6000f9db856223e3f3b94137550a6c19717c5ef5a5dc0751af1a900e",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-queue/use-queue.ts",
+    "origin": "adapted",
+    "sha256": "59c44e39ca22a25d817f5544b398f3eeb04243148e7d61b9cbce2ac34288ce87",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-radial-move/use-radial-move.ts",
+    "origin": "adapted",
+    "sha256": "4af76ac1c160d5dfb83712a23ae23a14e5c071512bee436b1c2842d298cc8bad",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-reduced-motion/use-reduced-motion.ts",
+    "origin": "adapted",
+    "sha256": "20068075d35117b885be1c1d6a26463f9d28e72d0eb3ec0241a4e62fd7b92363",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-resize-observer/use-resize-observer.ts",
+    "origin": "adapted",
+    "sha256": "475da07ef3cb6b7b2c744ae46fdee807c24a1ca1f09d684ff78acd197f4f235d",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-roving-index/use-roving-index.ts",
+    "origin": "adapted",
+    "sha256": "c80dd6c2ef15e5be1177329e900e343fe15705985f1493be6e962148b7bb5c91",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-scroll-direction/use-scroll-direction.ts",
+    "origin": "adapted",
+    "sha256": "3beecc7c3ef5ad8c713c32ba0c190bdedb410969b962127254ab0d1f9e1c53a7",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-scroll-into-view/use-scroll-into-view.ts",
+    "origin": "adapted",
+    "sha256": "41f01e2ae2f1695b41dc6d69b47f7d1361b4ca6d8558d8ae4ea8e9b6c116b4e2",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-scroll-spy/use-scroll-spy.ts",
+    "origin": "adapted",
+    "sha256": "ef63fb5e8dcd9cfca1d4bfca91c40b43494fbc8133972cb5afb1489119a06a90",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-scroller/use-scroller.ts",
+    "origin": "adapted",
+    "sha256": "4c514814780ab1ae8db1a83e414c8162ce876d835d1905593598145bfe637ec0",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-selection/use-selection.ts",
+    "origin": "adapted",
+    "sha256": "9f148afd7fa7caae9c47a85a95f3f822420fd1abd8965a46c2aaef3e13527e57",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-session-storage/use-session-storage.ts",
+    "origin": "adapted",
+    "sha256": "5b5b8762aa6545ddc7196de14064fd1e9d44fc6fce8f718d1d094fbeb5d02075",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-set-state/use-set-state.ts",
+    "origin": "adapted",
+    "sha256": "33ad0695ee27f83ea32a008ef468625254fe7c514b2c7b84cd5a0e136cb024db",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-set/use-set.ts",
+    "origin": "adapted",
+    "sha256": "c24ae3a51a4b808ab8ed0a07865664c75eadd91355e3195bd78ee2cd11346f99",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-shallow-effect/use-shallow-effect.ts",
+    "origin": "adapted",
+    "sha256": "da48090d3c55f9c1e6bf36485081789996a81754a7cede66d95792c92014759d",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-splitter/use-splitter.ts",
+    "origin": "adapted",
+    "sha256": "41be159809cdb66202e34bc76b8b626a2ec26d44186e673e7fcf32ee98b96109",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-state-history/use-state-history.ts",
+    "origin": "adapted",
+    "sha256": "a1e377cc03f28e52830fde15a4a0482000587a8090579930a067eae5cef7402e",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-text-selection/use-text-selection.ts",
+    "origin": "adapted",
+    "sha256": "c9d85e73bc2ca5b7196839127bd6ac82eed4a6c54765701bfa14cd26c2ac6e27",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-throttled-callback/use-throttled-callback.ts",
+    "origin": "adapted",
+    "sha256": "54d78096ea74a8d2ad72f15d517e3d20b3755de966faac0c1b416a9727b5ed1a",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-throttled-state/use-throttled-state.ts",
+    "origin": "adapted",
+    "sha256": "5916c70ab2c9c5099159dcd2c2a96e342668c1e4ac1d016ca52f34920602c3ae",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-throttled-value/use-throttled-value.ts",
+    "origin": "adapted",
+    "sha256": "a45bf01088ce7d9df4003f5a364343529807260bb8761983cb59a0ce1b6f9fab",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-timeout/use-timeout.ts",
+    "origin": "adapted",
+    "sha256": "8a5756b5ba16ae8118a82b08593414bc5a1c89e45885375eac0a97d6972515e6",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-toggle/use-toggle.ts",
+    "origin": "adapted",
+    "sha256": "270a545c7bd49cdb49f3cbacd138b8ea2904302b51d891216ec380f0cfa36614",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-uncontrolled/use-uncontrolled.ts",
+    "origin": "adapted",
+    "sha256": "a7e653c2a5b275ad58487cca59b45294a8b6090bd824bbb3bcedad2057d91548",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-validated-state/use-validated-state.ts",
+    "origin": "adapted",
+    "sha256": "6b6033d09a86b756c215035d1a55b9793026d7ed96aa85830a5122c68e63aa79",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-viewport-size/use-viewport-size.ts",
+    "origin": "adapted",
+    "sha256": "592345554096e4be9f7813dc687faf1e824ad25cb1d0af525803b0448548c2f3",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-window-event/use-window-event.ts",
+    "origin": "adapted",
+    "sha256": "cabfdf79d4e5dea02ff72294c6281f6a4174ed4ad0d5a1d59216540ab33e16d0",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/use-window-scroll/use-window-scroll.ts",
+    "origin": "adapted",
+    "sha256": "6f136fbd35bf117df85b6c4dcdbe23ae5cb1da4df13c2f7ad2a50333bfee5adb",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/utils/clamp/clamp.ts",
+    "origin": "adapted",
+    "sha256": "2973e11262273df295e098d08f858a287ea7a9d4d787dfea695197d1a826948f",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/utils/index.ts",
+    "origin": "adapted",
+    "sha256": "2303b39a71a2a8ad51a217960f1bd778ebbcf9414f9f20426c9e2a12ea27d34a",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/utils/lower-first/lower-first.ts",
+    "origin": "adapted",
+    "sha256": "04dbd0819e4462a9579d91a9a7b9ed20fc6e344fec6ac1fdf843c0ce0046d9ce",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/utils/random-id/random-id.ts",
+    "origin": "adapted",
+    "sha256": "bd0dce105df148cf4da034b181fbdda294c6b3ea348ce4aa24e9775f08397bbb",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/utils/range/range.ts",
+    "origin": "adapted",
+    "sha256": "a48dafc88382aa4a8aa3e8d6d58a3110fc6405e47f44485dd5ecba0a4e3396f4",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/utils/shallow-equal/shallow-equal.ts",
+    "origin": "adapted",
+    "sha256": "e5ca48e28774703afa5dd478640194e14b393987da08f504634940626d85171e",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/utils/upper-first/upper-first.ts",
+    "origin": "adapted",
+    "sha256": "ada67a213163659d5118b64e8fcdc673a05f3849ef95d3e5c76640ca6e63e993",
+    "packageName": "@mantine/hooks"
+  },
+  {
+    "path": "src/utils/use-callback-ref/use-callback-ref.ts",
+    "origin": "adapted",
+    "sha256": "3e1b28e51b9ae144161146cb4e118ae6165ea0032381225341ecd65b3ca7a746",
+    "packageName": "@mantine/hooks"
+  }
+]

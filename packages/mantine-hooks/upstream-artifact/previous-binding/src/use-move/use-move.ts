@@ -1,0 +1,165 @@
+import { useCallback, useEffect, useRef, useState } from 'octane';
+import { clamp } from '../utils';
+
+export interface UseMovePosition {
+	x: number;
+	y: number;
+}
+
+export function clampUseMovePosition(position: UseMovePosition) {
+	return {
+		x: clamp(position.x, 0, 1),
+		y: clamp(position.y, 0, 1),
+	};
+}
+
+export interface UseMoveHandlers {
+	onScrubStart?: () => void;
+	onScrubEnd?: () => void;
+}
+
+export interface UseMoveReturnValue<T extends HTMLElement = any> {
+	ref: React.RefCallback<T | null>;
+	active: boolean;
+}
+
+function withoutSlot<T>(value: T | symbol): T | undefined {
+	return typeof value === 'symbol' ? undefined : value;
+}
+
+export function useMove<T extends HTMLElement = any>(
+	onChange: (value: UseMovePosition) => void,
+	handlers?: UseMoveHandlers,
+	dir: 'ltr' | 'rtl' = 'ltr',
+): UseMoveReturnValue<T> {
+	const normalizedHandlers = withoutSlot(handlers);
+	const direction = withoutSlot(dir) ?? 'ltr';
+	const mounted = useRef<boolean>(false);
+	const isSliding = useRef(false);
+	const frame = useRef(0);
+	const cleanupRef = useRef<(() => void) | null>(null);
+	const [active, setActive] = useState(false);
+
+	useEffect(() => {
+		mounted.current = true;
+		return () => {
+			cleanupRef.current?.();
+		};
+	}, []);
+
+	const refCallback: React.RefCallback<T | null> = useCallback(
+		(node) => {
+			cleanupRef.current?.();
+			cleanupRef.current = null;
+
+			if (!node) {
+				return;
+			}
+
+			const onScrub = ({ x, y }: UseMovePosition) => {
+				cancelAnimationFrame(frame.current);
+
+				frame.current = requestAnimationFrame(() => {
+					if (mounted.current && node) {
+						node.style.userSelect = 'none';
+						const rect = node.getBoundingClientRect();
+
+						if (rect.width && rect.height) {
+							const _x = clamp((x - rect.left) / rect.width, 0, 1);
+							onChange({
+								x: direction === 'ltr' ? _x : 1 - _x,
+								y: clamp((y - rect.top) / rect.height, 0, 1),
+							});
+						}
+					}
+				});
+			};
+
+			const bindEvents = () => {
+				document.addEventListener('mousemove', onMouseMove);
+				document.addEventListener('mouseup', stopScrubbing);
+				document.addEventListener('touchmove', onTouchMove, { passive: false });
+				document.addEventListener('touchend', stopScrubbing);
+			};
+
+			const unbindEvents = () => {
+				document.removeEventListener('mousemove', onMouseMove);
+				document.removeEventListener('mouseup', stopScrubbing);
+				document.removeEventListener('touchmove', onTouchMove);
+				document.removeEventListener('touchend', stopScrubbing);
+			};
+
+			const startScrubbing = () => {
+				if (!isSliding.current && mounted.current) {
+					isSliding.current = true;
+					typeof normalizedHandlers?.onScrubStart === 'function' &&
+						normalizedHandlers.onScrubStart();
+					setActive(true);
+					bindEvents();
+				}
+			};
+
+			const stopScrubbing = () => {
+				if (isSliding.current && mounted.current) {
+					isSliding.current = false;
+					setActive(false);
+					unbindEvents();
+					setTimeout(() => {
+						typeof normalizedHandlers?.onScrubEnd === 'function' && normalizedHandlers.onScrubEnd();
+					}, 0);
+				}
+			};
+
+			const onMouseDown = (event: MouseEvent) => {
+				startScrubbing();
+				event.preventDefault();
+				onMouseMove(event);
+			};
+
+			const onMouseMove = (event: MouseEvent) => onScrub({ x: event.clientX, y: event.clientY });
+
+			const onTouchStart = (event: TouchEvent) => {
+				if (event.cancelable) {
+					event.preventDefault();
+				}
+
+				startScrubbing();
+				onTouchMove(event);
+			};
+
+			const onTouchMove = (event: TouchEvent) => {
+				if (event.cancelable) {
+					event.preventDefault();
+				}
+
+				onScrub({ x: event.changedTouches[0].clientX, y: event.changedTouches[0].clientY });
+			};
+
+			node.addEventListener('mousedown', onMouseDown);
+			node.addEventListener('touchstart', onTouchStart, { passive: false });
+
+			const cleanup = () => {
+				unbindEvents();
+				cancelAnimationFrame(frame.current);
+			};
+			cleanupRef.current = cleanup;
+
+			return () => {
+				node.removeEventListener('mousedown', onMouseDown);
+				node.removeEventListener('touchstart', onTouchStart);
+				if (cleanupRef.current === cleanup) {
+					cleanup();
+					cleanupRef.current = null;
+				}
+			};
+		},
+		[direction, onChange],
+	);
+
+	return { ref: refCallback, active };
+}
+
+export namespace useMove {
+	export type Handlers = UseMoveHandlers;
+	export type ReturnValue<T extends HTMLElement> = UseMoveReturnValue<T>;
+}

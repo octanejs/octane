@@ -103,7 +103,6 @@ export const SOURCE_PUBLICATION_DEBT = {
 		'packages/lexical/tsconfig.json',
 		'packages/livestore/tsconfig.json',
 		'packages/lucide/tsconfig.json',
-		'packages/mantine-hooks/tsconfig.json',
 		'packages/markdown/tsconfig.json',
 		'packages/mdx/tsconfig.json',
 		'packages/mobx/tsconfig.json',

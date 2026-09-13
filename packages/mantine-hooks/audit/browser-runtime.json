@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "project": "mantine-hooks-browser",
+  "roots": ["packages/mantine-hooks/tests/browser"],
+  "files": ["packages/mantine-hooks/tests/browser/mantine-hooks.browser.test.ts"],
+  "tests": [
+    {
+      "id": "runtime:mantine-hooks-browser-000",
+      "file": "packages/mantine-hooks/tests/browser/mantine-hooks.browser.test.ts",
+      "fullName": "Mantine hooks browser compatibility client startup preserves hook updates, refs, and cleanup"
+    },
+    {
+      "id": "runtime:mantine-hooks-browser-001",
+      "file": "packages/mantine-hooks/tests/browser/mantine-hooks.browser.test.ts",
+      "fullName": "Mantine hooks browser compatibility SSR hydration preserves hook updates, refs, and cleanup"
+    }
+  ]
+}

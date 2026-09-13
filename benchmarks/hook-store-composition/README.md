@@ -98,3 +98,18 @@ it does not require another workspace package or dependency versions. Run baseli
 and candidate sequentially, with the same lockfile, compiler, browser, machine,
 warmup, and iteration count. A successful source inspection or syntax check is not
 a benchmark result.
+
+### Frozen runtime comparisons
+
+`OCTANE_HOOKS_ROOT=/absolute/path/to/baseline` selects that checkout's Octane source
+and compiler while retaining this fixture, binding packages, and installed
+dependencies. The default selects the current checkout. Each source root has a
+separate build directory. Timing payloads include the runtime source SHA-256 and
+all emitted JavaScript asset hashes, raw bytes, and gzip-9 bytes in
+`target.meta.artifact`. Rebuild whenever either source or fixture changes;
+`--no-build` intentionally reuses the recorded artifact.
+
+For an A–B–B–A comparison, build both revisions first, then run eight measured
+samples per operation in separate sequential browser processes, alternating the
+environment variable and assigning a separate `BENCH_JSON` path to each run.
+Keep all other build inputs identical and report repeated-baseline variation.

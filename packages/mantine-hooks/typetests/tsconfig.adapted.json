@@ -1,0 +1,9 @@
+{
+  "extends": "../tsconfig.json",
+  "include": ["../tests/types/**/*.ts", "../tests/types/**/*.tsx"],
+  "reactPortEvidence": {
+    "gate": "upstream-types-adapted",
+    "upstreamRegistrations": [],
+    "publicMode": "pinned"
+  }
+}

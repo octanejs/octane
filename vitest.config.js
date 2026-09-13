@@ -5913,6 +5913,52 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'mantine-hooks-browser',
+					include: ['packages/mantine-hooks/tests/browser/**/*.test.ts'],
+					environment: 'node',
+					testTimeout: 30000,
+					hookTimeout: 60000,
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'mantine-hooks-pristine',
+					include: ['packages/mantine-hooks/upstream/src/**/*.test.{ts,tsx}'],
+					environment: 'jsdom',
+					globals: true,
+					setupFiles: [
+						'packages/mantine-hooks/tests/upstream-environment.ts',
+						'packages/mantine-hooks/tests/pristine-environment.ts',
+					],
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'mantine-hooks-adapted',
+					include: ['packages/mantine-hooks/tests/upstream/**/*.test.{ts,tsx}'],
+					environment: 'jsdom',
+					globals: true,
+					setupFiles: ['packages/mantine-hooks/tests/upstream-environment.ts'],
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/testing-library$/,
+							replacement: resolve(import.meta.dirname, 'packages/testing-library/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
 				test: {
 					name: 'mantine-hooks',
 					include: ['packages/mantine-hooks/tests/conformance/**/*.test.ts'],

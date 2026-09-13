@@ -11,6 +11,7 @@ type HydrationBinding =
 	| 'base-ui'
 	| 'docusaurus'
 	| 'formisch'
+	| 'mantine-hooks'
 	| 'monaco-editor'
 	| 'pdf'
 	| 'rainbowkit'
@@ -47,6 +48,10 @@ function bindingAliases(binding: HydrationBinding) {
 		return [
 			{ find: /^@octanejs\/react-error-boundary$/, replacement: resolve(source, 'server.tsrx') },
 		];
+	}
+
+	if (binding === 'mantine-hooks') {
+		return [{ find: /^@octanejs\/mantine-hooks$/, replacement: resolve(source, 'index.ts') }];
 	}
 
 	if (binding === 'alien-signals') {
