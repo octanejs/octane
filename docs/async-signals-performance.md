@@ -557,3 +557,64 @@ The catalog and published-export regressions were observed failing before repair
 repair. Fresh distribution imports verify the streaming bootstrap and server
 exports. Whole-package smoke testing remains blocked locally by the unavailable
 React peer dependency; it is not reported as a passing distribution build.
+
+## Packaging boundary follow-up (2026-09-12)
+
+A matched production rebuild against exact `9661ee423` separates server query
+observation mirrors from the shared request engine, and native-control capture
+from optional independent-island activation. The compiler and installed
+dependencies are held fixed. The control-only workload retains zero bytes of
+`hydration/event-capture.ts`; no server implementation or renderer resolves in
+its browser graph. Optional controllers still share the same physical engine.
+
+| Physical delivery | Before raw | After raw | Before gzip-9 | After gzip-9 |
+| --- | ---: | ---: | ---: | ---: |
+| Eager behavior entry | 17,720 | 18,297 | 6,093 | 6,326 |
+| Shared signal/async runtime and state | 74,579 | 67,482 | 22,352 | 20,151 |
+| Total eager (two files) | 92,299 | 85,779 | 28,445 | 26,477 |
+| Optional controller, excluded from eager total | 162 | 167 | 151 | 155 |
+
+Total eager delivery falls by 6,520 raw / 1,968 gzip bytes (6.9% gzip), not by
+the shared chunk's reduction alone: some code changes chunk placement. Brotli-11
+falls from 25,495 to 23,722 bytes. The complete inline capture tag is byte-identical
+at 811 raw / 457 gzip / 367 Brotli bytes (code body: 775 / 440 / 356).
+
+The nine public-entry build/export checks pass. Ordinary client output is
+byte-identical at 164,536 raw / 53,234 gzip bytes. Ordinary synchronous SSR changes
+from 44,779 / 15,727 to 44,840 / 15,750: 61 raw / 23 gzip bytes of factory protocol
+plumbing, with zero retained server mirror implementation. The full behavior
+fixture's server bundle changes from 147,626 / 47,136 to 147,898 / 47,256. Thus
+the browser reduction is not free everywhere; the server adapter adds a small
+measured wrapper cost. Benchmark guards reject emitted island-intent code in the
+control-only workload and retained observation mirrors in ordinary entries.
+
+Validation: 794 focused signal/stream/lifecycle test executions passed; the nearby
+hydration selection separately passed 528 executions (overlapping coverage, not
+an additive unique-test count). Existing cases now exercise two independent
+server readers' backpressure/release and control-first-to-island activation,
+including early composition, repeated dispatch of one event object, stale moved
+controls, and exactly one queued click. Deliberate acknowledgement and capture
+faults made those checks fail before restoration. A read-only review found no
+actionable regression. Whole-package TSRX typecheck and scoped formatting pass.
+
+Playwright WebKit 26.5 passed one warmup plus three samples per mode (12 flows)
+against the final production sources: pre-EOF activation, early native edits,
+revision-fenced restoration, three trusted selection clicks, and both auth-gated
+streams using one server producer each. This is WebKit correctness, not a fresh
+native Safari/iOS result, application latency improvement, or lightweight-web
+budget pass. Full monorepo Vitest/CI was not run: unrelated React/browser-plugin
+dependencies remain unavailable in this approved source-built toolchain.
+
+Evidence under `/Users/callie/code/playwright-runs/`:
+`octane-packaging-{baseline-9661ee,candidate}-20260912/build.json`,
+`octane-packaging-webkit-20260912/{build,browser}.json`, and
+`octane-packaging-public-bundles-final-20260912.json`. These record consumed source and
+output hashes, compiler options, compression, browser outcomes, and toolchain.
+
+The remaining scope class still exposes synchronous serialization, adoption and
+inspection through observable public owners. `"use strong"` provides render
+purity/memoization, not whole-program removal of those public capabilities.
+Removing that remaining coupling requires a separate compatible design; this
+patch neither strips those methods nor changes compiler directives. A pre-existing
+candidate snapshot-before-capture-initialization conservative rejection was
+reproduced at both baseline and candidate and left unchanged.

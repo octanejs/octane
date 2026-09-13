@@ -146,6 +146,7 @@ import {
 import {
 	runWithServerSignalQueryAttemptObserver,
 	type ServerSignalQueryAttempt,
+	type ServerSignalQueryAttemptObservations,
 } from './signals/query-attempt-observer.js';
 import {
 	SIGNAL_BINDING_IDENTITY,
@@ -4281,14 +4282,15 @@ function invokeServerSignalComponent(
 	const owner = serverSignalOwner(frame);
 	if (owner === undefined) return comp(props ?? {}, scope, undefined);
 	const invoke = () => comp(props ?? {}, scope, undefined);
-	const observe = (RESOLVED?.resourceOptions as StreamOptions | undefined)?.injection
-		?.observeSignalAttempt;
+	const injection = (RESOLVED?.resourceOptions as StreamOptions | undefined)?.injection;
+	const observe = injection?.observeSignalAttempt;
 	return runWithSignalOwner(owner, () =>
 		observe === undefined
 			? invoke()
 			: runWithServerSignalQueryAttemptObserver(
 					owner,
 					(attempt) => observe(attempt, captureSignalOwner(owner)),
+					injection!.createSignalAttemptObservations!,
 					invoke,
 				),
 	);
@@ -9401,6 +9403,8 @@ export interface StreamInjectionSource {
 		attempt: ServerSignalQueryAttempt,
 		run: <T>(callback: () => T) => T,
 	) => void;
+	/** @internal Server-only mirrors paired with the automatic attempt sink. */
+	readonly createSignalAttemptObservations?: () => ServerSignalQueryAttemptObservations;
 	/**
 	 * Pull all queued HTML (concatenated, verbatim). Called at emission
 	 * boundaries and after `subscribe` notifications; return '' when empty.

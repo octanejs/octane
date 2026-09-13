@@ -1,13 +1,12 @@
 import {
 	acceptScopeStreamedResult,
 	bindScopeStreamedSelection,
-	createDeclaredDerivedCell,
-	createDeclaredResourceCell,
 	createDeclaredSignalCell,
 	createScope,
 	failScopeStreamedResult,
 	ScopeImpl,
 } from './engine.js';
+import { createDeclaredScalarCell } from './scalar-computations.js';
 import { ScopeDisposedError, SignalStreamError } from './errors.js';
 import { readSignalBinding as readBinding } from './graph.js';
 import { readEarlySignalValue } from './early-values.js';
@@ -17,22 +16,16 @@ import {
 	installSignalOwnerRetirement,
 	runWithSignalOwner,
 } from './owner-context.js';
-import { query as createQueryRequest } from './requests.js';
 import {
 	SIGNAL_HANDLE,
 	SIGNAL_BINDING_IDENTITY,
 	SIGNAL_BINDING_READ,
 	SIGNAL_BINDING_SUBSCRIBE,
 	SIGNAL_OWNER_RESOLVE,
-	skip,
 	type DerivedCompute,
 	type DerivedOptions,
 	type DerivedSignal,
 	type OwnerBoundSignal,
-	type QueryContext,
-	type QueryLoadResult,
-	type QueryOptions,
-	type QuerySignal,
 	type Scope,
 	type ScopeSeed,
 	type SignalHandle,
@@ -296,7 +289,8 @@ function requireSite(site: string | undefined): string {
 	);
 }
 
-abstract class Descriptor<T, H extends SignalHandle<T>> implements OwnerBoundSignal<T> {
+/** @internal Shared owner resolution for statically selected signal factories. */
+export abstract class Descriptor<T, H extends SignalHandle<T>> implements OwnerBoundSignal<T> {
 	readonly [SIGNAL_HANDLE] = true as const;
 	private readonly cells = new WeakMap<Scope, H>();
 
@@ -309,7 +303,10 @@ abstract class Descriptor<T, H extends SignalHandle<T>> implements OwnerBoundSig
 
 	[SIGNAL_OWNER_RESOLVE](owner: Scope): H {
 		requireSite(this.site);
-		const target = resolveDescriptorOwner(this.site, owner);
+		return this.resolvedCell(resolveDescriptorOwner(this.site, owner));
+	}
+
+	private resolvedCell(target: Scope): H {
 		let cell = this.cells.get(target);
 		if (!cell) {
 			cell = this.create(target);
@@ -321,7 +318,10 @@ abstract class Descriptor<T, H extends SignalHandle<T>> implements OwnerBoundSig
 	protected resolve(): H {
 		const token = requireOwner();
 		const owner = resolveDescriptorOwner(this.site, token);
-		return this[SIGNAL_OWNER_RESOLVE](owner);
+		// This path already normalized the owner. Retain its validation order,
+		// but do not repeat document/instance routing for every cached read.
+		requireSite(this.site);
+		return this.resolvedCell(owner);
 	}
 
 	get(): T {
@@ -370,27 +370,16 @@ class SignalDescriptor<T> extends Descriptor<T, WritableSignal<T>> implements Wr
 	}
 }
 
-class DerivedDescriptor<T> extends Descriptor<T, DerivedSignal<T>> implements DerivedSignal<T> {
+/** @internal Scalar and general derivations share the same public handle. */
+export class DerivedDescriptor<T>
+	extends Descriptor<T, DerivedSignal<T>>
+	implements DerivedSignal<T>
+{
 	declare readonly kind: 'derived';
 }
 
-class QueryDescriptor<T> extends Descriptor<T, QuerySignal<T>> implements QuerySignal<T> {
-	declare readonly kind: 'async';
-
-	refetch(): void {
-		this.resolve().retry();
-	}
-
-	reset(): void {
-		this.resolve().retry({ pending: true });
-	}
-
-	retry(options?: { pending?: boolean }): void {
-		this.resolve().retry(options);
-	}
-}
-
-function descriptorKey(site: string | undefined, explicit: string | undefined): string {
+/** @internal Preserve authored or compiler-assigned declaration identity. */
+export function descriptorKey(site: string | undefined, explicit: string | undefined): string {
 	const key = explicit ?? site;
 	if (typeof key !== 'string' || !key.trim()) return '<compiler-assigned-signal>';
 	return key;
@@ -433,145 +422,35 @@ export function signal$<T>(keyOrInitial: string | T, initial?: T): WritableSigna
 		: __signalAt(undefined as never, keyOrInitial as T);
 }
 
-export function __derivedAt<T>(
+/** Compiler-only scalar proof; authored derived$ remains dynamically asynchronous. */
+export function __derivedScalarAt<T>(
 	site: string,
 	compute: DerivedCompute<T>,
 	options?: DerivedOptions,
 ): DerivedSignal<T>;
-export function __derivedAt<T>(
+export function __derivedScalarAt<T>(
 	site: string,
 	key: string,
 	compute: DerivedCompute<T>,
 	options?: DerivedOptions,
 ): DerivedSignal<T>;
-export function __derivedAt<T>(
+export function __derivedScalarAt<T>(
 	site: string,
 	keyOrCompute: string | DerivedCompute<T>,
 	computeOrOptions?: DerivedCompute<T> | DerivedOptions,
-	options?: DerivedOptions,
+	_options?: DerivedOptions,
 ): DerivedSignal<T> {
 	const explicit = typeof keyOrCompute === 'string' ? keyOrCompute : undefined;
-	const compute = (explicit ? computeOrOptions : keyOrCompute) as DerivedCompute<T>;
-	const resolvedOptions = (explicit ? options : computeOrOptions) as DerivedOptions | undefined;
+	const compute = (explicit ? computeOrOptions : keyOrCompute) as () => T;
 	if (typeof compute !== 'function') throw new TypeError('derived$ requires a function.');
 	const key = descriptorKey(site, explicit);
 	return new DerivedDescriptor(
 		key,
 		'derived',
-		(owner) => {
-			const wrapped = compute.length
-				? (context: Parameters<DerivedCompute<T>>[0]) =>
-						runWithSignalOwner(owner, () => compute(context))
-				: () => runWithSignalOwner(owner, () => (compute as () => ReturnType<DerivedCompute<T>>)());
-			return createDeclaredDerivedCell(owner, key, wrapped, resolvedOptions);
-		},
-		site,
-	);
-}
-
-export function derived$<T>(compute: DerivedCompute<T>, options?: DerivedOptions): DerivedSignal<T>;
-export function derived$<T>(
-	key: string,
-	compute: DerivedCompute<T>,
-	options?: DerivedOptions,
-): DerivedSignal<T>;
-export function derived$<T>(
-	keyOrCompute: string | DerivedCompute<T>,
-	computeOrOptions?: DerivedCompute<T> | DerivedOptions,
-	options?: DerivedOptions,
-): DerivedSignal<T> {
-	return typeof keyOrCompute === 'string'
-		? __derivedAt(keyOrCompute, keyOrCompute, computeOrOptions as DerivedCompute<T>, options)
-		: __derivedAt(undefined as never, keyOrCompute, computeOrOptions as DerivedOptions | undefined);
-}
-
-export function __queryAt<A, T>(
-	site: string,
-	select: () => A | typeof skip,
-	load: (selection: A, context: QueryContext<T>) => QueryLoadResult<T>,
-	options?: QueryOptions,
-): QuerySignal<T>;
-export function __queryAt<A, T>(
-	site: string,
-	key: string,
-	select: () => A | typeof skip,
-	load: (selection: A, context: QueryContext<T>) => QueryLoadResult<T>,
-	options?: QueryOptions,
-): QuerySignal<T>;
-export function __queryAt<A, T>(
-	site: string,
-	keyOrSelect: string | (() => A | typeof skip),
-	selectOrLoad:
-		(() => A | typeof skip) | ((selection: A, context: QueryContext<T>) => QueryLoadResult<T>),
-	loadOrOptions?: ((selection: A, context: QueryContext<T>) => QueryLoadResult<T>) | QueryOptions,
-	options?: QueryOptions,
-): QuerySignal<T> {
-	const explicit = typeof keyOrSelect === 'string' ? keyOrSelect : undefined;
-	const select = (explicit ? selectOrLoad : keyOrSelect) as () => A | typeof skip;
-	const load = (explicit ? loadOrOptions : selectOrLoad) as (
-		selection: A,
-		context: QueryContext<T>,
-	) => QueryLoadResult<T>;
-	const resolvedOptions = (explicit ? options : loadOrOptions) as QueryOptions | undefined;
-	if (typeof select !== 'function' || typeof load !== 'function') {
-		throw new TypeError('query$ requires selector and loader functions.');
-	}
-	const authoredKey = descriptorKey(site, explicit);
-	const key =
-		explicit !== undefined && (site.startsWith('g:') || site.startsWith('i:'))
-			? site.slice(0, 2) + authoredKey
-			: authoredKey;
-	const request = (
-		createQueryRequest as unknown as (
-			key: string,
-			load: (selection: A, context: QueryContext) => unknown,
-			options?: QueryOptions,
-		) => (selection: A) => import('./types.js').QueryRequest<T>
-	)(key, load as unknown as (selection: A, context: QueryContext) => unknown, resolvedOptions);
-	return new QueryDescriptor(
-		key,
-		'async',
 		(owner) =>
-			createDeclaredResourceCell(owner, key, () => {
-				const selection = runWithSignalOwner(owner, select);
-				return selection === skip ? skip : request(selection);
-			}) as QuerySignal<T>,
+			createDeclaredScalarCell(owner, key, () => runWithSignalOwner(owner, () => compute())),
 		site,
 	);
-}
-
-export function query$<A, T>(
-	select: () => A | typeof skip,
-	load: (selection: A, context: QueryContext<T>) => QueryLoadResult<T>,
-	options?: QueryOptions,
-): QuerySignal<T>;
-export function query$<A, T>(
-	key: string,
-	select: () => A | typeof skip,
-	load: (selection: A, context: QueryContext<T>) => QueryLoadResult<T>,
-	options?: QueryOptions,
-): QuerySignal<T>;
-export function query$<A, T>(
-	keyOrSelect: string | (() => A | typeof skip),
-	selectOrLoad:
-		(() => A | typeof skip) | ((selection: A, context: QueryContext<T>) => QueryLoadResult<T>),
-	loadOrOptions?: ((selection: A, context: QueryContext<T>) => QueryLoadResult<T>) | QueryOptions,
-	options?: QueryOptions,
-): QuerySignal<T> {
-	return typeof keyOrSelect === 'string'
-		? __queryAt(
-				keyOrSelect,
-				keyOrSelect,
-				selectOrLoad as () => A | typeof skip,
-				loadOrOptions as (selection: A, context: QueryContext<T>) => QueryLoadResult<T>,
-				options,
-			)
-		: __queryAt(
-				undefined as never,
-				keyOrSelect,
-				selectOrLoad as (selection: A, context: QueryContext<T>) => QueryLoadResult<T>,
-				loadOrOptions as QueryOptions | undefined,
-			);
 }
 
 export function isSignalHandle(value: unknown): value is SignalHandle<unknown> {

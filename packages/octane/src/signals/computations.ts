@@ -1,3 +1,4 @@
+import { createDerivedCellWith } from './engine.js';
 import {
 	ScopedNode,
 	assertAlive,
@@ -21,10 +22,20 @@ import {
 	type DerivedCompute,
 	type DerivedContext,
 	type DerivedOptions,
+	type DerivedSignal,
 	type OwnerBoundSignal,
 	type Scope,
 	type SignalHandle,
 } from './types.js';
+
+export function createDeclaredDerivedCell<T>(
+	owner: Scope,
+	key: string,
+	compute: DerivedCompute<T>,
+	options?: DerivedOptions,
+): DerivedSignal<T> {
+	return createDerivedCellWith(owner, key, compute, options, DerivedBinding);
+}
 
 interface AttemptDependency {
 	readonly node: ScopedNode;

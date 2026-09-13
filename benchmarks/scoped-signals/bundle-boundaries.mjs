@@ -54,6 +54,14 @@ export const BUNDLE_CASES = [
 		baseline: false,
 		rendererFree: true,
 	},
+	{
+		id: 'streamed-signal-results-bootstrap',
+		request: 'octane/hydration/streamed-signals',
+		exports: ['bootstrapStreamedSignalResults', 'installSignalDocumentLifecycle'],
+		platform: 'browser',
+		baseline: false,
+		rendererFree: true,
+	},
 ];
 
 export function entrySource(scenario) {
@@ -62,6 +70,8 @@ export function entrySource(scenario) {
 const count$ = signal$(1);
 const double$ = derived$(() => count$.get() * 2);
 const result$ = query$(() => count$.get(), async (value) => value * 3);
+// An unused declaration must not retain its general async implementation.
+const unused$ = derived$(async () => count$.get());
 export async function exercise() {
   const owner = { scopeKey: 'compiled-plain-bundle' };
   const read = (callback) => runWithSignalOwner(owner, callback);
@@ -107,7 +117,7 @@ export function verifyBundleInputs(scenario, inputs) {
 		assert.deepEqual(alien, [], `${scenario.id}: ordinary imports reached Alien Signals`);
 		assert.deepEqual(engine, [], `${scenario.id}: ordinary imports reached the scoped engine`);
 		const adapters = inputs.filter((input) =>
-			/\/src\/signals\/native-read-(?:client|server|collector|inspection|retry)\.[jt]s$/.test(
+			/\/src\/(?:signals\/native-read-(?:client|server|collector|inspection|retry)|server\/signal-query-observation)\.[jt]s$/.test(
 				input.path.replaceAll('\\', '/'),
 			),
 		);
@@ -139,6 +149,31 @@ export function verifyBundleInputs(scenario, inputs) {
 			[],
 			`${scenario.id}: renderer or DevTools reached the independent engine`,
 		);
+	}
+	if (scenario.id === 'compiled-plain-signals') {
+		// This fixture has a compiler-proven scalar derivation and a real async
+		// query. Neither the query nor an unused async declaration may force the
+		// general derived-attempt engine into this scalar caller.
+		for (const input of inputs.filter((input) =>
+			/\/src\/signals\/computations\.[jt]s$/.test(input.path.replaceAll('\\', '/')),
+		)) {
+			assert.equal(
+				input.bytesInOutput,
+				0,
+				`${scenario.id}: scalar caller retained general derived computation implementation`,
+			);
+		}
+	}
+	if (scenario.id === 'streamed-signal-results-bootstrap') {
+		for (const input of inputs.filter((input) =>
+			/\/src\/hydration\/stream-receiver\.[jt]s$/.test(input.path.replaceAll('\\', '/')),
+		)) {
+			assert.equal(
+				input.bytesInOutput,
+				0,
+				`${scenario.id}: result-only bootstrap retained DOM placement implementation`,
+			);
+		}
 	}
 	if (scenario.id === 'native-client' || scenario.id === 'native-server') {
 		const suffix = scenario.id === 'native-client' ? '/src/runtime.ts' : '/src/runtime.server.ts';

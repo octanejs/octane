@@ -197,6 +197,8 @@ export const REQUIRED_PUBLIC_VALUE_EXPORTS = {
 	'./react': ['OctaneCompat', '__hostContextFiberWalks'],
 	'./hydration': [
 		'condition',
+		'createStreamedRegionReceiver',
+		'createStreamedResultReceiver',
 		'idle',
 		'initializeHydrationEventCapture',
 		'interaction',
@@ -207,10 +209,12 @@ export const REQUIRED_PUBLIC_VALUE_EXPORTS = {
 	],
 	'./hydration/streamed-signals': [
 		'bootstrapStreamedSignalHydration',
+		'bootstrapStreamedSignalResults',
 		'installSignalDocumentLifecycle',
 	],
 	'./behavior': ['attachBehaviorRoot'],
 	'./signals': [
+		'createResource',
 		'createScope',
 		'query',
 		'ScopeDisposedError',

@@ -16,24 +16,34 @@ export interface ServerSignalQueryAttempt {
 
 export type ServerSignalQueryAttemptObserver = (attempt: ServerSignalQueryAttempt) => void;
 
-interface ObserverContext {
+export interface ServerSignalQueryAttemptObserverContext {
 	readonly owner: SignalRendererOwnerIdentity;
 	readonly observe: ServerSignalQueryAttemptObserver;
+	readonly createObservations: () => ServerSignalQueryAttemptObservations;
 }
 
 export interface ServerSignalQueryAttemptSource {
-	readonly scopeKey: string;
 	readonly nodeKey: string;
 	readonly selectionKey: string;
 	readonly attempt: number;
 	readonly kind: 'promise' | 'stream';
 	readonly result: unknown;
-	readonly signal: AbortSignal;
 	readonly isCurrent: () => boolean;
-	readonly release: () => void;
 }
 
-let CURRENT_OBSERVER: ObserverContext | undefined;
+/** The shared request engine owns a lease, not the server's transport mirrors. */
+export interface ServerSignalQueryAttemptObservations {
+	observe(
+		context: ServerSignalQueryAttemptObserverContext,
+		source: ServerSignalQueryAttemptSource,
+	): void;
+	publish(value: unknown): Promise<void> | undefined;
+	complete(): void;
+	fail(error: unknown): void;
+	retire(): void;
+}
+
+let CURRENT_OBSERVER: ServerSignalQueryAttemptObserverContext | undefined;
 
 /**
  * Install a synchronous renderer observation context around authored server
@@ -45,10 +55,11 @@ let CURRENT_OBSERVER: ObserverContext | undefined;
 export function runWithServerSignalQueryAttemptObserver<T>(
 	owner: SignalRendererOwnerIdentity,
 	observe: ServerSignalQueryAttemptObserver,
+	createObservations: () => ServerSignalQueryAttemptObservations,
 	callback: () => T,
 ): T {
 	const previous = CURRENT_OBSERVER;
-	CURRENT_OBSERVER = { owner, observe };
+	CURRENT_OBSERVER = { owner, observe, createObservations };
 	try {
 		return callback();
 	} finally {
@@ -56,53 +67,37 @@ export function runWithServerSignalQueryAttemptObserver<T>(
 	}
 }
 
-/** @internal Capture the request owner for a later synchronous authored callback. */
-export function captureServerSignalQueryAttemptObserver(
-	owner: SignalRendererOwnerIdentity,
-	observe: ServerSignalQueryAttemptObserver,
-): <T>(callback: () => T) => T {
-	return (callback) => runWithServerSignalQueryAttemptObserver(owner, observe, callback);
+/** @internal Keep the browser/query fast path allocation-free when no server observer matches. */
+export function serverSignalQueryAttemptObserver(
+	scopeKey: string,
+): ServerSignalQueryAttemptObserverContext | undefined {
+	const context = CURRENT_OBSERVER;
+	if (context === undefined) return;
+	const ownerKey = context.owner.documentOwner.scopeKey;
+	if (scopeKey !== ownerKey && scopeKey !== `${ownerKey}:instance:${context.owner.instanceKey}`) {
+		return;
+	}
+	if (typeof context.createObservations !== 'function') {
+		throw new TypeError('A server signal query observer requires an observation factory.');
+	}
+	return context;
 }
 
-/** @internal Keep the browser/query fast path allocation-free when no server observer matches. */
 export function hasServerSignalQueryAttemptObserver(scopeKey: string): boolean {
-	const context = CURRENT_OBSERVER;
-	if (context === undefined) return false;
-	const ownerKey = context.owner.documentOwner.scopeKey;
-	return scopeKey === ownerKey || scopeKey === `${ownerKey}:instance:${context.owner.instanceKey}`;
+	return serverSignalQueryAttemptObserver(scopeKey) !== undefined;
 }
 
 /** @internal Preserve observation across a pending query description, not an async context. */
 export function captureCurrentServerSignalQueryAttemptObserver(
 	scopeKey: string,
 ): (<T>(callback: () => T) => T) | undefined {
-	if (!hasServerSignalQueryAttemptObserver(scopeKey)) return;
-	const context = CURRENT_OBSERVER!;
-	return captureServerSignalQueryAttemptObserver(context.owner, context.observe);
-}
-
-/** @internal Publish one engine attempt only to the exact active renderer owner. */
-export function observeServerSignalQueryAttempt(source: ServerSignalQueryAttemptSource): boolean {
-	const context = CURRENT_OBSERVER;
-	if (context === undefined) return false;
-	const ownerKey = context.owner.documentOwner.scopeKey;
-	if (
-		source.scopeKey !== ownerKey &&
-		source.scopeKey !== `${ownerKey}:instance:${context.owner.instanceKey}`
-	) {
-		return false;
-	}
-	context.observe({
-		ownerKey,
-		instanceKey: context.owner.instanceKey,
-		nodeKey: source.nodeKey,
-		selectionKey: source.selectionKey,
-		attempt: source.attempt,
-		kind: source.kind,
-		result: source.result,
-		signal: source.signal,
-		isCurrent: source.isCurrent,
-		release: source.release,
-	});
-	return true;
+	const context = serverSignalQueryAttemptObserver(scopeKey);
+	if (context === undefined) return;
+	return (callback) =>
+		runWithServerSignalQueryAttemptObserver(
+			context.owner,
+			context.observe,
+			context.createObservations,
+			callback,
+		);
 }

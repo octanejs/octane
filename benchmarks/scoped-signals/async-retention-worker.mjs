@@ -93,7 +93,7 @@ function createOwnedResource(scope, query, slot, argument$) {
 			latest: (fallback) => api.runWithSignalOwner(scope, () => handle$.latest(fallback)),
 			subscribe: (callback) => api.runWithSignalOwner(scope, () => handle$.subscribe(callback)),
 		};
-	} else resource$ = scope.asyncSignal$(slot, () => query(argument$.get()));
+	} else resource$ = api.createResource(scope, slot, () => query(argument$.get()));
 	assert.equal(resource$.snapshot().status, 'pending');
 	resource$.subscribe(ignoreNotification);
 	return resource$;

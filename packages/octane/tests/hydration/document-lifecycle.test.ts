@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import {
-	bootstrapStreamedSignalHydration,
+	bootstrapStreamedSignalResults,
 	installSignalDocumentLifecycle,
 } from '../../src/hydration/streamed-signals.js';
 import { registerIndependentHydrationIsland } from '../../src/hydration/independent-island.js';
@@ -8,6 +8,7 @@ import { createIndependentHydrateManifest } from '../../src/independent-hydratio
 import { createSignalOwnerLifecycle } from '../../src/signals/facade.js';
 import { createStreamedRegionReceiver } from '../../src/hydration/stream-receiver.js';
 import {
+	createResource,
 	attachStreamedSignalResult,
 	createScope,
 	derived$,
@@ -88,7 +89,7 @@ it('freezes pending reads, fences late results, and restarts only the current se
 		attempts.push({ key, signal, result });
 		return result.promise;
 	});
-	const value = owner.asyncSignal$('value', () => fetch(selected.get()));
+	const value = createResource(owner, 'value', () => fetch(selected.get()));
 	expect(attempts).toHaveLength(1);
 	transition('pagehide', true);
 	expect(attempts[0].signal.aborted).toBe(true);
@@ -209,7 +210,7 @@ it.each(['pending', 'complete', 'complete-late'])(
 			__octaneStreamedSignalSelections: { version: 1, identities: [identity], register() {} },
 			__octaneStreamedRenderer: early,
 		};
-		const streamed = bootstrapStreamedSignalHydration({
+		const streamed = bootstrapStreamedSignalResults({
 			signalOwner: owner,
 			buildId: 'build',
 			documentId: 'document',
@@ -257,13 +258,13 @@ it.each(['pending', 'complete', 'complete-late'])(
 				const authQuery = query('restore-auth', () =>
 					++authCalls === 1 ? new Promise<string>(() => {}) : Promise.resolve(nextAuth),
 				);
-				const auth = scope.asyncSignal$('auth', () => authQuery(undefined));
+				const auth = createResource(scope, 'auth', () => authQuery(undefined));
 				const browser = vi.fn(async (key: string) => `browser ${key}`);
 				const bodyQuery = query('restore-body', browser);
 				let body =
 					mode === 'complete-late'
 						? undefined
-						: scope.asyncSignal$('body', () => bodyQuery(auth.get()));
+						: createResource(scope, 'body', () => bodyQuery(auth.get()));
 				const receiver = createStreamedRegionReceiver({
 					buildId: 'build',
 					documentId: 'document',
@@ -310,7 +311,7 @@ it.each(['pending', 'complete', 'complete-late'])(
 					receiver.dispose();
 					lifetime.resume();
 					await tick();
-					body ??= scope.asyncSignal$('body', () => bodyQuery(auth.get()));
+					body ??= createResource(scope, 'body', () => bodyQuery(auth.get()));
 					await tick();
 					expect(authCalls).toBe(2);
 					expect(body.get()).toBe(
@@ -406,7 +407,7 @@ it('keeps completed query data and writable drafts without refetching on restore
 	const { signalOwner: owner } = install();
 	const load = vi.fn(async () => 'completed');
 	const fetch = query('completed-read', load);
-	const value = owner.asyncSignal$('value', () => fetch('key'));
+	const value = createResource(owner, 'value', () => fetch('key'));
 	const draft = owner.signal$('draft', 'typed before navigation');
 	await tick();
 	transition('pagehide', true);
@@ -440,7 +441,7 @@ it('keeps an uncertain accepted write for reconciliation without submitting it a
 
 it('blocks abort-handler reentrant refetch and starts exactly one replacement', async () => {
 	const { signalOwner: owner } = install();
-	let value: ReturnType<typeof owner.asyncSignal$>;
+	let value: ReturnType<typeof createResource>;
 	const load = vi.fn((_key: string, { signal }: { signal: AbortSignal }) => {
 		signal.addEventListener('abort', () => {
 			if (!owner.retired) value.retry();
@@ -448,7 +449,7 @@ it('blocks abort-handler reentrant refetch and starts exactly one replacement', 
 		return new Promise<string>(() => {});
 	});
 	const fetch = query('reentrant-read', load);
-	value = owner.asyncSignal$('value', () => fetch('key'));
+	value = createResource(owner, 'value', () => fetch('key'));
 	transition('pagehide', true);
 	expect(load).toHaveBeenCalledTimes(1);
 	transition('pageshow', true);
@@ -480,7 +481,7 @@ it.each(['build', 'document', 'owner'])(
 		const { signalOwner: owner, onMismatch } = install();
 		const load = vi.fn(() => new Promise<string>(() => {}));
 		const fetch = query('mismatch-read', load);
-		owner.asyncSignal$('value', () => fetch('key'));
+		createResource(owner, 'value', () => fetch('key'));
 		transition('pagehide', true);
 		const element = document.getElementById('__octane_data')!;
 		const data = JSON.parse(element.textContent!);

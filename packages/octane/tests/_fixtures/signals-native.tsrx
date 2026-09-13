@@ -7,7 +7,7 @@ import {
 	useLayoutEffect,
 	useRef,
 } from 'octane';
-import { createScope, query } from 'octane/signals';
+import { createResource, createScope, query } from 'octane/signals';
 import { formatCounter$ } from './signals-native-readers';
 
 export function createCounter$(scopeKey = 'native-counter', initial = 0) {
@@ -99,7 +99,7 @@ export function createResource$(scopeKey: string, load: (key: string) => Promise
 	const key$ = scope.signal$('key', 'a');
 	const count$ = scope.signal$('count', 0);
 	const request = query('native-fixture', load);
-	const value$ = scope.asyncSignal$('value', () => request(scope.get(key$)));
+	const value$ = createResource(scope, 'value', () => request(scope.get(key$)));
 	return { scope, key$, count$, value$ };
 }
 

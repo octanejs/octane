@@ -1,7 +1,7 @@
 import {
-	initializeHydrationEventCapture,
+	initializeHydrationControlCapture,
 	snapshotHydrationControl,
-} from '../hydration/event-capture.js';
+} from '../hydration/control-capture.js';
 import {
 	hasHydrationControlSignalWriter,
 	registerHydrationControlSignalWriter,
@@ -53,7 +53,7 @@ export function bindSignalControl(
 		throw new Error(
 			'This control property already has a signal binding. Dispose it before rebinding.',
 		);
-	initializeHydrationEventCapture(control.ownerDocument);
+	initializeHydrationControlCapture(control.ownerDocument);
 	const owner = currentSignalOwner();
 	const run = owner === null ? <T>(callback: () => T): T => callback() : captureSignalOwner(owner);
 	const handle =

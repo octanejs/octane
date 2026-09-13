@@ -27,6 +27,11 @@ import {
 	type StreamedRendererDeliveryOptions,
 } from './stream-delivery.js';
 import { createStreamedRegionReceiver, type StreamedRegionReceiver } from './stream-receiver.js';
+import {
+	createStreamedResultReceiver,
+	type StreamedResultReceiver,
+	type StreamedResultReceiverOptions,
+} from './stream-result-receiver.js';
 export {
 	installSignalDocumentLifecycle,
 	type SignalDocumentLifecycleOptions,
@@ -62,12 +67,16 @@ export interface StreamedSignalHydrationOptions extends StreamedRendererDelivery
 	readonly target?: Record<string, unknown>;
 }
 
-export interface StreamedSignalHydration {
+export interface StreamedSignalResults {
 	readonly signalOwner: SignalOwnerIdentity;
-	readonly receiver: StreamedRegionReceiver;
+	readonly receiver: StreamedResultReceiver;
 	dispose(): void;
 	/** Permanently fence this document's old ingress without restoring its early mailbox. */
 	suspend(): void;
+}
+
+export interface StreamedSignalHydration extends StreamedSignalResults {
+	readonly receiver: StreamedRegionReceiver;
 }
 
 function documentOwner(owner: SignalOwner): SignalOwnerIdentity {
@@ -83,12 +92,30 @@ function documentOwner(owner: SignalOwner): SignalOwnerIdentity {
 export function bootstrapStreamedSignalHydration(
 	options: StreamedSignalHydrationOptions,
 ): StreamedSignalHydration {
+	return bootstrapStreamedSignals(options, createStreamedRegionReceiver);
+}
+
+/**
+ * Upgrade the same pre-module mailboxes when the host owns DOM delivery.
+ * Results join the existing signal owner synchronously, without region placement
+ * support. Use bootstrapStreamedSignalHydration to register streamed HTML ranges.
+ */
+export function bootstrapStreamedSignalResults(
+	options: StreamedSignalHydrationOptions,
+): StreamedSignalResults {
+	return bootstrapStreamedSignals(options, createStreamedResultReceiver);
+}
+
+function bootstrapStreamedSignals<Receiver extends StreamedResultReceiver>(
+	options: StreamedSignalHydrationOptions,
+	createReceiver: (options: StreamedResultReceiverOptions) => Receiver,
+): StreamedSignalResults & { readonly receiver: Receiver } {
 	if (!options.buildId || !options.documentId) {
 		throw new TypeError('Streamed signal hydration requires buildId and documentId.');
 	}
 	const target = options.target ?? (globalThis as Record<string, unknown>);
 	const signalOwner = options.signalOwner ?? documentSignalOwner(document);
-	const receiver = createStreamedRegionReceiver({
+	const receiver = createReceiver({
 		buildId: options.buildId,
 		documentId: options.documentId,
 		ownerKey: signalOwner.scopeKey,

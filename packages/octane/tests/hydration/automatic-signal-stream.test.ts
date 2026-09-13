@@ -11,7 +11,10 @@ import {
 	use,
 	type StreamOptions,
 } from '../../src/runtime.server.js';
-import { bootstrapStreamedSignalHydration } from '../../src/hydration/streamed-signals.js';
+import {
+	bootstrapStreamedSignalHydration,
+	bootstrapStreamedSignalResults,
+} from '../../src/hydration/streamed-signals.js';
 import { StreamedReceiverError } from '../../src/hydration/stream-receiver.js';
 import { __queryAt, runWithSignalOwner } from '../../src/signals/index.js';
 import type { StreamedRendererFrame } from '../../src/streamed-signals-protocol.js';
@@ -107,7 +110,7 @@ it('automatically publishes a rendered query attempt after the pre-module receiv
 	});
 	const target = streamedTarget(html);
 	enableSignalBindings();
-	const hydration = bootstrapStreamedSignalHydration({
+	const hydration = bootstrapStreamedSignalResults({
 		buildId: 'build:auto-stream-query',
 		documentId: 'document:auto-stream-query',
 		target,

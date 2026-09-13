@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import test from 'node:test';
+import { compile } from '../../packages/octane/src/compiler/compile.js';
+import { slotHooks } from '../../packages/octane/src/compiler/slot-hooks.js';
 import {
 	BUNDLE_CASES,
 	entrySource,
@@ -115,4 +117,79 @@ test('native entries require their actual runtime and pinned engine', () => {
 		() => verifyBundleInputs(scenario('native-server'), [source('runtime.server.ts')]),
 		/dependency is missing/,
 	);
+});
+
+test('scalar and result-only entries do not retain their optional implementations', () => {
+	const inputs = [source('signals/engine.ts'), source('signals/graph.ts'), alien()];
+	verifyBundleInputs(scenario('compiled-plain-signals'), inputs);
+	verifyBundleInputs(scenario('compiled-plain-signals'), [
+		...inputs,
+		{ ...source('signals/computations.ts'), bytesInOutput: 0 },
+	]);
+	for (const bytesInOutput of [undefined, 1]) {
+		assert.throws(
+			() =>
+				verifyBundleInputs(scenario('compiled-plain-signals'), [
+					...inputs,
+					{ ...source('signals/computations.ts'), bytesInOutput },
+				]),
+			/scalar caller retained general derived computation/,
+		);
+	}
+	verifyBundleInputs(scenario('streamed-signal-results-bootstrap'), inputs);
+	verifyBundleInputs(scenario('streamed-signal-results-bootstrap'), [
+		...inputs,
+		{ ...source('hydration/stream-receiver.ts'), bytesInOutput: 0 },
+	]);
+	for (const bytesInOutput of [undefined, 1]) {
+		assert.throws(
+			() =>
+				verifyBundleInputs(scenario('streamed-signal-results-bootstrap'), [
+					...inputs,
+					{ ...source('hydration/stream-receiver.ts'), bytesInOutput },
+				]),
+			/result-only bootstrap retained DOM placement/,
+		);
+	}
+});
+
+// Evaluated declaration effects, diagnostics, and Promise/stream semantics stay
+// in compiler/signal-declarations.test.ts; helper activation is a codegen metric.
+test('scalar declarations select the bounded implementation only with a static proof', () => {
+	for (const [callback, options, scalar] of [
+		['() => null', '', true],
+		['() => /pattern/', '', false],
+		['() => -value()', '', true],
+		['() => value() === other()', '', true],
+		['() => `value:${value()}`', '', true],
+		['() => value() ? 1 : 2', '', true],
+		['() => value() ? 1 : other()', '', false],
+		['() => value() + other()', '', false],
+		['() => String(value())', '', false],
+		['() => (value() as string)', '', false],
+		['async () => 1', '', false],
+		['() => { "use strong"; return value(); }', '', false],
+		['(context = undefined) => 1', '', false],
+		['() => value()', ', {sync: true}', true],
+		['() => 1', ', options', false],
+		['() => 1', ', {get sync() { return true; }}', false],
+		['({signal}) => 1', ', {sync: true}', false],
+		['function* () { return 1; }', '', false],
+	]) {
+		for (const factory of ['derive$', 'signals.derived$']) {
+			const candidate = `import {derived$ as derive$} from 'octane/signals';
+import * as signals from 'octane/signals';
+export const result$ = ${factory}(${callback}${options});`;
+			for (const environment of ['client', 'server']) {
+				for (const [extension, code] of [
+					['tsrx', compile(candidate, '/src/proof.tsrx', { mode: environment }).code],
+					['ts', slotHooks(candidate, '/src/proof.ts', { environment }).code],
+				]) {
+					const label = `${extension}/${environment}: ${factory}(${callback}${options})`;
+					assert.match(code, /__derived(?:Scalar)?At/, label);
+					assert.equal(code.includes('__derivedScalarAt'), scalar, label);
+				}
+			}
+		}
+	}
 });

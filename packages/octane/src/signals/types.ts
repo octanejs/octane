@@ -198,7 +198,6 @@ export interface Scope {
 		key: string,
 		compute: (() => T) & (T extends PromiseLike<unknown> ? never : unknown),
 	): DerivedSignal<T>;
-	asyncSignal$<T>(key: string, describe: () => QueryRequest<T> | typeof skip): Resource<T>;
 	get<T>(handle$: SignalHandle<T>): T;
 	set<T>(handle$: WritableSignal<T>, value: T | ((previous: T) => T)): void;
 	isPending(read: () => unknown): boolean;

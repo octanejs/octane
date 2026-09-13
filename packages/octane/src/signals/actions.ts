@@ -1,10 +1,10 @@
 import {
 	adoptResourceValue,
-	createDeclaredDerivedCell,
 	createDeclaredSignalCell,
 	getResourceSelectionAuthority,
 	getSignalScope,
 } from './engine.js';
+import { createDeclaredDerivedCell } from './computations.js';
 import { resolveCurrentSignalHandle, resolveSignalHandleForOwner } from './facade.js';
 import {
 	ScopedNode,

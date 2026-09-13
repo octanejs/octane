@@ -17,10 +17,7 @@ declare function fetchUser(
 	id: string,
 	options: { signal: AbortSignal; previous?: { id: string; name: string } },
 ): Promise<{ id: string; name: string }>;
-declare function fetchPreview(
-	id: string,
-	options: { signal: AbortSignal },
-): Promise<string>;
+declare function fetchPreview(id: string, options: { signal: AbortSignal }): Promise<string>;
 
 const selectedId$ = signal$(null as string | null);
 const draft$ = signal$('');
@@ -63,6 +60,12 @@ stop();
 account.dispose();
 ```
 
+`scope.asyncSignal$` is removed. Import `createResource(scope, key, describe)` for
+an eager resource with an explicit owner, or use the normal owner-optional
+`query$` declaration. Query construction is selected statically by these callers;
+an application importing only synchronous scope behavior does not retain query
+producers. There is no replacement compatibility method or runtime installation.
+
 Keys are nonempty strings, unique within one scope. Two scopes with the same textual `scopeKey` still own separate state. A handle can read itself, or its owning scope can read it with `scope.get(handle$)`; a different scope cannot impersonate that owner. Derived computations may read handles belonging to another scope without taking ownership of them.
 
 Writes use `Object.is` equality and become visible immediately. Nested batches defer notifications until the outer synchronous batch ends. `scope.action(fn)` preserves `this`, arguments, and the return value while applying that same batching rule. It does not untrack reads, roll back earlier writes on an exception, or keep a batch open across `await`.
@@ -81,7 +84,7 @@ Live derivations and async behavior additionally require the renderer-free
 signal engine; include that delivery in the eager byte budget.
 
 Before importing modules that read document signals, call
-`bootstrapStreamedSignalHydration({ buildId, documentId, initialSignals })` from
+`bootstrapStreamedSignalResults({ buildId, documentId, initialSignals })` from
 `octane/hydration/streamed-signals`. `initialSignals` is the initial response's
 native manifest, not a later cached HTML frame. It initializes unread document
 state once; early user edits take precedence. Late or duplicate initial state
@@ -91,6 +94,13 @@ if added later, use the returned `signalOwner`; none is required for behavior.
 carrier; a null, changed or throwing identity read fails closed on persisted
 restore. Deliberately custom `signalOwner` objects stay explicit and require
 `runWithSignalOwner` around their behavior callbacks.
+
+This result-only bootstrap accepts signal results without shipping Octane's DOM
+region-placement implementation. Use the existing `bootstrapStreamedSignalHydration`
+instead when the host calls `receiver.registerRegion` to let Octane place streamed
+HTML. Both use the same document ownership, validation, bounded delivery and
+lifecycle rules; choose one bootstrap per document. The result-only receiver
+validates placement frames and their order but never applies their HTML.
 
 For an existing server-owned control, bind its property without reconciliation:
 
@@ -120,7 +130,7 @@ expired transient user activation.
 Prefer `query$` for new keyed sources. A selector result of `skip` produces an idle snapshot and does not start the loader. `undefined` is still a valid selected key. `refetch()` keeps a usable same-selection result visible with `refreshing: true`; `reset()` deliberately returns strict reads to pending presentation. Loaders receive the prior ready value as optional `previous` and a fresh attempt `AbortSignal`.
 
 ```ts
-import { createScope, query } from 'octane/signals';
+import { createResource, createScope, query } from 'octane/signals';
 
 const account = createScope({ scopeKey: 'account:42' });
 const selectedId$ = account.signal$('selected-id', 1);
@@ -131,7 +141,7 @@ const userQuery = query('user', async (id: number, { signal }) => {
 	return response.json() as Promise<{ id: number; name: string }>;
 });
 
-const user$ = account.asyncSignal$('user', () => userQuery(selectedId$.get()));
+const user$ = createResource(account, 'user', () => userQuery(selectedId$.get()));
 const card$ = account.derived$('card', () => ({
 	id: selectedId$.get(),
 	name: user$.get().name,
@@ -190,7 +200,7 @@ Retain the operation if the application needs in-memory reconciliation after an 
 
 | Read                                   | Contract                                                                                                                          |
 | -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `handle$.get()` / `scope.get(handle$)` | Return the current ready value, throw its pending thenable, idle error, or source error.                                         |
+| `handle$.get()` / `scope.get(handle$)` | Return the current ready value, throw its pending thenable, idle error, or source error.                                          |
 | `handle$.latest(fallback)`             | Return the whole last successful computation, or the fallback if none exists. This result need not have appeared in committed UI. |
 | `handle$.snapshot()`                   | Return an immutable idle, pending, ready, or error record. Ready records have `value`; error records have `error`.                |
 | `scope.isPending(() => handle$.get())` | Catch pending thenables and return a boolean; other errors still throw.                                                           |

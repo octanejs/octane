@@ -89,6 +89,15 @@ export function useCounter$() { return ${name}(0); }`;
 const scope = createScope({ scopeKey: 'plain' }); const count = scope.signal$('count', 0);`;
 		const compiler = createOctaneCompiler({ root: '/project' });
 		expect(() => compiler.transform(source, '/project/src/store.ts')).toThrow(NAMING);
+		for (const module of ['octane/signals', 'octane/signals/client', 'octane/signals/server']) {
+			expect(() =>
+				compiler.transform(
+					`import { createResource as resource } from '${module}';
+const result = resource(owner, 'result', describe);`,
+					'/project/src/resource.ts',
+				),
+			).toThrow(NAMING);
+		}
 	});
 
 	it('checks runtime capabilities alongside inline type imports', () => {
@@ -211,6 +220,21 @@ const count = otherScope.signal$('other', 0);`,
 const otherScope = signals.createScope();
 const count = otherScope.signal$('other', 0);`,
 		],
+		[
+			'imported resource factories',
+			`import { createResource } from 'octane/signals';
+const result = createResource(scope, 'result', describe);`,
+		],
+		[
+			'imported resource factory aliases',
+			`import { createResource as resource } from 'octane/signals';
+const result = resource(scope, 'result', describe);`,
+		],
+		[
+			'namespace resource imports',
+			`import * as signals from 'octane/signals';
+const result = signals.createResource(scope, 'result', describe);`,
+		],
 	])('rejects missing suffixes through %s', (_label, module) => {
 		expect(() => compile(app('', PREFIX + module), FILENAME, {})).toThrow(NAMING);
 	});
@@ -260,15 +284,22 @@ const reset = () => scope.set(count$, 0);
 	});
 
 	it('does not give shadowed or unrelated APIs native semantics', () => {
-		const source = app(`
+		const source = app(
+			`
 const unrelated = { signal$(value) { return value; }, get(value) { return value; } };
 const result = unrelated.signal$(1);
+function shadowResource(createResource) {
+  const value = createResource(scope, 'field', () => 1);
+  return value;
+}
 function shadow(createScope) {
   const scope = createScope();
   const value = scope.signal$('field', 1);
   return value;
 }
-`);
+`,
+			`${PREFIX}\nimport { createResource } from 'octane/signals';`,
+		);
 		expect(() => compile(source, FILENAME, {})).not.toThrow();
 	});
 
@@ -299,6 +330,19 @@ describe('native reads and ordinary hook dependencies', () => {
 			`import { useMemo } from 'octane';\n${PREFIX}`,
 		);
 		expect(() => compile(source, FILENAME, {})).toThrow(MEMO_READ);
+		for (const [imported, factory] of [
+			['{ createResource }', 'createResource'],
+			['{ createResource as resource }', 'resource'],
+			['* as signals', 'signals.createResource'],
+		]) {
+			const resource = app(
+				`const value = memo(() => result$.get(), []);`,
+				`import { useMemo as memo } from 'octane';
+import ${imported} from 'octane/signals';
+const result$ = ${factory}(owner, 'result', describe);`,
+			);
+			expect(() => compile(resource, FILENAME, {})).toThrow(MEMO_READ);
+		}
 	});
 
 	it('diagnoses a helper read and a memo import alias without relying on dollar spelling', () => {
@@ -368,6 +412,8 @@ describe('native-read AST ownership', () => {
 
 	it.each(modes)('does not mutate a frozen parser tree in %j', (options) => {
 		const source = `${PREFIX}
+import { signal$ } from 'octane/signals';
+const nested$ = signal$(signal$(2));
 function readCount$() { return scope.get(count$); }
 export function App(props) @{
   const value = readCount$();

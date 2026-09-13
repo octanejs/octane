@@ -8,8 +8,8 @@ const CLIENT_MODULE = 'octane/signals/client';
 const SIGNAL_MODULES = new Set([SIGNALS_MODULE, CLIENT_MODULE, 'octane/signals/server']);
 const LOCAL_MODULES = new Set([CLIENT_MODULE, 'octane/signals/server']);
 const HANDLE_TYPES = new Set(['SignalHandle', 'Resource', 'WritableSignal', 'DerivedSignal']);
-const SIGNAL_METHODS = new Set(['signal$', 'derived$', 'asyncSignal$']);
-const SIGNAL_FACTORIES = new Set(['signal$', 'derived$', 'query$']);
+const SIGNAL_METHODS = new Set(['signal$', 'derived$']);
+const SIGNAL_FACTORIES = new Set(['signal$', 'derived$', 'query$', 'createResource']);
 const LOCAL_HOOKS = new Set(['useSignal$']);
 const FUNCTION_TYPES = new Set([
 	'ArrowFunctionExpression',

@@ -7,8 +7,10 @@ import {
 import {
 	StreamedReceiverError,
 	type StreamedFrameDisposition,
-	type StreamedRegionReceiver,
-} from './stream-receiver.js';
+	type StreamedResultReceiver,
+} from './stream-result-receiver.js';
+
+type StreamedDeliveryReceiver = Pick<StreamedResultReceiver, 'receive' | 'failSelection'>;
 
 /** Stable realm slot used by CSP-nonced server frame calls. */
 export const STREAMED_RENDERER_RECEIVER = '__octaneStreamedRenderer';
@@ -54,7 +56,7 @@ function positiveLimit(value: number | undefined, fallback: number): number {
 /** Cold, optional stream work only. Ordering belongs to one identity/channel;
  * HTML style waits never hold the result channel or another independent region. */
 function createDelivery(
-	receiver: StreamedRegionReceiver,
+	receiver: StreamedDeliveryReceiver,
 	options: StreamedRendererDeliveryOptions,
 	delivered?: (frame: StreamedRendererFrame, disposition: StreamedFrameDisposition) => void,
 ) {
@@ -178,7 +180,7 @@ function createDelivery(
  * document is an error rather than a silent authority transfer.
  */
 export function installStreamedRendererGlobal(
-	receiver: StreamedRegionReceiver,
+	receiver: StreamedDeliveryReceiver,
 	target: Record<string, unknown> = globalThis as Record<string, unknown>,
 	options: StreamedRendererDeliveryOptions = {},
 ): () => void {
@@ -289,7 +291,7 @@ export function installStreamedRendererGlobal(
  */
 export async function readStreamedRendererResponse(
 	response: Response,
-	receiver: StreamedRegionReceiver,
+	receiver: StreamedDeliveryReceiver,
 	options: StreamedRendererReadOptions = {},
 ): Promise<void> {
 	if (response.body === null) throw new Error('The streamed renderer response has no body.');

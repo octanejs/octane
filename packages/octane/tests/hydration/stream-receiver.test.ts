@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { createStreamedResultReceiver } from '../../src/hydration/index.js';
 import {
 	createStreamedRegionReceiver,
 	StreamedReceiverError,
@@ -46,209 +47,231 @@ function placement(
 
 describe('streamed region receiver', () => {
 	it('retains a transport failure until the result module attaches', async () => {
-		const receiver = createStreamedRegionReceiver({
-			buildId: 'build-1',
-			documentId: 'document-1',
-			ownerKey: 'account-1',
-		});
-		const selected = identity();
-		receiver.registerSelection(selected);
-		const blockedFailure = vi.fn();
-		const detach = receiver.attachResult(selected, { accept: () => false, fail: blockedFailure });
-		await receiver.receive({
-			identity: selected,
-			sequence: 0,
-			channel: 'result',
-			kind: 'open',
-			resource: 'promise',
-		});
-		const error = new StreamedReceiverError('terminal', 'Transport ended before completion.');
-		expect(receiver.failSelection(selected, error)).toBe(true);
-		expect(receiver.failSelection(selected, error)).toBe(false);
-		expect(blockedFailure).toHaveBeenCalledExactlyOnceWith(error);
-		detach();
-		const frames: string[] = [];
-		const failures: StreamedReceiverError[] = [];
-		receiver.attachResult(selected, {
-			accept(frame) {
-				frames.push(frame.kind);
-			},
-			fail(error) {
-				failures.push(error);
-			},
-		});
-		expect(frames).toEqual([]);
-		expect(failures).toEqual([error]);
-		receiver.dispose();
-	});
-
-	it('preserves a completed pre-code result when later HTML fails', async () => {
-		const receiver = createStreamedRegionReceiver({
-			buildId: 'build-1',
-			documentId: 'document-1',
-			ownerKey: 'account-1',
-		});
-		const selected = identity();
-		receiver.registerSelection(selected);
-		await receiver.receive({
-			identity: selected,
-			sequence: 0,
-			channel: 'result',
-			kind: 'open',
-			resource: 'promise',
-		});
-		await receiver.receive({
-			identity: selected,
-			sequence: 1,
-			channel: 'result',
-			kind: 'value',
-			value: ['string', 'ready'],
-		});
-		await receiver.receive({
-			identity: selected,
-			sequence: 2,
-			channel: 'result',
-			kind: 'complete',
-		});
-		receiver.failSelection(
-			selected,
-			new StreamedReceiverError('styles', 'The placement stylesheet failed.'),
-		);
-		const frames: StreamedSignalResultFrame[] = [];
-		const failures: StreamedReceiverError[] = [];
-		receiver.attachResult(selected, {
-			accept(frame) {
-				frames.push(frame);
-			},
-			fail(error) {
-				failures.push(error);
-			},
-		});
-		expect(frames.map((frame) => frame.kind)).toEqual(['open', 'value', 'complete']);
-		expect(frames[1]).toMatchObject({ value: ['string', 'ready'] });
-		expect(failures).toEqual([]);
-		receiver.dispose();
-	});
-
-	it('does not fail a newer selection when an old transport is canceled', async () => {
-		const receiver = createStreamedRegionReceiver({
-			buildId: 'build-1',
-			documentId: 'document-1',
-			ownerKey: 'account-1',
-		});
-		const old = identity();
-		const selected = identity({ selectionGeneration: 1 });
-		receiver.registerSelection(old);
-		receiver.registerSelection(selected);
-		expect(
-			receiver.failSelection(old, new StreamedReceiverError('terminal', 'Old response canceled.')),
-		).toBe(false);
-		await expect(
-			receiver.receive({
+		for (const createReceiver of [createStreamedRegionReceiver, createStreamedResultReceiver]) {
+			const receiver = createReceiver({
+				buildId: 'build-1',
+				documentId: 'document-1',
+				ownerKey: 'account-1',
+			});
+			const selected = identity();
+			receiver.registerSelection(selected);
+			const blockedFailure = vi.fn();
+			const detach = receiver.attachResult(selected, { accept: () => false, fail: blockedFailure });
+			await receiver.receive({
 				identity: selected,
 				sequence: 0,
 				channel: 'result',
 				kind: 'open',
 				resource: 'promise',
-			}),
-		).resolves.toBe('accepted');
-		receiver.dispose();
+			});
+			const error = new StreamedReceiverError('terminal', 'Transport ended before completion.');
+			expect(receiver.failSelection(selected, error)).toBe(true);
+			expect(receiver.failSelection(selected, error)).toBe(false);
+			expect(blockedFailure).toHaveBeenCalledExactlyOnceWith(error);
+			detach();
+			const frames: string[] = [];
+			const failures: StreamedReceiverError[] = [];
+			receiver.attachResult(selected, {
+				accept(frame) {
+					frames.push(frame.kind);
+				},
+				fail(error) {
+					failures.push(error);
+				},
+			});
+			expect(frames).toEqual([]);
+			expect(failures).toEqual([error]);
+			receiver.dispose();
+		}
+	});
+
+	it('preserves a completed pre-code result when later HTML fails', async () => {
+		for (const createReceiver of [createStreamedRegionReceiver, createStreamedResultReceiver]) {
+			const receiver = createReceiver({
+				buildId: 'build-1',
+				documentId: 'document-1',
+				ownerKey: 'account-1',
+			});
+			const selected = identity();
+			receiver.registerSelection(selected);
+			await receiver.receive({
+				identity: selected,
+				sequence: 0,
+				channel: 'result',
+				kind: 'open',
+				resource: 'promise',
+			});
+			await receiver.receive({
+				identity: selected,
+				sequence: 1,
+				channel: 'result',
+				kind: 'value',
+				value: ['string', 'ready'],
+			});
+			await receiver.receive({
+				identity: selected,
+				sequence: 2,
+				channel: 'result',
+				kind: 'complete',
+			});
+			receiver.failSelection(
+				selected,
+				new StreamedReceiverError('styles', 'The placement stylesheet failed.'),
+			);
+			const frames: StreamedSignalResultFrame[] = [];
+			const failures: StreamedReceiverError[] = [];
+			receiver.attachResult(selected, {
+				accept(frame) {
+					frames.push(frame);
+				},
+				fail(error) {
+					failures.push(error);
+				},
+			});
+			expect(frames.map((frame) => frame.kind)).toEqual(['open', 'value', 'complete']);
+			expect(frames[1]).toMatchObject({ value: ['string', 'ready'] });
+			expect(failures).toEqual([]);
+			receiver.dispose();
+		}
+	});
+
+	it('does not fail a newer selection when an old transport is canceled', async () => {
+		for (const createReceiver of [createStreamedRegionReceiver, createStreamedResultReceiver]) {
+			const receiver = createReceiver({
+				buildId: 'build-1',
+				documentId: 'document-1',
+				ownerKey: 'account-1',
+			});
+			const old = identity();
+			const selected = identity({ selectionGeneration: 1 });
+			receiver.registerSelection(old);
+			receiver.registerSelection(selected);
+			expect(
+				receiver.failSelection(
+					old,
+					new StreamedReceiverError('terminal', 'Old response canceled.'),
+				),
+			).toBe(false);
+			await expect(
+				receiver.receive({
+					identity: selected,
+					sequence: 0,
+					channel: 'result',
+					kind: 'open',
+					resource: 'promise',
+				}),
+			).resolves.toBe('accepted');
+			// Both receivers validate placement ordering even without a registered DOM region.
+			expect(await receiver.receive(placement(selected))).toBe('stale');
+			await expect(receiver.receive(placement(selected))).rejects.toMatchObject({
+				code: 'sequence',
+			});
+			const fail = vi.fn();
+			receiver.attachResult(selected, { accept() {}, fail });
+			expect(fail).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ code: 'sequence' }));
+			receiver.dispose();
+		}
 	});
 
 	it('does not treat a terminal rejected by the mailbox bound as successful completion', async () => {
-		const receiver = createStreamedRegionReceiver({
-			buildId: 'build-1',
-			documentId: 'document-1',
-			ownerKey: 'account-1',
-			maxPendingFrames: 2,
-		});
-		const selected = identity();
-		receiver.registerSelection(selected);
-		const blockedFailure = vi.fn();
-		const detach = receiver.attachResult(selected, { accept: () => false, fail: blockedFailure });
-		await receiver.receive({
-			identity: selected,
-			sequence: 0,
-			channel: 'result',
-			kind: 'open',
-			resource: 'promise',
-		});
-		await receiver.receive({
-			identity: selected,
-			sequence: 1,
-			channel: 'result',
-			kind: 'value',
-			value: ['string', 'ready'],
-		});
-		await expect(
-			receiver.receive({ identity: selected, sequence: 2, channel: 'result', kind: 'complete' }),
-		).rejects.toMatchObject({ code: 'overflow' });
-		expect(blockedFailure).toHaveBeenCalledExactlyOnceWith(
-			expect.objectContaining({ code: 'overflow' }),
-		);
-		detach();
-		const frames: string[] = [];
-		const failures: StreamedReceiverError[] = [];
-		receiver.attachResult(selected, {
-			accept(frame) {
-				frames.push(frame.kind);
-			},
-			fail(error) {
-				failures.push(error);
-			},
-		});
-		expect(frames).toEqual([]);
-		expect(failures).toMatchObject([{ code: 'overflow' }]);
-		receiver.dispose();
+		for (const createReceiver of [createStreamedRegionReceiver, createStreamedResultReceiver]) {
+			const receiver = createReceiver({
+				buildId: 'build-1',
+				documentId: 'document-1',
+				ownerKey: 'account-1',
+				maxPendingFrames: 2,
+			});
+			const selected = identity();
+			receiver.registerSelection(selected);
+			const blockedFailure = vi.fn();
+			const detach = receiver.attachResult(selected, { accept: () => false, fail: blockedFailure });
+			await receiver.receive({
+				identity: selected,
+				sequence: 0,
+				channel: 'result',
+				kind: 'open',
+				resource: 'promise',
+			});
+			await receiver.receive({
+				identity: selected,
+				sequence: 1,
+				channel: 'result',
+				kind: 'value',
+				value: ['string', 'ready'],
+			});
+			await expect(
+				receiver.receive({ identity: selected, sequence: 2, channel: 'result', kind: 'complete' }),
+			).rejects.toMatchObject({ code: 'overflow' });
+			expect(blockedFailure).toHaveBeenCalledExactlyOnceWith(
+				expect.objectContaining({ code: 'overflow' }),
+			);
+			detach();
+			const frames: string[] = [];
+			const failures: StreamedReceiverError[] = [];
+			receiver.attachResult(selected, {
+				accept(frame) {
+					frames.push(frame.kind);
+				},
+				fail(error) {
+					failures.push(error);
+				},
+			});
+			expect(frames).toEqual([]);
+			expect(failures).toMatchObject([{ code: 'overflow' }]);
+			receiver.dispose();
+		}
 	});
 
 	it('buffers a result before code and rejects out-of-order frames', async () => {
-		const receiver = createStreamedRegionReceiver({
-			buildId: 'build-1',
-			documentId: 'document-1',
-			ownerKey: 'account-1',
-		});
-		const selected = identity();
-		receiver.registerSelection(selected);
-		await receiver.receive({
-			identity: selected,
-			sequence: 0,
-			channel: 'result',
-			kind: 'open',
-			resource: 'promise',
-		} satisfies StreamedSignalResultFrame);
-		await receiver.receive({
-			identity: selected,
-			sequence: 1,
-			channel: 'result',
-			kind: 'value',
-			value: ['string', 'ready'],
-		} satisfies StreamedSignalResultFrame);
-
-		const accepted: string[] = [];
-		let ready = false;
-		const consumer = {
-			accept(frame) {
-				if (!ready) return false as const;
-				accepted.push(frame.kind);
-			},
-			fail(error) {
-				throw error;
-			},
-		} satisfies StreamedResultConsumer;
-		receiver.attachResult(selected, consumer);
-		expect(accepted).toEqual([]);
-		ready = true;
-		receiver.attachResult(selected, consumer);
-		expect(accepted).toEqual(['open', 'value']);
-		await expect(
-			receiver.receive({
+		for (const createReceiver of [createStreamedRegionReceiver, createStreamedResultReceiver]) {
+			const receiver = createReceiver({
+				buildId: 'build-1',
+				documentId: 'document-1',
+				ownerKey: 'account-1',
+			});
+			const selected = identity();
+			receiver.registerSelection(selected);
+			await receiver.receive({
 				identity: selected,
-				sequence: 3,
+				sequence: 0,
 				channel: 'result',
-				kind: 'complete',
-			} satisfies StreamedSignalResultFrame),
-		).rejects.toMatchObject({ code: 'sequence' });
+				kind: 'open',
+				resource: 'promise',
+			} satisfies StreamedSignalResultFrame);
+			await receiver.receive({
+				identity: selected,
+				sequence: 1,
+				channel: 'result',
+				kind: 'value',
+				value: ['string', 'ready'],
+			} satisfies StreamedSignalResultFrame);
+
+			const accepted: string[] = [];
+			let ready = false;
+			const consumer = {
+				accept(frame) {
+					if (!ready) return false as const;
+					accepted.push(frame.kind);
+				},
+				fail(error) {
+					throw error;
+				},
+			} satisfies StreamedResultConsumer;
+			receiver.attachResult(selected, consumer);
+			expect(accepted).toEqual([]);
+			ready = true;
+			receiver.attachResult(selected, consumer);
+			expect(accepted).toEqual(['open', 'value']);
+			await expect(
+				receiver.receive({
+					identity: selected,
+					sequence: 3,
+					channel: 'result',
+					kind: 'complete',
+				} satisfies StreamedSignalResultFrame),
+			).rejects.toMatchObject({ code: 'sequence' });
+			receiver.dispose();
+		}
 	});
 
 	it('fences stale A to B to A generations before DOM mutation', async () => {

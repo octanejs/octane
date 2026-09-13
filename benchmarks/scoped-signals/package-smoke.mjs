@@ -219,14 +219,14 @@ for (const mode of ['esm', 'cjs']) {
 const typeConsumer = join(packageDir, 'consumer.mts');
 writeFileSync(
 	typeConsumer,
-	`import { createScope, query, type SignalHandle, type WritableSignal, type ScopeSeed } from 'octane/signals';
+	`import { createResource, createScope, query, type SignalHandle, type WritableSignal, type ScopeSeed } from 'octane/signals';
 import { useSignal$ } from 'octane/signals/client';
 import { useSignal$ as useServerSignal$ } from 'octane/signals/server';
 const owner = createScope({scopeKey:'types'});
 const count$ = owner.signal$('count', 1);
 const count: number = count$.get();
 const derived$ = owner.derived$('derived', () => count$.get() + 1);
-const resource$ = owner.asyncSignal$('resource', () => query('load', async (x: number) => String(x))(count));
+const resource$ = createResource(owner, 'resource', () => query('load', async (x: number) => String(x))(count));
 const text: string = resource$.get();
 const local: WritableSignal<number> = useSignal$(1);
 const server: WritableSignal<string> = useServerSignal$(() => 'ready');

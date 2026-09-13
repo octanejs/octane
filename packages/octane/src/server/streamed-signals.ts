@@ -9,6 +9,7 @@ import {
 } from '../streamed-signals-protocol.js';
 import type { StreamInjectionSource } from '../runtime.server.js';
 import type { ServerSignalQueryAttempt } from '../signals/query-attempt-observer.js';
+import { createServerSignalQueryAttemptObservations } from './signal-query-observation.js';
 
 export interface StreamedRendererLimits {
 	readonly maxFrameBytes?: number;
@@ -495,6 +496,7 @@ export function createAutomaticStreamedSignalInjection(
 	if (external !== undefined) addChild(external, () => {});
 	return {
 		takeInitialSelections,
+		createSignalAttemptObservations: createServerSignalQueryAttemptObservations,
 		get streamedRenderer() {
 			return external?.streamedRenderer === true ||
 				children.some((child) => child.attempt !== undefined)

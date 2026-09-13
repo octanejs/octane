@@ -1,4 +1,5 @@
 import { decodeSignalValue, encodeSignalValue } from './encoding.js';
+import { createResourceCellWith } from './engine.js';
 import { SignalStreamError } from './errors.js';
 import {
 	ScopedNode,
@@ -25,6 +26,8 @@ import {
 	type Query,
 	type QueryContext,
 	type QueryRequest,
+	type Resource,
+	type Scope,
 	type SignalSeedEntry,
 } from './types.js';
 import type {
@@ -34,7 +37,8 @@ import type {
 import {
 	captureCurrentServerSignalQueryAttemptObserver,
 	hasServerSignalQueryAttemptObserver,
-	observeServerSignalQueryAttempt,
+	serverSignalQueryAttemptObserver,
+	type ServerSignalQueryAttemptObservations,
 } from './query-attempt-observer.js';
 
 export interface QueryDefinition {
@@ -106,6 +110,19 @@ export function query<A, T>(
 	return Object.freeze(describe);
 }
 
+/**
+ * Create an eagerly selected, explicitly owned query resource. Keys are unique
+ * within the scope; separate resources may share one canonical query request.
+ * Native query$ declarations are the owner-optional authoring API.
+ */
+export function createResource<T>(
+	owner: Scope,
+	key: string,
+	describe: () => QueryRequest<T> | typeof skip,
+): Resource<T> {
+	return createResourceCellWith(owner, key, describe, initializeResource, true);
+}
+
 interface Attempt {
 	entry: RequestEntry | undefined;
 	controller: AbortController | undefined;
@@ -114,99 +131,10 @@ interface Attempt {
 	readonly generation: number;
 	readonly streamed: boolean;
 	result: unknown;
-	readonly observations: Set<AttemptObservation>;
+	observations: ServerSignalQueryAttemptObservations | undefined;
 	sequence: number;
 	resolve(): void;
 	hasYielded: boolean;
-}
-
-interface AttemptObservation {
-	readonly controller: AbortController;
-	readonly mirror: StreamAttemptMirror | undefined;
-}
-
-class StreamAttemptMirror implements AsyncIterable<unknown>, AsyncIterator<unknown> {
-	private pending:
-		| {
-				resolve(result: IteratorResult<unknown>): void;
-				reject(error: unknown): void;
-		  }
-		| undefined;
-	private queued: unknown;
-	private hasQueued = false;
-	private acknowledgement: (() => void) | undefined;
-	private terminal: { kind: 'complete' } | { kind: 'error'; error: unknown } | undefined;
-
-	constructor(private readonly releaseObservation: () => void) {}
-
-	[Symbol.asyncIterator](): AsyncIterator<unknown> {
-		return this;
-	}
-
-	next(): Promise<IteratorResult<unknown>> {
-		if (this.pending !== undefined) {
-			return Promise.reject(new TypeError('A streamed signal result permits one pending read.'));
-		}
-		this.acknowledgement?.();
-		this.acknowledgement = undefined;
-		if (this.hasQueued) {
-			this.hasQueued = false;
-			const value = this.queued;
-			this.queued = undefined;
-			return Promise.resolve({ done: false, value });
-		}
-		if (this.terminal !== undefined) {
-			return this.terminal.kind === 'complete'
-				? Promise.resolve({ done: true, value: undefined })
-				: Promise.reject(this.terminal.error);
-		}
-		return new Promise((resolve, reject) => {
-			this.pending = { resolve, reject };
-		});
-	}
-
-	return(): Promise<IteratorResult<unknown>> {
-		this.releaseObservation();
-		return Promise.resolve({ done: true, value: undefined });
-	}
-
-	publish(value: unknown): Promise<void> {
-		if (this.terminal !== undefined) return Promise.resolve();
-		const acknowledgement = new Promise<void>((resolve) => {
-			this.acknowledgement = resolve;
-		});
-		if (this.pending !== undefined) {
-			const pending = this.pending;
-			this.pending = undefined;
-			pending.resolve({ done: false, value });
-		} else {
-			this.queued = value;
-			this.hasQueued = true;
-		}
-		return acknowledgement;
-	}
-
-	complete(): void {
-		if (this.terminal !== undefined) return;
-		this.terminal = { kind: 'complete' };
-		this.queued = undefined;
-		this.hasQueued = false;
-		this.acknowledgement?.();
-		this.acknowledgement = undefined;
-		this.pending?.resolve({ done: true, value: undefined });
-		this.pending = undefined;
-	}
-
-	fail(error: unknown): void {
-		if (this.terminal !== undefined) return;
-		this.terminal = { kind: 'error', error };
-		this.queued = undefined;
-		this.hasQueued = false;
-		this.acknowledgement?.();
-		this.acknowledgement = undefined;
-		this.pending?.reject(error);
-		this.pending = undefined;
-	}
 }
 
 function makeAttempt(entry: RequestEntry, generation: number, streamed = false): Attempt {
@@ -222,7 +150,7 @@ function makeAttempt(entry: RequestEntry, generation: number, streamed = false):
 		generation,
 		streamed,
 		result: undefined,
-		observations: new Set(),
+		observations: undefined,
 		sequence: 0,
 		resolve,
 		hasYielded: false,
@@ -259,36 +187,18 @@ export class RequestEntry {
 
 	observe(nodeKey: string): Attempt | undefined {
 		const attempt = this.attempt;
-		if (!attempt || attempt.streamed || !hasServerSignalQueryAttemptObserver(this.owner.scopeKey)) {
-			return;
-		}
-		let observation!: AttemptObservation;
-		const release = (): void => releaseAttemptObservation(attempt, observation);
-		const mirror =
-			this.request.definition.kind === 'stream' ? new StreamAttemptMirror(release) : undefined;
-		observation = { controller: new AbortController(), mirror };
-		attempt.observations.add(observation);
-		try {
-			if (
-				!observeServerSignalQueryAttempt({
-					scopeKey: this.owner.scopeKey,
-					nodeKey,
-					selectionKey: this.request.identity,
-					attempt: attempt.generation,
-					kind: this.request.definition.kind,
-					result: mirror ?? attempt.result,
-					signal: observation.controller.signal,
-					isCurrent: () => currentEntry(attempt) === this && attempt.observations.has(observation),
-					release,
-				})
-			) {
-				release();
-				return;
-			}
-		} catch (error) {
-			release();
-			throw error;
-		}
+		if (!attempt || attempt.streamed) return;
+		const context = serverSignalQueryAttemptObserver(this.owner.scopeKey);
+		if (context === undefined) return;
+		const observations = (attempt.observations ??= context.createObservations());
+		observations.observe(context, {
+			nodeKey,
+			selectionKey: this.request.identity,
+			attempt: attempt.generation,
+			kind: this.request.definition.kind,
+			result: attempt.result,
+			isCurrent: () => currentEntry(attempt) === this,
+		});
 		return attempt;
 	}
 
@@ -443,7 +353,7 @@ export class RequestEntry {
 		attempt.controller = undefined;
 		attempt.iterator = undefined;
 		attempt.result = undefined;
-		retireAttemptObservations(attempt);
+		attempt.observations?.retire();
 		attempt.resolve();
 		// Revoke publication and release owner references before user cancellation
 		// callbacks run; those callbacks may synchronously select another request.
@@ -466,41 +376,8 @@ function currentEntry(attempt: Attempt): RequestEntry | undefined {
 	return entry && !entry.owner.retired && entry.attempt === attempt ? entry : undefined;
 }
 
-function releaseAttemptObservation(attempt: Attempt, observation: AttemptObservation): void {
-	if (!attempt.observations.delete(observation)) return;
-	observation.mirror?.complete();
-	observation.controller.abort();
-}
-
-function retireAttemptObservations(attempt: Attempt): void {
-	for (const observation of attempt.observations) {
-		observation.mirror?.fail(
-			new DOMException('The signal query attempt was replaced.', 'AbortError'),
-		);
-		observation.controller.abort();
-	}
-	attempt.observations.clear();
-}
-
-function completeAttemptObservations(attempt: Attempt): void {
-	for (const observation of attempt.observations) observation.mirror?.complete();
-}
-
-function failAttemptObservations(attempt: Attempt, error: unknown): void {
-	for (const observation of attempt.observations) observation.mirror?.fail(error);
-}
-
-function publishAttemptObservations(attempt: Attempt, value: unknown): Promise<void> | undefined {
-	let pending: Promise<void>[] | undefined;
-	for (const observation of attempt.observations) {
-		if (observation.mirror === undefined) continue;
-		(pending ??= []).push(observation.mirror.publish(value));
-	}
-	return pending === undefined ? undefined : Promise.all(pending).then(() => {});
-}
-
 function completeAttempt(attempt: Attempt): void {
-	completeAttemptObservations(attempt);
+	attempt.observations?.complete();
 	const entry = attempt.entry;
 	if (entry?.attempt === attempt) entry.attempt = undefined;
 	attempt.entry = undefined;
@@ -528,7 +405,7 @@ function observePromise(attempt: Attempt, result: unknown): void {
 function failAttempt(attempt: Attempt, error: unknown): void {
 	const entry = currentEntry(attempt);
 	if (!entry) return;
-	failAttemptObservations(attempt, error);
+	attempt.observations?.fail(error);
 	signalBatch(() => {
 		const iterator = attempt.iterator;
 		entry.state = errorState(
@@ -658,7 +535,7 @@ function receiveStreamStep(attempt: Attempt, result: IteratorResult<unknown>): v
 		});
 		accepted.deliver();
 	});
-	const observed = publishAttemptObservations(attempt, value);
+	const observed = attempt.observations?.publish(value);
 	if (observed === undefined) nextStreamStep(attempt);
 	else observed.then(() => nextStreamStep(attempt));
 }
@@ -709,7 +586,7 @@ export class ResourceBinding<T = any> {
 		const request = pure(() => this.describe!());
 		if (request === skip) return request;
 		if (!(request instanceof Request))
-			throw new TypeError('asyncSignal$ must describe a query request.');
+			throw new TypeError('A resource must describe a query request.');
 		return request;
 	}
 

@@ -27,7 +27,9 @@ function sizes(bytes) {
 
 export async function buildFixture(
 	output = fs.mkdtempSync(path.join(os.tmpdir(), 'octane-behavior-only-')),
+	{ composerReceipts = false, bundler = 'esbuild' } = {},
 ) {
+	assert.ok(bundler === 'esbuild' || bundler === 'vite', 'Unknown client bundler');
 	fs.mkdirSync(output, { recursive: true });
 	const { build, version } = await import(pathToFileURL(require.resolve('esbuild')).href);
 	const compilerEntry = require.resolve('octane/compiler/bundler');
@@ -65,38 +67,55 @@ export async function buildFixture(
 		define: { 'process.env.NODE_ENV': '"production"', __OCTANE_PROFILE_ENABLED__: 'false' },
 	};
 	const compilations = [];
+	const loadSource = (compiler, environment, file) => {
+		const bytes = source(file);
+		const compiled =
+			file.startsWith(HERE + path.sep) && !file.endsWith('.mjs')
+				? compiler.transform(bytes.toString(), file)
+				: null;
+		if (compiled)
+			compilations.push({
+				environment,
+				file,
+				kind: compiled.kind,
+				sourceSha256: hash(bytes),
+				outputSha256: hash(compiled.code),
+			});
+		return compiled?.code ?? bytes.toString();
+	};
+	const resolveSource = (request, importer, environment) => {
+		if (/^octane(?:\/|$)/.test(request))
+			return require.resolve(
+				request === 'octane' && environment === 'server' ? 'octane/server' : request,
+			);
+		if (
+			composerReceipts &&
+			request === './State.ts' &&
+			['Shell.tsrx', 'server.ts', 'optional.ts'].some((name) => importer === path.join(HERE, name))
+		)
+			return path.join(HERE, 'ReceiptState.ts');
+		if (
+			environment === 'server' &&
+			request === './loaders.ts' &&
+			importer === path.join(HERE, composerReceipts ? 'receipt-query-state.ts' : 'State.ts')
+		)
+			return path.join(HERE, 'server-loaders.ts');
+	};
 	const makePlugin = (environment) => {
 		const compiler = createOctaneCompiler({ ...compilerOptions, environment });
 		return {
 			name: 'behavior-only-public-compiler',
 			setup(builder) {
-				builder.onResolve({ filter: /^octane(?:\/|$)/ }, ({ path: request }) => ({
-					path: require.resolve(
-						request === 'octane' && environment === 'server' ? 'octane/server' : request,
-					),
-				}));
-				if (environment === 'server')
-					builder.onResolve({ filter: /^\.\/loaders\.ts$/ }, ({ importer }) =>
-						importer === path.join(HERE, 'State.ts')
-							? { path: path.join(HERE, 'server-loaders.ts') }
-							: undefined,
-					);
+				builder.onResolve(
+					{ filter: /^octane(?:\/|$)|^\.\/(?:State|loaders)\.ts$/ },
+					({ path: request, importer }) => {
+						const resolved = resolveSource(request, importer, environment);
+						return resolved ? { path: resolved } : undefined;
+					},
+				);
 				builder.onLoad({ filter: /\.(?:[cm]?[jt]s|tsx|jsx|tsrx|json)$/ }, ({ path: file }) => {
-					const bytes = source(file);
-					const compiled =
-						file.startsWith(HERE + path.sep) && !file.endsWith('.mjs')
-							? compiler.transform(bytes.toString(), file)
-							: null;
-					if (compiled)
-						compilations.push({
-							environment,
-							file,
-							kind: compiled.kind,
-							sourceSha256: hash(bytes),
-							outputSha256: hash(compiled.code),
-						});
 					return {
-						contents: compiled?.code ?? bytes,
+						contents: loadSource(compiler, environment, file),
 						loader: /\.tsx$/.test(file)
 							? 'tsx'
 							: /\.ts$/.test(file)
@@ -110,19 +129,113 @@ export async function buildFixture(
 			},
 		};
 	};
-	const client = await build({
-		...buildOptions,
-		absWorkingDir: REPO,
-		entryPoints: { behavior: path.join(HERE, 'client.ts') },
-		outdir: path.join(output, 'client'),
-		platform: 'browser',
-		splitting: true,
-		chunkNames: 'chunks/[name]-[hash]',
-		plugins: [makePlugin('client')],
-	});
-	const clientInputs = Object.keys(client.metafile.inputs).map((file) =>
-		fs.realpathSync(path.resolve(REPO, file)),
-	);
+	let clientInputs, clientBundler;
+	const outputs = {};
+	const entry = path.join(HERE, composerReceipts ? 'receipt-client.ts' : 'client.ts');
+	if (bundler === 'esbuild') {
+		const client = await build({
+			...buildOptions,
+			absWorkingDir: REPO,
+			entryPoints: { behavior: entry },
+			outdir: path.join(output, 'client'),
+			platform: 'browser',
+			splitting: true,
+			chunkNames: 'chunks/[name]-[hash]',
+			plugins: [makePlugin('client')],
+		});
+		// Preserve import edges even when a boundary assertion fails.
+		fs.writeFileSync(
+			path.join(output, 'client-metafile.json'),
+			JSON.stringify(client.metafile, null, 2),
+		);
+		clientInputs = Object.keys(client.metafile.inputs).map((file) =>
+			fs.realpathSync(path.resolve(REPO, file)),
+		);
+		clientBundler = { name: bundler, version, options: buildOptions };
+		for (const [file, detail] of Object.entries(client.metafile.outputs)) {
+			const absolute = path.resolve(REPO, file);
+			outputs[path.relative(path.join(output, 'client'), absolute)] = {
+				...sizes(fs.readFileSync(absolute)),
+				entryPoint: detail.entryPoint,
+				imports: detail.imports,
+				inputs: detail.inputs,
+			};
+		}
+	} else {
+		const viteEntry = require.resolve('vite');
+		const { build: viteBuild, version: viteVersion } = await import(pathToFileURL(viteEntry).href);
+		const compiler = createOctaneCompiler({ ...compilerOptions, environment: 'client' });
+		const loaded = new Set();
+		const viteOptions = {
+			configFile: false,
+			root: REPO,
+			logLevel: 'warn',
+			clearScreen: false,
+			publicDir: false,
+			define: buildOptions.define,
+			build: {
+				outDir: path.join(output, 'client'),
+				emptyOutDir: false,
+				target: 'es2022',
+				minify: true,
+				sourcemap: false,
+				reportCompressedSize: false,
+				rolldownOptions: {
+					input: { behavior: entry },
+					output: { entryFileNames: 'behavior.js', chunkFileNames: 'chunks/[name]-[hash].js' },
+				},
+			},
+		};
+		const client = await viteBuild({
+			...viteOptions,
+			plugins: [
+				{
+					name: 'behavior-only-public-compiler',
+					enforce: 'pre',
+					resolveId: (request, importer) => resolveSource(request, importer, 'client'),
+					load(id) {
+						if (!path.isAbsolute(id) || !/\.(?:[cm]?[jt]s|tsx|jsx|tsrx|json)$/.test(id)) return;
+						const file = fs.realpathSync(id);
+						loaded.add(file);
+						return loadSource(compiler, 'client', file);
+					},
+				},
+			],
+		});
+		clientInputs = [...loaded];
+		clientBundler = {
+			name: bundler,
+			version: viteVersion,
+			rolldown: createRequire(viteEntry)('rolldown/package.json').version,
+			options: viteOptions,
+		};
+		for (const chunk of client.output) {
+			assert.equal(chunk.type, 'chunk', 'Unexpected non-JavaScript client output');
+			outputs[chunk.fileName] = {
+				...sizes(Buffer.from(chunk.code)),
+				entryPoint: chunk.facadeModuleId,
+				imports: [
+					...chunk.imports.map((file) => [file, 'import-statement']),
+					...chunk.dynamicImports.map((file) => [file, 'dynamic-import']),
+				].map(([file, kind]) => ({
+					path: path.relative(REPO, path.join(output, 'client', file)),
+					kind,
+				})),
+				// Rolldown lengths precede final chunk minification. Keep that metric
+				// distinct from esbuild's bytesInOutput; both prove retained membership.
+				inputs: Object.fromEntries(
+					Object.entries(chunk.modules).map(([file, detail]) => [
+						file,
+						{ renderedLength: detail.renderedLength },
+					]),
+				),
+			};
+		}
+		fs.writeFileSync(
+			path.join(output, 'client-metafile.json'),
+			JSON.stringify({ clientInputs, outputs }, null, 2),
+		);
+	}
 	assert.deepEqual(
 		clientInputs.filter((file) => forbidden.test(file)),
 		[],
@@ -141,24 +254,73 @@ export async function buildFixture(
 		plugins: [makePlugin('server')],
 	});
 	for (const environment of ['client', 'server'])
-		assert.ok(
-			compilations.some(
-				(item) =>
-					item.environment === environment &&
-					item.file.endsWith('/State.ts') &&
-					item.kind === 'slots',
+		for (const file of composerReceipts
+			? ['receipt-state.ts', 'receipt-query-state.ts', 'ReceiptState.ts']
+			: ['State.ts'])
+			assert.ok(
+				compilations.some(
+					(item) =>
+						item.environment === environment &&
+						item.file === path.join(HERE, file) &&
+						item.kind === 'slots',
+				),
+				`Plain state must pass public slot lowering: ${environment} ${file}`,
+			);
+	const emitted = (contribution) => {
+		const length = contribution.bytesInOutput ?? contribution.renderedLength;
+		assert.ok(Number.isFinite(length) && length >= 0, 'Missing or invalid emitted module length');
+		return length > 0;
+	};
+	for (const detail of Object.values(outputs)) {
+		assert.deepEqual(
+			Object.entries(detail.inputs).filter(
+				([input, contribution]) =>
+					/\/hydration\/event-capture\.[jt]s$/.test(input) && emitted(contribution),
 			),
-			`Plain state must pass public slot lowering: ${environment}`,
+			[],
+			'Control-only behavior must not ship independent-island intent capture',
 		);
-	const outputs = {};
-	for (const [file, detail] of Object.entries(client.metafile.outputs)) {
-		const absolute = path.resolve(REPO, file);
-		outputs[path.relative(path.join(output, 'client'), absolute)] = {
-			...sizes(fs.readFileSync(absolute)),
-			entryPoint: detail.entryPoint,
-			imports: detail.imports,
-			inputs: detail.inputs,
-		};
+	}
+	const eagerOutputs = new Set();
+	function includeEager(file) {
+		if (eagerOutputs.has(file)) return;
+		eagerOutputs.add(file);
+		for (const imported of outputs[file].imports) {
+			if (imported.kind === 'dynamic-import' || imported.external) continue;
+			includeEager(path.relative(path.join(output, 'client'), path.resolve(REPO, imported.path)));
+		}
+	}
+	includeEager('behavior.js');
+	if (composerReceipts) {
+		assert.deepEqual(
+			Object.values(outputs).flatMap((output) =>
+				Object.entries(output.inputs).filter(
+					([input, contribution]) =>
+						/\/hydration\/stream-receiver\.ts$/.test(input) && emitted(contribution),
+				),
+			),
+			[],
+			'Result-only streaming must not ship DOM region placement in the eventual graph',
+		);
+		const queryImplementations = /\/signals\/(?:requests|query-attempt-observer|computations)\.ts$/;
+		assert.deepEqual(
+			[...eagerOutputs].flatMap((file) =>
+				Object.entries(outputs[file].inputs).filter(
+					([input, contribution]) => queryImplementations.test(input) && emitted(contribution),
+				),
+			),
+			[],
+			'Composer receipts must not load query or asynchronous-derived implementations before use',
+		);
+		assert.ok(
+			Object.values(outputs).some((output) =>
+				Object.entries(output.inputs).some(
+					([input, contribution]) =>
+						/\/signals\/requests\.ts$/.test(input) && emitted(contribution),
+				),
+			),
+			'The delayed application controller must retain real native query execution',
+		);
 	}
 	const changedInputsDuringBuild = [...inputs]
 		.filter(([file, bytes]) => hash(fs.readFileSync(file)) !== hash(bytes))
@@ -182,6 +344,11 @@ export async function buildFixture(
 		},
 		compilerOptions,
 		buildOptions,
+		clientBundler,
+		serverBundler: { name: 'esbuild', version },
+		bundler,
+		composerReceipts,
+		eagerOutputs: [...eagerOutputs],
 		compilations,
 		clientInputs,
 		outputs,
@@ -199,7 +366,7 @@ export async function buildFixture(
 		),
 		changedInputsDuringBuild,
 		limitations: [
-			'Local production esbuild split output, not lightweight-web deployment or its Vite chunk policy.',
+			`Local production ${bundler} split client and esbuild server output, not lightweight-web deployment or its application chunk policy.`,
 			'Server-owned lists keep first-value historical HTML; live outputs observe later signal results without reconciling those lists.',
 			'Payload sizes are raw/gzip9/brotli11; not network transfer, parse, paint, INP, or Safari-device measurements.',
 		],
@@ -298,7 +465,13 @@ export async function startServer(report) {
 }
 
 if (process.argv[1] === import.meta.filename) {
-	const report = await buildFixture(process.env.BENCH_BUILD_DIR);
+	const report = await buildFixture(process.env.BENCH_BUILD_DIR, {
+		composerReceipts: process.argv.includes('--composer-receipts'),
+		bundler:
+			process.argv
+				.find((argument) => argument.startsWith('--bundler='))
+				?.slice('--bundler='.length) ?? 'esbuild',
+	});
 	console.log(
 		JSON.stringify(
 			{

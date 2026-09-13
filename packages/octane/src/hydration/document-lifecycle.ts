@@ -2,14 +2,14 @@ import { documentSignalOwner } from '../signals/document-owner.js';
 import { createSignalOwnerLifecycle } from '../signals/facade.js';
 import type { SignalOwner } from '../signals/types.js';
 import type { IndependentHydrateLifecycle } from './independent-island.js';
-import type { StreamedSignalHydration } from './streamed-signals.js';
+import type { StreamedSignalResults } from './streamed-signals.js';
 
 export interface SignalDocumentLifecycleOptions {
 	readonly document: Document;
 	readonly buildId: string;
 	readonly documentId: string;
 	readonly signalOwner?: SignalOwner;
-	readonly streamedHydration?: StreamedSignalHydration;
+	readonly streamedHydration?: Pick<StreamedSignalResults, 'suspend'>;
 	readonly independentHydration?: IndependentHydrateLifecycle;
 	/** Host-owned identity carrier. Null, mismatch, or failure retires persisted state. */
 	readonly readIdentity?: () => { readonly buildId: string; readonly documentId: string } | null;

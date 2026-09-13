@@ -7,7 +7,12 @@ import {
 	initializeHydrationEventCapture,
 	snapshotHydrationControl,
 } from '../../src/hydration/event-capture.js';
-import { bootstrapStreamedSignalHydration } from '../../src/hydration/streamed-signals.js';
+import { bootstrapStreamedSignalResults } from '../../src/hydration/streamed-signals.js';
+import {
+	registerIndependentHydrationIsland,
+	type IndependentHydrateActivationContext,
+} from '../../src/hydration/independent-island.js';
+import { createIndependentHydrateManifest } from '../../src/independent-hydration-protocol.js';
 import { registerSignalOwnerDocument } from '../../src/signals/early-values.js';
 import {
 	__derivedAt,
@@ -138,7 +143,7 @@ describe('early hydration control handoff', () => {
 			instanceKey: 'root',
 		});
 		registerSignalOwnerDocument(owner, document);
-		const hydration = bootstrapStreamedSignalHydration({
+		const hydration = bootstrapStreamedSignalResults({
 			buildId: 'early-control-build',
 			documentId: 'early-control-response',
 			signalOwner: documentOwner,
@@ -188,7 +193,7 @@ describe('early hydration control handoff', () => {
 		expect(runWithSignalOwner(owner, () => draft$.get())).toBe('after disposal');
 	});
 
-	it('preserves live focus, selection, and composition state', () => {
+	it('preserves live focus, selection, and composition state', async () => {
 		const scope = createScope({ scopeKey: 'composing-control' });
 		cleanups.push(() => scope.dispose());
 		const draft$ = scope.signal$('draft', 'server');
@@ -226,6 +231,88 @@ describe('early hydration control handoff', () => {
 		draft$.set('composed');
 		expect(input.selectionStart).toBe(2);
 		expect(input.selectionEnd).toBe(5);
+
+		// A renderer-free binding can start while inline island capture still owns
+		// activation. Its later upgrade must neither lose the click nor reapply
+		// old composition/input events to the already-live control.
+		const iframe = document.createElement('iframe');
+		document.body.appendChild(iframe);
+		cleanups.push(() => iframe.remove());
+		const foreignDocument = iframe.contentDocument!;
+		foreignDocument.head.innerHTML = earlySignalBootstrapScript({ independentHydration: true });
+		new Function(
+			'document',
+			'globalThis',
+			foreignDocument.head.querySelector('script')!.textContent!,
+		)(foreignDocument, {});
+		foreignDocument.body.innerHTML =
+			'<section data-octane-hydrate-id="late-control-island" data-octane-hydrate-when="interaction" data-octane-hydrate-independent>' +
+			'<input value="server"><button>Continue</button></section>';
+		const widget = foreignDocument.querySelector('section')!;
+		const foreignInput = widget.querySelector('input')!;
+		widget.querySelector('button')!.click();
+		foreignInput.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
+		const movedInput = foreignDocument.createElement('input');
+		movedInput.value = 'previous island';
+		widget.append(movedInput);
+		movedInput.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
+		foreignDocument.body.append(movedInput);
+		const nativeDraft$ = scope.signal$('native-draft', 'server');
+		cleanups.push(bindSignalControl(foreignInput, 'value', nativeDraft$));
+		cleanups.push(bindSignalControl(movedInput, 'value', nativeDraft$));
+		expect(movedInput.value).toBe('server');
+		nativeDraft$.set('late restore while composing');
+		expect(foreignInput.value).toBe('server');
+		const published: string[] = [];
+		cleanups.push(nativeDraft$.subscribe(() => published.push(nativeDraft$.get())));
+		const nativeInput = new InputEvent('input', { bubbles: true, isComposing: true });
+		foreignInput.value = 'first edit';
+		foreignInput.dispatchEvent(nativeInput);
+		foreignInput.value = 'second edit';
+		foreignInput.dispatchEvent(nativeInput);
+		expect(published).toEqual(['first edit', 'second edit']);
+		foreignInput.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true }));
+		const pendingCandidate = captureHydrationControlCandidate(foreignInput)!;
+		initializeHydrationEventCapture(foreignDocument);
+		expect(applyHydrationControlCandidate(pendingCandidate, { value: 'current candidate' })).toBe(
+			true,
+		);
+		expect(nativeDraft$.get()).toBe('current candidate');
+		const activations: string[] = [];
+		cleanups.push(
+			registerIndependentHydrationIsland(
+				widget,
+				createIndependentHydrateManifest(
+					{
+						version: 1,
+						boundaryId: 'control-template',
+						exportName: 'default',
+						captureSchema: [],
+						hookSeed: 0,
+						idSeed: 0,
+						signalSites: [],
+						parentDependencies: false,
+					},
+					[],
+					'late-control-island',
+					'control-build',
+					{ moduleId: 'control-island.js', styles: [] },
+				),
+				{
+					loadStyles() {},
+					async load() {
+						return {
+							default({ intents }: IndependentHydrateActivationContext) {
+								for (const { event } of intents) {
+									if (event.type === 'click') activations.push('continue');
+								}
+							},
+						};
+					},
+				},
+			),
+		);
+		await vi.waitFor(() => expect(activations).toEqual(['continue']));
 	});
 
 	it('consumes only the exact snapshot revision adopted by the renderer', async () => {

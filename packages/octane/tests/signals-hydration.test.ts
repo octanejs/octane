@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, flushSync, hydrateRoot, type Root } from 'octane';
 import { condition } from 'octane/hydration';
 import { renderToString } from 'octane/server';
-import { createScope, query, type Scope } from 'octane/signals';
+import { createResource, createScope, query, type Scope } from 'octane/signals';
 import { flushEffects } from './_helpers.js';
 import { loadServerFixture } from './_server-fixture.js';
 import {
@@ -158,7 +158,7 @@ describe('native signal server output and adoption', () => {
 		const load = query('native-hydration-latest-query', (key: string) =>
 			key === 'a' ? Promise.resolve('ready-a') : pending.promise,
 		);
-		const resource$ = model.scope.asyncSignal$('resource', () =>
+		const resource$ = createResource(model.scope, 'resource', () =>
 			load(model.scope.get(model.value$)),
 		);
 		await act(() => {});
@@ -179,7 +179,7 @@ describe('native signal server output and adoption', () => {
 		const model = state$('native-hydration-empty-latest');
 		const pending = deferred<string>();
 		const load = query('native-hydration-empty-latest-query', () => pending.promise);
-		const resource$ = model.scope.asyncSignal$('resource', () => load(undefined));
+		const resource$ = createResource(model.scope, 'resource', () => load(undefined));
 		const props = { resource$, fallback: 'empty' };
 		container.innerHTML = renderToString(server.LatestHydration, props).html;
 		await act(() => pending.resolve('ready'));
@@ -196,7 +196,7 @@ describe('native signal server output and adoption', () => {
 			'native-hydration-pending-snapshot-query',
 			() => new Promise<string>(() => {}),
 		);
-		const resource$ = model.scope.asyncSignal$('resource', () => load(undefined));
+		const resource$ = createResource(model.scope, 'resource', () => load(undefined));
 		expect(() => renderToString(server.SnapshotHydration, { resource$ })).toThrow(
 			'no serializable ready value',
 		);
@@ -208,7 +208,7 @@ describe('native signal server output and adoption', () => {
 		const load = query('native-hydration-pending-arm-query', (key: string) =>
 			key === 'a' ? old.promise : Promise.resolve('ready-b'),
 		);
-		const resource$ = model.scope.asyncSignal$('resource', () =>
+		const resource$ = createResource(model.scope, 'resource', () =>
 			load(model.scope.get(model.value$)),
 		);
 		const props = { ...model, resource$ };
@@ -257,7 +257,7 @@ describe('native signal server output and adoption', () => {
 		const load = query('native-hydration-stream-query', (key: string) =>
 			key === 'a' ? first.promise : next.promise,
 		);
-		const resource$ = model.scope.asyncSignal$('resource', () =>
+		const resource$ = createResource(model.scope, 'resource', () =>
 			load(model.scope.get(model.value$)),
 		);
 		const props = { ...model, resource$ };

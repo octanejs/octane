@@ -37,6 +37,11 @@ export {
 	type StreamedResultConsumer,
 } from './stream-receiver.js';
 export {
+	createStreamedResultReceiver,
+	type StreamedResultReceiver,
+	type StreamedResultReceiverOptions,
+} from './stream-result-receiver.js';
+export {
 	installStreamedRendererGlobal,
 	readStreamedRendererResponse,
 	STREAMED_RENDERER_RECEIVER,

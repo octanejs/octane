@@ -13,6 +13,46 @@ Chromium, feature-off shared support cost, complete mobile/application performan
 evidence, and publication/CI remain separate open gates. The evidence
 log below is chronological: earlier setup blockers do not override later results.
 
+### Static result-only receiver follow-up (2026-09-13)
+
+Hosts that accept signal results but own their HTML placement can select
+`bootstrapStreamedSignalResults`; the existing full bootstrap and `registerRegion`
+API remain unchanged. Both share the same selection, failure and cleanup authority.
+There is no runtime loader or extra initialization phase. Matched Vite receipts
+remove 1,203 gzip bytes from both startup and eventual delivery; the full-bootstrap
+control grows 117 gzip bytes. The inline capture is unchanged.
+
+Focused dev/prod/Strong checks pass 228 tests, with core/fixture typechecks, bundle
+guards, a sequencing fault-red/normal-green check, and twelve result-only plus
+nine full-bootstrap WebKit samples. These are fixture results, not fresh native
+Safari/iOS or application budget qualification. See the
+[receiver report](./async-signals-runtime-experiments.md#static-result-only-streaming-receiver-2026-09-13).
+
+### Static query-free owner follow-up (2026-09-12)
+
+The approved compatibility break removes `scope.asyncSignal$`; explicit-owner
+callers use the imported `createResource` factory. Normal `signal$`/`derived$`/
+`query$` authoring and optional `createScope` remain unchanged. Query constructors
+are static dependencies of query callers, not every scope. Conservative unused
+declaration elimination and immutable seed snapshotting are also implemented.
+
+The new composer-receipts workload passes its query-free startup boundary in
+Vite/Rolldown with ordinary public imports. An esbuild barrel-splitting limitation
+had hidden that improvement; minimal Vite and Rspack controls do not reproduce it.
+The benchmark now selects its client bundler explicitly and keeps the failing
+esbuild receipt boundary intact. No runtime loader or import-routing layer was
+added. Matched Vite startup drops from 25,269 to 20,573 gzip bytes; the full-query
+control is essentially unchanged. These are fixture results, not a rebuilt
+lightweight-web application.
+
+Focused validation passes 942 tests, core/fixture typechecking and 15 Node guards.
+WebKit passes nine full-query and twelve composer-receipt samples, including
+equal-value early edits and shared streamed results after delayed controller
+activation. Package-wide smoke remains blocked by an absent React peer; emitted
+ESM/CJS signal checks pass. Publication/CI and fresh native Safari/iOS remain open.
+The [runtime experiment report](./async-signals-runtime-experiments.md#retained-static-owner-changes-and-production-bundler-check)
+records matched bytes, isolated seed timing, negative controls and provenance.
+
 ### Renderer-free host follow-up (2026-09-12, locally verified)
 
 The accepted contract now explicitly includes behavior-only, server-owned HTML

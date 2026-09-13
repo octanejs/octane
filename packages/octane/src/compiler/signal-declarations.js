@@ -15,6 +15,151 @@ const SIGNAL_FACTORIES = new Map([
 	['query$', '__queryAt'],
 ]);
 
+const SCALAR_UNARY_OPERATORS = new Set(['!', '+', '-', '~', 'typeof', 'void']);
+const SCALAR_BINARY_OPERATORS = new Set([
+	'-',
+	'*',
+	'/',
+	'%',
+	'**',
+	'|',
+	'&',
+	'^',
+	'<<',
+	'>>',
+	'>>>',
+	'==',
+	'!=',
+	'===',
+	'!==',
+	'<',
+	'>',
+	'<=',
+	'>=',
+	'in',
+	'instanceof',
+]);
+
+function unwrapExpression(node) {
+	while (
+		node?.type === 'TSAsExpression' ||
+		node?.type === 'TSTypeAssertion' ||
+		node?.type === 'TSSatisfiesExpression' ||
+		node?.type === 'TSNonNullExpression' ||
+		node?.type === 'ParenthesizedExpression'
+	)
+		node = node.expression;
+	return node;
+}
+
+// These syntax forms either return primitives or throw. Type annotations and
+// calls (even an unshadowed, but globally replaceable String) are not proof.
+function isScalarResult(expression) {
+	const node = unwrapExpression(expression);
+	if (!node) return false;
+	if (node.type === 'Literal') {
+		return (
+			node.regex === undefined &&
+			(node.value === null || ['string', 'number', 'boolean', 'bigint'].includes(typeof node.value))
+		);
+	}
+	if (node.type === 'TemplateLiteral') return true;
+	if (node.type === 'UnaryExpression') return SCALAR_UNARY_OPERATORS.has(node.operator);
+	if (node.type === 'BinaryExpression') return SCALAR_BINARY_OPERATORS.has(node.operator);
+	if (node.type === 'ConditionalExpression') {
+		return isScalarResult(node.consequent) && isScalarResult(node.alternate);
+	}
+	if (node.type === 'LogicalExpression') {
+		return isScalarResult(node.left) && isScalarResult(node.right);
+	}
+	return false;
+}
+
+function declarationHelper(factory, call) {
+	if (factory !== 'derived$') return SIGNAL_FACTORIES.get(factory);
+	const args = call.arguments ?? [];
+	const offset = args[0]?.type === 'Literal' && typeof args[0].value === 'string' ? 1 : 0;
+	const compute = unwrapExpression(args[offset]);
+	if (
+		(compute?.type !== 'ArrowFunctionExpression' && compute?.type !== 'FunctionExpression') ||
+		compute.params.length !== 0
+	)
+		return '__derivedAt';
+	const options = unwrapExpression(args[offset + 1]);
+	if (options !== undefined) {
+		// A literal assertion is immutable for this declaration; unknown options
+		// may have a changing sync flag or an observable accessor. Keep them general.
+		const property =
+			options?.type === 'ObjectExpression' && options.properties.length === 1
+				? options.properties[0]
+				: undefined;
+		return property?.type === 'Property' &&
+			property.kind === 'init' &&
+			!property.computed &&
+			(property.key?.name ?? property.key?.value) === 'sync' &&
+			property.value?.type === 'Literal' &&
+			property.value.value === true
+			? '__derivedScalarAt'
+			: '__derivedAt';
+	}
+	if (compute.async || compute.generator) return '__derivedAt';
+	const result =
+		compute.body.type === 'BlockStatement'
+			? compute.body.body.length === 1 && compute.body.body[0].type === 'ReturnStatement'
+				? compute.body.body[0].argument
+				: undefined
+			: compute.body;
+	return isScalarResult(result) ? '__derivedScalarAt' : '__derivedAt';
+}
+
+// Declarations create lazy descriptors, not live cells. Only omit construction
+// when its validation and eager option reads are provably unobservable; a PURE
+// call still evaluates any effectful arguments. Unknown callbacks, observable
+// option reads, and malformed overloads must keep their effects and diagnostics.
+function pureSignalDeclaration(factory, call) {
+	const args = call.arguments ?? [];
+	if (args.some((argument) => argument.type === 'SpreadElement')) return false;
+	let offset = 0;
+	const first = unwrapExpression(args[0]);
+	if (first?.type === 'Literal' && typeof first.value === 'string') {
+		if (factory === 'signal$' && args.length === 1) return true;
+		// Empty keys do not select the callback overload at runtime.
+		if (!first.value.trim()) return false;
+		offset = 1;
+	}
+	if (factory === 'signal$') return args.length === 1 || (offset === 1 && args.length === 2);
+	const functionAt = (index) => {
+		const value = unwrapExpression(args[index]);
+		return value?.type === 'ArrowFunctionExpression' || value?.type === 'FunctionExpression';
+	};
+	if (factory === 'derived$') {
+		return functionAt(offset) && args.length >= offset + 1 && args.length <= offset + 2;
+	}
+	if (
+		factory !== 'query$' ||
+		!functionAt(offset) ||
+		!functionAt(offset + 1) ||
+		args.length < offset + 2 ||
+		args.length > offset + 3
+	) {
+		return false;
+	}
+	const options = unwrapExpression(args[offset + 2]);
+	if (options === undefined || (options.type === 'Literal' && options.value === null)) return true;
+	// query$ reads options.kind while constructing the descriptor. A literal
+	// supported kind is safe; a getter, spread, or opaque options object is not.
+	if (options.type !== 'ObjectExpression' || options.properties.length !== 1) return false;
+	const property = options.properties[0];
+	return (
+		property.type === 'Property' &&
+		property.kind === 'init' &&
+		!property.computed &&
+		(property.key?.name ?? property.key?.value) === 'kind' &&
+		property.value?.type === 'Literal' &&
+		(property.value.value === 'promise' || property.value.value === 'stream')
+	);
+}
+
 const AST_METADATA = new Set([
 	'loc',
 	'start',
@@ -109,7 +254,7 @@ function mapAst(node, replace) {
 		return out ?? node;
 	}
 	const replacement = replace(node);
-	if (replacement !== null) return replacement;
+	if (replacement !== null) node = replacement;
 	let out = null;
 	for (const key in node) {
 		if (AST_METADATA.has(key) || key.startsWith('_octane')) continue;
@@ -139,6 +284,27 @@ function signalSite(filename, owner, node) {
 	return `${scope}:${strongHash(
 		`octane:signal-site:2\0${filename}\0${owner.join('/')}\0${position}`,
 	)}`;
+}
+
+// Arguments may start inside parentheses or at a nested callee's replacement
+// offset. Replace the call delimiter itself so source edits never overlap.
+function callOpenParen(node, source) {
+	let pos = node.typeArguments?.end ?? node.callee.end;
+	while (pos < node.end) {
+		if (
+			/\s/.test(source[pos]) ||
+			source[pos] === ')' ||
+			source[pos] === '?' ||
+			source[pos] === '.'
+		) {
+			pos++;
+		} else if (source.startsWith('/*', pos)) {
+			pos = source.indexOf('*/', pos + 2) + 2;
+		} else if (source.startsWith('//', pos)) {
+			while (pos < node.end && source[pos] !== '\n' && source[pos] !== '\r') pos++;
+		} else return source[pos] === '(' ? pos : -1;
+	}
+	return -1;
 }
 
 /**
@@ -180,14 +346,14 @@ export function lowerSignalDeclarations(ast, filename) {
 		}
 	}
 
-	function helperFor(record) {
+	function helperFor(record, call) {
 		let helpers = importRecords.get(record.declaration);
 		if (helpers === undefined) importRecords.set(record.declaration, (helpers = new Map()));
-		let local = helpers.get(record.factory);
+		const imported = declarationHelper(record.factory, call);
+		let local = helpers.get(imported);
 		if (local === undefined) {
-			const imported = SIGNAL_FACTORIES.get(record.factory);
 			local = allocateName(usedNames, `_$${imported}`);
-			helpers.set(record.factory, local);
+			helpers.set(imported, local);
 		}
 		return b.id(local);
 	}
@@ -202,7 +368,7 @@ export function lowerSignalDeclarations(ast, filename) {
 			if (binding?.scope !== lexical.rootScope || binding.importSource?.value !== record.source) {
 				return null;
 			}
-			return { callee: helperFor(record), factory: record.factory };
+			return { callee: helperFor(record, node), factory: record.factory };
 		}
 		if (
 			(callee?.type === 'MemberExpression' || callee?.type === 'OptionalMemberExpression') &&
@@ -220,7 +386,7 @@ export function lowerSignalDeclarations(ast, filename) {
 				return null;
 			}
 			return {
-				callee: b.member(b.id(callee.object.name), SIGNAL_FACTORIES.get(factory)),
+				callee: b.member(b.id(callee.object.name), declarationHelper(factory, node)),
 				factory,
 			};
 		}
@@ -236,6 +402,7 @@ export function lowerSignalDeclarations(ast, filename) {
 		const site = signalSite(cleanFilename, owners.get(node) ?? ['module'], node);
 		return {
 			...node,
+			...(pureSignalDeclaration(trusted.factory, node) ? { __octanePure: true } : null),
 			callee: inheritHookMemoOrigin(trusted.callee, node.callee),
 			arguments: [
 				inheritHookMemoOrigin(b.literal(site, JSON.stringify(site)), node),
@@ -251,8 +418,8 @@ export function lowerSignalDeclarations(ast, filename) {
 		body: lowered.body.map((statement) => {
 			const helpers = importRecords.get(statement);
 			if (helpers === undefined || helpers.size === 0) return statement;
-			const generated = [...helpers].map(([factory, local]) =>
-				inheritHookMemoOrigin(b.import_specifier(SIGNAL_FACTORIES.get(factory), local), statement),
+			const generated = [...helpers].map(([imported, local]) =>
+				inheritHookMemoOrigin(b.import_specifier(imported, local), statement),
 			);
 			return { ...statement, specifiers: [...statement.specifiers, ...generated] };
 		}),
@@ -300,13 +467,14 @@ export function signalDeclarationSourceEdits(ast, filename, source) {
 		}
 	}
 
-	const helperFor = (record) => {
-		const key = `${record.source}\0${record.factory}`;
+	const helperFor = (record, call) => {
+		const imported = declarationHelper(record.factory, call);
+		const key = `${record.source}\0${imported}`;
 		let helper = helpers.get(key);
 		if (helper === undefined) {
 			helper = {
-				imported: SIGNAL_FACTORIES.get(record.factory),
-				local: allocateName(usedNames, `_$${SIGNAL_FACTORIES.get(record.factory)}`),
+				imported,
+				local: allocateName(usedNames, `_$${imported}`),
 				source: record.source,
 			};
 			helpers.set(key, helper);
@@ -326,6 +494,7 @@ export function signalDeclarationSourceEdits(ast, filename, source) {
 			const callee = node.callee;
 			const scope = lexical.nodeScopes.get(callee) ?? lexical.rootScope;
 			let replacement = null;
+			let pure = false;
 			if (callee?.type === 'Identifier') {
 				const record = namedImports.get(callee.name);
 				const binding = lexical.resolveBinding(scope, callee.name);
@@ -334,7 +503,8 @@ export function signalDeclarationSourceEdits(ast, filename, source) {
 					binding?.scope === lexical.rootScope &&
 					binding.importSource?.value === record.source
 				) {
-					replacement = helperFor(record);
+					replacement = helperFor(record, node);
+					pure = pureSignalDeclaration(record.factory, node);
 				}
 			} else if (
 				(callee?.type === 'MemberExpression' || callee?.type === 'OptionalMemberExpression') &&
@@ -349,17 +519,24 @@ export function signalDeclarationSourceEdits(ast, filename, source) {
 					binding?.scope === lexical.rootScope &&
 					binding.importSource?.value === importSource
 				) {
-					replacement = `${callee.object.name}.${SIGNAL_FACTORIES.get(factory)}`;
+					replacement = `${callee.object.name}.${declarationHelper(factory, node)}`;
+					pure = pureSignalDeclaration(factory, node);
 				}
 			}
 			if (replacement !== null) {
-				edits.push({ pos: callee.start, end: callee.end, text: replacement });
+				const opening = callOpenParen(node, source);
+				if (opening === -1) return;
+				edits.push({
+					pos: callee.start,
+					end: callee.end,
+					text: `${pure ? '/* @__PURE__ */ ' : ''}${replacement}`,
+				});
 				const first = node.arguments?.[0];
-				const argumentPosition = first?.start ?? Math.max(callee.end, node.end - 1);
 				const site = signalSite(cleanFilename, owners.get(node) ?? ['module'], node);
 				edits.push({
-					pos: argumentPosition,
-					text: `${JSON.stringify(site)}${first === undefined ? '' : ', '}`,
+					pos: opening,
+					end: opening + 1,
+					text: `(${JSON.stringify(site)}${first === undefined ? '' : ', '}`,
 				});
 			}
 		}

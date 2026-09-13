@@ -7,22 +7,33 @@ import { buildFixture, startServer } from './build.mjs';
 
 // Browser selection belongs to the caller. This supports real Chrome and
 // Playwright WebKit without mislabelling WebKit as installed Safari/iOS proof.
-export async function runBrowser(browser, { output, iterations = 3 } = {}) {
+export async function runBrowser(
+	browser,
+	{ output, iterations = 3, composerReceipts = false, bundler = 'esbuild' } = {},
+) {
 	assert.ok(Number.isInteger(iterations) && iterations > 0 && iterations <= 50);
-	const build = await buildFixture(output);
+	const build = await buildFixture(output, { composerReceipts, bundler });
 	const server = await startServer(build);
 	const result = {
 		suite: build.suite,
 		build: path.join(build.output, 'build.json'),
 		browser: browser.version(),
 		iterations,
+		composerReceipts,
+		bundler,
 		samples: [],
 		failures: [],
 		limitations: build.limitations,
 	};
 	try {
 		for (let iteration = -1; iteration < iterations; iteration++) {
-			for (const mode of ['eager', 'held-modules', 'pristine-restore']) {
+			for (const mode of [
+				'eager',
+				'held-modules',
+				'pristine-restore',
+				...(composerReceipts ? ['held-modules-equal'] : []),
+			]) {
+				const heldModules = mode.startsWith('held-modules');
 				const context = await browser.newContext();
 				const page = await context.newPage();
 				page.setDefaultTimeout(15_000);
@@ -58,7 +69,7 @@ export async function runBrowser(browser, { output, iterations = 3 } = {}) {
 							}
 						}).observe(document, { childList: true, subtree: true, characterData: true });
 					});
-					if (mode === 'held-modules') {
+					if (heldModules) {
 						const gate = new Promise((resolve) => {
 							releaseModules = resolve;
 						});
@@ -74,8 +85,9 @@ export async function runBrowser(browser, { output, iterations = 3 } = {}) {
 					assert.equal(await page.locator('[data-body-pending]').count(), 1);
 					assert.equal(await page.locator('[data-history-pending]').count(), 1);
 					assert.equal(await page.locator('[data-turn],[data-conversation]').count(), 0);
-					if (mode === 'held-modules') {
+					if (heldModules) {
 						await page.locator('#draft').fill('typed before modules');
+						if (mode === 'held-modules-equal') await page.locator('#draft').fill('from server');
 						assert.equal(
 							await page.locator('#draft-length').textContent(),
 							'11',
@@ -98,6 +110,13 @@ export async function runBrowser(browser, { output, iterations = 3 } = {}) {
 						'loading',
 						'Classic import launcher must activate before auth-gated parser EOF',
 					);
+					if (composerReceipts && heldModules) {
+						const receipt = JSON.parse(
+							await page.locator('html').getAttribute('data-draft-receipt'),
+						);
+						assert.ok(receipt.revision > 0, 'A pre-module edit must survive as a receipt');
+						assert.equal(receipt.value, await page.locator('#draft').inputValue());
+					}
 					let expectedDraft;
 					if (mode === 'pristine-restore') {
 						await page.evaluate(() => document.dispatchEvent(new Event('restore-draft')));
@@ -105,7 +124,12 @@ export async function runBrowser(browser, { output, iterations = 3 } = {}) {
 						expectedDraft = 'restored draft';
 					} else {
 						if (mode === 'eager') await page.locator('#draft').fill('typed after behavior');
-						expectedDraft = mode === 'eager' ? 'typed after behavior' : 'typed before modules';
+						expectedDraft =
+							mode === 'eager'
+								? 'typed after behavior'
+								: mode === 'held-modules-equal'
+									? 'from server'
+									: 'typed before modules';
 						await page.evaluate(() => document.dispatchEvent(new Event('restore-draft')));
 						assert.equal(await page.locator('html').getAttribute('data-restore-accepted'), 'false');
 						// Native edits return to the exact same string: equality cannot
@@ -113,8 +137,17 @@ export async function runBrowser(browser, { output, iterations = 3 } = {}) {
 						await page.locator('#draft').focus();
 						await page.locator('#draft').press('End');
 						await page.evaluate(() => document.dispatchEvent(new Event('begin-restore')));
+						const revision = composerReceipts
+							? JSON.parse(await page.locator('html').getAttribute('data-draft-receipt')).revision
+							: undefined;
 						await page.keyboard.type('x');
 						await page.keyboard.press('Backspace');
+						if (composerReceipts)
+							assert.ok(
+								JSON.parse(await page.locator('html').getAttribute('data-draft-receipt')).revision >
+									revision,
+								'An equal-value edit must advance the application receipt',
+							);
 						await page.evaluate(() => document.dispatchEvent(new Event('restore-draft')));
 						assert.equal(await page.locator('html').getAttribute('data-restore-accepted'), 'false');
 					}
@@ -123,6 +156,9 @@ export async function runBrowser(browser, { output, iterations = 3 } = {}) {
 						await page.locator('#draft-length').textContent(),
 						String(expectedDraft.length),
 					);
+					const receiptBeforeQueries = composerReceipts
+						? JSON.parse(await page.locator('html').getAttribute('data-draft-receipt'))
+						: undefined;
 					// WebKit can defer animation frames while this response remains open.
 					// Send trusted pointer input without Playwright's two-RAF stability wait.
 					const day = await page.locator('#day').boundingBox();
@@ -148,12 +184,22 @@ export async function runBrowser(browser, { output, iterations = 3 } = {}) {
 						await context.request.post(`${server.url}/release?run=${run}`)
 					).json();
 					assert.equal(released.released, 1);
-					await page.waitForFunction(
-						() =>
-							document.getElementById('body-live')?.textContent === '4:20' &&
-							document.getElementById('history-live')?.textContent === '4:12',
-					);
+					if (!composerReceipts)
+						await page.waitForFunction(
+							() =>
+								document.getElementById('body-live')?.textContent === '4:20' &&
+								document.getElementById('history-live')?.textContent === '4:12',
+						);
 					await page.waitForLoadState('load');
+					if (composerReceipts) {
+						assert.equal(await page.locator('#body-live').textContent(), '');
+						assert.equal(await page.locator('#history-live').textContent(), '');
+						assert.equal(
+							network.some((file) => file.includes('optional-')),
+							false,
+							'Stream completion must not load the optional query consumer',
+						);
+					}
 					assert.deepEqual(
 						await page.locator('[data-turn]').evaluateAll((nodes) =>
 							nodes.map((node) => ({
@@ -182,6 +228,15 @@ export async function runBrowser(browser, { output, iterations = 3 } = {}) {
 						history: { revision: 4, total: 12, rows: historyRows(12) },
 					});
 					assert.equal(await page.locator('html').getAttribute('data-client-loader-calls'), null);
+					if (composerReceipts) {
+						assert.equal(await page.locator('#body-live').textContent(), '4:20');
+						assert.equal(await page.locator('#history-live').textContent(), '4:12');
+						assert.deepEqual(
+							JSON.parse(await page.locator('html').getAttribute('data-draft-receipt')),
+							receiptBeforeQueries,
+							'Late query consumers must preserve the existing draft value and edit receipt',
+						);
+					}
 					await page.evaluate(() => document.dispatchEvent(new Event('verify-control-identity')));
 					assert.equal(await page.locator('html').getAttribute('data-control-survived'), 'true');
 					const trace = await (await context.request.get(`${server.url}/trace?run=${run}`)).json();

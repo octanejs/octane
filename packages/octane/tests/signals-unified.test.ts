@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import {
+	createResource,
 	__derivedAt,
+	__derivedScalarAt,
 	__queryAt,
 	__signalAt,
 	ActionUncertainError,
@@ -20,6 +22,7 @@ import {
 	type ActionOperation,
 	type DerivedContext,
 } from 'octane/signals';
+import { createSignalOwnerLifecycle } from '../src/signals/facade.js';
 import {
 	controlledStream,
 	deferred,
@@ -121,7 +124,7 @@ describe('unified readonly derived declarations', () => {
 			producerSignal = signal;
 			return producer.promise;
 		});
-		const source$ = foreign.asyncSignal$('source', () => load(undefined));
+		const source$ = createResource(foreign, 'source', () => load(undefined));
 		let context!: DerivedContext;
 		let settled = false;
 		const value$ = __derivedAt('local-pending-read', (current) => {
@@ -146,16 +149,58 @@ describe('unified readonly derived declarations', () => {
 	});
 
 	it('keeps the synchronous path immediate and readonly', () => {
-		const count$ = __signalAt('module.ts#source', 2);
-		const doubled$ = __derivedAt('module.ts#doubled', () => count$.get() * 2);
-		const scope = owner('document:sync-derived');
+		for (const declare of [__derivedAt, __derivedScalarAt]) {
+			const count$ = __signalAt('module.ts#source', 2);
+			const doubled$ = declare('module.ts#doubled', () => count$.get() * 2);
+			const scope = owner('document:sync-derived');
+			const lifetime = createSignalOwnerLifecycle(scope);
+			const foreign = owner('document:sync-foreign');
+			const foreignCount$ = foreign.signal$('count', 10);
+			const foreignValue$ = declare('module.ts#foreign-derived', () => foreignCount$.get() * 2);
 
-		runWithSignalOwner(scope, () => {
-			expect(doubled$.get()).toBe(4);
-			expect(isWritableSignal(doubled$)).toBe(false);
-			count$.set(3);
-			expect(doubled$.get()).toBe(6);
-		});
+			runWithSignalOwner(scope, () => {
+				expect(doubled$.get()).toBe(4);
+				expect(isWritableSignal(doubled$)).toBe(false);
+				const frame = scope.beginAdoption(scope.serialize());
+				const observed: number[] = [];
+				const stop = doubled$.subscribe(() => observed.push(doubled$.get()));
+				count$.set(3);
+				expect(doubled$.get()).toBe(6);
+				expect(frame.run(() => doubled$.get())).toBe(4);
+				expect(doubled$.get()).toBe(6);
+				frame.release();
+				// Repeated sites share one derived cell, independent of which compiler
+				// implementation a later declaration would otherwise choose.
+				expect(__derivedAt('module.ts#doubled', () => 100).get()).toBe(6);
+				expect(__derivedScalarAt('module.ts#doubled', () => 200).get()).toBe(6);
+				expect(() => __signalAt('module.ts#doubled', 0).get()).toThrow();
+				lifetime.freeze();
+				count$.set(4);
+				expect(doubled$.get()).toBe(6);
+				const firstRead$ = declare('module.ts#frozen-first', () => count$.get() * 3);
+				expect(firstRead$.snapshot().status).toBe('pending');
+				expect(observed).toEqual([6]);
+				lifetime.resume();
+				expect(doubled$.get()).toBe(8);
+				expect(firstRead$.get()).toBe(12);
+				expect(observed).toEqual([6, 8]);
+				stop();
+				expect(foreignValue$.get()).toBe(20);
+				foreign.dispose();
+				expect(() => foreignValue$.latest()).toThrow(/disposed/);
+				const failure = new Error('Thrown then accessor');
+				const failed$ = declare('module.ts#failed-derived', () => {
+					throw {
+						get then() {
+							throw failure;
+						},
+					};
+				});
+				expect(failed$.snapshot()).toMatchObject({ status: 'error', error: failure });
+				lifetime.retire();
+				expect(() => doubled$.get()).toThrow(/disposed/);
+			});
+		}
 	});
 
 	it('fences a promise attempt when an attempt-bound read changes after await', async () => {
@@ -300,7 +345,7 @@ describe('keyed query declarations', () => {
 		);
 		const scope = owner('document:query');
 		const projected$ = __derivedAt('module.ts#query-projected', () => value$.get().toUpperCase());
-		const synchronous$ = __derivedAt(
+		const synchronous$ = __derivedScalarAt(
 			'module.ts#query-synchronous',
 			() => value$.get().toUpperCase(),
 			{

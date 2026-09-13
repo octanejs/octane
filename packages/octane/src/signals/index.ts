@@ -2,19 +2,18 @@
 export { createScope } from './engine.js';
 export { bindSignalControl } from './control-binding.js';
 export { enableSignalDocument as __enableSignalDocument } from './document-owner.js';
-export { query } from './requests.js';
+export { createResource, query } from './requests.js';
 export { ActionUncertainError, action$, isActionUncertain, optimistic$ } from './actions.js';
+export { __derivedAt, derived$ } from './derived-facade.js';
+export { __queryAt, query$ } from './query-facade.js';
 export {
-	__derivedAt,
-	__queryAt,
+	__derivedScalarAt,
 	__signalAt,
 	acceptStreamedSignalResult,
 	attachStreamedSignalResult,
 	bindStreamedSignalSelection,
-	derived$,
 	isSignalHandle,
 	isWritableSignal,
-	query$,
 	readSignalBinding,
 	failStreamedSignalResult,
 	signal$,

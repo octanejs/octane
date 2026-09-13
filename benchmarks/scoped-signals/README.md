@@ -66,6 +66,41 @@ The timing is normalized to nanoseconds per retained event. Same-run ratios comp
 wrapped maximum budget with the unfilled maximum-budget control; they do not claim
 renderer or application-wide gains.
 
+## Baseline versus candidate owner reads
+
+`run-owner-reads.mjs` bundles the actual archived and current `octane/signals`
+public exports, without source overlays or compiler specialization. Prepare the
+same baseline archive topology described under public-entry bundle comparison.
+Every consumed baseline source must match its Git blob. Both variants use the
+same authored `signal$('g:…', value)` / `signal$('i:…', value)` declarations,
+production esbuild options, and explicitly pinned dependency versions.
+
+```bash
+BENCH_JSON=/private/tmp/owner-reads-prepare-01.json node benchmarks/scoped-signals/run-owner-reads.mjs \
+  --baseline-root=/absolute/path/to/extracted-baseline --baseline-ref=<git-commit> --prepare
+BENCH_JSON=/private/tmp/owner-reads-measured-01.json node benchmarks/scoped-signals/run-owner-reads.mjs \
+  --baseline-root=/absolute/path/to/extracted-baseline --baseline-ref=<git-commit> \
+  --samples=15 --reads=200000
+```
+
+An existing installation may be selected with `--tooling-root`. The runner never
+installs dependencies and requires a new absolute `BENCH_JSON` filename. Prepare
+mode compiles and checks semantics without collecting timing. Measurement mode
+rebuilds and verifies actual sources; run it in a quiet process after other tests,
+builds and browsers finish. Reports retain bundle and exact loaded-source hashes,
+manifests, lockfiles, toolchain, authored entry and runner provenance, and reject
+source drift during the run.
+
+Cached global, instance-local and cross-owner reads use `runWithSignalOwner`.
+The separate implicit-read case uses an installed public owner carrier; it does
+not simulate the browser's default document owner. Setup and five warmup blocks
+are excluded from timing. Seeded rounds shuffle cases and alternate paired ABBA
+and BAAB blocks. Every sample is retained, with arithmetic mean uncertainty and
+the paired ratio distribution/geometric 95% interval. Subscription ownership,
+unsubscribe, shared globals, isolated locals and retirement are checked outside
+timing. This is Node descriptor-loop evidence, not Safari, streaming, hydration
+or application latency evidence, and there is no wall-time pass threshold.
+
 ## Graphs and timing
 
 - Independent: one source and one derived output per row; a sparse write has
@@ -178,7 +213,8 @@ measurement from hiding a renderer dependency introduced by compilation or
 automatic owner initialization. Native hook entries must include the correct runtime and Alien
 3.2.0. Ordinary runtime exports can resolve their optional native adapters, but
 the emitted-byte check requires all client/server adapter, collector, inspection,
-and retry implementations to tree-shake to zero bytes. The read/event protocol
+and retry implementations, plus server query-observation mirrors, to tree-shake
+to zero bytes. The read/event protocol
 and empty server seed map remain separate, measured seams. All exported
 functions must load, the empty server render must agree,
 and a small engine write/subscription/disposal smoke must pass. The compiled
@@ -219,7 +255,7 @@ offline heap scanner. It snapshots after event-loop turns and three explicit
 collections at cycle 0, 100, and 1,000. One live scope with two requests is a
 positive control. `--api=derived` runs the same producers through public unified
 `derived$` declarations and `runWithSignalOwner`, instead of the default
-`query`/`scope.asyncSignal$` path. Its positive control has the same four nodes
+`query`/`createResource` path. Its positive control has the same four nodes
 and one iterator but no query request records. Later checkpoints retire and drop that scope while all
 producer promises remain reachable, then release the external promise array.
 

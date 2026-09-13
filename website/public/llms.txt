@@ -268,7 +268,7 @@ Native reads during rendering subscribe the render scope. The compiler recognize
 For shared state, create a scope at the data owner's lifetime boundary, pass handles through props/context, and dispose it when that owner ends:
 
 ```ts
-import { createScope, query } from 'octane/signals';
+import { createResource, createScope, query } from 'octane/signals';
 
 const account = createScope({ scopeKey: 'account' });
 const userId$ = account.signal$('user-id', 1);
@@ -278,7 +278,7 @@ const fetchUser = query('user', async (id: number, { signal }) => {
   if (!response.ok) throw new Error(`User request failed: ${response.status}`);
   return response.json() as Promise<{ id: number; name: string }>;
 });
-const user$ = account.asyncSignal$('user', () => fetchUser(userId$.get()));
+const user$ = createResource(account, 'user', () => fetchUser(userId$.get()));
 ```
 
 - `scope.signal$(key, initial)` creates writable state; `.set(value)` or `.set(updater)` uses `Object.is` equality. Replace objects/arrays; deep mutation is not tracked.
@@ -286,7 +286,7 @@ const user$ = account.asyncSignal$('user', () => fetchUser(userId$.get()));
 - Keys are nonempty strings unique within a scope. Equal textual `scopeKey` values do not share live state. `scope.get(handle$)` and `scope.set(handle$, value)` require the handle to belong to that scope.
 - Writes are immediately readable. `scope.batch(fn)` delays notifications until the outer synchronous batch ends. `scope.action(fn)` wraps a function with that batching rule and preserves `this`, arguments, and the result. Neither rolls back writes or batches across `await`. Writes during rendering, derived evaluation, updater callbacks, and historical adoption are rejected.
 - `handle$.subscribe(notify)` returns an unsubscribe function and does not notify initially. `scope.dispose()` is idempotent, cancels requests/streams, and releases subscriptions and retained state. Escaped handles then throw `ScopeDisposedError`. Unmounting one consumer does not dispose an explicit shared scope.
-- `asyncSignal$` eagerly tracks the synchronous request-selection callback. The query loader is untracked, receives `{ signal: AbortSignal }`, and cannot publish obsolete results after selection changes, retry, or disposal. Equivalent query arguments share in-flight work within one scope; there is no idle cache of historical keys. Reusing a query key with an incompatible loader is rejected.
+- `createResource(scope, key, describe)` replaces the removed `scope.asyncSignal$` method and eagerly tracks the synchronous request-selection callback. The query loader is untracked, receives `{ signal: AbortSignal }`, and cannot publish obsolete results after selection changes, retry, or disposal. Equivalent query arguments share in-flight work within one scope; there is no idle cache of historical keys. Reusing a query key with an incompatible loader is rejected. Native `query$` declarations remain owner-optional, and query-free scopes do not retain producer implementation.
 - `resource$.retry()` refreshes while preserving a usable current value; `retry({ pending: true })` makes strict reads suspend. A shared request retries for all its selectors. Data retry and UI error-boundary reset are separate operations.
 - `query(key, loader, { kind: 'stream' })` accepts an async iterable or a promise of one. First yield changes pending/connecting to ready/open. Completion retains the last value and marks closed/complete; completion without a yield is an error. Cancellation requests abort and iterator closure.
 

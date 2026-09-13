@@ -1,5 +1,4 @@
-import { decodeSignalValue, encodeSignalValue } from './encoding.js';
-import { DerivedBinding } from './computations.js';
+import { decodeSignalValue, encodeSignalValue, snapshotSignalValue } from './encoding.js';
 import {
 	ScopeDisposedError,
 	SignalFrameError,
@@ -39,11 +38,11 @@ import {
 	type NativeReadSource,
 	type NativeSerializedScope,
 } from './read-protocol.js';
-import {
+import type {
 	initializeResource,
-	type QueryDefinition,
-	type RequestEntry,
-	type ResourceBinding,
+	QueryDefinition,
+	RequestEntry,
+	ResourceBinding,
 } from './requests.js';
 import type {
 	StreamFrameIdentity,
@@ -71,6 +70,20 @@ interface DecodedSeedEntry {
 	readonly entry: SignalSeedEntry;
 	readonly value: unknown;
 }
+
+/** Owner lifecycle shared by scalar and asynchronous declaration implementations. */
+export interface DerivedBindingLifecycle {
+	suspend(): boolean;
+	resume(): void;
+	dispose(): void;
+}
+
+type DerivedBindingFactory<T> = new (
+	owner: ScopeImpl,
+	node: ScopedNode<T>,
+	compute: DerivedCompute<T>,
+	options?: DerivedOptions,
+) => DerivedBindingLifecycle;
 
 interface FrameData {
 	readonly owner: ScopeImpl;
@@ -107,7 +120,7 @@ function decodeSeed(scopeKey: string, seed: ScopeSeed): Map<string, DecodedSeedE
 	// A seed is plain wire data, even when supplied directly rather than parsed
 	// from JSON. Validate descriptors before reading fields so accessors cannot
 	// execute while constructing an immutable historical view.
-	seed = decodeSignalValue(encodeSignalValue(seed)) as ScopeSeed;
+	seed = snapshotSignalValue(seed) as ScopeSeed;
 	if (!seed || seed.version !== 1 || seed.scopeKey !== scopeKey || !Array.isArray(seed.entries)) {
 		throw new SignalFrameError(`A signal seed must match scope "${scopeKey}" and version 1.`);
 	}
@@ -149,10 +162,13 @@ function decodeSeed(scopeKey: string, seed: ScopeSeed): Map<string, DecodedSeedE
 			) {
 				throw new SignalFrameError('Async seed entries require a query identity.');
 			}
+			// The outer snapshot already owns this immutable encoded argument.
+			// Decode for canonical validation, then retain it without encoding again.
+			decodeSignalValue(entry.request.argument);
 			request = {
 				queryKey: entry.request.queryKey,
 				kind: entry.request.kind,
-				argument: encodeSignalValue(decodeSignalValue(entry.request.argument)),
+				argument: entry.request.argument,
 			};
 		} else if (entry.request !== undefined) {
 			throw new SignalFrameError('Only async seed entries may contain a query identity.');
@@ -162,7 +178,7 @@ function decodeSeed(scopeKey: string, seed: ScopeSeed): Map<string, DecodedSeedE
 			entry: {
 				key: entry.key,
 				kind: entry.kind,
-				value: encodeSignalValue(value),
+				value: entry.value,
 				complete: entry.complete,
 				...(read !== 'value' ? { read } : {}),
 				...(entry.available === false ? { available: false } : {}),
@@ -188,7 +204,7 @@ export class ScopeImpl implements Scope, GraphOwner {
 		string,
 		{ identity: StreamFrameIdentity; ready(): void }
 	>();
-	readonly derivedBindings = new Map<ScopedNode, DerivedBinding<unknown>>();
+	readonly derivedBindings = new Map<ScopedNode, DerivedBindingLifecycle>();
 	readonly frames = new Set<AdoptionFrameImpl>();
 	private readonly seedEntries: Map<string, DecodedSeedEntry>;
 	private readonly traceLimit: number;
@@ -371,46 +387,39 @@ export class ScopeImpl implements Scope, GraphOwner {
 	createDerivedDeclaration<T>(
 		key: string,
 		compute: DerivedCompute<T>,
-		options?: DerivedOptions,
+		options: DerivedOptions | undefined,
+		Binding: DerivedBindingFactory<T>,
 	): DerivedSignal<T> {
 		if (typeof compute !== 'function') throw new TypeError('derived$ requires a function.');
 		const [node, created] = this.declaredNode<T>(key, 'derived');
 		if (!created) return node as DerivedSignal<T>;
-		const binding = new DerivedBinding(this, node, compute, options);
-		this.derivedBindings.set(node, binding as DerivedBinding<unknown>);
+		const binding = new Binding(this, node, compute, options);
+		this.derivedBindings.set(node, binding);
 		this.initializeRetention(node);
 		this.consumeSeed(key);
 		return node as DerivedSignal<T>;
 	}
 
-	asyncSignal$<T>(key: string, describe: () => QueryRequest<T> | typeof skip): Resource<T> {
-		if (typeof describe !== 'function') throw new TypeError('asyncSignal$ requires a description.');
-		const node = this.createNode<T>(key, 'async');
-		const seed = this.initialSeed(key);
-		const retained = this.retainedSeed(key);
-		this.initializeRetention(node);
-		signalBatch(() => {
-			const binding = initializeResource(this, node, describe, seed, retained);
-			this.resources.set(node, binding);
-			refreshNode(node);
-			this.flushStreamedResult(node, binding);
-		});
-		this.consumeSeed(key);
-		return node as Resource<T>;
-	}
-
 	createResourceDeclaration<T>(
 		key: string,
 		describe: () => QueryRequest<T> | typeof skip,
+		initialize: typeof initializeResource,
+		unique = false,
 	): Resource<T> {
-		if (typeof describe !== 'function') throw new TypeError('query$ requires a description.');
-		const [node, created] = this.declaredNode<T>(key, 'async');
-		if (!created) return node as Resource<T>;
+		if (typeof describe !== 'function')
+			throw new TypeError('A query resource requires a description.');
+		let node: ScopedNode<T>;
+		if (unique) node = this.createNode<T>(key, 'async');
+		else {
+			const [declared, created] = this.declaredNode<T>(key, 'async');
+			if (!created) return declared as Resource<T>;
+			node = declared;
+		}
 		const seed = this.initialSeed(key);
 		const retained = this.retainedSeed(key);
 		this.initializeRetention(node);
 		signalBatch(() => {
-			const binding = initializeResource(this, node, describe, seed, retained);
+			const binding = initialize(this, node, describe, seed, retained);
 			this.resources.set(node, binding);
 			refreshNode(node);
 			this.flushStreamedResult(node, binding);
@@ -932,24 +941,31 @@ export function createDeclaredSignalCell<T>(
 	return owner.createSignalDeclaration(key, initial, preferInitial);
 }
 
-export function createDeclaredDerivedCell<T>(
+// The caller selects the implementation. Importing the owner must not retain
+// asynchronous attempt machinery for compiler-proven scalar declarations.
+export function createDerivedCellWith<T>(
 	owner: Scope,
 	key: string,
 	compute: DerivedCompute<T>,
-	options?: DerivedOptions,
+	options: DerivedOptions | undefined,
+	Binding: DerivedBindingFactory<T>,
 ): DerivedSignal<T> {
 	if (!(owner instanceof ScopeImpl))
 		throw new TypeError('A direct derived signal needs an Octane scope.');
-	return owner.createDerivedDeclaration(key, compute, options);
+	return owner.createDerivedDeclaration(key, compute, options, Binding);
 }
 
-export function createDeclaredResourceCell<T>(
+// Resource callers supply their implementation statically. Ownership, initial
+// seeds and lifecycle support must not retain a query producer by themselves.
+export function createResourceCellWith<T>(
 	owner: Scope,
 	key: string,
 	describe: () => QueryRequest<T> | typeof skip,
+	initialize: typeof initializeResource,
+	unique = false,
 ): Resource<T> {
 	if (!(owner instanceof ScopeImpl)) throw new TypeError('A direct query needs an Octane scope.');
-	return owner.createResourceDeclaration(key, describe);
+	return owner.createResourceDeclaration(key, describe, initialize, unique);
 }
 
 export function adoptResourceValue<T>(

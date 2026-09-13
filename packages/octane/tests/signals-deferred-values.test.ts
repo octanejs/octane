@@ -11,7 +11,7 @@ import {
 	type Root,
 } from 'octane';
 import * as ServerRuntime from 'octane/server';
-import { createScope, query } from 'octane/signals';
+import { createResource, createScope, query } from 'octane/signals';
 import { prerender } from 'octane/static';
 import { act, mount } from './_helpers.js';
 import { loadServerFixture } from './_server-fixture.js';
@@ -191,7 +191,7 @@ describe('native reads in deferred JSX values', () => {
 		const scope = createScope({ scopeKey: 'native-factory-suspense' });
 		const pending = deferred<string>();
 		const load = query('native-factory-suspense-query', () => pending.promise);
-		const value$ = scope.asyncSignal$('value', () => load(undefined));
+		const value$ = createResource(scope, 'value', () => load(undefined));
 		let rendered: ReturnType<typeof mount> | undefined;
 		try {
 			const view = client.makePendingView(value$);

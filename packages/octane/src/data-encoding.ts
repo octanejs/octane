@@ -51,6 +51,54 @@ export function encodeSignalValue(
 	}
 }
 
+/**
+ * Take an immutable plain-data snapshot without an encode/decode round trip.
+ * Keep this traversal separate so encode-only consumers retain neither its code
+ * nor a per-value mode branch. Both paths enforce the same input descriptor rules.
+ */
+export function snapshotSignalValue(value: unknown, ancestors = new Set<object>()): unknown {
+	if (
+		value === undefined ||
+		value === null ||
+		typeof value === 'boolean' ||
+		typeof value === 'string'
+	)
+		return value;
+	if (typeof value === 'number') return Number.isFinite(value) ? value : unsupported();
+	if (typeof value !== 'object' || ancestors.has(value)) return unsupported();
+	const prototype = Object.getPrototypeOf(value);
+	if (!Array.isArray(value) && prototype !== Object.prototype && prototype !== null) {
+		return unsupported();
+	}
+	ancestors.add(value);
+	try {
+		const keys = Reflect.ownKeys(value);
+		if (Array.isArray(value)) {
+			if (keys.length !== value.length + 1) return unsupported();
+			const items: unknown[] = [];
+			for (let i = 0; i < value.length; i++) {
+				const descriptor = Object.getOwnPropertyDescriptor(value, String(i));
+				if (!descriptor || !descriptor.enumerable || !('value' in descriptor)) return unsupported();
+				items.push(snapshotSignalValue(descriptor.value, ancestors));
+			}
+			return Object.freeze(items);
+		}
+		if (keys.some((key) => typeof key !== 'string')) return unsupported();
+		const object: Record<string, unknown> = {};
+		for (const key of (keys as string[]).sort()) {
+			const descriptor = Object.getOwnPropertyDescriptor(value, key)!;
+			if (!descriptor.enumerable || !('value' in descriptor)) return unsupported();
+			Object.defineProperty(object, key, {
+				value: snapshotSignalValue(descriptor.value, ancestors),
+				enumerable: true,
+			});
+		}
+		return Object.freeze(object);
+	} finally {
+		ancestors.delete(value);
+	}
+}
+
 export function decodeSignalValue(encoded: EncodedSignalValue): unknown {
 	if (!Array.isArray(encoded)) return unsupported();
 	const [tag, value] = encoded;

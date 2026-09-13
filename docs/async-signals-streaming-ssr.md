@@ -10,7 +10,11 @@ the future-integration discussion remains below.
 - `signal$(initial)` is writable state, including function-valued data.
   `derived$(compute)` is read-only sync, Promise, or async-iterable computation.
   `query$(select, load)` is a read-only keyed source. No writable-derived
-  override behavior is introduced; existing scoped/hook APIs remain compatible.
+  override behavior is introduced. Existing scoped/hook APIs remain compatible
+  except the legacy `scope.asyncSignal$` method: explicit-owner callers use the
+  imported `createResource(scope, key, describe)` factory instead. This keeps
+  query producers out of query-free owner dependencies; normal authors still
+  use `query$` without creating a scope.
 - `createScope` is optional. Global/module declarations are valid; server cells
   are request-isolated, browser cells are document-owned, and local declarations
   have stable instance identity. The compiler supplies serializable IDs.
@@ -59,13 +63,19 @@ The early path has two deliberately separate costs:
   consumers must share the same engine/owner, not separately bundled copies.
 
 Before evaluating behavior modules that read state, the host upgrades the early
-mailboxes with `bootstrapStreamedSignalHydration` from
+mailboxes with `bootstrapStreamedSignalResults` from
 `octane/hydration/streamed-signals`, supplying its build/document identity and the
 initial response's `initialSignals` manifest. This does not require app-core's
 private document envelope or `hydrateRoot`. Initial document seeds initialize
 unread live state once; a conflicting or late installation fails clearly. Early
 user edits win over those seeds. Instance read frames and later cached/streamed
 historical frames remain presentation evidence, never unconditional live writes.
+
+Hosts that also delegate streamed DOM placement to Octane keep using
+`bootstrapStreamedSignalHydration` and its `receiver.registerRegion` API. The
+result-only entry uses the same authority and delivery implementation without
+retaining DOM placement; it is a static host choice, not a second initialization
+phase or a runtime capability loader. Install only one of these document bridges.
 
 For server-owned native controls, `bindSignalControl(control, 'value', draft$)`
 joins the same writable cell without reconciling its HTML; `checked` and readonly
