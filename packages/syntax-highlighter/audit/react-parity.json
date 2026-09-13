@@ -11,7 +11,10 @@
     "integrity": "sha256:8a324f3d4d79e6b40b2f2279ee97285a0a85d552ecdf6f1910f178907cda31aa",
     "verification": "verified"
   },
-  "upstreamSuites": { "runtime": "present", "types": "insufficient" },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "insufficient"
+  },
   "adaptedRoots": {
     "source": {
       "roots": ["packages/syntax-highlighter/src"],
@@ -37,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "8b22926b6186369bfc8ca72aedb69b7853160e5ab762b1a36e1a61bf24f6c322"
+      "lockfileSha256": "5661c98bd5df743941733106d3483f4cee11f4373088c62d63e2e53899f2f4e1"
     }
   },
   "lanes": [
@@ -104,7 +107,7 @@
         {
           "path": "packages/syntax-highlighter/scripts/generate-adapted-tests.mjs",
           "role": "support",
-          "sha256": "3734fab41248ac52126a2fdb9b1a8ed497955194da9822dd192dcab7f33475f8"
+          "sha256": "82d1477644e5a1f9197aca49341310711cdea9a7e486b04218f98d0da744b480"
         },
         {
           "path": "packages/syntax-highlighter/scripts/generate-parity-audit.mjs",
@@ -224,7 +227,7 @@
         {
           "path": "packages/syntax-highlighter/tests/adapted/light-async.test.ts",
           "role": "support",
-          "sha256": "ce352e997eaf8cc4dd349b2b09c83db63dbf865ce7beb6a0982449ffe757315f"
+          "sha256": "fc842f503b4884c5e4c87edf96940059116a5bddd8423d22e1ef8e6703c1d300"
         },
         {
           "path": "packages/syntax-highlighter/tests/adapted/line-numbers.test.ts",

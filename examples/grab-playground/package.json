@@ -1,0 +1,27 @@
+{
+  "name": "grab-playground-example",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "1:1 Octane port of react-grab e2e-app-vite for validating @octanejs/grab.",
+  "scripts": {
+    "dev": "vite --host --port 5299 --strictPort",
+    "build": "vite build",
+    "preview": "vite preview --host --port 5299 --strictPort",
+    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json",
+    "test:e2e": "pnpm build && OCTANE_EXAMPLE_PREVIEW=1 playwright test --config e2e/playwright.config.ts",
+    "test:e2e:dev": "playwright test --config e2e/playwright.config.ts"
+  },
+  "dependencies": {
+    "@octanejs/grab": "workspace:*",
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "@playwright/test": "catalog:default",
+    "@tailwindcss/vite": "^4.1.0",
+    "@types/node": "catalog:default",
+    "tailwindcss": "^4.1.0",
+    "typescript": "catalog:default",
+    "vite": "catalog:default"
+  }
+}

@@ -1,0 +1,1628 @@
+{
+  "runtimeDependencies": ["@react-grab/cli", "octane", "tailwindcss"],
+  "adaptedSources": [
+    {
+      "packageName": "react-grab",
+      "paths": [
+        "src/components/context-menu.tsx",
+        "src/components/frozen-glow.tsx",
+        "src/components/icons/icon-check.tsx",
+        "src/components/icons/icon-chevron.tsx",
+        "src/components/icons/icon-command.tsx",
+        "src/components/icons/icon-ellipsis.tsx",
+        "src/components/icons/icon-loader.tsx",
+        "src/components/icons/icon-retry.tsx",
+        "src/components/icons/icon-return.tsx",
+        "src/components/icons/icon-select.tsx",
+        "src/components/icons/icon-submit.tsx",
+        "src/components/menu/index.ts",
+        "src/components/menu/menu-context.ts",
+        "src/components/menu/menu-item-label.tsx",
+        "src/components/menu/menu-item.tsx",
+        "src/components/menu/menu-list.tsx",
+        "src/components/menu/menu-panel.tsx",
+        "src/components/menu/menu-provider.tsx",
+        "src/components/menu/menu-shortcut.tsx",
+        "src/components/menu/menu-store.ts",
+        "src/components/overlay-canvas.tsx",
+        "src/components/renderer.tsx",
+        "src/components/selection-label/arrow.tsx",
+        "src/components/selection-label/bottom-section.tsx",
+        "src/components/selection-label/completion-view.tsx",
+        "src/components/selection-label/discard-prompt.tsx",
+        "src/components/selection-label/error-view.tsx",
+        "src/components/selection-label/index.tsx",
+        "src/components/selection-label/tag-badge.tsx",
+        "src/components/shortcut-hint.tsx",
+        "src/components/toolbar/hierarchy-menu.tsx",
+        "src/components/toolbar/index.tsx",
+        "src/components/toolbar/state.ts",
+        "src/components/toolbar/toolbar-action-button.tsx",
+        "src/components/toolbar/toolbar-content.tsx",
+        "src/components/toolbar/toolbar-menu.tsx",
+        "src/components/tooltip.tsx",
+        "src/components/ui/anchored-dropdown-surface.tsx",
+        "src/components/ui/button.tsx",
+        "src/components/ui/surface.tsx",
+        "src/constants.ts",
+        "src/core/arrow-navigation.ts",
+        "src/core/auto-scroll.ts",
+        "src/core/context.ts",
+        "src/core/copy.ts",
+        "src/core/element-adapter.ts",
+        "src/core/element-anchors.ts",
+        "src/core/events.ts",
+        "src/core/html-preview.ts",
+        "src/core/index.tsx",
+        "src/core/keyboard-handlers.ts",
+        "src/core/keyboard-selection.ts",
+        "src/core/label-controller.ts",
+        "src/core/log-intro.ts",
+        "src/core/logo-svg.ts",
+        "src/core/next-server-frames.ts",
+        "src/core/noop-api.ts",
+        "src/core/open-file-action.ts",
+        "src/core/plugin-registry.ts",
+        "src/core/plugins/comment.ts",
+        "src/core/plugins/copy.ts",
+        "src/core/plugins/open.ts",
+        "src/core/store.ts",
+        "src/core/theme.ts",
+        "src/core/three-selection.ts",
+        "src/errors.ts",
+        "src/global-api.ts",
+        "src/index.ts",
+        "src/primitives.ts",
+        "src/styles.css",
+        "src/utils/accumulate-rotation.ts",
+        "src/utils/action-shortcuts.ts",
+        "src/utils/actionable-selector-roles.ts",
+        "src/utils/adjust-lerp-for-frame-duration.ts",
+        "src/utils/are-arrays-shallow-equal.ts",
+        "src/utils/auto-resize-textarea.ts",
+        "src/utils/build-element-hierarchy.ts",
+        "src/utils/clamp-to-range.ts",
+        "src/utils/clamp-to-viewport.ts",
+        "src/utils/classify-source-path.ts",
+        "src/utils/cn.ts",
+        "src/utils/collect-cleanup-error.ts",
+        "src/utils/combine-bounds.ts",
+        "src/utils/compare-element-document-order.ts",
+        "src/utils/confirmation-focus-manager.ts",
+        "src/utils/convert-client-position-to-top-window.ts",
+        "src/utils/convert-parent-position-to-iframe.ts",
+        "src/utils/convert-top-window-position-to-client.ts",
+        "src/utils/copy-content.ts",
+        "src/utils/create-anchored-dropdown.ts",
+        "src/utils/create-bounds-from-drag-rect.ts",
+        "src/utils/create-component-name-for-element.ts",
+        "src/utils/create-confirmation-keyboard.ts",
+        "src/utils/create-element-bounds.ts",
+        "src/utils/create-element-selector.ts",
+        "src/utils/create-fiber-revision.ts",
+        "src/utils/create-menu-highlight.ts",
+        "src/utils/create-nearest-semantic-element-selector-details.ts",
+        "src/utils/create-pointer-move-prompt-handoff.ts",
+        "src/utils/create-style-element.ts",
+        "src/utils/create-toolbar-drag.ts",
+        "src/utils/create-variants.ts",
+        "src/utils/delete-cache-entry-if-current.ts",
+        "src/utils/detect-app-theme.ts",
+        "src/utils/detect-csp-nonce.ts",
+        "src/utils/escape-html-attribute.ts",
+        "src/utils/escape-html-text.ts",
+        "src/utils/execute-context-menu-action.ts",
+        "src/utils/extract-element-css.ts",
+        "src/utils/find-selector-target.ts",
+        "src/utils/find-unique-selector.ts",
+        "src/utils/focus-in-overlay.ts",
+        "src/utils/format-component-name-lines.ts",
+        "src/utils/format-list-item-key.ts",
+        "src/utils/forward-same-origin-frame-events.ts",
+        "src/utils/freeze-animation-frame-loops.ts",
+        "src/utils/freeze-animations.ts",
+        "src/utils/freeze-global-interactions.ts",
+        "src/utils/freeze-pseudo-states.ts",
+        "src/utils/freeze-renderers.ts",
+        "src/utils/generate-id.ts",
+        "src/utils/generate-snippet.ts",
+        "src/utils/get-accessible-iframe-document.ts",
+        "src/utils/get-anchored-dropdown-position.ts",
+        "src/utils/get-arrow-size.ts",
+        "src/utils/get-bounds-center.ts",
+        "src/utils/get-composed-parent-element.ts",
+        "src/utils/get-deep-element-at-point.ts",
+        "src/utils/get-deep-elements-at-point.ts",
+        "src/utils/get-deep-fallback-element-at-point.ts",
+        "src/utils/get-deep-hovered-elements.ts",
+        "src/utils/get-element-anchor-ratio.ts",
+        "src/utils/get-element-at-position.ts",
+        "src/utils/get-element-computed-style.ts",
+        "src/utils/get-element-text-bounds.ts",
+        "src/utils/get-elements-in-drag.ts",
+        "src/utils/get-iframe-layout-metrics.ts",
+        "src/utils/get-iframe-scale.ts",
+        "src/utils/get-local-content-element-at-point.ts",
+        "src/utils/get-nearest-edge.ts",
+        "src/utils/get-next-base-path.ts",
+        "src/utils/get-parent-react-grab-api.ts",
+        "src/utils/get-preview-text-content.ts",
+        "src/utils/get-script-options.ts",
+        "src/utils/get-tag-display.ts",
+        "src/utils/get-tag-name.ts",
+        "src/utils/get-unfiltered-elements-at-point.ts",
+        "src/utils/get-visible-bounds-center.ts",
+        "src/utils/get-visual-viewport.ts",
+        "src/utils/get-window-frame-element.ts",
+        "src/utils/has-element-box-paint.ts",
+        "src/utils/hide-from-third-parties.ts",
+        "src/utils/index-in-parent.ts",
+        "src/utils/invalidate-interaction-caches.ts",
+        "src/utils/is-c-like-key.ts",
+        "src/utils/is-css-color-transparent.ts",
+        "src/utils/is-document-ancestor-of-element.ts",
+        "src/utils/is-document-node.ts",
+        "src/utils/is-element-connected.ts",
+        "src/utils/is-element-node.ts",
+        "src/utils/is-element-painted-at-position.ts",
+        "src/utils/is-element-visible.ts",
+        "src/utils/is-element-within-container.ts",
+        "src/utils/is-enter-code.ts",
+        "src/utils/is-event-from-overlay.ts",
+        "src/utils/is-extension-context.ts",
+        "src/utils/is-generated-bundle-source-path.ts",
+        "src/utils/is-horizontally-grabbable.ts",
+        "src/utils/is-html-element.ts",
+        "src/utils/is-iframe-element.ts",
+        "src/utils/is-keyboard-event-composing.ts",
+        "src/utils/is-keyboard-event-triggered-by-input.ts",
+        "src/utils/is-mac.ts",
+        "src/utils/is-next-project-runtime.ts",
+        "src/utils/is-point-inside-rect.ts",
+        "src/utils/is-position-inside-bounds.ts",
+        "src/utils/is-react-grab-element.ts",
+        "src/utils/is-react-grab-host.ts",
+        "src/utils/is-root-element.ts",
+        "src/utils/is-shadow-root.ts",
+        "src/utils/is-shared-ui-source-path.ts",
+        "src/utils/is-stable-element-id.ts",
+        "src/utils/is-target-key-combination.ts",
+        "src/utils/is-useful-component-name.ts",
+        "src/utils/is-user-ignored-element.ts",
+        "src/utils/is-valid-grabbable-element.ts",
+        "src/utils/key-matches-code.ts",
+        "src/utils/lerp.ts",
+        "src/utils/matches-element-at-point-options.ts",
+        "src/utils/modifier-tracker.ts",
+        "src/utils/mount-root.ts",
+        "src/utils/native-raf.ts",
+        "src/utils/normalize-error.ts",
+        "src/utils/normalize-file-path.ts",
+        "src/utils/normalize-toolbar-default-action-id.ts",
+        "src/utils/notify-toolbar-state-change-subscribers.ts",
+        "src/utils/observe-same-origin-frame-documents.ts",
+        "src/utils/open-file.ts",
+        "src/utils/overlay-color.ts",
+        "src/utils/parse-activation-key.ts",
+        "src/utils/parse-any-color.ts",
+        "src/utils/parse-color.ts",
+        "src/utils/parse-package-name.ts",
+        "src/utils/pointer-events-freeze.ts",
+        "src/utils/preferred-selector-attribute-names.ts",
+        "src/utils/race-promise-with-abort.ts",
+        "src/utils/react-grab-attribute-name.ts",
+        "src/utils/register-overlay-dismiss.ts",
+        "src/utils/report-recoverable-error.ts",
+        "src/utils/resolve-action-enabled.ts",
+        "src/utils/resolve-current-revision-value.ts",
+        "src/utils/resolve-max-context-lines.ts",
+        "src/utils/resolve-solid-source-location.ts",
+        "src/utils/runtime-mode.ts",
+        "src/utils/safe-decode-uri-component.ts",
+        "src/utils/scale-border-radius.ts",
+        "src/utils/should-include-element-selector.ts",
+        "src/utils/source-fetch-queue.ts",
+        "src/utils/strip-internal-attributes.ts",
+        "src/utils/supports-display-p3.ts",
+        "src/utils/suppress-menu-event.ts",
+        "src/utils/throw-collected-errors.ts",
+        "src/utils/toolbar-position.ts",
+        "src/utils/truncate-escaped-html.ts",
+        "src/utils/truncate-string.ts"
+      ]
+    }
+  ],
+  "sourceLedger": [
+    {
+      "path": "package.json",
+      "origin": "authored",
+      "sha256": "af774da2f3e34ed9fc600aded6c0131a5e3d169f61851b5b250a3f45bab4e1a8"
+    },
+    {
+      "path": "src/components/context-menu.tsx",
+      "origin": "adapted",
+      "sha256": "5ef722441698770bc8978250db2b4ad363d0152eef33bb843fc5b79eb72b54fc",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/components/frozen-glow.tsx",
+      "origin": "adapted",
+      "sha256": "85c62606edae6ebb1b9822e3b6ecaef877de0693918db7827cd4902b9530c44f",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/components/icons/icon-check.tsx",
+      "origin": "adapted",
+      "sha256": "c633591e73e121081352e6b7c0aa641af7a3c420370161bf6f1c399527b248c1",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/components/icons/icon-chevron.tsx",
+      "origin": "adapted",
+      "sha256": "67e8e4b04d900d544cd48c6c3d8ecde8fc7af162cc2a0ba41474cc3cc69613e7",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/components/icons/icon-command.tsx",
+      "origin": "adapted",
+      "sha256": "c410252cdcd1437e7a77a385a39eeba6dcc682140c554dc4ae5e813e6167011a",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/components/icons/icon-ellipsis.tsx",
+      "origin": "adapted",
+      "sha256": "0d535e17c5f59930bc6b1946ff3e980cad1990451c8fe2c147cf6e432ae936c4",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/components/icons/icon-loader.tsx",
+      "origin": "adapted",
+      "sha256": "d513be4d0f135f0fe787b5ef9147445ec8e9c9f38e232555708042845fbf581d",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/components/icons/icon-retry.tsx",
+      "origin": "adapted",
+      "sha256": "5723d1d72e474afe97f9b1f88148380aaf916b0572b94027cc7ab2d27397144e",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/components/icons/icon-return.tsx",
+      "origin": "adapted",
+      "sha256": "0328f0b1a1e6bbc45e754fb7839b757b485749597b51772523e285ab191ac74a",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/components/icons/icon-select.tsx",
+      "origin": "adapted",
+      "sha256": "31d35be78cb5920dba8a237aa04aead3d83199f895443c8f6f8d5ec30cb768a4",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/components/icons/icon-submit.tsx",
+      "origin": "adapted",
+      "sha256": "4e13020f78ddde346ef52362afd72d10f9c6ff29e6c448d6aaabbbab1fceefe6",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/components/menu/index.ts",
+      "origin": "adapted",
+      "sha256": "9344f2a0e704a79e7a9655977bcff4a2186c9b9e253c75cf70c260b1f54f6a7e",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/components/menu/menu-context.ts",
+      "origin": "adapted",
+      "sha256": "ac43a9359bf5a6fd987e921ca819565ffa2ae8b11915fa9abe0a19849641ae91",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/components/menu/menu-item-label.tsx",
+      "origin": "adapted",
+      "sha256": "5a68e7a1bcbcb7d0d081fcbf8a9cc9c8c0e28db98de9d56d11e93090a7eb2849",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/components/menu/menu-item.tsx",
+      "origin": "adapted",
+      "sha256": "c0a58e49d8b55ac32ee82a1af838d7a7e6c3f4c2a68f3cfc1ef8c76782363fcc",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/components/menu/menu-list.tsx",
+      "origin": "adapted",
+      "sha256": "32859291f4e89df71b6eb5a5153dc476a9aafe69019a2b327e472dd3058bbd73",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/components/menu/menu-panel.tsx",
+      "origin": "adapted",
+      "sha256": "b6c48454b820e237ad602675f5645dfaa6e7e83a58d81abc046a552c960ec805",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/components/menu/menu-provider.tsx",
+      "origin": "adapted",
+      "sha256": "f11dda0778afe0da7a8a2b59bbfe5803b7e3bdf49626137bb6532fcac86e9ef5",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/components/menu/menu-shortcut.tsx",
+      "origin": "adapted",
+      "sha256": "adc20edb2a84da94de7b0e4b4c111032a102c0f5ea2099fc6a12a746e9afc8ee",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/components/menu/menu-store.ts",
+      "origin": "adapted",
+      "sha256": "c7c9ce248783fe08aa4e4db806578feed6e18eb2aa9cb472d6aad5f33038230e",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/components/overlay-canvas.tsx",
+      "origin": "adapted",
+      "sha256": "2c3b519f68a77dd50b1135fa38e9f988d065897715e143c9ecc88f9bce719c5d",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/components/renderer.tsx",
+      "origin": "adapted",
+      "sha256": "7b4d0f69e8773e567e168d95a8df779ca4b097c58ca2aa6c5210fd2e6195cb7b",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/components/selection-label/arrow.tsx",
+      "origin": "adapted",
+      "sha256": "57d8bac703e2a5f59de17a6de31dd9f06ed3f05214fa5ba944be2cc81e66dea1",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/components/selection-label/bottom-section.tsx",
+      "origin": "adapted",
+      "sha256": "aa0dc078232cd639036aa9c5e276c0404f2024b85e9358a19f34cdf48ee59e5f",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/components/selection-label/completion-view.tsx",
+      "origin": "adapted",
+      "sha256": "78b28ac652a8bd1e5fed584b4b5dfab49e757b6b143662f875d67f98430e40ee",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/components/selection-label/discard-prompt.tsx",
+      "origin": "adapted",
+      "sha256": "e1df2cce28a7b432bff5902dec31461ef541374d48dc5ddbffbfe3d002a5ee4b",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/components/selection-label/error-view.tsx",
+      "origin": "adapted",
+      "sha256": "08d78c23b67e47a86e3613a0a101afcddf6486c615f798970986bd63d3406ae4",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/components/selection-label/index.tsx",
+      "origin": "adapted",
+      "sha256": "30febebadd6314cbed83aa1dcfd2e216dbefffd350d655f18ade306b4faf7028",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/components/selection-label/tag-badge.tsx",
+      "origin": "adapted",
+      "sha256": "3943b6335ce72ae6d9da64331bcd3f019da7cb4c5fb14c6817e51e2b41335706",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/components/shortcut-hint.tsx",
+      "origin": "adapted",
+      "sha256": "58b0bbf0fee1c3c4bd1f38c0c45571e0ebd133b641063bddbbc98c7f37440528",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/components/toolbar/hierarchy-menu.tsx",
+      "origin": "adapted",
+      "sha256": "0e8f513046dea7250962c81baec1d33b106d2692fd6fa61ca1cb526cb35bbb0f",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/components/toolbar/index.tsx",
+      "origin": "adapted",
+      "sha256": "04ec4d57b20dd56b1fb9b7a5ff1d3fa1e5b069bd2f25f578288f37b6ef73b407",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/components/toolbar/state.ts",
+      "origin": "adapted",
+      "sha256": "0851b9d778b104443768fdd9a6df8ff8927be7c018a0d96468937f4ee9acfccb",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/components/toolbar/toolbar-action-button.tsx",
+      "origin": "adapted",
+      "sha256": "0074a14f122fc1d64dcfab511861772ebc8e48ca6a007b328c86af844a8080f3",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/components/toolbar/toolbar-content.tsx",
+      "origin": "adapted",
+      "sha256": "b487b2fcec7c81f004d38aadabf9f9f681eea1d7a2522f57d322e62885dc989a",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/components/toolbar/toolbar-menu.tsx",
+      "origin": "adapted",
+      "sha256": "cb1a69eaeb50610091e9a86428aa119e7bbcc9258362ab2a4fce794fcfe58069",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/components/tooltip.tsx",
+      "origin": "adapted",
+      "sha256": "2092248d6aa153423de9d3954436090a4603009336aec6bc9563d044c8542932",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/components/ui/anchored-dropdown-surface.tsx",
+      "origin": "adapted",
+      "sha256": "0efda30b4a63142332959d7f07c08fa32079e2369b618d2b5672b065299e7f6d",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/components/ui/button.tsx",
+      "origin": "adapted",
+      "sha256": "18883bb2592afe73505793c06ed91933e453b10c572094a649cbc8926cf0a520",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/components/ui/surface.tsx",
+      "origin": "adapted",
+      "sha256": "f00fe77545f015dabcf179ce1c9255b8f013349194e3874739525bce5d42f28a",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/constants.ts",
+      "origin": "adapted",
+      "sha256": "2480b026293c890af356f1705f6b35b3abcb4979d47ed4167a6b3b982eb92ac5",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/core/arrow-navigation.ts",
+      "origin": "adapted",
+      "sha256": "b2d09690c87de0ce430d8a56560ad976c8f2dadb371c802bc36d34a7189ce383",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/core/auto-scroll.ts",
+      "origin": "adapted",
+      "sha256": "0ac20bf2aba050caea05b000c7a82a772cd27c0097e8efbbfa54f7bec00a15f2",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/core/context.ts",
+      "origin": "adapted",
+      "sha256": "1386269beeef087ff836405bbfcc7f26af547180f088e387ee8a089f6021be30",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/core/copy.ts",
+      "origin": "adapted",
+      "sha256": "986b6ef241dc1214d507577e3ef66e089c7b459d1f562c59589b3b79bd49e221",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/core/element-adapter.ts",
+      "origin": "adapted",
+      "sha256": "77f567cb0cf7c8d827e01be87d189cdd03ca6d3105007833124695d38f6dd3d2",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/core/element-anchors.ts",
+      "origin": "adapted",
+      "sha256": "150714cd6e2d062549e4bda09a056f788bd669345fea5ab219257b139535e5bc",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/core/events.ts",
+      "origin": "adapted",
+      "sha256": "1a0067f0b17f706e4a8c2b1a84fe961b85eea5a072a92c1147aa68d79ca37cc2",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/core/html-preview.ts",
+      "origin": "adapted",
+      "sha256": "a175515dbe1138c009aadba255e29e9575862e114395ab8b5864ac2d22952505",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/core/index.tsx",
+      "origin": "adapted",
+      "sha256": "1832cf55d08284ca4ed167fe7f587e2e1cc5634c0406ac84c9fe2f0fe31ed607",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/core/keyboard-handlers.ts",
+      "origin": "adapted",
+      "sha256": "26e9e5c7feb26cb6aaf064346126694e87256f4a6878b068dab95d92b7a45338",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/core/keyboard-selection.ts",
+      "origin": "adapted",
+      "sha256": "36216c9c05a872be1ac2861c6fb1e73a767f89602fe2f050e32100dc111df7b0",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/core/label-controller.ts",
+      "origin": "adapted",
+      "sha256": "5d614ec4ddaee3fbc7ad5bff131a0c262aa66e40f5700700b8ca6f9aebd2b140",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/core/log-intro.ts",
+      "origin": "adapted",
+      "sha256": "42b4de3ed8065604772d1f06f532c42d1d99d1f0f152ebfc2dd8889c335defa6",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/core/logo-svg.ts",
+      "origin": "adapted",
+      "sha256": "b1d03e4c33a3a7409830c29431584c7e1837b845e15674abcb002ffc205e0539",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/core/next-server-frames.ts",
+      "origin": "adapted",
+      "sha256": "509f013e93c557b0a494dfd5b1721ee83922d314c429515b0a2db955a3c6647f",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/core/noop-api.ts",
+      "origin": "adapted",
+      "sha256": "7f1ba77adfc2461aa034aab4d580cd77ae8f191cb3e9b11fbf3a291acafa22cc",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/core/open-file-action.ts",
+      "origin": "adapted",
+      "sha256": "9cc7065443839311ac5110976f06ca78de4c32060fef30a438a8ff3547264b37",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/core/plugin-registry.ts",
+      "origin": "adapted",
+      "sha256": "b9ae0d5d9e20e952181aee7bc908773d3cdcfd4011abccbd70ea6da38026097c",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/core/plugins/comment.ts",
+      "origin": "adapted",
+      "sha256": "cdd8b65fbd62ce2118b3c1491a6105fe225ae049246ebe6fa65d9c0b840e0297",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/core/plugins/copy.ts",
+      "origin": "adapted",
+      "sha256": "ec7b972bfc120d9b311a87a877c75b5396a0586032c9d69e4b3881d5d7bd0d9d",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/core/plugins/open.ts",
+      "origin": "adapted",
+      "sha256": "6cc996080bd506f674d40cfb80efb215cab6969e5172f99741d6bbc056bcbb07",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/core/store.ts",
+      "origin": "adapted",
+      "sha256": "ea7a30d78ebf8e0091124ebc194f6df87f20cd71f373c053a9bec3b5dc8d0795",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/core/theme.ts",
+      "origin": "adapted",
+      "sha256": "77a8576f350472f0bf140b42177663dfbe7e9f9334424d144c85d2f7122d9dc1",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/core/three-selection.ts",
+      "origin": "adapted",
+      "sha256": "dabfd953bb2d79998fb89a417a289971e8a8a6c0ccf200d4da426d40361b053b",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/errors.ts",
+      "origin": "adapted",
+      "sha256": "16d14a2cd8ccb0322b86a7606aab8a56e37d609439f37920477c5da36fb53bda",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/global-api.ts",
+      "origin": "adapted",
+      "sha256": "bf8fede9d5e4c6dddbc6d9975b6b3aa40b13e6f30baeaaf29340de7720e4d323",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/index.ts",
+      "origin": "adapted",
+      "sha256": "5d3eb4276bdfbb15c4a4b416ae2847f951108c70f7b6e1a62155ffc49c8abc96",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/octane-adapter.ts",
+      "origin": "authored",
+      "sha256": "303951da059ee187ef2a5ee8a8c9fb73fc633c09552d1af057ec7b1bec9cf937"
+    },
+    {
+      "path": "src/primitives.ts",
+      "origin": "adapted",
+      "sha256": "9e6a6cbda42b1f18fad21cbdda8592550ecd7c5f8b5763c08971ceff25ed0eb0",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/styles.css",
+      "origin": "adapted",
+      "sha256": "a82bbec0ad8e09341c0e1e4e3de418bd84aa5fd47287b11a826592a1cedb4a21",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/accumulate-rotation.ts",
+      "origin": "adapted",
+      "sha256": "e9027dc793f30b54d8bcb599051cf55caa30648e3ed0e856f74b30a798f7bcd8",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/action-shortcuts.ts",
+      "origin": "adapted",
+      "sha256": "ef8de2b4d65db638f63cdd5ce66f50b8ab1cb296b33a7ed86df913d80a5d645b",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/actionable-selector-roles.ts",
+      "origin": "adapted",
+      "sha256": "e098c9505dd54e30271dc04385c24a84932d48f6c409de463ea8c6d2dcf9c767",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/adjust-lerp-for-frame-duration.ts",
+      "origin": "adapted",
+      "sha256": "2d97d4f35447dfb16d3a5fa6820768321450dbf3ef4b398cb44a60a7ea86825e",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/are-arrays-shallow-equal.ts",
+      "origin": "adapted",
+      "sha256": "f1e796fd817bc9cbb395a350d487c99f9316188d8355ab819e4cf3af8eff9fb2",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/auto-resize-textarea.ts",
+      "origin": "adapted",
+      "sha256": "c58e5bb66277b3fd050387743062d704132d465c729414cac97a0319a8ae9b68",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/build-element-hierarchy.ts",
+      "origin": "adapted",
+      "sha256": "6523d9b0a9f8ea9c0c6b976fbc61eee46e50d030af691697e82dc672c173334f",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/clamp-to-range.ts",
+      "origin": "adapted",
+      "sha256": "f1d10f17a6bfcb17b9e10e4fba07420a31669b4f5e9b086fce2c0e8d35d3604d",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/clamp-to-viewport.ts",
+      "origin": "adapted",
+      "sha256": "c369ee73db9b902d25d43c6947da3c0ad9f390bf019a2af0adb1e9d0d1ebaa3d",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/classify-source-path.ts",
+      "origin": "adapted",
+      "sha256": "46b30451a72790c75c2ab638cbc5d511eb580316cace8dcc69a444f32eb033ea",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/cn.ts",
+      "origin": "adapted",
+      "sha256": "48924c485d9b277a169376457fb82844bf193688cbb1fb51851054c214be0d68",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/collect-cleanup-error.ts",
+      "origin": "adapted",
+      "sha256": "90b059fc7cf7b064b02b97b3cd5a111eb82d2c6a0f5351cc13ae0d2232a466d7",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/combine-bounds.ts",
+      "origin": "adapted",
+      "sha256": "4c3f9bff779acf94617461d4f42824a8cb40166af30524589931937f64aac35c",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/compare-element-document-order.ts",
+      "origin": "adapted",
+      "sha256": "4622b91646b3cc02a506c305bab12b4a30767cf67467c2f8ee6ccd1056f897a9",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/confirmation-focus-manager.ts",
+      "origin": "adapted",
+      "sha256": "a324b6a0edd3c2345856112cbf0b341152d28648f3993131095a84aecb3628ed",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/convert-client-position-to-top-window.ts",
+      "origin": "adapted",
+      "sha256": "808e10405420ecae593b47fe0d1a1ebe2982ba39518b2e9ae4b0cff368096496",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/convert-parent-position-to-iframe.ts",
+      "origin": "adapted",
+      "sha256": "656c9fe9e7df218bf33e5669196343d8be1d5f2bcb794ada33ac254868920127",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/convert-top-window-position-to-client.ts",
+      "origin": "adapted",
+      "sha256": "80d2cf7ee6d714b0557f7648f98f6d47910904689c4d215000fe9ee46d80ec5e",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/copy-content.ts",
+      "origin": "adapted",
+      "sha256": "6d7fcb78000d0a1e2e2cb901a80938ab4e77b55f2a15de2525645ea55aa7e510",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/create-anchored-dropdown.ts",
+      "origin": "adapted",
+      "sha256": "4dfac82b5e18dac62471fc2a47f614472863ef5154817aeab82ad2484a5025bd",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/create-bounds-from-drag-rect.ts",
+      "origin": "adapted",
+      "sha256": "7e98cac1f1354231f17b7a8cf27a3d699cf45a5518b2a9bc85064bd553cc2d42",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/create-component-name-for-element.ts",
+      "origin": "adapted",
+      "sha256": "7226b388054a0054d5d61a13d689a55568b973a2431fe95da7a07873613d7f57",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/create-confirmation-keyboard.ts",
+      "origin": "adapted",
+      "sha256": "c88e13b01c268428236a7a9fff8103939ef8d5149ee3a27da9d9330e2806d369",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/create-element-bounds.ts",
+      "origin": "adapted",
+      "sha256": "ff58cd209ade5b2c65a6efbbd5c26e91fdfaae68fff003f88af8d431a242e535",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/create-element-selector.ts",
+      "origin": "adapted",
+      "sha256": "eaa710258911060bcaf7828d5b30df4edc6612bfb63c8376fa62648751e313c1",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/create-fiber-revision.ts",
+      "origin": "adapted",
+      "sha256": "1f047e19efb57c171068cce111cd94c3304a7417085eb46254978bb089fd4aa7",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/create-menu-highlight.ts",
+      "origin": "adapted",
+      "sha256": "91691fa4d71870492fb15facf128064ca4d8c0b7299e6356e14d4fb2c27c6d43",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/create-nearest-semantic-element-selector-details.ts",
+      "origin": "adapted",
+      "sha256": "c46226990b12014da87c16abb01533fd08c124ea896e924945fd17ab96ff1087",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/create-pointer-move-prompt-handoff.ts",
+      "origin": "adapted",
+      "sha256": "0d305392c19ca4a89ef2e7d206731b26728b4909aeeec45837f9a54e32662f7c",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/create-style-element.ts",
+      "origin": "adapted",
+      "sha256": "7ebf6e946c8e089049f428396bf984e76e334ecc6e9e6c28269a0cef50f694cf",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/create-toolbar-drag.ts",
+      "origin": "adapted",
+      "sha256": "5704f78e3f256b35101b11dfe128d51fdf46cc797ba368754167a19b27a83fd5",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/create-variants.ts",
+      "origin": "adapted",
+      "sha256": "1dc21c1e651cb9dc46a237504bc45f6e042049a1b36bb648d3ec0a4c4bd61c35",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/delete-cache-entry-if-current.ts",
+      "origin": "adapted",
+      "sha256": "249eb17c2fcd4a9de8db016d1d61b116f1e47e9b6697e31d117cbba929cbd1e0",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/detect-app-theme.ts",
+      "origin": "adapted",
+      "sha256": "ce86766577969f91d0c10913fc518cbd987184db7a9a7e3c491c2079ce422789",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/detect-csp-nonce.ts",
+      "origin": "adapted",
+      "sha256": "e66f94fe8af78397238c985e86a99d147e870571cf1c535eee30e3cf2d0a953c",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/escape-html-attribute.ts",
+      "origin": "adapted",
+      "sha256": "d8725c51e35baefc8c635a155e60d82815bc493cc85e95119a0bb87f316a8674",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/escape-html-text.ts",
+      "origin": "adapted",
+      "sha256": "005dd7fd22ba68f00f274f4124bc9ac63e79943325cd8d4565d62f982c08452b",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/execute-context-menu-action.ts",
+      "origin": "adapted",
+      "sha256": "a09c340e57598af968c45a05d01230a6e476a1e5b47065f7e3f85d9449efcb1f",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/extract-element-css.ts",
+      "origin": "adapted",
+      "sha256": "81d86c765bc0a25a67b5387ca9ed15e510dec22e7b1aa48058a855969c6ff4d6",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/find-selector-target.ts",
+      "origin": "adapted",
+      "sha256": "9ce8b792a2f871e234038d6a8e70453484fa7850620ec0bc3dcdff9751dca051",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/find-unique-selector.ts",
+      "origin": "adapted",
+      "sha256": "cf56a0cd2b739b30b658893b8e96529223a6b2a9e49e72f132606a28804d7f91",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/focus-in-overlay.ts",
+      "origin": "adapted",
+      "sha256": "c6ead065676c1d12d1facdb64e1e49f656634e4f25f78196338ee3b06efcf604",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/format-component-name-lines.ts",
+      "origin": "adapted",
+      "sha256": "1c2e30efa38663ed0897114194be5a2b8529d6c3a18d71c185b8c6161896da5a",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/format-list-item-key.ts",
+      "origin": "adapted",
+      "sha256": "3fd0712dc3997e0a72adaa5bb1eaf6db0c91ef33c2ce5f917219f5eef0a007bd",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/forward-same-origin-frame-events.ts",
+      "origin": "adapted",
+      "sha256": "8b86d8af6acec54b0332e462781521e0bc0a508ae5afb1fbcd27d4109d20e675",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/freeze-animation-frame-loops.ts",
+      "origin": "adapted",
+      "sha256": "c8bd7e00ee8a08586b4a0f51440e7dc421f8dcd58634c743a506817c2fdd214b",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/freeze-animations.ts",
+      "origin": "adapted",
+      "sha256": "fdb62b65b0e476adb86f29c6c072a90bac6b9adc7ddd29fe5e60f1617f5a1842",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/freeze-global-interactions.ts",
+      "origin": "adapted",
+      "sha256": "c2ad643e486fd4793d592c366ad2ec8e6f30443654fbde006bb0b759a2696592",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/freeze-pseudo-states.ts",
+      "origin": "adapted",
+      "sha256": "da4b2dd52d3adf44cd23020fc0e540a6664679c29f8ebe058e9ec4c0391c5f35",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/freeze-renderers.ts",
+      "origin": "adapted",
+      "sha256": "96d2f3b02cc363ac2bfda95cb184694283b98cfdb695565223b3a20a9dceda67",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/freeze-updates.ts",
+      "origin": "authored",
+      "sha256": "9447f7d611f97c930bda8dbe36d94fef2fe81c2b15c7a22bea6b5cce79a63d98"
+    },
+    {
+      "path": "src/utils/generate-id.ts",
+      "origin": "adapted",
+      "sha256": "f3d25804718fa87e28c80ba00ded9ad86b60b970c33699377eab96c63ce77665",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/generate-snippet.ts",
+      "origin": "adapted",
+      "sha256": "b92f3ed1465629979bc23132fd86c1255c26453704e12034bdf5c9d5b652cb7f",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/get-accessible-iframe-document.ts",
+      "origin": "adapted",
+      "sha256": "46ecb26d46a249521a96bdc7ec1b8130888b70926eb5f26fd3c4b1fef07f8388",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/get-anchored-dropdown-position.ts",
+      "origin": "adapted",
+      "sha256": "0073006f9186b2981dace656a9cb9a980dd897c07cb06bd9d61b8ed3e295f356",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/get-arrow-size.ts",
+      "origin": "adapted",
+      "sha256": "749e69e91b4077ab5e744aacf77c100d19817c412fe5a227d835c8fce5e3d6b4",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/get-bounds-center.ts",
+      "origin": "adapted",
+      "sha256": "3c73cd7230203eadf760f646810ff40cf10943e9cfa0f13b0b03d26361c785d6",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/get-composed-parent-element.ts",
+      "origin": "adapted",
+      "sha256": "c2e508d7c70c046451ee226588bfcf3fd4394c938358aaaf9ea11f9cd9dd6f13",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/get-deep-element-at-point.ts",
+      "origin": "adapted",
+      "sha256": "5d40a6ad3345fc1f456b7df50be58c05badddca4356dd3c6e8dd4358fa6066ad",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/get-deep-elements-at-point.ts",
+      "origin": "adapted",
+      "sha256": "1b7442dff7cdd377b5ce27070723ed81ba5321b0aa093117cc2673dea4e35617",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/get-deep-fallback-element-at-point.ts",
+      "origin": "adapted",
+      "sha256": "01171ff72ac30292b3d5530137c064b0836563bd33b5e2726ae744bfd8b3fdbf",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/get-deep-hovered-elements.ts",
+      "origin": "adapted",
+      "sha256": "08d661bc66d5c3605f205c64a62299f6c7476e5427f8f9c69eaf4859651c4eec",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/get-element-anchor-ratio.ts",
+      "origin": "adapted",
+      "sha256": "99571f92d45e6176df9448a828a5588f565db0793800bd4400b54fb3391d8fd0",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/get-element-at-position.ts",
+      "origin": "adapted",
+      "sha256": "087d35a52c4b1bd8167ae32fec6b49039b1de7b862c41020ee7ea8d7ccfb54f1",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/get-element-computed-style.ts",
+      "origin": "adapted",
+      "sha256": "253e31ef7bd558c2ffe4df3b71c736ed86a1312136b68fcf668d91c78d47c7f1",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/get-element-text-bounds.ts",
+      "origin": "adapted",
+      "sha256": "fe29503881030848fc28f57925f4b7fa50a3995801297c7e1c7b04f0a351fe89",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/get-elements-in-drag.ts",
+      "origin": "adapted",
+      "sha256": "da8a37e0c7fb0c92d4bb18838d9789f6b5e3ad90deac90c03e722c02dab246c5",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/get-iframe-layout-metrics.ts",
+      "origin": "adapted",
+      "sha256": "85214a82805c1465d80491bb0feae66b7804013af1d586a60b2e17cdfb790b6c",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/get-iframe-scale.ts",
+      "origin": "adapted",
+      "sha256": "fbb49284aa12e24d4a60ab0ed4f7809ea216e429cab733820939a7b1c31db7f1",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/get-local-content-element-at-point.ts",
+      "origin": "adapted",
+      "sha256": "5214290439d57fc7f55fdf649c1afe2a8ac36f22f1bbf5d5b1524dcaf2147813",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/get-nearest-edge.ts",
+      "origin": "adapted",
+      "sha256": "cccc8432f431440204423e73f72f9d8d59a275ddde40f08d9cda562778e8e752",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/get-next-base-path.ts",
+      "origin": "adapted",
+      "sha256": "e752b34cbf98157d4b3adb8b0de188e0e264257d372378a2bc69e98e1daa6d5b",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/get-parent-react-grab-api.ts",
+      "origin": "adapted",
+      "sha256": "ca94bd3a8880bef3627fa5674145cf0a1c69755a768a1b2d684698fd0f4d65f6",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/get-preview-text-content.ts",
+      "origin": "adapted",
+      "sha256": "cf9cb3d983c575b1891531d9b00037ce352bed19add5b272c33800b37d3f7812",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/get-script-options.ts",
+      "origin": "adapted",
+      "sha256": "b6458442c35f93650ff20412358c67adc94af5fbc8ce07e5919d218e53eeff29",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/get-tag-display.ts",
+      "origin": "adapted",
+      "sha256": "5beb17e6b929371452ef9f2a43cafadce959b8e17b1f98f5b3d5262a53af1bb1",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/get-tag-name.ts",
+      "origin": "adapted",
+      "sha256": "9666331ce2ca44949eabdbe6c77c6e6ad25d448babfc1486985650e378e3b10d",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/get-unfiltered-elements-at-point.ts",
+      "origin": "adapted",
+      "sha256": "13c28f4e8f0be8eebb160019ec15663a253015ead9abc53804cff44d2b2066a5",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/get-visible-bounds-center.ts",
+      "origin": "adapted",
+      "sha256": "fbc15b989cde89176f9235c7f16ee1a180e269ebf5153580a58d6bc82552f1df",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/get-visual-viewport.ts",
+      "origin": "adapted",
+      "sha256": "9d02501ad781e32137961fd6f3f7d4ee14f982ee4cc1f6c0b24216ca30de83b0",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/get-window-frame-element.ts",
+      "origin": "adapted",
+      "sha256": "0d7c5e7498757943e1ed3f3a343e08293f5f7bd4975559a7074fad446c1e82a0",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/has-element-box-paint.ts",
+      "origin": "adapted",
+      "sha256": "c41ee65b0004f43c465a035228ac0a34bfc742dc85b5233f4356cc9e2e00f058",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/hide-from-third-parties.ts",
+      "origin": "adapted",
+      "sha256": "1954b5f45a1278f0979856977464c0bd0e2ef3dd50f32af45a3ee8e2cd78583b",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/index-in-parent.ts",
+      "origin": "adapted",
+      "sha256": "bbcf2d1761a951d44af202b4ae1d33f662b488e872ff8f4cc838ef089d176060",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/invalidate-interaction-caches.ts",
+      "origin": "adapted",
+      "sha256": "6652f56aee9fc678426e05ee428422d4921cace794d5e33c7772186b63eb51a6",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/is-c-like-key.ts",
+      "origin": "adapted",
+      "sha256": "6c62ffa25111d9ee667cc0a00510a756cadc31896fe57d84a2be1312db558030",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/is-css-color-transparent.ts",
+      "origin": "adapted",
+      "sha256": "2f8a81ce0823b2ce4893730044bb9cfcef6c88eaea8a7323d8e92aaa5cb2ca2e",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/is-document-ancestor-of-element.ts",
+      "origin": "adapted",
+      "sha256": "c4fc923a25b12076963a48792bc1637c05267ac4d439673d170a9a16acefedf9",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/is-document-node.ts",
+      "origin": "adapted",
+      "sha256": "3ec9474c7adb9971607115d718289cffc44a9b016112346ec14dd338543a40e1",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/is-element-connected.ts",
+      "origin": "adapted",
+      "sha256": "caef4a9762e080f0d1213585b9246eb4ceca31179a0330f178c4adfc99ac778f",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/is-element-node.ts",
+      "origin": "adapted",
+      "sha256": "4b4a2349fb0e0bc4c517910874b60f5ddec78af9a5656bcffb8eb445e3616fb8",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/is-element-painted-at-position.ts",
+      "origin": "adapted",
+      "sha256": "af2af68d3a553efb045e7b0931785e42e3a77504e22313d5469bba300ee7f22f",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/is-element-visible.ts",
+      "origin": "adapted",
+      "sha256": "9f69fe7cc9cfe170c31354db61ceef7e75aa95493c6f1a4cd2818e84943946c0",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/is-element-within-container.ts",
+      "origin": "adapted",
+      "sha256": "69d8ea5cdcbb5267c615437bc21338cdf79b88fb5a078f0bd8c1900ec7a81a9b",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/is-enter-code.ts",
+      "origin": "adapted",
+      "sha256": "f40371f444cae888bcb47e66565b8f7cf2167babdfc5b0e3c0413ae180856d8f",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/is-event-from-overlay.ts",
+      "origin": "adapted",
+      "sha256": "768b5e809ac993fe312165ca65a016af8517bcc5ca4714e9519add84fa2e05a4",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/is-extension-context.ts",
+      "origin": "adapted",
+      "sha256": "586f68e82ee1f0451af7f66ffa8238b2abce8bdc12e0d363f0b443019df4eef3",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/is-generated-bundle-source-path.ts",
+      "origin": "adapted",
+      "sha256": "db3a37af4f215b8fe56150886228158f2e6fb2aef3c0a52fc211211859b0b88d",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/is-horizontally-grabbable.ts",
+      "origin": "adapted",
+      "sha256": "bea884466781b53647db3c6b171282500ff50e63c55f64eadbcc4ea50a5e030f",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/is-html-element.ts",
+      "origin": "adapted",
+      "sha256": "be8f636a1ec0e8a6b083af4afcfe82d34fc0b7bb36f58d7bd52f3dcbdbca6282",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/is-iframe-element.ts",
+      "origin": "adapted",
+      "sha256": "df1bbd6f760d5234df302c03bab8841148f98b4f6464bcf25f4a116402b0ed3a",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/is-keyboard-event-composing.ts",
+      "origin": "adapted",
+      "sha256": "7dd6f11123f37341ab2680945cbd05a8010d5d7a454f9e8aa7fcaffa6fade926",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/is-keyboard-event-triggered-by-input.ts",
+      "origin": "adapted",
+      "sha256": "988092189ea19989d25638d149cb424e31142f3f1ddc72c28003ca1dc01149d2",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/is-mac.ts",
+      "origin": "adapted",
+      "sha256": "7f5a452e630db0ea1543668a15be11d7e054a34be44a8f3864780c495e328231",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/is-next-project-runtime.ts",
+      "origin": "adapted",
+      "sha256": "650896c7db2d8d2dad275058755994ea07c47a56c7c863c4c462eeab15f6b4d6",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/is-point-inside-rect.ts",
+      "origin": "adapted",
+      "sha256": "6bc56add10003867f1b5c0153465166b2ad120c695041ae21c64d0099562be3d",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/is-position-inside-bounds.ts",
+      "origin": "adapted",
+      "sha256": "47e4d8ca8f22c4e2e8e36dbcc399850bbdcd19662bd604a1794fc10185dfe738",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/is-react-grab-element.ts",
+      "origin": "adapted",
+      "sha256": "2de06cfc56682131f5515a75d549753e5cbfaa5c3fe6634fc2f9fcb16ba1136b",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/is-react-grab-host.ts",
+      "origin": "adapted",
+      "sha256": "5cf9a80d19410d4e928dcddecd2005c1df0ae07de39c764c6e0a7da4c1881a6a",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/is-root-element.ts",
+      "origin": "adapted",
+      "sha256": "3cb9a7aade4d1be3d5d31c78a9ee35a24e6e766beb50558f28c4fcef4f04df6f",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/is-shadow-root.ts",
+      "origin": "adapted",
+      "sha256": "bcab39de43ab4b3ed39bb6c54289ee9a6b689d2504d47635d7996daf403d3b3c",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/is-shared-ui-source-path.ts",
+      "origin": "adapted",
+      "sha256": "40ed660d7b66a9a9e873d155ee54b1c3cd70a89f3fa87cee3467d26ae61b04c0",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/is-stable-element-id.ts",
+      "origin": "adapted",
+      "sha256": "79bb387b61072f7f03b5b62163840486ebdca134793688dddecceadc3bc61db7",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/is-target-key-combination.ts",
+      "origin": "adapted",
+      "sha256": "a8a52c9da0389f672e16ed283bef60fba32a6c5ec5cf230789ff5f47f28a0c7b",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/is-useful-component-name.ts",
+      "origin": "adapted",
+      "sha256": "90a1d61367f1e5ae3758f66113695625482cf1f16767ebea689992f8fef58241",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/is-user-ignored-element.ts",
+      "origin": "adapted",
+      "sha256": "17a76b09b35fb38e300f7a1cac7556869a72af6e8e11c3e570cec9a037235db2",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/is-valid-grabbable-element.ts",
+      "origin": "adapted",
+      "sha256": "c6579156c39d79249d1eb01ec72c3a4dbb578a1c97fe2e17267525598dbc6e07",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/key-matches-code.ts",
+      "origin": "adapted",
+      "sha256": "3aaefc53ae51c84b29ddba30e30e1b09c0b645265dd79089407f55e945cc4621",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/lerp.ts",
+      "origin": "adapted",
+      "sha256": "c70aa085e4dc313364ebc4b019a4fab5a02adf51f0bf394aaa709e338bf45fa2",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/matches-element-at-point-options.ts",
+      "origin": "adapted",
+      "sha256": "ada27b46132b33cb60d3e454d8e4f4d2ef9ac28eeb9e3c01e088e02f43790cbb",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/modifier-tracker.ts",
+      "origin": "adapted",
+      "sha256": "1855cb3faddd51f7ef38c85a55a19c916d04a1894919ddd55252955ca0ac00eb",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/mount-root.ts",
+      "origin": "adapted",
+      "sha256": "858415861200329b28119d2d62fefda769967ff6a625f1980e6ff5a2a1e0de2d",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/native-raf.ts",
+      "origin": "adapted",
+      "sha256": "7ffd74c482b36107fd8203b1f1dd87d792f2c01452d736c4ccadfb9b272a4f72",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/normalize-error.ts",
+      "origin": "adapted",
+      "sha256": "1e437adfe15c1efa3f016db5494f7eb9a7183306217ca131acd68166509055f0",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/normalize-file-path.ts",
+      "origin": "adapted",
+      "sha256": "79deb09937ba232d02010ed19c6a622f1839089a5771ccd1d4149d6606b7acb9",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/normalize-toolbar-default-action-id.ts",
+      "origin": "adapted",
+      "sha256": "83d2adde710425e72d376657bb9fd3ac310a95bb78b465e924ca13fcc230cd8e",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/notify-toolbar-state-change-subscribers.ts",
+      "origin": "adapted",
+      "sha256": "64f35c82123a8e920e89ca1a61648438f13e375a764eaba4f5411769a85f8c10",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/observe-same-origin-frame-documents.ts",
+      "origin": "adapted",
+      "sha256": "2b04e95d421ef7d4c7812b978840bcca93fc29d42c381feebeb3a89e3cd2f866",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/open-file.ts",
+      "origin": "adapted",
+      "sha256": "e99ae5abe046685d3e9f12e710a94aeeac8049d2c7223545c6b989617f696bea",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/overlay-color.ts",
+      "origin": "adapted",
+      "sha256": "77468b43e4f7936610e77a61c0e8e7d5027f21bc26eeb96be96625706258190c",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/parse-activation-key.ts",
+      "origin": "adapted",
+      "sha256": "d9842ffc1b5c7efc5aa9e78de47e230978c9fb5b8ea3e5fe9266814cc82cb9cc",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/parse-any-color.ts",
+      "origin": "adapted",
+      "sha256": "a9eebf400b1400080f68a738517f7bcae52182891e30738605f499b965b73ccf",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/parse-color.ts",
+      "origin": "adapted",
+      "sha256": "b2f8b6eaa34def06dace7fe9e337b424a6b741265312637937be97dcf40d054f",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/parse-package-name.ts",
+      "origin": "adapted",
+      "sha256": "ce34b5120ba3d4cca43c66900fd752812d37d570102dc57d2385f1507ab3e054",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/pointer-events-freeze.ts",
+      "origin": "adapted",
+      "sha256": "57b36986346bdab21ccc81243ac0b2b36d34d6558b3412470f3f4fe6c112a32b",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/preferred-selector-attribute-names.ts",
+      "origin": "adapted",
+      "sha256": "8efe6a46db9aabc66f13b854bc598d40d2b0fde13c33f5cf2346fc44e829f664",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/race-promise-with-abort.ts",
+      "origin": "adapted",
+      "sha256": "fecb78ea70d7f8ff5c5347538d5bce7e7ce9bd856057b4f9de772a3cbdc73743",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/react-grab-attribute-name.ts",
+      "origin": "adapted",
+      "sha256": "9689a084da8390dd2ecfaf1d054e2fee62805066fdb26df3835d5c6d64efa164",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/register-overlay-dismiss.ts",
+      "origin": "adapted",
+      "sha256": "2f5c68e43fbc4b86658bf39e8351633b228048a28d9e211d8df897e34c10936c",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/report-recoverable-error.ts",
+      "origin": "adapted",
+      "sha256": "3792acc5ded1538bfe79c14631ba5e4df99639e057d4ea72834662439ee41214",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/resolve-action-enabled.ts",
+      "origin": "adapted",
+      "sha256": "67ddec0ec09da23940e65bef66c85dedc612c794c890c3cb6f7e7576f741ea7a",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/resolve-current-revision-value.ts",
+      "origin": "adapted",
+      "sha256": "78e2bd3fa4d557b08a6f9f2985de623962fdf2df710eef2bbf08133e34f132c2",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/resolve-max-context-lines.ts",
+      "origin": "adapted",
+      "sha256": "445cb44048bb4eb9ae646aa3f2c9fb14701321f1f2d81c1cf31aaec799498a4c",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/resolve-solid-source-location.ts",
+      "origin": "adapted",
+      "sha256": "28c5a66048853c4fb5b6d907733ef71d421590cb7bbbce9550829ec3339d90a0",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/runtime-mode.ts",
+      "origin": "adapted",
+      "sha256": "1b53bad7896db4f563391a745d08bed21302bc23b0a6c0ff1ed0c2f4096ec7c2",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/safe-decode-uri-component.ts",
+      "origin": "adapted",
+      "sha256": "dc7249ad88281f0df67187d319b73dd0dd878f176defe25ccfcabc31082ca632",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/scale-border-radius.ts",
+      "origin": "adapted",
+      "sha256": "91f2255e651a9b8e7870c63873498b53240f33dfc13c8ee5febb3faede9df17a",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/should-include-element-selector.ts",
+      "origin": "adapted",
+      "sha256": "127c81dbd4282744420373289c647300a47965fb136dbedaac56fa50b72f68dd",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/source-fetch-queue.ts",
+      "origin": "adapted",
+      "sha256": "e2657a36121a36e557be555e4b21c6ffe0f892ef04260f085069a6e3456d7ef6",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/strip-internal-attributes.ts",
+      "origin": "adapted",
+      "sha256": "0542e801815bde4adf3af4982e144dc87b4a89f9af257600bc873a286cd5a0a1",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/supports-display-p3.ts",
+      "origin": "adapted",
+      "sha256": "8ad942a6b3fb386d77dafd83fb44180164ca19b492fe014c80576e43124beeec",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/suppress-menu-event.ts",
+      "origin": "adapted",
+      "sha256": "d7e9ed77a1caf30351c228b5ac78c18540300d2991869383d7bf85859fdf0f90",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/throw-collected-errors.ts",
+      "origin": "adapted",
+      "sha256": "8da557f12f94fc287b1306aabe28b95899f1dafc95569552f3637596d56a2237",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/toolbar-position.ts",
+      "origin": "adapted",
+      "sha256": "f91425665e365b5b048e737a1023a56b8ba8f7ac34cf80af5ea3aa37565d3020",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/truncate-escaped-html.ts",
+      "origin": "adapted",
+      "sha256": "a5e9e69d19fe1462cc96a673227270db23b1d8d20dac1ca36cd90904f81d69d1",
+      "packageName": "react-grab"
+    },
+    {
+      "path": "src/utils/truncate-string.ts",
+      "origin": "adapted",
+      "sha256": "7260f5fc500adc4799fdaa010fda3bbffafc7df349ff0a8b409c0b9f0497352b",
+      "packageName": "react-grab"
+    }
+  ],
+  "reimplementedDependencies": [
+    {
+      "packageName": "bippy",
+      "publicBehaviors": [
+        "getFiberFromHostInstance",
+        "getOwnerStack",
+        "getSource",
+        "isInstrumentationActive",
+        "traverseFiber",
+        "instrument",
+        "normalizeFileName",
+        "isSourceFile",
+        "formatOwnerStack",
+        "hasDebugStack",
+        "parseStack",
+        "getLatestFiber",
+        "getDisplayName",
+        "pause/freeze updates"
+      ],
+      "localEvidence": [
+        "src/octane-adapter.ts",
+        "src/utils/freeze-updates.ts",
+        "tests/grab.contract.test.ts"
+      ]
+    }
+  ]
+}

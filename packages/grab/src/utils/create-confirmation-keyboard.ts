@@ -1,0 +1,50 @@
+import { confirmationFocusManager } from './confirmation-focus-manager.js';
+import { isKeyboardEventTriggeredByInput } from './is-keyboard-event-triggered-by-input.js';
+import { ignoreRealInput } from './runtime-mode.js';
+
+interface ConfirmationKeyboardHandlers {
+	onEnter?: (event: KeyboardEvent) => void;
+	onEscape?: (event: KeyboardEvent) => void;
+}
+
+interface ConfirmationKeyboardController {
+	claimFocus: () => void;
+	// Claim a focus slot and start listening; returns the teardown to run on
+	// unmount. Call once from a mount effect (`useEffect(() =>
+	// controller.register(), [])`).
+	register: () => () => void;
+}
+
+// Shared wiring for the confirmation prompts (completion/discard/error): claim
+// a slot in the focus manager, listen for Enter/Escape at the window in capture
+// phase so it wins against focus traps, and ignore keystrokes that belong to a
+// focused input. Each prompt supplies only its Enter/Escape bodies.
+export const createConfirmationKeyboard = (
+	handlers: ConfirmationKeyboardHandlers,
+): ConfirmationKeyboardController => {
+	const instanceId = Symbol();
+
+	const handleKeyDown = ignoreRealInput((event: KeyboardEvent): void => {
+		if (!confirmationFocusManager.isActive(instanceId)) return;
+		if (isKeyboardEventTriggeredByInput(event)) return;
+		if (event.code === 'Enter') {
+			handlers.onEnter?.(event);
+		} else if (event.code === 'Escape') {
+			handlers.onEscape?.(event);
+		}
+	});
+
+	const register = (): (() => void) => {
+		confirmationFocusManager.claim(instanceId);
+		window.addEventListener('keydown', handleKeyDown, { capture: true });
+		return () => {
+			confirmationFocusManager.release(instanceId);
+			window.removeEventListener('keydown', handleKeyDown, { capture: true });
+		};
+	};
+
+	return {
+		claimFocus: () => confirmationFocusManager.claim(instanceId),
+		register,
+	};
+};

@@ -475,7 +475,25 @@ function loopContexts(source, tokens, pairs, staticCounts) {
 			tokens[index + 1]?.value === '('
 		) {
 			const headerEnd = pairs.get(index + 1);
-			if (headerEnd !== undefined) addBody('for', index, headerEnd + 1, tokens.length);
+			// Only braced for-bodies participate in registration multiplication.
+			// A brace-less `for (...) stmt;` must not claim the next `{` from a
+			// later describe/it callback (common in afterEach cleanup loops).
+			if (headerEnd !== undefined && tokens[headerEnd + 1]?.value === '{') {
+				const bodyOpen = headerEnd + 1;
+				const bodyClose = pairs.get(bodyOpen);
+				if (bodyClose !== undefined) {
+					contexts.push({
+						kind: 'for',
+						rowCount: staticCounts.get(tokens[index].start) ?? null,
+						start: tokens[bodyOpen].end,
+						end: tokens[bodyClose].start,
+						source: source
+							.slice(tokens[index].start, tokens[bodyOpen].end)
+							.replace(/\s+/g, ' ')
+							.trim(),
+					});
+				}
+			}
 		}
 		if (
 			tokens[index].value === 'forEach' &&

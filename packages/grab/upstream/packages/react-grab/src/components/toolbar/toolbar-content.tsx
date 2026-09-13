@@ -1,0 +1,150 @@
+import type { Component, JSX } from "solid-js";
+import { cn } from "../../utils/cn.js";
+import { isHorizontalEdge } from "../../utils/toolbar-position.js";
+import { IconChevron } from "../icons/icon-chevron.jsx";
+
+interface ToolbarContentProps {
+  isCollapsed?: boolean;
+  snapEdge?: "top" | "bottom" | "left" | "right";
+  isShaking?: boolean;
+  isChevronPressed?: boolean;
+  onAnimationEnd?: () => void;
+  onPanelClick?: (event: MouseEvent) => void;
+  onCollapseClick?: (event: MouseEvent) => void;
+  onCollapsePointerDown?: (event: PointerEvent) => void;
+  onCollapsePointerUp?: (event: PointerEvent) => void;
+  onCollapsePointerLeave?: (event: PointerEvent) => void;
+  actionButtons?: JSX.Element;
+  transformOrigin?: string;
+}
+
+export const ToolbarContent: Component<ToolbarContentProps> = (props) => {
+  const edge = () => props.snapEdge ?? "bottom";
+  const isVertical = () => !isHorizontalEdge(edge());
+
+  const sizeDurationClass = () => (props.isCollapsed ? "duration-140" : "duration-220");
+  const opacityEnterClass = "transition-opacity duration-180 ease-drawer delay-[80ms]";
+  const opacityExitClass = "transition-opacity duration-100 ease-drawer";
+
+  const gridSizeTransitionClass = (): string =>
+    isVertical()
+      ? `transition-[grid-template-rows] ${sizeDurationClass()} ease-drawer`
+      : `transition-[grid-template-columns] ${sizeDurationClass()} ease-drawer`;
+
+  const minDimensionClass = () => (isVertical() ? "min-h-0" : "min-w-0");
+
+  const collapsedEdgeClasses = () => {
+    if (!props.isCollapsed) return "";
+    const roundedClass = {
+      top: "rounded-t-none rounded-b-[10px]",
+      bottom: "rounded-b-none rounded-t-[10px]",
+      left: "rounded-l-none rounded-r-[10px]",
+      right: "rounded-r-none rounded-l-[10px]",
+    }[edge()];
+    const paddingClass = isVertical() ? "px-0.25 py-2" : "px-2 py-0.25";
+    return `${roundedClass} ${paddingClass}`;
+  };
+
+  const chevronRotation = () => {
+    const collapsed = props.isCollapsed;
+    switch (edge()) {
+      case "top":
+        return collapsed ? "rotate-90" : "-rotate-90";
+      case "bottom":
+        return collapsed ? "-rotate-90" : "rotate-90";
+      case "left":
+        return collapsed ? "rotate-0" : "rotate-180";
+      case "right":
+        return collapsed ? "rotate-180" : "rotate-0";
+      default:
+        return "-rotate-90";
+    }
+  };
+
+  const pressSquishTransform = (): string | undefined => {
+    if (!props.isChevronPressed) return undefined;
+    return isVertical() ? "scale(0.97, 1)" : "scale(1, 0.97)";
+  };
+
+  const outerTransitionClass = () =>
+    props.isChevronPressed
+      ? `transition-[padding,border-radius,transform] duration-60 ease-[cubic-bezier(0,0,0.2,1)]`
+      : `transition-[padding,border-radius,transform] ${sizeDurationClass()} ease-drawer`;
+
+  return (
+    <div
+      data-react-grab-toolbar-panel
+      class={cn(
+        // rounded-full is calc(infinity * 1px); transitioning border-radius
+        // from that clamped huge value to the collapsed 10px/0 stays pill-
+        // shaped for the whole duration and snaps on the last frame. 13px is
+        // half the expanded 26px thickness, so it renders identically to
+        // rounded-full but interpolates visibly in sync with the collapse.
+        "flex items-center justify-center rounded-[13px] antialiased relative overflow-visible [font-synthesis:none]",
+        outerTransitionClass(),
+        isVertical() && "flex-col",
+        "bg-[var(--rg-panel-bg)] [box-shadow:var(--rg-shadow)]",
+        !props.isCollapsed && (isVertical() ? "px-1.5 gap-0 py-2" : "py-1.5 gap-0 px-2"),
+        collapsedEdgeClasses(),
+        props.isShaking && (isVertical() ? "animate-shake-vertical" : "animate-shake"),
+      )}
+      style={{ "transform-origin": props.transformOrigin, transform: pressSquishTransform() }}
+      onAnimationEnd={props.onAnimationEnd}
+      onClick={props.onPanelClick}
+    >
+      <div
+        class={cn(
+          "grid relative overflow-visible",
+          gridSizeTransitionClass(),
+          props.isCollapsed
+            ? isVertical()
+              ? "grid-rows-[0fr] pointer-events-none"
+              : "grid-cols-[0fr] pointer-events-none"
+            : isVertical()
+              ? "grid-rows-[1fr]"
+              : "grid-cols-[1fr]",
+        )}
+      >
+        <div
+          class={cn(
+            "flex",
+            isVertical() ? "flex-col items-center min-h-0" : "items-center min-w-0",
+            props.isCollapsed ? "opacity-0" : "opacity-100",
+            props.isCollapsed ? opacityExitClass : opacityEnterClass,
+          )}
+        >
+          <div
+            class={cn(
+              "relative overflow-visible flex",
+              isVertical() ? "flex-col items-center" : "items-center",
+              minDimensionClass(),
+            )}
+          >
+            {props.actionButtons}
+          </div>
+        </div>
+      </div>
+      <button
+        data-react-grab-ignore-events
+        data-react-grab-toolbar-collapse
+        aria-label={props.isCollapsed ? "Expand toolbar" : "Collapse toolbar"}
+        aria-expanded={!props.isCollapsed}
+        type="button"
+        class="group contain-layout shrink-0 flex items-center justify-center cursor-pointer interactive-scale a11y-hitbox"
+        onClick={props.onCollapseClick}
+        on:pointerdown={props.onCollapsePointerDown}
+        onPointerUp={props.onCollapsePointerUp}
+        onPointerLeave={props.onCollapsePointerLeave}
+        onPointerCancel={props.onCollapsePointerLeave}
+      >
+        <IconChevron
+          size={18}
+          class={cn(
+            "text-[var(--rg-text-secondary)] group-hover:text-[var(--rg-text-primary)] transition-[transform,color] duration-150 ease-drawer -m-0.5",
+            chevronRotation(),
+          )}
+        />
+      </button>
+    </div>
+  );
+};

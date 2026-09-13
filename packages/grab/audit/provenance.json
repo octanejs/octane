@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "artifacts": [
+    {
+      "path": "upstream-artifact/react-grab-0.2.0.tgz",
+      "sha256": "33d3f5a8363c0282cda04decc81cfa3a634d81c661ad42db6dc3e30087321d45"
+    },
+    {
+      "path": "upstream-artifact/package/LICENSE",
+      "sha256": "3cb91aec78b7a54136b60a81055a3e1e5bac3c2d47d06dc866948129e4cd4f45"
+    },
+    {
+      "path": "upstream-artifact/package/package.json",
+      "sha256": "086db0d087ee5f241b9939db184fae02f56c049da98290c4dd9e9a7db1e9de96"
+    },
+    {
+      "path": "LICENSE.upstream",
+      "sha256": "3cb91aec78b7a54136b60a81055a3e1e5bac3c2d47d06dc866948129e4cd4f45"
+    }
+  ],
+  "packageIdentity": {
+    "path": "upstream-artifact/package/package.json",
+    "name": "react-grab",
+    "version": "0.2.0",
+    "license": "MIT"
+  },
+  "unpublishedDirs": ["audit", "tests", "upstream", "upstream-artifact"],
+  "filesEqual": [
+    {
+      "path": "LICENSE.upstream",
+      "equalsPath": "upstream-artifact/package/LICENSE"
+    }
+  ]
+}

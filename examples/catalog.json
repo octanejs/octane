@@ -404,6 +404,29 @@
       ]
     },
     {
+      "directory": "examples/grab-playground",
+      "id": "grab-playground",
+      "title": "Grab Playground",
+      "summary": "Upstream react-grab e2e-app-vite ported to Octane for manual and smoke validation of @octanejs/grab overlays, owner stacks, and toolbar activation.",
+      "status": "experimental",
+      "host": "octane",
+      "renderModes": ["client"],
+      "dialects": ["tsx"],
+      "bindings": ["@octanejs/grab"],
+      "octaneFeatures": ["effects", "native-events", "refs-as-props"],
+      "commands": { "build": ["build"], "typecheck": "typecheck", "e2e": "test:e2e" },
+      "journeys": [
+        {
+          "id": "grab-overlay-smoke",
+          "title": "Load the playground, activate grab, and confirm the overlay host mounts",
+          "kind": "health",
+          "spec": "e2e/grab-smoke.spec.ts",
+          "critical": true
+        }
+      ],
+      "faultScenarios": []
+    },
+    {
       "directory": "examples/gridlab",
       "id": "gridlab",
       "title": "Gridlab",

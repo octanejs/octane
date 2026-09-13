@@ -7,6 +7,7 @@ import { join, resolve } from 'node:path';
 // without registering it in either catalog fails the mcp-server tests.
 export const KNOWN_BINDINGS = {
 	'react-is': '@octanejs/octane-is',
+	'react-grab': '@octanejs/grab',
 	'@gsap/react': '@octanejs/gsap',
 	animejs: '@octanejs/animejs',
 	'usehooks-ts': '@octanejs/usehooks-ts',
@@ -491,9 +492,18 @@ export function scanSource(source) {
 	)) {
 		if (symbols.has(match[2])) symbolExports.set(match[1], (symbolExports.get(match[1]) ?? 0) + 1);
 	}
+	// Denylist strings (for example filtering "Profiler" / "SuspenseList" from
+	// component labels) are not React API uses. Blank literals and comments
+	// before the identifier scan so those mentions cannot hard-block a port.
+	const codeForApiScan = source
+		.replace(/\/\*[\s\S]*?\*\//g, (block) => ' '.repeat(block.length))
+		.replace(/(^|[^:])\/\/.*$/gm, (line) =>
+			line.replace(/\/\/.*$/, (comment) => ' '.repeat(comment.length)),
+		)
+		.replace(/(['"`])(?:\\.|(?!\1)[^\\])*\1/g, (literal) => ' '.repeat(literal.length));
 	for (const name of Object.keys(REACT_API_MAP)) {
 		if (name === 'onChange') continue;
-		const matches = source.match(new RegExp(`\\b${name}\\b`, 'g'));
+		const matches = codeForApiScan.match(new RegExp(`\\b${name}\\b`, 'g'));
 		if (matches) apis.set(name, matches.length);
 	}
 	const textChanges = countReactStyleTextChanges(source);

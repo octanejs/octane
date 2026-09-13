@@ -765,11 +765,19 @@ function staticModuleSpecifiers(filePath) {
 }
 
 function resolveRelativeSource(fromFile, specifier) {
-	const base = path.resolve(path.dirname(fromFile), specifier);
+	const bareSpecifier = specifier.replace(/[?#].*$/, '');
+	const base = path.resolve(path.dirname(fromFile), bareSpecifier);
+	const extensionless =
+		/\.(?:[cm]?js|jsx)$/i.test(bareSpecifier) && !existsSync(base)
+			? base.replace(/\.(?:[cm]?js|jsx)$/i, '')
+			: base;
 	const candidates = [
 		base,
-		...SHIPPED_SOURCE_EXTENSIONS.map((extension) => `${base}${extension}`),
-		...SHIPPED_SOURCE_EXTENSIONS.map((extension) => path.join(base, `index${extension}`)),
+		extensionless,
+		...SHIPPED_SOURCE_EXTENSIONS.flatMap((extension) => [
+			`${extensionless}${extension}`,
+			path.join(extensionless, `index${extension}`),
+		]),
 	];
 	return (
 		candidates.find((candidate) => existsSync(candidate) && statSync(candidate).isFile()) ?? null

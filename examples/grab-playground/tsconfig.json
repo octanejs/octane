@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "target": "esnext",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "lib": ["esnext", "dom", "dom.iterable"],
+    "strict": true,
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "isolatedModules": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "jsx": "react-jsx",
+    "jsxImportSource": "octane",
+    "types": ["node", "vite/client"],
+    "plugins": [{ "name": "@tsrx/typescript-plugin" }],
+    "paths": {
+      "@octanejs/grab": ["./src/typecheck-shims/grab.ts"],
+      "@octanejs/grab/primitives": ["./src/typecheck-shims/grab-primitives.ts"],
+      "@octanejs/grab/styles.css": ["./src/typecheck-shims/grab-styles.css"],
+      "octane": ["../../packages/octane/src/index.ts"],
+      "octane/*": ["../../packages/octane/src/*"]
+    }
+  },
+  "include": ["src/**/*", "e2e/**/*"]
+}

@@ -1,0 +1,72 @@
+{
+  "name": "@octanejs/grab",
+  "version": "0.0.1",
+  "description": "Select context for coding agents directly from your Octane website — port of react-grab.",
+  "keywords": [
+    "agent",
+    "context",
+    "grab",
+    "octane",
+    "react-grab"
+  ],
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/grab"
+  },
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "sideEffects": [
+    "./src/index.ts",
+    "./src/styles.css"
+  ],
+  "exports": {
+    ".": "./src/index.ts",
+    "./core": "./src/core/index.tsx",
+    "./primitives": "./src/primitives.ts",
+    "./styles.css": "./src/styles.css",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "src",
+    "README.md",
+    "UPSTREAM.md",
+    "LICENSE",
+    "LICENSE.upstream",
+    "status.json"
+  ],
+  "scripts": {
+    "css:build": "node ./scripts/build-overlay-css.mjs",
+    "test": "vitest run --root ../.. --project grab --project grab-adapted --maxWorkers=2",
+    "upstream:verify": "node ../../scripts/react-parity/verify-provenance.mjs",
+    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@react-grab/cli": "0.2.0",
+    "tailwindcss": "^4.1.0"
+  },
+  "peerDependencies": {
+    "octane": "workspace:^0.1.51 || ^0.2.0"
+  },
+  "devDependencies": {
+    "@octanejs/testing-library": "workspace:*",
+    "@tailwindcss/cli": "^4.1.0",
+    "octane": "workspace:*",
+    "vitest": "catalog:default",
+    "vite": "catalog:default",
+    "@testing-library/jest-dom": "catalog:default"
+  }
+}

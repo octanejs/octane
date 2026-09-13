@@ -1,0 +1,306 @@
+import { test, expect } from "./fixtures.js";
+
+test.describe("Visual Feedback", () => {
+  test.describe("Selection Box", () => {
+    test("selection box should match element bounds", async ({ reactGrab }) => {
+      await reactGrab.activate();
+      await reactGrab.hoverUntilSelected("li:first-child span");
+
+      const elementBounds = await reactGrab.getElementBounds("li:first-child span");
+      const selectionBounds = await reactGrab.getSelectionBoxBounds();
+
+      if (elementBounds && selectionBounds) {
+        expect(Math.abs(selectionBounds.x - elementBounds.x)).toBeLessThan(5);
+        expect(Math.abs(selectionBounds.y - elementBounds.y)).toBeLessThan(5);
+        expect(Math.abs(selectionBounds.width - elementBounds.width)).toBeLessThan(10);
+        expect(Math.abs(selectionBounds.height - elementBounds.height)).toBeLessThan(10);
+      }
+    });
+
+    test("selection box should update when hovering different elements", async ({ reactGrab }) => {
+      await reactGrab.activate();
+
+      await reactGrab.hoverUntilSelected("li:first-child");
+      await reactGrab.page.waitForTimeout(100);
+      const bounds1 = await reactGrab.getSelectionBoxBounds();
+
+      await reactGrab.hoverUntilSelected("h1");
+      await reactGrab.page.waitForTimeout(100);
+      const bounds2 = await reactGrab.getSelectionBoxBounds();
+
+      if (bounds1 && bounds2) {
+        expect(bounds1.width !== bounds2.width || bounds1.height !== bounds2.height).toBe(true);
+      }
+    });
+
+    test("selection box should track scrolling element", async ({ reactGrab }) => {
+      await reactGrab.activate();
+      await reactGrab.hoverUntilSelected("li:first-child");
+
+      const boundsBefore = await reactGrab.getSelectionBoxBounds();
+
+      await reactGrab.scrollPage(50);
+      await reactGrab.page.waitForTimeout(200);
+
+      const boundsAfter = await reactGrab.getSelectionBoxBounds();
+
+      if (boundsBefore && boundsAfter) {
+        expect(boundsBefore.y - boundsAfter.y).toBeGreaterThan(0);
+      }
+    });
+  });
+
+  test.describe("Drag Box", () => {
+    test("drag box should appear during drag", async ({ reactGrab }) => {
+      await reactGrab.activate();
+
+      const listItem = reactGrab.page.locator("li").first();
+      const box = await listItem.boundingBox();
+      if (!box) throw new Error("Could not get bounding box");
+
+      await reactGrab.page.mouse.move(box.x - 20, box.y - 20);
+      await reactGrab.page.mouse.down();
+      await reactGrab.page.mouse.move(box.x + 150, box.y + 150, { steps: 10 });
+
+      const dragBounds = await reactGrab.getDragBoxBounds();
+      expect(dragBounds).toBeDefined();
+
+      await reactGrab.page.mouse.up();
+    });
+
+    test("drag box should grow with drag distance", async ({ reactGrab }) => {
+      await reactGrab.activate();
+
+      const listItem = reactGrab.page.locator("li").first();
+      const box = await listItem.boundingBox();
+      if (!box) throw new Error("Could not get bounding box");
+
+      await reactGrab.page.mouse.move(box.x - 20, box.y - 20);
+      await reactGrab.page.mouse.down();
+
+      await reactGrab.page.mouse.move(box.x + 50, box.y + 50, { steps: 5 });
+      const smallDragBounds = await reactGrab.getDragBoxBounds();
+
+      await reactGrab.page.mouse.move(box.x + 200, box.y + 200, { steps: 5 });
+      const largeDragBounds = await reactGrab.getDragBoxBounds();
+
+      if (smallDragBounds && largeDragBounds) {
+        expect(largeDragBounds.width).toBeGreaterThan(smallDragBounds.width);
+        expect(largeDragBounds.height).toBeGreaterThan(smallDragBounds.height);
+      }
+
+      await reactGrab.page.mouse.up();
+    });
+
+    test("drag box should disappear after drag ends", async ({ reactGrab }) => {
+      await reactGrab.activate();
+
+      const listItem = reactGrab.page.locator("li").first();
+      const box = await listItem.boundingBox();
+      if (!box) throw new Error("Could not get bounding box");
+
+      await reactGrab.page.mouse.move(box.x - 20, box.y - 20);
+      await reactGrab.page.mouse.down();
+      await reactGrab.page.mouse.move(box.x + 150, box.y + 150, { steps: 10 });
+      await reactGrab.page.mouse.up();
+
+      await reactGrab.page.waitForTimeout(100);
+
+      const dragBounds = await reactGrab.getDragBoxBounds();
+      expect(dragBounds).toBeNull();
+    });
+  });
+
+  test.describe("Grabbed Box", () => {
+    test("grabbed box should appear after element click", async ({ reactGrab }) => {
+      await reactGrab.activate();
+      await reactGrab.hoverUntilSelected("li:first-child");
+
+      await reactGrab.clickElement("li:first-child");
+      await reactGrab.page.waitForTimeout(200);
+
+      const grabbedInfo = await reactGrab.getGrabbedBoxInfo();
+      expect(grabbedInfo.count).toBeGreaterThan(0);
+    });
+
+    test("grabbed box should fade out after delay", async ({ reactGrab }) => {
+      await reactGrab.activate();
+      await reactGrab.hoverUntilSelected("li:first-child");
+
+      await reactGrab.clickElement("li:first-child");
+
+      await reactGrab.page.waitForTimeout(2000);
+
+      const grabbedInfo = await reactGrab.getGrabbedBoxInfo();
+      expect(grabbedInfo.count).toBe(0);
+    });
+  });
+
+  test.describe("Selection Label", () => {
+    test("label should show tag name", async ({ reactGrab }) => {
+      await reactGrab.activate();
+      await reactGrab.hoverUntilSelected("h1");
+      await reactGrab.waitForSelectionLabel();
+
+      const labelInfo = await reactGrab.getSelectionLabelInfo();
+      expect(labelInfo.tagName).toBe("h1");
+    });
+
+    test("label should show element count for multi-select", async ({ reactGrab }) => {
+      await reactGrab.activate();
+      await reactGrab.dragSelect("li:first-child", "li:nth-child(3)");
+      await reactGrab.page.waitForTimeout(200);
+
+      const state = await reactGrab.getState();
+      expect(state).toBeDefined();
+    });
+
+    test("label should position below element by default", async ({ reactGrab }) => {
+      await reactGrab.activate();
+      await reactGrab.hoverUntilSelected("h1");
+
+      const elementBounds = await reactGrab.getElementBounds("h1");
+      const labelInfo = await reactGrab.getSelectionLabelInfo();
+
+      expect(labelInfo.isVisible).toBe(true);
+      expect(elementBounds).toBeDefined();
+    });
+
+    test("label should be clamped to viewport", async ({ reactGrab }) => {
+      await reactGrab.activate();
+      await reactGrab.hoverUntilSelected("[data-testid='edge-bottom-left']");
+      await reactGrab.waitForSelectionLabel();
+
+      const labelInfo = await reactGrab.getSelectionLabelInfo();
+      expect(labelInfo.isVisible).toBe(true);
+    });
+
+    test("label and arrow should stay within bounds at left edge", async ({ reactGrab }) => {
+      await reactGrab.activate();
+      await reactGrab.hoverUntilSelected("[data-testid='edge-top-left']");
+      await reactGrab.waitForSelectionLabel();
+
+      await expect(async () => {
+        const bounds = await reactGrab.getSelectionLabelBounds();
+        expect(bounds).not.toBeNull();
+        expect(bounds?.arrow).not.toBeNull();
+        if (bounds?.arrow) {
+          expect(bounds.label.x).toBeGreaterThanOrEqual(0);
+          expect(bounds.label.x + bounds.label.width).toBeLessThanOrEqual(bounds.viewport.width);
+          expect(bounds.arrow.x).toBeGreaterThanOrEqual(bounds.label.x);
+          expect(bounds.arrow.x + bounds.arrow.width).toBeLessThanOrEqual(
+            bounds.label.x + bounds.label.width,
+          );
+        }
+      }).toPass({ timeout: 2000 });
+    });
+
+    test("label and arrow should stay within bounds at right edge", async ({ reactGrab }) => {
+      await reactGrab.activate();
+      await reactGrab.hoverUntilSelected("[data-testid='edge-top-right']");
+      await reactGrab.waitForSelectionLabel();
+
+      await expect(async () => {
+        const bounds = await reactGrab.getSelectionLabelBounds();
+        expect(bounds).not.toBeNull();
+        expect(bounds?.arrow).not.toBeNull();
+        if (bounds?.arrow) {
+          expect(bounds.label.x).toBeGreaterThanOrEqual(0);
+          expect(bounds.label.x + bounds.label.width).toBeLessThanOrEqual(bounds.viewport.width);
+          expect(bounds.arrow.x).toBeGreaterThanOrEqual(bounds.label.x);
+          expect(bounds.arrow.x + bounds.arrow.width).toBeLessThanOrEqual(
+            bounds.label.x + bounds.label.width,
+          );
+        }
+      }).toPass({ timeout: 2000 });
+    });
+
+    test("label and arrow should stay within bounds at bottom-left edge", async ({ reactGrab }) => {
+      await reactGrab.activate();
+      await reactGrab.hoverUntilSelected("[data-testid='edge-bottom-left']");
+      await reactGrab.waitForSelectionLabel();
+
+      await expect(async () => {
+        const bounds = await reactGrab.getSelectionLabelBounds();
+        expect(bounds).not.toBeNull();
+        expect(bounds?.arrow).not.toBeNull();
+        if (bounds?.arrow) {
+          expect(bounds.label.x).toBeGreaterThanOrEqual(0);
+          expect(bounds.label.x + bounds.label.width).toBeLessThanOrEqual(bounds.viewport.width);
+          expect(bounds.arrow.x).toBeGreaterThanOrEqual(bounds.label.x);
+          expect(bounds.arrow.x + bounds.arrow.width).toBeLessThanOrEqual(
+            bounds.label.x + bounds.label.width,
+          );
+        }
+      }).toPass({ timeout: 2000 });
+    });
+  });
+
+  test.describe("Status Transitions", () => {
+    test("should show copying status during copy", async ({ reactGrab }) => {
+      await reactGrab.activate();
+      await reactGrab.hoverUntilSelected("li:first-child");
+
+      await reactGrab.clickElement("li:first-child");
+
+      // During/after copy, a status label should appear (e.g., "Copying..." or "Copied")
+      await expect.poll(() => reactGrab.getLabelStatusText(), { timeout: 2000 }).toBeTruthy();
+    });
+
+    test("should transition to copied status after copy", async ({ reactGrab }) => {
+      await reactGrab.activate();
+      await reactGrab.hoverUntilSelected("li:first-child");
+
+      await reactGrab.clickElement("li:first-child");
+
+      await expect.poll(() => reactGrab.getLabelStatusText(), { timeout: 2000 }).toBe("Copied");
+    });
+  });
+
+  test.describe("Arrow Direction", () => {
+    test("arrow should point down when label is below element", async ({ reactGrab }) => {
+      await reactGrab.activate();
+      await reactGrab.hoverUntilSelected("h1");
+
+      const labelInfo = await reactGrab.getSelectionLabelInfo();
+      expect(labelInfo.isVisible).toBe(true);
+    });
+
+    test("arrow should adjust when near viewport bottom", async ({ reactGrab }) => {
+      await reactGrab.activate();
+      await reactGrab.scrollPage(500);
+      await reactGrab.hoverUntilSelected("[data-testid='footer']");
+      await reactGrab.waitForSelectionLabel();
+
+      const labelInfo = await reactGrab.getSelectionLabelInfo();
+      expect(labelInfo.isVisible).toBe(true);
+    });
+  });
+
+  test.describe("Multiple Visual Elements", () => {
+    test("selection box and label should be synchronized", async ({ reactGrab }) => {
+      await reactGrab.activate();
+      await reactGrab.hoverUntilSelected("li:first-child");
+      await reactGrab.waitForSelectionLabel();
+
+      const selectionVisible = await reactGrab.isSelectionBoxVisible();
+      const labelVisible = await reactGrab.isSelectionLabelVisible();
+
+      expect(selectionVisible).toBe(true);
+      expect(labelVisible).toBe(true);
+    });
+
+    test("all visual elements should update on viewport change", async ({ reactGrab }) => {
+      await reactGrab.activate();
+      await reactGrab.hoverUntilSelected("li:first-child");
+
+      await reactGrab.setViewportSize(1024, 768);
+      await reactGrab.page.waitForTimeout(200);
+
+      const selectionVisible = await reactGrab.isSelectionBoxVisible();
+      expect(selectionVisible).toBe(true);
+
+      await reactGrab.setViewportSize(1280, 720);
+    });
+  });
+});

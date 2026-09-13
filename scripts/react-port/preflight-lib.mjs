@@ -1073,7 +1073,9 @@ export async function immutableTestInventory(tree, subdirectory, manifest, optio
 			relativePath,
 			configuredInlineSourcePatterns,
 		);
-		return directTest || inlineSource ? [{ directTest, entry, inlineSource, relativePath }] : [];
+		return directTest || inlineSource
+			? [{ conventional, directTest, entry, inlineSource, relativePath }]
+			: [];
 	});
 	if (candidateEntries.length > MAX_UPSTREAM_TEST_FILES) {
 		throw new Error('Immutable upstream test inventory exceeds the file limit');
@@ -1095,7 +1097,7 @@ export async function immutableTestInventory(tree, subdirectory, manifest, optio
 		candidates.push(candidate);
 	}
 	const inventory = [];
-	for (const { entry, relativePath } of candidates.sort((left, right) =>
+	for (const { conventional, entry, relativePath } of candidates.sort((left, right) =>
 		left.entry.path.localeCompare(right.entry.path),
 	)) {
 		const source =
@@ -1116,6 +1118,10 @@ export async function immutableTestInventory(tree, subdirectory, manifest, optio
 			runtimeCases.length === 0 ? extractTypeAssertionGroups(source, entry.path) : [];
 		const testCases = runtimeCases.length > 0 ? runtimeCases : typeCases;
 		if (testCases.length === 0) {
+			// Scripts named in test commands (for example AI expect runners or
+			// production wrappers) are not Vitest/Playwright suites. Skip them
+			// when they are only configuration-referenced and declare no cases.
+			if (!conventional) continue;
 			throw new Error(`Immutable upstream test ${entry.path} has no countable registrations`);
 		}
 		const registrations = testCases.flatMap((testCase) => {

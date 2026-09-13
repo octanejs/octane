@@ -1412,6 +1412,19 @@
   },
   {
     "kind": "library-binding",
+    "id": "binding-grab",
+    "title": "Grab",
+    "packageName": "@octanejs/grab",
+    "upstreamPackage": "react-grab",
+    "category": "Developer Tools",
+    "categoryId": "developer-tools",
+    "description": "Use react-grab with Octane.",
+    "searchTerms": ["react-grab", "React Grab"],
+    "tags": ["devtools", "context", "agents", "selection"],
+    "order": 109
+  },
+  {
+    "kind": "library-binding",
     "id": "binding-octane-is",
     "title": "Octane Is",
     "packageName": "@octanejs/octane-is",
@@ -1421,7 +1434,7 @@
     "description": "Use react-is with Octane.",
     "searchTerms": ["react-is", "React Is"],
     "tags": ["elements", "introspection", "compatibility"],
-    "order": 109
+    "order": 110
   },
   {
     "kind": "library-binding",
@@ -1434,6 +1447,6 @@
     "description": "Use @tanstack/react-devtools with Octane.",
     "searchTerms": [],
     "tags": ["devtools", "debugging"],
-    "order": 110
+    "order": 111
   }
 ]

@@ -662,6 +662,12 @@
         "tags": ["devtools", "debugging"]
       },
       {
+        "packageName": "@octanejs/grab",
+        "title": "Grab",
+        "searchTerms": ["react-grab", "React Grab"],
+        "tags": ["devtools", "context", "agents", "selection"]
+      },
+      {
         "packageName": "@octanejs/octane-is",
         "title": "Octane Is",
         "searchTerms": ["react-is", "React Is"],

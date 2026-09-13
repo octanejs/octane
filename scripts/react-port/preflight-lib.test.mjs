@@ -983,6 +983,8 @@ export function Wrapper(props: Widget.Props<string>) { return <Widget {...props}
 		);
 
 		const emptyTestBytes = Buffer.from('export const fixture = true;\n');
+		// Config-referenced but non-conventional empty suites (AI expect scripts,
+		// wrappers) are skipped — only conventional *.test.* / *.spec.* reject.
 		responses.set(
 			`https://api.github.com/repos/example/widgets/git/trees/${tree}?recursive=1`,
 			githubTreeResponse(
@@ -1005,13 +1007,35 @@ export function Wrapper(props: Widget.Props<string>) { return <Widget {...props}
 				size: emptyTestBytes.length,
 			}),
 		);
-		await assert.rejects(
-			resolveRemoteInput(parseInput(githubInput), githubInput, { fetchImpl }),
-			/has no countable registrations/i,
+		const skippedEmptyNonConventional = await resolveRemoteInput(
+			parseInput(githubInput),
+			githubInput,
+			{ fetchImpl },
+		);
+		assert.ok(
+			skippedEmptyNonConventional.upstreamTestInventory.some(
+				(entry) => entry.path === 'packages/react-widget/src/inline.ts',
+			),
+		);
+		assert.equal(
+			skippedEmptyNonConventional.upstreamTestInventory.some(
+				(entry) => entry.path === 'packages/react-widget/quality/widget.behavior.ts',
+			),
+			false,
 		);
 		responses.set(
 			`https://api.github.com/repos/example/widgets/git/trees/${tree}?recursive=1`,
-			githubTreeResponse(),
+			githubTreeResponse([
+				...sourceTree,
+				{
+					path: 'packages/react-widget/quality/widget.test.ts',
+					mode: '100644',
+					type: 'blob',
+					size: emptyTestBytes.length,
+					sha: gitBlobSha(emptyTestBytes),
+					url: 'https://api.github.com/repos/example/widgets/git/blobs/empty-conventional-test',
+				},
+			]),
 		);
 		responses.set(
 			'https://api.github.com/repos/example/widgets/git/blobs/test',
@@ -1020,6 +1044,22 @@ export function Wrapper(props: Widget.Props<string>) { return <Widget {...props}
 				content: sourceTestBytes.toString('base64'),
 				size: sourceTestBytes.length,
 			}),
+		);
+		responses.set(
+			'https://api.github.com/repos/example/widgets/git/blobs/empty-conventional-test',
+			Response.json({
+				encoding: 'base64',
+				content: emptyTestBytes.toString('base64'),
+				size: emptyTestBytes.length,
+			}),
+		);
+		await assert.rejects(
+			resolveRemoteInput(parseInput(githubInput), githubInput, { fetchImpl }),
+			/has no countable registrations/i,
+		);
+		responses.set(
+			`https://api.github.com/repos/example/widgets/git/trees/${tree}?recursive=1`,
+			githubTreeResponse(),
 		);
 
 		responses.set(

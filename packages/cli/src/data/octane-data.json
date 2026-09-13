@@ -405,6 +405,21 @@
       "verified": "2026-07-30"
     },
     {
+      "name": "@octanejs/grab",
+      "version": "0.0.1",
+      "category": "Developer Tools",
+      "upstream": { "package": "react-grab", "version": "0.2.0" },
+      "surface": "Published init/core/primitives/styles surface of react-grab@0.2.0, with bippy reimplemented against octane/inspect and Solid overlay retained. CLI bin packaging is an explicit gap; consume @react-grab/cli directly.",
+      "divergences": [
+        "Fiber inspection uses Octane inspect owners via src/octane-adapter.ts rather than React Fibers/bippy.",
+        "Update freeze uses octane/inspect pauseUpdates instead of React dispatcher patching.",
+        "Window global prefers __OCTANE_GRAB__ while retaining __REACT_GRAB__ compatibility aliases.",
+        "Next.js RSC symbolication and react-three-fiber selection paths are blocked pending bridges."
+      ],
+      "ssr": "Client overlay tool; SSR is a no-op mount guard. Upstream Next SSR e2e cases are blocked/inapplicable for this binding.",
+      "verified": "2026-09-10"
+    },
+    {
       "name": "@octanejs/gsap",
       "version": "0.0.21",
       "category": "Animation",
@@ -1791,6 +1806,7 @@
     "react-dropzone": "@octanejs/dropzone",
     "react-email": "@octanejs/email",
     "react-error-boundary": "@octanejs/react-error-boundary",
+    "react-grab": "@octanejs/grab",
     "react-hook-form": "@octanejs/hook-form",
     "react-i18next": "@octanejs/i18next",
     "react-image-crop": "@octanejs/image-crop",

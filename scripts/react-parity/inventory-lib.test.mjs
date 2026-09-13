@@ -332,6 +332,22 @@ describe('extractTestCases', () => {
 		assert.deepEqual(extractTestCases(`constructor('not a test'); toString('also not');`), []);
 	});
 
+	test('brace-less for cleanup loops do not wrap later suites', () => {
+		const cases = extractTestCases(`
+			const callbacks = [];
+			afterEach(() => {
+				for (const unregister of callbacks.splice(0).reverse()) unregister();
+			});
+			describe('suite', () => {
+				it('keeps a single registration', () => {});
+			});
+		`);
+		const itCase = cases.find((testCase) => testCase.title === 'keeps a single registration');
+		assert.ok(itCase);
+		assert.equal(itCase.estimatedRegistrations, 1);
+		assert.equal(itCase.dynamicExpansion, null);
+	});
+
 	test('gives repeated static matrix rows distinct IDs', () => {
 		const cases = extractTestCases(`test.each([1, 1])('value %s', value => value);`);
 

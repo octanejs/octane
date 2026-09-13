@@ -5617,6 +5617,98 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: {
+					group: 'react-parity',
+					include: ['packages/grab/tests/grab.contract.test.ts'],
+				},
+				test: {
+					name: 'grab',
+					include: ['packages/grab/tests/**/*.test.ts'],
+					exclude: [
+						...configDefaults.exclude,
+						'packages/grab/tests/upstream/**',
+						'packages/grab/tests/upstream-e2e/**',
+					],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/grab$/,
+							replacement: resolve(import.meta.dirname, 'packages/grab/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/grab\/primitives$/,
+							replacement: resolve(import.meta.dirname, 'packages/grab/src/primitives.ts'),
+						},
+						{
+							find: /^@octanejs\/grab\/core$/,
+							replacement: resolve(import.meta.dirname, 'packages/grab/src/core/index.tsx'),
+						},
+						{
+							find: /^octane\/inspect$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/inspect.ts'),
+						},
+					],
+					conditions: ['browser', 'development', 'import', 'module', 'default'],
+				},
+			},
+			{
+				testExecution: {
+					group: 'react-parity',
+					include: ['packages/grab/tests/upstream/*.test.ts'],
+				},
+				test: {
+					name: 'grab-adapted',
+					include: ['packages/grab/tests/upstream/*.test.ts'],
+					exclude: [
+						...configDefaults.exclude,
+						// Fiber/React-dispatcher/Next/R3F-coupled units — tracked in crosswalk as blocked.
+						'packages/grab/tests/upstream/context.test.ts',
+						'packages/grab/tests/upstream/create-fiber-revision.test.ts',
+						'packages/grab/tests/upstream/freeze-renderers.test.ts',
+						'packages/grab/tests/upstream/next-server-frames.test.ts',
+						'packages/grab/tests/upstream/perf-instrumentation.test.ts',
+						'packages/grab/tests/upstream/three-selection.test.ts',
+					],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							// Adapted upstream suites still import solid-js; map to grab's local shim.
+							find: /^solid-js$/,
+							replacement: resolve(import.meta.dirname, 'packages/grab/src/reactivity/index.ts'),
+						},
+						{
+							find: /^solid-js\/store$/,
+							replacement: resolve(import.meta.dirname, 'packages/grab/src/reactivity/index.ts'),
+						},
+						{
+							find: /^@octanejs\/grab$/,
+							replacement: resolve(import.meta.dirname, 'packages/grab/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/grab\/primitives$/,
+							replacement: resolve(import.meta.dirname, 'packages/grab/src/primitives.ts'),
+						},
+						{
+							find: /^@octanejs\/grab\/core$/,
+							replacement: resolve(import.meta.dirname, 'packages/grab/src/core/index.tsx'),
+						},
+						{
+							find: /^octane\/inspect$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/inspect.ts'),
+						},
+					],
+					conditions: ['browser', 'import', 'module', 'default'],
+				},
+			},
+			{
 				test: {
 					name: 'gsap',
 					include: [

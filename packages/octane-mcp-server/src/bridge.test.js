@@ -41,6 +41,25 @@ describe('scanSource', () => {
 		expect(scanSource('class Memoish extends PureComponent {}').classComponent).toBe(true);
 	});
 
+	it('ignores React API names that appear only inside string literals', () => {
+		const source = `
+			const REACT_INTERNAL_COMPONENT_NAMES = new Set([
+				"Suspense",
+				"Fragment",
+				"StrictMode",
+				"Profiler",
+				"SuspenseList",
+			]);
+			export const isInternal = (name) => REACT_INTERNAL_COMPONENT_NAMES.has(name);
+		`;
+		const { apis } = scanSource(source);
+		expect(apis.has('Profiler')).toBe(false);
+		expect(apis.has('SuspenseList')).toBe(false);
+		expect(apis.has('Suspense')).toBe(false);
+		expect(apis.has('Fragment')).toBe(false);
+		expect(apis.has('StrictMode')).toBe(false);
+	});
+
 	it('classifies symbol-kind exports without requiring the corresponding renderer', () => {
 		const report = bridgeReportFromSource(`
 			var REACT_PROFILER_TYPE = Symbol.for('react.profiler');

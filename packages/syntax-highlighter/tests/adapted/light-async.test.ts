@@ -33,7 +33,8 @@ class Expire extends React.Component {
 	);
 	expect(tree.toJSON()).toMatchSnapshot();
 });
-test('SyntaxHighlighter render as text if language doesnt exist', () => {
+test('SyntaxHighlighter render as text if language doesnt exist', async () => {
+	await SyntaxHighlighter.preload();
 	const tree = renderer.create(
 		/* @__PURE__ */ React.createElement(
 			SyntaxHighlighter,
@@ -117,6 +118,9 @@ test('SyntaxHighlighter renders text while language loads', async () => {
 	const loadLanguage = vi
 		.spyOn(SyntaxHighlighter, 'loadLanguage')
 		.mockImplementation(() => new Promise(() => {}));
+	const highlightAuto = vi
+		.spyOn(SyntaxHighlighter.astGenerator, 'highlightAuto')
+		.mockImplementation(() => ({ language: null, value: [] }));
 	const tree = renderer.create(
 		/* @__PURE__ */ React.createElement(
 			SyntaxHighlighter,
@@ -153,5 +157,6 @@ test('SyntaxHighlighter renders text while language loads', async () => {
 	);
 	await vi.waitFor(() => expect(loadLanguage).toHaveBeenCalledWith('gherkin'));
 	expect(tree.toJSON()).toMatchSnapshot();
+	highlightAuto.mockRestore();
 	loadLanguage.mockRestore();
 });

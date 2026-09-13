@@ -1,0 +1,633 @@
+/** @jsxImportSource octane */
+import { useEffect, useRef } from 'octane';
+import type { OverlayBounds, SelectionLabelInstance } from '../types.js';
+import { lerp } from '../utils/lerp.js';
+import {
+	SELECTION_LERP_FACTOR,
+	FADE_DURATION_MS,
+	FEEDBACK_DURATION_MS,
+	DRAG_LERP_FACTOR,
+	LERP_CONVERGENCE_THRESHOLD_PX,
+	MIN_DEVICE_PIXEL_RATIO,
+	Z_INDEX_OVERLAY_CANVAS,
+	OVERLAY_BORDER_COLOR_DRAG,
+	OVERLAY_FILL_COLOR_DRAG,
+	OPACITY_CONVERGENCE_THRESHOLD,
+	OVERLAY_BORDER_COLOR_DEFAULT,
+	OVERLAY_FILL_COLOR_DEFAULT,
+	BASELINE_FRAME_DURATION_MS,
+} from '../constants.js';
+import { nativeCancelAnimationFrame, nativeRequestAnimationFrame } from '../utils/native-raf.js';
+import { supportsDisplayP3 } from '../utils/supports-display-p3.js';
+import { adjustLerpForFrameDuration } from '../utils/adjust-lerp-for-frame-duration.js';
+
+const DEFAULT_LAYER_STYLE = {
+	borderColor: OVERLAY_BORDER_COLOR_DEFAULT,
+	fillColor: OVERLAY_FILL_COLOR_DEFAULT,
+	lerpFactor: SELECTION_LERP_FACTOR,
+} as const;
+
+const LAYER_STYLES = {
+	drag: {
+		borderColor: OVERLAY_BORDER_COLOR_DRAG,
+		fillColor: OVERLAY_FILL_COLOR_DRAG,
+		lerpFactor: DRAG_LERP_FACTOR,
+	},
+	selection: DEFAULT_LAYER_STYLE,
+	grabbed: DEFAULT_LAYER_STYLE,
+} as const;
+
+interface AnimatedBounds {
+	id: string;
+	current: { x: number; y: number; width: number; height: number };
+	target: { x: number; y: number; width: number; height: number };
+	borderRadius: number;
+	opacity: number;
+	targetOpacity: number;
+	createdAt?: number;
+	fadeStartTimestamp: number | null;
+	isInitialized: boolean;
+}
+
+interface OverlayCanvasProps {
+	selectionVisible?: boolean;
+	selectionBounds?: OverlayBounds;
+	selectionBoundsMultiple?: OverlayBounds[];
+
+	selectionShouldSnap?: boolean;
+
+	dragVisible?: boolean;
+	dragBounds?: OverlayBounds;
+
+	grabbedBoxes?: Array<{
+		id: string;
+		bounds: OverlayBounds;
+		createdAt: number;
+	}>;
+
+	labelInstances?: SelectionLabelInstance[];
+}
+
+export const OverlayCanvas = (props: OverlayCanvasProps) => {
+	// Octane re-runs the body every render, so the long-lived rAF loop and the
+	// window listeners read the latest props through this ref.
+	const propsRef = useRef(props);
+	propsRef.current = props;
+
+	const canvasRef = useRef<HTMLCanvasElement | null>(null);
+	const mainContext = useRef<CanvasRenderingContext2D | null>(null);
+	const canvasWidth = useRef(0);
+	const canvasHeight = useRef(0);
+	const devicePixelRatio = useRef(1);
+	const animationFrameId = useRef<number | null>(null);
+	const fadeWakeTimeoutId = useRef<number | null>(null);
+	const previousFrameTimestamp = useRef<number | null>(null);
+
+	const selectionAnimations = useRef<AnimatedBounds[]>([]);
+	const dragAnimation = useRef<AnimatedBounds | null>(null);
+	const grabbedAnimations = useRef<AnimatedBounds[]>([]);
+
+	const canvasColorSpace: PredefinedColorSpace = supportsDisplayP3() ? 'display-p3' : 'srgb';
+
+	const initializeCanvas = () => {
+		const canvas = canvasRef.current;
+		if (!canvas) return;
+
+		devicePixelRatio.current = Math.max(window.devicePixelRatio || 1, MIN_DEVICE_PIXEL_RATIO);
+		// Size to the layout viewport (documentElement.clientWidth/Height), not
+		// window.innerWidth/Height. Under browser zoom the latter shrink to the
+		// visual viewport while getBoundingClientRect — which positions the boxes —
+		// keeps returning full layout coordinates, so a canvas sized to innerWidth
+		// draws the selection box off-canvas for anything past the shrunken edge
+		// (the "selection box gone entirely when zoomed" bug).
+		canvasWidth.current = document.documentElement.clientWidth || window.innerWidth;
+		canvasHeight.current = document.documentElement.clientHeight || window.innerHeight;
+
+		canvas.width = canvasWidth.current * devicePixelRatio.current;
+		canvas.height = canvasHeight.current * devicePixelRatio.current;
+		canvas.style.width = `${canvasWidth.current}px`;
+		canvas.style.height = `${canvasHeight.current}px`;
+
+		mainContext.current = canvas.getContext('2d', { colorSpace: canvasColorSpace });
+		if (mainContext.current) {
+			mainContext.current.scale(devicePixelRatio.current, devicePixelRatio.current);
+		}
+	};
+
+	const parseBorderRadiusValue = (borderRadius: string): number => {
+		if (!borderRadius) return 0;
+		const match = borderRadius.match(/^(\d+(?:\.\d+)?)/);
+		return match ? parseFloat(match[1]) : 0;
+	};
+
+	const createAnimatedBounds = (
+		id: string,
+		bounds: OverlayBounds,
+		options?: { createdAt?: number; opacity?: number; targetOpacity?: number },
+	): AnimatedBounds => ({
+		id,
+		current: {
+			x: bounds.x,
+			y: bounds.y,
+			width: bounds.width,
+			height: bounds.height,
+		},
+		target: {
+			x: bounds.x,
+			y: bounds.y,
+			width: bounds.width,
+			height: bounds.height,
+		},
+		borderRadius: parseBorderRadiusValue(bounds.borderRadius),
+		opacity: options?.opacity ?? 1,
+		targetOpacity: options?.targetOpacity ?? options?.opacity ?? 1,
+		createdAt: options?.createdAt,
+		fadeStartTimestamp: null,
+		isInitialized: true,
+	});
+
+	const updateAnimationTarget = (
+		animation: AnimatedBounds,
+		bounds: OverlayBounds,
+		targetOpacity?: number,
+	) => {
+		const target = animation.target;
+		target.x = bounds.x;
+		target.y = bounds.y;
+		target.width = bounds.width;
+		target.height = bounds.height;
+		animation.borderRadius = parseBorderRadiusValue(bounds.borderRadius);
+		if (targetOpacity !== undefined) {
+			if (targetOpacity > animation.targetOpacity) {
+				animation.opacity = targetOpacity;
+			}
+			animation.targetOpacity = targetOpacity;
+		}
+	};
+
+	const resolveBoundsArray = (instance: SelectionLabelInstance): OverlayBounds[] =>
+		instance.boundsMultiple ?? [instance.bounds];
+
+	const drawRoundedRectangle = (
+		context: CanvasRenderingContext2D,
+		rectX: number,
+		rectY: number,
+		rectWidth: number,
+		rectHeight: number,
+		cornerRadius: number,
+		fillColor: string,
+		strokeColor: string,
+		opacity: number = 1,
+	) => {
+		if (rectWidth <= 0 || rectHeight <= 0) return;
+
+		const maxCornerRadius = Math.min(rectWidth / 2, rectHeight / 2);
+		const clampedCornerRadius = Math.min(cornerRadius, maxCornerRadius);
+
+		const shouldSetGlobalAlpha = opacity !== 1;
+		if (shouldSetGlobalAlpha) context.globalAlpha = opacity;
+		context.beginPath();
+		if (clampedCornerRadius > 0) {
+			context.roundRect(rectX, rectY, rectWidth, rectHeight, clampedCornerRadius);
+		} else {
+			context.rect(rectX, rectY, rectWidth, rectHeight);
+		}
+		context.fillStyle = fillColor;
+		context.fill();
+		context.strokeStyle = strokeColor;
+		context.lineWidth = 1;
+		context.stroke();
+		if (shouldSetGlobalAlpha) context.globalAlpha = 1;
+	};
+
+	const renderDragLayer = () => {
+		const context = mainContext.current;
+		const animation = dragAnimation.current;
+		if (!context || !propsRef.current.dragVisible || !animation) return;
+
+		const style = LAYER_STYLES.drag;
+		drawRoundedRectangle(
+			context,
+			animation.current.x,
+			animation.current.y,
+			animation.current.width,
+			animation.current.height,
+			animation.borderRadius,
+			style.fillColor,
+			style.borderColor,
+		);
+	};
+
+	const renderSelectionLayer = () => {
+		const context = mainContext.current;
+		if (!context || !propsRef.current.selectionVisible) return;
+
+		const style = LAYER_STYLES.selection;
+
+		for (const animation of selectionAnimations.current) {
+			drawRoundedRectangle(
+				context,
+				animation.current.x,
+				animation.current.y,
+				animation.current.width,
+				animation.current.height,
+				animation.borderRadius,
+				style.fillColor,
+				style.borderColor,
+				animation.opacity,
+			);
+		}
+	};
+
+	const renderBoundsLayer = (animations: AnimatedBounds[]) => {
+		const context = mainContext.current;
+		if (!context) return;
+
+		const style = LAYER_STYLES.grabbed;
+
+		for (const animation of animations) {
+			drawRoundedRectangle(
+				context,
+				animation.current.x,
+				animation.current.y,
+				animation.current.width,
+				animation.current.height,
+				animation.borderRadius,
+				style.fillColor,
+				style.borderColor,
+				animation.opacity,
+			);
+		}
+	};
+
+	const compositeAllLayers = () => {
+		const context = mainContext.current;
+		const canvas = canvasRef.current;
+		if (!context || !canvas) return;
+		if (canvasWidth.current <= 0 || canvasHeight.current <= 0) return;
+
+		context.setTransform(1, 0, 0, 1, 0, 0);
+		context.clearRect(0, 0, canvas.width, canvas.height);
+		context.setTransform(devicePixelRatio.current, 0, 0, devicePixelRatio.current, 0, 0);
+
+		renderDragLayer();
+		renderSelectionLayer();
+		renderBoundsLayer(grabbedAnimations.current);
+	};
+
+	const interpolateBounds = (
+		animation: AnimatedBounds,
+		lerpFactor: number,
+		options?: { interpolateOpacity?: boolean },
+	): boolean => {
+		const lerpedX = lerp(animation.current.x, animation.target.x, lerpFactor);
+		const lerpedY = lerp(animation.current.y, animation.target.y, lerpFactor);
+		const lerpedWidth = lerp(animation.current.width, animation.target.width, lerpFactor);
+		const lerpedHeight = lerp(animation.current.height, animation.target.height, lerpFactor);
+
+		const hasBoundsConverged =
+			Math.abs(lerpedX - animation.target.x) < LERP_CONVERGENCE_THRESHOLD_PX &&
+			Math.abs(lerpedY - animation.target.y) < LERP_CONVERGENCE_THRESHOLD_PX &&
+			Math.abs(lerpedWidth - animation.target.width) < LERP_CONVERGENCE_THRESHOLD_PX &&
+			Math.abs(lerpedHeight - animation.target.height) < LERP_CONVERGENCE_THRESHOLD_PX;
+
+		animation.current.x = hasBoundsConverged ? animation.target.x : lerpedX;
+		animation.current.y = hasBoundsConverged ? animation.target.y : lerpedY;
+		animation.current.width = hasBoundsConverged ? animation.target.width : lerpedWidth;
+		animation.current.height = hasBoundsConverged ? animation.target.height : lerpedHeight;
+
+		let hasOpacityConverged = true;
+		if (options?.interpolateOpacity) {
+			const lerpedOpacity = lerp(animation.opacity, animation.targetOpacity, lerpFactor);
+			hasOpacityConverged =
+				Math.abs(lerpedOpacity - animation.targetOpacity) < OPACITY_CONVERGENCE_THRESHOLD;
+			animation.opacity = hasOpacityConverged ? animation.targetOpacity : lerpedOpacity;
+		}
+
+		return !hasBoundsConverged || !hasOpacityConverged;
+	};
+
+	const runAnimationFrame = () => {
+		const currentFrameTimestamp = performance.now();
+		const frameDurationMs =
+			previousFrameTimestamp.current !== null
+				? currentFrameTimestamp - previousFrameTimestamp.current
+				: BASELINE_FRAME_DURATION_MS;
+		previousFrameTimestamp.current = currentFrameTimestamp;
+
+		const dragLerpForFrame = adjustLerpForFrameDuration(
+			LAYER_STYLES.drag.lerpFactor,
+			frameDurationMs,
+		);
+		const selectionLerpForFrame = adjustLerpForFrameDuration(
+			LAYER_STYLES.selection.lerpFactor,
+			frameDurationMs,
+		);
+		const grabbedLerpForFrame = adjustLerpForFrameDuration(
+			LAYER_STYLES.grabbed.lerpFactor,
+			frameDurationMs,
+		);
+
+		let shouldContinueAnimating = false;
+		let nextFadeDelayMs: number | null = null;
+
+		if (dragAnimation.current?.isInitialized) {
+			if (interpolateBounds(dragAnimation.current, dragLerpForFrame)) {
+				shouldContinueAnimating = true;
+			}
+		}
+
+		for (const animation of selectionAnimations.current) {
+			if (animation.isInitialized) {
+				if (interpolateBounds(animation, selectionLerpForFrame)) {
+					shouldContinueAnimating = true;
+				}
+			}
+		}
+
+		const currentTimestamp = Date.now();
+		grabbedAnimations.current = grabbedAnimations.current.filter((animation) => {
+			const isLabelAnimation = animation.id.startsWith('label-');
+
+			if (animation.isInitialized) {
+				const isStillAnimating = interpolateBounds(animation, grabbedLerpForFrame);
+				if (isStillAnimating) {
+					shouldContinueAnimating = true;
+				}
+			}
+
+			if (isLabelAnimation && animation.targetOpacity === 0) {
+				if (animation.fadeStartTimestamp === null) {
+					animation.fadeStartTimestamp = currentFrameTimestamp;
+				}
+				const labelElapsed = currentFrameTimestamp - animation.fadeStartTimestamp;
+				const labelProgress = Math.min(1, labelElapsed / FADE_DURATION_MS);
+				const labelEaseOut = 1 - (1 - labelProgress) * (1 - labelProgress);
+				animation.opacity = Math.max(0, 1 - labelEaseOut);
+				if (labelProgress >= 1) return false;
+				shouldContinueAnimating = true;
+				return true;
+			} else if (isLabelAnimation) {
+				animation.fadeStartTimestamp = null;
+			}
+
+			if (animation.createdAt !== undefined) {
+				const elapsed = currentTimestamp - animation.createdAt;
+				const fadeOutDeadline = FEEDBACK_DURATION_MS + FADE_DURATION_MS;
+
+				if (elapsed >= fadeOutDeadline) {
+					return false;
+				}
+
+				if (elapsed > FEEDBACK_DURATION_MS) {
+					const fadeProgress = Math.min(1, (elapsed - FEEDBACK_DURATION_MS) / FADE_DURATION_MS);
+					const easeOut = 1 - (1 - fadeProgress) * (1 - fadeProgress);
+					animation.opacity = 1 - easeOut;
+					shouldContinueAnimating = true;
+				} else {
+					const fadeDelayMs = FEEDBACK_DURATION_MS - elapsed;
+					nextFadeDelayMs =
+						nextFadeDelayMs === null ? fadeDelayMs : Math.min(nextFadeDelayMs, fadeDelayMs);
+				}
+
+				return true;
+			}
+
+			if (isLabelAnimation) {
+				return true;
+			}
+
+			return animation.opacity > 0;
+		});
+
+		compositeAllLayers();
+
+		if (shouldContinueAnimating) {
+			animationFrameId.current = nativeRequestAnimationFrame(runAnimationFrame);
+		} else {
+			animationFrameId.current = null;
+			previousFrameTimestamp.current = null;
+			if (nextFadeDelayMs !== null) {
+				fadeWakeTimeoutId.current = window.setTimeout(
+					() => {
+						fadeWakeTimeoutId.current = null;
+						scheduleAnimationFrame();
+					},
+					Math.max(0, nextFadeDelayMs),
+				);
+			}
+		}
+	};
+
+	const scheduleAnimationFrame = () => {
+		if (fadeWakeTimeoutId.current !== null) {
+			window.clearTimeout(fadeWakeTimeoutId.current);
+			fadeWakeTimeoutId.current = null;
+		}
+		if (animationFrameId.current !== null) return;
+		animationFrameId.current = nativeRequestAnimationFrame(runAnimationFrame);
+	};
+
+	const handleWindowResize = () => {
+		initializeCanvas();
+		scheduleAnimationFrame();
+	};
+
+	useEffect(() => {
+		const isVisible = props.selectionVisible;
+		const singleBounds = props.selectionBounds;
+		const multipleBounds = props.selectionBoundsMultiple;
+		const shouldSnap = props.selectionShouldSnap;
+
+		if (!isVisible || (!singleBounds && (!multipleBounds || multipleBounds.length === 0))) {
+			selectionAnimations.current = [];
+			scheduleAnimationFrame();
+			return;
+		}
+
+		let boundsToRender: readonly OverlayBounds[];
+		if (multipleBounds && multipleBounds.length > 0) {
+			boundsToRender = multipleBounds;
+		} else if (singleBounds) {
+			boundsToRender = [singleBounds];
+		} else {
+			boundsToRender = [];
+		}
+
+		const existingSelectionById = new Map<string, AnimatedBounds>();
+		for (const animation of selectionAnimations.current) {
+			existingSelectionById.set(animation.id, animation);
+		}
+
+		selectionAnimations.current = boundsToRender.map((bounds, index) => {
+			const animationId = `selection-${index}`;
+			const existingAnimation = existingSelectionById.get(animationId);
+
+			if (existingAnimation) {
+				updateAnimationTarget(existingAnimation, bounds);
+				if (shouldSnap) {
+					existingAnimation.current.x = existingAnimation.target.x;
+					existingAnimation.current.y = existingAnimation.target.y;
+					existingAnimation.current.width = existingAnimation.target.width;
+					existingAnimation.current.height = existingAnimation.target.height;
+				}
+				return existingAnimation;
+			}
+
+			return createAnimatedBounds(animationId, bounds);
+		});
+
+		scheduleAnimationFrame();
+	}, [
+		props.selectionVisible,
+		props.selectionBounds,
+		props.selectionBoundsMultiple,
+		props.selectionShouldSnap,
+	]);
+
+	useEffect(() => {
+		const isVisible = props.dragVisible;
+		const bounds = props.dragBounds;
+
+		if (!isVisible || !bounds) {
+			dragAnimation.current = null;
+			scheduleAnimationFrame();
+			return;
+		}
+
+		if (dragAnimation.current) {
+			updateAnimationTarget(dragAnimation.current, bounds);
+		} else {
+			dragAnimation.current = createAnimatedBounds('drag', bounds);
+		}
+
+		scheduleAnimationFrame();
+	}, [props.dragVisible, props.dragBounds]);
+
+	useEffect(() => {
+		const boxesToProcess = props.grabbedBoxes ?? [];
+		const instancesToProcess = props.labelInstances ?? [];
+
+		const boxesById = new Map<string, (typeof boxesToProcess)[number]>();
+		for (const box of boxesToProcess) {
+			boxesById.set(box.id, box);
+		}
+
+		// Build one id→animation index up-front so the per-instance lookups
+		// below are O(1). The previous .find() inside a for-loop produced
+		// O(boxes × animations) and O(labels × animations) hot work, both
+		// of which grow with multi-select.
+		const animationsById = new Map<string, AnimatedBounds>();
+		for (const animation of grabbedAnimations.current) {
+			animationsById.set(animation.id, animation);
+		}
+
+		for (const box of boxesToProcess) {
+			if (!animationsById.has(box.id)) {
+				const newAnimation = createAnimatedBounds(box.id, box.bounds, {
+					createdAt: box.createdAt,
+				});
+				grabbedAnimations.current.push(newAnimation);
+				animationsById.set(box.id, newAnimation);
+			}
+		}
+
+		for (const animation of grabbedAnimations.current) {
+			const matchingBox = boxesById.get(animation.id);
+			if (matchingBox) {
+				updateAnimationTarget(animation, matchingBox.bounds);
+			}
+		}
+
+		const activeLabelIds = new Set<string>();
+		for (const instance of instancesToProcess) {
+			const boundsToRender = resolveBoundsArray(instance);
+			const targetOpacity = instance.status === 'fading' ? 0 : 1;
+
+			for (let index = 0; index < boundsToRender.length; index++) {
+				const bounds = boundsToRender[index];
+				const animationId = `label-${instance.id}-${index}`;
+				activeLabelIds.add(animationId);
+
+				const existingAnimation = animationsById.get(animationId);
+				if (existingAnimation) {
+					updateAnimationTarget(existingAnimation, bounds, targetOpacity);
+				} else {
+					const newAnimation = createAnimatedBounds(animationId, bounds, {
+						opacity: 1,
+						targetOpacity,
+					});
+					grabbedAnimations.current.push(newAnimation);
+					animationsById.set(animationId, newAnimation);
+				}
+			}
+		}
+
+		// Boxes stay in the store for their full fade-out, so an animation
+		// whose box is gone was cleared explicitly (reset/escape) and must
+		// not linger — an orphaned remnant can't track layout shifts and
+		// would freeze at stale coordinates.
+		grabbedAnimations.current = grabbedAnimations.current.filter((animation) => {
+			if (animation.id.startsWith('label-')) {
+				return activeLabelIds.has(animation.id);
+			}
+			return boxesById.has(animation.id);
+		});
+
+		scheduleAnimationFrame();
+	}, [props.grabbedBoxes, props.labelInstances]);
+
+	useEffect(() => {
+		initializeCanvas();
+		scheduleAnimationFrame();
+
+		window.addEventListener('resize', handleWindowResize);
+
+		let currentDprMediaQuery: MediaQueryList | null = null;
+
+		const handleDevicePixelRatioChange = () => {
+			const newDevicePixelRatio = Math.max(window.devicePixelRatio || 1, MIN_DEVICE_PIXEL_RATIO);
+			if (newDevicePixelRatio !== devicePixelRatio.current) {
+				handleWindowResize();
+				setupDprMediaQuery();
+			}
+		};
+
+		const setupDprMediaQuery = () => {
+			if (currentDprMediaQuery) {
+				currentDprMediaQuery.removeEventListener('change', handleDevicePixelRatioChange);
+			}
+			currentDprMediaQuery = window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`);
+			currentDprMediaQuery.addEventListener('change', handleDevicePixelRatioChange);
+		};
+
+		setupDprMediaQuery();
+
+		return () => {
+			window.removeEventListener('resize', handleWindowResize);
+			if (currentDprMediaQuery) {
+				currentDprMediaQuery.removeEventListener('change', handleDevicePixelRatioChange);
+			}
+			if (animationFrameId.current !== null) {
+				nativeCancelAnimationFrame(animationFrameId.current);
+			}
+			if (fadeWakeTimeoutId.current !== null) {
+				window.clearTimeout(fadeWakeTimeoutId.current);
+			}
+		};
+	}, []);
+
+	return (
+		<canvas
+			ref={canvasRef}
+			data-react-grab-overlay-canvas
+			style={{
+				position: 'fixed',
+				top: '0',
+				left: '0',
+				pointerEvents: 'none',
+				zIndex: Z_INDEX_OVERLAY_CANVAS,
+			}}
+		/>
+	);
+};

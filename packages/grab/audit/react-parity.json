@@ -1,0 +1,139 @@
+{
+  "schemaVersion": 1,
+  "provenance": {
+    "repo": "https://github.com/aidenybai/react-grab.git",
+    "version": "0.2.0",
+    "commit": "23bce0e56f2808902f1126ad581f6d8c3b5f639e",
+    "sourceRoot": "packages/grab/upstream/packages/react-grab",
+    "testRoot": "packages/grab/upstream/packages/react-grab/tests",
+    "license": "MIT",
+    "integrity": "sha256:33d3f5a8363c0282cda04decc81cfa3a634d81c661ad42db6dc3e30087321d45",
+    "verification": "recorded-unverified"
+  },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "absent"
+  },
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/grab/src"],
+      "include": ["\\.(ts|tsx|css)$"],
+      "exclude": []
+    },
+    "tests": {
+      "roots": ["packages/grab/tests/upstream"],
+      "include": ["\\.test\\.ts$"],
+      "exclude": [
+        "/e2e/",
+        "/context\\.test\\.ts$",
+        "/create-fiber-revision\\.test\\.ts$",
+        "/freeze-renderers\\.test\\.ts$",
+        "/next-server-frames\\.test\\.ts$",
+        "/perf-instrumentation\\.test\\.ts$",
+        "/three-selection\\.test\\.ts$"
+      ]
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 286,
+    "uniqueIdentities": 281,
+    "duplicateEntriesWithinLanes": 5,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@11.15.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "5661c98bd5df743941733106d3483f4cee11f4373088c62d63e2e53899f2f4e1"
+    }
+  },
+  "lanes": [
+    {
+      "id": "grab-adapted-units",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "grab-adapted",
+      "evidenceOrigin": "upstream-suite",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/grab/audit/adapted-runtime.json"
+      },
+      "notes": "Adapted upstream unit tests under tests/upstream/*.test.ts with mechanical rewrites; Fiber/Next/R3F-coupled files are excluded in the Vitest project and dispositioned in crosswalk.",
+      "files": [
+        {
+          "path": "packages/grab/audit/adapted-runtime.json",
+          "role": "support",
+          "sha256": "06fd001ce2f31d0aa7babae16b82867357d09654c14a359580cc610a540043d5"
+        },
+        {
+          "path": "packages/grab/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "5dff17f406c5af5a2bb642f90f73a2687f06dc31f9a38411e9f44a12e16ee4a1"
+        },
+        {
+          "path": "packages/grab/audit/provenance.json",
+          "role": "support",
+          "sha256": "dd93cba54d9a699de2aab63341abef9d7e9eaebd09858cd592b0c67516187df6"
+        },
+        {
+          "path": "packages/grab/audit/crosswalk.json",
+          "role": "support",
+          "sha256": "2d8834666b23063240a22a1f611b4180351b6d3d5d1d411889793001536a1188"
+        }
+      ]
+    },
+    {
+      "id": "grab-package-contract",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "grab",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Octane inspect adapter and package contract: freeze/pause, host→owner mapping, primitives, and globals.",
+      "files": [
+        {
+          "path": "packages/grab/tests/grab.contract.test.ts",
+          "role": "test",
+          "sha256": "7295756c091b86118a319d0dc4391483d5ecf73b5658e9318207245027ea0544",
+          "cases": [
+            {
+              "id": "grab:contract-is-element-grabbable",
+              "testName": "isElementGrabbable accepts ordinary elements and rejects html/body",
+              "fullName": "@octanejs/grab package contract isElementGrabbable accepts ordinary elements and rejects html/body"
+            },
+            {
+              "id": "grab:contract-freeze-updates",
+              "testName": "freezeUpdates pauses Octane scheduling via the adapter",
+              "fullName": "@octanejs/grab package contract freezeUpdates pauses Octane scheduling via the adapter"
+            },
+            {
+              "id": "grab:contract-freeze-lifecycle",
+              "testName": "isFreezeActive tracks full freeze lifecycle when animations are stubbed",
+              "fullName": "@octanejs/grab package contract isFreezeActive tracks full freeze lifecycle when animations are stubbed"
+            },
+            {
+              "id": "grab:contract-host-owner-mapping",
+              "testName": "adapter maps registered host nodes to owners and reports instrumentation",
+              "fullName": "@octanejs/grab package contract adapter maps registered host nodes to owners and reports instrumentation"
+            },
+            {
+              "id": "grab:contract-source-helpers",
+              "testName": "adapter source helpers normalize paths and parse stacks",
+              "fullName": "@octanejs/grab package contract adapter source helpers normalize paths and parse stacks"
+            },
+            {
+              "id": "grab:contract-global-api",
+              "testName": "global API registry mirrors window __OCTANE_GRAB__",
+              "fullName": "@octanejs/grab package contract global API registry mirrors window __OCTANE_GRAB__"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "divergences": []
+}

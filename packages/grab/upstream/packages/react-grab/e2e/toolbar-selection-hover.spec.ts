@@ -1,0 +1,105 @@
+import type { Page } from "@playwright/test";
+import { test, expect } from "./fixtures.js";
+import { ATTRIBUTE_NAME, UI_STATE_TIMEOUT_MS } from "./constants.js";
+
+const hoverToolbar = async (page: Page) =>
+  page.locator(`[${ATTRIBUTE_NAME}] [data-react-grab-toolbar]`).first().hover();
+
+const hoverAwayFromToolbar = async (page: Page) => {
+  await page.mouse.move(10, 10);
+  await page.waitForTimeout(150);
+};
+
+test.describe("Toolbar Selection Hover", () => {
+  test.describe("Selection Mode", () => {
+    test("should hide selection box when hovering toolbar", async ({ reactGrab }) => {
+      await reactGrab.activate();
+      await reactGrab.hoverUntilSelected("li");
+
+      await expect
+        .poll(() => reactGrab.isSelectionBoxVisible(), { timeout: UI_STATE_TIMEOUT_MS })
+        .toBe(true);
+
+      await hoverToolbar(reactGrab.page);
+
+      await expect.poll(() => reactGrab.isSelectionBoxVisible(), { timeout: 2000 }).toBe(false);
+    });
+
+    test("should hide selection label when hovering toolbar", async ({ reactGrab }) => {
+      await reactGrab.activate();
+      await reactGrab.hoverUntilSelected("li");
+
+      await expect.poll(() => reactGrab.isSelectionLabelVisible(), { timeout: 2000 }).toBe(true);
+
+      await hoverToolbar(reactGrab.page);
+
+      await expect.poll(() => reactGrab.isSelectionLabelVisible(), { timeout: 2000 }).toBe(false);
+    });
+
+    test("should restore selection after moving mouse back from toolbar", async ({ reactGrab }) => {
+      await reactGrab.activate();
+      await reactGrab.hoverUntilSelected("li");
+
+      await hoverToolbar(reactGrab.page);
+
+      await expect.poll(() => reactGrab.isSelectionBoxVisible(), { timeout: 2000 }).toBe(false);
+
+      await hoverAwayFromToolbar(reactGrab.page);
+
+      await expect
+        .poll(() => reactGrab.isSelectionBoxVisible(), { timeout: UI_STATE_TIMEOUT_MS })
+        .toBe(true);
+    });
+  });
+
+  test.describe("Frozen Mode", () => {
+    test("should keep selection box visible when hovering toolbar after right-click freeze", async ({
+      reactGrab,
+    }) => {
+      await reactGrab.activate();
+      await reactGrab.hoverUntilSelected("li");
+
+      await reactGrab.rightClickElement("li");
+
+      await expect.poll(() => reactGrab.isSelectionBoxVisible(), { timeout: 2000 }).toBe(true);
+
+      await hoverToolbar(reactGrab.page);
+
+      await expect.poll(() => reactGrab.isSelectionBoxVisible(), { timeout: 2000 }).toBe(true);
+    });
+
+    test("should keep selection box visible after context menu dismiss and toolbar hover", async ({
+      reactGrab,
+    }) => {
+      await reactGrab.activate();
+      await reactGrab.hoverUntilSelected("li");
+
+      await reactGrab.rightClickElement("li");
+
+      await expect.poll(() => reactGrab.isContextMenuVisible(), { timeout: 2000 }).toBe(true);
+
+      await expect.poll(() => reactGrab.isSelectionBoxVisible(), { timeout: 2000 }).toBe(true);
+
+      await hoverToolbar(reactGrab.page);
+
+      await expect.poll(() => reactGrab.isSelectionBoxVisible(), { timeout: 2000 }).toBe(true);
+    });
+
+    test("selection box should not flicker when moving between frozen element and toolbar", async ({
+      reactGrab,
+    }) => {
+      await reactGrab.activate();
+      await reactGrab.hoverUntilSelected("li");
+
+      await reactGrab.rightClickElement("li");
+
+      for (let hoverIndex = 0; hoverIndex < 3; hoverIndex++) {
+        await hoverToolbar(reactGrab.page);
+        await expect.poll(() => reactGrab.isSelectionBoxVisible(), { timeout: 2000 }).toBe(true);
+
+        await hoverAwayFromToolbar(reactGrab.page);
+        await expect.poll(() => reactGrab.isSelectionBoxVisible(), { timeout: 2000 }).toBe(true);
+      }
+    });
+  });
+});

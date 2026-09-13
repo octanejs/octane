@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "skipLibCheck": false,
+    "noEmit": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "allowSyntheticDefaultImports": true,
+    "paths": {
+      "react": ["./react-module.ts"],
+      "react-grab": ["./react-grab-public.d.ts"],
+      "react-grab/primitives": ["./react-grab-primitives-public.d.ts"]
+    }
+  },
+  "files": [
+    "pristine.ts",
+    "react-module.ts",
+    "react-grab-public.d.ts",
+    "react-grab-primitives-public.d.ts"
+  ],
+  "reactPortEvidence": {
+    "gate": "upstream-types-pristine",
+    "upstreamRegistrations": []
+  }
+}

@@ -3,7 +3,7 @@
 <!-- GENERATED FILE — do not edit. Edit packages/<name>/status.json and
      regenerate with `pnpm bindings:status`. -->
 
-The central status table for the 108 `@octanejs/*` framework bindings.
+The central status table for the 109 `@octanejs/*` framework bindings.
 Each row is sourced from that package's `packages/<name>/status.json` — the
 machine-readable status block maintained next to the code it describes — merged
 with the version in its `package.json`. CI runs `pnpm bindings:status:check`,
@@ -43,6 +43,7 @@ supported surface and known test coverage described for that package.
 | [`@octanejs/embla-carousel`](#octanejsembla-carousel) | `embla-carousel-react@8.6.0` | Complete package-root adapter: default useEmblaCarousel hook, its viewport-ref and tuple types, and globalOptions; the framework-neutral Embla core and reactive equality utilities are reused unchanged. | none known | The hook constructs no carousel without DOM globals; client attachment initializes the core. | 2026-08-02 |
 | [`@octanejs/floating-ui`](#octanejsfloating-ui) | `@floating-ui/react@0.27.19` | Complete @floating-ui/react 0.27.19 export surface: positioning (`useFloating`, ref-aware `arrow`, and the framework-neutral middleware re-exports), floating tree and list primitives, every interaction hook, portals/overlays/focus management/arrows/composites, transitions, both delay-group APIs, and the deprecated `inner`/`useInnerOffset` pair. Runtime parity is executable and bounded: 276 adapted assertions pass compatibly, 25 remain executable expected-failure negative controls, and 6 upstream-declared skips are non-evidence. | `ref-as-prop`: React forwardRef component APIs become Octane ref-as-prop APIs; Twenty-five upstream assertions remain executable expected-failure controls across ref/focus/effect scheduling, dynamic-child registration, iframe realms, render counts, React-only context fixtures, and list registration; audit/expected-failures.json names every case; The combined Octane entry point cannot preserve every @floating-ui/react-dom-only type narrowing; the one-for-one adapted type program records those diagnostics explicitly | No dedicated SSR/hydration lane; the supported claims are client positioning and interactions. | 2026-08-26 |
 | [`@octanejs/formisch`](#octanejsformisch) | `@formisch/react@1.0.0-rc.0` | Ports the Formisch React adapter surface while vendoring its React-selected core and modular methods into one React-free Octane package. | Octane native text controls use `onInput`; selects, checkboxes, and radios use native `onChange`; React synthetic event and renderable types are replaced with native DOM events and OctaneNode; React StrictMode-specific delayed signal cleanup is omitted in favor of Octane lifecycle cleanup | Supported and tested: sequential requests stay isolated, hydration adopts existing form controls, and native input updates activate after hydration. | 2026-07-30 |
+| [`@octanejs/grab`](#octanejsgrab) | `react-grab@0.2.0` | Published init/core/primitives/styles surface of react-grab@0.2.0, with bippy reimplemented against octane/inspect and Solid overlay retained. CLI bin packaging is an explicit gap; consume @react-grab/cli directly. | Fiber inspection uses Octane inspect owners via src/octane-adapter.ts rather than React Fibers/bippy; Update freeze uses octane/inspect pauseUpdates instead of React dispatcher patching; Window global prefers __OCTANE_GRAB__ while retaining __REACT_GRAB__ compatibility aliases; Next.js RSC symbolication and react-three-fiber selection paths are blocked pending bridges | Client overlay tool; SSR is a no-op mount guard. Upstream Next SSR e2e cases are blocked/inapplicable for this binding. | 2026-09-10 |
 | [`@octanejs/gsap`](#octanejsgsap) | `@gsap/react@2.1.2` | Full useGSAP hook contract: callback, dependency-array and config signatures; scoped contexts; contextSafe; revertOnUpdate; register; and headless. | The adapter imports Octane hooks and uses compiler-selected manual hook slots instead of React hooks; GSAP remains an external peer dependency and is not redistributed by this MIT-licensed adapter | Server rendering creates stable context helpers without running GSAP effects. Client hydration activates the standard lifecycle. | 2026-08-02 |
 | [`@octanejs/hook-form`](#octanejshook-form) | `react-hook-form@7.81.0` | Complete port of react-hook-form 7.81.0 (tag commit 46b217e034dd92f7aa3cb3a478815556b416b299). The automated parity check runs all 1,193 original tests against the pinned React package as a pristine baseline; the Octane port separately runs byte-locked, unfiltered DOM and server suites with exact collected/executed inventories containing 1,187 entries representing 1,178 unique file/full-name identities. The nine duplicate entries are repeated titles within the DOM inventory; the server inventory is disjoint. Coverage includes `useForm`, `useController`, `useFieldArray`, `useFormState`, `useWatch`, `useFormContext`/`FormProvider`, schema resolvers, and all validation modes. | `register()` returns `onInput` (octane's native per-keystroke event) instead of React's synthetic `onChange`; mode names and `register` option keys keep the upstream spelling; The structured parity ledger records native no-op input delivery, microtask batching, duplicate resolver notification, async act flush, reset render-count, and eager `Object.is` bailout differences with executable case identities, consumer impact, and migration guidance; the suite contains no skipped or expected-failure cases | Supported and tested — the upstream `*.server.test.tsx` suite runs via `octane/server` with byte-identical markup. | 2026-08-01 |
 | [`@octanejs/html-react-parser`](#octanejshtml-react-parser) | `html-react-parser@6.1.7` | Public runtime surface at html-react-parser 6.1.7: default parse, attributesToProps, domToReact, htmlToDOM, HTMLReactParserOptions, and re-exported domhandler node classes. library defaults to Octane createElement/cloneElement/isValidElement. | Consumers import from @octanejs/html-react-parser instead of html-react-parser; Default element library is Octane, not React; PRESERVE_CUSTOM_ATTRIBUTES is hardcoded true because Octane matches React 16+ DOM attributes while octane.version is 0.x; Public types use ElementDescriptor/OctaneNode instead of React JSX.Element/ReactNode; Octane serializes style objects through CSSOM, so custom-element style attribute spelling can differ from React snapshots while the parsed style object stays identical | Parsing is string-to-element-tree and is SSR-safe. Rendering the tree uses Octane server renderToStaticMarkup. | 2026-08-20 |
@@ -577,6 +578,26 @@ Scope/evidence last checked: 2026-07-30.
 - All 549 upstream runtime cases execute in pristine and adapted lanes; all eight type artifacts execute in pristine tsc and adapted tsrx-tsc lanes with assertion inventories and negative controls.
 - Differential coverage compares a representative programmatic field update with the real @formisch/react adapter.
 - The React StrictMode effect-replay case is retained as an explicit Octane divergence because Octane does not implement StrictMode double invocation.
+
+## @octanejs/grab
+
+[`packages/grab`](../packages/grab) `0.0.1` — ports `react-grab@0.2.0`. Status data: [`packages/grab/status.json`](../packages/grab/status.json).
+
+Published init/core/primitives/styles surface of react-grab@0.2.0, with bippy reimplemented against octane/inspect and Solid overlay retained. CLI bin packaging is an explicit gap; consume @react-grab/cli directly.
+
+Known divergences:
+
+- Fiber inspection uses Octane inspect owners via src/octane-adapter.ts rather than React Fibers/bippy.
+- Update freeze uses octane/inspect pauseUpdates instead of React dispatcher patching.
+- Window global prefers __OCTANE_GRAB__ while retaining __REACT_GRAB__ compatibility aliases.
+- Next.js RSC symbolication and react-three-fiber selection paths are blocked pending bridges.
+
+SSR / hydration: Client overlay tool; SSR is a no-op mount guard. Upstream Next SSR e2e cases are blocked/inapplicable for this binding.
+
+Scope/evidence last checked: 2026-09-10.
+
+- Evidence categories: thin-core (differential-surface).
+- Adapted unit suites regenerate from audit/upstream.lock.json; Playwright e2e registrations are dispositioned in audit/crosswalk.json.
 
 ## @octanejs/gsap
 

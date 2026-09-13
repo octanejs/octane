@@ -53,6 +53,7 @@
     "./testing": "./src/testing.ts",
     "./constants": "./src/constants.ts",
     "./profiling": "./src/profiling.ts",
+    "./inspect": "./src/inspect.ts",
     "./universal": "./src/universal.ts",
     "./universal/native": "./src/universal-native.ts",
     "./compiler": {
@@ -171,6 +172,10 @@
       "./profiling": {
         "types": "./dist/profiling.d.ts",
         "default": "./dist/profiling.js"
+      },
+      "./inspect": {
+        "types": "./dist/inspect.d.ts",
+        "default": "./dist/inspect.js"
       },
       "./universal": {
         "types": "./dist/universal.d.ts",

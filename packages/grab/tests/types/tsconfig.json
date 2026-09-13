@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "target": "esnext",
+    "lib": ["esnext", "dom", "dom.iterable"],
+    "types": ["node"],
+    "strict": true,
+    "skipLibCheck": false,
+    "noEmit": true,
+    "jsx": "preserve",
+    "jsxImportSource": "octane",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "paths": {
+      "@octanejs/grab": ["../../src/index.ts"],
+      "@octanejs/grab/*": ["../../src/*"],
+      "@octanejs/grab/package.json": ["../../package.json"]
+    }
+  },
+  "reactPortEvidence": {
+    "gate": "public-types"
+  },
+  "include": ["public.test-d.ts", "css-modules.d.ts"]
+}

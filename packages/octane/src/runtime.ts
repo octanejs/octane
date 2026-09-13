@@ -99,6 +99,15 @@ import {
 	__devtoolsSetBoundaryState,
 	__devtoolsClearBoundary,
 } from './devtools-hook.js';
+import {
+	__inspectRegisterRoot,
+	__inspectUnregisterRoot,
+	__inspectSetNameResolver,
+	__inspectSetChildWalker,
+	__inspectSetResumeFlush,
+	isInspectUpdatesPaused,
+	isUnderInstrumentedInspectRoot,
+} from './inspect.js';
 import type {
 	HydrateProps,
 	HydrationPrefetchFunction,
@@ -489,8 +498,12 @@ function inspectDevtoolsChildScopes(
 }
 
 function inspectDevtoolsName(scope: import('./devtools-hook.js').DevtoolsScopeLike): string {
-	const component = __profileGetComponent(scope);
-	if (component !== undefined) return componentName({ body: component } as Block);
+	// Keep `__profileGetComponent` behind the profile flag so normal production
+	// bundles can tree-shake profiling.ts (octane/inspect must not pin it).
+	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
+		const component = __profileGetComponent(scope);
+		if (component !== undefined) return componentName({ body: component } as Block);
+	}
 	return scope.body === undefined ? 'Unknown' : componentName(scope as Block);
 }
 
@@ -4560,9 +4573,69 @@ function scheduleRender(block: Block): void {
 	block.pendingDeferred = deferred;
 	QUEUE.push(block);
 	if (syncFlush) return;
+	// Grab/inspect freeze: keep instrumented-root work queued without draining
+	// until pauseUpdates()'s resume runs. inspect:false overlay roots still
+	// schedule so tool UIs stay live (see octane/inspect).
+	if (isInspectUpdatesPaused() && isUnderInstrumentedInspectRoot(block)) return;
 	if (!scheduled) {
 		scheduled = true;
 		queueMicrotask(flush);
+	}
+}
+
+__inspectSetResumeFlush(() => {
+	if (isInspectUpdatesPaused() || syncFlush || QUEUE.length === 0 || scheduled) return;
+	scheduled = true;
+	queueMicrotask(flush);
+});
+
+/**
+ * While `pauseUpdates()` is held, drain only work that belongs to
+ * `inspect: false` roots (tool overlays). Instrumented application updates stay
+ * in QUEUE until resume. Effect/ref queues from the overlay's sync first mount
+ * also need this path — they are armed via `queueMicrotask(flush)` and would
+ * otherwise be dropped by the pause early-return forever.
+ */
+function flushWhileInspectPaused(): void {
+	const held: Block[] = [];
+	let write = 0;
+	for (let i = 0; i < QUEUE.length; i++) {
+		const block = QUEUE[i]!;
+		if (isUnderInstrumentedInspectRoot(block)) {
+			held.push(block);
+		} else {
+			QUEUE[write++] = block;
+		}
+	}
+	QUEUE.length = write;
+
+	try {
+		if (inFlush) {
+			if ((QUEUE.length > 0 || ROOT_RENDER_TRANSACTIONS.length > 0) && !scheduled) {
+				scheduled = true;
+				queueMicrotask(flush);
+			}
+			return;
+		}
+		if (
+			!hasPendingWork() &&
+			refDetachQueue.length === 0 &&
+			refAttachQueue.length === 0 &&
+			activeFragments.size === 0 &&
+			FLUSHED_TRANSITION_UPDATES.length === 0 &&
+			VIEW_TRANSITION_DRIVER === null
+		) {
+			return;
+		}
+		try {
+			if (VIEW_TRANSITION_DRIVER?.routeFlush() === true) return;
+			flushWork();
+		} catch (error) {
+			if (actScopeDepth === 0) throw error;
+			(actErrors ??= []).push(error);
+		}
+	} finally {
+		for (let i = 0; i < held.length; i++) QUEUE.push(held[i]!);
 	}
 }
 
@@ -4880,6 +4953,13 @@ function drainQueue(): { err: any } | null {
 
 function flush(): void {
 	scheduled = false;
+	// Inspect freeze: instrumented roots stay queued; inspect:false overlays
+	// still drain (mount effects + live updates). Resume re-arms via
+	// __inspectSetResumeFlush for any held application work.
+	if (isInspectUpdatesPaused()) {
+		flushWhileInspectPaused();
+		return;
+	}
 	// Re-entrancy backstop (see `inFlush`): a flush landing inside an active
 	// flush re-arms the scheduler instead of draining over the outer walk.
 	if (inFlush) {
@@ -7851,12 +7931,11 @@ function unmountBlock(block: Block, detachDom: boolean = true): void {
 
 function unmountBlockInner(block: Block, detachDom: boolean): void {
 	block.disposed = true;
-	if (
-		typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' &&
-		__OCTANE_PROFILE_ENABLED__ &&
-		block.kind === 'root'
-	)
-		__devtoolsUnregisterRoot(block);
+	if (block.kind === 'root') {
+		__inspectUnregisterRoot(block as any);
+		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+			__devtoolsUnregisterRoot(block);
+	}
 	const owner = block.idState.renderOwner;
 	if (owner?.current === block) {
 		owner.generation++;
@@ -18054,11 +18133,41 @@ interface InvalidEventListenerSlot {
 type EventSlot = unknown;
 
 function isHandlerBundle(slot: EventSlot): slot is HandlerBundle {
+	// Bundles published on the DOM are callable no-ops so foreign `$$event`
+	// walkers (Solid's document delegation) can `handler.call(...)` without
+	// throwing. Snapshots kept only in CAPTURE_SLOTS may still be plain objects.
+	const t = typeof slot;
 	return (
-		typeof slot === 'object' &&
+		(t === 'object' || t === 'function') &&
 		slot !== null &&
 		(slot as HandlerBundle)[EVENT_SLOT_KIND] === HANDLER_BUNDLE_KIND
 	);
+}
+
+/**
+ * Build a delegated handler bundle. The slot itself is a no-op function:
+ * Octane dispatches through `fireEventSlot` (reads `.fn` / `.args`); callers
+ * that treat `el.$$click` as a Solid-style function must not throw or run the
+ * Octane listener a second time.
+ */
+function createHandlerBundle(
+	fn: (...args: any[]) => any,
+	args: any[] | 1 | 2,
+	a0?: any,
+	a1?: any,
+): HandlerBundle {
+	const slot = function octaneEventSlot() {
+		/* foreign $$event walkers invoke this; Octane never does */
+	} as unknown as HandlerBundle;
+	slot.fn = fn;
+	slot.args = args;
+	if (args === 1) slot.a0 = a0;
+	else if (args === 2) {
+		slot.a0 = a0;
+		slot.a1 = a1;
+	}
+	slot[EVENT_SLOT_KIND] = HANDLER_BUNDLE_KIND;
+	return slot;
 }
 
 /**
@@ -18132,7 +18241,7 @@ export function setEventHandler(el: Element, key: string, handler: any): void {
 }
 
 export function evt0(el: Element, key: string, fn: any): HandlerBundle {
-	const d: HandlerBundle = { fn, args: EMPTY_ARGS, [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND };
+	const d = createHandlerBundle(fn, EMPTY_ARGS);
 	setEventHandler(el, key, d);
 	return d;
 }
@@ -18142,7 +18251,7 @@ export function evt0u(d: HandlerBundle, fn: any): void {
 	d.fn = fn;
 }
 export function evt1(el: Element, key: string, fn: any, a0: any): HandlerBundle {
-	const d: HandlerBundle = { fn, args: 1, a0, [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND };
+	const d = createHandlerBundle(fn, 1, a0);
 	setEventHandler(el, key, d);
 	return d;
 }
@@ -18153,7 +18262,7 @@ export function evt1u(d: HandlerBundle, fn: any, a0: any): void {
 	d.a0 = a0;
 }
 export function evt2(el: Element, key: string, fn: any, a0: any, a1: any): HandlerBundle {
-	const d: HandlerBundle = { fn, args: 2, a0, a1, [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND };
+	const d = createHandlerBundle(fn, 2, a0, a1);
 	setEventHandler(el, key, d);
 	return d;
 }
@@ -18165,7 +18274,7 @@ export function evt2u(d: HandlerBundle, fn: any, a0: any, a1: any): void {
 	d.a1 = a1;
 }
 export function evtN(el: Element, key: string, fn: any, args: any[]): HandlerBundle {
-	const d: HandlerBundle = { fn, args, [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND };
+	const d = createHandlerBundle(fn, args);
 	setEventHandler(el, key, d);
 	return d;
 }
@@ -19030,14 +19139,9 @@ function fireEventSlot(slot: EventSlot, event: Event): void {
 	CURRENT_SCOPE = null;
 	CURRENT_BLOCK = null;
 	try {
-		if (typeof slot === 'function') {
-			slot(event);
-			return;
-		}
-		if (process.env.NODE_ENV !== 'production' && isInvalidEventListenerSlot(slot)) {
-			invokeInvalidEventListener(`\`${slot.name}\``, slot.value, event);
-			return;
-		}
+		// Bundles may be functions (Solid-safe no-ops); brand check must win over
+		// the bare-function path so we dispatch `.fn`/`.args` instead of calling
+		// the no-op slot body.
 		if (isHandlerBundle(slot)) {
 			const bundle = slot;
 			const a = bundle.args;
@@ -19060,6 +19164,14 @@ function fireEventSlot(slot: EventSlot, event: Event): void {
 			} else {
 				bundle.fn(bundle.a0, bundle.a1);
 			}
+			return;
+		}
+		if (typeof slot === 'function') {
+			slot(event);
+			return;
+		}
+		if (process.env.NODE_ENV !== 'production' && isInvalidEventListenerSlot(slot)) {
+			invokeInvalidEventListener(`\`${slot.name}\``, slot.value, event);
 			return;
 		}
 		invokeInvalidEventListener(`${event.type} event`, slot, event);
@@ -35547,6 +35659,20 @@ export interface RootOptions {
 	 * recovery stays quiet to keep the report channel comparable.
 	 */
 	onRecoverableError?: (error: unknown) => void;
+	/**
+	 * When false, this root is NOT registered with the inspect/devtools subsystem.
+	 * Host nodes inside the root will not be discoverable via
+	 * `getOwnerFromHostInstance` or appear in the inspect root set. Useful for
+	 * tool overlays (e.g. `@octanejs/grab`) that mount their own root alongside
+	 * the application and must stay invisible to instrumentation.
+	 *
+	 * Exempt roots also keep scheduling while `pauseUpdates()` freezes
+	 * instrumented application trees, so overlay mount effects and live UI
+	 * updates continue during grab mode.
+	 *
+	 * Defaults to `true`.
+	 */
+	inspect?: boolean;
 }
 
 /**
@@ -36117,12 +36243,19 @@ function makeRoot(
 			createdInRootRender(rootBlock);
 			registerRootErrorHandlers(rootBlock, errorOptions);
 			registerRootDisposer(rootBlock);
+			__inspectSetNameResolver(inspectDevtoolsName);
+			__inspectSetChildWalker(inspectDevtoolsChildScopes);
+			if (errorOptions?.inspect !== false) {
+				__inspectRegisterRoot(rootBlock as any);
+			}
 			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
 				__devtoolsSetNameResolver(inspectDevtoolsName);
 				__devtoolsSetChildWalker(inspectDevtoolsChildScopes);
-				__devtoolsRegisterRoot(
-					rootBlock as unknown as import('./devtools-hook.js').DevtoolsScopeLike,
-				);
+				if (errorOptions?.inspect !== false) {
+					__devtoolsRegisterRoot(
+						rootBlock as unknown as import('./devtools-hook.js').DevtoolsScopeLike,
+					);
+				}
 			}
 			currentBody = body;
 			currentKey = nextKey;
@@ -36296,6 +36429,7 @@ function makeRoot(
 			try {
 				if (rootBlock) {
 					DOM_ROOT_DISPOSERS.delete(rootBlock);
+					__inspectUnregisterRoot(rootBlock as any);
 					if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 						__devtoolsUnregisterRoot(
 							rootBlock as unknown as import('./devtools-hook.js').DevtoolsScopeLike,
@@ -36465,10 +36599,19 @@ export function hydrateRoot(
 	);
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileTrackComponent(rootBlock, body);
+	__inspectSetNameResolver(inspectDevtoolsName);
+	__inspectSetChildWalker(inspectDevtoolsChildScopes);
+	if (rootOptions?.inspect !== false) {
+		__inspectRegisterRoot(rootBlock as any);
+	}
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
 		__devtoolsSetNameResolver(inspectDevtoolsName);
 		__devtoolsSetChildWalker(inspectDevtoolsChildScopes);
-		__devtoolsRegisterRoot(rootBlock as unknown as import('./devtools-hook.js').DevtoolsScopeLike);
+		if (rootOptions?.inspect !== false) {
+			__devtoolsRegisterRoot(
+				rootBlock as unknown as import('./devtools-hook.js').DevtoolsScopeLike,
+			);
+		}
 	}
 	const idState: RootIdState = {
 		prefix: rootOptions?.identifierPrefix ?? '',

@@ -206,6 +206,14 @@ export const REQUIRED_PUBLIC_VALUE_EXPORTS = {
 		'visible',
 	],
 	'./behavior': ['attachBehaviorRoot'],
+	'./inspect': [
+		'getOwnerFromHostInstance',
+		'getOwnerStack',
+		'getOwnerStackFromHost',
+		'isInspectUpdatesPaused',
+		'isInstrumentationActive',
+		'pauseUpdates',
+	],
 	'./signals': [
 		'createScope',
 		'query',

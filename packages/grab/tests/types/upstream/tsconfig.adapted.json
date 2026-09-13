@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "skipLibCheck": false,
+    "noEmit": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "jsx": "preserve",
+    "jsxImportSource": "octane",
+    "allowImportingTsExtensions": true,
+    "types": ["node"],
+    "paths": {
+      "@octanejs/grab": ["../../../src/index.ts"],
+      "@octanejs/grab/*": ["../../../src/*"]
+    }
+  },
+  "files": ["adapted.ts", "../css-modules.d.ts"],
+  "reactPortEvidence": {
+    "gate": "upstream-types-adapted",
+    "upstreamRegistrations": []
+  }
+}

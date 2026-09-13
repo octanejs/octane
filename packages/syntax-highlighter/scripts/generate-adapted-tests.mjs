@@ -34,6 +34,15 @@ for (const name of testFiles) {
 		.replace(/jest\.fn/g, 'vi.fn')
 		.replace(/jest\./g, 'vi.');
 	if (name === 'light-async.js') {
+		const missingLanguageCase =
+			"test('SyntaxHighlighter render as text if language doesnt exist', () => {";
+		const missingLanguageIndex = adapted.indexOf(missingLanguageCase);
+		if (missingLanguageIndex === -1) {
+			throw new Error('Unable to stabilize the missing-language case');
+		}
+		adapted = `${adapted.slice(0, missingLanguageIndex)}test('SyntaxHighlighter render as text if language doesnt exist', async () => {
+  await SyntaxHighlighter.preload();${adapted.slice(missingLanguageIndex + missingLanguageCase.length)}`;
+
 		const loadingCase = "test('SyntaxHighlighter renders text while language loads', async () => {";
 		const loadingCaseIndex = adapted.indexOf(loadingCase);
 		const preload = '  await SyntaxHighlighter.preload();';
@@ -48,8 +57,15 @@ for (const name of testFiles) {
   // Keep the request pending so runner load cannot race the loading-state assertion.
   const loadLanguage = vi
     .spyOn(SyntaxHighlighter, 'loadLanguage')
-    .mockImplementation(() => new Promise(() => {}));${adapted.slice(preloadIndex + preload.length, assertionIndex)}  await vi.waitFor(() => expect(loadLanguage).toHaveBeenCalledWith('gherkin'));
+    .mockImplementation(() => new Promise(() => {}));
+  // Pending languages fall through to highlightAuto. Sibling tests register
+  // javascript/fortran on the shared lowlight core, so auto-detect would
+  // otherwise tokenize this fortran-looking sample and flake the snap.
+  const highlightAuto = vi
+    .spyOn(SyntaxHighlighter.astGenerator, 'highlightAuto')
+    .mockImplementation(() => ({ language: null, value: [] }));${adapted.slice(preloadIndex + preload.length, assertionIndex)}  await vi.waitFor(() => expect(loadLanguage).toHaveBeenCalledWith('gherkin'));
 ${assertion}
+  highlightAuto.mockRestore();
   loadLanguage.mockRestore();${adapted.slice(assertionIndex + assertion.length)}`;
 	}
 	const outputName = name.replace(/\.js$/, '.test.ts');

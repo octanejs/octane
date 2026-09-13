@@ -36,6 +36,19 @@ for (const [name, source, expected] of [
 		null,
 	],
 	['runtime filter', `const rows = [1,2].filter(predicate); it.each(rows)('row', () => {});`, null],
+	[
+		'for-of over typed const matrix',
+		`interface Row { label: string }
+		const rows: Row[] = [{ label: 'a' }, { label: 'b' }];
+		for (const row of rows) { it(\`row \${row.label}\`, () => {}); }`,
+		2,
+	],
+	[
+		'for-of over untyped const matrix',
+		`const rows = [{ label: 'a' }, { label: 'b' }];
+		for (const row of rows) { it(\`row \${row.label}\`, () => {}); }`,
+		2,
+	],
 ]) {
 	test(`inventory handles ${name}`, () => {
 		const cases = extractTestCases(source);

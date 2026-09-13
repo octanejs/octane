@@ -88,6 +88,7 @@ export function staticArrayInventory(source) {
 			['each', 'for'].includes(parent.expression.name.text)
 		)
 			return true;
+		if (ts.isForOfStatement(parent) && parent.expression === node) return true;
 		return false;
 	};
 	const merge = (values) => {
@@ -170,6 +171,10 @@ export function staticArrayInventory(source) {
 				);
 				if (value) counts.set(node.expression.name.getStart(sourceFile), value.length);
 			}
+		}
+		if (ts.isForOfStatement(node)) {
+			const value = evaluate(node.expression);
+			if (value) counts.set(node.getStart(sourceFile), value.length);
 		}
 		ts.forEachChild(node, collect);
 	};

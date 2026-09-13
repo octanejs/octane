@@ -1,0 +1,2013 @@
+{
+  "schemaVersion": 1,
+  "identity": {
+    "packageName": "react-grab",
+    "version": "0.2.0",
+    "repository": {
+      "owner": "aidenybai",
+      "repo": "react-grab",
+      "subdirectory": null
+    },
+    "commit": "23bce0e56f2808902f1126ad581f6d8c3b5f639e",
+    "integrity": "sha512-ohhsfXD4qN0j6cMQd56aaVJBPDF3kUdviF/Od1Eak/rEIXQ3svQ4gjkwTfuTZwTBnxHRL16p9JqdlVQO5nUHqA=="
+  },
+  "license": {
+    "spdx": "MIT",
+    "evidence": [
+      {
+        "path": "LICENSE",
+        "sha256": "3cb91aec78b7a54136b60a81055a3e1e5bac3c2d47d06dc866948129e4cd4f45"
+      },
+      {
+        "path": "packages/react-grab/LICENSE",
+        "sha256": "3cb91aec78b7a54136b60a81055a3e1e5bac3c2d47d06dc866948129e4cd4f45"
+      }
+    ],
+    "notices": []
+  },
+  "scopes": ["LICENSE", "packages/react-grab"],
+  "adaptedMappings": [
+    {
+      "fromRoot": "packages/react-grab/tests",
+      "toRoot": "tests/upstream"
+    },
+    {
+      "fromRoot": "packages/react-grab/e2e",
+      "toRoot": "tests/upstream/e2e"
+    }
+  ],
+  "adaptedRewrites": [
+    {
+      "find": "from \"react\"",
+      "replace": "from \"octane\""
+    },
+    {
+      "find": "from 'react'",
+      "replace": "from 'octane'"
+    },
+    {
+      "find": "from \"bippy\"",
+      "replace": "from \"../../src/octane-adapter.js\""
+    },
+    {
+      "find": "from 'bippy'",
+      "replace": "from '../../src/octane-adapter.js'"
+    },
+    {
+      "find": "from \"bippy/source\"",
+      "replace": "from \"../../src/octane-adapter.js\""
+    },
+    {
+      "find": "from 'bippy/source'",
+      "replace": "from '../../src/octane-adapter.js'"
+    },
+    {
+      "find": "from \"react-grab\"",
+      "replace": "from \"@octanejs/grab\""
+    },
+    {
+      "find": "from 'react-grab'",
+      "replace": "from '@octanejs/grab'"
+    },
+    {
+      "find": "from \"@testing-library/react\"",
+      "replace": "from \"@octanejs/testing-library\""
+    },
+    {
+      "find": "from '@testing-library/react'",
+      "replace": "from '@octanejs/testing-library'"
+    },
+    {
+      "find": "from \"vite-plus/test\"",
+      "replace": "from \"vitest\""
+    },
+    {
+      "find": "from 'vite-plus/test'",
+      "replace": "from 'vitest'"
+    },
+    {
+      "find": "from \"../src/",
+      "replace": "from \"../../src/"
+    },
+    {
+      "find": "from '../src/",
+      "replace": "from '../../src/"
+    },
+    {
+      "find": "vi.mock(\"../src/",
+      "replace": "vi.mock(\"../../src/"
+    },
+    {
+      "find": "vi.mock('../src/",
+      "replace": "vi.mock('../../src/"
+    }
+  ],
+  "files": [
+    {
+      "path": "LICENSE",
+      "gitBlob": "9ffd507155b4fc6b464d426abec9375dbd795d43",
+      "size": 1066
+    },
+    {
+      "path": "packages/react-grab/bin/cli.js",
+      "gitBlob": "425d9ff0c0644f10914ab26e4e922aa7263419c7",
+      "size": 260
+    },
+    {
+      "path": "packages/react-grab/CHANGELOG.md",
+      "gitBlob": "494e8386e7461e57517655faf07d4027a75b0459",
+      "size": 21919
+    },
+    {
+      "path": "packages/react-grab/docs/architecture.md",
+      "gitBlob": "4a961fd7a58ce325d9004e1f314558342d732480",
+      "size": 32069
+    },
+    {
+      "path": "packages/react-grab/e2e/activation-edge-cases.spec.ts",
+      "gitBlob": "cf6d0969730c0d68e897c6baea147280fc830850",
+      "size": 8071
+    },
+    {
+      "path": "packages/react-grab/e2e/activation-key-config.spec.ts",
+      "gitBlob": "6707846b9f8b2eb236864bcd9a9ea58f7e81c69f",
+      "size": 7261
+    },
+    {
+      "path": "packages/react-grab/e2e/activation.spec.ts",
+      "gitBlob": "cdaec1fa251a23ccaf3976bdbd0d5a4cca42f08d",
+      "size": 6686
+    },
+    {
+      "path": "packages/react-grab/e2e/api-methods.spec.ts",
+      "gitBlob": "c9726eeab57a1217e8df40b59805ff208e3aca95",
+      "size": 25291
+    },
+    {
+      "path": "packages/react-grab/e2e/app-theme-detection.spec.ts",
+      "gitBlob": "71e154f19047819e56e2f82f9e71e24b52a1e430",
+      "size": 17590
+    },
+    {
+      "path": "packages/react-grab/e2e/combinatorial-interactions.spec.ts",
+      "gitBlob": "4879b3d99d6f82d2402894ab0ca1ebbdc28e8c30",
+      "size": 15583
+    },
+    {
+      "path": "packages/react-grab/e2e/constants.ts",
+      "gitBlob": "c06365508d1e73a7b697285e18b576c0d2d0cde3",
+      "size": 2608
+    },
+    {
+      "path": "packages/react-grab/e2e/context-menu.spec.ts",
+      "gitBlob": "6595ce7afda3d34d6265e301fbb79a14764bb2d6",
+      "size": 26188
+    },
+    {
+      "path": "packages/react-grab/e2e/copy-failure.spec.ts",
+      "gitBlob": "eb1a0d7c1b0ed5dfa225aaf8dfce631d6e692a30",
+      "size": 9940
+    },
+    {
+      "path": "packages/react-grab/e2e/copy-feedback.spec.ts",
+      "gitBlob": "0aed20f194432bcbdaaa117b09b61a0830dcb254",
+      "size": 20778
+    },
+    {
+      "path": "packages/react-grab/e2e/coverage-config.ts",
+      "gitBlob": "6f1680171ae96a7927e5a2cbeafc705dfaa2dc39",
+      "size": 909
+    },
+    {
+      "path": "packages/react-grab/e2e/coverage-setup.ts",
+      "gitBlob": "40387fe6ea43fd79328a6942dca7fb00fc76e96d",
+      "size": 400
+    },
+    {
+      "path": "packages/react-grab/e2e/coverage-teardown.ts",
+      "gitBlob": "268335a5555d056efa2238d20380bc4bb90340c3",
+      "size": 1483
+    },
+    {
+      "path": "packages/react-grab/e2e/disabled-elements.spec.ts",
+      "gitBlob": "ddc0f1d9e0163356a52ed08e552a761fe6075167",
+      "size": 14517
+    },
+    {
+      "path": "packages/react-grab/e2e/drag-selection.spec.ts",
+      "gitBlob": "4b92969fc5c0eef165deb03360982bebb22dab64",
+      "size": 18513
+    },
+    {
+      "path": "packages/react-grab/e2e/drag-targeting-regressions.spec.ts",
+      "gitBlob": "6f0016ca30abf84ee25e3e28ad2cbb87c639a897",
+      "size": 8723
+    },
+    {
+      "path": "packages/react-grab/e2e/edge-cases.spec.ts",
+      "gitBlob": "a631e445263f6f661c09e8b5f57ef1342e85dec9",
+      "size": 11547
+    },
+    {
+      "path": "packages/react-grab/e2e/element-context.spec.ts",
+      "gitBlob": "e783573937e909f20b6e81cf67e6395df871cd17",
+      "size": 24556
+    },
+    {
+      "path": "packages/react-grab/e2e/event-callbacks.spec.ts",
+      "gitBlob": "b3717be9701fbbc6e3eb2a3649ad8e5760bc84d1",
+      "size": 14024
+    },
+    {
+      "path": "packages/react-grab/e2e/fiber-relink.spec.ts",
+      "gitBlob": "30c708a2b475288eba92c72888bcd03fa0a35501",
+      "size": 8167
+    },
+    {
+      "path": "packages/react-grab/e2e/fixtures.ts",
+      "gitBlob": "3f79b047fb14c40bdc8402d4b049904a457a9ce4",
+      "size": 61644
+    },
+    {
+      "path": "packages/react-grab/e2e/focus-trap.spec.ts",
+      "gitBlob": "c51da550af1914bf5fb8ea8609d7cf59a7069961",
+      "size": 10250
+    },
+    {
+      "path": "packages/react-grab/e2e/framework-production.spec.ts",
+      "gitBlob": "068714e378cb715c76b458087b8b2c484ad126f3",
+      "size": 3696
+    },
+    {
+      "path": "packages/react-grab/e2e/framework/contract.spec.ts",
+      "gitBlob": "f0391a60c7d8f61ed49eaec5e11e9f610a73397e",
+      "size": 2765
+    },
+    {
+      "path": "packages/react-grab/e2e/framework/framework-helpers.ts",
+      "gitBlob": "9dad503c3642fa22e969d2fc871e569350dd20da",
+      "size": 2550
+    },
+    {
+      "path": "packages/react-grab/e2e/framework/list-keys.spec.ts",
+      "gitBlob": "c904fe66273c63b8c5a2cf85737fa37954ab9720",
+      "size": 3065
+    },
+    {
+      "path": "packages/react-grab/e2e/framework/navigation.spec.ts",
+      "gitBlob": "78d1ee0fd0e99befc077037d092a03a8d94d0f2a",
+      "size": 1385
+    },
+    {
+      "path": "packages/react-grab/e2e/framework/owner-semantics.spec.ts",
+      "gitBlob": "0ee1e9483a0f4f6644904cf5da0b219d03a8c82a",
+      "size": 3658
+    },
+    {
+      "path": "packages/react-grab/e2e/framework/production.spec.ts",
+      "gitBlob": "23fef16f279a3aa5d0ca14658fe78acf4c090369",
+      "size": 3291
+    },
+    {
+      "path": "packages/react-grab/e2e/framework/recovery.spec.ts",
+      "gitBlob": "c2a41df2f7be4ece8ea5e75b838e146b6bb9fe6c",
+      "size": 3294
+    },
+    {
+      "path": "packages/react-grab/e2e/freeze-animations.spec.ts",
+      "gitBlob": "78e64f76bdb67b68dea6549733c3e49dbd715f89",
+      "size": 23278
+    },
+    {
+      "path": "packages/react-grab/e2e/freeze-pseudo-states.spec.ts",
+      "gitBlob": "21d691bb34b564a9a10d4c8bed9ca20163c7d83a",
+      "size": 1340
+    },
+    {
+      "path": "packages/react-grab/e2e/freeze-updates.spec.ts",
+      "gitBlob": "54f44462a0ea4ab3e8ed6c154a9d4979e6e22dee",
+      "size": 15799
+    },
+    {
+      "path": "packages/react-grab/e2e/get-text-interaction-position.ts",
+      "gitBlob": "233bcaf1490d151955c5f9158b011d6e40fb559c",
+      "size": 1343
+    },
+    {
+      "path": "packages/react-grab/e2e/heavy-ui.spec.ts",
+      "gitBlob": "38050c7cdd1f3ebe56679065a4f5d8d9b684489c",
+      "size": 8115
+    },
+    {
+      "path": "packages/react-grab/e2e/hold-activation.spec.ts",
+      "gitBlob": "62fb9669ffed054271ad70819957e4abd17a6fae",
+      "size": 2962
+    },
+    {
+      "path": "packages/react-grab/e2e/host-interaction-cleanup.spec.ts",
+      "gitBlob": "5a3189eb23f010897f0c7859dc20c127630448c8",
+      "size": 1525
+    },
+    {
+      "path": "packages/react-grab/e2e/hover-reveal.spec.ts",
+      "gitBlob": "2dba5b08a0e79d835c3639253fd93954c432ca9b",
+      "size": 11795
+    },
+    {
+      "path": "packages/react-grab/e2e/iframe.spec.ts",
+      "gitBlob": "db35bfd45335099c2978870fe47bc59dbfa83770",
+      "size": 41464
+    },
+    {
+      "path": "packages/react-grab/e2e/interference-ui.spec.ts",
+      "gitBlob": "40a1333d5a6b1e73cefd57e4fb65a345165419c1",
+      "size": 12436
+    },
+    {
+      "path": "packages/react-grab/e2e/keyboard-navigation.spec.ts",
+      "gitBlob": "8488430c5a901463f4264b920dff368494ed80ed",
+      "size": 23645
+    },
+    {
+      "path": "packages/react-grab/e2e/keyboard-shortcuts.spec.ts",
+      "gitBlob": "1a72559a7098cca458893401f5ea63e7d50b1441",
+      "size": 2490
+    },
+    {
+      "path": "packages/react-grab/e2e/malformed-events.spec.ts",
+      "gitBlob": "d7372e82e4fd32c345675b9ccbeed83b63603ae5",
+      "size": 14910
+    },
+    {
+      "path": "packages/react-grab/e2e/move-pointer-to-locator-center.ts",
+      "gitBlob": "9d313bbe51dd4775183a96349845f14bedb4ac33",
+      "size": 700
+    },
+    {
+      "path": "packages/react-grab/e2e/move-to-three-object.ts",
+      "gitBlob": "52134733f93769a1eb9e37b960fa9443d062397e",
+      "size": 1150
+    },
+    {
+      "path": "packages/react-grab/e2e/next-symbolication-blocking.spec.ts",
+      "gitBlob": "66b68b8361a71ec71c554abb38f964bb1128e732",
+      "size": 4724
+    },
+    {
+      "path": "packages/react-grab/e2e/open-file.spec.ts",
+      "gitBlob": "dc93be7fec872b4eb312d0d29d87a1843b312e51",
+      "size": 13170
+    },
+    {
+      "path": "packages/react-grab/e2e/overlay-filtering.spec.ts",
+      "gitBlob": "dc87a5947baa3705d2863fc2fa71e657c643c41c",
+      "size": 7707
+    },
+    {
+      "path": "packages/react-grab/e2e/owner-stack.spec.ts",
+      "gitBlob": "ab966da87994e7c5db1c5dde269b77a9da951093",
+      "size": 6769
+    },
+    {
+      "path": "packages/react-grab/e2e/perf-animation-controls.ts",
+      "gitBlob": "947de76d367079450bd36d2b84c51835e5db6c7e",
+      "size": 14615
+    },
+    {
+      "path": "packages/react-grab/e2e/perf-animation-counterfactual.ts",
+      "gitBlob": "736ebb9344fc2f2ec3f9f19b385ccab17a032e61",
+      "size": 7186
+    },
+    {
+      "path": "packages/react-grab/e2e/perf-bench.spec.ts",
+      "gitBlob": "4ad002307497e6c5a3d51ebbb20062f8581ee20c",
+      "size": 41536
+    },
+    {
+      "path": "packages/react-grab/e2e/perf-compositing.ts",
+      "gitBlob": "6d687618529ced70ffd789ea0b80dd53f897fcbf",
+      "size": 18526
+    },
+    {
+      "path": "packages/react-grab/e2e/perf-constants.ts",
+      "gitBlob": "1ec59813cd9c975bcbc176286ee046b353976474",
+      "size": 3842
+    },
+    {
+      "path": "packages/react-grab/e2e/perf-dom-mutation-attribution.ts",
+      "gitBlob": "1e57eb72fe2fb33bf9e5579925ee9e1b1db8607a",
+      "size": 21174
+    },
+    {
+      "path": "packages/react-grab/e2e/perf-environment.ts",
+      "gitBlob": "a5cb4f9ba5e8666048ce03771b44fef0a231f551",
+      "size": 6178
+    },
+    {
+      "path": "packages/react-grab/e2e/perf-fixtures.ts",
+      "gitBlob": "b16ddf056a1eca3fe6de8f9cb1dca1415f032102",
+      "size": 11457
+    },
+    {
+      "path": "packages/react-grab/e2e/perf-hardware-gpu.ts",
+      "gitBlob": "8f81174af66523e6ebe6025f0e737f3c63929a52",
+      "size": 16124
+    },
+    {
+      "path": "packages/react-grab/e2e/perf-heavy.spec.ts",
+      "gitBlob": "49dcba48bb2450e2654ef7ac80b6d17620a6e8e1",
+      "size": 26107
+    },
+    {
+      "path": "packages/react-grab/e2e/perf-interference.spec.ts",
+      "gitBlob": "c08fd7979261818955ec6845a97cd73e482e5bc5",
+      "size": 17954
+    },
+    {
+      "path": "packages/react-grab/e2e/perf-process-cpu.ts",
+      "gitBlob": "adc27b3ec3cb8ba6772724922c3b870d4587e8f0",
+      "size": 9496
+    },
+    {
+      "path": "packages/react-grab/e2e/perf-recorder.ts",
+      "gitBlob": "f8807b9afdb5a3ddde62d1da0e4a6184aff2da5d",
+      "size": 51916
+    },
+    {
+      "path": "packages/react-grab/e2e/perf-render-trace-summary.ts",
+      "gitBlob": "9c30120dc62675e14c301093cd37fc5dacb10192",
+      "size": 19605
+    },
+    {
+      "path": "packages/react-grab/e2e/perf-render-trace.ts",
+      "gitBlob": "eab8d49aeccca0c03150bba97796c173239d33a1",
+      "size": 26481
+    },
+    {
+      "path": "packages/react-grab/e2e/perf-statistics.ts",
+      "gitBlob": "f5de6585c34a4fdb2970dbd56334f24490d46ebe",
+      "size": 1154
+    },
+    {
+      "path": "packages/react-grab/e2e/perf-validity.ts",
+      "gitBlob": "f8fbad02bd69bf2706a1b27760e06501a1386ec6",
+      "size": 9950
+    },
+    {
+      "path": "packages/react-grab/e2e/perf-workload.ts",
+      "gitBlob": "ff87d77d462569185f778dcb9a198f7f72fec936",
+      "size": 4807
+    },
+    {
+      "path": "packages/react-grab/e2e/prompt-mode.spec.ts",
+      "gitBlob": "5f5a28b6ac11a0ba62b83bda4a47550504bc346e",
+      "size": 10088
+    },
+    {
+      "path": "packages/react-grab/e2e/race-deadline.ts",
+      "gitBlob": "6d9aab70b90a0bf7e48031cd377214b41f67d91f",
+      "size": 586
+    },
+    {
+      "path": "packages/react-grab/e2e/react-grab.expect.ts",
+      "gitBlob": "5d99b451ccb30f67bdbf3a00b8af5d9cc7e6c1c6",
+      "size": 4657
+    },
+    {
+      "path": "packages/react-grab/e2e/selection.spec.ts",
+      "gitBlob": "dee258e28d601e6b3dc436434b2400a301cc49d3",
+      "size": 10120
+    },
+    {
+      "path": "packages/react-grab/e2e/shadow-dom.spec.ts",
+      "gitBlob": "f425c04781960224c58a7fe10b189948cc779b9d",
+      "size": 7937
+    },
+    {
+      "path": "packages/react-grab/e2e/shift-multi-select.spec.ts",
+      "gitBlob": "db4933a0f1b29dfcf0a91fe12f9fd2ba1d7f03d3",
+      "size": 32512
+    },
+    {
+      "path": "packages/react-grab/e2e/solid-source-location.spec.ts",
+      "gitBlob": "e5ecb2e8e55e783160a056a89e43ec757908438b",
+      "size": 2200
+    },
+    {
+      "path": "packages/react-grab/e2e/ssr.spec.ts",
+      "gitBlob": "832868f2ed6d12d3206e6e1de14cc14812c83e7b",
+      "size": 6855
+    },
+    {
+      "path": "packages/react-grab/e2e/theme-customization.spec.ts",
+      "gitBlob": "4cef0cd0ebbaa87201bd205247199d12a658c313",
+      "size": 7346
+    },
+    {
+      "path": "packages/react-grab/e2e/three-fiber-selection.spec.ts",
+      "gitBlob": "774626f042c3191b6169b49f9f34e4bf143d9496",
+      "size": 6469
+    },
+    {
+      "path": "packages/react-grab/e2e/three-js-rendering.spec.ts",
+      "gitBlob": "bde207a683ae0b385b55544543c4d0b9db9101de",
+      "size": 1445
+    },
+    {
+      "path": "packages/react-grab/e2e/toolbar-actions.spec.ts",
+      "gitBlob": "0462803413c6825b8245f1db97ef50ad667bdbe0",
+      "size": 4498
+    },
+    {
+      "path": "packages/react-grab/e2e/toolbar-menu.spec.ts",
+      "gitBlob": "31d186c3ab0dbf20c0e9f53c64d8baabee555479",
+      "size": 6838
+    },
+    {
+      "path": "packages/react-grab/e2e/toolbar-selection-hover.spec.ts",
+      "gitBlob": "4b01702b1ee41f31394e8ae36cc2a6691dff6a70",
+      "size": 3684
+    },
+    {
+      "path": "packages/react-grab/e2e/toolbar.spec.ts",
+      "gitBlob": "b78fadad3bee7db9643ed78076be653a5c7491b0",
+      "size": 32207
+    },
+    {
+      "path": "packages/react-grab/e2e/touch-mode.spec.ts",
+      "gitBlob": "c214d44b2fd4777df5aa082ec4b124fbd69cae18",
+      "size": 8245
+    },
+    {
+      "path": "packages/react-grab/e2e/viewport.spec.ts",
+      "gitBlob": "9473247c0a6f06081bafad4ddd59dec045c222c5",
+      "size": 10779
+    },
+    {
+      "path": "packages/react-grab/e2e/visual-feedback.spec.ts",
+      "gitBlob": "518c3c6e8d49a5b54bf75d4ddc223241adeace2c",
+      "size": 11792
+    },
+    {
+      "path": "packages/react-grab/e2e/web-extension.spec.ts",
+      "gitBlob": "6b795a5e71ca854468fa5ac96594a6398ccad849",
+      "size": 5649
+    },
+    {
+      "path": "packages/react-grab/e2e/zoom-canvas.spec.ts",
+      "gitBlob": "dcbdccde2b3b463c0ce9797fa25c810595ae4156",
+      "size": 2719
+    },
+    {
+      "path": "packages/react-grab/LICENSE",
+      "gitBlob": "9ffd507155b4fc6b464d426abec9375dbd795d43",
+      "size": 1066
+    },
+    {
+      "path": "packages/react-grab/package.json",
+      "gitBlob": "2829bae3c9fa7f6c9a294f64a5a8fbef03af7946",
+      "size": 5177
+    },
+    {
+      "path": "packages/react-grab/perf/.gitignore",
+      "gitBlob": "b1bf6787002dcc6e8ff11b6605f09d07d8e545b4",
+      "size": 652
+    },
+    {
+      "path": "packages/react-grab/perf/README.md",
+      "gitBlob": "c58144e10a6df4ae80f93131310b3716ad5754fc",
+      "size": 16852
+    },
+    {
+      "path": "packages/react-grab/playwright.config.ts",
+      "gitBlob": "69231077354e15f8555410b44c303c7adf315750",
+      "size": 11426
+    },
+    {
+      "path": "packages/react-grab/README.md",
+      "gitBlob": "9ae0164caf8bf1cbbe3e04beb31d850d572fa3b1",
+      "size": 4549
+    },
+    {
+      "path": "packages/react-grab/scripts/analyze-perf-trace.mjs",
+      "gitBlob": "28ad578db161248f1175e70c4c8cedb9c6ba55bb",
+      "size": 24038
+    },
+    {
+      "path": "packages/react-grab/scripts/css-rem-to-px.ts",
+      "gitBlob": "ff6d74efb92a53a2274644af3066a31429f0f563",
+      "size": 938
+    },
+    {
+      "path": "packages/react-grab/scripts/deopt-trace.mjs",
+      "gitBlob": "9c3c9682d36dffa44d07257f7e421199bbac0aef",
+      "size": 26278
+    },
+    {
+      "path": "packages/react-grab/scripts/diff-perf-runs.mjs",
+      "gitBlob": "e8418274b0604a95291b9427f304e46b5b57b297",
+      "size": 23783
+    },
+    {
+      "path": "packages/react-grab/solid-babel-plugin.ts",
+      "gitBlob": "d6b26739be1dd433ee5738ef5eb655c063215a74",
+      "size": 2259
+    },
+    {
+      "path": "packages/react-grab/solid-source-location-babel-plugin.ts",
+      "gitBlob": "642abea6075010bb3ac3953b441e8077c5602242",
+      "size": 1537
+    },
+    {
+      "path": "packages/react-grab/src/components/context-menu.tsx",
+      "gitBlob": "5caa21dc38549373a6f755f4af404c8bc0eb2fc9",
+      "size": 13531
+    },
+    {
+      "path": "packages/react-grab/src/components/frozen-glow.tsx",
+      "gitBlob": "ac8549775d3afd3a563e129e5e1e3da836787b7c",
+      "size": 3066
+    },
+    {
+      "path": "packages/react-grab/src/components/icons/icon-check.tsx",
+      "gitBlob": "cbe971c664f392c0c1910403b73b3be6bbfbaf12",
+      "size": 939
+    },
+    {
+      "path": "packages/react-grab/src/components/icons/icon-chevron.tsx",
+      "gitBlob": "56d0ec4dcb95fc875bcf57f2ae3112cc30db1c39",
+      "size": 861
+    },
+    {
+      "path": "packages/react-grab/src/components/icons/icon-command.tsx",
+      "gitBlob": "971beedca58ed67692581c0e70ee7d00f9cbf64d",
+      "size": 1278
+    },
+    {
+      "path": "packages/react-grab/src/components/icons/icon-ellipsis.tsx",
+      "gitBlob": "9eda6e54c842fd205c903b66864a560012af596f",
+      "size": 934
+    },
+    {
+      "path": "packages/react-grab/src/components/icons/icon-loader.tsx",
+      "gitBlob": "69b8ac01a4641747624ff9f8cca07d829c656cb4",
+      "size": 1667
+    },
+    {
+      "path": "packages/react-grab/src/components/icons/icon-retry.tsx",
+      "gitBlob": "0125841c5f1ed22713e93a6318cabd40b06f2f3a",
+      "size": 1227
+    },
+    {
+      "path": "packages/react-grab/src/components/icons/icon-return.tsx",
+      "gitBlob": "1dd996110c20e5eb08288c5c7ac10bff2b1809ea",
+      "size": 976
+    },
+    {
+      "path": "packages/react-grab/src/components/icons/icon-select.tsx",
+      "gitBlob": "f75f7f58d64c827044e07fbefe1515524154ea12",
+      "size": 1343
+    },
+    {
+      "path": "packages/react-grab/src/components/icons/icon-submit.tsx",
+      "gitBlob": "bc6f4f44cac637f6b0ceef759a4731d9c5007c98",
+      "size": 928
+    },
+    {
+      "path": "packages/react-grab/src/components/menu/index.ts",
+      "gitBlob": "f7a57eddbea6cda66a5aaf532d4d0c1532e68924",
+      "size": 497
+    },
+    {
+      "path": "packages/react-grab/src/components/menu/menu-context.ts",
+      "gitBlob": "685d9f0ca9d79a631ff6b61f085ecc31c6faaf13",
+      "size": 1265
+    },
+    {
+      "path": "packages/react-grab/src/components/menu/menu-item-label.tsx",
+      "gitBlob": "1a602a6fc4f96ffdf1f5fc6b61c70c323af40724",
+      "size": 359
+    },
+    {
+      "path": "packages/react-grab/src/components/menu/menu-item.tsx",
+      "gitBlob": "3dc381850bc678637bd881d16c06235cb92286be",
+      "size": 2741
+    },
+    {
+      "path": "packages/react-grab/src/components/menu/menu-list.tsx",
+      "gitBlob": "b08107558e7a5e76c89b3e7ac8426642124f14c2",
+      "size": 1139
+    },
+    {
+      "path": "packages/react-grab/src/components/menu/menu-panel.tsx",
+      "gitBlob": "51ba07e4330c4cb8c164a8ceff94586db0b34d73",
+      "size": 422
+    },
+    {
+      "path": "packages/react-grab/src/components/menu/menu-provider.tsx",
+      "gitBlob": "cce77638cdf769bf75a5ef11fbd1a7bb17add2f5",
+      "size": 350
+    },
+    {
+      "path": "packages/react-grab/src/components/menu/menu-shortcut.tsx",
+      "gitBlob": "f2dc0684e437dfd8eb8ca22eb2f55940f69c167c",
+      "size": 474
+    },
+    {
+      "path": "packages/react-grab/src/components/menu/menu-store.ts",
+      "gitBlob": "8ffbfb076a841d5926d70710337887b78f73d76f",
+      "size": 5063
+    },
+    {
+      "path": "packages/react-grab/src/components/overlay-canvas.tsx",
+      "gitBlob": "3e5bd76585de91d0a70ce9c623b84f51ad949a18",
+      "size": 20645
+    },
+    {
+      "path": "packages/react-grab/src/components/renderer.tsx",
+      "gitBlob": "5884b9dcff24cae01bbdde3fe2d2e7e7ec1b3c95",
+      "size": 6558
+    },
+    {
+      "path": "packages/react-grab/src/components/selection-label/arrow.tsx",
+      "gitBlob": "b13285c4b876b431b696e2579610a1a29c865e5b",
+      "size": 1736
+    },
+    {
+      "path": "packages/react-grab/src/components/selection-label/bottom-section.tsx",
+      "gitBlob": "2bebf793902c4f6400ff2593a11b1fc46eb05ac9",
+      "size": 406
+    },
+    {
+      "path": "packages/react-grab/src/components/selection-label/completion-view.tsx",
+      "gitBlob": "87d4e94081f60fe29590dbaef1e3263a3bbd4a3b",
+      "size": 5878
+    },
+    {
+      "path": "packages/react-grab/src/components/selection-label/discard-prompt.tsx",
+      "gitBlob": "ed038e3d2f55977a935761b259a08ee8fa1f4a58",
+      "size": 3186
+    },
+    {
+      "path": "packages/react-grab/src/components/selection-label/error-view.tsx",
+      "gitBlob": "978119a4191330657f2a0e2e5c24e86ccd2eb0d3",
+      "size": 2915
+    },
+    {
+      "path": "packages/react-grab/src/components/selection-label/index.tsx",
+      "gitBlob": "9ade0786200d30bdb6562b441d160e6b65b3137d",
+      "size": 20312
+    },
+    {
+      "path": "packages/react-grab/src/components/selection-label/tag-badge.tsx",
+      "gitBlob": "ecaa4470c5caaa94ad1cdb384b2710ea6465f6d9",
+      "size": 2245
+    },
+    {
+      "path": "packages/react-grab/src/components/shortcut-hint.tsx",
+      "gitBlob": "debcd24ab63a2a0ecdaa0d3852f2b294dd3eb7a4",
+      "size": 1093
+    },
+    {
+      "path": "packages/react-grab/src/components/toolbar/hierarchy-menu.tsx",
+      "gitBlob": "e6042d3e668920de26d0e9b0bfbc5b946b486442",
+      "size": 3332
+    },
+    {
+      "path": "packages/react-grab/src/components/toolbar/index.tsx",
+      "gitBlob": "d7c1d54ce9a3d8c12e5703a8a601601cfc21c93f",
+      "size": 27741
+    },
+    {
+      "path": "packages/react-grab/src/components/toolbar/state.ts",
+      "gitBlob": "70389837583064f03bb9ed9dd7893c40bb5b3e94",
+      "size": 1987
+    },
+    {
+      "path": "packages/react-grab/src/components/toolbar/toolbar-action-button.tsx",
+      "gitBlob": "68cc307da64d1a7eedd4b8957b7ae7f0b77d68e4",
+      "size": 1518
+    },
+    {
+      "path": "packages/react-grab/src/components/toolbar/toolbar-content.tsx",
+      "gitBlob": "5da5eb1c1775e6dd4ecc288d3927ebd933b1da9f",
+      "size": 5785
+    },
+    {
+      "path": "packages/react-grab/src/components/toolbar/toolbar-menu.tsx",
+      "gitBlob": "543c253844f30ac05a04f81665e4b15d70eed23d",
+      "size": 2613
+    },
+    {
+      "path": "packages/react-grab/src/components/tooltip.tsx",
+      "gitBlob": "934c2ee6e355542f881c25364a77487c5628be51",
+      "size": 2873
+    },
+    {
+      "path": "packages/react-grab/src/components/ui/anchored-dropdown-surface.tsx",
+      "gitBlob": "0ea6be4afde6d2a3cbd679de5512df91ce17b7da",
+      "size": 3206
+    },
+    {
+      "path": "packages/react-grab/src/components/ui/button.tsx",
+      "gitBlob": "9cf77248e7452cb546caaee59d87470b79fd88c5",
+      "size": 1335
+    },
+    {
+      "path": "packages/react-grab/src/components/ui/surface.tsx",
+      "gitBlob": "c09856793dec7456824afdf48a21bd4c37d8ba42",
+      "size": 806
+    },
+    {
+      "path": "packages/react-grab/src/constants.ts",
+      "gitBlob": "8ae7c499d982adeea00d09043434e951f73368b7",
+      "size": 14668
+    },
+    {
+      "path": "packages/react-grab/src/core/arrow-navigation.ts",
+      "gitBlob": "cd8e79bc564c942d01e758a3ff9842ed72718f50",
+      "size": 3985
+    },
+    {
+      "path": "packages/react-grab/src/core/auto-scroll.ts",
+      "gitBlob": "29892467768a1636385097b32f75962f8477d5a1",
+      "size": 2471
+    },
+    {
+      "path": "packages/react-grab/src/core/context.ts",
+      "gitBlob": "27f3895b3cebb3a53cb161ec4413257f29e8984c",
+      "size": 32079
+    },
+    {
+      "path": "packages/react-grab/src/core/copy.ts",
+      "gitBlob": "0d9d0c72085a1bad987726ee074c53775274e504",
+      "size": 5356
+    },
+    {
+      "path": "packages/react-grab/src/core/element-adapter.ts",
+      "gitBlob": "9fac5e3beadbe651e6da54124f84d02f81a7335e",
+      "size": 855
+    },
+    {
+      "path": "packages/react-grab/src/core/element-anchors.ts",
+      "gitBlob": "481c7253e3f0ab472033f4deba38522b8e3cfdd8",
+      "size": 6440
+    },
+    {
+      "path": "packages/react-grab/src/core/events.ts",
+      "gitBlob": "98f11dcbce8edc1881119a95831fa4ea039d3fd6",
+      "size": 1211
+    },
+    {
+      "path": "packages/react-grab/src/core/html-preview.ts",
+      "gitBlob": "addaf07efd8e098ee05978f722cb5e353df99727",
+      "size": 5923
+    },
+    {
+      "path": "packages/react-grab/src/core/index.tsx",
+      "gitBlob": "90cc596e65a30818e99e426fe14432bdfff5b05e",
+      "size": 157077
+    },
+    {
+      "path": "packages/react-grab/src/core/keyboard-handlers.ts",
+      "gitBlob": "af3b94bd21ac2c0946e272f41774a1ad934dbeff",
+      "size": 1378
+    },
+    {
+      "path": "packages/react-grab/src/core/keyboard-selection.ts",
+      "gitBlob": "92e50488fc7fefbaca674bbcfa0181020da8ecb7",
+      "size": 2045
+    },
+    {
+      "path": "packages/react-grab/src/core/label-controller.ts",
+      "gitBlob": "caaebf512e1270e144b449ef6b93dadb37f42b7b",
+      "size": 6793
+    },
+    {
+      "path": "packages/react-grab/src/core/log-intro.ts",
+      "gitBlob": "718bc7300fb24616a9a7eba91326c1f835893b85",
+      "size": 1400
+    },
+    {
+      "path": "packages/react-grab/src/core/logo-svg.ts",
+      "gitBlob": "7cc1d87002924400c8c3f4809bfccfa0d3721d62",
+      "size": 1218
+    },
+    {
+      "path": "packages/react-grab/src/core/next-server-frames.ts",
+      "gitBlob": "4a434a763c529c29a73c973f6137a9c3d0918437",
+      "size": 7682
+    },
+    {
+      "path": "packages/react-grab/src/core/noop-api.ts",
+      "gitBlob": "61700c1ac2aab9c507aa679cd2622dc28e4935b9",
+      "size": 980
+    },
+    {
+      "path": "packages/react-grab/src/core/open-file-action.ts",
+      "gitBlob": "2687d8e959339a897c6454162729c7c3c8cf0ce2",
+      "size": 922
+    },
+    {
+      "path": "packages/react-grab/src/core/plugin-registry.ts",
+      "gitBlob": "99de22d72479fe085e851600ca17625eca5c6412",
+      "size": 14006
+    },
+    {
+      "path": "packages/react-grab/src/core/plugins/comment.ts",
+      "gitBlob": "524b9505e25a751dbbf3e632883aa25996a17b98",
+      "size": 317
+    },
+    {
+      "path": "packages/react-grab/src/core/plugins/copy.ts",
+      "gitBlob": "c1b2d0efc586f378baecc1dd65073c77b90ad9a1",
+      "size": 290
+    },
+    {
+      "path": "packages/react-grab/src/core/plugins/open.ts",
+      "gitBlob": "2d294cd600cd6f9914bc747fe5c16fdecdc6dce3",
+      "size": 539
+    },
+    {
+      "path": "packages/react-grab/src/core/store.ts",
+      "gitBlob": "021d0174141058db1852360a9d95e4648c317fbb",
+      "size": 21361
+    },
+    {
+      "path": "packages/react-grab/src/core/theme.ts",
+      "gitBlob": "90e913076b0955d29bd8d4e4af54d11f453889db",
+      "size": 1058
+    },
+    {
+      "path": "packages/react-grab/src/core/three-selection.ts",
+      "gitBlob": "9f7023709c835e1151d6390638b6b63cd52821af",
+      "size": 26076
+    },
+    {
+      "path": "packages/react-grab/src/demo.ts",
+      "gitBlob": "ca801ce205740fd3b202fc6512a73379b3657b03",
+      "size": 17678
+    },
+    {
+      "path": "packages/react-grab/src/errors.ts",
+      "gitBlob": "56b75d1215a3a65864cbc39f53b9927cf0a2d68d",
+      "size": 3166
+    },
+    {
+      "path": "packages/react-grab/src/global-api.ts",
+      "gitBlob": "cb79df72cebf9f9e0375fb9618c2f4b1d83e5e4e",
+      "size": 1604
+    },
+    {
+      "path": "packages/react-grab/src/index.ts",
+      "gitBlob": "5a1becb834b6249d723d5fdb1308abe9d4a91da2",
+      "size": 1777
+    },
+    {
+      "path": "packages/react-grab/src/primitives.ts",
+      "gitBlob": "d2ae5be9134922795f763a99ba3c644616ebfb0f",
+      "size": 10220
+    },
+    {
+      "path": "packages/react-grab/src/styles.css",
+      "gitBlob": "8f77dfedcafb413758bfe1e3ef42b071a5424591",
+      "size": 6224
+    },
+    {
+      "path": "packages/react-grab/src/types.ts",
+      "gitBlob": "591b1415d02279921adb132ef3294fc034ceafe4",
+      "size": 17215
+    },
+    {
+      "path": "packages/react-grab/src/utils/accumulate-rotation.ts",
+      "gitBlob": "bdf053803164d549ed22b293b577c300d7985a6f",
+      "size": 936
+    },
+    {
+      "path": "packages/react-grab/src/utils/action-shortcuts.ts",
+      "gitBlob": "da89c4cd8d9c5d51b20ca872e4d11d73eaf71ee7",
+      "size": 1319
+    },
+    {
+      "path": "packages/react-grab/src/utils/actionable-selector-roles.ts",
+      "gitBlob": "86db704625ab6187177df885fdde5d4204687564",
+      "size": 204
+    },
+    {
+      "path": "packages/react-grab/src/utils/adjust-lerp-for-frame-duration.ts",
+      "gitBlob": "4a3b503d782ab22b08ccfb3381696fcf3b36923f",
+      "size": 378
+    },
+    {
+      "path": "packages/react-grab/src/utils/are-arrays-shallow-equal.ts",
+      "gitBlob": "6f6cc078574ed9064ace67d80a383178066415f9",
+      "size": 243
+    },
+    {
+      "path": "packages/react-grab/src/utils/auto-resize-textarea.ts",
+      "gitBlob": "7a3f21658b69c7e7e25f8461e6a99404976769aa",
+      "size": 204
+    },
+    {
+      "path": "packages/react-grab/src/utils/build-element-hierarchy.ts",
+      "gitBlob": "43f068702bafd740d94b0dbc17053b61b97221bc",
+      "size": 3996
+    },
+    {
+      "path": "packages/react-grab/src/utils/clamp-to-range.ts",
+      "gitBlob": "68c52b0a74abe0615cd9a27650ab7862d04b562e",
+      "size": 120
+    },
+    {
+      "path": "packages/react-grab/src/utils/clamp-to-viewport.ts",
+      "gitBlob": "807042fa4f2a0aac16f52843d71c597d539789bf",
+      "size": 203
+    },
+    {
+      "path": "packages/react-grab/src/utils/classify-source-path.ts",
+      "gitBlob": "c1d301e8de44e3ec704f480b93f202534e576182",
+      "size": 647
+    },
+    {
+      "path": "packages/react-grab/src/utils/cn.ts",
+      "gitBlob": "84321490227e5effddb057b8d4a6acaddcd7ae46",
+      "size": 1048
+    },
+    {
+      "path": "packages/react-grab/src/utils/collect-cleanup-error.ts",
+      "gitBlob": "9fedecc07138e66dee420056b6ad41a43cb393ac",
+      "size": 175
+    },
+    {
+      "path": "packages/react-grab/src/utils/combine-bounds.ts",
+      "gitBlob": "9f949ec6fd30f4a0cdf80ee0ac2942a9f11527ee",
+      "size": 720
+    },
+    {
+      "path": "packages/react-grab/src/utils/compare-element-document-order.ts",
+      "gitBlob": "ab796179d43b4ad549152b528a1458633a33fa78",
+      "size": 1603
+    },
+    {
+      "path": "packages/react-grab/src/utils/confirmation-focus-manager.ts",
+      "gitBlob": "6d15819715c7d8ac20c14137ce204a9a7b814bca",
+      "size": 646
+    },
+    {
+      "path": "packages/react-grab/src/utils/convert-client-position-to-top-window.ts",
+      "gitBlob": "1f594717e968609b86fb924b760eff705454f2c5",
+      "size": 1574
+    },
+    {
+      "path": "packages/react-grab/src/utils/convert-parent-position-to-iframe.ts",
+      "gitBlob": "23c9fa238ad918fc234a4be1ef3b5bc517291109",
+      "size": 792
+    },
+    {
+      "path": "packages/react-grab/src/utils/convert-top-window-position-to-client.ts",
+      "gitBlob": "63e9e43259ed6acd27e5ecc5d25b4d469be7849b",
+      "size": 1173
+    },
+    {
+      "path": "packages/react-grab/src/utils/copy-content.ts",
+      "gitBlob": "8ac421af3b3ff1bdc7afdf9241b5704e5f36ce68",
+      "size": 2731
+    },
+    {
+      "path": "packages/react-grab/src/utils/create-anchored-dropdown.ts",
+      "gitBlob": "fa9effb817df253fd7e87d2276f7ed305308cc53",
+      "size": 5811
+    },
+    {
+      "path": "packages/react-grab/src/utils/create-bounds-from-drag-rect.ts",
+      "gitBlob": "22b8bf77e38ecff7a4244215d0a0dce0846bf8c0",
+      "size": 1204
+    },
+    {
+      "path": "packages/react-grab/src/utils/create-component-name-for-element.ts",
+      "gitBlob": "d4e7ba9de16cb4ab9027910100a6ccd5c583b057",
+      "size": 1146
+    },
+    {
+      "path": "packages/react-grab/src/utils/create-confirmation-keyboard.ts",
+      "gitBlob": "a96e35cf5c551f192240ad24d9c37de46e207ff4",
+      "size": 1678
+    },
+    {
+      "path": "packages/react-grab/src/utils/create-element-bounds.ts",
+      "gitBlob": "44be944602a3fc079f7624005909913f25ef9b5f",
+      "size": 2435
+    },
+    {
+      "path": "packages/react-grab/src/utils/create-element-selector.ts",
+      "gitBlob": "1dd45fc40b9e4218aaaf717f5390c43062038055",
+      "size": 6955
+    },
+    {
+      "path": "packages/react-grab/src/utils/create-fiber-revision.ts",
+      "gitBlob": "7a6fe827314a61239c3d41673cd94f9ac30f9ccc",
+      "size": 850
+    },
+    {
+      "path": "packages/react-grab/src/utils/create-menu-highlight.ts",
+      "gitBlob": "7060242460ec54048be72743aca522e99915f824",
+      "size": 6561
+    },
+    {
+      "path": "packages/react-grab/src/utils/create-nearest-semantic-element-selector-details.ts",
+      "gitBlob": "7fe1f82098df2e57d16602fa69c9309d96b2b8b4",
+      "size": 799
+    },
+    {
+      "path": "packages/react-grab/src/utils/create-pointer-move-prompt-handoff.ts",
+      "gitBlob": "a00cd7549f81e338df47dd660e1abbafb4d52299",
+      "size": 448
+    },
+    {
+      "path": "packages/react-grab/src/utils/create-style-element.ts",
+      "gitBlob": "6e25f9fe405dd44d39bae0c33daeebf3bc951b6f",
+      "size": 577
+    },
+    {
+      "path": "packages/react-grab/src/utils/create-toolbar-drag.ts",
+      "gitBlob": "42b70d9996682c6ab5982402e72ad67cf03fdfe0",
+      "size": 6672
+    },
+    {
+      "path": "packages/react-grab/src/utils/create-variants.ts",
+      "gitBlob": "fe8893f3b880367ea75648db44a38130c9b0b36a",
+      "size": 1149
+    },
+    {
+      "path": "packages/react-grab/src/utils/delete-cache-entry-if-current.ts",
+      "gitBlob": "cc30a55bc10016a1a3cf7c115bf2b3fbb3935839",
+      "size": 195
+    },
+    {
+      "path": "packages/react-grab/src/utils/detect-app-theme.ts",
+      "gitBlob": "0061d8b0553e3b86c970767fc68491fcb3dc4a31",
+      "size": 13157
+    },
+    {
+      "path": "packages/react-grab/src/utils/detect-csp-nonce.ts",
+      "gitBlob": "569c4b4b93027d3391e1206975b5c6d963a08d4b",
+      "size": 543
+    },
+    {
+      "path": "packages/react-grab/src/utils/escape-html-attribute.ts",
+      "gitBlob": "d24966d992d630d111383ddd7d1b609b27aff5ef",
+      "size": 277
+    },
+    {
+      "path": "packages/react-grab/src/utils/escape-html-text.ts",
+      "gitBlob": "d6874303d01db8514d84c576e2393449864d1678",
+      "size": 145
+    },
+    {
+      "path": "packages/react-grab/src/utils/execute-context-menu-action.ts",
+      "gitBlob": "0aa2c7baa514ccb29595b570932c2ec0f515ba60",
+      "size": 810
+    },
+    {
+      "path": "packages/react-grab/src/utils/extract-element-css.ts",
+      "gitBlob": "5fc603b93800c702cddd0bbaf056abadef04d429",
+      "size": 3261
+    },
+    {
+      "path": "packages/react-grab/src/utils/find-selector-target.ts",
+      "gitBlob": "c1529251ff497094a7846fbe4c3f4e3cb9a05137",
+      "size": 2682
+    },
+    {
+      "path": "packages/react-grab/src/utils/find-unique-selector.ts",
+      "gitBlob": "829e3e8060286a3ca2369db64f7de09a532e9b34",
+      "size": 7954
+    },
+    {
+      "path": "packages/react-grab/src/utils/focus-in-overlay.ts",
+      "gitBlob": "06987583abbe29b531a3c88279b3c8bf97867d74",
+      "size": 507
+    },
+    {
+      "path": "packages/react-grab/src/utils/format-component-name-lines.ts",
+      "gitBlob": "390279d9f8ffec2f42458dc0cbdf6bd0e97d0036",
+      "size": 155
+    },
+    {
+      "path": "packages/react-grab/src/utils/format-list-item-key.ts",
+      "gitBlob": "e14b40fe4fdba070d1d73e22a01e21f6ce6ecf92",
+      "size": 267
+    },
+    {
+      "path": "packages/react-grab/src/utils/forward-same-origin-frame-events.ts",
+      "gitBlob": "03d7cb7bcb565e8bc382c0383dbe69745a543f15",
+      "size": 5555
+    },
+    {
+      "path": "packages/react-grab/src/utils/freeze-animation-frame-loops.ts",
+      "gitBlob": "db2938a15b27bf700d13c0cc60127146f7c044fd",
+      "size": 6049
+    },
+    {
+      "path": "packages/react-grab/src/utils/freeze-animations.ts",
+      "gitBlob": "0ce232576cc1ec185e4938b3ccfb2bd3c5feb516",
+      "size": 14299
+    },
+    {
+      "path": "packages/react-grab/src/utils/freeze-global-interactions.ts",
+      "gitBlob": "eca5601ee84bcfa272744dfacdb864ee8f1c4619",
+      "size": 1876
+    },
+    {
+      "path": "packages/react-grab/src/utils/freeze-pseudo-states.ts",
+      "gitBlob": "55ca9f75261dbe0fd8253add1266f9cca716e444",
+      "size": 9573
+    },
+    {
+      "path": "packages/react-grab/src/utils/freeze-renderers.ts",
+      "gitBlob": "f00c24623509d3da2587e0d5bf5d769c8ee22855",
+      "size": 2420
+    },
+    {
+      "path": "packages/react-grab/src/utils/freeze-updates.ts",
+      "gitBlob": "e69d9e4e5d1d1b852ed0db1270cec5e070c025b9",
+      "size": 23177
+    },
+    {
+      "path": "packages/react-grab/src/utils/generate-id.ts",
+      "gitBlob": "b368ff5dd2072145a6aaf71a4d2066255b130179",
+      "size": 125
+    },
+    {
+      "path": "packages/react-grab/src/utils/generate-snippet.ts",
+      "gitBlob": "4acd05f6b0a61e413ec1d61012bffb607b1ebe0f",
+      "size": 443
+    },
+    {
+      "path": "packages/react-grab/src/utils/get-accessible-iframe-document.ts",
+      "gitBlob": "97b9c27900918e3e3afeec11349b2594954d592d",
+      "size": 186
+    },
+    {
+      "path": "packages/react-grab/src/utils/get-anchored-dropdown-position.ts",
+      "gitBlob": "b0c10c8c6e67da760df11da7f0a8e3f0c1a4b986",
+      "size": 1580
+    },
+    {
+      "path": "packages/react-grab/src/utils/get-arrow-size.ts",
+      "gitBlob": "2affb5720198a1d4e8e359013dc714ea8735f572",
+      "size": 764
+    },
+    {
+      "path": "packages/react-grab/src/utils/get-bounds-center.ts",
+      "gitBlob": "68abb8d8b416cc417e3661bcb164889ef46acea5",
+      "size": 253
+    },
+    {
+      "path": "packages/react-grab/src/utils/get-composed-parent-element.ts",
+      "gitBlob": "684ea98e50bb3087e8a95388f84c2f21d5de9772",
+      "size": 573
+    },
+    {
+      "path": "packages/react-grab/src/utils/get-deep-element-at-point.ts",
+      "gitBlob": "fdcfdd0cc0396565cc28be3af5711821f7192825",
+      "size": 1302
+    },
+    {
+      "path": "packages/react-grab/src/utils/get-deep-elements-at-point.ts",
+      "gitBlob": "d1150ae705f5aa42c0a603e626ae6edfc14cd019",
+      "size": 1554
+    },
+    {
+      "path": "packages/react-grab/src/utils/get-deep-fallback-element-at-point.ts",
+      "gitBlob": "2a2d8f9d44a3f8dcbd84acc29194dc1573ba4204",
+      "size": 2197
+    },
+    {
+      "path": "packages/react-grab/src/utils/get-deep-hovered-elements.ts",
+      "gitBlob": "9e5a4fe6156567f2c251593f40064b70d56f400b",
+      "size": 1030
+    },
+    {
+      "path": "packages/react-grab/src/utils/get-element-anchor-ratio.ts",
+      "gitBlob": "458e4d38e89ae38de0c3b1b43f564c6dfe376a08",
+      "size": 612
+    },
+    {
+      "path": "packages/react-grab/src/utils/get-element-at-position.ts",
+      "gitBlob": "e013031c27ff8a04362abf850eca6c237d3e87dd",
+      "size": 10866
+    },
+    {
+      "path": "packages/react-grab/src/utils/get-element-computed-style.ts",
+      "gitBlob": "1ec4aa1e2d6b61582d20f71aea56e0263a6c6322",
+      "size": 241
+    },
+    {
+      "path": "packages/react-grab/src/utils/get-element-text-bounds.ts",
+      "gitBlob": "c5081cf063712e95e1f1ab8a9524ab60dd55296b",
+      "size": 5602
+    },
+    {
+      "path": "packages/react-grab/src/utils/get-elements-in-drag.ts",
+      "gitBlob": "a6ad2ca55962aa3c77ff40002e182f961a67a8fd",
+      "size": 19131
+    },
+    {
+      "path": "packages/react-grab/src/utils/get-iframe-layout-metrics.ts",
+      "gitBlob": "a9ed4746a518d2476acc5de79c30089278756fb9",
+      "size": 2743
+    },
+    {
+      "path": "packages/react-grab/src/utils/get-iframe-scale.ts",
+      "gitBlob": "43307ecd7c9efbdebdcb76fc421fe919382e452f",
+      "size": 134
+    },
+    {
+      "path": "packages/react-grab/src/utils/get-local-content-element-at-point.ts",
+      "gitBlob": "3f3ed9ac63c90c7e50db1ae6dad4580b9edff65f",
+      "size": 2458
+    },
+    {
+      "path": "packages/react-grab/src/utils/get-nearest-edge.ts",
+      "gitBlob": "33702a12440babb2be1a20dc9eda53dfe8b28b74",
+      "size": 710
+    },
+    {
+      "path": "packages/react-grab/src/utils/get-next-base-path.ts",
+      "gitBlob": "03cf97f73a98a6242f945b97ecb63da9d8502367",
+      "size": 958
+    },
+    {
+      "path": "packages/react-grab/src/utils/get-parent-react-grab-api.ts",
+      "gitBlob": "e48667fa00021b8bcb6bd596d30afe4bf15df3f1",
+      "size": 288
+    },
+    {
+      "path": "packages/react-grab/src/utils/get-preview-text-content.ts",
+      "gitBlob": "b3b348290bec4270f00b8af5bc78cc7b71b61ba7",
+      "size": 2316
+    },
+    {
+      "path": "packages/react-grab/src/utils/get-script-options.ts",
+      "gitBlob": "d5b15084a0d9c31a39f5cea53eeae8dd54619161",
+      "size": 1958
+    },
+    {
+      "path": "packages/react-grab/src/utils/get-tag-display.ts",
+      "gitBlob": "436146a715027d97de93d537817fffd744fa799c",
+      "size": 571
+    },
+    {
+      "path": "packages/react-grab/src/utils/get-tag-name.ts",
+      "gitBlob": "c77889f9be3b4a4cc52b0d9d81adf28883f80053",
+      "size": 206
+    },
+    {
+      "path": "packages/react-grab/src/utils/get-unfiltered-elements-at-point.ts",
+      "gitBlob": "f7fcefdc2053144ea37d0f4860d96355b855e430",
+      "size": 490
+    },
+    {
+      "path": "packages/react-grab/src/utils/get-visible-bounds-center.ts",
+      "gitBlob": "82ce8378159fcea1575cdb2c18ab82e74507b03c",
+      "size": 567
+    },
+    {
+      "path": "packages/react-grab/src/utils/get-visual-viewport.ts",
+      "gitBlob": "7c0357349e79e8314b2786404d2dee7c0b90755c",
+      "size": 863
+    },
+    {
+      "path": "packages/react-grab/src/utils/get-window-frame-element.ts",
+      "gitBlob": "58a987d8c58d308b308422703d1b1b5a22722824",
+      "size": 204
+    },
+    {
+      "path": "packages/react-grab/src/utils/has-element-box-paint.ts",
+      "gitBlob": "02f86d9a417adeed9b327a14e36650e3fbb3b1c0",
+      "size": 832
+    },
+    {
+      "path": "packages/react-grab/src/utils/hide-from-third-parties.ts",
+      "gitBlob": "abde9667c82eedfc989a105b1d7971e7961ce220",
+      "size": 923
+    },
+    {
+      "path": "packages/react-grab/src/utils/index-in-parent.ts",
+      "gitBlob": "be9d1d95313e6bdd0a5f82b463b356093badfcfd",
+      "size": 442
+    },
+    {
+      "path": "packages/react-grab/src/utils/invalidate-interaction-caches.ts",
+      "gitBlob": "fd898cdc97f7aa826f25d23e88107c26ac19dec5",
+      "size": 897
+    },
+    {
+      "path": "packages/react-grab/src/utils/is-c-like-key.ts",
+      "gitBlob": "7d7caa3e12c29434a4aeb74d9c100ff14879cb7e",
+      "size": 884
+    },
+    {
+      "path": "packages/react-grab/src/utils/is-css-color-transparent.ts",
+      "gitBlob": "b2fbf184da36958a100cfbca42f371a3bc955876",
+      "size": 516
+    },
+    {
+      "path": "packages/react-grab/src/utils/is-document-ancestor-of-element.ts",
+      "gitBlob": "5fe1735c303c673d9ee541e529dc57526e8c1dd5",
+      "size": 505
+    },
+    {
+      "path": "packages/react-grab/src/utils/is-document-node.ts",
+      "gitBlob": "218576150545dcc145ca06e6070a0c8d8f819f0f",
+      "size": 235
+    },
+    {
+      "path": "packages/react-grab/src/utils/is-element-connected.ts",
+      "gitBlob": "61ed2d5680122a1082e361854be26f40e0c528db",
+      "size": 369
+    },
+    {
+      "path": "packages/react-grab/src/utils/is-element-node.ts",
+      "gitBlob": "787d7d9976ef943906e3b1e5fe649eef1063dc04",
+      "size": 177
+    },
+    {
+      "path": "packages/react-grab/src/utils/is-element-painted-at-position.ts",
+      "gitBlob": "1d5b2fec078940be574134cd58b5d0c91ee6fc4d",
+      "size": 603
+    },
+    {
+      "path": "packages/react-grab/src/utils/is-element-visible.ts",
+      "gitBlob": "512035766917ef28c5cbd3260cbacda7a614564d",
+      "size": 1721
+    },
+    {
+      "path": "packages/react-grab/src/utils/is-element-within-container.ts",
+      "gitBlob": "34e7a60e7423e897173f663712cfa3c6af69c5f8",
+      "size": 490
+    },
+    {
+      "path": "packages/react-grab/src/utils/is-enter-code.ts",
+      "gitBlob": "5bbbd2d260d63ac37e97c0d2de1f87e09f2096e8",
+      "size": 98
+    },
+    {
+      "path": "packages/react-grab/src/utils/is-event-from-overlay.ts",
+      "gitBlob": "f9b00e11a93e8a79df7bb791c9bfbf18c27f0864",
+      "size": 303
+    },
+    {
+      "path": "packages/react-grab/src/utils/is-extension-context.ts",
+      "gitBlob": "b73188fdc9d7efdba213a5bb215612107e33009f",
+      "size": 258
+    },
+    {
+      "path": "packages/react-grab/src/utils/is-generated-bundle-source-path.ts",
+      "gitBlob": "339907a06d71f8bed9829755c8477945b97f43ef",
+      "size": 555
+    },
+    {
+      "path": "packages/react-grab/src/utils/is-horizontally-grabbable.ts",
+      "gitBlob": "2c6487442c6cd279310344a8b78fa3200f689639",
+      "size": 1117
+    },
+    {
+      "path": "packages/react-grab/src/utils/is-html-element.ts",
+      "gitBlob": "073b8e9579bdc7aff656a588b9dd81669bf852d5",
+      "size": 215
+    },
+    {
+      "path": "packages/react-grab/src/utils/is-iframe-element.ts",
+      "gitBlob": "7d991bf8a76b75d43bf4cfc71b7d90b82b2296a7",
+      "size": 196
+    },
+    {
+      "path": "packages/react-grab/src/utils/is-keyboard-event-composing.ts",
+      "gitBlob": "b47a00ea959154534db8a375339c7250b2803326",
+      "size": 199
+    },
+    {
+      "path": "packages/react-grab/src/utils/is-keyboard-event-triggered-by-input.ts",
+      "gitBlob": "6423f593a1c4b110bf9f2350d8b184d55555a80a",
+      "size": 1615
+    },
+    {
+      "path": "packages/react-grab/src/utils/is-mac.ts",
+      "gitBlob": "4a9172b18229be4ab977babaab5c02e69914d311",
+      "size": 1128
+    },
+    {
+      "path": "packages/react-grab/src/utils/is-next-project-runtime.ts",
+      "gitBlob": "7314ded7df8b1e1b395d6d4551b3035dbf29de99",
+      "size": 1142
+    },
+    {
+      "path": "packages/react-grab/src/utils/is-point-inside-rect.ts",
+      "gitBlob": "7ed2458e2568cca3c9b66cbe2d5d8e7baa781d2d",
+      "size": 232
+    },
+    {
+      "path": "packages/react-grab/src/utils/is-position-inside-bounds.ts",
+      "gitBlob": "a62efe9e2abb150b4adec240dbe2a66524029420",
+      "size": 287
+    },
+    {
+      "path": "packages/react-grab/src/utils/is-react-grab-element.ts",
+      "gitBlob": "759f7563c934e77b669ee53b9352b00476dac5e4",
+      "size": 337
+    },
+    {
+      "path": "packages/react-grab/src/utils/is-react-grab-host.ts",
+      "gitBlob": "e8133a3f5ed723d3e996fd87e2f6dee8613438c4",
+      "size": 497
+    },
+    {
+      "path": "packages/react-grab/src/utils/is-root-element.ts",
+      "gitBlob": "ecbdf8fec81daf7ac81058a1a95610a279281846",
+      "size": 204
+    },
+    {
+      "path": "packages/react-grab/src/utils/is-shadow-root.ts",
+      "gitBlob": "41ab41bc1e30e5e4a70a341a30919dbcfb33d9dd",
+      "size": 197
+    },
+    {
+      "path": "packages/react-grab/src/utils/is-shared-ui-source-path.ts",
+      "gitBlob": "dcbd63475e3cad2a709dc734e92e37eefab4ce8f",
+      "size": 779
+    },
+    {
+      "path": "packages/react-grab/src/utils/is-stable-element-id.ts",
+      "gitBlob": "1d368e0c14b50852d811f27f9a2024202e73c098",
+      "size": 1144
+    },
+    {
+      "path": "packages/react-grab/src/utils/is-target-key-combination.ts",
+      "gitBlob": "84fa2e70af466d83824fc14b643b80650b171bb6",
+      "size": 746
+    },
+    {
+      "path": "packages/react-grab/src/utils/is-useful-component-name.ts",
+      "gitBlob": "e9f68d0cbf4566037cba36deb7798fbac4ef6e0f",
+      "size": 2650
+    },
+    {
+      "path": "packages/react-grab/src/utils/is-user-ignored-element.ts",
+      "gitBlob": "59fb7e29e66fd3d714a9b4733ce131ab97b18838",
+      "size": 438
+    },
+    {
+      "path": "packages/react-grab/src/utils/is-valid-grabbable-element.ts",
+      "gitBlob": "a78d635c7797348f58029ae08fd79f7f9bc3b47a",
+      "size": 3792
+    },
+    {
+      "path": "packages/react-grab/src/utils/key-matches-code.ts",
+      "gitBlob": "edcb0750b09a38ae848733c4b2b968236b474ba1",
+      "size": 502
+    },
+    {
+      "path": "packages/react-grab/src/utils/lerp.ts",
+      "gitBlob": "add64d64ed037684fce9d815a0d8d3f323c1a8a5",
+      "size": 122
+    },
+    {
+      "path": "packages/react-grab/src/utils/matches-element-at-point-options.ts",
+      "gitBlob": "922d984e873956eb7f1da2b3c048e73a2ef4419b",
+      "size": 503
+    },
+    {
+      "path": "packages/react-grab/src/utils/modifier-tracker.ts",
+      "gitBlob": "9ce31fbd8168e188919345635b14f04c5da5c826",
+      "size": 1104
+    },
+    {
+      "path": "packages/react-grab/src/utils/mount-root.ts",
+      "gitBlob": "f2f0de4a1224cadbea6451deca9fc05d0922d9ee",
+      "size": 4491
+    },
+    {
+      "path": "packages/react-grab/src/utils/native-raf.ts",
+      "gitBlob": "4d288e905b23ef38bb50038f62c412bade20169d",
+      "size": 1360
+    },
+    {
+      "path": "packages/react-grab/src/utils/normalize-error.ts",
+      "gitBlob": "3f42bfa077774921355fb44c531b497c2d07318e",
+      "size": 282
+    },
+    {
+      "path": "packages/react-grab/src/utils/normalize-file-path.ts",
+      "gitBlob": "b613e947b2f01e33cd5ba43312aaffa624a5c692",
+      "size": 408
+    },
+    {
+      "path": "packages/react-grab/src/utils/normalize-toolbar-default-action-id.ts",
+      "gitBlob": "0ab8a032116d5aa0584f88be2071979745026428",
+      "size": 225
+    },
+    {
+      "path": "packages/react-grab/src/utils/notify-toolbar-state-change-subscribers.ts",
+      "gitBlob": "2b59853bf30d3478e4a5c3ab030663d33cfaf672",
+      "size": 677
+    },
+    {
+      "path": "packages/react-grab/src/utils/observe-same-origin-frame-documents.ts",
+      "gitBlob": "f82c4a28e9e26451054dfa39254933e4af5a2863",
+      "size": 8383
+    },
+    {
+      "path": "packages/react-grab/src/utils/open-file.ts",
+      "gitBlob": "e19df36a1448c137ce58e9fc3fe8248a2f2758e1",
+      "size": 1860
+    },
+    {
+      "path": "packages/react-grab/src/utils/overlay-color.ts",
+      "gitBlob": "3b6076d5a9329d52a3cbcf657cc432e39ea24ddc",
+      "size": 505
+    },
+    {
+      "path": "packages/react-grab/src/utils/parse-activation-key.ts",
+      "gitBlob": "f186d75677e4dd3b29b0b29c6a4ca79520998734",
+      "size": 3428
+    },
+    {
+      "path": "packages/react-grab/src/utils/parse-any-color.ts",
+      "gitBlob": "ea7e3dc89cbe73fc693763f24f413d9147c3969c",
+      "size": 6860
+    },
+    {
+      "path": "packages/react-grab/src/utils/parse-color.ts",
+      "gitBlob": "3854f7461b3897b08e62656b194d07514d73520f",
+      "size": 1674
+    },
+    {
+      "path": "packages/react-grab/src/utils/parse-package-name.ts",
+      "gitBlob": "05abfbe0c84a99e609eb43aae81d1bbe016dcda2",
+      "size": 5968
+    },
+    {
+      "path": "packages/react-grab/src/utils/pointer-events-freeze.ts",
+      "gitBlob": "453cc9839b74d0d800e83c598aa9e286318344e0",
+      "size": 4790
+    },
+    {
+      "path": "packages/react-grab/src/utils/preferred-selector-attribute-names.ts",
+      "gitBlob": "10fb021369701a3a9814ef66e829a36f8c0ea77a",
+      "size": 215
+    },
+    {
+      "path": "packages/react-grab/src/utils/race-promise-with-abort.ts",
+      "gitBlob": "d8c716bf877e2df372ace8b2c8bccfef78453667",
+      "size": 697
+    },
+    {
+      "path": "packages/react-grab/src/utils/react-grab-attribute-name.ts",
+      "gitBlob": "56279be641a3f31da6fb916bd078bcc4ced2590a",
+      "size": 638
+    },
+    {
+      "path": "packages/react-grab/src/utils/register-overlay-dismiss.ts",
+      "gitBlob": "8eee7289c2083743324c59e100a4de64d7721c1d",
+      "size": 2282
+    },
+    {
+      "path": "packages/react-grab/src/utils/report-recoverable-error.ts",
+      "gitBlob": "a7b05f9b3168e7c90755542e0ab95c20bd560d5c",
+      "size": 172
+    },
+    {
+      "path": "packages/react-grab/src/utils/resolve-action-enabled.ts",
+      "gitBlob": "a7a326527e584c04be2bc89807d0d06b7844daf0",
+      "size": 744
+    },
+    {
+      "path": "packages/react-grab/src/utils/resolve-current-revision-value.ts",
+      "gitBlob": "cf573f22ce374402ec603b953654d9c33d06bea0",
+      "size": 755
+    },
+    {
+      "path": "packages/react-grab/src/utils/resolve-max-context-lines.ts",
+      "gitBlob": "6e14cea2ef8d7fe2f50fda1dc17a05a91afda4fe",
+      "size": 569
+    },
+    {
+      "path": "packages/react-grab/src/utils/resolve-solid-source-location.ts",
+      "gitBlob": "1fd1f4d6a9d59cee2956413098cdcf51f8e9a499",
+      "size": 1134
+    },
+    {
+      "path": "packages/react-grab/src/utils/runtime-mode.ts",
+      "gitBlob": "3c0db41384e0167117c32ea3713ea7ece5b323be",
+      "size": 2940
+    },
+    {
+      "path": "packages/react-grab/src/utils/safe-decode-uri-component.ts",
+      "gitBlob": "b8567fbc0a42970e6b87fa7d1e287714e5f7b658",
+      "size": 150
+    },
+    {
+      "path": "packages/react-grab/src/utils/scale-border-radius.ts",
+      "gitBlob": "b30efb77d64e6b5ed77680ea8b9b1dce60b8315b",
+      "size": 1006
+    },
+    {
+      "path": "packages/react-grab/src/utils/should-include-element-selector.ts",
+      "gitBlob": "d4089f1fafb3b12ded8dcbc775c9e16dbbdbfd86",
+      "size": 273
+    },
+    {
+      "path": "packages/react-grab/src/utils/source-fetch-queue.ts",
+      "gitBlob": "d3570791d7a8e0932576ffa333f91ef7d9a45500",
+      "size": 3648
+    },
+    {
+      "path": "packages/react-grab/src/utils/strip-internal-attributes.ts",
+      "gitBlob": "e000eb422a5ef1e118c5cfe84cc91c3b3fc78800",
+      "size": 99
+    },
+    {
+      "path": "packages/react-grab/src/utils/supports-display-p3.ts",
+      "gitBlob": "3ab625d597a0902fd076f30d70a9fd335560ad8b",
+      "size": 287
+    },
+    {
+      "path": "packages/react-grab/src/utils/suppress-menu-event.ts",
+      "gitBlob": "3e95cd1831b8e8013188f165bb19e3fe4eadac6b",
+      "size": 168
+    },
+    {
+      "path": "packages/react-grab/src/utils/throw-collected-errors.ts",
+      "gitBlob": "37a5d83465e430a41bcdb5392247de3d0af737f9",
+      "size": 211
+    },
+    {
+      "path": "packages/react-grab/src/utils/toolbar-position.ts",
+      "gitBlob": "c8cfe4e2cddc093d17946d983c590a3006fed899",
+      "size": 8571
+    },
+    {
+      "path": "packages/react-grab/src/utils/truncate-escaped-html.ts",
+      "gitBlob": "9df9c9991f1d1c326cf7f9b7391d52d246cf9ebb",
+      "size": 691
+    },
+    {
+      "path": "packages/react-grab/src/utils/truncate-string.ts",
+      "gitBlob": "453fdfdc32df2a1fb04a87478a0ee6279c04ab09",
+      "size": 144
+    },
+    {
+      "path": "packages/react-grab/tests/auto-scroll.test.ts",
+      "gitBlob": "4ad32e9dab15133a283f0d7a4e3742182c67a22d",
+      "size": 2316
+    },
+    {
+      "path": "packages/react-grab/tests/classify-source-path.test.ts",
+      "gitBlob": "32006ee2a687d549a53b866ceb3519278e112c29",
+      "size": 2372
+    },
+    {
+      "path": "packages/react-grab/tests/context.test.ts",
+      "gitBlob": "f271ba1de615af88e872944f36a583421251b2e3",
+      "size": 17921
+    },
+    {
+      "path": "packages/react-grab/tests/convert-top-window-position-to-client.test.ts",
+      "gitBlob": "0bb3f949291964feea365226b87ce71920900a30",
+      "size": 2305
+    },
+    {
+      "path": "packages/react-grab/tests/copy-content.test.ts",
+      "gitBlob": "ab9bf76f03ef9533fa6d6ad264e01af9a884dc07",
+      "size": 1182
+    },
+    {
+      "path": "packages/react-grab/tests/copy-flow.test.ts",
+      "gitBlob": "2390a6f54f25510d67361cfe13f04ed4da44a53c",
+      "size": 3448
+    },
+    {
+      "path": "packages/react-grab/tests/copy-payload.test.ts",
+      "gitBlob": "f8e7a9dcaff42ae9ef0513675527e7cd399cb8c0",
+      "size": 1857
+    },
+    {
+      "path": "packages/react-grab/tests/create-element-selector.test.ts",
+      "gitBlob": "8d503c7a9fead78c13b8e80dfdacd14045f7d230",
+      "size": 1645
+    },
+    {
+      "path": "packages/react-grab/tests/create-fiber-revision.test.ts",
+      "gitBlob": "ab53ed7d801920f863f9d7cb866911ef4d034054",
+      "size": 3251
+    },
+    {
+      "path": "packages/react-grab/tests/create-nearest-semantic-element-selector-details.test.ts",
+      "gitBlob": "472639c79416ceef1f6bdfbf21d854b6f0bb3ae8",
+      "size": 9463
+    },
+    {
+      "path": "packages/react-grab/tests/create-toolbar-drag.test.ts",
+      "gitBlob": "adf1aa9066f06684a5bcdb729d0ac1ab9087fe7e",
+      "size": 3196
+    },
+    {
+      "path": "packages/react-grab/tests/create-variants.test.ts",
+      "gitBlob": "b9627509743801d1e2ac23c75a2a47a943375aa0",
+      "size": 1061
+    },
+    {
+      "path": "packages/react-grab/tests/delete-cache-entry-if-current.test.ts",
+      "gitBlob": "5f6316099a337d88be18dab7b4ab4184fc65ba3c",
+      "size": 825
+    },
+    {
+      "path": "packages/react-grab/tests/escape-html-attribute.test.ts",
+      "gitBlob": "e9a88206732061b8cdaf4c762af0db249e71eadb",
+      "size": 394
+    },
+    {
+      "path": "packages/react-grab/tests/escape-html-text.test.ts",
+      "gitBlob": "79afed8fee289a9defd809e90d1a1ce3041f847f",
+      "size": 387
+    },
+    {
+      "path": "packages/react-grab/tests/execute-context-menu-action.test.ts",
+      "gitBlob": "9582852886d44695c80377e735b3458a92125943",
+      "size": 2742
+    },
+    {
+      "path": "packages/react-grab/tests/format-list-item-key.test.ts",
+      "gitBlob": "5f52038b67abcccd22151c87f5dd1d62eaa47dc7",
+      "size": 606
+    },
+    {
+      "path": "packages/react-grab/tests/freeze-renderers.test.ts",
+      "gitBlob": "7a5cfc69367503e333d769a586cca44220026bbc",
+      "size": 4507
+    },
+    {
+      "path": "packages/react-grab/tests/get-element-at-position.test.ts",
+      "gitBlob": "4ae5c2d5d8d2a7c8bc6ed0ad9f5330626173124f",
+      "size": 24897
+    },
+    {
+      "path": "packages/react-grab/tests/get-element-text-bounds.test.ts",
+      "gitBlob": "0b1573c70a90bb6c3ac680c0d525fc4c0a350363",
+      "size": 9583
+    },
+    {
+      "path": "packages/react-grab/tests/get-elements-in-drag.test.ts",
+      "gitBlob": "a7ae4e0263da4080dc5d07e5482c0f8dbc9a72ca",
+      "size": 38130
+    },
+    {
+      "path": "packages/react-grab/tests/get-local-content-element-at-point.test.ts",
+      "gitBlob": "b5a9981cb0266bf914ae088ed1a9514f107a4956",
+      "size": 11534
+    },
+    {
+      "path": "packages/react-grab/tests/global-plugin-registry.test.ts",
+      "gitBlob": "a4585b80c8800b29cf570ebba707c3ac22eb8dfc",
+      "size": 3246
+    },
+    {
+      "path": "packages/react-grab/tests/has-element-box-paint.test.ts",
+      "gitBlob": "76e2351c77bb04c75a5be54b97a8fdd49aa6fe3f",
+      "size": 2000
+    },
+    {
+      "path": "packages/react-grab/tests/is-generated-bundle-source-path.test.ts",
+      "gitBlob": "1a39f2413895dab2e378e10376b0ed295fc8c1e3",
+      "size": 1001
+    },
+    {
+      "path": "packages/react-grab/tests/is-next-project-runtime.test.ts",
+      "gitBlob": "31f3e43e14d2c178aa16470987cc9f4937086a24",
+      "size": 2847
+    },
+    {
+      "path": "packages/react-grab/tests/is-shared-ui-source-path.test.ts",
+      "gitBlob": "bb748f7a774e779bb176c045b17a57edab849862",
+      "size": 1802
+    },
+    {
+      "path": "packages/react-grab/tests/is-stable-element-id.test.ts",
+      "gitBlob": "200654d2db1457f6e034ac424cbfb9c4fe5d44e4",
+      "size": 2198
+    },
+    {
+      "path": "packages/react-grab/tests/is-useful-component-name.test.ts",
+      "gitBlob": "679004f476cf76ff08bc8a74c232acebdd95cc2a",
+      "size": 1771
+    },
+    {
+      "path": "packages/react-grab/tests/label-controller.test.ts",
+      "gitBlob": "1320eb546a1e81367fd922373f834e207034ec8b",
+      "size": 2279
+    },
+    {
+      "path": "packages/react-grab/tests/next-server-frames.test.ts",
+      "gitBlob": "440acf885437961118627559bb9882269f0042b9",
+      "size": 8956
+    },
+    {
+      "path": "packages/react-grab/tests/notify-toolbar-state-change-subscribers.test.ts",
+      "gitBlob": "cbc46f37695a9f2d22f890226c81b92d132fbeab",
+      "size": 1636
+    },
+    {
+      "path": "packages/react-grab/tests/open-file-action.test.ts",
+      "gitBlob": "f8031399b341a8b80b142d4fae0f389c37c4be7c",
+      "size": 1786
+    },
+    {
+      "path": "packages/react-grab/tests/open-file.test.ts",
+      "gitBlob": "cd1f092f87a50c1005738248cf5f056c87ade564",
+      "size": 864
+    },
+    {
+      "path": "packages/react-grab/tests/parse-activation-key.test.ts",
+      "gitBlob": "98e6fc91e7573307eb38d8375c363c29c3fd3540",
+      "size": 781
+    },
+    {
+      "path": "packages/react-grab/tests/parse-package-name.test.ts",
+      "gitBlob": "ef0c49e0df1f0a5432a0773f0eb91ee947fc2853",
+      "size": 1379
+    },
+    {
+      "path": "packages/react-grab/tests/perf-instrumentation.test.ts",
+      "gitBlob": "81c36e4de5284bd5078602e6d157a07daff616c1",
+      "size": 12848
+    },
+    {
+      "path": "packages/react-grab/tests/plugin-registry.test.ts",
+      "gitBlob": "6f388ebf1f86c3a0d3fc30c62dfa6d450641fb87",
+      "size": 14420
+    },
+    {
+      "path": "packages/react-grab/tests/primitives-freeze.test.ts",
+      "gitBlob": "7cd66058ce0517f6d3bad7db41deb57c8b759a9c",
+      "size": 5411
+    },
+    {
+      "path": "packages/react-grab/tests/primitives-hit-testing.test.ts",
+      "gitBlob": "d8a052c2c916e742806987994ffff27474eec827",
+      "size": 8344
+    },
+    {
+      "path": "packages/react-grab/tests/race-promise-with-abort.test.ts",
+      "gitBlob": "ae694afe7eba0e30e7203bbdc1f7bfc2d45142a9",
+      "size": 800
+    },
+    {
+      "path": "packages/react-grab/tests/resolve-current-revision-value.test.ts",
+      "gitBlob": "0b9fc85920e925db1ea96e69e122af659adbd35c",
+      "size": 2663
+    },
+    {
+      "path": "packages/react-grab/tests/resolve-max-context-lines.test.ts",
+      "gitBlob": "2f67fe9383bcae408774ec1c8074b7df0d48d7b3",
+      "size": 963
+    },
+    {
+      "path": "packages/react-grab/tests/runtime-mode.test.ts",
+      "gitBlob": "dfb85fb87f7757a7a4e46199131447ec5a37b2fc",
+      "size": 1166
+    },
+    {
+      "path": "packages/react-grab/tests/should-include-element-selector.test.ts",
+      "gitBlob": "a41c16c038eab269cc3a6a0f21832ddf9cc642c6",
+      "size": 941
+    },
+    {
+      "path": "packages/react-grab/tests/source-fetch-queue.test.ts",
+      "gitBlob": "a62ec26bcbd7b3218dcaaa47d764decf7022fe75",
+      "size": 9284
+    },
+    {
+      "path": "packages/react-grab/tests/three-selection.test.ts",
+      "gitBlob": "7bbaf4c2f62e8e6a69832e0314574de345b8ff4e",
+      "size": 3608
+    },
+    {
+      "path": "packages/react-grab/tests/truncate-escaped-html.test.ts",
+      "gitBlob": "ce7d76e52c6b8e741434e6bd5f95255733483a45",
+      "size": 556
+    },
+    {
+      "path": "packages/react-grab/tsconfig.json",
+      "gitBlob": "a82d4c27a36d493246385608947997acfad78dab",
+      "size": 485
+    },
+    {
+      "path": "packages/react-grab/vite.config.ts",
+      "gitBlob": "a63b627b6fa41ea59e9431034e7bd0ec518da588",
+      "size": 3794
+    }
+  ],
+  "fingerprint": "88065b4f507621f01b758eb11485f1c7698149d43458b4808f27b5ffdf68120a"
+}
