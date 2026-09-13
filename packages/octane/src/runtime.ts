@@ -13603,6 +13603,17 @@ export function memoPublishAlways<T>(slot: HookSlot, value: T): T {
 // ---------------------------------------------------------------------------
 
 const LAZY_COMPONENT = Symbol.for('octane.lazy');
+const LAZY_BODY_CHECK = Symbol.for('octane.lazyBodyCheck');
+type LazyBodyCheck = (scope: Scope) => boolean;
+
+function markLazyBodyCheck(body: ComponentBody<any>, check: LazyBodyCheck): void {
+	// Static-hoisting HOCs must not inherit the wrapped lazy's ownership check.
+	Object.defineProperty(body, LAZY_BODY_CHECK, {
+		get() {
+			return this === body ? check : undefined;
+		},
+	});
+}
 
 /**
  * Resolve a lazy module payload to its component. Accepts React's canonical
@@ -13743,7 +13754,15 @@ export function lazy<C extends ComponentBody<any>>(
 							((previous: any, incoming: any) => boolean) | undefined;
 						const previous = lazyResolvedProps(current, prev);
 						const incoming = lazyResolvedProps(current, next);
-						return compare ? compare(previous, incoming) : shallowEqualProps(previous, incoming);
+						return compare
+							? (current as any)[LAZY_BODY_CHECK] !== undefined
+								? (compare as (prev: any, next: any, scope: Scope) => boolean)(
+										previous,
+										incoming,
+										renderScope,
+									)
+								: compare(previous, incoming)
+							: shallowEqualProps(previous, incoming);
 					},
 				});
 				memoMetadataInstalled = true;
@@ -13794,6 +13813,15 @@ export function lazy<C extends ComponentBody<any>>(
 	// Existing ancestor warm plans can start an independently reachable module,
 	// but resolution, component execution, and deferred hydration remain lazy.
 	markWarm(lazyWrapper, initializeLazy);
+	markLazyBodyCheck(lazyWrapper, (scope) => {
+		// Checking a bailout never starts the loader or accepts speculative output.
+		if (status !== 'fulfilled') return false;
+		const current = resolveLazyModule(result);
+		if (scope.hooks?.get(bodySlot) !== current) return false;
+		// Direct lazy -> lazy is invalid, but lazy -> memo -> lazy is supported.
+		const nestedCheck = (current as any)[LAZY_BODY_CHECK] as LazyBodyCheck | undefined;
+		return nestedCheck === undefined || nestedCheck(scope);
+	});
 	Object.defineProperty(lazyWrapper, LAZY_COMPONENT, {
 		get() {
 			return this === lazyWrapper;
@@ -27237,7 +27265,7 @@ function tryMemoBail(block: Block, comp: any, props: any): boolean {
 	// React.memo's optional comparator: returns true when props are equal
 	// (→ skip the render). Falls back to a shallow Object.is comparison.
 	const equal = compare
-		? (comp as any)[LAZY_COMPONENT] === true
+		? (comp as any)[LAZY_BODY_CHECK] !== undefined
 			? (compare as (prev: any, next: any, scope: Scope) => boolean)(block.props, props, block)
 			: compare(block.props, props)
 		: shallowEqualProps(block.props, props);
@@ -27264,6 +27292,8 @@ function tryImplicitBail(block: Block): boolean {
 	// A first attempt that suspended or threw has no committed output to reuse.
 	// Its identity-equal retry must execute until this Block mounts successfully.
 	if (!block.mounted || block.renderStatus !== RENDER_VALID) return false;
+	const checkLazyBody = (block.body as any)[LAZY_BODY_CHECK] as LazyBodyCheck | undefined;
+	if (checkLazyBody !== undefined && !checkLazyBody(block)) return false;
 	if (ctxDirectChanged(block)) return false;
 	if (ctxDepsChanged(block)) refreshContextConsumers(block);
 	restampCtxDeps(block);
@@ -27558,7 +27588,18 @@ export function memo<P>(
 	Object.defineProperty(memoWrapper, 'defaultProps', MEMO_DEFAULT_PROPS_DESCRIPTOR);
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileComponentSource(memoWrapper, component);
-	if (arePropsEqual) Object.defineProperty(memoWrapper, '__compare', { value: arePropsEqual });
+	const checkLazyBody = (component as any)[LAZY_BODY_CHECK] as LazyBodyCheck | undefined;
+	if (checkLazyBody !== undefined) {
+		markLazyBodyCheck(memoWrapper, checkLazyBody);
+		// Even the default comparator must remain explicit for this family: a
+		// compiler memo witness may otherwise skip the slot before its body check.
+		Object.defineProperty(memoWrapper, '__compare', {
+			value: (prev: any, next: any, scope: Scope): boolean =>
+				checkLazyBody(scope) &&
+				(arePropsEqual ? arePropsEqual(prev, next) : shallowEqualProps(prev, next)),
+		});
+	} else if (arePropsEqual)
+		Object.defineProperty(memoWrapper, '__compare', { value: arePropsEqual });
 	return memoWrapper as ComponentBody<P> & {
 		readonly type: ComponentBody<P>;
 		displayName?: string;

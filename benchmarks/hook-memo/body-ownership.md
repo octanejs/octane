@@ -42,6 +42,16 @@ existing output regions and journals the identity for rollback. The marker is
 released with the owning scope. Lazy comparator dispatch supplies the mounted
 scope internally; authored comparators still receive exactly two arguments.
 
+Lazy ownership guards also pass through actual `memo` wrappers, including
+nested wrappers. Their owner-bound accessors cannot be inherited by unrelated
+components through static hoisting. A lazy wrapper adds one guard closure and
+one accessor descriptor; a memo wrapper around a lazy component adds an accessor
+and specialized comparator. Ordinary memo creation adds one marker lookup, with
+no extra retained metadata. Its ordinary update path stays unchanged. Eligible
+implicit bailouts add one marker lookup, and lazy-containing bodies validate
+their current body before reusing output. An explicit comparator on this family
+also prevents compiler memo witnesses from bypassing the ownership check.
+
 Scoped descriptors reuse their captured context Maps and replay dependencies
 onto the consuming block and enclosing capture. A surrounding capture may now
 allocate the dependency Map it previously omitted incorrectly. Descriptors that
@@ -93,10 +103,10 @@ esbuild 0.28.1, TSRX core 0.1.71, installed dependencies and options.
 | Full Blocks constructed by the existing direct Provider mount | 3 | 3 |
 | Full Blocks constructed by the existing inline memo Provider mount | 5 | 5 |
 | Full Blocks constructed during 128 inline Provider updates | 0 | 0 |
-| Clean ownership application, minified bytes | 190,130 | 190,664 |
-| Clean ownership application, gzip bytes | 61,087 | 61,335 |
-| Existing Provider application, minified bytes | 200,377 | 200,644 |
-| Existing Provider application, gzip bytes | 63,916 | 64,018 |
+| Clean ownership application, minified bytes | 190,130 | 190,975 |
+| Clean ownership application, gzip bytes | 61,087 | 61,401 |
+| Existing Provider application, minified bytes | 200,377 | 200,706 |
+| Existing Provider application, gzip bytes | 63,916 | 64,029 |
 
 A separate closed-application Vite build checks the ordinary lite path. Its
 `main.ts` imports `createRoot` and an imported `Main`, then calls
@@ -112,7 +122,7 @@ declaring Octane as a dependency, `mode: 'production'`, `target: 'esnext'`, and
 an IIFE library build. The readable output is minified with esbuild using the
 same target. Root specialization removes the generic `createRoot` on both
 sides; both already retain the full component slot implementation. Size changes
-70,032 → 70,149 minified and 23,695 → 23,740 gzip bytes. Thus this probe finds a
+70,032 → 70,162 minified and 23,695 → 23,743 gzip bytes. Thus this probe finds a
 small shared-path cost, without newly retaining the full reconciliation graph.
 
 The inline mount replaces one lite child with full ownership. Existing Provider
@@ -129,6 +139,13 @@ slot wrapper. Each was corrected before final validation. Rendering tests cover
 development and production, authored TSRX, native reads, distinct Providers,
 multiple lazy mounts, server hydration, mixed compilation modes, repeated
 switches, held retries, supersession, native events and cleanup.
+
+PR review also found that `memo(lazy(...))`, identical descriptor props and
+compiler memo witnesses could hide a body change. Sixteen new development and
+production cases failed the initial PR commit. Owner-bound checks now cover
+those paths, including lazy bodies reached through resolved memo wrappers,
+while unchanged-body custom comparisons and unrelated hoisted metadata retain
+their behavior.
 
 This change preserves the previously documented retained costs in the
 [descriptor renderer audit](../descriptor-renderer/README.md) and

@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
-import { flushSync, hydrateRoot, lazy, memo } from '../src/index.js';
+import { createElement, flushSync, hydrateRoot, lazy, memo } from '../src/index.js';
 import * as ServerRuntime from 'octane/server';
 import { loadCompiledFixtureSource } from './_server-fixture.js';
 import { act, mount } from './_helpers.js';
@@ -25,6 +25,245 @@ function immediate<T>(value: T): PromiseLike<T> {
 }
 
 describe('resolved lazy body ownership', () => {
+	for (const depth of [1, 2]) {
+		it.each([false, true])(
+			`checks bodies through ${depth} memo wrappers (custom comparator=%s)`,
+			(custom) => {
+				const { First, Second, Shell } = compileFixture();
+				let selected = First;
+				let Wrapped = lazy(() =>
+					immediate({
+						get default() {
+							return selected;
+						},
+					}),
+				);
+				const compare = vi.fn(() => true);
+				for (let i = 0; i < depth; i++) Wrapped = memo(Wrapped, custom ? compare : undefined);
+				const log = vi.fn();
+				const read = () => 'tail';
+				const views = [
+					mount(Shell, { Lazy: Wrapped, log, read }),
+					mount(Shell, { Lazy: Wrapped, log, read }),
+				];
+				try {
+					const inputs = views.map((view) => view.find('input') as HTMLInputElement);
+					const buttons = views.map((view) => view.find('button'));
+					for (const view of views) view.click('button');
+					inputs[0].value = 'first draft';
+					inputs[1].value = 'second draft';
+					for (const [body, text] of [
+						[First, 'first'],
+						[Second, 'second'],
+						[First, 'first'],
+					] as const) {
+						selected = body;
+						for (const [index, view] of views.entries()) {
+							view.update(Shell, { Lazy: Wrapped, log, read });
+							expect(view.find('span').textContent).toBe(text);
+							expect(view.find('input')).toBe(inputs[index]);
+							expect(view.find('button')).toBe(buttons[index]);
+							expect(buttons[index].textContent).toBe('1');
+							expect(inputs[index].value).toBe(index === 0 ? 'first draft' : 'second draft');
+						}
+					}
+					if (custom) {
+						expect(compare).toHaveBeenCalled();
+						for (const args of compare.mock.calls) expect(args).toHaveLength(2);
+					}
+					expect(log.mock.calls).toEqual([['mount'], ['mount']]);
+				} finally {
+					for (const view of views) view.unmount();
+				}
+				expect(log.mock.calls).toEqual([['mount'], ['mount'], ['unmount'], ['unmount']]);
+			},
+		);
+	}
+
+	it.each([false, true])(
+		'preserves the outer comparison for an unchanged lazy body (custom=%s)',
+		(custom) => {
+			const { Dynamic, PropShell } = compileFixture();
+			const compare = vi.fn(() => true);
+			const Wrapped = memo(
+				memo(lazy(() => immediate({ default: Dynamic }))),
+				custom ? compare : undefined,
+			);
+			const view = mount(PropShell, { Lazy: Wrapped, text: 'first' });
+			try {
+				view.update(PropShell, { Lazy: Wrapped, text: 'second' });
+				expect(view.find('span').textContent).toBe(custom ? 'first' : 'second');
+				if (custom) {
+					expect(compare).toHaveBeenCalled();
+					for (const args of compare.mock.calls) expect(args).toHaveLength(2);
+				}
+			} finally {
+				view.unmount();
+			}
+		},
+	);
+
+	it.each([0, 1, 2])(
+		'checks lazy ownership before an identical descriptor bailout (memo depth=%s)',
+		(depth) => {
+			const { First, Second, DescriptorShell } = compileFixture();
+			let selected = First;
+			let Wrapped = lazy(() =>
+				immediate({
+					get default() {
+						return selected;
+					},
+				}),
+			);
+			for (let i = 0; i < depth; i++) Wrapped = memo(Wrapped);
+			const log = () => {};
+			const child = createElement(Wrapped, { log });
+			const view = mount(DescriptorShell, { child, read: () => 'first' });
+			try {
+				const input = view.find('input');
+				for (const [body, text] of [
+					[Second, 'second'],
+					[First, 'first'],
+				] as const) {
+					selected = body;
+					view.update(DescriptorShell, { child, read: () => text });
+					expect(view.find('span').textContent).toBe(text);
+					expect(view.find('input')).toBe(input);
+				}
+			} finally {
+				view.unmount();
+			}
+		},
+	);
+
+	it('checks a lazy body reached through a resolved memo wrapper', () => {
+		const { First, Second, Shell } = compileFixture();
+		let selected = First;
+		const Inner = lazy(() =>
+			immediate({
+				get default() {
+					return selected;
+				},
+			}),
+		);
+		const current = memo(Inner, () => true);
+		const Outer = lazy(() => immediate({ default: current }));
+		const log = () => {};
+		const read = () => 'tail';
+		const view = mount(Shell, { Lazy: Outer, log, read });
+		try {
+			for (const [body, text] of [
+				[Second, 'second'],
+				[First, 'first'],
+			] as const) {
+				selected = body;
+				view.update(Shell, { Lazy: Outer, log, read });
+				expect(view.find('span').textContent).toBe(text);
+			}
+		} finally {
+			view.unmount();
+		}
+	});
+
+	it('keeps hoisted lazy memo metadata nominal to the original wrapper', () => {
+		const { First, Shell } = compileFixture();
+		const loader = vi.fn(() => immediate({ default: First }));
+		const Original = memo(lazy(loader));
+		let output = 'wrapper';
+		const Hoc = () => createElement('span', null, output);
+		for (const key of Reflect.ownKeys(Original)) {
+			if (['name', 'length', 'prototype', 'caller', 'arguments'].includes(String(key))) continue;
+			Object.defineProperty(Hoc, key, Object.getOwnPropertyDescriptor(Original, key)!);
+		}
+		const compare = vi.fn(() => true);
+		const Wrapped = memo(Hoc, compare);
+		const log = () => {};
+		const view = mount(Shell, { Lazy: Wrapped, log, read: () => 'first' });
+		try {
+			output = 'not accepted';
+			view.update(Shell, { Lazy: Wrapped, log, read: () => 'second' });
+			expect(view.find('span').textContent).toBe('wrapper');
+			expect(loader).not.toHaveBeenCalled();
+			expect(compare).toHaveBeenCalled();
+			for (const args of compare.mock.calls) expect(args).toHaveLength(2);
+		} finally {
+			view.unmount();
+		}
+	});
+
+	it('checks an imported memo lazy wrapper through a cached compiled parent', () => {
+		const { First, Second } = compileFixture();
+		let selected = First;
+		const Wrapped = memo(
+			lazy(() =>
+				immediate({
+					get default() {
+						return selected;
+					},
+				}),
+			),
+		);
+		const imported = readFileSync(
+			'packages/octane/tests/_fixtures/lazy-output-imported.tsrx',
+			'utf8',
+		);
+		const { ImportedShell } = loadCompiledFixtureSource(imported, {
+			id: 'lazy-output-imported.tsrx',
+			mode: 'client',
+			compileOptions: options,
+			runtimeModules: { './lazy-output.tsrx': { First: Wrapped } },
+		});
+		const log = () => {};
+		const view = mount(ImportedShell, { log, read: () => 'first' });
+		try {
+			for (const [body, text] of [
+				[Second, 'second'],
+				[First, 'first'],
+			] as const) {
+				selected = body;
+				view.update(ImportedShell, { log, read: () => text });
+				expect(view.find('span').textContent).toBe(text);
+			}
+		} finally {
+			view.unmount();
+		}
+	});
+
+	it('shares lazy bailout checks across independently evaluated runtime copies', async () => {
+		const { First, Second, Shell } = compileFixture();
+		let selected = memo(First, () => true);
+		const first = selected;
+		const second = memo(Second, () => true);
+		// Isolate only the wrapper factory; the compiled bodies use this root's runtime.
+		vi.resetModules();
+		const OtherRuntime = await import('../src/runtime.js');
+		const Lazy = OtherRuntime.lazy(() =>
+			immediate({
+				get default() {
+					return selected;
+				},
+			}),
+		);
+		const Wrapped = memo(Lazy);
+		const log = () => {};
+		const read = () => 'tail';
+		const views = [mount(Shell, { Lazy, log, read }), mount(Shell, { Lazy: Wrapped, log, read })];
+		try {
+			for (const [body, text] of [
+				[second, 'second'],
+				[first, 'first'],
+			] as const) {
+				selected = body;
+				for (const [index, view] of views.entries()) {
+					view.update(Shell, { Lazy: index === 0 ? Lazy : Wrapped, log, read });
+					expect(view.find('span').textContent).toBe(text);
+				}
+			}
+		} finally {
+			for (const view of views) view.unmount();
+		}
+	});
+
 	it('renders each accepted module body while preserving compatible descendants', () => {
 		const { First, Second } = compileFixture();
 		let selected = First;
@@ -239,75 +478,79 @@ describe('resolved lazy body ownership', () => {
 		},
 	);
 
-	it('restores the accepted body after a later sibling suspends and retries', async () => {
-		const { First, Second, Shell } = compileFixture();
-		let selected = First;
-		const Lazy = lazy(() =>
-			immediate({
-				get default() {
-					return selected;
-				},
-			}),
-		);
-		const log = vi.fn();
-		let ready = false;
-		let resolve!: () => void;
-		const promise = new Promise<void>((done) => {
-			resolve = done;
-		});
-		const view = mount(Shell, { Lazy, log, read: () => 'accepted' });
-		try {
-			// Both bodies have committed caches before the speculative handoff.
-			// The retry must invalidate Second again after rollback restores First.
-			selected = Second;
-			view.update(Shell, { Lazy, log, read: () => 'previous second' });
-			selected = First;
-			view.update(Shell, { Lazy, log, read: () => 'accepted' });
-			const input = view.find('input') as HTMLInputElement;
-			const label = view.find('span');
-			const button = view.find('button');
-			input.value = 'held';
-			input.focus();
-			view.click('button');
-			selected = Second;
-			view.update(Shell, {
-				Lazy,
-				log,
-				read() {
-					if (!ready) throw promise;
-					return 'retried';
-				},
+	it.each([false, true])(
+		'restores the accepted body after a later sibling suspends and retries (memo wrapper=%s)',
+		async (wrapped) => {
+			const { First, Second, Shell } = compileFixture();
+			let selected = First;
+			const LazyBody = lazy(() =>
+				immediate({
+					get default() {
+						return selected;
+					},
+				}),
+			);
+			const Lazy = wrapped ? memo(memo(LazyBody), () => true) : LazyBody;
+			const log = vi.fn();
+			let ready = false;
+			let resolve!: () => void;
+			const promise = new Promise<void>((done) => {
+				resolve = done;
 			});
-			expect(label.textContent).toBe('first');
-			expect(view.find('p').textContent).toBe('accepted');
-			expect(view.find('input')).toBe(input);
-			expect(input.value).toBe('held');
-			expect(document.activeElement).toBe(input);
-			expect(log.mock.calls).toEqual([['mount']]);
-			ready = true;
-			await act(async () => {
+			const view = mount(Shell, { Lazy, log, read: () => 'accepted' });
+			try {
+				// Both bodies have committed caches before the speculative handoff.
+				// The retry must invalidate Second again after rollback restores First.
+				selected = Second;
+				view.update(Shell, { Lazy, log, read: () => 'previous second' });
+				selected = First;
+				view.update(Shell, { Lazy, log, read: () => 'accepted' });
+				const input = view.find('input') as HTMLInputElement;
+				const label = view.find('span');
+				const button = view.find('button');
+				input.value = 'held';
+				input.focus();
+				view.click('button');
+				selected = Second;
+				view.update(Shell, {
+					Lazy,
+					log,
+					read() {
+						if (!ready) throw promise;
+						return 'retried';
+					},
+				});
+				expect(label.textContent).toBe('first');
+				expect(view.find('p').textContent).toBe('accepted');
+				expect(view.find('input')).toBe(input);
+				expect(input.value).toBe('held');
+				expect(document.activeElement).toBe(input);
+				expect(log.mock.calls).toEqual([['mount']]);
+				ready = true;
+				await act(async () => {
+					resolve();
+					await promise;
+				});
+				expect(label.textContent).toBe('second');
+				expect(view.find('p').textContent).toBe('retried');
+				selected = First;
+				view.update(Shell, { Lazy, log, read: () => 'returned' });
+				expect(view.find('span')).toBe(label);
+				expect(label.textContent).toBe('first');
+				expect(view.find('button')).toBe(button);
+				expect(button.textContent).toBe('1');
+				expect(view.findAll('input')).toHaveLength(1);
+				expect(view.find('input')).toBe(input);
+				expect(input.value).toBe('held');
+				expect(log.mock.calls).toEqual([['mount']]);
+			} finally {
+				ready = true;
 				resolve();
-				await promise;
-			});
-			expect(label.textContent).toBe('second');
-			expect(view.find('p').textContent).toBe('retried');
-			selected = First;
-			view.update(Shell, { Lazy, log, read: () => 'returned' });
-			expect(view.find('span')).toBe(label);
-			expect(label.textContent).toBe('first');
-			expect(view.find('button')).toBe(button);
-			expect(button.textContent).toBe('1');
-			expect(view.findAll('input')).toHaveLength(1);
-			expect(view.find('input')).toBe(input);
-			expect(input.value).toBe('held');
-			expect(log.mock.calls).toEqual([['mount']]);
-		} finally {
-			ready = true;
-			resolve();
-			view.unmount();
-		}
-		expect(log.mock.calls).toEqual([['mount'], ['unmount']]);
-	});
+				view.unmount();
+			}
+			expect(log.mock.calls).toEqual([['mount'], ['unmount']]);
+		},
+	);
 
 	it('updates hydrated output after leaving and returning to the server body', () => {
 		const client = compileFixture();

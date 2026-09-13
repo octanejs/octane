@@ -37,3 +37,20 @@ export function Shell({ Lazy, log, read }) @{
 		<p>{read() as string}</p>
 	</section>
 }
+
+export function Dynamic({ text }) @{
+	<span>{text as string}</span>
+}
+
+export function PropShell({ Lazy, text }) @{
+	<section>
+		<Lazy text={text} />
+	</section>
+}
+
+export function DescriptorShell({ child, read }) @{
+	<section>
+		{child}
+		<p>{read() as string}</p>
+	</section>
+}
