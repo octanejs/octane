@@ -1,6 +1,6 @@
 import { ensureStackContainsMessage } from './vitest-json-reporter.mjs';
 
-function formatUnhandledError(error) {
+function formatErrorSummary(error) {
 	ensureStackContainsMessage(error);
 	if (typeof error?.stack === 'string') return error.stack;
 	if (typeof error?.message === 'string') return error.message;
@@ -10,6 +10,17 @@ function formatUnhandledError(error) {
 	} catch {
 		return String(error);
 	}
+}
+
+function formatUnhandledError(error, seen = new Set()) {
+	if (error !== null && typeof error === 'object') {
+		if (seen.has(error)) return '[Circular error cause]';
+		seen.add(error);
+	}
+	const summary = formatErrorSummary(error);
+	return error?.cause === undefined
+		? summary
+		: `${summary}\nCaused by: ${formatUnhandledError(error.cause, seen)}`;
 }
 
 export default class ReactParityUnhandledReporter {
