@@ -6,6 +6,7 @@ import {
 	createRouter,
 	getRouteApi,
 	linkOptions,
+	useMatchRoute,
 } from '@octanejs/tanstack-router';
 
 const rootRoute = createRootRoute();
@@ -46,3 +47,16 @@ expectTypeOf(postLink.params).toEqualTypeOf<{ readonly postId: '42' }>();
 getRouteApi('/missing');
 // @ts-expect-error links must target a route from the registered route tree
 linkOptions({ to: '/missing' });
+
+const matchPost = useMatchRoute();
+expectTypeOf(matchPost({ to: '/posts/$postId' })).toEqualTypeOf<false | { postId: string }>();
+// @ts-expect-error matchers reject routes absent from the registered route tree
+matchPost({ to: '/missing' });
+
+const otherRoot = createRootRoute();
+const otherRoute = createRoute({ getParentRoute: () => otherRoot, path: 'items/$itemId' });
+const otherRouter = createRouter({ routeTree: otherRoot.addChildren([otherRoute]) });
+const matchItem = useMatchRoute<typeof otherRouter>();
+expectTypeOf(matchItem({ to: '/items/$itemId' })).toEqualTypeOf<false | { itemId: string }>();
+// @ts-expect-error an explicit router controls the matcher instead of the global registration
+matchItem({ to: '/posts/$postId' });

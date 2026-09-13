@@ -1,0 +1,914 @@
+{
+  "schemaVersion": 1,
+  "identity": {
+    "packageName": "@tanstack/react-router",
+    "version": "1.170.35",
+    "repository": {
+      "owner": "TanStack",
+      "repo": "router",
+      "subdirectory": "packages/react-router"
+    },
+    "commit": "6494e75362ff7ca4988ef41046498dea10cbc462",
+    "integrity": "sha512-MiqKL692aSOFsbtEts5eFjfCixxrej+ko+gA2Y85gmWdxolgtfcBPOdJ6tMSi/zFePqwwPLo+CVSUWu/qXu8LQ=="
+  },
+  "license": {
+    "spdx": "MIT",
+    "evidence": [
+      {
+        "path": "LICENSE",
+        "sha256": "a405ee70c632bb938acb7ac5f210e814409b3760ea9d2329d8ed8ffcfd11a0e7"
+      }
+    ],
+    "notices": []
+  },
+  "scopes": [],
+  "adaptedMappings": [
+    {
+      "fromRoot": "tests",
+      "toRoot": "tests/upstream"
+    }
+  ],
+  "adaptedRewrites": [
+    {
+      "find": "from '../../src'",
+      "replace": "from '../../../src'"
+    },
+    {
+      "find": "@testing-library/react",
+      "replace": "@octanejs/testing-library"
+    },
+    {
+      "find": "react-dom/client",
+      "replace": "octane"
+    },
+    {
+      "find": "react-dom/server",
+      "replace": "octane/server"
+    },
+    {
+      "find": "'react'",
+      "replace": "'octane'"
+    },
+    {
+      "find": "\"react\"",
+      "replace": "\"octane\""
+    },
+    {
+      "find": "../src/",
+      "replace": "../../src/"
+    },
+    {
+      "find": "from '../src'",
+      "replace": "from '../../src'"
+    },
+    {
+      "find": "ReactNode",
+      "replace": "OctaneNode"
+    },
+    {
+      "find": "'react-dom'",
+      "replace": "'octane'"
+    },
+    {
+      "find": "\"react-dom\"",
+      "replace": "\"octane\""
+    },
+    {
+      "find": "import React from 'octane'",
+      "replace": "import * as React from 'octane'"
+    },
+    {
+      "find": "import ReactDOM from 'octane'",
+      "replace": "import * as ReactDOM from 'octane'"
+    },
+    {
+      "find": "// @ts-expect-error\nglobal.IS_REACT_ACT_ENVIRONMENT = true",
+      "replace": "import { setOctaneActEnvironment } from '../../../testing-library/src/act-environment'\nsetOctaneActEnvironment(true)"
+    },
+    {
+      "find": "import React, { act } from 'octane'",
+      "replace": "import * as React from 'octane'\nimport { act } from 'octane'"
+    },
+    {
+      "find": "import ReactDOMServer from 'octane/server'",
+      "replace": "import * as ReactDOMServer from 'octane/server'"
+    },
+    {
+      "find": "fireEvent.mouseOver(",
+      "replace": "fireEvent.mouseEnter("
+    }
+  ],
+  "files": [
+    {
+      "path": "CHANGELOG.md",
+      "gitBlob": "b86a2723c3b516a0270a1a29dc81cdaa27d98300",
+      "size": 34275
+    },
+    {
+      "path": "eslint.config.ts",
+      "gitBlob": "e5f4ab4120673ecacf3648ecb18500898846421d",
+      "size": 823
+    },
+    {
+      "path": "package.json",
+      "gitBlob": "a299eba62a9f4864b52ac7173fe4d46680c744b9",
+      "size": 3828
+    },
+    {
+      "path": "README.md",
+      "gitBlob": "c3a60d1008ffe9300b98979278a22ceb53ccbb98",
+      "size": 2832
+    },
+    {
+      "path": "skills/compositions/router-query/SKILL.md",
+      "gitBlob": "9bda851b1c2cbbdcd24ef65bed0cd9cfb19ee4ab",
+      "size": 12482
+    },
+    {
+      "path": "skills/lifecycle/migrate-from-react-router/SKILL.md",
+      "gitBlob": "fdc4f4c4e5eb61ae6b76252801928f7416b40546",
+      "size": 13314
+    },
+    {
+      "path": "skills/react-router/SKILL.md",
+      "gitBlob": "ba628f70031821c7f0540cf37683f09efa623eed",
+      "size": 12066
+    },
+    {
+      "path": "src/Asset.tsx",
+      "gitBlob": "04cbac906403ca55f9eb9419cce234994e7d6a4d",
+      "size": 7196
+    },
+    {
+      "path": "src/awaited.tsx",
+      "gitBlob": "c3397bd433ecf5bfca02dce5f03bd373533bc1b4",
+      "size": 1395
+    },
+    {
+      "path": "src/CatchBoundary.tsx",
+      "gitBlob": "1015a9e116ed303eaf02b254b5ce253c45e98b12",
+      "size": 2866
+    },
+    {
+      "path": "src/ClientOnly.tsx",
+      "gitBlob": "102859d75a5c3fa18329a79e7e50cd66f1ead867",
+      "size": 1745
+    },
+    {
+      "path": "src/fileRoute.ts",
+      "gitBlob": "f4d8c9b9676a0bb327a1f23bb08d9b8f39555855",
+      "size": 9163
+    },
+    {
+      "path": "src/HeadContent.dev.tsx",
+      "gitBlob": "776f334318342c7f1fb1481bb4cce6ade0c49616",
+      "size": 1566
+    },
+    {
+      "path": "src/HeadContent.tsx",
+      "gitBlob": "6a0c8188bcbdb7dea5c650adfeacce7a5cfb4bd5",
+      "size": 872
+    },
+    {
+      "path": "src/headContentUtils.tsx",
+      "gitBlob": "d517e0e453c08ca819e3e8a048badb9d8547c1c6",
+      "size": 5644
+    },
+    {
+      "path": "src/history.ts",
+      "gitBlob": "2271af692cd690630e126e06962e6530e8084ab6",
+      "size": 254
+    },
+    {
+      "path": "src/index.dev.tsx",
+      "gitBlob": "dde6fd2eea5a4cc42639ac343fb0c018c6789527",
+      "size": 254
+    },
+    {
+      "path": "src/index.rsc.ts",
+      "gitBlob": "d5baf7e9521d2e928a0ffe62f275795c6259012a",
+      "size": 192
+    },
+    {
+      "path": "src/index.tsx",
+      "gitBlob": "6637c7542bc9042db86454d64b1c246c03a02b12",
+      "size": 7461
+    },
+    {
+      "path": "src/lazyRouteComponent.tsx",
+      "gitBlob": "a7b58c449914f93cffa02233cb95324efc660309",
+      "size": 2822
+    },
+    {
+      "path": "src/link.tsx",
+      "gitBlob": "c0e2ddc4e3ec017b146f04d6f9a5651fc5d309f1",
+      "size": 28717
+    },
+    {
+      "path": "src/Match.tsx",
+      "gitBlob": "1ba756053a0600f0204f87b854de017d7ca507f2",
+      "size": 10101
+    },
+    {
+      "path": "src/matchContext.tsx",
+      "gitBlob": "a7030847e166047442c83412148702092ce4fc04",
+      "size": 334
+    },
+    {
+      "path": "src/Matches.tsx",
+      "gitBlob": "6dea1032f22bb981067e5b3872b9d9f3880164e6",
+      "size": 11356
+    },
+    {
+      "path": "src/nonRouteComponentContext.tsx",
+      "gitBlob": "252ab7fd109724de463af6ed1353bcecda681cc7",
+      "size": 567
+    },
+    {
+      "path": "src/not-found.tsx",
+      "gitBlob": "3c5287cb2e0a8828b9c42d81b213356dafc3475f",
+      "size": 2299
+    },
+    {
+      "path": "src/renderRouteNotFound.tsx",
+      "gitBlob": "9e363da7f44c2762130c16250d78de25fa49c797",
+      "size": 1780
+    },
+    {
+      "path": "src/route.tsx",
+      "gitBlob": "57dca9ef029b6f5ad4d338d61438c7b498d6b0db",
+      "size": 17068
+    },
+    {
+      "path": "src/router.ts",
+      "gitBlob": "de5e89a9fbc65595bec661d084bb99016aa70b5d",
+      "size": 4937
+    },
+    {
+      "path": "src/routerContext.tsx",
+      "gitBlob": "30b442c6c4517d7a9bc0ea47ef07dc4a16a11eb1",
+      "size": 168
+    },
+    {
+      "path": "src/RouterProvider.tsx",
+      "gitBlob": "81c3fb4ece27ca0e8044f58a14677eb68628adb7",
+      "size": 2484
+    },
+    {
+      "path": "src/routerStores.ts",
+      "gitBlob": "3197f5468123801342f3f9668fe534aa82220f3b",
+      "size": 824
+    },
+    {
+      "path": "src/SafeFragment.tsx",
+      "gitBlob": "72a95bac01ba705af2b1d4131915d1822a83a1f2",
+      "size": 108
+    },
+    {
+      "path": "src/ScriptOnce.tsx",
+      "gitBlob": "f552becb9f317f15e2e498a78efba98817aecccb",
+      "size": 511
+    },
+    {
+      "path": "src/Scripts.tsx",
+      "gitBlob": "13679f553db44af5c588b58ffb4f66d71b0aec76",
+      "size": 2597
+    },
+    {
+      "path": "src/scroll-restoration.tsx",
+      "gitBlob": "5c49425e77753ccd4720c0fcf4a5635ace168075",
+      "size": 396
+    },
+    {
+      "path": "src/ScrollRestoration.tsx",
+      "gitBlob": "d36210db4159aeb6fc08f00a249f99bf53654630",
+      "size": 1189
+    },
+    {
+      "path": "src/ssr/client.ts",
+      "gitBlob": "c6eadb15215a099fdb356a18cda3db4d066501c9",
+      "size": 95
+    },
+    {
+      "path": "src/ssr/defaultRenderHandler.tsx",
+      "gitBlob": "a1f11787076a28d683e2b30e49ffe8272c44637f",
+      "size": 400
+    },
+    {
+      "path": "src/ssr/defaultStreamHandler.tsx",
+      "gitBlob": "b220a8dd747e91b641a5bcbda993e39cb33d3f01",
+      "size": 424
+    },
+    {
+      "path": "src/ssr/renderRouterToStream.tsx",
+      "gitBlob": "abfe36b86dea205c87c9a7b97ac2bdec51544209",
+      "size": 6970
+    },
+    {
+      "path": "src/ssr/renderRouterToString.tsx",
+      "gitBlob": "5e299cc215942e004821d6d9ea985dede7a3770c",
+      "size": 1020
+    },
+    {
+      "path": "src/ssr/RouterClient.tsx",
+      "gitBlob": "69abc97f0ba88b33d9df3d097e4f44cb730fd2d5",
+      "size": 522
+    },
+    {
+      "path": "src/ssr/RouterServer.tsx",
+      "gitBlob": "c0199cb05c4662486a0b62f4fd3766dad0e6fd07",
+      "size": 278
+    },
+    {
+      "path": "src/ssr/serializer.ts",
+      "gitBlob": "9a1743c18a80080b966aa1df614166779ec7a4dd",
+      "size": 164
+    },
+    {
+      "path": "src/ssr/server.ts",
+      "gitBlob": "b4e84970c47d39da26e0f4f25005123ac7181da9",
+      "size": 343
+    },
+    {
+      "path": "src/structuralSharing.ts",
+      "gitBlob": "7810a1ec528ee6179af15197af14d8559d5e2d25",
+      "size": 1563
+    },
+    {
+      "path": "src/Transitioner.tsx",
+      "gitBlob": "ddf8afea2e1e92f1024e688f52409dba7cd5ae7e",
+      "size": 2728
+    },
+    {
+      "path": "src/typePrimitives.ts",
+      "gitBlob": "317ab260c86fd653972b3230d3f4cc2399ba1a91",
+      "size": 1819
+    },
+    {
+      "path": "src/useBlocker.tsx",
+      "gitBlob": "65636510c9dcaafbc7ffeedc657319081c46e420",
+      "size": 8071
+    },
+    {
+      "path": "src/useCanGoBack.ts",
+      "gitBlob": "2a8ce612b192a2a6f370e2c21be329cf7f96e772",
+      "size": 508
+    },
+    {
+      "path": "src/useLoaderData.tsx",
+      "gitBlob": "755a39616ed169e4730b01f88caa90eaed8f144c",
+      "size": 2500
+    },
+    {
+      "path": "src/useLoaderDeps.tsx",
+      "gitBlob": "21e7267d4eee7d1561dda7927def38898ddf2a50",
+      "size": 2189
+    },
+    {
+      "path": "src/useLocation.tsx",
+      "gitBlob": "5fa39fa92ef55de0aeda0919f9e0b5622c16436b",
+      "size": 2186
+    },
+    {
+      "path": "src/useMatch.tsx",
+      "gitBlob": "95a4aaa286b52d78602a28360b4e6f0ba28a7500",
+      "size": 5290
+    },
+    {
+      "path": "src/useNavigate.tsx",
+      "gitBlob": "ce95e5b4c1c647f37274a0d4b56c1caf95c11588",
+      "size": 2316
+    },
+    {
+      "path": "src/useParams.tsx",
+      "gitBlob": "44a6e47f9d3b0a0114acb91018e103229ea3a093",
+      "size": 2917
+    },
+    {
+      "path": "src/useRouteContext.ts",
+      "gitBlob": "0aed8720e647530ba8f038f991ce80f3647bda6f",
+      "size": 974
+    },
+    {
+      "path": "src/useRouter.tsx",
+      "gitBlob": "925cba411ed46e9606f2c4146558198bb3babb48",
+      "size": 902
+    },
+    {
+      "path": "src/useRouterState.tsx",
+      "gitBlob": "fa17ee9f598f9b2f80a88a8ae05f88cb09a79fff",
+      "size": 2650
+    },
+    {
+      "path": "src/useSearch.tsx",
+      "gitBlob": "3979967d76e4cde0819775cab4156070e1323533",
+      "size": 2833
+    },
+    {
+      "path": "src/utils.ts",
+      "gitBlob": "b650e343881ed3df93f51599b54f629b824dabe3",
+      "size": 3699
+    },
+    {
+      "path": "tests/ancestor-loader-child-pending-min.test.tsx",
+      "gitBlob": "09945bb9af39a68b7381f47830484180951a74d9",
+      "size": 4591
+    },
+    {
+      "path": "tests/Asset.test.tsx",
+      "gitBlob": "11978db209e11824c0409adf07d5e11f07dc5492",
+      "size": 5069
+    },
+    {
+      "path": "tests/blocker.test.tsx",
+      "gitBlob": "60d1e8a821af82def7a23311a4c24ad518a53d71",
+      "size": 5230
+    },
+    {
+      "path": "tests/ClientOnly.test.tsx",
+      "gitBlob": "4bfe863d0b8ec6872a0307b84eafb298484005a2",
+      "size": 3004
+    },
+    {
+      "path": "tests/component-preload-retry-pending-min.test.tsx",
+      "gitBlob": "dcdd94af671a90db9124b4ca2e358e7127117462",
+      "size": 4414
+    },
+    {
+      "path": "tests/component-preload-retry.test.tsx",
+      "gitBlob": "7abe959ebce8e0113e35f45764ac872551865768",
+      "size": 6364
+    },
+    {
+      "path": "tests/createLazyRoute.test.tsx",
+      "gitBlob": "a4fdffd73806ad2de9d76d68b8938bae65938522",
+      "size": 3447
+    },
+    {
+      "path": "tests/disableGlobalCatchBoundary.test.tsx",
+      "gitBlob": "15e0b71752ced119003982b1e0767f2667661994",
+      "size": 2766
+    },
+    {
+      "path": "tests/errorBoundary.test-d.tsx",
+      "gitBlob": "ccb66929dde6236564cb9a2267264b30124fd8aa",
+      "size": 915
+    },
+    {
+      "path": "tests/errorComponent.test.tsx",
+      "gitBlob": "442a94bc103c346f21aeb5ec2ee4516985612c9e",
+      "size": 30522
+    },
+    {
+      "path": "tests/fileRoute.test-d.tsx",
+      "gitBlob": "cc0e7b265a626ed95f882d6cf382af18829d78a3",
+      "size": 4723
+    },
+    {
+      "path": "tests/fileRoute.test.ts",
+      "gitBlob": "9f3fa290d3a724bcb616ef63c3d5c87a46a6f161",
+      "size": 2207
+    },
+    {
+      "path": "tests/hydration-capped-boundary-pending.test.tsx",
+      "gitBlob": "57d99c8af588a3f16f3e2643649dab538b5e1c3f",
+      "size": 8154
+    },
+    {
+      "path": "tests/hydration-terminal-lane.test.tsx",
+      "gitBlob": "c53dc62ae33ceb734c73d257e98110d15539afad",
+      "size": 4242
+    },
+    {
+      "path": "tests/issue-2182-root-pending.test.tsx",
+      "gitBlob": "9cf3f82cb7f8c368816ba0e6da2134c66ec06225",
+      "size": 1635
+    },
+    {
+      "path": "tests/issue-2905-root-beforeload-pending.test.tsx",
+      "gitBlob": "2821571c42b0ecbb76ec0bd8351c7a56a58d5f7e",
+      "size": 1789
+    },
+    {
+      "path": "tests/issue-4467-lazy-route-pending.test.tsx",
+      "gitBlob": "11e2c150cc96c42b423533727f02f6e347b6c257",
+      "size": 6679
+    },
+    {
+      "path": "tests/issue-4476-react-query-cancellation.test.tsx",
+      "gitBlob": "824fcc1fb785cc5d6ebd793dc1dc0bbed8068fae",
+      "size": 3816
+    },
+    {
+      "path": "tests/issue-5778-router-provider-context-preload.test.tsx",
+      "gitBlob": "e179a1502ea4dc3bb3ae1967520b463e52eb7695",
+      "size": 3124
+    },
+    {
+      "path": "tests/issue-6107-lazy-chunk-error-component.test.tsx",
+      "gitBlob": "138e7f5716f1874e23a7affc0ebda89aa2beac6d",
+      "size": 2716
+    },
+    {
+      "path": "tests/issue-6371-search-default-normalization-abort.test.tsx",
+      "gitBlob": "836ff045bc48523779c0251f5e999ff48633e3af",
+      "size": 4983
+    },
+    {
+      "path": "tests/issue-7051-force-pending-suspense.test.tsx",
+      "gitBlob": "5640cb7477e2f3911f25c408847f5dc3c04560b0",
+      "size": 6087
+    },
+    {
+      "path": "tests/issue-7367-pending-min-redirect.test.tsx",
+      "gitBlob": "8edf32c13311dfcd6d3d70ebca8645e56978a319",
+      "size": 6463
+    },
+    {
+      "path": "tests/issue-7635-error-head-after-navigation.test.tsx",
+      "gitBlob": "23bc0aa5f3757bf4f2bbdb0dd905287dfdc91796",
+      "size": 2854
+    },
+    {
+      "path": "tests/issue-7638-invalidate-transition-error.test.tsx",
+      "gitBlob": "e80f073896ff8138e6ff3fafe27eeec71744a6bb",
+      "size": 5528
+    },
+    {
+      "path": "tests/issue-7964-param-parsing-loader.test.tsx",
+      "gitBlob": "54f6c19c47f96ed92702a1f430cb2abe572e257f",
+      "size": 3106
+    },
+    {
+      "path": "tests/issue-7986-retained-pending.test.tsx",
+      "gitBlob": "04d762df64efa74ef609fa3aa62e70bde241329e",
+      "size": 31118
+    },
+    {
+      "path": "tests/issue-8115-context.test.tsx",
+      "gitBlob": "69399d26c0f9c15d5e7a0812ebd76570fd19a34e",
+      "size": 24140
+    },
+    {
+      "path": "tests/issue-8128-context.test.tsx",
+      "gitBlob": "f615bba8d9d88d3b87210180f8060f2f9e8873c6",
+      "size": 3286
+    },
+    {
+      "path": "tests/issue-8128-source-notfound-retention-boundary.test.tsx",
+      "gitBlob": "58c3d8cbc71e1113aa906f92b27766e792a8b9a1",
+      "size": 9474
+    },
+    {
+      "path": "tests/lazy/error.tsx",
+      "gitBlob": "271f6a058ec7396cdeee88e4dd650a1af7337933",
+      "size": 318
+    },
+    {
+      "path": "tests/lazy/heavy.tsx",
+      "gitBlob": "d7ca39c40f3d46afdbde82db01e1bcd518aa3753",
+      "size": 216
+    },
+    {
+      "path": "tests/lazy/mockHeavyDependenciesRoute.tsx",
+      "gitBlob": "68fafcd3776192b63318242e075364956071b5ba",
+      "size": 253
+    },
+    {
+      "path": "tests/lazy/normal.tsx",
+      "gitBlob": "675deb83f390d7286ba44ab58b8a4d123a6145eb",
+      "size": 365
+    },
+    {
+      "path": "tests/link-events.test.tsx",
+      "gitBlob": "0095d450a555adf41ab2c0e9b3c36fc145d378f6",
+      "size": 5662
+    },
+    {
+      "path": "tests/link-href-safety.test.tsx",
+      "gitBlob": "5838d0b8c3d68892ebbe7077568dba9311b16bd6",
+      "size": 3122
+    },
+    {
+      "path": "tests/link-path-matching.test.tsx",
+      "gitBlob": "232a0d863382c9097942903ecf684853aacbee95",
+      "size": 2040
+    },
+    {
+      "path": "tests/link-state-props.test.tsx",
+      "gitBlob": "6f205b20206a86e4ffb367ae601e437eb2909640",
+      "size": 11438
+    },
+    {
+      "path": "tests/link.bench.tsx",
+      "gitBlob": "a04149ed615ae0819c318b6fd34f3c51094a11ad",
+      "size": 4655
+    },
+    {
+      "path": "tests/link.test-d.tsx",
+      "gitBlob": "d510d754856a92fbe688baac2cf9aac8bb6895f8",
+      "size": 126470
+    },
+    {
+      "path": "tests/link.test.tsx",
+      "gitBlob": "897b6d94144597aec0fe404b9df5ea69bcbac4bc",
+      "size": 235974
+    },
+    {
+      "path": "tests/loaders.test.tsx",
+      "gitBlob": "b96931d61ae4346f7683a051a7a8d03ae1230627",
+      "size": 26894
+    },
+    {
+      "path": "tests/Matches.test-d.tsx",
+      "gitBlob": "89e1088454bf10e4fb0f7e5fcaf552f2f6106b43",
+      "size": 6678
+    },
+    {
+      "path": "tests/Matches.test.tsx",
+      "gitBlob": "93dca8b9c023098efaf35a0142cf5d77575b46b9",
+      "size": 14943
+    },
+    {
+      "path": "tests/navigate.test.tsx",
+      "gitBlob": "dd7b252c48f08621d9a9e661f7e141821458651e",
+      "size": 40326
+    },
+    {
+      "path": "tests/not-found-pending-context.test.tsx",
+      "gitBlob": "6d3542f96d2faafd28e9c2f65561045b901af70e",
+      "size": 3469
+    },
+    {
+      "path": "tests/not-found-route-context.test.tsx",
+      "gitBlob": "5528efabecacdc687136d5b61243309500b59947",
+      "size": 5275
+    },
+    {
+      "path": "tests/not-found-route-lifecycle.test.tsx",
+      "gitBlob": "3a648c332628320749bc593169fa198c2d630b83",
+      "size": 1829
+    },
+    {
+      "path": "tests/not-found.test.tsx",
+      "gitBlob": "f27057c7abc5b85d562595404c8de003e2b4f21b",
+      "size": 18144
+    },
+    {
+      "path": "tests/on-rendered-same-href-state.test.tsx",
+      "gitBlob": "76e7a0cb9d9df57057f25a2e077e659b3dc06308",
+      "size": 2162
+    },
+    {
+      "path": "tests/optional-path-params.test-d.tsx",
+      "gitBlob": "ae6df1b8516e22e689354d124fb786a22f61b833",
+      "size": 5976
+    },
+    {
+      "path": "tests/optional-path-params.test.tsx",
+      "gitBlob": "1a69d70b96ed3904b50ce0804b072401b5cca639",
+      "size": 31783
+    },
+    {
+      "path": "tests/Outlet.test.tsx",
+      "gitBlob": "e8dc5447cbc7548481ca5faef9fd3d62bd7b25f3",
+      "size": 4452
+    },
+    {
+      "path": "tests/pending-fallback-promise-replacement.test.tsx",
+      "gitBlob": "0f5ca3703d3dc650a68eb04de629ddec6c64a80c",
+      "size": 4036
+    },
+    {
+      "path": "tests/pending-route-context.test.tsx",
+      "gitBlob": "5274fb83ccf6051a632ffd582ecfa5a07ff96bbe",
+      "size": 8755
+    },
+    {
+      "path": "tests/preloaded-mount-resolution.test.tsx",
+      "gitBlob": "1679546c79ff809c38f2b2e0ee608b755c539762",
+      "size": 5092
+    },
+    {
+      "path": "tests/public-presentation-lane-contract.test.tsx",
+      "gitBlob": "644c4887e6557621dc8418831b966a33dae8a2b7",
+      "size": 19680
+    },
+    {
+      "path": "tests/react-render-owner-contract.test.tsx",
+      "gitBlob": "0797fa5264c22e42595fbcc36a12edcf25939d88",
+      "size": 3023
+    },
+    {
+      "path": "tests/redirect-chain-first-load.test.tsx",
+      "gitBlob": "b3f4618a281bbadeaab4a07fe61aabae3211d4a2",
+      "size": 3416
+    },
+    {
+      "path": "tests/redirect.test.tsx",
+      "gitBlob": "ea8cd30dd446c5d93d74ba2ee563e017734f2e1f",
+      "size": 14443
+    },
+    {
+      "path": "tests/redirects.test-d.tsx",
+      "gitBlob": "66fc8f7b11f9a5a6e4ac9f6af30127571cee253e",
+      "size": 1028
+    },
+    {
+      "path": "tests/renderRouterToStream.test.tsx",
+      "gitBlob": "f42456b7bec9281a4e61c655d1fa10c8fc659e9b",
+      "size": 8157
+    },
+    {
+      "path": "tests/root-pending-min.test.tsx",
+      "gitBlob": "1ce8ab482232c317810c701c1014dbdc78ee5423",
+      "size": 6777
+    },
+    {
+      "path": "tests/route.test-d.tsx",
+      "gitBlob": "41b003e5d1ffdecbb78cef20da46886dcebfebe2",
+      "size": 56683
+    },
+    {
+      "path": "tests/route.test.tsx",
+      "gitBlob": "e425dfaaf85a6e6f2ccc05b70a673c933d08854f",
+      "size": 16083
+    },
+    {
+      "path": "tests/routeApi.test-d.tsx",
+      "gitBlob": "d0553a9e0b22662e0c9729cd3238dc6351a674fa",
+      "size": 4924
+    },
+    {
+      "path": "tests/routeContext.test.tsx",
+      "gitBlob": "e00228e280601132ff016b2ef23e6c5b1b552f6a",
+      "size": 105628
+    },
+    {
+      "path": "tests/router-client-stream-cleanup.test.tsx",
+      "gitBlob": "865b7cd732b024f3c1d6d28412831a1fbc4292b7",
+      "size": 1573
+    },
+    {
+      "path": "tests/router.test-d.tsx",
+      "gitBlob": "82ce7022220313d855ad03c30dd1d8b5a5a7585b",
+      "size": 6608
+    },
+    {
+      "path": "tests/router.test.tsx",
+      "gitBlob": "926e2c3b8f6d81639a8f9c86c1de805c87c2cbb6",
+      "size": 117419
+    },
+    {
+      "path": "tests/RouterProvider.test-d.tsx",
+      "gitBlob": "31c5d6673827075506c878b7c861a282505eb16c",
+      "size": 1039
+    },
+    {
+      "path": "tests/routeScopedShouldThrow.test.tsx",
+      "gitBlob": "c1b326f41bcd8ef9bd7d9d47f1419cd79229ad32",
+      "size": 2798
+    },
+    {
+      "path": "tests/Scripts.test.tsx",
+      "gitBlob": "893cef01bc812c8e6c2ae0b000e95d5e2f3604a4",
+      "size": 38063
+    },
+    {
+      "path": "tests/searchMiddleware.test.tsx",
+      "gitBlob": "6629dab08516eae073e21720ad2e1e675010863d",
+      "size": 5472
+    },
+    {
+      "path": "tests/setupTests.tsx",
+      "gitBlob": "c3d7ec5cf76b4874f9c10094871fc1448515837d",
+      "size": 208
+    },
+    {
+      "path": "tests/store-updates-during-navigation.test.tsx",
+      "gitBlob": "8a10e06339a0caae2a3b8761b1fad18d609afa20",
+      "size": 8474
+    },
+    {
+      "path": "tests/transactional-loading.test.tsx",
+      "gitBlob": "a6769c6063934524dc5b0770f78563077b44909d",
+      "size": 9892
+    },
+    {
+      "path": "tests/transitioner-listener-errors.test.tsx",
+      "gitBlob": "9682b8f60c323a5c23fc5bc6bdd6725d1a1e2f0d",
+      "size": 2467
+    },
+    {
+      "path": "tests/transitioner-remount.test.tsx",
+      "gitBlob": "76cc6393cea1f5ee679bfb580d671b4c01abada8",
+      "size": 3158
+    },
+    {
+      "path": "tests/transitioner-render-ack.test.tsx",
+      "gitBlob": "535a1e0e71a68b91cfd5b91e69d7d89d544554cb",
+      "size": 6265
+    },
+    {
+      "path": "tests/useBlocker.test-d.tsx",
+      "gitBlob": "644a8036b0169115c5a38d361c3c9d82a3bd2730",
+      "size": 2976
+    },
+    {
+      "path": "tests/useBlocker.test.tsx",
+      "gitBlob": "c11cd054f167c239a8020709a7d317668aaf03f1",
+      "size": 14156
+    },
+    {
+      "path": "tests/useCanGoBack.test.tsx",
+      "gitBlob": "122e647d83906c8806cec494be20de62e51fcd21",
+      "size": 2285
+    },
+    {
+      "path": "tests/useLoaderData.test-d.tsx",
+      "gitBlob": "1c524a5e54befb6315826857b25c1fbfc688fdb8",
+      "size": 10939
+    },
+    {
+      "path": "tests/useLocation.test-d.tsx",
+      "gitBlob": "5989a492caf08fd1cb26d217df62cd5863efc3ed",
+      "size": 1104
+    },
+    {
+      "path": "tests/useLocation.test.tsx",
+      "gitBlob": "ab3dce78cde32e243315e34bd9f4dfc377b2f9d3",
+      "size": 2404
+    },
+    {
+      "path": "tests/useMatch.test-d.tsx",
+      "gitBlob": "7b6efbbd6e700b5dd4d52da7c7ce43d04dbdf644",
+      "size": 2185
+    },
+    {
+      "path": "tests/useMatch.test.tsx",
+      "gitBlob": "f1b8352bb0b754aea97fe6f8da0e9ee24aea7db6",
+      "size": 9969
+    },
+    {
+      "path": "tests/useNavigate.test-d.tsx",
+      "gitBlob": "6fe9f71cacf561d3cd1df4a2d8b4048556193a2d",
+      "size": 1616
+    },
+    {
+      "path": "tests/useNavigate.test.tsx",
+      "gitBlob": "1ec1072a26cec414d5aa2c1a10d5150503f198eb",
+      "size": 69395
+    },
+    {
+      "path": "tests/useParams.test-d.tsx",
+      "gitBlob": "d243b05cebe236f8e07193b3ca4a7ba9c219fc1b",
+      "size": 9204
+    },
+    {
+      "path": "tests/useParams.test.tsx",
+      "gitBlob": "19cf096ea0bd57d6d115d3323376f6869f0f1a73",
+      "size": 9374
+    },
+    {
+      "path": "tests/useRouteContext.test-d.tsx",
+      "gitBlob": "7d0a14ef4a85873eeda2f1ebc6e8d3695f1d531b",
+      "size": 7681
+    },
+    {
+      "path": "tests/useRouterState.test-d.tsx",
+      "gitBlob": "c91a8005a263a1a3f0fa3db06a3456bd023ddb8d",
+      "size": 2772
+    },
+    {
+      "path": "tests/useSearch.test-d.tsx",
+      "gitBlob": "12fec6eb6c4154b0fc72824ce087907b65281203",
+      "size": 18908
+    },
+    {
+      "path": "tests/utils.ts",
+      "gitBlob": "da96eb2d959255f4bfa9b94c404f287df1d32d64",
+      "size": 1364
+    },
+    {
+      "path": "tsconfig.build.json",
+      "gitBlob": "92be18587f2ab4537c49df6f92114be3c0c92a14",
+      "size": 108
+    },
+    {
+      "path": "tsconfig.json",
+      "gitBlob": "f406bf1c095c69f544ba12e6b3059fb9dc0b9481",
+      "size": 214
+    },
+    {
+      "path": "tsconfig.legacy.json",
+      "gitBlob": "b90fc83e04c260510b7986e68871e1f385a5c0cb",
+      "size": 57
+    },
+    {
+      "path": "vite.config.ts",
+      "gitBlob": "0eb9e3c77e12630b2483bc637525131a86805ac1",
+      "size": 1000
+    }
+  ],
+  "fingerprint": "f21cabed024584a2b5a7dc8e11236666a09dd880ec678f5b25c030a6bc5c8268"
+}

@@ -1,84 +1,81 @@
-// react-router's CatchBoundary + default ErrorComponent, rebuilt on octane's
-// `@try`/`@catch` (octane has no class components, so the upstream
-// CatchBoundaryImpl class becomes a catch branch). Contract preserved from
-// upstream CatchBoundary.tsx:
-//   - renders `children` until a descendant throws during render/effects;
-//   - then renders `errorComponent` with `{ error, reset }`;
-//   - `onCatch(error, errorInfo)` fires once per caught error (componentDidCatch
-//     parity). It runs during the catch-branch render — BEFORE the error UI — so
-//     an onCatch that rethrows (Match forwards `notFound()` errors this way)
-//     propagates to the parent boundary exactly like a throwing componentDidCatch;
-//   - when `getResetKey()` changes while an error is showing, the boundary resets
-//     and re-renders `children` (upstream clears the error in
-//     getDerivedStateFromProps; here a layout effect calls the catch reset — one
-//     commit later, same observable outcome). Match passes the router's `loadedAt`
-//     so navigation clears route error UI.
-import { useState, useRef, useLayoutEffect } from 'octane';
+declare const process: { env: { NODE_ENV?: string } };
+
+import { ErrorBoundary as NativeErrorBoundary, createElement, useState, useRef } from 'octane';
 import type { OctaneNode } from 'octane';
 import type { ErrorInfo, ErrorRouteComponent } from './route.ts';
+import { wrapInNonRouteComponentContext } from './nonRouteComponentContext.ts';
 
 export function CatchBoundary(props: {
-	getResetKey: () => number | string;
+	getResetKey: () => unknown;
 	children: OctaneNode;
 	errorComponent?: ErrorRouteComponent;
-	onCatch?: (error: Error, errorInfo: ErrorInfo) => void;
+	onCatch?: (error: unknown, errorInfo: ErrorInfo) => void;
 }) @{
-	@try {
-		<>
-			{props.children}
-		</>
-	} @catch (error, reset) {
-		<CatchErrorView
-			error={error}
-			reset={reset}
-			getResetKey={props.getResetKey}
-			errorComponent={props.errorComponent}
-			onCatch={props.onCatch}
-		/>
+	const resetKey = props.getResetKey();
+	const caught = useRef<{ key: unknown; reset: () => void } | null>(null);
+	// Clear the prior error before the native boundary renders changed props.
+	// Deferring this to the fallback's layout effect can render a new route's
+	// error component with the previous route's error for one commit.
+	if (caught.current && !Object.is(caught.current.key, resetKey)) {
+		const previous = caught.current;
+		caught.current = null;
+		previous.reset();
 	}
+	<NativeErrorBoundary
+		fallback={(error: unknown, reset: () => void) => {
+			caught.current = { key: resetKey, reset };
+			return <CatchErrorView
+				error={error}
+				reset={reset}
+				errorComponent={props.errorComponent}
+				onCatch={props.onCatch}
+			/>;
+		}}
+	>{props.children}</NativeErrorBoundary>
 }
 
 function CatchErrorView(props: {
-	error: any;
+	error: unknown;
 	reset: () => void;
-	getResetKey?: () => number | string;
 	errorComponent?: ErrorRouteComponent;
-	onCatch?: (error: Error, errorInfo: ErrorInfo) => void;
+	onCatch?: (error: unknown, errorInfo: ErrorInfo) => void;
 }) @{
 	// componentDidCatch parity — once per distinct caught error, during render so a
 	// rethrow (the notFound-forwarding path) escapes to the parent boundary.
-	const reported = useRef<unknown>(null);
-	if (reported.current !== props.error) {
-		reported.current = props.error;
+	const reported = useRef<[unknown] | undefined>(undefined);
+	if (!reported.current || !Object.is(reported.current[0], props.error)) {
+		reported.current = [props.error];
 		if (props.onCatch) props.onCatch(props.error, { componentStack: '' });
 	}
 
-	// Reset when the reset key rolls (navigation). Skip the mount render — the key
-	// captured while catching is the baseline.
-	const resetKey =
-		props.getResetKey ? props.getResetKey() : undefined;
-	const keyRef = useRef(resetKey);
-	useLayoutEffect(() => {
-		if (keyRef.current !== resetKey) {
-			keyRef.current = resetKey;
-			props.reset();
-		}
-	}, [resetKey]);
-
 	const ErrorComp = props.errorComponent ?? ErrorComponent;
 
-	<ErrorComp error={props.error} reset={props.reset} info={{ componentStack: '' }} />
+	const element = createElement(ErrorComp, {
+		error: props.error,
+		reset: props.reset,
+		info: { componentStack: '' },
+	});
+	<>
+		{process.env.NODE_ENV !== 'production'
+			? wrapInNonRouteComponentContext(element, 'errorComponent')
+			: element}
+	</>
 }
 
 // The default error UI, markup-identical to react-router's ErrorComponent (string
 // styles serialize to the same inline css React produces, so the differential rig
 // can byte-compare it).
 export function ErrorComponent(props: {
-	error: any;
+	error: unknown;
 	reset?: () => void;
 	info?: { componentStack?: string };
 }) @{
 	const [show, setShow] = useState(process.env.NODE_ENV !== 'production');
+	const message =
+		props.error && (typeof props.error === 'object' || typeof props.error === 'function') &&
+		'message' in props.error
+			? props.error.message
+			: undefined;
 
 	<div style="padding:.5rem;max-width:100%">
 		<div style="display:flex;align-items:center;gap:.5rem">
@@ -96,8 +93,8 @@ export function ErrorComponent(props: {
 				<pre
 					style="font-size:.7em;border:1px solid red;border-radius:.25rem;padding:.3rem;color:red;overflow:auto"
 				>
-					@if (props.error?.message) {
-						<code>{props.error.message as string}</code>
+					@if (message) {
+						<code>{message as string}</code>
 					}
 				</pre>
 			</div>

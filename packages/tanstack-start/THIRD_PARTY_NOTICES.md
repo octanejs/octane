@@ -10,3 +10,7 @@ package.
 The native streaming path is adapted to Octane's `StreamOptions.injection` API
 so streamed router HTML is merged by the renderer rather than by a byte-level
 post-processing transform.
+
+The route-update HMR handler follows `packages/router-plugin/src/core/hmr/handle-route-update.ts`
+at TanStack/router commit `6494e75362ff7ca4988ef41046498dea10cbc462`,
+with the existing Octane code-splitter skip contract retained.

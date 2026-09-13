@@ -1,0 +1,21 @@
+{
+  "runtimeDependencies": [
+    "@octanejs/tanstack-query",
+    "@octanejs/tanstack-router",
+    "@tanstack/query-core",
+    "@tanstack/router-ssr-query-core",
+    "octane"
+  ],
+  "adaptedSources": [
+    { "packageName": "@tanstack/react-router-ssr-query", "paths": ["src/index.tsrx"] }
+  ],
+  "sourceLedger": [
+    {
+      "path": "src/index.tsrx",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-router-ssr-query",
+      "sha256": "48e836dafaac38b547d6ae937200b50929a8223e86fb95d2dbbb920c913cbfac"
+    }
+  ],
+  "reimplementedDependencies": []
+}

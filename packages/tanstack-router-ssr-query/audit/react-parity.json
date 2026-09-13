@@ -3,13 +3,13 @@
   "schemaVersion": 1,
   "provenance": {
     "repo": "https://github.com/TanStack/router.git",
-    "version": "1.167.1",
-    "commit": "8b3659143f634542c455a9d7915a8c7e8fabb65d",
+    "version": "1.167.2",
+    "commit": "0dbb77f7260b4919786c2c3d594b8c262de43a9e",
     "sourceRoot": "packages/react-router-ssr-query/src",
     "testRoot": "packages/react-router-ssr-query (no runtime test artifacts)",
     "license": "MIT",
-    "integrity": "sha256:14b0cc524faad53c9e0d68fb2277bdd66147f0589048762fde82dda6aa7fa743",
-    "verification": "recorded-unverified"
+    "integrity": "sha256:1301a0f79fab7aca720fc2289cf6c9e6157e2e76d4442241fd6a9420f646a7c5",
+    "verification": "verified"
   },
   "upstreamSuites": { "runtime": "absent", "types": "present" },
   "adaptedRoots": {
@@ -37,7 +37,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "57dcbd6657cce7470df1124f428731acc5136b8c0188c8b59a96c95dbd7e459e"
+      "lockfileSha256": "94c31ca45af2699bfe2010ff2c09840023a6104edc50f916b5a336ff1707d42d"
     }
   },
   "lanes": [
@@ -53,7 +53,6 @@
         {
           "path": "packages/tanstack-router-ssr-query/tests/differential/parity.test.ts",
           "role": "test",
-          "sha256": "6ae3e69fe62023f30c330f742177db04176f99a22a060a30e09d9c1f2c8f9974",
           "cases": [
             {
               "id": "differential:tanstack-router-ssr-query-provider-ssr",
@@ -65,7 +64,8 @@
               "testName": "matches the disabled query-client wrapper control",
               "fullName": "differential: @octanejs/tanstack-router-ssr-query vs @tanstack/react-router-ssr-query matches the disabled query-client wrapper control"
             }
-          ]
+          ],
+          "sha256": "6ae3e69fe62023f30c330f742177db04176f99a22a060a30e09d9c1f2c8f9974"
         },
         {
           "path": "packages/tanstack-router-ssr-query/tests/differential/_setup.ts",
@@ -80,12 +80,12 @@
         {
           "path": "packages/tanstack-router-ssr-query/audit/upstream-crosswalk.json",
           "role": "support",
-          "sha256": "02e7674c3252b1f91179a053688e2562667ebcf7ebce2c930bfc7cf281cbb95a"
+          "sha256": "f5b419526e83ab402ae1477a73ffed1685c204019cc0a204eaef998a32f82914"
         },
         {
           "path": "packages/tanstack-router-ssr-query/audit/test-classifications.json",
           "role": "support",
-          "sha256": "de7506c4ba1972116103810b8ca6ce6de17a3cf6483423a4d430fb7d37b3549f"
+          "sha256": "df8d982fb07d8c5fcbe4d158dec7917578fade16acc36564bb42202af5ccbcc4"
         },
         {
           "path": "scripts/react-parity/tanstack-router-ssr-query-controls.test.mjs",
@@ -95,7 +95,47 @@
         {
           "path": "packages/tanstack-router-ssr-query/audit/upstream.lock.json",
           "role": "support",
-          "sha256": "8b2667a6309a69c03506ddeb1b4594f49fc655a69e8dfda75fe7123314328322"
+          "sha256": "edb416a3262b83ce8d55999bbae2e9d9e329a9f790b32f89f3f77aa7dd6e0d78"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/audit/provenance.json",
+          "role": "support",
+          "sha256": "830712e8b56aaaa4f9f539443bcb005ccb60a1631eff295d9570ecadecdebe66"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/audit/registrations.json",
+          "role": "support",
+          "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/audit/crosswalk.json",
+          "role": "support",
+          "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/audit/authored-lanes.json",
+          "role": "support",
+          "sha256": "66de6c4321ff342df767406aadfe18d708aeb3c6364ec65389def21b4dab5b6c"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/scripts/generate-parity.mjs",
+          "role": "support",
+          "sha256": "5d9a8cdb40d78aea65777c592dcbe51220b5c704524702c8f1eabe8b973349c8"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/src/index.tsrx",
+          "role": "support",
+          "sha256": "48e836dafaac38b547d6ae937200b50929a8223e86fb95d2dbbb920c913cbfac"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/src/index.tsrx.d.ts",
+          "role": "support",
+          "sha256": "40b93bd804569e4e48294fcb0b4f8a44eda29e02010602ee2cdf854fdc302990"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/tsconfig.json",
+          "role": "support",
+          "sha256": "314698e35bad70008fde1a27a5c78cc338103e6295d43aa90e04e321fc3ca6ec"
         }
       ]
     },
@@ -106,31 +146,86 @@
       "environment": "workspace-node",
       "project": "tanstack-router-ssr-query-pristine-types",
       "evidenceOrigin": "upstream-suite",
-      "notes": "Invokes the vendored upstream tsconfig.build.json under typescript55–typescript60, matching upstream test:types accept/reject evidence (no dedicated expectType artifacts).",
+      "notes": "Original adapter source compile matrix, TypeScript 5.6–7.0. Upstream has no dedicated runtime or type-test registrations.",
       "execution": {
         "kind": "typescript",
         "compiler": "tsc",
         "compilerBins": [
-          "packages/tanstack-router-ssr-query/node_modules/typescript55/lib/tsc.js",
-          "packages/tanstack-router-ssr-query/node_modules/typescript56/lib/tsc.js",
-          "packages/tanstack-router-ssr-query/node_modules/typescript57/lib/tsc.js",
-          "packages/tanstack-router-ssr-query/node_modules/typescript58/lib/tsc.js",
-          "packages/tanstack-router-ssr-query/node_modules/typescript59/lib/tsc.js",
-          "packages/tanstack-router-ssr-query/node_modules/typescript60/lib/tsc.js"
+          "packages/tanstack-router-ssr-query/node_modules/typescript56/bin/tsc",
+          "packages/tanstack-router-ssr-query/node_modules/typescript57/bin/tsc",
+          "packages/tanstack-router-ssr-query/node_modules/typescript58/bin/tsc",
+          "packages/tanstack-router-ssr-query/node_modules/typescript59/bin/tsc",
+          "packages/tanstack-router-ssr-query/node_modules/typescript60/bin/tsc",
+          "node_modules/@typescript/native-preview/bin/tsgo"
         ],
         "project": "packages/tanstack-router-ssr-query/audit/type-probes/tsconfig.pristine.json"
       },
       "files": [
         {
+          "path": "packages/tanstack-router-ssr-query/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "edb416a3262b83ce8d55999bbae2e9d9e329a9f790b32f89f3f77aa7dd6e0d78"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/audit/provenance.json",
+          "role": "support",
+          "sha256": "830712e8b56aaaa4f9f539443bcb005ccb60a1631eff295d9570ecadecdebe66"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/audit/upstream-crosswalk.json",
+          "role": "support",
+          "sha256": "f5b419526e83ab402ae1477a73ffed1685c204019cc0a204eaef998a32f82914"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/audit/registrations.json",
+          "role": "support",
+          "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/audit/crosswalk.json",
+          "role": "support",
+          "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/audit/test-classifications.json",
+          "role": "support",
+          "sha256": "df8d982fb07d8c5fcbe4d158dec7917578fade16acc36564bb42202af5ccbcc4"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/audit/authored-lanes.json",
+          "role": "support",
+          "sha256": "66de6c4321ff342df767406aadfe18d708aeb3c6364ec65389def21b4dab5b6c"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/scripts/generate-parity.mjs",
+          "role": "support",
+          "sha256": "5d9a8cdb40d78aea65777c592dcbe51220b5c704524702c8f1eabe8b973349c8"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/src/index.tsrx",
+          "role": "support",
+          "sha256": "48e836dafaac38b547d6ae937200b50929a8223e86fb95d2dbbb920c913cbfac"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/src/index.tsrx.d.ts",
+          "role": "support",
+          "sha256": "40b93bd804569e4e48294fcb0b4f8a44eda29e02010602ee2cdf854fdc302990"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/tsconfig.json",
+          "role": "support",
+          "sha256": "314698e35bad70008fde1a27a5c78cc338103e6295d43aa90e04e321fc3ca6ec"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/audit/type-probes/tsconfig.pristine.json",
+          "role": "support",
+          "sha256": "319b9861bf6c2495239606c2f0253ff15e29ae9c65aae1d98e67089a3f3753d4"
+        },
+        {
           "path": "packages/tanstack-router-ssr-query/upstream/src/index.tsx",
           "role": "test",
           "sha256": "5cc143a009df65f9dcc1820a61ab0cb64519b33abf32dc3f71c513496fbc4a5a",
           "cases": [
-            {
-              "id": "types:pristine-upstream-compile-ts55",
-              "testName": "pinned upstream adapter source compile (TypeScript 5.5)",
-              "fullName": "pinned upstream adapter source compile (TypeScript 5.5)"
-            },
             {
               "id": "types:pristine-upstream-compile-ts56",
               "testName": "pinned upstream adapter source compile (TypeScript 5.6)",
@@ -155,23 +250,13 @@
               "id": "types:pristine-upstream-compile-ts60",
               "testName": "pinned upstream adapter source compile (TypeScript 6.0)",
               "fullName": "pinned upstream adapter source compile (TypeScript 6.0)"
+            },
+            {
+              "id": "types:pristine-upstream-compile-ts70",
+              "testName": "pinned upstream adapter source compile (TypeScript 7.0)",
+              "fullName": "pinned upstream adapter source compile (TypeScript 7.0)"
             }
           ]
-        },
-        {
-          "path": "packages/tanstack-router-ssr-query/tsconfig.json",
-          "role": "support",
-          "sha256": "54593830c286058e815a124ba3d0b2fe0c598879531786e055d7ddb54ac25aed"
-        },
-        {
-          "path": "packages/tanstack-router-ssr-query/tsconfig.octane.json",
-          "role": "support",
-          "sha256": "0397e587688e9b4131084ce70c06d0ae6268682fb3cf674c331fcb81a358ce36"
-        },
-        {
-          "path": "packages/tanstack-router-ssr-query/audit/type-probes/tsconfig.pristine.json",
-          "role": "support",
-          "sha256": "eba45ac24d71cfe94866c7f2e5c66986abcb49c7ae47362439439bbcf7539aca"
         }
       ]
     },
@@ -182,17 +267,67 @@
       "environment": "workspace-node",
       "project": "tanstack-router-ssr-query-adapted-types",
       "evidenceOrigin": "upstream-suite",
-      "notes": "One-for-one Octane compiler configuration compile of the adapted adapter source with tsrx-tsc (TypeScript 5.9-equivalent). TypeScript 5.5, 5.6, 5.7, 5.8, and 6.0 are explicit adapted-lane incompatibilities.",
+      "notes": "The native source is compiled by tsrx-tsc. Other TypeScript versions do not parse .tsrx and are recorded as incompatible in the upstream crosswalk.",
       "execution": {
         "kind": "typescript",
         "compiler": "tsrx-tsc",
-        "project": "packages/tanstack-router-ssr-query/typetests/adapted/tsconfig.json"
+        "project": "packages/tanstack-router-ssr-query/tsconfig.json"
       },
       "files": [
         {
+          "path": "packages/tanstack-router-ssr-query/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "edb416a3262b83ce8d55999bbae2e9d9e329a9f790b32f89f3f77aa7dd6e0d78"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/audit/provenance.json",
+          "role": "support",
+          "sha256": "830712e8b56aaaa4f9f539443bcb005ccb60a1631eff295d9570ecadecdebe66"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/audit/upstream-crosswalk.json",
+          "role": "support",
+          "sha256": "f5b419526e83ab402ae1477a73ffed1685c204019cc0a204eaef998a32f82914"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/audit/registrations.json",
+          "role": "support",
+          "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/audit/crosswalk.json",
+          "role": "support",
+          "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/audit/test-classifications.json",
+          "role": "support",
+          "sha256": "df8d982fb07d8c5fcbe4d158dec7917578fade16acc36564bb42202af5ccbcc4"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/audit/authored-lanes.json",
+          "role": "support",
+          "sha256": "66de6c4321ff342df767406aadfe18d708aeb3c6364ec65389def21b4dab5b6c"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/scripts/generate-parity.mjs",
+          "role": "support",
+          "sha256": "5d9a8cdb40d78aea65777c592dcbe51220b5c704524702c8f1eabe8b973349c8"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/src/index.tsrx.d.ts",
+          "role": "support",
+          "sha256": "40b93bd804569e4e48294fcb0b4f8a44eda29e02010602ee2cdf854fdc302990"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/tsconfig.json",
+          "role": "support",
+          "sha256": "314698e35bad70008fde1a27a5c78cc338103e6295d43aa90e04e321fc3ca6ec"
+        },
+        {
           "path": "packages/tanstack-router-ssr-query/src/index.tsrx",
           "role": "test",
-          "sha256": "ffb6c68fd523b8c4bab6c754bbbb6c0c5d81507f6236165cf5c3e0416852a774",
+          "sha256": "48e836dafaac38b547d6ae937200b50929a8223e86fb95d2dbbb920c913cbfac",
           "cases": [
             {
               "id": "types:adapted-octane-compile",
@@ -200,11 +335,353 @@
               "fullName": "adapted Octane adapter source compile"
             }
           ]
+        }
+      ]
+    },
+    {
+      "id": "tanstack-router-ssr-query-pristine-public-types",
+      "type": "pristine-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tanstack-router-ssr-query-pristine-public-types",
+      "evidenceOrigin": "repo-authored",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsgo",
+        "project": "packages/tanstack-router-ssr-query/typetests/pristine/tsconfig.json"
+      },
+      "files": [
+        {
+          "path": "packages/tanstack-router-ssr-query/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "edb416a3262b83ce8d55999bbae2e9d9e329a9f790b32f89f3f77aa7dd6e0d78"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/audit/provenance.json",
+          "role": "support",
+          "sha256": "830712e8b56aaaa4f9f539443bcb005ccb60a1631eff295d9570ecadecdebe66"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/audit/upstream-crosswalk.json",
+          "role": "support",
+          "sha256": "f5b419526e83ab402ae1477a73ffed1685c204019cc0a204eaef998a32f82914"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/audit/registrations.json",
+          "role": "support",
+          "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/audit/crosswalk.json",
+          "role": "support",
+          "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/audit/test-classifications.json",
+          "role": "support",
+          "sha256": "df8d982fb07d8c5fcbe4d158dec7917578fade16acc36564bb42202af5ccbcc4"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/audit/authored-lanes.json",
+          "role": "support",
+          "sha256": "66de6c4321ff342df767406aadfe18d708aeb3c6364ec65389def21b4dab5b6c"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/scripts/generate-parity.mjs",
+          "role": "support",
+          "sha256": "5d9a8cdb40d78aea65777c592dcbe51220b5c704524702c8f1eabe8b973349c8"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/src/index.tsrx",
+          "role": "support",
+          "sha256": "48e836dafaac38b547d6ae937200b50929a8223e86fb95d2dbbb920c913cbfac"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/src/index.tsrx.d.ts",
+          "role": "support",
+          "sha256": "40b93bd804569e4e48294fcb0b4f8a44eda29e02010602ee2cdf854fdc302990"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/tsconfig.json",
+          "role": "support",
+          "sha256": "314698e35bad70008fde1a27a5c78cc338103e6295d43aa90e04e321fc3ca6ec"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/typetests/pristine/tsconfig.json",
+          "role": "support",
+          "sha256": "e15df303919e6780971528fcb4b02edb98efdf4a920c815524da36dda29939b9"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/typetests/pristine/integration.test-d.ts",
+          "role": "test",
+          "sha256": "8c03c79d9abb91f332c342ec985ea11062a0bf7f759fb3cc2b9ca508d51348cd",
+          "cases": [
+            {
+              "id": "types:ssr-query-pristine-public-types",
+              "testName": "both public exports preserve precise options and reject invalid inputs",
+              "fullName": "both public exports preserve precise options and reject invalid inputs"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tanstack-router-ssr-query-adapted-public-types",
+      "type": "adapted-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tanstack-router-ssr-query-adapted-public-types",
+      "evidenceOrigin": "repo-authored",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsrx-tsc",
+        "project": "packages/tanstack-router-ssr-query/typetests/adapted/tsconfig.json"
+      },
+      "files": [
+        {
+          "path": "packages/tanstack-router-ssr-query/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "edb416a3262b83ce8d55999bbae2e9d9e329a9f790b32f89f3f77aa7dd6e0d78"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/audit/provenance.json",
+          "role": "support",
+          "sha256": "830712e8b56aaaa4f9f539443bcb005ccb60a1631eff295d9570ecadecdebe66"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/audit/upstream-crosswalk.json",
+          "role": "support",
+          "sha256": "f5b419526e83ab402ae1477a73ffed1685c204019cc0a204eaef998a32f82914"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/audit/registrations.json",
+          "role": "support",
+          "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/audit/crosswalk.json",
+          "role": "support",
+          "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/audit/test-classifications.json",
+          "role": "support",
+          "sha256": "df8d982fb07d8c5fcbe4d158dec7917578fade16acc36564bb42202af5ccbcc4"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/audit/authored-lanes.json",
+          "role": "support",
+          "sha256": "66de6c4321ff342df767406aadfe18d708aeb3c6364ec65389def21b4dab5b6c"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/scripts/generate-parity.mjs",
+          "role": "support",
+          "sha256": "5d9a8cdb40d78aea65777c592dcbe51220b5c704524702c8f1eabe8b973349c8"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/src/index.tsrx",
+          "role": "support",
+          "sha256": "48e836dafaac38b547d6ae937200b50929a8223e86fb95d2dbbb920c913cbfac"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/src/index.tsrx.d.ts",
+          "role": "support",
+          "sha256": "40b93bd804569e4e48294fcb0b4f8a44eda29e02010602ee2cdf854fdc302990"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/tsconfig.json",
+          "role": "support",
+          "sha256": "314698e35bad70008fde1a27a5c78cc338103e6295d43aa90e04e321fc3ca6ec"
         },
         {
           "path": "packages/tanstack-router-ssr-query/typetests/adapted/tsconfig.json",
           "role": "support",
-          "sha256": "aab88b4330137d4e3469590b62299a800c9c552e1fe1c79009fca442b06aaf36"
+          "sha256": "a523215d5129d9267701a54b8388659c67c65f1b6e9219079f1c58ce8d66c42a"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/typetests/adapted/integration.test-d.ts",
+          "role": "test",
+          "sha256": "40ed24062d77e5519441af0063fbc0947a72f5f520705399f7e9b30b52fd9f55",
+          "cases": [
+            {
+              "id": "types:ssr-query-adapted-public-types",
+              "testName": "both public exports preserve precise options and reject invalid inputs",
+              "fullName": "both public exports preserve precise options and reject invalid inputs"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tanstack-router-ssr-query-public-types",
+      "type": "adapted-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tanstack-router-ssr-query-public-types",
+      "evidenceOrigin": "repo-authored",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsrx-tsc",
+        "project": "packages/tanstack-router-ssr-query/tests/types/tsconfig.json"
+      },
+      "files": [
+        {
+          "path": "packages/tanstack-router-ssr-query/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "edb416a3262b83ce8d55999bbae2e9d9e329a9f790b32f89f3f77aa7dd6e0d78"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/audit/provenance.json",
+          "role": "support",
+          "sha256": "830712e8b56aaaa4f9f539443bcb005ccb60a1631eff295d9570ecadecdebe66"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/audit/upstream-crosswalk.json",
+          "role": "support",
+          "sha256": "f5b419526e83ab402ae1477a73ffed1685c204019cc0a204eaef998a32f82914"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/audit/registrations.json",
+          "role": "support",
+          "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/audit/crosswalk.json",
+          "role": "support",
+          "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/audit/test-classifications.json",
+          "role": "support",
+          "sha256": "df8d982fb07d8c5fcbe4d158dec7917578fade16acc36564bb42202af5ccbcc4"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/audit/authored-lanes.json",
+          "role": "support",
+          "sha256": "66de6c4321ff342df767406aadfe18d708aeb3c6364ec65389def21b4dab5b6c"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/scripts/generate-parity.mjs",
+          "role": "support",
+          "sha256": "5d9a8cdb40d78aea65777c592dcbe51220b5c704524702c8f1eabe8b973349c8"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/src/index.tsrx",
+          "role": "support",
+          "sha256": "48e836dafaac38b547d6ae937200b50929a8223e86fb95d2dbbb920c913cbfac"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/src/index.tsrx.d.ts",
+          "role": "support",
+          "sha256": "40b93bd804569e4e48294fcb0b4f8a44eda29e02010602ee2cdf854fdc302990"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/tsconfig.json",
+          "role": "support",
+          "sha256": "314698e35bad70008fde1a27a5c78cc338103e6295d43aa90e04e321fc3ca6ec"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/tests/types/tsconfig.json",
+          "role": "support",
+          "sha256": "959204e98e8a8b71c81640a8e87494dfbc4646ce66b66ad8fd8ea3c52928fb0f"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/tests/types/integration.test-d.ts",
+          "role": "test",
+          "sha256": "40ed24062d77e5519441af0063fbc0947a72f5f520705399f7e9b30b52fd9f55",
+          "cases": [
+            {
+              "id": "types:ssr-query-public-types",
+              "testName": "both public exports preserve precise options and reject invalid inputs",
+              "fullName": "both public exports preserve precise options and reject invalid inputs"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tanstack-router-ssr-query-browser",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "tanstack-router-ssr-query",
+      "files": [
+        {
+          "path": "packages/tanstack-router-ssr-query/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "edb416a3262b83ce8d55999bbae2e9d9e329a9f790b32f89f3f77aa7dd6e0d78"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/audit/provenance.json",
+          "role": "support",
+          "sha256": "830712e8b56aaaa4f9f539443bcb005ccb60a1631eff295d9570ecadecdebe66"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/audit/upstream-crosswalk.json",
+          "role": "support",
+          "sha256": "f5b419526e83ab402ae1477a73ffed1685c204019cc0a204eaef998a32f82914"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/audit/registrations.json",
+          "role": "support",
+          "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/audit/crosswalk.json",
+          "role": "support",
+          "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/audit/test-classifications.json",
+          "role": "support",
+          "sha256": "df8d982fb07d8c5fcbe4d158dec7917578fade16acc36564bb42202af5ccbcc4"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/audit/authored-lanes.json",
+          "role": "support",
+          "sha256": "66de6c4321ff342df767406aadfe18d708aeb3c6364ec65389def21b4dab5b6c"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/scripts/generate-parity.mjs",
+          "role": "support",
+          "sha256": "5d9a8cdb40d78aea65777c592dcbe51220b5c704524702c8f1eabe8b973349c8"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/src/index.tsrx",
+          "role": "support",
+          "sha256": "48e836dafaac38b547d6ae937200b50929a8223e86fb95d2dbbb920c913cbfac"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/src/index.tsrx.d.ts",
+          "role": "support",
+          "sha256": "40b93bd804569e4e48294fcb0b4f8a44eda29e02010602ee2cdf854fdc302990"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/tsconfig.json",
+          "role": "support",
+          "sha256": "314698e35bad70008fde1a27a5c78cc338103e6295d43aa90e04e321fc3ca6ec"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/tests/_fixtures/provider-hydration.tsrx",
+          "role": "support",
+          "sha256": "bb25a7b3f5f3552ee1bebffc27940e9b94e390a225e8b0e7daeb15fe5f5eba7f"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/tests/_fixtures/provider-hydration-client.tsrx",
+          "role": "support",
+          "sha256": "776d84705c15ee45130c2afb546606bcd89d47db2c44eea4e41f1aed292c7491"
+        },
+        {
+          "path": "packages/tanstack-router-ssr-query/tests/provider-hydration.browser.test.ts",
+          "role": "test",
+          "sha256": "7b5c4b496e153028916b046f884bee6a12951e98a86b45084ded37d340299de0",
+          "cases": [
+            {
+              "id": "browser:ssr-query-provider-hydration",
+              "testName": "hydrates query providers without losing input state and releases page and portal subscriptions",
+              "fullName": "hydrates query providers without losing input state and releases page and portal subscriptions"
+            }
+          ]
         }
       ]
     }

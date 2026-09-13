@@ -121,6 +121,40 @@ export function RetainedResetSuspenseHost(props) @{
 	</ErrorBoundary>
 }
 
+function ResetThenSuspendChild(props) @{
+	if (props.state.failed) throw new Error('retry failure');
+	const value = use(props.promise);
+	useLayoutEffect(() => {
+		props.log?.push('setup');
+		return () => props.log?.push('cleanup');
+	}, []);
+	<span id="retry-ready">{value as string}</span>
+}
+
+export function ResetThenSuspendHost(props) @{
+	<Suspense fallback={<span id="retry-pending">pending</span>}>
+		<ErrorBoundary
+			resetRef={props.resetRef}
+			fallback={(error, reset) =>
+				<button id="retry-error" onClick={reset}>{String(error) as string}</button>}
+		>
+			<ResetThenSuspendChild state={props.state} promise={props.promise} log={props.log} />
+		</ErrorBoundary>
+	</Suspense>
+}
+
+// Omitting resetRef keeps the exact imported ErrorBoundary lowering.
+export function LiteralResetThenSuspendHost(props) @{
+	<Suspense fallback={<span id="retry-pending">pending</span>}>
+		<ErrorBoundary
+			fallback={(error, reset) =>
+				<button id="retry-error" onClick={reset}>{String(error) as string}</button>}
+		>
+			<ResetThenSuspendChild state={props.state} promise={props.promise} log={props.log} />
+		</ErrorBoundary>
+	</Suspense>
+}
+
 interface EffectFailureProps {
 	phase: 'layout' | 'passive';
 }

@@ -6,6 +6,7 @@ import {
 	ErrorWhileHeld,
 	RapidTransitions,
 	EffectOrdering,
+	HiddenChildStore,
 } from './_fixtures/transition-held-audit.tsrx';
 
 function deferred<T>() {
@@ -148,4 +149,40 @@ describe('external-store suspense across transitions', () => {
 		}
 		expect(log.drain()).toEqual(['cleanup-3']);
 	});
+});
+
+it('reveals the latest child store value through a memoized child after suspension', async () => {
+	const { store } = setup();
+	const gate = deferred<void>();
+	let pending: Promise<void> | null = null;
+	const listeners = new Set<() => void>();
+	const gateStore = {
+		get: () => pending,
+		subscribe: (listener: () => void) => {
+			listeners.add(listener);
+			return () => {
+				listeners.delete(listener);
+			};
+		},
+	};
+	const root = mount(HiddenChildStore, { store, gateStore });
+	try {
+		await act(() => {});
+		const output = root.find('#hidden-child-value');
+		expect(output.textContent).toBe('1');
+		await act(() => {
+			pending = gate.promise;
+			for (const listener of listeners) listener();
+		});
+		expect(root.find('#hidden-child-fallback').textContent).toBe('Waiting');
+		await act(() => store.setUrgent(2));
+		expect(root.find('#hidden-child-fallback').textContent).toBe('Waiting');
+		await act(() => gate.resolve());
+		expect(root.find('#hidden-child-value')).toBe(output);
+		expect(output.textContent).toBe('2');
+		expect(root.findAll('#hidden-child-fallback')).toHaveLength(0);
+	} finally {
+		root.unmount();
+	}
+	expect(listeners.size).toBe(0);
 });

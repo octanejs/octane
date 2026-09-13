@@ -1,0 +1,32 @@
+diff --git a/tests/upstream/link-path-matching.test.tsx b/tests/upstream/link-path-matching.test.tsx
+--- a/tests/upstream/link-path-matching.test.tsx
++++ b/tests/upstream/link-path-matching.test.tsx
+@@ -1,5 +1,6 @@
+ import * as React from 'octane'
+-import { renderToString } from 'octane/server'
++// OCTANE DIVERGENCE[ssr-compiler]: render the same link through its server graph.
++import { runServerFixture } from '../ssr-fixture'
+ import { cleanup, render } from '@octanejs/testing-library'
+ import { afterEach, expect, test } from 'vitest'
+ import {
+@@ -24,7 +25,7 @@ const cases = [
+ for (const basepath of ['', '/app']) {
+   test.each(cases)(
+     `pathname matching agrees on server and client with basepath "${basepath}": $current -> $to, exact=$exact`,
+-    ({ current, to, exact, active }) => {
++    async ({ current, to, exact, active }) => {
+       const router = createRouter({
+         routeTree: createRootRoute(),
+         history: createMemoryHistory({ initialEntries: [basepath + current] }),
+@@ -44,7 +45,10 @@ for (const basepath of ['', '/app']) {
+       )
+       router.isServer = true
+       const server = document.createElement('div')
+-      server.innerHTML = renderToString(tree)
++      server.innerHTML = await runServerFixture<string>('_fixtures/link-parity.tsrx', 'renderLink', {
++        router, linkProps: { to, activeOptions: { exact }, inactiveProps: { className: 'inactive' } },
++        children: ({ isActive }) => String(isActive),
++      })
+       router.isServer = false
+       const client = render(tree).container
+       for (const container of [server, client]) {

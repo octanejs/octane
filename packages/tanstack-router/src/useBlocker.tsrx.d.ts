@@ -1,19 +1,37 @@
-// Type declaration for the .tsrx module (resolved by relative path).
 import type { HistoryAction } from '@tanstack/history';
-
-export interface ShouldBlockFnLocation {
-	routeId: string;
-	fullPath: string;
+import type { AnyRoute, AnyRouter, ParseRoute, RegisteredRouter } from '@tanstack/router-core';
+import type { OctaneNode } from 'octane';
+export type ShouldBlockFnLocation<
+	out TRouteId = string,
+	out TFullPath = string,
+	out TAllParams = Record<string, string>,
+	out TFullSearchSchema = Record<string, any>,
+> = {
+	routeId: TRouteId;
+	fullPath: TFullPath;
 	pathname: string;
-	params: Record<string, string>;
-	search: Record<string, any>;
-}
+	params: TAllParams;
+	search: TFullSearchSchema;
+};
 
-export type BlockerResolver =
+type AnyShouldBlockFnLocation = ShouldBlockFnLocation<any, any, any, any>;
+type MakeShouldBlockFnLocationUnion<
+	TRouter extends AnyRouter = RegisteredRouter,
+	TRoute extends AnyRoute = ParseRoute<TRouter['routeTree']>,
+> = TRoute extends any
+	? ShouldBlockFnLocation<
+			TRoute['id'],
+			TRoute['fullPath'],
+			TRoute['types']['allParams'],
+			TRoute['types']['fullSearchSchema']
+		>
+	: never;
+
+export type BlockerResolver<TRouter extends AnyRouter = RegisteredRouter> =
 	| {
 			status: 'blocked';
-			current: ShouldBlockFnLocation;
-			next: ShouldBlockFnLocation;
+			current: MakeShouldBlockFnLocationUnion<TRouter>;
+			next: MakeShouldBlockFnLocationUnion<TRouter>;
 			action: HistoryAction;
 			proceed: () => void;
 			reset: () => void;
@@ -27,19 +45,23 @@ export type BlockerResolver =
 			reset: undefined;
 	  };
 
-export type ShouldBlockFnArgs = {
-	current: ShouldBlockFnLocation;
-	next: ShouldBlockFnLocation;
+export type ShouldBlockFnArgs<TRouter extends AnyRouter = RegisteredRouter> = {
+	current: MakeShouldBlockFnLocationUnion<TRouter>;
+	next: MakeShouldBlockFnLocationUnion<TRouter>;
 	action: HistoryAction;
 };
 
-export type ShouldBlockFn = (args: ShouldBlockFnArgs) => boolean | Promise<boolean>;
-
-export type UseBlockerOpts = {
-	shouldBlockFn: ShouldBlockFn;
+export type ShouldBlockFn<TRouter extends AnyRouter = RegisteredRouter> = (
+	args: ShouldBlockFnArgs<TRouter>,
+) => boolean | Promise<boolean>;
+export type UseBlockerOpts<
+	TRouter extends AnyRouter = RegisteredRouter,
+	TWithResolver extends boolean = boolean,
+> = {
+	shouldBlockFn: ShouldBlockFn<TRouter>;
 	enableBeforeUnload?: boolean | (() => boolean);
 	disabled?: boolean;
-	withResolver?: boolean;
+	withResolver?: TWithResolver;
 };
 
 type LegacyBlockerFn = () => Promise<any> | any;
@@ -48,12 +70,44 @@ type LegacyBlockerOpts = {
 	condition?: boolean | any;
 };
 
-export type PromptProps = (UseBlockerOpts | LegacyBlockerOpts) & {
-	children?: unknown | ((params: BlockerResolver) => unknown);
+export declare function useBlocker<
+	TRouter extends AnyRouter = RegisteredRouter,
+	TWithResolver extends boolean = false,
+>(
+	opts: UseBlockerOpts<TRouter, TWithResolver>,
+): TWithResolver extends true ? BlockerResolver<TRouter> : void;
+
+/**
+ * @deprecated Use the shouldBlockFn property instead
+ */
+export declare function useBlocker(blockerFnOrOpts?: LegacyBlockerOpts): BlockerResolver;
+
+/**
+ * @deprecated Use the UseBlockerOpts object syntax instead
+ */
+export declare function useBlocker(
+	blockerFn?: LegacyBlockerFn,
+	condition?: boolean | any,
+): BlockerResolver;
+
+type LegacyPromptProps = {
+	blockerFn?: LegacyBlockerFn;
+	condition?: boolean | any;
+	children?: OctaneNode | ((params: BlockerResolver) => OctaneNode);
 };
 
-export declare const useBlocker: (
-	opts?: UseBlockerOpts | LegacyBlockerOpts | LegacyBlockerFn,
-	condition?: boolean | any,
-) => BlockerResolver;
-export declare const Block: (props: PromptProps) => unknown;
+export type PromptProps<
+	TRouter extends AnyRouter = RegisteredRouter,
+	TWithResolver extends boolean = boolean,
+	TParams = TWithResolver extends true ? BlockerResolver<TRouter> : void,
+> = UseBlockerOpts<TRouter, TWithResolver> & {
+	children?: OctaneNode | ((params: TParams) => OctaneNode);
+};
+export declare function Block<
+	TRouter extends AnyRouter = RegisteredRouter,
+	TWithResolver extends boolean = boolean,
+>(opts: PromptProps<TRouter, TWithResolver>): OctaneNode;
+
+/**
+ *  @deprecated Use the UseBlockerOpts property instead
+ */

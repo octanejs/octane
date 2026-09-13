@@ -5,22 +5,42 @@
 // instance), wraps in `router.options.Wrap` when configured, and provides the
 // router; `RouterProvider` renders `<Matches/>` inside it.
 import { hasKeys } from '@tanstack/router-core';
-import type { AnyRouter } from '@tanstack/router-core';
+import type { AnyRouter, RegisteredRouter, RouterOptions } from '@tanstack/router-core';
 import type { OctaneNode } from 'octane';
 import { routerContext } from './context.ts';
 import { Matches } from './Matches.tsrx';
 import { SafeFragment } from './SafeFragment.tsrx';
 
-// Upstream's `RouterProps` is `Omit<RouterOptions<…>, 'context'> & { router }` —
-// extra props reconfigure the instance via `router.update()`. The octane binding
-// keeps the router-typed member strict and the option passthrough permissive.
-export type RouterProps =
-	{
-		router: AnyRouter;
-		context?: Record<string, any>;
-	} & Record<string, any>;
+export type RouterProps<
+	TRouter extends AnyRouter = RegisteredRouter,
+	TDehydrated extends Record<string, any> = Record<string, any>,
+> =
+	Omit<
+		RouterOptions<
+			TRouter['routeTree'],
+			NonNullable<TRouter['options']['trailingSlash']>,
+			NonNullable<TRouter['options']['defaultStructuralSharing']>,
+			TRouter['history'],
+			TDehydrated
+		>,
+		'context'
+	> & {
+		router: TRouter;
+		context?: Partial<
+			RouterOptions<
+				TRouter['routeTree'],
+				NonNullable<TRouter['options']['trailingSlash']>,
+				NonNullable<TRouter['options']['defaultStructuralSharing']>,
+				TRouter['history'],
+				TDehydrated
+			>['context']
+		>;
+	};
 
-export function RouterContextProvider(props: RouterProps & { children?: OctaneNode }) @{
+export function RouterContextProvider<
+	TRouter extends AnyRouter = RegisteredRouter,
+	TDehydrated extends Record<string, any> = Record<string, any>,
+>(props: RouterProps<TRouter, TDehydrated> & { children?: OctaneNode }) @{
 	const { router, children, ...rest } = props;
 	if (hasKeys(rest)) {
 		router.update({
@@ -39,7 +59,10 @@ export function RouterContextProvider(props: RouterProps & { children?: OctaneNo
 	</Wrap>
 }
 
-export function RouterProvider(props: RouterProps) @{
+export function RouterProvider<
+	TRouter extends AnyRouter = RegisteredRouter,
+	TDehydrated extends Record<string, any> = Record<string, any>,
+>(props: RouterProps<TRouter, TDehydrated>) @{
 	const { router, ...rest } = props;
 
 	<RouterContextProvider router={router} {...rest}>

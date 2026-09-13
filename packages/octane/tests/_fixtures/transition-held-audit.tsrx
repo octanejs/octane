@@ -1,4 +1,4 @@
-import { use, useTransition, useSyncExternalStore, useEffect } from 'octane';
+import { use, useTransition, useSyncExternalStore, useEffect, memo } from 'octane';
 
 interface StoreProps {
 	store: { get: () => number; subscribe: (listener: () => void) => () => void };
@@ -115,4 +115,31 @@ export function EffectOrdering(props: EffectProps) @{
 			<span id="fallback">{'fallback'}</span>
 		}
 	</div>
+}
+
+interface HiddenChildStoreProps {
+	store: StoreProps['store'];
+	gateStore: {
+		get: () => PromiseLike<void> | null;
+		subscribe: (listener: () => void) => () => void;
+	};
+}
+function StoreChild(props: { store: StoreProps['store'] }) @{
+	const value = useSyncExternalStore(props.store.subscribe, props.store.get);
+	<output id="hidden-child-value">{value as number}</output>
+}
+const MemoStoreChild = memo(StoreChild);
+function StoreGate(props: HiddenChildStoreProps) @{
+	const pending = useSyncExternalStore(props.gateStore.subscribe, props.gateStore.get);
+	if (pending) use(pending);
+	<section id="hidden-child-shell">
+		<MemoStoreChild store={props.store} />
+	</section>
+}
+export function HiddenChildStore(props: HiddenChildStoreProps) @{
+	@try {
+		<StoreGate store={props.store} gateStore={props.gateStore} />
+	} @pending {
+		<p id="hidden-child-fallback">Waiting</p>
+	}
 }

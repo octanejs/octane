@@ -1,0 +1,80 @@
+diff --git a/tests/upstream/ClientOnly.test.tsx b/tests/upstream/ClientOnly.test.tsx
+--- a/tests/upstream/ClientOnly.test.tsx
++++ b/tests/upstream/ClientOnly.test.tsx
+@@ -16,51 +16,13 @@ afterEach(() => {
+   cleanup()
+ })
+ 
+-function createTestRouter(opts: { isServer: boolean }) {
+-  const history = createMemoryHistory({ initialEntries: ['/'] })
+-
+-  const rootRoute = createRootRoute({})
+-
+-  const indexRoute = createRoute({
+-    getParentRoute: () => rootRoute,
+-    path: '/',
+-    component: () => (
+-      <div>
+-        <p>Index Route</p>
+-        <ClientOnly fallback={<div data-testid="loading">Loading...</div>}>
+-          <div data-testid="client-only-content">Client Only Content</div>
+-        </ClientOnly>
+-      </div>
+-    ),
+-  })
+-  const otherRoute = createRoute({
+-    getParentRoute: () => rootRoute,
+-    path: '/other',
+-    component: () => (
+-      <div>
+-        <p data-testid="other-route">Other Route</p>
+-      </div>
+-    ),
+-  })
+-
+-  const routeTree = rootRoute.addChildren([indexRoute, otherRoute])
+-  const router = createRouter({ routeTree, history, ...opts })
+-
+-  return {
+-    router,
+-    routes: { indexRoute },
+-  }
+-}
++// OCTANE DIVERGENCE[ssr-compiler]: the shared factory is compiled independently.
++import { createTestRouter } from '../_fixtures/client-only-parity'
++import { runServerFixture } from '../ssr-fixture'
+ 
+ describe('ClientOnly', () => {
+   it('should render fallback during SSR', async () => {
+-    const { router } = createTestRouter({ isServer: true })
+-    await router.load()
+-
+-    // Initial render (SSR)
+-    const html = ReactDOMServer.renderToString(
+-      <RouterProvider router={router} />,
+-    )
++    const html = await runServerFixture<string>('_fixtures/client-only-parity.tsx', 'renderClientOnly')
+     expect(html).include('Loading...')
+     expect(html).not.include('Client Only Content')
+   })
+@@ -69,8 +31,8 @@ describe('ClientOnly', () => {
+     const { router } = createTestRouter({ isServer: false })
+     await router.load()
+ 
+-    // Mock useSyncExternalStore to simulate hydration
+-    vi.spyOn(React, 'useSyncExternalStore').mockImplementation(() => true)
++    // OCTANE DIVERGENCE[store-hooks]: use the real client hydration snapshot;
++    // globally mocking this hook would also replace the router's match stores.
+ 
+     render(<RouterProvider router={router} />)
+ 
+@@ -82,8 +44,7 @@ describe('ClientOnly', () => {
+     const { router } = createTestRouter({ isServer: false })
+     await router.load()
+ 
+-    // Simulate hydration
+-    vi.spyOn(React, 'useSyncExternalStore').mockImplementation(() => true)
++    // OCTANE DIVERGENCE[store-hooks]: use the real client hydration snapshot.
+ 
+     // Re-render after hydration
+     render(<RouterProvider router={router} />)

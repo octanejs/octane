@@ -1,7 +1,7 @@
 {
   "name": "@octanejs/tanstack-router-ssr-query",
   "version": "0.0.43",
-  "description": "Octane port of @tanstack/react-router-ssr-query — TanStack Router ⇄ Query SSR integration.",
+  "description": "Octane port of @tanstack/react-router-ssr-query \u2014 TanStack Router \u21c4 Query SSR integration.",
   "type": "module",
   "main": "src/index.tsrx",
   "types": "src/index.tsrx.d.ts",
@@ -12,11 +12,12 @@
     }
   },
   "scripts": {
-    "test": "vitest run --project tanstack-router-ssr-query",
-    "typecheck": "tsrx-tsc --noEmit -p tsconfig.octane.json"
+    "test": "vitest run --root ../.. --project tanstack-router-ssr-query --project tanstack-router-ssr-query-differential",
+    "typecheck": "tsrx-tsc --noEmit -p tsconfig.octane.json",
+    "upstream:check": "node ../../scripts/react-parity/verify-provenance.mjs --package-dir ."
   },
   "dependencies": {
-    "@tanstack/router-ssr-query-core": "1.169.1",
+    "@tanstack/router-ssr-query-core": "1.169.2",
     "@tanstack/query-core": "catalog:default"
   },
   "peerDependencies": {
@@ -27,9 +28,9 @@
   "devDependencies": {
     "@octanejs/tanstack-query": "workspace:*",
     "@octanejs/tanstack-router": "workspace:*",
-    "@tanstack/react-query": "catalog:default",
-    "@tanstack/react-router": "catalog:default",
-    "@tanstack/react-router-ssr-query": "1.167.1",
+    "@tanstack/react-query": "5.102.8",
+    "@tanstack/react-router": "1.170.35",
+    "@tanstack/react-router-ssr-query": "1.167.2",
     "@tsrx/react": "catalog:default",
     "@types/react": "catalog:default",
     "@types/react-dom": "catalog:default",
@@ -37,7 +38,6 @@
     "octane": "workspace:*",
     "react": "catalog:default",
     "react-dom": "catalog:default",
-    "typescript55": "npm:typescript@5.5.4",
     "typescript56": "npm:typescript@5.6.3",
     "typescript57": "npm:typescript@5.7.3",
     "typescript58": "npm:typescript@5.8.3",
@@ -60,7 +60,9 @@
   "files": [
     "src",
     "README.md",
-    "LICENSE.upstream"
+    "LICENSE.upstream",
+    "UPSTREAM.md",
+    "LICENSE"
   ],
   "author": {
     "name": "Dominic Gannaway",

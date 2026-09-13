@@ -1279,7 +1279,7 @@
       "name": "@octanejs/tanstack-router",
       "version": "0.1.53",
       "category": "Routing",
-      "upstream": { "package": "@tanstack/react-router", "version": "1.170.18" },
+      "upstream": { "package": "@tanstack/react-router", "version": "1.170.35" },
       "surface": "Octane's TanStack Router binding: typed route factories and hooks, the full Match pipeline and lifecycle, file routes with TSRX-aware generator integration, full Link navigation/preloading/masking behavior, blocking, Await/deferred hydration, scroll restoration, lazy routes, not-found handling, document/head assets, and client/server SSR entries.",
       "divergences": [
         "Refs are props — `createLink`'s `forwardRef` becomes a `ref` prop.",
@@ -1287,17 +1287,17 @@
         "Router devtools are distributed separately."
       ],
       "ssr": "Full-document buffered and readable-stream SSR through `./ssr/server`, client hydration through `./ssr/client`, route-owned head/scripts, CSP nonce propagation, per-route SSR modes, and native Octane stream injection; covered by Octane-only framework-contract tests in ordinary shards (not a React SSR oracle).",
-      "verified": "2026-08-02"
+      "verified": "2026-09-12"
     },
     {
       "name": "@octanejs/tanstack-router-ssr-query",
       "version": "0.0.43",
       "category": "Routing",
-      "upstream": { "package": "@tanstack/react-router-ssr-query", "version": "1.167.1" },
-      "surface": "Surface-present for the pinned adapter's only runtime entrypoint (`Options` and `setupRouterSsrQueryIntegration`). The metadata-only `./package.json` subpath is intentionally omitted. A representative differential covers provider-backed SSR, existing-wrapper preservation, setup mutations, and the wrapping control; upstream has no runtime suite, and type evidence is the upstream source compile plus the adapted Octane compile, so verification remains recorded-unverified.",
+      "upstream": { "package": "@tanstack/react-router-ssr-query", "version": "1.167.2" },
+      "surface": "Native query-client wrapping and router SSR integration for Options and setupRouterSsrQueryIntegration. The metadata-only upstream ./package.json subpath remains omitted.",
       "divergences": [],
       "ssr": "Supported — this package IS the SSR integration (dehydrates query state into the router stream and wraps the app in the query provider).",
-      "verified": "2026-08-03"
+      "verified": "2026-09-12"
     },
     {
       "name": "@octanejs/tanstack-store",

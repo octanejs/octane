@@ -4,7 +4,12 @@
     "jsx": "react-jsx",
     "jsxImportSource": "react",
     "rootDir": "../../upstream/src",
-    "noEmit": true
+    "noEmit": true,
+    "skipLibCheck": false,
+    "paths": {
+      "react": ["../../node_modules/@types/react/index.d.ts"],
+      "react/*": ["../../node_modules/@types/react/*"]
+    }
   },
   "include": ["../../upstream/src"]
 }

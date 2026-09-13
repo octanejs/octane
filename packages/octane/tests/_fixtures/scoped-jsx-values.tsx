@@ -7,8 +7,10 @@ import {
 	cloneElement,
 	createContext,
 	createElement,
+	createScopedElement,
 	isValidElement,
 	use,
+	useSyncExternalStore,
 	type ElementDescriptor,
 	type OctaneNode,
 } from 'octane';
@@ -751,4 +753,33 @@ export function InspectableExpressionValue() {
 export function DirectCreateElementValue() {
 	const content = createElement('span', { 'data-ordinary': 'create-element' }, 'direct');
 	return <InspectChild child={content} />;
+}
+
+export interface ScopedStoreSource {
+	get: () => number;
+	subscribe: (listener: () => void) => () => void;
+}
+
+function useScopedStore(source: ScopedStoreSource) {
+	use(ValueContext);
+	return useSyncExternalStore(source.subscribe, source.get, source.get);
+}
+
+function ScopedStoreSibling() {
+	return <span>sibling</span>;
+}
+
+export function createScopedStoreModel(source: ScopedStoreSource) {
+	return { useValue: () => useScopedStore(source) };
+}
+// Use the public deferred-descriptor shape emitted for hookful JSX children.
+// A sibling forces host classification before the child takes ownership.
+export function ScopedStoreHost({ model }: { model: { useValue: () => number } }) {
+	return createScopedElement('main', {}, () => [
+		createScopedElement('output', { 'data-testid': 'scoped-store' }, () => [
+			'Value ',
+			model.useValue(),
+		]),
+		createElement(ScopedStoreSibling, {}),
+	]);
 }

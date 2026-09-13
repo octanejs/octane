@@ -1,0 +1,63 @@
+diff --git a/tests/upstream/link.test-d.tsx b/tests/upstream/link.test-d.tsx
+--- a/tests/upstream/link.test-d.tsx
++++ b/tests/upstream/link.test-d.tsx
+@@ -3979,6 +3979,7 @@ test('when passing a component with props to createLink and navigating to the ro
+     .returns.toHaveProperty('additionalProps')
+     .toEqualTypeOf<number | undefined>()
+ 
++  // OCTANE DIVERGENCE[ref-prop]: custom-component props include ref/key only when declared by the component; no React legacy ref injection.
+   expectTypeOf(DefaultRouterLink)
+     .parameter(0)
+     .toHaveProperty('activeProps')
+@@ -3986,9 +3987,7 @@ test('when passing a component with props to createLink and navigating to the ro
+     .toEqualTypeOf<
+       | {
+           [x: `data-${string}`]: unknown
+-          ref?: React.LegacyRef<never> | undefined
+           additionalProps?: number | undefined
+-          key?: React.Key | null | undefined
+         }
+       | undefined
+     >()
+@@ -3999,9 +3998,7 @@ test('when passing a component with props to createLink and navigating to the ro
+     .extract<(...args: Array<any>) => any>()
+     .returns.toEqualTypeOf<{
+       [x: `data-${string}`]: unknown
+-      ref?: React.LegacyRef<never> | undefined
+       additionalProps?: number | undefined
+-      key?: React.Key | null | undefined
+     }>()
+ 
+   createLink((props) => expectTypeOf(props).toEqualTypeOf<CreateLinkProps>())
+@@ -4010,14 +4007,12 @@ test('when passing a component with props to createLink and navigating to the ro
+ test('that createLink refs forward correctly', () => {
+   // copied from: https://tanstack.com/router/latest/docs/framework/react/guide/custom-link#basic-example
+   interface BasicLinkProps extends React.AnchorHTMLAttributes<HTMLAnchorElement> {}
+-  const BasicLinkComponent = React.forwardRef<
+-    HTMLAnchorElement,
+-    BasicLinkProps
+-  >((props, ref) => {
++  // OCTANE DIVERGENCE[ref-prop]: refs are ordinary typed props.
++  const BasicLinkComponent = ({ ref, ...props }: BasicLinkProps & { ref?: React.Ref<HTMLAnchorElement> }) => {
+     return (
+       <a ref={ref} {...props} className={'block px-3 py-2 text-blue-700'} />
+     )
+-  })
++  }
+   const CreatedLinkComponent = createLink(BasicLinkComponent)
+   const CustomLink: LinkComponent<typeof BasicLinkComponent> = (props) => {
+     return <CreatedLinkComponent preload={'intent'} {...props} />
+@@ -4044,11 +4039,8 @@ test('createLink should preserve correct ref type with required interface proper
+     extra: unknown
+   }
+ 
+-  const MyLink = React.forwardRef<HTMLAnchorElement, MyLinkProps>(
+-    (props, ref) => {
+-      return <a ref={ref} {...props} />
+-    },
+-  )
++  // OCTANE DIVERGENCE[ref-prop]: the required custom props retain the native ref prop.
++  const MyLink = ({ ref, ...props }: MyLinkProps) => <a ref={ref} {...props} />
+ 
+   const CreatedLink = createLink(MyLink)
+ 

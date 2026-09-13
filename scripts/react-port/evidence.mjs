@@ -1221,7 +1221,8 @@ function analyzeTypeEvidence(
 			if (pinnedExports) {
 				const witness = publicCompatibilityExport(specifier, symbol.name)
 					? pinnedPublicExport(pinnedEntries, program, checker, specifier, symbol.name)
-					: pinnedExports.get(symbol.name);
+					: (pinnedExports.get(symbol.name) ??
+						pinnedPublicExport(pinnedEntries, program, checker, specifier, symbol.name));
 				if (!witness)
 					throw new Error(
 						`Export ${specifier}.${symbol.name} is absent from the pinned public API`,
@@ -1366,7 +1367,7 @@ function structurallyMappedRegistrations(programFiles, analysis) {
 	return registrations;
 }
 
-function assertTypeProjectSemantics(gateId, commandArguments, node, workspaceRoot) {
+function assertTypeProjectSemantics(gateId, commandArguments, node, workspaceRoot, baseline) {
 	const packageDirectory = bindingPackageDirectory(node, workspaceRoot);
 	const projectPath = path.resolve(workspaceRoot, commandArguments.at(-1));
 	const relativeProject = path.relative(packageDirectory, projectPath);
@@ -1431,7 +1432,7 @@ function assertTypeProjectSemantics(gateId, commandArguments, node, workspaceRoo
 				concretePublicSpecifiers(packageDirectory, node.binding, { excludePackageMetadata: true }),
 				trustedTypeAssertionModulePath,
 				loaded.config.reactPortEvidence?.publicMode === 'pinned'
-					? pinnedPublicEntries(packageDirectory, node)
+					? pinnedPublicEntries(packageDirectory, node, { baseline })
 					: undefined,
 			);
 			if (!semantics.hasPositiveAssertion) {
@@ -1481,7 +1482,7 @@ function assertTypeProjectSemantics(gateId, commandArguments, node, workspaceRoo
 			[expectedImport],
 			canonicalPath(path.join(workspaceRoot, 'scripts/react-port/type-assertions.d.ts')),
 			loaded.config.reactPortEvidence?.publicMode === 'pinned'
-				? pinnedPublicEntries(packageDirectory, { ...node, binding: expectedImport })
+				? pinnedPublicEntries(packageDirectory, { ...node, binding: expectedImport }, { baseline })
 				: undefined,
 		);
 		if (!analysis.hasPositiveAssertion || !analysis.hasNegativeControl) {
@@ -1509,7 +1510,7 @@ export function assertApprovedGateCommand(
 	gateIds,
 	commandArguments,
 	node,
-	{ workspaceRoot = null, manifestPath = null, nodeId = null } = {},
+	{ workspaceRoot = null, manifestPath = null, nodeId = null, baseline } = {},
 ) {
 	const bindingDirectory = node.bindingDirectory?.replaceAll('\\', '/');
 	if (!bindingDirectory) throw new Error('Evidence node has no graph-planned binding directory');
@@ -1586,7 +1587,7 @@ export function assertApprovedGateCommand(
 				'public-types',
 			].includes(gateId)
 		) {
-			assertTypeProjectSemantics(gateId, commandArguments, node, workspaceRoot);
+			assertTypeProjectSemantics(gateId, commandArguments, node, workspaceRoot, baseline);
 		}
 	}
 	return { packageTestPlan };
@@ -1759,6 +1760,7 @@ async function operate(
 			workspaceRoot: manifest.workspaceRoot ?? process.cwd(),
 			manifestPath: path.join(batchDirectory, 'manifest.json'),
 			nodeId: options.node,
+			baseline: manifest.baseline,
 		});
 		const packageTestPlan = gateIds.includes('package-tests')
 			? (commandValidation?.packageTestPlan ??

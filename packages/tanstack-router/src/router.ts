@@ -12,7 +12,6 @@ import {
 	createNonReactiveReadonlyStore,
 } from '@tanstack/router-core';
 import { createAtom, batch } from '@tanstack/store';
-import { startTransition } from 'octane';
 import type { RouterHistory } from '@tanstack/history';
 import type {
 	AnyRoute,
@@ -23,11 +22,8 @@ import type {
 
 const isServerEnv = typeof document === 'undefined';
 
-// Batch router mutations atomically, including resolved commits delivered by a
-// later View Transition callback. The transition scope preserves navigation
-// bookkeeping; useSyncExternalStore notifications still render urgently. Routes
-// that keep stale content while new data loads should defer their render input
-// with useDeferredValue. Server snapshots use the non-reactive factory below.
+// Router core schedules each offered match generation through startTransition.
+// Store transactions only batch their framework-neutral atom publications.
 const octaneStoreFactory = (opts: { isServer?: boolean }) => {
 	if (opts?.isServer ?? isServerEnv) {
 		return {
@@ -39,7 +35,7 @@ const octaneStoreFactory = (opts: { isServer?: boolean }) => {
 	return {
 		createMutableStore: createAtom,
 		createReadonlyStore: createAtom,
-		batch: (fn: () => void) => startTransition(() => batch(fn)),
+		batch,
 	};
 };
 
@@ -109,6 +105,7 @@ export class Router<
 				rejectCommit(error);
 				throw error;
 			}
+			return commit;
 		};
 
 		this.load = async (...args: any[]) => {
@@ -143,22 +140,6 @@ export class Router<
 			if (hasLoadError) throw loadError;
 			if (hasCommitError) throw commitError;
 
-			// RouterCore derives the final HTTP status immediately after its internal
-			// load promise resolves. A platform-deferred View Transition can commit the
-			// new tree only after that point, so finalize every branch once the
-			// render-ready tree is present. RouterCore has already committed a
-			// redirect and its HTTP status together, so preserve that authoritative
-			// status; otherwise a successful tree must also clear a stale 404/500.
-			const state = this.state;
-			const statusCode =
-				state.redirect != null
-					? state.statusCode
-					: this.hasNotFoundMatch()
-						? 404
-						: state.matches.some((match: any) => match.status === 'error')
-							? 500
-							: 200;
-			this.stores.statusCode.set(statusCode);
 			return result;
 		};
 	}

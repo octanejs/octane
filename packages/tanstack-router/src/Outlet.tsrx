@@ -1,50 +1,41 @@
-// Renders the child match below the current one. Reads the current match id from
-// `matchContext`, finds the NEXT id in the match-id chain, and renders its `<Match/>`
-// — the pull-based descent that replaces a top-down state diff. Renders nothing at
-// a leaf.
-//
-// Not-found (react-router's Outlet, same order): when the URL matched no route,
-// router-core flags ONE match `globalNotFound` — with the default
-// `notFoundMode: 'fuzzy'` the deepest fuzzy-matched route that has children, with
-// `notFoundMode: 'root'` the root. That match still renders its own component
-// (the layout), and its `<Outlet/>` renders the not-found UI INSTEAD of a child
-// match — so the 404 lands inside the layout chrome.
-import { useContext, createElement, Suspense } from 'octane';
+declare const process: { env: { NODE_ENV?: string } };
+
+import { useContext, Suspense } from 'octane';
 import { rootRouteId } from '@tanstack/router-core';
 import { useStore } from './useStore.ts';
 import { useRouter, matchContext } from './context.ts';
-import { Match } from './Match.tsrx';
+import { Match, renderPending } from './Match.tsrx';
 import { RouteNotFound } from './RouteNotFound.tsrx';
 import { SafeFragment } from './SafeFragment.tsrx';
+import { nonRouteComponentContext } from './nonRouteComponentContext.ts';
 
 export function Outlet() @{
+	if (process.env.NODE_ENV !== 'production') {
+		const nonRouteComponent = useContext(nonRouteComponentContext);
+		if (nonRouteComponent) console.warn(
+			`Warning: An <Outlet /> was rendered inside a ${nonRouteComponent}. <Outlet /> should only be rendered inside a route component.`,
+		);
+	}
 	const router = useRouter();
-	// Outlet only renders inside a match's component, so the context id (and its
-	// pooled store) are present — same invariant upstream asserts with invariant().
-	const parentId = useContext(matchContext)!;
-	const parentStore = router.stores.matchStores.get(parentId)!;
-	const parentRouteId = useStore(parentStore, (m: any) => m?.routeId as string | undefined);
-	const globalNotFound = useStore(parentStore, (m: any) => m?.globalNotFound ?? false as boolean);
-	const childId = useStore(router.stores.matchesId, (ids: Array<string>) => {
-		const i = ids.indexOf(parentId);
-		return i >= 0 ? ids[i + 1] : undefined;
-	});
-
-	// The root route's outlet wraps the first real match in a Suspense boundary
-	// whose fallback is the router's defaultPendingComponent (react-router's
-	// Outlet does the same) — the outermost pending UI for the initial load.
-	const DefaultPending = router.options.defaultPendingComponent;
+	const parentRouteId = useContext(matchContext)!;
+	const parentStore = router.stores.getMatchStore(parentRouteId);
+	const parent = useStore(
+		parentStore,
+		(match) => [!!match?._notFound, match?.error] as const,
+		(a, b) => a[0] === b[0] && a[1] === b[1],
+	);
+	const childRouteId = useStore(router.stores.ids, (ids) => ids[ids.indexOf(parentRouteId) + 1]);
 	const RootSuspense =
 		parentRouteId === rootRouteId ? Suspense : SafeFragment;
-	const pendingElement =
-		DefaultPending ? createElement(DefaultPending, {}) : null;
+	const PendingComponent = router.options.defaultPendingComponent;
+	const pendingElement = renderPending(PendingComponent);
 
-	@if (globalNotFound) {
-		<RouteNotFound routeId={parentRouteId!} />
+	@if (parent[0]) {
+		<RouteNotFound routeId={parentRouteId} error={parent[1]} />
 	} @else {
-		@if (childId) {
+		@if (childRouteId) {
 			<RootSuspense fallback={pendingElement}>
-				<Match matchId={childId} />
+				<Match routeId={childRouteId} />
 			</RootSuspense>
 		}
 	}

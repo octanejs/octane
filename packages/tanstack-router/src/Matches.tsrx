@@ -1,57 +1,53 @@
-// Runs the navigation engine and renders the match tree root — port of react-router's
-// Matches.tsx. Structure mirrors upstream:
-//
-//   useTransitioner + InnerWrap? > Suspense(root pending) > MatchesInner
-//   MatchesInner: matchContext(firstId) > global CatchBoundary? > Match(firstId)
-//
-// The root Suspense is ALWAYS present on the client (fallback is the root
-// route's pendingComponent ?? defaultPendingComponent ?? null) — it's the
-// already-revealed boundary that lets a navigation transition hold the current
-// page when the next route suspends without a boundary of its own. The global
-// CatchBoundary (opt out: `disableGlobalCatchBoundary`) renders the generic
-// ErrorComponent for errors no route boundary caught, reset by `loadedAt`.
-import { useLayoutEffect, createElement, Suspense } from 'octane';
+import { useLayoutEffect, useRef, Suspense } from 'octane';
 import { setupScrollRestoration, rootRouteId } from '@tanstack/router-core';
+import { isServer } from '@tanstack/router-core/isServer';
+import type { AnyRouteMatch } from '@tanstack/router-core';
+import type { RefObject } from 'octane';
 import { useStore } from './useStore.ts';
 import { useRouter, matchContext } from './context.ts';
-import { useTransitioner } from './Transitioner.tsrx';
-import { Match } from './Match.tsrx';
+import { useTransitioner, settleOwner } from './Transitioner.tsrx';
+import { Match, renderPending } from './Match.tsrx';
 import { CatchBoundary, ErrorComponent } from './CatchBoundary.tsrx';
 import { SafeFragment } from './SafeFragment.tsrx';
 
 export function Matches() @{
 	const router = useRouter();
-	const rootRoute = (router.routesById as any)[rootRouteId];
 	const PendingComponent =
-		rootRoute.options.pendingComponent ?? router.options.defaultPendingComponent;
-	const pendingElement =
-		PendingComponent ? createElement(PendingComponent, {}) : null;
+		router.routesById[rootRouteId]?.options.pendingComponent ??
+			router.options.defaultPendingComponent;
+	const pendingElement = renderPending(PendingComponent);
 	const InnerWrap = router.options.InnerWrap ?? SafeFragment;
-
-	// `createRouter({ scrollRestoration: true })` wires scroll save/restore here, so
-	// it works without the (deprecated) <ScrollRestoration/> component.
+	const RootSuspense =
+		(isServer ?? router.isServer) || router.ssr ? SafeFragment : Suspense;
 	useLayoutEffect(() => {
 		if (router.options.scrollRestoration) setupScrollRestoration(router);
 	}, [router]);
-	useTransitioner();
+	const committedMatches = useRef<Array<AnyRouteMatch> | undefined>(undefined);
+	if (!(isServer ?? router.isServer)) useTransitioner(committedMatches);
 
 	<InnerWrap>
-		<Suspense fallback={pendingElement}>
-			<MatchesInner />
-		</Suspense>
+		<RootSuspense fallback={pendingElement}>
+			<MatchesInner committedMatches={committedMatches} />
+		</RootSuspense>
 	</InnerWrap>
 }
 
-function MatchesInner() @{
+function MatchesInner(props: { committedMatches: RefObject<Array<AnyRouteMatch> | undefined> }) @{
 	const router = useRouter();
-	const matchId = useStore(router.stores.firstId, (id: any) => id as string | undefined);
-	const resetKey = useStore(router.stores.loadedAt, (l: any) => l as number | string);
+	const acknowledgement = router._rendered ??= [];
+	const matches = useStore(router.stores.matches, (value) => acknowledgement[0] ?? value);
+	const match = matches[0];
+	const routeId = match?.routeId;
 	const CatchWrap = router.options.disableGlobalCatchBoundary ? SafeFragment : CatchBoundary;
+	useLayoutEffect(() => {
+		props.committedMatches.current = matches;
+		if (acknowledgement[0] === matches) settleOwner(acknowledgement, true);
+	}, [acknowledgement, matches, props.committedMatches]);
 
-	<matchContext.Provider value={matchId}>
-		<CatchWrap getResetKey={() => resetKey} errorComponent={ErrorComponent}>
-			@if (matchId) {
-				<Match matchId={matchId} />
+	<matchContext.Provider value={routeId}>
+		<CatchWrap getResetKey={() => match} errorComponent={ErrorComponent}>
+			@if (routeId) {
+				<Match routeId={routeId} />
 			}
 		</CatchWrap>
 	</matchContext.Provider>

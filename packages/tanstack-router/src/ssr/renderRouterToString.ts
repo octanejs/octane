@@ -26,7 +26,7 @@ export async function renderRouterToString({
 		return new Response(
 			finalizeBufferedHtml(result.html, result.css, router.serverSsr!.takeBufferedHtml()),
 			{
-				status: router.stores.statusCode.get(),
+				status: router._serverResult?.type === 'render' ? router._serverResult.status : 200,
 				headers: responseHeaders,
 			},
 		);

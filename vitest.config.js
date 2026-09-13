@@ -1,3 +1,4 @@
+import tanstackRouterAdapted from './packages/tanstack-router/tests/vitest.adapted.config.ts';
 import tanstackAiAdapted from './packages/tanstack-ai/tests/vitest.adapted.config.ts';
 import tanstackAiAdaptedSSR from './packages/tanstack-ai/tests/vitest.adapted-ssr.config.ts';
 import tanstackDbAdapted from './packages/tanstack-db/tests/vitest.adapted.config.ts';
@@ -611,6 +612,23 @@ export default defineConfig({
 		// `--silent=passed-only` overrides this default.
 		silent: true,
 		projects: [
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'tanstack-router-browser',
+					include: ['packages/tanstack-router/tests/browser/**/*.test.ts'],
+					environment: 'node',
+				},
+			},
+			{ ...tanstackRouterAdapted, testExecution: { group: 'react-parity' } },
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'tanstack-router-pristine',
+					include: ['packages/tanstack-router/tests/upstream-original.test.ts'],
+					environment: 'node',
+				},
+			},
 			{
 				testExecution: { group: 'react-parity' },
 				test: {
@@ -3958,6 +3976,9 @@ export default defineConfig({
 					include: ['packages/tanstack-router/tests/**/*.test.ts'],
 					environment: 'jsdom',
 					exclude: [
+						'packages/tanstack-router/tests/browser/**',
+						'packages/tanstack-router/tests/upstream/**',
+						'packages/tanstack-router/tests/upstream-original.test.ts',
 						'packages/tanstack-router/tests/differential/**/*.test.ts',
 						'packages/tanstack-router/tests/ssr/**/*.test.ts',
 					],

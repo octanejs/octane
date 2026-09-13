@@ -25,6 +25,8 @@
 import './frameworkTypes';
 
 export * from '@tanstack/router-core';
+// Preserve upstream utility imports through Octane's native hooks.
+export { use as reactUse, useLayoutEffect } from 'octane';
 export {
 	createHistory,
 	createBrowserHistory,
@@ -145,6 +147,7 @@ export type {
 	UseBlockerOpts,
 } from './useBlocker.tsrx';
 export { useMatchRoute, MatchRoute } from './MatchRoute.tsrx';
+export type { UseMatchRouteOptions, MakeMatchRouteOptions } from './MatchRoute.tsrx';
 export { useElementScrollRestoration } from './useElementScrollRestoration';
 export { lazyRouteComponent } from './lazyRouteComponent';
 

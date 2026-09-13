@@ -1,57 +1,81 @@
-// Code-split a route's component: wrap a dynamic import as a component that suspends
-// (via octane's `use`) until the module loads, then renders it. Carries `.preload()`
-// for hover/intent preloading, and reloads the page once on a stale-chunk
-// module-not-found error (the same recovery react-router does).
-//
-//   createRoute({ path: 'item/$id', component: lazyRouteComponent(() => import('./Item')) })
-import { use, createElement } from 'octane';
-import { isModuleNotFoundError } from '@tanstack/router-core';
+import { createElement, use } from 'octane';
+import type { OctaneNode } from 'octane';
 import { toExternalHydrationThenable } from './externalHydration';
+import { isModuleNotFoundError } from '@tanstack/router-core';
+import { isServer } from '@tanstack/router-core/isServer';
+import type { AsyncRouteComponent } from './route';
 
-export function lazyRouteComponent(
-	importer: () => Promise<any>,
-	exportName?: string,
-): ((props: any) => any) & { preload: () => Promise<any> | undefined } {
+/**
+ * Wrap a dynamic import to create a route component that supports
+ * `.preload()` and friendly reload-on-module-missing behavior.
+ *
+ * @param importer Function returning a module promise
+ * @param exportName Named export to use (default: `default`)
+ * @returns A lazy route component compatible with TanStack Router
+ * @link https://tanstack.com/router/latest/docs/framework/react/api/router/lazyRouteComponentFunction
+ */
+export function lazyRouteComponent<T extends Record<string, any>, TKey extends keyof T = 'default'>(
+	importer: () => Promise<T>,
+	exportName?: TKey,
+): T[TKey] extends (props: infer TProps) => any
+	? ((props: TProps) => OctaneNode) & Pick<AsyncRouteComponent<TProps>, 'preload'>
+	: never {
 	let loadPromise: Promise<any> | undefined;
-	let comp: any;
+	let comp: T[TKey] | T['default'];
 	let error: any;
-	let reload = false;
 
 	const load = () => {
 		if (!loadPromise) {
+			error = undefined;
 			loadPromise = importer()
 				.then((res) => {
-					loadPromise = undefined;
+					// Resolved clients have no preload work; SSR can reuse the import.
+					if (!(isServer ?? typeof window === 'undefined')) {
+						loadPromise = undefined;
+						(lazyComp as any).preload = undefined;
+					}
 					comp = res[exportName ?? 'default'];
 				})
 				.catch((err) => {
+					loadPromise = undefined;
+					// We don't want an error thrown from preload in this case, because
+					// there's nothing we want to do about module not found during preload.
+					// Record the error, the rest is handled during the render path.
 					error = err;
-					if (
-						isModuleNotFoundError(error) &&
-						error instanceof Error &&
-						typeof window !== 'undefined' &&
-						typeof sessionStorage !== 'undefined'
-					) {
-						const key = `tanstack_router_reload:${error.message}`;
-						if (!sessionStorage.getItem(key)) {
-							sessionStorage.setItem(key, '1');
-							reload = true;
-						}
-					}
 				});
 		}
+
 		return loadPromise;
 	};
-
-	const Lazy = (props: any) => {
-		if (reload) {
-			window.location.reload();
-			throw new Promise(() => {});
+	const lazyComp = function Lazy(props: any) {
+		if (error) {
+			// A missing module can mean that a newer deployment replaced the URL.
+			// Reload only for the error that is still current at render time, so a
+			// successful retry cannot leave a stale reload request armed.
+			if (
+				isModuleNotFoundError(error) &&
+				!(isServer ?? typeof window === 'undefined') &&
+				typeof sessionStorage !== 'undefined'
+			) {
+				const storageKey = `tanstack_router_reload:${error.message}`;
+				if (!sessionStorage.getItem(storageKey)) {
+					sessionStorage.setItem(storageKey, '1');
+					window.location.reload();
+					// Suspend forever while the document reloads.
+					throw new Promise(() => {});
+				}
+			}
+			throw error;
 		}
-		if (error) throw error;
-		if (!comp) use(toExternalHydrationThenable(load()));
+
+		if (!comp) {
+			use(toExternalHydrationThenable(load()));
+		}
+
 		return createElement(comp, props);
 	};
-	Lazy.preload = load;
-	return Lazy;
+
+	(lazyComp as any).preload = load;
+
+	return lazyComp as any;
 }
