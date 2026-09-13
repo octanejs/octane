@@ -1668,12 +1668,16 @@ export function createPortal(body: unknown, target: unknown, props: any = undefi
 // Escaping
 // ---------------------------------------------------------------------------
 
-// Guarded escapers: a single .test() scan first, so the common no-escape case
-// returns the ORIGINAL string with zero allocation (~5x on clean text). When
-// something does need escaping, native replacement passes are kept —
-// measured faster than an exec-loop or replace-with-callback single pass on V8
-// for both sparse and dense escape densities.
-const HTML_ESCAPE_RE = /[&<>]/g;
+// Guarded escapers: a cheap pre-scan decides whether the ORIGINAL string can
+// be returned with zero allocation. The regexps are deliberately non-global —
+// no lastIndex to reset per call, and a nested render cannot corrupt a shared
+// scan position. escapeHtml splits the pre-scan by length: a regexp .test()
+// has lower fixed cost on short strings, while three memchr-backed indexOf
+// scans win on long ones (crossover measured at ~32 chars). When something
+// does need escaping, native replacement passes are kept — measured faster
+// than an exec-loop or replace-with-callback single pass on V8 for both
+// sparse and dense escape densities.
+const HTML_ESCAPE_RE = /[&<>]/;
 
 // A primitive component return is user text. Only compiler-owned HTML may
 // bypass escaping; carrying the proof with the value also preserves it through
@@ -1703,17 +1707,19 @@ function serverComponentOutput(out: unknown, scope: SSRScope): string {
 
 export function escapeHtml(v: unknown): string {
 	const s = typeof v === 'string' ? v : String(v);
-	HTML_ESCAPE_RE.lastIndex = 0;
-	if (!HTML_ESCAPE_RE.test(s)) return s;
+	const needsEscape =
+		s.length < 32
+			? HTML_ESCAPE_RE.test(s)
+			: s.indexOf('&') !== -1 || s.indexOf('<') !== -1 || s.indexOf('>') !== -1;
+	if (!needsEscape) return s;
 	return s.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
 }
 
-const ATTR_ESCAPE_RE = /[&"]/g;
+const ATTR_ESCAPE_RE = /[&"]/;
 export function escapeAttr(v: unknown): string {
 	const s = typeof v === 'string' ? v : String(v);
-	ATTR_ESCAPE_RE.lastIndex = 0;
 	if (!ATTR_ESCAPE_RE.test(s)) return s;
-	return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+	return s.replaceAll('&', '&amp;').replaceAll('"', '&quot;');
 }
 
 // ---------------------------------------------------------------------------

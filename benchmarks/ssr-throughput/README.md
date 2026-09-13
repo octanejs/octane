@@ -231,6 +231,39 @@ pnpm exec vite build benchmarks/ssr-throughput/fixtures --ssr src/entry-server.t
 CONFIGS=deopt-page,escape-heavy BENCH_JSON=/tmp/ssr-sample.json node benchmarks/ssr-throughput/run.mjs 2 --no-build
 ```
 
+### Escape pre-scan split by length — 2026-09-12
+
+Compared main `58da3448b` against a candidate that makes `escapeHtml`'s
+no-escape guard length-keyed — a stateless non-global `/[&<>]/` test under 32
+chars, three `indexOf` scans at or above — and drops the `/g`+`lastIndex`
+bookkeeping from `escapeAttr`. Node 22 / macOS / Apple Silicon. A CPU profile
+of the baseline news-500 loop showed the global-regexp guard scan at ~30% of
+render time. Baseline and candidate each ran three fresh processes of the same
+command (fixture bundles rebuilt per revision, then `--no-build`):
+
+```bash
+CONFIGS=news-500/octane-tsrx,news-50/octane-tsrx,waterfall-d1 \
+  node benchmarks/ssr-throughput/run.mjs 8
+```
+
+| Config | Baseline score ms, runs | Candidate score ms, runs | Delta |
+| --- | --- | --- | --- |
+| news-500/octane-tsrx | 0.552 / 0.544 / 0.531 | 0.427 / 0.435 / 0.512 | −20% on median (0.435 vs 0.544) |
+| news-50/octane-tsrx | 0.045 / 0.048 / 0.047 | 0.038 / 0.041 / 0.041 | −14% |
+| waterfall-d1 (control) | 0.070 / 0.071 / 0.066 | 0.072 / 0.070 / 0.081 | inside spread |
+
+Body bytes and marker counts were identical across every run (41 KB/2,
+409 KB/2, 30 KB/5). waterfall-d1 re-serializes a ~1,000-node page per Suspense
+pass and is the noisiest config in this suite — same-binary repeats spanned
+0.066–0.122 across the session, so its small residual elevation is noise, not
+a measured regression; the mechanism there is strictly less work than the old
+`/g` scan (its strings are all under 32 chars and take the non-global regexp).
+
+An intermediate version used three `indexOf` scans at all lengths: it kept the
+news-500 win but measurably regressed waterfall-d1 (~+13%), because three
+builtin calls cost more than one regexp entry on tiny strings. The measured
+crossover sits at ~32 chars, which is what the length split encodes.
+
 ## Production HTML payload audit
 
 `pnpm --dir benchmarks/ssr-throughput bench:payload` builds only the Octane and
