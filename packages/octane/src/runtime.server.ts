@@ -2592,26 +2592,55 @@ export function ssrControl<T>(siteKey: string, fn: () => T): T {
 	}
 }
 
-/** Compiler-emitted identity membrane for one arm/item inside ssrControl. */
-export function ssrArm<T>(armKey: unknown, fn: () => T): T {
+function enterAsyncArm(armKey: unknown): void {
+	const previous = ASYNC_SCOPE;
 	const frame = FRAME;
-	const occurrence =
-		frame === null ? 0 : nextFrameOccurrence(frame, '@arm-position:' + ASYNC_SCOPE);
+	const occurrence = frame === null ? 0 : nextFrameOccurrence(frame, '@arm-position:' + previous);
 	// A freshly allocated object key has no cross-pass identity. Reuse the same
 	// lexical item position only as its fallback lookup. The final scope remains
 	// keyed solely by armKey, so a stable primitive/object key keeps its identity
 	// when an @for reorders between streaming passes.
-	const fallbackPosition = ASYNC_SCOPE + '|@arm-position:' + occurrence;
+	const fallbackPosition = previous + '|@arm-position:' + occurrence;
 	if (SERVER_SIGNAL_BINDINGS_ENABLED && SIGNAL_CONTROL_SITE.charCodeAt(0) === 102) {
-		const previousSignalKeys = SIGNAL_LIST_KEYS;
-		SIGNAL_LIST_KEYS = [...previousSignalKeys, signalIdentityKey(armKey)];
-		try {
-			return withAsyncIdentity('arm', armKey, fn, false, fallbackPosition);
-		} finally {
-			SIGNAL_LIST_KEYS = previousSignalKeys;
-		}
+		SIGNAL_LIST_KEYS = [...SIGNAL_LIST_KEYS, signalIdentityKey(armKey)];
 	}
-	return withAsyncIdentity('arm', armKey, fn, false, fallbackPosition);
+	ASYNC_SCOPE = previous + '|@arm:' + asyncIdentityKey(armKey, false, fallbackPosition);
+}
+
+/** Compiler-emitted identity membrane for one arm/item inside ssrControl. */
+export function ssrArm<T>(armKey: unknown, fn: () => T): T {
+	const previous = ASYNC_SCOPE;
+	const previousSignalKeys = SIGNAL_LIST_KEYS;
+	try {
+		enterAsyncArm(armKey);
+		return fn();
+	} finally {
+		ASYNC_SCOPE = previous;
+		SIGNAL_LIST_KEYS = previousSignalKeys;
+	}
+}
+
+/** Invoke a compiled list body without allocating a callback per item. */
+export function ssrForItem(
+	armKey: unknown,
+	fn: (...args: any[]) => string,
+	item: unknown,
+	index: number | undefined,
+	scope: SSRScope,
+	block: boolean,
+): string {
+	const previous = ASYNC_SCOPE;
+	const previousSignalKeys = SIGNAL_LIST_KEYS;
+	try {
+		enterAsyncArm(armKey);
+		// Preserve the authored body's parameter/default evaluation and exact
+		// argument count, including an @for that declares no index binding.
+		const html = index === undefined ? fn(item, scope) : fn(item, index, scope);
+		return block ? ssrBlock(html) : html;
+	} finally {
+		ASYNC_SCOPE = previous;
+		SIGNAL_LIST_KEYS = previousSignalKeys;
+	}
 }
 
 /**

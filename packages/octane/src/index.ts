@@ -155,6 +155,8 @@ export {
 	evt1u,
 	evt2,
 	evt2u,
+	evt1e,
+	evt2e,
 	evtN,
 	evtNu,
 	setEventHandler,

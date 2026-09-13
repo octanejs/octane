@@ -1205,6 +1205,17 @@ const SUITES = [
 		runs: [{ script: 'run-size.mjs', args: () => [] }],
 	},
 	{
+		name: 'compiler-output',
+		cwd: 'compiler-output',
+		servers: [],
+		iter: { normal: 2, quick: 1 },
+		runs: [
+			{ script: 'branch-environments.mjs', args: () => [] },
+			{ script: 'handlers.mjs', args: () => [] },
+			{ script: 'server.mjs', args: (n) => [String(n)] },
+		],
+	},
+	{
 		name: 'hooks-runtime',
 		cwd: 'hooks-runtime',
 		servers: [],
