@@ -1,5 +1,14 @@
 # @octanejs/mcp-server
 
+## 0.2.29
+
+### Patch Changes
+
+- 6284156: Reduce scheduler batch bookkeeping and skip ref sorting for sibling-only attachment queues, preserving update ordering, effect lifecycle checks, and render-loop limits. Expose deterministic scheduling benchmarks through the MCP benchmark catalog.
+- 8a45222: Reduce DOM attribute, spread-prop, template mounting, metadata, and delegated-event work while preserving hydration, rollback, native event descriptors, and custom-element connection behavior.
+
+  Expose the DOM attribute, template mount, and spread host benchmark suites through the MCP benchmark tool.
+
 ## 0.2.28
 
 ### Patch Changes

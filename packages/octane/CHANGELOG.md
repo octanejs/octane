@@ -1,5 +1,23 @@
 # octane
 
+## 0.2.11
+
+### Patch Changes
+
+- 2789eab: Read descriptor list keys directly during reconciliation without creating a key callback for each list render, while preserving keyed identity and hydration behavior.
+
+  Keep mapped component slots compatible when rendering switches between native array mapping and a custom map implementation, preserving hydrated inputs and component identity.
+
+- fa11c10: Reuse wrapper-path serialization for nested explicitly keyed children while preserving key identity, hydration, and custom key conversion behavior.
+- 6284156: Reduce scheduler batch bookkeeping and skip ref sorting for sibling-only attachment queues, preserving update ordering, effect lifecycle checks, and render-loop limits. Expose deterministic scheduling benchmarks through the MCP benchmark catalog.
+- 58da344: Keep compiler memo caches off scope slot arrays, stabilize internal hook, host,
+  list, and render-capture records, and initialize memo and template caches without
+  sparse namespace entries. Preserve memo identity, staged hook values, keyed DOM
+  reuse, and commit-time cleanup behavior.
+- 8a45222: Reduce DOM attribute, spread-prop, template mounting, metadata, and delegated-event work while preserving hydration, rollback, native event descriptors, and custom-element connection behavior.
+
+  Expose the DOM attribute, template mount, and spread host benchmark suites through the MCP benchmark tool.
+
 ## 0.2.10
 
 ### Patch Changes
