@@ -117,18 +117,25 @@ describe('de-opt pure-host → component upgrade', () => {
 		r.unmount();
 	});
 
-	it('keeps an adopted prefix while removing incompatible stale list nodes', () => {
+	it('keeps keyed survivors after removing an incompatible list node', () => {
 		const r = mount(KeyedWithStaleTail);
-		const liA = r.find('[data-testid="li-a"]');
-		const staleB = r.find('[data-testid="li-b"]');
-		const staleC = r.find('[data-testid="li-c"]');
-		r.click('[data-testid="replace"]');
-		expect(r.find('[data-testid="li-a"]')).toBe(liA);
-		expect(r.find('[data-testid="li-c"]')).not.toBe(staleC);
-		expect(r.findAll('li').map((li) => li.textContent)).toEqual(['a', 'x', 'c']);
-		expect(staleB.isConnected).toBe(false);
-		expect(staleC.isConnected).toBe(false);
-		r.unmount();
+		try {
+			const liA = r.find('[data-testid="li-a"]');
+			const staleB = r.find('[data-testid="li-b"]');
+			const retainedC = r.find('[data-testid="li-c"]');
+			let clicks = 0;
+			retainedC.addEventListener('click', () => clicks++);
+			r.click('[data-testid="replace"]');
+			expect(r.find('[data-testid="li-a"]')).toBe(liA);
+			expect(r.find('[data-testid="li-c"]')).toBe(retainedC);
+			r.click('[data-testid="li-c"]');
+			expect(clicks).toBe(1);
+			expect(r.findAll('li').map((li) => li.textContent)).toEqual(['a', 'x', 'c']);
+			expect(staleB.isConnected).toBe(false);
+			expect(retainedC.isConnected).toBe(true);
+		} finally {
+			r.unmount();
+		}
 	});
 
 	it('re-adopts a retained keyed prefix when a later component suspends', async () => {
@@ -163,15 +170,16 @@ describe('de-opt pure-host → component upgrade', () => {
 		try {
 			const retainedA = r.find('[data-testid="li-a"]');
 			const staleB = r.find('[data-testid="li-b"]');
-			const staleC = r.find('[data-testid="li-c"]');
+			const retainedC = r.find('[data-testid="li-c"]');
 			r.click('[data-testid="replace-lazily"]');
 			expect(r.find('[data-testid="pending"]').textContent).toBe('pending');
 
 			await act(() => loaded.resolve({ default: Inner }));
 			expect(r.find('[data-testid="li-a"]')).toBe(retainedA);
+			expect(r.find('[data-testid="li-c"]')).toBe(retainedC);
 			expect(r.findAll('li').map((li) => li.textContent)).toEqual(['a', 'x', 'c']);
 			expect(staleB.isConnected).toBe(false);
-			expect(staleC.isConnected).toBe(false);
+			expect(retainedC.isConnected).toBe(true);
 			expect(r.find('[data-testid="inner"]')).toBeTruthy();
 		} finally {
 			r.unmount();

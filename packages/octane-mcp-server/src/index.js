@@ -144,6 +144,7 @@ export const BENCHMARK_SUITES = [
 	'three-renderer',
 	'three-bundle-size',
 	'root-transactions',
+	'descriptor-renderer',
 	'compiler-output',
 	'hooks-runtime',
 	'effect-scheduling',
