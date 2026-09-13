@@ -3119,6 +3119,70 @@
     "note": "Production compiler output must not publish hook or automatic memo regions through dynamically added named properties on the slot array."
   },
   {
+    "suite": "hook-memo",
+    "op": "stale_output_count",
+    "target": "provider-output",
+    "reference": "provider-output-reference",
+    "maxRatio": 0,
+    "note": "Alternating retained Provider bodies must render the currently requested label. The same-input baseline reported two stale returns; all DOM/input/state/event controls remain checked."
+  },
+  {
+    "suite": "hook-memo",
+    "op": "same_body_label_renders",
+    "target": "provider-output",
+    "reference": "provider-output-reference",
+    "maxRatio": 0,
+    "note": "A repeated direct Provider child body keeps its automatic child memo hit across 128 Provider updates; clearing every region on every render would perform 128 extra Label renders."
+  },
+  {
+    "suite": "hook-memo",
+    "op": "same_body_component_slots",
+    "target": "provider-output",
+    "reference": "provider-output-reference",
+    "maxRatio": 1,
+    "note": "Same-body direct Provider updates retain only the existing Counter dispatch per render; automatic Label memo hits skip its component slot."
+  },
+  {
+    "suite": "hook-memo",
+    "op": "inline_memo_snapshot_slots",
+    "target": "provider-output",
+    "reference": "provider-output-reference",
+    "maxRatio": 0,
+    "note": "Fresh generated Provider children closures with unchanged calculated descriptor arrays must retain their automatic region hit and skip childSlot."
+  },
+  {
+    "suite": "hook-memo",
+    "op": "inline_memo_label_renders",
+    "target": "provider-output",
+    "reference": "provider-output-reference",
+    "maxRatio": 0,
+    "note": "The memoized inline Provider descriptor array must not rerender its Label on 128 unchanged captured inputs."
+  },
+  {
+    "suite": "hook-memo",
+    "op": "inline_memo_changed_renders",
+    "target": "provider-output",
+    "reference": "provider-output-reference",
+    "maxRatio": 1,
+    "note": "Changed calculated-array captures remain live; output controls and the observer require all 128 distinct Labels to render."
+  },
+  {
+    "suite": "hook-memo",
+    "op": "inline_body_component_slots",
+    "target": "provider-output",
+    "reference": "provider-output-reference",
+    "maxRatio": 3,
+    "note": "Ordinary inline Provider children retain their existing three dispatches per update: Provider, Label, and Counter. This fixture deliberately has no child automatic memo region."
+  },
+  {
+    "suite": "hook-memo",
+    "op": "inline_body_children",
+    "target": "provider-output",
+    "reference": "provider-output-reference",
+    "maxRatio": 1,
+    "note": "Each ordinary inline Provider update still reaches exactly one generated children registration; no new registration work is added by stable body identity."
+  },
+  {
     "suite": "transition-hooks",
     "op": "cycle_renders",
     "target": "octane",
