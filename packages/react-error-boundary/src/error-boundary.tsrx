@@ -32,10 +32,10 @@ export function ErrorBoundary(props: ErrorBoundaryProps) @{
 
 	<NativeErrorBoundary
 		resetRef={nativeResetRef}
-		fallback={(error: unknown) =>
+		fallback={(error: unknown, reset: () => void) =>
 			<CaughtError
 				error={error}
-				reset={nativeResetRef.current!}
+				reset={reset}
 				resetErrorBoundary={resetErrorBoundary}
 				caughtRef={caughtRef}
 				propsRef={propsRef}
