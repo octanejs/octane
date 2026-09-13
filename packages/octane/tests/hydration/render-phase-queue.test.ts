@@ -54,7 +54,9 @@ describe('hydrateRoot — render-phase queue isolation', () => {
 		queueForeignUpdates(4);
 		const targetRoot = hydrateRoot(target, SettlingRows, { count: 4, settle: true });
 
-		expect(Array.from(target.querySelectorAll('[data-settling-row]'))).toEqual(serverRows);
+		const hydratedRows = target.querySelectorAll('[data-settling-row]');
+		expect(hydratedRows.length).toBe(serverRows.length);
+		for (let i = 0; i < serverRows.length; i++) expect(hydratedRows[i]).toBe(serverRows[i]);
 		expect(rowText(target, '[data-settling-row]')).toEqual(Array(4).fill('target:2'));
 		expect(rowText(foreign, '[data-foreign-row]')).toEqual(Array(4).fill('foreign:0'));
 		expect(renders).toEqual([]);
@@ -121,6 +123,7 @@ describe('hydrateRoot — render-phase queue isolation', () => {
 	it('survives flushSync nested in a hydration replay', () => {
 		const renders: number[] = [];
 		const foreignRoot = mountForeign(3, renders);
+		const foreignNodes = foreign.querySelectorAll('[data-foreign-row]');
 		target.innerHTML = renderToString(server.NestedFlush, { flush: false }).html;
 		const serverNode = target.querySelector('[data-nested-flush]');
 		queueForeignUpdates(3);
@@ -134,6 +137,11 @@ describe('hydrateRoot — render-phase queue isolation', () => {
 		expect(serverNode?.textContent).toBe('nested-flush:1');
 		expect(rowText(foreign, '[data-foreign-row]')).toEqual(Array(3).fill('foreign:1'));
 		expect(renders).toEqual([0, 1, 2]);
+		const updatedForeignNodes = foreign.querySelectorAll('[data-foreign-row]');
+		expect(updatedForeignNodes.length).toBe(foreignNodes.length);
+		for (let i = 0; i < foreignNodes.length; i++) {
+			expect(updatedForeignNodes[i]).toBe(foreignNodes[i]);
+		}
 
 		targetRoot.unmount();
 		foreignRoot.unmount();

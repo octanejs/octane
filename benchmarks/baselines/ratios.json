@@ -4471,5 +4471,141 @@
     "reference": "dispatch-work-model",
     "maxRatio": 1,
     "note": "Production portal-free native dispatch retains framework/native order and exact public descriptors while avoiding repeated event-type sets, portal ancestry reads, and private symbols."
+  },
+  {
+    "suite": "effect-scheduling",
+    "op": "collections",
+    "target": "chain",
+    "reference": "chain-budget",
+    "maxRatio": 0,
+    "note": "Scheduler depth ordering allocates no Map or Set per wave."
+  },
+  {
+    "suite": "effect-scheduling",
+    "op": "parent_reads",
+    "target": "chain",
+    "reference": "chain-budget",
+    "maxRatio": 1,
+    "note": "Scheduler ancestry work stays bounded under depth, stable-order, reparenting and lite-shape controls."
+  },
+  {
+    "suite": "effect-scheduling",
+    "op": "collections",
+    "target": "siblings",
+    "reference": "siblings-budget",
+    "maxRatio": 0,
+    "note": "Scheduler depth ordering allocates no Map or Set per wave."
+  },
+  {
+    "suite": "effect-scheduling",
+    "op": "parent_reads",
+    "target": "siblings",
+    "reference": "siblings-budget",
+    "maxRatio": 1,
+    "note": "Scheduler ancestry work stays bounded under depth, stable-order, reparenting and lite-shape controls."
+  },
+  {
+    "suite": "effect-scheduling",
+    "op": "collections",
+    "target": "sparse",
+    "reference": "sparse-budget",
+    "maxRatio": 0,
+    "note": "Scheduler depth ordering allocates no Map or Set per wave."
+  },
+  {
+    "suite": "effect-scheduling",
+    "op": "parent_reads",
+    "target": "sparse",
+    "reference": "sparse-budget",
+    "maxRatio": 1,
+    "note": "Scheduler ancestry work stays bounded under depth, stable-order, reparenting and lite-shape controls."
+  },
+  {
+    "suite": "effect-scheduling",
+    "op": "collections",
+    "target": "mixed",
+    "reference": "mixed-budget",
+    "maxRatio": 0,
+    "note": "Scheduler depth ordering allocates no Map or Set per wave."
+  },
+  {
+    "suite": "effect-scheduling",
+    "op": "parent_reads",
+    "target": "mixed",
+    "reference": "mixed-budget",
+    "maxRatio": 1,
+    "note": "Scheduler ancestry work stays bounded under depth, stable-order, reparenting and lite-shape controls."
+  },
+  {
+    "suite": "effect-scheduling",
+    "op": "collections",
+    "target": "lite",
+    "reference": "lite-budget",
+    "maxRatio": 0,
+    "note": "Scheduler depth ordering allocates no Map or Set per wave."
+  },
+  {
+    "suite": "effect-scheduling",
+    "op": "parent_reads",
+    "target": "lite",
+    "reference": "lite-budget",
+    "maxRatio": 1,
+    "note": "Scheduler ancestry work stays bounded under depth, stable-order, reparenting and lite-shape controls."
+  },
+  {
+    "suite": "effect-scheduling",
+    "op": "sort_calls",
+    "target": "ref-single",
+    "reference": "ref-single-budget",
+    "maxRatio": 0,
+    "note": "Ref attachment preserves child-before-parent and disjoint ordering; single/sibling queues need no sort."
+  },
+  {
+    "suite": "effect-scheduling",
+    "op": "sort_calls",
+    "target": "ref-siblings",
+    "reference": "ref-siblings-budget",
+    "maxRatio": 0,
+    "note": "Ref attachment preserves child-before-parent and disjoint ordering; single/sibling queues need no sort."
+  },
+  {
+    "suite": "effect-scheduling",
+    "op": "sort_calls",
+    "target": "ref-mixed",
+    "reference": "ref-mixed-budget",
+    "maxRatio": 1,
+    "note": "Ref attachment preserves child-before-parent and disjoint ordering; single/sibling queues need no sort."
+  },
+  {
+    "suite": "effect-scheduling",
+    "op": "sort_calls",
+    "target": "ref-deep-disjoint",
+    "reference": "ref-deep-disjoint-budget",
+    "maxRatio": 1,
+    "note": "Ref attachment preserves child-before-parent and disjoint ordering; single/sibling queues need no sort."
+  },
+  {
+    "suite": "effect-scheduling",
+    "op": "sort_calls",
+    "target": "ref-unowned-first",
+    "reference": "ref-unowned-first-budget",
+    "maxRatio": 1,
+    "note": "Ref queues without an owning block preserve attachment order and cannot crash the commit."
+  },
+  {
+    "suite": "effect-scheduling",
+    "op": "sort_calls",
+    "target": "ref-unowned-last",
+    "reference": "ref-unowned-last-budget",
+    "maxRatio": 1,
+    "note": "Ref queues without an owning block preserve attachment order and cannot crash the commit."
+  },
+  {
+    "suite": "effect-scheduling",
+    "op": "sort_calls",
+    "target": "ref-unowned-only",
+    "reference": "ref-unowned-only-budget",
+    "maxRatio": 0,
+    "note": "Ref queues without an owning block preserve attachment order and cannot crash the commit."
   }
 ]
