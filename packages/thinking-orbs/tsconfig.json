@@ -11,8 +11,13 @@
     "noEmitOnError": true,
     "noErrorTruncation": true,
     "allowSyntheticDefaultImports": true,
-    "strict": true
+    "strict": true,
+    "skipLibCheck": false,
+    "types": []
   },
   "include": ["./src/"],
-  "exclude": ["node_modules", "dist", "tests"]
+  "exclude": ["node_modules", "dist", "tests"],
+  "reactPortEvidence": {
+    "gate": "authored-source-types"
+  }
 }

@@ -896,8 +896,8 @@ catalogs:
       specifier: 4.3.3
       version: 4.3.3
     thinking-orbs:
-      specifier: 0.2.0
-      version: 0.2.0
+      specifier: 0.3.1
+      version: 0.3.1
     three:
       specifier: 0.172.0
       version: 0.172.0
@@ -9549,10 +9549,20 @@ importers:
         version: 4.1.10(@edge-runtime/vm@5.0.0)(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(@vitest/browser-playwright@4.1.10)(@vitest/coverage-istanbul@4.1.10)(@vitest/coverage-v8@4.1.10)(happy-dom@20.11.2(bufferutil@4.1.0)(utf-8-validate@5.0.10))(jsdom@30.0.1(@noble/hashes@2.2.0))(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
 
   packages/thinking-orbs:
+    dependencies:
+      thinking-orbs:
+        specifier: catalog:default
+        version: 0.3.1(react@19.2.7)
     devDependencies:
       '@tsrx/react':
         specifier: catalog:default
         version: 0.2.71(react@19.2.7)
+      '@types/react':
+        specifier: catalog:default
+        version: 19.2.18
+      '@types/react-dom':
+        specifier: catalog:default
+        version: 19.2.4(@types/react@19.2.18)
       esbuild:
         specifier: catalog:default
         version: 0.28.1
@@ -9565,9 +9575,6 @@ importers:
       react-dom:
         specifier: catalog:default
         version: 19.2.7(react@19.2.7)
-      thinking-orbs:
-        specifier: catalog:default
-        version: 0.2.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       vitest:
         specifier: catalog:default
         version: 4.1.10(@edge-runtime/vm@5.0.0)(@opentelemetry/api@1.9.1)(@types/node@26.1.1)(@vitest/browser-playwright@4.1.10)(@vitest/coverage-istanbul@4.1.10)(@vitest/coverage-v8@4.1.10)(happy-dom@20.11.2(bufferutil@4.1.0)(utf-8-validate@5.0.10))(jsdom@30.0.1(@noble/hashes@2.2.0))(vite@8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
@@ -32389,11 +32396,10 @@ packages:
     peerDependencies:
       tslib: ^2
 
-  thinking-orbs@0.2.0:
-    resolution: {integrity: sha512-CQux/YsLlB9nY60BDpZ/uW7knAvXg+U2T/gzrzuLRw8xlzfJPLXZxAg2tbbIBGp/nE2Kol1GfbMOJnoH+tcb/A==}
+  thinking-orbs@0.3.1:
+    resolution: {integrity: sha512-3BG1aeB1RUTxItCml/BBuIz5JRM4kZqGuyx+vouv0fXTtcR9ZNoKjWGneHPx94y74GxgArwJZ1qbJR5dt54kSw==}
     peerDependencies:
       react: '>=18.0.0'
-      react-dom: '>=18.0.0'
 
   third-party-web@0.29.2:
     resolution: {integrity: sha512-fegtha91tq2DHphyoiBXVHjVi2YG9zFaRnboT9C28tO1en9Y3wJsfspuy40F+u5wl3hHVbw7cnd1b67kEGHb8g==}
@@ -65209,10 +65215,9 @@ snapshots:
     dependencies:
       tslib: 2.8.1
 
-  thinking-orbs@0.2.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7):
+  thinking-orbs@0.3.1(react@19.2.7):
     dependencies:
       react: 19.2.7
-      react-dom: 19.2.7(react@19.2.7)
 
   third-party-web@0.29.2: {}
 

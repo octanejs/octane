@@ -211,6 +211,17 @@ export function configuredTestSelectors(
 		}
 		return result;
 	}
+	function inheritsVitestProject(project) {
+		if (project.extends === true || project.extends === false) return project.extends;
+		if (project.extends !== undefined)
+			throw new Error(`Cannot resolve upstream test project inheritance ${fileName}`);
+		const major = /^[~^]?([345])\.\d+\.\d+$/.exec(vitestVersion ?? '')?.[1];
+		if (!major)
+			throw new Error(
+				`Cannot resolve default upstream test project inheritance for Vitest ${vitestVersion ?? 'unknown'}`,
+			);
+		return major === '5';
+	}
 	function collect(value, inheritedRoot) {
 		if (Array.isArray(value)) {
 			if (value.length === 0)
@@ -237,7 +248,7 @@ export function configuredTestSelectors(
 						project && typeof project === 'object' && !Array.isArray(project)
 							? runner === 'playwright'
 								? { ...shared, ...project }
-								: project.extends === true
+								: inheritsVitestProject(project)
 									? { ...project, test: mergeConfiguration(shared, project.test ?? {}) }
 									: project
 							: project,

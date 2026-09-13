@@ -23,6 +23,7 @@ import {
 	sanitizeForReport,
 	validateArchiveEntries,
 	verifyIntegrity,
+	verifyNonTestArtifact,
 } from './preflight-lib.mjs';
 
 test('conventional test discovery excludes fixture modules beside runnable suites', () => {
@@ -1699,4 +1700,35 @@ test('a configuration import does not hide an independently selected runtime sui
 		result.upstreamTestInventory.map(({ path }) => path),
 		['tests/widget.test.ts'],
 	);
+});
+
+test('non-test dispositions require an exact reviewed blob and cannot suppress registrations', () => {
+	const source =
+		"import {writeFileSync} from 'node:fs'; writeFileSync('golden.json', JSON.stringify({samples:[0,1]}));";
+	const entry = { path: 'scripts/extract-spec.ts', sha: gitBlobSha(Buffer.from(source)) };
+	const disposition = {
+		path: entry.path,
+		gitBlob: entry.sha,
+		reason: 'Generates geometry vectors; it contains no runtime or type assertions.',
+	};
+	assert.doesNotThrow(() => verifyNonTestArtifact(source, entry, disposition));
+	assert.throws(
+		() => verifyNonTestArtifact(source, entry, { ...disposition, gitBlob: '0'.repeat(40) }),
+		/mismatch/,
+	);
+	assert.throws(
+		() => verifyNonTestArtifact(source, entry, { ...disposition, reason: '' }),
+		/reason/,
+	);
+	for (const source of [
+		"test('real test', () => {});",
+		"it.each(values)('dynamic', () => {});",
+		'expectTypeOf<string>().toEqualTypeOf<string>();',
+	]) {
+		const entry = { path: disposition.path, sha: gitBlobSha(Buffer.from(source)) };
+		assert.throws(
+			() => verifyNonTestArtifact(source, entry, { ...disposition, gitBlob: entry.sha }),
+			/contains.*(registration|assertion)/,
+		);
+	}
 });

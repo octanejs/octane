@@ -11,6 +11,7 @@ import {
 	EVIDENCE_MATRIX_SCHEMA_VERSION,
 	evaluateVerificationReadiness,
 	inspectBindingPackage,
+	inspectShippedSources,
 	migrateEvidenceMatrix,
 	recordEvidence,
 	validateUpstreamCrosswalk,
@@ -816,5 +817,56 @@ describe('package and closure completion', () => {
 		});
 		assert.equal(readiness.status, 'blocked');
 		assert.ok(readiness.issues.some((issue) => issue.includes('package-tests')));
+	});
+});
+
+test('shipped source closure retains local type-only exports without inventing runtime dependencies', async () => {
+	const directory = await mkdtemp(path.join(tmpdir(), 'react-port-public-type-closure-'));
+	await mkdir(path.join(directory, 'src'));
+	await writeFile(
+		path.join(directory, 'package.json'),
+		JSON.stringify({ exports: './src/index.ts' }),
+	);
+	await writeFile(
+		path.join(directory, 'src/index.ts'),
+		"export type { Props } from './types'; export const name = 'widget';",
+	);
+	await writeFile(
+		path.join(directory, 'src/types.ts'),
+		"import type { External } from 'type-only-authority'; export interface Props { value: External; }",
+	);
+	assert.deepEqual(inspectShippedSources(directory), {
+		files: ['src/index.ts', 'src/types.ts'],
+		runtimeDependencies: [],
+	});
+});
+
+test('source closure follows type imports and inline re-exports while retaining real runtime imports', async () => {
+	const directory = await mkdtemp(path.join(tmpdir(), 'react-port-type-edge-closure-'));
+	await mkdir(path.join(directory, 'src'));
+	await writeFile(
+		path.join(directory, 'package.json'),
+		JSON.stringify({ exports: './src/index.ts' }),
+	);
+	await writeFile(
+		path.join(directory, 'src/index.ts'),
+		[
+			"import type { Props } from './props';",
+			"export { type Details } from './details';",
+			"export type Result = import('./result').Result;",
+			"import { type External } from 'inline-types-only';",
+			"export { type Another } from 'export-types-only';",
+			"import { type Label, value } from 'real-runtime';",
+			'export const current = value;',
+		].join('\n'),
+	);
+	for (const name of ['props', 'details', 'result'])
+		await writeFile(
+			path.join(directory, 'src', name + '.ts'),
+			'export interface Value { name: string }',
+		);
+	assert.deepEqual(inspectShippedSources(directory), {
+		files: ['src/details.ts', 'src/index.ts', 'src/props.ts', 'src/result.ts'],
+		runtimeDependencies: ['real-runtime'],
 	});
 });

@@ -727,28 +727,48 @@ function staticModuleSpecifiers(filePath) {
 	);
 	const specifiers = [];
 	function visit(node) {
-		if (
-			ts.isImportDeclaration(node) &&
-			node.moduleSpecifier &&
-			ts.isStringLiteralLike(node.moduleSpecifier) &&
-			!node.importClause?.isTypeOnly
-		) {
-			specifiers.push(node.moduleSpecifier.text);
+		if (ts.isImportDeclaration(node) && ts.isStringLiteralLike(node.moduleSpecifier)) {
+			const clause = node.importClause;
+			const named = clause?.namedBindings;
+			const typeOnly = Boolean(
+				clause?.isTypeOnly ||
+				(!clause?.name &&
+					named &&
+					ts.isNamedImports(named) &&
+					named.elements.length > 0 &&
+					named.elements.every((entry) => entry.isTypeOnly)),
+			);
+			specifiers.push({ specifier: node.moduleSpecifier.text, typeOnly });
 		} else if (
 			ts.isExportDeclaration(node) &&
 			node.moduleSpecifier &&
-			ts.isStringLiteralLike(node.moduleSpecifier) &&
-			!node.isTypeOnly
+			ts.isStringLiteralLike(node.moduleSpecifier)
 		) {
-			specifiers.push(node.moduleSpecifier.text);
+			const named = node.exportClause;
+			const typeOnly = Boolean(
+				node.isTypeOnly ||
+				(named &&
+					ts.isNamedExports(named) &&
+					named.elements.length > 0 &&
+					named.elements.every((entry) => entry.isTypeOnly)),
+			);
+			specifiers.push({ specifier: node.moduleSpecifier.text, typeOnly });
 		} else if (
 			ts.isImportEqualsDeclaration(node) &&
 			ts.isExternalModuleReference(node.moduleReference) &&
 			node.moduleReference.expression &&
-			ts.isStringLiteralLike(node.moduleReference.expression) &&
-			!node.isTypeOnly
+			ts.isStringLiteralLike(node.moduleReference.expression)
 		) {
-			specifiers.push(node.moduleReference.expression.text);
+			specifiers.push({
+				specifier: node.moduleReference.expression.text,
+				typeOnly: node.isTypeOnly,
+			});
+		} else if (
+			ts.isImportTypeNode(node) &&
+			ts.isLiteralTypeNode(node.argument) &&
+			ts.isStringLiteralLike(node.argument.literal)
+		) {
+			specifiers.push({ specifier: node.argument.literal.text, typeOnly: true });
 		} else if (
 			ts.isCallExpression(node) &&
 			node.arguments.length === 1 &&
@@ -756,7 +776,7 @@ function staticModuleSpecifiers(filePath) {
 			(node.expression.kind === ts.SyntaxKind.ImportKeyword ||
 				(ts.isIdentifier(node.expression) && node.expression.text === 'require'))
 		) {
-			specifiers.push(node.arguments[0].text);
+			specifiers.push({ specifier: node.arguments[0].text, typeOnly: false });
 		}
 		ts.forEachChild(node, visit);
 	}
@@ -804,18 +824,18 @@ export function inspectShippedSources(packageDirectory) {
 			continue;
 		}
 		reachableFiles.add(resolvedFile);
-		for (const specifier of staticModuleSpecifiers(resolvedFile)) {
+		for (const { specifier, typeOnly } of staticModuleSpecifiers(resolvedFile)) {
 			if (specifier.startsWith('#') && manifest.imports?.[specifier] !== undefined) {
 				// Package imports resolve from the package root. Audit all export
 				// conditions, including browser stubs and server prehydration scripts.
 				for (const target of collectExportTargets(manifest.imports[specifier])) {
 					if (target.startsWith('./')) queue.push(path.resolve(resolvedPackageDirectory, target));
-					else runtimeDependencies.add(packageRoot(target));
+					else if (!typeOnly) runtimeDependencies.add(packageRoot(target));
 				}
 			} else if (specifier.startsWith('.') || specifier.startsWith('/')) {
 				const dependencyFile = resolveRelativeSource(resolvedFile, specifier);
 				if (dependencyFile) queue.push(dependencyFile);
-			} else {
+			} else if (!typeOnly) {
 				runtimeDependencies.add(packageRoot(specifier));
 			}
 		}

@@ -129,6 +129,7 @@ test('Vitest include overrides conventional discovery without unioning exclusion
 	assert.deepEqual(
 		selected(source, ['src/use.ssr.test.ts', 'src/use.test.tsx', 'other/extra.test.ts'], {
 			runner: 'vitest',
+			vitestVersion: '4.1.0',
 		}),
 		['src/use.ssr.test.ts', 'src/use.test.tsx'],
 	);
@@ -152,7 +153,11 @@ test('unresolved project lists and configuration bases fail closed', () => {
 		'export default { root: getRoot(), test: { include: ["custom/*.ts"] } };',
 	])
 		assert.throws(
-			() => configuredTestSelectors(source, 'vitest.config.ts', { runner: 'vitest' }),
+			() =>
+				configuredTestSelectors(source, 'vitest.config.ts', {
+					runner: 'vitest',
+					vitestVersion: '4.1.0',
+				}),
 			/Cannot resolve/,
 		);
 });
@@ -173,7 +178,11 @@ test('project paths cannot silently fall back to conventional discovery', () => 
 		'export default { projects: [{ testMatch: ["known/*.ts"] }, "./extra.config.js"] };',
 	]) {
 		assert.throws(
-			() => configuredTestSelectors(source, 'vitest.config.ts', { runner: 'vitest' }),
+			() =>
+				configuredTestSelectors(source, 'vitest.config.ts', {
+					runner: 'vitest',
+					vitestVersion: '4.1.0',
+				}),
 			/Cannot resolve/,
 		);
 	}
@@ -287,7 +296,7 @@ test('Vitest projects inherit selectors only when extends is true and match with
 				'test/outside.spec.ts',
 				'ignored/standalone.spec.ts',
 			],
-			{ runner: 'vitest' },
+			{ runner: 'vitest', vitestVersion: '4.1.0' },
 		),
 		['www/test/component.spec.ts', 'ignored/standalone.spec.ts'],
 	);
@@ -350,7 +359,80 @@ test('missing shared exclusions and files without configuration exports fail clo
 		`const config = { include: ['**/*.test.ts'] };`,
 	])
 		assert.throws(
-			() => configuredTestSelectors(source, 'vitest.config.ts', { runner: 'vitest' }),
+			() =>
+				configuredTestSelectors(source, 'vitest.config.ts', {
+					runner: 'vitest',
+					vitestVersion: '4.1.0',
+				}),
 			/Cannot resolve/,
 		);
+});
+
+test('Vitest 5 inline projects inherit root selectors by default while version 4 and explicit opt-outs do not', () => {
+	const source = `export default { root: 'packages/widget', test: { include: ['tests/**/*.test.ts'], exclude: ['tests/ignored.test.ts'], projects: [{ test: { name: 'unit' } }] } };`;
+	for (const [vitestVersion, inherited] of [
+		['4.1.0', false],
+		['5.0.0', true],
+	]) {
+		const [selector] = configuredTestSelectors(source, 'vitest.config.ts', {
+			runner: 'vitest',
+			vitestVersion,
+		});
+		assert.equal(
+			selectedByTestConfiguration(
+				'packages/widget/tests/ignored.test.ts',
+				selector,
+				conventionalTestPath,
+			),
+			!inherited,
+		);
+		assert.equal(
+			selectedByTestConfiguration(
+				'packages/widget/tests/selected.test.ts',
+				selector,
+				conventionalTestPath,
+			),
+			true,
+		);
+		assert.equal(
+			selectedByTestConfiguration(
+				'packages/widget/other/outside.test.ts',
+				selector,
+				conventionalTestPath,
+			),
+			!inherited,
+		);
+	}
+	const [optedOut] = configuredTestSelectors(
+		source.replace('{ test: { name:', '{ extends: false, test: { name:'),
+		'vitest.config.ts',
+		{ runner: 'vitest', vitestVersion: '5.0.0' },
+	);
+	assert.equal(
+		selectedByTestConfiguration(
+			'packages/widget/tests/ignored.test.ts',
+			optedOut,
+			conventionalTestPath,
+		),
+		true,
+	);
+});
+
+test('unknown Vitest versions require explicit inline project inheritance', () => {
+	const source =
+		"export default { test: { exclude: ['ignored/**'], projects: [{ test: { include: ['**/*.test.ts'] } }] } };";
+	for (const vitestVersion of [undefined, 'latest', '^6.0.0', 'workspace:*']) {
+		assert.throws(
+			() =>
+				configuredTestSelectors(source, 'vitest.config.ts', { runner: 'vitest', vitestVersion }),
+			/Cannot resolve default.*inheritance/,
+		);
+		assert.doesNotThrow(() =>
+			configuredTestSelectors(
+				source.replace('{ test: { include:', '{ extends: false, test: { include:'),
+				'vitest.config.ts',
+				{ runner: 'vitest', vitestVersion },
+			),
+		);
+	}
 });

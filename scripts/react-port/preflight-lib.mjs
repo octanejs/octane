@@ -1084,6 +1084,43 @@ export function pinnedLiteralRows(source, { arrayName, excludeFirstColumn = [] }
 	return rows.filter((row) => !excludeFirstColumn.includes(row[0]));
 }
 
+export function verifyNonTestArtifact(source, entry, disposition) {
+	if (
+		disposition.path !== entry.path ||
+		disposition.gitBlob !== entry.sha ||
+		createHash('sha1')
+			.update(`blob ${Buffer.byteLength(source)}\0`)
+			.update(source)
+			.digest('hex') !== entry.sha
+	)
+		throw new Error(`Non-test artifact profile source mismatch: ${entry.path}`);
+	if (typeof disposition.reason !== 'string' || disposition.reason.trim().length < 20)
+		throw new Error(`Non-test artifact disposition requires a precise reason: ${entry.path}`);
+	const file = ts.createSourceFile(entry.path, source, ts.ScriptTarget.Latest, true);
+	function containsAssertion(node) {
+		if (ts.isCallExpression(node)) {
+			let callee = node.expression;
+			while (ts.isPropertyAccessExpression(callee) || ts.isCallExpression(callee))
+				callee = callee.expression;
+			if (
+				ts.isIdentifier(callee) &&
+				/^(?:expect(?:Type|TypeOf)?|assert(?:Type)?)$/.test(callee.text)
+			)
+				return true;
+		}
+		return ts.forEachChild(node, containsAssertion) ?? false;
+	}
+	if (
+		containsAssertion(file) ||
+		findPossibleUnexpandedRegistrars(source).length ||
+		extractTestCases(source, { file: entry.path }).length ||
+		extractTypeAssertionGroups(source, entry.path).length
+	)
+		throw new Error(
+			`Non-test artifact contains a test registration or type assertion: ${entry.path}`,
+		);
+}
+
 export async function immutableTestInventory(tree, subdirectory, manifest, options) {
 	const profilePath = new URL(
 		`./profiles/${manifest.name?.replace(/^@/, '').replaceAll('/', '-')}-${manifest.version}.json`,
@@ -1310,6 +1347,11 @@ export async function immutableTestInventory(tree, subdirectory, manifest, optio
 	)) {
 		const source =
 			candidateSources.get(entry.path) ?? (await fetchGitHubBlob(entry, options)).toString('utf8');
+		const nonTest = profile?.nonTestFiles?.find((file) => file.path === entry.path);
+		if (nonTest) {
+			verifyNonTestArtifact(source, entry, nonTest);
+			continue;
+		}
 		const possibleRegistrars = findPossibleUnexpandedRegistrars(source);
 		if (possibleRegistrars.length > 0) {
 			throw new Error(
