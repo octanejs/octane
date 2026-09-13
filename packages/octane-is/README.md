@@ -1,6 +1,6 @@
 # @octanejs/octane-is
 
-The `react-is` 19.2.7 predicates for Octane elements. Replace `react-is` imports
+The `react-is` 19.3.0 predicates for Octane elements. Replace `react-is` imports
 with `@octanejs/octane-is` when porting source to Octane.
 
 This binding requires the coordinated Octane core release containing the

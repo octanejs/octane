@@ -707,8 +707,8 @@
       "name": "@octanejs/octane-is",
       "version": "0.0.1",
       "category": "Developer Tools",
-      "upstream": { "package": "react-is", "version": "19.2.7" },
-      "surface": "All 26 published react-is 19.2.7 exports over Octane element descriptors and callable component metadata.",
+      "upstream": { "package": "react-is", "version": "19.3.0" },
+      "surface": "All 26 published react-is 19.3.0 exports over Octane element descriptors and callable component metadata.",
       "divergences": [
         "Kind labels use Octane symbols and reject React elements.",
         "Context.Consumer, forwardRef, Profiler and SuspenseList have no Octane kind; their predicates return false.",
@@ -716,7 +716,7 @@
         "React Server Component references are not valid Octane types."
       ],
       "ssr": "Predicates are pure; they never render a component or start a lazy loader.",
-      "verified": "2026-09-03"
+      "verified": "2026-09-13"
     },
     {
       "name": "@octanejs/opentui",

@@ -112,8 +112,8 @@ await write(`${base}/audit/react-parity.json`, {
 		sourceRoot: `${base}/upstream/src`,
 		testRoot: `${base}/upstream/src/__tests__`,
 		license: 'MIT',
-		integrity: `sha256:${digest(`${base}/upstream-artifact/react-is-19.2.7.tgz`)}`,
-		verification: 'verified',
+		integrity: `sha256:${digest(`${base}/upstream-artifact/react-is-${lock.identity.version}.tgz`)}`,
+		verification: JSON.parse(read(`${base}/status.json`)).provenance.verification,
 	},
 	upstreamSuites: { runtime: 'present', types: 'absent' },
 	adaptedRoots: {
