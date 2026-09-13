@@ -240,6 +240,47 @@ describe('batch state', () => {
 	});
 
 	for (const action of ['create-binding', 'extend-binding']) {
+		test(`captures a newly resolved ${action} path without accepting prior dirty files`, () => {
+			const previous = fixtureManifest();
+			previous.nodes['pkg:leaf'].state = 'blocked';
+			previous.baseline['packages/new/local.ts'] = 'original-local';
+			const next = fixtureManifest();
+			next.nodes['pkg:leaf'] = {
+				...next.nodes['pkg:leaf'],
+				state: 'ready',
+				action,
+				bindingDirectory: 'packages/new',
+				nodeFingerprint: 'resolved',
+			};
+			next.baseline = {
+				'packages/new': 'directory',
+				'packages/new/package.json': 'existing-package',
+				'packages/new/local.ts': 'changed-local',
+				'packages/neighbor/a.ts': 'unrelated',
+			};
+			const resumed = reconcileBatchManifest(previous, next);
+			assert.deepEqual(
+				detectWorktreeCollisions({
+					plannedPaths: ['packages/new', 'packages/new/package.json', 'packages/new/local.ts'],
+					baseline: resumed.baseline,
+					current: next.baseline,
+				}),
+				['packages/new/local.ts'],
+			);
+			assert.equal(resumed.baseline['packages/neighbor/a.ts'], undefined);
+			const later = structuredClone(next);
+			later.baseline['packages/new/later.ts'] = 'unreviewed';
+			const again = reconcileBatchManifest(resumed, later);
+			assert.deepEqual(
+				detectWorktreeCollisions({
+					plannedPaths: ['packages/new/later.ts'],
+					baseline: again.baseline,
+					current: later.baseline,
+				}),
+				['packages/new/later.ts'],
+			);
+		});
+
 		test(`does not accept changed paths during ordinary ${action} resume`, () => {
 			const previous = fixtureManifest();
 			const next = fixtureManifest();

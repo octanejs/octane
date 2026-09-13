@@ -1,0 +1,139 @@
+import { atom } from '../../vanilla.js'
+import type { Atom, WritableAtom } from '../../vanilla.js'
+
+const getCached = <T>(c: () => T, m: WeakMap<object, unknown>, k: object): T =>
+  (m.has(k) ? m : m.set(k, c())).get(k) as T
+const cache1 = new WeakMap<object, unknown>()
+const memo2 = <T>(create: () => T, dep1: object, dep2: object): T => {
+  const cache2 = getCached(() => new WeakMap<object, unknown>(), cache1, dep1)
+  return getCached(create, cache2, dep2)
+}
+
+const isPromiseLike = (p: unknown): p is PromiseLike<unknown> =>
+  typeof (p as PromiseLike<unknown>)?.then === 'function'
+
+const defaultFallback = () => undefined
+
+export function unwrap<Value, Args extends unknown[], Result>(
+  anAtom: WritableAtom<Value, Args, Result>,
+): WritableAtom<Awaited<Value> | undefined, Args, Result>
+
+export function unwrap<Value, Args extends unknown[], Result, PendingValue>(
+  anAtom: WritableAtom<Value, Args, Result>,
+  fallback: (prev?: Awaited<Value>) => PendingValue,
+): WritableAtom<Awaited<Value> | PendingValue, Args, Result>
+
+export function unwrap<Value>(
+  anAtom: Atom<Value>,
+): Atom<Awaited<Value> | undefined>
+
+export function unwrap<Value, PendingValue>(
+  anAtom: Atom<Value>,
+  fallback: (prev?: Awaited<Value>) => PendingValue,
+): Atom<Awaited<Value> | PendingValue>
+
+export function unwrap<Value, Args extends unknown[], Result, PendingValue>(
+  anAtom: WritableAtom<Value, Args, Result> | Atom<Value>,
+  fallback: (prev?: Awaited<Value>) => PendingValue = defaultFallback as never,
+) {
+  return memo2(
+    () => {
+      type PromiseAndValue = { readonly p?: PromiseLike<unknown> } & (
+        | { readonly v: Awaited<Value> }
+        | { readonly f: PendingValue; readonly v?: Awaited<Value> }
+        | { readonly e: unknown; readonly v?: Awaited<Value> }
+      )
+      const promiseErrorCache = new WeakMap<PromiseLike<unknown>, unknown>()
+      const promiseResultCache = new WeakMap<
+        PromiseLike<unknown>,
+        Awaited<Value>
+      >()
+      const refreshAtom = atom(0)
+      const triggerRefreshAtom = atom([] as [triggerRefresh?: () => void])
+      triggerRefreshAtom.INTERNAL_onInit = (store) => {
+        store.set(triggerRefreshAtom, [
+          () => store.set(refreshAtom, (c) => c + 1),
+        ])
+      }
+
+      if (process.env.NODE_ENV !== 'production') {
+        refreshAtom.debugPrivate = true
+        triggerRefreshAtom.debugPrivate = true
+      }
+
+      const promiseAndValueAtom: Atom<PromiseAndValue> & {
+        init?: undefined
+      } = atom((get) => {
+        get(refreshAtom)
+        let prev: PromiseAndValue | undefined
+        try {
+          prev = get(promiseAndValueAtom) as PromiseAndValue | undefined
+        } catch {
+          // ignore previous errors to avoid getting stuck in error state
+        }
+        const promise = get(anAtom)
+        if (!isPromiseLike(promise)) {
+          return { v: promise as Awaited<Value> }
+        }
+        if (promise !== prev?.p) {
+          promise.then(
+            (v) => {
+              promiseResultCache.set(promise, v as Awaited<Value>)
+              const [triggerRefresh] = get(triggerRefreshAtom)
+              triggerRefresh!()
+            },
+            (e) => {
+              promiseErrorCache.set(promise, e)
+              const [triggerRefresh] = get(triggerRefreshAtom)
+              triggerRefresh!()
+            },
+          )
+        }
+        if (promiseErrorCache.has(promise)) {
+          if (prev && 'e' in prev && prev.p === promise) {
+            return prev
+          }
+          const e = promiseErrorCache.get(promise)
+          if (prev && 'v' in prev) {
+            return { p: promise, e, v: prev.v }
+          }
+          return { p: promise, e }
+        }
+        if (promiseResultCache.has(promise)) {
+          return {
+            p: promise,
+            v: promiseResultCache.get(promise) as Awaited<Value>,
+          }
+        }
+        if (prev && 'v' in prev) {
+          return { p: promise, f: fallback(prev.v), v: prev.v }
+        }
+        return { p: promise, f: fallback() }
+      })
+      // HACK to read PromiseAndValue atom before initialization
+      promiseAndValueAtom.init = undefined
+
+      if (process.env.NODE_ENV !== 'production') {
+        promiseAndValueAtom.debugPrivate = true
+      }
+
+      return atom(
+        (get) => {
+          const state = get(promiseAndValueAtom)
+          if ('e' in state) {
+            throw state.e
+          }
+          if ('f' in state) {
+            // is pending
+            return state.f
+          }
+          return state.v
+        },
+        (_get, set, ...args) =>
+          set(anAtom as WritableAtom<Value, unknown[], unknown>, ...args),
+      )
+    },
+    anAtom,
+    fallback,
+  )
+}

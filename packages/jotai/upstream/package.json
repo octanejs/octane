@@ -1,0 +1,150 @@
+{
+  "name": "jotai",
+  "description": "👻 Primitive and flexible state management for React",
+  "type": "module",
+  "version": "3.0.0",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "typesVersions": {
+    ">=5.5": {
+      "*": [
+        "dist/*"
+      ]
+    },
+    "*": {
+      "*": [
+        "dist/ts_version_5.5_and_above_is_required.d.ts"
+      ]
+    }
+  },
+  "exports": {
+    "./package.json": "./package.json",
+    ".": {
+      "types@>=5.5": "./dist/index.d.ts",
+      "types": "./dist/ts_version_5.5_and_above_is_required.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./utils": {
+      "types@>=5.5": "./dist/utils.d.ts",
+      "types": "./dist/ts_version_5.5_and_above_is_required.d.ts",
+      "default": "./dist/utils.js"
+    },
+    "./vanilla": {
+      "types@>=5.5": "./dist/vanilla.d.ts",
+      "types": "./dist/ts_version_5.5_and_above_is_required.d.ts",
+      "default": "./dist/vanilla.js"
+    },
+    "./vanilla/utils": {
+      "types@>=5.5": "./dist/vanilla/utils.d.ts",
+      "types": "./dist/ts_version_5.5_and_above_is_required.d.ts",
+      "default": "./dist/vanilla/utils.js"
+    },
+    "./vanilla/internals": {
+      "types@>=5.5": "./dist/vanilla/internals.d.ts",
+      "types": "./dist/ts_version_5.5_and_above_is_required.d.ts",
+      "default": "./dist/vanilla/internals.js"
+    },
+    "./react": {
+      "types@>=5.5": "./dist/react.d.ts",
+      "types": "./dist/ts_version_5.5_and_above_is_required.d.ts",
+      "default": "./dist/react.js"
+    },
+    "./react/utils": {
+      "types@>=5.5": "./dist/react/utils.d.ts",
+      "types": "./dist/ts_version_5.5_and_above_is_required.d.ts",
+      "default": "./dist/react/utils.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "shx rm -rf dist && tsc -p tsconfig.build.json --noCheck && shx touch dist/ts_version_5.5_and_above_is_required.d.ts",
+    "build-watch": "tsc -p tsconfig.build.json --noCheck --watch",
+    "prepack": "shx cp README.md .README.md.bak && shx sed -i 's/.*Jotai \\(dark mode\\).*//' README.md",
+    "postpack": "shx mv .README.md.bak README.md",
+    "fix": "pnpm run fix:lint && pnpm run fix:format",
+    "fix:format": "prettier . --write",
+    "fix:lint": "eslint . --fix",
+    "bench": "npx tsx benchmarks/run-all.ts",
+    "test": "pnpm run \"/^test:.*/\"",
+    "test:format": "prettier . --list-different",
+    "test:types": "tsc --noEmit",
+    "test:lint": "eslint .",
+    "test:spec": "vitest run"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "prettier": {
+    "semi": false,
+    "singleQuote": true
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pmndrs/jotai.git"
+  },
+  "keywords": [
+    "react",
+    "state",
+    "manager",
+    "management",
+    "recoil",
+    "store"
+  ],
+  "author": "Daishi Kato",
+  "contributors": [],
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/pmndrs/jotai/issues"
+  },
+  "homepage": "https://github.com/pmndrs/jotai",
+  "devDependencies": {
+    "@eslint/js": "9.39.4",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
+    "@types/node": "^26.4.1",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
+    "@vitejs/plugin-react": "^6.1.1",
+    "@vitest/coverage-v8": "^5.0.0",
+    "@vitest/eslint-plugin": "^1.6.27",
+    "@vitest/ui": "^5.0.0",
+    "benny": "^3.7.1",
+    "eslint": "9.39.4",
+    "eslint-import-resolver-typescript": "^4.4.5",
+    "eslint-plugin-import": "^2.32.0",
+    "eslint-plugin-jest-dom": "^5.10.1",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-testing-library": "^7.16.2",
+    "jest-leak-detector": "30.5.1",
+    "jsdom": "^30.0.1",
+    "json": "^11.0.0",
+    "prettier": "^3.9.6",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "rxjs": "^7.8.2",
+    "shelljs": "^0.10.0",
+    "shx": "^0.4.0",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.69.0",
+    "vitest": "^5.0.0",
+    "wonka": "^6.3.6"
+  },
+  "peerDependencies": {
+    "@types/react": ">=18.0.0",
+    "react": ">=18.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@types/react": {
+      "optional": true
+    },
+    "react": {
+      "optional": true
+    }
+  },
+  "packageManager": "pnpm@11.3.0+sha512.2c403d6594527287672b1f7056343a1f7c3634036a67ffabfcc2b3d7595d843768f8787148d1b57cf7956c90606bbd192857c363af19e96d2d0ec9ec5741d215"
+}

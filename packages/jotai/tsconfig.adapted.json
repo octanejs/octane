@@ -1,0 +1,48 @@
+{
+  "compilerOptions": {
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "target": "es2020",
+    "strict": true,
+    "skipLibCheck": false,
+    "esModuleInterop": true,
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "types": ["node", "@testing-library/jest-dom/vitest"],
+    "jsxImportSource": "octane",
+    "paths": {
+      "@octanejs/jotai": ["./src/index.ts"],
+      "@octanejs/jotai/*": ["./src/*.ts"]
+    }
+  },
+  "include": [
+    "tests/upstream/react/types.test.tsx",
+    "tests/upstream/react/utils/types.test.tsx",
+    "tests/upstream/vanilla/types.test.tsx",
+    "tests/upstream/vanilla/utils/types.test.tsx",
+    "tests/upstream/react/utils/useHydrateAtoms.test.tsx"
+  ],
+  "exclude": ["node_modules"],
+  "reactPortEvidence": {
+    "gate": "upstream-types-adapted",
+    "upstreamMode": "materialized",
+    "upstreamRegistrations": [
+      "react-case-v1:662f414a1417322944b5",
+      "react-case-v1:6d36520c4dad913e75e4",
+      "react-case-v1:f5dfcdfa3b7ebc70ef74",
+      "react-case-v1:c69829727209d4afcb4b",
+      "react-case-v1:7b8b875241b4f8cbf7ac",
+      "react-case-v1:3e46663a97bd84eea959",
+      "react-case-v1:8fcde0d9a10517228e6f",
+      "react-case-v1:4786a24fb0480bee8612",
+      "react-case-v1:228034d654dd190902d7",
+      "react-case-v1:e8b818d3c6dbff80fef7",
+      "react-case-v1:ed9aaf536cd21718741d"
+    ]
+  },
+  "tsrx": {
+    "compiler": "octane/compiler/volar"
+  }
+}

@@ -18,7 +18,12 @@
     "jsxImportSource": "octane",
     "allowImportingTsExtensions": true
   },
-  "tsrx": { "compiler": "octane/compiler/volar" },
+  "tsrx": {
+    "compiler": "octane/compiler/volar"
+  },
   "include": ["./src/"],
-  "exclude": ["node_modules", "dist", "tests"]
+  "exclude": ["node_modules", "dist", "tests"],
+  "reactPortEvidence": {
+    "gate": "authored-source-types"
+  }
 }

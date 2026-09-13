@@ -1,142 +1,69 @@
 # Jotai upstream
 
-`@octanejs/jotai` ports the React-facing layer from
-[`jotai@2.20.2`](https://github.com/pmndrs/jotai/releases/tag/v2.20.2) while
-reusing Jotai's framework-neutral vanilla implementation.
+`@octanejs/jotai` ports the provider and React hooks from Jotai 3.0.0 and imports the framework-neutral core from `jotai/vanilla`, `/vanilla/utils`, and `/vanilla/internals`.
 
-## Immutable pin
+## Immutable identity and license
 
-- Package: `jotai@2.20.2`
-- Tag and commit: `v2.20.2` / `5c4ca26b0db5571114be58393e17854a771f7790`
-- Repository: `https://github.com/pmndrs/jotai.git`
-- Source root: `src`
-- Test root: `tests`
-- License: MIT
-- npm archive SHA-256: `52c820bc338cbbcc1b58c7758c9603b61ca9fc17526adecd84045a15e91c0157`
-- Supported upstream range: exactly `2.20.2`
-- React oracle: `react@19.2.7` and `react-dom@19.2.7`
+- Release: `jotai@3.0.0`
+- Commit: `89d4fddd1949628e50952fc8ac1b09786248dfca`
+- Source: https://github.com/pmndrs/jotai/tree/89d4fddd1949628e50952fc8ac1b09786248dfca
+- MIT license: exact upstream bytes in packaged `LICENSE.upstream`; SHA-256 `0530d5d58026f4bb73367d195946f6a516a648ea62dd8b84763318f64d3cb3e2`.
+- npm integrity: `sha512-KxhbmsJUp/tmrv6aZgO+nzB3H9K8C0xmk5i3aGkwy/EANg73DVBkggv3zVHaAi5PlNlQgTgP4uiVepo+JC+wSA==`.
+- npm archive SHA-256: `dc9cfb4c901424eea4be448048a274c56472ab0956ee4e4e7d1623bc98e4ef00`.
+- Signed npm provenance resolves the release tag to this commit; npm does not publish a `gitHead` for this release.
+- Tested dependency: 3.0.0; supported catalog range: `^3.0.0`.
+- React runtime oracle: React and React DOM 19.2.7. Original type compiler: TypeScript 6.0.3, with React types 19.2.18 and React DOM types 19.2.7.
 
-The npm archive contains the compiled package, declarations, and license, but
-not the complete repository test history. The tagged runtime and type suites
-have not been vendored and adapted one-for-one, so the parity manifest remains
-`recorded-unverified`.
+`audit/upstream.lock.json` authenticates the byte-exact repository source and tests under `upstream/`. The npm artifact is retained for published-declaration verification. Neither tree is published. Vanilla source appears only in the pristine test environment; runtime code imports the installed upstream dependency.
 
-## Export crosswalk
+## Complete export crosswalk
 
-| Upstream entry point or export | Octane disposition | Evidence or gap |
+The table includes runtime and type exports from every published runtime entry. Root and vanilla utilities import the same upstream implementation. Provider/hooks and the four hook utilities are adapted to Octane. All seven entries have exact runtime export-set checks and positive public type assertions in `tests/types/public.ts`, including upstream's unstable `INTERNAL_*` exports. Package metadata describes the Octane package itself.
+
+| Entry | Exports | Disposition |
 | --- | --- | --- |
-| `atom` (`jotai`, `/vanilla`) | Reused unchanged | Re-exported from `jotai/vanilla`; binding and utility conformance suites exercise atom behavior. |
-| `createStore` (`jotai`, `/vanilla`) | Reused unchanged | Re-exported from `jotai/vanilla`; provider and store conformance suites exercise explicit stores. |
-| `getDefaultStore` (`jotai`, `/vanilla`) | Reused unchanged | Re-exported from `jotai/vanilla`; default-store conformance cases exercise it. |
-| `INTERNAL_overrideCreateStore` (`jotai`, `/vanilla`) | Reused unchanged | Re-exported from the pinned vanilla package; no Octane-specific adaptation. |
-| `RESET` (`/vanilla/utils`, `/utils`) | Reused unchanged | Re-exported from the pinned vanilla utilities; reset utility conformance covers its public behavior. |
-| `atomFamily` (`/vanilla/utils`, `/utils`) | Reused unchanged | Re-exported; utility conformance covers family reuse and removal. |
-| `atomWithDefault` (`/vanilla/utils`, `/utils`) | Reused unchanged | Re-exported; utility conformance covers default restoration. |
-| `atomWithLazy` (`/vanilla/utils`, `/utils`) | Reused unchanged | Re-exported from the pinned framework-neutral implementation. |
-| `atomWithObservable` (`/vanilla/utils`, `/utils`) | Reused unchanged | Re-exported; local utility conformance covers observable subscription behavior. |
-| `atomWithReducer` (`/vanilla/utils`, `/utils`) | Reused unchanged | Re-exported; local utility conformance covers reducer updates. |
-| `atomWithRefresh` (`/vanilla/utils`, `/utils`) | Reused unchanged | Re-exported from the pinned framework-neutral implementation. |
-| `atomWithReset` (`/vanilla/utils`, `/utils`) | Reused unchanged | Re-exported; reset utility conformance covers it. |
-| `atomWithStorage` (`/vanilla/utils`, `/utils`) | Reused unchanged | Re-exported; local utility conformance covers storage-backed atoms. |
-| `createJSONStorage` (`/vanilla/utils`, `/utils`) | Reused unchanged | Re-exported from the pinned framework-neutral implementation. |
-| `freezeAtom` (`/vanilla/utils`, `/utils`) | Reused unchanged | Re-exported from the pinned framework-neutral implementation. |
-| `freezeAtomCreator` (`/vanilla/utils`, `/utils`) | Reused unchanged | Re-exported from the pinned framework-neutral implementation. |
-| `loadable` (`/vanilla/utils`, `/utils`) | Reused unchanged | Re-exported; async conformance exercises loadable atom state. |
-| `selectAtom` (`/vanilla/utils`, `/utils`) | Reused unchanged | Re-exported; local utility conformance covers derived selection. |
-| `splitAtom` (`/vanilla/utils`, `/utils`) | Reused unchanged | Re-exported; the bounded list differential covers add, toggle, remove, and stable keys. |
-| `unstable_withStorageValidator` (`/vanilla/utils`, `/utils`) | Reused unchanged | Re-exported from the pinned framework-neutral implementation. |
-| `unwrap` (`/vanilla/utils`, `/utils`) | Reused unchanged | Re-exported from the pinned framework-neutral implementation. |
-| `INTERNAL_addPendingPromiseToDependency` (`/vanilla/internals`) | Reused unchanged | Exact re-export from the pinned internals module. |
-| `INTERNAL_buildStoreRev3` (`/vanilla/internals`) | Reused unchanged | Exact re-export from the pinned internals module. |
-| `INTERNAL_getBuildingBlocksRev3` (`/vanilla/internals`) | Reused unchanged | Exact re-export from the pinned internals module. |
-| `INTERNAL_getMountedOrPendingDependents` (`/vanilla/internals`) | Reused unchanged | Exact re-export from the pinned internals module. |
-| `INTERNAL_hasInitialValue` (`/vanilla/internals`) | Reused unchanged | Exact re-export from the pinned internals module. |
-| `INTERNAL_initializeStoreHooksRev3` (`/vanilla/internals`) | Reused unchanged | Exact re-export from the pinned internals module. |
-| `INTERNAL_isActuallyWritableAtom` (`/vanilla/internals`) | Reused unchanged | Exact re-export from the pinned internals module. |
-| `INTERNAL_isAtomStateInitialized` (`/vanilla/internals`) | Reused unchanged | Exact re-export from the pinned internals module. |
-| `INTERNAL_isPromiseLike` (`/vanilla/internals`) | Reused unchanged | Exact re-export from the pinned internals module. |
-| `INTERNAL_returnAtomValue` (`/vanilla/internals`) | Reused unchanged | Exact re-export from the pinned internals module. |
-| `INTERNAL_shouldThrowSynchronously` (`/vanilla/internals`) | Reused unchanged | Exact re-export from the pinned internals module. |
-| `Provider` | Ported | Provider scope and nested-shadowing behavior is covered by conformance tests and the bounded differential. |
-| `useStore` | Ported | Store-resolution and provider-swap conformance cases cover default, provider, and explicit stores. |
-| `useAtom` | Ported | Conformance and differential cases cover primitive, derived, writable, scoped, list, and async atoms. |
-| `useAtomValue` | Ported | Conformance and differential cases cover subscriptions, derived values, and async resolution. |
-| `useSetAtom` | Ported | Conformance verifies writes without writer re-renders; the counter differential covers setter behavior. |
-| `useResetAtom` (`/react/utils`, `/utils`) | Ported | `tests/conformance/utils.test.ts`. |
-| `useReducerAtom` (`/react/utils`, `/utils`) | Ported | `tests/conformance/utils.test.ts`. |
-| `useAtomCallback` (`/react/utils`, `/utils`) | Ported | `tests/conformance/utils.test.ts`. |
-| `useHydrateAtoms` (`/react/utils`, `/utils`) | Ported | `tests/conformance/utils.test.ts`; no dedicated server/hydration differential exists. |
-| `jotai` | Published entry point | Export-surface conformance compares every runtime export with upstream. |
-| `jotai/vanilla` | Published entry point | Exact framework-neutral re-export; export-surface conformance checks it. |
-| `jotai/vanilla/utils` | Published entry point | Exact framework-neutral re-export; export-surface conformance checks it. |
-| `jotai/vanilla/internals` | Published entry point | Exact framework-neutral re-export under the matching Octane subpath. |
-| `jotai/react` | Published entry point | Ported React-facing exports; export-surface conformance checks it. |
-| `jotai/react/utils` | Published entry point | Ported React-facing utilities; export-surface conformance checks it. |
-| `jotai/utils` | Published entry point | Combined vanilla and React utility surface; export-surface conformance checks it. |
-| `jotai/babel/*` | Excluded non-runtime scope | React-specific build-time plugins are not part of the Octane runtime binding contract. |
-| `jotai/package.json` | Not published | Package metadata is not part of the Octane runtime binding contract. |
+| `@octanejs/jotai` | `Atom`, `ExtractAtomArgs`, `ExtractAtomResult`, `ExtractAtomValue`, `Getter`, `INTERNAL_overrideCreateStore`, `PrimitiveAtom`, `Provider`, `SetStateAction`, `Setter`, `WritableAtom`, `atom`, `createStore`, `getDefaultStore`, `useAtom`, `useAtomValue`, `useAtomValueRaw`, `useAtomValueRawSync`, `useSetAtom`, `useStore` | Imported vanilla exports plus ported hooks/provider. |
+| `@octanejs/jotai/utils` | `RESET`, `atomWithDefault`, `atomWithLazy`, `atomWithObservable`, `atomWithReducer`, `atomWithRefresh`, `atomWithReset`, `atomWithStorage`, `createJSONStorage`, `freezeAtom`, `freezeAtomCreator`, `selectAtom`, `splitAtom`, `unstable_withStorageValidator`, `unwrap`, `useAtomCallback`, `useHydrateAtoms`, `useReducerAtom`, `useResetAtom` | Imported vanilla exports plus ported hooks/provider. |
+| `@octanejs/jotai/vanilla` | `Atom`, `ExtractAtomArgs`, `ExtractAtomResult`, `ExtractAtomValue`, `Getter`, `INTERNAL_overrideCreateStore`, `PrimitiveAtom`, `SetStateAction`, `Setter`, `WritableAtom`, `atom`, `createStore`, `getDefaultStore` | Imported from the matching Jotai vanilla entry. |
+| `@octanejs/jotai/vanilla/utils` | `RESET`, `atomWithDefault`, `atomWithLazy`, `atomWithObservable`, `atomWithReducer`, `atomWithRefresh`, `atomWithReset`, `atomWithStorage`, `createJSONStorage`, `freezeAtom`, `freezeAtomCreator`, `selectAtom`, `splitAtom`, `unstable_withStorageValidator`, `unwrap` | Imported from the matching Jotai vanilla entry. |
+| `@octanejs/jotai/vanilla/internals` | `INTERNAL_AtomOnInit`, `INTERNAL_AtomOnMount`, `INTERNAL_AtomRead`, `INTERNAL_AtomState`, `INTERNAL_AtomStateMap`, `INTERNAL_AtomWrite`, `INTERNAL_BuildingBlocks`, `INTERNAL_Callbacks`, `INTERNAL_ChangedAtoms`, `INTERNAL_EnsureAtomState`, `INTERNAL_FlushCallbacks`, `INTERNAL_InvalidateDependents`, `INTERNAL_InvalidatedAtoms`, `INTERNAL_KEY_abortHandlersMap`, `INTERNAL_KEY_abortPromise`, `INTERNAL_KEY_atomOnInit`, `INTERNAL_KEY_atomOnMount`, `INTERNAL_KEY_atomRead`, `INTERNAL_KEY_atomStateMap`, `INTERNAL_KEY_atomWrite`, `INTERNAL_KEY_changedAtoms`, `INTERNAL_KEY_enhanceBuildingBlocks`, `INTERNAL_KEY_ensureAtomState`, `INTERNAL_KEY_flushCallbacks`, `INTERNAL_KEY_invalidateDependents`, `INTERNAL_KEY_invalidatedAtoms`, `INTERNAL_KEY_mountAtom`, `INTERNAL_KEY_mountCallbacks`, `INTERNAL_KEY_mountDependencies`, `INTERNAL_KEY_mountedMap`, `INTERNAL_KEY_readAtomState`, `INTERNAL_KEY_recomputeInvalidatedAtoms`, `INTERNAL_KEY_registerAbortHandler`, `INTERNAL_KEY_setAtomStateValueOrPromise`, `INTERNAL_KEY_storeEpochHolder`, `INTERNAL_KEY_storeGet`, `INTERNAL_KEY_storeHooks`, `INTERNAL_KEY_storeSet`, `INTERNAL_KEY_storeSub`, `INTERNAL_KEY_unmountAtom`, `INTERNAL_KEY_unmountCallbacks`, `INTERNAL_KEY_writeAtomState`, `INTERNAL_MountAtom`, `INTERNAL_MountDependencies`, `INTERNAL_Mounted`, `INTERNAL_MountedMap`, `INTERNAL_ReadAtomState`, `INTERNAL_RecomputeInvalidatedAtoms`, `INTERNAL_Store`, `INTERNAL_StoreHooks`, `INTERNAL_UnmountAtom`, `INTERNAL_WriteAtomState`, `INTERNAL_addPendingPromiseToDependency`, `INTERNAL_buildStoreRev4`, `INTERNAL_getBuildingBlocksRev4`, `INTERNAL_getMountedOrPendingDependents`, `INTERNAL_hasInitialValue`, `INTERNAL_initializeStoreHooksRev4`, `INTERNAL_isActuallyWritableAtom`, `INTERNAL_isAtomStateInitialized`, `INTERNAL_isPromiseLike`, `INTERNAL_returnAtomValue`, `INTERNAL_shouldThrowSynchronously` | Imported from the matching Jotai vanilla entry. |
+| `@octanejs/jotai/react` | `Provider`, `useAtom`, `useAtomValue`, `useAtomValueRaw`, `useAtomValueRawSync`, `useSetAtom`, `useStore` | Ported hooks/provider. |
+| `@octanejs/jotai/react/utils` | `useAtomCallback`, `useHydrateAtoms`, `useReducerAtom`, `useResetAtom` | Ported hooks/provider. |
 
-## Upstream suite disposition
+## Source boundary
 
-| Pinned artifact | Current disposition | Reason or local evidence |
-| --- | --- | --- |
-| `tests/babel/plugin-debug-label.test.ts` | Out of scope | Babel plugins are an intentional non-runtime divergence. |
-| `tests/babel/plugin-react-refresh.test.ts` | Out of scope | Babel plugins are an intentional non-runtime divergence. |
-| `tests/babel/preset.test.ts` | Out of scope | Babel plugins are an intentional non-runtime divergence. |
-| `tests/react/abortable.test.tsx` | Not adapted | Upstream suite remains unvendored; async behavior has bounded local conformance only. |
-| `tests/react/async.test.tsx` | Not adapted | Async atoms have bounded conformance and differential evidence, not one-for-one adaptation. |
-| `tests/react/async2.test.tsx` | Not adapted | Async atoms have bounded conformance and differential evidence, not one-for-one adaptation. |
-| `tests/react/basic.test.tsx` | Not adapted | Core binding behavior has local conformance and differential evidence. |
-| `tests/react/dependency.test.tsx` | Not adapted | Dependency behavior has local conformance coverage only. |
-| `tests/react/error.test.tsx` | Not adapted | Error behavior is not represented by an adapted upstream lane. |
-| `tests/react/items.test.tsx` | Not adapted | List behavior has bounded `splitAtom` evidence only. |
-| `tests/react/onmount.test.tsx` | Not adapted | Mount behavior is not represented by an adapted upstream lane. |
-| `tests/react/optimization.test.tsx` | Not adapted | Bailout and subscription behavior has local conformance coverage only. |
-| `tests/react/provider.test.tsx` | Not adapted | Provider behavior has bounded conformance and differential evidence. |
-| `tests/react/transition.test.tsx` | Not adapted | React transition mechanics are not represented by an adapted upstream lane. |
-| `tests/react/types.test.tsx` | Not adapted | Upstream type suite is present but unvendored and unadapted. |
-| `tests/react/useAtomValue.test.tsx` | Not adapted | `useAtomValue` has bounded local runtime evidence. |
-| `tests/react/useSetAtom.test.tsx` | Not adapted | `useSetAtom` has bounded local runtime evidence. |
-| `tests/react/utils/types.test.tsx` | Not adapted | Upstream utility type suite is present but unadapted. |
-| `tests/react/utils/useAtomCallback.test.tsx` | Not adapted | Local utility conformance covers representative behavior. |
-| `tests/react/utils/useHydrateAtoms.test.tsx` | Not adapted | Local utility conformance exists; no hydration differential is registered. |
-| `tests/react/utils/useReducerAtom.test.tsx` | Not adapted | Local utility conformance covers representative behavior. |
-| `tests/react/utils/useResetAtom.test.tsx` | Not adapted | Local utility conformance covers representative behavior. |
-| `tests/react/vanilla-utils/atomFamily.test.tsx` | Not adapted | Framework-neutral implementation is reused; React integration suite remains unadapted. |
-| `tests/react/vanilla-utils/atomWithDefault.test.tsx` | Not adapted | Framework-neutral implementation is reused; React integration suite remains unadapted. |
-| `tests/react/vanilla-utils/atomWithObservable.test.tsx` | Not adapted | Framework-neutral implementation is reused; React integration suite remains unadapted. |
-| `tests/react/vanilla-utils/atomWithReducer.test.tsx` | Not adapted | Framework-neutral implementation is reused; React integration suite remains unadapted. |
-| `tests/react/vanilla-utils/atomWithRefresh.test.tsx` | Not adapted | Framework-neutral implementation is reused; React integration suite remains unadapted. |
-| `tests/react/vanilla-utils/atomWithStorage.test.tsx` | Not adapted | Framework-neutral implementation is reused; React integration suite remains unadapted. |
-| `tests/react/vanilla-utils/freezeAtom.test.tsx` | Not adapted | Framework-neutral implementation is reused; React integration suite remains unadapted. |
-| `tests/react/vanilla-utils/loadable.test.tsx` | Not adapted | Framework-neutral implementation is reused; React integration suite remains unadapted. |
-| `tests/react/vanilla-utils/selectAtom.test.tsx` | Not adapted | Framework-neutral implementation is reused; React integration suite remains unadapted. |
-| `tests/react/vanilla-utils/splitAtom.test.tsx` | Not adapted | Bounded `splitAtom` differential exists; upstream file remains unadapted. |
-| `tests/setup.ts` | Support only | Upstream runner setup is not an executable test artifact. |
-| `tests/test-utils.ts` | Support only | Upstream test helper is not an executable test artifact. |
-| `tests/vanilla/basic.test.tsx` | Not adapted | Pinned vanilla runtime is reused directly; upstream suite is not claimed as executed. |
-| `tests/vanilla/dependency.test.tsx` | Not adapted | Pinned vanilla runtime is reused directly; upstream suite is not claimed as executed. |
-| `tests/vanilla/derive.test.tsx` | Not adapted | Pinned vanilla runtime is reused directly; upstream suite is not claimed as executed. |
-| `tests/vanilla/effect.test.ts` | Not adapted | Pinned vanilla runtime is reused directly; upstream suite is not claimed as executed. |
-| `tests/vanilla/internals.test.tsx` | Not adapted | Pinned vanilla internals are reused directly; upstream suite is not claimed as executed. |
-| `tests/vanilla/memoryleaks.test.ts` | Not adapted | Pinned vanilla runtime is reused directly; upstream suite is not claimed as executed. |
-| `tests/vanilla/store.test.tsx` | Not adapted | Pinned vanilla store is reused; local store conformance is bounded evidence only. |
-| `tests/vanilla/storedev.test.tsx` | Not adapted | Pinned vanilla runtime is reused directly; upstream suite is not claimed as executed. |
-| `tests/vanilla/types.test.tsx` | Not adapted | Upstream vanilla type suite is present but unadapted. |
-| `tests/vanilla/utils/atomFamily.test.ts` | Not adapted | Pinned vanilla utility is reused; upstream suite is not claimed as executed. |
-| `tests/vanilla/utils/atomWithDefault.test.ts` | Not adapted | Pinned vanilla utility is reused; upstream suite is not claimed as executed. |
-| `tests/vanilla/utils/atomWithLazy.test.ts` | Not adapted | Pinned vanilla utility is reused; upstream suite is not claimed as executed. |
-| `tests/vanilla/utils/atomWithRefresh.test.ts` | Not adapted | Pinned vanilla utility is reused; upstream suite is not claimed as executed. |
-| `tests/vanilla/utils/atomWithReset.test.ts` | Not adapted | Pinned vanilla utility is reused; upstream suite is not claimed as executed. |
-| `tests/vanilla/utils/loadable.test.ts` | Not adapted | Pinned vanilla utility is reused; upstream suite is not claimed as executed. |
-| `tests/vanilla/utils/types.test.tsx` | Not adapted | Upstream vanilla utility type suite is present but unadapted. |
-| `tests/vanilla/utils/unwrap.test.ts` | Not adapted | Pinned vanilla utility is reused; upstream suite is not claimed as executed. |
+`src/react/Provider.tsrx` and `src/react/store.ts` correspond to upstream `src/react/Provider.ts`. `src/react/utils.ts` retains the four modules under upstream `src/react/utils/`. Other hook and continuable-promise modules preserve upstream layout. `src/internal.ts` supplies the Octane call-site slot adaptation. `audit/source-ledger.json` records hashes for the complete shipped closure and identifies the adapted boundary.
 
-## Bounded evidence
+Octane's `use()` handles Suspense; React 18's fallback is unnecessary. Raw hook subscriptions and the Rev4 abort-handler protocol follow Jotai 3. Provider context is deduplicated by renderer identity, retaining the existing Octane binding contract. Providers render one stable JSX shape when the store prop changes.
 
-The `jotai-runtime-differential` lane compiles four `.tsrx` fixtures for both
-runtimes. It compares primitive and derived atoms, write-only setters, default
-and nested provider scopes, `splitAtom` keyed-list changes, and async pending to
-resolved output after identical interactions. These declared cases are
-enforced by the shared harness; they do not establish exhaustive upstream-suite
-parity.
+The migration removes `delay`, `loadable`, `atomFamily`, the atom-read `setSelf` option, and Rev3 internals, as upstream did. The existing `INTERNAL_InferAtomTuples` utility export is retained for compatibility and checked against Jotai's published `dist/react/utils/useHydrateAtoms.d.ts` declaration. See README for consumer guidance.
+
+## Complete upstream test crosswalk
+
+`audit/registrations.json` preserves all 404 immutable registrations across 44 test files. `audit/crosswalk.json` maps each registration to its generated Octane test file. Both pristine and adapted runtime suites execute all 404 registrations without skips. Eleven registrations in the four explicit type-test files are additionally compiled in separate pristine and adapted programs; the hydration utility suite's negative type controls are also compiled.
+
+The committed lock generates ignored `tests/upstream/`. Import repointing and the Octane JSX pragma are mechanical rewrites. Committed patches contain only these test adaptations:
+
+- React class error boundaries become functional Octane error boundaries, preserving the error, fallback and retry assertions.
+- Commit-count hooks move from JSX child expressions into component setup so they observe the owning component. Their effects use explicit `null` dependencies for the original every-render observation.
+- The observable error-boundary fixture moves to module scope for Octane compilation.
+
+The pristine type lane preserves upstream's `noUncheckedIndexedAccess` and `exactOptionalPropertyTypes`. The adapted lane uses the repository's strict configuration without these additional flags because imported Octane runtime source does not satisfy them. Both lanes retain `strict: true`, `skipLibCheck: false`, every upstream positive assertion, and every negative control.
+
+`audit/react-parity.json` registers pristine/adapted runtime and type lanes, the four existing React/Octane differential scenarios, and the SSR/hydration conformance scenario. The latter proves no server subscriptions, existing DOM adoption, click/external-store updates, and teardown. Conformance checks additionally cover slot identity, provider scope/swap, subscription cleanup, async rejection/resolution and utilities.
+
+## Reproduce evidence
+
+```sh
+node scripts/react-port/materialize.mjs run --package-dir packages/jotai
+node scripts/react-parity/verify-provenance.mjs --package-dir packages/jotai
+pnpm --dir packages/jotai test
+node scripts/react-parity/harness.mjs run-required --manifest packages/jotai/audit/react-parity.json
+./packages/jotai/node_modules/.bin/tsc --noEmit -p packages/jotai/tsconfig.pristine.json
+pnpm exec tsrx-tsc --noEmit -p packages/jotai/tsconfig.adapted.json
+pnpm exec tsrx-tsc --noEmit -p packages/jotai/tsconfig.json
+pnpm exec tsrx-tsc --noEmit -p packages/jotai/tests/types/tsconfig.json
+pnpm packages:pack:check
+```
+
+The shared port evidence gate records the actual commands and verifies the package contract, licenses, crosswalk, and shipped closure. The declared imported surfaces retain dependency, exports, public types and consumer checks; copied React surfaces retain their full upstream suite obligations. The ownership declaration does not remove prior evidence.

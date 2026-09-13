@@ -1,0 +1,43 @@
+diff --git a/tests/upstream/react/useAtomValue.test.tsx b/tests/upstream/react/useAtomValue.test.tsx
+--- a/tests/upstream/react/useAtomValue.test.tsx
++++ b/tests/upstream/react/useAtomValue.test.tsx
+@@ -1,5 +1,5 @@
+ /** @jsxImportSource octane */
+-import { Component, StrictMode, Suspense } from 'octane'
++import { ErrorBoundary as OctaneErrorBoundary, StrictMode, Suspense } from 'octane'
+ import type { OctaneNode } from 'octane'
+ import { act, fireEvent, render, screen } from '@octanejs/testing-library'
+ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+@@ -63,27 +63,11 @@ it('useAtomValue with async atom (promise)', async () => {
+   expect(screen.getByText('value: 42')).toBeInTheDocument()
+ })
+ 
+-class ErrorBoundary extends Component<
+-  { children: OctaneNode },
+-  { error: Error | null }
+-> {
+-  constructor(props: { children: OctaneNode }) {
+-    super(props)
+-
+-    this.state = { error: null }
+-  }
+-
+-  static getDerivedStateFromError(error: Error) {
+-    return { error }
+-  }
+-
+-  render() {
+-    if (this.state.error) {
+-      return <div>error: {this.state.error.message}</div>
+-    }
+-
+-    return this.props.children
+-  }
++// OCTANE DIVERGENCE[functional-error-boundary]: function boundary preserves the error message without React classes.
++function ErrorBoundary({ children }: { children: OctaneNode }) {
++  return <OctaneErrorBoundary fallback={(error: unknown) => (
++    <div>error: {(error as Error).message}</div>
++  )}>{children}</OctaneErrorBoundary>
+ }
+ 
+ it('useAtomValue with error throwing atom', async () => {

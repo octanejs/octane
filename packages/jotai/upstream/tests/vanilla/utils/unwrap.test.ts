@@ -1,0 +1,287 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { atom, createStore } from 'jotai/vanilla'
+import { unwrap } from 'jotai/vanilla/utils'
+import { sleep } from '../../test-utils.js'
+
+let savedConsoleWarn: typeof console.warn
+
+describe('unwrap', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    savedConsoleWarn = console.warn
+    console.warn = vi.fn()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    console.warn = savedConsoleWarn
+  })
+
+  it('should unwrap a promise with no fallback function', async () => {
+    const store = createStore()
+    const countAtom = atom(1)
+    const asyncAtom = atom(async (get) => {
+      const count = get(countAtom)
+      await sleep(100)
+      return count * 2
+    })
+    const syncAtom = unwrap(asyncAtom)
+
+    expect(store.get(syncAtom)).toBe(undefined)
+    await vi.advanceTimersByTimeAsync(100)
+    expect(store.get(syncAtom)).toBe(2)
+
+    store.set(countAtom, 2)
+    expect(store.get(syncAtom)).toBe(undefined)
+    await vi.advanceTimersByTimeAsync(100)
+    expect(store.get(syncAtom)).toBe(4)
+
+    store.set(countAtom, 3)
+    expect(store.get(syncAtom)).toBe(undefined)
+    await vi.advanceTimersByTimeAsync(100)
+    expect(store.get(syncAtom)).toBe(6)
+  })
+
+  it('should unwrap a promise with fallback function without prev', async () => {
+    const store = createStore()
+    const countAtom = atom(1)
+    const asyncAtom = atom(async (get) => {
+      const count = get(countAtom)
+      await sleep(100)
+      return count * 2
+    })
+    const syncAtom = unwrap(asyncAtom, () => -1)
+
+    expect(store.get(syncAtom)).toBe(-1)
+    await vi.advanceTimersByTimeAsync(100)
+    expect(store.get(syncAtom)).toBe(2)
+
+    store.set(countAtom, 2)
+    expect(store.get(syncAtom)).toBe(-1)
+    await vi.advanceTimersByTimeAsync(100)
+    expect(store.get(syncAtom)).toBe(4)
+
+    store.set(countAtom, 3)
+    expect(store.get(syncAtom)).toBe(-1)
+    await vi.advanceTimersByTimeAsync(100)
+    expect(store.get(syncAtom)).toBe(6)
+  })
+
+  it('should unwrap a promise with fallback function with prev', async () => {
+    const store = createStore()
+    const countAtom = atom(1)
+    const asyncAtom = atom(async (get) => {
+      const count = get(countAtom)
+      await sleep(100)
+      return count * 2
+    })
+    const syncAtom = unwrap(asyncAtom, (prev?: number) => prev ?? 0)
+
+    expect(store.get(syncAtom)).toBe(0)
+    await vi.advanceTimersByTimeAsync(100)
+    expect(store.get(syncAtom)).toBe(2)
+
+    store.set(countAtom, 2)
+    expect(store.get(syncAtom)).toBe(2)
+    await vi.advanceTimersByTimeAsync(100)
+    expect(store.get(syncAtom)).toBe(4)
+
+    store.set(countAtom, 3)
+    expect(store.get(syncAtom)).toBe(4)
+    await vi.advanceTimersByTimeAsync(100)
+    expect(store.get(syncAtom)).toBe(6)
+
+    store.set(countAtom, 4)
+    expect(store.get(syncAtom)).toBe(6)
+    store.set(countAtom, 5)
+    expect(store.get(syncAtom)).not.toBe(0) // expect 6 or 8
+    await vi.advanceTimersByTimeAsync(100)
+    expect(store.get(syncAtom)).toBe(10)
+  })
+
+  it('should unwrap a sync atom which is noop', () => {
+    const store = createStore()
+    const countAtom = atom(1)
+    const syncAtom = unwrap(countAtom)
+
+    expect(store.get(syncAtom)).toBe(1)
+
+    store.set(countAtom, 2)
+    expect(store.get(syncAtom)).toBe(2)
+
+    store.set(countAtom, 3)
+    expect(store.get(syncAtom)).toBe(3)
+  })
+
+  it('should unwrap an async writable atom', async () => {
+    const store = createStore()
+    const asyncAtom = atom(Promise.resolve(1))
+    const syncAtom = unwrap(asyncAtom, (prev?: number) => prev ?? 0)
+
+    expect(store.get(syncAtom)).toBe(0)
+    await vi.advanceTimersByTimeAsync(0)
+    expect(store.get(syncAtom)).toBe(1)
+
+    store.set(syncAtom, Promise.resolve(2))
+    expect(store.get(syncAtom)).toBe(1)
+    await vi.advanceTimersByTimeAsync(0)
+    expect(store.get(syncAtom)).toBe(2)
+
+    store.set(syncAtom, Promise.resolve(3))
+    expect(store.get(syncAtom)).toBe(2)
+    await vi.advanceTimersByTimeAsync(0)
+    expect(store.get(syncAtom)).toBe(3)
+  })
+
+  it('should unwrap to a fulfilled value of an already resolved async atom', async () => {
+    const store = createStore()
+    const asyncAtom = atom(Promise.resolve('concrete'))
+
+    expect(store.get(unwrap(asyncAtom))).toEqual(undefined)
+    await vi.advanceTimersByTimeAsync(0)
+    expect(store.get(unwrap(asyncAtom))).toEqual('concrete')
+  })
+
+  it('should get a fulfilled value after the promise resolves', async () => {
+    const store = createStore()
+    const asyncAtom = atom(Promise.resolve('concrete'))
+    const syncAtom = unwrap(asyncAtom)
+
+    expect(store.get(syncAtom)).toEqual(undefined)
+    await vi.advanceTimersByTimeAsync(0)
+    expect(store.get(syncAtom)).toEqual('concrete')
+  })
+
+  it('should throw an error if underlying promise is rejected', async () => {
+    const store = createStore()
+    const asyncAtom = atom(Promise.reject<number>('error'))
+    const syncAtom = unwrap(asyncAtom)
+    store.sub(syncAtom, () => {})
+
+    await vi.advanceTimersByTimeAsync(0)
+    expect(() => store.get(syncAtom)).toThrow('error')
+
+    store.set(asyncAtom, Promise.resolve(3))
+
+    await vi.advanceTimersByTimeAsync(0)
+    expect(store.get(syncAtom)).toBe(3)
+  })
+
+  // https://github.com/pmndrs/jotai/discussions/3362
+  it('should not enter an infinite loop when a rejected source recomputes', async () => {
+    const store = createStore()
+    const error = new Error('boom')
+
+    let rejectPending: (e: unknown) => void
+    const pending = new Promise<never>((_, reject) => {
+      rejectPending = reject
+    })
+    pending.catch(() => {}) // suppress unhandled rejection
+
+    const stageAtom = atom(0)
+    const sourceAtom = atom((get) => {
+      if (get(stageAtom) === 0) return pending
+      throw error
+    })
+    const asyncAtom = atom(async (get) => get(sourceAtom))
+    const syncAtom = unwrap(asyncAtom)
+
+    store.sub(syncAtom, () => {})
+    expect(store.get(syncAtom)).toBeUndefined()
+
+    store.set(stageAtom, 1)
+    rejectPending!(error)
+
+    await vi.advanceTimersByTimeAsync(100)
+    expect(() => store.get(syncAtom)).toThrow('boom')
+  })
+
+  it('should pass the last value to fallback after an error state', async () => {
+    const store = createStore()
+
+    let resolveFirst: (v: number) => void
+    const first = new Promise<number>((resolve) => {
+      resolveFirst = resolve
+    })
+    let rejectSecond: (e: unknown) => void
+    const second = new Promise<number>((_, reject) => {
+      rejectSecond = reject
+    })
+    second.catch(() => {}) // suppress unhandled rejection
+    const third = new Promise<number>(() => {})
+
+    const stageAtom = atom(0)
+    const sourceAtom = atom((get) => [first, second, third][get(stageAtom)]!)
+    const fallbackArgs: Array<number | undefined> = []
+    const syncAtom = unwrap(sourceAtom, (prev) => {
+      fallbackArgs.push(prev)
+      return prev ?? -1
+    })
+
+    store.sub(syncAtom, () => {})
+    expect(store.get(syncAtom)).toBe(-1)
+    resolveFirst!(7)
+    await vi.advanceTimersByTimeAsync(100)
+    expect(store.get(syncAtom)).toBe(7)
+
+    store.set(stageAtom, 1)
+    rejectSecond!(new Error('boom'))
+    await vi.advanceTimersByTimeAsync(100)
+    expect(() => store.get(syncAtom)).toThrow('boom')
+
+    store.set(stageAtom, 2)
+    await vi.advanceTimersByTimeAsync(100)
+    expect(store.get(syncAtom)).toBe(7)
+    expect(fallbackArgs).toEqual([undefined, 7, 7])
+  })
+
+  it('should update dependents with the value of the unwrapped atom when the promise resolves', async () => {
+    const store = createStore()
+    const asyncTarget = atom(() => Promise.resolve('value'))
+    const target = unwrap(asyncTarget)
+    const results: string[] = []
+    const derived = atom(async (get) => {
+      await Promise.resolve()
+      results.push('effect ' + get(target))
+    })
+
+    store.sub(derived, () => {})
+
+    await vi.advanceTimersByTimeAsync(0)
+    expect(results).toEqual(['effect undefined', 'effect value'])
+  })
+
+  // https://github.com/pmndrs/jotai/discussions/3208#discussioncomment-15431859
+  it('[DEV-ONLY] should not call store.set during atom read', async () => {
+    const store = createStore()
+    const example = atom('Hello')
+    store.get(example)
+    const unwrapAtom = unwrap(example)
+    vi.clearAllMocks()
+    store.get(unwrapAtom)
+    expect(console.warn).not.toHaveBeenCalled()
+  })
+
+  it('should expose the latest value after a linked async read resolves (#3296)', async () => {
+    const store = createStore()
+    const countAtom = atom(0)
+    const bumpAtom = atom(null, (_get, set) =>
+      set(countAtom, (count) => count + 1),
+    )
+    const asyncTarget = atom(async (get): Promise<{ someData: string }> => {
+      await Promise.resolve()
+      return { someData: String(get(countAtom)) }
+    })
+    const unwrappedTarget = unwrap(asyncTarget)
+    const linkedTarget = atom(async (get) => {
+      get(unwrappedTarget)
+      return get(asyncTarget)
+    })
+    const initialData = await store.get(linkedTarget)
+    expect(store.get(unwrappedTarget)).toBe(initialData)
+    store.set(bumpAtom)
+    const nextData = await store.get(linkedTarget)
+    expect(nextData).toEqual({ someData: '1' })
+    expect(store.get(unwrappedTarget)).toBe(nextData)
+  })
+})

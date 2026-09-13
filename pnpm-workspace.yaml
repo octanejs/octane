@@ -362,7 +362,7 @@ catalogs:
     html-parse-stringify: ^3.0.1
     i18next: 26.3.6
     jsdom: ^30.0.1
-    jotai: ^2.20.2
+    jotai: ^3.0.0
     mobx: 6.16.1
     monaco-editor: 0.55.1
     lexical: 0.46.0

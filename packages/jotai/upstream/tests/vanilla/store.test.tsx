@@ -1,0 +1,1679 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { atom, createStore } from 'jotai/vanilla'
+import type { Atom, Getter, PrimitiveAtom } from 'jotai/vanilla'
+import {
+  INTERNAL_buildStoreRev4 as INTERNAL_buildStore,
+  INTERNAL_getBuildingBlocksRev4 as INTERNAL_getBuildingBlocks,
+  INTERNAL_initializeStoreHooksRev4 as INTERNAL_initializeStoreHooks,
+  INTERNAL_KEY_atomStateMap as KEY_atomStateMap,
+  INTERNAL_KEY_storeHooks as KEY_storeHooks,
+} from 'jotai/vanilla/internals'
+import type { INTERNAL_Store } from 'jotai/vanilla/internals'
+import { sleep } from '../test-utils.js'
+
+let savedConsoleWarn: typeof console.warn
+
+beforeEach(() => {
+  vi.useFakeTimers()
+  savedConsoleWarn = console.warn
+  console.warn = vi.fn()
+})
+
+afterEach(() => {
+  vi.useRealTimers()
+  console.warn = savedConsoleWarn
+})
+
+type DevStore = {
+  get_mounted_atoms: () => Set<Atom<unknown>>
+}
+
+const createDevStore = (): INTERNAL_Store & DevStore => {
+  const storeHooks = INTERNAL_initializeStoreHooks({})
+  const store = INTERNAL_buildStore({ [KEY_storeHooks]: storeHooks })
+  const debugMountedAtoms = new Set<Atom<unknown>>()
+  storeHooks.m.add(undefined, (atom) => {
+    debugMountedAtoms.add(atom)
+  })
+  storeHooks.u.add(undefined, (atom) => {
+    debugMountedAtoms.delete(atom)
+  })
+  const devStore: DevStore = {
+    get_mounted_atoms: () => debugMountedAtoms,
+  }
+  return Object.assign(store, devStore)
+}
+
+type AtomStateMapType = ReturnType<
+  typeof INTERNAL_getBuildingBlocks
+>[typeof KEY_atomStateMap]
+
+const deriveStore = (
+  store: ReturnType<typeof createStore>,
+  enhanceAtomStateMap: (atomStateMap: AtomStateMapType) => AtomStateMapType,
+): ReturnType<typeof createStore> => {
+  const buildingBlocks = INTERNAL_getBuildingBlocks(store)
+  const atomStateMap = buildingBlocks[KEY_atomStateMap]
+  const derivedStore = INTERNAL_buildStore({
+    [KEY_atomStateMap]: enhanceAtomStateMap(atomStateMap),
+  })
+  return derivedStore
+}
+
+it('should not fire on subscribe', async () => {
+  const store = createStore()
+  const countAtom = atom(0)
+  const callback1 = vi.fn()
+  const callback2 = vi.fn()
+
+  store.sub(countAtom, callback1)
+  store.sub(countAtom, callback2)
+  expect(callback1).not.toHaveBeenCalled()
+  expect(callback2).not.toHaveBeenCalled()
+})
+
+it('should not fire subscription if primitive atom value is the same', () => {
+  const store = createStore()
+  const countAtom = atom(0)
+  const callback = vi.fn()
+
+  store.sub(countAtom, callback)
+  const calledTimes = callback.mock.calls.length
+  store.set(countAtom, 0)
+  expect(callback).toHaveBeenCalledTimes(calledTimes)
+})
+
+it('should not fire subscription if derived atom value is the same', () => {
+  const store = createStore()
+  const countAtom = atom(0)
+  const derivedAtom = atom((get) => get(countAtom) * 0)
+  const callback = vi.fn()
+
+  store.sub(derivedAtom, callback)
+  const calledTimes = callback.mock.calls.length
+  store.set(countAtom, 1)
+  expect(callback).toHaveBeenCalledTimes(calledTimes)
+})
+
+it('should unmount with store.get', () => {
+  const store = createDevStore()
+  const countAtom = atom(0)
+  const callback = vi.fn()
+  const unsub = store.sub(countAtom, callback)
+
+  store.get(countAtom)
+  unsub()
+  const result = Array.from(store.get_mounted_atoms())
+  expect(result).toEqual([])
+})
+
+it('should unmount dependencies with store.get', () => {
+  const store = createDevStore()
+  const countAtom = atom(0)
+  const derivedAtom = atom((get) => get(countAtom) * 2)
+  const callback = vi.fn()
+  const unsub = store.sub(derivedAtom, callback)
+
+  store.get(derivedAtom)
+  unsub()
+  const result = Array.from(store.get_mounted_atoms())
+  expect(result).toEqual([])
+})
+
+it('should update async atom with delay (#1813)', async () => {
+  const countAtom = atom(0)
+
+  const delayedAtom = atom(async (get) => {
+    const count = get(countAtom)
+    await sleep(100)
+    return count
+  })
+
+  const store = createStore()
+  store.get(delayedAtom)
+  store.set(countAtom, 1)
+  await vi.advanceTimersByTimeAsync(100)
+  await expect(store.get(delayedAtom)).resolves.toBe(1)
+})
+
+it('should override a promise by setting', async () => {
+  const store = createStore()
+  const countAtom = atom(Promise.resolve(0))
+  const infinitePending = new Promise<never>(() => {})
+
+  store.set(countAtom, infinitePending)
+  const promise1 = store.get(countAtom)
+  expect(promise1).toBe(infinitePending)
+
+  store.set(countAtom, Promise.resolve(1))
+  const promise2 = store.get(countAtom)
+  expect(await promise2).toBe(1)
+})
+
+it('should update async atom with deps after await (#1905)', async () => {
+  const countAtom = atom(0)
+  const delayedAtom = atom(async (get) => {
+    await sleep(100)
+    const count = get(countAtom)
+    return count
+  })
+  const derivedAtom = atom(async (get) => {
+    const count = await get(delayedAtom)
+    return count
+  })
+
+  const store = createStore()
+  let lastValue = store.get(derivedAtom)
+  const unsub = store.sub(derivedAtom, () => {
+    lastValue = store.get(derivedAtom)
+  })
+
+  store.set(countAtom, 1)
+  await vi.advanceTimersByTimeAsync(100)
+  expect(await lastValue).toBe(1)
+
+  store.set(countAtom, 2)
+  await vi.advanceTimersByTimeAsync(100)
+  expect(await lastValue).toBe(2)
+
+  store.set(countAtom, 3)
+  await vi.advanceTimersByTimeAsync(100)
+  expect(await lastValue).toBe(3)
+
+  unsub()
+})
+
+it('should not fire subscription when async atom promise is the same', async () => {
+  const promise = Promise.resolve()
+  const promiseAtom = atom(promise)
+  const derivedGetter = vi.fn((get: Getter) => get(promiseAtom))
+  const derivedAtom = atom(derivedGetter)
+
+  const store = createStore()
+
+  expect(derivedGetter).not.toHaveBeenCalled()
+
+  const promiseListener = vi.fn()
+  const promiseUnsub = store.sub(promiseAtom, promiseListener)
+  const derivedListener = vi.fn()
+  const derivedUnsub = store.sub(derivedAtom, derivedListener)
+
+  expect(derivedGetter).toHaveBeenCalledOnce()
+  expect(promiseListener).not.toHaveBeenCalled()
+  expect(derivedListener).not.toHaveBeenCalled()
+
+  store.get(promiseAtom)
+  store.get(derivedAtom)
+
+  expect(derivedGetter).toHaveBeenCalledOnce()
+  expect(promiseListener).not.toHaveBeenCalled()
+  expect(derivedListener).not.toHaveBeenCalled()
+
+  store.set(promiseAtom, promise)
+
+  expect(derivedGetter).toHaveBeenCalledOnce()
+  expect(promiseListener).not.toHaveBeenCalled()
+  expect(derivedListener).not.toHaveBeenCalled()
+
+  store.set(promiseAtom, promise)
+
+  expect(derivedGetter).toHaveBeenCalledOnce()
+  expect(promiseListener).not.toHaveBeenCalled()
+  expect(derivedListener).not.toHaveBeenCalled()
+
+  promiseUnsub()
+  derivedUnsub()
+})
+
+it('should notify subscription with tree dependencies (#1956)', () => {
+  const valueAtom = atom(1)
+  const dep1Atom = atom((get) => get(valueAtom) * 2)
+  const dep2Atom = atom((get) => get(valueAtom) + get(dep1Atom))
+  const dep3Atom = atom((get) => get(dep1Atom))
+
+  const cb = vi.fn()
+  const store = createStore()
+  store.sub(dep2Atom, vi.fn()) // this will cause the bug
+  store.sub(dep3Atom, cb)
+
+  expect(cb).toHaveBeenCalledTimes(0)
+  expect(store.get(dep3Atom)).toBe(2)
+  store.set(valueAtom, (c) => c + 1)
+  expect(cb).toHaveBeenCalledTimes(1)
+  expect(store.get(dep3Atom)).toBe(4)
+})
+
+it('should notify subscription with tree dependencies with bail-out', () => {
+  const valueAtom = atom(1)
+  const dep1Atom = atom((get) => get(valueAtom) * 2)
+  const dep2Atom = atom((get) => get(valueAtom) * 0)
+  const dep3Atom = atom((get) => get(dep1Atom) + get(dep2Atom))
+
+  const cb = vi.fn()
+  const store = createStore()
+  store.sub(dep1Atom, vi.fn())
+  store.sub(dep3Atom, cb)
+
+  expect(cb).toHaveBeenCalledTimes(0)
+  expect(store.get(dep3Atom)).toBe(2)
+  store.set(valueAtom, (c) => c + 1)
+  expect(cb).toHaveBeenCalledTimes(1)
+  expect(store.get(dep3Atom)).toBe(4)
+})
+
+it('should bail out with the same value with chained dependency (#2014)', () => {
+  const store = createStore()
+  const objAtom = atom({ count: 1 })
+  const countAtom = atom((get) => get(objAtom).count)
+  const deriveFn = vi.fn((get: Getter) => get(countAtom))
+  const derivedAtom = atom(deriveFn)
+  const deriveFurtherFn = vi.fn((get: Getter) => {
+    get(objAtom) // intentional extra dependency
+    return get(derivedAtom)
+  })
+  const derivedFurtherAtom = atom(deriveFurtherFn)
+  const callback = vi.fn()
+
+  store.sub(derivedFurtherAtom, callback)
+
+  expect(store.get(derivedAtom)).toBe(1)
+  expect(store.get(derivedFurtherAtom)).toBe(1)
+  expect(callback).toHaveBeenCalledTimes(0)
+  expect(deriveFn).toHaveBeenCalledTimes(1)
+  expect(deriveFurtherFn).toHaveBeenCalledTimes(1)
+
+  store.set(objAtom, (obj) => ({ ...obj }))
+  expect(callback).toHaveBeenCalledTimes(0)
+  expect(deriveFn).toHaveBeenCalledTimes(1)
+  expect(deriveFurtherFn).toHaveBeenCalledTimes(2)
+})
+
+it('should not call read function for unmounted atoms (#2076)', () => {
+  const store = createStore()
+  const countAtom = atom(1)
+  const derive1Fn = vi.fn((get: Getter) => get(countAtom))
+  const derived1Atom = atom(derive1Fn)
+  const derive2Fn = vi.fn((get: Getter) => get(countAtom))
+  const derived2Atom = atom(derive2Fn)
+
+  expect(store.get(derived1Atom)).toBe(1)
+  expect(store.get(derived2Atom)).toBe(1)
+  expect(derive1Fn).toHaveBeenCalledTimes(1)
+  expect(derive2Fn).toHaveBeenCalledTimes(1)
+
+  store.sub(derived2Atom, vi.fn())
+
+  store.set(countAtom, (c) => c + 1)
+  expect(derive1Fn).toHaveBeenCalledTimes(1)
+  expect(derive2Fn).toHaveBeenCalledTimes(2)
+})
+
+it('should update with conditional dependencies (#2084)', () => {
+  const store = createStore()
+  const f1 = atom(false)
+  const f2 = atom(false)
+  const f3 = atom(
+    (get) => get(f1) && get(f2),
+    (_get, set, val: boolean) => {
+      set(f1, val)
+      set(f2, val)
+    },
+  )
+
+  store.sub(f1, vi.fn())
+  store.sub(f2, vi.fn())
+  store.sub(f3, vi.fn())
+
+  store.set(f3, true)
+  expect(store.get(f3)).toBe(true)
+})
+
+it("should recompute dependents' state after onMount (#2098)", () => {
+  const store = createStore()
+
+  const condAtom = atom(false)
+  const baseAtom = atom(false)
+  baseAtom.onMount = (set) => set(true)
+  const derivedAtom = atom(
+    (get) => get(baseAtom),
+    (_get, set, update: boolean) => set(baseAtom, update),
+  )
+  const finalAtom = atom(
+    (get) => (get(condAtom) ? get(derivedAtom) : undefined),
+    (_get, set, value: boolean) => set(derivedAtom, value),
+  )
+
+  store.sub(finalAtom, () => {}) // mounts finalAtom, but not baseAtom
+  expect(store.get(baseAtom)).toBe(false)
+  expect(store.get(derivedAtom)).toBe(false)
+  expect(store.get(finalAtom)).toBe(undefined)
+
+  store.set(condAtom, true) // mounts baseAtom
+  expect(store.get(baseAtom)).toBe(true)
+  expect(store.get(derivedAtom)).toBe(true)
+  expect(store.get(finalAtom)).toBe(true)
+
+  store.set(finalAtom, false)
+  expect(store.get(baseAtom)).toBe(false)
+  expect(store.get(derivedAtom)).toBe(false)
+  expect(store.get(finalAtom)).toBe(false)
+})
+
+it('should update derived atoms during write (#2107)', () => {
+  const store = createStore()
+
+  const baseCountAtom = atom(1)
+  const countAtom = atom(
+    (get) => get(baseCountAtom),
+    (get, set, newValue: number) => {
+      set(baseCountAtom, newValue)
+      if (get(countAtom) !== newValue) {
+        throw new Error('mismatch')
+      }
+    },
+  )
+
+  store.sub(countAtom, () => {})
+
+  expect(store.get(countAtom)).toBe(1)
+  store.set(countAtom, 2)
+  expect(store.get(countAtom)).toBe(2)
+})
+
+it('resolves dependencies reliably after a delay (#2192)', async () => {
+  expect.assertions(3)
+  const countAtom = atom(0)
+  let result: number | null = null
+
+  const asyncAtom = atom(async (get) => {
+    const count = get(countAtom)
+    await sleep(100)
+    return count
+  })
+  const derivedAtom = atom(
+    async (get) => {
+      get(countAtom)
+      await sleep(50)
+      result = await get(asyncAtom)
+      if (result === 2) store.set(derivedAtom) // <-- necessary
+    },
+    () => {},
+  )
+  const store = createStore()
+
+  store.sub(derivedAtom, () => {})
+
+  const increment = (c: number) => c + 1
+
+  store.set(countAtom, increment)
+  store.set(countAtom, increment)
+  await vi.advanceTimersByTimeAsync(150)
+  expect(result).toBe(2)
+
+  store.set(countAtom, increment)
+  store.set(countAtom, increment)
+  await vi.advanceTimersByTimeAsync(150)
+  expect(store.get(countAtom)).toBe(4)
+  expect(result).toBe(4)
+})
+
+it('should not recompute a derived atom value if unchanged (#2168)', () => {
+  const store = createStore()
+  const countAtom = atom(1)
+  const derived1Atom = atom((get) => get(countAtom) * 0)
+  const derive2Fn = vi.fn((get: Getter) => get(derived1Atom))
+  const derived2Atom = atom(derive2Fn)
+
+  expect(store.get(derived2Atom)).toBe(0)
+  store.set(countAtom, (c) => c + 1)
+  expect(store.get(derived2Atom)).toBe(0)
+  expect(derive2Fn).toHaveBeenCalledTimes(1)
+})
+
+it('should mount once with atom creator atom (#2314)', () => {
+  const countAtom = atom(1)
+  countAtom.onMount = vi.fn((setAtom: (v: number) => void) => {
+    setAtom(2)
+  })
+  const atomCreatorAtom = atom((get) => {
+    const derivedAtom = atom((get) => get(countAtom))
+    get(derivedAtom)
+  })
+  const store = createStore()
+
+  store.sub(atomCreatorAtom, () => {})
+  expect(countAtom.onMount).toHaveBeenCalledTimes(1)
+})
+
+it('should mount sibling dependencies in read order', () => {
+  const store = createStore()
+  const mounted: string[] = []
+  const firstAtom = atom(0)
+  firstAtom.onMount = () => {
+    mounted.push('first')
+  }
+  const secondAtom = atom(0)
+  secondAtom.onMount = () => {
+    mounted.push('second')
+  }
+  const derivedAtom = atom((get) => {
+    get(firstAtom)
+    get(secondAtom)
+  })
+
+  const unsub = store.sub(derivedAtom, () => {})
+  expect(mounted).toEqual(['first', 'second'])
+  unsub()
+})
+
+it('should flush pending write triggered asynchronously and indirectly (#2451)', async () => {
+  const store = createStore()
+  const anAtom = atom('initial')
+  const callbackFn = vi.fn((_value: string) => {})
+  const unsub = store.sub(anAtom, () => {
+    callbackFn(store.get(anAtom))
+  })
+  const actionAtom = atom(null, async (_get, set) => {
+    await Promise.resolve() // waiting a microtask
+    set(indirectSetAtom)
+  })
+  const indirectSetAtom = atom(null, (_get, set) => {
+    set(anAtom, 'next')
+  })
+
+  // executing the chain reaction
+  await store.set(actionAtom)
+  expect(callbackFn).toHaveBeenCalledExactlyOnceWith('next')
+  unsub()
+})
+
+describe('async atom with subtle timing', () => {
+  it('case 1', async () => {
+    const store = createStore()
+    const a = atom(1)
+    const b = atom(async (get) => {
+      await sleep(100)
+      return get(a)
+    })
+    const bValue = store.get(b)
+
+    store.set(a, 2)
+    const bValue2 = store.get(b)
+    await vi.advanceTimersByTimeAsync(100)
+    expect(await bValue).toBe(2)
+    expect(await bValue2).toBe(2)
+  })
+
+  it('case 2', async () => {
+    const store = createStore()
+    const a = atom(1)
+    const b = atom(async (get) => {
+      const aValue = get(a)
+      await sleep(100)
+      return aValue
+    })
+    const bValue = store.get(b)
+
+    store.set(a, 2)
+    const bValue2 = store.get(b)
+    await vi.advanceTimersByTimeAsync(100)
+    expect(await bValue).toBe(1) // returns old value
+    expect(await bValue2).toBe(2)
+  })
+})
+
+describe('aborting atoms', () => {
+  // We can't use signal.throwIfAborted as it is not available
+  // in earlier versions of TS that this is tested on.
+  const throwIfAborted = (signal: AbortSignal) => {
+    if (signal.aborted) {
+      throw new Error('aborted')
+    }
+  }
+
+  it('should abort the signal when dependencies change', async () => {
+    const a = atom(1)
+    const callBeforeAbort = vi.fn()
+    const callAfterAbort = vi.fn()
+    const store = createStore()
+    const derivedAtom = atom(async (get, { signal }) => {
+      const aVal = get(a)
+      await sleep(100)
+      callBeforeAbort()
+      throwIfAborted(signal)
+      callAfterAbort()
+      return aVal + 1
+    })
+
+    const promise = store.get(derivedAtom)
+    store.set(a, 3)
+    const promise2 = store.get(derivedAtom)
+    await vi.advanceTimersByTimeAsync(100)
+    await expect(promise).rejects.toThrow('aborted')
+    await expect(promise2).resolves.toEqual(4)
+    expect(callBeforeAbort).toHaveBeenCalledTimes(2)
+    expect(callAfterAbort).toHaveBeenCalledTimes(1)
+  })
+
+  it('should abort the signal when dependencies change and the atom is mounted', async () => {
+    const a = atom(1)
+    const callBeforeAbort = vi.fn()
+    const callAfterAbort = vi.fn()
+    const store = createStore()
+    const derivedAtom = atom(async (get, { signal }) => {
+      const aVal = get(a)
+      await sleep(100)
+      callBeforeAbort()
+      throwIfAborted(signal)
+      callAfterAbort()
+      return aVal + 1
+    })
+
+    store.sub(derivedAtom, () => {})
+
+    store.set(a, 3)
+    await vi.advanceTimersByTimeAsync(100)
+    expect(callBeforeAbort).toHaveBeenCalledTimes(2)
+    expect(callAfterAbort).toHaveBeenCalledTimes(1)
+  })
+
+  it('should not abort the signal when unsubscribed', async () => {
+    const a = atom(1)
+    const callBeforeAbort = vi.fn()
+    const callAfterAbort = vi.fn()
+    const store = createStore()
+    const derivedAtom = atom(async (get, { signal }) => {
+      const aVal = get(a)
+      await sleep(100)
+      callBeforeAbort()
+      throwIfAborted(signal)
+      callAfterAbort()
+      return aVal + 1
+    })
+
+    const unsub = store.sub(derivedAtom, () => {})
+    unsub()
+
+    await vi.advanceTimersByTimeAsync(100)
+    expect(await store.get(derivedAtom)).toEqual(2)
+    expect(callBeforeAbort).toHaveBeenCalledTimes(1)
+    expect(callAfterAbort).toHaveBeenCalledTimes(1)
+  })
+})
+
+it('Unmount an atom that is no longer dependent within a derived atom (#2658)', () => {
+  const condAtom = atom(true)
+  const baseAtom = atom(0)
+  const onUnmount = vi.fn()
+  baseAtom.onMount = () => onUnmount
+  const derivedAtom = atom((get) => {
+    if (get(condAtom)) get(baseAtom)
+  })
+  const store = createStore()
+
+  store.sub(derivedAtom, () => {})
+
+  store.set(condAtom, false)
+  expect(onUnmount).toHaveBeenCalledTimes(1)
+})
+
+it('should update derived atom even if dependencies changed (#2697)', () => {
+  const primitiveAtom = atom<number | undefined>(undefined)
+  const derivedAtom = atom((get) => get(primitiveAtom))
+  const conditionalAtom = atom((get) => {
+    const base = get(primitiveAtom)
+    if (!base) return
+    return get(derivedAtom)
+  })
+  const store = createStore()
+  const onChangeDerived = vi.fn()
+
+  store.sub(derivedAtom, onChangeDerived)
+  store.sub(conditionalAtom, () => {})
+
+  expect(onChangeDerived).toHaveBeenCalledTimes(0)
+  store.set(primitiveAtom, 1)
+  expect(onChangeDerived).toHaveBeenCalledTimes(1)
+})
+
+describe('should invoke flushPending only after all atoms are updated (#2804)', () => {
+  const store = createStore()
+
+  it('should invoke flushPending only after all atoms are updated with set', () => {
+    const a = atom(0)
+    const setResult = []
+    const w = atom(null, (_get, set, value: number) => {
+      setResult.push('before set')
+      set(a, value)
+      setResult.push('after set')
+    })
+
+    store.sub(a, () => {
+      setResult.push('a value changed - ' + store.get(a))
+    })
+    setResult.push('before store.set')
+    store.set(w, 1)
+    setResult.push('after store.set')
+    expect(setResult).not.toEqual([
+      'before store.set',
+      'before set',
+      'a value changed - 1',
+      'after set',
+      'after store.set',
+    ])
+    expect(setResult).toEqual([
+      'before store.set',
+      'before set',
+      'after set',
+      'a value changed - 1',
+      'after store.set',
+    ])
+  })
+
+  it('should invoke flushPending only after all atoms are updated with mount', () => {
+    const mountResult = []
+    const a = atom(0)
+    const m = atom(null, (_get, set, value: number) => {
+      set(a, value)
+    })
+    m.onMount = (setSelf) => {
+      mountResult.push('before onMount setSelf')
+      setSelf(1)
+      mountResult.push('after onMount setSelf')
+    }
+    mountResult.push('before store.sub')
+    store.sub(a, () => {
+      mountResult.push('a value changed - ' + store.get(a))
+    })
+
+    store.sub(m, () => {})
+
+    mountResult.push('after store.sub')
+    expect(mountResult).not.toEqual([
+      'before store.sub',
+      'before onMount setSelf',
+      'a value changed - 1',
+      'after onMount setSelf',
+      'after store.sub',
+    ])
+    expect(mountResult).toEqual([
+      'before store.sub',
+      'before onMount setSelf',
+      'after onMount setSelf',
+      'a value changed - 1',
+      'after store.sub',
+    ])
+  })
+
+  it('should flush only after all atoms are updated with unmount', () => {
+    const result: string[] = []
+    const a = atom(0)
+    const b = atom(null, (_get, set, value: number) => {
+      set(a, value)
+    })
+    b.onMount = (setAtom) => {
+      return () => {
+        result.push('onUmount: before setAtom')
+        setAtom(1)
+        result.push('onUmount: after setAtom')
+      }
+    }
+    const c = atom(true)
+    const d = atom((get) => get(c) && get(b))
+
+    store.sub(a, () => {
+      result.push('a value changed - ' + store.get(a))
+    })
+    store.sub(d, () => {})
+
+    expect(store.get(d)).toEqual(null)
+    store.set(c, false)
+    expect(result).toEqual([
+      'onUmount: before setAtom',
+      'onUmount: after setAtom',
+      'a value changed - 1',
+    ])
+  })
+})
+
+describe('should mount and trigger listeners even when an error is thrown', () => {
+  it('in asynchronous read', async () => {
+    const store = createStore()
+    const a = atom(0)
+    a.onMount = vi.fn()
+    const e = atom(
+      () => {
+        throw new Error('error')
+      },
+      () => {},
+    )
+    e.onMount = vi.fn()
+    const b = atom((get) => {
+      setTimeout(() => {
+        get(a)
+        try {
+          get(e)
+        } catch {
+          // expect error
+        }
+      })
+    })
+
+    store.sub(b, () => {})
+
+    await vi.advanceTimersByTimeAsync(0)
+    expect(a.onMount).toHaveBeenCalledOnce()
+    expect(e.onMount).toHaveBeenCalledOnce()
+  })
+
+  it('in read promise on settled', async () => {
+    const store = createStore()
+    const a = atom(0)
+    a.onMount = vi.fn()
+    const e = atom(
+      () => {
+        throw new Error('error')
+      },
+      () => {},
+    )
+    const b = atom(async (get) => {
+      await sleep(0)
+      get(a)
+      get(e)
+    })
+
+    store.sub(b, () => {})
+
+    await vi.advanceTimersByTimeAsync(0)
+    expect(a.onMount).toHaveBeenCalledOnce()
+  })
+
+  it('in asynchronous write', async () => {
+    const store = createStore()
+    const a = atom(0)
+    const e = atom(() => {
+      throw new Error('error')
+    })
+    const b = atom(null, (get, set) => {
+      set(a, 1)
+      get(e)
+    })
+    const w = atom(null, async (_get, set) => {
+      setTimeout(() => {
+        try {
+          set(b)
+        } catch {
+          // expect error
+        }
+      })
+    })
+    const listener = vi.fn()
+
+    store.sub(a, listener)
+    store.set(w)
+
+    await vi.advanceTimersByTimeAsync(0)
+    expect(listener).toHaveBeenCalledOnce()
+  })
+
+  it('in synchronous write', () => {
+    const store = createStore()
+    const a = atom(0)
+    const e = atom(() => {
+      throw new Error('error')
+    })
+    const b = atom(null, (get, set) => {
+      set(a, 1)
+      get(e)
+    })
+    const listener = vi.fn()
+    store.sub(a, listener)
+    try {
+      store.set(b)
+    } catch {
+      // expect error
+    }
+
+    expect(listener).toHaveBeenCalledOnce()
+  })
+
+  it('in onmount/onunmount asynchronous setAtom', async () => {
+    const store = createStore()
+    const a = atom(0)
+    const e = atom(() => {
+      throw new Error('error')
+    })
+    const b = atom(null, (get, set) => {
+      set(a, (v) => ++v)
+      get(e)
+    })
+    b.onMount = (setAtom) => {
+      setTimeout(() => {
+        try {
+          setAtom()
+        } catch {
+          // expect error
+        }
+      })
+      return () => {
+        setTimeout(() => {
+          try {
+            setAtom()
+          } catch {
+            // expect error
+          }
+        })
+      }
+    }
+    const listener = vi.fn()
+
+    store.sub(a, listener)
+    const unsub = store.sub(b, () => {})
+
+    await vi.advanceTimersByTimeAsync(0)
+    expect(listener).toHaveBeenCalledOnce()
+
+    listener.mockClear()
+    unsub()
+
+    await vi.advanceTimersByTimeAsync(0)
+    expect(listener).toHaveBeenCalledOnce()
+  })
+
+  it('in synchronous onmount', () => {
+    const store = createStore()
+    const a = atom(0)
+    const aUnmount = vi.fn()
+    a.onMount = vi.fn(() => aUnmount)
+    const b = atom(
+      (get) => get(a),
+      () => {},
+    )
+    b.onMount = () => {
+      throw new Error('error')
+    }
+    try {
+      store.sub(b, () => {})
+    } catch {
+      // expect error
+    }
+
+    expect(a.onMount).toHaveBeenCalledOnce()
+  })
+
+  it('in synchronous onunmount', () => {
+    const store = createStore()
+    const a = atom(0)
+    const aUnmount = vi.fn()
+    a.onMount = () => aUnmount
+    const b = atom(
+      (get) => get(a),
+      () => {},
+    )
+    b.onMount = () => () => {
+      throw new Error('error')
+    }
+    const unsub = store.sub(b, () => {})
+    try {
+      unsub()
+    } catch {
+      // expect error
+    }
+
+    expect(aUnmount).toHaveBeenCalledOnce()
+  })
+
+  it('in synchronous listener', () => {
+    const store = createStore()
+    const a = atom(0)
+    const e = atom(0)
+    const b = atom(null, (_, set) => {
+      set(a, 1)
+      set(e, 1)
+    })
+    store.sub(e, () => {
+      throw new Error('error')
+    })
+    const listener = vi.fn()
+    store.sub(a, listener)
+    try {
+      store.set(b)
+    } catch {
+      // expect error
+    }
+
+    expect(listener).toHaveBeenCalledOnce()
+  })
+})
+
+it('throws falsy errors in onMount, onUnmount, and listeners', () => {
+  const store = createStore()
+  const a = atom(0)
+  a.onMount = () => {
+    throw ''
+  }
+  expect(() => store.sub(a, () => {})).toThrow('')
+  const b = atom(0)
+  b.onMount = () => () => {
+    throw ''
+  }
+  const unsub = store.sub(b, () => {})
+  expect(() => unsub()).toThrow('')
+  const c = atom(0)
+
+  store.sub(c, () => {
+    throw ''
+  })
+
+  expect(() => store.set(c, 1)).toThrow('')
+})
+
+it('should use the correct pending on unmount', () => {
+  const store = createStore()
+  const a = atom(0)
+  const b = atom(0, (_, set, update: number) => set(a, update))
+  b.onMount = (setAtom) => () => setAtom(1)
+  const aListener = vi.fn()
+
+  store.sub(a, aListener)
+  const unsub = store.sub(b, () => {})
+  aListener.mockClear()
+  unsub()
+
+  expect(store.get(a)).toBe(1)
+  expect(aListener).toHaveBeenCalledTimes(1)
+})
+
+it('should call subscribers after setAtom updates atom value on mount but not on unmount', () => {
+  const store = createStore()
+  const a = atom(0)
+  let unmount
+  a.onMount = vi.fn(((setAtom) => {
+    setAtom(1)
+    unmount = vi.fn(() => {
+      setAtom(2)
+    })
+    return unmount
+  }) as NonNullable<(typeof a)['onMount']>)
+  const listener = vi.fn()
+
+  const unsub = store.sub(a, listener)
+  expect(store.get(a)).toBe(1)
+  expect(a.onMount).toHaveBeenCalledTimes(1)
+  expect(listener).toHaveBeenCalledTimes(1)
+
+  listener.mockClear()
+  unsub()
+
+  expect(store.get(a)).toBe(2)
+  expect(unmount).toHaveBeenCalledTimes(1)
+  expect(listener).toHaveBeenCalledTimes(0)
+})
+
+it('surfaces a stack overflow for a graph too deep to read synchronously', () => {
+  function getMaxDepth() {
+    let depth = 0
+    function d(): number {
+      ++depth
+      try {
+        return d()
+      } catch {
+        return depth
+      }
+    }
+    return d()
+  }
+  const maxDepth = getMaxDepth()
+  const store = createStore()
+  const baseAtom = atom(0)
+  const atoms: [PrimitiveAtom<number>, ...Atom<number>[]] = [baseAtom]
+  Array.from({ length: maxDepth }, (_, i) => {
+    const prevAtom = atoms[i]!
+    const a = atom((get) => get(prevAtom))
+    atoms.push(a)
+  })
+  const lastAtom = atoms[maxDepth]!
+  expect(() => store.get(lastAtom)).toThrow(/call stack|recursion/i)
+  expect(() => store.sub(lastAtom, () => {})).toThrow(/call stack|recursion/i)
+  expect(() => store.set(baseAtom, 1)).not.toThrow()
+  atoms.forEach((a) => store.get(a))
+  expect(store.get(lastAtom)).toBe(1)
+}, 10_000)
+
+it('mounted atom should be recomputed eagerly', () => {
+  const result: string[] = []
+  const a = atom(0)
+  const b = atom((get) => {
+    result.push('bRead')
+    return get(a)
+  })
+  const store = createStore()
+
+  store.sub(a, () => {
+    result.push('aCallback')
+  })
+  store.sub(b, () => {
+    result.push('bCallback')
+  })
+
+  expect(result).toEqual(['bRead'])
+  result.splice(0)
+  store.set(a, 1)
+  expect(result).toEqual(['bRead', 'aCallback', 'bCallback'])
+})
+
+it('should notify subscription even with reading atom in write', () => {
+  const a = atom(1)
+  const b = atom((get) => get(a) * 2)
+  const c = atom((get) => get(b) + 1)
+  const d = atom(null, (get, set) => {
+    set(a, 2)
+    get(b)
+  })
+  const store = createStore()
+  const callback = vi.fn()
+
+  store.sub(c, callback)
+  store.set(d)
+  expect(callback).toHaveBeenCalledTimes(1)
+})
+
+it('should process all atom listeners even if some of them throw errors', () => {
+  const store = createStore()
+  const a = atom(0)
+  const listenerA = vi.fn()
+  const listenerB = vi.fn(() => {
+    throw new Error('error')
+  })
+  const listenerC = vi.fn()
+
+  store.sub(a, listenerA)
+  store.sub(a, listenerB)
+  store.sub(a, listenerC)
+  try {
+    store.set(a, 1)
+  } catch {
+    // expect empty
+  }
+
+  expect(listenerA).toHaveBeenCalledTimes(1)
+  expect(listenerB).toHaveBeenCalledTimes(1)
+  expect(listenerC).toHaveBeenCalledTimes(1)
+})
+
+it('throws listener errors without AggregateError support', () => {
+  vi.stubGlobal('AggregateError', undefined)
+  try {
+    const store = createStore()
+    const a = atom(0)
+    const error1 = new Error('error1')
+    const error2 = new Error('error2')
+    store.sub(a, () => {
+      throw error1
+    })
+    store.sub(a, () => {
+      throw error2
+    })
+    let thrown: unknown
+    try {
+      store.set(a, 1)
+    } catch (e) {
+      thrown = e
+    }
+    expect(thrown).toBeInstanceOf(Error)
+    expect((thrown as { errors: unknown[] }).errors).toEqual([error1, error2])
+  } finally {
+    vi.unstubAllGlobals()
+  }
+})
+
+it('should call onInit only once per atom', () => {
+  const store = createStore()
+  const a = atom(0)
+  const onInit = vi.fn()
+
+  a.INTERNAL_onInit = onInit
+  store.get(a)
+  expect(onInit).toHaveBeenCalledTimes(1)
+  expect(onInit).toHaveBeenCalledWith(store)
+
+  onInit.mockClear()
+  store.get(a)
+  store.set(a, 1)
+
+  const unsub = store.sub(a, () => {})
+  unsub()
+
+  const b = atom((get) => get(a))
+  store.get(b)
+  store.sub(b, () => {})
+  expect(onInit).not.toHaveBeenCalled()
+})
+
+it('should call onInit only once per store', () => {
+  const a = atom(0)
+  const aOnInit = vi.fn()
+  a.INTERNAL_onInit = aOnInit
+  const b = atom(0)
+  const bOnInit = vi.fn()
+  b.INTERNAL_onInit = bOnInit
+  type Store = ReturnType<typeof createStore>
+  function testInStore(store: Store) {
+    store.get(a)
+    store.get(b)
+    expect(aOnInit).toHaveBeenCalledTimes(1)
+    expect(bOnInit).toHaveBeenCalledTimes(1)
+    aOnInit.mockClear()
+    bOnInit.mockClear()
+    return store
+  }
+  testInStore(createStore())
+  const store = testInStore(createStore())
+  testInStore(
+    deriveStore(store, (atomStateMap) => {
+      const initializedAtoms = new WeakSet()
+      return {
+        get: (atom) => {
+          if (!initializedAtoms.has(atom)) {
+            return undefined
+          }
+          return atomStateMap.get(atom)
+        },
+        set: (atom, atomState) => {
+          initializedAtoms.add(atom)
+          atomStateMap.set(atom, atomState)
+        },
+        has: (atom) => {
+          if (!initializedAtoms.has(atom)) {
+            return false
+          }
+          return atomStateMap.has(atom)
+        },
+        delete: (atom) => {
+          initializedAtoms.delete(atom)
+          return atomStateMap.delete(atom)
+        },
+      }
+    }) as Store,
+  )
+})
+
+it('should pass store and atomState to the atom initializer', () => {
+  expect.assertions(1)
+
+  const store = createStore()
+  const a = atom(null)
+
+  a.INTERNAL_onInit = (store) => {
+    expect(store).toBe(store)
+  }
+  store.get(a)
+})
+
+it('recomputes dependents of unmounted atoms', () => {
+  const a = atom(0)
+  const bRead = vi.fn((get: Getter) => {
+    return get(a)
+  })
+  const b = atom(bRead)
+  const c = atom((get) => get(b))
+  const w = atom(null, (get, set) => {
+    set(a, 1)
+    get(c)
+    set(a, 2)
+    bRead.mockClear()
+  })
+  const store = createStore()
+
+  store.set(w)
+  expect(bRead).not.toHaveBeenCalled()
+})
+
+it('recomputes all changed atom dependents together', () => {
+  const a = atom([0])
+  const b = atom([0])
+  const a0 = atom((get) => get(a)[0]!)
+  const b0 = atom((get) => get(b)[0]!)
+  const a0b0 = atom((get) => [get(a0), get(b0)])
+  const w = atom(null, (_, set) => {
+    set(a, [0])
+    set(b, [1])
+  })
+  const store = createStore()
+
+  store.sub(a0b0, () => {})
+  store.set(w)
+  expect(store.get(a0)).toBe(0)
+  expect(store.get(b0)).toBe(1)
+  expect(store.get(a0b0)).toEqual([0, 1])
+})
+
+it('should not inf on subscribe or unsubscribe', () => {
+  const store = createStore()
+  const countAtom = atom(0)
+  const effectAtom = atom(
+    (get) => get(countAtom),
+    (_, set) => set,
+  )
+  effectAtom.onMount = (setAtom) => {
+    const set = setAtom()
+    set(countAtom, 1)
+    return () => {
+      set(countAtom, 2)
+    }
+  }
+
+  const unsub = store.sub(effectAtom, () => {})
+  expect(store.get(countAtom)).toBe(1)
+  unsub()
+  expect(store.get(countAtom)).toBe(2)
+})
+
+it('supports recursion in an atom subscriber', () => {
+  const a = atom(0)
+  const store = createStore()
+
+  store.sub(a, () => {
+    if (store.get(a) < 3) {
+      store.set(a, (v) => v + 1)
+    }
+  })
+  store.set(a, 1)
+  expect(store.get(a)).toBe(3)
+})
+
+it('allows subscribing to atoms during mount', () => {
+  const store = createStore()
+  const a = atom(0)
+  a.onMount = () => {
+    store.sub(b, () => {})
+  }
+  const b = atom(0)
+  let bMounted = false
+  b.onMount = () => {
+    bMounted = true
+  }
+
+  store.sub(a, () => {})
+  expect(bMounted).toBe(true)
+})
+
+it('updates with reading derived atoms (#2959)', () => {
+  const store = createStore()
+  const countAtom = atom(0)
+  const countDerivedAtom = atom((get) => get(countAtom))
+  const countUpAtom = atom(null, (get, set) => {
+    set(countAtom, 1)
+    get(countDerivedAtom)
+    set(countAtom, 2)
+  })
+
+  store.sub(countDerivedAtom, () => {})
+  store.set(countUpAtom)
+  expect(store.get(countDerivedAtom)).toBe(2)
+})
+
+it('updates dependents when it eagerly recomputes dirty atoms', () => {
+  const countAtom = atom(0)
+  const isActiveAtom = atom(false)
+  const activeCountAtom = atom((get) =>
+    get(isActiveAtom) ? get(countAtom) : undefined,
+  )
+  const activateAction = atom(null, (get, set, value: boolean) => {
+    set(isActiveAtom, value)
+    get(activeCountAtom)
+  })
+
+  const store = createStore()
+  store.sub(activeCountAtom, () => {})
+  store.set(activateAction, true)
+  store.set(countAtom, 1)
+
+  expect(store.get(activeCountAtom)).toBe(1)
+})
+
+it('[DEV-ONLY] should warn store mutation during read', () => {
+  const store = createStore()
+  const countAtom = atom(0)
+  const derivedAtom = atom(() => {
+    store.set(countAtom, (c) => c + 1)
+  })
+  store.get(derivedAtom)
+  expect(console.warn).toHaveBeenCalledWith(
+    'Detected store mutation during atom read. This is not supported.',
+  )
+})
+
+it('should keep reactivity when a derived atom returns a function that calls get (#3240)', () => {
+  const store = createStore()
+  const stableAtom = atom(0)
+  const closureAtom = atom((get) => (x: number) => {
+    const s = get(stableAtom)
+    return x + s
+  })
+  const changingAtom = atom(0)
+  const upstreamAtom = atom((get) => {
+    const n = get(changingAtom)
+    const fn = get(closureAtom)
+    return fn(n)
+  })
+  const downstreamAtom = atom((get) => get(upstreamAtom) * 2)
+
+  const callback = vi.fn()
+  store.sub(downstreamAtom, callback)
+
+  expect(store.get(upstreamAtom)).toBe(0)
+  expect(store.get(downstreamAtom)).toBe(0)
+
+  store.set(changingAtom, 1)
+  expect(store.get(upstreamAtom)).toBe(1)
+  expect(store.get(downstreamAtom)).toBe(2)
+  expect(callback).toHaveBeenCalledTimes(1)
+
+  store.set(changingAtom, 2)
+  expect(store.get(upstreamAtom)).toBe(2)
+  expect(store.get(downstreamAtom)).toBe(4)
+  expect(callback).toHaveBeenCalledTimes(2)
+})
+
+// Regression (v2.12.1+, commit f5d843c): when a derived atom's read calls store.set
+// (e.g. via a write-only atom), that atom's subscribers are not notified on dependency
+// changes — store.get(atom) is correct but the subscription callback never runs.
+// Repro: counterAtom, write-only queryAtom, dataAtom = get => query(get(counterAtom)).
+// https://github.com/koutaro-masaki/jotai-atom-in-component-with-usesetatom
+it('notifies derived-atom subscriber when read calls store.set', () => {
+  const store = createStore()
+  const counterAtom = atom(0)
+  const queryAtom = atom(null, (_get, _set, v: number) => v)
+  const dataAtom = atom((get) => {
+    const v = get(counterAtom)
+    const result = store.set(queryAtom, v * 2)
+    return result
+  })
+
+  const dataListener = vi.fn()
+  store.sub(dataAtom, dataListener)
+
+  expect(store.get(dataAtom)).toBe(0)
+  expect(dataListener.mock.calls.length).toBe(0)
+
+  store.set(counterAtom, 1)
+
+  expect(store.get(dataAtom)).toBe(2)
+  expect(dataListener.mock.calls.length).toBe(1)
+
+  store.set(counterAtom, 2)
+
+  expect(store.get(dataAtom)).toBe(4)
+  expect(dataListener.mock.calls.length).toBe(2)
+})
+
+it('notifies subscriber through chain of derived atoms when root calls store.set', () => {
+  const store = createStore()
+  const counterAtom = atom(0)
+  const queryAtom = atom(null, (_get, _set, v: number) => v)
+  const baseAtom = atom((get) => {
+    const v = get(counterAtom)
+    return store.set(queryAtom, v * 2)
+  })
+  const derivedAtom = atom((get) => get(baseAtom) * 2)
+
+  const derivedListener = vi.fn()
+  store.sub(derivedAtom, derivedListener)
+
+  expect(store.get(derivedAtom)).toBe(0)
+  expect(derivedListener.mock.calls.length).toBe(0)
+
+  store.set(counterAtom, 1)
+
+  expect(store.get(derivedAtom)).toBe(4)
+  expect(derivedListener.mock.calls.length).toBe(1)
+})
+
+it('notifies subscriber when nested write uses get to read atom with store.set', () => {
+  const store = createStore()
+  const counterAtom = atom(0)
+  const innerQueryAtom = atom(null, (_get, _set, v: number) => v)
+  const middleAtom = atom((get) => {
+    const v = get(counterAtom)
+    return store.set(innerQueryAtom, v * 3)
+  })
+  const outerQueryAtom = atom(null, (get, _set, v: number) => {
+    const m = get(middleAtom)
+    return v + m
+  })
+  const dataAtom = atom((get) => {
+    const v = get(counterAtom)
+    return store.set(outerQueryAtom, v * 2)
+  })
+
+  const dataListener = vi.fn()
+  store.sub(dataAtom, dataListener)
+
+  expect(store.get(dataAtom)).toBe(0)
+  expect(dataListener.mock.calls.length).toBe(0)
+
+  store.set(counterAtom, 1)
+
+  expect(store.get(dataAtom)).toBe(5)
+  expect(dataListener.mock.calls.length).toBe(1)
+
+  store.set(counterAtom, 2)
+
+  expect(store.get(dataAtom)).toBe(10)
+  expect(dataListener.mock.calls.length).toBe(2)
+})
+
+it('notifies async derived-atom subscriber when read calls store.set before await', async () => {
+  const store = createStore()
+  const counterAtom = atom(0)
+  const queryAtom = atom(null, (_get, _set, v: number) => v)
+  const dataAtom = atom(async (get) => {
+    const v = get(counterAtom)
+    const result = store.set(queryAtom, v * 2)
+    await sleep(0)
+    return result
+  })
+
+  let lastValue: number | Promise<number> | undefined
+  store.sub(dataAtom, () => {
+    lastValue = store.get(dataAtom)
+  })
+
+  await vi.advanceTimersByTimeAsync(10)
+  expect(await store.get(dataAtom)).toBe(0)
+
+  store.set(counterAtom, 1)
+  await vi.advanceTimersByTimeAsync(10)
+  expect(await lastValue).toBe(2)
+
+  store.set(counterAtom, 2)
+  await vi.advanceTimersByTimeAsync(10)
+  expect(await lastValue).toBe(4)
+})
+
+it('notifies subscriber normally when store.set is in write function, not read', () => {
+  const store = createStore()
+  const counterAtom = atom(0)
+  const innerQueryAtom = atom(null, (_get, _set, v: number) => v)
+  const queryAtom = atom(null, (_get, _set, v: number) =>
+    store.set(innerQueryAtom, v),
+  )
+  const dataAtom = atom((get) => {
+    const v = get(counterAtom)
+    const result = store.set(queryAtom, v * 2)
+    return result
+  })
+
+  const dataListener = vi.fn()
+  store.sub(dataAtom, dataListener)
+
+  expect(store.get(dataAtom)).toBe(0)
+
+  store.set(counterAtom, 1)
+
+  expect(store.get(dataAtom)).toBe(2)
+  expect(dataListener.mock.calls.length).toBe(1)
+
+  store.set(counterAtom, 2)
+
+  expect(store.get(dataAtom)).toBe(4)
+  expect(dataListener.mock.calls.length).toBe(2)
+})
+
+it('store.set before get(dep) causes deep recursion but recovers', () => {
+  const store = createStore()
+  const counterAtom = atom(0)
+  const queryAtom = atom(null, (_get, _set, v: number) => v)
+  const dataAtom = atom((get) => {
+    const result = store.set(queryAtom, 1)
+    const v = get(counterAtom)
+    return result + v
+  })
+
+  const dataListener = vi.fn()
+  store.sub(dataAtom, dataListener)
+
+  expect(store.get(dataAtom)).toBe(1)
+
+  store.set(counterAtom, 1)
+
+  expect(store.get(dataAtom)).toBe(2)
+  expect(dataListener.mock.calls.length).toBeGreaterThanOrEqual(1)
+})
+
+it('notifies subscriber when read calls store.set multiple times', () => {
+  const store = createStore()
+  const counterAtom = atom(0)
+  const query1 = atom(null, (_get, _set, v: number) => v)
+  const query2 = atom(null, (_get, _set, v: number) => v * 10)
+  const dataAtom = atom((get) => {
+    const v = get(counterAtom)
+    const r1 = store.set(query1, v)
+    const r2 = store.set(query2, v)
+    return r1 + r2
+  })
+
+  const dataListener = vi.fn()
+  store.sub(dataAtom, dataListener)
+
+  expect(store.get(dataAtom)).toBe(0)
+  expect(dataListener.mock.calls.length).toBe(0)
+
+  store.set(counterAtom, 1)
+
+  expect(store.get(dataAtom)).toBe(11)
+  expect(dataListener.mock.calls.length).toBe(1)
+
+  store.set(counterAtom, 2)
+
+  expect(store.get(dataAtom)).toBe(22)
+  expect(dataListener.mock.calls.length).toBe(2)
+})
+
+it('does not recompute derived atom redundantly when store.set in read uses return value without setting atoms', () => {
+  const store = createStore()
+  const counterAtom = atom(0)
+  const queryAtom = atom(null, (_get, _set, v: number) => v)
+
+  let baseReadCount = 0
+  const baseAtom = atom((get) => {
+    baseReadCount++
+    const v = get(counterAtom)
+    return store.set(queryAtom, v * 2)
+  })
+  const baseAtom2 = atom((get) => {
+    const v = get(counterAtom)
+    return store.set(queryAtom, v * 2)
+  })
+
+  let derivedReadCount = 0
+  const derivedAtom = atom((get) => {
+    derivedReadCount++
+    get(baseAtom)
+    get(baseAtom2)
+    return get(counterAtom)
+  })
+
+  const listener = vi.fn()
+  store.sub(derivedAtom, listener)
+
+  expect(store.get(derivedAtom)).toBe(0)
+  expect(baseReadCount).toBe(1)
+  expect(derivedReadCount).toBe(1)
+
+  baseReadCount = 0
+  derivedReadCount = 0
+
+  store.set(counterAtom, 1)
+
+  expect(store.get(derivedAtom)).toBe(1)
+  expect(listener).toHaveBeenCalledTimes(1)
+  expect(baseReadCount).toBe(1)
+  expect(derivedReadCount).not.toBe(3)
+  expect(derivedReadCount).toBe(1)
+})
+
+it('notifies subscriber when a nested no-op store.set and a subscription happen inside the outer write (#3353)', () => {
+  const store = createStore()
+  const a = atom(0)
+  const derivedAtom = atom((get) => get(a))
+  const b = atom(0)
+
+  const listener = vi.fn()
+  store.sub(derivedAtom, listener)
+
+  const w = atom(null, (_get, set) => {
+    set(a, 1) // derivedAtom becomes invalidated, `a` is pending
+    // nested store.set that changes nothing: storeSet skips its
+    // recompute+flush because changedAtoms.size did not change
+    store.set(b, store.get(b))
+    // sub/unsub used to run flushCallbacks without recomputing
+    // invalidated atoms, clearing `a` from changedAtoms while
+    // derivedAtom was still invalidated (stranding its listener)
+    store.sub(b, () => {})()
+  })
+  store.set(w)
+
+  expect(store.get(derivedAtom)).toBe(1)
+  expect(listener).toHaveBeenCalledTimes(1)
+})
+
+it('notifies subscriber of interrupt-derived atom after a synchronous event cascade of nested store.set (#3353)', () => {
+  const store = createStore()
+  const interruptAtom = atom<{ resume: () => void } | undefined>(undefined)
+  const isInterruptedAtom = atom((get) => get(interruptAtom) !== undefined)
+  const dataAtom = atom(0)
+
+  // plain event emitter (not jotai)
+  const emitterListeners = new Set<() => void>()
+  const externalState = 0 // unchanged while interrupted -> no-op set
+
+  // atomEffect-style helper with temporary unsubscribe/resubscribe
+  let unsub = store.sub(dataAtom, () => {})
+  emitterListeners.add(() => {
+    store.set(dataAtom, externalState)
+    unsub()
+    unsub = store.sub(dataAtom, () => {})
+  })
+
+  const listener = vi.fn()
+  store.sub(isInterruptedAtom, listener)
+
+  const startInterruptAtom = atom(null, (_get, set) => {
+    set(interruptAtom, {
+      resume: () => emitterListeners.forEach((l) => l()),
+    })
+  })
+  const finishInterruptActionAtom = atom(null, (get, set) => {
+    const interrupt = get(interruptAtom)
+    set(interruptAtom, undefined)
+    interrupt?.resume() // synchronous cascade, not jotai
+  })
+
+  store.set(startInterruptAtom)
+  expect(listener).toHaveBeenCalledTimes(1) // false -> true
+  store.set(finishInterruptActionAtom)
+  expect(store.get(isInterruptedAtom)).toBe(false)
+  expect(listener).toHaveBeenCalledTimes(2) // true -> false
+})

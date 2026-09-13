@@ -7,7 +7,7 @@ import { useRef, type OctaneNode } from 'octane';
 import { createStore } from 'jotai/vanilla';
 import { StoreContext, type Store } from './store.ts';
 
-export function Provider(props: { children?: OctaneNode; store?: Store }) @{
+export function Provider(props: { children?: OctaneNode; store?: Store }) {
 	const { children, store } = props;
 
 	const storeRef = useRef<Store | null>(null);
@@ -15,5 +15,7 @@ export function Provider(props: { children?: OctaneNode; store?: Store }) @{
 		storeRef.current = createStore();
 	}
 
-	<StoreContext.Provider value={store || storeRef.current!}>{children}</StoreContext.Provider>
+	return <StoreContext.Provider
+		value={store || storeRef.current!}
+	>{children}</StoreContext.Provider>;
 }

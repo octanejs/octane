@@ -3,7 +3,10 @@ import { createRequire } from 'node:module';
 import { gunzipSync } from 'node:zlib';
 import { parseTarArchive, verifyIntegrity } from './preflight-lib.mjs';
 import path from 'node:path';
-import { publicCompatibilityExport } from './public-compatibility.mjs';
+import {
+	publicCompatibilityDeclarations,
+	publicCompatibilityExport,
+} from './public-compatibility.mjs';
 import ts from 'typescript';
 import { validateUpstreamLock, verifyPristineTree } from './materialize-lib.mjs';
 
@@ -76,11 +79,27 @@ export function pinnedPublicEntries(packageDirectory, node) {
 		visit(source);
 	}
 	for (const [subpath, target] of Object.entries(manifest.exports)) {
-		const file = target?.import?.types ?? target?.types ?? target?.default?.types;
-		if (typeof file !== 'string') continue;
-		if (!published.files.has(`package/${file.slice(2)}`))
+		if (typeof target !== 'object' || target === null) continue;
+		// Let the checking compiler select versioned and nested export conditions,
+		// just as it does for the consumer. A fallback `types` may intentionally
+		// reject older compilers rather than describe the current public surface.
+		const upstreamSpecifier = node.identity.packageName + (subpath === '.' ? '' : subpath.slice(1));
+		const resolved = ts.resolveModuleName(
+			upstreamSpecifier,
+			path.join(packageDirectory, 'package.json'),
+			{ module: ts.ModuleKind.ESNext, moduleResolution: ts.ModuleResolutionKind.Bundler },
+			ts.sys,
+		).resolvedModule;
+		if (!resolved || !/\.d\.[cm]?ts$/.test(resolved.resolvedFileName)) continue;
+		const file = path.relative(installedRoot, resolved.resolvedFileName).replaceAll(path.sep, '/');
+		if (!published.files.has(`package/${file}`))
 			throw new Error(`Public export points outside the pinned declarations: ${file}`);
 		const specifier = subpath === '.' ? node.binding : node.binding + subpath.slice(1);
+		entries.set(specifier, path.resolve(installedRoot, file));
+	}
+	for (const [specifier, file] of publicCompatibilityDeclarations(node.binding)) {
+		if (!published.files.has(`package/${file}`))
+			throw new Error(`Compatibility witness is absent from the pinned declarations: ${file}`);
 		entries.set(specifier, path.resolve(installedRoot, file));
 	}
 	return entries;
@@ -485,6 +504,10 @@ export function newOpaquePublicSymbol(symbol, witness, checker, options = {}) {
 	if (symbol.flags & ts.SymbolFlags.Alias) symbol = checker.getAliasedSymbol(symbol);
 	if (witness?.flags & ts.SymbolFlags.Alias) witness = checker.getAliasedSymbol(witness);
 	for (const declaration of symbol.declarations ?? []) {
+		// Callable generics are checked per public signature below. Matching every
+		// overload to the first declaration mispairs constraints and includes the
+		// implementation signature, which is not part of the exported contract.
+		if (ts.isFunctionDeclaration(declaration)) continue;
 		const original = witness?.declarations?.find(
 			(candidate) => candidate.kind === declaration.kind,
 		);

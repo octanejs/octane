@@ -1,4 +1,6 @@
-import { useAtomValue } from '@octanejs/jotai';
+import { useEffect, useState } from 'octane';
+import type { Atom } from 'jotai/vanilla';
+import { useAtomValue, useAtomValueRaw } from '@octanejs/jotai';
 
 // Async-atom fixtures — the reader suspends through octane's use() on the
 // binding's continuable promise; the boundary provides the pending fallback
@@ -21,13 +23,28 @@ export function AsyncApp(props: { asyncAtom: any }) @{
 	</div>
 }
 
-// loadable(asyncAtom) — no suspense boundary needed; renders the state enum.
-export function LoadableApp(props: { loadableAtom: any }) @{
-	const state = useAtomValue(props.loadableAtom);
-	<span id="loadable">
-		{state.state + (state.state === 'hasData' ? ':' + state.data : '') +
-			(state.state === 'hasError' ? ':' + (state.error as any).message : '')}
-	</span>
+// Raw reads let applications own loading/error UI without a Suspense boundary.
+export function RawPromiseApp(props: { asyncAtom: Atom<Promise<number>> }) @{
+	const promise = useAtomValueRaw(props.asyncAtom);
+	const [state, setState] = useState('loading');
+	useEffect(() => {
+		let active = true;
+		setState('loading');
+		promise.then(
+			(value) => {
+				if (active) setState('hasData:' + value);
+			},
+			(error) => {
+				if (active) setState(
+					'hasError:' + (error instanceof Error ? error.message : String(error)),
+				);
+			},
+		);
+		return () => {
+			active = false;
+		};
+	}, [promise]);
+	<span id="raw">{state as string}</span>
 }
 
 // unwrap(asyncAtom, fallback) — sync view of an async atom, no boundary.

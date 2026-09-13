@@ -40,7 +40,7 @@ function sourceFacts(root, file, manifest, seen = new Set()) {
 		source,
 		ts.ScriptTarget.Latest,
 		true,
-		ts.ScriptKind.TSX,
+		/\.(?:tsx|jsx|tsrx)$/.test(file) ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
 	);
 	if (ast.parseDiagnostics.length)
 		throw new Error(`Unparsed source coverage requires review: ${file}`);

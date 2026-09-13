@@ -4,6 +4,7 @@ import path from 'node:path';
 import ts from 'typescript';
 import { fileURLToPath } from 'node:url';
 import { planAdaptedFiles, validateUpstreamLock, verifyPristineTree } from './materialize-lib.mjs';
+import { isUpstreamTypeTestPath } from './preflight-lib.mjs';
 import {
 	assertBindingSurfacePolicy,
 	assertUpstreamLockScope,
@@ -18,7 +19,14 @@ export function scopedUpstreamTestInventory({
 	surfacePolicy = assertBindingSurfacePolicy(packageDirectory),
 	lock,
 }) {
-	const inventory = node.upstreamTestInventory ?? [];
+	// Older intake counted registrations in types.test.tsx but called them
+	// runtime-only. Retain their pinned bytes and identities while requiring
+	// the type lane as well; no file or assertion is removed from the crosswalk.
+	const inventory = (node.upstreamTestInventory ?? []).map((entry) =>
+		entry.kind === 'runtime' && isUpstreamTypeTestPath(entry.path)
+			? { ...entry, kind: 'type' }
+			: entry,
+	);
 	if (surfacePolicy.mode === 'legacy') return inventory;
 	if (!surfacePolicy.requiresCopiedEvidence) return [];
 	if (!requiresUpstreamEvidence(surfacePolicy, node.identity?.packageName))
@@ -54,9 +62,12 @@ export function scopedUpstreamTestInventory({
 }
 
 function assertionCounts(source, file) {
-	if (/@ts-(?:nocheck|ignore)\b/.test(source))
-		throw new Error(`Type evidence suppresses checking: ${file}`);
 	const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+	if (
+		ast.pragmas?.has('ts-nocheck') ||
+		ast.commentDirectives?.some((directive) => directive.type === ts.CommentDirectiveType.Ignore)
+	)
+		throw new Error(`Type evidence suppresses checking: ${file}`);
 	const counts = {
 		checks: 0,
 		negative: [...source.matchAll(/@ts-expect-error\b/g)].length,

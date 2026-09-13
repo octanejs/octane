@@ -1,0 +1,115 @@
+{
+  "runtimeDependencies": ["jotai", "octane"],
+  "sourceLedger": [
+    {
+      "path": "src/index.ts",
+      "sha256": "73881bed4d9992183b04a628f74c4a0a88d6e5e99e6d8fec371ff4a8be5c8b74",
+      "origin": "authored"
+    },
+    {
+      "path": "src/internal.ts",
+      "sha256": "ffca6ddc94112aa8639f25cbe7fc6df224b6f6775534e0076459114f2faf6d77",
+      "origin": "adapted",
+      "packageName": "jotai"
+    },
+    {
+      "path": "src/react.ts",
+      "sha256": "8bd73b3d5e2e40cfee7157c176ee5affd99f5eaf14f1c3f94ec984021c5c0822",
+      "origin": "adapted",
+      "packageName": "jotai"
+    },
+    {
+      "path": "src/react/Provider.tsrx",
+      "sha256": "0bbfb2e32a3124b4bf43b6e7898dc7ff6b0e91e8cb64d94af7e46a785bf74ee7",
+      "origin": "adapted",
+      "packageName": "jotai"
+    },
+    {
+      "path": "src/react/continuablePromise.ts",
+      "sha256": "009fccc238e0aaea2a4b8dc76f1eca5ee1ce9b01c636a434f606ea66db7120aa",
+      "origin": "adapted",
+      "packageName": "jotai"
+    },
+    {
+      "path": "src/react/store.ts",
+      "sha256": "b915566fa854e464965e020f2cd2b1794afdc4dd0ff441d345884244caf41485",
+      "origin": "adapted",
+      "packageName": "jotai"
+    },
+    {
+      "path": "src/react/useAtom.ts",
+      "sha256": "93d7fce2a295f49413da21b21d2807545c9651a8de0eaa79433b3bcc2745cfb6",
+      "origin": "adapted",
+      "packageName": "jotai"
+    },
+    {
+      "path": "src/react/useAtomValue.ts",
+      "sha256": "0fd79eb7eae542ee51b02485ca055259ce7f0b550baaa7dd012402e9100f4c23",
+      "origin": "adapted",
+      "packageName": "jotai"
+    },
+    {
+      "path": "src/react/useAtomValueRaw.ts",
+      "sha256": "96d8d140622de9e88fe11c35da38bd50fa209e02a42889829a10c8fd76c43405",
+      "origin": "adapted",
+      "packageName": "jotai"
+    },
+    {
+      "path": "src/react/useAtomValueRawSync.ts",
+      "sha256": "684e7cd5cabdf37e22bb0c1c28161212269226f71a4320e2a8738b80307da82c",
+      "origin": "adapted",
+      "packageName": "jotai"
+    },
+    {
+      "path": "src/react/useSetAtom.ts",
+      "sha256": "05cca1758d64dfda7383d42b274378208e25eea35437a4e849e33ea994ef6465",
+      "origin": "adapted",
+      "packageName": "jotai"
+    },
+    {
+      "path": "src/react/utils.ts",
+      "sha256": "cf7d5a8b6360fa70ae40b5ca1f1cc40a2edeb8357b05c9accd16f3b32b1762b7",
+      "origin": "adapted",
+      "packageName": "jotai"
+    },
+    {
+      "path": "src/utils.ts",
+      "sha256": "10288d8c76e018ed93f057122d89e063510fdcfb596342c760f1067a3452a67d",
+      "origin": "authored"
+    },
+    {
+      "path": "src/vanilla.ts",
+      "sha256": "bc3131345f25cefcc84a511c2b07b4ee042655689a44a0a70619eba9660d4f97",
+      "origin": "authored"
+    },
+    {
+      "path": "src/vanilla/internals.ts",
+      "sha256": "2632aa0fbdb2c2a28c27cde8256ec01b9f7e5cd37a0250ef2adee7f36c00083e",
+      "origin": "authored"
+    },
+    {
+      "path": "src/vanilla/utils.ts",
+      "sha256": "0c3144f86e8415532095897d6646118453a05f0881ac8c633fa6d0ce7fdb9d1f",
+      "origin": "authored"
+    }
+  ],
+  "adaptedSources": [
+    {
+      "packageName": "jotai",
+      "paths": [
+        "src/internal.ts",
+        "src/react.ts",
+        "src/react/Provider.tsrx",
+        "src/react/continuablePromise.ts",
+        "src/react/store.ts",
+        "src/react/useAtom.ts",
+        "src/react/useAtomValue.ts",
+        "src/react/useAtomValueRaw.ts",
+        "src/react/useAtomValueRawSync.ts",
+        "src/react/useSetAtom.ts",
+        "src/react/utils.ts"
+      ]
+    }
+  ],
+  "reimplementedDependencies": []
+}

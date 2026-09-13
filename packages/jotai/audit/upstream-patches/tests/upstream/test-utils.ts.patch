@@ -1,0 +1,15 @@
+diff --git a/tests/upstream/test-utils.ts b/tests/upstream/test-utils.ts
+--- a/tests/upstream/test-utils.ts
++++ b/tests/upstream/test-utils.ts
+@@ -6,9 +6,10 @@ export function sleep(ms: number): Promise<void> {
+ 
+ export function useCommitCount(): number {
+   const commitCountRef = useRef(1)
++  // OCTANE DIVERGENCE[component-commit-observation]: null preserves React's omitted-deps effect on every commit.
+   useEffect(() => {
+     commitCountRef.current += 1
+-  })
++  }, null)
+   // eslint-disable-next-line react-hooks/refs
+   return commitCountRef.current
+ }

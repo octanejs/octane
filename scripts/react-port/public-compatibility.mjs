@@ -1,5 +1,5 @@
 // Compatibility names retained from the earlier Octane Base UI binding. Each
-// name still points at a concrete public export in the pinned upstream release;
+// name points at a concrete declaration in the pinned upstream release;
 // this mapping does not waive declaration precision or upstream coverage.
 const baseUIAliases = new Map();
 for (const [entry, namespace] of [
@@ -26,7 +26,23 @@ baseUIAliases.set('useMediaQuery', {
 	additionalArity: 1,
 });
 
+// This type was exposed by the original Octane utility barrels. Jotai still
+// publishes its declaration alongside useHydrateAtoms, although its barrels do
+// not re-export it. The witness must pass the same npm-byte authentication.
+const jotaiHydrationWitness = '@octanejs/jotai#hydration-types';
+export function publicCompatibilityDeclarations(binding) {
+	return binding === '@octanejs/jotai'
+		? new Map([[jotaiHydrationWitness, 'dist/react/utils/useHydrateAtoms.d.ts']])
+		: new Map();
+}
+
 export function publicCompatibilityExport(specifier, name) {
+	if (
+		name === 'INTERNAL_InferAtomTuples' &&
+		['@octanejs/jotai/react/utils', '@octanejs/jotai/utils'].includes(specifier)
+	)
+		return { specifier: jotaiHydrationWitness, path: name };
+
 	const alias = baseUIAliases.get(name);
 	if (!alias) return undefined;
 	const witnessSpecifier = `@octanejs/base-ui/${alias.entry}`;
