@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "nextCode": 65,
+  "nextCode": 72,
   "codes": {
     "1": {
       "message": "Maximum update depth exceeded. Octane limits the number of nested updates to prevent infinite loops.",
@@ -384,6 +384,48 @@
       "message": "Target container is not a DOM element. Pass an Element, Document, or DocumentFragment. If document.body is null after document hydration, update the existing document root or render a document shell containing <body>.",
       "argumentCount": 0,
       "runtime": ["client"],
+      "status": "active"
+    },
+    "65": {
+      "message": "Unsupported Octane signal binding ABI.",
+      "argumentCount": 0,
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "66": {
+      "message": "An independent Hydrate boundary cannot change ownership after mount.",
+      "argumentCount": 0,
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "67": {
+      "message": "Signal control identity mismatch for \"%s\".",
+      "argumentCount": 1,
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "68": {
+      "message": "A signal control cannot join values from different document owners.",
+      "argumentCount": 0,
+      "runtime": ["server"],
+      "status": "active"
+    },
+    "69": {
+      "message": "Independent Hydrate requires a build manifest in RenderOptions.",
+      "argumentCount": 0,
+      "runtime": ["server"],
+      "status": "active"
+    },
+    "70": {
+      "message": "Independent Hydrate activation chunk is missing from the build manifest.",
+      "argumentCount": 0,
+      "runtime": ["server"],
+      "status": "active"
+    },
+    "71": {
+      "message": "Unsupported Octane server signal binding ABI.",
+      "argumentCount": 0,
+      "runtime": ["server"],
       "status": "active"
     }
   }

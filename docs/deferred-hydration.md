@@ -32,14 +32,15 @@ Deferred hydration applies only when matching server HTML exists in the initial
 document. A boundary first mounted after the app is running renders normally on
 the client.
 
-## The three decisions
+## The activation decisions
 
-Every boundary makes three performance decisions:
+Every boundary makes these performance decisions:
 
 | Prop | Default | Controls |
 | --- | --- | --- |
 | `when` | required | When preserved server HTML becomes interactive. |
 | `split` | `true` | Whether the compiler moves the children into a generated JavaScript chunk. |
+| `independent` | `false` | Require standalone activation without evaluating or hydrating the lexical parent. |
 | `prefetch` | none | Whether code or other resources begin loading before `when` resolves. |
 
 The complete component surface is:
@@ -48,6 +49,7 @@ The complete component surface is:
 | --- | --- | --- |
 | `when` | `HydrationStrategy \| (() => HydrationStrategy)` | Required hydration trigger. The function form runs only on the client and must return synchronously. |
 | `split` | `boolean` | Compiler-split the direct children into a deferred chunk. Defaults to `true`. |
+| `independent` | `boolean` | Require a compiler-proven standalone widget. Unsupported ownership or captures fail compilation instead of falling back. |
 | `prefetch` | `HydrationPrefetchStrategy \| HydrationPrefetchFunction` | Start loading the split chunk or run custom preparation before hydration. |
 | `fallback` | renderable | Client-only loading UI for a later client mount or suspension. |
 | `onHydrated` | `() => void` | Called once after the child successfully commits on the client. |
@@ -192,6 +194,63 @@ route's deferred chunks, including its layout and configured root fallbacks,
 because that route's server HTML needs its styling before the child JavaScript
 loads. This eager CSS collection follows the composed route's asset graphs; it
 does not turn deferred JavaScript into an eager dependency.
+
+### `independent`
+
+`independent` is an explicit, strict request for a standalone widget entry:
+
+```tsrx
+<Hydrate independent when={interaction()}>
+	<TodoComposer city={city} />
+</Hydrate>
+```
+
+The compiler and bundler must preserve serializable captures, stable IDs and
+hook seeds, the matching server read frame, and every reachable stylesheet. If
+the child depends on parent-owned runtime state such as a ref initialized by a
+parent effect, compilation fails with a source-located diagnostic. It does not
+silently change to parent-first hydration. Lexical nesting alone is not a
+dependency: a local callback that closes only over a shared signal can remain
+eligible after compiler lifting.
+
+Ordinary `<Hydrate>` boundaries, including the default split form, retain the
+existing parent-first activation behavior.
+
+#### Replaceable selections versus commands
+
+Independent widgets normally preserve every captured interaction in order. A
+widget can explicitly mark a replaceable selection with a nonempty
+`data-octane-hydrate-selection` group on native `type="button"` buttons:
+
+```tsrx
+<Hydrate independent when={interaction({ events: 'click' })}>
+	<button type="button" data-octane-hydrate-selection="forecast-day"
+		onClick={() => selectedDay$.set('Monday')}>Monday</button>
+	<button type="button" data-octane-hydrate-selection="forecast-day"
+		onClick={() => selectedDay$.set('Tuesday')}>Tuesday</button>
+	<button type="button" onClick={sendForecast}>Send</button>
+</Hydrate>
+```
+
+Before activation, consecutive plain primary clicks in the same group and the
+same independent boundary keep only the latest click. For example,
+Monday → Tuesday → Send → Monday → Tuesday replays Tuesday → Send → Tuesday.
+A different group or another widget's captured action is also an ordering
+barrier. Groups do not merge across boundaries. This applies before bootstrap
+and while the widget's code is loading; once active, native events run normally.
+
+The marker asserts that replacing earlier clicks is safe. Do not put it on
+commands such as Send, Add, or Purchase; Octane does not inspect arbitrary event
+closures to infer this distinction. Modified clicks, non-primary clicks,
+submit/reset buttons, links, and input events do not coalesce. Use the explicit
+click-only strategy shown above: default `interaction()` also captures pointer,
+focus, and input events, which remain ordering barriers. Independent native
+links keep their native navigation instead of being queued for replay.
+
+Capture preserves the original target, boundary, and selection group. Replaced
+or stale controls are not redirected to equivalent-looking DOM. This opt-in
+does not evaluate a handler before its code arrives, promise immediate visual
+selection feedback, or recreate trusted browser user activation.
 
 ### `prefetch`
 
@@ -376,6 +435,62 @@ ancestor root. Pass `{ preserveDOM: false }` to `root.dispose()` only when the
 root should explicitly clear its container.
 
 ## Correctness and nesting
+
+### Later-fetched SSR regions
+
+A custom host can send separately fetched SSR through the same bounded renderer
+frame transport. `createStreamedRegionPlacementFrame` from `octane/server`
+packages a completed `renderToString` result with its exact historical signal
+owner, selection identity, content revision, scoped CSS, and completed-build
+stylesheet URLs. It rejects missing or mismatched owners, multiple data owners,
+and document-head metadata. It does not authorize requests or rebind cached HTML;
+cache authorized source data and render a new request-specific envelope.
+
+On the client, register the selected identity and dormant range with
+`createStreamedRegionReceiver`, then consume the response with
+`readStreamedRendererResponse` from `octane/hydration`. Result decoding uses the
+matching `decodeSignalValue` codec. The region's historical-frame callback
+establishes adoption separately from newer live data. When activating, mark the
+range active, retire only its receiver-owned outer anchors, and hydrate the
+original component HTML. Later placement is rejected for that active range;
+the renderer alone reconciles subsequent model updates.
+
+The [conversation-history fixture](../packages/vite-plugin-octane/tests/_fixtures/app/src/conversation-history/)
+demonstrates this integration, cached/fresh responses, stable-key updates,
+completed-page cursors, and independent document-owned drafts. Custom fetches
+and explicit owners must also participate in document retirement/freeze handling;
+installing the document lifecycle helper does not automatically cancel an
+application's unrelated transport.
+
+### Persisted document navigation
+
+The app integrations install document lifecycle handling when SSR emits a signal
+mailbox or the completed client build declares independent hydration support.
+On a persisted `pagehide`, pending query/derived reads and not-yet-entered island
+activation are fenced. Active island DOM, completed results (including results
+buffered before a descriptor executes), and writable drafts are retained.
+
+On a persisted `pageshow`, the integration checks the executing build ID, the
+document ID in `#__octane_data`, and the original owner lifetime. Compatible
+restoration starts only still-selected unfinished reads under fresh attempts;
+the old document stream remains closed. It does not resubmit accepted mutations:
+uncertain optimistic operations still require explicit reconciliation. A
+mismatched identity retires the owner and reloads; ordinary non-persisted exit
+retires the owner and disposes independent roots.
+
+This is document/build revalidation, not an account authorization service or a
+deployment-version lookup. Hosts still own account changes and subsequent server
+authorization. Client-only signal routes with neither SSR signal mailboxes nor
+independent capability do not automatically load this integration. A custom host
+can explicitly call `installSignalDocumentLifecycle` from
+`octane/hydration/streamed-signals`, providing the same build/document metadata,
+document owner, and optional stream/island lifecycle handles.
+
+Browsers decide whether to preserve a page at all. A new document after history
+navigation follows normal SSR/hydration; restored form values alone do not prove
+BFCache restoration.
+
+### Boundary ownership
 
 Deferred hydration is a performance hint. An update outside a dormant boundary
 may open it early when Octane must reconcile the child to avoid stale server

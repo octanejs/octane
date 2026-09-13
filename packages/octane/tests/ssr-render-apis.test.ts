@@ -1,5 +1,5 @@
+import { loadCompiledFixtureSource } from './_server-fixture.js';
 import { describe, it, expect } from 'vitest';
-import { compile } from 'octane/compiler';
 import * as Server from 'octane/server';
 import { prerender } from 'octane/static';
 
@@ -10,14 +10,11 @@ import { prerender } from 'octane/static';
 // All return { html, css } (head folded into html; css a separate channel).
 
 function evalServer(source: string, file: string): Record<string, any> {
-	let { code } = compile(source, file, { mode: 'server' });
-	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/server['"];?/g,
-		(_m: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
-	);
-	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
-	code = code.replace(/export function (\w+)/g, '__exports.$1 = function $1');
-	return new Function('__rt', '__exports', code + '\nreturn __exports;')(Server, {});
+	return loadCompiledFixtureSource(source, {
+		id: file,
+		mode: 'server',
+		compileOptions: { mode: 'server' },
+	});
 }
 
 describe('SSR entry — { html, css } shape', () => {

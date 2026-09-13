@@ -1,6 +1,8 @@
 // @vitest-environment node
 
 import { build } from 'esbuild';
+import { realpathSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
@@ -30,7 +32,13 @@ describe('octane/compiler browser bundle', () => {
 		});
 
 		const inputs = Object.keys(result.metafile.inputs).map((input) => input.replaceAll('\\', '/'));
-		expect(inputs.some((input) => input.includes('/@tsrx/core/'))).toBe(true);
+		const coreEntry = realpathSync(fileURLToPath(import.meta.resolve('@tsrx/core')));
+		expect(
+			inputs.some(
+				(input) =>
+					input !== '<stdin>' && realpathSync(resolve(OCTANE_PACKAGE_ROOT, input)) === coreEntry,
+			),
+		).toBe(true);
 		expect(inputs.some((input) => input.includes('/oxc-tsrx/'))).toBe(false);
 		expect(inputs.some((input) => input.endsWith('/compiler/typescript.js'))).toBe(false);
 		expect(inputs.some((input) => input.includes('/node_modules/typescript/'))).toBe(false);

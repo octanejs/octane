@@ -175,6 +175,8 @@ export interface OctaneRspackLoaderOptions {
 }
 
 export interface OctaneRspackPluginOptions extends OctaneRspackLoaderOptions {
+	/** Build intent for SSR metadata; independent of optimization/HMR settings. */
+	clientBuildMode?: 'production' | 'development';
 	/**
 	 * @experimental Prove primitive DOM text children from the TypeScript project
 	 * in one-shot production builds. Relative paths resolve from the plugin root.
@@ -226,8 +228,25 @@ export interface OctaneRspackPluginOptions extends OctaneRspackLoaderOptions {
 
 export interface OctaneRspackBuildInfo {
 	canonicalId: string;
+	/** Resource query retained separately from the canonical source identity. */
+	resourceQuery?: string;
 	transformKind: 'compile' | 'slots' | 'client-only-stub';
+	streamedSignals?: true;
 	serverRpc: boolean;
+	/** Strict-independent Hydrate templates completed into the emitted client manifest. */
+	independentWidgets?: readonly {
+		readonly version: 1;
+		readonly boundaryId: string;
+		readonly moduleId: string;
+		readonly exportName: string;
+		readonly request: string;
+		readonly captureSchema: readonly { readonly name: string; readonly type: 'json' }[];
+		readonly hookSeed: number;
+		readonly idSeed: number;
+		readonly signalSites: readonly string[];
+		readonly styles: readonly string[];
+		readonly parentDependencies: false;
+	}[];
 	/** Universal host runtime/thread identity, when this module was specialized. */
 	universalRuntime?: OctaneUniversalRuntimeOptions;
 	/** Stable identity shared by the client compile and its inert server stub. */

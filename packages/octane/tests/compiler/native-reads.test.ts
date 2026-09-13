@@ -59,9 +59,10 @@ export function App(props) @{
 	it.each([{ dev: true }, { dev: false, hmr: false }])(
 		'keeps the ordinary DOM compile path for $ names in %j',
 		(options) => {
-			const plain = ORDINARY_DOLLAR.replaceAll('tick$', 'tick');
+			// Keep authored offsets identical: declaration/binding sites encode them.
+			const plain = ORDINARY_DOLLAR.replaceAll('tick$', 'tick_');
 			const compiled = compile(ORDINARY_DOLLAR, FILENAME, options).code;
-			expect(compiled.replaceAll('tick$', 'tick')).toBe(compile(plain, FILENAME, options).code);
+			expect(compiled.replaceAll('tick$', 'tick_')).toBe(compile(plain, FILENAME, options).code);
 		},
 	);
 
@@ -188,27 +189,16 @@ export function App() @{ <div /> }`;
 describe('native signal capability names', () => {
 	it.each([
 		['created handles', `const count = scope.signal$('draft-title', 1);`],
-		['aliases', 'const alias = count$;'],
-		['destructured aliases', 'const { count$: count } = { count$ };'],
-		['array destructuring', 'const [count] = [count$];'],
-		['object fields', 'const bag = { count: count$ };'],
-		['assigned fields', 'const bag = {}; bag.count = count$;'],
 		['handle factories', 'function createCount() { return count$; }'],
 		['aggregate factories', 'function makeCounter() { return { count$ }; }'],
 		['arrow factories', 'const createCount = () => count$;'],
 		['live accessor functions', 'function readCount() { return scope.get(count$); }'],
 		['live accessor arrows', 'const readCount = () => scope.get(count$);'],
-		[
-			'live accessor aliases',
-			'function readCount$() { return scope.get(count$); } const read = readCount$;',
-		],
-		['known read parameters', 'function read$(value) { return scope.get(value); }'],
 	])('rejects missing suffixes on %s', (_label, setup) => {
 		expect(() => compile(app(setup), FILENAME, {})).toThrow(NAMING);
 	});
 
 	it.each([
-		['export aliases', 'export { count$ as count };'],
 		[
 			'imported scope factory aliases',
 			`import { createScope as makeScope } from 'octane/signals';
@@ -221,9 +211,34 @@ const count = otherScope.signal$('other', 0);`,
 const otherScope = signals.createScope();
 const count = otherScope.signal$('other', 0);`,
 		],
-		['local hook aliases', `import { useSignal$ as useSignal } from 'octane/signals/client';`],
 	])('rejects missing suffixes through %s', (_label, module) => {
 		expect(() => compile(app('', PREFIX + module), FILENAME, {})).toThrow(NAMING);
+	});
+
+	it('allows handles and factories to pass through ordinary alias and prop names', () => {
+		const source = app(
+			`
+const alias = count$;
+const { count$: count } = { count$ };
+const [item] = [count$];
+const bag = { count: count$ };
+bag.count = count$;
+function readCount$() { return scope.get(count$); }
+const read = readCount$;
+function read$(value) { return scope.get(value); }
+`,
+			`${PREFIX}\nexport { count$ as exportedCount };`,
+		);
+		expect(() => compile(source, FILENAME, {})).not.toThrow();
+	});
+
+	it('allows imported capability factories to use ordinary local aliases', () => {
+		const source = app(
+			'',
+			`${PREFIX}
+import { useSignal$ as useSignal } from 'octane/signals/client';`,
+		);
+		expect(() => compile(source, FILENAME, {})).not.toThrow();
 	});
 
 	it('accepts suffixed capabilities, ordinary snapshots, durable keys, and commands', () => {
@@ -258,7 +273,7 @@ function shadow(createScope) {
 	});
 
 	it.each(modes)('reports the authored binding in %j', (options) => {
-		const source = app('const wrong = count$;');
+		const source = app("const wrong = scope.signal$('wrong', 0);");
 		const start = source.indexOf('wrong');
 		let diagnostic: any;
 		try {

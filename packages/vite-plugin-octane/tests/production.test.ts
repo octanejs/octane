@@ -14,6 +14,7 @@
 // debris under `tests/_fixtures/app` whenever a run is interrupted, and two
 // concurrent runs would build into the same directory.
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { JSDOM } from 'jsdom';
 import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
@@ -21,6 +22,7 @@ import { EventEmitter, once } from 'node:events';
 import { createServer as createHttpServer, type IncomingMessage, type Server } from 'node:http';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { build, createServer, type ViteDevServer } from 'vite';
+import type { Locator } from 'playwright';
 import { createTempProject } from '../../octane/tests/_temp-project.js';
 import { createNodeServer } from '../../app-core/src/server/node-http.js';
 
@@ -40,14 +42,28 @@ function linkPackage(name: string, target: string) {
 	fs.symlinkSync(target, dest, 'dir');
 }
 
-/** The rendered body region: everything streamed into `<div id="root">`. */
+/** The authored root HTML, preserving its original bytes and hydration markers. */
 function bodyRegionOf(html: string): string {
-	const open = '<div id="root">';
-	const start = html.indexOf(open);
-	const end = html.lastIndexOf('</div>');
-	expect(start).toBeGreaterThan(-1);
-	expect(end).toBeGreaterThan(start);
-	return html.slice(start + open.length, end);
+	const dom = new JSDOM(html, { includeNodeLocations: true });
+	try {
+		const root = dom.window.document.getElementById('root');
+		expect(root).not.toBeNull();
+		expect(root!.firstChild).not.toBeNull();
+		const start = dom.nodeLocation(root!.firstChild!)!.startOffset;
+		const end = dom.nodeLocation(root!.lastChild!)!.endOffset;
+		let body = html.slice(start, end);
+		// hydrateRoot removes only direct renderer transport scripts before
+		// adoption. Their presence depends on the build's early-hydration
+		// capability; browser and CSP tests exercise their execution separately.
+		for (const child of Array.from(root!.children).reverse()) {
+			if (child.localName !== 'script' || !child.hasAttribute('data-octane-stream')) continue;
+			const script = dom.nodeLocation(child)!;
+			body = body.slice(0, script.startOffset - start) + body.slice(script.endOffset - start);
+		}
+		return body;
+	} finally {
+		dom.window.close();
+	}
 }
 
 function dataScriptOf(html: string): string {
@@ -164,6 +180,14 @@ describe('production SSR build', { timeout: 30_000 }, () => {
 	it('emits both bundles, moves the template to dist/server, and strips build metadata', () => {
 		expect(fs.existsSync(path.join(distDir, 'server/entry.js'))).toBe(true);
 		expect(fs.existsSync(path.join(distDir, 'server/index.html'))).toBe(true);
+		expect(
+			JSON.parse(fs.readFileSync(path.join(distDir, 'server/octane-client-build.json'), 'utf-8')),
+		).toMatchObject({
+			version: 1,
+			buildId: expect.any(String),
+			mode: 'production',
+		});
+		expect(fs.existsSync(path.join(distDir, 'client/octane-client-build.json'))).toBe(false);
 		// The template must NOT stay in the static dir (it would shadow SSR at '/'
 		// on filesystem-first hosts) and the manifest must not ship.
 		expect(fs.existsSync(path.join(distDir, 'client/index.html'))).toBe(false);
@@ -264,10 +288,27 @@ describe('production SSR build', { timeout: 30_000 }, () => {
 			expect(devResponse.status).toBe(200);
 			const devHtml = await devResponse.text();
 
-			// The hydratable body region and the hydration payload are the
-			// byte-compat contract between dev and production.
+			// Hydratable content and route data agree; deployment identity and the
+			// per-response document identity necessarily differ between servers.
 			expect(bodyRegionOf(prodHtml)).toBe(bodyRegionOf(devHtml));
-			expect(dataScriptOf(prodHtml)).toBe(dataScriptOf(devHtml));
+			const {
+				clientBuild: productionBuild,
+				streamedSignals: productionSignals,
+				...productionData
+			} = JSON.parse(dataScriptOf(prodHtml));
+			const {
+				clientBuild: developmentBuild,
+				streamedSignals: developmentSignals,
+				...developmentData
+			} = JSON.parse(dataScriptOf(devHtml));
+			expect(productionData).toEqual(developmentData);
+			expect(productionBuild).toEqual(
+				JSON.parse(fs.readFileSync(path.join(distDir, 'server/octane-client-build.json'), 'utf-8')),
+			);
+			expect(productionSignals.buildId).toBe(productionBuild.buildId);
+			expect(developmentBuild.mode).toBe('development');
+			expect(developmentSignals.buildId).toBe(developmentBuild.buildId);
+			expect(productionSignals.documentId).not.toBe(developmentSignals.documentId);
 
 			// Sanity: it actually rendered the page.
 			expect(prodHtml).toContain('fixture-nav');
@@ -687,6 +728,261 @@ describe('production SSR build', { timeout: 30_000 }, () => {
 		expect(stylesheet).toBeTruthy();
 		expect(html).toContain(`<link rel="stylesheet" href="/${stylesheet}">`);
 	});
+
+	for (const engine of ['chromium', 'webkit'] as const) {
+		it(`preserves early composer input through independent activation and conversation navigation in ${engine}`, async () => {
+			const playwright = await import('playwright');
+			const browser = await playwright[engine].launch({ headless: true });
+			try {
+				const parentAsset = findBuiltAsset(
+					path.join(distDir, 'client'),
+					'.js',
+					'Streaming conversations',
+				);
+				expect(parentAsset).toBeTruthy();
+				const page = await browser.newPage({ extraHTTPHeaders: { 'x-fixture-viewer': engine } });
+				// WebKit can pause animation frames while the streamed document is
+				// still loading. Check actionability without its rAF-based locator
+				// stability wait, then send a real pointer event to the visible control.
+				const clickControl = async (control: Locator) => {
+					await control.waitFor({ state: 'visible' });
+					await expect.poll(() => control.isEnabled()).toBe(true);
+					let previous: { x: number; y: number; width: number; height: number } | undefined;
+					const point = { x: 0, y: 0 };
+					await expect
+						.poll(async () => {
+							const bounds = await control.boundingBox();
+							if (bounds === null) return false;
+							const stable =
+								previous !== undefined &&
+								Object.entries(bounds).every(
+									([key, value]) =>
+										Number.isFinite(value) && value === previous![key as keyof typeof bounds],
+								);
+							previous = bounds;
+							point.x = bounds.x + bounds.width / 2;
+							point.y = bounds.y + bounds.height / 2;
+							return (
+								stable &&
+								bounds.width > 0 &&
+								bounds.height > 0 &&
+								(await control.evaluate(
+									(node, position) =>
+										node.contains(document.elementFromPoint(position.x, position.y)),
+									point,
+								))
+							);
+						})
+						.toBe(true);
+					await page.mouse.click(point.x, point.y);
+				};
+				const errors: string[] = [];
+				page.on('pageerror', (error) => errors.push(String(error)));
+				let releaseParent!: () => void;
+				const parentGate = new Promise<void>((resolve) => {
+					releaseParent = resolve;
+				});
+				const blockedParents: string[] = [];
+				await page.route('**/' + parentAsset, async (route) => {
+					blockedParents.push(route.request().url());
+					await parentGate;
+					await route.continue();
+				});
+				try {
+					// Holding the parent module must not prevent its SSR input or the
+					// independent widget's activation closure from becoming usable.
+					await page.goto(productionOrigin + '/conversations', { waitUntil: 'commit' });
+					const input = page.getByRole('textbox', { name: 'Message' });
+					await input.waitFor();
+					const original = await input.elementHandle();
+					await clickControl(input);
+					await input.fill('draft typed before the parent');
+					await expect.poll(() => input.inputValue()).toBe('draft typed before the parent');
+					// A derived read proves that code adopted the early
+					// cell; retaining only an uncontrolled DOM string would not pass.
+					await expect.poll(() => page.getByText('Characters: 29').count()).toBe(1);
+					expect(
+						await original!.evaluate((node) => node === document.querySelector('textarea')),
+					).toBe(true);
+					expect(blockedParents).toHaveLength(1);
+					await input.fill('');
+					await expect.poll(() => page.getByText('Characters: 0').count()).toBe(1);
+					releaseParent();
+					// Observe the parent's committed controls, not EOF: a watch query
+					// can remain open for the document's lifetime.
+					await expect
+						.poll(() =>
+							page
+								.getByRole('group', { name: 'Conversation in this document' })
+								.getAttribute('aria-busy'),
+						)
+						.toBe('false');
+					expect(
+						await original!.evaluate((node) => node === document.querySelector('textarea')),
+					).toBe(true);
+					expect(await input.inputValue()).toBe('');
+					expect(await input.evaluate((node) => document.activeElement === node)).toBe(true);
+
+					const startHash = createHash('sha256')
+						.update('/src/conversation/Calls.tsrx#startConversation')
+						.digest('hex')
+						.slice(0, 8);
+					const starts: string[] = [];
+					const batches: string[] = [];
+					page.on('request', (request) => {
+						if (request.method() === 'POST' && request.url().endsWith('/' + startHash))
+							starts.push(request.url());
+						if (request.headers()['accept'] === 'application/x-octane-rpc-batch+ndjson')
+							batches.push(request.url());
+					});
+					await input.fill('one accepted operation');
+					await clickControl(page.getByRole('button', { name: 'Send message' }));
+					await expect
+						.poll(() => page.getByText('Message accepted.', { exact: true }).count())
+						.toBe(1);
+					await input.fill('next draft for A');
+					await clickControl(page.getByRole('button', { name: 'Conversation B', exact: true }));
+					await expect.poll(() => input.inputValue()).toBe('');
+					await input.fill('separate draft for B');
+					await clickControl(page.getByRole('button', { name: 'Conversation A', exact: true }));
+					await expect.poll(() => input.inputValue()).toBe('next draft for A');
+					await expect
+						.poll(() =>
+							page.getByText('Completed: one accepted operation', { exact: true }).count(),
+						)
+						.toBe(1);
+					expect(await page.locator('[data-conversation="A"] [data-turn]').count()).toBe(1);
+					await clickControl(page.getByRole('button', { name: 'Check last operation' }));
+					await expect
+						.poll(() => page.getByRole('status').textContent())
+						.toMatch(/^Operation complete,/);
+					expect(batches).toHaveLength(1);
+					expect(starts).toHaveLength(1);
+					expect(errors).toEqual([]);
+				} finally {
+					releaseParent();
+					await page.close();
+				}
+			} finally {
+				await browser.close();
+			}
+		}, 60_000);
+	}
+
+	it('places fetched SSR, adopts URL receipts, and pages completed history in webkit', async () => {
+		const { webkit } = await import('playwright');
+		const browser = await webkit.launch({ headless: true });
+		try {
+			const page = await browser.newPage({
+				extraHTTPHeaders: { 'x-fixture-viewer': 'fetched-history-webkit' },
+			});
+			const errors: string[] = [];
+			const posts: string[] = [];
+			page.on('pageerror', (error) => errors.push(String(error)));
+			page.on('request', (request) => {
+				if (request.method() === 'POST') posts.push(request.url());
+			});
+			const warmDocument = await page.request.get(productionOrigin + '/conversation-history');
+			const warmData = JSON.parse(dataScriptOf(await warmDocument.text()));
+			const warmQuery = new URLSearchParams({
+				build: warmData.clientBuild.buildId,
+				document: warmData.streamedSignals.documentId,
+				conversation: 'A',
+				generation: '1',
+			});
+			const denied = await page.request.get(
+				productionOrigin + '/conversation-history/frames?' + warmQuery,
+				{ headers: { 'x-fixture-rpc-authorization': 'deny' } },
+			);
+			expect(denied.status()).toBe(401);
+			const wrongBuild = await page.request.get(
+				productionOrigin +
+					'/conversation-history/frames?' +
+					new URLSearchParams({
+						...Object.fromEntries(warmQuery),
+						build: 'not-the-executing-build',
+					}),
+			);
+			expect(wrongBuild.status()).toBe(409);
+			// Warm only an authorized input cache. The browser below receives a
+			// new document identity and fresh SSR of this older empty snapshot.
+			const warmHistory = await page.request.get(
+				productionOrigin + '/conversation-history/frames?' + warmQuery,
+			);
+			expect(warmHistory.headers()['cache-control']).toBe('private, no-store');
+			const warmFrames = (await warmHistory.text())
+				.trim()
+				.split('\n')
+				.map((line) => JSON.parse(line));
+			expect(
+				warmFrames.some(
+					(frame) => frame.channel === 'placement' && frame.html.includes('data-history="A"'),
+				),
+			).toBe(true);
+			for (let index = 1; index <= 3; index++) {
+				const response = await page.request.get(
+					productionOrigin + `/conversation-history?q=history-${index}&operation=history-${index}`,
+				);
+				expect(response.status()).toBe(200);
+				await response.body();
+			}
+			await page.goto(productionOrigin + '/conversation-history?q=history-4&operation=history-4');
+			const input = page.getByRole('textbox', { name: 'History draft' });
+			await page.locator('[data-history="A"][data-source="cached"][data-revision="0"]').waitFor();
+			expect(
+				await page.locator('[data-history="A"]').evaluate((node) => getComputedStyle(node).color),
+			).toBe('rgb(12, 54, 87)');
+			await input.fill('draft A survives server history');
+			await page.getByRole('button', { name: 'Select B', exact: true }).click();
+			await expect.poll(() => page.locator('[data-history="B"]').count()).toBe(1);
+			await expect.poll(() => input.inputValue()).toBe('');
+			await input.fill('draft B');
+			await page.getByRole('button', { name: 'Select A', exact: true }).click();
+			await expect.poll(() => page.locator('[data-history="A"]').count()).toBe(1);
+			await expect.poll(() => input.inputValue()).toBe('draft A survives server history');
+			await expect
+				.poll(() => page.getByText('Completed: history-4', { exact: true }).count())
+				.toBe(1);
+			await expect.poll(() => page.getByRole('status').textContent()).toBe('History complete');
+			expect(await page.locator('[data-history="A"] [data-turn]').count()).toBe(2);
+			expect(await page.locator('[data-receipt="history-4"]').textContent()).toBe(
+				'Accepted operation: complete',
+			);
+			const original = await page.locator('[data-history="A"]').elementHandle();
+			await page.getByRole('button', { name: 'Activate history', exact: true }).click();
+			await expect.poll(() => page.getByRole('status').textContent()).toBe('History active');
+			expect(
+				await original!.evaluate((node) => node === document.querySelector('[data-history]')),
+			).toBe(true);
+			await page.getByRole('button', { name: 'Select A', exact: true }).click();
+			await expect.poll(() => page.getByRole('status').textContent()).toBe('History complete');
+			expect(
+				await original!.evaluate((node) => node === document.querySelector('[data-history]')),
+			).toBe(true);
+			await page.getByRole('button', { name: 'Older page', exact: true }).click();
+			await expect.poll(() => page.getByRole('status').textContent()).toBe('All history loaded');
+			expect(
+				await page
+					.locator('[data-history="A"] [data-turn]')
+					.evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-turn'))),
+			).toEqual(['history-1', 'history-2', 'history-3', 'history-4']);
+			await page.getByRole('button', { name: 'Older page', exact: true }).click();
+			expect(await page.locator('[data-turn]').count()).toBe(4);
+			expect(await input.inputValue()).toBe('draft A survives server history');
+			// The one POST is the explicit finite page read. URL acceptance was
+			// server-side and hydration did not resubmit any generation action.
+			const pageHash = createHash('sha256')
+				.update('/src/conversation/Calls.tsrx#readConversationPage')
+				.digest('hex')
+				.slice(0, 8);
+			expect(posts).toHaveLength(1);
+			expect(posts[0]).toMatch(new RegExp('/' + pageHash + '$'));
+			expect(errors).toEqual([]);
+			await page.close();
+		} finally {
+			await browser.close();
+		}
+	}, 60_000);
 
 	it('bundles module-server exports and executes them through production RPC', async () => {
 		const { handler } = await import(pathToFileURL(path.join(distDir, 'server/entry.js')).href);

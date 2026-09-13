@@ -6,7 +6,7 @@ export interface NativeReadInspection {
 	readonly key: string;
 	readonly read: 'value' | 'latest' | 'snapshot';
 	readonly kind: 'signal' | 'derived' | 'async';
-	readonly status: 'ready' | 'pending' | 'error' | 'unevaluated';
+	readonly status: 'idle' | 'ready' | 'pending' | 'error' | 'unevaluated';
 	readonly revision: number;
 	readonly generation?: number;
 	readonly epoch: number;

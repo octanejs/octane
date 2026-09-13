@@ -1,3 +1,4 @@
+import { loadCompiledFixtureSource } from '../_server-fixture.js';
 /**
  * Port of facebook/react ReactDOMFizzViewTransition-test.js (2026-07-11) —
  * the SSR side of View Transitions: the server emits resolved `vt-*`
@@ -16,7 +17,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { compile } from 'octane/compiler';
 import { hydrateRoot } from '../../src/index.js';
 import * as ServerRT from '../../src/server/index.js';
 // CLIENT-compiled fixture (for hydration).
@@ -28,14 +28,11 @@ const FIXTURE = join(
 );
 
 function serverModule(): Record<string, any> {
-	let { code } = compile(readFileSync(FIXTURE, 'utf8'), FIXTURE, { mode: 'server' });
-	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/server['"];?/g,
-		(_m: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
-	);
-	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
-	code = code.replace(/export function (\w+)/g, '__exports.$1 = function $1');
-	return new Function('__rt', '__exports', code + '\nreturn __exports;')(ServerRT, {});
+	return loadCompiledFixtureSource(readFileSync(FIXTURE, 'utf8'), {
+		id: FIXTURE,
+		mode: 'server',
+		compileOptions: { mode: 'server' },
+	});
 }
 const server = serverModule();
 

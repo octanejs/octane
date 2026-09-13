@@ -525,6 +525,8 @@ describe('full Select in Chromium', () => {
 						)
 							return null;
 						const attributes = [...node.attributes]
+							// Compiler-owned input identity does not change native control behavior.
+							.filter((attribute) => attribute.name !== 'data-octane-input')
 							.map(
 								(attribute) =>
 									[

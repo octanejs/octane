@@ -22,12 +22,17 @@ function runtimeImports(code: string, names: readonly string[]): Set<string> {
 	const program = parseModule(code, 'compiled.js');
 	for (const statement of program.body) {
 		if (statement.type !== 'ImportDeclaration') continue;
-		if (statement.source?.value !== 'octane' && statement.source?.value !== 'octane/server') {
+		if (
+			typeof statement.source.value !== 'string' ||
+			!['octane', 'octane/server', 'octane/internal/client', 'octane/internal/server'].includes(
+				statement.source.value,
+			)
+		) {
 			continue;
 		}
 		for (const specifier of statement.specifiers) {
 			if (specifier.type !== 'ImportSpecifier') continue;
-			if (names.includes(specifier.imported?.name)) {
+			if (specifier.imported.type === 'Identifier' && names.includes(specifier.imported.name)) {
 				factories.add(specifier.local.name);
 			}
 		}
@@ -35,8 +40,13 @@ function runtimeImports(code: string, names: readonly string[]): Set<string> {
 	return factories;
 }
 
-function descriptorFactories(code: string): Set<string> {
-	return runtimeImports(code, ['createElement', 'createScopedElement']);
+function descriptorFactories(code: string): Map<string, number> {
+	return new Map([
+		...[...runtimeImports(code, ['createElement', 'createScopedElement'])].map(
+			(name) => [name, 0] as const,
+		),
+		...[...runtimeImports(code, ['createElementAt'])].map((name) => [name, 1] as const),
+	]);
 }
 
 function elementDescriptorCalls(code: string, component: string, root?: any): any[] {
@@ -49,7 +59,7 @@ function elementDescriptorCalls(code: string, component: string, root?: any): an
 		if (
 			node.type === 'CallExpression' &&
 			factories.has(node.callee?.name) &&
-			node.arguments[0]?.name === component
+			node.arguments[factories.get(node.callee.name)!]?.name === component
 		) {
 			calls.push(node);
 		}
@@ -73,8 +83,8 @@ function hostDescriptorCalls(code: string, tag: string, root?: any): any[] {
 		if (
 			node.type === 'CallExpression' &&
 			factories.has(node.callee?.name) &&
-			node.arguments[0]?.type === 'Literal' &&
-			node.arguments[0].value === tag
+			node.arguments[factories.get(node.callee.name)!]?.type === 'Literal' &&
+			node.arguments[factories.get(node.callee.name)!].value === tag
 		) {
 			calls.push(node);
 		}

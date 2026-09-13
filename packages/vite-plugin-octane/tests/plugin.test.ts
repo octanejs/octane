@@ -8,7 +8,7 @@ import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from 'node:fs/promis
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { describe, it, expect, vi } from 'vitest';
-import { createServer } from 'vite';
+import { createServer, resolveConfig } from 'vite';
 import type { RenderBuiltAssetUrl, UserConfig } from 'vite';
 import { octane, isViteOwnedUrl, resolveOctaneConfig, RenderRoute } from '../src/index.js';
 import { RESOLVED_ADAPTER_BROWSER_STUB_ID } from '../src/project-codegen.js';
@@ -24,6 +24,18 @@ function url(u: string): URL {
 const PKG_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const REPO_ROOT = dirname(dirname(PKG_ROOT));
 const APP_FIXTURE_ROOT = fileURLToPath(new URL('./_fixtures/app', import.meta.url));
+
+async function configuredOctane(
+	options: Parameters<typeof octane>[0],
+	root = '/repo',
+	command: 'serve' | 'build' = 'serve',
+) {
+	const plugins = octane(options);
+	// Vite resolves the compiler and metaframework hooks together before any
+	// transform, including their shared project and client-build metadata.
+	await resolveConfig({ root, configFile: false, plugins, logLevel: 'silent' }, command);
+	return plugins;
+}
 
 describe('production client assets', () => {
 	it('links CSS from deferred hydration branches without promoting their JavaScript', () => {
@@ -194,11 +206,8 @@ describe('octane() plugin factory', () => {
 		expect(Component({ value: 'props-first' }, undefined)).toBe('props-first');
 	});
 
-	it('forwards `exclude` to the bundled compiler (hook-slotting skip)', () => {
-		const [compiler] = octane({ exclude: ['/packages/tanstack-router/src/'] });
-		// Vite calls config() before transforms; pin the synthetic project root so
-		// linked paths outside it are correctly treated as external packages.
-		(compiler.config as (config: { root: string }) => unknown)({ root: '/repo' });
+	it('forwards `exclude` to the bundled compiler (hook-slotting skip)', async () => {
+		const [compiler] = await configuredOctane({ exclude: ['/packages/tanstack-router/src/'] });
 		const code =
 			"import { useState } from 'octane';\nexport function useThing() { return useState(0); }\n";
 		const transform = compiler.transform as (code: string, id: string) => unknown;
@@ -216,14 +225,7 @@ describe('octane() plugin factory', () => {
 			[true, true],
 			[false, false],
 		] as const) {
-			const [compiler] = octane({ hmr });
-			await (compiler.config as (config: { root: string }) => unknown)({ root: '/repo' });
-			(compiler.configResolved as (config: unknown) => void)({
-				root: '/repo',
-				command: 'serve',
-				build: {},
-				define: {},
-			});
+			const [compiler] = await configuredOctane({ hmr });
 			const output = await (
 				compiler.transform as (source: string, id: string) => Promise<{ code: string }>
 			).call({}, source, '/repo/src/App.tsrx');
@@ -238,8 +240,7 @@ describe('octane() plugin factory', () => {
 			[false, true],
 			[true, false],
 		] as const) {
-			const [compiler] = octane({ hmr: false, requireDirective });
-			await (compiler.config as (config: { root: string }) => unknown)({ root: '/repo' });
+			const [compiler] = await configuredOctane({ hmr: false, requireDirective });
 			const output = await (
 				compiler.transform as (
 					source: string,
@@ -258,14 +259,11 @@ describe('octane() plugin factory', () => {
 		const provider = vi.fn(() => ({
 			default: { root: '_panel_root', label: '_panel_label' },
 		}));
-		const [compiler] = octane({ hmr: false, cssModuleConstants: provider });
-		await (compiler.config as (config: { root: string }) => unknown)({ root: '/repo' });
-		(compiler.configResolved as (config: unknown) => void)({
-			root: '/repo',
-			command: 'build',
-			build: {},
-			define: {},
-		});
+		const [compiler] = await configuredOctane(
+			{ hmr: false, cssModuleConstants: provider },
+			'/repo',
+			'build',
+		);
 		const source =
 			'import styles from "./panel.module.css"; ' +
 			'export function Panel() @{ <section class={styles.root}><span class={styles.label}>Ready</span></section> }';
@@ -290,8 +288,7 @@ describe('octane() plugin factory', () => {
 	});
 
 	it.each([true, false])('forwards strong=%s to the bundled compiler', async (strong) => {
-		const [compiler] = octane({ hmr: false, strong });
-		await (compiler.config as (config: { root: string }) => unknown)({ root: '/repo' });
+		const [compiler] = await configuredOctane({ hmr: false, strong });
 		const transform = compiler.transform as (source: string, id: string) => { code: string };
 		const source =
 			"import { useState } from 'octane';\n" +
@@ -335,15 +332,13 @@ describe('octane() plugin factory', () => {
 				"import { strong } from './strong.config.ts';\nexport default { compiler: { strong } };\n",
 			);
 
-			const [compiler, meta] = octane({ hmr: false });
-			await (compiler.config as (config: { root: string }) => unknown)({ root });
+			const [compiler, meta] = await configuredOctane({ hmr: false }, root);
 			const transform = compiler.transform as (source: string, id: string) => { code: string };
 			expect(() => transform.call({}, source, join(root, 'src/App.tsrx'))).toThrow(
 				/useLinkedState/,
 			);
 
-			const [override] = octane({ hmr: false, strong: false });
-			await (override.config as (config: { root: string }) => unknown)({ root });
+			const [override] = await configuredOctane({ hmr: false, strong: false }, root);
 			expect(
 				(override.transform as (source: string, id: string) => { code: string }).call(
 					{},
@@ -359,11 +354,10 @@ describe('octane() plugin factory', () => {
 				),
 			).toThrow(/useLinkedState/);
 
-			const [inlineRenderers] = octane({
-				hmr: false,
-				renderers: { registry: { alternate: 'octane/universal' } },
-			});
-			await (inlineRenderers.config as (config: { root: string }) => unknown)({ root });
+			const [inlineRenderers] = await configuredOctane(
+				{ hmr: false, renderers: { registry: { alternate: 'octane/universal' } } },
+				root,
+			);
 			expect(() =>
 				(inlineRenderers.transform as (source: string, id: string) => { code: string }).call(
 					{},
@@ -374,6 +368,7 @@ describe('octane() plugin factory', () => {
 
 			const add = vi.fn();
 			(meta.configureServer as (server: unknown) => void)({
+				ws: { on: vi.fn(), send: vi.fn() },
 				watcher: { add },
 				middlewares: { use: vi.fn() },
 			});
@@ -412,13 +407,13 @@ describe('octane() plugin factory', () => {
 				"import { strong } from './entity.ts';\nexport default { compiler: { strong } };\n",
 			);
 
-			const [compiler, meta] = octane({ hmr: false });
-			await (compiler.config as (config: { root: string }) => unknown)({ root });
+			const [, meta] = await configuredOctane({ hmr: false }, root);
 
 			const add = vi.fn((files: string[]) => {
 				for (const file of files) statSync(file);
 			});
 			(meta.configureServer as (server: unknown) => void)({
+				ws: { on: vi.fn(), send: vi.fn() },
 				watcher: { add },
 				middlewares: { use: vi.fn() },
 			});
@@ -482,8 +477,8 @@ export default {
 		},
 	);
 
-	it('forwards inline renderer rules to the bundled compiler', () => {
-		const [compiler] = octane({
+	it('forwards inline renderer rules to the bundled compiler', async () => {
+		const [compiler] = await configuredOctane({
 			hmr: false,
 			renderers: {
 				registry: { object: 'octane/universal' },
@@ -499,7 +494,6 @@ export default {
 				rules: [{ include: 'src/**/*.object.tsrx', renderer: 'object' }],
 			},
 		});
-		(compiler.config as (config: { root: string }) => unknown)({ root: '/repo' });
 		const transform = compiler.transform as (code: string, id: string) => { code: string };
 		const result = transform.call(
 			{},
@@ -551,8 +545,7 @@ export default { compiler: { renderers } };
 			);
 			const watchedRendererConfigPath = await realpath(rendererConfigPath);
 
-			const [compiler, meta] = octane({ hmr: false });
-			await (compiler.config as (config: { root: string }) => unknown)({ root });
+			const [compiler, meta] = await configuredOctane({ hmr: false }, root);
 			const transform = compiler.transform as (code: string, id: string) => { code: string };
 			const appConfigured = transform.call(
 				{},
@@ -564,6 +557,7 @@ export default { compiler: { renderers } };
 
 			const add = vi.fn();
 			(meta.configureServer as (server: unknown) => void)({
+				ws: { on: vi.fn(), send: vi.fn() },
 				watcher: { add },
 				middlewares: { use: vi.fn() },
 			});
@@ -581,14 +575,16 @@ export default { compiler: { renderers } };
 			);
 			expect(restart).toHaveBeenCalledOnce();
 
-			const [inlineCompiler] = octane({
-				hmr: false,
-				renderers: {
-					registry: { inline: 'octane/universal' },
-					rules: [{ include: 'src/**/*.object.tsrx', renderer: 'inline' }],
+			const [inlineCompiler] = await configuredOctane(
+				{
+					hmr: false,
+					renderers: {
+						registry: { inline: 'octane/universal' },
+						rules: [{ include: 'src/**/*.object.tsrx', renderer: 'inline' }],
+					},
 				},
-			});
-			await (inlineCompiler.config as (config: { root: string }) => unknown)({ root });
+				root,
+			);
 			const inlineConfigured = (
 				inlineCompiler.transform as (code: string, id: string) => { code: string }
 			).call(

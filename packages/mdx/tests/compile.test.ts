@@ -127,7 +127,7 @@ describe('compileMdxSync', () => {
 		// descriptor — `<_createMdxContent/>` is a component REFERENCE per JSX
 		// semantics) — no direct call that would bypass the
 		// `(props, __s, __extra)` ABI.
-		expect(code).toContain('_$createElement(_createMdxContent');
+		expect(code).toMatch(/_\$createElementAt\(['"][^'"]+['"],\s*_createMdxContent,/);
 		// …and the emitted ternary-else direct-call shape is gone.
 		expect(code).not.toContain(': _createMdxContent(');
 	});

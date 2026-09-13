@@ -205,6 +205,10 @@ export const REQUIRED_PUBLIC_VALUE_EXPORTS = {
 		'never',
 		'visible',
 	],
+	'./hydration/streamed-signals': [
+		'bootstrapStreamedSignalHydration',
+		'installSignalDocumentLifecycle',
+	],
 	'./behavior': ['attachBehaviorRoot'],
 	'./signals': [
 		'createScope',
@@ -236,6 +240,7 @@ export const REQUIRED_PUBLIC_VALUE_EXPORTS = {
 		'createElement',
 		'createPortal',
 		'escapeAttr',
+		'earlySignalBootstrapScript',
 		'escapeHtml',
 		'executeServerFunction',
 		'flushSync',

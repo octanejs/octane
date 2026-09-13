@@ -54,6 +54,7 @@ export {
 	CLIENT_REFERENCE_MANIFEST_VERSION,
 	createClientReferenceManifest,
 } from './client-only-server.js';
+export const INDEPENDENT_HYDRATION_MANIFEST_FILENAME = 'octane-independent-hydration.json';
 export {
 	DOM_RENDERER_ID,
 	DOM_RENDERER_MODULE,
@@ -1096,7 +1097,7 @@ class OctaneBundlerCompiler {
 			options.universalRuntime ?? this.defaults.universalRuntime,
 		);
 		const filename = this._canonicalModuleId(file);
-		const targetRuntimeRequests = (source, kind) => {
+		const targetRuntimeRequests = (source, kind, streamedSignals = false) => {
 			if (environment !== 'server' || options.explicitRuntimeRequests !== true) return null;
 			const runtimeResult = rewriteServerRuntimeRequests(source, filename);
 			if (runtimeResult === null) return null;
@@ -1104,6 +1105,7 @@ class OctaneBundlerCompiler {
 				code: runtimeResult.code,
 				map: runtimeResult.map,
 				kind,
+				...(streamedSignals ? { streamedSignals: true } : null),
 				...finishMetadata(collected),
 			};
 		};
@@ -1223,9 +1225,12 @@ class OctaneBundlerCompiler {
 			let out;
 			let voidComponentAst = null;
 			let cssModuleConstantImports;
-			if (collectVoidComponentExports || collectCssModuleConstants) {
+			let independentWidgets;
+			const collectIndependentWidgets = code.includes('Hydrate') && code.includes('independent');
+			if (collectVoidComponentExports || collectCssModuleConstants || collectIndependentWidgets) {
 				const compilation = compileForBundler(code, compileFilename, compileOptions);
 				out = compilation.result;
+				if (collectIndependentWidgets) independentWidgets = compilation.independentWidgets;
 				if (collectVoidComponentExports) voidComponentAst = compilation.hydrateAst;
 				if (collectCssModuleConstants) {
 					cssModuleConstantImports = compilation.cssModuleConstantImports;
@@ -1239,6 +1244,7 @@ class OctaneBundlerCompiler {
 				map: out.map,
 				diagnostics: out.diagnostics,
 				kind: 'compile',
+				...(out.streamedSignals === true ? { streamedSignals: true } : null),
 				renderer,
 				...(out.universalRuntime === undefined ? null : { universalRuntime: out.universalRuntime }),
 				...(clientReference === null ? null : { clientReference }),
@@ -1248,6 +1254,7 @@ class OctaneBundlerCompiler {
 							voidComponentExports: findVoidComponentExports(voidComponentAst, filename),
 						}),
 				...(cssModuleConstantImports === undefined ? null : { cssModuleConstantImports }),
+				...(independentWidgets === undefined ? null : { independentWidgets }),
 				descriptorChildrenExports:
 					preparedDescriptorChildrenExports === null
 						? findDescriptorChildrenExports(code, filename)
@@ -1341,10 +1348,11 @@ class OctaneBundlerCompiler {
 			});
 			if (out === null) return passThrough();
 			return (
-				targetRuntimeRequests(out.code, 'slots') ?? {
+				targetRuntimeRequests(out.code, 'slots', out.streamedSignals) ?? {
 					code: out.code,
 					map: out.map,
 					kind: 'slots',
+					...(out.streamedSignals === true ? { streamedSignals: true } : null),
 					...finishMetadata(collected),
 				}
 			);

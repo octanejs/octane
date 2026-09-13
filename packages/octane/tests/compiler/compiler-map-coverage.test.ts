@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { compile } from 'octane/compiler';
+import { parseModule } from '@tsrx/core';
 
 // Module-map coverage for render-plan expressions (the "2C" contract): the
 // positions users hover most — event handlers and text holes — must map from
@@ -158,8 +159,33 @@ describe.each([
 		// hole may print parenthesized (string emit) or bare (AST emit).
 		if (code.includes('const _v = (n)')) {
 			expectMapped(code, map, 'const _v = (n)', 'const _v = ('.length, '{n as string}', 1);
-		} else {
+		} else if (code.includes('const _v = n')) {
 			expectMapped(code, map, 'const _v = n', 'const _v = '.length, '{n as string}', 1);
+		} else {
+			// A capability-aware text writer receives the authored value directly,
+			// without a scalar temporary. Check its argument tokens, not an alias.
+			const lines = decodeMappings(map.mappings);
+			const source = positionOf(SOURCE, '{n as string}', 1);
+			let argumentsFound = 0;
+			const visit = (node: any) => {
+				if (!node || typeof node !== 'object') return;
+				if (node.type === 'CallExpression') {
+					for (const argument of node.arguments) {
+						if (argument.type !== 'Identifier' || argument.name !== 'n') continue;
+						argumentsFound++;
+						const { line, column } = argument.loc.start;
+						const segment = lines[line - 1].find((entry) => entry[0] === column);
+						expect(segment?.slice(1)).toEqual([source.line, source.col]);
+					}
+				}
+				for (const [key, value] of Object.entries(node)) {
+					if (key === 'metadata' || key === 'loc' || key === 'parent') continue;
+					if (Array.isArray(value)) value.forEach(visit);
+					else visit(value);
+				}
+			};
+			visit(parseModule(code, 'compiled.js'));
+			expect(argumentsFound).toBeGreaterThan(0);
 		}
 	});
 

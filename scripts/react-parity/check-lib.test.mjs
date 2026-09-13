@@ -93,6 +93,29 @@ test('prints runner-level Vitest errors that the JSON reporter omits', () => {
 	]);
 });
 
+test('preserves the nested cause of a browser-runner failure without looping on cycles', () => {
+	const messages = [];
+	const originalError = console.error;
+	const cause = { message: 'Browser page closed', cause: 'Connection lost' };
+	const wrapper = {
+		stack: 'Error: Failed to run the test MenuPortal.test.tsx',
+		cause,
+	};
+	const circular = { message: 'Runner shutdown failed' };
+	circular.cause = circular;
+	console.error = (message) => messages.push(message);
+	try {
+		new ReactParityUnhandledReporter().onTestRunEnd([], [wrapper, circular]);
+	} finally {
+		console.error = originalError;
+	}
+	assert.match(messages[1], /Failed to run the test MenuPortal\.test\.tsx/);
+	assert.match(messages[1], /Browser page closed/);
+	assert.match(messages[1], /Connection lost/);
+	assert.match(messages[2], /Runner shutdown failed/);
+	assert.match(messages[2], /Circular error cause/);
+});
+
 test('rebuilds timeout placeholder stacks around the real failure message', () => {
 	const error = {
 		name: 'Error',

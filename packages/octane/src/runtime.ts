@@ -30,6 +30,8 @@ import {
 	HYDRATE_WHEN_ATTR,
 	HYDRATE_ID_COUNT_ATTR,
 	HYDRATE_SEED_ATTR,
+	HYDRATE_INPUT_ATTR,
+	HYDRATE_INDEPENDENT_ATTR,
 	STREAM_BOUNDARY_ATTR,
 	STREAM_SCRIPT_ATTR,
 	STREAM_SEED_COMMENT,
@@ -108,6 +110,10 @@ import type {
 	HydrationStrategy,
 	HydrationWhen,
 } from './hydration/types.js';
+import type {
+	IndependentHydrateActivationContext,
+	IndependentHydrateActivator,
+} from './hydration/independent-island.js';
 import {
 	HYDRATE_DEFAULT_INTERACTION_EVENTS,
 	HYDRATE_INTERACTION_EVENTS_ATTR,
@@ -116,9 +122,12 @@ import {
 	HYDRATE_SUPPORTED_INTERACTION_EVENTS,
 	hydrationEventPathWithin,
 	initializeHydrationEventCapture,
+	isHydrationSelectionIntentCurrent,
 	markDelegatedDynamicHydrationIntent,
 	registerHydrationIntentBoundary,
 	shouldPreventHydrationInteractionDefault,
+	snapshotHydrationControl,
+	consumeHydrationControl,
 	takeDelegatedDynamicHydrationIntent,
 	takePendingHydrationIntents,
 	unregisterHydrationIntentBoundary,
@@ -167,6 +176,35 @@ import {
 	type NativeAdoptionState,
 	type NativeSignalManifest,
 } from './signals/native-read-seeds.js';
+import {
+	currentSignalOwner,
+	retireSignalOwnerIdentity,
+	runWithSignalOwner,
+} from './signals/owner-context.js';
+import {
+	documentSignalOwner,
+	enableSignalDocument,
+	streamedSignalOwnerActivator as STREAMED_SIGNAL_OWNER_ACTIVATOR,
+} from './signals/document-owner.js';
+export {
+	documentSignalOwner,
+	installStreamedSignalOwnerActivator,
+} from './signals/document-owner.js';
+import {
+	hasHydrationControlSignalWriter,
+	registerHydrationControlSignalWriter,
+	registerSignalOwnerDocument,
+} from './signals/early-values.js';
+import {
+	SIGNAL_BINDING_READ,
+	SIGNAL_BINDING_SUBSCRIBE,
+	SIGNAL_HANDLE,
+	type SignalHandle,
+	type SignalOwner,
+	type SignalOwnerIdentity,
+	type SignalRendererOwnerIdentity,
+	type WritableSignal,
+} from './signals/types.js';
 
 export { EXTERNAL_HYDRATION_PROMISE, HYDRATION_RANGE_BOUNDARY };
 export { validateNativeReadWitness };
@@ -405,6 +443,121 @@ function registerHookCleanup(scope: Scope, cleanup: Cleanup): void {
 let NATIVE_READ_DRIVER: NativeReadDriver | null = null;
 let NATIVE_BLOCK_RETRIES: WeakMap<Block, NativeReadRetry> | null = null;
 let NATIVE_ADOPTION_RELEASES: NativeAdoptionState[] | null = null;
+
+// Module/global signals are a document capability, not root state. The compiler
+// enables it only for modules that use the facade/direct-binding ABI; unrelated
+// applications retain neither a document identity nor any signal-engine cells.
+let SIGNAL_BINDINGS_ENABLED = false;
+const SCOPE_SIGNAL_OWNERS = /* @__PURE__ */ new WeakMap<Scope, SignalRendererOwnerIdentity>();
+const SCOPE_SIGNAL_INSTANCE_KEYS = /* @__PURE__ */ new WeakMap<Scope, string>();
+
+/** @internal Compiler/runtime module-signal capability version 1. */
+export function enableSignalBindings(abi = 1): void {
+	if (abi !== 1) throw new TypeError(formatClientError(65));
+	SIGNAL_BINDINGS_ENABLED = true;
+	enableSignalDocument(abi);
+}
+
+function signalIdentityKey(value: unknown): string {
+	if (value === null) return 'null';
+	const kind = typeof value;
+	return kind === 'string' || kind === 'number' || kind === 'bigint' || kind === 'boolean'
+		? kind.charCodeAt(0).toString(36) + ':' + String(value)
+		: kind === 'undefined'
+			? 'u:'
+			: 'o:' + String(value);
+}
+
+function rootSignalInstanceKey(ids: RootIdState): string {
+	return JSON.stringify([ids.signalState?.prefix ?? ids.prefix, 'root']);
+}
+
+function structuralSignalInstanceKey(
+	parentScope: Scope,
+	invocationSite: string | undefined,
+	key: unknown,
+	hasKey: boolean,
+): string {
+	let base = SCOPE_SIGNAL_INSTANCE_KEYS.get(parentScope);
+	const itemKeys: string[] = [];
+	const visited = new Set<Block>();
+	let scope: Scope | null = parentScope;
+	while (base === undefined && scope !== null) {
+		const block = scope.block;
+		if (!visited.has(block)) {
+			visited.add(block);
+			if (block.forSlot !== null) itemKeys.push(signalIdentityKey(block.key));
+			base = SCOPE_SIGNAL_INSTANCE_KEYS.get(block);
+		}
+		scope = scope.parent;
+		if (base === undefined && scope !== null) base = SCOPE_SIGNAL_INSTANCE_KEYS.get(scope);
+	}
+	let block: Block | null = parentScope.block;
+	while (base === undefined && block !== null) {
+		if (!visited.has(block)) {
+			visited.add(block);
+			if (block.forSlot !== null) itemKeys.push(signalIdentityKey(block.key));
+		}
+		base = SCOPE_SIGNAL_INSTANCE_KEYS.get(block);
+		block = block.parentBlock;
+	}
+	base ??= rootSignalInstanceKey(parentScope.block.idState);
+	itemKeys.reverse();
+	// Encode only the new segment: re-encoding the ancestor JSON doubles its
+	// escaping at every level and exhausts string limits on deeply nested trees.
+	return (
+		base +
+		JSON.stringify([invocationSite ?? 'legacy', itemKeys, hasKey ? signalIdentityKey(key) : ''])
+	);
+}
+
+function stampSignalInstance(
+	scope: Scope,
+	parentScope: Scope,
+	invocationSite: string | undefined,
+	key: unknown,
+	hasKey: boolean,
+): void {
+	if (SIGNAL_BINDINGS_ENABLED) {
+		SCOPE_SIGNAL_INSTANCE_KEYS.set(
+			scope,
+			structuralSignalInstanceKey(parentScope, invocationSite, key, hasKey),
+		);
+	}
+}
+
+function scopeSignalOwner(scope: Scope | null): SignalOwner | undefined {
+	if (scope === null) return;
+	const root = scope.block.idState.renderOwner;
+	let documentOwner = root?.signalOwner;
+	if (documentOwner === undefined && SIGNAL_BINDINGS_ENABLED) {
+		documentOwner = documentSignalOwner(scope.block.parentNode);
+		if (root !== undefined) root.signalOwner = documentOwner;
+	}
+	if (documentOwner === undefined) return;
+	let owner = SCOPE_SIGNAL_OWNERS.get(scope);
+	if (owner === undefined || owner.documentOwner !== documentOwner) {
+		const ids = scope.block.idState;
+		const instanceKey = SCOPE_SIGNAL_INSTANCE_KEYS.get(scope) ?? rootSignalInstanceKey(ids);
+		owner = Object.freeze({
+			scopeKey: documentOwner.scopeKey,
+			documentOwner,
+			instanceOwner: scope,
+			instanceKey,
+		});
+		SCOPE_SIGNAL_OWNERS.set(scope, owner);
+	}
+	registerSignalOwnerDocument(owner, scope.block.parentNode.ownerDocument!);
+	return owner;
+}
+
+function runWithBlockSignalOwner<T>(scope: Scope | null, callback: () => T): T {
+	const owner = scopeSignalOwner(scope);
+	if (owner !== undefined) STREAMED_SIGNAL_OWNER_ACTIVATOR?.(owner);
+	return owner === undefined || currentSignalOwner() === owner
+		? callback()
+		: runWithSignalOwner(owner, callback);
+}
 
 /** @internal Enable invocation collection before an opted-in module renders. */
 export function enableNativeReadCollection(abi = 1): void {
@@ -856,6 +1009,9 @@ function hydrationNodeMatches(
 	const tAttrs = t.attributes;
 	for (let i = 0; i < tAttrs.length; i++) {
 		const a = tAttrs[i];
+		// This optional compiler marker is not authored static structure. Actual
+		// writable bindings validate its identity before adopting their state.
+		if (a.name === HYDRATE_INPUT_ATTR) continue;
 		if (
 			s.getAttribute(a.name) !== a.value &&
 			!(
@@ -916,6 +1072,8 @@ type OutputHandler = (block: Block, value: unknown) => void;
 interface RootIdState {
 	prefix: string;
 	next: number;
+	/** Shared deterministic namespace for lazily used module-signal instances. */
+	signalState?: { prefix: string; next: number };
 	/** Shared render ownership; descendants already carry this root-local record. */
 	renderOwner?: RootRenderOwner;
 	/** Exclusive end of an SSR-reserved deferred-boundary range. */
@@ -1210,11 +1368,11 @@ let STORE_SYNC_DEPTH = 0;
 // from them even though CURRENT_SCOPE still reflects the eager parent render.
 let EFFECT_EVENT_LIFECYCLE_DEPTH = 0;
 
-function runEffectLifecycleCallback(callback: Cleanup): void {
+function runEffectLifecycleCallback(callback: Cleanup, scope: Scope | null = null): void {
 	EFFECT_EVENT_LIFECYCLE_DEPTH++;
 	const nativeFrame = NATIVE_READ_DRIVER?.pauseLifecycle() ?? -1;
 	try {
-		callback();
+		runWithBlockSignalOwner(scope, callback);
 	} finally {
 		if (nativeFrame >= 0) NATIVE_READ_DRIVER!.resumeLifecycle(nativeFrame);
 		EFFECT_EVENT_LIFECYCLE_DEPTH--;
@@ -1224,12 +1382,16 @@ function runEffectLifecycleCallback(callback: Cleanup): void {
 // Layout/passive/insertion cleanups are commit callbacks just like their setup
 // bodies. Keep their scheduled updates in the same bounded nested-update chain,
 // while leaving runEffectLifecycleCallback's Effect Event permission intact.
-function runEffectCleanupCallback(callback: Cleanup, phase: number = -1): void {
+function runEffectCleanupCallback(
+	callback: Cleanup,
+	phase: number = -1,
+	scope: Scope | null = null,
+): void {
 	const previousPhase = CURRENT_EFFECT_PHASE;
 	CURRENT_EFFECT_PHASE = phase;
 	EFFECT_BODY_DEPTH++;
 	try {
-		runEffectLifecycleCallback(callback);
+		runEffectLifecycleCallback(callback, scope);
 	} finally {
 		EFFECT_BODY_DEPTH--;
 		CURRENT_EFFECT_PHASE = previousPhase;
@@ -2425,6 +2587,8 @@ let TRANSITION_JOURNAL_DEPTH = 0;
 
 interface RootRenderOwner {
 	current: Block | null;
+	/** Shared document/account data owner; distinct from this root's presentation owner. */
+	signalOwner?: SignalOwner;
 	adopt?: (block: Block) => void;
 	retry: () => void;
 	request: ((mode: 'urgent' | 'transition') => void) | null;
@@ -6355,7 +6519,7 @@ function fireEffectCleanup(e: PendingEffect): void {
 	if (cleanup) {
 		slot.cleanup = undefined;
 		try {
-			runEffectCleanupCallback(cleanup, e.phase);
+			runEffectCleanupCallback(cleanup, e.phase, e.scope);
 		} catch (err) {
 			if (err instanceof MaximumUpdateDepthError) throw err;
 			reportEffectError(e.scope.block, err);
@@ -6381,7 +6545,7 @@ function runEffectBody(e: PendingEffect): void {
 			// Spread deps as positional args (see PendingEffect.args). A no-deps
 			// effect has args === undefined, which apply accepts as zero arguments.
 			// eslint-disable-next-line prefer-spread
-			cleanup = e.fn.apply(null, e.args as []);
+			cleanup = runWithBlockSignalOwner(e.scope, () => e.fn!.apply(null, e.args as []));
 		} finally {
 			EFFECT_BODY_DEPTH--;
 			CURRENT_EFFECT_PHASE = previousPhase;
@@ -6580,7 +6744,7 @@ function drainDeferredPassiveUnmounts(): void {
 	const q = pendingPassiveUnmounts.splice(0);
 	for (let i = 0; i < q.length; i += 3) {
 		try {
-			runEffectCleanupCallback(q[i] as Cleanup, PASSIVE);
+			runEffectCleanupCallback(q[i] as Cleanup, PASSIVE, q[i + 2] as Block | null);
 		} catch (err) {
 			if (err instanceof MaximumUpdateDepthError) throw err;
 			const handler = q[i + 1] as TryHandler | null;
@@ -6987,6 +7151,16 @@ function captureRenderPhaseUpdate(cell: RenderPhaseCell, key: RenderPhaseSnapsho
 }
 
 export function renderBlock(block: Block): void {
+	const owner = scopeSignalOwner(block);
+	if (owner !== undefined) STREAMED_SIGNAL_OWNER_ACTIVATOR?.(owner);
+	if (owner !== undefined && currentSignalOwner() !== owner) {
+		runWithSignalOwner(owner, () => renderBlockOwned(block));
+		return;
+	}
+	renderBlockOwned(block);
+}
+
+function renderBlockOwned(block: Block): void {
 	const hydration = activeHydration();
 	if (hydration !== null && !hydration.owns(block)) {
 		hydration.suspend(() => renderBlock(block));
@@ -7483,6 +7657,7 @@ function renderReturnedValue(block: Block, out: unknown): void {
 					true,
 					undefined,
 					activeHydration() !== null && elementKeyWasProvided(d),
+					d.__octaneInvocationSite,
 				),
 			);
 		} else {
@@ -7497,6 +7672,7 @@ function renderReturnedValue(block: Block, out: unknown): void {
 				true,
 				undefined,
 				activeHydration() !== null && elementKeyWasProvided(d),
+				d.__octaneInvocationSite,
 			);
 		}
 	} else {
@@ -7699,6 +7875,7 @@ export function componentSlotLite<P>(
 	comp: ComponentBody<P>,
 	props: P,
 	anchor?: Node,
+	invocationSite?: string,
 ): void {
 	if (CURRENT_BLOCK?.pending && !CURRENT_BLOCK.crossRenderUpdate) return;
 	const hydration = activeHydration();
@@ -7745,6 +7922,7 @@ export function componentSlotLite<P>(
 			}
 		}
 		scope.block = new LiteBlockImpl(host, endMarker, parentScope.block) as unknown as Block;
+		stampSignalInstance(scope, parentScope, invocationSite, undefined, false);
 		if (adoptedOpen !== null && adoptedClose !== null) {
 			hydration!.liteRanges.set(scope, {
 				start: adoptedOpen,
@@ -7771,7 +7949,7 @@ export function componentSlotLite<P>(
 	let profileThrown: unknown;
 	const nativeToken = NATIVE_READ_DRIVER === null ? -1 : beginActiveNativeReadScope(scope);
 	try {
-		comp(props, scope, undefined);
+		runWithBlockSignalOwner(scope, () => comp(props, scope, undefined));
 		if (!scope.mounted) scope.mounted = true;
 	} catch (error) {
 		profileDidThrow = true;
@@ -7991,7 +8169,7 @@ function unmountScope(scope: Scope, detachDom: boolean = true): void {
 				if (!passiveScheduled) schedulePassiveFlush();
 			} else {
 				try {
-					runEffectCleanupCallback(cleanup, slot.phase);
+					runEffectCleanupCallback(cleanup, slot.phase, scope);
 				} catch (err) {
 					reportTeardownError(err);
 				}
@@ -8027,7 +8205,7 @@ function runScopeCleanups(scope: Scope): void {
 	if (c !== null)
 		for (let i = c.length - 1; i >= 0; i--) {
 			try {
-				runEffectLifecycleCallback(c[i]);
+				runEffectLifecycleCallback(c[i], scope);
 			} catch (err) {
 				// Route to the boundary enclosing the DELETION (collected + dispatched
 				// after the walk — see reportTeardownError); React parity: an error in a
@@ -8036,6 +8214,11 @@ function runScopeCleanups(scope: Scope): void {
 				reportTeardownError(err);
 			}
 		}
+	const signalOwner = SCOPE_SIGNAL_OWNERS.get(scope);
+	if (signalOwner !== undefined) {
+		SCOPE_SIGNAL_OWNERS.delete(scope);
+		retireSignalOwnerIdentity(signalOwner);
+	}
 }
 
 function unmountScopeChildrenAndSlots(scope: Scope, detachDom: boolean): void {
@@ -10300,7 +10483,7 @@ function resetHmrBlock(block: Block): void {
 					const cleanup = cleanups[i] as Cleanup & { [HMR]?: true };
 					if (cleanup[HMR] === true) continue;
 					try {
-						runEffectLifecycleCallback(cleanup);
+						runEffectLifecycleCallback(cleanup, block);
 					} catch (err) {
 						reportTeardownError(err);
 					}
@@ -10422,6 +10605,10 @@ type InternalHydrateProps = HydrateProps & {
 	__load?: () => Promise<HydrateLoadResult>;
 	/** Latest lexical values consumed by the compiler-generated split child. */
 	__data?: unknown[];
+	/** Compiler-owned independent island descriptor; the document bootstrap owns activation. */
+	__independent?: unknown;
+	/** Bundler graph edge only. Runtime must never evaluate the lexical parent through it. */
+	__independentLoad?: () => Promise<unknown>;
 };
 
 interface HydrateSlot {
@@ -10430,8 +10617,9 @@ interface HydrateSlot {
 	__teardown: typeof teardownHydrateBoundary;
 	block: Block;
 	wrapper: HTMLDivElement;
-	start: Comment;
-	end: Comment;
+	/** Independent children belong to their own root, not a parent-owned range. */
+	start: Comment | null;
+	end: Comment | null;
 	parentBlock: Block;
 	props: InternalHydrateProps;
 	boundaryId: string;
@@ -10467,6 +10655,7 @@ interface HydrateSlot {
 	hasError: boolean;
 	error: unknown;
 	replays: HydrationReplayIntent[];
+	independent: boolean;
 }
 
 // Created only for the rare activation that races a renderer stream. Keep the
@@ -11119,6 +11308,7 @@ function requestHydrateBoundary(state: HydrateSlot): void {
 
 function installHydrateBoundary(state: HydrateSlot): () => void {
 	if (!state.serverPreserved || state.hydrated) return () => undefined;
+	if (state.independent) return () => teardownHydrateBoundary(state);
 	const strategy = resolveHydrateStrategy(state);
 	if (strategy._t === 'never') {
 		state.strategyCleanup = null;
@@ -11184,15 +11374,14 @@ function createHydrateSlot(
 	if (!wrapper.hasAttribute(HYDRATE_ID_ATTR)) wrapper.setAttribute(HYDRATE_ID_ATTR, boundaryId);
 	if (!wrapper.hasAttribute(HYDRATE_WHEN_ATTR))
 		wrapper.setAttribute(HYDRATE_WHEN_ATTR, hydrateStrategyType(props.when));
+	if (props.__independent !== undefined) wrapper.setAttribute(HYDRATE_INDEPENDENT_ATTR, '');
 
-	let start: Comment;
-	let end: Comment;
+	let start: Comment | null = null;
+	let end: Comment | null = null;
 	let seedRaw: string | null = null;
 	let nativeSeedRaw: string | null = null;
 	let idState = parentBlock.idState;
-	if (serverPreserved && hydration!.isOpen(wrapper.firstChild)) {
-		start = wrapper.firstChild as Comment;
-		end = hydration!.close(start);
+	if (serverPreserved) {
 		const rawCount = wrapper.getAttribute(HYDRATE_ID_COUNT_ATTR);
 		const parsedCount = rawCount === null ? 0 : Number(rawCount);
 		const idCount = Number.isSafeInteger(parsedCount) && parsedCount >= 0 ? parsedCount : 0;
@@ -11202,11 +11391,21 @@ function createHydrateSlot(
 		idState = {
 			prefix: rootIds.prefix,
 			next: childStart,
+			signalState: rootIds.signalState,
 			limit: childStart + idCount,
 			overflow: rootIds,
 			renderOwner: rootIds.renderOwner,
 		};
 		wrapper.removeAttribute(HYDRATE_ID_COUNT_ATTR);
+	}
+	// An independent root may already have compacted its server ranges. The
+	// parent reserves its IDs but owns only the wrapper, never its child list or
+	// seed sidecars, regardless of which root hydrates first.
+	if (props.__independent !== undefined) {
+		// No parent-owned content range.
+	} else if (serverPreserved && hydration!.isOpen(wrapper.firstChild)) {
+		start = wrapper.firstChild as Comment;
+		end = hydration!.close(start);
 		const seed = findHydrateSeedSidecar(wrapper);
 		if (seed !== null) {
 			seedRaw = seed.textContent || '[]';
@@ -11279,15 +11478,19 @@ function createHydrateSlot(
 		hasError: false,
 		error: undefined,
 		replays: [],
+		independent: props.__independent !== undefined,
 	};
 	if (nativeSeedRaw !== null) state.nativeSeedRaw = nativeSeedRaw;
 	scope.slots[0] = state;
 	registerSlot(scope, state);
-	registerHydrationIntentBoundary(wrapper, intentBoundary);
+	if (!state.independent) registerHydrationIntentBoundary(wrapper, intentBoundary);
 	block.body = hydrateBoundaryBody(state);
 	const initialStrategy = resolveHydrateStrategy(state);
-	const pendingIntents = takePendingHydrationIntents(wrapper);
-	if (serverPreserved && pendingIntents !== undefined && initialStrategy._t !== 'never') {
+	const pendingIntents = state.independent ? undefined : takePendingHydrationIntents(wrapper);
+	if (state.independent) {
+		// bootstrapIndependentHydration owns the preserved children and intent
+		// listener. The parent root retains only the wrapper's outer lifetime.
+	} else if (serverPreserved && pendingIntents !== undefined && initialStrategy._t !== 'never') {
 		state.replays.push(...pendingIntents);
 		requestHydrateBoundary(state);
 	} else if (serverPreserved) {
@@ -11298,6 +11501,7 @@ function createHydrateSlot(
 }
 
 function activateHydrateBoundary(state: HydrateSlot): void {
+	if (state.start === null || state.end === null) return;
 	const block = state.block;
 	const activationSlot = block.slots[0] as TrySlot | undefined;
 	const preserved = preservedHydrateActivations?.get(state);
@@ -11582,10 +11786,13 @@ function initializeHydrateComponent(): InternalHydrateComponent {
 			if (state === undefined) {
 				state = createHydrateSlot(props, scope, boundaryId);
 			} else {
+				if (state.independent !== (props.__independent !== undefined)) {
+					throw new Error(formatClientError(66));
+				}
 				state.props = props;
 				// A surrounding update makes preserved server HTML potentially stale. Match
 				// the correctness-first contract by opening the boundary, except for never().
-				if (!state.hydrated) {
+				if (!state.independent && !state.hydrated) {
 					const strategy = resolveHydrateStrategy(state);
 					if (strategy._t === 'never') {
 						// Only the hydration trigger changes here. Preparation has an independent
@@ -11599,6 +11806,10 @@ function initializeHydrateComponent(): InternalHydrateComponent {
 				}
 			}
 
+			if (state.independent) {
+				useEffect(() => installHydrateBoundary(state!), [state], HYDRATE_SETUP_SLOT);
+				return;
+			}
 			if (state.hasError) throw state.error;
 			if (
 				!state.hydrated &&
@@ -15171,6 +15382,482 @@ export function setText(node: Text, value: any): void {
 	node.nodeValue = text;
 }
 
+const DIRECT_SIGNAL_BINDING = /* @__PURE__ */ Symbol('octane.direct-signal-binding');
+type DirectSignalBindingKind =
+	'text' | 'textOnlyChild' | 'attribute' | 'style' | 'value' | 'checked';
+type DirectSignalAttributeKind = 'attr' | 'class' | 'booleanAttr' | 'ariaAttr' | 'stringData';
+
+interface DirectSignalBinding {
+	readonly [DIRECT_SIGNAL_BINDING]: true;
+	readonly scope: Scope;
+	readonly kind: DirectSignalBindingKind;
+	readonly target: Node;
+	readonly site: string;
+	readonly name?: string;
+	readonly attributeKind?: DirectSignalAttributeKind;
+	readonly staticCss?: string;
+	readonly handle: SignalHandle<unknown> | null;
+	text?: Text;
+	value: unknown;
+	unsubscribe?: () => void;
+	input?: EventListener;
+	controlWriterCleanup?: () => void;
+	pendingControl?: boolean;
+	disposed: boolean;
+}
+
+function isSignalHandle(value: unknown): value is SignalHandle<unknown> {
+	return (
+		(typeof value === 'object' || typeof value === 'function') &&
+		value !== null &&
+		(value as SignalHandle<unknown>)[SIGNAL_HANDLE] === true
+	);
+}
+
+function readSignalBinding(handle: SignalHandle<unknown>): unknown {
+	return handle[SIGNAL_BINDING_READ]();
+}
+
+function isWritableSignal(value: unknown): value is WritableSignal<unknown> {
+	return (
+		isSignalHandle(value) &&
+		(value as { kind?: unknown }).kind === 'signal' &&
+		typeof (value as { set?: unknown }).set === 'function'
+	);
+}
+
+function disposeDirectSignalBinding(binding: DirectSignalBinding): void {
+	if (binding.disposed) return;
+	binding.disposed = true;
+	binding.unsubscribe?.();
+	binding.controlWriterCleanup?.();
+	if (binding.input !== undefined) {
+		(binding.target as Element).removeEventListener('input', binding.input);
+	}
+}
+
+function directSignalControlValue(
+	binding: DirectSignalBinding,
+	snapshot: NonNullable<ReturnType<typeof snapshotHydrationControl>>,
+): unknown {
+	if (binding.kind === 'checked') return snapshot.checked ?? false;
+	return snapshot.selectedValues ?? snapshot.value;
+}
+
+function validateDirectSignalControl(element: Element, site: string): void {
+	const actual = element.getAttribute(HYDRATE_INPUT_ATTR);
+	if (actual === null && activeHydration() === null) {
+		element.setAttribute(HYDRATE_INPUT_ATTR, site);
+		return;
+	}
+	if (actual !== site) {
+		throw new Error(formatClientError(67, site));
+	}
+}
+
+function writeDirectSignalBinding(binding: DirectSignalBinding, value: unknown): void {
+	if (binding.kind === 'text' || binding.kind === 'textOnlyChild') {
+		if (binding.text === undefined) {
+			binding.text =
+				binding.kind === 'textOnlyChild'
+					? htext(binding.target, value)
+					: htextSwap(binding.target, value);
+		} else {
+			setText(binding.text, value);
+		}
+	} else if (binding.kind === 'attribute') {
+		const element = binding.target as Element;
+		switch (binding.attributeKind) {
+			case 'class':
+				if (element.namespaceURI === HTML_NS) setClassName(element, value);
+				else setClassAttr(element, value);
+				break;
+			case 'booleanAttr':
+				setBooleanAttribute(element, binding.name!, value);
+				break;
+			case 'ariaAttr':
+				setAriaAttribute(element, binding.name!, value);
+				break;
+			case 'stringData':
+				setStringData(element, binding.name!, value);
+				break;
+			default:
+				setAttribute(element, binding.name!, value);
+		}
+	} else if (binding.kind === 'style') {
+		setStyleProperty(
+			binding.target as HTMLElement | SVGElement,
+			binding.name!,
+			value,
+			binding.staticCss!,
+			binding.value,
+		);
+	} else if (binding.kind === 'value') {
+		const element = binding.target as Element;
+		if (element.localName === 'select') setSelectValue(element, value);
+		else setValue(element, value);
+	} else {
+		setChecked(binding.target as Element, value);
+	}
+	binding.value = value;
+}
+
+function writeDirectSignalScalar(
+	target: Node,
+	value: unknown,
+	kind: DirectSignalBindingKind,
+	previous: unknown,
+	name?: string,
+	staticCss?: string,
+	attributeKind?: DirectSignalAttributeKind,
+): unknown {
+	if (kind === 'text' || kind === 'textOnlyChild') {
+		if (previous instanceof Text) {
+			setText(previous, value);
+			return previous;
+		}
+		// The compiler owns this distinction: an empty sibling text hole can
+		// point at the next element while hydrating, not an only-child parent.
+		return kind === 'textOnlyChild' ? htext(target, value) : htextSwap(target, value);
+	}
+	if (kind === 'attribute') {
+		const element = target as Element;
+		switch (attributeKind) {
+			case 'class':
+				if (element.namespaceURI === HTML_NS) setClassName(element, value);
+				else setClassAttr(element, value);
+				break;
+			case 'booleanAttr':
+				setBooleanAttribute(element, name!, value);
+				break;
+			case 'ariaAttr':
+				setAriaAttribute(element, name!, value);
+				break;
+			case 'stringData':
+				setStringData(element, name!, value);
+				break;
+			default:
+				setAttribute(element, name!, value);
+		}
+	} else if (kind === 'style') {
+		setStyleProperty(target as HTMLElement | SVGElement, name!, value, staticCss!, previous);
+	} else if (kind === 'value') {
+		const element = target as Element;
+		if (element.localName === 'select') setSelectValue(element, value);
+		else setValue(element, value);
+	} else {
+		setChecked(target as Element, value);
+	}
+	return value;
+}
+
+function updateDirectSignalBinding(binding: DirectSignalBinding): void {
+	if (
+		binding.disposed ||
+		binding.pendingControl ||
+		binding.handle === null ||
+		binding.scope.block.disposed
+	)
+		return;
+	try {
+		runWithBlockSignalOwner(binding.scope, () => {
+			const value = readSignalBinding(binding.handle!);
+			if (!Object.is(binding.value, value)) writeDirectSignalBinding(binding, value);
+		});
+	} catch {
+		// Pending/error reads re-enter the renderer so the nearest Suspense/error
+		// boundary, rather than this targeted DOM subscription, owns recovery.
+		scheduleRender(binding.scope.block);
+	}
+}
+
+function installDirectSignalControl(binding: DirectSignalBinding): void {
+	if (!isWritableSignal(binding.handle)) return;
+	const element = binding.target as Element;
+	validateDirectSignalControl(element, binding.site);
+	const handle = binding.handle;
+	const input: EventListener = () => {
+		if (binding.disposed || binding.pendingControl) return;
+		const snapshot = snapshotHydrationControl(element);
+		if (snapshot === null) return;
+		runWithBlockSignalOwner(binding.scope, () =>
+			handle.set(directSignalControlValue(binding, snapshot)),
+		);
+	};
+	binding.input = input;
+	element.addEventListener('input', input);
+	binding.controlWriterCleanup = registerHydrationControlSignalWriter(
+		element,
+		binding.kind === 'checked' ? 'checked' : 'value',
+		(value) =>
+			runWithBlockSignalOwner(binding.scope, () => {
+				if (!binding.disposed && !binding.pendingControl && isWritableSignal(binding.handle))
+					binding.handle.set(value);
+			}),
+	);
+}
+
+function queueDirectSignalControlAdoption(binding: DirectSignalBinding): void {
+	// Use the render attempt's existing commit queue: failed/WIP attempts discard
+	// this publication, and committed actions run outside the native read guard.
+	enqueueEffectEventCommitAction(() => {
+		if (binding.disposed || binding.scope.block.disposed || !binding.pendingControl) return;
+		runWithBlockSignalOwner(binding.scope, () => {
+			const element = binding.target as Element;
+			const snapshot = snapshotHydrationControl(element)!;
+			if (snapshot.editRevision > 0 && isWritableSignal(binding.handle)) {
+				binding.handle.set(directSignalControlValue(binding, snapshot));
+			}
+			if (binding.disposed || binding.scope.block.disposed) return;
+			// A synchronous subscriber can dispatch a newer native edit. Leave the
+			// DOM authoritative until that exact revision has also been published.
+			if (!consumeHydrationControl(element, snapshot.revision)) {
+				queueDirectSignalControlAdoption(binding);
+				return;
+			}
+			binding.pendingControl = false;
+			writeDirectSignalBinding(binding, readSignalBinding(binding.handle!));
+		});
+	});
+}
+
+function createDirectSignalBinding(
+	scope: Scope,
+	target: Node,
+	value: unknown,
+	site: string,
+	kind: DirectSignalBindingKind,
+	name?: string,
+	staticCss?: string,
+	attributeKind?: DirectSignalAttributeKind,
+	text?: Text,
+): DirectSignalBinding {
+	const handle = isSignalHandle(value) ? value : null;
+	const binding: DirectSignalBinding = {
+		[DIRECT_SIGNAL_BINDING]: true,
+		scope,
+		kind,
+		target,
+		site,
+		name,
+		attributeKind,
+		staticCss,
+		handle,
+		value: scope,
+		disposed: false,
+	};
+	// A previous text token has already gone through mount/hydration. Reuse
+	// it across capability changes; a raw SSR Text target still needs adoption.
+	if (text !== undefined) binding.text = text;
+	const controlSnapshot =
+		kind === 'value' || kind === 'checked' ? snapshotHydrationControl(target as Element) : null;
+	if (controlSnapshot !== null) validateDirectSignalControl(target as Element, site);
+	binding.pendingControl =
+		activeHydration() !== null &&
+		isWritableSignal(handle) &&
+		controlSnapshot !== null &&
+		controlSnapshot.editRevision > 0;
+	const initial = handle === null ? value : readSignalBinding(handle);
+	if (!binding.pendingControl) writeDirectSignalBinding(binding, initial);
+	if (handle !== null)
+		binding.unsubscribe = handle[SIGNAL_BINDING_SUBSCRIBE](() =>
+			updateDirectSignalBinding(binding),
+		);
+	if (controlSnapshot !== null) {
+		installDirectSignalControl(binding);
+		if (binding.pendingControl) queueDirectSignalControlAdoption(binding);
+		else consumeHydrationControl(target as Element, controlSnapshot.revision);
+	}
+	registerHookCleanup(scope, () => disposeDirectSignalBinding(binding));
+	return binding;
+}
+
+function bindDirectSignal(
+	scope: Scope,
+	previous: unknown,
+	target: Node,
+	value: unknown,
+	site: string,
+	kind: DirectSignalBindingKind,
+	name?: string,
+	staticCss?: string,
+	attributeKind?: DirectSignalAttributeKind,
+): unknown {
+	const prior =
+		typeof previous === 'object' &&
+		previous !== null &&
+		(previous as DirectSignalBinding)[DIRECT_SIGNAL_BINDING] === true
+			? (previous as DirectSignalBinding)
+			: null;
+	const handle = isSignalHandle(value) ? value : null;
+	if (handle === null && prior === null) {
+		if (kind === 'attribute' && previous === value) return previous;
+		if (TRANSITION_JOURNAL !== null) journalBag();
+		const scalarTarget =
+			(kind === 'text' || kind === 'textOnlyChild') && previous instanceof Text ? previous : target;
+		return writeDirectSignalScalar(
+			scalarTarget,
+			value,
+			kind,
+			previous,
+			name,
+			staticCss,
+			attributeKind,
+		);
+	}
+	if (
+		prior !== null &&
+		!prior.disposed &&
+		prior.target === target &&
+		prior.kind === kind &&
+		prior.site === site &&
+		prior.name === name &&
+		prior.staticCss === staticCss &&
+		prior.attributeKind === attributeKind &&
+		prior.handle === handle
+	) {
+		if (prior.pendingControl) {
+			// The preceding attempt's action may have been dropped by rollback.
+			queueDirectSignalControlAdoption(prior);
+			return prior;
+		}
+		const next = readSignalBinding(handle!);
+		if (!Object.is(prior.value, next)) writeDirectSignalBinding(prior, next);
+		return prior;
+	}
+	if (TRANSITION_JOURNAL !== null) journalBag();
+	if (handle === null) {
+		const scalarTarget =
+			kind === 'text' || kind === 'textOnlyChild'
+				? (prior?.text ?? prior?.target ?? target)
+				: target;
+		const token = writeDirectSignalScalar(
+			scalarTarget,
+			value,
+			kind,
+			kind === 'text' || kind === 'textOnlyChild' ? prior?.text : (prior?.value ?? previous),
+			name,
+			staticCss,
+			attributeKind,
+		);
+		if (prior !== null) {
+			const finish = (discarded: boolean): void => {
+				if (!discarded) disposeDirectSignalBinding(prior);
+			};
+			if (WIP_CAPTURE === null) finish(false);
+			else (WIP_CAPTURE.renderCleanups ??= []).push(finish);
+		}
+		return token;
+	}
+	const signalTarget =
+		(kind === 'text' || kind === 'textOnlyChild') && previous instanceof Text ? previous : target;
+	const binding = createDirectSignalBinding(
+		scope,
+		signalTarget,
+		value,
+		site,
+		kind,
+		name,
+		staticCss,
+		attributeKind,
+		kind === 'text' || kind === 'textOnlyChild'
+			? (prior?.text ?? (previous instanceof Text ? previous : undefined))
+			: undefined,
+	);
+	if (prior !== null) {
+		const finish = (discarded: boolean): void =>
+			disposeDirectSignalBinding(discarded ? binding : prior);
+		if (WIP_CAPTURE === null) finish(false);
+		else (WIP_CAPTURE.renderCleanups ??= []).push(finish);
+	}
+	return binding;
+}
+
+/** @internal Compiler target for a direct signal/scalar text binding. */
+export function bindSignalText(
+	scope: Scope,
+	previous: unknown,
+	position: Node,
+	value: unknown,
+	site: string,
+	onlyChild = false,
+	seededText: 1 | undefined = undefined,
+): unknown {
+	// Only the compiler's fresh native template placeholder is already owned.
+	// Hydration still goes through htext to adopt and advance the server cursor.
+	if (previous === undefined && onlyChild && seededText === 1 && activeHydration() === null) {
+		const text = getFirstChild(position);
+		if (text instanceof Text) previous = text;
+	}
+	const prior = previous as DirectSignalBinding | undefined;
+	return bindDirectSignal(
+		scope,
+		previous,
+		prior?.target ?? (previous instanceof Text ? previous : position),
+		value,
+		site,
+		onlyChild ? 'textOnlyChild' : 'text',
+	);
+}
+
+/** @internal Compiler target for a direct signal/scalar attribute binding. */
+export function bindSignalAttribute(
+	scope: Scope,
+	previous: unknown,
+	element: Element,
+	name: string,
+	value: unknown,
+	site: string,
+	attributeKind: DirectSignalAttributeKind = 'attr',
+): unknown {
+	return bindDirectSignal(
+		scope,
+		previous,
+		element,
+		value,
+		site,
+		'attribute',
+		name,
+		undefined,
+		attributeKind,
+	);
+}
+
+/** @internal Compiler target for a direct signal/scalar fixed style property. */
+export function bindSignalStyleProperty(
+	scope: Scope,
+	previous: unknown,
+	element: HTMLElement | SVGElement,
+	name: string,
+	value: unknown,
+	staticCss: string,
+	site: string,
+): unknown {
+	return bindDirectSignal(scope, previous, element, value, site, 'style', name, staticCss);
+}
+
+/** @internal Compiler target for a direct signal/scalar value binding. */
+export function bindSignalValue(
+	scope: Scope,
+	previous: unknown,
+	element: Element,
+	value: unknown,
+	site: string,
+): unknown {
+	return bindDirectSignal(scope, previous, element, value, site, 'value');
+}
+
+/** @internal Compiler target for a direct signal/scalar checked binding. */
+export function bindSignalChecked(
+	scope: Scope,
+	previous: unknown,
+	element: Element,
+	value: unknown,
+	site: string,
+): unknown {
+	return bindDirectSignal(scope, previous, element, value, site, 'checked');
+}
+
 /**
  * Compact compiler binding ABI. Evaluate the authored value first, compare its
  * raw identity, then call the ordinary writer. Returning only after that writer
@@ -17388,6 +18075,7 @@ export function setHostPropSources(
 	prev: Record<string, unknown> | undefined,
 	scope: Scope,
 	hasNestedChildren = false,
+	deferControl = false,
 ): Record<string, unknown> {
 	interface PropWriter {
 		name: string;
@@ -17479,8 +18167,351 @@ export function setHostPropSources(
 		el.localName === 'input' || el.localName === 'textarea' || el.localName === 'select';
 	setSpread(el, resolved, prev, scope, true, formHost);
 	setDangerouslySetInnerHTMLSources(el, sources, hasNestedChildren);
-	if (formHost) setFormControlSources(el, sources);
+	if (formHost && !deferControl) setFormControlSources(el, sources);
 	return resolved;
+}
+
+const SIGNAL_HOST_PROP_SOURCES = /* @__PURE__ */ Symbol('octane.signal-host-prop-sources');
+
+interface SignalHostPropSourcesBinding {
+	readonly [SIGNAL_HOST_PROP_SOURCES]: true;
+	readonly scope: Scope;
+	readonly element: Element;
+	readonly site: string;
+	readonly hasNestedChildren: boolean;
+	sources: readonly HostPropSource[];
+	resolved: Record<string, unknown> | undefined;
+	subscriptions: Map<SignalHandle<unknown>, () => void>;
+	controlWriters: Map<'value' | 'checked', () => void>;
+	input?: EventListener;
+	pendingControl?: boolean;
+	disposed: boolean;
+}
+
+function resolveSignalStyle(value: unknown, handles: Set<SignalHandle<unknown>>): unknown {
+	if (isSignalHandle(value)) {
+		handles.add(value);
+		return readSignalBinding(value);
+	}
+	if (value === null || typeof value !== 'object' || Array.isArray(value)) return value;
+	let copy: Record<string, unknown> | undefined;
+	for (const name of Object.keys(value)) {
+		const current = (value as Record<string, unknown>)[name];
+		if (!isSignalHandle(current)) continue;
+		handles.add(current);
+		copy ??= { ...(value as Record<string, unknown>) };
+		copy[name] = readSignalBinding(current);
+	}
+	return copy ?? value;
+}
+
+function resolveSignalHostPropSources(sources: readonly HostPropSource[]): {
+	sources: readonly HostPropSource[];
+	handles: Set<SignalHandle<unknown>>;
+} {
+	// Children keep their handle for the separate child binding; resolving them
+	// here would subscribe only the host props and strand later child updates.
+	const handles = new Set<SignalHandle<unknown>>();
+	let rows: HostPropSource[] | undefined;
+	for (let i = 0; i < sources.length; i++) {
+		const source = sources[i];
+		if (!source[0]) {
+			const value =
+				source[1] === 'children'
+					? source[2]
+					: source[1] === 'style'
+						? resolveSignalStyle(source[2], handles)
+						: isSignalHandle(source[2])
+							? (handles.add(source[2]), readSignalBinding(source[2]))
+							: source[2];
+			if (value !== source[2]) {
+				rows ??= sources.slice() as HostPropSource[];
+				rows[i] = [false, source[1], value, source[3]];
+			}
+			continue;
+		}
+		const spread = source[1];
+		if (spread === null || typeof spread !== 'object') continue;
+		let copy: Record<string, unknown> | undefined;
+		for (const name of Object.keys(spread)) {
+			const current = (spread as Record<string, unknown>)[name];
+			const value =
+				name === 'children'
+					? current
+					: name === 'style'
+						? resolveSignalStyle(current, handles)
+						: isSignalHandle(current)
+							? (handles.add(current), readSignalBinding(current))
+							: current;
+			if (value !== current) {
+				copy ??= { ...(spread as Record<string, unknown>) };
+				copy[name] = value;
+			}
+		}
+		if (copy !== undefined) {
+			rows ??= sources.slice() as HostPropSource[];
+			rows[i] = [true, copy];
+		}
+	}
+	return { sources: rows ?? sources, handles };
+}
+
+function winningSignalHostControl(
+	sources: readonly HostPropSource[],
+	name: 'value' | 'checked',
+): SignalHandle<unknown> | null {
+	let winner: unknown;
+	for (const source of sources) {
+		if (!source[0]) {
+			if (source[1] === name) winner = source[2];
+			continue;
+		}
+		const spread = source[1];
+		if (
+			spread !== null &&
+			typeof spread === 'object' &&
+			Object.prototype.propertyIsEnumerable.call(spread, name)
+		) {
+			winner = (spread as Record<string, unknown>)[name];
+		}
+	}
+	return isSignalHandle(winner) ? winner : null;
+}
+
+function updateSignalHostPropSources(binding: SignalHostPropSourcesBinding): void {
+	if (binding.disposed || binding.pendingControl || binding.scope.block.disposed) return;
+	try {
+		runWithBlockSignalOwner(binding.scope, () => {
+			const next = resolveSignalHostPropSources(binding.sources);
+			binding.resolved = setHostPropSources(
+				binding.element,
+				next.sources,
+				binding.resolved,
+				binding.scope,
+				binding.hasNestedChildren,
+			);
+		});
+	} catch {
+		scheduleRender(binding.scope.block);
+	}
+}
+
+function addSignalHostSubscription(
+	binding: SignalHostPropSourcesBinding,
+	handle: SignalHandle<unknown>,
+): () => void {
+	const unsubscribe = handle[SIGNAL_BINDING_SUBSCRIBE](() => updateSignalHostPropSources(binding));
+	binding.subscriptions.set(handle, unsubscribe);
+	return unsubscribe;
+}
+
+function rebindSignalHostSubscriptions(
+	binding: SignalHostPropSourcesBinding,
+	handles: Set<SignalHandle<unknown>>,
+): void {
+	for (const [handle, unsubscribe] of binding.subscriptions) {
+		if (handles.has(handle)) continue;
+		unsubscribe();
+		binding.subscriptions.delete(handle);
+		if (TRANSITION_JOURNAL !== null) {
+			// The record snapshot restores source identity, but a canceled observer
+			// must actually be reattached to keep the committed DOM live.
+			journalUndo(() => {
+				if (binding.disposed || binding.scope.block.disposed) return;
+				runWithBlockSignalOwner(binding.scope, () => addSignalHostSubscription(binding, handle));
+			});
+		}
+	}
+	for (const handle of handles) {
+		if (binding.subscriptions.has(handle)) continue;
+		const unsubscribe = addSignalHostSubscription(binding, handle);
+		if (TRANSITION_JOURNAL !== null) {
+			journalUndo(() => {
+				unsubscribe();
+				binding.subscriptions.delete(handle);
+			});
+		}
+	}
+}
+
+function addSignalHostControlWriter(
+	binding: SignalHostPropSourcesBinding,
+	channel: 'value' | 'checked',
+): () => void {
+	const cleanup = registerHydrationControlSignalWriter(binding.element, channel, (next) => {
+		const handle = winningSignalHostControl(binding.sources, channel);
+		if (!binding.disposed && !binding.pendingControl && isWritableSignal(handle))
+			runWithBlockSignalOwner(binding.scope, () => handle.set(next));
+	});
+	binding.controlWriters.set(channel, cleanup);
+	return cleanup;
+}
+
+function syncSignalHostControl(binding: SignalHostPropSourcesBinding): void {
+	const element = binding.element;
+	const value = winningSignalHostControl(binding.sources, 'value');
+	const checked = winningSignalHostControl(binding.sources, 'checked');
+	const writable = isWritableSignal(value) || isWritableSignal(checked);
+	for (const [channel, cleanup] of binding.controlWriters) {
+		if (
+			(channel === 'value' && isWritableSignal(value)) ||
+			(channel === 'checked' && isWritableSignal(checked))
+		) {
+			continue;
+		}
+		cleanup();
+		binding.controlWriters.delete(channel);
+		if (TRANSITION_JOURNAL !== null) {
+			journalUndo(() => {
+				if (!binding.disposed && !binding.scope.block.disposed)
+					addSignalHostControlWriter(binding, channel);
+			});
+		}
+	}
+	if (isWritableSignal(value) && !binding.controlWriters.has('value')) {
+		const cleanup = addSignalHostControlWriter(binding, 'value');
+		if (TRANSITION_JOURNAL !== null) {
+			journalUndo(() => {
+				cleanup();
+				binding.controlWriters.delete('value');
+			});
+		}
+	}
+	if (isWritableSignal(checked) && !binding.controlWriters.has('checked')) {
+		const cleanup = addSignalHostControlWriter(binding, 'checked');
+		if (TRANSITION_JOURNAL !== null) {
+			journalUndo(() => {
+				cleanup();
+				binding.controlWriters.delete('checked');
+			});
+		}
+	}
+	if (!writable) {
+		if (binding.input !== undefined) {
+			const input = binding.input;
+			element.removeEventListener('input', input);
+			if (TRANSITION_JOURNAL !== null) {
+				journalUndo(() => {
+					if (!binding.disposed && !binding.scope.block.disposed)
+						element.addEventListener('input', input);
+				});
+			}
+			binding.input = undefined;
+		}
+		return;
+	}
+	validateDirectSignalControl(element, binding.site);
+	if (binding.input !== undefined) return;
+	const input: EventListener = () => {
+		if (binding.disposed || binding.pendingControl) return;
+		const live = snapshotHydrationControl(element);
+		if (live === null) return;
+		runWithBlockSignalOwner(binding.scope, () => {
+			const nextValue = winningSignalHostControl(binding.sources, 'value');
+			const nextChecked = winningSignalHostControl(binding.sources, 'checked');
+			if (isWritableSignal(nextChecked) && live.checked !== undefined)
+				nextChecked.set(live.checked);
+			if (isWritableSignal(nextValue)) nextValue.set(live.selectedValues ?? live.value);
+		});
+	};
+	binding.input = input;
+	element.addEventListener('input', input);
+	if (TRANSITION_JOURNAL !== null) journalUndo(() => element.removeEventListener('input', input));
+}
+
+function disposeSignalHostPropSources(binding: SignalHostPropSourcesBinding): void {
+	if (binding.disposed) return;
+	binding.disposed = true;
+	for (const unsubscribe of binding.subscriptions.values()) unsubscribe();
+	binding.subscriptions.clear();
+	for (const cleanup of binding.controlWriters.values()) cleanup();
+	binding.controlWriters.clear();
+	if (binding.input !== undefined) binding.element.removeEventListener('input', binding.input);
+	queueOwnRefDetach(binding.resolved, binding.element);
+}
+
+function queueSignalHostControlAdoption(binding: SignalHostPropSourcesBinding): void {
+	enqueueEffectEventCommitAction(() => {
+		if (binding.disposed || binding.scope.block.disposed || !binding.pendingControl) return;
+		runWithBlockSignalOwner(binding.scope, () => {
+			const snapshot = snapshotHydrationControl(binding.element)!;
+			if (snapshot.editRevision > 0) {
+				const checked = winningSignalHostControl(binding.sources, 'checked');
+				const value = winningSignalHostControl(binding.sources, 'value');
+				if (isWritableSignal(checked) && snapshot.checked !== undefined)
+					checked.set(snapshot.checked);
+				if (isWritableSignal(value)) value.set(snapshot.selectedValues ?? snapshot.value);
+			}
+			if (binding.disposed || binding.scope.block.disposed) return;
+			if (!consumeHydrationControl(binding.element, snapshot.revision)) {
+				queueSignalHostControlAdoption(binding);
+				return;
+			}
+			binding.pendingControl = false;
+			updateSignalHostPropSources(binding);
+		});
+	});
+}
+
+/** @internal Compiler target for spread-bearing hosts containing direct signals. */
+export function bindSignalHostPropSources(
+	scope: Scope,
+	previous: unknown,
+	element: Element,
+	sources: readonly HostPropSource[],
+	site: string,
+	hasNestedChildren = false,
+): unknown {
+	let binding =
+		typeof previous === 'object' &&
+		previous !== null &&
+		(previous as SignalHostPropSourcesBinding)[SIGNAL_HOST_PROP_SOURCES] === true
+			? (previous as SignalHostPropSourcesBinding)
+			: undefined;
+	if (binding === undefined) {
+		binding = {
+			[SIGNAL_HOST_PROP_SOURCES]: true,
+			scope,
+			element,
+			site,
+			hasNestedChildren,
+			sources,
+			resolved: undefined,
+			subscriptions: new Map(),
+			controlWriters: new Map(),
+			disposed: false,
+		};
+		registerHookCleanup(scope, () => disposeSignalHostPropSources(binding!));
+	} else {
+		// The resolved props must roll back with the DOM; otherwise a retry
+		// mistakes discarded event/control writes for already committed values.
+		if (TRANSITION_JOURNAL !== null) journalObjectOnce(binding);
+		binding.sources = sources;
+	}
+	const valueControl = winningSignalHostControl(sources, 'value');
+	const checkedControl = winningSignalHostControl(sources, 'checked');
+	const controlSnapshot =
+		isWritableSignal(valueControl) || isWritableSignal(checkedControl)
+			? snapshotHydrationControl(element)
+			: null;
+	if (controlSnapshot !== null) {
+		validateDirectSignalControl(element, site);
+		binding.pendingControl ||= activeHydration() !== null && controlSnapshot.editRevision > 0;
+	}
+	const next = resolveSignalHostPropSources(sources);
+	binding.resolved = setHostPropSources(
+		element,
+		next.sources,
+		binding.resolved,
+		scope,
+		hasNestedChildren,
+		binding.pendingControl,
+	);
+	rebindSignalHostSubscriptions(binding, next.handles);
+	syncSignalHostControl(binding);
+	if (binding.pendingControl) queueSignalHostControlAdoption(binding);
+	else if (controlSnapshot !== null) consumeHydrationControl(element, controlSnapshot.revision);
+	return binding;
 }
 
 function isAggregatedFormControlProp(el: Element, name: string): boolean {
@@ -18121,6 +19152,7 @@ function isUsableEventSlot(slot: EventSlot): boolean {
 // ---------------------------------------------------------------------------
 
 const EMPTY_ARGS: any[] = [];
+let SIGNAL_EVENT_OWNERS: WeakMap<Element, SignalOwner> | null = null;
 
 /** Publish a native delegated handler with the same rollback ownership as its bindings. */
 export function setEventHandler(el: Element, key: string, handler: any): void {
@@ -18129,6 +19161,10 @@ export function setEventHandler(el: Element, key: string, handler: any): void {
 		journalBag();
 	}
 	(el as any)[key] = handler;
+	if (SIGNAL_BINDINGS_ENABLED) {
+		const owner = currentSignalOwner();
+		if (owner !== null) (SIGNAL_EVENT_OWNERS ??= new WeakMap()).set(el, owner);
+	}
 }
 
 export function evt0(el: Element, key: string, fn: any): HandlerBundle {
@@ -19020,7 +20056,7 @@ function buildDelegatedPath(event: Event, listener: Node, path = event.composedP
 // receive the event, exactly as separate native listeners would. `reportError`
 // surfaces through the global error event (window.onerror) like an uncaught
 // listener exception; console.error is the non-browser fallback.
-function fireEventSlot(slot: EventSlot, event: Event): void {
+function fireEventSlot(slot: EventSlot, event: Event, currentTarget: Element): void {
 	// DOM writes can synchronously dispatch native events (for example blur when
 	// disabling a focused input). Their handlers are outside component rendering,
 	// even when the compiled DOM patch is still on the render stack. Restore that
@@ -19029,7 +20065,7 @@ function fireEventSlot(slot: EventSlot, event: Event): void {
 	const previousBlock = CURRENT_BLOCK;
 	CURRENT_SCOPE = null;
 	CURRENT_BLOCK = null;
-	try {
+	const invoke = (): void => {
 		if (typeof slot === 'function') {
 			slot(event);
 			return;
@@ -19063,6 +20099,11 @@ function fireEventSlot(slot: EventSlot, event: Event): void {
 			return;
 		}
 		invokeInvalidEventListener(`${event.type} event`, slot, event);
+	};
+	try {
+		const owner = SIGNAL_EVENT_OWNERS?.get(currentTarget);
+		if (owner === undefined || currentSignalOwner() === owner) invoke();
+		else runWithSignalOwner(owner, invoke);
 	} catch (err) {
 		reportListenerError(err);
 	} finally {
@@ -19237,7 +20278,7 @@ function dispatchDelegated(this: Node, event: Event): void {
 			const slot = CAPTURE_SLOTS[i];
 			if (slot != null) {
 				setCurrentTarget(event, current, frame);
-				fireEventSlot(slot, event);
+				fireEventSlot(slot, event, current);
 				if ((frame.flags & 1) !== 0) break;
 			}
 			if (targetOnly) break;
@@ -19305,7 +20346,7 @@ function dispatchDelegatedCapture(
 			const slot = CAPTURE_SLOTS[i];
 			if (slot != null) {
 				setCurrentTarget(event, CAPTURE_PATH[i], frame);
-				fireEventSlot(slot, event);
+				fireEventSlot(slot, event, CAPTURE_PATH[i]);
 				if ((frame.flags & 1) !== 0) break;
 			}
 		}
@@ -20689,7 +21730,7 @@ function formDiagnosticOutcome(el: Element): FormDiagnosticOutcome | null {
 
 	if (isTextEntry(el)) {
 		const controlled = ctrl !== undefined && ctrl.v !== UNCONTROLLED;
-		if (hasInput) return null;
+		if (hasInput || hasHydrationControlSignalWriter(el, 'value')) return null;
 		if (hasChange) {
 			const dev = getDevFormDiagnosticState(el);
 			if (host.__oct_native_change_suppressed === true || dev?.staticNativeChange === true)
@@ -20711,7 +21752,14 @@ function formDiagnosticOutcome(el: Element): FormDiagnosticOutcome | null {
 	}
 
 	if (el.localName === 'select') {
-		if (ctrl === undefined || ctrl.sv === null || hasInput || hasChange) return null;
+		if (
+			ctrl === undefined ||
+			ctrl.sv === null ||
+			hasInput ||
+			hasChange ||
+			hasHydrationControlSignalWriter(el, 'value')
+		)
+			return null;
 		return {
 			signature: 'controlled-select-missing',
 			message:
@@ -20728,7 +21776,8 @@ function formDiagnosticOutcome(el: Element): FormDiagnosticOutcome | null {
 	const hasClick =
 		isUsableEventSlot(host.$$click as EventSlot) ||
 		isUsableEventSlot(host['$$capture:click'] as EventSlot);
-	if (hasClick || hasInput || hasChange) return null;
+	if (hasClick || hasInput || hasChange || hasHydrationControlSignalWriter(el, 'checked'))
+		return null;
 	return {
 		signature: `controlled-checkable-missing:${input.type}`,
 		message:
@@ -20752,7 +21801,13 @@ function drainDevFormDiagnostics(): void {
 		if (authoring !== undefined) {
 			let props = authoring.authoringProps;
 			if (authoring.authoringSelected !== undefined) {
-				(props ??= Object.create(null)).selected = authoring.authoringSelected();
+				const selected = authoring.authoringSelected();
+				(props ??= Object.create(null)).selected =
+					typeof selected === 'object' &&
+					selected !== null &&
+					(selected as DirectSignalBinding)[DIRECT_SIGNAL_BINDING] === true
+						? (selected as DirectSignalBinding).value
+						: selected;
 			}
 			const action = (el as any).$$formAction;
 			if (typeof action === 'function') {
@@ -21585,6 +22640,8 @@ export interface ElementDescriptor<P = any> {
 	// Children passed to `createElement(type, props, ...children)` (host de-opt).
 	// `null` for the component-value form (children flow through the component).
 	children: any;
+	/** @internal Compiler-stable component invocation identity. */
+	__octaneInvocationSite?: string;
 }
 
 // Octane's analog of React's `ReactNode`: the type of a renderable prop or
@@ -21728,8 +22785,10 @@ function scopedElementRecord<P>(
 	key: any,
 	ref: any,
 	resolve: () => unknown,
+	invocationSite?: string,
 ): ElementDescriptor<P> {
 	const descriptor = { $$kind: ELEMENT_TAG, type, props, key, ref } as ElementDescriptor<P>;
+	if (invocationSite !== undefined) descriptor.__octaneInvocationSite = invocationSite;
 	Object.defineProperty(descriptor, SCOPED_CHILDREN_RESOLVER, { value: resolve });
 	Object.defineProperty(descriptor, 'children', SCOPED_CHILDREN_PROPERTY);
 	return descriptor;
@@ -21769,12 +22828,20 @@ function scopedValueRef(this: ScopedValueDescriptor<any>): any {
 function scopedValueChildren(this: ScopedValueDescriptor<any>): any {
 	return this[SCOPED_VALUE_RECORD]!().children;
 }
+function scopedValueInvocationSite(this: ScopedValueDescriptor<any>): string | undefined {
+	return this[SCOPED_VALUE_RECORD]!().__octaneInvocationSite;
+}
 const SCOPED_VALUE_PROPERTIES: PropertyDescriptorMap = {
 	type: { configurable: true, enumerable: true, get: scopedValueType },
 	props: { configurable: true, enumerable: true, get: scopedValueProps },
 	key: { configurable: true, enumerable: true, get: scopedValueKey },
 	ref: { configurable: true, enumerable: true, get: scopedValueRef },
 	children: { configurable: true, enumerable: true, get: scopedValueChildren },
+	__octaneInvocationSite: {
+		configurable: true,
+		enumerable: true,
+		get: scopedValueInvocationSite,
+	},
 };
 
 /**
@@ -21810,6 +22877,11 @@ function scopedValueDescriptor<P>(resolve: () => ElementDescriptor<P>): ElementD
 	Object.defineProperty(descriptor, 'key', SCOPED_VALUE_PROPERTIES.key);
 	Object.defineProperty(descriptor, 'ref', SCOPED_VALUE_PROPERTIES.ref);
 	Object.defineProperty(descriptor, 'children', SCOPED_VALUE_PROPERTIES.children);
+	Object.defineProperty(
+		descriptor,
+		'__octaneInvocationSite',
+		SCOPED_VALUE_PROPERTIES.__octaneInvocationSite,
+	);
 	if (process.env.NODE_ENV !== 'production') Object.freeze(descriptor);
 	return descriptor;
 }
@@ -21828,8 +22900,9 @@ export function createScopedElement<P>(
 	type: ComponentBody<P> | string | typeof Fragment,
 	props: P | undefined,
 	readChildren: () => unknown,
+	invocationSite?: string,
 ): ElementDescriptor<P> {
-	return scopedElementDescriptor(type, props, createScopedResolver(readChildren));
+	return scopedElementDescriptor(type, props, createScopedResolver(readChildren), invocationSite);
 }
 
 /** @internal Resolve native children in their represented render Scope. */
@@ -21837,14 +22910,21 @@ export function nativeCreateScopedElement<P>(
 	type: ComponentBody<P> | string | typeof Fragment,
 	props: P | undefined,
 	readChildren: () => unknown,
+	invocationSite?: string,
 ): ElementDescriptor<P> {
-	return scopedElementDescriptor(type, props, createNativeScopedResolver(readChildren));
+	return scopedElementDescriptor(
+		type,
+		props,
+		createNativeScopedResolver(readChildren),
+		invocationSite,
+	);
 }
 
 function scopedElementDescriptor<P>(
 	type: ComponentBody<P> | string | typeof Fragment,
 	props: P | undefined,
 	children: () => unknown,
+	invocationSite?: string,
 ): ElementDescriptor<P> {
 	const src = (props ?? null) as any;
 	const hasKey = hasElementConfigKey(src);
@@ -21856,6 +22936,7 @@ function scopedElementDescriptor<P>(
 		key,
 		copiedProps.ref !== undefined ? copiedProps.ref : null,
 		children,
+		invocationSite,
 	);
 	if (
 		key === null &&
@@ -21877,6 +22958,25 @@ export function createElement<P>(
 	type: ComponentBody<P> | string | typeof Fragment,
 	props?: P,
 	...children: any[]
+): ElementDescriptor<P> {
+	return createElementInternal(undefined, type, props, children);
+}
+
+/** @internal Compiler-authored element descriptor with stable invocation identity. */
+export function createElementAt<P>(
+	invocationSite: string,
+	type: ComponentBody<P> | string | typeof Fragment,
+	props?: P,
+	...children: any[]
+): ElementDescriptor<P> {
+	return createElementInternal(invocationSite, type, props, children);
+}
+
+function createElementInternal<P>(
+	invocationSite: string | undefined,
+	type: ComponentBody<P> | string | typeof Fragment,
+	props: P | undefined,
+	children: any[],
 ): ElementDescriptor<P> {
 	if (typeof type === 'function' && isRendererContext(type)) {
 		registerClientRendererBridge(renderClientContextProvider, flushSync);
@@ -21920,6 +23020,7 @@ export function createElement<P>(
 		ref: p.ref !== undefined ? p.ref : null,
 		children: kids ?? null,
 	};
+	if (invocationSite !== undefined) descriptor.__octaneInvocationSite = invocationSite;
 	// Only a NULLISH `key` leaves presence ambiguous (`key` is non-null exactly when
 	// `hasKey`), so the prototype-chain probe stays off the keyed-list hot path.
 	if (
@@ -22046,7 +23147,14 @@ export function cloneElement<P>(
 	const ref = props.ref !== undefined ? props.ref : null;
 	let descriptor: ElementDescriptor<P>;
 	if (keepsScopedChildren && copiedGetter === undefined) {
-		descriptor = scopedElementRecord(element.type, props, key, ref, scopedChildren!);
+		descriptor = scopedElementRecord(
+			element.type,
+			props,
+			key,
+			ref,
+			scopedChildren!,
+			element.__octaneInvocationSite,
+		);
 	} else {
 		descriptor = {
 			$$kind: ELEMENT_TAG,
@@ -22056,6 +23164,8 @@ export function cloneElement<P>(
 			ref,
 			children: kids ?? null,
 		};
+		if (element.__octaneInvocationSite !== undefined)
+			descriptor.__octaneInvocationSite = element.__octaneInvocationSite;
 		if (keepsScopedChildren) {
 			// A production caller may replace the accessor. Copy its receiver-sensitive
 			// getter unchanged on this cold path.
@@ -22094,6 +23204,7 @@ function cloneAndReplaceElementKey(element: ElementDescriptor, key: string): Ele
 				key,
 				element.ref,
 				(element as any)[SCOPED_CHILDREN_RESOLVER],
+				element.__octaneInvocationSite,
 			);
 		} else {
 			const copiedGetter =
@@ -22106,6 +23217,8 @@ function cloneAndReplaceElementKey(element: ElementDescriptor, key: string): Ele
 				ref: element.ref,
 				children: null,
 			};
+			if (element.__octaneInvocationSite !== undefined)
+				descriptor.__octaneInvocationSite = element.__octaneInvocationSite;
 			Object.defineProperty(descriptor, 'children', {
 				configurable: true,
 				enumerable: true,
@@ -22121,6 +23234,8 @@ function cloneAndReplaceElementKey(element: ElementDescriptor, key: string): Ele
 			ref: element.ref,
 			children: element.children,
 		};
+		if (element.__octaneInvocationSite !== undefined)
+			descriptor.__octaneInvocationSite = element.__octaneInvocationSite;
 	}
 	// `key` is a real (non-null) string here, so presence is already implied.
 	if (ELEMENTS_MISSING_LIST_KEY.has(element)) ELEMENTS_MISSING_LIST_KEY.add(descriptor);
@@ -22365,6 +23480,7 @@ export function componentSlot(
 	singleRoot?: boolean | 2,
 	inherit?: boolean,
 	hasKey?: boolean,
+	invocationSite?: string,
 ): void {
 	const dispatch = activityDescriptorDispatch;
 	const activity = dispatch !== null && (comp as unknown) === dispatch.type;
@@ -22415,6 +23531,7 @@ export function componentSlot(
 		singleRoot,
 		inherit,
 		hasKey,
+		invocationSite,
 	);
 }
 
@@ -22430,6 +23547,7 @@ export function componentSlotVoid(
 	singleRoot?: boolean | 2,
 	inherit?: boolean,
 	hasKey?: boolean,
+	invocationSite?: string,
 ): void {
 	if (typeof comp !== 'function') throw invalidElementTypeError(comp);
 	componentSlotImpl(
@@ -22446,6 +23564,7 @@ export function componentSlotVoid(
 		singleRoot,
 		inherit,
 		hasKey,
+		invocationSite,
 	);
 }
 
@@ -22489,11 +23608,17 @@ function componentSlotImpl(
 	// Compiler call-site bit: unlike the key value, this distinguishes an
 	// explicit `key={undefined}` from an unkeyed call.
 	hasKey?: boolean,
+	// Compiler-stable component invocation identity. Unlike traversal order, this
+	// survives SSR fallback-only branches and out-of-order sibling completion.
+	invocationSite?: string,
 ): void {
 	// Attribute expressions can schedule a self-update after the compiled
 	// setup checkpoint. Skip their discarded child before it owns any state.
 	if (CURRENT_BLOCK?.pending && !CURRENT_BLOCK.crossRenderUpdate) return;
 	const parentBlock = parentScope.block;
+	const signalInstanceKey = SIGNAL_BINDINGS_ENABLED
+		? structuralSignalInstanceKey(parentScope, invocationSite, key, key != null)
+		: undefined;
 	const hydration = activeHydration();
 	// A component nested inside a client-built replacement range must mount as
 	// ordinary client DOM. Its fresh anchor is not server output to adopt; keep
@@ -22518,6 +23643,7 @@ function componentSlotImpl(
 				singleRoot,
 				inherit,
 				hasKey,
+				invocationSite,
 			),
 		);
 		return;
@@ -22767,6 +23893,10 @@ function componentSlotImpl(
 					body,
 					renderProps,
 					outputHandler,
+					'dynamic',
+					undefined,
+					false,
+					signalInstanceKey,
 				);
 				if (r.suspended || r.failed) {
 					disposeWip(r.wip);
@@ -22811,6 +23941,10 @@ function componentSlotImpl(
 					body,
 					renderProps,
 					outputHandler,
+					'dynamic',
+					undefined,
+					false,
+					signalInstanceKey,
 				);
 				if (r.suspended || r.failed) {
 					transitionSwap.dispose(r.wip);
@@ -22852,6 +23986,10 @@ function componentSlotImpl(
 					body,
 					renderProps,
 					outputHandler,
+					'dynamic',
+					undefined,
+					false,
+					signalInstanceKey,
 				);
 				transitionSwap.dispose(r.wip);
 				if (r.failed) throw r.error;
@@ -22917,6 +24055,7 @@ function componentSlotImpl(
 				undefined,
 				outputHandler,
 			);
+			if (signalInstanceKey !== undefined) SCOPE_SIGNAL_INSTANCE_KEYS.set(b, signalInstanceKey);
 			if (
 				typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' &&
 				__OCTANE_PROFILE_ENABLED__ &&
@@ -22958,6 +24097,7 @@ function componentSlotImpl(
 				undefined,
 				outputHandler,
 			);
+			if (signalInstanceKey !== undefined) SCOPE_SIGNAL_INSTANCE_KEYS.set(b, signalInstanceKey);
 			if (
 				typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' &&
 				__OCTANE_PROFILE_ENABLED__ &&
@@ -23076,6 +24216,8 @@ interface ChildSlot {
 	// down when the value stops being a portal. Lets a portal render at any value
 	// position (component return, ternary, fragment root, render-fn result).
 	portal: PortalSlot | null;
+	/** Cold capability path for a signal passed through an otherwise-unmarked prop. */
+	implicitSignal?: unknown;
 }
 
 // `true`/`false`/`null`/`undefined` render as empty (React parity); everything
@@ -23118,6 +24260,7 @@ function renderOffscreen(
 	// must carry the construct's env or that destructure throws off-screen.
 	env?: any[],
 	implicitBail = false,
+	signalInstanceKey?: string,
 ): { wip: OffscreenWip; suspended: any; error: any; failed: boolean } {
 	const start = document.createComment('wip');
 	const end = document.createComment('/wip');
@@ -23139,6 +24282,7 @@ function renderOffscreen(
 		env,
 		outputHandler,
 	);
+	if (signalInstanceKey !== undefined) SCOPE_SIGNAL_INSTANCE_KEYS.set(block, signalInstanceKey);
 	if (implicitBail) {
 		block.$$implicitBail = true;
 		block.memoInChain = true;
@@ -24766,6 +25910,8 @@ function mappedDeoptItemBody(item: any, scope: Scope): void {
 				undefined,
 				true,
 				true,
+				undefined,
+				item.__octaneInvocationSite,
 			);
 			return;
 		}
@@ -25757,6 +26903,135 @@ function renderPreparedChildList(
 	return;
 }
 
+const DIRECT_SIGNAL_CHILD = /* @__PURE__ */ Symbol('octane.direct-signal-child');
+let IMPLICIT_SIGNAL_CHILD_DEPTH = 0;
+
+interface DirectSignalChildBinding {
+	readonly [DIRECT_SIGNAL_CHILD]: true;
+	readonly scope: Scope;
+	readonly slotKey: number;
+	readonly handle: SignalHandle<unknown>;
+	text?: Text | null;
+	state: ChildSlot | undefined;
+	value: unknown;
+	unsubscribe?: () => void;
+	disposed: boolean;
+}
+
+function disposeDirectSignalChild(binding: DirectSignalChildBinding): void {
+	if (binding.disposed) return;
+	binding.disposed = true;
+	binding.unsubscribe?.();
+}
+
+function updateDirectSignalChild(binding: DirectSignalChildBinding): void {
+	if (binding.disposed || binding.scope.block.disposed) return;
+	try {
+		runWithBlockSignalOwner(binding.scope, () => {
+			const value = readSignalBinding(binding.handle);
+			if (Object.is(binding.value, value)) return;
+			const state = binding.scope.slots[binding.slotKey] as ChildSlot | undefined;
+			const type = typeof value;
+			const primitive = value == null || (type !== 'object' && type !== 'function');
+			const text = primitive ? coerceChildText(value) : null;
+			if (state === undefined && binding.text != null && text !== null && text !== '') {
+				setText(binding.text, text);
+				binding.value = value;
+				return;
+			}
+			if (
+				state === binding.state &&
+				state?.block === null &&
+				state.forSlot === null &&
+				state.hostNode === null &&
+				state.portal === null &&
+				text !== null &&
+				text !== '' &&
+				state.text !== null
+			) {
+				setText(state.text, text);
+				binding.value = value;
+				return;
+			}
+			scheduleRender(binding.scope.block);
+		});
+	} catch {
+		scheduleRender(binding.scope.block);
+	}
+}
+
+/** @internal Capability-routed renderable hole with targeted signal text updates. */
+export function bindSignalChild(
+	parentScope: Scope,
+	previous: unknown,
+	slotKey: number,
+	domParent: Node,
+	value: unknown,
+	_site: string,
+	anchor?: Node | null,
+	ownEnd?: boolean,
+	ownsHost?: Element,
+	compactable?: boolean,
+	// Compiler proof that this hole owns the host's markerless only-child ABI.
+	onlyChild?: boolean,
+): unknown {
+	const prior =
+		typeof previous === 'object' &&
+		previous !== null &&
+		(previous as DirectSignalChildBinding)[DIRECT_SIGNAL_CHILD] === true
+			? (previous as DirectSignalChildBinding)
+			: null;
+	const cachedText = prior?.text ?? (previous instanceof Text ? previous : null);
+	if (!isSignalHandle(value)) {
+		const text = onlyChild
+			? childTextHole(parentScope, slotKey, domParent, value, cachedText)
+			: (childSlot(parentScope, slotKey, domParent, value, anchor, ownEnd, ownsHost, compactable),
+				null);
+		if (prior !== null) {
+			if (TRANSITION_JOURNAL !== null) journalBag();
+			const finish = (discarded: boolean): void => {
+				if (!discarded) disposeDirectSignalChild(prior);
+			};
+			if (WIP_CAPTURE === null) finish(false);
+			else (WIP_CAPTURE.renderCleanups ??= []).push(finish);
+		}
+		return text;
+	}
+	if (prior !== null && !prior.disposed && prior.handle === value) {
+		const next = readSignalBinding(value);
+		if (onlyChild) prior.text = childTextHole(parentScope, slotKey, domParent, next, cachedText);
+		else childSlot(parentScope, slotKey, domParent, next, anchor, ownEnd, ownsHost, compactable);
+		prior.value = next;
+		prior.state = parentScope.slots[slotKey] as ChildSlot | undefined;
+		return prior;
+	}
+	const initial = readSignalBinding(value);
+	const text = onlyChild
+		? childTextHole(parentScope, slotKey, domParent, initial, cachedText)
+		: (childSlot(parentScope, slotKey, domParent, initial, anchor, ownEnd, ownsHost, compactable),
+			null);
+	if (TRANSITION_JOURNAL !== null) journalBag();
+	const binding: DirectSignalChildBinding = {
+		[DIRECT_SIGNAL_CHILD]: true,
+		scope: parentScope,
+		slotKey,
+		handle: value,
+		text,
+		state: parentScope.slots[slotKey] as ChildSlot | undefined,
+		value: initial,
+		disposed: false,
+	};
+	binding.unsubscribe = value[SIGNAL_BINDING_SUBSCRIBE](() => updateDirectSignalChild(binding));
+	registerHookCleanup(parentScope, () => disposeDirectSignalChild(binding));
+	if (prior !== null) {
+		const finish = (discarded: boolean): void =>
+			disposeDirectSignalChild(discarded ? binding : prior);
+		if (WIP_CAPTURE === null) finish(false);
+		else (WIP_CAPTURE.renderCleanups ??= []).push(finish);
+	}
+	return binding;
+}
+
 export function childSlot(
 	parentScope: Scope,
 	slotKey: number,
@@ -25787,6 +27062,39 @@ export function childSlot(
 	mappedFallback?: boolean,
 ): void {
 	if (CURRENT_BLOCK?.pending && !CURRENT_BLOCK.crossRenderUpdate) return;
+	if (IMPLICIT_SIGNAL_CHILD_DEPTH === 0) {
+		const existing = parentScope.slots[slotKey] as ChildSlot | undefined;
+		const previous = existing?.implicitSignal;
+		if (isSignalHandle(value) || previous !== undefined) {
+			// An arbitrary prop/alias is syntactically indistinguishable from another
+			// renderable child. Keep ordinary primitives untouched and activate the
+			// signal owner only after the nominal runtime capability is observed.
+			if (isSignalHandle(value)) enableSignalBindings();
+			IMPLICIT_SIGNAL_CHILD_DEPTH++;
+			let token: unknown;
+			try {
+				token = runWithBlockSignalOwner(parentScope, () =>
+					bindSignalChild(
+						parentScope,
+						previous,
+						slotKey,
+						domParent,
+						value,
+						`runtime:${slotKey}`,
+						anchor,
+						ownEnd,
+						ownsHost,
+						compactable,
+					),
+				);
+			} finally {
+				IMPLICIT_SIGNAL_CHILD_DEPTH--;
+			}
+			const state = parentScope.slots[slotKey] as ChildSlot | undefined;
+			if (state !== undefined) state.implicitSignal = token;
+			return;
+		}
+	}
 	// Reading the host's tag costs two DOM accessors and this runs for every
 	// renderable hole on every render, so lead with the cheap facts. A de-opt list
 	// ITEM (`includeKeyedSingle === false`, passed only by deoptItemBody) shares
@@ -26063,6 +27371,7 @@ export function childSlot(
 			forSlot: null,
 			hostNode: null,
 			portal: null,
+			implicitSignal: undefined,
 		};
 		parentScope.slots[slotKey] = state;
 		registerSlot(parentScope, state);
@@ -26217,6 +27526,9 @@ export function childSlot(
 	let comp: ComponentBody | null = null;
 	let props: any = {};
 	let isBodyFn = false;
+	let invocationSite: string | undefined;
+	let componentKey: unknown;
+	let componentHasKey = false;
 	if (isHostDescriptor(value)) {
 		if (pureHost) {
 			// Pure host/text → reconcile in place, REUSING the existing node so DOM
@@ -26292,8 +27604,14 @@ export function childSlot(
 		}
 		comp = activity ? dispatch!.body : (value.type as ComponentBody);
 		props = value.props;
+		invocationSite = value.__octaneInvocationSite;
+		componentKey = value.key;
+		componentHasKey = value.key != null;
 	}
 	if (comp !== null) {
+		const signalInstanceKey = SIGNAL_BINDINGS_ENABLED
+			? structuralSignalInstanceKey(parentScope, invocationSite, componentKey, componentHasKey)
+			: undefined;
 		// A bare render-FUNCTION child (a `.tsrx` `{children}` body forwarded onto a `.ts`
 		// component's host element via createElement) is re-created every render, so its
 		// identity always differs — but it is the SAME slot child. Reconcile by SLOT like
@@ -26385,6 +27703,10 @@ export function childSlot(
 								comp,
 								props,
 								renderReturnedValue,
+								'dynamic',
+								undefined,
+								false,
+								signalInstanceKey,
 							),
 						)
 					: transitionSwap.render(
@@ -26394,6 +27716,10 @@ export function childSlot(
 							comp,
 							props,
 							renderReturnedValue,
+							'dynamic',
+							undefined,
+							false,
+							signalInstanceKey,
 						);
 			if (r.suspended || r.failed) {
 				// Discard the partial; the OLD content was never touched, so it stays live.
@@ -26466,6 +27792,7 @@ export function childSlot(
 				undefined,
 				renderReturnedValue,
 			);
+			if (signalInstanceKey !== undefined) SCOPE_SIGNAL_INSTANCE_KEYS.set(b, signalInstanceKey);
 			preserveRootCreatedDom(b);
 			if (state.borrowed) b.exclusiveMarkers = true;
 			b.$$implicitBail = true;
@@ -26515,6 +27842,7 @@ export function childSlot(
 									'dynamic',
 									undefined,
 									implicitBail,
+									signalInstanceKey,
 								),
 							)
 						: renderOffscreen(
@@ -26527,6 +27855,7 @@ export function childSlot(
 								'dynamic',
 								undefined,
 								implicitBail,
+								signalInstanceKey,
 							);
 				if (r.suspended || r.failed) {
 					disposeWip(r.wip);
@@ -26594,6 +27923,7 @@ export function childSlot(
 			undefined,
 			renderReturnedValue,
 		);
+		if (signalInstanceKey !== undefined) SCOPE_SIGNAL_INSTANCE_KEYS.set(b, signalInstanceKey);
 		if (
 			typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' &&
 			__OCTANE_PROFILE_ENABLED__ &&
@@ -32735,7 +34065,10 @@ function detachSubtreeRefs(
 					// Spread binding: the committed spread object may carry a ref.
 					const el = bag[rm[j + 2]];
 					if (el == null) continue;
-					const ref = bag[rm[j + 1]]?.ref ?? activityRefs?.get(el)?.connected;
+					const spread = bag[rm[j + 1]];
+					const ref =
+						(spread?.[SIGNAL_HOST_PROP_SOURCES] === true ? spread.resolved : spread)?.ref ??
+						activityRefs?.get(el)?.connected;
 					if (ref == null) continue;
 					out.push({ ref, el, scope });
 					if (shouldDetach && !refAttachWasDiscarded(uncommitted, el, ref)) {
@@ -32891,7 +34224,7 @@ function deactivateScope(scope: Scope, disconnectPassive: boolean = true): void 
 				// no cleanup and won't re-run it.
 				e.cleanup = undefined;
 				try {
-					runEffectCleanupCallback(cleanup, e.phase);
+					runEffectCleanupCallback(cleanup, e.phase, scope);
 				} catch (err) {
 					if (err instanceof MaximumUpdateDepthError) throw err;
 					const handler = findTryHandler(scope.block);
@@ -35513,10 +36846,19 @@ export interface Root {
 
 export interface RootOptions {
 	/**
+	 * Shared document/account owner for module signals. Roots borrow this owner;
+	 * unmounting a presentation root never retires shared data state.
+	 */
+	signalOwner?: SignalOwner;
+	/**
 	 * Caller-controlled useId prefix. createRoot composes it with an automatic
 	 * client-root namespace; hydrateRoot uses it verbatim to match server output.
 	 */
 	identifierPrefix?: string;
+	/** @internal Compiler-owned starting useId slot for an independently hydrated range. */
+	identifierSeed?: number;
+	/** @internal Stable instance namespace for an independently hydrated root. */
+	signalInstancePrefix?: string;
 	/**
 	 * React 19 parity, reporting only: called after an error boundary
 	 * (`@try`/`@catch` or `<ErrorBoundary>`) claims an error from this root's
@@ -35991,6 +37333,7 @@ function makeRoot(
 	idState: RootIdState,
 	outputHandler: OutputHandler | null,
 	ownerToken: object | null,
+	signalOwner: SignalOwner | undefined,
 	errorOptions?: RootOptions,
 ): Root {
 	let root!: Root;
@@ -36011,6 +37354,7 @@ function makeRoot(
 	};
 	const renderOwner: RootRenderOwner = {
 		current: rootBlock,
+		signalOwner,
 		retry: noop,
 		request: null,
 		generation: 0,
@@ -36360,17 +37704,21 @@ function createRootWithOutputHandler(
 	// registered later (via `delegateEvents`) will back-attach automatically.
 	registerDelegationTarget(container, true);
 	// Lazy root: the block is created on the first `.render()` call.
+	const rootPrefix =
+		(options?.identifierPrefix ?? '') + 'r' + (nextClientRootId++).toString(36) + '-';
 	return makeRoot(
 		container,
 		null,
 		null,
 		null,
 		{
-			prefix: (options?.identifierPrefix ?? '') + 'r' + (nextClientRootId++).toString(36) + '-',
+			prefix: rootPrefix,
 			next: 0,
+			signalState: { prefix: options?.signalInstancePrefix ?? rootPrefix, next: 0 },
 		},
 		outputHandler,
 		ownerToken,
+		options?.signalOwner ?? (SIGNAL_BINDINGS_ENABLED ? documentSignalOwner(container) : undefined),
 		options,
 	);
 }
@@ -36472,7 +37820,11 @@ export function hydrateRoot(
 	}
 	const idState: RootIdState = {
 		prefix: rootOptions?.identifierPrefix ?? '',
-		next: 0,
+		next: rootOptions?.identifierSeed ?? 0,
+		signalState: {
+			prefix: rootOptions?.signalInstancePrefix ?? rootOptions?.identifierPrefix ?? '',
+			next: 0,
+		},
 	};
 	rootBlock.idState = idState;
 	registerRootErrorHandlers(rootBlock, rootOptions);
@@ -36503,6 +37855,8 @@ export function hydrateRoot(
 		idState,
 		renderReturnedValue,
 		ownerToken,
+		rootOptions?.signalOwner ??
+			(SIGNAL_BINDINGS_ENABLED ? documentSignalOwner(container) : undefined),
 		rootOptions,
 	);
 	const owner = idState.renderOwner!;
@@ -36531,7 +37885,7 @@ export function hydrateRoot(
 		journalRootProperty(idState, 'next', idState.next);
 		// Every failed adoption discards its scopes, not the server DOM. Restart
 		// the root-local ID and seed cursors together on the next attempt.
-		idState.next = 0;
+		idState.next = rootOptions?.identifierSeed ?? 0;
 		let firstNode = container.firstChild;
 		while (firstNode !== null && (firstNode.nodeType === 10 || isRendererHydrationStyle(firstNode)))
 			firstNode = firstNode.nextSibling;
@@ -36588,7 +37942,7 @@ export function hydrateRoot(
 		}
 		if (nativeRecovery !== undefined && !owner.disposed) {
 			noteRecoverableHydrationError(() => nativeRecovery!, rootBlock);
-			idState.next = 0;
+			idState.next = rootOptions?.identifierSeed ?? 0;
 			if (isElementDescriptor(bodyOrElement)) root.render(bodyOrElement);
 			else root.render(body, props);
 			return;
@@ -36607,6 +37961,47 @@ export function hydrateRoot(
 	owner.retry = adopt;
 	adopt();
 	return root;
+}
+
+/** @internal Adapt a compiler-extracted body to the parent-free island loader contract. */
+export function createIndependentHydrateActivator(
+	body: ComponentBody,
+): IndependentHydrateActivator {
+	return (context: IndependentHydrateActivationContext) => {
+		// SSR Hydrate owns an outer frame and a try/content pair. Recreate those
+		// owners before the extracted body adopts its own host or authored ranges.
+		const content: ComponentBody = (_props, scope, extra) => {
+			body(context.captures, scope, extra);
+		};
+		const framed: ComponentBody = (_props, scope) => {
+			tryBlock(scope, 0, scope.block.parentNode, content, null, null, scope.block.endMarker);
+		};
+		const adapter: ComponentBody = (_props, scope) => {
+			componentSlotVoid(scope, 0, scope.block.parentNode, framed, undefined, scope.block.endMarker);
+		};
+		const root = hydrateRoot(context.element, adapter, context.captures, {
+			identifierPrefix: context.manifest.boundaryId + '-',
+			identifierSeed: context.manifest.idSeed,
+			signalInstancePrefix: context.manifest.boundaryId,
+			...(context.signalOwner === undefined ? {} : { signalOwner: context.signalOwner }),
+		});
+		for (const replay of context.intents) {
+			// A preceding replay may have changed this control's selection meaning.
+			if (!isHydrationSelectionIntentCurrent(replay)) continue;
+			const originalTarget = replay.event.target;
+			// A matching DOM path is not matching intent: a replaced button may
+			// represent a different action even when its markup is identical.
+			if (
+				originalTarget === null ||
+				(originalTarget as Node).nodeType !== 1 ||
+				!context.element.contains(originalTarget as Node)
+			)
+				continue;
+			const target = originalTarget as Element;
+			target.dispatchEvent(cloneHydrationReplayEvent(replay.event, target));
+		}
+		return root;
+	};
 }
 
 // ---------------------------------------------------------------------------

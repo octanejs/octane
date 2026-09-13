@@ -47,6 +47,26 @@ function emittedHeadKey(code: string | undefined): string | undefined {
 }
 
 describe('bundler-neutral compiler integration', () => {
+	it('preserves compiler signal capability through client and server runtime-request transforms', () => {
+		const compiler = createOctaneCompiler({ root: '/project' });
+		for (const environment of ['client', 'server'] as const) {
+			for (const extension of ['ts', 'js', 'tsrx']) {
+				const result = compiler.transform(
+					`import { signal$ } from 'octane/signals'; export const draft$ = signal$('');`,
+					`/project/src/state.${extension}`,
+					{ environment, explicitRuntimeRequests: true },
+				);
+				expect(result?.streamedSignals).toBe(true);
+			}
+			expect(
+				compiler.transform(HOOK, '/project/src/useCount.ts', {
+					environment,
+					explicitRuntimeRequests: true,
+				})?.streamedSignals,
+			).toBeUndefined();
+		}
+	});
+
 	it('accepts only a one-shot descriptor proof for its exact source', () => {
 		const authority = Symbol('test descriptor preflight');
 		const compiler = createOctaneCompiler({

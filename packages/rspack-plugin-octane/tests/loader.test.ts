@@ -355,6 +355,7 @@ describe('octane Rspack loader', () => {
 		});
 		expect(output.module.buildInfo.octane).toEqual({
 			canonicalId: '/src/App.tsrx',
+			resourceQuery: '?cache=1',
 			transformKind: 'compile',
 			serverRpc: true,
 			universalRuntime: { runtime: 'lynx', thread: 'background' },
@@ -565,6 +566,7 @@ describe('octane Rspack loader', () => {
 		expect(output.module.layer).toBe('octane:main-thread');
 		expect(output.module.buildInfo.octane).toEqual({
 			canonicalId: '/src/App.tsrx',
+			resourceQuery: '?cache=1',
 			transformKind: 'compile',
 			serverRpc: false,
 			universalRuntime: { runtime: 'object', thread: 'main-thread' },

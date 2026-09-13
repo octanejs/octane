@@ -19,10 +19,26 @@ export class SignalCycleError extends Error {
 	}
 }
 
+export class SignalIdleError extends Error {
+	constructor(key: string) {
+		super(`Signal "${key}" has no selected value.`);
+		this.name = 'SignalIdleError';
+	}
+}
+
 export class SignalFrameError extends Error {
 	constructor(message: string) {
 		super(message);
 		this.name = 'SignalFrameError';
+	}
+}
+
+export class SignalStreamError extends Error {
+	readonly code: string;
+	constructor(code: string) {
+		super(`Streamed signal failed with code "${code}".`);
+		this.code = code;
+		this.name = 'SignalStreamError';
 	}
 }
 

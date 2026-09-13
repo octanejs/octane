@@ -348,7 +348,7 @@ export function Scene(props) @{
 
 	it('leaves unrelated DOM compilation byte-identical when renderer metadata is present', () => {
 		const source = `export function App(props) @{ <main>{props.label as string}</main> }`;
-		const plain = compile(source, '/src/plain.tsrx');
+		const plain = compile(source, '/src/universal-local-specialization.tsrx');
 		const configured = compileDomBoundary(source);
 		expect(configured.code).toBe(plain.code);
 	});

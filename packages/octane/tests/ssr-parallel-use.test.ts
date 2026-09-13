@@ -1,3 +1,4 @@
+import { evaluateCompiledFixtureCode } from './_server-fixture.js';
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -20,30 +21,7 @@ function evalModule(
 	file: string,
 	modules: Record<string, Record<string, any>> = {},
 ): Record<string, any> {
-	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]octane(?:\/server)?['"];?/g,
-		(_m: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
-	);
-	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]([^'"]+)['"];?/g,
-		(match: string, names: string, request: string) => {
-			if (modules[request] === undefined) return match;
-			return `const {${names.replace(/ as /g, ': ')}} = __modules[${JSON.stringify(request)}];`;
-		},
-	);
-	code = code.replace(
-		/export\s+(async\s+)?function\s+(\w+)/g,
-		(_m: string, asyncKeyword: string | undefined, name: string) =>
-			`__exports.${name} = ${asyncKeyword ?? ''}function ${name}`,
-	);
-	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
-	const fn = new Function(
-		'__rt',
-		'__exports',
-		'__modules',
-		code + `\nreturn __exports;\n//# sourceURL=${file}`,
-	);
-	return fn(RT, {}, modules);
+	return evaluateCompiledFixtureCode(code, file, 'server', modules);
 }
 
 function evalServer(

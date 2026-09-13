@@ -5,7 +5,7 @@ import { compile } from 'octane/compiler';
 // (Babel/TS `isCompatTag`, ESTree) treat an identifier tag as a HOST string
 // tag only when it starts with a lowercase ASCII letter — `_`- and
 // `$`-prefixed identifiers are component REFERENCES: `<_Inner/>` must lower
-// to `createElement(_Inner, …)`, never `createElement('_Inner', …)`.
+// to `createElementAt(site, _Inner, …)`, never a string tag.
 
 const client = (src: string): string => compile(src, 'App.tsrx').code;
 const server = (src: string): string => compile(src, 'App.tsrx', { mode: 'server' }).code;
@@ -21,7 +21,7 @@ const APP = (tag: string) => `
 describe('identifier JSX tags — host vs component classification', () => {
 	it('`<_Inner/>` is a component reference in client mode', () => {
 		const out = client(APP('_Inner'));
-		expect(out).toContain('createElement(_Inner,');
+		expect(out).toMatch(/createElementAt\((['"])c:[^'"]+\1, _Inner,/);
 		expect(out).not.toMatch(/['"<]_Inner\b/); // no string tag, no template HTML
 	});
 
@@ -33,7 +33,7 @@ describe('identifier JSX tags — host vs component classification', () => {
 
 	it('`<$Inner/>` is a component reference in client mode', () => {
 		const out = client(APP('$Inner'));
-		expect(out).toContain('createElement($Inner,');
+		expect(out).toMatch(/createElementAt\((['"])c:[^'"]+\1, \$Inner,/);
 		expect(out).not.toMatch(/['"<]\$Inner/);
 	});
 

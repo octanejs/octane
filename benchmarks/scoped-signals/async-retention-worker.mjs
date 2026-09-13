@@ -5,9 +5,10 @@ import { setImmediate as nextTurn } from 'node:timers/promises';
 import { pathToFileURL } from 'node:url';
 import { writeHeapSnapshot } from 'node:v8';
 
-const [engineFile, snapshotDirectory, cycleArgument] = process.argv.slice(2);
+const [engineFile, snapshotDirectory, cycleArgument, selectedApi = 'query'] = process.argv.slice(2);
 const cycles = Number(cycleArgument);
 assert.ok(engineFile && snapshotDirectory && Number.isSafeInteger(cycles) && cycles >= 100);
+assert.ok(selectedApi === 'query' || selectedApi === 'derived');
 assert.equal(typeof globalThis.gc, 'function', 'The retention worker requires --expose-gc');
 assert.equal(typeof globalThis.document, 'undefined', 'This diagnostic must run without a DOM');
 const api = await import(pathToFileURL(engineFile).href);
@@ -78,7 +79,21 @@ const promiseQuery = api.query('async-retention/promise', loadPromise);
 const streamQuery = api.query('async-retention/stream', loadStream, { kind: 'stream' });
 
 function createOwnedResource(scope, query, slot, argument$) {
-	const resource$ = scope.asyncSignal$(slot, () => query(argument$.get()));
+	let resource$;
+	if (selectedApi === 'derived') {
+		const load = query === promiseQuery ? loadPromise : loadStream;
+		const handle$ = api.derived$(`${scope.scopeKey}/${slot}`, (context) =>
+			load(argument$.get(), context),
+		);
+		// The descriptor is shared author API; observations select this explicit
+		// owner through the public host entrypoint, without private cell access.
+		resource$ = {
+			snapshot: () => api.runWithSignalOwner(scope, () => handle$.snapshot()),
+			get: () => api.runWithSignalOwner(scope, () => handle$.get()),
+			latest: (fallback) => api.runWithSignalOwner(scope, () => handle$.latest(fallback)),
+			subscribe: (callback) => api.runWithSignalOwner(scope, () => handle$.subscribe(callback)),
+		};
+	} else resource$ = scope.asyncSignal$(slot, () => query(argument$.get()));
 	assert.equal(resource$.snapshot().status, 'pending');
 	resource$.subscribe(ignoreNotification);
 	return resource$;
@@ -116,13 +131,15 @@ function disposedPromiseCycle(cycle) {
 }
 
 async function disposedStreamCycle(cycle) {
+	// Unified derived streams can pull during the initial read; query streams
+	// acquire their iterator in a promise continuation. Both must pull once.
+	const before = { ...external.counters };
 	const scope = api.createScope({ scopeKey: `async-retention/stream/${cycle}` });
 	const argument$ = scope.signal$('argument', `async-retention/stream/${cycle}`);
 	const resource$ = createOwnedResource(scope, streamQuery, 'resource', argument$);
 	const view$ = scope.derived$('view', () => resource$.latest('pending'));
 	assert.equal(view$.get(), 'pending');
 	view$.subscribe(ignoreNotification);
-	const before = { ...external.counters };
 	await Promise.resolve();
 	assert.equal(external.counters.streamNexts, before.streamNexts + 1);
 	scope.dispose();

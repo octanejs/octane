@@ -496,7 +496,24 @@ jobs:
       - name: Check React parity inventories and execute required lanes
         env:
           REACT_PARITY_VITEST_REPORT: ${{ runner.temp }}/react-parity-vitest/shard-${{ matrix.shard }}.json
+          # Retain browser-process exits and RPC disconnects when a runner stops
+          # before it can produce a complete assertion report.
+          DEBUG: pw:browser*,vitest:browser:api,vitest:browser:pool
+          VITEST_PW_DEBUG: "1"
         run: pnpm react-parity:check --shard ${{ matrix.shard }}/4
+
+      - name: Report browser runner resources on failure
+        if: failure()
+        run: |
+          free -h
+          df -h /dev/shm
+          for resource in memory.events memory.current memory.peak; do
+            if [ -f "/sys/fs/cgroup/$resource" ]; then
+              printf '%s\n' "$resource"
+              cat "/sys/fs/cgroup/$resource"
+            fi
+          done
+          dmesg --ctime --level=err,warn | tail -80 || true
 
       - name: Upload React parity Vitest shard report
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -661,12 +678,12 @@ jobs:
         with:
           bun-version: 1.3.14
 
-      - name: Install Playwright Chromium for package and Astro coverage
+      - name: Install Playwright Chromium and WebKit for package and Astro coverage
         id: install_heavy_node_chromium
         if: ${{ !cancelled() && steps.install_heavy_node_dependencies.outcome == 'success' }}
         run: |
           bash scripts/ci-apt-https.sh
-          pnpm --filter website exec playwright install --with-deps chromium
+          pnpm --filter website exec playwright install --with-deps chromium webkit
 
       # Keep each former lane as a named step, and let independent suites run
       # after a sibling failure when their own prerequisites are still valid.

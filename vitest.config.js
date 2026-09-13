@@ -420,6 +420,12 @@ function userAppEvalSubmission() {
 				return this.resolve(source, importer, { ...resolveOptions, skipSelf: true });
 			}
 
+			// The trusted SSR grader needs compiler helpers without a package link.
+			// Keep this after the candidate allowlist so submissions cannot import them.
+			if (source === 'octane/internal/server') {
+				return resolve(import.meta.dirname, 'packages/octane/src/internal/server.ts');
+			}
+
 			if (!source.startsWith(USER_APP_EVAL_PREFIX)) {
 				const frameworkEntry = USER_APP_EVAL_ALLOWED_IMPORTS.get(source);
 				return typeof frameworkEntry === 'string' ? frameworkEntry : null;
@@ -3610,7 +3616,14 @@ export default defineConfig({
 					globals: false,
 					testTimeout: 60_000,
 					hookTimeout: 60_000,
-					server: { deps: { inline: ['@react-three/fiber'] } },
+					server: {
+						deps: {
+							inline: ['@react-three/fiber'],
+							// Execute production bundles with Node's native import semantics,
+							// including Rsbuild's file-URL requests for split server chunks.
+							external: [/\/octane-three-ssr-[^/]+\/dist-(?:vite|rsbuild)\/server\//],
+						},
+					},
 				},
 				plugins: [octane({ renderers: THREE_RENDERERS })],
 				resolve: { alias: THREE_ALIASES, dedupe: ['react', 'react-dom', 'three'] },
@@ -5433,6 +5446,11 @@ export default defineConfig({
 					include: ['packages/rsbuild-plugin-octane/tests/**/*.test.ts'],
 					environment: 'node',
 					globals: false,
+					// Execute production artifacts with Node's native ESM loader. Vite's
+					// module runner rewrites Rspack's file-URL chunk imports as root paths.
+					server: {
+						deps: { external: [/\/octane-rsbuild-[^/]+\/(?:dist|build)\/server\//] },
+					},
 				},
 			},
 			{

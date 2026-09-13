@@ -54,6 +54,9 @@ type ClientErrorArguments = {
 	62: [];
 	63: [];
 	64: [];
+	65: [];
+	66: [];
+	67: [unknown];
 };
 
 export function formatClientError<Code extends keyof ClientErrorArguments>(
@@ -248,6 +251,15 @@ export function formatClientError<Code extends keyof ClientErrorArguments>(
 				);
 			case 64:
 				return formatDevErrorMessage('Multiple errors were thrown during act.', args);
+			case 65:
+				return formatDevErrorMessage('Unsupported Octane signal binding ABI.', args);
+			case 66:
+				return formatDevErrorMessage(
+					'An independent Hydrate boundary cannot change ownership after mount.',
+					args,
+				);
+			case 67:
+				return formatDevErrorMessage('Signal control identity mismatch for "%s".', args);
 			default:
 				return formatUnknownDevErrorMessage(code);
 		}

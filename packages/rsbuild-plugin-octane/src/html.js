@@ -10,6 +10,42 @@ function escapeRegExp(value) {
 }
 
 /**
+ * A classic bootstrap can run after the streamed shell only if its native
+ * entrypoint needs no deferred prerequisite and starts no other entry module.
+ * Keep the bundler's runtime/chunk ownership intact; reject unsafe overrides.
+ *
+ * @param {import('@rspack/core').Compilation} compilation
+ * @param {string} name
+ * @param {string} clientEntry
+ */
+export function assertEarlyHydrationEntry(compilation, name, clientEntry) {
+	const entrypoint = compilation.entrypoints.get(name);
+	const chunk = entrypoint?.getEntrypointChunk();
+	const files = entrypoint?.getFiles().filter((file) => /\.m?js(?:\?.*)?$/.test(file)) ?? [];
+	if (!chunk || files.length !== 1 || !chunk.files.has(files[0])) {
+		throw new Error(
+			'Octane early hydration requires one self-contained entry script. ' +
+				'Do not extract its runtime or initial JavaScript dependencies into deferred chunks.',
+		);
+	}
+	const entries = [...compilation.chunkGraph.getChunkEntryModulesIterable(chunk)];
+	const entry = entries[0];
+	const root = entry && 'rootModule' in entry ? (entry.rootModule ?? entry) : entry;
+	const resource =
+		root && typeof root === 'object' && 'resource' in root ? root.resource : undefined;
+	if (
+		entries.length !== 1 ||
+		typeof resource !== 'string' ||
+		fs.realpathSync(resource.split('?', 1)[0]) !== fs.realpathSync(clientEntry)
+	) {
+		throw new Error(
+			'Octane early hydration must own its entry module exclusively. ' +
+				'Keep user entries and pre-entry scripts separate from the generated hydration entry.',
+		);
+	}
+}
+
+/**
  * Rsbuild has already injected the web entry by the time `modifyHTML` runs.
  * Mark the concrete generated tag so the shared production runtime can add a
  * per-request CSP nonce without knowing its hashed filename.

@@ -1,4 +1,4 @@
-import type { JSX } from 'octane/jsx-runtime';
+import type { JSX } from 'octane';
 import type { Font } from './font';
 import type { ContentNode } from './ContentNode';
 

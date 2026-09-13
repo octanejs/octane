@@ -20,6 +20,33 @@ export interface ClientAssetEntry {
 	css: string[];
 }
 
+export interface IndependentHydrationBuildEntry {
+	readonly version: 1;
+	readonly boundaryId: string;
+	readonly moduleId: string;
+	readonly exportName: string;
+	readonly captureSchema: readonly { readonly name: string; readonly type: 'json' }[];
+	readonly hookSeed: number;
+	readonly idSeed: number;
+	readonly signalSites: readonly string[];
+	readonly styles: readonly string[];
+	readonly parentDependencies: false;
+}
+
+export interface IndependentHydrationBuildManifest {
+	readonly version: 1;
+	readonly buildId: string;
+	readonly widgets: Readonly<Record<string, IndependentHydrationBuildEntry>>;
+}
+
+/** Identity embedded in the executing client entry before its assets are hashed. */
+export interface ClientBuildManifest {
+	readonly version: 1;
+	readonly buildId: string;
+	readonly mode: 'production' | 'development';
+	readonly capabilities: { readonly independentHydration: boolean };
+}
+
 export interface ServerManifest {
 	routes: Route[];
 	/** RenderRoute entry module path → module namespace (export picked per-route) */
@@ -51,6 +78,10 @@ export interface ServerManifest {
 	runtime?: RuntimePrimitives;
 	/** Route entry module path → built client asset paths (preload tags) */
 	clientAssets?: Record<string, ClientAssetEntry>;
+	/** Completed client-compilation identity used by automatic signal hydration. */
+	clientBuild?: ClientBuildManifest | null;
+	/** Client-build records used to complete strict independent Hydrate sidecars. */
+	independentHydration?: IndependentHydrationBuildManifest | null;
 }
 
 export interface HandlerOptions {
@@ -69,7 +100,15 @@ export interface HandlerOptions {
 	/** The BUILT dist client index.html (moved to dist/server by the build) */
 	htmlTemplate: string;
 	/** RPC executor from 'octane/server' */
-	executeServerFunction: (fn: Function, body: string) => Promise<string>;
+	executeServerFunction: (
+		fn: Function,
+		body: string,
+		context?: import('octane/server').ServerCallContext,
+	) => Promise<string>;
+	/** Optional streamed RPC executor from 'octane/server'. */
+	streamServerFunction?: import('@octanejs/app-core').RpcRequestOptions['streamServerFunction'];
+	batchServerFunctions?: import('@octanejs/app-core').RpcRequestOptions['batchServerFunctions'];
+	signalOwners?: import('@octanejs/app-core').SignalRequestHooks;
 	/** Boundary primitives from 'octane/server'. */
 	Suspense: Component;
 	ErrorBoundary: Component;

@@ -1,0 +1,5 @@
+{
+  "extends": "../fixture/tsconfig.json",
+  "include": ["*.ts", "*.tsrx"],
+  "exclude": ["node_modules"]
+}

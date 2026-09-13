@@ -6,6 +6,19 @@
 // the compact binding operations emitted by the component compiler.
 export * from '../../octane/src/index.js';
 export {
+	enableSignalBindings,
+	createElementAt,
+	bindSignalText,
+	bindSignalChild,
+	bindSignalAttribute,
+	bindSignalStyleProperty,
+	bindSignalValue,
+	bindSignalChecked,
+	bindSignalHostPropSources,
+	setPlainAttribute,
+	setPlainAttributeIfChanged,
+	setURLAttribute,
+	setURLAttributeIfChanged,
 	setAttributeIfChanged,
 	setStringDataIfChanged,
 	setBooleanAttributeIfChanged,

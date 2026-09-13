@@ -1047,8 +1047,12 @@ describe('conformance: SSR serialization — uncontrolled form controls', () => 
 	// are plain attributes. The SERIALIZED half matches React's initial markup
 	// for an uncontrolled input; the controlled re-assertion half is out of scope.
 	it('serializes input value/checked as plain attributes (uncontrolled halves)', () => {
-		expect(ssr('InputValue', { v: 'v', c: true })).toBe('<input value="v" checked/>');
-		expect(ssr('InputValue', { v: '', c: false })).toBe('<input value=""/>');
+		container.innerHTML = ssr('InputValue', { v: 'v', c: true });
+		expect(container.querySelector('input')!.getAttribute('value')).toBe('v');
+		expect(container.querySelector('input')!.hasAttribute('checked')).toBe(true);
+		container.innerHTML = ssr('InputValue', { v: '', c: false });
+		expect(container.querySelector('input')!.getAttribute('value')).toBe('');
+		expect(container.querySelector('input')!.hasAttribute('checked')).toBe(false);
 		expectCleanHydrate('InputValue', { v: 'v', c: true });
 		const input = container.querySelector('input') as HTMLInputElement;
 		expect(input.value).toBe('v');

@@ -25,12 +25,15 @@ import {
 	write_project_generated_file,
 } from '@octanejs/app-core/codegen';
 import { OctaneRspackPlugin } from '@octanejs/rspack-plugin';
-import { createOctaneCompiler } from 'octane/compiler/bundler';
+import {
+	INDEPENDENT_HYDRATION_MANIFEST_FILENAME,
+	createOctaneCompiler,
+} from 'octane/compiler/bundler';
 
 import { finalizeOctaneRsbuildOutput } from './build.js';
 import { OctaneClientAssetsPlugin } from './client-assets-plugin.js';
 import { createOctaneDevMiddleware } from './dev-server.js';
-import { markHydrationEntry } from './html.js';
+import { assertEarlyHydrationEntry, markHydrationEntry } from './html.js';
 import {
 	collectClientEntries,
 	discoverServerModules,
@@ -397,6 +400,18 @@ export function pluginOctane(inlineOptions = {}) {
 					server: { htmlFallback: false, historyApiFallback: false },
 					environments: {
 						[clientEnvironment]: {
+							// Keep the generated bootstrap self-contained by default, including
+							// downlevel helpers. Explicit splitting remains subject to the
+							// emitted-entry ownership check instead of being silently replaced.
+							...(watchedConfig.splitChunks !== false &&
+							Object.keys(watchedConfig.splitChunks ?? {}).length === 0 &&
+							watchedConfig.environments?.[clientEnvironment]?.splitChunks !== false &&
+							Object.keys(watchedConfig.environments?.[clientEnvironment]?.splitChunks ?? {})
+								.length === 0 &&
+							watchedConfig.performance?.chunkSplit === undefined &&
+							watchedConfig.environments?.[clientEnvironment]?.performance?.chunkSplit === undefined
+								? { splitChunks: { chunks: 'async' } }
+								: {}),
 							...targetConfig,
 							source: { entry: { [CLIENT_ENTRY_NAME]: clientEntryFile } },
 							html: { template },
@@ -480,6 +495,7 @@ export function pluginOctane(inlineOptions = {}) {
 						}));
 						return create_client_entry_source({
 							staticEntries: entries,
+							clientBuildIdExpression: '__webpack_hash__',
 							generatedBy: PLUGIN_NAME,
 						});
 					},
@@ -520,7 +536,11 @@ export function pluginOctane(inlineOptions = {}) {
 							rpcModulePaths: serverModules.ids,
 							...(webWorkerServer ? { mode: 'webworker' } : null),
 							...(production && !webWorkerServer
-								? { clientAssetMapFile: CLIENT_ASSET_MAP }
+								? {
+										clientAssetMapFile: CLIENT_ASSET_MAP,
+										clientBuildFile: 'octane-client-build.json',
+										independentHydrationManifestFile: INDEPENDENT_HYDRATION_MANIFEST_FILENAME,
+									}
 								: { clientAssetMap: {} }),
 							resolveImport: (id) => resolveProjectModule(id, root),
 							configModuleId: localRequire.resolve('@octanejs/app-core/config'),
@@ -551,6 +571,7 @@ export function pluginOctane(inlineOptions = {}) {
 					new OctaneRspackPlugin({
 						root,
 						environment,
+						clientBuildMode: productionBuild ? 'production' : 'development',
 						transpile: false,
 						...(inlineOptions.parallel === undefined ? null : { parallel: inlineOptions.parallel }),
 						...(inlineOptions.cssModuleConstants === undefined
@@ -645,6 +666,9 @@ export function pluginOctane(inlineOptions = {}) {
 
 			api.modifyHTML((html, context) => {
 				if (context.environment.name !== clientEnvironment) return html;
+				if (isProductionBuild()) {
+					assertEarlyHydrationEntry(context.compilation, CLIENT_ENTRY_NAME, clientEntryFile);
+				}
 				const entrypoint = context.compilation.entrypoints.get(CLIENT_ENTRY_NAME);
 				const entryFiles = entrypoint?.getEntrypointChunk().files ?? [];
 				return markHydrationEntry(html, entryFiles);
@@ -685,6 +709,7 @@ export function pluginOctane(inlineOptions = {}) {
 					root,
 					config: loaded.config,
 					assetMapFilename: CLIENT_ASSET_MAP,
+					independentHydrationManifestFilename: INDEPENDENT_HYDRATION_MANIFEST_FILENAME,
 					log: createLog(api.logger),
 				});
 			});

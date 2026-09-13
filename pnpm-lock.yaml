@@ -9942,6 +9942,9 @@ importers:
         specifier: catalog:default
         version: 0.3.125
     devDependencies:
+      '@types/jsdom':
+        specifier: catalog:default
+        version: 30.0.0
       '@types/node':
         specifier: catalog:default
         version: 24.13.3

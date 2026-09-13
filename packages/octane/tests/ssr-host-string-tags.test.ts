@@ -1,5 +1,5 @@
+import { loadCompiledFixtureSource } from './_server-fixture.js';
 import { describe, it, expect } from 'vitest';
-import { compile } from 'octane/compiler';
 import * as RT from 'octane/server';
 
 // Member-expression / dynamic JSX tags (`<obj.tag/>`, `<{expr}/>`) whose RUNTIME
@@ -10,14 +10,11 @@ import * as RT from 'octane/server';
 // `<!--[-->…<!--]-->` block a component body gets) instead of CALLING it.
 
 function evalServer(source: string, file: string): Record<string, any> {
-	let { code } = compile(source, file, { mode: 'server' });
-	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/server['"];?/g,
-		(_m: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
-	);
-	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
-	const fn = new Function('__rt', '__exports', code + '\nreturn __exports;');
-	return fn(RT, {});
+	return loadCompiledFixtureSource(source, {
+		id: file,
+		mode: 'server',
+		compileOptions: { mode: 'server' },
+	});
 }
 
 // Value-position (.tsx return) bodies — the MDX shape (`<_components.h1>` in a

@@ -43,9 +43,9 @@ const payload = {
 	request: process.argv,
 	startedAt: new Date().toISOString(),
 	limitations: [
-		'Public source-entry export costs, not compiled .tsrx or application bundles.',
+		'Public source-entry exports and a compiled plain state module, not compiled .tsrx application bundles.',
 		'Native client/server hook entries are measured independently; their sizes are not incremental application costs.',
-		'Export loading and a small engine smoke test do not establish DOM, hydration, or async behavior.',
+		'Export loading and focused signal semantics do not establish DOM, streamed handoff, hydration, or browser behavior.',
 		'Preliminary while integration source is changing; rerun after the final source freeze.',
 	],
 	buildOptions: {
@@ -73,7 +73,7 @@ function cachedSource(filename) {
 	return sourceCache.get(resolved);
 }
 
-function findPackage(filename) {
+function findPackage(filename, expectedName) {
 	let directory = path.dirname(fs.realpathSync(filename));
 	while (true) {
 		const manifest = path.join(directory, 'package.json');
@@ -86,7 +86,8 @@ function findPackage(filename) {
 					manifestSha256: sha256(contents),
 				});
 			}
-			return manifestCache.get(manifest);
+			const data = manifestCache.get(manifest);
+			if (expectedName === undefined || data.name === expectedName) return data;
 		}
 		const parent = path.dirname(directory);
 		if (parent === directory) return null;
@@ -95,7 +96,7 @@ function findPackage(filename) {
 }
 
 function packageEvidence(entry, expectedName) {
-	const manifest = findPackage(entry);
+	const manifest = findPackage(entry, expectedName);
 	assert.equal(manifest?.name, expectedName, `Unexpected package for ${entry}`);
 	return {
 		name: manifest.name,
@@ -213,7 +214,7 @@ try {
 				});
 			}
 			// Hash the exact bytes supplied to esbuild, not a later disk read.
-			// Repeated inputs use the same bytes across all seven builds.
+			// Repeated inputs use the same bytes across all builds.
 			builder.onLoad({ filter: /\.(?:[cm]?[jt]s|jsx|tsx|json)$/ }, ({ path: filename }) => {
 				const extension = path.extname(filename);
 				const loader = ['.ts', '.mts', '.cts'].includes(extension)
@@ -225,12 +226,68 @@ try {
 			});
 		},
 	};
+	let plainCompiler;
+	function recordCompilerSources(directory) {
+		for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+			const file = path.join(directory, entry.name);
+			if (entry.isDirectory()) recordCompilerSources(file);
+			else if (/\.[cm]?js$/.test(entry.name)) cachedSource(file);
+		}
+	}
+	async function compilePlainSource(source, filename) {
+		if (plainCompiler === undefined) {
+			const compilerEntry = createRequire(path.join(candidateRoot, 'package.json')).resolve(
+				'octane/compiler/bundler',
+			);
+			recordCompilerSources(path.dirname(compilerEntry));
+			const { createOctaneCompiler } = await import(pathToFileURL(compilerEntry).href);
+			const compilerOptions = {
+				root: candidateRoot,
+				requireDirective: false,
+				environment: 'client',
+				hmr: false,
+				dev: false,
+				profile: false,
+			};
+			plainCompiler = createOctaneCompiler(compilerOptions);
+			payload.compiler = {
+				request: 'octane/compiler/bundler',
+				entry: compilerEntry,
+				options: compilerOptions,
+				dependencies: Object.fromEntries(
+					['@tsrx/core', 'esrap', 'entities', 'es-module-lexer', 'oxc-tsrx'].map((name) => [
+						name,
+						packageEvidence(
+							createRequire(compilerEntry).resolve(
+								name === 'oxc-tsrx' ? 'oxc-tsrx/tsrx-core-compat' : name,
+							),
+							name,
+						),
+					]),
+				),
+				sources: [...sourceCache]
+					.filter(([file]) => file.startsWith(path.dirname(compilerEntry) + path.sep))
+					.map(([file, contents]) => ({ file, sha256: sha256(contents) })),
+			};
+		}
+		const transformed = plainCompiler.transform(source, filename);
+		assert.equal(
+			transformed?.kind,
+			'slots',
+			'Plain signal declarations must exercise the public compiler hook-slot transform',
+		);
+		assert.notEqual(transformed.code, source, 'Plain signal fixture was not compiled');
+		return transformed.code;
+	}
 
 	for (const scenario of BUNDLE_CASES) {
 		for (const label of scenario.baseline ? ['baseline', 'candidate'] : ['candidate']) {
 			const root = roots[label];
-			const source = entrySource(scenario);
+			const authored = entrySource(scenario);
 			const sourcefile = `${label}-${scenario.id}-public-entry.mjs`;
+			const source = scenario.compilePlain
+				? await compilePlainSource(authored, path.join(root, 'renderer-free-state.ts'))
+				: authored;
 			const result = await esbuild.build({
 				...payload.buildOptions,
 				absWorkingDir: REPO,
@@ -307,6 +364,14 @@ try {
 				meta: {
 					request: scenario.request,
 					exports: scenario.exports,
+					...(scenario.compilePlain
+						? {
+								authoredSource: authored,
+								authoredSha256: sha256(authored),
+								compiledSource: source,
+								compiledSha256: sha256(source),
+							}
+						: {}),
 					platform: scenario.platform,
 					bundleSha256: sha256(bytes),
 					inputs,
@@ -367,6 +432,11 @@ try {
 					} finally {
 						scope.dispose();
 					}
+				}
+				if (scenario.compilePlain) {
+					assert.deepEqual(await api.exercise(), { initial: 2, updated: 4, result: 6 });
+					// A second owner lifetime must start from the declaration, not the retired value.
+					assert.deepEqual(await api.exercise(), { initial: 2, updated: 4, result: 6 });
 				}
 				row.meta.exportLoadSmoke = 'passed';
 			} catch (error) {

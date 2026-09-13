@@ -1139,6 +1139,76 @@ export function Chart<T extends Octane.SVGProps<SVGTextElement>>(props: T) {
 		}
 	});
 
+	it.each([
+		["import type { ServerCallContext as Context } from 'octane/server';", 'Context'],
+		["import type * as Server from 'octane/server';", 'Server.ServerCallContext'],
+	])(
+		'projects trusted server context only at browser call boundaries (%s)',
+		(typeImport, contextType) => {
+			const source = `module server {
+	${typeImport}
+	async function save(value: string, context: ${contextType}) {
+		const request: Request = context.request;
+		return value + request.method;
+	}
+	const alias = save;
+	export const persist = alias;
+	export function ordinary(value: string, options: { count: number }) { return value + options.count; }
+	export function local(context: ${contextType}) { return save('inside', context); }
+}
+import { persist as save, ordinary, local } from 'server';
+export const pending: Promise<string> = save('draft');
+export const cancellable: Promise<string> = save('draft', { signal: new AbortController().signal });
+export const localResult: Promise<string> = local();
+export const ordinaryResult: string = ordinary('draft', { count: 1 });
+`;
+			const root = mkdtempSync(join(tmpdir(), 'octane-volar-server-context-'));
+			try {
+				const check = (authored: string) => {
+					const result = compileToVolarMappings(authored, '/src/Calls.tsrx');
+					expect(result.errors).toEqual([]);
+					const file = join(root, 'Calls.tsx');
+					writeFileSync(file, result.code);
+					const program = ts.createProgram({
+						rootNames: [file],
+						options: {
+							module: ts.ModuleKind.ESNext,
+							moduleResolution: ts.ModuleResolutionKind.Bundler,
+							noEmit: true,
+							skipLibCheck: true,
+							strict: true,
+							target: ts.ScriptTarget.ESNext,
+							paths: {
+								'octane/server': [
+									fileURLToPath(new URL('../../src/server-call.ts', import.meta.url)),
+								],
+							},
+						},
+					});
+					return ts.getPreEmitDiagnostics(program).map((diagnostic) => ({
+						code: diagnostic.code,
+						message: ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n'),
+					}));
+				};
+				expect(check(source)).toEqual([]);
+				expect(
+					check(
+						source +
+							"save('draft', { request: new Request('https://example.test'), signal: new AbortController().signal, viewer: {} });",
+					),
+				).toEqual([expect.objectContaining({ code: 2353 })]);
+				expect(check(source + "ordinary('draft');")).toEqual([
+					expect.objectContaining({ code: 2554 }),
+				]);
+				expect(check(source.replace("save('inside', context)", "save('inside')"))).toEqual([
+					expect.objectContaining({ code: 2554 }),
+				]);
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
+		},
+	);
+
 	it('keeps plain overload signatures non-ambient in the virtual TSX', () => {
 		// esrap <2.3.2 printed `declare` on EVERY bodyless function, so a plain
 		// overload pair next to its implementation typechecked as TS2384

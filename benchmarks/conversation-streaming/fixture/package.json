@@ -1,0 +1,6 @@
+{
+  "name": "octane-conversation-streaming-benchmark-fixture",
+  "private": true,
+  "type": "module",
+  "description": "Production app fixture for the conversation streaming benchmark."
+}

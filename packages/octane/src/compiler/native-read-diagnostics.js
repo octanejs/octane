@@ -5,9 +5,11 @@ export { NATIVE_SIGNAL_NAME, NATIVE_MEMO_READ } from './native-read-facts.js';
 
 const SIGNALS_MODULE = 'octane/signals';
 const CLIENT_MODULE = 'octane/signals/client';
+const SIGNAL_MODULES = new Set([SIGNALS_MODULE, CLIENT_MODULE, 'octane/signals/server']);
 const LOCAL_MODULES = new Set([CLIENT_MODULE, 'octane/signals/server']);
 const HANDLE_TYPES = new Set(['SignalHandle', 'Resource', 'WritableSignal', 'DerivedSignal']);
 const SIGNAL_METHODS = new Set(['signal$', 'derived$', 'asyncSignal$']);
+const SIGNAL_FACTORIES = new Set(['signal$', 'derived$', 'query$']);
 const LOCAL_HOOKS = new Set(['useSignal$']);
 const FUNCTION_TYPES = new Set([
 	'ArrowFunctionExpression',
@@ -191,6 +193,8 @@ export function analyzeNativeReadDiagnostics(ast, source, filename, options = {}
 	function importedValue(module, name) {
 		if (module === SIGNALS_MODULE && name === 'createScope')
 			return { kind: 'builtin', name: 'createScope' };
+		if (SIGNAL_MODULES.has(module) && SIGNAL_FACTORIES.has(name))
+			return { kind: 'builtin', name, capability: true };
 		if (LOCAL_MODULES.has(module) && name === 'useDerived$')
 			return { kind: 'unsupportedHook', name };
 		if (LOCAL_MODULES.has(module) && LOCAL_HOOKS.has(name))
@@ -382,7 +386,12 @@ export function analyzeNativeReadDiagnostics(ast, source, filename, options = {}
 			if (callee.kind === 'function') return callee.result;
 			if (callee.kind === 'builtin') {
 				if (callee.name === 'createScope') return SCOPE;
-				if (SIGNAL_METHODS.has(callee.name) || LOCAL_HOOKS.has(callee.name)) return HANDLE;
+				if (
+					SIGNAL_METHODS.has(callee.name) ||
+					SIGNAL_FACTORIES.has(callee.name) ||
+					LOCAL_HOOKS.has(callee.name)
+				)
+					return HANDLE;
 			}
 			return UNKNOWN;
 		}
@@ -510,9 +519,24 @@ export function analyzeNativeReadDiagnostics(ast, source, filename, options = {}
 			`Native signal handles and functions exposing handles or live reads must end in $. Rename ${JSON.stringify(name)} to ${JSON.stringify(name + '$')}; sampled values keep ordinary names.`,
 		);
 	}
+	function createsCapability(node, value) {
+		node = unwrap(node);
+		if (!node || !isCapability(value)) return false;
+		return (
+			node.type === 'CallExpression' ||
+			node.type === 'OptionalCallExpression' ||
+			FUNCTION_TYPES.has(node.type)
+		);
+	}
 	for (const record of allRecords) {
 		const value = recordValue(record);
-		for (const declaration of record.declarations) checkName(declaration, record.name, value);
+		if (
+			record.expressions.some(({ expression }) =>
+				createsCapability(expression, valueOf(expression)),
+			)
+		) {
+			for (const declaration of record.declarations) checkName(declaration, record.name, value);
+		}
 	}
 	for (const node of nodes) {
 		if (
@@ -526,13 +550,14 @@ export function analyzeNativeReadDiagnostics(ast, source, filename, options = {}
 				'useDerived$ is not available. Create derived$ on an explicitly owned Scope and pass the handle to the component.',
 			);
 		} else if (node.type === 'Property' && parents.get(node)?.type === 'ObjectExpression') {
-			checkName(node.key, propertyName(node.key, node.computed), valueOf(node.value));
+			const value = valueOf(node.value);
+			if (createsCapability(node.value, value))
+				checkName(node.key, propertyName(node.key, node.computed), value);
 		} else if (node.type === 'AssignmentExpression' && node.operator === '=') {
 			const left = unwrap(node.left);
-			if (left?.type === 'MemberExpression')
-				checkName(left.property, propertyName(left.property, left.computed), valueOf(node.right));
-		} else if (node.type === 'ExportSpecifier' && parents.get(node)?.source == null) {
-			checkName(node.exported, node.exported.name ?? node.exported.value, valueOf(node.local));
+			const value = valueOf(node.right);
+			if (left?.type === 'MemberExpression' && createsCapability(node.right, value))
+				checkName(left.property, propertyName(left.property, left.computed), value);
 		} else if (node.type === 'CallExpression' || node.type === 'OptionalCallExpression') {
 			const callee = valueOf(node.callee);
 			if (callee.kind === 'builtin' && callee.name === 'useMemo') {
