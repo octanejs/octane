@@ -18058,7 +18058,8 @@ interface HandlerBundle {
 	[EVENT_SLOT_KIND]: typeof HANDLER_BUNDLE_KIND;
 	fn: (...args: any[]) => any;
 	// An array for arity 0/N; fixed arities carry their arguments in the bundle.
-	args: any[] | 1 | 2;
+	// Negative tags prepend the native event to lifted block-arrow captures.
+	args: any[] | 1 | 2 | -1 | -2;
 	a0?: any;
 	a1?: any;
 }
@@ -18181,6 +18182,19 @@ export function evt2u(d: HandlerBundle, fn: any, a0: any, a1: any): void {
 	d.fn = fn;
 	d.a0 = a0;
 	d.a1 = a1;
+}
+// Lifted block arrows receive the native event before their lexical captures.
+// Negative arities preserve the ordinary bundle's exact authored argument list
+// and reuse its field layout, update helpers, journal, and dispatch snapshot.
+export function evt1e(el: Element, key: string, fn: any, a0: any): HandlerBundle {
+	const d: HandlerBundle = { fn, args: -1, a0, [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND };
+	setEventHandler(el, key, d);
+	return d;
+}
+export function evt2e(el: Element, key: string, fn: any, a0: any, a1: any): HandlerBundle {
+	const d: HandlerBundle = { fn, args: -2, a0, a1, [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND };
+	setEventHandler(el, key, d);
+	return d;
 }
 export function evtN(el: Element, key: string, fn: any, args: any[]): HandlerBundle {
 	const d: HandlerBundle = { fn, args, [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND };
@@ -18810,11 +18824,11 @@ function preserveDispatchedBundle(bundle: HandlerBundle): void {
 				snapshot =
 					typeof args !== 'number'
 						? { fn: bundle.fn, args: args.slice(), [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND }
-						: args === 1
-							? { fn: bundle.fn, args: 1, a0: bundle.a0, [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND }
+						: args === 1 || args === -1
+							? { fn: bundle.fn, args, a0: bundle.a0, [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND }
 							: {
 									fn: bundle.fn,
-									args: 2,
+									args,
 									a0: bundle.a0,
 									a1: bundle.a1,
 									[EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND,
@@ -19028,9 +19042,9 @@ function buildDelegatedPath(event: Event, listener: Node, path = event.composedP
 }
 
 // Invoke one event slot — a bare handler `fn(event)` or a nominal arity-specific
-// bundle (the compiler's zero-argument-arrow optimisation) as `fn(...args)`. A bundled
-// arrow never observes its native event, so forwarding that event to its callee
-// would change the authored callback's argument list.
+// bundle. Ordinary bundles call `fn(...args)` without an event, preserving the
+// authored call argument list. Negative fixed arities prepend the native event
+// for compiler-lifted block arrows that receive their lexical captures by value.
 //
 // GUARDED like the platform guards each listener invocation: a throwing handler
 // (or a non-function listener value that arrived through a spread/prop) reports
@@ -19075,8 +19089,12 @@ function fireEventSlot(slot: EventSlot, event: Event): void {
 				}
 			} else if (a === 1) {
 				bundle.fn(bundle.a0);
-			} else {
+			} else if (a === 2) {
 				bundle.fn(bundle.a0, bundle.a1);
+			} else if (a === -1) {
+				bundle.fn(event, bundle.a0);
+			} else {
+				bundle.fn(event, bundle.a0, bundle.a1);
 			}
 			return;
 		}
