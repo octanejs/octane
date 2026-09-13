@@ -26,11 +26,13 @@ const sha256 = (source) => createHash('sha256').update(source).digest('hex');
 
 function productionHelper(source) {
 	const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
-	const helper = ast.statements.find(
-		(node) => ts.isFunctionDeclaration(node) && node.name?.text === 'runEffectBody',
+	const helpers = ast.statements.filter(
+		(node) =>
+			ts.isFunctionDeclaration(node) &&
+			['fireEffectCleanup', 'runEffectBody'].includes(node.name?.text),
 	);
-	assert.ok(helper, 'effect-dispatch helper is present');
-	return transformSync(helper.getText(ast), {
+	assert.equal(helpers.length, 2, 'effect cleanup/body dispatch helpers are present');
+	return transformSync(helpers.map((helper) => helper.getText(ast)).join('\n'), {
 		loader: 'ts',
 		define: { 'process.env.NODE_ENV': '"production"' },
 		minifySyntax: true,
@@ -48,23 +50,30 @@ function instantiate(code) {
 		class MaximumUpdateDepthError extends Error {}
 		function nativeEffectPublicationCurrent(entry) { return entry.current !== false; }
 		function reportEffectError(block, error) { errors.push({ block, error }); }
+		function runEffectCleanupCallback(cleanup) { cleanup(); }
 		${code}
-		return { run: runEffectBody, errors, MaximumUpdateDepthError,
+		return { run: runEffectBody, clean: fireEffectCleanup, errors, MaximumUpdateDepthError,
 			phase: () => CURRENT_EFFECT_PHASE, depth: () => EFFECT_BODY_DEPTH };
 	`)();
 }
 
 function workload(code, argsKind) {
 	const runtime = instantiate(code);
-	const snapshot = { calls: 0, cleanups: 0, argumentValues: 0 };
+	const snapshot = { calls: 0, cleanups: 0, argumentValues: 0, hookMapReads: 0 };
 	const token = {};
 	for (let phase = 0; phase < 3; phase++) {
 		for (let index = 0; index < count; index++) {
 			const args =
 				argsKind === 'omitted' ? undefined : argsKind === 'empty' ? [] : [index, token, undefined];
 			const slotKey = Symbol();
-			const slot = { revision: 1, cleanup: undefined };
-			const scope = { block: {}, hooks: new Map([[slotKey, slot]]) };
+			const slot = { slot: slotKey, order: 0, revision: 1, cleanup: undefined };
+			const hooks = new Map([[slotKey, slot]]);
+			const read = hooks.get;
+			hooks.get = function (key) {
+				snapshot.hookMapReads++;
+				return read.call(this, key);
+			};
+			const scope = { block: {}, hooks, effectSlots: [slot] };
 			const cleanup = () => snapshot.cleanups++;
 			function body() {
 				assert.equal(this, null);
@@ -80,17 +89,21 @@ function workload(code, argsKind) {
 				snapshot.calls++;
 				return cleanup;
 			}
-			const entry = { fn: body, args, slot: slotKey, revision: 1, scope, phase };
+			const entry = { fn: body, args, slot: slotKey, order: 0, revision: 1, scope, phase };
+			runtime.clean(entry);
 			runtime.run(entry);
 			assert.equal(runtime.phase(), -1);
 			assert.equal(runtime.depth(), 0);
 			assert.equal(slot.cleanup, cleanup);
-			slot.cleanup();
+			runtime.clean(entry);
+			assert.equal(slot.cleanup, undefined);
 			// Stale revisions, disconnected bodies, and superseded publications
 			// must neither invoke a callback nor create its argument fallback.
 			runtime.run({ ...entry, revision: 0 });
+			runtime.clean({ ...entry, revision: 0 });
 			runtime.run({ ...entry, fn: null });
 			runtime.run({ ...entry, current: false });
+			runtime.clean({ ...entry, current: false });
 		}
 	}
 	assert.equal(snapshot.calls, count * 3);
@@ -100,17 +113,65 @@ function workload(code, argsKind) {
 	return snapshot;
 }
 
+function membershipControls(code) {
+	const runtime = instantiate(code);
+	const key = Symbol();
+	let calls = 0;
+	let cleanups = 0;
+	const slot = {
+		slot: key,
+		order: 0,
+		revision: 1,
+		cleanup() {
+			cleanups++;
+		},
+	};
+	const scope = { block: {}, hooks: new Map([[key, slot]]), effectSlots: [slot] };
+	const entry = {
+		scope,
+		slot: key,
+		order: 0,
+		revision: 1,
+		phase: 2,
+		fn() {
+			calls++;
+		},
+	};
+	// A retained declaration list is not proof of current hook membership.
+	// Rollback/remount can remove a slot; same-scope body reuse can replace its
+	// Map entry. No old callback or cleanup may survive either invalidation.
+	for (const hooks of [null, new Map(), new Map([[key, { deps: [], value: 'replacement' }]])]) {
+		scope.hooks = hooks;
+		runtime.clean(entry);
+		runtime.run(entry);
+		assert.equal(calls, 0);
+		assert.equal(cleanups, 0);
+	}
+	scope.hooks = new Map([[key, slot]]);
+	slot.cleanup = () => {
+		cleanups++;
+		// User cleanup can revoke membership before the corresponding body pass.
+		scope.hooks.delete(key);
+	};
+	runtime.clean(entry);
+	runtime.run(entry);
+	assert.equal(cleanups, 1);
+	assert.equal(calls, 0);
+	assert.equal(runtime.errors.length, 0);
+}
+
 function errorControls(code) {
 	const runtime = instantiate(code);
 	const slotKey = Symbol();
-	const slot = { revision: 1 };
+	const slot = { slot: slotKey, order: 0, revision: 1 };
 	const block = {};
 	const entry = {
 		args: undefined,
 		phase: 2,
 		revision: 1,
 		slot: slotKey,
-		scope: { block, hooks: new Map([[slotKey, slot]]) },
+		order: 0,
+		scope: { block, hooks: new Map([[slotKey, slot]]), effectSlots: [slot] },
 	};
 	const error = new Error('effect failure');
 	runtime.run({
@@ -157,13 +218,15 @@ function measure(source) {
 	}
 	errorControls(clean);
 	errorControls(observed);
+	membershipControls(clean);
+	membershipControls(observed);
 	delete globalThis[COUNTER_GLOBAL];
 	return { sourceHash: sha256(source), helperHash: sha256(clean), cases };
 }
 
 const result = {
 	suite: 'effect-dispatch',
-	metric: 'source array-literal creation events in the production dispatch helper',
+	metric: 'source array-literal creations and hook Map reads in production effect dispatch',
 	node: process.version,
 	v8: process.versions.v8,
 	effectsPerCase: count * 3,
@@ -179,10 +242,20 @@ if (baselineRef) {
 		}),
 	);
 	for (const name of ['omitted', 'empty', 'values']) {
-		const { emptyArrayCreations: before, ...beforeBehavior } = result.baseline.cases[name];
-		const { emptyArrayCreations: after, ...afterBehavior } = result.candidate.cases[name];
+		const {
+			emptyArrayCreations: before,
+			hookMapReads: beforeReads,
+			...beforeBehavior
+		} = result.baseline.cases[name];
+		const {
+			emptyArrayCreations: after,
+			hookMapReads: afterReads,
+			...afterBehavior
+		} = result.candidate.cases[name];
 		assert.deepEqual(afterBehavior, beforeBehavior);
-		console.log(`${name}: ${result.effectsPerCase} effects; array creations ${before} → ${after}`);
+		console.log(
+			`${name}: ${result.effectsPerCase} effects; array creations ${before} → ${after}; hook Map reads ${beforeReads} → ${afterReads}`,
+		);
 	}
 } else console.log(JSON.stringify(result.candidate.cases, null, 2));
 if (process.env.BENCH_JSON)
@@ -193,6 +266,10 @@ if (!measureOnly) {
 			scenario.emptyArrayCreations,
 			0,
 			`${name}: dispatch must not create argument arrays`,
+		);
+		assert.ok(
+			scenario.hookMapReads <= count * 3 * 7,
+			`${name}: at most one hook Map read per nonempty cleanup/body attempt`,
 		);
 	}
 }
