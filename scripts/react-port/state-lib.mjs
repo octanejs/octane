@@ -206,6 +206,30 @@ export function reconcileBatchManifest(previousManifest, nextManifest) {
 		}
 	}
 	merged.baseline = structuredClone(previousManifest.baseline);
+	// Intake may resolve a binding directory only after identity or dependency
+	// repair. Capture that first planned boundary, preserving any dirty paths
+	// already observed. Once a directory is planned, ordinary resumes must not
+	// accept later writes, including newly created files.
+	const previousDirectories = Object.values(previousManifest.nodes)
+		.map((node) => node.bindingDirectory?.replace(/\/$/, ''))
+		.filter(Boolean);
+	for (const [id, node] of Object.entries(merged.nodes)) {
+		if (
+			previousManifest.nodes[id]?.bindingDirectory ||
+			!node.bindingDirectory ||
+			!['create-binding', 'extend-binding'].includes(node.action)
+		)
+			continue;
+		const directory = node.bindingDirectory.replace(/\/$/, '');
+		for (const [filePath, hash] of Object.entries(nextManifest.baseline)) {
+			if (
+				(filePath === directory || filePath.startsWith(directory + '/')) &&
+				!Object.hasOwn(merged.baseline, filePath) &&
+				!previousDirectories.some((root) => filePath === root || filePath.startsWith(root + '/'))
+			)
+				merged.baseline[filePath] = hash;
+		}
+	}
 	// Explicit adoption accepts an already-present, provenance-matched package.
 	// Refresh that package's baseline only; ordinary resumes still reject writes
 	// since intake, and similarly named neighboring directories remain protected.
