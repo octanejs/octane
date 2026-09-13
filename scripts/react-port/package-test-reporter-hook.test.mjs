@@ -4,6 +4,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, rmSyn
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
 const require = createRequire(import.meta.url);
@@ -102,9 +103,61 @@ for (const form of ['equals', 'separate', 'json']) {
 		assert.equal(expected.numPassedTests, 1);
 		const files = readdirSync(reports).filter((file) => file.endsWith('.report.json'));
 		assert.equal(files.length, 1);
-		assert.deepEqual(JSON.parse(readFileSync(path.join(reports, files[0]), 'utf8')), expected);
+		const actual = JSON.parse(readFileSync(path.join(reports, files[0]), 'utf8'));
+		// Independent reporters initialize at different times, but observe the
+		// same completed tests and failures.
+		assert.equal(typeof actual.startTime, 'number');
+		assert.equal(typeof expected.startTime, 'number');
+		assert.deepEqual({ ...actual, startTime: expected.startTime }, expected);
 	});
 }
+test('keeps custom reporter output separate from package evidence', (t) => {
+	const root = mkdtempSync(path.join(tmpdir(), 'binding-custom-report-'));
+	t.after(() => rmSync(root, { recursive: true, force: true }));
+	const reports = path.join(root, 'reports');
+	mkdirSync(reports);
+	writeFileSync(
+		path.join(root, 'vitest.config.mjs'),
+		"export default {test:{name:'contract',globals:true,include:['pass.test.js'],maxWorkers:1}};",
+	);
+	writeFileSync(path.join(root, 'pass.test.js'), "test('binding behavior',()=>expect(1).toBe(1));");
+	const original = path.join(root, 'parity.json');
+	const run = spawnSync(
+		process.execPath,
+		[
+			'--import',
+			new URL('./package-test-reporter-hook.mjs', import.meta.url).href,
+			path.join(path.dirname(require.resolve('vitest/package.json')), 'vitest.mjs'),
+			'run',
+			'--root',
+			root,
+			'--config',
+			path.join(root, 'vitest.config.mjs'),
+			`--reporter=${fileURLToPath(new URL('../react-parity/vitest-json-reporter.mjs', import.meta.url))}`,
+			'--outputFile',
+			original,
+		],
+		{
+			encoding: 'utf8',
+			env: { ...process.env, REACT_PORT_TEST_REPORT_DIR: reports },
+			timeout: 30000,
+		},
+	);
+	assert.equal(run.status, 0, run.stdout + run.stderr);
+	const custom = JSON.parse(readFileSync(original, 'utf8'));
+	assert.equal(custom.numPassedTests, 1);
+	assert.equal(custom.testResults[0].projectName, 'contract');
+	const files = readdirSync(reports).filter((file) => file.endsWith('.report.json'));
+	assert.equal(files.length, 1);
+	const evidence = JSON.parse(readFileSync(path.join(reports, files[0]), 'utf8'));
+	assert.equal(evidence.numPassedTests, 1);
+	assert.equal(evidence.testResults[0].projectName, undefined);
+	assert.deepEqual(
+		evidence.testResults[0].assertionResults,
+		custom.testResults[0].assertionResults,
+	);
+});
+
 test('a failed Vitest assertion remains visible alongside its machine report', (t) => {
 	const root = mkdtempSync(path.join(tmpdir(), 'binding-visible-failure-'));
 	t.after(() => rmSync(root, { recursive: true, force: true }));

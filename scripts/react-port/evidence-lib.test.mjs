@@ -406,6 +406,35 @@ describe('package and closure completion', () => {
 			expectedNoticeHashes: [sha256('Fixture attribution\n')],
 		});
 		assert.equal(result.status, 'passed', result.issues.join('\n'));
+		// Existing packages may use the standard Markdown license filename.
+		const licenseManifestPath = path.join(packageDirectory, 'package.json');
+		const licenseManifest = JSON.parse(await readFile(licenseManifestPath, 'utf8'));
+		licenseManifest.files = licenseManifest.files.map((file) =>
+			file === 'LICENSE' ? 'LICENSE.md' : file,
+		);
+		await writeFile(licenseManifestPath, JSON.stringify(licenseManifest));
+		await unlink(path.join(packageDirectory, 'LICENSE'));
+		await writeFile(path.join(packageDirectory, 'LICENSE.md'), MIT_TEXT);
+		const inspectLicense = () =>
+			inspectBindingPackage(packageDirectory, {
+				expectedPackageName: '@octanejs/widget',
+				expectedDirectory: 'packages/widget',
+				identity: { packageName: 'widget', version: '1.0.0', commit: 'a'.repeat(40) },
+				expectedLicenseHashes: [sha256(MIT_TEXT)],
+				expectedNoticeHashes: [sha256('Fixture attribution\n')],
+			});
+		const markdownLicense = inspectLicense();
+		assert.equal(markdownLicense.status, 'passed', markdownLicense.issues.join('\n'));
+		await writeFile(path.join(packageDirectory, 'LICENSE.md'), 'MIT\n');
+		const invalidLicense = inspectLicense();
+		assert.match(invalidLicense.issues.join('\n'), /LICENSE\.md is not recognizable MIT text/);
+		assert.match(invalidLicense.issues.join('\n'), /exact upstream bytes/);
+		await unlink(path.join(packageDirectory, 'LICENSE.md'));
+		await writeFile(path.join(packageDirectory, 'LICENSE'), MIT_TEXT);
+		licenseManifest.files = licenseManifest.files.map((file) =>
+			file === 'LICENSE.md' ? 'LICENSE' : file,
+		);
+		await writeFile(licenseManifestPath, JSON.stringify(licenseManifest));
 		await unlink(path.join(packageDirectory, 'tests/widget.test.ts'));
 		await writeFile(
 			path.join(packageDirectory, 'src/widget.spec.ts'),
@@ -541,6 +570,40 @@ describe('package and closure completion', () => {
 		assert.equal(result.status, 'blocked');
 		assert.match(result.issues.join('\n'), /surprise-runtime.*approved graph/i);
 	});
+
+	for (const [specifier, sourceFile] of [
+		['helper.js', 'helper.ts'],
+		['helper.js', 'helper.tsx'],
+		['helper.jsx', 'helper.tsx'],
+		['helper.mjs', 'helper.mts'],
+		['helper.cjs', 'helper.cts'],
+	]) {
+		test(`audits runtime dependencies behind ${specifier} imports of ${sourceFile}`, async () => {
+			const packageDirectory = await mkdtemp(path.join(tmpdir(), 'react-port-source-extension-'));
+			await mkdir(path.join(packageDirectory, 'src'));
+			await writeFile(
+				path.join(packageDirectory, 'package.json'),
+				JSON.stringify({ name: '@octanejs/widget', exports: { '.': './src/index.ts' } }),
+			);
+			await writeFile(
+				path.join(packageDirectory, 'src/index.ts'),
+				`export { widget } from './${specifier}';\n`,
+			);
+			await writeFile(
+				path.join(packageDirectory, 'src', sourceFile),
+				"import 'surprise-runtime';\nexport const widget = true;\n",
+			);
+			const result = auditShippedClosure({
+				nodeId: 'pkg:widget',
+				graphNodes: { 'pkg:widget': { packageName: 'widget', dependsOn: [] } },
+				packageDirectory,
+				runtimeDependencies: [],
+				adaptedSources: [],
+			});
+			assert.equal(result.status, 'blocked');
+			assert.match(result.issues.join('\n'), /surprise-runtime.*approved graph/i);
+		});
+	}
 
 	test('does not classify TypeScript type-only imports as shipped runtime dependencies', async () => {
 		const packageDirectory = await mkdtemp(path.join(tmpdir(), 'react-port-type-only-closure-'));

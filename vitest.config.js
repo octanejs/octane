@@ -8446,6 +8446,17 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'window-browser',
+					include: ['packages/window/tests/browser/**/*.browser.test.ts'],
+					environment: 'node',
+					globals: false,
+					testTimeout: 60_000,
+					hookTimeout: 60_000,
+				},
+			},
+			{
 				test: {
 					name: 'window-feasibility',
 					include: ['packages/window/tests/feasibility/**/*.test.ts'],

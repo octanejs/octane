@@ -13,10 +13,10 @@ export function useIsRtl(
 
 	useLayoutEffect(
 		() => {
-			if (element) {
-				if (!dir) {
-					setValue(isRtl(element));
-				}
+			if (dir) {
+				setValue(dir === 'rtl');
+			} else if (element) {
+				setValue(isRtl(element));
 			}
 		},
 		[dir, element],

@@ -15,10 +15,12 @@ type HydrationBinding =
 	| 'pdf'
 	| 'rainbowkit'
 	| 'react-map-gl'
+	| 'react-window'
 	| 'select'
 	| 'solana-kit'
 	| 'testing-library'
 	| 'thinking-orbs'
+	| 'window'
 	| 'tanstack-pacer'
 	| 'tanstack-query'
 	| 'tanstack-virtual'
@@ -29,6 +31,14 @@ type HydrationBinding =
 const repositoryRoot = resolve(import.meta.dirname, '../../..');
 
 function bindingAliases(binding: HydrationBinding) {
+	if (binding === 'window' || binding === 'react-window') {
+		return [
+			{
+				find: /^@octanejs\/window$/,
+				replacement: resolve(repositoryRoot, 'packages/window/src/index.ts'),
+			},
+		];
+	}
 	const source = resolve(repositoryRoot, 'packages', binding, 'src');
 	if (binding === 'thinking-orbs')
 		return [{ find: /^@octanejs\/thinking-orbs$/, replacement: resolve(source, 'index.ts') }];

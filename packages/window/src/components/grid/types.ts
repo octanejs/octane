@@ -16,7 +16,7 @@ type ExcludeForbiddenKeys<Type> = {
 
 export type GridProps<CellProps extends object, TagName extends TagNames = 'div'> = Omit<
 	HTMLAttributes<HTMLDivElement>,
-	'onResize' | 'style'
+	'onResize' | 'style' | 'className'
 > & {
 	/**
 	 * React component responsible for rendering a cell.

@@ -1,0 +1,199 @@
+[
+  {
+    "path": "src/components/grid/Grid.tsx",
+    "origin": "adapted",
+    "sha256": "5ba43558a486fa91c95fb8fc677516986f84332076b31d800867dc6f7f96b0f5",
+    "packageName": "react-window"
+  },
+  {
+    "path": "src/components/grid/types.ts",
+    "origin": "adapted",
+    "sha256": "4722143148a0e9dbafb5cfa35f94e050bad3250c97934c7d775535f01703ca71",
+    "packageName": "react-window"
+  },
+  {
+    "path": "src/components/grid/useGridCallbackRef.ts",
+    "origin": "adapted",
+    "sha256": "5e8481927913ddf17fcf2de003f2d4f01f88da42411a4b65b8fdd8b5b684bb68",
+    "packageName": "react-window"
+  },
+  {
+    "path": "src/components/grid/useGridRef.ts",
+    "origin": "adapted",
+    "sha256": "c5b1c09e555e53b05f689a49347684beb33c6f218d809fcb22aa6ca2ba70c75d",
+    "packageName": "react-window"
+  },
+  {
+    "path": "src/components/list/List.tsx",
+    "origin": "adapted",
+    "sha256": "23965fe30077627498f3af317ba3acecc42efcc52ec81afc3ec26565db7c7c25",
+    "packageName": "react-window"
+  },
+  {
+    "path": "src/components/list/isDynamicRowHeight.ts",
+    "origin": "adapted",
+    "sha256": "16ac4c0822b7dc6b91abc484b0216d2908a3d68e1c59692bc48f40c11db15d7e",
+    "packageName": "react-window"
+  },
+  {
+    "path": "src/components/list/types.ts",
+    "origin": "adapted",
+    "sha256": "f929dcb5cfb649a0364bd7db7f8dcaa2226228730742170f45d6ff3f8a52acb1",
+    "packageName": "react-window"
+  },
+  {
+    "path": "src/components/list/useDynamicRowHeight.ts",
+    "origin": "adapted",
+    "sha256": "40ad8fdc83617f78dae8808abd5fa544ca207ce3e5bd89bae4c52aa5371deb2a",
+    "packageName": "react-window"
+  },
+  {
+    "path": "src/components/list/useListCallbackRef.ts",
+    "origin": "adapted",
+    "sha256": "9fec383b032ab80088448c5f4fc8cd2884490be07139d5ff66fa32af53320a9d",
+    "packageName": "react-window"
+  },
+  {
+    "path": "src/components/list/useListRef.ts",
+    "origin": "adapted",
+    "sha256": "e85960dea4ab1e9015910e01b31740764b55d0cdc742ab4735db808df2f5b39e",
+    "packageName": "react-window"
+  },
+  {
+    "path": "src/core/createCachedBounds.ts",
+    "origin": "adapted",
+    "sha256": "b199c2ef8a40e8db64d527a61f23bc758c138a7215a85ac32bff417c67a6fd89",
+    "packageName": "react-window"
+  },
+  {
+    "path": "src/core/getEstimatedSize.ts",
+    "origin": "adapted",
+    "sha256": "cfef067562870d200dcad1fa343b9d07f0106bb167001a4ab098a1d2c5bae288",
+    "packageName": "react-window"
+  },
+  {
+    "path": "src/core/getOffsetForIndex.ts",
+    "origin": "adapted",
+    "sha256": "b02db2d46c12034182ebbdf6956260fbaac64cc6d248d2bc2a7c8c177f2653a5",
+    "packageName": "react-window"
+  },
+  {
+    "path": "src/core/getStartStopIndices.ts",
+    "origin": "adapted",
+    "sha256": "337b57587cd61f3867921f060da91663092a58f7ed7a34c31d55255d1c5c6908",
+    "packageName": "react-window"
+  },
+  {
+    "path": "src/core/useCachedBounds.ts",
+    "origin": "adapted",
+    "sha256": "dc2aef75052151bfc9e1d700ad36c4ea962a2b5145b72be25b7031349500240a",
+    "packageName": "react-window"
+  },
+  {
+    "path": "src/core/useIsRtl.ts",
+    "origin": "adapted",
+    "sha256": "a114846e90928be50e5470a0e998a75f2515aea70ed39145c6047df2cc57c057",
+    "packageName": "react-window"
+  },
+  {
+    "path": "src/core/useItemSize.ts",
+    "origin": "adapted",
+    "sha256": "c18be984a20ce7bf463320186417387a94b216e113c82e52a75ca06b81175e76",
+    "packageName": "react-window"
+  },
+  {
+    "path": "src/core/useVirtualizer.ts",
+    "origin": "adapted",
+    "sha256": "51e5330b6a1792a1c0be9d9cff170ed4bd251a747a166b0d68dd798571813017",
+    "packageName": "react-window"
+  },
+  {
+    "path": "src/hooks/useIsomorphicLayoutEffect.ts",
+    "origin": "adapted",
+    "sha256": "19fb049fa1e77acaa5ecef4648b4c74fc9e796b10c678c78eff3d5eba8aff887",
+    "packageName": "react-window"
+  },
+  {
+    "path": "src/hooks/useMemoizedObject.ts",
+    "origin": "adapted",
+    "sha256": "6e5bceda1898648ab271b0b027e44ffb727e531c328cb0b4701d9e2e928f81a7",
+    "packageName": "react-window"
+  },
+  {
+    "path": "src/hooks/useResizeObserver.ts",
+    "origin": "adapted",
+    "sha256": "4ba58e7b302cbe39ce2f29b9bcdae970ed00f6a0fe721ab67b1d6274fa6a3f75",
+    "packageName": "react-window"
+  },
+  {
+    "path": "src/hooks/useStableCallback.ts",
+    "origin": "adapted",
+    "sha256": "30f4d69bc101a3c9f5b72328594bf4236779900c9ebd59d38c30dc3a25b1ce68",
+    "packageName": "react-window"
+  },
+  {
+    "path": "src/index.ts",
+    "origin": "adapted",
+    "sha256": "fbdfda143228e9b9ae13d7f1719896cb085ebd18f4f1d2cf2813c86543c9cd90",
+    "packageName": "react-window"
+  },
+  {
+    "path": "src/internal.ts",
+    "origin": "authored",
+    "sha256": "8434dca9a1a09ab32f4b080e5e3b96204a48860fa4a4f566936aca0c7726f370"
+  },
+  {
+    "path": "src/types.ts",
+    "origin": "adapted",
+    "sha256": "8e96b707cac41595d686388173099c72ca9a00e1fc2118ea9f362bb91c57638f",
+    "packageName": "react-window"
+  },
+  {
+    "path": "src/utils/adjustScrollOffsetForRtl.ts",
+    "origin": "adapted",
+    "sha256": "e8119f8a85ecd5ede0c0c4b72a9fa33bbd5e23a49fd35dc8b6d5a4bf819678e1",
+    "packageName": "react-window"
+  },
+  {
+    "path": "src/utils/arePropsEqual.ts",
+    "origin": "adapted",
+    "sha256": "0c37eb4cd18d1744e504dcdf54079bcba548ef08be9f349c2406f12b6d70c53b",
+    "packageName": "react-window"
+  },
+  {
+    "path": "src/utils/assert.ts",
+    "origin": "adapted",
+    "sha256": "6cb574d3736a5a876d38c69adadecd6e25dd587b8d10d493812692f67f693a44",
+    "packageName": "react-window"
+  },
+  {
+    "path": "src/utils/getRTLOffsetType.ts",
+    "origin": "adapted",
+    "sha256": "05251aabe9482c40b55bad03ebed1f8878f5f14a03131d6d1004f94a165b59d9",
+    "packageName": "react-window"
+  },
+  {
+    "path": "src/utils/getScrollbarSize.ts",
+    "origin": "adapted",
+    "sha256": "536bf86035bcd2ab410472988774abe0a7c686b404077f70f9af441eeeb839ce",
+    "packageName": "react-window"
+  },
+  {
+    "path": "src/utils/isRtl.ts",
+    "origin": "adapted",
+    "sha256": "5991687a1368adced1c0636f2d931d94725c02a6639e074d49ed37f5c688051e",
+    "packageName": "react-window"
+  },
+  {
+    "path": "src/utils/parseNumericStyleValue.ts",
+    "origin": "adapted",
+    "sha256": "318c3b6043111c5396971168e54dd50f2e0f6b23de23fd5f37eba7751e1fa01a",
+    "packageName": "react-window"
+  },
+  {
+    "path": "src/utils/shallowCompare.ts",
+    "origin": "adapted",
+    "sha256": "7f1662b8845939845edefc5fd8c3237112a81fee2f02833d7ac88f0246c14535",
+    "packageName": "react-window"
+  }
+]

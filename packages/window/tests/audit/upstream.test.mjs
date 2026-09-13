@@ -17,9 +17,9 @@ function fixture() {
 
 test('accepts the pristine pinned tree', () => {
 	assert.deepEqual(verifyUpstream(packageRoot), {
-		files: 57,
-		testFiles: 14,
-		testCases: 117,
+		files: 59,
+		testFiles: 15,
+		testCases: 119,
 		runtimeExports: 8,
 		typeExports: 8,
 	});

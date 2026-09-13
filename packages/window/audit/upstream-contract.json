@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "package": "react-window",
-  "version": "2.3.0",
-  "commit": "4d9eebbb510262b3b7e95463cf49a10de53ea77d",
+  "version": "2.3.1",
+  "commit": "eb7398fdc0e9d9b54560142caa2f6461474e0014",
   "license": "MIT",
   "runtimeExports": [
     "Grid",
@@ -24,13 +24,13 @@
     "ListProps",
     "RowComponentProps"
   ],
-  "testFiles": 14,
-  "testCases": 117,
-  "testInventorySha256": "954cb70a2892ee613fa31d34a4b4fb9e57b01d2bca7e9303dcb5296584e15b48",
+  "testFiles": 15,
+  "testCases": 119,
+  "testInventorySha256": "55c1a24bc3b35760f46d5c1380eece3b96fd0ca7ce7fdbb5667d177b0eaef218",
   "artifactFiles": [
     {
       "path": "upstream-artifact/dist/react-window.d.ts",
-      "sha256": "16bdb4d5404dc4e487e9ddbe5f1417b82ef320dad10a14580349acb18a03f7cc"
+      "sha256": "33d0f33cad05d91334afefa659dc582211a477f62c9cd5bf4aba7d7d1601ff5b"
     }
   ]
 }

@@ -5,17 +5,15 @@
 | Field | Value |
 | --- | --- |
 | Package | `react-window` |
-| Version | `2.3.0` |
+| Version | `2.3.1` |
 | Repository | `https://github.com/bvaughn/react-window.git` |
-| Annotated tag | `2.3.0` (`c8f17487…`) |
-| Dereferenced tag commit | `4d9eebbb510262b3b7e95463cf49a10de53ea77d` |
-| npm integrity | `sha512-FW6TIpaOH646k51X7yE+LSCWGkt5Pfsnc1fVyq/sCI9h0pTqmMiBXM04pzFKg3Bt7NGkeV6kqbU8d/QjmFS7Ug==` |
-| npm shasum | `92fefee75b7de56a31204dfffc492b84136e4783` |
-| npm tarball SHA-256 | `c62b0568794a8cf5f523fa6fd68f83261cfdc9bb7578e918ca2ae1181fc44623` |
-| Canonical tag archive SHA-256 | `d0b66c0138c6355051a75086ce0681aa5880249c0d14f1e9759185daee16e452` |
+| Pinned source commit | `eb7398fdc0e9d9b54560142caa2f6461474e0014` |
+| npm integrity | `sha512-x/+N6b7FNVtlKE7ZQlfOY2bYdA7VXvT2B1Emo/ndAsFsSQ98FBIO88MsatNELbSIlYJgkCd7unBps5XMfv0Eyg==` |
+| npm shasum | `92fd42d7a3704644f56f31a4e829ab74f87126f5` |
+| npm tarball SHA-256 | `44ff692f9d49c32cd6b8306b164bba7d0029f58437708cc832414ecb5ebc7ee6` |
 | License | MIT, copyright Brian Vaughn |
 
-The byte-exact tagged tree (the `lib/` sources and tests, repository package
+The byte-exact pinned tree (the `lib/` sources and tests, repository package
 metadata, Vitest setup, and license) is vendored under `upstream/` and verifies
 offline against the upstream git blob shas recorded in
 `audit/upstream.lock.json`. The published npm declaration bundle is vendored
@@ -24,11 +22,11 @@ pinned license is republished at the package root as `LICENSE.upstream`. All of
 it is audit input only and must remain excluded from the published package.
 
 Run `pnpm --dir packages/window upstream:verify` to verify the lock-pinned tree
-and all 57 vendored artifacts, the exact file set, the published declaration
-bundle, the 14 upstream test artifacts and their 117 test registrations, package
+and all 59 vendored artifacts, the exact file set, the published declaration
+bundle, the 15 upstream unit test artifacts and their 119 test registrations, package
 metadata, and the complete root export inventory.
 
-## Public v2.3.0 surface
+## Public v2.3.1 surface
 
 Runtime exports: `Grid`, `List`, `getScrollbarSize`, `useDynamicRowHeight`,
 `useGridCallbackRef`, `useGridRef`, `useListCallbackRef`, and `useListRef`.
@@ -41,9 +39,9 @@ The v1 `FixedSizeList`, `VariableSizeList`, `FixedSizeGrid`, and
 `VariableSizeGrid` names are not part of this pin and are intentionally outside
 the binding contract.
 
-## Source boundary and module disposition
+## Source boundary
 
-The immutable boundary is every file under upstream `lib/`, plus `src/constants.ts`,
+The immutable boundary is every file under upstream `lib/`, plus the six-case browser layout-shift specification, `src/constants.ts`,
 `vitest.setup.js`, `package.json`, and the MIT license. Production modules are
 ported source-correspondently under `src/`; test modules are either executed
 byte-exact in the pristine lane or regenerated into `tests/upstream/`
@@ -84,7 +82,7 @@ transformation classifications documented in
 ## Upstream test crosswalk
 
 Every row runs unchanged in `react-window-pristine` and as a lock-regenerated
-adaptation in `react-window-adapted`; the inventories prove all 117
+adaptation in `react-window-adapted`; the inventories prove all 119
 registered cases are unique and executed.
 
 | Upstream test file | Pristine disposition | Adapted disposition |
@@ -97,6 +95,7 @@ registered cases are unique and executed.
 | `core/getOffsetForIndex.test.ts` | byte-exact | regenerated import adaptation |
 | `core/getStartStopIndices.test.ts` | byte-exact | regenerated import adaptation |
 | `core/useCachedBounds.test.ts` | byte-exact | regenerated hook adaptation |
+| `core/useIsRtl.test.ts` | byte-exact | regenerated hook adaptation |
 | `core/useVirtualizer.test.ts` | byte-exact | regenerated hook adaptation |
 | `hooks/useMemoizedObject.test.ts` | byte-exact | regenerated hook adaptation |
 | `hooks/useResizeObserver.test.ts` | byte-exact | regenerated hook adaptation |
@@ -118,3 +117,20 @@ registered cases are unique and executed.
 | `tests/audit/adapted.test.mjs` | Adaptation audit | Regenerates and byte-compares every adapted upstream test/source mapping with mutation controls |
 | `tests/audit/types.test.mjs` | Type-evidence audit | Accounts for every assertion group and proves skipped/deleted/unauthorized mutations fail |
 | `tests/feasibility/renderer-boundary.test.ts` | Framework-boundary characterization | Documents the two reviewed renderer ABI/scheduling divergences recorded in the manifest |
+
+## Browser conformance
+
+The complete preflight inventory has 125 registrations. All 119 unit cases run
+in both pinned React and generated Octane lanes. Four upstream layout-shift
+scenarios have native Chromium conformance in
+`tests/browser/window.browser.test.ts`: List and Grid client startup and SSR
+hydration retain the expected initial visible item counts, produce no cumulative
+layout shift, and preserve bounded rendering after scrolling. Hydration also
+checks that existing server item nodes are adopted. A fifth browser case verifies
+that a mounted Grid switches imperative scrolling between LTR and RTL.
+
+The two upstream React Server Components application scenarios are inapplicable:
+Octane does not implement Server Components. `audit/crosswalk.json` records all
+125 immutable identities and their individual dispositions. Browser evidence is
+Chromium-specific; the legacy Firefox readiness note is not a claim of Firefox
+coverage.

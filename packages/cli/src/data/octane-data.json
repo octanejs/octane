@@ -1568,14 +1568,19 @@
       "name": "@octanejs/window",
       "version": "0.0.19",
       "category": "Tables",
-      "upstream": { "package": "react-window", "version": "2.3.0" },
-      "surface": "Provisional complete exact port of the react-window 2.3.0 root surface: List, Grid, getScrollbarSize, useDynamicRowHeight, four imperative-ref hooks, and all eight public types. The byte-locked pristine React suite and generated Octane adaptation each execute all 14 upstream files and all 117 cases; shared differential, SSR, hydration, and assertion-level public type lanes are required by the React parity manifest. Final Chromium/Firefox browser and executable CommonJS package-condition evidence remain pending shared infrastructure PRs #548 and #550.",
+      "upstream": {
+        "package": "react-window",
+        "version": "2.3.1",
+        "commit": "eb7398fdc0e9d9b54560142caa2f6461474e0014",
+        "license": "MIT"
+      },
+      "surface": "List, Grid, getScrollbarSize, useDynamicRowHeight, four imperative-ref hooks, and all eight public types from react-window 2.3.1. The complete 119-case upstream unit suite runs in pristine React and generated Octane lanes, with differential, SSR, hydration, shared public types, and native Chromium startup, scrolling, and direction-change coverage.",
       "divergences": [
         "Octane reserves the second raw function-component invocation argument for its internal block ABI; public props and rendered behavior match, so instrumentation should not assert React's undocumented undefined second argument.",
         "Keyed state and DOM identity are preserved, but sibling effect-log order and equal-prop rerender counts may differ after reordering because Octane schedules moved blocks and memoizes unchanged children differently."
       ],
       "ssr": "Supported and tested — defaultHeight/defaultWidth produce deterministic bounded List and Grid markup without browser globals, and hydration adopts the server nodes before live scrolling and measurement.",
-      "verified": "2026-08-03"
+      "verified": "2026-09-13"
     },
     {
       "name": "@octanejs/wouter",

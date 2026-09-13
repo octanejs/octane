@@ -522,7 +522,10 @@ export function inspectBindingPackage(
 	},
 ) {
 	const issues = [];
-	const requiredFiles = ['package.json', 'README.md', 'status.json', 'UPSTREAM.md', 'LICENSE'];
+	const licenseName =
+		['LICENSE', 'LICENSE.md'].find((name) => existsSync(path.join(packageDirectory, name))) ??
+		'LICENSE';
+	const requiredFiles = ['package.json', 'README.md', 'status.json', 'UPSTREAM.md', licenseName];
 	for (const relativePath of requiredFiles) {
 		if (!existsSync(path.join(packageDirectory, relativePath)))
 			issues.push(`Missing ${relativePath}`);
@@ -630,9 +633,9 @@ export function inspectBindingPackage(
 		if (!/^## Source boundary$/m.test(upstream))
 			issues.push('UPSTREAM.md has no Source boundary section');
 	}
-	const licensePath = path.join(packageDirectory, 'LICENSE');
+	const licensePath = path.join(packageDirectory, licenseName);
 	if (existsSync(licensePath) && !isRecognizableMitText(readFileSync(licensePath, 'utf8'))) {
-		issues.push('LICENSE is not recognizable MIT text');
+		issues.push(`${licenseName} is not recognizable MIT text`);
 	}
 	const authoredSource = sourceFiles(path.join(packageDirectory, 'src'));
 	if (authoredSource.length === 0) issues.push('package has no source files');
@@ -786,8 +789,19 @@ function staticModuleSpecifiers(filePath) {
 
 function resolveRelativeSource(fromFile, specifier) {
 	const base = path.resolve(path.dirname(fromFile), specifier);
+	// TypeScript source commonly uses the eventual JavaScript extension in
+	// relative imports. Follow those source files when no emitted file exists.
+	const extension = path.extname(base);
+	const substitutions =
+		{
+			'.js': ['.ts', '.tsx'],
+			'.jsx': ['.tsx'],
+			'.mjs': ['.mts'],
+			'.cjs': ['.cts'],
+		}[extension] ?? [];
 	const candidates = [
 		base,
+		...substitutions.map((replacement) => `${base.slice(0, -extension.length)}${replacement}`),
 		...SHIPPED_SOURCE_EXTENSIONS.map((extension) => `${base}${extension}`),
 		...SHIPPED_SOURCE_EXTENSIONS.map((extension) => path.join(base, `index${extension}`)),
 	];

@@ -2,18 +2,17 @@
   "schemaVersion": 1,
   "identity": {
     "packageName": "react-window",
-    "version": "2.3.0",
+    "version": "2.3.1",
     "repository": {
       "owner": "bvaughn",
       "repo": "react-window",
       "subdirectory": null
     },
-    "commit": "4d9eebbb510262b3b7e95463cf49a10de53ea77d",
-    "integrity": "sha512-FW6TIpaOH646k51X7yE+LSCWGkt5Pfsnc1fVyq/sCI9h0pTqmMiBXM04pzFKg3Bt7NGkeV6kqbU8d/QjmFS7Ug=="
+    "commit": "eb7398fdc0e9d9b54560142caa2f6461474e0014",
+    "integrity": "sha512-x/+N6b7FNVtlKE7ZQlfOY2bYdA7VXvT2B1Emo/ndAsFsSQ98FBIO88MsatNELbSIlYJgkCd7unBps5XMfv0Eyg=="
   },
   "license": {
     "spdx": "MIT",
-    "declaration": "manifest",
     "evidence": [
       {
         "path": "LICENSE.md",
@@ -22,7 +21,14 @@
     ],
     "notices": []
   },
-  "scopes": ["LICENSE.md", "lib", "package.json", "src/constants.ts", "vitest.setup.js"],
+  "scopes": [
+    "LICENSE.md",
+    "integrations/tests/tests/layout-shift.spec.tsx",
+    "lib",
+    "package.json",
+    "src/constants.ts",
+    "vitest.setup.js"
+  ],
   "adaptedMappings": [
     {
       "fromRoot": "lib",
@@ -154,9 +160,18 @@
     {
       "find": "\"./useListCallbackRef\"",
       "replace": "\"../../../../src/components/list/useListCallbackRef\""
+    },
+    {
+      "find": "\"./useIsRtl\"",
+      "replace": "\"../../../src/core/useIsRtl\""
     }
   ],
   "files": [
+    {
+      "path": "integrations/tests/tests/layout-shift.spec.tsx",
+      "gitBlob": "6c7008d7bc613c699f45125be62e784549360949",
+      "size": 2422
+    },
     {
       "path": "lib/components/grid/Grid.test.tsx",
       "gitBlob": "9417c382c3f368165cb784b0193f922962fe670f",
@@ -278,9 +293,14 @@
       "size": 516
     },
     {
+      "path": "lib/core/useIsRtl.test.ts",
+      "gitBlob": "0296fa3b3ffc07d6f4cf7f552886c4e93f138362",
+      "size": 1202
+    },
+    {
       "path": "lib/core/useIsRtl.ts",
-      "gitBlob": "ee687b5ff6a55f28af69f266a57b7d966c3df3e0",
-      "size": 422
+      "gitBlob": "b9f35f897e0253245fa8672372aaffc84395feee",
+      "size": 447
     },
     {
       "path": "lib/core/useItemSize.ts",
@@ -429,7 +449,7 @@
     },
     {
       "path": "package.json",
-      "gitBlob": "cb6c91f51c0a18f2bc884bc7414b8d44c2df7bcf",
+      "gitBlob": "9dc854cabaab75eb53cf0a57e189de0e4a4ff512",
       "size": 3884
     },
     {
@@ -443,5 +463,5 @@
       "size": 594
     }
   ],
-  "fingerprint": "be6cf4ca0e496fe6158421b3063d46bd7f34e638d67d1e347f47f034050e61d6"
+  "fingerprint": "c2ddb0c860b1d8e4888e15f3ac8af7faec173e1712022c99a2dde9590dec7c0f"
 }

@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { copyFileSync, existsSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 // A wrapper may start its own pristine suite. The package script plan counts
 // the outer runner; its test assertions own the nested suite's result.
@@ -27,15 +28,14 @@ function registerInvocation(runner) {
 	return path.join(reportDirectory, reportFile);
 }
 
-function preserveReportPath(reportPath, runner) {
+function preserveJestReportPath(reportPath) {
 	const args = process.argv.slice(2);
 	let original;
 	for (let i = 0; i < args.length; i++) {
-		const match = args[i].match(/^--outputFile(\.json)?(?:=(.*))?$/);
-		if (!match || (match[1] && runner !== 'vitest')) continue;
-		const value = match[2] ?? args[++i];
+		const match = args[i].match(/^--outputFile(?:=(.*))?$/);
+		if (!match) continue;
+		const value = match[1] ?? args[++i];
 		if (value) original = path.resolve(value);
-		if (match[1]) break;
 	}
 	if (!original) {
 		process.argv.push(`--outputFile=${reportPath}`);
@@ -54,11 +54,14 @@ if (
 	/vitest/i.test(entryPoint)
 ) {
 	const reportPath = registerInvocation('vitest');
+	process.env.REACT_PORT_VITEST_REPORT_FILE = reportPath;
 	// Keep assertion failures visible while the JSON report supplies machine evidence.
-	process.argv.push('--reporter=default', '--reporter=json');
-	preserveReportPath(reportPath, 'vitest');
+	process.argv.push(
+		'--reporter=default',
+		`--reporter=${fileURLToPath(new URL('./package-test-json-reporter.mjs', import.meta.url))}`,
+	);
 } else if (reportDirectory && /^jest(?:\.m?js)?$/i.test(entryName)) {
 	const reportPath = registerInvocation('jest');
 	process.argv.push('--json');
-	preserveReportPath(reportPath, 'jest');
+	preserveJestReportPath(reportPath);
 }
