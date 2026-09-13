@@ -77,7 +77,7 @@
       "WeakSet"
     ],
     "microtaskContract": "Universal roots use the standard queueMicrotask global when present. A native host without that global must pass options.scheduleMicrotask; Lynx provides lynx.queueMicrotask for this integration point.",
-    "symbolContract": "Nested hook slots use Symbol.prototype.description, which the selected Lynx runtimes document as supported.",
+    "symbolContract": "The selected Lynx runtimes document support for Symbol.prototype.description, used by nested hook slots in the shared hook-slot-cache module. Its guarded native-function inspection is optional: an unavailable, altered, or unrecognized inspector disables caching and preserves ordinary slot resolution.",
     "diagnosedApplicationGlobals": [
       "FinalizationRegistry",
       "queueMicrotask",

@@ -47,3 +47,20 @@ export function ServerGetter() @{
 	if (count < 2) setCount(count + 1);
 	<span>{'Count: ' + getCount()}</span>
 }
+
+function useIndependentCounters(initial, step) {
+	const state = useState(() => initial);
+	const reducer = useReducer((value, amount) => value + amount * step, initial);
+	return { state, reducer };
+}
+
+export function ConditionalGetters(props) @{
+	let first;
+	if (props.visible) first = useIndependentCounters(10, props.step);
+	const second = useIndependentCounters(20, props.step);
+	props.bind({ first, second });
+	<output>
+		{(first ? first.state[0] + ':' + first.reducer[0] : 'hidden') + '|' + second.state[0] + ':' +
+			second.reducer[0]}
+	</output>
+}

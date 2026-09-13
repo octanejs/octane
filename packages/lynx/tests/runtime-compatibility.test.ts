@@ -23,10 +23,12 @@ const toolchain = JSON.parse(readFileSync(resolve(LYNX_ROOT, 'audit/toolchain.js
 	nativeSdk: { version: string };
 	packages: Array<{ name: string; version: string }>;
 };
-const universalCore = readFileSync(
+// Built-in use may move into shared helpers without changing the native contract.
+const universalCore = runtimeSourceGraph(
 	resolve(REPOSITORY_ROOT, 'packages/octane/src/universal-core.ts'),
-	'utf8',
-);
+)
+	.files.map((filename) => readFileSync(resolve(LYNX_ROOT, filename), 'utf8'))
+	.join('\n');
 const lifecycleData = readFileSync(resolve(LYNX_ROOT, 'src/core/lifecycle-data.ts'), 'utf8');
 
 function runtimeSourceGraph(entry: string): { files: string[]; packages: string[] } {
