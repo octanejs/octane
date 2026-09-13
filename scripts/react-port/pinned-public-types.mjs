@@ -163,21 +163,18 @@ export function pinnedPublicEntries(packageDirectory, node, { baseline } = {}) {
 		};
 		visit(source);
 	}
-	for (const [subpath, target] of Object.entries(manifest.exports ?? { '.': null })) {
+	for (const subpath of Object.keys(manifest.exports ?? { '.': null })) {
 		if (subpath === './package.json') continue;
-		let file = target?.import?.types ?? target?.types ?? target?.default?.types;
-		if (typeof file !== 'string') {
-			const request = subpath === '.' ? manifest.name : manifest.name + subpath.slice(1);
-			const resolved = ts.resolveModuleName(
-				request,
-				path.join(packageDirectory, '__public_type_witness__.ts'),
-				{ moduleResolution: ts.ModuleResolutionKind.Bundler, module: ts.ModuleKind.ESNext },
-				ts.sys,
-			).resolvedModule?.resolvedFileName;
-			if (!resolved || !/\.d\.[cm]?ts$/.test(resolved))
-				throw new Error(`Public export has no pinned declaration: ${subpath}`);
-			file = './' + path.relative(installedRoot, resolved).split(path.sep).join('/');
-		}
+		const request = subpath === '.' ? manifest.name : manifest.name + subpath.slice(1);
+		const resolved = ts.resolveModuleName(
+			request,
+			path.join(packageDirectory, '__public_type_witness__.ts'),
+			{ moduleResolution: ts.ModuleResolutionKind.Bundler, module: ts.ModuleKind.ESNext },
+			ts.sys,
+		).resolvedModule?.resolvedFileName;
+		if (!resolved || !/\.d\.[cm]?ts$/.test(resolved))
+			throw new Error(`Public export has no pinned declaration: ${subpath}`);
+		const file = './' + path.relative(installedRoot, resolved).split(path.sep).join('/');
 		if (!published.files.has(`package/${file.slice(2)}`))
 			throw new Error(`Public export points outside the pinned declarations: ${file}`);
 		const specifier = subpath === '.' ? node.binding : node.binding + subpath.slice(1);

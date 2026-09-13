@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "e6eba27d5f5c8ea9fcc2c61ffc406e502a9f40f5e9c1ac100f2a9c316974fabe"
+      "lockfileSha256": "d4831945917b00aa5977386fae32c0c8553cbdcf276e5e326c6a50ae490b5391"
     }
   },
   "lanes": [
@@ -356,8 +356,8 @@
             },
             {
               "id": "differential:tanstack-table-sorting",
-              "testName": "SortingTable: asc → desc → cleared → replace, byte-identical",
-              "fullName": "differential: @octanejs/tanstack-table vs real @tanstack/react-table SortingTable: asc → desc → cleared → replace, byte-identical"
+              "testName": "SortingTable: asc \u2192 desc \u2192 cleared \u2192 replace, byte-identical",
+              "fullName": "differential: @octanejs/tanstack-table vs real @tanstack/react-table SortingTable: asc \u2192 desc \u2192 cleared \u2192 replace, byte-identical"
             },
             {
               "id": "differential:tanstack-table-filter-pagination",
@@ -485,12 +485,12 @@
       ],
       "upstreamResult": "React uses synthetic input changes, forwardRef wrappers, SSR strings and an invisible suspended owner without an additional committed notification.",
       "octaneResult": "Native input events and ref props preserve the same DOM assertions. SSR assertions read RenderResult.html and normalize only hydration boundary comments. The first held transition restores the committed owner to publish its cue; this accepted render produces one unchanged-state notification, while suspended state never reaches base atoms or subscribers.",
-      "rationale": "These adaptations follow Octane’s documented native events, ref/SSR APIs and pending-cue commit behavior. The immutable React suites keep all original assertions. Native tests retain exact visible state, base state, notification values, markup and mounted-input identity.",
+      "rationale": "These adaptations follow Octane\u2019s documented native events, ref/SSR APIs and pending-cue commit behavior. The immutable React suites keep all original assertions. Native tests retain exact visible state, base state, notification values, markup and mounted-input identity.",
       "classification": "renderer-contract",
       "consumerImpact": "Use onInput for per-keystroke text edits and refs as props. Raw store observers may receive the unchanged committed snapshot during a held transition; they never observe the suspended controlled value.",
       "migrationGuidance": "Read server result .html, use native input events/ref props, and compare selected store values instead of relying on React-specific commit counts.",
       "owner": "@octanejs/tanstack-table",
-      "reviewCondition": "Review when upstream tests or Octane’s input, ref, SSR or transition commit contracts change."
+      "reviewCondition": "Review when upstream tests or Octane\u2019s input, ref, SSR or transition commit contracts change."
     }
   ],
   "materializedTests": "packages/tanstack-table"

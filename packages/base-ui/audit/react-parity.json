@@ -11,7 +11,10 @@
     "integrity": "sha256:699d86811d03011bd2b1f8eba6f8945b1c9912a635ddda6b31edcdd6e5d2cf7b",
     "verification": "verified"
   },
-  "upstreamSuites": { "runtime": "present", "types": "present" },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "present"
+  },
   "adaptedRoots": {
     "source": {
       "roots": ["packages/base-ui/src"],
@@ -37,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "e6eba27d5f5c8ea9fcc2c61ffc406e502a9f40f5e9c1ac100f2a9c316974fabe"
+      "lockfileSha256": "d4831945917b00aa5977386fae32c0c8553cbdcf276e5e326c6a50ae490b5391"
     }
   },
   "lanes": [
@@ -91,8 +94,8 @@
             },
             {
               "id": "differential:base-ui-switch-native-input",
-              "testName": "Switch: uncontrolled — click toggles aria-checked + data-checked (native input adaptation)",
-              "fullName": "differential: @octanejs/base-ui vs real Base UI on React Switch: uncontrolled — click toggles aria-checked + data-checked (native input adaptation)"
+              "testName": "Switch: uncontrolled \u2014 click toggles aria-checked + data-checked (native input adaptation)",
+              "fullName": "differential: @octanejs/base-ui vs real Base UI on React Switch: uncontrolled \u2014 click toggles aria-checked + data-checked (native input adaptation)"
             },
             {
               "id": "differential:base-ui-number-field",

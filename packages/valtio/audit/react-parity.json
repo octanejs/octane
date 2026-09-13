@@ -11,7 +11,10 @@
     "integrity": "sha256:90ba3507f7fefcf8654c36bcedffa1f7b96d5a9ed7cde14a9df52107eb90c825",
     "verification": "verified"
   },
-  "upstreamSuites": { "runtime": "absent", "types": "insufficient" },
+  "upstreamSuites": {
+    "runtime": "absent",
+    "types": "insufficient"
+  },
   "adaptedRoots": {
     "source": {
       "roots": ["packages/valtio/src"],
@@ -37,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "e6eba27d5f5c8ea9fcc2c61ffc406e502a9f40f5e9c1ac100f2a9c316974fabe"
+      "lockfileSha256": "d4831945917b00aa5977386fae32c0c8553cbdcf276e5e326c6a50ae490b5391"
     }
   },
   "lanes": [

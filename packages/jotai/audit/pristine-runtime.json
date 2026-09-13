@@ -1,0 +1,2074 @@
+{
+  "schemaVersion": 1,
+  "project": "jotai-pristine",
+  "roots": ["packages/jotai/upstream"],
+  "files": [
+    "packages/jotai/upstream/tests/react/abortable.test.tsx",
+    "packages/jotai/upstream/tests/react/async.test.tsx",
+    "packages/jotai/upstream/tests/react/async2.test.tsx",
+    "packages/jotai/upstream/tests/react/basic.test.tsx",
+    "packages/jotai/upstream/tests/react/dependency.test.tsx",
+    "packages/jotai/upstream/tests/react/error.test.tsx",
+    "packages/jotai/upstream/tests/react/items.test.tsx",
+    "packages/jotai/upstream/tests/react/onmount.test.tsx",
+    "packages/jotai/upstream/tests/react/optimization.test.tsx",
+    "packages/jotai/upstream/tests/react/provider.test.tsx",
+    "packages/jotai/upstream/tests/react/transition.test.tsx",
+    "packages/jotai/upstream/tests/react/types.test.tsx",
+    "packages/jotai/upstream/tests/react/useAtomValue.test.tsx",
+    "packages/jotai/upstream/tests/react/useAtomValueRaw.test.tsx",
+    "packages/jotai/upstream/tests/react/useAtomValueRawSync.test.tsx",
+    "packages/jotai/upstream/tests/react/useSetAtom.test.tsx",
+    "packages/jotai/upstream/tests/react/utils/types.test.tsx",
+    "packages/jotai/upstream/tests/react/utils/useAtomCallback.test.tsx",
+    "packages/jotai/upstream/tests/react/utils/useHydrateAtoms.test.tsx",
+    "packages/jotai/upstream/tests/react/utils/useReducerAtom.test.tsx",
+    "packages/jotai/upstream/tests/react/utils/useResetAtom.test.tsx",
+    "packages/jotai/upstream/tests/react/vanilla-utils/atomWithDefault.test.tsx",
+    "packages/jotai/upstream/tests/react/vanilla-utils/atomWithObservable.test.tsx",
+    "packages/jotai/upstream/tests/react/vanilla-utils/atomWithReducer.test.tsx",
+    "packages/jotai/upstream/tests/react/vanilla-utils/atomWithRefresh.test.tsx",
+    "packages/jotai/upstream/tests/react/vanilla-utils/atomWithStorage.test.tsx",
+    "packages/jotai/upstream/tests/react/vanilla-utils/freezeAtom.test.tsx",
+    "packages/jotai/upstream/tests/react/vanilla-utils/selectAtom.test.tsx",
+    "packages/jotai/upstream/tests/react/vanilla-utils/splitAtom.test.tsx",
+    "packages/jotai/upstream/tests/vanilla/basic.test.tsx",
+    "packages/jotai/upstream/tests/vanilla/dependency.test.tsx",
+    "packages/jotai/upstream/tests/vanilla/derive.test.tsx",
+    "packages/jotai/upstream/tests/vanilla/effect.test.ts",
+    "packages/jotai/upstream/tests/vanilla/internals.test.tsx",
+    "packages/jotai/upstream/tests/vanilla/memoryleaks.test.ts",
+    "packages/jotai/upstream/tests/vanilla/store.test.tsx",
+    "packages/jotai/upstream/tests/vanilla/storedev.test.tsx",
+    "packages/jotai/upstream/tests/vanilla/types.test.tsx",
+    "packages/jotai/upstream/tests/vanilla/utils/atomWithDefault.test.ts",
+    "packages/jotai/upstream/tests/vanilla/utils/atomWithLazy.test.ts",
+    "packages/jotai/upstream/tests/vanilla/utils/atomWithRefresh.test.ts",
+    "packages/jotai/upstream/tests/vanilla/utils/atomWithReset.test.ts",
+    "packages/jotai/upstream/tests/vanilla/utils/types.test.tsx",
+    "packages/jotai/upstream/tests/vanilla/utils/unwrap.test.ts"
+  ],
+  "tests": [
+    {
+      "id": "runtime:066374fda20c91f4",
+      "file": "packages/jotai/upstream/tests/react/abortable.test.tsx",
+      "fullName": "abortable atom test can abort with event listener"
+    },
+    {
+      "id": "runtime:dde7130c5a6c15bd",
+      "file": "packages/jotai/upstream/tests/react/abortable.test.tsx",
+      "fullName": "abortable atom test can abort with signal.aborted"
+    },
+    {
+      "id": "runtime:14cc2ffe0e4f6d17",
+      "file": "packages/jotai/upstream/tests/react/abortable.test.tsx",
+      "fullName": "abortable atom test does not abort on unmount"
+    },
+    {
+      "id": "runtime:8e064e2dcd46a435",
+      "file": "packages/jotai/upstream/tests/react/abortable.test.tsx",
+      "fullName": "abortable atom test throws aborted error (like fetch)"
+    },
+    {
+      "id": "runtime:5e3aa486189eed8d",
+      "file": "packages/jotai/upstream/tests/react/async.test.tsx",
+      "fullName": "Handles synchronously invoked async set (#375)"
+    },
+    {
+      "id": "runtime:bec4c37d4cadd3f5",
+      "file": "packages/jotai/upstream/tests/react/async.test.tsx",
+      "fullName": "a derived atom from a newly created async atom (#351)"
+    },
+    {
+      "id": "runtime:6034c4be2d602491",
+      "file": "packages/jotai/upstream/tests/react/async.test.tsx",
+      "fullName": "async atom double chain with setTimeout"
+    },
+    {
+      "id": "runtime:f91344316395412b",
+      "file": "packages/jotai/upstream/tests/react/async.test.tsx",
+      "fullName": "async atom double chain without setTimeout (#751)"
+    },
+    {
+      "id": "runtime:b2c21f3e3cf0e152",
+      "file": "packages/jotai/upstream/tests/react/async.test.tsx",
+      "fullName": "async get and useEffect on parent"
+    },
+    {
+      "id": "runtime:3ac112b8676ff56c",
+      "file": "packages/jotai/upstream/tests/react/async.test.tsx",
+      "fullName": "async get with another dep and useEffect on parent"
+    },
+    {
+      "id": "runtime:eedc5b28d68e01ba",
+      "file": "packages/jotai/upstream/tests/react/async.test.tsx",
+      "fullName": "async write chain"
+    },
+    {
+      "id": "runtime:0543dc43c086a9d3",
+      "file": "packages/jotai/upstream/tests/react/async.test.tsx",
+      "fullName": "async write self atom"
+    },
+    {
+      "id": "runtime:a89e3f66c465be2f",
+      "file": "packages/jotai/upstream/tests/react/async.test.tsx",
+      "fullName": "combine two promise atom values (#442)"
+    },
+    {
+      "id": "runtime:fc173d7f876da090",
+      "file": "packages/jotai/upstream/tests/react/async.test.tsx",
+      "fullName": "does not show async stale result"
+    },
+    {
+      "id": "runtime:aa0361c847a5f3eb",
+      "file": "packages/jotai/upstream/tests/react/async.test.tsx",
+      "fullName": "does not show async stale result on derived atom"
+    },
+    {
+      "id": "runtime:fda60e56412ae778",
+      "file": "packages/jotai/upstream/tests/react/async.test.tsx",
+      "fullName": "multiple derived atoms with dependency chaining and async write (#813)"
+    },
+    {
+      "id": "runtime:a3e1ba2ea5d9fc63",
+      "file": "packages/jotai/upstream/tests/react/async.test.tsx",
+      "fullName": "non suspense async write self atom with setTimeout (#389)"
+    },
+    {
+      "id": "runtime:735d3acd12912f70",
+      "file": "packages/jotai/upstream/tests/react/async.test.tsx",
+      "fullName": "reuses promises on initial read"
+    },
+    {
+      "id": "runtime:3929e0a0ecd8f941",
+      "file": "packages/jotai/upstream/tests/react/async.test.tsx",
+      "fullName": "set promise atom value on write (#304)"
+    },
+    {
+      "id": "runtime:e74d0f4cb11924d9",
+      "file": "packages/jotai/upstream/tests/react/async.test.tsx",
+      "fullName": "set two promise atoms at once"
+    },
+    {
+      "id": "runtime:427e91179c9daa72",
+      "file": "packages/jotai/upstream/tests/react/async.test.tsx",
+      "fullName": "should override promise as atom value (#430)"
+    },
+    {
+      "id": "runtime:c978f45f8240c91e",
+      "file": "packages/jotai/upstream/tests/react/async.test.tsx",
+      "fullName": "update unmounted async atom with intermediate atom"
+    },
+    {
+      "id": "runtime:3caec83c8aa9c1e9",
+      "file": "packages/jotai/upstream/tests/react/async.test.tsx",
+      "fullName": "updates an async atom in child useEffect on remount"
+    },
+    {
+      "id": "runtime:df7dea73183b3e54",
+      "file": "packages/jotai/upstream/tests/react/async.test.tsx",
+      "fullName": "updates an async atom in child useEffect on remount without setTimeout"
+    },
+    {
+      "id": "runtime:42045b6fcdf408a7",
+      "file": "packages/jotai/upstream/tests/react/async.test.tsx",
+      "fullName": "uses an async atom that depends on another async atom"
+    },
+    {
+      "id": "runtime:b7e19674516e96ab",
+      "file": "packages/jotai/upstream/tests/react/async.test.tsx",
+      "fullName": "uses async atom double chain (#306)"
+    },
+    {
+      "id": "runtime:9d686471999b71fd",
+      "file": "packages/jotai/upstream/tests/react/async.test.tsx",
+      "fullName": "uses async atom in the middle of dependency chain"
+    },
+    {
+      "id": "runtime:ad59a703e99300b2",
+      "file": "packages/jotai/upstream/tests/react/async.test.tsx",
+      "fullName": "uses multiple async atoms at once"
+    },
+    {
+      "id": "runtime:86c0a856cbeb01c2",
+      "file": "packages/jotai/upstream/tests/react/async.test.tsx",
+      "fullName": "works with async get with extra deps"
+    },
+    {
+      "id": "runtime:ba32f656e436a814",
+      "file": "packages/jotai/upstream/tests/react/async2.test.tsx",
+      "fullName": "infinite pending odd counter"
+    },
+    {
+      "id": "runtime:5f3b114363942094",
+      "file": "packages/jotai/upstream/tests/react/async2.test.tsx",
+      "fullName": "suspend suspend for Promise.resolve"
+    },
+    {
+      "id": "runtime:69db21de01b1d405",
+      "file": "packages/jotai/upstream/tests/react/async2.test.tsx",
+      "fullName": "timing issue resolves dependencies reliably after a delay (#2192)"
+    },
+    {
+      "id": "runtime:25cf5b2ec8010ea1",
+      "file": "packages/jotai/upstream/tests/react/async2.test.tsx",
+      "fullName": "with onMount does not infinite loop with setting a promise (#2931)"
+    },
+    {
+      "id": "runtime:10b5585c4faf313c",
+      "file": "packages/jotai/upstream/tests/react/async2.test.tsx",
+      "fullName": "write to async atom twice no wait"
+    },
+    {
+      "id": "runtime:369e1803bcb5761a",
+      "file": "packages/jotai/upstream/tests/react/async2.test.tsx",
+      "fullName": "write to async atom twice wait Promise.resolve()"
+    },
+    {
+      "id": "runtime:52f0c63ae418ceb2",
+      "file": "packages/jotai/upstream/tests/react/async2.test.tsx",
+      "fullName": "write to async atom twice wait setTimeout()"
+    },
+    {
+      "id": "runtime:c88e71191ac63a4d",
+      "file": "packages/jotai/upstream/tests/react/basic.test.tsx",
+      "fullName": "async chain for multiple sync and async atoms (#443)"
+    },
+    {
+      "id": "runtime:f6c66a7bb1b761ec",
+      "file": "packages/jotai/upstream/tests/react/basic.test.tsx",
+      "fullName": "can write an atom value on useEffect"
+    },
+    {
+      "id": "runtime:85b364f334333b7c",
+      "file": "packages/jotai/upstream/tests/react/basic.test.tsx",
+      "fullName": "can write an atom value on useEffect in children"
+    },
+    {
+      "id": "runtime:b376718d4c3c9fa4",
+      "file": "packages/jotai/upstream/tests/react/basic.test.tsx",
+      "fullName": "chained derive atom with onMount and useEffect (#897)"
+    },
+    {
+      "id": "runtime:2c5ed736b46035f5",
+      "file": "packages/jotai/upstream/tests/react/basic.test.tsx",
+      "fullName": "changes atom from parent (#273, #275)"
+    },
+    {
+      "id": "runtime:63f04c25290742fb",
+      "file": "packages/jotai/upstream/tests/react/basic.test.tsx",
+      "fullName": "onMount is not called when atom value is accessed from writeGetter in derived atom (#942)"
+    },
+    {
+      "id": "runtime:c31e46ba4550e118",
+      "file": "packages/jotai/upstream/tests/react/basic.test.tsx",
+      "fullName": "only invoke read function on use atom"
+    },
+    {
+      "id": "runtime:3bd12f1e1bab72ff",
+      "file": "packages/jotai/upstream/tests/react/basic.test.tsx",
+      "fullName": "only re-renders if value has changed"
+    },
+    {
+      "id": "runtime:f35e905e44a2a316",
+      "file": "packages/jotai/upstream/tests/react/basic.test.tsx",
+      "fullName": "re-renders a time delayed derived atom with the same initial value (#947)"
+    },
+    {
+      "id": "runtime:fa5f338048175d30",
+      "file": "packages/jotai/upstream/tests/react/basic.test.tsx",
+      "fullName": "runs update only once in StrictMode"
+    },
+    {
+      "id": "runtime:1e2c8a423a4d9f22",
+      "file": "packages/jotai/upstream/tests/react/basic.test.tsx",
+      "fullName": "set atom right after useEffect (#208)"
+    },
+    {
+      "id": "runtime:61b6babcab8e7265",
+      "file": "packages/jotai/upstream/tests/react/basic.test.tsx",
+      "fullName": "should be able to use a double derived atom twice and useEffect (#373)"
+    },
+    {
+      "id": "runtime:a4043c9295814761",
+      "file": "packages/jotai/upstream/tests/react/basic.test.tsx",
+      "fullName": "sync re-renders with useState re-renders (#827)"
+    },
+    {
+      "id": "runtime:c04c4f061fcf4bb1",
+      "file": "packages/jotai/upstream/tests/react/basic.test.tsx",
+      "fullName": "updates a derived atom in useEffect with two primitive atoms"
+    },
+    {
+      "id": "runtime:d9f403a8aa0801a2",
+      "file": "packages/jotai/upstream/tests/react/basic.test.tsx",
+      "fullName": "updates two atoms in child useEffect"
+    },
+    {
+      "id": "runtime:697c5e5a056e3daf",
+      "file": "packages/jotai/upstream/tests/react/basic.test.tsx",
+      "fullName": "useAtom returns consistent value with input with changing atoms (#1235)"
+    },
+    {
+      "id": "runtime:5ca617b57e5d8161",
+      "file": "packages/jotai/upstream/tests/react/basic.test.tsx",
+      "fullName": "uses a primitive atom"
+    },
+    {
+      "id": "runtime:d6c61a2b15630e20",
+      "file": "packages/jotai/upstream/tests/react/basic.test.tsx",
+      "fullName": "uses a read-only derived atom"
+    },
+    {
+      "id": "runtime:0a488f2004dceaef",
+      "file": "packages/jotai/upstream/tests/react/basic.test.tsx",
+      "fullName": "uses a read-write derived atom"
+    },
+    {
+      "id": "runtime:3e7c1c0bec64ef0d",
+      "file": "packages/jotai/upstream/tests/react/basic.test.tsx",
+      "fullName": "uses a read-write derived atom with two primitive atoms"
+    },
+    {
+      "id": "runtime:0e5ffc75cb57f5e1",
+      "file": "packages/jotai/upstream/tests/react/basic.test.tsx",
+      "fullName": "uses a writable atom without read function"
+    },
+    {
+      "id": "runtime:cfb1a6a40bb638cb",
+      "file": "packages/jotai/upstream/tests/react/basic.test.tsx",
+      "fullName": "uses a write-only derived atom"
+    },
+    {
+      "id": "runtime:b00541113ce27348",
+      "file": "packages/jotai/upstream/tests/react/basic.test.tsx",
+      "fullName": "uses an async write-only atom"
+    },
+    {
+      "id": "runtime:fc76c11e669dc809",
+      "file": "packages/jotai/upstream/tests/react/basic.test.tsx",
+      "fullName": "uses atoms with tree dependencies"
+    },
+    {
+      "id": "runtime:2f7987b96de98a71",
+      "file": "packages/jotai/upstream/tests/react/basic.test.tsx",
+      "fullName": "works with async get"
+    },
+    {
+      "id": "runtime:4e148c0ede3cc9d6",
+      "file": "packages/jotai/upstream/tests/react/basic.test.tsx",
+      "fullName": "works with async get without setTimeout"
+    },
+    {
+      "id": "runtime:782aa61fc0e11e0c",
+      "file": "packages/jotai/upstream/tests/react/basic.test.tsx",
+      "fullName": "write self atom (undocumented usage)"
+    },
+    {
+      "id": "runtime:5fa2e0a80eb7a245",
+      "file": "packages/jotai/upstream/tests/react/dependency.test.tsx",
+      "fullName": "Should bail for derived async chains (#877)"
+    },
+    {
+      "id": "runtime:f402dcdb55abc5c2",
+      "file": "packages/jotai/upstream/tests/react/dependency.test.tsx",
+      "fullName": "Should bail for derived sync chains (#877)"
+    },
+    {
+      "id": "runtime:914e5677108bf26c",
+      "file": "packages/jotai/upstream/tests/react/dependency.test.tsx",
+      "fullName": "can read sync derived atom in write without initializing"
+    },
+    {
+      "id": "runtime:c9e932b30f1c02ea",
+      "file": "packages/jotai/upstream/tests/react/dependency.test.tsx",
+      "fullName": "can remount atoms with dependency (#490)"
+    },
+    {
+      "id": "runtime:77b7cb8d4564dd4b",
+      "file": "packages/jotai/upstream/tests/react/dependency.test.tsx",
+      "fullName": "can remount atoms with intermediate atom"
+    },
+    {
+      "id": "runtime:fe76d8f45e5e315b",
+      "file": "packages/jotai/upstream/tests/react/dependency.test.tsx",
+      "fullName": "can update dependents with useEffect (#512)"
+    },
+    {
+      "id": "runtime:ceceac622362d5f2",
+      "file": "packages/jotai/upstream/tests/react/dependency.test.tsx",
+      "fullName": "derived atom to update base atom in callback"
+    },
+    {
+      "id": "runtime:fea90cbf48c0280f",
+      "file": "packages/jotai/upstream/tests/react/dependency.test.tsx",
+      "fullName": "glitch free basic"
+    },
+    {
+      "id": "runtime:c7a4aafe670f2d87",
+      "file": "packages/jotai/upstream/tests/react/dependency.test.tsx",
+      "fullName": "glitch free double chain"
+    },
+    {
+      "id": "runtime:faf4f01a7af0ce78",
+      "file": "packages/jotai/upstream/tests/react/dependency.test.tsx",
+      "fullName": "glitch free same value"
+    },
+    {
+      "id": "runtime:339785ef64439142",
+      "file": "packages/jotai/upstream/tests/react/dependency.test.tsx",
+      "fullName": "should bail out updating if not changed"
+    },
+    {
+      "id": "runtime:b1c78aed840dfad1",
+      "file": "packages/jotai/upstream/tests/react/dependency.test.tsx",
+      "fullName": "should bail out updating if not changed, 2 level"
+    },
+    {
+      "id": "runtime:684b14026f86bcca",
+      "file": "packages/jotai/upstream/tests/react/dependency.test.tsx",
+      "fullName": "should keep a dependent atom value even if unmounted"
+    },
+    {
+      "id": "runtime:efaada25a8cb9344",
+      "file": "packages/jotai/upstream/tests/react/dependency.test.tsx",
+      "fullName": "should keep an atom value even if unmounted"
+    },
+    {
+      "id": "runtime:9f346051331d1617",
+      "file": "packages/jotai/upstream/tests/react/dependency.test.tsx",
+      "fullName": "should not call read function for unmounted atoms in StrictMode (#2076)"
+    },
+    {
+      "id": "runtime:cfc9aca16afe7ab2",
+      "file": "packages/jotai/upstream/tests/react/dependency.test.tsx",
+      "fullName": "update correctly with async updates (#1250)"
+    },
+    {
+      "id": "runtime:af8270222fb734b6",
+      "file": "packages/jotai/upstream/tests/react/dependency.test.tsx",
+      "fullName": "update unmounted atom with intermediate atom"
+    },
+    {
+      "id": "runtime:2b597b8730168234",
+      "file": "packages/jotai/upstream/tests/react/dependency.test.tsx",
+      "fullName": "works a primitive atom and a dependent async atom"
+    },
+    {
+      "id": "runtime:ec65d0bd77e16c24",
+      "file": "packages/jotai/upstream/tests/react/dependency.test.tsx",
+      "fullName": "works with 2 level dependencies"
+    },
+    {
+      "id": "runtime:a1cceecb754a4317",
+      "file": "packages/jotai/upstream/tests/react/dependency.test.tsx",
+      "fullName": "works with async dependencies (#2565)"
+    },
+    {
+      "id": "runtime:2c71024dade5ca4e",
+      "file": "packages/jotai/upstream/tests/react/dependency.test.tsx",
+      "fullName": "works with unused hook (#2554)"
+    },
+    {
+      "id": "runtime:d415274214fbfbf6",
+      "file": "packages/jotai/upstream/tests/react/error.test.tsx",
+      "fullName": "can throw a chained error in read function"
+    },
+    {
+      "id": "runtime:46658c73ccedf700",
+      "file": "packages/jotai/upstream/tests/react/error.test.tsx",
+      "fullName": "can throw a chained error in write function"
+    },
+    {
+      "id": "runtime:78fa8409a1d8f91d",
+      "file": "packages/jotai/upstream/tests/react/error.test.tsx",
+      "fullName": "can throw an error in async read function"
+    },
+    {
+      "id": "runtime:6cb8944f6a8acbfc",
+      "file": "packages/jotai/upstream/tests/react/error.test.tsx",
+      "fullName": "can throw an error in async write function"
+    },
+    {
+      "id": "runtime:c3ee09e66d9d20b6",
+      "file": "packages/jotai/upstream/tests/react/error.test.tsx",
+      "fullName": "can throw an error in read function"
+    },
+    {
+      "id": "runtime:40087aec29c0b78c",
+      "file": "packages/jotai/upstream/tests/react/error.test.tsx",
+      "fullName": "can throw an error in write function"
+    },
+    {
+      "id": "runtime:cfa8005c3d5fbad2",
+      "file": "packages/jotai/upstream/tests/react/error.test.tsx",
+      "fullName": "can throw an initial chained error in read function"
+    },
+    {
+      "id": "runtime:f60a42c42c29822d",
+      "file": "packages/jotai/upstream/tests/react/error.test.tsx",
+      "fullName": "can throw an initial error in async read function"
+    },
+    {
+      "id": "runtime:d1ce6ab0c30e79f4",
+      "file": "packages/jotai/upstream/tests/react/error.test.tsx",
+      "fullName": "can throw an initial error in read function"
+    },
+    {
+      "id": "runtime:e86e64aab047c2f8",
+      "file": "packages/jotai/upstream/tests/react/error.test.tsx",
+      "fullName": "error recovery recovers from async errors"
+    },
+    {
+      "id": "runtime:16e0285841287870",
+      "file": "packages/jotai/upstream/tests/react/error.test.tsx",
+      "fullName": "error recovery recovers from sync errors"
+    },
+    {
+      "id": "runtime:e211765d8e3904cc",
+      "file": "packages/jotai/upstream/tests/react/error.test.tsx",
+      "fullName": "throws an error while updating in effect"
+    },
+    {
+      "id": "runtime:e300a120b85ac436",
+      "file": "packages/jotai/upstream/tests/react/error.test.tsx",
+      "fullName": "throws an error while updating in effect cleanup [DEV-ONLY] double setCount"
+    },
+    {
+      "id": "runtime:1800550a9ed201ed",
+      "file": "packages/jotai/upstream/tests/react/error.test.tsx",
+      "fullName": "throws an error while updating in effect cleanup [DEV-ONLY] single setCount"
+    },
+    {
+      "id": "runtime:a687ad131481b4d7",
+      "file": "packages/jotai/upstream/tests/react/items.test.tsx",
+      "fullName": "add an item with filtered list"
+    },
+    {
+      "id": "runtime:af18baa28f7ad0ff",
+      "file": "packages/jotai/upstream/tests/react/items.test.tsx",
+      "fullName": "remove an item, then add another"
+    },
+    {
+      "id": "runtime:441af7e629939a6d",
+      "file": "packages/jotai/upstream/tests/react/onmount.test.tsx",
+      "fullName": "create atom with onMount in async get"
+    },
+    {
+      "id": "runtime:52390475886639c0",
+      "file": "packages/jotai/upstream/tests/react/onmount.test.tsx",
+      "fullName": "mount/unMount order"
+    },
+    {
+      "id": "runtime:57cde1173320c390",
+      "file": "packages/jotai/upstream/tests/react/onmount.test.tsx",
+      "fullName": "mount/unmount test"
+    },
+    {
+      "id": "runtime:0878301cdebe0620",
+      "file": "packages/jotai/upstream/tests/react/onmount.test.tsx",
+      "fullName": "mount/unmount test with async atom"
+    },
+    {
+      "id": "runtime:cbd30ae88bfbdf8d",
+      "file": "packages/jotai/upstream/tests/react/onmount.test.tsx",
+      "fullName": "one atom, one effect"
+    },
+    {
+      "id": "runtime:56ad721470c0375f",
+      "file": "packages/jotai/upstream/tests/react/onmount.test.tsx",
+      "fullName": "one derived atom, one onMount"
+    },
+    {
+      "id": "runtime:c21883bc731be072",
+      "file": "packages/jotai/upstream/tests/react/onmount.test.tsx",
+      "fullName": "one derived atom, one onMount for the derived one, and one for the regular atom + onUnMount"
+    },
+    {
+      "id": "runtime:b85fa9f20ff90388",
+      "file": "packages/jotai/upstream/tests/react/onmount.test.tsx",
+      "fullName": "subscription in base atom test"
+    },
+    {
+      "id": "runtime:a0ee2ca0fd2c88f6",
+      "file": "packages/jotai/upstream/tests/react/onmount.test.tsx",
+      "fullName": "subscription usage test"
+    },
+    {
+      "id": "runtime:906b6573626ec7c2",
+      "file": "packages/jotai/upstream/tests/react/onmount.test.tsx",
+      "fullName": "two atoms, one each"
+    },
+    {
+      "id": "runtime:4360ba21001ef918",
+      "file": "packages/jotai/upstream/tests/react/optimization.test.tsx",
+      "fullName": "does not re-render if value is the same (#1158)"
+    },
+    {
+      "id": "runtime:4d86d238d22c1e5c",
+      "file": "packages/jotai/upstream/tests/react/optimization.test.tsx",
+      "fullName": "no extra rerenders after commit with derived atoms (#1213)"
+    },
+    {
+      "id": "runtime:aeb20a6cfb687e24",
+      "file": "packages/jotai/upstream/tests/react/optimization.test.tsx",
+      "fullName": "only relevant render function called (#156)"
+    },
+    {
+      "id": "runtime:3e38d5362fffe2f6",
+      "file": "packages/jotai/upstream/tests/react/optimization.test.tsx",
+      "fullName": "only render once using atoms with write-only atom"
+    },
+    {
+      "id": "runtime:eefbdc5a36af39a8",
+      "file": "packages/jotai/upstream/tests/react/optimization.test.tsx",
+      "fullName": "useless re-renders with static atoms (#355)"
+    },
+    {
+      "id": "runtime:52c728d33973c838",
+      "file": "packages/jotai/upstream/tests/react/provider.test.tsx",
+      "fullName": "only uses initial value from provider for specific atom"
+    },
+    {
+      "id": "runtime:c35148b7cc747bf7",
+      "file": "packages/jotai/upstream/tests/react/provider.test.tsx",
+      "fullName": "renders correctly without children"
+    },
+    {
+      "id": "runtime:b5b5eee8de51780a",
+      "file": "packages/jotai/upstream/tests/react/provider.test.tsx",
+      "fullName": "uses initial values from provider"
+    },
+    {
+      "id": "runtime:49d382b59a0469fc",
+      "file": "packages/jotai/upstream/tests/react/transition.test.tsx",
+      "fullName": "useTransition can update normal atom with useTransition (#1151)"
+    },
+    {
+      "id": "runtime:e726ac2b43ac257c",
+      "file": "packages/jotai/upstream/tests/react/transition.test.tsx",
+      "fullName": "useTransition no extra commit with useTransition (#1125)"
+    },
+    {
+      "id": "runtime:ec809e543cc2db72",
+      "file": "packages/jotai/upstream/tests/react/types.test.tsx",
+      "fullName": "useAtom should handle inference of atoms (#1831 #1387)"
+    },
+    {
+      "id": "runtime:fe2a7264c8802a17",
+      "file": "packages/jotai/upstream/tests/react/types.test.tsx",
+      "fullName": "useAtom should handle inference of read-only atoms"
+    },
+    {
+      "id": "runtime:29fe9bfc309edd70",
+      "file": "packages/jotai/upstream/tests/react/types.test.tsx",
+      "fullName": "useAtom should handle primitive atom with one type argument"
+    },
+    {
+      "id": "runtime:f766b67b8c77fd84",
+      "file": "packages/jotai/upstream/tests/react/types.test.tsx",
+      "fullName": "useAtom should return the correct types"
+    },
+    {
+      "id": "runtime:de45782f5a4df14c",
+      "file": "packages/jotai/upstream/tests/react/types.test.tsx",
+      "fullName": "useSetAtom should handle inference of atoms"
+    },
+    {
+      "id": "runtime:b54276e9a57b7369",
+      "file": "packages/jotai/upstream/tests/react/useAtomValue.test.tsx",
+      "fullName": "useAtomValue basic test"
+    },
+    {
+      "id": "runtime:3790ba476d7a05d8",
+      "file": "packages/jotai/upstream/tests/react/useAtomValue.test.tsx",
+      "fullName": "useAtomValue with async atom (promise)"
+    },
+    {
+      "id": "runtime:335a5fc7e00e68ec",
+      "file": "packages/jotai/upstream/tests/react/useAtomValue.test.tsx",
+      "fullName": "useAtomValue with atom returning object"
+    },
+    {
+      "id": "runtime:4641f944bdfd72b1",
+      "file": "packages/jotai/upstream/tests/react/useAtomValue.test.tsx",
+      "fullName": "useAtomValue with error throwing atom"
+    },
+    {
+      "id": "runtime:444642b7d20335ef",
+      "file": "packages/jotai/upstream/tests/react/useAtomValueRaw.test.tsx",
+      "fullName": "useAtomValueRaw basic test"
+    },
+    {
+      "id": "runtime:0686b7466b47a49a",
+      "file": "packages/jotai/upstream/tests/react/useAtomValueRaw.test.tsx",
+      "fullName": "useAtomValueRaw renders once on initial mount"
+    },
+    {
+      "id": "runtime:8c75272fed211c9e",
+      "file": "packages/jotai/upstream/tests/react/useAtomValueRaw.test.tsx",
+      "fullName": "useAtomValueRaw returns a stable promise across re-renders"
+    },
+    {
+      "id": "runtime:55905cc9e29b6e13",
+      "file": "packages/jotai/upstream/tests/react/useAtomValueRaw.test.tsx",
+      "fullName": "useAtomValueRaw with async atom returns a promise as is"
+    },
+    {
+      "id": "runtime:dda358654fb487ea",
+      "file": "packages/jotai/upstream/tests/react/useAtomValueRaw.test.tsx",
+      "fullName": "useAtomValueRaw with derived atom"
+    },
+    {
+      "id": "runtime:1160047bbee1f6c4",
+      "file": "packages/jotai/upstream/tests/react/useAtomValueRaw.test.tsx",
+      "fullName": "useAtomValueRaw with store option"
+    },
+    {
+      "id": "runtime:180d6ac5405a373d",
+      "file": "packages/jotai/upstream/tests/react/useAtomValueRawSync.test.tsx",
+      "fullName": "useAtomValueRawSync basic test"
+    },
+    {
+      "id": "runtime:428cc6db68ac3098",
+      "file": "packages/jotai/upstream/tests/react/useAtomValueRawSync.test.tsx",
+      "fullName": "useAtomValueRawSync picks up a value written on mount before subscription"
+    },
+    {
+      "id": "runtime:9b2f68b92dc7d5d6",
+      "file": "packages/jotai/upstream/tests/react/useAtomValueRawSync.test.tsx",
+      "fullName": "useAtomValueRawSync returns a stable promise across re-renders"
+    },
+    {
+      "id": "runtime:316f7cb4c00c99c0",
+      "file": "packages/jotai/upstream/tests/react/useAtomValueRawSync.test.tsx",
+      "fullName": "useAtomValueRawSync with async atom returns a promise as is"
+    },
+    {
+      "id": "runtime:ca1b8701545c1110",
+      "file": "packages/jotai/upstream/tests/react/useAtomValueRawSync.test.tsx",
+      "fullName": "useAtomValueRawSync with derived atom"
+    },
+    {
+      "id": "runtime:9179c0909fd3484c",
+      "file": "packages/jotai/upstream/tests/react/useAtomValueRawSync.test.tsx",
+      "fullName": "useAtomValueRawSync with store option"
+    },
+    {
+      "id": "runtime:8d9d9498b79a6b4d",
+      "file": "packages/jotai/upstream/tests/react/useSetAtom.test.tsx",
+      "fullName": "[DEV-ONLY] useSetAtom throws when called with a read-only atom"
+    },
+    {
+      "id": "runtime:d83aad88541ea65f",
+      "file": "packages/jotai/upstream/tests/react/useSetAtom.test.tsx",
+      "fullName": "useSetAtom does not trigger rerender in component"
+    },
+    {
+      "id": "runtime:42470ea6c98b2101",
+      "file": "packages/jotai/upstream/tests/react/useSetAtom.test.tsx",
+      "fullName": "useSetAtom with write without an argument"
+    },
+    {
+      "id": "runtime:16c67dacd7a18d09",
+      "file": "packages/jotai/upstream/tests/react/utils/types.test.tsx",
+      "fullName": "useHydrateAtoms should not allow invalid atom types when array is passed"
+    },
+    {
+      "id": "runtime:c9eb5295083fa610",
+      "file": "packages/jotai/upstream/tests/react/utils/useAtomCallback.test.tsx",
+      "fullName": "useAtomCallback with get"
+    },
+    {
+      "id": "runtime:7d5283d73a6a4bd5",
+      "file": "packages/jotai/upstream/tests/react/utils/useAtomCallback.test.tsx",
+      "fullName": "useAtomCallback with set and update"
+    },
+    {
+      "id": "runtime:ccb042718271eba1",
+      "file": "packages/jotai/upstream/tests/react/utils/useAtomCallback.test.tsx",
+      "fullName": "useAtomCallback with set and update and arg"
+    },
+    {
+      "id": "runtime:97f9d1adda331be0",
+      "file": "packages/jotai/upstream/tests/react/utils/useAtomCallback.test.tsx",
+      "fullName": "useAtomCallback with sync atom (#1100)"
+    },
+    {
+      "id": "runtime:f9795eeb80653079",
+      "file": "packages/jotai/upstream/tests/react/utils/useHydrateAtoms.test.tsx",
+      "fullName": "passing dangerouslyForceHydrate to useHydrateAtoms will re-hydrated atoms"
+    },
+    {
+      "id": "runtime:d60d2a2c0acb8224",
+      "file": "packages/jotai/upstream/tests/react/utils/useHydrateAtoms.test.tsx",
+      "fullName": "types: useHydrateAtoms should enforce tuple/value/args types"
+    },
+    {
+      "id": "runtime:133d0ee26caf0a92",
+      "file": "packages/jotai/upstream/tests/react/utils/useHydrateAtoms.test.tsx",
+      "fullName": "useHydrateAtoms can only restore an atom once"
+    },
+    {
+      "id": "runtime:3d36995445b810fc",
+      "file": "packages/jotai/upstream/tests/react/utils/useHydrateAtoms.test.tsx",
+      "fullName": "useHydrateAtoms should not trigger unnecessary re-renders"
+    },
+    {
+      "id": "runtime:d8bfc3adbc504107",
+      "file": "packages/jotai/upstream/tests/react/utils/useHydrateAtoms.test.tsx",
+      "fullName": "useHydrateAtoms should only hydrate on first render"
+    },
+    {
+      "id": "runtime:83943e78f3367902",
+      "file": "packages/jotai/upstream/tests/react/utils/useHydrateAtoms.test.tsx",
+      "fullName": "useHydrateAtoms should only hydrate on first render using a Map"
+    },
+    {
+      "id": "runtime:258f6b191fa203a4",
+      "file": "packages/jotai/upstream/tests/react/utils/useHydrateAtoms.test.tsx",
+      "fullName": "useHydrateAtoms should respect onMount"
+    },
+    {
+      "id": "runtime:63de4a9ccb35d2b8",
+      "file": "packages/jotai/upstream/tests/react/utils/useHydrateAtoms.test.tsx",
+      "fullName": "useHydrateAtoms should work with derived atoms"
+    },
+    {
+      "id": "runtime:cebde6e662714cad",
+      "file": "packages/jotai/upstream/tests/react/utils/useReducerAtom.test.tsx",
+      "fullName": "useReducerAtom with no action argument"
+    },
+    {
+      "id": "runtime:ba216593da053883",
+      "file": "packages/jotai/upstream/tests/react/utils/useReducerAtom.test.tsx",
+      "fullName": "useReducerAtom with non-optional action argument"
+    },
+    {
+      "id": "runtime:51bceb789c3821ce",
+      "file": "packages/jotai/upstream/tests/react/utils/useReducerAtom.test.tsx",
+      "fullName": "useReducerAtom with optional action argument"
+    },
+    {
+      "id": "runtime:d66d3e4c27b228b3",
+      "file": "packages/jotai/upstream/tests/react/utils/useResetAtom.test.tsx",
+      "fullName": "atomWithReset reset based on previous value"
+    },
+    {
+      "id": "runtime:41a65f6107b08022",
+      "file": "packages/jotai/upstream/tests/react/utils/useResetAtom.test.tsx",
+      "fullName": "atomWithReset resets to its first value"
+    },
+    {
+      "id": "runtime:5e353a345eb2e1b9",
+      "file": "packages/jotai/upstream/tests/react/utils/useResetAtom.test.tsx",
+      "fullName": "atomWithReset through read-write atom"
+    },
+    {
+      "id": "runtime:65c52c3a2fad76c0",
+      "file": "packages/jotai/upstream/tests/react/utils/useResetAtom.test.tsx",
+      "fullName": "useResetAtom with custom atom"
+    },
+    {
+      "id": "runtime:cbd7a32f5a695b86",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/atomWithDefault.test.tsx",
+      "fullName": "can be set synchronously by passing value"
+    },
+    {
+      "id": "runtime:cdd9bec482873ed0",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/atomWithDefault.test.tsx",
+      "fullName": "refresh async atoms to default values"
+    },
+    {
+      "id": "runtime:2533eab8261ee981",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/atomWithDefault.test.tsx",
+      "fullName": "refresh sync atoms to default values"
+    },
+    {
+      "id": "runtime:56114bad35437928",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/atomWithDefault.test.tsx",
+      "fullName": "simple async get default"
+    },
+    {
+      "id": "runtime:ad604ee9b2608265",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/atomWithDefault.test.tsx",
+      "fullName": "simple sync get default"
+    },
+    {
+      "id": "runtime:56b34308b3a6c788",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/atomWithObservable.test.tsx",
+      "fullName": "atomWithObservable vanilla tests can propagate updates with async atom chains"
+    },
+    {
+      "id": "runtime:2b567bc25dbf2a4c",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/atomWithObservable.test.tsx",
+      "fullName": "atomWithObservable vanilla tests can propagate updates with rxjs chains"
+    },
+    {
+      "id": "runtime:a9a2193e5aad7532",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/atomWithObservable.test.tsx",
+      "fullName": "atomWithObservable vanilla tests should throw error when writing to non-subject observable"
+    },
+    {
+      "id": "runtime:5c1df44eef4751b7",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/atomWithObservable.test.tsx",
+      "fullName": "cleanup subscription"
+    },
+    {
+      "id": "runtime:05b6639a6e5bf82b",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/atomWithObservable.test.tsx",
+      "fullName": "count state"
+    },
+    {
+      "id": "runtime:12082346dcc30285",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/atomWithObservable.test.tsx",
+      "fullName": "count state with Symbol.observable"
+    },
+    {
+      "id": "runtime:4d073922f633b0ee",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/atomWithObservable.test.tsx",
+      "fullName": "count state with initialValue doesn't suspend"
+    },
+    {
+      "id": "runtime:24dabab23db02606",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/atomWithObservable.test.tsx",
+      "fullName": "don't omit values emitted between init and mount"
+    },
+    {
+      "id": "runtime:0917059eaa0d537d",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/atomWithObservable.test.tsx",
+      "fullName": "error handling can catch error in error boundary"
+    },
+    {
+      "id": "runtime:22a75325fdb82068",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/atomWithObservable.test.tsx",
+      "fullName": "error handling can recover from error with dependency"
+    },
+    {
+      "id": "runtime:c95c5289f9ed513c",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/atomWithObservable.test.tsx",
+      "fullName": "error handling can recover with intermediate atom"
+    },
+    {
+      "id": "runtime:827e78413c3c1b24",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/atomWithObservable.test.tsx",
+      "fullName": "only subscribe once per atom"
+    },
+    {
+      "id": "runtime:41d77dd209575bf1",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/atomWithObservable.test.tsx",
+      "fullName": "resubscribe on remount"
+    },
+    {
+      "id": "runtime:917f214e07763897",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/atomWithObservable.test.tsx",
+      "fullName": "should throw error when writing to non-subject observable"
+    },
+    {
+      "id": "runtime:acdad4387a1c7516",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/atomWithObservable.test.tsx",
+      "fullName": "should update continuous values in React 19"
+    },
+    {
+      "id": "runtime:b8baf89f451f281d",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/atomWithObservable.test.tsx",
+      "fullName": "synchronous subscription with BehaviorSubject"
+    },
+    {
+      "id": "runtime:6f496bf54540b807",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/atomWithObservable.test.tsx",
+      "fullName": "synchronous subscription with already emitted value"
+    },
+    {
+      "id": "runtime:23ac891201f65c82",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/atomWithObservable.test.tsx",
+      "fullName": "synchronous subscription with initial value"
+    },
+    {
+      "id": "runtime:b6746ab36cd9ef48",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/atomWithObservable.test.tsx",
+      "fullName": "with falsy initial value"
+    },
+    {
+      "id": "runtime:8cee6e05a15842e7",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/atomWithObservable.test.tsx",
+      "fullName": "with initially emitted undefined value"
+    },
+    {
+      "id": "runtime:91b75be0a47c2d73",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/atomWithObservable.test.tsx",
+      "fullName": "wonka count state"
+    },
+    {
+      "id": "runtime:71c792da6a49ce9e",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/atomWithObservable.test.tsx",
+      "fullName": "wonka make subject"
+    },
+    {
+      "id": "runtime:3e5434a4506e5df6",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/atomWithObservable.test.tsx",
+      "fullName": "writable count state"
+    },
+    {
+      "id": "runtime:a485a8e298c2f5d2",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/atomWithObservable.test.tsx",
+      "fullName": "writable count state with delayed value"
+    },
+    {
+      "id": "runtime:e6d76015685ea593",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/atomWithObservable.test.tsx",
+      "fullName": "writable count state with error"
+    },
+    {
+      "id": "runtime:d70064b3e1ad5fa0",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/atomWithObservable.test.tsx",
+      "fullName": "writable count state with initialValue"
+    },
+    {
+      "id": "runtime:8ed8ecf459006e5f",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/atomWithObservable.test.tsx",
+      "fullName": "writable count state without initial value"
+    },
+    {
+      "id": "runtime:9e7970bbad1c197b",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/atomWithReducer.test.tsx",
+      "fullName": "atomWithReducer with non-optional action argument"
+    },
+    {
+      "id": "runtime:6032f6c6d30eb10d",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/atomWithReducer.test.tsx",
+      "fullName": "atomWithReducer with optional action argument"
+    },
+    {
+      "id": "runtime:46c32167a7b4cd6b",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/atomWithRefresh.test.tsx",
+      "fullName": "async counter"
+    },
+    {
+      "id": "runtime:926eb89e7c750ce6",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/atomWithRefresh.test.tsx",
+      "fullName": "sync counter"
+    },
+    {
+      "id": "runtime:837fb9180275b564",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/atomWithRefresh.test.tsx",
+      "fullName": "writable counter"
+    },
+    {
+      "id": "runtime:49421495ff802a5e",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/atomWithStorage.test.tsx",
+      "fullName": "atomWithStorage (async) async count"
+    },
+    {
+      "id": "runtime:9b9d7ed712e73b4e",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/atomWithStorage.test.tsx",
+      "fullName": "atomWithStorage (async) async new count"
+    },
+    {
+      "id": "runtime:e2dfe7efadd15e3c",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/atomWithStorage.test.tsx",
+      "fullName": "atomWithStorage (async) createJSONStorage with async string storage"
+    },
+    {
+      "id": "runtime:ea08159588d503b3",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/atomWithStorage.test.tsx",
+      "fullName": "atomWithStorage (in non-browser environment) createJSONStorage with localStorage"
+    },
+    {
+      "id": "runtime:9e23712906edca7b",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/atomWithStorage.test.tsx",
+      "fullName": "atomWithStorage (in non-browser environment) createJSONStorage with sessionStorage"
+    },
+    {
+      "id": "runtime:bd4e1ee7ae3e65ab",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/atomWithStorage.test.tsx",
+      "fullName": "atomWithStorage (in non-browser environment) createJSONStorage with undefined window.addEventListener"
+    },
+    {
+      "id": "runtime:12f6ce24053747af",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/atomWithStorage.test.tsx",
+      "fullName": "atomWithStorage (sync) should get stored value on init with getOnInit option"
+    },
+    {
+      "id": "runtime:b402d6bb0c749ff1",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/atomWithStorage.test.tsx",
+      "fullName": "atomWithStorage (sync) simple count"
+    },
+    {
+      "id": "runtime:91fcc4978a1be72a",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/atomWithStorage.test.tsx",
+      "fullName": "atomWithStorage (sync) storage updates before mount (#1079)"
+    },
+    {
+      "id": "runtime:85f855066b2e6ab7",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/atomWithStorage.test.tsx",
+      "fullName": "atomWithStorage (with browser storage) createJSONStorage subscribes to specific window storage events"
+    },
+    {
+      "id": "runtime:2f1ef989471c35f1",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/atomWithStorage.test.tsx",
+      "fullName": "atomWithStorage (with browser storage) should recompute dependents' state after onMount (#2098)"
+    },
+    {
+      "id": "runtime:f2f135c41f825f27",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/atomWithStorage.test.tsx",
+      "fullName": "atomWithStorage (with disabled browser storage) initial value of atomWithStorage can be used when cookies are disabled"
+    },
+    {
+      "id": "runtime:3b40bfa46d7cb329",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/atomWithStorage.test.tsx",
+      "fullName": "atomWithStorage (with non-browser storage) createJSONStorage avoids attaching event handler for non-browser storage"
+    },
+    {
+      "id": "runtime:8e0c316f684a5208",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/atomWithStorage.test.tsx",
+      "fullName": "atomWithStorage (without localStorage) (#949) createJSONStorage without localStorage"
+    },
+    {
+      "id": "runtime:60f5a38b617e4fde",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/atomWithStorage.test.tsx",
+      "fullName": "with custom async storage does not infinite loop (#2931)"
+    },
+    {
+      "id": "runtime:9837b7204d7c43ba",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/atomWithStorage.test.tsx",
+      "fullName": "with subscribe method in string storage createJSONStorage reviver is applied on subscription updates (#3101)"
+    },
+    {
+      "id": "runtime:779ad3a22756a717",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/atomWithStorage.test.tsx",
+      "fullName": "with subscribe method in string storage createJSONStorage subscriber is called correctly"
+    },
+    {
+      "id": "runtime:62b606e633f44986",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/atomWithStorage.test.tsx",
+      "fullName": "with subscribe method in string storage createJSONStorage subscriber responds to events correctly"
+    },
+    {
+      "id": "runtime:eda346029b75fb34",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/atomWithStorage.test.tsx",
+      "fullName": "with sync string storage no entry (#1086)"
+    },
+    {
+      "id": "runtime:7d29890f587201d2",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/atomWithStorage.test.tsx",
+      "fullName": "with sync string storage simple count"
+    },
+    {
+      "id": "runtime:d2d277efcfbf73d9",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/atomWithStorage.test.tsx",
+      "fullName": "withStorageValidator should return initialValue when async validator fails"
+    },
+    {
+      "id": "runtime:37ee567dcb10c314",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/atomWithStorage.test.tsx",
+      "fullName": "withStorageValidator should return initialValue when sync validator fails with render"
+    },
+    {
+      "id": "runtime:d1d44392838b8b54",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/atomWithStorage.test.tsx",
+      "fullName": "withStorageValidator should return initialValue when validator fails"
+    },
+    {
+      "id": "runtime:a781ad812157a28a",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/atomWithStorage.test.tsx",
+      "fullName": "withStorageValidator should return stored value when async validator succeeds"
+    },
+    {
+      "id": "runtime:f2a85df90c612f9c",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/atomWithStorage.test.tsx",
+      "fullName": "withStorageValidator should use withStorageValidator with isNumber"
+    },
+    {
+      "id": "runtime:1fdc7197cf15dada",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/freezeAtom.test.tsx",
+      "fullName": "freezeAtom basic test"
+    },
+    {
+      "id": "runtime:e3a0b3e9f6b4bb2e",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/freezeAtom.test.tsx",
+      "fullName": "freezeAtom handles null correctly"
+    },
+    {
+      "id": "runtime:e976d15f66c975f8",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/freezeAtom.test.tsx",
+      "fullName": "freezeAtom handles primitive correctly"
+    },
+    {
+      "id": "runtime:f0a9f71d16c63c2a",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/freezeAtom.test.tsx",
+      "fullName": "freezeAtomCreator freezeAtomCreator basic test"
+    },
+    {
+      "id": "runtime:395be5e2cbfd89ee",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/selectAtom.test.tsx",
+      "fullName": "creates fresh cache path when deps differ (memo3)"
+    },
+    {
+      "id": "runtime:24c6bd4963ab07d0",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/selectAtom.test.tsx",
+      "fullName": "do not update unless equality function says value has changed"
+    },
+    {
+      "id": "runtime:64b22305887329e1",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/selectAtom.test.tsx",
+      "fullName": "selectAtom works as expected"
+    },
+    {
+      "id": "runtime:b0cd5a75c5bb9c4a",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/splitAtom.test.tsx",
+      "fullName": "inserting atoms"
+    },
+    {
+      "id": "runtime:7aeed08228f63fe8",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/splitAtom.test.tsx",
+      "fullName": "moving atoms"
+    },
+    {
+      "id": "runtime:e3d15bd81986c81f",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/splitAtom.test.tsx",
+      "fullName": "no error with cached atoms (fix 510)"
+    },
+    {
+      "id": "runtime:6421a22ee7e9216d",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/splitAtom.test.tsx",
+      "fullName": "no unnecessary updates when updating atoms"
+    },
+    {
+      "id": "runtime:e91337ad82852b8b",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/splitAtom.test.tsx",
+      "fullName": "read-only array atom"
+    },
+    {
+      "id": "runtime:a0beecf0dbc4d7ea",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/splitAtom.test.tsx",
+      "fullName": "removing atoms"
+    },
+    {
+      "id": "runtime:0ac7eb68d9a72878",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/splitAtom.test.tsx",
+      "fullName": "should not update split atom when single item is set to identical value"
+    },
+    {
+      "id": "runtime:d873370263daab7f",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/splitAtom.test.tsx",
+      "fullName": "should throw error when writing to a removed item atom"
+    },
+    {
+      "id": "runtime:c088cd3ba3d4724a",
+      "file": "packages/jotai/upstream/tests/react/vanilla-utils/splitAtom.test.tsx",
+      "fullName": "variable sized split atom"
+    },
+    {
+      "id": "runtime:180c4cdf5d8b65ab",
+      "file": "packages/jotai/upstream/tests/vanilla/basic.test.tsx",
+      "fullName": "[DEV-ONLY] should include debugLabel in toString output"
+    },
+    {
+      "id": "runtime:c93b6fb81fdff763",
+      "file": "packages/jotai/upstream/tests/vanilla/basic.test.tsx",
+      "fullName": "creates atoms"
+    },
+    {
+      "id": "runtime:867236343605dda6",
+      "file": "packages/jotai/upstream/tests/vanilla/basic.test.tsx",
+      "fullName": "should let users mark atoms as private"
+    },
+    {
+      "id": "runtime:0b1041d2990eaa2f",
+      "file": "packages/jotai/upstream/tests/vanilla/dependency.test.tsx",
+      "fullName": "batches sync writes"
+    },
+    {
+      "id": "runtime:75b0d710969da566",
+      "file": "packages/jotai/upstream/tests/vanilla/dependency.test.tsx",
+      "fullName": "can cache reading an atom in write function (with mounting)"
+    },
+    {
+      "id": "runtime:111d65aee68fc92f",
+      "file": "packages/jotai/upstream/tests/vanilla/dependency.test.tsx",
+      "fullName": "can cache reading an atom in write function (without mounting)"
+    },
+    {
+      "id": "runtime:ecd2b5fd38a7f4bd",
+      "file": "packages/jotai/upstream/tests/vanilla/dependency.test.tsx",
+      "fullName": "can get async atom with deps more than once before resolving (#1668)"
+    },
+    {
+      "id": "runtime:00c2ed2440a21f5d",
+      "file": "packages/jotai/upstream/tests/vanilla/dependency.test.tsx",
+      "fullName": "can propagate updates with async atom chains"
+    },
+    {
+      "id": "runtime:6323fc71e20990f9",
+      "file": "packages/jotai/upstream/tests/vanilla/dependency.test.tsx",
+      "fullName": "can read in write function without changing dependencies"
+    },
+    {
+      "id": "runtime:1eb7edca7578018d",
+      "file": "packages/jotai/upstream/tests/vanilla/dependency.test.tsx",
+      "fullName": "can read sync derived atom in write without initializing"
+    },
+    {
+      "id": "runtime:47b0e2559a096dfd",
+      "file": "packages/jotai/upstream/tests/vanilla/dependency.test.tsx",
+      "fullName": "correctly handles the same promise being returned twice from an atom getter (#2151)"
+    },
+    {
+      "id": "runtime:6890d11a5a34b0a6",
+      "file": "packages/jotai/upstream/tests/vanilla/dependency.test.tsx",
+      "fullName": "correctly updates async derived atom after get/set update"
+    },
+    {
+      "id": "runtime:f6541447afab822a",
+      "file": "packages/jotai/upstream/tests/vanilla/dependency.test.tsx",
+      "fullName": "handles complex dependency chains"
+    },
+    {
+      "id": "runtime:1ca16d2a80a03598",
+      "file": "packages/jotai/upstream/tests/vanilla/dependency.test.tsx",
+      "fullName": "keeps atoms mounted between recalculations"
+    },
+    {
+      "id": "runtime:f91487618a7ef2a0",
+      "file": "packages/jotai/upstream/tests/vanilla/dependency.test.tsx",
+      "fullName": "refreshes deps for each async read"
+    },
+    {
+      "id": "runtime:00b943f1de26e327",
+      "file": "packages/jotai/upstream/tests/vanilla/dependency.test.tsx",
+      "fullName": "settles never resolving async derivations with deps picked up async"
+    },
+    {
+      "id": "runtime:ae5c13fa72bee270",
+      "file": "packages/jotai/upstream/tests/vanilla/dependency.test.tsx",
+      "fullName": "settles never resolving async derivations with deps picked up sync"
+    },
+    {
+      "id": "runtime:e2f50390eee7db9e",
+      "file": "packages/jotai/upstream/tests/vanilla/dependency.test.tsx",
+      "fullName": "should not provide stale values to conditional dependents"
+    },
+    {
+      "id": "runtime:040f1e35254d4333",
+      "file": "packages/jotai/upstream/tests/vanilla/dependency.test.tsx",
+      "fullName": "should not re-evaluate stable derived atom values in situations where dependencies are re-ordered (#2738)"
+    },
+    {
+      "id": "runtime:a68dfd3590c10f1b",
+      "file": "packages/jotai/upstream/tests/vanilla/derive.test.tsx",
+      "fullName": "deriveStore for scoping atoms derived atom (scoping primitive)"
+    },
+    {
+      "id": "runtime:d98451deb7ec0786",
+      "file": "packages/jotai/upstream/tests/vanilla/derive.test.tsx",
+      "fullName": "deriveStore for scoping atoms derived atom with subscribe"
+    },
+    {
+      "id": "runtime:e421cb8f1e779c79",
+      "file": "packages/jotai/upstream/tests/vanilla/derive.test.tsx",
+      "fullName": "deriveStore for scoping atoms primitive atom"
+    },
+    {
+      "id": "runtime:189d53e9d13013fe",
+      "file": "packages/jotai/upstream/tests/vanilla/derive.test.tsx",
+      "fullName": "should pass the correct store instance to the atom initializer"
+    },
+    {
+      "id": "runtime:dc249f485949f935",
+      "file": "packages/jotai/upstream/tests/vanilla/effect.test.ts",
+      "fullName": "fires after recomputeDependents and before atom listeners"
+    },
+    {
+      "id": "runtime:a4bd68108a123bcc",
+      "file": "packages/jotai/upstream/tests/vanilla/effect.test.ts",
+      "fullName": "responds to changes to atoms when mounted with get"
+    },
+    {
+      "id": "runtime:277efc4989136aaf",
+      "file": "packages/jotai/upstream/tests/vanilla/effect.test.ts",
+      "fullName": "responds to changes to atoms when subscribed"
+    },
+    {
+      "id": "runtime:f6c8d8e3487547a9",
+      "file": "packages/jotai/upstream/tests/vanilla/effect.test.ts",
+      "fullName": "sets values to atoms without causing infinite loop"
+    },
+    {
+      "id": "runtime:0d4c704434155c1d",
+      "file": "packages/jotai/upstream/tests/vanilla/effect.test.ts",
+      "fullName": "supports recursive setting synchronous in read"
+    },
+    {
+      "id": "runtime:e0282431dfc720a9",
+      "file": "packages/jotai/upstream/tests/vanilla/internals.test.tsx",
+      "fullName": "internals deep dependency graphs does not poison the atom state after a stack overflow"
+    },
+    {
+      "id": "runtime:2567c3db8994b465",
+      "file": "packages/jotai/upstream/tests/vanilla/internals.test.tsx",
+      "fullName": "internals deep dependency graphs still caches a genuine error thrown by an atom read"
+    },
+    {
+      "id": "runtime:d6ce163b9a88431a",
+      "file": "packages/jotai/upstream/tests/vanilla/internals.test.tsx",
+      "fullName": "internals deep dependency graphs still caches user errors that look like stack overflow messages"
+    },
+    {
+      "id": "runtime:430376d1c01da278",
+      "file": "packages/jotai/upstream/tests/vanilla/internals.test.tsx",
+      "fullName": "internals deep dependency graphs surfaces a stack overflow at the call site instead of swallowing it"
+    },
+    {
+      "id": "runtime:0ec63d7c8a08dccc",
+      "file": "packages/jotai/upstream/tests/vanilla/internals.test.tsx",
+      "fullName": "internals each store.get causes full scan of atom dependencies when state unchanged (performance)"
+    },
+    {
+      "id": "runtime:120beb83e428636b",
+      "file": "packages/jotai/upstream/tests/vanilla/internals.test.tsx",
+      "fullName": "internals internals should not hold stale references"
+    },
+    {
+      "id": "runtime:bf0b64c03a0e8aab",
+      "file": "packages/jotai/upstream/tests/vanilla/internals.test.tsx",
+      "fullName": "internals invalidateDependents should not invalidate the same dependent twice via multiple paths"
+    },
+    {
+      "id": "runtime:a3f7896108ce3636",
+      "file": "packages/jotai/upstream/tests/vanilla/internals.test.tsx",
+      "fullName": "internals multiple unmounted derived atom caches stay valid after one mutation (performance)"
+    },
+    {
+      "id": "runtime:a99b485901187634",
+      "file": "packages/jotai/upstream/tests/vanilla/internals.test.tsx",
+      "fullName": "internals should export distinct single-char key constants"
+    },
+    {
+      "id": "runtime:c737d2cfeca6fd12",
+      "file": "packages/jotai/upstream/tests/vanilla/internals.test.tsx",
+      "fullName": "internals should return complete building blocks"
+    },
+    {
+      "id": "runtime:9cad76371e391fbf",
+      "file": "packages/jotai/upstream/tests/vanilla/internals.test.tsx",
+      "fullName": "internals should transform external building blocks differently from internal ones"
+    },
+    {
+      "id": "runtime:bdc8d68efb5ba1d7",
+      "file": "packages/jotai/upstream/tests/vanilla/internals.test.tsx",
+      "fullName": "store hooks change hook (c) should call change hook when atom value changes"
+    },
+    {
+      "id": "runtime:08e06e1ca1912b37",
+      "file": "packages/jotai/upstream/tests/vanilla/internals.test.tsx",
+      "fullName": "store hooks flush hook (f) should call flush hook when callbacks are flushed"
+    },
+    {
+      "id": "runtime:98ba27d4ab98381b",
+      "file": "packages/jotai/upstream/tests/vanilla/internals.test.tsx",
+      "fullName": "store hooks init hook (i) should call init hook when atom state is initialized"
+    },
+    {
+      "id": "runtime:d948bdeb74fb77ed",
+      "file": "packages/jotai/upstream/tests/vanilla/internals.test.tsx",
+      "fullName": "store hooks mount hook (m) should call mount hook when atom is mounted"
+    },
+    {
+      "id": "runtime:05a81410e3236ab7",
+      "file": "packages/jotai/upstream/tests/vanilla/internals.test.tsx",
+      "fullName": "store hooks read hook (r) should call read hook when atom is read"
+    },
+    {
+      "id": "runtime:734fe37c30a3d0f6",
+      "file": "packages/jotai/upstream/tests/vanilla/internals.test.tsx",
+      "fullName": "store hooks unmount hook (u) should call unmount hook when atom is unmounted"
+    },
+    {
+      "id": "runtime:7d0c24b503ab5f03",
+      "file": "packages/jotai/upstream/tests/vanilla/memoryleaks.test.ts",
+      "fullName": "memory leaks (get & set only) one atom"
+    },
+    {
+      "id": "runtime:0f13a475b631df2d",
+      "file": "packages/jotai/upstream/tests/vanilla/memoryleaks.test.ts",
+      "fullName": "memory leaks (get & set only) should not hold onto dependent atoms that are not mounted"
+    },
+    {
+      "id": "runtime:102ca149d46ced28",
+      "file": "packages/jotai/upstream/tests/vanilla/memoryleaks.test.ts",
+      "fullName": "memory leaks (get & set only) two atoms"
+    },
+    {
+      "id": "runtime:992e1e7c55e78755",
+      "file": "packages/jotai/upstream/tests/vanilla/memoryleaks.test.ts",
+      "fullName": "memory leaks (get & set only) with a long-lived base atom"
+    },
+    {
+      "id": "runtime:221c22426776d354",
+      "file": "packages/jotai/upstream/tests/vanilla/memoryleaks.test.ts",
+      "fullName": "memory leaks (with dependencies) async await dependency"
+    },
+    {
+      "id": "runtime:e047a55175d357ee",
+      "file": "packages/jotai/upstream/tests/vanilla/memoryleaks.test.ts",
+      "fullName": "memory leaks (with dependencies) async dependency"
+    },
+    {
+      "id": "runtime:e8d18bed39e18cd0",
+      "file": "packages/jotai/upstream/tests/vanilla/memoryleaks.test.ts",
+      "fullName": "memory leaks (with dependencies) sync dependency"
+    },
+    {
+      "id": "runtime:a65f2139fc65df67",
+      "file": "packages/jotai/upstream/tests/vanilla/memoryleaks.test.ts",
+      "fullName": "memory leaks (with subscribe) one atom"
+    },
+    {
+      "id": "runtime:c5b306c0986f7482",
+      "file": "packages/jotai/upstream/tests/vanilla/memoryleaks.test.ts",
+      "fullName": "memory leaks (with subscribe) two atoms"
+    },
+    {
+      "id": "runtime:da83b2dc2e98fe56",
+      "file": "packages/jotai/upstream/tests/vanilla/memoryleaks.test.ts",
+      "fullName": "memory leaks (with subscribe) with a long-lived base atom"
+    },
+    {
+      "id": "runtime:3ce1cd70afacefe8",
+      "file": "packages/jotai/upstream/tests/vanilla/store.test.tsx",
+      "fullName": "Unmount an atom that is no longer dependent within a derived atom (#2658)"
+    },
+    {
+      "id": "runtime:881d127f74c7882a",
+      "file": "packages/jotai/upstream/tests/vanilla/store.test.tsx",
+      "fullName": "[DEV-ONLY] should warn store mutation during read"
+    },
+    {
+      "id": "runtime:2a13b25ee678aee9",
+      "file": "packages/jotai/upstream/tests/vanilla/store.test.tsx",
+      "fullName": "aborting atoms should abort the signal when dependencies change"
+    },
+    {
+      "id": "runtime:b49ab683cef30365",
+      "file": "packages/jotai/upstream/tests/vanilla/store.test.tsx",
+      "fullName": "aborting atoms should abort the signal when dependencies change and the atom is mounted"
+    },
+    {
+      "id": "runtime:399d442c10f00f25",
+      "file": "packages/jotai/upstream/tests/vanilla/store.test.tsx",
+      "fullName": "aborting atoms should not abort the signal when unsubscribed"
+    },
+    {
+      "id": "runtime:6926638ef1404200",
+      "file": "packages/jotai/upstream/tests/vanilla/store.test.tsx",
+      "fullName": "allows subscribing to atoms during mount"
+    },
+    {
+      "id": "runtime:d20d50fe41832cb1",
+      "file": "packages/jotai/upstream/tests/vanilla/store.test.tsx",
+      "fullName": "async atom with subtle timing case 1"
+    },
+    {
+      "id": "runtime:18efe3decf5ed4e8",
+      "file": "packages/jotai/upstream/tests/vanilla/store.test.tsx",
+      "fullName": "async atom with subtle timing case 2"
+    },
+    {
+      "id": "runtime:56d13cf36f5c856d",
+      "file": "packages/jotai/upstream/tests/vanilla/store.test.tsx",
+      "fullName": "does not recompute derived atom redundantly when store.set in read uses return value without setting atoms"
+    },
+    {
+      "id": "runtime:38a04f364a7dfcac",
+      "file": "packages/jotai/upstream/tests/vanilla/store.test.tsx",
+      "fullName": "mounted atom should be recomputed eagerly"
+    },
+    {
+      "id": "runtime:e2ba687720c39dc3",
+      "file": "packages/jotai/upstream/tests/vanilla/store.test.tsx",
+      "fullName": "notifies async derived-atom subscriber when read calls store.set before await"
+    },
+    {
+      "id": "runtime:3c4f7f9f10a339b4",
+      "file": "packages/jotai/upstream/tests/vanilla/store.test.tsx",
+      "fullName": "notifies derived-atom subscriber when read calls store.set"
+    },
+    {
+      "id": "runtime:af81ccfbb68a5489",
+      "file": "packages/jotai/upstream/tests/vanilla/store.test.tsx",
+      "fullName": "notifies subscriber normally when store.set is in write function, not read"
+    },
+    {
+      "id": "runtime:5d99f441519cf420",
+      "file": "packages/jotai/upstream/tests/vanilla/store.test.tsx",
+      "fullName": "notifies subscriber of interrupt-derived atom after a synchronous event cascade of nested store.set (#3353)"
+    },
+    {
+      "id": "runtime:079b6a09717d6217",
+      "file": "packages/jotai/upstream/tests/vanilla/store.test.tsx",
+      "fullName": "notifies subscriber through chain of derived atoms when root calls store.set"
+    },
+    {
+      "id": "runtime:6571c40ee985f93b",
+      "file": "packages/jotai/upstream/tests/vanilla/store.test.tsx",
+      "fullName": "notifies subscriber when a nested no-op store.set and a subscription happen inside the outer write (#3353)"
+    },
+    {
+      "id": "runtime:e155f34f80bbbd95",
+      "file": "packages/jotai/upstream/tests/vanilla/store.test.tsx",
+      "fullName": "notifies subscriber when nested write uses get to read atom with store.set"
+    },
+    {
+      "id": "runtime:6a42b6fa80b5ba36",
+      "file": "packages/jotai/upstream/tests/vanilla/store.test.tsx",
+      "fullName": "notifies subscriber when read calls store.set multiple times"
+    },
+    {
+      "id": "runtime:10be7f5537953a60",
+      "file": "packages/jotai/upstream/tests/vanilla/store.test.tsx",
+      "fullName": "recomputes all changed atom dependents together"
+    },
+    {
+      "id": "runtime:ff480cf8bc044038",
+      "file": "packages/jotai/upstream/tests/vanilla/store.test.tsx",
+      "fullName": "recomputes dependents of unmounted atoms"
+    },
+    {
+      "id": "runtime:fa56d3abad86c060",
+      "file": "packages/jotai/upstream/tests/vanilla/store.test.tsx",
+      "fullName": "resolves dependencies reliably after a delay (#2192)"
+    },
+    {
+      "id": "runtime:e5d7575854f709af",
+      "file": "packages/jotai/upstream/tests/vanilla/store.test.tsx",
+      "fullName": "should bail out with the same value with chained dependency (#2014)"
+    },
+    {
+      "id": "runtime:1a5014286c48b964",
+      "file": "packages/jotai/upstream/tests/vanilla/store.test.tsx",
+      "fullName": "should call onInit only once per atom"
+    },
+    {
+      "id": "runtime:f1ef549b5a5c45b5",
+      "file": "packages/jotai/upstream/tests/vanilla/store.test.tsx",
+      "fullName": "should call onInit only once per store"
+    },
+    {
+      "id": "runtime:5b204dfda2d6a244",
+      "file": "packages/jotai/upstream/tests/vanilla/store.test.tsx",
+      "fullName": "should call subscribers after setAtom updates atom value on mount but not on unmount"
+    },
+    {
+      "id": "runtime:1790e1a150694b6a",
+      "file": "packages/jotai/upstream/tests/vanilla/store.test.tsx",
+      "fullName": "should flush pending write triggered asynchronously and indirectly (#2451)"
+    },
+    {
+      "id": "runtime:ddac32ec92c8c121",
+      "file": "packages/jotai/upstream/tests/vanilla/store.test.tsx",
+      "fullName": "should invoke flushPending only after all atoms are updated (#2804) should flush only after all atoms are updated with unmount"
+    },
+    {
+      "id": "runtime:8a309c99fe7f04ca",
+      "file": "packages/jotai/upstream/tests/vanilla/store.test.tsx",
+      "fullName": "should invoke flushPending only after all atoms are updated (#2804) should invoke flushPending only after all atoms are updated with mount"
+    },
+    {
+      "id": "runtime:485a17addc462558",
+      "file": "packages/jotai/upstream/tests/vanilla/store.test.tsx",
+      "fullName": "should invoke flushPending only after all atoms are updated (#2804) should invoke flushPending only after all atoms are updated with set"
+    },
+    {
+      "id": "runtime:cc607ae8f0c476e5",
+      "file": "packages/jotai/upstream/tests/vanilla/store.test.tsx",
+      "fullName": "should keep reactivity when a derived atom returns a function that calls get (#3240)"
+    },
+    {
+      "id": "runtime:1963ef2898d62953",
+      "file": "packages/jotai/upstream/tests/vanilla/store.test.tsx",
+      "fullName": "should mount and trigger listeners even when an error is thrown in asynchronous read"
+    },
+    {
+      "id": "runtime:0c4e2f1d131e93b8",
+      "file": "packages/jotai/upstream/tests/vanilla/store.test.tsx",
+      "fullName": "should mount and trigger listeners even when an error is thrown in asynchronous write"
+    },
+    {
+      "id": "runtime:9ed59c35534f9d93",
+      "file": "packages/jotai/upstream/tests/vanilla/store.test.tsx",
+      "fullName": "should mount and trigger listeners even when an error is thrown in onmount/onunmount asynchronous setAtom"
+    },
+    {
+      "id": "runtime:7010b193f3783cef",
+      "file": "packages/jotai/upstream/tests/vanilla/store.test.tsx",
+      "fullName": "should mount and trigger listeners even when an error is thrown in read promise on settled"
+    },
+    {
+      "id": "runtime:3992507a38352e02",
+      "file": "packages/jotai/upstream/tests/vanilla/store.test.tsx",
+      "fullName": "should mount and trigger listeners even when an error is thrown in synchronous listener"
+    },
+    {
+      "id": "runtime:c08cf73743c7ebb9",
+      "file": "packages/jotai/upstream/tests/vanilla/store.test.tsx",
+      "fullName": "should mount and trigger listeners even when an error is thrown in synchronous onmount"
+    },
+    {
+      "id": "runtime:6869fb65691fad10",
+      "file": "packages/jotai/upstream/tests/vanilla/store.test.tsx",
+      "fullName": "should mount and trigger listeners even when an error is thrown in synchronous onunmount"
+    },
+    {
+      "id": "runtime:87f380a1b8c65a82",
+      "file": "packages/jotai/upstream/tests/vanilla/store.test.tsx",
+      "fullName": "should mount and trigger listeners even when an error is thrown in synchronous write"
+    },
+    {
+      "id": "runtime:9f2ba43cbdca41e3",
+      "file": "packages/jotai/upstream/tests/vanilla/store.test.tsx",
+      "fullName": "should mount once with atom creator atom (#2314)"
+    },
+    {
+      "id": "runtime:516a8a1a24817254",
+      "file": "packages/jotai/upstream/tests/vanilla/store.test.tsx",
+      "fullName": "should mount sibling dependencies in read order"
+    },
+    {
+      "id": "runtime:22e898a586b7217d",
+      "file": "packages/jotai/upstream/tests/vanilla/store.test.tsx",
+      "fullName": "should not call read function for unmounted atoms (#2076)"
+    },
+    {
+      "id": "runtime:33b3c37c32384521",
+      "file": "packages/jotai/upstream/tests/vanilla/store.test.tsx",
+      "fullName": "should not fire on subscribe"
+    },
+    {
+      "id": "runtime:7a1684e8fc23e4cd",
+      "file": "packages/jotai/upstream/tests/vanilla/store.test.tsx",
+      "fullName": "should not fire subscription if derived atom value is the same"
+    },
+    {
+      "id": "runtime:16fe609702c9c1f9",
+      "file": "packages/jotai/upstream/tests/vanilla/store.test.tsx",
+      "fullName": "should not fire subscription if primitive atom value is the same"
+    },
+    {
+      "id": "runtime:c8979f1db93cf335",
+      "file": "packages/jotai/upstream/tests/vanilla/store.test.tsx",
+      "fullName": "should not fire subscription when async atom promise is the same"
+    },
+    {
+      "id": "runtime:4a9c72fba1b0dd27",
+      "file": "packages/jotai/upstream/tests/vanilla/store.test.tsx",
+      "fullName": "should not inf on subscribe or unsubscribe"
+    },
+    {
+      "id": "runtime:42cbed0819dbd8cb",
+      "file": "packages/jotai/upstream/tests/vanilla/store.test.tsx",
+      "fullName": "should not recompute a derived atom value if unchanged (#2168)"
+    },
+    {
+      "id": "runtime:3ef356b56f160545",
+      "file": "packages/jotai/upstream/tests/vanilla/store.test.tsx",
+      "fullName": "should notify subscription even with reading atom in write"
+    },
+    {
+      "id": "runtime:15bb1dff95fd917e",
+      "file": "packages/jotai/upstream/tests/vanilla/store.test.tsx",
+      "fullName": "should notify subscription with tree dependencies (#1956)"
+    },
+    {
+      "id": "runtime:43c291160e71bf44",
+      "file": "packages/jotai/upstream/tests/vanilla/store.test.tsx",
+      "fullName": "should notify subscription with tree dependencies with bail-out"
+    },
+    {
+      "id": "runtime:f6eb45d5bf238e8a",
+      "file": "packages/jotai/upstream/tests/vanilla/store.test.tsx",
+      "fullName": "should override a promise by setting"
+    },
+    {
+      "id": "runtime:cb5d99317c35437d",
+      "file": "packages/jotai/upstream/tests/vanilla/store.test.tsx",
+      "fullName": "should pass store and atomState to the atom initializer"
+    },
+    {
+      "id": "runtime:66efc4b307ee3ba2",
+      "file": "packages/jotai/upstream/tests/vanilla/store.test.tsx",
+      "fullName": "should process all atom listeners even if some of them throw errors"
+    },
+    {
+      "id": "runtime:1722e133eb337bdb",
+      "file": "packages/jotai/upstream/tests/vanilla/store.test.tsx",
+      "fullName": "should recompute dependents' state after onMount (#2098)"
+    },
+    {
+      "id": "runtime:5b3aba768d49793e",
+      "file": "packages/jotai/upstream/tests/vanilla/store.test.tsx",
+      "fullName": "should unmount dependencies with store.get"
+    },
+    {
+      "id": "runtime:5d2600bdceabb19d",
+      "file": "packages/jotai/upstream/tests/vanilla/store.test.tsx",
+      "fullName": "should unmount with store.get"
+    },
+    {
+      "id": "runtime:c26dd5544913ce4a",
+      "file": "packages/jotai/upstream/tests/vanilla/store.test.tsx",
+      "fullName": "should update async atom with delay (#1813)"
+    },
+    {
+      "id": "runtime:514c64c1026f3606",
+      "file": "packages/jotai/upstream/tests/vanilla/store.test.tsx",
+      "fullName": "should update async atom with deps after await (#1905)"
+    },
+    {
+      "id": "runtime:ac3617a79e3c58d5",
+      "file": "packages/jotai/upstream/tests/vanilla/store.test.tsx",
+      "fullName": "should update derived atom even if dependencies changed (#2697)"
+    },
+    {
+      "id": "runtime:6c9de7f9f95dfa0e",
+      "file": "packages/jotai/upstream/tests/vanilla/store.test.tsx",
+      "fullName": "should update derived atoms during write (#2107)"
+    },
+    {
+      "id": "runtime:02851b031b729b2c",
+      "file": "packages/jotai/upstream/tests/vanilla/store.test.tsx",
+      "fullName": "should update with conditional dependencies (#2084)"
+    },
+    {
+      "id": "runtime:434f833f4e819f0f",
+      "file": "packages/jotai/upstream/tests/vanilla/store.test.tsx",
+      "fullName": "should use the correct pending on unmount"
+    },
+    {
+      "id": "runtime:d6c60a0cb9d6ce71",
+      "file": "packages/jotai/upstream/tests/vanilla/store.test.tsx",
+      "fullName": "store.set before get(dep) causes deep recursion but recovers"
+    },
+    {
+      "id": "runtime:5dfeae7bba0baf5d",
+      "file": "packages/jotai/upstream/tests/vanilla/store.test.tsx",
+      "fullName": "supports recursion in an atom subscriber"
+    },
+    {
+      "id": "runtime:a1b24fbc0afa6ea1",
+      "file": "packages/jotai/upstream/tests/vanilla/store.test.tsx",
+      "fullName": "surfaces a stack overflow for a graph too deep to read synchronously"
+    },
+    {
+      "id": "runtime:fa2b12a8ad93bc15",
+      "file": "packages/jotai/upstream/tests/vanilla/store.test.tsx",
+      "fullName": "throws falsy errors in onMount, onUnmount, and listeners"
+    },
+    {
+      "id": "runtime:79b3a33e849ed382",
+      "file": "packages/jotai/upstream/tests/vanilla/store.test.tsx",
+      "fullName": "throws listener errors without AggregateError support"
+    },
+    {
+      "id": "runtime:c13a3c985e4b015b",
+      "file": "packages/jotai/upstream/tests/vanilla/store.test.tsx",
+      "fullName": "updates dependents when it eagerly recomputes dirty atoms"
+    },
+    {
+      "id": "runtime:ee4426f95eec2d66",
+      "file": "packages/jotai/upstream/tests/vanilla/store.test.tsx",
+      "fullName": "updates with reading derived atoms (#2959)"
+    },
+    {
+      "id": "runtime:8946ec9c609bc311",
+      "file": "packages/jotai/upstream/tests/vanilla/storedev.test.tsx",
+      "fullName": "dev-only methods should get atom value"
+    },
+    {
+      "id": "runtime:3a72d74ac316e50b",
+      "file": "packages/jotai/upstream/tests/vanilla/storedev.test.tsx",
+      "fullName": "dev-only methods should restore atoms and call store listeners correctly"
+    },
+    {
+      "id": "runtime:1dae3d4197527787",
+      "file": "packages/jotai/upstream/tests/vanilla/storedev.test.tsx",
+      "fullName": "dev-only methods should restore atoms and its dependencies correctly"
+    },
+    {
+      "id": "runtime:698d40bddf329e0d",
+      "file": "packages/jotai/upstream/tests/vanilla/storedev.test.tsx",
+      "fullName": "dev-only methods should restore atoms with custom write function"
+    },
+    {
+      "id": "runtime:9f874f9317c62f9c",
+      "file": "packages/jotai/upstream/tests/vanilla/storedev.test.tsx",
+      "fullName": "dev-only methods should return all the mounted atoms correctly"
+    },
+    {
+      "id": "runtime:0fc1f2a23de794ec",
+      "file": "packages/jotai/upstream/tests/vanilla/storedev.test.tsx",
+      "fullName": "dev-only methods should return all the mounted atoms correctly after they're unsubscribed"
+    },
+    {
+      "id": "runtime:1f7343218c01b7b6",
+      "file": "packages/jotai/upstream/tests/vanilla/types.test.tsx",
+      "fullName": "WritableAtom Result type should be covariant"
+    },
+    {
+      "id": "runtime:9a7460a355da5e17",
+      "file": "packages/jotai/upstream/tests/vanilla/types.test.tsx",
+      "fullName": "atom() should return the correct types"
+    },
+    {
+      "id": "runtime:78f9b0db354c463a",
+      "file": "packages/jotai/upstream/tests/vanilla/types.test.tsx",
+      "fullName": "type utils should work"
+    },
+    {
+      "id": "runtime:f7f35382c68af311",
+      "file": "packages/jotai/upstream/tests/vanilla/utils/atomWithDefault.test.ts",
+      "fullName": "atomWithDefault should reflect changes to the initial value atom when main atom has been manually changed but then RESET"
+    },
+    {
+      "id": "runtime:c3a6d4a21001388d",
+      "file": "packages/jotai/upstream/tests/vanilla/utils/atomWithDefault.test.ts",
+      "fullName": "atomWithDefault should reflect changes to the initial value atom when main atom hasn't been manually changed"
+    },
+    {
+      "id": "runtime:a855bc787b20e8bd",
+      "file": "packages/jotai/upstream/tests/vanilla/utils/atomWithDefault.test.ts",
+      "fullName": "atomWithDefault should reset to initial value derived from another atom"
+    },
+    {
+      "id": "runtime:4fac08a03da1549d",
+      "file": "packages/jotai/upstream/tests/vanilla/utils/atomWithDefault.test.ts",
+      "fullName": "atomWithDefault should reset to initial value using RESET"
+    },
+    {
+      "id": "runtime:b341b2f8e5bb5118",
+      "file": "packages/jotai/upstream/tests/vanilla/utils/atomWithDefault.test.ts",
+      "fullName": "atomWithDefault should reset with a function"
+    },
+    {
+      "id": "runtime:e0701b23cc55c908",
+      "file": "packages/jotai/upstream/tests/vanilla/utils/atomWithDefault.test.ts",
+      "fullName": "atomWithDefault should update atom using a function"
+    },
+    {
+      "id": "runtime:bf90fc026f3dc733",
+      "file": "packages/jotai/upstream/tests/vanilla/utils/atomWithDefault.test.ts",
+      "fullName": "atomWithDefault should update atom with a new value"
+    },
+    {
+      "id": "runtime:6298ccdfce206482",
+      "file": "packages/jotai/upstream/tests/vanilla/utils/atomWithLazy.test.ts",
+      "fullName": "initializes on first store get"
+    },
+    {
+      "id": "runtime:a0ffe082a746db0c",
+      "file": "packages/jotai/upstream/tests/vanilla/utils/atomWithLazy.test.ts",
+      "fullName": "is writable"
+    },
+    {
+      "id": "runtime:840d9a55add016c1",
+      "file": "packages/jotai/upstream/tests/vanilla/utils/atomWithLazy.test.ts",
+      "fullName": "should work with a set state action"
+    },
+    {
+      "id": "runtime:6546cef1b454ef96",
+      "file": "packages/jotai/upstream/tests/vanilla/utils/atomWithRefresh.test.ts",
+      "fullName": "atomWithRefresh [DEV-ONLY] throws when refresh is called with extra arguments"
+    },
+    {
+      "id": "runtime:9707022e83a72b24",
+      "file": "packages/jotai/upstream/tests/vanilla/utils/atomWithReset.test.ts",
+      "fullName": "atomWithReset should reset to initial value using RESET"
+    },
+    {
+      "id": "runtime:c97755955dcc8831",
+      "file": "packages/jotai/upstream/tests/vanilla/utils/atomWithReset.test.ts",
+      "fullName": "atomWithReset should update atom using a function"
+    },
+    {
+      "id": "runtime:bdfe38a3fcf4bad4",
+      "file": "packages/jotai/upstream/tests/vanilla/utils/atomWithReset.test.ts",
+      "fullName": "atomWithReset should update atom with a new value"
+    },
+    {
+      "id": "runtime:f8d185720a67d79a",
+      "file": "packages/jotai/upstream/tests/vanilla/utils/types.test.tsx",
+      "fullName": "selectAtom() should return the correct types"
+    },
+    {
+      "id": "runtime:a51ed5df2b9b8b60",
+      "file": "packages/jotai/upstream/tests/vanilla/utils/types.test.tsx",
+      "fullName": "unwrap() should return the correct types"
+    },
+    {
+      "id": "runtime:5451d2f6ee8d0d6a",
+      "file": "packages/jotai/upstream/tests/vanilla/utils/unwrap.test.ts",
+      "fullName": "unwrap [DEV-ONLY] should not call store.set during atom read"
+    },
+    {
+      "id": "runtime:6e61f0428fd9f377",
+      "file": "packages/jotai/upstream/tests/vanilla/utils/unwrap.test.ts",
+      "fullName": "unwrap should expose the latest value after a linked async read resolves (#3296)"
+    },
+    {
+      "id": "runtime:c98bb55c184fbf7c",
+      "file": "packages/jotai/upstream/tests/vanilla/utils/unwrap.test.ts",
+      "fullName": "unwrap should get a fulfilled value after the promise resolves"
+    },
+    {
+      "id": "runtime:3c2f50717de0df4d",
+      "file": "packages/jotai/upstream/tests/vanilla/utils/unwrap.test.ts",
+      "fullName": "unwrap should not enter an infinite loop when a rejected source recomputes"
+    },
+    {
+      "id": "runtime:b3eb6302a6728f77",
+      "file": "packages/jotai/upstream/tests/vanilla/utils/unwrap.test.ts",
+      "fullName": "unwrap should pass the last value to fallback after an error state"
+    },
+    {
+      "id": "runtime:f4bf3a5c6f50be29",
+      "file": "packages/jotai/upstream/tests/vanilla/utils/unwrap.test.ts",
+      "fullName": "unwrap should throw an error if underlying promise is rejected"
+    },
+    {
+      "id": "runtime:d16b680efc9db467",
+      "file": "packages/jotai/upstream/tests/vanilla/utils/unwrap.test.ts",
+      "fullName": "unwrap should unwrap a promise with fallback function with prev"
+    },
+    {
+      "id": "runtime:bd6a0c9ddafcfb81",
+      "file": "packages/jotai/upstream/tests/vanilla/utils/unwrap.test.ts",
+      "fullName": "unwrap should unwrap a promise with fallback function without prev"
+    },
+    {
+      "id": "runtime:b9fa94f1fe30de54",
+      "file": "packages/jotai/upstream/tests/vanilla/utils/unwrap.test.ts",
+      "fullName": "unwrap should unwrap a promise with no fallback function"
+    },
+    {
+      "id": "runtime:e412651f4fb337ed",
+      "file": "packages/jotai/upstream/tests/vanilla/utils/unwrap.test.ts",
+      "fullName": "unwrap should unwrap a sync atom which is noop"
+    },
+    {
+      "id": "runtime:f3198012c4bf35f8",
+      "file": "packages/jotai/upstream/tests/vanilla/utils/unwrap.test.ts",
+      "fullName": "unwrap should unwrap an async writable atom"
+    },
+    {
+      "id": "runtime:910800bff4044b5c",
+      "file": "packages/jotai/upstream/tests/vanilla/utils/unwrap.test.ts",
+      "fullName": "unwrap should unwrap to a fulfilled value of an already resolved async atom"
+    },
+    {
+      "id": "runtime:3931bc57450979d6",
+      "file": "packages/jotai/upstream/tests/vanilla/utils/unwrap.test.ts",
+      "fullName": "unwrap should update dependents with the value of the unwrapped atom when the promise resolves"
+    }
+  ],
+  "snapshots": 0
+}

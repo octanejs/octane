@@ -1,0 +1,495 @@
+{
+  "schemaVersion": 1,
+  "identity": {
+    "packageName": "jotai",
+    "version": "3.0.0",
+    "repository": {
+      "owner": "pmndrs",
+      "repo": "jotai",
+      "subdirectory": null
+    },
+    "commit": "89d4fddd1949628e50952fc8ac1b09786248dfca",
+    "integrity": "sha512-KxhbmsJUp/tmrv6aZgO+nzB3H9K8C0xmk5i3aGkwy/EANg73DVBkggv3zVHaAi5PlNlQgTgP4uiVepo+JC+wSA=="
+  },
+  "license": {
+    "spdx": "MIT",
+    "evidence": [
+      {
+        "path": "LICENSE",
+        "sha256": "0530d5d58026f4bb73367d195946f6a516a648ea62dd8b84763318f64d3cb3e2"
+      }
+    ],
+    "notices": []
+  },
+  "scopes": ["LICENSE", "package.json", "src", "tests", "tsconfig.json", "vitest.config.mts"],
+  "adaptedMappings": [
+    {
+      "fromRoot": "tests",
+      "toRoot": "tests/upstream"
+    }
+  ],
+  "adaptedRewrites": [
+    {
+      "find": "'react'",
+      "replace": "'octane'"
+    },
+    {
+      "find": "'@testing-library/react'",
+      "replace": "'@octanejs/testing-library'"
+    },
+    {
+      "find": "'react-dom/client'",
+      "replace": "'octane/client'"
+    },
+    {
+      "find": "'react-dom'",
+      "replace": "'octane'"
+    },
+    {
+      "find": "'jotai'",
+      "replace": "'@octanejs/jotai'"
+    },
+    {
+      "find": "'jotai/react'",
+      "replace": "'@octanejs/jotai/react'"
+    },
+    {
+      "find": "'jotai/react/utils'",
+      "replace": "'@octanejs/jotai/react/utils'"
+    },
+    {
+      "find": "'jotai/utils'",
+      "replace": "'@octanejs/jotai/utils'"
+    },
+    {
+      "find": "'react-dom/server'",
+      "replace": "'octane/server'"
+    },
+    {
+      "find": "ReactNode",
+      "replace": "OctaneNode"
+    },
+    {
+      "prepend": "/** @jsxImportSource octane */\n",
+      "include": "\\.tsx$"
+    }
+  ],
+  "files": [
+    {
+      "path": "LICENSE",
+      "gitBlob": "38ab200c3ed6a47a682b873e924e480921c93a56",
+      "size": 1067
+    },
+    {
+      "path": "package.json",
+      "gitBlob": "fe70fa66d81db7a0801fd19dc432a7b7298eea0d",
+      "size": 4427
+    },
+    {
+      "path": "src/index.ts",
+      "gitBlob": "df20325364280a73ecac7a8cd83ee59a7c27b0ce",
+      "size": 56
+    },
+    {
+      "path": "src/react.ts",
+      "gitBlob": "a7d80526e71c0164f3537c77bc46149e52449141",
+      "size": 352
+    },
+    {
+      "path": "src/react/continuablePromise.ts",
+      "gitBlob": "6189514cf898ba18a3a3122faf9d110edeaa9463",
+      "size": 1912
+    },
+    {
+      "path": "src/react/Provider.ts",
+      "gitBlob": "25d69a994ec5a121623bc6e857ec70706225136b",
+      "size": 1315
+    },
+    {
+      "path": "src/react/useAtom.ts",
+      "gitBlob": "064e5c5efd8fe0be4ae33d28f72754d4effc86b4",
+      "size": 1534
+    },
+    {
+      "path": "src/react/useAtomValue.ts",
+      "gitBlob": "5ce6cc322521034cb67a6e5e4883e99b56dbb010",
+      "size": 1834
+    },
+    {
+      "path": "src/react/useAtomValueRaw.ts",
+      "gitBlob": "6cde365088c41317a56deb4dd4c512bdfebf5850",
+      "size": 1521
+    },
+    {
+      "path": "src/react/useAtomValueRawSync.ts",
+      "gitBlob": "8892cddb2edff3b476f7ee7fb242f400bd427569",
+      "size": 1097
+    },
+    {
+      "path": "src/react/useSetAtom.ts",
+      "gitBlob": "53d5c98530b49b3639507b9247c5619a94796d83",
+      "size": 1207
+    },
+    {
+      "path": "src/react/utils.ts",
+      "gitBlob": "bb0c7905336004dda3127cbfe8b6eae3d87bea52",
+      "size": 250
+    },
+    {
+      "path": "src/react/utils/useAtomCallback.ts",
+      "gitBlob": "a3b340fd2a2a7c0ba34fc6f834d77632eb9fc92d",
+      "size": 581
+    },
+    {
+      "path": "src/react/utils/useHydrateAtoms.ts",
+      "gitBlob": "167f438fc870438d669b66a5b34027c942798d4d",
+      "size": 1831
+    },
+    {
+      "path": "src/react/utils/useReducerAtom.ts",
+      "gitBlob": "c342d23d37ca2601f3be9f0abf5c7aa34eeb6273",
+      "size": 1371
+    },
+    {
+      "path": "src/react/utils/useResetAtom.ts",
+      "gitBlob": "8430cdd926b97db63ef29b83d20e1702ef15d4da",
+      "size": 495
+    },
+    {
+      "path": "src/utils.ts",
+      "gitBlob": "dedb876517fe2cba0143f3bee43ab60bcbba0016",
+      "size": 68
+    },
+    {
+      "path": "src/vanilla.ts",
+      "gitBlob": "6602cbbe5bad789a3ad12a8f9d18c1db3bc88987",
+      "size": 365
+    },
+    {
+      "path": "src/vanilla/atom.ts",
+      "gitBlob": "b155c90d753d53fa48054d6104bc11a2163e9aaa",
+      "size": 3360
+    },
+    {
+      "path": "src/vanilla/internals.ts",
+      "gitBlob": "47c31dd25a54f23990439595de25fc0f1ffd6f4c",
+      "size": 41896
+    },
+    {
+      "path": "src/vanilla/store.ts",
+      "gitBlob": "4d431a54024ccabace09d675d4c713e5e2cfb241",
+      "size": 1217
+    },
+    {
+      "path": "src/vanilla/typeUtils.ts",
+      "gitBlob": "bb0c001e88c02ae52f222d96acbcb1986e46a61a",
+      "size": 658
+    },
+    {
+      "path": "src/vanilla/utils.ts",
+      "gitBlob": "93a2bbd65da31ea09938aa1526695187c0d60535",
+      "size": 762
+    },
+    {
+      "path": "src/vanilla/utils/atomWithDefault.ts",
+      "gitBlob": "c9a998382e006b1f43a6761b94b19106e614d4fe",
+      "size": 1247
+    },
+    {
+      "path": "src/vanilla/utils/atomWithLazy.ts",
+      "gitBlob": "75dfec9c2b8ee8264d44f30ac72d81d9db7e9177",
+      "size": 373
+    },
+    {
+      "path": "src/vanilla/utils/atomWithObservable.ts",
+      "gitBlob": "49ae9dce308ee42f8f685f0d71b46e79b85b5760",
+      "size": 5473
+    },
+    {
+      "path": "src/vanilla/utils/atomWithReducer.ts",
+      "gitBlob": "3df6a44b6a413a335da88af1805b9e593f1c565d",
+      "size": 677
+    },
+    {
+      "path": "src/vanilla/utils/atomWithRefresh.ts",
+      "gitBlob": "d419e23d4591d1e6c6152ddeab4d845bcee7263f",
+      "size": 1292
+    },
+    {
+      "path": "src/vanilla/utils/atomWithReset.ts",
+      "gitBlob": "94a33a4f0d65ca2a86975d8d9a83696b58686ff3",
+      "size": 1008
+    },
+    {
+      "path": "src/vanilla/utils/atomWithStorage.ts",
+      "gitBlob": "46d07244db8c7a8849a0e3c134e58a52cb45b000",
+      "size": 7385
+    },
+    {
+      "path": "src/vanilla/utils/constants.ts",
+      "gitBlob": "7e8c204d344139538e5663282f255f165247feb9",
+      "size": 102
+    },
+    {
+      "path": "src/vanilla/utils/freezeAtom.ts",
+      "gitBlob": "c15deb2e6cab84f5926ca7322f9ab1c5e31e173d",
+      "size": 1638
+    },
+    {
+      "path": "src/vanilla/utils/selectAtom.ts",
+      "gitBlob": "01840241a347ec7649c46f6554e9457a94d035fa",
+      "size": 1711
+    },
+    {
+      "path": "src/vanilla/utils/splitAtom.ts",
+      "gitBlob": "2d93f762a624922a12559a81c8adebd1d874e984",
+      "size": 7584
+    },
+    {
+      "path": "src/vanilla/utils/unwrap.ts",
+      "gitBlob": "50b4d164dd2903bf6db090acd1179f05f5b4121c",
+      "size": 4692
+    },
+    {
+      "path": "tests/react/abortable.test.tsx",
+      "gitBlob": "7501ad295e942fda02fee16c7460a080c451227f",
+      "size": 7070
+    },
+    {
+      "path": "tests/react/async.test.tsx",
+      "gitBlob": "170327b234dbf6e465c2add3e868c7b3dedfc355",
+      "size": 30324
+    },
+    {
+      "path": "tests/react/async2.test.tsx",
+      "gitBlob": "2d04941796ac4be908d4e233ed43cd6c53a54cf2",
+      "size": 9318
+    },
+    {
+      "path": "tests/react/basic.test.tsx",
+      "gitBlob": "40c439e7cfa0a870f840379e334b1d4b1be22f88",
+      "size": 25036
+    },
+    {
+      "path": "tests/react/dependency.test.tsx",
+      "gitBlob": "53db4cbc2154e68dc3edb2ad3e0627279fe8c803",
+      "size": 27234
+    },
+    {
+      "path": "tests/react/error.test.tsx",
+      "gitBlob": "5637d0450448afb8972da605905c71a0f02e1bf2",
+      "size": 13098
+    },
+    {
+      "path": "tests/react/items.test.tsx",
+      "gitBlob": "822ef377b1c49bad82553eebb41714ab5e97a806",
+      "size": 5261
+    },
+    {
+      "path": "tests/react/onmount.test.tsx",
+      "gitBlob": "49cfc420e26f1865560dfff17f2f6f8bbc2af082",
+      "size": 12196
+    },
+    {
+      "path": "tests/react/optimization.test.tsx",
+      "gitBlob": "792aaaff23428c89c1502c24e2889d3cfa294f43",
+      "size": 7064
+    },
+    {
+      "path": "tests/react/provider.test.tsx",
+      "gitBlob": "9bf0fc3e0db88ddbaf6c8a256e669bff0b24c52c",
+      "size": 1674
+    },
+    {
+      "path": "tests/react/transition.test.tsx",
+      "gitBlob": "76f3e1e3afb9fefaab0e6c039fdee8884ce13b31",
+      "size": 3416
+    },
+    {
+      "path": "tests/react/types.test.tsx",
+      "gitBlob": "7413e9ce73aa6199a5d2d63864a8e8fff0eec055",
+      "size": 5168
+    },
+    {
+      "path": "tests/react/useAtomValue.test.tsx",
+      "gitBlob": "4472023679a7d625db12f132f177c57af733a3cc",
+      "size": 2705
+    },
+    {
+      "path": "tests/react/useAtomValueRaw.test.tsx",
+      "gitBlob": "9df5dc50a9d6535dac1b0a566c211240e5728ad3",
+      "size": 3788
+    },
+    {
+      "path": "tests/react/useAtomValueRawSync.test.tsx",
+      "gitBlob": "b60575af8db0822f5363d0cb51d89f81841a4849",
+      "size": 3684
+    },
+    {
+      "path": "tests/react/useSetAtom.test.tsx",
+      "gitBlob": "964993b8c028efd8737d02dcb13a1d19e9a08cce",
+      "size": 3235
+    },
+    {
+      "path": "tests/react/utils/types.test.tsx",
+      "gitBlob": "2f5bc3de4e9d10dd1b1d05a12f9dc928aedc6642",
+      "size": 1716
+    },
+    {
+      "path": "tests/react/utils/useAtomCallback.test.tsx",
+      "gitBlob": "2a4d42d6c695d31f3e9196eb5589365b21053fa9",
+      "size": 4410
+    },
+    {
+      "path": "tests/react/utils/useHydrateAtoms.test.tsx",
+      "gitBlob": "f513850792d35607bfc6d8367c75c5aeb3a51e6f",
+      "size": 12481
+    },
+    {
+      "path": "tests/react/utils/useReducerAtom.test.tsx",
+      "gitBlob": "56d82b97f831667195f4212931ee87487cfd0ce9",
+      "size": 3327
+    },
+    {
+      "path": "tests/react/utils/useResetAtom.test.tsx",
+      "gitBlob": "7f73f58ed4a79cba601ffa2aacf0f0f2489e55f5",
+      "size": 5111
+    },
+    {
+      "path": "tests/react/vanilla-utils/atomWithDefault.test.tsx",
+      "gitBlob": "ba2b6c86d34267e1b7c4aec83a541dd6549d57bc",
+      "size": 7214
+    },
+    {
+      "path": "tests/react/vanilla-utils/atomWithObservable.test.tsx",
+      "gitBlob": "d85f230b105b740f3be6c34d6ae140f8ff81b0b5",
+      "size": 25412
+    },
+    {
+      "path": "tests/react/vanilla-utils/atomWithReducer.test.tsx",
+      "gitBlob": "b7254d1a33ad9494bb34ff65cedfc3b463e32bbc",
+      "size": 2429
+    },
+    {
+      "path": "tests/react/vanilla-utils/atomWithRefresh.test.tsx",
+      "gitBlob": "e24773e4d597e8e04116ec9e34e3cfc54937bda4",
+      "size": 3281
+    },
+    {
+      "path": "tests/react/vanilla-utils/atomWithStorage.test.tsx",
+      "gitBlob": "9b0b5e5f22b74d4e883124327b2f7d7fef3dc28b",
+      "size": 28518
+    },
+    {
+      "path": "tests/react/vanilla-utils/freezeAtom.test.tsx",
+      "gitBlob": "e582e58325aea9215fa0828e7840233bab5feb80",
+      "size": 3082
+    },
+    {
+      "path": "tests/react/vanilla-utils/selectAtom.test.tsx",
+      "gitBlob": "99730d97cdcaff40954ae88ba0be943190bc671a",
+      "size": 4119
+    },
+    {
+      "path": "tests/react/vanilla-utils/splitAtom.test.tsx",
+      "gitBlob": "ecd91fa18319070c0bb79459adb41ecc8475707a",
+      "size": 14635
+    },
+    {
+      "path": "tests/setup.ts",
+      "gitBlob": "a9d0dd31aa6eae87f8689e99b802b92a020b30d9",
+      "size": 42
+    },
+    {
+      "path": "tests/test-utils.ts",
+      "gitBlob": "3fb71a817e2de47f50dcb3bab082e206e4985116",
+      "size": 372
+    },
+    {
+      "path": "tests/vanilla/basic.test.tsx",
+      "gitBlob": "2dee6c2af871656a06dd63d421150af18e179a00",
+      "size": 1820
+    },
+    {
+      "path": "tests/vanilla/dependency.test.tsx",
+      "gitBlob": "f65a8d06f1fa1338ea401d816fb58fa64e9aed1f",
+      "size": 10958
+    },
+    {
+      "path": "tests/vanilla/derive.test.tsx",
+      "gitBlob": "4a62f4cce37e4e0510117377616218754b44e7ee",
+      "size": 6965
+    },
+    {
+      "path": "tests/vanilla/effect.test.ts",
+      "gitBlob": "5492d5319dd1fc0d6aeedcbc20692d686b73aaeb",
+      "size": 7985
+    },
+    {
+      "path": "tests/vanilla/internals.test.tsx",
+      "gitBlob": "23cfe63e6b6b1106396c13a85c29b7d2872dcafc",
+      "size": 16274
+    },
+    {
+      "path": "tests/vanilla/memoryleaks.test.ts",
+      "gitBlob": "59ff29b92f02f4b4ecdbffdb0b291056eff8873f",
+      "size": 5047
+    },
+    {
+      "path": "tests/vanilla/store.test.tsx",
+      "gitBlob": "0280da49a5379e9edb59fa8061264556e3bbb11f",
+      "size": 45308
+    },
+    {
+      "path": "tests/vanilla/storedev.test.tsx",
+      "gitBlob": "c4b529c98091f34355a31fb94e27c519feb1e765",
+      "size": 5293
+    },
+    {
+      "path": "tests/vanilla/types.test.tsx",
+      "gitBlob": "89b0993018ecd498ab6a9016acf351de1b7d9b47",
+      "size": 3825
+    },
+    {
+      "path": "tests/vanilla/utils/atomWithDefault.test.ts",
+      "gitBlob": "50be424cf524918f987a2e00f0576d2f9b2a695b",
+      "size": 2632
+    },
+    {
+      "path": "tests/vanilla/utils/atomWithLazy.test.ts",
+      "gitBlob": "e290e7bc6ee143509eea0e67f21b75b94a8cdc0c",
+      "size": 1103
+    },
+    {
+      "path": "tests/vanilla/utils/atomWithRefresh.test.ts",
+      "gitBlob": "9c3efa578962eb47c0831e3fee3b9aae309c9256",
+      "size": 441
+    },
+    {
+      "path": "tests/vanilla/utils/atomWithReset.test.ts",
+      "gitBlob": "bf7e955b67936b6076e785f1d5ffe5f55fc4ebf6",
+      "size": 1039
+    },
+    {
+      "path": "tests/vanilla/utils/types.test.tsx",
+      "gitBlob": "ab89437d14bc676746a89c998ecaf83ea3861941",
+      "size": 1612
+    },
+    {
+      "path": "tests/vanilla/utils/unwrap.test.ts",
+      "gitBlob": "833afe5317327a4a52423c33848bda8a7c382fca",
+      "size": 9187
+    },
+    {
+      "path": "tsconfig.json",
+      "gitBlob": "22b8807070cb55b1d3df343404c77df035b9000a",
+      "size": 691
+    },
+    {
+      "path": "vitest.config.mts",
+      "gitBlob": "b600a933ac12512aec2d6547dbd0593ab273fd12",
+      "size": 962
+    }
+  ],
+  "fingerprint": "57dbee5c0f03afa43718e400476a70d8aea608e578b02dabff36047e303fa9b9"
+}

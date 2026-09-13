@@ -10,9 +10,16 @@
     "integrity": "sha256:3adffb233a18be2b79c3521cf1b2e26902c0cafc2a1de2d7e9f086afd3a2f7a5",
     "verification": "verified"
   },
-  "upstreamSuites": { "runtime": "present", "types": "absent" },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "absent"
+  },
   "adaptedRoots": {
-    "source": { "roots": ["packages/octane-is/src"], "include": ["\\.ts$"], "exclude": [] },
+    "source": {
+      "roots": ["packages/octane-is/src"],
+      "include": ["\\.ts$"],
+      "exclude": []
+    },
     "tests": {
       "roots": ["packages/octane-is/tests"],
       "include": ["/adapted\\.test\\.ts$"],
@@ -32,7 +39,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "e6eba27d5f5c8ea9fcc2c61ffc406e502a9f40f5e9c1ac100f2a9c316974fabe"
+      "lockfileSha256": "d4831945917b00aa5977386fae32c0c8553cbdcf276e5e326c6a50ae490b5391"
     }
   },
   "lanes": [

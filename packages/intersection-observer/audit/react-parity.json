@@ -11,7 +11,10 @@
     "integrity": "sha256:24ccd051d0e1945d76d7b005c1a90829e07a15303618b704e01fc918f59d22c9",
     "verification": "verified"
   },
-  "upstreamSuites": { "runtime": "present", "types": "absent" },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "absent"
+  },
   "adaptedRoots": {
     "source": {
       "roots": ["packages/intersection-observer/src"],
@@ -37,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "e6eba27d5f5c8ea9fcc2c61ffc406e502a9f40f5e9c1ac100f2a9c316974fabe"
+      "lockfileSha256": "d4831945917b00aa5977386fae32c0c8553cbdcf276e5e326c6a50ae490b5391"
     }
   },
   "lanes": [

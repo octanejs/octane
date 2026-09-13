@@ -206,3 +206,6 @@ packages/tanstack-virtual/.browser-results/
 packages/tanstack-db/upstream-helpers/
 
 packages/tanstack-ai/upstream-helpers/
+# Byte-exact Jotai 3 source and test evidence.
+packages/jotai/upstream/
+packages/jotai/tests/upstream/

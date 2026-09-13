@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "e6eba27d5f5c8ea9fcc2c61ffc406e502a9f40f5e9c1ac100f2a9c316974fabe"
+      "lockfileSha256": "d4831945917b00aa5977386fae32c0c8553cbdcf276e5e326c6a50ae490b5391"
     }
   },
   "lanes": [
@@ -481,13 +481,13 @@
             },
             {
               "id": "differential:tanstack-query-async",
-              "testName": "AsyncApp: pending → success renders byte-identical at both steps",
-              "fullName": "differential: @octanejs/tanstack-query vs real @tanstack/react-query AsyncApp: pending → success renders byte-identical at both steps"
+              "testName": "AsyncApp: pending \u2192 success renders byte-identical at both steps",
+              "fullName": "differential: @octanejs/tanstack-query vs real @tanstack/react-query AsyncApp: pending \u2192 success renders byte-identical at both steps"
             },
             {
               "id": "differential:tanstack-query-mutation",
-              "testName": "MutationApp: idle → pending → success renders byte-identical",
-              "fullName": "differential: @octanejs/tanstack-query vs real @tanstack/react-query MutationApp: idle → pending → success renders byte-identical"
+              "testName": "MutationApp: idle \u2192 pending \u2192 success renders byte-identical",
+              "fullName": "differential: @octanejs/tanstack-query vs real @tanstack/react-query MutationApp: idle \u2192 pending \u2192 success renders byte-identical"
             }
           ]
         },
@@ -653,8 +653,8 @@
           "cases": [
             {
               "id": "conformance:a5ed495e6f2c92c1",
-              "testName": "reset → retry → fail AGAIN re-throws to the boundary (no undefined-data fall-through)",
-              "fullName": "suspense error retry loop (clearReset) reset → retry → fail AGAIN re-throws to the boundary (no undefined-data fall-through)"
+              "testName": "reset \u2192 retry \u2192 fail AGAIN re-throws to the boundary (no undefined-data fall-through)",
+              "fullName": "suspense error retry loop (clearReset) reset \u2192 retry \u2192 fail AGAIN re-throws to the boundary (no undefined-data fall-through)"
             },
             {
               "id": "conformance:42c0382221dae71e",
@@ -683,8 +683,8 @@
             },
             {
               "id": "conformance:b2cb1d554f994523",
-              "testName": "disables the query — pending status, idle fetchStatus, no fetch",
-              "fullName": "skipToken disables the query — pending status, idle fetchStatus, no fetch"
+              "testName": "disables the query \u2014 pending status, idle fetchStatus, no fetch",
+              "fullName": "skipToken disables the query \u2014 pending status, idle fetchStatus, no fetch"
             },
             {
               "id": "conformance:fcce0e7644147ca5",
@@ -713,8 +713,8 @@
             },
             {
               "id": "conformance:32e738956e4c4462",
-              "testName": "true → false starts the fetch that restore was holding back",
-              "fullName": "isRestoring flip true → false starts the fetch that restore was holding back"
+              "testName": "true \u2192 false starts the fetch that restore was holding back",
+              "fullName": "isRestoring flip true \u2192 false starts the fetch that restore was holding back"
             }
           ]
         },
@@ -757,8 +757,8 @@
             },
             {
               "id": "conformance:182bb67f7cee96dc",
-              "testName": "works with octane’s <Suspense> component (not just @try)",
-              "fullName": "suspense query works with octane’s <Suspense> component (not just @try)"
+              "testName": "works with octane\u2019s <Suspense> component (not just @try)",
+              "fullName": "suspense query works with octane\u2019s <Suspense> component (not just @try)"
             },
             {
               "id": "conformance:e0f7e8f4dc4c97a3",
@@ -775,12 +775,12 @@
             {
               "id": "conformance:c1e0561f0da086ba",
               "testName": "value=1 committed; transition to value=2 holds value=1 until value=2 resolves",
-              "fullName": "useSuspenseQuery — transition keeps prior content, no fallback flash (React parity) value=1 committed; transition to value=2 holds value=1 until value=2 resolves"
+              "fullName": "useSuspenseQuery \u2014 transition keeps prior content, no fallback flash (React parity) value=1 committed; transition to value=2 holds value=1 until value=2 resolves"
             },
             {
               "id": "conformance:6592b3cc7d15f45c",
               "testName": "an urgent key change supersedes a held transition and reveals fallback",
-              "fullName": "useSuspenseQuery — transition keeps prior content, no fallback flash (React parity) an urgent key change supersedes a held transition and reveals fallback"
+              "fullName": "useSuspenseQuery \u2014 transition keeps prior content, no fallback flash (React parity) an urgent key change supersedes a held transition and reveals fallback"
             }
           ]
         }

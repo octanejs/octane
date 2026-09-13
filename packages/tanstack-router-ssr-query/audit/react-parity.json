@@ -11,7 +11,10 @@
     "integrity": "sha256:1301a0f79fab7aca720fc2289cf6c9e6157e2e76d4442241fd6a9420f646a7c5",
     "verification": "verified"
   },
-  "upstreamSuites": { "runtime": "absent", "types": "present" },
+  "upstreamSuites": {
+    "runtime": "absent",
+    "types": "present"
+  },
   "adaptedRoots": {
     "source": {
       "roots": ["packages/tanstack-router-ssr-query/src"],
@@ -37,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "e6eba27d5f5c8ea9fcc2c61ffc406e502a9f40f5e9c1ac100f2a9c316974fabe"
+      "lockfileSha256": "d4831945917b00aa5977386fae32c0c8553cbdcf276e5e326c6a50ae490b5391"
     }
   },
   "lanes": [
@@ -146,7 +149,7 @@
       "environment": "workspace-node",
       "project": "tanstack-router-ssr-query-pristine-types",
       "evidenceOrigin": "upstream-suite",
-      "notes": "Original adapter source compile matrix, TypeScript 5.6–7.0. Upstream has no dedicated runtime or type-test registrations.",
+      "notes": "Original adapter source compile matrix, TypeScript 5.6\u20137.0. Upstream has no dedicated runtime or type-test registrations.",
       "execution": {
         "kind": "typescript",
         "compiler": "tsc",

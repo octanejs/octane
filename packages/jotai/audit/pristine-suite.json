@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "project": "jotai-pristine",
+  "vitestConfig": "tests/upstream-vitest.config.ts",
+  "rootEnvVar": "JOTAI_PRISTINE_ROOT",
+  "copy": ["src", "tests"],
+  "inlineFiles": {
+    "package.json": { "type": "module" },
+    "tsconfig.json": {
+      "compilerOptions": {
+        "esModuleInterop": true,
+        "jsx": "react-jsx",
+        "jsxImportSource": "react",
+        "module": "ESNext",
+        "moduleResolution": "Bundler",
+        "target": "ES2020"
+      }
+    }
+  }
+}

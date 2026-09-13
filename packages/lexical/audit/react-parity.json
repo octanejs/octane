@@ -11,10 +11,21 @@
     "integrity": "sha256:a7f56b39ebc7fe1cb101d63b829947cd8ee21a28af44eadaed65453b83293060",
     "verification": "recorded-unverified"
   },
-  "upstreamSuites": { "runtime": "present", "types": "absent" },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "absent"
+  },
   "adaptedRoots": {
-    "source": { "roots": ["packages/lexical/src"], "include": ["\\.(?:ts|tsrx)$"], "exclude": [] },
-    "tests": { "roots": ["packages/lexical/tests"], "include": ["\\.test\\.ts$"], "exclude": [] }
+    "source": {
+      "roots": ["packages/lexical/src"],
+      "include": ["\\.(?:ts|tsrx)$"],
+      "exclude": []
+    },
+    "tests": {
+      "roots": ["packages/lexical/tests"],
+      "include": ["\\.test\\.ts$"],
+      "exclude": []
+    }
   },
   "adaptedRuntimeSummary": {
     "inventoryEntries": 0,
@@ -29,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "e6eba27d5f5c8ea9fcc2c61ffc406e502a9f40f5e9c1ac100f2a9c316974fabe"
+      "lockfileSha256": "d4831945917b00aa5977386fae32c0c8553cbdcf276e5e326c6a50ae490b5391"
     }
   },
   "lanes": [

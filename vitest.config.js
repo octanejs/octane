@@ -19,6 +19,7 @@ import { opentuiRenderers as OPENTUI_RENDERERS } from './packages/opentui/src/co
 import { threeRenderers as THREE_RENDERERS } from './packages/three/src/config.ts';
 import { inkRenderers as INK_RENDERERS } from './packages/ink/src/config.ts';
 import { websiteMdxOptions } from './website/mdx-options.ts';
+import { octaneServerFixtures } from './scripts/react-parity/server-fixtures.mjs';
 import { ensureMaterializedUpstream } from './scripts/react-port/ensure-materialized.mjs';
 import tanstackVirtualAdapted from './packages/tanstack-virtual/tests/vitest.adapted.config.ts';
 import tanstackQueryAdaptedSSR from './packages/tanstack-query/tests/vitest.adapted-ssr.config.ts';
@@ -1274,14 +1275,32 @@ export default defineConfig({
 				},
 			})),
 			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'jotai-pristine',
+					include: ['packages/jotai/tests/upstream-original.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+			},
+			{
+				testExecution: {
+					group: 'react-parity',
+					include: ['packages/jotai/tests/upstream/**/*.test.{ts,tsx}'],
+				},
 				test: {
 					name: 'jotai',
-					include: ['packages/jotai/tests/**/*.test.ts'],
+					include: ['packages/jotai/tests/**/*.test.{ts,tsx}'],
 					environment: 'jsdom',
-					exclude: ['packages/jotai/tests/differential/**/*.test.ts'],
+					exclude: [
+						'packages/jotai/tests/differential/**/*.test.ts',
+						'packages/jotai/tests/upstream-original.test.ts',
+						'packages/jotai/tests/conformance/hydration.test.ts',
+					],
+					setupFiles: ['packages/jotai/tests/upstream/setup.ts'],
 					// Same differential precompile, but for jotai fixtures: also rewrites
 					// `@octanejs/jotai` → `jotai` so the React side runs real jotai.
-					globals: false,
+					globals: true,
 				},
 				plugins: [octane()],
 				// `@octanejs/jotai` is the package under test; alias the public name (and
@@ -1299,6 +1318,24 @@ export default defineConfig({
 						{
 							find: /^@octanejs\/jotai\/(.*)$/,
 							replacement: resolve(import.meta.dirname, 'packages/jotai/src') + '/$1.ts',
+						},
+					],
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'jotai-hydration',
+					include: ['packages/jotai/tests/conformance/hydration.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octaneServerFixtures(import.meta.dirname), octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/jotai$/,
+							replacement: resolve(import.meta.dirname, 'packages/jotai/src/index.ts'),
 						},
 					],
 				},

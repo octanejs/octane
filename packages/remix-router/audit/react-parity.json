@@ -11,7 +11,10 @@
     "integrity": "sha256:4ac4dc0f608dfaced2943da365c95634c9f5a550d33be6c10f1d13d70f59692b",
     "verification": "recorded-unverified"
   },
-  "upstreamSuites": { "runtime": "present", "types": "absent" },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "absent"
+  },
   "adaptedRoots": {
     "source": {
       "roots": ["packages/remix-router/src"],
@@ -37,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "e6eba27d5f5c8ea9fcc2c61ffc406e502a9f40f5e9c1ac100f2a9c316974fabe"
+      "lockfileSha256": "d4831945917b00aa5977386fae32c0c8553cbdcf276e5e326c6a50ae490b5391"
     }
   },
   "lanes": [
@@ -67,8 +70,8 @@
             },
             {
               "id": "differential:remix-router-await",
-              "testName": "AwaitApp: fallback → resolved render-prop, byte-identical at both steps",
-              "fullName": "differential: @octanejs/remix-router vs real react-router AwaitApp: fallback → resolved render-prop, byte-identical at both steps"
+              "testName": "AwaitApp: fallback \u2192 resolved render-prop, byte-identical at both steps",
+              "fullName": "differential: @octanejs/remix-router vs real react-router AwaitApp: fallback \u2192 resolved render-prop, byte-identical at both steps"
             },
             {
               "id": "differential:remix-router-declarative",
@@ -97,8 +100,8 @@
             },
             {
               "id": "differential:remix-router-pending",
-              "testName": "PendingApp: deterministic loading state → landed page, byte-identical",
-              "fullName": "differential: @octanejs/remix-router vs real react-router PendingApp: deterministic loading state → landed page, byte-identical"
+              "testName": "PendingApp: deterministic loading state \u2192 landed page, byte-identical",
+              "fullName": "differential: @octanejs/remix-router vs real react-router PendingApp: deterministic loading state \u2192 landed page, byte-identical"
             }
           ]
         },

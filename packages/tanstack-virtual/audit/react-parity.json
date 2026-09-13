@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "e6eba27d5f5c8ea9fcc2c61ffc406e502a9f40f5e9c1ac100f2a9c316974fabe"
+      "lockfileSha256": "d4831945917b00aa5977386fae32c0c8553cbdcf276e5e326c6a50ae490b5391"
     }
   },
   "lanes": [
@@ -574,8 +574,8 @@
             },
             {
               "id": "conformance:406501eec651c49f",
-              "testName": "getTotalSize() = count × estimateSize",
-              "fullName": "state wiring + scrolling getTotalSize() = count × estimateSize"
+              "testName": "getTotalSize() = count \u00d7 estimateSize",
+              "fullName": "state wiring + scrolling getTotalSize() = count \u00d7 estimateSize"
             },
             {
               "id": "conformance:694eb94d5d01cdfd",
@@ -584,8 +584,8 @@
             },
             {
               "id": "conformance:5ca7cd325175fd85",
-              "testName": "positions items at start = index × size (API and rendered transform)",
-              "fullName": "state wiring + scrolling positions items at start = index × size (API and rendered transform)"
+              "testName": "positions items at start = index \u00d7 size (API and rendered transform)",
+              "fullName": "state wiring + scrolling positions items at start = index \u00d7 size (API and rendered transform)"
             },
             {
               "id": "conformance:78bcf0367436d931",
@@ -697,8 +697,8 @@
           "cases": [
             {
               "id": "conformance:103ef876c99af74b",
-              "testName": "windows from the native 1024×768 jsdom viewport",
-              "fullName": "useWindowVirtualizer windows from the native 1024×768 jsdom viewport"
+              "testName": "windows from the native 1024\u00d7768 jsdom viewport",
+              "fullName": "useWindowVirtualizer windows from the native 1024\u00d7768 jsdom viewport"
             },
             {
               "id": "conformance:6e0aee886ac505db",
