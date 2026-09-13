@@ -71,6 +71,7 @@
     "vitest": "catalog:default",
     "playwright": "catalog:default",
     "vite": "catalog:default",
-    "framer-motion": "13.2.0"
+    "framer-motion": "13.2.0",
+    "@types/react": "18.3.1"
   }
 }

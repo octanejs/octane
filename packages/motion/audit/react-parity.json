@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "c0f6cb06a0dcfcba575075acbf7ad664fcb2e239abc74b2fe80fed27137e3111"
+      "lockfileSha256": "3205c60da064f64300148af1d5306928d1365d9f6633cca59d6283f5b8c74e4a"
     }
   },
   "lanes": [
@@ -213,7 +213,7 @@
         {
           "path": "packages/motion/typetests/assertions.md",
           "role": "support",
-          "sha256": "a76f55dfa9f2929eac92ff0db11cec7a569e7a5f27a5f5d70c46a1055a43576a"
+          "sha256": "eb0797cd8f3ebc5e016ebf04d4f681cfda5f95ce498d3c22eebf90e300bfca16"
         },
         {
           "path": "packages/motion/typetests/pristine/published-contract.ts",
@@ -347,7 +347,7 @@
         {
           "path": "packages/motion/typetests/assertions.md",
           "role": "support",
-          "sha256": "a76f55dfa9f2929eac92ff0db11cec7a569e7a5f27a5f5d70c46a1055a43576a"
+          "sha256": "eb0797cd8f3ebc5e016ebf04d4f681cfda5f95ce498d3c22eebf90e300bfca16"
         },
         {
           "path": "packages/motion/tests/types/published-contract.ts",

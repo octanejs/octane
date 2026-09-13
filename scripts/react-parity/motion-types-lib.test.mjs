@@ -47,13 +47,10 @@ test('rejects a removed @ts-expect-error negative control', async (t) => {
 	});
 	const adaptedPath = join(root, ADAPTED_TYPES);
 	const source = await readFile(adaptedPath, 'utf8');
-	await writeFile(
-		adaptedPath,
-		source.replace(
-			'// 8. Rejected assertion: number is not a string.\n\t// @ts-expect-error fixture negative control: number is not assignable to string.\n\tconst rejectedNumberAsString: string = 0;\n',
-			'',
-		),
-	);
+	const negativeControl =
+		'// @ts-expect-error fixture negative control: number is not assignable to string.';
+	assert.equal(source.split(negativeControl).length - 1, 1);
+	await writeFile(adaptedPath, source.replace(negativeControl, ''));
 	assert.throws(function run() {
 		verifyMotionTypes(root);
 	}, /assertion groups must match/);

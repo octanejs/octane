@@ -6,6 +6,10 @@ port-authored. The two files assert the same public-surface claims, one against
 `motion/react@13.2.0` compiled with `tsc`, one against `@octanejs/motion`
 compiled with `tsrx-tsc`.
 
+The declaration oracle pins `@types/react@18.3.1`, matching the isolated React
+18.3.1 runtime oracle. Explicit paths and type roots keep dependency hoisting
+from silently selecting React 19 declarations on another machine.
+
 Permitted differences between the two files, and nothing else:
 
 | # | Transformation | Why |
