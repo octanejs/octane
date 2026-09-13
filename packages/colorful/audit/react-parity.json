@@ -2,26 +2,33 @@
   "schemaVersion": 1,
   "provenance": {
     "repo": "https://github.com/omgovich/react-colorful.git",
-    "version": "5.8.0",
-    "commit": "d914e7647c40a8bbdb286985176e769d76061732",
+    "version": "5.8.1",
+    "commit": "8506e8c4b777e0056ce3567dc3a06ced143034bc",
     "sourceRoot": "src",
     "testRoot": "tests",
     "license": "MIT",
-    "integrity": "sha256:d1ad50cb61882c3e631de05414688d74740281c46633ce40492855bc3816f1c6",
+    "integrity": "sha256:d9c8f10496989e50ba18a4898b5a44185ca84f573b654688c29492aca16d8e76",
     "verification": "verified"
   },
-  "upstreamSuites": { "runtime": "present", "types": "present" },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "present"
+  },
   "adaptedRoots": {
-    "source": { "roots": ["packages/colorful/src"], "include": ["\\.(?:ts|tsrx)$"], "exclude": [] },
+    "source": {
+      "roots": ["packages/colorful/src"],
+      "include": ["\\.(?:ts|tsrx)$"],
+      "exclude": []
+    },
     "tests": {
       "roots": ["packages/colorful/tests/upstream"],
-      "include": ["\\.test\\.(?:ts|tsx)$"],
+      "include": ["\\.test\\.(?:js|ts|tsx)$"],
       "exclude": []
     }
   },
   "adaptedRuntimeSummary": {
-    "inventoryEntries": 64,
-    "uniqueIdentities": 64,
+    "inventoryEntries": 68,
+    "uniqueIdentities": 68,
     "duplicateEntriesWithinLanes": 0,
     "identitiesSharedAcrossLanes": 0
   },
@@ -32,7 +39,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "40bb797cdc8f0e7c72e49dfbca5b3ac8072c563b3482a987e6601abb9a5d4531"
+      "lockfileSha256": "280403a2849ce66a7c5fa33da1ed49c4f4085c42a11145ff06a9bafe436a9962"
     }
   },
   "lanes": [
@@ -43,7 +50,7 @@
       "environment": "workspace-node",
       "project": "colorful-pristine",
       "evidenceOrigin": "upstream-suite",
-      "notes": "Runs the byte-exact react-colorful 5.8.0 Jest suite against its original React binding.",
+      "notes": "Runs the byte-exact react-colorful 5.8.1 Jest suite against its original React binding.",
       "execution": {
         "kind": "jest-full",
         "config": "packages/colorful/tests/upstream-jest.config.cjs",
@@ -54,12 +61,12 @@
         {
           "path": "packages/colorful/audit/upstream.lock.json",
           "role": "support",
-          "sha256": "50135f844ec8ab667a9fb4b4d6269e35179ea1462259f7a48fe1e9ec5eb04ff0"
+          "sha256": "3f24dd9f8b88fca812ee61d36f51e1f0bbe1244e84a2c2ec7e772a47c1be959d"
         },
         {
           "path": "packages/colorful/audit/pristine-runtime.json",
           "role": "support",
-          "sha256": "aab633febcfb42893147db4597e34b0dfe68cf840ef5c819c899dbdb14d25bbc"
+          "sha256": "c44fd7caca637b5fa04c8f7c7ddfb577f981d6da4d6e1a3a04afcd43b099ad4a"
         },
         {
           "path": "packages/colorful/tests/upstream-jest.config.cjs",
@@ -104,7 +111,7 @@
         {
           "path": "packages/colorful/audit/adapted-runtime.json",
           "role": "support",
-          "sha256": "5afc8a329b52734f1bbf642c5e9a7ee9b2da87a35c4583b57086d4e25c37c197"
+          "sha256": "6d9585796685de26601998d28abc9b7cfb701f9011379890a31875938add1727"
         }
       ]
     },
@@ -119,19 +126,19 @@
         {
           "path": "packages/colorful/tests/differential/parity.test.ts",
           "role": "test",
-          "sha256": "c33e226938cc05eb4f5cb6ab8a7491fbbb6f2500f508580158a0c733be70dad1",
+          "sha256": "a608e23df4842298a20bc8346665095e34f78ee566641fc02a993e7bec63e987",
           "cases": [
             {
               "id": "differential:react-colorful-controlled",
               "testName": "matches controlled picker markup, input edits, and keyboard color updates",
-              "fullName": "differential: @octanejs/colorful vs react-colorful@5.8.0 matches controlled picker markup, input edits, and keyboard color updates"
+              "fullName": "differential: @octanejs/colorful vs react-colorful@5.8.1 matches controlled picker markup, input edits, and keyboard color updates"
             }
           ]
         },
         {
           "path": "packages/colorful/audit/test-classifications.json",
           "role": "support",
-          "sha256": "84469c3fbc2a695fe378ab397e31fc8333a628d5a29b40cc2c8f51eb0867b20b"
+          "sha256": "fde529cc6ce3123a9db2858bb90affca6226790a4f0798c614b63e522fa6e32e"
         }
       ]
     },
@@ -157,19 +164,19 @@
             {
               "id": "types:react-colorful-pristine",
               "testName": "upstream check-types program",
-              "fullName": "react-colorful 5.8.0 upstream check-types program"
+              "fullName": "react-colorful 5.8.1 upstream check-types program"
             }
           ]
         },
         {
           "path": "packages/colorful/audit/pristine-program-types.json",
           "role": "support",
-          "sha256": "09eeb89d8f2d8bdf5871b5ec75f595c009674d7d5be02e7a511597aad4d757a8"
+          "sha256": "3d49dbdef4f09e690b7469446343acfe7be2a8fb45b2cf5740d8c5fffafd3579"
         },
         {
           "path": "packages/colorful/audit/adapted-program-types.json",
           "role": "support",
-          "sha256": "aedde66789de99fead2ba00f670d12a68c0601575e40311bf567d3ab2794d4f0"
+          "sha256": "493ee14a1c9eb136817896ee109f4b0c2f80c5eecf15be6745466fe8c59f9f96"
         },
         {
           "path": "packages/colorful/audit/type-parity.json",
@@ -184,7 +191,7 @@
         {
           "path": "scripts/react-parity/react-colorful-types-lib.test.mjs",
           "role": "support",
-          "sha256": "bfdd9a9b8588c5ce8e754796b5215e77f2a4b0a14e6fde655fd2bbe5bbf79398"
+          "sha256": "ef0879bcb897719c85e7f42249c5bc1fcb6f47facab8486c1947d490777465e7"
         }
       ]
     },
@@ -237,22 +244,22 @@
         {
           "path": "scripts/react-parity/react-colorful-types-lib.test.mjs",
           "role": "support",
-          "sha256": "bfdd9a9b8588c5ce8e754796b5215e77f2a4b0a14e6fde655fd2bbe5bbf79398"
+          "sha256": "ef0879bcb897719c85e7f42249c5bc1fcb6f47facab8486c1947d490777465e7"
         },
         {
           "path": "scripts/react-parity/react-colorful-classifications-lib.mjs",
           "role": "support",
-          "sha256": "436883f34788586b7fd4b8b93bb49f3dda2a47a6921c172da1fee4d72b4f13f4"
+          "sha256": "f91303b71652fc459852a4d3376cd3729875c1baa83636127225be29e730ec1c"
         },
         {
           "path": "packages/colorful/audit/test-classifications.json",
           "role": "support",
-          "sha256": "84469c3fbc2a695fe378ab397e31fc8333a628d5a29b40cc2c8f51eb0867b20b"
+          "sha256": "fde529cc6ce3123a9db2858bb90affca6226790a4f0798c614b63e522fa6e32e"
         },
         {
           "path": "packages/colorful/audit/upstream-inventory.mjs",
           "role": "support",
-          "sha256": "54f4fe1d9bc27f05a52efb69655f37b086d2c282e41197f475a9a583e92bb54c"
+          "sha256": "5a013ae936f1643658d2d8aeff9310f542806ed00b9a8f5901a02e8a997ebae6"
         },
         {
           "path": "scripts/react-parity/react-colorful-upstream-lib.mjs",
@@ -262,7 +269,7 @@
         {
           "path": "scripts/react-parity/react-colorful-upstream-lib.test.mjs",
           "role": "support",
-          "sha256": "b49035de21ab668eec24ae65d49f6a9c8e3a3ae5f102c36b3be33cc8f7313358"
+          "sha256": "49dcc0ef2a530daba9a8a8ca9abec5af9b7ce16b3568b46c337d15f3fe85ef16"
         }
       ]
     },
@@ -330,7 +337,7 @@
         {
           "path": "scripts/react-parity/react-colorful-types-lib.test.mjs",
           "role": "support",
-          "sha256": "bfdd9a9b8588c5ce8e754796b5215e77f2a4b0a14e6fde655fd2bbe5bbf79398"
+          "sha256": "ef0879bcb897719c85e7f42249c5bc1fcb6f47facab8486c1947d490777465e7"
         },
         {
           "path": "scripts/react-parity/react-colorful-types.mjs",
@@ -340,12 +347,12 @@
         {
           "path": "packages/colorful/audit/pristine-program-types.json",
           "role": "support",
-          "sha256": "09eeb89d8f2d8bdf5871b5ec75f595c009674d7d5be02e7a511597aad4d757a8"
+          "sha256": "3d49dbdef4f09e690b7469446343acfe7be2a8fb45b2cf5740d8c5fffafd3579"
         },
         {
           "path": "packages/colorful/audit/adapted-program-types.json",
           "role": "support",
-          "sha256": "aedde66789de99fead2ba00f670d12a68c0601575e40311bf567d3ab2794d4f0"
+          "sha256": "493ee14a1c9eb136817896ee109f4b0c2f80c5eecf15be6745466fe8c59f9f96"
         },
         {
           "path": "packages/colorful/audit/type-probes/host-input-event.ts",
@@ -365,22 +372,110 @@
         {
           "path": "scripts/react-parity/react-colorful-upstream-lib.test.mjs",
           "role": "support",
-          "sha256": "b49035de21ab668eec24ae65d49f6a9c8e3a3ae5f102c36b3be33cc8f7313358"
+          "sha256": "49dcc0ef2a530daba9a8a8ca9abec5af9b7ce16b3568b46c337d15f3fe85ef16"
         },
         {
           "path": "scripts/react-parity/react-colorful-classifications-lib.mjs",
           "role": "support",
-          "sha256": "436883f34788586b7fd4b8b93bb49f3dda2a47a6921c172da1fee4d72b4f13f4"
+          "sha256": "f91303b71652fc459852a4d3376cd3729875c1baa83636127225be29e730ec1c"
         },
         {
           "path": "packages/colorful/audit/test-classifications.json",
           "role": "support",
-          "sha256": "84469c3fbc2a695fe378ab397e31fc8333a628d5a29b40cc2c8f51eb0867b20b"
+          "sha256": "fde529cc6ce3123a9db2858bb90affca6226790a4f0798c614b63e522fa6e32e"
         },
         {
           "path": "packages/colorful/audit/upstream-inventory.mjs",
           "role": "support",
-          "sha256": "54f4fe1d9bc27f05a52efb69655f37b086d2c282e41197f475a9a583e92bb54c"
+          "sha256": "5a013ae936f1643658d2d8aeff9310f542806ed00b9a8f5901a02e8a997ebae6"
+        }
+      ]
+    },
+    {
+      "id": "react-colorful-lifecycle",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "colorful",
+      "notes": "Octane conformance evidence for its native host integration.",
+      "files": [
+        {
+          "path": "packages/colorful/tests/runtime/lifecycle.test.ts",
+          "role": "test",
+          "sha256": "c605a71152ee0ce7b53f2fcb6eaaf70899fe51032552e7d7127ce1d98f79071c",
+          "cases": [
+            {
+              "id": "adapted:react-colorful-lifecycle",
+              "testName": "preserves picker identity and refs through controlled updates and keyed reordering",
+              "fullName": "preserves picker identity and refs through controlled updates and keyed reordering"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "react-colorful-ssr",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "colorful-ssr",
+      "notes": "Octane conformance evidence for its native host integration.",
+      "files": [
+        {
+          "path": "packages/colorful/tests/ssr/server.test.ts",
+          "role": "test",
+          "sha256": "3223dcdc26a04a75582037f77ac7d7a2e33148b8f930c2de85ccc8e5c006334b",
+          "cases": [
+            {
+              "id": "adapted:react-colorful-ssr",
+              "testName": "renders deterministic picker and input markup without browser globals",
+              "fullName": "@octanejs/colorful \u2014 server rendering renders deterministic picker and input markup without browser globals"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "react-colorful-hydration",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "colorful-hydration",
+      "notes": "Octane conformance evidence for its native host integration.",
+      "files": [
+        {
+          "path": "packages/colorful/tests/hydration/hydration.test.ts",
+          "role": "test",
+          "sha256": "74d54da02f364612cf7d59ba3c820941f772f8200fab9b8842b16376d28130ac",
+          "cases": [
+            {
+              "id": "adapted:react-colorful-hydration",
+              "testName": "adopts server nodes, injects styles after mount, and becomes interactive",
+              "fullName": "@octanejs/colorful \u2014 hydration adopts server nodes, injects styles after mount, and becomes interactive"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "react-colorful-browser",
+      "type": "browser",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "colorful-browser",
+      "notes": "Octane conformance evidence for its native host integration.",
+      "files": [
+        {
+          "path": "packages/colorful/tests/browser/parity.browser.test.ts",
+          "role": "test",
+          "sha256": "b8330bc6f61beaeb3464723f65c99ca3a7ddfca4c0625513c6967d36f32e9298",
+          "cases": [
+            {
+              "id": "browser:react-colorful-selected",
+              "testName": "drives native interaction and closest-root styles",
+              "fullName": "@octanejs/colorful real-browser parity drives native interaction and closest-root styles"
+            }
+          ]
         }
       ]
     }

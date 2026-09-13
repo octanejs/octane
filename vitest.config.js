@@ -8680,7 +8680,7 @@ export default defineConfig({
 				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'colorful-upstream',
-					include: ['packages/colorful/tests/upstream/**/*.test.ts'],
+					include: ['packages/colorful/tests/upstream/**/*.test.{js,ts}'],
 					environment: 'jsdom',
 					globals: false,
 				},

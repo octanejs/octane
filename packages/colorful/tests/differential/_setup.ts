@@ -1,7 +1,7 @@
 /**
  * Precompile react-colorful's differential fixtures for React. The same `.tsrx`
  * source is loaded by Octane in the test project and rewritten to use the
- * published `react-colorful@5.8.0` package on the React side.
+ * published `react-colorful@5.8.1` package on the React side.
  */
 import { compile as compileToReact } from '@tsrx/react';
 import { transformSync as esbuildTransformSync } from 'esbuild';

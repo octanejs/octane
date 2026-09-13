@@ -1,0 +1,486 @@
+[
+  {
+    "id": "react-case-v1:bef2fe5e8e8d07c2b449",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components.test.ts"
+  },
+  {
+    "id": "react-case-v1:fb41f639f7ec600d8088",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components.test.ts"
+  },
+  {
+    "id": "react-case-v1:b292a7b655589dcbff8e",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components.test.ts"
+  },
+  {
+    "id": "react-case-v1:ee80f82f1bb932919177",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components.test.ts"
+  },
+  {
+    "id": "react-case-v1:c8e016c0d6e86527c1e6",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components.test.ts"
+  },
+  {
+    "id": "react-case-v1:81d0b12493944e4f510b",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components.test.ts"
+  },
+  {
+    "id": "react-case-v1:8b5267b053f9198591eb",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components.test.ts"
+  },
+  {
+    "id": "react-case-v1:aabb6cf02149b99014b7",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components.test.ts"
+  },
+  {
+    "id": "react-case-v1:3b1b73ca5d52cf871d8d",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components.test.ts"
+  },
+  {
+    "id": "react-case-v1:05d41671374b9642f71f",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components.test.ts"
+  },
+  {
+    "id": "react-case-v1:cc1c52b43be45335171e",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components.test.ts"
+  },
+  {
+    "id": "react-case-v1:d364bd20035523b15af8",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components.test.ts"
+  },
+  {
+    "id": "react-case-v1:6bea6fe81945e0aec57c",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components.test.ts"
+  },
+  {
+    "id": "react-case-v1:86469c7faad13e90d14a",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components.test.ts"
+  },
+  {
+    "id": "react-case-v1:4db56da5e366439c2c68",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components.test.ts"
+  },
+  {
+    "id": "react-case-v1:95f268f93846cc1f2ded",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components.test.ts"
+  },
+  {
+    "id": "react-case-v1:a60cb8b8cb9f838a9001",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components.test.ts"
+  },
+  {
+    "id": "react-case-v1:e8c42e35ea24052ddc98",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components.test.ts"
+  },
+  {
+    "id": "react-case-v1:73724c2e70387665a2ae",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components.test.ts"
+  },
+  {
+    "id": "react-case-v1:a70998eca7cbd42fd5db",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components.test.ts"
+  },
+  {
+    "id": "react-case-v1:69c9ed8e4e33ce993867",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components.test.ts"
+  },
+  {
+    "id": "react-case-v1:d919286bf513ffaea8c4",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components.test.ts"
+  },
+  {
+    "id": "react-case-v1:498abde692426a85901a",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components.test.ts"
+  },
+  {
+    "id": "react-case-v1:d6a7d0147e7fe9b2483a",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components.test.ts"
+  },
+  {
+    "id": "react-case-v1:def2b1df2037ca769d64",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components.test.ts"
+  },
+  {
+    "id": "react-case-v1:e0e76a2747d19d6084c0",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components.test.ts"
+  },
+  {
+    "id": "react-case-v1:4b86720f733f03e284f0",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components.test.ts"
+  },
+  {
+    "id": "react-case-v1:c14c81480cf35a290aa3",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components.test.ts"
+  },
+  {
+    "id": "react-case-v1:81f075c439bb13c8e14e",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components.test.ts"
+  },
+  {
+    "id": "react-case-v1:08782a624ec99f8bc941",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components.test.ts"
+  },
+  {
+    "id": "react-case-v1:19c7d34648586718a2ff",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components.test.ts"
+  },
+  {
+    "id": "react-case-v1:7a8fe17aedf88fa0a84a",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components.test.ts"
+  },
+  {
+    "id": "react-case-v1:8d402cf108e2023a2940",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components.test.ts"
+  },
+  {
+    "id": "react-case-v1:04b017b383cc9f425444",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components.test.ts"
+  },
+  {
+    "id": "react-case-v1:61569000c635ff13d6d3",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components.test.ts"
+  },
+  {
+    "id": "react-case-v1:afe8530bc4e38b4f447f",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components.test.ts"
+  },
+  {
+    "id": "react-case-v1:98018cf4e62480d83e83",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components.test.ts"
+  },
+  {
+    "id": "react-case-v1:52e253ccd1a4599d6751",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components.test.ts"
+  },
+  {
+    "id": "react-case-v1:c11dbf2098e53a9c7e7d",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/csp.test.ts"
+  },
+  {
+    "id": "react-case-v1:4cf9f474288019e953c1",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/shadowDom.test.ts"
+  },
+  {
+    "id": "react-case-v1:d37dce52b980d82dba59",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/generated/utils.test.js"
+  },
+  {
+    "id": "react-case-v1:8a3963d4331f66d6babe",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/generated/utils.test.js"
+  },
+  {
+    "id": "react-case-v1:461f939538ddeb3efcff",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/generated/utils.test.js"
+  },
+  {
+    "id": "react-case-v1:c6a919385aa3ec76055e",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/generated/utils.test.js"
+  },
+  {
+    "id": "react-case-v1:62246bbb9803ec0536fe",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/generated/utils.test.js",
+    "rationale": "Inline conversion assertion helper within Converts HSVA to HSLA; preflight identifies its test() call separately, and the generated suite executes this assertion in the enclosing upstream case."
+  },
+  {
+    "id": "react-case-v1:e4375cad4c1a3fcd392b",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/generated/utils.test.js",
+    "rationale": "Inline conversion assertion helper within Converts HSVA to HSLA; preflight identifies its test() call separately, and the generated suite executes this assertion in the enclosing upstream case."
+  },
+  {
+    "id": "react-case-v1:f27f733cd53a1b1b40a9",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/generated/utils.test.js",
+    "rationale": "Inline conversion assertion helper within Converts HSVA to HSLA; preflight identifies its test() call separately, and the generated suite executes this assertion in the enclosing upstream case."
+  },
+  {
+    "id": "react-case-v1:e07197625ffe7b40fcb6",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/generated/utils.test.js",
+    "rationale": "Inline conversion assertion helper within Converts HSVA to HSLA; preflight identifies its test() call separately, and the generated suite executes this assertion in the enclosing upstream case."
+  },
+  {
+    "id": "react-case-v1:9962dc2b0889d31c05c4",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/generated/utils.test.js",
+    "rationale": "Inline conversion assertion helper within Converts HSVA to HSLA; preflight identifies its test() call separately, and the generated suite executes this assertion in the enclosing upstream case."
+  },
+  {
+    "id": "react-case-v1:406b36bbb6ba5eb86b9c",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/generated/utils.test.js"
+  },
+  {
+    "id": "react-case-v1:80d5a861a04504d200bc",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/generated/utils.test.js",
+    "rationale": "Inline conversion assertion helper within Converts HSLA to HSVA; preflight identifies its test() call separately, and the generated suite executes this assertion in the enclosing upstream case."
+  },
+  {
+    "id": "react-case-v1:0d5a49534bb6c123cab5",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/generated/utils.test.js",
+    "rationale": "Inline conversion assertion helper within Converts HSLA to HSVA; preflight identifies its test() call separately, and the generated suite executes this assertion in the enclosing upstream case."
+  },
+  {
+    "id": "react-case-v1:8cdd4dd6e49e0e4f4422",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/generated/utils.test.js",
+    "rationale": "Inline conversion assertion helper within Converts HSLA to HSVA; preflight identifies its test() call separately, and the generated suite executes this assertion in the enclosing upstream case."
+  },
+  {
+    "id": "react-case-v1:245fdc65197d4d007120",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/generated/utils.test.js",
+    "rationale": "Inline conversion assertion helper within Converts HSLA to HSVA; preflight identifies its test() call separately, and the generated suite executes this assertion in the enclosing upstream case."
+  },
+  {
+    "id": "react-case-v1:d63302db210690466503",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/generated/utils.test.js",
+    "rationale": "Inline conversion assertion helper within Converts HSLA to HSVA; preflight identifies its test() call separately, and the generated suite executes this assertion in the enclosing upstream case."
+  },
+  {
+    "id": "react-case-v1:9d608a5e419ced42349a",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/generated/utils.test.js"
+  },
+  {
+    "id": "react-case-v1:0fe3a5a57dede0b60354",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/generated/utils.test.js"
+  },
+  {
+    "id": "react-case-v1:b206876b5eade86e5292",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/generated/utils.test.js"
+  },
+  {
+    "id": "react-case-v1:abd1ca1f7b4030ed0f65",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/generated/utils.test.js",
+    "rationale": "Inline conversion assertion helper within Converts HSLA string to HSVA; preflight identifies its test() call separately, and the generated suite executes this assertion in the enclosing upstream case."
+  },
+  {
+    "id": "react-case-v1:5380d16104214739366f",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/generated/utils.test.js",
+    "rationale": "Inline conversion assertion helper within Converts HSLA string to HSVA; preflight identifies its test() call separately, and the generated suite executes this assertion in the enclosing upstream case."
+  },
+  {
+    "id": "react-case-v1:646b04c20b94fcb056a4",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/generated/utils.test.js",
+    "rationale": "Inline conversion assertion helper within Converts HSLA string to HSVA; preflight identifies its test() call separately, and the generated suite executes this assertion in the enclosing upstream case."
+  },
+  {
+    "id": "react-case-v1:62c7636744fc6de468d0",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/generated/utils.test.js"
+  },
+  {
+    "id": "react-case-v1:dcff5e9a126c1dcfb91b",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/generated/utils.test.js",
+    "rationale": "Inline conversion assertion helper within Converts HSVA to RGBA; preflight identifies its test() call separately, and the generated suite executes this assertion in the enclosing upstream case."
+  },
+  {
+    "id": "react-case-v1:ca20e569e2c873d6ac1f",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/generated/utils.test.js",
+    "rationale": "Inline conversion assertion helper within Converts HSVA to RGBA; preflight identifies its test() call separately, and the generated suite executes this assertion in the enclosing upstream case."
+  },
+  {
+    "id": "react-case-v1:a15b59e7b44118a25d63",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/generated/utils.test.js"
+  },
+  {
+    "id": "react-case-v1:63bf34350601a85bce4f",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/generated/utils.test.js",
+    "rationale": "Inline conversion assertion helper within Converts RGBA to HSVA and back without losing precision; preflight identifies its test() call separately, and the generated suite executes this assertion in the enclosing upstream case."
+  },
+  {
+    "id": "react-case-v1:a378bebf0bc567ab19f9",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/generated/utils.test.js",
+    "rationale": "Inline conversion assertion helper within Converts RGBA to HSVA and back without losing precision; preflight identifies its test() call separately, and the generated suite executes this assertion in the enclosing upstream case."
+  },
+  {
+    "id": "react-case-v1:b47760287136015e0d3b",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/generated/utils.test.js",
+    "rationale": "Inline conversion assertion helper within Converts RGBA to HSVA and back without losing precision; preflight identifies its test() call separately, and the generated suite executes this assertion in the enclosing upstream case."
+  },
+  {
+    "id": "react-case-v1:988a9313653ddaa048e9",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/generated/utils.test.js",
+    "rationale": "Inline conversion assertion helper within Converts RGBA to HSVA and back without losing precision; preflight identifies its test() call separately, and the generated suite executes this assertion in the enclosing upstream case."
+  },
+  {
+    "id": "react-case-v1:bf77a9c9e463b5ac117e",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/generated/utils.test.js"
+  },
+  {
+    "id": "react-case-v1:36dc8333308cd5b4acd2",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/generated/utils.test.js"
+  },
+  {
+    "id": "react-case-v1:22a6c0dc3ea15410b91d",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/generated/utils.test.js"
+  },
+  {
+    "id": "react-case-v1:82e62173ae27a76deefd",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/generated/utils.test.js"
+  },
+  {
+    "id": "react-case-v1:782cddd078f19d399d08",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/generated/utils.test.js",
+    "rationale": "Inline conversion assertion helper within Converts HSVA to RGBA string; preflight identifies its test() call separately, and the generated suite executes this assertion in the enclosing upstream case."
+  },
+  {
+    "id": "react-case-v1:7ea685bc59e0f6c4b08a",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/generated/utils.test.js"
+  },
+  {
+    "id": "react-case-v1:5b501682e323bb32cbc0",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/generated/utils.test.js",
+    "rationale": "Inline conversion assertion helper within Converts RGBA string to HSVA; preflight identifies its test() call separately, and the generated suite executes this assertion in the enclosing upstream case."
+  },
+  {
+    "id": "react-case-v1:11440fa8fae05be3a940",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/generated/utils.test.js",
+    "rationale": "Inline conversion assertion helper within Converts RGBA string to HSVA; preflight identifies its test() call separately, and the generated suite executes this assertion in the enclosing upstream case."
+  },
+  {
+    "id": "react-case-v1:211b98cb9f7248675e6b",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/generated/utils.test.js"
+  },
+  {
+    "id": "react-case-v1:f0a39483d75fdf99fd7a",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/generated/utils.test.js"
+  },
+  {
+    "id": "react-case-v1:f1d83b2d9dea9bfa6d4f",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/generated/utils.test.js"
+  },
+  {
+    "id": "react-case-v1:b3c6f2eadbf53ba31da7",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/generated/utils.test.js"
+  },
+  {
+    "id": "react-case-v1:6969bbfddd3ab88d4b70",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/generated/utils.test.js"
+  },
+  {
+    "id": "react-case-v1:51d3472867f84bccf554",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/generated/utils.test.js",
+    "rationale": "Inline conversion assertion helper within Rounds HSVA; preflight identifies its test() call separately, and the generated suite executes this assertion in the enclosing upstream case."
+  },
+  {
+    "id": "react-case-v1:acd47c45545692a5e899",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/generated/utils.test.js",
+    "rationale": "Inline conversion assertion helper within Rounds HSVA; preflight identifies its test() call separately, and the generated suite executes this assertion in the enclosing upstream case."
+  },
+  {
+    "id": "react-case-v1:277e306b10131419137c",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/generated/utils.test.js"
+  },
+  {
+    "id": "react-case-v1:05950d8ef83bbe97048e",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/generated/utils.test.js"
+  },
+  {
+    "id": "react-case-v1:f1fe5e6ebf72ae065fa0",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/generated/utils.test.js"
+  },
+  {
+    "id": "react-case-v1:ab4461e906efbb8cdb72",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/generated/utils.test.js"
+  },
+  {
+    "id": "react-case-v1:5c1f42ce69b526258768",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/generated/utils.test.js"
+  },
+  {
+    "id": "react-case-v1:d149f46d86bc8d02ae8c",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/generated/utils.test.js"
+  },
+  {
+    "id": "react-case-v1:01a19dd50a89804339f1",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/generated/utils.test.js"
+  },
+  {
+    "id": "react-case-v1:424f27c889d2a16e0818",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/generated/utils.test.js"
+  }
+]

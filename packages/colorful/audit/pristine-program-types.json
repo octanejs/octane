@@ -129,7 +129,7 @@
   },
   {
     "path": "utils/convert.ts",
-    "sha256": "91472af7a296d74dec5e3f9818b662a3e3f8a097db568dc432844938481086e3"
+    "sha256": "f12901263fdabddff789e5b253d59523d606a8ce6ea45520f3e9f12aef410d87"
   },
   {
     "path": "utils/format.ts",

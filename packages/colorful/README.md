@@ -1,6 +1,6 @@
 # @octanejs/colorful
 
-Exact Octane binding for [`react-colorful@5.8.0`](https://github.com/omgovich/react-colorful).
+Exact Octane binding for [`react-colorful@5.8.1`](https://github.com/omgovich/react-colorful).
 
 ## Install
 

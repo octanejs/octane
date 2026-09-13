@@ -5422,8 +5422,8 @@ importers:
         specifier: catalog:react-colorful-react-oracle
         version: 19.2.7
       react-colorful:
-        specifier: 5.8.0
-        version: 5.8.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+        specifier: 5.8.1
+        version: 5.8.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       react-dom:
         specifier: catalog:react-colorful-react-oracle
         version: 19.2.7(react@19.2.7)
@@ -30563,6 +30563,12 @@ packages:
 
   react-colorful@5.8.0:
     resolution: {integrity: sha512-Wy9OzPfjSN9bF12OB8N7UQvlsZ0I+7wHxpN+bV5BjNQGxOj6IiwkRjevJK9yOBjJWGQvAaf1OXtn8rUeEatAng==}
+    peerDependencies:
+      react: '>=16.8.0'
+      react-dom: '>=16.8.0'
+
+  react-colorful@5.8.1:
+    resolution: {integrity: sha512-oz68bhsnFWnpDf1ZR8daiQbYpXUnM2h2J6hl9Zg2rTpM/DU6vCqe1E+CpqmqLnJucMZetHZeifSAfJ+geN9lcA==}
     peerDependencies:
       react: '>=16.8.0'
       react-dom: '>=16.8.0'
@@ -62657,6 +62663,11 @@ snapshots:
       react-dom: 19.2.3(react@19.2.3)
 
   react-colorful@5.8.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7):
+    dependencies:
+      react: 19.2.7
+      react-dom: 19.2.7(react@19.2.7)
+
+  react-colorful@5.8.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7):
     dependencies:
       react: 19.2.7
       react-dom: 19.2.7(react@19.2.7)

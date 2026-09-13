@@ -6,7 +6,7 @@ const MANIFEST = 'packages/colorful/audit/react-parity.json';
 const DISCOVERY_ROOTS = [
 	{
 		root: 'packages/colorful/tests',
-		match: /\.test\.(?:ts|tsx|tsrx)$/,
+		match: /\.test(?:-d)?\.(?:js|ts|tsx|tsrx)$/,
 	},
 	{
 		root: 'packages/colorful/audit/type-probes',
@@ -21,6 +21,7 @@ const DISPOSITIONS = new Set([
 	'unmodified-upstream-suite-wrapper',
 	'adapted-upstream-suite',
 	'paired-repo-authored-react-type-oracle',
+	'paired-repo-authored-type-probes',
 	'react-octane-differential',
 	'octane-only-divergence',
 	'octane-only-framework-contract',
@@ -67,7 +68,10 @@ export function verifyReactColorfulTestClassifications(root) {
 		if (!DISPOSITIONS.has(entry.disposition)) {
 			throw new Error(`${entry.path}: unknown test disposition`);
 		}
-		if (entry.path.startsWith(TYPE_PROBE_PREFIX)) {
+		if (
+			entry.path.startsWith(TYPE_PROBE_PREFIX) ||
+			entry.path === 'packages/colorful/tests/types/pristine.test-d.ts'
+		) {
 			if (entry.disposition !== 'paired-repo-authored-react-type-oracle') {
 				throw new Error(
 					`${entry.path}: type-probe files are repo-authored React declaration/type-oracle evidence and must use paired-repo-authored-react-type-oracle`,
@@ -75,7 +79,7 @@ export function verifyReactColorfulTestClassifications(root) {
 			}
 		} else if (entry.disposition === 'paired-repo-authored-react-type-oracle') {
 			throw new Error(
-				`${entry.path}: paired-repo-authored-react-type-oracle is reserved for audit/type-probes`,
+				`${entry.path}: paired-repo-authored-react-type-oracle is reserved for pristine type probes`,
 			);
 		}
 		if (entry.disposition.startsWith('octane-only-')) {

@@ -5,8 +5,8 @@
   "files": [
     "packages/colorful/tests/upstream/components.test.ts",
     "packages/colorful/tests/upstream/csp.test.ts",
-    "packages/colorful/tests/upstream/shadowDom.test.ts",
-    "packages/colorful/tests/upstream/utils.test.ts"
+    "packages/colorful/tests/upstream/generated/utils.test.js",
+    "packages/colorful/tests/upstream/shadowDom.test.ts"
   ],
   "tests": [
     {
@@ -63,6 +63,21 @@
       "id": "adapted:packages/colorful/tests/upstream/components.test.ts::Doesn't call `onChange` when user changes a hue of a grayscale color",
       "file": "packages/colorful/tests/upstream/components.test.ts",
       "fullName": "Doesn't call `onChange` when user changes a hue of a grayscale color"
+    },
+    {
+      "id": "adapted:packages/colorful/tests/upstream/components.test.ts::Doesn't change HEX color channels when only alpha is changed",
+      "file": "packages/colorful/tests/upstream/components.test.ts",
+      "fullName": "Doesn't change HEX color channels when only alpha is changed"
+    },
+    {
+      "id": "adapted:packages/colorful/tests/upstream/components.test.ts::Doesn't change RGB channels when only alpha is changed",
+      "file": "packages/colorful/tests/upstream/components.test.ts",
+      "fullName": "Doesn't change RGB channels when only alpha is changed"
+    },
+    {
+      "id": "adapted:packages/colorful/tests/upstream/components.test.ts::Doesn't change RGB string channels when only alpha is changed",
+      "file": "packages/colorful/tests/upstream/components.test.ts",
+      "fullName": "Doesn't change RGB string channels when only alpha is changed"
     },
     {
       "id": "adapted:packages/colorful/tests/upstream/components.test.ts::Doesn't react on mouse events after a touch interaction",
@@ -190,144 +205,149 @@
       "fullName": "Signs the `style` element with a nonce"
     },
     {
-      "id": "adapted:packages/colorful/tests/upstream/shadowDom.test.ts::Injects styles into the closest ShadowRoot when mounted inside one",
-      "file": "packages/colorful/tests/upstream/shadowDom.test.ts",
-      "fullName": "Injects styles into the closest ShadowRoot when mounted inside one"
-    },
-    {
-      "id": "adapted:packages/colorful/tests/upstream/utils.test.ts::Clamps a number between bounds",
-      "file": "packages/colorful/tests/upstream/utils.test.ts",
+      "id": "adapted:packages/colorful/tests/upstream/generated/utils.test.js::Clamps a number between bounds",
+      "file": "packages/colorful/tests/upstream/generated/utils.test.js",
       "fullName": "Clamps a number between bounds"
     },
     {
-      "id": "adapted:packages/colorful/tests/upstream/utils.test.ts::Compares two HEX colors",
-      "file": "packages/colorful/tests/upstream/utils.test.ts",
+      "id": "adapted:packages/colorful/tests/upstream/generated/utils.test.js::Compares two HEX colors",
+      "file": "packages/colorful/tests/upstream/generated/utils.test.js",
       "fullName": "Compares two HEX colors"
     },
     {
-      "id": "adapted:packages/colorful/tests/upstream/utils.test.ts::Compares two object colors",
-      "file": "packages/colorful/tests/upstream/utils.test.ts",
+      "id": "adapted:packages/colorful/tests/upstream/generated/utils.test.js::Compares two object colors",
+      "file": "packages/colorful/tests/upstream/generated/utils.test.js",
       "fullName": "Compares two object colors"
     },
     {
-      "id": "adapted:packages/colorful/tests/upstream/utils.test.ts::Compares two string colors",
-      "file": "packages/colorful/tests/upstream/utils.test.ts",
+      "id": "adapted:packages/colorful/tests/upstream/generated/utils.test.js::Compares two string colors",
+      "file": "packages/colorful/tests/upstream/generated/utils.test.js",
       "fullName": "Compares two string colors"
     },
     {
-      "id": "adapted:packages/colorful/tests/upstream/utils.test.ts::Converts HEX to HSVA",
-      "file": "packages/colorful/tests/upstream/utils.test.ts",
+      "id": "adapted:packages/colorful/tests/upstream/generated/utils.test.js::Converts HEX to HSVA",
+      "file": "packages/colorful/tests/upstream/generated/utils.test.js",
       "fullName": "Converts HEX to HSVA"
     },
     {
-      "id": "adapted:packages/colorful/tests/upstream/utils.test.ts::Converts HSL string to HSVA",
-      "file": "packages/colorful/tests/upstream/utils.test.ts",
+      "id": "adapted:packages/colorful/tests/upstream/generated/utils.test.js::Converts HSL string to HSVA",
+      "file": "packages/colorful/tests/upstream/generated/utils.test.js",
       "fullName": "Converts HSL string to HSVA"
     },
     {
-      "id": "adapted:packages/colorful/tests/upstream/utils.test.ts::Converts HSLA string to HSVA",
-      "file": "packages/colorful/tests/upstream/utils.test.ts",
+      "id": "adapted:packages/colorful/tests/upstream/generated/utils.test.js::Converts HSLA string to HSVA",
+      "file": "packages/colorful/tests/upstream/generated/utils.test.js",
       "fullName": "Converts HSLA string to HSVA"
     },
     {
-      "id": "adapted:packages/colorful/tests/upstream/utils.test.ts::Converts HSLA to HSVA",
-      "file": "packages/colorful/tests/upstream/utils.test.ts",
+      "id": "adapted:packages/colorful/tests/upstream/generated/utils.test.js::Converts HSLA to HSVA",
+      "file": "packages/colorful/tests/upstream/generated/utils.test.js",
       "fullName": "Converts HSLA to HSVA"
     },
     {
-      "id": "adapted:packages/colorful/tests/upstream/utils.test.ts::Converts HSV string to HSVA",
-      "file": "packages/colorful/tests/upstream/utils.test.ts",
+      "id": "adapted:packages/colorful/tests/upstream/generated/utils.test.js::Converts HSV string to HSVA",
+      "file": "packages/colorful/tests/upstream/generated/utils.test.js",
       "fullName": "Converts HSV string to HSVA"
     },
     {
-      "id": "adapted:packages/colorful/tests/upstream/utils.test.ts::Converts HSVA string to HSVA",
-      "file": "packages/colorful/tests/upstream/utils.test.ts",
+      "id": "adapted:packages/colorful/tests/upstream/generated/utils.test.js::Converts HSVA string to HSVA",
+      "file": "packages/colorful/tests/upstream/generated/utils.test.js",
       "fullName": "Converts HSVA string to HSVA"
     },
     {
-      "id": "adapted:packages/colorful/tests/upstream/utils.test.ts::Converts HSVA to HEX",
-      "file": "packages/colorful/tests/upstream/utils.test.ts",
+      "id": "adapted:packages/colorful/tests/upstream/generated/utils.test.js::Converts HSVA to HEX",
+      "file": "packages/colorful/tests/upstream/generated/utils.test.js",
       "fullName": "Converts HSVA to HEX"
     },
     {
-      "id": "adapted:packages/colorful/tests/upstream/utils.test.ts::Converts HSVA to HSL string",
-      "file": "packages/colorful/tests/upstream/utils.test.ts",
+      "id": "adapted:packages/colorful/tests/upstream/generated/utils.test.js::Converts HSVA to HSL string",
+      "file": "packages/colorful/tests/upstream/generated/utils.test.js",
       "fullName": "Converts HSVA to HSL string"
     },
     {
-      "id": "adapted:packages/colorful/tests/upstream/utils.test.ts::Converts HSVA to HSLA",
-      "file": "packages/colorful/tests/upstream/utils.test.ts",
+      "id": "adapted:packages/colorful/tests/upstream/generated/utils.test.js::Converts HSVA to HSLA",
+      "file": "packages/colorful/tests/upstream/generated/utils.test.js",
       "fullName": "Converts HSVA to HSLA"
     },
     {
-      "id": "adapted:packages/colorful/tests/upstream/utils.test.ts::Converts HSVA to HSV string",
-      "file": "packages/colorful/tests/upstream/utils.test.ts",
+      "id": "adapted:packages/colorful/tests/upstream/generated/utils.test.js::Converts HSVA to HSV string",
+      "file": "packages/colorful/tests/upstream/generated/utils.test.js",
       "fullName": "Converts HSVA to HSV string"
     },
     {
-      "id": "adapted:packages/colorful/tests/upstream/utils.test.ts::Converts HSVA to HSVA string",
-      "file": "packages/colorful/tests/upstream/utils.test.ts",
+      "id": "adapted:packages/colorful/tests/upstream/generated/utils.test.js::Converts HSVA to HSVA string",
+      "file": "packages/colorful/tests/upstream/generated/utils.test.js",
       "fullName": "Converts HSVA to HSVA string"
     },
     {
-      "id": "adapted:packages/colorful/tests/upstream/utils.test.ts::Converts HSVA to RGB string",
-      "file": "packages/colorful/tests/upstream/utils.test.ts",
+      "id": "adapted:packages/colorful/tests/upstream/generated/utils.test.js::Converts HSVA to RGB string",
+      "file": "packages/colorful/tests/upstream/generated/utils.test.js",
       "fullName": "Converts HSVA to RGB string"
     },
     {
-      "id": "adapted:packages/colorful/tests/upstream/utils.test.ts::Converts HSVA to RGBA",
-      "file": "packages/colorful/tests/upstream/utils.test.ts",
+      "id": "adapted:packages/colorful/tests/upstream/generated/utils.test.js::Converts HSVA to RGBA",
+      "file": "packages/colorful/tests/upstream/generated/utils.test.js",
       "fullName": "Converts HSVA to RGBA"
     },
     {
-      "id": "adapted:packages/colorful/tests/upstream/utils.test.ts::Converts HSVA to RGBA string",
-      "file": "packages/colorful/tests/upstream/utils.test.ts",
+      "id": "adapted:packages/colorful/tests/upstream/generated/utils.test.js::Converts HSVA to RGBA string",
+      "file": "packages/colorful/tests/upstream/generated/utils.test.js",
       "fullName": "Converts HSVA to RGBA string"
     },
     {
-      "id": "adapted:packages/colorful/tests/upstream/utils.test.ts::Converts RGB string to HSVA",
-      "file": "packages/colorful/tests/upstream/utils.test.ts",
+      "id": "adapted:packages/colorful/tests/upstream/generated/utils.test.js::Converts RGB string to HSVA",
+      "file": "packages/colorful/tests/upstream/generated/utils.test.js",
       "fullName": "Converts RGB string to HSVA"
     },
     {
-      "id": "adapted:packages/colorful/tests/upstream/utils.test.ts::Converts RGBA string to HSVA",
-      "file": "packages/colorful/tests/upstream/utils.test.ts",
+      "id": "adapted:packages/colorful/tests/upstream/generated/utils.test.js::Converts RGBA string to HSVA",
+      "file": "packages/colorful/tests/upstream/generated/utils.test.js",
       "fullName": "Converts RGBA string to HSVA"
     },
     {
-      "id": "adapted:packages/colorful/tests/upstream/utils.test.ts::Converts RGBA to HSVA",
-      "file": "packages/colorful/tests/upstream/utils.test.ts",
+      "id": "adapted:packages/colorful/tests/upstream/generated/utils.test.js::Converts RGBA to HSVA",
+      "file": "packages/colorful/tests/upstream/generated/utils.test.js",
       "fullName": "Converts RGBA to HSVA"
     },
     {
-      "id": "adapted:packages/colorful/tests/upstream/utils.test.ts::Converts shorthand HEX to HSVA",
-      "file": "packages/colorful/tests/upstream/utils.test.ts",
+      "id": "adapted:packages/colorful/tests/upstream/generated/utils.test.js::Converts RGBA to HSVA and back without losing precision",
+      "file": "packages/colorful/tests/upstream/generated/utils.test.js",
+      "fullName": "Converts RGBA to HSVA and back without losing precision"
+    },
+    {
+      "id": "adapted:packages/colorful/tests/upstream/generated/utils.test.js::Converts shorthand HEX to HSVA",
+      "file": "packages/colorful/tests/upstream/generated/utils.test.js",
       "fullName": "Converts shorthand HEX to HSVA"
     },
     {
-      "id": "adapted:packages/colorful/tests/upstream/utils.test.ts::Formats a class name",
-      "file": "packages/colorful/tests/upstream/utils.test.ts",
+      "id": "adapted:packages/colorful/tests/upstream/generated/utils.test.js::Formats a class name",
+      "file": "packages/colorful/tests/upstream/generated/utils.test.js",
       "fullName": "Formats a class name"
     },
     {
-      "id": "adapted:packages/colorful/tests/upstream/utils.test.ts::Rounds HSVA",
-      "file": "packages/colorful/tests/upstream/utils.test.ts",
+      "id": "adapted:packages/colorful/tests/upstream/generated/utils.test.js::Rounds HSVA",
+      "file": "packages/colorful/tests/upstream/generated/utils.test.js",
       "fullName": "Rounds HSVA"
     },
     {
-      "id": "adapted:packages/colorful/tests/upstream/utils.test.ts::Rounds a number",
-      "file": "packages/colorful/tests/upstream/utils.test.ts",
+      "id": "adapted:packages/colorful/tests/upstream/generated/utils.test.js::Rounds a number",
+      "file": "packages/colorful/tests/upstream/generated/utils.test.js",
       "fullName": "Rounds a number"
     },
     {
-      "id": "adapted:packages/colorful/tests/upstream/utils.test.ts::Trims alpha-channel",
-      "file": "packages/colorful/tests/upstream/utils.test.ts",
+      "id": "adapted:packages/colorful/tests/upstream/generated/utils.test.js::Trims alpha-channel",
+      "file": "packages/colorful/tests/upstream/generated/utils.test.js",
       "fullName": "Trims alpha-channel"
     },
     {
-      "id": "adapted:packages/colorful/tests/upstream/utils.test.ts::Validates HEX colors",
-      "file": "packages/colorful/tests/upstream/utils.test.ts",
+      "id": "adapted:packages/colorful/tests/upstream/generated/utils.test.js::Validates HEX colors",
+      "file": "packages/colorful/tests/upstream/generated/utils.test.js",
       "fullName": "Validates HEX colors"
+    },
+    {
+      "id": "adapted:packages/colorful/tests/upstream/shadowDom.test.ts::Injects styles into the closest ShadowRoot when mounted inside one",
+      "file": "packages/colorful/tests/upstream/shadowDom.test.ts",
+      "fullName": "Injects styles into the closest ShadowRoot when mounted inside one"
     }
   ]
 }
