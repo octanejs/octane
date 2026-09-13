@@ -4,7 +4,11 @@ import {
 	ServerRoute,
 	OCTANE_NONCE_STATE_KEY,
 } from '@octanejs/vite-plugin';
-import { acceptUrlAction, fetchHistory } from './src/conversation-history/server.ts';
+import {
+	acceptUrlAction,
+	controlHistoryRevalidation,
+	fetchHistory,
+} from './src/conversation-history/server.ts';
 
 export default defineConfig({
 	server: {
@@ -74,6 +78,11 @@ export default defineConfig({
 				before: [acceptUrlAction],
 			}),
 			new ServerRoute({ path: '/conversation-history/frames', handler: fetchHistory }),
+			new ServerRoute({
+				path: '/conversation-history/revalidation',
+				methods: ['POST'],
+				handler: controlHistoryRevalidation,
+			}),
 			new RenderRoute({
 				path: '/conversations',
 				entry: ['ConversationApp', '/src/conversation/App.tsrx'],

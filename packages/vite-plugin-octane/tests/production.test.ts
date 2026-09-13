@@ -872,9 +872,15 @@ describe('production SSR build', { timeout: 30_000 }, () => {
 	it('places fetched SSR, adopts URL receipts, and pages completed history in webkit', async () => {
 		const { webkit } = await import('playwright');
 		const browser = await webkit.launch({ headless: true });
+		const viewer = 'fetched-history-webkit';
+		const releaseRevalidation = () =>
+			fetch(productionOrigin + '/conversation-history/revalidation?action=release', {
+				method: 'POST',
+				headers: { 'x-fixture-viewer': viewer },
+			});
 		try {
 			const page = await browser.newPage({
-				extraHTTPHeaders: { 'x-fixture-viewer': 'fetched-history-webkit' },
+				extraHTTPHeaders: { 'x-fixture-viewer': viewer },
 			});
 			const errors: string[] = [];
 			const posts: string[] = [];
@@ -926,12 +932,19 @@ describe('production SSR build', { timeout: 30_000 }, () => {
 				expect(response.status()).toBe(200);
 				await response.body();
 			}
+			// Cached visibility is a causal gate, not a race against origin latency.
+			const held = await page.request.post(
+				productionOrigin + '/conversation-history/revalidation?action=hold',
+			);
+			expect(held.status()).toBe(204);
 			await page.goto(productionOrigin + '/conversation-history?q=history-4&operation=history-4');
 			const input = page.getByRole('textbox', { name: 'History draft' });
 			await page.locator('[data-history="A"][data-source="cached"][data-revision="0"]').waitFor();
 			expect(
 				await page.locator('[data-history="A"]').evaluate((node) => getComputedStyle(node).color),
 			).toBe('rgb(12, 54, 87)');
+			expect(await page.getByRole('status').textContent()).toBe('Showing cached history');
+			expect((await releaseRevalidation()).status).toBe(204);
 			await input.fill('draft A survives server history');
 			await page.getByRole('button', { name: 'Select B', exact: true }).click();
 			await expect.poll(() => page.locator('[data-history="B"]').count()).toBe(1);
@@ -980,7 +993,11 @@ describe('production SSR build', { timeout: 30_000 }, () => {
 			expect(errors).toEqual([]);
 			await page.close();
 		} finally {
-			await browser.close();
+			try {
+				await releaseRevalidation();
+			} finally {
+				await browser.close();
+			}
 		}
 	}, 60_000);
 

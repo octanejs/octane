@@ -10,6 +10,11 @@ interface AttemptObservation {
 }
 
 class StreamAttemptMirror implements AsyncIterable<unknown>, AsyncIterator<unknown> {
+	constructor(releaseObservation: () => void) {
+		this.releaseObservation = releaseObservation;
+	}
+
+	private readonly releaseObservation: () => void;
 	private pending:
 		| {
 				resolve(result: IteratorResult<unknown>): void;
@@ -20,8 +25,6 @@ class StreamAttemptMirror implements AsyncIterable<unknown>, AsyncIterator<unkno
 	private hasQueued = false;
 	private acknowledgement: (() => void) | undefined;
 	private terminal: { kind: 'complete' } | { kind: 'error'; error: unknown } | undefined;
-
-	constructor(private readonly releaseObservation: () => void) {}
 
 	[Symbol.asyncIterator](): AsyncIterator<unknown> {
 		return this;

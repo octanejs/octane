@@ -16,11 +16,36 @@ import { history$, type HistoryModel } from './State.tsrx';
 // Example host policy, not an Octane cache: bounded authorized input snapshots.
 // Never retain rendered HTML, a document token, a nonce, or an adoption lease.
 const cachedPages = new Map<string, { page: ConversationPage; until: number }>();
+const revalidationGates = new Map<string, { promise: Promise<void>; release: () => void }>();
 
 function authorized(context: Context): ServerCallContext {
 	if (typeof context.viewer !== 'string' || !context.viewer)
 		throw new Error('Authorization required');
 	return { request: context.request, signal: context.request.signal, viewer: context.viewer };
+}
+
+// Test-host control: keep real cached HTML observable until the browser has
+// checked it, without depending on how quickly the test worker is scheduled.
+export function controlHistoryRevalidation(context: Context): Response {
+	const authority = authorized(context);
+	if (context.request.method !== 'POST') return new Response(null, { status: 405 });
+	const key = String(authority.viewer);
+	const action = context.url.searchParams.get('action');
+	if (action === 'release') {
+		const gate = revalidationGates.get(key);
+		revalidationGates.delete(key);
+		gate?.release();
+		return new Response(null, { status: 204 });
+	}
+	if (action !== 'hold') return new Response(null, { status: 400 });
+	if (revalidationGates.has(key)) return new Response(null, { status: 409 });
+	if (revalidationGates.size >= 16) return new Response(null, { status: 429 });
+	let release!: () => void;
+	const promise = new Promise<void>((resolve) => {
+		release = resolve;
+	});
+	revalidationGates.set(key, { promise, release });
+	return new Response(null, { status: 204 });
 }
 
 export const acceptUrlAction: Middleware = async (context, next) => {
@@ -133,14 +158,18 @@ export function fetchHistory(context: Context): Response {
 			yield placement;
 		}
 		yield* snapshot(cachedPage, 'cached');
-		// Simulate the example origin revalidation without delaying cached paint.
+		// Simulate origin revalidation after cached paint. Browser tests may hold
+		// this host response until they have observed the cached revision.
 		await new Promise<void>((resolve) => {
+			let timer: ReturnType<typeof setTimeout> | undefined;
 			const done = () => {
 				clearTimeout(timer);
 				authority.signal.removeEventListener('abort', done);
 				resolve();
 			};
-			const timer = setTimeout(done, 150);
+			const gate = revalidationGates.get(String(authority.viewer));
+			if (gate === undefined) timer = setTimeout(done, 150);
+			else void gate.promise.then(done);
 			authority.signal.addEventListener('abort', done, { once: true });
 			if (authority.signal.aborted) done();
 		});

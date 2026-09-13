@@ -17,7 +17,9 @@ before returning private bytes.
 `server.ts` caches at most 16 viewer/conversation input snapshots for 60 seconds.
 It never caches response HTML, nonces, document identities, or adoption leases.
 Every request renders the cached input again under its current region owner,
-then streams fresh authoritative snapshots. The renderer's scoped CSS and exact
+then streams fresh authoritative snapshots. The test-only revalidation control
+can hold fresh snapshots for one authorized fixture viewer until the browser
+checks cached content, then releases them; it does not fabricate stream frames. The renderer's scoped CSS and exact
 native signal seed travel with its HTML; production stylesheet identities also
 come from the completed-build asset map. Placement revision zero means an empty
 slot, so source revision `n` maps monotonically to placement revision `n + 1`.
