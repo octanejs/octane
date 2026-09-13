@@ -1049,7 +1049,9 @@ export interface Block extends Scope {
 	 * many times it rendered within that pass. A block that keeps re-queueing
 	 * itself from its own render body (an unguarded render-phase setState) is a
 	 * non-converging loop — drainQueue throws after RENDER_PHASE_UPDATE_LIMIT,
-	 * mirroring React's "Too many re-renders".
+	 * mirroring React's "Too many re-renders". Negative stamps are transient
+	 * scheduler-sort epochs: drainRenders holds depth until the first render
+	 * resets it under the positive drain id.
 	 */
 	drainStamp: number;
 	drainRenders: number;
@@ -4638,34 +4640,41 @@ function drainHydrationRenderPhaseUpdates(root: Block): void {
 	}
 }
 
-// Sort a render wave shallow-first (ancestors before descendants). If A is an
-// ancestor of B then depth(A) < depth(B), so A renders first and its cascade can
-// clear B's `pending` (skipping B's redundant standalone render) regardless of
-// the order their setStates were queued. Depths are precomputed so the comparator
-// doesn't re-walk the chain on every compare. Resolve each unknown path to its
-// nearest cached queued ancestor, retaining depths only for blocks in this wave.
-function sortWaveByDepth(wave: Block[]): Block[] {
-	const queued = new Set(wave);
-	const depth = new Map<Block, number>();
-	const path: Block[] = [];
+// Sort a render wave shallow-first so an ancestor can consume or remove queued
+// descendants before their standalone updates. No user code runs during this
+// sort. Negative drain stamps temporarily reuse the loop-guard fields for depth;
+// the positive drain id resets them to a render count before executing a block.
+// Cache every real ancestor for this wave, including unqueued intermediates.
+// Two walks over each unknown path avoid allocating a path stack or collections.
+function sortWaveByDepth(wave: Block[], drainId: number): Block[] {
+	const stamp = -drainId;
 	for (let i = 0; i < wave.length; i++) {
-		let current: Block | null = wave[i];
-		let knownDepth: number | undefined;
-		while (current !== null) {
-			knownDepth = depth.get(current);
-			if (knownDepth !== undefined) break;
-			path.push(current);
+		const start = wave[i];
+		if (start.drainStamp === stamp) continue;
+		let current: Block | null = start;
+		let depth = 0;
+		while (current !== null && current.drainStamp !== stamp) {
+			depth++;
 			current = current.parentBlock;
 		}
-		let currentDepth = knownDepth ?? -1;
-		while (path.length > 0) {
-			const block = path.pop()!;
-			currentDepth++;
-			if (queued.has(block)) depth.set(block, currentDepth);
+		depth += current === null ? -1 : current.drainRenders;
+		current = start;
+		while (current !== null && current.drainStamp !== stamp) {
+			// Lite ancestry proxies intentionally have no scheduler fields.
+			if (current.drainStamp !== undefined) {
+				current.drainStamp = stamp;
+				current.drainRenders = depth;
+			}
+			depth--;
+			current = current.parentBlock;
 		}
 	}
-	wave.sort((a, b) => depth.get(a)! - depth.get(b)!);
+	wave.sort(compareWaveDepth);
 	return wave;
+}
+
+function compareWaveDepth(a: Block, b: Block): number {
+	return a.drainRenders - b.drainRenders;
 }
 
 // Visibility-owner scheduling is optional: roots without Suspense or hidden
@@ -4717,7 +4726,7 @@ function drainQueue(): { err: any } | null {
 	let pendingError: { err: any; all: any[] } | null = null;
 	let activitiesToRehide: Set<ActivitySlot> | null = null;
 	const drainId = ++DRAIN_ID;
-	if (QUEUE.length > 1) sortWaveByDepth(QUEUE);
+	if (QUEUE.length > 1) sortWaveByDepth(QUEUE, drainId);
 	// Iterate by index. A render may enqueue MORE work (e.g. a setState during
 	// render) — it appends to QUEUE, and `i < QUEUE.length` is re-evaluated every
 	// step, so those are drained in this same pass. The loop only exits once i has
@@ -5828,7 +5837,17 @@ function drainRefAttaches(): void {
 	const q = refAttachQueue.splice(0);
 	// ES stable sort preserves the queue's DFS/source order for disjoint subtrees;
 	// comparePostOrder moves only descendants ahead of their queued ancestors.
-	q.sort((a, b) => comparePostOrder(a.block, 0, b.block, 0));
+	// Entries with one immediate parent are siblings (or on the same block), so
+	// every comparison is zero and their existing queue order is already final.
+	if (q.length > 1) {
+		const parent = q[0].block?.parentBlock ?? null;
+		for (let i = 1; i < q.length; i++) {
+			if ((q[i].block?.parentBlock ?? null) !== parent) {
+				q.sort(compareRefPostOrder);
+				break;
+			}
+		}
+	}
 	for (const r of q) {
 		// Skip attaches whose owning subtree was unmounted earlier in THIS flush
 		// (e.g. a try boundary caught a mount-time throw and ran unmountBlock +
@@ -6304,6 +6323,9 @@ function comparePostOrder(
 function compareEffectPostOrder(a: PendingEffect, b: PendingEffect): number {
 	if (a.scope === b.scope) return a.order - b.order || a.seq - b.seq;
 	return comparePostOrder(a.scope.block, a.seq, b.scope.block, b.seq);
+}
+function compareRefPostOrder(a: RefAttach, b: RefAttach): number {
+	return comparePostOrder(a.block, 0, b.block, 0);
 }
 
 function finishEffectCommit(): void {
