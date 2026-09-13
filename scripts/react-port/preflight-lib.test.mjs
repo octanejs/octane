@@ -1621,3 +1621,82 @@ test('pinned literal rows derive a reviewed filter without evaluating source', (
 		/must be literal/,
 	);
 });
+
+test('immutable test discovery follows bounded shared config imports outside the package directory', async () => {
+	const input = 'react-root-discovery@1.0.0';
+	const fetchImpl = packageRootResolverFixture(
+		(manifest) => ({
+			'package.json': { private: true },
+			'packages/widget/package.json': manifest,
+			LICENSE: MIT_TEXT,
+			'packages/widget/jest.config.js': `const base = require('../../shared/jest'); module.exports = { ...base };`,
+			'shared/jest.js': `throw new Error('must not run'); module.exports = { testMatch: ['tests/**/*-test.ts'], testPathIgnorePatterns: ['helper'] };`,
+			'packages/widget/tests/widget-test.ts': "test('renders', () => {});",
+			'packages/widget/tests/helper-test.ts': 'export const helper = true;',
+			'packages/widget/tests/unrelated.test.ts': "test('excluded', () => {});",
+		}),
+		'packages/widget',
+		{ scripts: { test: 'jest' } },
+	);
+	const result = await resolveRemoteInput(parseInput(input), input, { fetchImpl });
+	assert.deepEqual(
+		result.upstreamTestInventory.map(({ path }) => path),
+		['packages/widget/tests/widget-test.ts'],
+	);
+});
+
+test('uses immutable repository Vitest defaults for a workspace package', async () => {
+	const input = 'react-root-discovery@1.0.0';
+	const fetchImpl = packageRootResolverFixture(
+		(manifest) => ({
+			'package.json': { private: true, devDependencies: { vitest: '^5.0.0' } },
+			'packages/widget/package.json': manifest,
+			LICENSE: MIT_TEXT,
+			'packages/widget/vitest.config.ts': `import { configDefaults } from 'vitest/config'; export default { test: { exclude: [...configDefaults.exclude, 'src/index.test.ts'] } };`,
+			'packages/widget/src/index.test.ts': 'export const helper = true;',
+			'packages/widget/src/widget.test.ts': "test('renders', () => {});",
+		}),
+		'packages/widget',
+	);
+	const result = await resolveRemoteInput(parseInput(input), input, { fetchImpl });
+	assert.deepEqual(
+		result.upstreamTestInventory.map(({ path }) => path),
+		['packages/widget/src/widget.test.ts'],
+	);
+});
+
+test('shared configuration traversal rejects graphs exceeding the bounded file budget', async () => {
+	const input = 'react-root-discovery@1.0.0';
+	const fetchImpl = packageRootResolverFixture((manifest) => ({
+		'package.json': manifest,
+		LICENSE: MIT_TEXT,
+		'vitest.config.ts': `import base from './shared/config0'; export default base;`,
+		...Object.fromEntries(
+			Array.from({ length: 65 }, (_, index) => [
+				`shared/config${index}.ts`,
+				index < 64
+					? `import base from './config${index + 1}'; export default base;`
+					: `export default { test: { include: [] } };`,
+			]),
+		),
+	}));
+	await assert.rejects(
+		() => resolveRemoteInput(parseInput(input), input, { fetchImpl }),
+		/configuration exceeds the file limit/,
+	);
+});
+
+test('a configuration import does not hide an independently selected runtime suite', async () => {
+	const input = 'react-root-discovery@1.0.0';
+	const fetchImpl = packageRootResolverFixture((manifest) => ({
+		'package.json': manifest,
+		LICENSE: MIT_TEXT,
+		'vitest.config.ts': `import './tests/widget.test'; export default { test: { include: ['tests/*.test.ts'] } };`,
+		'tests/widget.test.ts': "test('renders', () => {});",
+	}));
+	const result = await resolveRemoteInput(parseInput(input), input, { fetchImpl });
+	assert.deepEqual(
+		result.upstreamTestInventory.map(({ path }) => path),
+		['tests/widget.test.ts'],
+	);
+});

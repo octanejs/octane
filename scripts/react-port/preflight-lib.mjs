@@ -13,7 +13,11 @@ import {
 import { decodePathPart, parseGitHubUrl, parseInput } from './input-lib.mjs';
 import { fingerprint, sanitizeForReport, stableStringify } from './report-lib.mjs';
 import { selectHighestSatisfyingVersion } from './version-lib.mjs';
-import { configuredTestSelectors, selectedByTestConfiguration } from './test-discovery.mjs';
+import {
+	configuredTestSelectors,
+	resolveConfigurationImport,
+	selectedByTestConfiguration,
+} from './test-discovery.mjs';
 
 const SUPPORTED_INTEGRITY_ALGORITHMS = ['sha512', 'sha384', 'sha256'];
 
@@ -1176,8 +1180,46 @@ export async function immutableTestInventory(tree, subdirectory, manifest, optio
 		...manifestSelections.testFiles,
 	]);
 	const inlineSourcePatterns = new Set(manifestSelections.inlineSources);
+	let vitestVersion = manifest.devDependencies?.vitest ?? manifest.dependencies?.vitest;
+	if (
+		!vitestVersion &&
+		subdirectory &&
+		configurationEntries.some((entry) => path.posix.basename(entry.path).startsWith('vitest.'))
+	) {
+		const rootManifest = tree.find(
+			(entry) => entry.path === 'package.json' && isGitHubRegularBlob(entry),
+		);
+		if (rootManifest) {
+			const root = parseJsonFile(
+				await fetchGitHubBlob(rootManifest, options),
+				'Repository package.json',
+			);
+			vitestVersion = root.devDependencies?.vitest ?? root.dependencies?.vitest;
+		}
+	}
+	const configurationSources = new Map();
+	const sourceEntriesByPath = new Map(
+		tree.filter(isGitHubRegularBlob).map((entry) => [entry.path, entry]),
+	);
+	let configurationBytes = 0;
+	async function readConfiguration(entry) {
+		if (configurationSources.has(entry.path)) return;
+		if (configurationSources.size >= 64)
+			throw new Error('Immutable upstream configuration exceeds the file limit');
+		const bytes = await fetchGitHubBlob(entry, options);
+		configurationBytes += bytes.length;
+		if (configurationBytes > 4 * 1024 * 1024)
+			throw new Error('Immutable upstream configuration exceeds the byte limit');
+		const source = bytes.toString('utf8');
+		configurationSources.set(entry.path, source);
+		for (const specifier of collectModuleSpecifiers([[entry.path, bytes]])) {
+			const imported = resolveConfigurationImport(entry.path, specifier, sourceEntriesByPath);
+			if (imported) await readConfiguration(sourceEntriesByPath.get(imported));
+		}
+	}
+	for (const entry of configurationEntries) await readConfiguration(entry);
 	for (const entry of configurationEntries) {
-		const source = (await fetchGitHubBlob(entry, options)).toString('utf8');
+		const source = configurationSources.get(entry.path);
 		const configurationRunner =
 			['vitest', 'jest', 'playwright'].find((name) =>
 				path.posix.basename(entry.path).startsWith(`${name}.`),
@@ -1185,6 +1227,8 @@ export async function immutableTestInventory(tree, subdirectory, manifest, optio
 		selectors.push(
 			...configuredTestSelectors(source, entry.path, {
 				runner: configurationRunner,
+				modules: configurationSources,
+				vitestVersion,
 				scope: subdirectory ?? '',
 			}),
 		);
