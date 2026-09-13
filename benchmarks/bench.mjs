@@ -1005,6 +1005,7 @@ const SUITES = [
 			{ script: 'provider-output.mjs', args: () => [] },
 		],
 	},
+
 	{
 		// Production static attributes and live head reapplication, with exact
 		// generic routing/write counts; timing runs use an uninstrumented bundle.
@@ -1206,6 +1207,20 @@ const SUITES = [
 			{ script: 'retirement.mjs', args: () => [] },
 			{ script: 'inputs.mjs', args: () => [] },
 			{ script: 'contracts.mjs', args: () => [] },
+		],
+	},
+	{
+		// Descriptor child traversal, persistent host props, and form-control
+		// source/projection work, with clean semantic controls and exact counts.
+		name: 'descriptor-renderer',
+		cwd: 'descriptor-renderer',
+		servers: [],
+		iter: { normal: 1, quick: 1 },
+		runs: [
+			{ script: 'children.mjs', args: () => [] },
+			{ script: 'props.mjs', args: () => [] },
+			{ script: 'forms.mjs', args: () => [] },
+			{ script: 'events.mjs', args: () => [] },
 		],
 	},
 	{

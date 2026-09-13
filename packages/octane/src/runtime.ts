@@ -17313,15 +17313,24 @@ function jsxEventName(rest: string): string {
 	return rest.toLowerCase();
 }
 
-function eventSlot(
-	name: string,
-	el?: Element,
-): { type: string; key: string; capture: boolean } | null {
+interface ParsedEventSlot {
+	readonly type: string;
+	readonly key: string;
+	readonly capture: boolean;
+}
+
+// Only the finite delegated JSX catalog is retained. Unknown native event names
+// keep the uncached fallback, and custom-element acceptance stays element-local.
+let PARSED_EVENT_SLOTS: Map<string, ParsedEventSlot> | undefined;
+
+function eventSlot(name: string, el?: Element): ParsedEventSlot | null {
 	if (
 		!isEventKey(name) ||
 		(el !== undefined && isHtmlCustomElement(el) && !isDelegatedEventProp(name))
 	)
 		return null;
+	const cached = PARSED_EVENT_SLOTS?.get(name);
+	if (cached !== undefined) return cached;
 	let rest = name.slice(2);
 	let capture = false;
 	if (
@@ -17334,7 +17343,9 @@ function eventSlot(
 		rest = rest.slice(0, rest.length - 7);
 	}
 	const type = jsxEventName(rest);
-	return { type, key: capture ? CAPTURE_PREFIX + type : '$$' + type, capture };
+	const slot = { type, key: capture ? CAPTURE_PREFIX + type : '$$' + type, capture };
+	if (isDelegatedEventProp(name)) (PARSED_EVENT_SLOTS ??= new Map()).set(name, slot);
+	return slot;
 }
 
 // Remove ONE host prop that was present last render and is gone this render. This is
@@ -17555,11 +17566,23 @@ export function setHostPropSources(
 		? [...values.values()].sort((a, b) => a.firstOrder - b.firstOrder)
 		: values.values();
 	for (const { name, value } of ordered) resolved[name] = value;
-	const formHost =
-		el.localName === 'input' || el.localName === 'textarea' || el.localName === 'select';
+	const tag = el.localName;
+	const formHost = tag === 'input' || tag === 'textarea' || tag === 'select';
 	setSpread(el, resolved, prev, scope, true, formHost);
 	setDangerouslySetInnerHTMLSources(el, sources, hasNestedChildren);
-	if (formHost) setFormControlSources(el, sources);
+	// Form writers use the exact JSX spelling, independently of DOM aliases:
+	// e.g. a later VALUE attribute must not replace the controlled value prop.
+	// The raw writer Map already resolved source precedence and getter reads.
+	if (formHost)
+		applyFormControlValues(
+			el,
+			tag,
+			props.get('value')?.value,
+			props.get('defaultValue')?.value,
+			props.get('checked')?.value,
+			props.get('defaultChecked')?.value,
+			props.get('multiple')?.value,
+		);
 	return resolved;
 }
 
@@ -20435,20 +20458,22 @@ function projectSelectValue(
 	}
 	if (typeof sv !== 'string') {
 		for (let i = 0; i < options.length; i++) {
-			const selected = sv.has(options[i].value);
-			if (options[i].selected !== selected) options[i].selected = selected;
-			if (setDefaultSelected) options[i].defaultSelected = selected;
+			const option = options[i];
+			const selected = sv.has(option.value);
+			if (option.selected !== selected) option.selected = selected;
+			if (setDefaultSelected) option.defaultSelected = selected;
 		}
 		return;
 	}
 	let defaultOption: HTMLOptionElement | null = null;
 	for (let i = 0; i < options.length; i++) {
-		if (options[i].value === sv) {
-			options[i].selected = true;
-			if (setDefaultSelected) options[i].defaultSelected = true;
+		const option = options[i];
+		if (option.value === sv) {
+			option.selected = true;
+			if (setDefaultSelected) option.defaultSelected = true;
 			return;
 		}
-		if (defaultOption === null && !options[i].disabled) defaultOption = options[i];
+		if (defaultOption === null && !option.disabled) defaultOption = option;
 	}
 	if (defaultOption !== null) defaultOption.selected = true;
 }
@@ -20615,48 +20640,57 @@ export function setFormControlSources(
 	let multiple: unknown;
 	const tag = el.localName;
 
-	const assign = (name: string, next: unknown) => {
-		switch (name) {
-			case 'value':
-				value = next;
-				break;
-			case 'defaultValue':
-				defaultValue = next;
-				break;
-			case 'checked':
-				if (tag === 'input') checked = next;
-				break;
-			case 'defaultChecked':
-				if (tag === 'input') defaultChecked = next;
-				break;
-			case 'multiple':
-				if (tag === 'select') multiple = next;
-				break;
-		}
-	};
-
 	for (let i = 0; i < sources.length; i++) {
 		const source = sources[i];
 		if (!source[0]) {
-			assign(source[1] as string, source[2]);
+			const name = source[1];
+			const next = source[2];
+			switch (name) {
+				case 'value':
+					value = next;
+					break;
+				case 'defaultValue':
+					defaultValue = next;
+					break;
+				case 'checked':
+					if (tag === 'input') checked = next;
+					break;
+				case 'defaultChecked':
+					if (tag === 'input') defaultChecked = next;
+					break;
+				case 'multiple':
+					if (tag === 'select') multiple = next;
+					break;
+			}
 			continue;
 		}
 		const spread = source[1];
 		if (spread == null || (typeof spread !== 'object' && typeof spread !== 'function')) continue;
 		const object = Object(spread) as Record<string, unknown>;
-		if (Object.prototype.propertyIsEnumerable.call(object, 'value')) assign('value', object.value);
+		if (Object.prototype.propertyIsEnumerable.call(object, 'value')) value = object.value;
 		if (Object.prototype.propertyIsEnumerable.call(object, 'defaultValue'))
-			assign('defaultValue', object.defaultValue);
+			defaultValue = object.defaultValue;
 		if (tag === 'input') {
-			if (Object.prototype.propertyIsEnumerable.call(object, 'checked'))
-				assign('checked', object.checked);
+			if (Object.prototype.propertyIsEnumerable.call(object, 'checked')) checked = object.checked;
 			if (Object.prototype.propertyIsEnumerable.call(object, 'defaultChecked'))
-				assign('defaultChecked', object.defaultChecked);
+				defaultChecked = object.defaultChecked;
 		} else if (tag === 'select' && Object.prototype.propertyIsEnumerable.call(object, 'multiple')) {
-			assign('multiple', object.multiple);
+			multiple = object.multiple;
 		}
 	}
+	applyFormControlValues(el, tag, value, defaultValue, checked, defaultChecked, multiple);
+}
 
+/** Apply already-resolved values without rescanning a compiled host's sources. */
+function applyFormControlValues(
+	el: Element,
+	tag: string,
+	value: unknown,
+	defaultValue: unknown,
+	checked: unknown,
+	defaultChecked: unknown,
+	multiple: unknown,
+): void {
 	const ctrl = armControlled(el);
 	const first = !ctrl.formSeen;
 	const previousMultiple = ctrl.formMultiple;
@@ -23692,8 +23726,9 @@ function applyDeoptProp(el: Element, name: string, v: any, ownerBlock: Block): v
 				ev.key,
 				process.env.NODE_ENV !== 'production' ? devEventListener(name, v) : v,
 			);
-			if (ev.capture) delegateCaptureEvents([ev.type]);
-			else delegateEvents([ev.type]);
+			if (ev.capture) {
+				if (!_delegatedCapture.has(ev.type)) delegateCaptureEvents([ev.type]);
+			} else if (!_delegated.has(ev.type)) delegateEvents([ev.type]);
 		} else {
 			setAttribute(el, name, v);
 		}
@@ -23907,6 +23942,7 @@ export function hostComponent(
 // while className/style/events/attributes are idempotently re-set.
 function applyHostProps(el: Element, props: any, scope: Scope, state: HostComponentSlot): void {
 	const prev = state.props;
+	const compareLive = prev !== undefined && activeHydration() === null && !isHtmlCustomElement(el);
 	let needsCheckedInitialization = prev === undefined && el.localName === 'input';
 	if (ROOT_RENDER_TRANSACTION !== null && prev !== props) journalObjectOnce(state);
 	// REMOVE props/events present last render but gone now, via the shared removeHostProp
@@ -23961,7 +23997,12 @@ function applyHostProps(el: Element, props: any, scope: Scope, state: HostCompon
 				state.ref = v;
 			}
 		} else if (name === 'className' || name === 'class') {
-			setDeoptClass(el, v);
+			// Compare the current target, not a same-named previous prop: another
+			// alias can have won or disappeared, and foreign code can edit the DOM.
+			// Mutable class arrays/objects still pass through normalization.
+			if (!compareLive || typeof v !== 'string' || el.getAttribute('class') !== v) {
+				setDeoptClass(el, v);
+			}
 		} else if (name === 'style') {
 			setStyle(el as HTMLElement, v, prev != null ? prev.style : undefined);
 		} else {
@@ -23975,12 +24016,26 @@ function applyHostProps(el: Element, props: any, scope: Scope, state: HostCompon
 				} else if (!_delegated.has(ev.type)) {
 					delegateEvents([ev.type]);
 				}
-				setEventHandler(
-					el,
-					ev.key,
-					process.env.NODE_ENV !== 'production' ? devEventListener(name, v) : v,
-				);
+				const handler = process.env.NODE_ENV !== 'production' ? devEventListener(name, v) : v;
+				if (!compareLive || (el as any)[ev.key] !== handler) setEventHandler(el, ev.key, handler);
 			} else if (prev === undefined || name !== 'autoFocus' || isHtmlCustomElement(el)) {
+				// These string attributes have no coercion, property projection, or
+				// URL policy. Matching live values need neither a write nor an undo
+				// snapshot. The remaining attributes retain their complete setter.
+				if (
+					compareLive &&
+					(process.env.NODE_ENV === 'production' || (el as any).__oct_loc === undefined) &&
+					typeof v === 'string' &&
+					(name === 'id' ||
+						name === 'title' ||
+						name === 'role' ||
+						name === 'for' ||
+						name === 'htmlFor' ||
+						name.startsWith('data-') ||
+						name.startsWith('aria-')) &&
+					el.getAttribute(name === 'htmlFor' ? 'for' : name) === v
+				)
+					continue;
 				setAttribute(el, name, v);
 			}
 		}
@@ -24025,19 +24080,59 @@ interface DeoptStamped {
 function getDeoptDesc(n: Node): ElementDescriptor | undefined {
 	return (n as Node & DeoptStamped)[DEOPT_DESC];
 }
+function sameDeoptDesc(
+	previous: ElementDescriptor | undefined,
+	next: ElementDescriptor,
+	children: unknown,
+): boolean {
+	return (
+		previous !== undefined &&
+		previous.type === next.type &&
+		previous.props === next.props &&
+		previous.key === next.key &&
+		previous.ref === next.ref &&
+		previous.children === children
+	);
+}
+
+function unchangedScopedHostDescriptor(block: Block, d: ElementDescriptor): boolean {
+	const resolve = (d as ScopedValueDescriptor<any>)[SCOPED_VALUE_RECORD];
+	if (resolve === undefined && (d as any)[SCOPED_CHILDREN_RESOLVER] === undefined) return true;
+	const next = resolve === undefined ? d : resolve();
+	const previous = block.deoptNode === null ? undefined : getDeoptDesc(block.deoptNode);
+	return previous === next || sameDeoptDesc(previous, next, next.children);
+}
+
 function setDeoptDesc(el: Element, d: ElementDescriptor): void {
 	// Preserve the record committed to this DOM node. A deferred JSX shell can
 	// resolve differently after a Provider update; stamping the shell itself
 	// would make both sides of the next prop diff observe the new record and
 	// would run user code outside render while Suspense detaches subtree refs.
 	const resolveScopedRecord = (d as ScopedValueDescriptor<any>)[SCOPED_VALUE_RECORD];
+	let record = resolveScopedRecord === undefined ? d : resolveScopedRecord();
+	if ((record as any)[SCOPED_CHILDREN_RESOLVER] !== undefined) {
+		// A deferred-children shell is stable across different resolved trees too.
+		// Retain the actual children used by this host so a later raw-host upgrade
+		// can match the old DOM, without resolving its old keys in the new scope.
+		const children = record.children;
+		const previous = getDeoptDesc(el);
+		record = sameDeoptDesc(previous, record, children)
+			? previous!
+			: {
+					$$kind: ELEMENT_TAG,
+					type: record.type,
+					props: record.props,
+					key: record.key,
+					ref: record.ref,
+					children,
+				};
+	}
 	// A held descriptor retry restores host props too. Restore their comparison
 	// record with them or the final retry will mistake aborted props for live ones.
 	if (TRANSITION_JOURNAL !== null) {
 		TRANSITION_JOURNAL.push(JOURNAL_PROP, el, DEOPT_DESC, getDeoptDesc(el));
 	}
-	(el as Element & DeoptStamped)[DEOPT_DESC] =
-		resolveScopedRecord === undefined ? d : resolveScopedRecord();
+	(el as Element & DeoptStamped)[DEOPT_DESC] = record;
 }
 
 type DeoptWrapperKind = 'array' | 'fragment';
@@ -24444,7 +24539,7 @@ function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): 
 	const next: any[] = [];
 	const nextKeys: any[] = [];
 	flattenDeoptChildrenKeyed(next, nextKeys, children, '');
-	const existing = el.childNodes;
+	const firstChild = getFirstChild(el);
 	const journal =
 		ROOT_RENDER_TRANSACTION !== null &&
 		el.parentNode !== null &&
@@ -24454,7 +24549,7 @@ function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): 
 	// Fresh element (first build / fresh client mount) — nothing to reconcile against,
 	// so just build + append each child. Skips the keyed-match Map / Set / reorder
 	// bookkeeping below, which is the hot path for large initial mounts.
-	if (existing.length === 0) {
+	if (firstChild === null) {
 		for (let i = 0; i < next.length; i++) {
 			const node = reconcileDeoptNode(null, next[i], ownerBlock, childNs);
 			if (node !== null) {
@@ -24483,7 +24578,7 @@ function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): 
 	let hydrationOwnsUnstamped: boolean | undefined;
 	let byKey: Map<any, Node> | null = null;
 	const unstamped: Node[] = [];
-	let scan: Node | null = getFirstChild(el);
+	let scan: Node | null = firstChild;
 	while (scan !== null) {
 		const rangeEnd = (scan as any).$$portalEnd as Node | undefined;
 		if (rangeEnd != null) {
@@ -24550,14 +24645,13 @@ function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): 
 			}
 		}
 	}
-	// Order survivors/new nodes to match the descriptor. With foreign ranges present,
-	// index against the i-th OWNED live child (a foreign range floats in place,
-	// like a React portal whose container children reorder around it).
+	// Advance through owned live children once. Indexed childNodes reads restart
+	// native list walks after each insertion; foreign ranges also must not make
+	// every survivor rescan the preceding siblings.
+	let cursor: Node | null = getFirstChild(el);
 	for (let i = 0; i < result.length; i++) {
 		const want = result[i];
-		const at = hasForeign
-			? liveOwnedChildAt(el, i, hydrationOwnsUnstamped === true)
-			: (existing[i] ?? null);
+		const at = hasForeign ? nextDeoptOwnedChild(cursor, hydrationOwnsUnstamped === true) : cursor;
 		if (at !== want) {
 			if (journal) journalRootChildren(el);
 			if (renderingFocus === null) el.insertBefore(want, at);
@@ -24566,25 +24660,25 @@ function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): 
 				moveFocusedNodeBefore(el, want, at, renderingFocus);
 			}
 		}
+		// Focus-preserving moves can rotate surrounding siblings instead of
+		// detaching want. Read its successor only after that movement completes.
+		cursor = getNextSibling(want);
 	}
 }
 
 // Resume point of an owned-children walk after a foreign portal range: the first
 // node AFTER the range close (`end`). Tolerates a torn range (the close was removed
 // out from under us) by resuming right after `start`, so the walk can never loop.
-// Shared by reconcileDeoptChildren's owned-children scan and liveOwnedChildAt.
+// Shared by reconcileDeoptChildren's ownership and ordering walks.
 function nodeAfterPortalRange(start: Node, end: Node): Node | null {
 	let m: Node | null = start;
 	while (m !== null && m !== end) m = getNextSibling(m);
 	return getNextSibling(m ?? start);
 }
 
-// The i-th child of `el` that the de-opt reconciler OWNS, skipping foreign
-// `<!--portal-->…<!--/portal-->` ranges (see reconcileDeoptChildren). Live walk —
-// called per reorder step, only when a foreign range exists.
-function liveOwnedChildAt(el: Element, index: number, adoptHydrationChildren = false): Node | null {
-	let i = 0;
-	let scan: Node | null = getFirstChild(el);
+// Continue an ordering walk past foreign portal ranges and imperative nodes.
+// Hydration may also adopt unmarked server children in this owned host.
+function nextDeoptOwnedChild(scan: Node | null, adoptHydrationChildren: boolean): Node | null {
 	while (scan !== null) {
 		const rangeEnd = (scan as any).$$portalEnd as Node | undefined;
 		if (rangeEnd != null) {
@@ -24599,9 +24693,7 @@ function liveOwnedChildAt(el: Element, index: number, adoptHydrationChildren = f
 			scan = getNextSibling(scan);
 			continue;
 		}
-		if (i === index) return scan;
-		i++;
-		scan = getNextSibling(scan);
+		return scan;
 	}
 	return null;
 }
@@ -25224,6 +25316,31 @@ function teardownChildForSlot(state: ChildSlot): void {
 // the OLD descriptor's children (pre-upgrade), used to key the existing nodes.
 let DEOPT_UPGRADE: { block: Block; children: any } | null = null;
 
+// Only raw-host upgrades need this walk. The retained array structure supplies
+// positional boundaries, while each raw node supplies its accepted descriptor:
+// a deferred leaf's live key/type may already belong to the next Provider value.
+function adoptedDeoptChildren(value: any, cursor: { node: Node | null; end: Node }): any {
+	if (Array.isArray(value)) {
+		// A plain cold-path copy avoids invoking an authored slice/species and
+		// reads indexed accessors only once before preparing the accepted keys.
+		const copy: any[] = [];
+		const length = value.length;
+		for (let index = 0; index < length; index++) {
+			copy[index] = adoptedDeoptChildren(value[index], cursor);
+		}
+		if (POSITIONAL_CHILDREN.has(value)) POSITIONAL_CHILDREN.add(copy);
+		return copy;
+	}
+	if (value == null || value === false || value === true || value === '') return value;
+	const type = typeof value;
+	const element = isElementDescriptor(value);
+	if (!element && type !== 'string' && type !== 'number' && type !== 'bigint') return value;
+	const node = cursor.node;
+	if (node === null || node === cursor.end) return value;
+	cursor.node = node.nextSibling;
+	return element ? (getDeoptDesc(node) ?? value) : value;
+}
+
 // Build the adoption queue for an upgraded element: pair each existing raw
 // child node (strictly between `start` and `end`, in DOM order) with the key
 // its OLD child value carries under the same keying scheme the incoming items
@@ -25238,7 +25355,8 @@ function buildDeoptAdoptQueue(
 	// SAME flatten + keying as the childSlot array path (incl. compound
 	// slot-scoped keys for nested arrays) — the queue's keys must match the
 	// keys the incoming items will get, or nothing adopts.
-	const prepared = prepareDeoptList(oldChildren, true)!;
+	const accepted = adoptedDeoptChildren(oldChildren, { node: start.nextSibling, end });
+	const prepared = prepareDeoptList(accepted, true)!;
 	const { items, keys } = prepared;
 	const queue: Array<{ key: any; node: Node }> = [];
 	let cursor: Node | null = start.nextSibling;
@@ -26437,7 +26555,15 @@ export function childSlot(
 			// skips the body outright; changed-context consumers below refresh
 			// lazily. This is what lets a `{children}` passthrough under a
 			// re-rendering Provider skip untouched subtrees without a memo() shim.
-			if (props === state.block.props && tryImplicitBail(state.block)) return;
+			if (
+				props === state.block.props &&
+				// Deferred host shells can change their complete record or children.
+				// Compare the accepted resolution before accepting the shell's identity.
+				(comp !== (hostElementBody as unknown as ComponentBody) ||
+					unchangedScopedHostDescriptor(state.block, props)) &&
+				tryImplicitBail(state.block)
+			)
+				return;
 			if (state.block.props !== props) journalRootProperty(state.block, 'props', state.block.props);
 			state.block.props = props;
 			renderBlock(state.block);
@@ -33987,11 +34113,6 @@ function updateSurvivor<T>(
 	}
 }
 
-function consumeAdoptQueuePrefix(adopt: Array<{ key: any; node: Node }>, count: number): void {
-	if (count < adopt.length) adopt.copyWithin(0, count);
-	adopt.length -= count;
-}
-
 type ListKeySource<T> = readonly any[] | ((item: T, index: number) => any);
 
 // Prepared descriptor keys already have their reconciliation encoding. Compiled
@@ -34065,14 +34186,20 @@ function mountItemsLinear<T>(
 	const oldItems = state.items;
 	const parentNode = state.end.parentNode!;
 	// Pure-host → blocks upgrade adoption (childSlot arms `state.adopt`): the
-	// element's existing raw children, keyed like the incoming items. An item
-	// whose key matches the queue FRONT adopts that node in place (mountItem
-	// wraps it in the item's markers and seeds block.deoptNode); other items
-	// mount fresh BEFORE the next unconsumed node so DOM order tracks list
-	// order. Non-front key matches (a reorder in the very same render) mount
-	// fresh — the unconsumed nodes are swept by the caller.
+	// element's existing raw children, keyed like the incoming items. This cold
+	// map preserves later survivors after a removed/changed key, and reorders
+	// adopted nodes without remounting their DOM state. Ordinary fills allocate
+	// no adoption map. Keep the original queue intact until every item succeeds.
 	const adopt = state.adopt;
-	let adoptIndex = 0;
+	let adoptByKey: Map<any, { key: any; node: Node }> | null = null;
+	let adoptedNodes: Set<Node> | null = null;
+	if (adopt !== null) {
+		adoptByKey = new Map();
+		for (let index = 0; index < adopt.length; index++) {
+			const entry = adopt[index];
+			if (!adoptByKey.has(entry.key)) adoptByKey.set(entry.key, entry);
+		}
+	}
 	let prev: Block | null = null;
 	try {
 		for (let i = 0; i < newLen; i++) {
@@ -34080,13 +34207,19 @@ function mountItemsLinear<T>(
 			const key = readListKey(keySource, item, i, normalizeKey);
 			let adoptNode: Node | null = null;
 			let anchor: Node = state.end;
-			if (adopt !== null && adoptIndex < adopt.length) {
-				const candidate = adopt[adoptIndex];
-				if (candidate.key === key) {
+			if (adoptByKey !== null) {
+				anchor = (prev === null ? state.start!.nextSibling : prev.endMarker!.nextSibling)!;
+				const candidate = adoptByKey.get(key);
+				if (candidate !== undefined) {
 					adoptNode = candidate.node;
-					adoptIndex++;
-				} else {
-					anchor = candidate.node;
+					adoptByKey.delete(key);
+					(adoptedNodes ??= new Set()).add(adoptNode);
+					if (adoptNode !== anchor) {
+						if (renderingFocus !== null) {
+							captureFocusedMovement(parentNode, renderingFocus);
+							moveFocusedNodeBefore(parentNode, adoptNode, anchor, renderingFocus);
+						} else parentNode.insertBefore(adoptNode, anchor);
+					}
 				}
 			}
 			const block = mountItem(
@@ -34132,9 +34265,14 @@ function mountItemsLinear<T>(
 		state.size = 0;
 		throw error;
 	}
-	// Adoption consumes only a queue prefix. Compact it once after the pass
-	// instead of shifting every adopted node and repeatedly reindexing the tail.
-	if (adoptIndex !== 0) consumeAdoptQueuePrefix(adopt!, adoptIndex);
+	if (adoptByKey !== null) {
+		let remaining = 0;
+		for (let index = 0; index < adopt!.length; index++) {
+			const entry = adopt![index];
+			if (!adoptedNodes?.has(entry.node)) adopt![remaining++] = entry;
+		}
+		adopt!.length = remaining;
+	}
 }
 
 function reconcileKeyed<T>(
@@ -34976,8 +35114,7 @@ function mountItem<T>(
 			// Upgrade adoption on the self-marked path: the adopted raw node IS
 			// the item's single element, already in position — no markers, no
 			// insert. Seed it as both markers AND the block's deoptNode so the
-			// body's raw path patches it in place (the queue only pairs
-			// tag-compatible nodes, so the reuse branch always hits).
+			// body's raw path can reuse a matching tag or replace a changed tag.
 			const block = createBlock(
 				'control-flow',
 				parentBlock,
