@@ -668,8 +668,8 @@ catalogs:
       specifier: 4.4.4
       version: 4.4.4
     electron:
-      specifier: 43.2.0
-      version: 43.2.0
+      specifier: 44.3.0
+      version: 44.3.0
     es-module-lexer:
       specifier: ^1.7.0
       version: 1.7.0
@@ -4429,7 +4429,7 @@ importers:
         version: 24.13.3
       electron:
         specifier: catalog:default
-        version: 43.2.0(supports-color@10.2.2)
+        version: 44.3.0(supports-color@10.2.2)
       typescript:
         specifier: catalog:default
         version: 5.9.3
@@ -5828,7 +5828,7 @@ importers:
     devDependencies:
       electron:
         specifier: catalog:default
-        version: 43.2.0(supports-color@10.2.2)
+        version: 44.3.0(supports-color@10.2.2)
       octane:
         specifier: workspace:*
         version: link:../octane
@@ -24896,8 +24896,8 @@ packages:
   electron-to-chromium@1.5.393:
     resolution: {integrity: sha512-kiDJdIUawuEIcp9XoICKp1iTYDEbgguIPq526N1Q7jIQDeQ3CqoMx71025PI/7E48Ddtw2HuWsVjY7afEgNxmg==}
 
-  electron@43.2.0:
-    resolution: {integrity: sha512-80zvrgG7ZRXD+tD0IyLvrnN9n+veSxadMRsMaC9wKKP3iUbtC7rGM8+dVuCmOb0Rrwwv8ESW4awnUZh9Hbp1fA==}
+  electron@44.3.0:
+    resolution: {integrity: sha512-St9EV7F2VtYaYWD2qaAjBwUgKxx39eJOUsUJ5+/1113sqbVfNqv4Dbm/W1rN7qmYSPa+mWwR6yr+b7MfgjgVfQ==}
     engines: {node: '>= 22.12.0'}
     hasBin: true
 
@@ -54509,7 +54509,7 @@ snapshots:
 
   electron-to-chromium@1.5.393: {}
 
-  electron@43.2.0(supports-color@10.2.2):
+  electron@44.3.0(supports-color@10.2.2):
     dependencies:
       '@electron-internal/extract-zip': 1.0.5
       '@electron/get': 5.1.0(supports-color@10.2.2)

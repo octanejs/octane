@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { OCTANE_ELECTRON_CHANNELS } from '../../src/common/channels';
+import { createOctaneElectronAPI } from '../../src/preload/index';
 import {
 	registerOctaneElectronMain,
 	registerOctaneElectronMainFromElectron,
@@ -184,6 +185,48 @@ describe('trackOctaneElectronWindow', () => {
 });
 
 describe('registerOctaneElectronMainFromElectron', () => {
+	it.each(['complete', 'reject'] as const)(
+		'preserves asynchronous clipboard writes that %s across the preload bridge',
+		async (outcome) => {
+			const electron = await import('electron');
+			const nativeWrite = Promise.withResolvers<void>();
+			// Also observe the native rejection if a broken bridge drops the promise.
+			void nativeWrite.promise.catch(() => {});
+			const write = vi
+				.spyOn(electron.clipboard, 'writeText')
+				.mockImplementation(() => nativeWrite.promise);
+			const dispose = await registerOctaneElectronMainFromElectron();
+			const api = createOctaneElectronAPI({
+				invoke: async (channel, ...args) => electronHandlers.get(channel)!({}, ...args),
+				on: () => {},
+				removeListener: () => {},
+			});
+			try {
+				const result = api.clipboard.writeText('copied text');
+				expect(write).toHaveBeenCalledWith('copied text');
+				if (outcome === 'reject') {
+					const rejected = expect(result).rejects.toThrow('Clipboard unavailable');
+					nativeWrite.reject(new Error('Clipboard unavailable'));
+					await rejected;
+				} else {
+					let completed = false;
+					void result.then(() => {
+						completed = true;
+					});
+					await Promise.resolve();
+					expect(completed).toBe(false);
+					nativeWrite.resolve();
+					await result;
+					expect(completed).toBe(true);
+				}
+			} finally {
+				nativeWrite.resolve();
+				dispose();
+				write.mockRestore();
+			}
+		},
+	);
+
 	it('resolves the invoking BrowserWindow via BrowserWindow.fromWebContents by default', async () => {
 		const dispose = await registerOctaneElectronMainFromElectron();
 		const event = { sender: 'the-sender' };
