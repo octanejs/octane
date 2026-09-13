@@ -3,10 +3,15 @@
  */
 import { describe, expect, it } from 'vitest';
 import { resolve } from 'node:path';
-import { mountDifferential } from '../../../octane/tests/differential/_rig.js';
+import {
+	mountDifferential,
+	preloadDifferentialFixture,
+} from '../../../octane/tests/differential/_rig.js';
 
 const FIXTURE = resolve(__dirname, '../_fixtures/thinking-orbs-diff.tsrx');
 const CACHE = resolve(__dirname, '.react-cache');
+
+await preloadDifferentialFixture(FIXTURE, CACHE);
 
 describe('differential: @octanejs/thinking-orbs vs thinking-orbs@0.3.1', () => {
 	// @parity-case thinking-orbs:differential:1
