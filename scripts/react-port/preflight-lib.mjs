@@ -13,6 +13,7 @@ import {
 import { decodePathPart, parseGitHubUrl, parseInput } from './input-lib.mjs';
 import { fingerprint, sanitizeForReport, stableStringify } from './report-lib.mjs';
 import { selectHighestSatisfyingVersion } from './version-lib.mjs';
+import { configuredTestSelectors, selectedByTestConfiguration } from './test-discovery.mjs';
 
 const SUPPORTED_INTEGRITY_ALGORITHMS = ['sha512', 'sha384', 'sha256'];
 
@@ -319,7 +320,10 @@ export function assessResolvedEvidence({ input, registry, source }) {
 	const identity = {
 		packageName: registry.name,
 		version: registry.version,
-		repository: registry.repository,
+		repository: {
+			...registry.repository,
+			subdirectory: registry.repository?.subdirectory ?? source.repository?.subdirectory ?? null,
+		},
 		commit: source.commit,
 		integrity: registry.integrity,
 	};
@@ -754,6 +758,7 @@ function isScannableSourcePath(entryPath) {
 export function conventionalTestPath(relativePath, { runner } = {}) {
 	const segments = relativePath.toLowerCase().split('/');
 	const baseName = segments.at(-1);
+	if (/\.d\.[cm]?ts$/.test(baseName)) return false;
 	if (
 		segments.some((segment) => ['fixture', 'fixtures', '__fixtures__'].includes(segment)) ||
 		/(?:^|[.-])fixture\.[cm]?[jt]sx?$/.test(baseName)
@@ -1140,7 +1145,7 @@ export async function immutableTestInventory(tree, subdirectory, manifest, optio
 		...manifestRunnerConfiguration,
 	});
 	const explicitConfigurationPaths = [
-		...initialConfigurationSource.matchAll(/--config(?:=|\s+)([^\s"']+)/g),
+		...initialConfigurationSource.matchAll(/(?:--config|-c)(?:=|\s+)([^\s"']+)/g),
 	].map((match) => match[1].replace(/^\.\//, ''));
 	const configurationEntries = tree.filter((entry) => {
 		if (!isGitHubRegularBlob(entry)) return false;
@@ -1156,6 +1161,12 @@ export async function immutableTestInventory(tree, subdirectory, manifest, optio
 			(relativePath !== null && explicitConfigurationPaths.includes(relativePath))
 		);
 	});
+	const runner = ['vitest', 'jest'].find(
+		(name) =>
+			Object.values(testScripts).some((command) => new RegExp(`\\b${name}\\b`).test(command)) ||
+			configurationEntries.some((entry) => path.posix.basename(entry.path).startsWith(`${name}.`)),
+	);
+	const selectors = [];
 	const manifestSelections = configurationPathSelections(
 		JSON.stringify(manifestRunnerConfiguration),
 		'package-runner-config.json',
@@ -1167,6 +1178,16 @@ export async function immutableTestInventory(tree, subdirectory, manifest, optio
 	const inlineSourcePatterns = new Set(manifestSelections.inlineSources);
 	for (const entry of configurationEntries) {
 		const source = (await fetchGitHubBlob(entry, options)).toString('utf8');
+		const configurationRunner =
+			['vitest', 'jest', 'playwright'].find((name) =>
+				path.posix.basename(entry.path).startsWith(`${name}.`),
+			) ?? runner;
+		selectors.push(
+			...configuredTestSelectors(source, entry.path, {
+				runner: configurationRunner,
+				scope: subdirectory ?? '',
+			}),
+		);
 		const selections = configurationPathSelections(source, entry.path);
 		for (const pattern of selections.testFiles) {
 			configurationPatterns.add(pattern);
@@ -1176,11 +1197,6 @@ export async function immutableTestInventory(tree, subdirectory, manifest, optio
 	const configuredTestPatterns = [...configurationPatterns];
 	const configuredInlineSourcePatterns = [...inlineSourcePatterns];
 	const configurationEntryPaths = new Set(configurationEntries.map((entry) => entry.path));
-	const runner = ['vitest', 'jest'].find(
-		(name) =>
-			Object.values(testScripts).some((command) => new RegExp(`\\b${name}\\b`).test(command)) ||
-			configurationEntries.some((entry) => path.posix.basename(entry.path).startsWith(`${name}.`)),
-	);
 	const candidateEntries = tree.flatMap((entry) => {
 		if (!isGitHubRegularBlob(entry) || !entry.path.startsWith(scopePrefix)) return [];
 		if (configurationEntryPaths.has(entry.path)) return [];
@@ -1192,13 +1208,26 @@ export async function immutableTestInventory(tree, subdirectory, manifest, optio
 		// module beneath a test/ support directory. Explicit include patterns
 		// still admit nonstandard names, and compile-only specs remain inventoried.
 		const conventional = conventionalTestPath(relativePath, { runner });
+		const typeSuite =
+			/(?:^|\/)(?:typetests|type-tests|test-d)(?:\/|$)|[.-](?:test-d|d-test)\.[cm]?[jt]sx?$|[.-]types?\.test\.[cm]?[jt]sx?$/i.test(
+				relativePath,
+			);
 		const directTest =
-			conventional || referencedByTestConfiguration(relativePath, configuredTestPatterns);
+			selectors.length > 0
+				? selectors.some((selector) =>
+						selectedByTestConfiguration(relativePath, selector, conventionalTestPath),
+					)
+				: conventional || referencedByTestConfiguration(relativePath, configuredTestPatterns);
 		const inlineSource = referencedByTestConfiguration(
 			relativePath,
 			configuredInlineSourcePatterns,
 		);
-		return directTest || inlineSource ? [{ directTest, entry, inlineSource, relativePath }] : [];
+		// Compile-only conformance specs can live outside the runtime runner's roots.
+		// Inspect excluded conventional candidates for actual type assertions only.
+		const typeCandidate = !directTest && !inlineSource && conventional;
+		return directTest || inlineSource || typeCandidate
+			? [{ directTest, entry, inlineSource, typeCandidate, typeSuite, relativePath }]
+			: [];
 	});
 	if (candidateEntries.length > MAX_UPSTREAM_TEST_FILES) {
 		throw new Error('Immutable upstream test inventory exceeds the file limit');
@@ -1212,7 +1241,17 @@ export async function immutableTestInventory(tree, subdirectory, manifest, optio
 	const candidateSources = new Map();
 	const candidates = [];
 	for (const candidate of candidateEntries) {
-		if (!candidate.directTest && candidate.inlineSource) {
+		if (candidate.typeCandidate) {
+			const source = (await fetchGitHubBlob(candidate.entry, options)).toString('utf8');
+			const runtimeCases = extractTestCases(source, { file: candidate.entry.path });
+			if (
+				runtimeCases.length > 0
+					? !candidate.typeSuite
+					: extractTypeAssertionGroups(source, candidate.entry.path).length === 0
+			)
+				continue;
+			candidateSources.set(candidate.entry.path, source);
+		} else if (!candidate.directTest && candidate.inlineSource) {
 			const source = (await fetchGitHubBlob(candidate.entry, options)).toString('utf8');
 			if (!containsInlineTestMarker(source, candidate.entry.path)) continue;
 			candidateSources.set(candidate.entry.path, source);
@@ -1653,15 +1692,41 @@ async function resolveGitHubSource(repository, ref, options) {
 		}));
 	validateArchiveEntries(sourceEntries, { maxFiles: 50_000 });
 
-	const manifestPath = repository.subdirectory
+	let manifestPath = repository.subdirectory
 		? `${repository.subdirectory}/package.json`
 		: 'package.json';
-	const manifestEntry = treeResponse.tree.find(
+	let manifestEntry = treeResponse.tree.find(
 		(entry) => entry.path === manifestPath && isGitHubRegularBlob(entry),
 	);
+	let manifestBytes = manifestEntry ? await fetchGitHubBlob(manifestEntry, options) : null;
+	let manifest = manifestBytes ? parseJsonFile(manifestBytes, 'Immutable source manifest') : null;
+	// npm metadata sometimes omits a monorepo directory. Resolve its exact
+	// published name from authenticated manifests; an explicit directory is
+	// authoritative, and ambiguous sibling packages remain an intake failure.
+	if (
+		options.expectedPackage &&
+		!repository.subdirectory &&
+		manifest?.name !== options.expectedPackage
+	) {
+		const matches = [];
+		for (const entry of treeResponse.tree) {
+			if (!isGitHubRegularBlob(entry) || !entry.path.endsWith('/package.json')) continue;
+			const bytes = await fetchGitHubBlob(entry, options);
+			const candidate = parseJsonFile(bytes, `Immutable source manifest ${entry.path}`);
+			if (candidate.name === options.expectedPackage && candidate.private !== true) {
+				matches.push({ entry, bytes, manifest: candidate });
+			}
+		}
+		if (matches.length !== 1) {
+			throw new Error(
+				`Immutable source must contain one package named ${options.expectedPackage}; found ${matches.length}`,
+			);
+		}
+		({ entry: manifestEntry, bytes: manifestBytes, manifest } = matches[0]);
+		manifestPath = manifestEntry.path;
+		repository = { ...repository, subdirectory: path.posix.dirname(manifestPath) };
+	}
 	if (!manifestEntry) throw new Error(`Immutable source has no ${manifestPath}`);
-	const manifestBytes = await fetchGitHubBlob(manifestEntry, options);
-	const manifest = parseJsonFile(manifestBytes, 'Immutable source manifest');
 	if (manifest.repository) {
 		const sourceManifestRepository = normalizeRepository(manifest.repository);
 		if (!repositoryMatchesLocation(sourceManifestRepository, repository)) {
@@ -1737,7 +1802,7 @@ export async function resolveRemoteInput(parsedInput, rawInput, options = {}) {
 		source = await resolveGitHubSource(
 			registry.repository,
 			registry.gitHead ?? registry.sourceProvenance?.commit,
-			resolvedOptions,
+			{ ...resolvedOptions, expectedPackage: registry.name },
 		);
 	} else {
 		const repository = {

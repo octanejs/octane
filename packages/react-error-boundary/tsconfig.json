@@ -13,9 +13,12 @@
     "noErrorTruncation": true,
     "allowSyntheticDefaultImports": true,
     "verbatimModuleSyntax": true,
-    "types": ["node"],
-    "strict": true
+    "types": [],
+    "strict": true,
+    "skipLibCheck": false
   },
-  "include": ["./src/", "./typetests/"],
-  "exclude": ["node_modules", "dist", "tests"]
+  "include": ["src/**/*.ts", "src/**/*.tsrx"],
+  "reactPortEvidence": {
+    "gate": "authored-source-types"
+  }
 }

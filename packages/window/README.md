@@ -1,6 +1,6 @@
 # @octanejs/window
 
-The exact [`react-window@2.3.0`](https://github.com/bvaughn/react-window) API for
+The exact [`react-window@2.3.1`](https://github.com/bvaughn/react-window) API for
 the [Octane](https://github.com/octanejs/octane) renderer. Change the package
 import and keep the current v2 `List`, `Grid`, sizing, callback, ref, and
 imperative-scrolling contracts.
@@ -62,7 +62,7 @@ SSR; and hydration are covered by executable parity evidence.
 
 This package targets the current `react-window` v2 API. The older v1
 `FixedSizeList`, `VariableSizeList`, `FixedSizeGrid`, and `VariableSizeGrid`
-names are not exports of `react-window@2.3.0` and are intentionally not added
+names are not exports of `react-window@2.3.1` and are intentionally not added
 here. Applications still using those names need a v1-specific migration before
 changing imports.
 

@@ -1,3 +1,5 @@
+declare const process: { env: { NODE_ENV?: string } };
+
 import { useCallback, useEffect, useRef } from 'octane';
 import { scopeTab } from './scope-tab';
 import { FOCUS_SELECTOR, focusable, tabbable } from './tabbable';
@@ -18,7 +20,7 @@ export function useFocusTrap(active = true): React.RefCallback<HTMLElement | nul
 
 		if (focusElement) {
 			focusElement.focus({ preventScroll: true });
-		} else if (process.env.NODE_ENV === 'development') {
+		} else if (typeof process !== 'undefined' && process.env.NODE_ENV === 'development') {
 			// oxlint-disable-next-line no-console
 			console.warn(
 				'[@mantine/hooks/use-focus-trap] Failed to find focusable element within provided node',
@@ -46,7 +48,7 @@ export function useFocusTrap(active = true): React.RefCallback<HTMLElement | nul
 			setTimeout(() => {
 				if (node.getRootNode()) {
 					focusNode(node);
-				} else if (process.env.NODE_ENV === 'development') {
+				} else if (typeof process !== 'undefined' && process.env.NODE_ENV === 'development') {
 					// oxlint-disable-next-line no-console
 					console.warn('[@mantine/hooks/use-focus-trap] Ref node is not part of the dom', node);
 				}

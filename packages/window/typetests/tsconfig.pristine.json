@@ -7,11 +7,16 @@
     "lib": ["dom", "dom.iterable", "esnext"],
     "skipLibCheck": false,
     "noEmit": true,
-    "noErrorTruncation": true,
+    "noErrorTruncation": false,
     "baseUrl": ".",
     "paths": {
       "react-window-under-test": ["../upstream-artifact/dist/react-window.d.ts"]
     }
   },
-  "include": ["./parity.test-d.ts"]
+  "include": ["./parity.test-d.ts", "./published.test-d.ts"],
+  "reactPortEvidence": {
+    "gate": "upstream-types-pristine",
+    "upstreamRegistrations": [],
+    "publicMode": "pinned"
+  }
 }

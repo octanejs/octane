@@ -11,6 +11,7 @@
     "packages/window/tests/upstream/core/getOffsetForIndex.test.ts",
     "packages/window/tests/upstream/core/getStartStopIndices.test.ts",
     "packages/window/tests/upstream/core/useCachedBounds.test.ts",
+    "packages/window/tests/upstream/core/useIsRtl.test.ts",
     "packages/window/tests/upstream/core/useVirtualizer.test.ts",
     "packages/window/tests/upstream/hooks/useMemoizedObject.test.ts",
     "packages/window/tests/upstream/hooks/useResizeObserver.test.ts",
@@ -603,6 +604,16 @@
       "id": "runtime:react-window-adapted-116",
       "file": "packages/window/tests/upstream/utils/shallowCompare.test.ts",
       "fullName": "shallowCompare should respect shallow equality"
+    },
+    {
+      "id": "runtime:react-window-adapted-rtl-dom",
+      "file": "packages/window/tests/upstream/core/useIsRtl.test.ts",
+      "fullName": "useIsRtl should read the DOM element's direction when no explicit prop provided"
+    },
+    {
+      "id": "runtime:react-window-adapted-rtl-prop",
+      "file": "packages/window/tests/upstream/core/useIsRtl.test.ts",
+      "fullName": "useIsRtl should update when an explicit direction changes"
     }
   ]
 }

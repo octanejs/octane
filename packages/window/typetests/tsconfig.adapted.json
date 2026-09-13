@@ -7,7 +7,7 @@
     "lib": ["dom", "dom.iterable", "esnext"],
     "skipLibCheck": false,
     "noEmit": true,
-    "noErrorTruncation": true,
+    "noErrorTruncation": false,
     "jsx": "react-jsx",
     "jsxImportSource": "octane",
     "baseUrl": ".",
@@ -15,5 +15,15 @@
       "react-window-under-test": ["../src/index.ts"]
     }
   },
-  "include": ["./parity.test-d.ts", "../src/**/*.ts", "../src/**/*.tsx"]
+  "include": [
+    "./parity.test-d.ts",
+    "../src/**/*.ts",
+    "../src/**/*.tsx",
+    "../tests/types/public.test-d.ts"
+  ],
+  "reactPortEvidence": {
+    "gate": "upstream-types-adapted",
+    "upstreamRegistrations": [],
+    "publicMode": "pinned"
+  }
 }

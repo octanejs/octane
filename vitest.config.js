@@ -5778,6 +5778,49 @@ export default defineConfig({
 				plugins: [octane()],
 			},
 			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'react-error-boundary-browser',
+					include: ['packages/react-error-boundary/tests/browser/**/*.test.ts'],
+					environment: 'node',
+					testTimeout: 30000,
+					hookTimeout: 60000,
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'react-error-boundary-pristine',
+					include: ['packages/react-error-boundary/upstream/lib/**/*.test.tsx'],
+					environment: 'jsdom',
+					setupFiles: ['packages/react-error-boundary/upstream/vitest.setup.ts'],
+					globals: false,
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'react-error-boundary-adapted',
+					include: ['packages/react-error-boundary/tests/upstream/**/*.test.tsx'],
+					environment: 'jsdom',
+					setupFiles: ['packages/react-error-boundary/upstream/vitest.setup.ts'],
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/index.ts'),
+						},
+						{
+							find: /^@testing-library\/react$/,
+							replacement: resolve(import.meta.dirname, 'packages/testing-library/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
 				test: {
 					name: 'react-error-boundary',
 					include: [
@@ -5785,7 +5828,10 @@ export default defineConfig({
 						'!packages/react-error-boundary/tests/ssr/**/*.test.ts',
 					],
 					environment: 'jsdom',
-					exclude: ['packages/react-error-boundary/tests/differential/**/*.test.ts'],
+					exclude: [
+						'packages/react-error-boundary/tests/differential/**/*.test.ts',
+						'packages/react-error-boundary/tests/browser/**/*.test.ts',
+					],
 					globals: false,
 				},
 				plugins: [octane()],
@@ -5862,6 +5908,52 @@ export default defineConfig({
 						{
 							find: /^@octanejs\/gsap$/,
 							replacement: resolve(import.meta.dirname, 'packages/gsap/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'mantine-hooks-browser',
+					include: ['packages/mantine-hooks/tests/browser/**/*.test.ts'],
+					environment: 'node',
+					testTimeout: 30000,
+					hookTimeout: 60000,
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'mantine-hooks-pristine',
+					include: ['packages/mantine-hooks/upstream/src/**/*.test.{ts,tsx}'],
+					environment: 'jsdom',
+					globals: true,
+					setupFiles: [
+						'packages/mantine-hooks/tests/upstream-environment.ts',
+						'packages/mantine-hooks/tests/pristine-environment.ts',
+					],
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'mantine-hooks-adapted',
+					include: ['packages/mantine-hooks/tests/upstream/**/*.test.{ts,tsx}'],
+					environment: 'jsdom',
+					globals: true,
+					setupFiles: ['packages/mantine-hooks/tests/upstream-environment.ts'],
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/testing-library$/,
+							replacement: resolve(import.meta.dirname, 'packages/testing-library/src/index.ts'),
 						},
 					],
 				},
@@ -8443,6 +8535,17 @@ export default defineConfig({
 					],
 					environment: 'node',
 					globals: false,
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'window-browser',
+					include: ['packages/window/tests/browser/**/*.browser.test.ts'],
+					environment: 'node',
+					globals: false,
+					testTimeout: 60_000,
+					hookTimeout: 60_000,
 				},
 			},
 			{

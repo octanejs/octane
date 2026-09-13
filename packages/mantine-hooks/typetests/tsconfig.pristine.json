@@ -1,0 +1,12 @@
+{
+  "extends": "../tsconfig.json",
+  "include": ["./published-contract.ts", "./inference.pristine.test-d.ts"],
+  "reactPortEvidence": {
+    "gate": "upstream-types-pristine",
+    "upstreamRegistrations": [],
+    "publicMode": "pinned"
+  },
+  "compilerOptions": {
+    "jsxImportSource": "react"
+  }
+}

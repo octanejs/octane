@@ -3,26 +3,33 @@
   "schemaVersion": 1,
   "provenance": {
     "repo": "https://github.com/bvaughn/react-error-boundary.git",
-    "version": "6.1.2",
-    "commit": "90b9a7e8766faa7890eff14ffedc77ea80740179",
+    "version": "6.1.5",
+    "commit": "83b0f856e650b143d3d74d397f0cea5204a37460",
     "sourceRoot": "lib",
     "testRoot": "lib",
     "license": "MIT",
-    "integrity": "sha256:74ba770d513712aaab909ffe27209804739a33896c2635f974eddf141661901f",
-    "verification": "recorded-unverified"
+    "integrity": "sha256:58254acdc7357e94b9ce6b0097e1601db8cdbf9f44d0e8f44e3e09b0ab77a011",
+    "verification": "verified"
   },
-  "upstreamSuites": { "runtime": "present", "types": "absent" },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "absent"
+  },
   "adaptedRoots": {
-    "source": { "roots": ["packages/react-error-boundary/src"], "include": ["$a"], "exclude": [] },
+    "source": {
+      "roots": ["packages/react-error-boundary/src"],
+      "include": ["\\.(?:ts|tsx|tsrx)$"],
+      "exclude": []
+    },
     "tests": {
-      "roots": ["packages/react-error-boundary/tests/differential"],
-      "include": ["$a"],
+      "roots": ["packages/react-error-boundary/tests/upstream"],
+      "include": ["\\.test\\.tsx$"],
       "exclude": []
     }
   },
   "adaptedRuntimeSummary": {
-    "inventoryEntries": 0,
-    "uniqueIdentities": 0,
+    "inventoryEntries": 25,
+    "uniqueIdentities": 25,
     "duplicateEntriesWithinLanes": 0,
     "identitiesSharedAcrossLanes": 0
   },
@@ -33,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "94c31ca45af2699bfe2010ff2c09840023a6104edc50f916b5a336ff1707d42d"
+      "lockfileSha256": "59b5197a457d62d05aa8866334bc41567581c414b30452a047b00c020d587883"
     }
   },
   "lanes": [
@@ -74,7 +81,243 @@
           "sha256": "364c0595b08b26343fa3cd9ff7ddbdaa5fd227cfcd390437aa67ae9a173ebe1b"
         }
       ]
+    },
+    {
+      "id": "react-error-boundary-pristine-upstream",
+      "type": "pristine-upstream",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "react-error-boundary-pristine",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "All 25 pinned upstream cases run; the adapted lane uses native Octane hooks, refs and catching.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/react-error-boundary/audit/pristine-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/react-error-boundary/audit/pristine-runtime.json",
+          "role": "support",
+          "sha256": "2c88b6ba3faf316ba6d2b75107d95d00e9f4ef053749a4ec5e1a79b13055fc09"
+        },
+        {
+          "path": "packages/react-error-boundary/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "ac8d1b12aa5975bbefc53ffbf21a49d35f0e289966ecb7ff1ffdeba7effdfe86"
+        },
+        {
+          "path": "packages/react-error-boundary/audit/provenance.json",
+          "role": "support",
+          "sha256": "3c4b6624b985125370fd8b7544144b117e45f65a0d21402d80c42e043598c8a1"
+        },
+        {
+          "path": "packages/react-error-boundary/upstream/vitest.setup.ts",
+          "role": "support",
+          "sha256": "6e5b1e71b03b83b715473b80297a1e3202997e8e2f2abc594e1d534888c0c9c1"
+        }
+      ]
+    },
+    {
+      "id": "react-error-boundary-adapted-upstream",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "react-error-boundary-adapted",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "All 25 pinned upstream cases run; the adapted lane uses native Octane hooks, refs and catching.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/react-error-boundary/audit/adapted-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/react-error-boundary/audit/adapted-runtime.json",
+          "role": "support",
+          "sha256": "9d6a27cedba8a09cd3e30ee97ab95d1728115f42db11633db46e43d162bedcda"
+        },
+        {
+          "path": "packages/react-error-boundary/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "ac8d1b12aa5975bbefc53ffbf21a49d35f0e289966ecb7ff1ffdeba7effdfe86"
+        },
+        {
+          "path": "packages/react-error-boundary/audit/provenance.json",
+          "role": "support",
+          "sha256": "3c4b6624b985125370fd8b7544144b117e45f65a0d21402d80c42e043598c8a1"
+        },
+        {
+          "path": "packages/react-error-boundary/upstream/vitest.setup.ts",
+          "role": "support",
+          "sha256": "6e5b1e71b03b83b715473b80297a1e3202997e8e2f2abc594e1d534888c0c9c1"
+        },
+        {
+          "path": "packages/react-error-boundary/tests/upstream-support.ts",
+          "role": "support",
+          "sha256": "6d968943486e69847da981d2fe6e2f4f226606de91092dcd61e9eb9b0d089958"
+        },
+        {
+          "path": "packages/react-error-boundary/audit/upstream-patches/tests/upstream/utils/withErrorBoundary.test.tsx.patch",
+          "role": "support",
+          "sha256": "3c5a0d97a102eceaca582f8d5d07868d5e7e7c15e4292b493763efca2563e8d9"
+        }
+      ]
+    },
+    {
+      "id": "react-error-boundary-pristine-types",
+      "type": "pristine-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "react-error-boundary-pristine-types",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Strict positive and negative assertions over every published export and typed reset/HOC refs. Upstream publishes declarations but no independent type suite.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsc",
+        "project": "packages/react-error-boundary/typetests/tsconfig.pristine.json"
+      },
+      "files": [
+        {
+          "path": "packages/react-error-boundary/typetests/published.test-d.ts",
+          "role": "test",
+          "sha256": "826ef3c01f54d74cf2e9ddce0d0baba41a6e15a7f3a6c7eb2a11d5d0e27cc258",
+          "cases": [
+            {
+              "id": "types:error-boundary-pristine:public-contract",
+              "testName": "public-contract",
+              "fullName": "Error Boundary public contract"
+            }
+          ]
+        },
+        {
+          "path": "packages/react-error-boundary/typetests/tsconfig.pristine.json",
+          "role": "support",
+          "sha256": "6a0a56b68a421414c89dd386f68882e9369a642dcd370c7ea0aa649c9c3af94f"
+        },
+        {
+          "path": "packages/react-error-boundary/typetests/consumer.pristine.tsx",
+          "role": "support",
+          "sha256": "6febb1cdf2992cf2cb6aa434e96ce29c206053258f218873b163b39651686d66"
+        },
+        {
+          "path": "packages/react-error-boundary/audit/compatibility-baseline.json",
+          "role": "support",
+          "sha256": "ca62fe2441b8e685a55a5676dd6abf1df541095f9c8a1f5598284f0484736c82"
+        }
+      ]
+    },
+    {
+      "id": "react-error-boundary-adapted-types",
+      "type": "adapted-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "react-error-boundary-adapted-types",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Strict positive and negative assertions over every published export and typed reset/HOC refs. Upstream publishes declarations but no independent type suite.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsrx-tsc",
+        "project": "packages/react-error-boundary/typetests/tsconfig.adapted.json"
+      },
+      "files": [
+        {
+          "path": "packages/react-error-boundary/tests/types/public-shapes.test-d.ts",
+          "role": "test",
+          "sha256": "cbb932129303574a333e10a1e102f8e70407a17dec59f8fa64bca1cbe5ae0d8f",
+          "cases": [
+            {
+              "id": "types:error-boundary-adapted:public-contract",
+              "testName": "public-contract",
+              "fullName": "Error Boundary public contract"
+            }
+          ]
+        },
+        {
+          "path": "packages/react-error-boundary/typetests/tsconfig.adapted.json",
+          "role": "support",
+          "sha256": "4fcc69b5fe73b96b9269c3065c63400818741d8e1314a098a9fb06208a8bfc6b"
+        },
+        {
+          "path": "packages/react-error-boundary/tests/types/consumer.tsx",
+          "role": "support",
+          "sha256": "ea212346e4762674a24e420b2cdca3f78dc699b7eed0fa2275120b10866bb276"
+        },
+        {
+          "path": "packages/react-error-boundary/audit/compatibility-baseline.json",
+          "role": "support",
+          "sha256": "ca62fe2441b8e685a55a5676dd6abf1df541095f9c8a1f5598284f0484736c82"
+        }
+      ]
+    },
+    {
+      "id": "react-error-boundary-browser",
+      "type": "browser",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "react-error-boundary-browser",
+      "notes": "Chromium proves client/hydrated null and async error resets, latest callback props, stable ref/DOM identity, focus retention, resetKeys and unmount ref cleanup.",
+      "files": [
+        {
+          "path": "packages/react-error-boundary/audit/browser-runtime.json",
+          "role": "support",
+          "sha256": "848e67e0dfa01c0743b2ee0ea1c05905cd9d5b483c89bbaf77043797e9ee3265"
+        },
+        {
+          "path": "packages/react-error-boundary/tests/browser/error-boundary.browser.test.ts",
+          "role": "support",
+          "sha256": "9b8894231563a267dddd6733aae72d54ae6ee9b16150d0eb0a8239ad4d509728"
+        },
+        {
+          "path": "packages/react-error-boundary/tests/browser/harness/fixture.tsx",
+          "role": "support",
+          "sha256": "0d524746d6f6d8995ce1ee7bae4ff19a995a3053bb0628118229715958382f6a"
+        },
+        {
+          "path": "packages/react-error-boundary/tests/browser/harness/index.html",
+          "role": "support",
+          "sha256": "c21df20b1752c0a3851c9acfd1e7efa0f82d155d33c7a86401a96e3731cfb2c0"
+        },
+        {
+          "path": "packages/react-error-boundary/tests/browser/harness/main.tsx",
+          "role": "support",
+          "sha256": "9f8db16a80a41d5b570a79932483c84727e87186a57eceb32a8f2d249ce46a25"
+        },
+        {
+          "path": "packages/octane/tests/_hydration-ssr.ts",
+          "role": "support",
+          "sha256": "f6ec7d5cb3ca4786cda227ba6e518e707996b179e4be2bb9c8935ea4ef4cdfeb"
+        }
+      ],
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/react-error-boundary/audit/browser-runtime.json",
+        "fileParallelism": false
+      }
     }
   ],
-  "divergences": []
+  "divergences": [
+    {
+      "id": "react-error-boundary-class-ref",
+      "caseIds": ["runtime:error-boundary-adapted-022"],
+      "upstreamResult": "A React class exposes getFoo on its instance.",
+      "octaneResult": "An Octane function component exposes getFoo with useImperativeHandle.",
+      "rationale": "Octane has no class components or forwardRef; the adapted fixture retains the same imperative API and assertions.",
+      "classification": "framework-abi",
+      "consumerImpact": "Component authoring uses native function components and ref props; the observable ref handle remains compatible.",
+      "migrationGuidance": "Use a ref prop and useImperativeHandle for an imperative component handle.",
+      "owner": "@octanejs/react-error-boundary",
+      "reviewCondition": "Review if the native ref-as-prop contract changes."
+    },
+    {
+      "id": "react-error-boundary-forward-ref",
+      "caseIds": ["runtime:error-boundary-adapted-024"],
+      "upstreamResult": "React forwards the imperative ref through forwardRef.",
+      "octaneResult": "Octane forwards the same typed ref as an ordinary prop.",
+      "rationale": "Octane has no class components or forwardRef; the adapted fixture retains the same imperative API and assertions.",
+      "classification": "framework-abi",
+      "consumerImpact": "Component authoring uses native function components and ref props; the observable ref handle remains compatible.",
+      "migrationGuidance": "Use a ref prop and useImperativeHandle for an imperative component handle.",
+      "owner": "@octanejs/react-error-boundary",
+      "reviewCondition": "Review if the native ref-as-prop contract changes."
+    }
+  ]
 }

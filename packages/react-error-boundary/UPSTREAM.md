@@ -1,43 +1,30 @@
-# react-error-boundary upstream contract
+# React Error Boundary provenance
 
-## Pin and source boundary
+Pinned package: `react-error-boundary@6.1.5`.
+Repository: https://github.com/bvaughn/react-error-boundary
+Immutable commit: `83b0f856e650b143d3d74d397f0cea5204a37460`.
+The registry artifact is verified against its exact SHA-512 integrity in `audit/upstream.lock.json`.
 
-| Field | Value |
-|---|---|
-| Package | `react-error-boundary` |
-| Version | `6.1.2` |
-| Canonical commit | `90b9a7e8766faa7890eff14ffedc77ea80740179` |
-| Supported upstream range | exactly `6.1.2` |
-| React oracle | `19.2.7` |
-| Canonical archive SHA-256 | `74ba770d513712aaab909ffe27209804739a33896c2635f974eddf141661901f` |
-| License | MIT |
+## Source boundary
 
-The npm package contains compiled output and declarations. The canonical
-repository contains source and three runtime test files under `lib/`. Those
-pristine artifacts have not yet been vendored or executed here, so the parity
-manifest records this pin as `recorded-unverified`.
+The licensed React implementation under `lib/` is rewritten into Octane's existing `src/` layout: `components/ErrorBoundary.tsx` maps to `error-boundary.tsrx`, `context/ErrorBoundaryContext.ts` to `context.ts`, `hooks/useErrorBoundary.ts` to `use-error-boundary.ts`, `utils/withErrorBoundary.ts` to `with-error-boundary.tsrx`, and the error-message/context validation utilities to `utils.ts` and `use-error-boundary.ts`. `types.ts` and `index.ts` retain the public shape and exports. The source ledger records every shipped file; `internal.ts` is authored native compiler-slot integration. React's class lifecycle is expressed using Octane hooks and its native error boundary. No React runtime is shipped.
 
-## Export crosswalk
+`server.tsrx` is the native server entry. It keeps the client's boundary structure for hydration and rethrows server failures, matching upstream error propagation. Its previous public contract and the native `ComponentType` alias are retained as byte-authenticated baseline evidence under `upstream-artifact/previous-binding`.
 
-| Upstream export | Octane disposition | Evidence |
-|---|---|---|
-| `ErrorBoundary` | Ported to Octane's native boundary | `tests/fallbacks.test.ts`, `tests/reset.test.ts`, differential reset lane |
-| `ErrorBoundaryContext` | Ported to Octane context | `tests/use-error-boundary.test.ts` |
-| `getErrorMessage` | Ported unchanged | `tests/use-error-boundary.test.ts` |
-| `useErrorBoundary` | Ported to Octane hooks | `tests/use-error-boundary.test.ts` |
-| `withErrorBoundary` | Ported to an Octane wrapper | `tests/fallbacks.test.ts`, public typetest |
-| Public prop/callback/API types | Ported structurally | `typetests/public-api.ts` |
+## Public exports
 
-The explicit Octane `/server` entry is an extension: it preserves upstream
-server error propagation without pretending that a client boundary catches
-SSR errors. Component stack text remains an explicit divergence because Octane
-does not expose a public component-stack formatter.
+All 13 upstream value/type exports are preserved: `ErrorBoundary` (component and imperative reset handle), `ErrorBoundaryContext`, `getErrorMessage`, `useErrorBoundary`, `withErrorBoundary`, `ErrorBoundaryContextType`, `UseErrorBoundaryApi`, `ErrorBoundaryProps`, `ErrorBoundaryPropsWithComponent`, `ErrorBoundaryPropsWithFallback`, `ErrorBoundaryPropsWithRender`, `FallbackProps`, and `OnErrorCallback`. The existing native `ComponentType` alias and `/server` entry remain supported.
 
-## Test-suite disposition
+## Evidence
 
-Upstream runtime suites exist for `ErrorBoundary`, `useErrorBoundary`, and
-`withErrorBoundary`; no independent upstream type suite is present at this pin.
-The current Octane tests are repository-authored adaptations and contracts.
-Only the shared imperative-reset fixture is registered as bounded React parity
-evidence. Advancing the manifest to `verified` requires byte-exact vendoring,
-pristine execution, one-for-one adaptation, and exhaustive test classification.
+The immutable tree includes all three upstream test files and all 25 runtime cases. Both pristine React and generated Octane suites execute every assertion. Two documented fixture adaptations replace a class ref and `forwardRef` with native function components, ref props and `useImperativeHandle`; their observable `getFoo()` assertions stay unchanged. The upstream setup and license remain byte-exact. `audit/crosswalk.json` accounts for every registration.
+
+Upstream has no separate type suite. Strict consumer assertions exercise every published declaration, fallback alternatives, callback shapes, reset refs, and wrapped component props against the pinned npm declarations and Octane source. Additional checks cover the native server entry. Chromium exercises initial rendering, server DOM adoption, null and async errors, stable handles, latest callbacks, reset keys, focus and DOM identity, and unmount cleanup. Existing differential tests compare actual React/Octane output; server tests verify failure propagation and idle hook/context behavior.
+
+## Intentional differences
+
+Octane components are functions and refs are ordinary props. The compatibility handle exposes `resetErrorBoundary`, without React class lifecycle methods. Component stacks remain empty strings because Octane has no public component-stack formatter. Server rendering uses the explicit `/server` entry. Native catching remains delegated to Octane while reset keys, callbacks, context, hooks, fallback choices, and HOC APIs remain in this binding.
+
+## Licensing
+
+Binding-authored work uses the repository MIT license in `LICENSE`. The byte-exact upstream MIT attribution is retained in `LICENSE.upstream` and included in the published package. The immutable source, lock, generated-test patches, and registry evidence are outside the published files allowlist. Shared provenance checks verify all source blobs, artifact hashes, and license copies offline.

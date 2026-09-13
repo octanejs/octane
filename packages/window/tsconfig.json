@@ -8,12 +8,15 @@
     "noEmit": true,
     "moduleResolution": "bundler",
     "noEmitOnError": true,
-    "noErrorTruncation": true,
+    "noErrorTruncation": false,
     "allowSyntheticDefaultImports": true,
-    "skipLibCheck": true,
+    "skipLibCheck": false,
     "types": ["node"],
     "strict": true
   },
   "include": ["./src/", "./tests/types/"],
-  "exclude": ["node_modules", "dist", "upstream"]
+  "exclude": ["node_modules", "dist", "upstream"],
+  "reactPortEvidence": {
+    "gate": "authored-source-types"
+  }
 }

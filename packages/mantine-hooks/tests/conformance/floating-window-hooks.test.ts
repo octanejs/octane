@@ -3,6 +3,46 @@ import { mount, nextPaint } from '../_helpers';
 import { FloatingWindowHarness } from '../_fixtures/floating-window-hooks.tsrx';
 
 describe('@octanejs/mantine-hooks useFloatingWindow', () => {
+	it('keeps drag callbacks distinct and uses updated callbacks and enabled state', async () => {
+		vi.stubGlobal(
+			'ResizeObserver',
+			class {
+				observe() {}
+				disconnect() {}
+			},
+		);
+		const events: string[] = [];
+		const options = (label: string, enabled = true) => ({
+			enabled,
+			constrainToViewport: false,
+			onDragStart: () => events.push(`${label}:start`),
+			onPositionChange: () => events.push(`${label}:move`),
+			onDragEnd: () => events.push(`${label}:end`),
+		});
+		const result = mount(FloatingWindowHarness, { show: true, options: options('first') });
+		try {
+			await nextPaint();
+			const drag = () => {
+				result
+					.find('#floating-window')
+					.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, clientX: 10, clientY: 10 }));
+				document.dispatchEvent(new MouseEvent('mousemove', { clientX: 20, clientY: 20 }));
+				document.dispatchEvent(new MouseEvent('mouseup'));
+			};
+			drag();
+			expect(events.splice(0)).toEqual(['first:start', 'first:move', 'first:end']);
+			result.update(FloatingWindowHarness, { show: true, options: options('next') });
+			drag();
+			expect(events.splice(0)).toEqual(['next:start', 'next:move', 'next:end']);
+			result.update(FloatingWindowHarness, { show: true, options: options('disabled', false) });
+			drag();
+			expect(events).toEqual([]);
+		} finally {
+			result.unmount();
+			vi.unstubAllGlobals();
+		}
+	});
+
 	it('observes an element attached after the initial effect and disconnects on removal', async () => {
 		const observers: Array<{
 			observe: ReturnType<typeof vi.fn>;

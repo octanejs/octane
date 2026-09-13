@@ -143,6 +143,8 @@ export const BENCHMARK_SUITES = [
 	'bundle-reachability',
 	'three-renderer',
 	'three-bundle-size',
+	'hooks-runtime',
+	'effect-scheduling',
 	'spread-hosts',
 ];
 

@@ -1,7 +1,13 @@
-import { useFloatingWindow } from '@octanejs/mantine-hooks';
+import { useFloatingWindow, type UseFloatingWindowOptions } from '@octanejs/mantine-hooks';
 
-export function FloatingWindowHarness({ show }: { show: boolean }) @{
-	const { ref } = useFloatingWindow<HTMLDivElement>({ constrainToViewport: true });
+export function FloatingWindowHarness({
+	show,
+	options,
+}: {
+	show: boolean;
+	options?: UseFloatingWindowOptions;
+}) @{
+	const { ref } = useFloatingWindow<HTMLDivElement>({ constrainToViewport: true, ...options });
 
 	<section>
 		@if (show) {

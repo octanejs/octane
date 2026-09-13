@@ -1,0 +1,750 @@
+[
+  {
+    "id": "react-case-v1:e6e2535ee1f76faabf5d",
+    "classification": "conformance",
+    "localEvidence": "tests/browser/window.browser.test.ts",
+    "rationale": "Native Chromium List/Grid client startup and SSR hydration assert the upstream initial 10/30 item counts and no layout shift, plus server DOM adoption and live bounded scrolling."
+  },
+  {
+    "id": "react-case-v1:2a04f473f99ed72b5a6f",
+    "classification": "conformance",
+    "localEvidence": "tests/browser/window.browser.test.ts",
+    "rationale": "Native Chromium List/Grid client startup and SSR hydration assert the upstream initial 10/30 item counts and no layout shift, plus server DOM adoption and live bounded scrolling."
+  },
+  {
+    "id": "react-case-v1:cd7914f6bf86a05c2460",
+    "classification": "conformance",
+    "localEvidence": "tests/browser/window.browser.test.ts",
+    "rationale": "Native Chromium List/Grid client startup and SSR hydration assert the upstream initial 10/30 item counts and no layout shift, plus server DOM adoption and live bounded scrolling."
+  },
+  {
+    "id": "react-case-v1:6efb54cf8cb180c0b4e2",
+    "classification": "conformance",
+    "localEvidence": "tests/browser/window.browser.test.ts",
+    "rationale": "Native Chromium List/Grid client startup and SSR hydration assert the upstream initial 10/30 item counts and no layout shift, plus server DOM adoption and live bounded scrolling."
+  },
+  {
+    "id": "react-case-v1:8f9b9a1833768ec4cd6d",
+    "classification": "inapplicable",
+    "rationale": "This case requires a React Server Components application. Octane has no Server Components contract; the supported SSR/hydration behavior is covered separately for both List and Grid."
+  },
+  {
+    "id": "react-case-v1:011d4b899f1f60bf535f",
+    "classification": "inapplicable",
+    "rationale": "This case requires a React Server Components application. Octane has no Server Components contract; the supported SSR/hydration behavior is covered separately for both List and Grid."
+  },
+  {
+    "id": "react-case-v1:e7368de9e57eb1a487c4",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/grid/Grid.test.tsx",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:b795d099b6cb72e29bc1",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/grid/Grid.test.tsx",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:e4d79ca0b51fa4f8cd8b",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/grid/Grid.test.tsx",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:3f7967b6faf728b99da7",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/grid/Grid.test.tsx",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:48b7c41875613541fbf2",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/grid/Grid.test.tsx",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:40af2639684a89d80dff",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/grid/Grid.test.tsx",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:a7d71a15427ac6d8f47f",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/grid/Grid.test.tsx",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:650048d8dd2d5395c617",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/grid/Grid.test.tsx",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:197980a3d7985d798e5e",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/grid/Grid.test.tsx",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:641e75bcdc76502d7433",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/grid/Grid.test.tsx",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:e4ea71c6b43e95dc5378",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/grid/Grid.test.tsx",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:c6d094acf845c37a6034",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/grid/Grid.test.tsx",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:2b5aa4507acc98430307",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/grid/Grid.test.tsx",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:48c6f951feae3bf7bb6d",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/grid/Grid.test.tsx",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:2a1ed7857952f3163a3d",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/grid/Grid.test.tsx",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:4767735236ef9259180e",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/grid/Grid.test.tsx",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:c338e2d7cb62f4c62d24",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/grid/Grid.test.tsx",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:6863fdfd4db8ef045d13",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/grid/Grid.test.tsx",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:9dd8665da16ccf854660",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/grid/Grid.test.tsx",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:8fdcbe6597e5d051bb7c",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/grid/Grid.test.tsx",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:160cc28f5e6edc0699ed",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/grid/Grid.test.tsx",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:f2d795317d66e26be8c6",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/grid/Grid.test.tsx",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:a1e34e11d97ac298c413",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/grid/Grid.test.tsx",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:862a8bcf1bb8c2f1bd3f",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/grid/Grid.test.tsx",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:e7da2953a53bddf59942",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/grid/Grid.test.tsx",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:b81a7243222c51783c37",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/grid/Grid.test.tsx",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:9458549966cab655f236",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/list/List.test.tsx",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:fb431d5b8beea99af837",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/list/List.test.tsx",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:d00b5e307815aaee008a",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/list/List.test.tsx",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:7d3ed00cc7290f78b4b0",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/list/List.test.tsx",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:1e6c583ce94dbda8c64b",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/list/List.test.tsx",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:e26173550ca2a8a012a4",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/list/List.test.tsx",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:014d311e5baa49b4fa06",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/list/List.test.tsx",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:b03d5b25f41e8a0b655d",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/list/List.test.tsx",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:a5377fb3f07b7837b859",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/list/List.test.tsx",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:11ddcb630450646bacf6",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/list/List.test.tsx",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:3d4c142ec9b6faaf5adf",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/list/List.test.tsx",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:67d3b13e1b3d70db6a34",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/list/List.test.tsx",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:340ba3123eeb98e67b23",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/list/List.test.tsx",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:20251adb4525676bc939",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/list/List.test.tsx",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:22e30777dd305827114e",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/list/List.test.tsx",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:52d0bfe9e105956f5fe1",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/list/List.test.tsx",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:00d3963363a9e56e33a0",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/list/List.test.tsx",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:5398c7cc7b5e59f4316b",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/list/List.test.tsx",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:7f727634c8e2eaa0df03",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/list/List.test.tsx",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:e64ed50088c469cb4f69",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/list/List.test.tsx",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:7a099b11dca09eab5e3c",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/list/List.test.tsx",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:8ee6fd8f9aa66dc374ff",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/list/List.test.tsx",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:6a1a7be2aab9ffdffba9",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/list/List.test.tsx",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:d4bf4f30d5ddd734d8b1",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/list/List.test.tsx",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:eb7c4449fced566e6c1c",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/list/List.test.tsx",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:d489049505aa0ea1f028",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/list/List.test.tsx",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:62332fab491cc5177574",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/list/List.test.tsx",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:e131721c2e4c058145aa",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/list/List.test.tsx",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:c6f07941865a188c162e",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/list/List.test.tsx",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:14973eeb99e75a6f8bb6",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/list/List.test.tsx",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:612b817a54bb32464b36",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/list/useDynamicRowHeight.test.ts",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:41c2d234e2efbdb3f882",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/list/useDynamicRowHeight.test.ts",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:18b2f7a7c564fa25e0d7",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/list/useDynamicRowHeight.test.ts",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:17d220bcb35f25f761a6",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/list/useDynamicRowHeight.test.ts",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:a06ad643350a836b2a6a",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/list/useDynamicRowHeight.test.ts",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:2a5f555810bcc8c9c197",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/list/useDynamicRowHeight.test.ts",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:205dca8b2704ed30b8f3",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/list/useDynamicRowHeight.test.ts",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:54366db12773e737b719",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/list/useDynamicRowHeight.test.ts",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:5d5d1b24efaa4ebedf9d",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/core/createCachedBounds.test.ts",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:9f82056b1d106ae6649c",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/core/createCachedBounds.test.ts",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:135b050f87d1f52dca8e",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/core/createCachedBounds.test.ts",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:c83c80f723d022c5e1fa",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/core/getEstimatedSize.test.ts",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:333c772561be505eee0c",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/core/getEstimatedSize.test.ts",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:bc92a757675f1779e13d",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/core/getEstimatedSize.test.ts",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:0f5a74357261f7d3bc23",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/core/getEstimatedSize.test.ts",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:89ca6f868fa3341f66f7",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/core/getEstimatedSize.test.ts",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:de9c561b8ed4d2a93b83",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/core/getOffsetForIndex.test.ts",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:c1382fe2dce126a0eecb",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/core/getOffsetForIndex.test.ts",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:d3dab1387c55236a2071",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/core/getOffsetForIndex.test.ts",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:c1a00d911ceec2c5579f",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/core/getOffsetForIndex.test.ts",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:0c7e26abc46c22869629",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/core/getOffsetForIndex.test.ts",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:d7f26c98cd62dae137f2",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/core/getStartStopIndices.test.ts",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:5df016d575946262a52c",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/core/getStartStopIndices.test.ts",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:7e2aa6c7d63eee4da174",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/core/getStartStopIndices.test.ts",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:f1bae372131075a9e670",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/core/getStartStopIndices.test.ts",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:11c285d9b7e54a2a5bcb",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/core/getStartStopIndices.test.ts",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:859f44d9028460b91723",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/core/getStartStopIndices.test.ts",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:e3e8556e442cb961e09e",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/core/getStartStopIndices.test.ts",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:eb2399f3e911fdd67125",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/core/getStartStopIndices.test.ts",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:a0fcf6a28c63483f0320",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/core/getStartStopIndices.test.ts",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:814c61087da5f45669f9",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/core/getStartStopIndices.test.ts",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:34599d63a4e239e8c19f",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/core/getStartStopIndices.test.ts",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:c3e530f13d1bf27a09d2",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/core/useCachedBounds.test.ts",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:b13da970dae3bcf0a22d",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/core/useIsRtl.test.ts",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:1b8f2b75462b0a73ed19",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/core/useIsRtl.test.ts",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:e18ba639243c4e43accc",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/core/useVirtualizer.test.ts",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:714fe202879c5e489560",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/core/useVirtualizer.test.ts",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:71f026888eb51bd70a17",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/core/useVirtualizer.test.ts",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:712ae0a316485e90fcb6",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/core/useVirtualizer.test.ts",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:abba8f46a8825e55d4dd",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/core/useVirtualizer.test.ts",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:f03ca41adb0cdbd8bd26",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/core/useVirtualizer.test.ts",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:327c087f9f3d4b236e22",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/core/useVirtualizer.test.ts",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:09d9cf08f5bec40829a7",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/core/useVirtualizer.test.ts",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:cb70ef5dedf726240f36",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/core/useVirtualizer.test.ts",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:c3d0877ede6403373157",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/core/useVirtualizer.test.ts",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:2eb255957ed37f6433ab",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/hooks/useMemoizedObject.test.ts",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:ed53f3163a8d24034344",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/hooks/useMemoizedObject.test.ts",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:0564eeee4d739f509c7d",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/hooks/useResizeObserver.test.ts",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:ec569b925b2794340085",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/hooks/useResizeObserver.test.ts",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:b4cc8494aeee70de98dc",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/hooks/useResizeObserver.test.ts",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:66c438af2dc66754a6ce",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/hooks/useResizeObserver.test.ts",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:302e7e7db1918265a9de",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/hooks/useResizeObserver.test.ts",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:b9a52bda54f6fafb9c61",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/hooks/useResizeObserver.test.ts",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:5c7a8f86a68c0e1e8aba",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/hooks/useResizeObserver.test.ts",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:102fa5df6dffceaa56b8",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/hooks/useStableCallback.test.tsx",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:87db0dae6a4961dbacc0",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/hooks/useStableCallback.test.tsx",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:909f702d7d756bc9f33b",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/utils/parseNumericStyleValue.test.ts",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:3a82339bbb0ea909716d",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/utils/parseNumericStyleValue.test.ts",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:28ff23c62e468a6ae2b8",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/utils/parseNumericStyleValue.test.ts",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:d66056f9c33bc93217f9",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/utils/parseNumericStyleValue.test.ts",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:7404fa64b38651f6b628",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/utils/parseNumericStyleValue.test.ts",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:4f68fc4c595ca9093800",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/utils/shallowCompare.test.ts",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  },
+  {
+    "id": "react-case-v1:56e77cc7b93972cf1e49",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/utils/shallowCompare.test.ts",
+    "rationale": "The unchanged pinned React case and generated Octane adaptation both execute."
+  }
+]

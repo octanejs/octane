@@ -3,30 +3,33 @@
   "schemaVersion": 1,
   "provenance": {
     "repo": "https://github.com/mantinedev/mantine.git",
-    "version": "9.5.0",
-    "commit": "bb3d25ca42244e996a73e49f6ad94d0047f607d9",
+    "version": "9.6.1",
+    "commit": "61049ecd950f6fb9ddc631decfec2edbdffe58e1",
     "sourceRoot": "packages/@mantine/hooks/src",
     "testRoot": "packages/@mantine/hooks/src",
     "license": "MIT",
-    "integrity": "sha256:ebe0f2a2958bf0fc82164bd3def77be8315778d0607de96b0d5977c211a4839a",
-    "verification": "recorded-unverified"
+    "integrity": "sha256:ad832a02d979a8b249ccf9d47fac8f57315c46259572f071fae406c778e1b912",
+    "verification": "verified"
   },
-  "upstreamSuites": { "runtime": "present", "types": "present" },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "absent"
+  },
   "adaptedRoots": {
     "source": {
       "roots": ["packages/mantine-hooks/src"],
-      "include": ["\\.(?:[cm]?[jt]s|[jt]sx|tsrx)$"],
+      "include": ["\\.ts$"],
       "exclude": []
     },
     "tests": {
-      "roots": ["packages/mantine-hooks/tests/differential"],
-      "include": ["\\.(?:test|spec)\\.(?:[cm]?[jt]s|[jt]sx|tsrx)$"],
+      "roots": ["packages/mantine-hooks/tests/upstream"],
+      "include": ["\\.test\\.tsx?$"],
       "exclude": []
     }
   },
   "adaptedRuntimeSummary": {
-    "inventoryEntries": 0,
-    "uniqueIdentities": 0,
+    "inventoryEntries": 545,
+    "uniqueIdentities": 545,
     "duplicateEntriesWithinLanes": 0,
     "identitiesSharedAcrossLanes": 0
   },
@@ -37,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "94c31ca45af2699bfe2010ff2c09840023a6104edc50f916b5a336ff1707d42d"
+      "lockfileSha256": "59b5197a457d62d05aa8866334bc41567581c414b30452a047b00c020d587883"
     }
   },
   "lanes": [
@@ -78,7 +81,291 @@
           "sha256": "364c0595b08b26343fa3cd9ff7ddbdaa5fd227cfcd390437aa67ae9a173ebe1b"
         }
       ]
+    },
+    {
+      "id": "mantine-hooks-pristine-upstream",
+      "type": "pristine-upstream",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "mantine-hooks-pristine",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "All 545 cases in 63 pinned upstream files execute. The Vitest environment preserves upstream Jest globals and allows its legacy mouse-coordinate fixture assignments.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/mantine-hooks/audit/pristine-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/mantine-hooks/audit/pristine-runtime.json",
+          "role": "support",
+          "sha256": "ac55b1daa8ad3cc3b68707609af1c703708fc29bee5b90fb9b5bec7996b079d0"
+        },
+        {
+          "path": "packages/mantine-hooks/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "5b15ddc24101919febdf9bbc9cd23900f2714a40c2b39656ebdda0bf0780fdbf"
+        },
+        {
+          "path": "packages/mantine-hooks/audit/provenance.json",
+          "role": "support",
+          "sha256": "7f0fc4845a85b5c0c9702d9117f8bfc8be3ca58678e519eabc7c74ab3fa52563"
+        },
+        {
+          "path": "packages/mantine-hooks/tests/upstream-environment.ts",
+          "role": "support",
+          "sha256": "9de5439b3c19f5d71754bb3d7c06c5a030a157da6a597215a35553c4f7c10ddc"
+        },
+        {
+          "path": "packages/mantine-hooks/upstream-artifact/git-support/jsdom.mocks.ts",
+          "role": "support",
+          "sha256": "a8f8bdbc4fb36c7ba1d54e60be76d18cf5160eb5679638d4d1d3bd325db261c8"
+        },
+        {
+          "path": "packages/mantine-hooks/tests/pristine-environment.ts",
+          "role": "support",
+          "sha256": "3f1768ddbe42a5a2822b8fadc38f74ab063732b168074a05a38b9c1235673ae1"
+        }
+      ]
+    },
+    {
+      "id": "mantine-hooks-adapted-upstream",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "mantine-hooks-adapted",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "All 545 cases in 63 pinned upstream files execute. The Vitest environment preserves upstream Jest globals and allows its legacy mouse-coordinate fixture assignments.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/mantine-hooks/audit/adapted-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/mantine-hooks/audit/adapted-runtime.json",
+          "role": "support",
+          "sha256": "7db64027b872db04a0dd66c3bd2f408caa12dd6826f59154b21ef532a8dd7d87"
+        },
+        {
+          "path": "packages/mantine-hooks/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "5b15ddc24101919febdf9bbc9cd23900f2714a40c2b39656ebdda0bf0780fdbf"
+        },
+        {
+          "path": "packages/mantine-hooks/audit/provenance.json",
+          "role": "support",
+          "sha256": "7f0fc4845a85b5c0c9702d9117f8bfc8be3ca58678e519eabc7c74ab3fa52563"
+        },
+        {
+          "path": "packages/mantine-hooks/tests/upstream-environment.ts",
+          "role": "support",
+          "sha256": "9de5439b3c19f5d71754bb3d7c06c5a030a157da6a597215a35553c4f7c10ddc"
+        },
+        {
+          "path": "packages/mantine-hooks/upstream-artifact/git-support/jsdom.mocks.ts",
+          "role": "support",
+          "sha256": "a8f8bdbc4fb36c7ba1d54e60be76d18cf5160eb5679638d4d1d3bd325db261c8"
+        },
+        {
+          "path": "packages/mantine-hooks/tests/upstream-support.ts",
+          "role": "support",
+          "sha256": "e79f8090c7214d5400dea8a10e35c70a4a68084ac3b1fd4e6648c782ee58a465"
+        },
+        {
+          "path": "packages/mantine-hooks/audit/upstream-patches/tests/upstream/use-debounced-state/use-debounced-state.test.ts.patch",
+          "role": "support",
+          "sha256": "15a233ad264c42357877ffcfabde6dcea74e20427476f3174cbafd5b3bfec9bd"
+        },
+        {
+          "path": "packages/mantine-hooks/audit/upstream-patches/tests/upstream/use-idle/use-idle.test.tsx.patch",
+          "role": "support",
+          "sha256": "a46fa8a969202486979cefd8f259a0776adb73e575daa304d50199b7bca07e43"
+        },
+        {
+          "path": "packages/mantine-hooks/audit/upstream-patches/tests/upstream/use-throttled-state/use-throttled-state.test.ts.patch",
+          "role": "support",
+          "sha256": "481d42259ce0bfba3c243ebee52211ebedcaba018903fd6eeb753d60a6b60edf"
+        },
+        {
+          "path": "packages/mantine-hooks/audit/upstream-patches/tests/upstream/use-throttled-value/use-throttled-value.test.ts.patch",
+          "role": "support",
+          "sha256": "0eb8d33483a95b94511aa4e70b4b378770d55246ea4f4d4831c3b8e064d28450"
+        },
+        {
+          "path": "packages/mantine-hooks/audit/upstream-patches/tests/upstream/use-timeout/use-timeout.test.ts.patch",
+          "role": "support",
+          "sha256": "1ba8da381827961a803f5cfee3d1a8e052ee9e90f3db4725f12d49b94581e418"
+        }
+      ]
+    },
+    {
+      "id": "mantine-hooks-pristine-types",
+      "type": "pristine-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "mantine-hooks-pristine-types",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Strict assertions cover all 223 published exports and explicit inference/negative consumers. Upstream has no standalone type suite; npm declarations and the authenticated prior native API are the witnesses.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsc",
+        "project": "packages/mantine-hooks/typetests/tsconfig.pristine.json"
+      },
+      "files": [
+        {
+          "path": "packages/mantine-hooks/typetests/published-contract.ts",
+          "role": "test",
+          "sha256": "f7193ca4e0f90a6f66c9745ddc79c9b5e5d2809b2ea9080edd28641fef7e33e0",
+          "cases": [
+            {
+              "id": "types:mantine-hooks-pristine:public-contract",
+              "testName": "public-contract",
+              "fullName": "Mantine hooks public-contract"
+            }
+          ]
+        },
+        {
+          "path": "packages/mantine-hooks/typetests/inference.pristine.test-d.ts",
+          "role": "test",
+          "sha256": "31f454f7a62de7c458a442517865401b52b20df9d424c396ce4c6c86f9d7ca84",
+          "cases": [
+            {
+              "id": "types:mantine-hooks-pristine:inference",
+              "testName": "inference",
+              "fullName": "Mantine hooks inference"
+            }
+          ]
+        },
+        {
+          "path": "packages/mantine-hooks/typetests/tsconfig.pristine.json",
+          "role": "support",
+          "sha256": "5546fabb144bd38988dc68893f5c3107d1b5fc340ce27787b4abc27e2bd6ef06"
+        },
+        {
+          "path": "packages/mantine-hooks/audit/compatibility-baseline.json",
+          "role": "support",
+          "sha256": "66bd157a20b4208e46b73e983b8a1fe8ed84ea478b741aa833133a0309799bc7"
+        }
+      ]
+    },
+    {
+      "id": "mantine-hooks-adapted-types",
+      "type": "adapted-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "mantine-hooks-adapted-types",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Strict assertions cover all 223 published exports and explicit inference/negative consumers. Upstream has no standalone type suite; npm declarations and the authenticated prior native API are the witnesses.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsrx-tsc",
+        "project": "packages/mantine-hooks/typetests/tsconfig.adapted.json"
+      },
+      "files": [
+        {
+          "path": "packages/mantine-hooks/tests/types/published-contract.ts",
+          "role": "test",
+          "sha256": "2807e0bd38d090ab3e5b93923b16c7c717814972d25f349e6f41c711c51f1fbe",
+          "cases": [
+            {
+              "id": "types:mantine-hooks-adapted:public-contract",
+              "testName": "public-contract",
+              "fullName": "Mantine hooks public-contract"
+            }
+          ]
+        },
+        {
+          "path": "packages/mantine-hooks/tests/types/inference.test-d.ts",
+          "role": "test",
+          "sha256": "f379151ebb596f6e6aa8cd6a475ba05a68bd7480a64fb64bde46623fcb83a1fc",
+          "cases": [
+            {
+              "id": "types:mantine-hooks-adapted:inference",
+              "testName": "inference",
+              "fullName": "Mantine hooks inference"
+            }
+          ]
+        },
+        {
+          "path": "packages/mantine-hooks/typetests/tsconfig.adapted.json",
+          "role": "support",
+          "sha256": "e2053df3be0272e57b1288e74a1ad1ba3460c284b3ad896c2d1e501b4dcd4efb"
+        },
+        {
+          "path": "packages/mantine-hooks/audit/compatibility-baseline.json",
+          "role": "support",
+          "sha256": "66bd157a20b4208e46b73e983b8a1fe8ed84ea478b741aa833133a0309799bc7"
+        },
+        {
+          "path": "packages/mantine-hooks/tests/types/consumer.tsx",
+          "role": "support",
+          "sha256": "7f63ff334e22fd6fc473c5b7374527edb2989f93d11d1c9a85028a8d45b3e445"
+        }
+      ]
+    },
+    {
+      "id": "mantine-hooks-browser",
+      "type": "browser",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "mantine-hooks-browser",
+      "notes": "Chromium client and SSR hydration consumers cover unmeasured collapse completion, debounce bursts, current interval callbacks during rapid renders, ref scroll hosts, DOM/focus retention, drag cancellation and unmount cleanup.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/mantine-hooks/audit/browser-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/mantine-hooks/audit/browser-runtime.json",
+          "role": "support",
+          "sha256": "ca9a5610e1385d8e245b3fb8fd3db2cc11dcca0b394665784d3ab5d625b823cb"
+        },
+        {
+          "path": "packages/mantine-hooks/tests/browser/mantine-hooks.browser.test.ts",
+          "role": "support",
+          "sha256": "be6cbda10a85f8b2505cdcdaa5d613addaac7576be61df911ea0e59bbb0af3a3"
+        },
+        {
+          "path": "packages/octane/tests/_hydration-ssr.ts",
+          "role": "support",
+          "sha256": "f6ec7d5cb3ca4786cda227ba6e518e707996b179e4be2bb9c8935ea4ef4cdfeb"
+        },
+        {
+          "path": "packages/mantine-hooks/tests/browser/harness/fixture.tsx",
+          "role": "support",
+          "sha256": "c2604662790ab2787b605ddb3ab51527548bfdb831dc8f14dd4f12c8b9aec968"
+        },
+        {
+          "path": "packages/mantine-hooks/tests/browser/harness/index.html",
+          "role": "support",
+          "sha256": "b36b7b1886963a5117e7b6ebf15a23a3229ab50e06ef940c210c364931bcd486"
+        },
+        {
+          "path": "packages/mantine-hooks/tests/browser/harness/main.tsx",
+          "role": "support",
+          "sha256": "22d1a89bc95c5ed226568b5e8f1a5d613aaba69ae4bec9334926518af62a9acc"
+        }
+      ]
     }
   ],
-  "divergences": []
+  "divergences": [
+    {
+      "id": "mantine-timer-boundary",
+      "caseIds": [
+        "runtime:mantine-hooks-adapted-065",
+        "runtime:mantine-hooks-adapted-066",
+        "runtime:mantine-hooks-adapted-187",
+        "runtime:mantine-hooks-adapted-498",
+        "runtime:mantine-hooks-adapted-501",
+        "runtime:mantine-hooks-adapted-503"
+      ],
+      "upstreamResult": "The React suite counts every global scheduling call as if each belonged to the hook.",
+      "octaneResult": "The native suite identifies the hook timer by its requested delay and returned handle, then verifies its exact cancellation and the same observable callback/state behavior.",
+      "rationale": "Octane uses additional scheduler timers; their global count is not part of Mantine\u2019s hook API. The idle case also explicitly advances the fake clock so its deadline assertion executes.",
+      "classification": "framework-abi",
+      "consumerImpact": "Hook deadlines, callbacks, state updates and cleanup remain compatible; framework scheduling internals differ.",
+      "migrationGuidance": "Observe the timer owned by the hook, its deadline and its callback rather than all global timer activity.",
+      "owner": "@octanejs/mantine-hooks",
+      "reviewCondition": "Review when Mantine changes timer ownership or cleanup guarantees."
+    }
+  ]
 }

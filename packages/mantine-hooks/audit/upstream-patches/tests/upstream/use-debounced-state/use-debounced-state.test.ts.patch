@@ -1,0 +1,41 @@
+diff --git a/tests/upstream/use-debounced-state/use-debounced-state.test.ts b/tests/upstream/use-debounced-state/use-debounced-state.test.ts
+--- a/tests/upstream/use-debounced-state/use-debounced-state.test.ts
++++ b/tests/upstream/use-debounced-state/use-debounced-state.test.ts
+@@ -11,9 +11,15 @@ describe('use-debounced-state', () => {
+   });
+ 
+   let timeoutCallback: () => void;
+-  const setTimeout = vi.spyOn(window, 'setTimeout').mockImplementation(((cb: () => void) => {
+-    timeoutCallback = cb;
+-    return 1;
++  let hookTimerId: number;
++  let nextTimerId = 0;
++  const setTimeout = vi.spyOn(window, 'setTimeout').mockImplementation(((cb: () => void, delay?: number) => {
++    const id = ++nextTimerId;
++    if (delay === 100) {
++      timeoutCallback = cb;
++      hookTimerId = id;
++    }
++    return id;
+   }) as any);
+   const clearTimeout = vi.spyOn(window, 'clearTimeout').mockReturnValue();
+ 
+@@ -49,7 +55,8 @@ describe('use-debounced-state', () => {
+     clearTimeout.mockReset();
+     expect(clearTimeout).toHaveBeenCalledTimes(0);
+     act(() => hook.unmount());
+-    expect(clearTimeout).toHaveBeenCalledTimes(1);
++    // OCTANE DIVERGENCE[mantine-timer-boundary][runtime:mantine-hooks-adapted-065]: native scheduling owns additional timers; observe only the hook timer.
++    expect(clearTimeout.mock.calls.filter(([id]) => id === hookTimerId)).toHaveLength(1);
+   });
+ 
+   it('should debounce value with leading=true', () => {
+@@ -71,6 +78,7 @@ describe('use-debounced-state', () => {
+     clearTimeout.mockReset();
+     expect(clearTimeout).toHaveBeenCalledTimes(0);
+     act(() => hook.unmount());
+-    expect(clearTimeout).toHaveBeenCalledTimes(1);
++    // OCTANE DIVERGENCE[mantine-timer-boundary][runtime:mantine-hooks-adapted-066]: native scheduling owns additional timers; observe only the hook timer.
++    expect(clearTimeout.mock.calls.filter(([id]) => id === hookTimerId)).toHaveLength(1);
+   });
+ });

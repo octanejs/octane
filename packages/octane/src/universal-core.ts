@@ -12,6 +12,7 @@
  * validate the protocol.
  */
 import { hasOwnProp } from './has-own.js';
+import { resolveHookPath } from './hook-slot-cache.js';
 import {
 	__profileBeginRender,
 	__profileComponentSource,
@@ -4956,16 +4957,7 @@ function resolveHookSlot(slot: unknown): unknown {
 	const own = slot ?? `implicit:${owner.implicitSlot++}`;
 	const depth = UNIVERSAL_SLOT_STACK.length;
 	if (depth === 0) return own;
-	let key = '@octane:universal-hook:';
-	for (let index = 0; index <= depth; index++) {
-		const part = index === depth ? own : UNIVERSAL_SLOT_STACK[index];
-		const value =
-			typeof part === 'symbol'
-				? `s${part.description?.length ?? 0}:${part.description ?? ''}`
-				: `v${String(part).length}:${String(part)}`;
-		key += value;
-	}
-	return Symbol.for(key);
+	return resolveHookPath(UNIVERSAL_SLOT_STACK, own, true);
 }
 
 export function hookSlots(count: number): number {
@@ -6100,16 +6092,18 @@ export function useSyncExternalStore<T>(
 export function useSyncExternalStore<T>(
 	subscribe: (onStoreChange: () => void) => () => void,
 	getSnapshot: () => T,
-	...serverSnapshotAndSlot: unknown[]
+	serverSnapshotOrSlot: unknown = undefined,
+	lastSlot?: unknown,
 ): T {
 	let slot: unknown;
-	if (serverSnapshotAndSlot.length === 1) {
+	const count = arguments.length;
+	if (count === 3) {
 		// An authored two-argument call receives only the compiler slot here. A
 		// direct, uncompiled three-argument call may instead provide a server
 		// snapshot function and relies on the implicit slot fallback.
-		slot = typeof serverSnapshotAndSlot[0] === 'function' ? undefined : serverSnapshotAndSlot[0];
-	} else if (serverSnapshotAndSlot.length > 1) {
-		slot = serverSnapshotAndSlot[serverSnapshotAndSlot.length - 1];
+		slot = typeof serverSnapshotOrSlot === 'function' ? undefined : serverSnapshotOrSlot;
+	} else if (count > 3) {
+		slot = count > 4 ? arguments[count - 1] : lastSlot;
 	}
 	const base = resolveHookSlot(slot);
 	return withSlot(base, () => {
@@ -6146,10 +6140,16 @@ export function useSyncExternalStore<T>(
 	});
 }
 
-export function useDeferredValue<T>(value: T, ...initialValueAndSlot: unknown[]): T {
-	const slot = initialValueAndSlot[initialValueAndSlot.length - 1];
-	const hasInitialValue = initialValueAndSlot.length >= 2;
-	const initialValue = initialValueAndSlot[0] as T;
+export function useDeferredValue<T>(value: T, ...initialValueAndSlot: unknown[]): T;
+export function useDeferredValue<T>(
+	value: T,
+	initialValueOrSlot: unknown = undefined,
+	lastSlot?: unknown,
+): T {
+	const count = arguments.length;
+	const slot = count > 3 ? arguments[count - 1] : count === 3 ? lastSlot : initialValueOrSlot;
+	const hasInitialValue = count >= 3;
+	const initialValue = initialValueOrSlot as T;
 	const base = resolveHookSlot(slot);
 	return withSlot(base, () => {
 		const owner = currentDraftOwner();

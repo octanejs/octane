@@ -1,0 +1,137 @@
+{
+  "schemaVersion": 1,
+  "project": "react-error-boundary-adapted",
+  "roots": ["packages/react-error-boundary/tests/upstream"],
+  "files": [
+    "packages/react-error-boundary/tests/upstream/components/ErrorBoundary.test.tsx",
+    "packages/react-error-boundary/tests/upstream/hooks/useErrorBoundary.test.tsx",
+    "packages/react-error-boundary/tests/upstream/utils/withErrorBoundary.test.tsx"
+  ],
+  "tests": [
+    {
+      "id": "runtime:error-boundary-adapted-000",
+      "file": "packages/react-error-boundary/tests/upstream/components/ErrorBoundary.test.tsx",
+      "fullName": "ErrorBoundary should render children"
+    },
+    {
+      "id": "runtime:error-boundary-adapted-001",
+      "file": "packages/react-error-boundary/tests/upstream/components/ErrorBoundary.test.tsx",
+      "fullName": "ErrorBoundary fallback props should call \"onError\" prop if one is provided"
+    },
+    {
+      "id": "runtime:error-boundary-adapted-002",
+      "file": "packages/react-error-boundary/tests/upstream/components/ErrorBoundary.test.tsx",
+      "fullName": "ErrorBoundary fallback props should call \"onReset\" when boundary reset via imperative API"
+    },
+    {
+      "id": "runtime:error-boundary-adapted-003",
+      "file": "packages/react-error-boundary/tests/upstream/components/ErrorBoundary.test.tsx",
+      "fullName": "ErrorBoundary fallback props should call \"onReset\" when boundary reset via \"resetKeys\""
+    },
+    {
+      "id": "runtime:error-boundary-adapted-004",
+      "file": "packages/react-error-boundary/tests/upstream/components/ErrorBoundary.test.tsx",
+      "fullName": "ErrorBoundary \"fallback\" element should render fallback in the event of an error"
+    },
+    {
+      "id": "runtime:error-boundary-adapted-005",
+      "file": "packages/react-error-boundary/tests/upstream/components/ErrorBoundary.test.tsx",
+      "fullName": "ErrorBoundary \"fallback\" element should re-render children if boundary is reset reset keys"
+    },
+    {
+      "id": "runtime:error-boundary-adapted-006",
+      "file": "packages/react-error-boundary/tests/upstream/components/ErrorBoundary.test.tsx",
+      "fullName": "ErrorBoundary \"fallback\" element should catch errors thrown again after reset"
+    },
+    {
+      "id": "runtime:error-boundary-adapted-007",
+      "file": "packages/react-error-boundary/tests/upstream/components/ErrorBoundary.test.tsx",
+      "fullName": "ErrorBoundary \"fallback\" element should render a null fallback if specified"
+    },
+    {
+      "id": "runtime:error-boundary-adapted-008",
+      "file": "packages/react-error-boundary/tests/upstream/components/ErrorBoundary.test.tsx",
+      "fullName": "ErrorBoundary \"FallbackComponent\" should render fallback in the event of an error"
+    },
+    {
+      "id": "runtime:error-boundary-adapted-009",
+      "file": "packages/react-error-boundary/tests/upstream/components/ErrorBoundary.test.tsx",
+      "fullName": "ErrorBoundary \"FallbackComponent\" should re-render children if boundary is reset via prop"
+    },
+    {
+      "id": "runtime:error-boundary-adapted-010",
+      "file": "packages/react-error-boundary/tests/upstream/components/ErrorBoundary.test.tsx",
+      "fullName": "ErrorBoundary \"FallbackComponent\" should re-render children if boundary is reset reset keys"
+    },
+    {
+      "id": "runtime:error-boundary-adapted-011",
+      "file": "packages/react-error-boundary/tests/upstream/components/ErrorBoundary.test.tsx",
+      "fullName": "ErrorBoundary \"fallbackRender\" render prop should render fallback in the event of an error"
+    },
+    {
+      "id": "runtime:error-boundary-adapted-012",
+      "file": "packages/react-error-boundary/tests/upstream/components/ErrorBoundary.test.tsx",
+      "fullName": "ErrorBoundary \"fallbackRender\" render prop should re-render children if boundary is reset via prop"
+    },
+    {
+      "id": "runtime:error-boundary-adapted-013",
+      "file": "packages/react-error-boundary/tests/upstream/components/ErrorBoundary.test.tsx",
+      "fullName": "ErrorBoundary \"fallbackRender\" render prop should re-render children if boundary is reset reset keys"
+    },
+    {
+      "id": "runtime:error-boundary-adapted-014",
+      "file": "packages/react-error-boundary/tests/upstream/components/ErrorBoundary.test.tsx",
+      "fullName": "ErrorBoundary thrown values should support thrown strings"
+    },
+    {
+      "id": "runtime:error-boundary-adapted-015",
+      "file": "packages/react-error-boundary/tests/upstream/components/ErrorBoundary.test.tsx",
+      "fullName": "ErrorBoundary thrown values should support thrown null or undefined values"
+    },
+    {
+      "id": "runtime:error-boundary-adapted-016",
+      "file": "packages/react-error-boundary/tests/upstream/components/ErrorBoundary.test.tsx",
+      "fullName": "ErrorBoundary thrown values should re-render children if a boundary that caught a thrown null is reset via prop"
+    },
+    {
+      "id": "runtime:error-boundary-adapted-017",
+      "file": "packages/react-error-boundary/tests/upstream/components/ErrorBoundary.test.tsx",
+      "fullName": "ErrorBoundary thrown values should re-render children if a boundary that caught a thrown null is reset reset keys"
+    },
+    {
+      "id": "runtime:error-boundary-adapted-018",
+      "file": "packages/react-error-boundary/tests/upstream/hooks/useErrorBoundary.test.tsx",
+      "fullName": "useErrorBoundary should activate and deactivate the nearest error boundary"
+    },
+    {
+      "id": "runtime:error-boundary-adapted-019",
+      "file": "packages/react-error-boundary/tests/upstream/hooks/useErrorBoundary.test.tsx",
+      "fullName": "useErrorBoundary should expose the current error to a fallback component"
+    },
+    {
+      "id": "runtime:error-boundary-adapted-020",
+      "file": "packages/react-error-boundary/tests/upstream/utils/withErrorBoundary.test.tsx",
+      "fullName": "withErrorBoundary should render children within the created HOC"
+    },
+    {
+      "id": "runtime:error-boundary-adapted-021",
+      "file": "packages/react-error-boundary/tests/upstream/utils/withErrorBoundary.test.tsx",
+      "fullName": "withErrorBoundary should catch errors with the created HOC"
+    },
+    {
+      "id": "runtime:error-boundary-adapted-022",
+      "file": "packages/react-error-boundary/tests/upstream/utils/withErrorBoundary.test.tsx",
+      "fullName": "withErrorBoundary should forward refs"
+    },
+    {
+      "id": "runtime:error-boundary-adapted-023",
+      "file": "packages/react-error-boundary/tests/upstream/utils/withErrorBoundary.test.tsx",
+      "fullName": "withErrorBoundary should forward refs to a function component that takes a ref prop"
+    },
+    {
+      "id": "runtime:error-boundary-adapted-024",
+      "file": "packages/react-error-boundary/tests/upstream/utils/withErrorBoundary.test.tsx",
+      "fullName": "withErrorBoundary should forward refs to a function using forwardRef"
+    }
+  ]
+}

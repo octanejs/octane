@@ -1,6 +1,6 @@
 /**
  * Copyright (c) Meta Platforms, Inc. and affiliates.
- * Adapted for Octane from react-is 19.2.7 under the MIT license.
+ * Adapted for Octane from react-is 19.3.0 under the MIT license.
  * See LICENSE.upstream and UPSTREAM.md.
  */
 import { Activity, StrictMode as OctaneStrictMode } from 'octane';

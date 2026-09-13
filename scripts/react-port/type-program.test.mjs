@@ -52,3 +52,32 @@ const invalid: Props = { text: 123 };
 		rmSync(root, { recursive: true, force: true });
 	}
 });
+
+test('loads a TSRX public witness as a program root without a consumer import', () => {
+	const root = mkdtempSync(path.join(tmpdir(), 'react-port-root-types-'));
+	try {
+		const entry = path.join(root, 'server.tsrx');
+		writeFileSync(
+			entry,
+			'export function Label({ text }: { text: string }) @{ <span>{text as string}</span> }',
+		);
+		const program = createTypeEvidenceProgram([entry], {
+			strict: true,
+			noEmit: true,
+			jsx: ts.JsxEmit.Preserve,
+			module: ts.ModuleKind.ESNext,
+			moduleResolution: ts.ModuleResolutionKind.Bundler,
+		});
+		const source = program.getSourceFile(entry);
+		assert.ok(source, 'the authenticated TSRX witness must be loaded');
+		const checker = program.getTypeChecker();
+		const module = checker.getSymbolAtLocation(source);
+		assert.ok(module, 'the witness must expose its real module symbol');
+		const label = checker.getExportsOfModule(module).find((symbol) => symbol.name === 'Label');
+		const signature = checker.getTypeOfSymbolAtLocation(label, source).getCallSignatures()[0];
+		const props = checker.getTypeOfSymbolAtLocation(signature.parameters[0], source);
+		assert.equal(checker.typeToString(checker.getTypeOfPropertyOfType(props, 'text')), 'string');
+	} finally {
+		rmSync(root, { recursive: true, force: true });
+	}
+});

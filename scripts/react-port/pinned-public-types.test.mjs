@@ -178,7 +178,10 @@ test('matches an inlined generic public contract', () =>
 		null,
 	));
 
-function pinnedFixture(run, { adjacent = false, opaque = false, hiddenManifest = false } = {}) {
+function pinnedFixture(
+	run,
+	{ adjacent = false, opaque = false, hiddenManifest = false, legacy = false } = {},
+) {
 	const workspaceRoot = realpathSync(mkdtempSync(path.join(tmpdir(), 'pinned-public-artifact-')));
 	const directory = path.join(workspaceRoot, 'packages/widget');
 	mkdirSync(directory, { recursive: true });
@@ -186,12 +189,16 @@ function pinnedFixture(run, { adjacent = false, opaque = false, hiddenManifest =
 		const published = JSON.stringify({
 			name: 'mit-widget',
 			version: '1.0.0',
-			exports: {
-				'.': adjacent
-					? { import: './index.mjs' }
-					: { import: { types: './index.d.mts', default: './index.mjs' } },
-				...(hiddenManifest ? {} : { './package.json': './package.json' }),
-			},
+			...(legacy
+				? { types: 'index.d.mts' }
+				: {
+						exports: {
+							'.': adjacent
+								? { import: './index.mjs' }
+								: { import: { types: './index.d.mts', default: './index.mjs' } },
+							...(hiddenManifest ? {} : { './package.json': './package.json' }),
+						},
+					}),
 		});
 		const declaration = opaque
 			? 'export declare function widget(value: unknown): unknown;'
@@ -633,4 +640,26 @@ test('checks component props while recognizing native compiler arguments', () =>
 			upstream,
 		),
 	);
+});
+
+test('resolves a legacy types entry only from authenticated npm declarations', () =>
+	pinnedFixture(
+		({ directory, node, put }) => {
+			assert.equal(
+				pinnedPublicEntries(directory, node).get('@octanejs/widget'),
+				path.join(directory, 'node_modules/mit-widget/index.d.mts'),
+			);
+			put('node_modules/mit-widget/index.d.mts', 'export declare const unrelated: any;');
+			assert.throws(() => pinnedPublicEntries(directory, node), /differs from pinned npm bytes/);
+		},
+		{ legacy: true },
+	));
+
+test('pristine declarations do not import native compatibility entrypoints', () => {
+	pinnedFixture(({ directory, node, put }) => {
+		put('audit/compatibility-baseline.json', JSON.stringify({ binding: node.binding }));
+		assert.throws(() => pinnedPublicEntries(directory, node), /Compatibility evidence requires/);
+		const entries = pinnedPublicEntries(directory, { ...node, binding: node.identity.packageName });
+		assert.deepEqual([...entries.keys()], [node.identity.packageName]);
+	});
 });

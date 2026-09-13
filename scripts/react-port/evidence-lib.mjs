@@ -522,7 +522,10 @@ export function inspectBindingPackage(
 	},
 ) {
 	const issues = [];
-	const requiredFiles = ['package.json', 'README.md', 'status.json', 'UPSTREAM.md', 'LICENSE'];
+	const licenseName =
+		['LICENSE', 'LICENSE.md'].find((name) => existsSync(path.join(packageDirectory, name))) ??
+		'LICENSE';
+	const requiredFiles = ['package.json', 'README.md', 'status.json', 'UPSTREAM.md', licenseName];
 	for (const relativePath of requiredFiles) {
 		if (!existsSync(path.join(packageDirectory, relativePath)))
 			issues.push(`Missing ${relativePath}`);
@@ -630,9 +633,9 @@ export function inspectBindingPackage(
 		if (!/^## Source boundary$/m.test(upstream))
 			issues.push('UPSTREAM.md has no Source boundary section');
 	}
-	const licensePath = path.join(packageDirectory, 'LICENSE');
+	const licensePath = path.join(packageDirectory, licenseName);
 	if (existsSync(licensePath) && !isRecognizableMitText(readFileSync(licensePath, 'utf8'))) {
-		issues.push('LICENSE is not recognizable MIT text');
+		issues.push(`${licenseName} is not recognizable MIT text`);
 	}
 	const authoredSource = sourceFiles(path.join(packageDirectory, 'src'));
 	if (authoredSource.length === 0) issues.push('package has no source files');
@@ -727,28 +730,48 @@ function staticModuleSpecifiers(filePath) {
 	);
 	const specifiers = [];
 	function visit(node) {
-		if (
-			ts.isImportDeclaration(node) &&
-			node.moduleSpecifier &&
-			ts.isStringLiteralLike(node.moduleSpecifier) &&
-			!node.importClause?.isTypeOnly
-		) {
-			specifiers.push(node.moduleSpecifier.text);
+		if (ts.isImportDeclaration(node) && ts.isStringLiteralLike(node.moduleSpecifier)) {
+			const clause = node.importClause;
+			const named = clause?.namedBindings;
+			const typeOnly = Boolean(
+				clause?.isTypeOnly ||
+				(!clause?.name &&
+					named &&
+					ts.isNamedImports(named) &&
+					named.elements.length > 0 &&
+					named.elements.every((entry) => entry.isTypeOnly)),
+			);
+			specifiers.push({ specifier: node.moduleSpecifier.text, typeOnly });
 		} else if (
 			ts.isExportDeclaration(node) &&
 			node.moduleSpecifier &&
-			ts.isStringLiteralLike(node.moduleSpecifier) &&
-			!node.isTypeOnly
+			ts.isStringLiteralLike(node.moduleSpecifier)
 		) {
-			specifiers.push(node.moduleSpecifier.text);
+			const named = node.exportClause;
+			const typeOnly = Boolean(
+				node.isTypeOnly ||
+				(named &&
+					ts.isNamedExports(named) &&
+					named.elements.length > 0 &&
+					named.elements.every((entry) => entry.isTypeOnly)),
+			);
+			specifiers.push({ specifier: node.moduleSpecifier.text, typeOnly });
 		} else if (
 			ts.isImportEqualsDeclaration(node) &&
 			ts.isExternalModuleReference(node.moduleReference) &&
 			node.moduleReference.expression &&
-			ts.isStringLiteralLike(node.moduleReference.expression) &&
-			!node.isTypeOnly
+			ts.isStringLiteralLike(node.moduleReference.expression)
 		) {
-			specifiers.push(node.moduleReference.expression.text);
+			specifiers.push({
+				specifier: node.moduleReference.expression.text,
+				typeOnly: node.isTypeOnly,
+			});
+		} else if (
+			ts.isImportTypeNode(node) &&
+			ts.isLiteralTypeNode(node.argument) &&
+			ts.isStringLiteralLike(node.argument.literal)
+		) {
+			specifiers.push({ specifier: node.argument.literal.text, typeOnly: true });
 		} else if (
 			ts.isCallExpression(node) &&
 			node.arguments.length === 1 &&
@@ -756,7 +779,7 @@ function staticModuleSpecifiers(filePath) {
 			(node.expression.kind === ts.SyntaxKind.ImportKeyword ||
 				(ts.isIdentifier(node.expression) && node.expression.text === 'require'))
 		) {
-			specifiers.push(node.arguments[0].text);
+			specifiers.push({ specifier: node.arguments[0].text, typeOnly: false });
 		}
 		ts.forEachChild(node, visit);
 	}
@@ -766,8 +789,19 @@ function staticModuleSpecifiers(filePath) {
 
 function resolveRelativeSource(fromFile, specifier) {
 	const base = path.resolve(path.dirname(fromFile), specifier);
+	// TypeScript source commonly uses the eventual JavaScript extension in
+	// relative imports. Follow those source files when no emitted file exists.
+	const extension = path.extname(base);
+	const substitutions =
+		{
+			'.js': ['.ts', '.tsx'],
+			'.jsx': ['.tsx'],
+			'.mjs': ['.mts'],
+			'.cjs': ['.cts'],
+		}[extension] ?? [];
 	const candidates = [
 		base,
+		...substitutions.map((replacement) => `${base.slice(0, -extension.length)}${replacement}`),
 		...SHIPPED_SOURCE_EXTENSIONS.map((extension) => `${base}${extension}`),
 		...SHIPPED_SOURCE_EXTENSIONS.map((extension) => path.join(base, `index${extension}`)),
 	];
@@ -804,18 +838,18 @@ export function inspectShippedSources(packageDirectory) {
 			continue;
 		}
 		reachableFiles.add(resolvedFile);
-		for (const specifier of staticModuleSpecifiers(resolvedFile)) {
+		for (const { specifier, typeOnly } of staticModuleSpecifiers(resolvedFile)) {
 			if (specifier.startsWith('#') && manifest.imports?.[specifier] !== undefined) {
 				// Package imports resolve from the package root. Audit all export
 				// conditions, including browser stubs and server prehydration scripts.
 				for (const target of collectExportTargets(manifest.imports[specifier])) {
 					if (target.startsWith('./')) queue.push(path.resolve(resolvedPackageDirectory, target));
-					else runtimeDependencies.add(packageRoot(target));
+					else if (!typeOnly) runtimeDependencies.add(packageRoot(target));
 				}
 			} else if (specifier.startsWith('.') || specifier.startsWith('/')) {
 				const dependencyFile = resolveRelativeSource(resolvedFile, specifier);
 				if (dependencyFile) queue.push(dependencyFile);
-			} else {
+			} else if (!typeOnly) {
 				runtimeDependencies.add(packageRoot(specifier));
 			}
 		}

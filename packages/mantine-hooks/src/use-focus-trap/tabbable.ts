@@ -1,8 +1,10 @@
+declare const process: { env: { NODE_ENV?: string } };
+
 const TABBABLE_NODES = /input|select|textarea|button|object/;
 export const FOCUS_SELECTOR = 'a, input, select, textarea, button, object, [tabindex]';
 
 function hidden(element: HTMLElement) {
-	if (process.env.NODE_ENV === 'test') {
+	if (typeof process !== 'undefined' && process.env.NODE_ENV === 'test') {
 		return false;
 	}
 

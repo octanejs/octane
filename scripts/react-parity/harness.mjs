@@ -77,6 +77,12 @@ if (action === 'validate') {
 		}
 		throw new Error(`Unknown lane: ${laneId}`);
 	}
+	// The package evidence plan treats this harness as the owner of its nested
+	// runners. Their results are checked below against the complete inventories;
+	// they must not also count as direct package test-script invocations.
+	if (process.env.REACT_PORT_TEST_REPORT_DIR) {
+		process.env.REACT_PORT_TEST_RUNNER_ACTIVE ??= 'react-parity';
+	}
 	const pnpmVersion = execFileSync('pnpm', ['--version'], { encoding: 'utf8' });
 	for (const lane of selected) {
 		const laneStartedAt = Date.now();

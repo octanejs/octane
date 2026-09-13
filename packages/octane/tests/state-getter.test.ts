@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { compile } from 'octane/compiler';
 import * as ServerRuntime from 'octane/server';
-import { mount } from './_helpers';
+import { act, mount } from './_helpers';
 import {
+	ConditionalGetters,
 	ReducerGetter,
 	RenderPhaseNullableReducerGetter,
 	StateGetter,
@@ -19,6 +20,40 @@ function evalServer(source: string, filename: string): Record<string, any> {
 }
 
 describe('state getter runtime semantics', () => {
+	it('keeps retained getters associated with their custom-hook call site across conditional renders', () => {
+		let current: any;
+		const bind = (value: any) => {
+			current = value;
+		};
+		const r = mount(ConditionalGetters, { visible: true, step: 1, bind });
+		const first = current.first;
+		const second = current.second;
+		act(() => {
+			first.state[1]((value: number) => value + 3);
+			second.state[1]((value: number) => value + 7);
+			first.reducer[1](2);
+			second.reducer[1](4);
+		});
+		expect(r.container.textContent).toBe('13:12|27:24');
+		expect([first.state[2](), first.reducer[2](), second.state[2](), second.reducer[2]()]).toEqual([
+			13, 12, 27, 24,
+		]);
+		r.update(ConditionalGetters, { visible: false, step: 3, bind });
+		act(() => {
+			second.reducer[1](2);
+			second.state[1](31);
+		});
+		expect(r.container.textContent).toBe('hidden|31:30');
+		expect([second.state[2](), second.reducer[2]()]).toEqual([31, 30]);
+		r.update(ConditionalGetters, { visible: true, step: 4, bind });
+		act(() => first.reducer[1](3));
+		expect(r.container.textContent).toBe('13:24|31:30');
+		expect([first.state[2](), first.reducer[2](), second.state[2](), second.reducer[2]()]).toEqual([
+			13, 24, 31, 30,
+		]);
+		r.unmount();
+	});
+
 	it('reads sequential useState updates immediately and stays stable', () => {
 		const values: number[] = [];
 		const getters: Array<() => number> = [];

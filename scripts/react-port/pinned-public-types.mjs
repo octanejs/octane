@@ -163,7 +163,7 @@ export function pinnedPublicEntries(packageDirectory, node, { baseline } = {}) {
 		};
 		visit(source);
 	}
-	for (const [subpath, target] of Object.entries(manifest.exports)) {
+	for (const [subpath, target] of Object.entries(manifest.exports ?? { '.': null })) {
 		if (subpath === './package.json') continue;
 		let file = target?.import?.types ?? target?.types ?? target?.default?.types;
 		if (typeof file !== 'string') {
@@ -188,7 +188,13 @@ export function pinnedPublicEntries(packageDirectory, node, { baseline } = {}) {
 			throw new Error(`Compatibility witness is absent from the pinned declarations: ${file}`);
 		entries.set(specifier, path.resolve(installedRoot, file));
 	}
-	for (const [specifier, file] of readCompatibilityBaseline(packageDirectory, node, baseline)) {
+	// Pristine type programs inspect only the upstream package. Native-only
+	// entrypoints are authenticated separately by the binding's consumer gates.
+	const compatibilityEntries =
+		node.binding === node.identity.packageName
+			? new Map()
+			: readCompatibilityBaseline(packageDirectory, node, baseline);
+	for (const [specifier, file] of compatibilityEntries) {
 		if (entries.has(specifier)) entries.set(specifier + '#prior-binding', file);
 		else entries.set(specifier, file);
 	}
