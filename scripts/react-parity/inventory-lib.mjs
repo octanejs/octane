@@ -323,6 +323,12 @@ function splitElements(tokens, start, end) {
 }
 
 function staticValue(tokens, start, end, pairs) {
+	if (
+		end - start === 2 &&
+		['-', '+'].includes(tokens[start]?.value) &&
+		tokens[start + 1]?.type === 'number'
+	)
+		return Number(`${tokens[start].value}${tokens[start + 1].value.replaceAll('_', '')}`);
 	if (end - start === 1) {
 		const token = tokens[start];
 		const literal = decodeLiteral(token);
@@ -347,7 +353,9 @@ function staticArrayValues(tokens, start, end, pairs) {
 	const values = splitElements(tokens, start + 1, end - 1).map(([itemStart, itemEnd]) =>
 		staticValue(tokens, itemStart, itemEnd, pairs),
 	);
-	return values.some((value) => value === UNKNOWN_STATIC_VALUE) ? null : values;
+	const unresolved = (value) =>
+		value === UNKNOWN_STATIC_VALUE || (Array.isArray(value) && value.some(unresolved));
+	return values.some(unresolved) ? null : values;
 }
 
 function formatEachValue(value, specifier) {
@@ -920,7 +928,9 @@ export function extractTestCases(
 							? 'The test is registered inside a loop with an unknown expansion count.'
 							: estimatedRegistrations === null
 								? 'The upstream parameter matrix has a dynamic row count.'
-								: null,
+								: parsed.each && !parsed.each.rows
+									? 'The upstream parameter values cannot be expanded statically.'
+									: null,
 			});
 	}
 	for (let index = 0; index + 3 < tokens.length; index++) {

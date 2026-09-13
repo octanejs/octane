@@ -154,7 +154,8 @@ export function configuredTestSelectors(source, fileName, { runner, scope = '' }
 			throw new Error(`Cannot resolve upstream test configuration base ${fileName}`);
 		selectors.push({ ...value, runner, root: root ?? '', scope, fileName });
 	}
-	for (const expression of exported) collect(resolve(expression), '');
+	if (fileName.endsWith('.json')) collect(JSON.parse(source), '');
+	else for (const expression of exported) collect(resolve(expression), '');
 	return selectors;
 }
 

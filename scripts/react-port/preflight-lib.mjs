@@ -49,7 +49,7 @@ const MAX_SOURCE_FILES = 4_000;
 const MAX_SOURCE_BYTES = 64 * 1024 * 1024;
 const TEST_SOURCE_PATTERN = /\.(?:[cm]?[jt]sx?|coffee)$/i;
 const TEST_CONFIG_PATTERN =
-	/^(?:(?:vitest|vite|jest|karma|mocha|ava|webpack)\.config|test(?:s)?\.config)\.[cm]?[jt]s$/i;
+	/^(?:(?:vitest|vite|jest|playwright|karma|mocha|ava|webpack)\.config|test(?:s)?\.config)\.[cm]?[jt]s$/i;
 const MAX_UPSTREAM_TEST_FILES = 500;
 const MAX_UPSTREAM_TEST_BYTES = 16 * 1024 * 1024;
 
@@ -1692,7 +1692,14 @@ async function resolveGitHubSource(repository, ref, options) {
 			type: entry.type === 'tree' ? 'directory' : 'file',
 			size: entry.size ?? 0,
 		}));
-	validateArchiveEntries(sourceEntries, { maxFiles: 50_000 });
+	// A recursive Git tree is bounded metadata, not a downloaded archive. Large
+	// unrelated assets are never fetched; fetchGitHubBlob and the test inventory
+	// enforce the byte limits on the evidence we actually read.
+	validateArchiveEntries(sourceEntries, {
+		maxFiles: 50_000,
+		maxFileBytes: Number.MAX_SAFE_INTEGER,
+		maxTotalBytes: Number.MAX_SAFE_INTEGER,
+	});
 
 	let manifestPath = repository.subdirectory
 		? `${repository.subdirectory}/package.json`

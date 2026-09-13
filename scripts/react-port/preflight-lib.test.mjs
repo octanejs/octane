@@ -320,7 +320,7 @@ function makeTar(files) {
 	return makeTarEntries(Object.entries(files).map(([name, value]) => ({ name, value })));
 }
 
-function packageRootResolverFixture(files, repositoryDirectory) {
+function packageRootResolverFixture(files, repositoryDirectory, manifestOverrides = {}) {
 	const commit = '1'.repeat(40);
 	const tree = '2'.repeat(40);
 	const manifest = {
@@ -334,6 +334,7 @@ function packageRootResolverFixture(files, repositoryDirectory) {
 			...(repositoryDirectory ? { directory: repositoryDirectory } : {}),
 		},
 		scripts: { test: 'vitest run' },
+		...manifestOverrides,
 	};
 	const tarball = gzipSync(
 		makeTar({ 'package/package.json': JSON.stringify(manifest), 'package/LICENSE': MIT_TEXT }),
@@ -383,6 +384,53 @@ function packageRootResolverFixture(files, repositoryDirectory) {
 		throw new Error(`Unexpected fixture request ${url}`);
 	};
 }
+
+test('discovers a root Playwright configuration even when npm invokes a wrapper script', async () => {
+	const input = 'react-root-discovery@1.0.0';
+	const fetchImpl = packageRootResolverFixture(
+		(manifest) => ({
+			'package.json': manifest,
+			LICENSE: MIT_TEXT,
+			'playwright.config.ts': "export default { testDir: './browser' };",
+			'browser/widget.spec.ts': "test('renders', () => {});",
+			'browser/helpers.ts': 'export const fixture = true;',
+			'outside/unrelated.spec.ts': "test('not selected', () => {});",
+		}),
+		null,
+		{ scripts: { test: './run-tests.sh' } },
+	);
+	const result = await resolveRemoteInput(parseInput(input), input, { fetchImpl });
+	assert.deepEqual(
+		result.upstreamTestInventory.map(({ path }) => path),
+		['browser/widget.spec.ts'],
+	);
+});
+
+test('large unrelated Git blobs do not consume the downloaded artifact byte budget', async () => {
+	const input = 'react-root-discovery@1.0.0';
+	const fetchFixture = packageRootResolverFixture((manifest) => ({
+		'package.json': manifest,
+		LICENSE: MIT_TEXT,
+		'tests/widget.test.ts': "test('renders', () => {});",
+	}));
+	const fetchImpl = async (url, options) => {
+		const response = await fetchFixture(url, options);
+		if (!String(url).includes('/git/trees/')) return response;
+		const tree = await response.json();
+		tree.tree.push({
+			path: 'docs/demo-video.mp4',
+			type: 'blob',
+			mode: '100644',
+			size: 512 * 1024 * 1024,
+			sha: '3'.repeat(40),
+			url: 'https://api.github.com/never-download-this-blob',
+		});
+		return Response.json(tree);
+	};
+	const result = await resolveRemoteInput(parseInput(input), input, { fetchImpl });
+	assert.equal(result.status, 'licensed');
+	assert.equal(result.upstreamTestInventory.length, 1);
+});
 
 test('resolves an omitted npm directory from the immutable package name and scopes its tests', async () => {
 	const input = 'react-root-discovery@1.0.0';

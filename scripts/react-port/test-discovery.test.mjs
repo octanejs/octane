@@ -11,6 +11,38 @@ function selected(source, files, options = { runner: 'jest' }) {
 	);
 }
 
+test('reads JSON Jest selectors and preserves both client and server projects', () => {
+	const selectors = [
+		configuredTestSelectors(
+			JSON.stringify({
+				rootDir: 'src',
+				testMatch: ['**/*.test.(js|ts)?(x)'],
+				testPathIgnorePatterns: ['ssr.test.tsx'],
+			}),
+			'jest.config.json',
+			{ runner: 'jest' },
+		),
+		configuredTestSelectors(
+			JSON.stringify({ rootDir: 'src', testMatch: ['**/*ssr.test.(js|ts)?(x)'] }),
+			'jest.config.ssr.json',
+			{ runner: 'jest' },
+		),
+	].flat();
+	assert.deepEqual(
+		[
+			'src/__tests__/animation.test.tsx',
+			'src/__tests__/ssr.test.tsx',
+			'src/__tests__/helpers.ts',
+			'other/outside.test.ts',
+		].filter((file) =>
+			selectors.some((selector) =>
+				selectedByTestConfiguration(file, selector, conventionalTestPath),
+			),
+		),
+		['src/__tests__/animation.test.tsx', 'src/__tests__/ssr.test.tsx'],
+	);
+});
+
 test('Playwright projects inherit root selectors and preserve project overrides', () => {
 	assert.deepEqual(
 		selected(
