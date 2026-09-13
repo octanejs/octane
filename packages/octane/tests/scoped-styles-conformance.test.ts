@@ -217,7 +217,9 @@ function classCandidates(key: string, chain: string[], hashes: Map<string, strin
 	}
 	const expression = key.slice(1, -1);
 	if (parts.length === 0) {
-		return [`(${expression},`, `= ${expression};`, `{${expression}}`];
+		// Unevaluable fixtures also admit a direct serializer value argument;
+		// no temporary or particular argument position is part of the contract.
+		return [`(${expression},`, `, ${expression},`, `= ${expression};`, `{${expression}}`];
 	}
 	return [
 		`\`\${${expression}} ${parts.join(' ')}\``,

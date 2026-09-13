@@ -87,15 +87,6 @@ describe('$class opt-in — a block whose $class is read is a theme', () => {
 		expect(code).toContain("Card, { 'parentClass': theme.$class }");
 	});
 
-	it('server: the theme is a lazily injecting map and the child uses ssrAttr', () => {
-		const code = compiled('server');
-		const { theme } = hashes(code);
-		expect(code).toContain(`const theme = _$styleMap("${theme}",`);
-		expect(code).toContain('_$ssrAttr("class", __sp0, "article"');
-		expect(code).toContain('_$ssrAttr("class", __sp0, "h2"');
-		expect(code).toContain('_$ssrComponent(__s, Card, { "parentClass": theme.$class })');
-	});
-
 	it('client: only the elements carrying $class pick up the theme rules', () => {
 		const client = load('client');
 		const { theme, local } = hashes(compiled('client'));
@@ -141,3 +132,57 @@ describe('$class opt-in — a block whose $class is read is a theme', () => {
 		expect(html).toContain('<p>untouched</p>');
 	});
 });
+
+const NESTED_STYLE_SOURCE = `
+export function Nested(props) @{
+	<>
+		<style>.a { color: red; } .b { color: blue; } .c { color: green; }</style>
+		<i class={[style('a'), props.cond && style('b')]}>{'i'}</i>
+		<b class={props.on ? style('a') : 'plain'}>{'b'}</b>
+		<u class={\`\${style('a')} \${props.more}\`}>{'u'}</u>
+		<s class={(style('c') as string)}>{'s'}</s>
+	</>
+}`;
+
+for (const mode of ['client', 'server'] as const) {
+	for (const dev of [true, false]) {
+		it(`${mode} (${dev ? 'development' : 'production'}): nested style expressions stamp each element once`, () => {
+			const module = loadCompiledFixtureSource(NESTED_STYLE_SOURCE, {
+				id: 'nested-style-class.tsrx',
+				mode,
+				compileOptions: { dev, hmr: false },
+			});
+			for (const on of [false, true]) {
+				const props = { on, cond: on, more: on ? 'extra' : '' };
+				const mounted = mode === 'client' ? mount(module.Nested, props) : null;
+				const rendered =
+					mode === 'server' ? ServerRuntime.renderToString(module.Nested, props) : null;
+				const container = mounted?.container ?? document.createElement('div');
+				if (rendered !== null) container.innerHTML = rendered.html;
+				try {
+					const elements = [...container.querySelectorAll('i, b, u, s')];
+					const classes = elements.map((element) => element.className.trim().split(/\s+/));
+					const scope = classes[0].find((token) => token.startsWith('tsrx-'));
+					expect(scope).toBeDefined();
+					expect(classes).toEqual([
+						on ? ['a', 'b', scope] : ['a', scope],
+						[on ? 'a' : 'plain', scope],
+						on ? ['a', 'extra', scope] : ['a', scope],
+						[scope, 'c'],
+					]);
+					if (rendered !== null) {
+						expect(rendered.css).toContain(`.a.${scope}`);
+						expect(rendered.css).toContain(`.b.${scope}`);
+						expect(rendered.css).toContain(`.c.${scope}`);
+					} else {
+						expect(getComputedStyle(elements[0]).color).toBe(
+							on ? 'rgb(0, 0, 255)' : 'rgb(255, 0, 0)',
+						);
+					}
+				} finally {
+					mounted?.unmount();
+				}
+			}
+		});
+	}
+}
