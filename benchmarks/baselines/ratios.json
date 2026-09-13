@@ -1216,16 +1216,16 @@
     "op": "raw",
     "target": "css-modules-server-proven",
     "reference": "css-modules-server-control",
-    "maxRatio": 0.75,
-    "note": "Proven immutable CSS strings remove repeated server class serialization without dropping the stylesheet dependency."
+    "maxRatio": 0.84,
+    "note": "Proven immutable CSS strings retain at least 16% raw savings. Sole-attribute IIFE removal reduced control/proven bytes 4871/3182 to 3771/3123; the improved control denominator invalidated the previous 0.75 ceiling. See compiler-output/server.md for baseline and semantic hashes."
   },
   {
     "suite": "codegen-size",
     "op": "minified",
     "target": "css-modules-server-proven",
     "reference": "css-modules-server-control",
-    "maxRatio": 0.84,
-    "note": "The paired production CSS-module server sentinel must retain a material minified-code reduction."
+    "maxRatio": 0.89,
+    "note": "The paired production CSS-module server sentinel retains at least 11% minified savings. Both arms shrank (2535/1943 to 2199/1919); the improved control denominator invalidated the previous 0.84 ceiling. See compiler-output/server.md."
   },
   {
     "suite": "codegen-size",
@@ -4959,5 +4959,133 @@
     "reference": "custom-path-budget",
     "maxRatio": 480,
     "note": "Actual hook path helpers retain bounded primitive metadata and preserve slot/coercion identity; warm repeated paths avoid registry calls and key assembly. Counts are source operations, not heap allocation or elapsed time."
+  },
+  {
+    "suite": "compiler-output",
+    "op": "active_arrays",
+    "target": "branch-direct",
+    "reference": "branch-direct-work-budget",
+    "maxRatio": 1,
+    "note": "Compiled conditional capture arrays under real root updates, current text and cleanup controls. Required two-arm and shadowed environments retain their work."
+  },
+  {
+    "suite": "compiler-output",
+    "op": "absent_arrays",
+    "target": "branch-direct",
+    "reference": "branch-direct-work-budget",
+    "maxRatio": 0,
+    "note": "Compiled conditional capture arrays under real root updates, current text and cleanup controls. Required two-arm and shadowed environments retain their work."
+  },
+  {
+    "suite": "compiler-output",
+    "op": "active_arrays",
+    "target": "branch-folded",
+    "reference": "branch-folded-work-budget",
+    "maxRatio": 1,
+    "note": "Compiled conditional capture arrays under real root updates, current text and cleanup controls. Required two-arm and shadowed environments retain their work."
+  },
+  {
+    "suite": "compiler-output",
+    "op": "absent_arrays",
+    "target": "branch-folded",
+    "reference": "branch-folded-work-budget",
+    "maxRatio": 0,
+    "note": "Compiled conditional capture arrays under real root updates, current text and cleanup controls. Required two-arm and shadowed environments retain their work."
+  },
+  {
+    "suite": "compiler-output",
+    "op": "active_arrays",
+    "target": "branch-nested",
+    "reference": "branch-nested-work-budget",
+    "maxRatio": 1,
+    "note": "Compiled conditional capture arrays under real root updates, current text and cleanup controls. Required two-arm and shadowed environments retain their work."
+  },
+  {
+    "suite": "compiler-output",
+    "op": "absent_arrays",
+    "target": "branch-nested",
+    "reference": "branch-nested-work-budget",
+    "maxRatio": 0,
+    "note": "Compiled conditional capture arrays under real root updates, current text and cleanup controls. Required two-arm and shadowed environments retain their work."
+  },
+  {
+    "suite": "compiler-output",
+    "op": "active_arrays",
+    "target": "branch-twoArms",
+    "reference": "branch-twoArms-work-budget",
+    "maxRatio": 1,
+    "note": "Compiled conditional capture arrays under real root updates, current text and cleanup controls. Required two-arm and shadowed environments retain their work."
+  },
+  {
+    "suite": "compiler-output",
+    "op": "absent_arrays",
+    "target": "branch-twoArms",
+    "reference": "branch-twoArms-work-budget",
+    "maxRatio": 1,
+    "note": "Compiled conditional capture arrays under real root updates, current text and cleanup controls. Required two-arm and shadowed environments retain their work."
+  },
+  {
+    "suite": "compiler-output",
+    "op": "active_arrays",
+    "target": "branch-shadowed",
+    "reference": "branch-shadowed-work-budget",
+    "maxRatio": 1,
+    "note": "Compiled conditional capture arrays under real root updates, current text and cleanup controls. Required two-arm and shadowed environments retain their work."
+  },
+  {
+    "suite": "compiler-output",
+    "op": "absent_arrays",
+    "target": "branch-shadowed",
+    "reference": "branch-shadowed-work-budget",
+    "maxRatio": 1,
+    "note": "Compiled conditional capture arrays under real root updates, current text and cleanup controls. Required two-arm and shadowed environments retain their work."
+  },
+  {
+    "suite": "compiler-output",
+    "op": "event_slot_writes",
+    "target": "handler-lifted",
+    "reference": "handler-closure-control",
+    "maxRatio": 0,
+    "note": "Production lifted block handlers retain current captures, native cancellation, and element identity while eliminating repeated handler assignment and per-render closure sites."
+  },
+  {
+    "suite": "compiler-output",
+    "op": "render_closure_sites",
+    "target": "handler-lifted",
+    "reference": "handler-closure-control",
+    "maxRatio": 0,
+    "note": "Production lifted block handlers retain current captures, native cancellation, and element identity while eliminating repeated handler assignment and per-render closure sites."
+  },
+  {
+    "suite": "compiler-output",
+    "op": "itemArrows",
+    "target": "ssr-compiled",
+    "reference": "ssr-reference",
+    "maxRatio": 0,
+    "note": "Emitted SSR per-item callback/key expression sites and sole-attribute IIFE removed; HTML, key/body evaluation counts, and ordered row contents are verified."
+  },
+  {
+    "suite": "compiler-output",
+    "op": "singleIifes",
+    "target": "ssr-compiled",
+    "reference": "ssr-reference",
+    "maxRatio": 0,
+    "note": "Emitted SSR per-item callback/key expression sites and sole-attribute IIFE removed; HTML, key/body evaluation counts, and ordered row contents are verified."
+  },
+  {
+    "suite": "compiler-output",
+    "op": "active_arrays",
+    "target": "branch-argumentsEscape",
+    "reference": "branch-argumentsEscape-work-budget",
+    "maxRatio": 1,
+    "note": "Escaped argument tuples remain independent under real nested branch updates; absent branches omit unused captures."
+  },
+  {
+    "suite": "compiler-output",
+    "op": "absent_arrays",
+    "target": "branch-argumentsEscape",
+    "reference": "branch-argumentsEscape-work-budget",
+    "maxRatio": 0,
+    "note": "Escaped argument tuples remain independent under real nested branch updates; absent branches omit unused captures."
   }
 ]

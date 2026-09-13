@@ -5,6 +5,7 @@ import { compile } from 'octane/compiler';
 import { injectStyle } from '../src/index.js';
 import * as RT from 'octane/server';
 import { prerender } from 'octane/static';
+import { loadCompiledFixtureSource } from './_server-fixture';
 
 // SSR Phase 3 — control flow (@if/@for/@switch/@try) + component children +
 // portals emitted to HTML strings with block markers, plus scoped-CSS de-dup.
@@ -60,7 +61,7 @@ describe('SSR Phase 3 — control flow with block markers', () => {
 		expect(code).not.toContain('() => _$ssrBlock(__sitem');
 	});
 
-	it('@for retains per-item async identity when an item can suspend', () => {
+	it('@for keeps async values with their item keys across a retry that reorders the list', async () => {
 		const source = `
 			import { use } from 'octane';
 			export function List(props) @{
@@ -71,8 +72,26 @@ describe('SSR Phase 3 — control flow with block markers', () => {
 				</ul>
 			}
 		`;
-		const code = compile(source, 'suspending-list.tsrx', { mode: 'server' }).code;
-		expect(code).toContain('__html += _$ssrArm');
+		const { List } = loadCompiledFixtureSource(source, {
+			id: 'suspending-list.tsrx',
+			mode: 'server',
+		});
+		let resolveFirst!: (value: string) => void;
+		const items = [
+			{
+				id: 'a',
+				value: new Promise<string>((resolve) => {
+					resolveFirst = resolve;
+				}),
+			},
+			{ id: 'b', value: Promise.resolve('B') },
+		];
+		const pending = prerender(List, { items });
+		items.reverse();
+		resolveFirst('A');
+		const container = document.createElement('div');
+		container.innerHTML = (await pending).html;
+		expect([...container.querySelectorAll('li')].map((row) => row.textContent)).toEqual(['B', 'A']);
 	});
 
 	it('@for retains per-item pairs for multi-root item bodies', () => {

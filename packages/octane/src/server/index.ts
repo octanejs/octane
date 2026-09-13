@@ -180,6 +180,7 @@ export {
 	mapSlot,
 	ssrControl,
 	ssrArm,
+	ssrForItem,
 	ssrTry,
 	ssrPortal,
 	injectStyle,
