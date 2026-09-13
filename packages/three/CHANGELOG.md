@@ -1,5 +1,11 @@
 # @octanejs/three
 
+## 0.1.46
+
+### Patch Changes
+
+- 43568ef: Align the test renderer's camera option with the root camera configuration type so constructed and declarative cameras remain compatible with current Three declarations.
+
 ## 0.1.45
 
 ### Patch Changes
