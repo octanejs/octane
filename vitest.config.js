@@ -4201,6 +4201,13 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: {
+					group: 'react-parity',
+					include: [
+						'packages/motion/tests/browser/motion.browser.test.ts',
+						'packages/motion/tests/production-bundle.test.ts',
+					],
+				},
 				test: {
 					name: 'motion',
 					include: ['packages/motion/tests/**/*.test.ts'],
