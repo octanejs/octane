@@ -124,6 +124,11 @@ export function configuredTestSelectors(source, fileName, { runner, scope = '' }
 		}
 		const root = typeof value.root === 'string' ? value.root : inheritedRoot;
 		if ('projects' in value) {
+			const entries = Array.isArray(value.projects) ? value.projects : [value.projects];
+			// String (and other non-object) project paths point at nested configs
+			// that were never read. Fail closed instead of inventing an empty suite.
+			if (entries.some((entry) => !entry || typeof entry !== 'object' || Array.isArray(entry)))
+				throw new Error(`Cannot resolve upstream test selector ${fileName}:projects`);
 			collect(value.projects, root);
 			return;
 		}
@@ -176,17 +181,22 @@ export function selectedByTestConfiguration(relativePath, selector, conventional
 		return false;
 	if (patterns(selector.exclude).some((pattern) => glob(relativePath, token(pattern))))
 		return false;
+	let matchPath = relativePath;
 	if (selector.testDir) {
 		const configDirectory = path.posix.relative(
 			selector.scope || '.',
 			path.posix.dirname(selector.fileName),
 		);
-		if (!within(path.posix.normalize(path.posix.join(configDirectory, selector.testDir))))
-			return false;
+		const testDirectory = path.posix
+			.normalize(path.posix.join(configDirectory, selector.testDir))
+			.replace(/^\.\//, '');
+		if (!within(testDirectory)) return false;
+		// Playwright matches testMatch against the path relative to testDir.
+		matchPath = path.posix.relative(testDirectory === '' ? '.' : testDirectory, relativePath);
 	}
 	if (selector.testMatch !== undefined || selector.include !== undefined) {
 		return patterns(selector.testMatch ?? selector.include).some((pattern) =>
-			glob(relativePath, token(pattern)),
+			glob(matchPath, token(pattern)),
 		);
 	}
 	if (selector.testRegex !== undefined) {

@@ -87,6 +87,8 @@ test('does not execute dynamic upstream selectors or silently discard their suit
 test('unresolved project lists and configuration bases fail closed', () => {
 	for (const source of [
 		'export default { projects: getProjects() };',
+		"export default { projects: ['<rootDir>/packages/*'] };",
+		"export default { projects: [{ testMatch: ['**/*.test.ts'] }, '<rootDir>/packages/other'] };",
 		'import base from "./shared.js"; export default { ...base };',
 		'export default { root: getRoot(), test: { include: ["custom/*.ts"] } };',
 	])
@@ -107,7 +109,7 @@ test('explicit empty selectors do not fall back to conventional names', () => {
 
 test('Playwright testDir confines an explicit testMatch relative to its config', () => {
 	const selectors = configuredTestSelectors(
-		'export default { testDir: "./specs", testMatch: "**/*.spec.ts" };',
+		'export default { testDir: "./specs", testMatch: "*.spec.ts" };',
 		'packages/widget/playwright.config.ts',
 		{ runner: 'playwright', scope: 'packages/widget' },
 	);
@@ -116,7 +118,24 @@ test('Playwright testDir confines an explicit testMatch relative to its config',
 		true,
 	);
 	assert.equal(
+		selectedByTestConfiguration('specs/nested/browser.spec.ts', selectors[0], conventionalTestPath),
+		false,
+	);
+	assert.equal(
 		selectedByTestConfiguration('outside/browser.spec.ts', selectors[0], conventionalTestPath),
 		false,
+	);
+	const recursive = configuredTestSelectors(
+		'export default { testDir: "./specs", testMatch: "**/*.spec.ts" };',
+		'packages/widget/playwright.config.ts',
+		{ runner: 'playwright', scope: 'packages/widget' },
+	);
+	assert.equal(
+		selectedByTestConfiguration('specs/browser.spec.ts', recursive[0], conventionalTestPath),
+		true,
+	);
+	assert.equal(
+		selectedByTestConfiguration('specs/nested/browser.spec.ts', recursive[0], conventionalTestPath),
+		true,
 	);
 });
