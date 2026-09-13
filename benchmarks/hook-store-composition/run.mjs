@@ -66,6 +66,7 @@ try {
 				name: lane,
 				ops,
 				meta: {
+					artifact: fixture.artifact,
 					browser: 'chromium',
 					environment,
 					gcBeforeSample,

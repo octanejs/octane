@@ -4607,5 +4607,357 @@
     "reference": "ref-unowned-only-budget",
     "maxRatio": 0,
     "note": "Ref queues without an owning block preserve attachment order and cannot crash the commit."
+  },
+  {
+    "suite": "hooks-runtime",
+    "op": "hook_map_reads",
+    "target": "state-access-pair-direct",
+    "reference": "state-access-budget",
+    "maxRatio": 1,
+    "note": "Two state/reducer hooks across 64 updates retain output, cell and getter semantics with one canonical hook Map read each."
+  },
+  {
+    "suite": "hooks-runtime",
+    "op": "hook_map_reads",
+    "target": "state-access-pair-nested",
+    "reference": "state-access-budget",
+    "maxRatio": 1,
+    "note": "Two state/reducer hooks across 64 updates retain output, cell and getter semantics with one canonical hook Map read each."
+  },
+  {
+    "suite": "hooks-runtime",
+    "op": "hook_map_reads",
+    "target": "state-access-getter-direct",
+    "reference": "state-access-budget",
+    "maxRatio": 1,
+    "note": "Two state/reducer hooks across 64 updates retain output, cell and getter semantics with one canonical hook Map read each."
+  },
+  {
+    "suite": "hooks-runtime",
+    "op": "hook_map_reads",
+    "target": "state-access-getter-nested",
+    "reference": "state-access-budget",
+    "maxRatio": 1,
+    "note": "Two state/reducer hooks across 64 updates retain output, cell and getter semantics with one canonical hook Map read each."
+  },
+  {
+    "suite": "hooks-runtime",
+    "op": "rest_sites_reached",
+    "target": "argument-client",
+    "reference": "argument-work-budget",
+    "maxRatio": 0,
+    "note": "Production hook argument and subscription work under clean/observed snapshot, callback, store swap and cleanup controls; event publication costs remain protected."
+  },
+  {
+    "suite": "hooks-runtime",
+    "op": "subscribe_deps_arrays",
+    "target": "argument-client",
+    "reference": "argument-work-budget",
+    "maxRatio": 0,
+    "note": "Production hook argument and subscription work under clean/observed snapshot, callback, store swap and cleanup controls; event publication costs remain protected."
+  },
+  {
+    "suite": "hooks-runtime",
+    "op": "effect_event_entries",
+    "target": "argument-client",
+    "reference": "argument-work-budget",
+    "maxRatio": 1,
+    "note": "Production hook argument and subscription work under clean/observed snapshot, callback, store swap and cleanup controls; event publication costs remain protected."
+  },
+  {
+    "suite": "hooks-runtime",
+    "op": "effect_event_wrappers",
+    "target": "argument-client",
+    "reference": "argument-work-budget",
+    "maxRatio": 1,
+    "note": "Production hook argument and subscription work under clean/observed snapshot, callback, store swap and cleanup controls; event publication costs remain protected."
+  },
+  {
+    "suite": "hooks-runtime",
+    "op": "arrays",
+    "target": "warm-empty",
+    "reference": "warm-empty-budget",
+    "maxRatio": 0,
+    "note": "Actual warm activation preserves independent plan occurrences, reentrant cache restoration and exception isolation without selected-plan arrays or wrapper callbacks."
+  },
+  {
+    "suite": "hooks-runtime",
+    "op": "functions",
+    "target": "warm-empty",
+    "reference": "warm-empty-budget",
+    "maxRatio": 0,
+    "note": "Actual warm activation preserves independent plan occurrences, reentrant cache restoration and exception isolation without selected-plan arrays or wrapper callbacks."
+  },
+  {
+    "suite": "hooks-runtime",
+    "op": "constructors",
+    "target": "warm-empty",
+    "reference": "warm-empty-budget",
+    "maxRatio": 0,
+    "note": "Actual warm activation preserves independent plan occurrences, reentrant cache restoration and exception isolation without selected-plan arrays or wrapper callbacks."
+  },
+  {
+    "suite": "hooks-runtime",
+    "op": "arrays",
+    "target": "warm-local",
+    "reference": "warm-local-budget",
+    "maxRatio": 0,
+    "note": "Actual warm activation preserves independent plan occurrences, reentrant cache restoration and exception isolation without selected-plan arrays or wrapper callbacks."
+  },
+  {
+    "suite": "hooks-runtime",
+    "op": "functions",
+    "target": "warm-local",
+    "reference": "warm-local-budget",
+    "maxRatio": 0,
+    "note": "Actual warm activation preserves independent plan occurrences, reentrant cache restoration and exception isolation without selected-plan arrays or wrapper callbacks."
+  },
+  {
+    "suite": "hooks-runtime",
+    "op": "constructors",
+    "target": "warm-local",
+    "reference": "warm-local-budget",
+    "maxRatio": 1,
+    "note": "Actual warm activation preserves independent plan occurrences, reentrant cache restoration and exception isolation without selected-plan arrays or wrapper callbacks."
+  },
+  {
+    "suite": "hooks-runtime",
+    "op": "arrays",
+    "target": "warm-wide",
+    "reference": "warm-wide-budget",
+    "maxRatio": 0,
+    "note": "Actual warm activation preserves independent plan occurrences, reentrant cache restoration and exception isolation without selected-plan arrays or wrapper callbacks."
+  },
+  {
+    "suite": "hooks-runtime",
+    "op": "functions",
+    "target": "warm-wide",
+    "reference": "warm-wide-budget",
+    "maxRatio": 0,
+    "note": "Actual warm activation preserves independent plan occurrences, reentrant cache restoration and exception isolation without selected-plan arrays or wrapper callbacks."
+  },
+  {
+    "suite": "hooks-runtime",
+    "op": "constructors",
+    "target": "warm-wide",
+    "reference": "warm-wide-budget",
+    "maxRatio": 1,
+    "note": "Actual warm activation preserves independent plan occurrences, reentrant cache restoration and exception isolation without selected-plan arrays or wrapper callbacks."
+  },
+  {
+    "suite": "hooks-runtime",
+    "op": "arrays",
+    "target": "warm-throwing",
+    "reference": "warm-throwing-budget",
+    "maxRatio": 0,
+    "note": "Actual warm activation preserves independent plan occurrences, reentrant cache restoration and exception isolation without selected-plan arrays or wrapper callbacks."
+  },
+  {
+    "suite": "hooks-runtime",
+    "op": "functions",
+    "target": "warm-throwing",
+    "reference": "warm-throwing-budget",
+    "maxRatio": 0,
+    "note": "Actual warm activation preserves independent plan occurrences, reentrant cache restoration and exception isolation without selected-plan arrays or wrapper callbacks."
+  },
+  {
+    "suite": "hooks-runtime",
+    "op": "constructors",
+    "target": "warm-throwing",
+    "reference": "warm-throwing-budget",
+    "maxRatio": 1,
+    "note": "Actual warm activation preserves independent plan occurrences, reentrant cache restoration and exception isolation without selected-plan arrays or wrapper callbacks."
+  },
+  {
+    "suite": "hooks-runtime",
+    "op": "arrays",
+    "target": "warm-reentrant",
+    "reference": "warm-reentrant-budget",
+    "maxRatio": 0,
+    "note": "Actual warm activation preserves independent plan occurrences, reentrant cache restoration and exception isolation without selected-plan arrays or wrapper callbacks."
+  },
+  {
+    "suite": "hooks-runtime",
+    "op": "functions",
+    "target": "warm-reentrant",
+    "reference": "warm-reentrant-budget",
+    "maxRatio": 0,
+    "note": "Actual warm activation preserves independent plan occurrences, reentrant cache restoration and exception isolation without selected-plan arrays or wrapper callbacks."
+  },
+  {
+    "suite": "hooks-runtime",
+    "op": "constructors",
+    "target": "warm-reentrant",
+    "reference": "warm-reentrant-budget",
+    "maxRatio": 1,
+    "note": "Actual warm activation preserves independent plan occurrences, reentrant cache restoration and exception isolation without selected-plan arrays or wrapper callbacks."
+  },
+  {
+    "suite": "hooks-runtime",
+    "op": "internCalls",
+    "target": "custom-path-client-cold",
+    "reference": "custom-path-budget",
+    "maxRatio": 8,
+    "note": "Actual hook path helpers retain bounded primitive metadata and preserve slot/coercion identity; warm repeated paths avoid registry calls and key assembly. Counts are source operations, not heap allocation or elapsed time."
+  },
+  {
+    "suite": "hooks-runtime",
+    "op": "concatenations",
+    "target": "custom-path-client-cold",
+    "reference": "custom-path-budget",
+    "maxRatio": 40,
+    "note": "Actual hook path helpers retain bounded primitive metadata and preserve slot/coercion identity; warm repeated paths avoid registry calls and key assembly. Counts are source operations, not heap allocation or elapsed time."
+  },
+  {
+    "suite": "hooks-runtime",
+    "op": "internCalls",
+    "target": "custom-path-client-warm",
+    "reference": "custom-path-budget",
+    "maxRatio": 0,
+    "note": "Actual hook path helpers retain bounded primitive metadata and preserve slot/coercion identity; warm repeated paths avoid registry calls and key assembly. Counts are source operations, not heap allocation or elapsed time."
+  },
+  {
+    "suite": "hooks-runtime",
+    "op": "concatenations",
+    "target": "custom-path-client-warm",
+    "reference": "custom-path-budget",
+    "maxRatio": 0,
+    "note": "Actual hook path helpers retain bounded primitive metadata and preserve slot/coercion identity; warm repeated paths avoid registry calls and key assembly. Counts are source operations, not heap allocation or elapsed time."
+  },
+  {
+    "suite": "hooks-runtime",
+    "op": "frames",
+    "target": "custom-path-client-bounds",
+    "reference": "custom-path-budget",
+    "maxRatio": 16,
+    "note": "Actual hook path helpers retain bounded primitive metadata and preserve slot/coercion identity; warm repeated paths avoid registry calls and key assembly. Counts are source operations, not heap allocation or elapsed time."
+  },
+  {
+    "suite": "hooks-runtime",
+    "op": "maxEntries",
+    "target": "custom-path-client-bounds",
+    "reference": "custom-path-budget",
+    "maxRatio": 32,
+    "note": "Actual hook path helpers retain bounded primitive metadata and preserve slot/coercion identity; warm repeated paths avoid registry calls and key assembly. Counts are source operations, not heap allocation or elapsed time."
+  },
+  {
+    "suite": "hooks-runtime",
+    "op": "retainedEntries",
+    "target": "custom-path-client-bounds",
+    "reference": "custom-path-budget",
+    "maxRatio": 480,
+    "note": "Actual hook path helpers retain bounded primitive metadata and preserve slot/coercion identity; warm repeated paths avoid registry calls and key assembly. Counts are source operations, not heap allocation or elapsed time."
+  },
+  {
+    "suite": "hooks-runtime",
+    "op": "internCalls",
+    "target": "custom-path-server-cold",
+    "reference": "custom-path-budget",
+    "maxRatio": 8,
+    "note": "Actual hook path helpers retain bounded primitive metadata and preserve slot/coercion identity; warm repeated paths avoid registry calls and key assembly. Counts are source operations, not heap allocation or elapsed time."
+  },
+  {
+    "suite": "hooks-runtime",
+    "op": "concatenations",
+    "target": "custom-path-server-cold",
+    "reference": "custom-path-budget",
+    "maxRatio": 40,
+    "note": "Actual hook path helpers retain bounded primitive metadata and preserve slot/coercion identity; warm repeated paths avoid registry calls and key assembly. Counts are source operations, not heap allocation or elapsed time."
+  },
+  {
+    "suite": "hooks-runtime",
+    "op": "internCalls",
+    "target": "custom-path-server-warm",
+    "reference": "custom-path-budget",
+    "maxRatio": 0,
+    "note": "Actual hook path helpers retain bounded primitive metadata and preserve slot/coercion identity; warm repeated paths avoid registry calls and key assembly. Counts are source operations, not heap allocation or elapsed time."
+  },
+  {
+    "suite": "hooks-runtime",
+    "op": "concatenations",
+    "target": "custom-path-server-warm",
+    "reference": "custom-path-budget",
+    "maxRatio": 0,
+    "note": "Actual hook path helpers retain bounded primitive metadata and preserve slot/coercion identity; warm repeated paths avoid registry calls and key assembly. Counts are source operations, not heap allocation or elapsed time."
+  },
+  {
+    "suite": "hooks-runtime",
+    "op": "frames",
+    "target": "custom-path-server-bounds",
+    "reference": "custom-path-budget",
+    "maxRatio": 16,
+    "note": "Actual hook path helpers retain bounded primitive metadata and preserve slot/coercion identity; warm repeated paths avoid registry calls and key assembly. Counts are source operations, not heap allocation or elapsed time."
+  },
+  {
+    "suite": "hooks-runtime",
+    "op": "maxEntries",
+    "target": "custom-path-server-bounds",
+    "reference": "custom-path-budget",
+    "maxRatio": 32,
+    "note": "Actual hook path helpers retain bounded primitive metadata and preserve slot/coercion identity; warm repeated paths avoid registry calls and key assembly. Counts are source operations, not heap allocation or elapsed time."
+  },
+  {
+    "suite": "hooks-runtime",
+    "op": "retainedEntries",
+    "target": "custom-path-server-bounds",
+    "reference": "custom-path-budget",
+    "maxRatio": 480,
+    "note": "Actual hook path helpers retain bounded primitive metadata and preserve slot/coercion identity; warm repeated paths avoid registry calls and key assembly. Counts are source operations, not heap allocation or elapsed time."
+  },
+  {
+    "suite": "hooks-runtime",
+    "op": "internCalls",
+    "target": "custom-path-universal-cold",
+    "reference": "custom-path-budget",
+    "maxRatio": 8,
+    "note": "Actual hook path helpers retain bounded primitive metadata and preserve slot/coercion identity; warm repeated paths avoid registry calls and key assembly. Counts are source operations, not heap allocation or elapsed time."
+  },
+  {
+    "suite": "hooks-runtime",
+    "op": "concatenations",
+    "target": "custom-path-universal-cold",
+    "reference": "custom-path-budget",
+    "maxRatio": 40,
+    "note": "Actual hook path helpers retain bounded primitive metadata and preserve slot/coercion identity; warm repeated paths avoid registry calls and key assembly. Counts are source operations, not heap allocation or elapsed time."
+  },
+  {
+    "suite": "hooks-runtime",
+    "op": "internCalls",
+    "target": "custom-path-universal-warm",
+    "reference": "custom-path-budget",
+    "maxRatio": 0,
+    "note": "Actual hook path helpers retain bounded primitive metadata and preserve slot/coercion identity; warm repeated paths avoid registry calls and key assembly. Counts are source operations, not heap allocation or elapsed time."
+  },
+  {
+    "suite": "hooks-runtime",
+    "op": "concatenations",
+    "target": "custom-path-universal-warm",
+    "reference": "custom-path-budget",
+    "maxRatio": 0,
+    "note": "Actual hook path helpers retain bounded primitive metadata and preserve slot/coercion identity; warm repeated paths avoid registry calls and key assembly. Counts are source operations, not heap allocation or elapsed time."
+  },
+  {
+    "suite": "hooks-runtime",
+    "op": "frames",
+    "target": "custom-path-universal-bounds",
+    "reference": "custom-path-budget",
+    "maxRatio": 16,
+    "note": "Actual hook path helpers retain bounded primitive metadata and preserve slot/coercion identity; warm repeated paths avoid registry calls and key assembly. Counts are source operations, not heap allocation or elapsed time."
+  },
+  {
+    "suite": "hooks-runtime",
+    "op": "maxEntries",
+    "target": "custom-path-universal-bounds",
+    "reference": "custom-path-budget",
+    "maxRatio": 32,
+    "note": "Actual hook path helpers retain bounded primitive metadata and preserve slot/coercion identity; warm repeated paths avoid registry calls and key assembly. Counts are source operations, not heap allocation or elapsed time."
+  },
+  {
+    "suite": "hooks-runtime",
+    "op": "retainedEntries",
+    "target": "custom-path-universal-bounds",
+    "reference": "custom-path-budget",
+    "maxRatio": 480,
+    "note": "Actual hook path helpers retain bounded primitive metadata and preserve slot/coercion identity; warm repeated paths avoid registry calls and key assembly. Counts are source operations, not heap allocation or elapsed time."
   }
 ]

@@ -1195,6 +1195,18 @@ const SUITES = [
 		runs: [{ script: 'run-size.mjs', args: () => [] }],
 	},
 	{
+		name: 'hooks-runtime',
+		cwd: 'hooks-runtime',
+		servers: [],
+		iter: { normal: 1, quick: 1 },
+		runs: [
+			{ script: 'state-access.mjs', args: () => [] },
+			{ script: 'optional-arguments.mjs', args: () => [] },
+			{ script: '../custom-hook-path/run.mjs', args: () => [] },
+			{ script: '../recursive-context/hooks-warm-work.mjs', args: () => [] },
+		],
+	},
+	{
 		name: 'effect-scheduling',
 		cwd: 'effect-scheduling',
 		servers: [],
