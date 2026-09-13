@@ -1,0 +1,7 @@
+[
+  {
+    "file": "packages/tanstack-router/upstream/tests/routeContext.test.tsx",
+    "fullName": "loader in the route definition on navigate (with preload using router methods), loader isn't invoked with undefined context if beforeLoad is pending when navigation happens",
+    "status": "skipped"
+  }
+]

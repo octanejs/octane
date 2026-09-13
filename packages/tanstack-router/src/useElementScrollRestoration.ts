@@ -5,7 +5,9 @@
 import { setupScrollRestoration, getElementScrollRestorationEntry } from '@tanstack/router-core';
 import { useRouter } from './context';
 
-export function useElementScrollRestoration(options: any): any {
+export function useElementScrollRestoration(
+	options: Parameters<typeof getElementScrollRestorationEntry>[1],
+) {
 	const router = useRouter();
 	setupScrollRestoration(router, true);
 	return getElementScrollRestorationEntry(router, options);

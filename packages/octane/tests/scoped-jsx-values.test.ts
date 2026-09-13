@@ -1323,3 +1323,31 @@ describe('TSRX directives nested in JSX values', () => {
 		expect(html).not.toContain('outer');
 	});
 });
+
+it('keeps a deferred JSX external-store read live across successive notifications', async () => {
+	let value = 1;
+	const listeners = new Set<() => void>();
+	const source = {
+		get: () => value,
+		subscribe(listener: () => void) {
+			listeners.add(listener);
+			return () => listeners.delete(listener);
+		},
+	};
+	const r = mount(tsx.ScopedStoreHost, { model: tsx.createScopedStoreModel(source) });
+	const output = r.find('[data-testid="scoped-store"]');
+	try {
+		expect(output.textContent).toBe('Value 1');
+		for (const next of [2, 3, 4]) {
+			await act(() => {
+				value = next;
+				for (const listener of listeners) listener();
+			});
+			expect(r.find('[data-testid="scoped-store"]')).toBe(output);
+			expect(output.textContent).toBe('Value ' + next);
+		}
+	} finally {
+		r.unmount();
+	}
+	expect(listeners.size).toBe(0);
+});

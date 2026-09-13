@@ -2,6 +2,11 @@
   "schemaVersion": 1,
   "tests": [
     {
+      "path": "packages/tanstack-router/tests/browser/navigation.browser.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Production Chromium proves focus/input identity, route loading, logical portal context/error ownership, recovery and teardown."
+    },
+    {
       "path": "packages/tanstack-router/tests/conformance/blocker.test.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Checks Octane navigation-blocker integration; it is not same-scenario React execution."
@@ -72,9 +77,19 @@
       "reason": "Checks Octane same-route search updates; it is not same-scenario React execution."
     },
     {
+      "path": "packages/tanstack-router/tests/conformance/scroll-hydration.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Preserves server DOM, edited input, focus, and hydration agreement with scroll restoration enabled or disabled."
+    },
+    {
       "path": "packages/tanstack-router/tests/differential/parity.test.ts",
       "disposition": "react-octane-differential",
-      "oracle": "Runs exact initial, multi-navigation, params, active-link, and not-found scenarios against @tanstack/react-router@1.170.18."
+      "oracle": "Runs exact initial, multi-navigation, params, active-link, and not-found scenarios against @tanstack/react-router@1.170.35."
+    },
+    {
+      "path": "packages/tanstack-router/tests/harness/export-parity.test.ts",
+      "disposition": "adapted-upstream-suite",
+      "oracle": "Compares the value/type export names of all three pinned React entrypoints with the authored Octane entries."
     },
     {
       "path": "packages/tanstack-router/tests/harness/setup.test.ts",
@@ -85,6 +100,21 @@
       "path": "packages/tanstack-router/tests/ssr/ssr.test.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Checks the retained Octane adapter SSR behavior cited to TanStack Router PR #7847; it is not a React SSR oracle."
+    },
+    {
+      "path": "packages/tanstack-router/tests/types/all-exports.test-d.ts",
+      "disposition": "octane-only-type-conformance",
+      "reason": "Checks all published Router value/type exports and exact browser-safe client SSR declarations."
+    },
+    {
+      "path": "packages/tanstack-router/tests/types/entrypoints.test-d.ts",
+      "disposition": "octane-only-type-conformance",
+      "reason": "Precise public entrypoint assertions and negative controls cover external source consumers."
+    },
+    {
+      "path": "packages/tanstack-router/tests/upstream-original.test.ts",
+      "disposition": "unmodified-upstream-suite-wrapper",
+      "oracle": "Executes and checks every passing and skipped runtime identity from the pinned React 1.170.35 suite."
     },
     {
       "path": "packages/tanstack-router/typetests/public-api.test-d.ts",

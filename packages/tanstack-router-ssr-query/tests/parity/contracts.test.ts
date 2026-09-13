@@ -18,9 +18,9 @@ describe('@octanejs/tanstack-router-ssr-query parity audit contracts', () => {
 	// @parity-case adapted:tanstack-router-ssr-query-upstream-ledger
 	it('authenticates the complete adapter and absent runtime suite', () => {
 		expect(manifest.provenance).toMatchObject({
-			version: '1.167.1',
-			commit: '8b3659143f634542c455a9d7915a8c7e8fabb65d',
-			verification: 'recorded-unverified',
+			version: '1.167.2',
+			commit: '0dbb77f7260b4919786c2c3d594b8c262de43a9e',
+			verification: 'verified',
 		});
 		// The committed upstream tree verifies offline against
 		// audit/upstream.lock.json (upstream git blob shas at the pinned commit).
@@ -43,7 +43,7 @@ describe('@octanejs/tanstack-router-ssr-query parity audit contracts', () => {
 	it('records the core version published by the pinned adapter', () => {
 		expect(crosswalk.coreDependency).toEqual({
 			package: '@tanstack/router-ssr-query-core',
-			version: '1.169.1',
+			version: '1.169.2',
 			disposition: 'published-adapter-version-reused',
 		});
 	});
@@ -70,19 +70,19 @@ describe('@octanejs/tanstack-router-ssr-query parity audit contracts', () => {
 			adaptedCompiler: 'tsrx-tsc',
 		});
 		expect(crosswalk.typeSuite.pristineCompilers).toEqual([
-			'typescript55',
 			'typescript56',
 			'typescript57',
 			'typescript58',
 			'typescript59',
 			'typescript60',
+			'tsgo',
 		]);
 		expect(crosswalk.typeSuite.adaptedIncompatibleCompilers).toEqual([
-			'typescript55',
 			'typescript56',
 			'typescript57',
 			'typescript58',
 			'typescript60',
+			'tsgo',
 		]);
 		expect(manifest.upstreamSuites.types).toBe('present');
 		const pristine = manifest.lanes.find(function findPristine(lane) {

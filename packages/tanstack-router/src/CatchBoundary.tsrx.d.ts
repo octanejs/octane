@@ -2,13 +2,13 @@
 import type { ErrorInfo, ErrorRouteComponent } from './route';
 
 export declare const CatchBoundary: (props: {
-	getResetKey: () => number | string;
+	getResetKey: () => unknown;
 	errorComponent?: ErrorRouteComponent;
-	onCatch?: (error: Error, errorInfo: ErrorInfo) => void;
+	onCatch?: (error: unknown, errorInfo: ErrorInfo) => void;
 	children?: unknown;
 }) => unknown;
 export declare const ErrorComponent: (props: {
-	error: any;
+	error: unknown;
 	reset?: () => void;
 	info?: { componentStack?: string };
 }) => unknown;

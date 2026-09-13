@@ -581,3 +581,56 @@ test('compares callable type parameters through their constraints without repeat
 		/any/,
 	);
 });
+
+test('matches function generics to a published callable alias', () => {
+	assert.equal(
+		check(
+			'export declare function value<T = unknown>(input: T): T;',
+			'export declare const value: <T = unknown>(input: T) => T;',
+		),
+		null,
+	);
+	assert.ok(
+		check(
+			'export declare function value<T = any>(input: T): T;',
+			'export declare const value: <T = unknown>(input: T) => T;',
+		),
+	);
+});
+
+test('matches native boundary props to a React class constructor without erasing callbacks', () => {
+	const upstream =
+		"import * as React from 'react'; export declare class value extends React.Component<{resetKey: () => unknown; onError: (error: Error) => void}> {}";
+	assert.equal(
+		check(
+			'export declare function value(props: {resetKey: () => unknown; onError: (error: Error) => void}): void;',
+			upstream,
+		),
+		null,
+	);
+	assert.ok(
+		check(
+			'export declare function value(props: {resetKey: () => unknown; onError: (error: any) => void}): void;',
+			upstream,
+		),
+	);
+});
+
+test('checks component props while recognizing native compiler arguments', () => {
+	const body = path.resolve('packages/octane/src/runtime.ts').replaceAll('\\', '/');
+	const upstream =
+		"import * as React from 'react'; export declare const value: { component: React.ComponentType<{label: string}> };";
+	assert.equal(
+		check(
+			`import type {ComponentBody} from '${body}'; export declare const value: {component: ComponentBody<{label: string}>};`,
+			upstream,
+		),
+		null,
+	);
+	assert.ok(
+		check(
+			`import type {ComponentBody} from '${body}'; export declare const value: {component: ComponentBody<{label: any}>};`,
+			upstream,
+		),
+	);
+});

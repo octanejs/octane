@@ -1,3 +1,4 @@
+import tanstackRouterAdapted from './packages/tanstack-router/tests/vitest.adapted.config.ts';
 import tanstackAiAdapted from './packages/tanstack-ai/tests/vitest.adapted.config.ts';
 import tanstackAiAdaptedSSR from './packages/tanstack-ai/tests/vitest.adapted-ssr.config.ts';
 import tanstackDbAdapted from './packages/tanstack-db/tests/vitest.adapted.config.ts';
@@ -611,6 +612,23 @@ export default defineConfig({
 		// `--silent=passed-only` overrides this default.
 		silent: true,
 		projects: [
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'tanstack-router-browser',
+					include: ['packages/tanstack-router/tests/browser/**/*.test.ts'],
+					environment: 'node',
+				},
+			},
+			{ ...tanstackRouterAdapted, testExecution: { group: 'react-parity' } },
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'tanstack-router-pristine',
+					include: ['packages/tanstack-router/tests/upstream-original.test.ts'],
+					environment: 'node',
+				},
+			},
 			{
 				testExecution: { group: 'react-parity' },
 				test: {
@@ -3958,6 +3976,9 @@ export default defineConfig({
 					include: ['packages/tanstack-router/tests/**/*.test.ts'],
 					environment: 'jsdom',
 					exclude: [
+						'packages/tanstack-router/tests/browser/**',
+						'packages/tanstack-router/tests/upstream/**',
+						'packages/tanstack-router/tests/upstream-original.test.ts',
 						'packages/tanstack-router/tests/differential/**/*.test.ts',
 						'packages/tanstack-router/tests/ssr/**/*.test.ts',
 					],
@@ -3984,10 +4005,44 @@ export default defineConfig({
 						'packages/tanstack-router-ssr-query/tests/**/*.test.ts',
 						'!packages/tanstack-router-ssr-query/tests/differential/**/*.test.ts',
 						'!packages/tanstack-router-ssr-query/tests/parity/**/*.test.ts',
+						'!packages/tanstack-router-ssr-query/tests/*.browser.test.ts',
 					],
 					environment: 'node',
 					globals: false,
 				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/tanstack-router-ssr-query$/,
+							replacement: resolve(
+								import.meta.dirname,
+								'packages/tanstack-router-ssr-query/src/index.tsrx',
+							),
+						},
+						{
+							find: /^@octanejs\/tanstack-query$/,
+							replacement: resolve(import.meta.dirname, 'packages/tanstack-query/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/tanstack-router$/,
+							replacement: resolve(import.meta.dirname, 'packages/tanstack-router/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'tanstack-router-ssr-query-browser',
+					include: ['packages/tanstack-router-ssr-query/tests/*.browser.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				testExecution: { group: 'react-parity' },
 				plugins: [octane({ ssr: true })],
 				resolve: {
 					alias: [

@@ -877,7 +877,7 @@
     "target": "octane-tsrx",
     "reference": "react",
     "maxRatio": 0.6,
-    "note": "rotate-backward is the LIS-vs-lastPlacedIndex differentiator: octane moves 1 node, React moves all survivors (known ~12x faster → 0.08x). Guard 0.6 leaves huge headroom while still catching a fast-path break."
+    "note": "rotate-backward is the LIS-vs-lastPlacedIndex differentiator: octane moves 1 node, React moves all survivors (known ~12x faster \u2192 0.08x). Guard 0.6 leaves huge headroom while still catching a fast-path break."
   },
   {
     "suite": "memo-wall",
@@ -1005,7 +1005,7 @@
     "target": "news-50/octane-tsrx",
     "reference": "news-50/react",
     "maxRatio": 1.2,
-    "note": "octane server render() vs react-dom renderToString at 50 cards (known ~0.6x → octane faster). Guard 1.2 tolerates noise but catches an octane SSR regression."
+    "note": "octane server render() vs react-dom renderToString at 50 cards (known ~0.6x \u2192 octane faster). Guard 1.2 tolerates noise but catches an octane SSR regression."
   },
   {
     "suite": "ssr-throughput",
@@ -1014,7 +1014,7 @@
     "reference": "deopt-page/octane-fast",
     "minRatio": 1.2,
     "maxRatio": 4.0,
-    "note": "intra-octane de-opt cliff: plain-.ts createElement vs compiled .tsrx SSR (known ~2.1x). Bounds the cliff so a broken fast path (ratio→1) or a runaway deopt (ratio>4) both surface."
+    "note": "intra-octane de-opt cliff: plain-.ts createElement vs compiled .tsrx SSR (known ~2.1x). Bounds the cliff so a broken fast path (ratio\u21921) or a runaway deopt (ratio>4) both surface."
   },
   {
     "suite": "bundle-size",
@@ -2317,7 +2317,7 @@
     "target": "octane-minimal",
     "reference": "react",
     "maxRatio": 3.5,
-    "note": "KNOWN GAP under active investigation: warmed /posts first-byte measured 2.57x react on 2026-07-20 (1.85ms vs 0.72ms) — the octane Start SSR stack, not the host (nitro-vs-minimal ~1x) and not the raw renderer (ssr-http shell is at parity). The 3.5 ceiling only catches further regression; renderer/Start fixes should TIGHTEN this guard."
+    "note": "KNOWN GAP under active investigation: warmed /posts first-byte measured 2.57x react on 2026-07-20 (1.85ms vs 0.72ms) \u2014 the octane Start SSR stack, not the host (nitro-vs-minimal ~1x) and not the raw renderer (ssr-http shell is at parity). The 3.5 ceiling only catches further regression; renderer/Start fixes should TIGHTEN this guard."
   },
   {
     "suite": "tanstack-start",
@@ -2333,7 +2333,7 @@
     "target": "octane-minimal",
     "reference": "react",
     "maxRatio": 3.5,
-    "note": "KNOWN GAP: warmed sequential ms/request on / measured 2.37x react on 2026-07-20 (695 vs 1650 req/s) — per-request overhead in the octane Start SSR path. The 3.5 ceiling only catches further regression; fixes should TIGHTEN it."
+    "note": "KNOWN GAP: warmed sequential ms/request on / measured 2.37x react on 2026-07-20 (695 vs 1650 req/s) \u2014 per-request overhead in the octane Start SSR path. The 3.5 ceiling only catches further regression; fixes should TIGHTEN it."
   },
   {
     "suite": "tanstack-start",
@@ -2733,7 +2733,7 @@
     "target": "octane-tsrx",
     "reference": "react",
     "maxRatio": 1.3,
-    "note": "40 series `d` rebuilds (+8 areas, 32 sparklines, tick/legend text, 24 gradient stops) per frame through the generic prev-guarded setAttribute path, incl. the sanitize-url toLowerCase pair per write. Observed 0.95x, 2026-08-07 — octane must not fall behind react at bulk d-churn."
+    "note": "40 series `d` rebuilds (+8 areas, 32 sparklines, tick/legend text, 24 gradient stops) per frame through the generic prev-guarded setAttribute path, incl. the sanitize-url toLowerCase pair per write. Observed 0.95x, 2026-08-07 \u2014 octane must not fall behind react at bulk d-churn."
   },
   {
     "suite": "svg-dashboard",
@@ -2749,7 +2749,7 @@
     "target": "octane-tsrx",
     "reference": "react",
     "maxRatio": 2.5,
-    "note": "Per-frame topology commits (10 node+icon transforms + ~26 incident edge d rebuilds, 30 frames). Observed 1.45x at introduction (2026-08-07) and 1.89x once the react fixture adopted the React Compiler rollout (#639, 2026-08-08) — a known octane gap: each topo commit re-walks the keyed row bindings including the 150 de-opt icon holes. Tripwire against the gap widening. The autoMemo host-spread admission adds always-missing region guards to these commits; a same-session A/B (2026-08-08, pre-#639 react column) attributed only ~0.1 ms (~1.4%) of octane's 7.0 ms to them."
+    "note": "Per-frame topology commits (10 node+icon transforms + ~26 incident edge d rebuilds, 30 frames). Observed 1.45x at introduction (2026-08-07) and 1.89x once the react fixture adopted the React Compiler rollout (#639, 2026-08-08) \u2014 a known octane gap: each topo commit re-walks the keyed row bindings including the 150 de-opt icon holes. Tripwire against the gap widening. The autoMemo host-spread admission adds always-missing region guards to these commits; a same-session A/B (2026-08-08, pre-#639 react column) attributed only ~0.1 ms (~1.4%) of octane's 7.0 ms to them."
   },
   {
     "suite": "svg-dashboard",
@@ -2773,7 +2773,7 @@
     "target": "octane-tsrx",
     "reference": "solid",
     "maxRatio": 0.9,
-    "note": "350 class-string rewrites per round through setClassAttr (SVG class is attribute-only). Observed 0.58x, 2026-08-07 — octane's many-small-writes profile beats solid's reconcile here; the guard rejects per-write fixed-cost regressions (alias lookup, sanitize, clsx normalize)."
+    "note": "350 class-string rewrites per round through setClassAttr (SVG class is attribute-only). Observed 0.58x, 2026-08-07 \u2014 octane's many-small-writes profile beats solid's reconcile here; the guard rejects per-write fixed-cost regressions (alias lookup, sanitize, clsx normalize)."
   },
   {
     "suite": "svg-dashboard",
@@ -2789,7 +2789,7 @@
     "target": "octane-tsrx",
     "reference": "solid",
     "maxRatio": 2.1,
-    "note": "480 foreignObject insert/removals per sample — the SVG→HTML namespace push/pop on runtime insertion. Observed 1.38x, 2026-08-07."
+    "note": "480 foreignObject insert/removals per sample \u2014 the SVG\u2192HTML namespace push/pop on runtime insertion. Observed 1.38x, 2026-08-07."
   },
   {
     "suite": "svg-dashboard",
@@ -2797,7 +2797,7 @@
     "target": "octane-tsrx",
     "reference": "react",
     "maxRatio": 0.8,
-    "note": "360 portal commits per sample into the overlay <g> (mount, two moves, unmount per cycle). Observed 0.50x, 2026-08-07 — octane portals into SVG beat react's createPortal; the guard keeps that from silently inverting."
+    "note": "360 portal commits per sample into the overlay <g> (mount, two moves, unmount per cycle). Observed 0.50x, 2026-08-07 \u2014 octane portals into SVG beat react's createPortal; the guard keeps that from silently inverting."
   },
   {
     "suite": "svg-dashboard",
@@ -2805,7 +2805,7 @@
     "target": "octane-tsrx",
     "reference": "react",
     "maxRatio": 1.2,
-    "note": "All 150 createElement-built icons re-diff per flip (tag swaps replace elements, same-tag patches attrs) plus 150 <use href> fast-path writes. Octane's DELIBERATE de-opt path vs react's one-and-only path — a cliff-width tripwire, not a win claim. Observed 0.79x, 2026-08-07."
+    "note": "All 150 createElement-built icons re-diff per flip (tag swaps replace elements, same-tag patches attrs) plus 150 <use href> fast-path writes. Octane's DELIBERATE de-opt path vs react's one-and-only path \u2014 a cliff-width tripwire, not a win claim. Observed 0.79x, 2026-08-07."
   },
   {
     "suite": "svg-dashboard",
@@ -2813,7 +2813,7 @@
     "target": "octane-tsrx",
     "reference": "react",
     "maxRatio": 3,
-    "note": "200 edges x (style-object diff with unitless SVG props + data-* spread bag) per pulse. Observed 1.98x, 2026-08-07 — octane's setSpread + per-property style diff currently trails react's; tripwire against the gap widening while it is worked on."
+    "note": "200 edges x (style-object diff with unitless SVG props + data-* spread bag) per pulse. Observed 1.98x, 2026-08-07 \u2014 octane's setSpread + per-property style diff currently trails react's; tripwire against the gap widening while it is worked on."
   },
   {
     "suite": "svg-dashboard",
@@ -3103,12 +3103,28 @@
     "note": "Same-run clean tree-shaken application plus Octane runtime: closure-free lowering must stay within 2% gzip of the runtime-form control. No instrumentation contributes to these bytes."
   },
   {
+    "suite": "hook-memo",
+    "op": "named_reads",
+    "target": "compiler-cache-shapes",
+    "reference": "cache-shape-reference",
+    "maxRatio": 0,
+    "note": "Production compiler output for hook and automatic memo regions must not read named _m$N or _k$N properties from the dense DOM/control slot array. The fixture also exercises flat and shared-scope Provider controls."
+  },
+  {
+    "suite": "hook-memo",
+    "op": "named_writes",
+    "target": "compiler-cache-shapes",
+    "reference": "cache-shape-reference",
+    "maxRatio": 0,
+    "note": "Production compiler output must not publish hook or automatic memo regions through dynamically added named properties on the slot array."
+  },
+  {
     "suite": "transition-hooks",
     "op": "cycle_renders",
     "target": "octane",
     "reference": "work-model",
     "maxRatio": 1,
-    "note": "A useTransition start → pending render → settle cycle renders the owner exactly twice: the pending cue with the new value and the falling edge."
+    "note": "A useTransition start \u2192 pending render \u2192 settle cycle renders the owner exactly twice: the pending cue with the new value and the falling edge."
   },
   {
     "suite": "transition-hooks",
@@ -4199,5 +4215,261 @@
     "reference": "work-model",
     "maxRatio": 1,
     "note": "Whole-workload native Map.get calls during 64 completed urgent cycles, excluding mount/unmount and timing. Includes DOM/harness lookups; independent render-sequence, DOM, hold/release, and cleanup gates establish equal work. The measured per-cycle ceiling permits cheaper equivalent implementations."
+  },
+  {
+    "suite": "dom-template-mount",
+    "op": "insertBefore",
+    "target": "fragment-256",
+    "reference": "work-model",
+    "maxRatio": 1,
+    "note": "256 keyed three-root fragments mount with no more than 770 top-level insertBefore calls. Every root, text value, keyed survivor, focus, removal, and foreign-content control is checked; custom elements retain their sequential connection semantics in the real-browser gate."
+  },
+  {
+    "suite": "dom-template-mount",
+    "op": "labelTextCreates",
+    "target": "fragment-256",
+    "reference": "work-model",
+    "maxRatio": 0,
+    "note": "The 256 only-child labels reuse the cloned template's text placeholders. Their visible values and empty text-node identity survive updates, while sibling text holes remain in source order."
+  },
+  {
+    "suite": "dom-template-mount",
+    "op": "labelTextCreates",
+    "target": "flat-256",
+    "reference": "work-model",
+    "maxRatio": 0,
+    "note": "A flat single-root keyed list also avoids explicit label-text creation; it retains all 256 label values and nodes on update."
+  },
+  {
+    "suite": "dom-template-mount",
+    "op": "insertBefore",
+    "target": "flat-256",
+    "reference": "flat-work-model",
+    "maxRatio": 1,
+    "note": "The flat single-root control stays at or below 258 insertBefore calls for 256 keyed labels; fragment work is not moved to ordinary flat templates."
+  },
+  {
+    "suite": "dom-template-mount",
+    "op": "insertBefore",
+    "target": "unrelated-update",
+    "reference": "work-model",
+    "maxRatio": 0,
+    "note": "An unrelated visible output update retains all keyed rows and text without mounting or moving nodes."
+  },
+  {
+    "suite": "dom-template-mount",
+    "op": "insertBefore",
+    "target": "reorder",
+    "reference": "reorder-work-model",
+    "maxRatio": 1,
+    "note": "Reversing 256 keyed three-root rows stays within 1294 insertBefore calls while retaining every physical root, typed input, and focus."
+  },
+  {
+    "suite": "dom-attributes",
+    "op": "changed",
+    "target": "octane",
+    "reference": "reference",
+    "maxRatio": 0,
+    "note": "Production native attribute work: safe static names avoid generic routing; unchanged metadata avoids redundant writes while external DOM edits and object coercion remain observable."
+  },
+  {
+    "suite": "dom-attributes",
+    "op": "restored",
+    "target": "octane",
+    "reference": "reference",
+    "maxRatio": 0,
+    "note": "Production native attribute work: safe static names avoid generic routing; unchanged metadata avoids redundant writes while external DOM edits and object coercion remain observable."
+  },
+  {
+    "suite": "dom-attributes",
+    "op": "unchanged",
+    "target": "octane",
+    "reference": "reference",
+    "maxRatio": 0,
+    "note": "Production native attribute work: safe static names avoid generic routing; unchanged metadata avoids redundant writes while external DOM edits and object coercion remain observable."
+  },
+  {
+    "suite": "dom-attributes",
+    "op": "headStableWrites",
+    "target": "octane",
+    "reference": "reference",
+    "maxRatio": 0,
+    "note": "Production native attribute work: safe static names avoid generic routing; unchanged metadata avoids redundant writes while external DOM edits and object coercion remain observable."
+  },
+  {
+    "suite": "spread-hosts",
+    "op": "source_expressions",
+    "target": "client-canonical_4",
+    "reference": "client-canonical_4-budget",
+    "maxRatio": 1,
+    "note": "Executed production allocation expressions under spread/alias/event semantic controls; bounds retained writer, snapshot, own-key scan, and exceptional alias/event work. Not heap allocation or timing."
+  },
+  {
+    "suite": "spread-hosts",
+    "op": "source_expressions",
+    "target": "client-aliases_4",
+    "reference": "client-aliases_4-budget",
+    "maxRatio": 1,
+    "note": "Executed production allocation expressions under spread/alias/event semantic controls; bounds retained writer, snapshot, own-key scan, and exceptional alias/event work. Not heap allocation or timing."
+  },
+  {
+    "suite": "spread-hosts",
+    "op": "source_expressions",
+    "target": "client-stable-events_4",
+    "reference": "client-stable-events_4-budget",
+    "maxRatio": 1,
+    "note": "Executed production allocation expressions under spread/alias/event semantic controls; bounds retained writer, snapshot, own-key scan, and exceptional alias/event work. Not heap allocation or timing."
+  },
+  {
+    "suite": "spread-hosts",
+    "op": "source_expressions",
+    "target": "client-changed-events_4",
+    "reference": "client-changed-events_4-budget",
+    "maxRatio": 1,
+    "note": "Executed production allocation expressions under spread/alias/event semantic controls; bounds retained writer, snapshot, own-key scan, and exceptional alias/event work. Not heap allocation or timing."
+  },
+  {
+    "suite": "spread-hosts",
+    "op": "source_expressions",
+    "target": "client-canonical_15",
+    "reference": "client-canonical_15-budget",
+    "maxRatio": 1,
+    "note": "Executed production allocation expressions under spread/alias/event semantic controls; bounds retained writer, snapshot, own-key scan, and exceptional alias/event work. Not heap allocation or timing."
+  },
+  {
+    "suite": "spread-hosts",
+    "op": "source_expressions",
+    "target": "client-aliases_15",
+    "reference": "client-aliases_15-budget",
+    "maxRatio": 1,
+    "note": "Executed production allocation expressions under spread/alias/event semantic controls; bounds retained writer, snapshot, own-key scan, and exceptional alias/event work. Not heap allocation or timing."
+  },
+  {
+    "suite": "spread-hosts",
+    "op": "source_expressions",
+    "target": "client-stable-events_15",
+    "reference": "client-stable-events_15-budget",
+    "maxRatio": 1,
+    "note": "Executed production allocation expressions under spread/alias/event semantic controls; bounds retained writer, snapshot, own-key scan, and exceptional alias/event work. Not heap allocation or timing."
+  },
+  {
+    "suite": "spread-hosts",
+    "op": "source_expressions",
+    "target": "client-changed-events_15",
+    "reference": "client-changed-events_15-budget",
+    "maxRatio": 1,
+    "note": "Executed production allocation expressions under spread/alias/event semantic controls; bounds retained writer, snapshot, own-key scan, and exceptional alias/event work. Not heap allocation or timing."
+  },
+  {
+    "suite": "spread-hosts",
+    "op": "source_expressions",
+    "target": "client-canonical_50",
+    "reference": "client-canonical_50-budget",
+    "maxRatio": 1,
+    "note": "Executed production allocation expressions under spread/alias/event semantic controls; bounds retained writer, snapshot, own-key scan, and exceptional alias/event work. Not heap allocation or timing."
+  },
+  {
+    "suite": "spread-hosts",
+    "op": "source_expressions",
+    "target": "client-aliases_50",
+    "reference": "client-aliases_50-budget",
+    "maxRatio": 1,
+    "note": "Executed production allocation expressions under spread/alias/event semantic controls; bounds retained writer, snapshot, own-key scan, and exceptional alias/event work. Not heap allocation or timing."
+  },
+  {
+    "suite": "spread-hosts",
+    "op": "source_expressions",
+    "target": "client-stable-events_50",
+    "reference": "client-stable-events_50-budget",
+    "maxRatio": 1,
+    "note": "Executed production allocation expressions under spread/alias/event semantic controls; bounds retained writer, snapshot, own-key scan, and exceptional alias/event work. Not heap allocation or timing."
+  },
+  {
+    "suite": "spread-hosts",
+    "op": "source_expressions",
+    "target": "client-changed-events_50",
+    "reference": "client-changed-events_50-budget",
+    "maxRatio": 1,
+    "note": "Executed production allocation expressions under spread/alias/event semantic controls; bounds retained writer, snapshot, own-key scan, and exceptional alias/event work. Not heap allocation or timing."
+  },
+  {
+    "suite": "spread-hosts",
+    "op": "source_expressions",
+    "target": "ssr-canonical_4",
+    "reference": "ssr-canonical_4-budget",
+    "maxRatio": 1,
+    "note": "Executed production allocation expressions under spread/alias/event semantic controls; bounds retained writer, snapshot, own-key scan, and exceptional alias/event work. Not heap allocation or timing."
+  },
+  {
+    "suite": "spread-hosts",
+    "op": "source_expressions",
+    "target": "ssr-aliases_4",
+    "reference": "ssr-aliases_4-budget",
+    "maxRatio": 1,
+    "note": "Executed production allocation expressions under spread/alias/event semantic controls; bounds retained writer, snapshot, own-key scan, and exceptional alias/event work. Not heap allocation or timing."
+  },
+  {
+    "suite": "spread-hosts",
+    "op": "source_expressions",
+    "target": "ssr-canonical_15",
+    "reference": "ssr-canonical_15-budget",
+    "maxRatio": 1,
+    "note": "Executed production allocation expressions under spread/alias/event semantic controls; bounds retained writer, snapshot, own-key scan, and exceptional alias/event work. Not heap allocation or timing."
+  },
+  {
+    "suite": "spread-hosts",
+    "op": "source_expressions",
+    "target": "ssr-aliases_15",
+    "reference": "ssr-aliases_15-budget",
+    "maxRatio": 1,
+    "note": "Executed production allocation expressions under spread/alias/event semantic controls; bounds retained writer, snapshot, own-key scan, and exceptional alias/event work. Not heap allocation or timing."
+  },
+  {
+    "suite": "spread-hosts",
+    "op": "source_expressions",
+    "target": "ssr-canonical_50",
+    "reference": "ssr-canonical_50-budget",
+    "maxRatio": 1,
+    "note": "Executed production allocation expressions under spread/alias/event semantic controls; bounds retained writer, snapshot, own-key scan, and exceptional alias/event work. Not heap allocation or timing."
+  },
+  {
+    "suite": "spread-hosts",
+    "op": "source_expressions",
+    "target": "ssr-aliases_50",
+    "reference": "ssr-aliases_50-budget",
+    "maxRatio": 1,
+    "note": "Executed production allocation expressions under spread/alias/event semantic controls; bounds retained writer, snapshot, own-key scan, and exceptional alias/event work. Not heap allocation or timing."
+  },
+  {
+    "suite": "event-delegation",
+    "op": "setProbes",
+    "target": "dispatch-work",
+    "reference": "dispatch-work-model",
+    "maxRatio": 0,
+    "note": "Production portal-free native dispatch retains framework/native order and exact public descriptors while avoiding repeated event-type sets, portal ancestry reads, and private symbols."
+  },
+  {
+    "suite": "event-delegation",
+    "op": "portalReads",
+    "target": "dispatch-work",
+    "reference": "dispatch-work-model",
+    "maxRatio": 0,
+    "note": "Production portal-free native dispatch retains framework/native order and exact public descriptors while avoiding repeated event-type sets, portal ancestry reads, and private symbols."
+  },
+  {
+    "suite": "event-delegation",
+    "op": "symbolPeak",
+    "target": "dispatch-work",
+    "reference": "dispatch-work-model",
+    "maxRatio": 0,
+    "note": "Production portal-free native dispatch retains framework/native order and exact public descriptors while avoiding repeated event-type sets, portal ancestry reads, and private symbols."
+  },
+  {
+    "suite": "event-delegation",
+    "op": "typeLookups",
+    "target": "dispatch-work",
+    "reference": "dispatch-work-model",
+    "maxRatio": 1,
+    "note": "Production portal-free native dispatch retains framework/native order and exact public descriptors while avoiding repeated event-type sets, portal ancestry reads, and private symbols."
   }
 ]

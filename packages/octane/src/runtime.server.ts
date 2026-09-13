@@ -2863,7 +2863,7 @@ export function ssrAttrs(
 ): string {
 	namespace = resolveAttributeNamespace(namespace);
 	interface PropWriter {
-		rawName: string;
+		name: string;
 		value: unknown;
 		firstOrder: number;
 		lastOrder: number;
@@ -2875,12 +2875,12 @@ export function ssrAttrs(
 		if (typeof rawName !== 'string') return;
 		const order = sourceOrder++;
 		const previous = props.get(rawName);
-		props.set(rawName, {
-			rawName,
-			value,
-			firstOrder: previous?.firstOrder ?? order,
-			lastOrder: order,
-		});
+		if (previous !== undefined) {
+			previous.value = value;
+			previous.lastOrder = order;
+		} else {
+			props.set(rawName, { name: rawName, value, firstOrder: order, lastOrder: order });
+		}
 	}
 
 	for (const [isSpread, sourceOrName, directValue, merge] of sources) {
@@ -2924,7 +2924,7 @@ export function ssrAttrs(
 		// the original Map already holds their final values in insertion order.
 		if (canonical) {
 			let out = '';
-			for (const { rawName, value } of props.values()) {
+			for (const { name: rawName, value } of props.values()) {
 				if (
 					rawName === 'dangerouslySetInnerHTML' ||
 					(skipFormControls && isAggregatedFormAttribute(tag, rawName))
@@ -2936,13 +2936,12 @@ export function ssrAttrs(
 		}
 	}
 
-	const resolved = new Map<
-		string,
-		readonly [name: string, value: unknown, firstOrder: number, lastOrder: number]
-	>();
+	// Reuse the raw writer after all source reads; its normalized name is private
+	// to this resolution and the original Map is no longer consulted by name.
+	const resolved = new Map<string, PropWriter>();
 	let needsWinningOrderSort = false;
 	for (const writer of props.values()) {
-		const { rawName, value, firstOrder, lastOrder } = writer;
+		const { name: rawName, lastOrder } = writer;
 		if (
 			rawName === 'key' ||
 			rawName === 'ref' ||
@@ -2966,56 +2965,54 @@ export function ssrAttrs(
 		const identity = namespace === 'html' ? name.toLowerCase() : name;
 		const previous = resolved.get(identity);
 		if (previous !== undefined) {
-			if (previous[3] >= lastOrder) continue;
+			if (previous.lastOrder >= lastOrder) continue;
 			// Map order already matches firstOrder unless a later raw alias replaces
 			// an earlier normalized identity without moving its Map entry.
 			needsWinningOrderSort = true;
 		}
-		resolved.set(identity, [
+		writer.name =
 			process.env.NODE_ENV !== 'production' && (rawName === 'tabIndex' || rawName === 'htmlFor')
 				? rawName
-				: name,
-			value,
-			firstOrder,
-			lastOrder,
-		]);
+				: name;
+		resolved.set(identity, writer);
 	}
 	if (classMerges !== null) {
 		for (const extra of classMerges) {
-			const name = normalizeSsrAttributeName(extra.rawName, tag, namespace);
-			if (!VALID_ATTR_NAME.test(name)) continue;
-			const identity = namespace === 'html' ? name.toLowerCase() : name;
-			const previous = resolved.get(identity);
+			const previous = resolved.get('class');
 			if (previous !== undefined) {
-				resolved.set(identity, [
-					previous[0],
-					mergeClass(previous[1], extra.value),
-					previous[2],
-					extra.order,
-				]);
-				continue;
+				previous.value = mergeClass(previous.value, extra.value);
+				previous.lastOrder = extra.order;
+			} else {
+				resolved.set('class', {
+					name: 'class',
+					value: extra.value,
+					firstOrder: extra.order,
+					lastOrder: extra.order,
+				});
 			}
-			resolved.set(identity, [name, extra.value, extra.order, extra.order]);
 		}
 	}
 
 	let out = '';
-	const ordered = [...resolved.values()];
-	if (needsWinningOrderSort) ordered.sort((a, b) => a[2] - b[2]);
+	const ordered =
+		process.env.NODE_ENV !== 'production' || needsWinningOrderSort
+			? [...resolved.values()]
+			: resolved.values();
+	if (needsWinningOrderSort) (ordered as PropWriter[]).sort((a, b) => a.firstOrder - b.firstOrder);
 	if (process.env.NODE_ENV !== 'production') {
 		devValidateSsrAriaProps(
-			ordered.map(([name]) => name),
+			(ordered as PropWriter[]).map(({ name }) => name),
 			tag,
 			namespace,
 		);
 		devValidateSsrHostProps(
-			ordered.map(([name, value]) => [name, value] as const),
+			(ordered as PropWriter[]).map(({ name, value }) => [name, value] as const),
 			tag,
 			namespace,
 		);
 		if (tag === 'form' || tag === 'button' || tag === 'input') {
 			const formProps: Record<string, unknown> = Object.create(null);
-			for (const [name, value] of ordered) formProps[name] = value;
+			for (const { name, value } of ordered) formProps[name] = value;
 			const action =
 				tag === 'form' ? formProps.action : (formProps.formAction ?? formProps.formaction);
 			if (typeof action === 'function') devValidateSsrFormProps(tag, formProps);
@@ -3023,16 +3020,16 @@ export function ssrAttrs(
 	}
 	if (
 		process.env.NODE_ENV !== 'production' &&
-		ordered.some(([name, value]) => name === 'is' && typeof value === 'string')
+		(ordered as PropWriter[]).some(({ name, value }) => name === 'is' && typeof value === 'string')
 	) {
 		DEV_SSR_CUSTOM_HOST_DEPTH++;
 		try {
-			for (const [name, value] of ordered) out += ssrAttrEntry(name, value, tag, namespace);
+			for (const { name, value } of ordered) out += ssrAttrEntry(name, value, tag, namespace);
 		} finally {
 			DEV_SSR_CUSTOM_HOST_DEPTH--;
 		}
 	} else {
-		for (const [name, value] of ordered) {
+		for (const { name, value } of ordered) {
 			out += ssrAttrEntry(name, value, tag, namespace);
 		}
 	}

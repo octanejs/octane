@@ -1,0 +1,31 @@
+diff --git a/tests/upstream/not-found-route-context.test.tsx b/tests/upstream/not-found-route-context.test.tsx
+--- a/tests/upstream/not-found-route-context.test.tsx
++++ b/tests/upstream/not-found-route-context.test.tsx
+@@ -1,3 +1,4 @@
++import { runServerFixture } from '../ssr-fixture'
+ import { cleanup, render, screen } from '@octanejs/testing-library'
+ import { afterEach, expect, test, vi } from 'vitest'
+ import {
+@@ -91,21 +92,7 @@ test('a client load-phase not-found preserves inherited ancestor context', async
+ })
+ 
+ test('an SSR load-phase not-found preserves inherited ancestor context', async () => {
+-  const response = await createRequestHandler({
+-    request: new Request('http://localhost/parent/child'),
+-    createRouter: () =>
+-      createRouter({
+-        routeTree: createRouteTree(),
+-        context: { routerValue: 'from router' },
+-        isServer: true,
+-      }),
+-  })(({ router, responseHeaders }) =>
+-    renderRouterToString({
+-      router,
+-      responseHeaders,
+-      children: <RouterServer router={router} />,
+-    }),
+-  )
++  const response = await runServerFixture<Response>('_fixtures/error-ssr-parity.tsx', 'renderNotFoundContext')
+ 
+   const html = await response.text()
+ 

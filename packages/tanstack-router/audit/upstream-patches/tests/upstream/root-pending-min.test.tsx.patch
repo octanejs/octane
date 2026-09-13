@@ -1,0 +1,84 @@
+diff --git a/tests/upstream/root-pending-min.test.tsx b/tests/upstream/root-pending-min.test.tsx
+--- a/tests/upstream/root-pending-min.test.tsx
++++ b/tests/upstream/root-pending-min.test.tsx
+@@ -1,3 +1,5 @@
++import { runServerFixture } from '../ssr-fixture'
++import { makeStateRoute } from '../_fixtures/root-hydration-parity'
+ import * as React from 'octane'
+ import { act, cleanup, render, screen } from '@octanejs/testing-library'
+ import { hydrateRoot } from 'octane'
+@@ -110,17 +112,8 @@ test('root route hydration without a pending boundary preserves component state'
+   const unmounts = vi.fn()
+   const initializers = vi.fn(() => 'preserved')
+ 
+-  const rootRoute = createRootRoute({
+-    pendingComponent: () => <div>Root pending</div>,
+-    component: function RootComponent() {
+-      const [value] = React.useState(initializers)
+-      React.useEffect(() => {
+-        mounts()
+-        return unmounts
+-      }, [])
+-      return <div data-testid="root-content">{value}</div>
+-    },
+-  })
++  const rootRoute = makeStateRoute(initializers, mounts, unmounts)
++
+   const router = createRouter({
+     routeTree: rootRoute,
+     history: createMemoryHistory({ initialEntries: ['/'] }),
+@@ -131,7 +124,7 @@ test('root route hydration without a pending boundary preserves component state'
+   // without a separate shell stays unwrapped on both sides of hydration.
+   router.ssr = { manifest: { routes: {} } }
+   router.isServer = true
+-  const html = renderToString(<RouterProvider router={router} />)
++  const html = await runServerFixture<string>('_fixtures/root-hydration-parity.tsx', 'renderStateRoute', initializers, mounts, unmounts)
+   router.isServer = false
+   expect(html).not.toContain('<!--$-->')
+   expect(html).toContain('preserved')
+@@ -142,7 +135,7 @@ test('root route hydration without a pending boundary preserves component state'
+   const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+   let root!: ReturnType<typeof hydrateRoot>
+   await act(async () => {
+-    root = hydrateRoot(container, <RouterProvider router={router} />)
++    root = hydrateRoot(container, RouterProvider, { router })
+     testCleanups.push(async () => {
+       await act(() => root.unmount())
+       consoleError.mockRestore()
+@@ -178,34 +171,14 @@ test('an unresolved functional ssr option does not enable a root pending boundar
+   // hydration replaces it with its transported value.
+   router.ssr = { manifest: { routes: {} } }
+   router.isServer = true
+-  const html = renderToString(<RouterProvider router={router} />)
++  const html = await runServerFixture<string>('_fixtures/root-hydration-parity.tsx', 'renderFunctionalRoute')
+ 
+   expect(html).not.toContain('<!--$-->')
+   expect(html).toContain('Root content')
+ })
+ 
+ test('server rendering uses the root pending boundary inside its document shell', async () => {
+-  const gate = createControlledPromise<void>()
+-  const rootRoute = createRootRoute({
+-    pendingComponent: () => <div>Server root pending</div>,
+-    shellComponent: ({ children }) => (
+-      <html>
+-        <head />
+-        <body>{children}</body>
+-      </html>
+-    ),
+-    component: () => {
+-      throw gate
+-    },
+-  })
+-  const router = createRouter({
+-    routeTree: rootRoute,
+-    history: createMemoryHistory({ initialEntries: ['/'] }),
+-  })
+-  router.isServer = true
+-  await router.load()
+-
+-  const html = renderToString(<RouterProvider router={router} />)
++  const html = await runServerFixture<string>('_fixtures/root-hydration-parity.tsx', 'renderPendingShell')
+ 
+   // renderToString cannot wait for Suspense, but the boundary inside the root
+   // shell contains the suspension and emits its fallback.

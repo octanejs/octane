@@ -147,10 +147,6 @@ const packedTsrxSourceExceptions = new Map([
 		'@octanejs/solana-kit',
 		'its TanStack Query peer declarations are not yet compatible with the installed strict consumer graph',
 	],
-	[
-		'@octanejs/tanstack-router',
-		'its browser source reads process.env.NODE_ENV and its upstream declarations import node:http2',
-	],
 	['@octanejs/tiptap', 'its browser source still reads process.env.NODE_ENV'],
 	[
 		'@octanejs/wagmi',
@@ -1145,7 +1141,12 @@ function validatePackedTsrxConsumer(tempRoot, archives, packedFiles, packedManif
 	const browserSourceConsumerSpecifiers = new Map(
 		browserSourceConsumerPackages.map((packageName) => [
 			packageName,
-			sourceConsumerSpecifiers.get(packageName),
+			findPackedTsrxSourceConsumerSpecifiers(
+				packageName,
+				packedManifests.get(packageName),
+				packedFiles.get(packageName),
+				{ nodeTypes: false },
+			),
 		]),
 	);
 	const strictBrowserSpecifiers = PACKED_STRICT_BROWSER_SOURCE_PACKAGES.flatMap((packageName) => {

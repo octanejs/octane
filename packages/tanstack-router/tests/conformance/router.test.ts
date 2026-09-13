@@ -6,6 +6,7 @@ import {
 	createRootRoute,
 	createRoute,
 	createRouter,
+	isNotFound,
 } from '@octanejs/tanstack-router';
 import { makeRouter } from '../_fixtures/basic.tsrx';
 
@@ -157,28 +158,35 @@ describe('@octanejs/tanstack-router core seam', () => {
 	it.each([
 		['/load-failure', 500],
 		['/load-not-found', 404],
-	])('finalizes the %s status after a deferred match commit', async (path, expectedStatus) => {
-		const router = makeRouter(path);
-		router.options.defaultViewTransition = true;
-		const transition = deferViewTransitionCommit();
+	])(
+		'publishes the %s failure only after its deferred match commit',
+		async (path, expectedStatus) => {
+			const router = makeRouter(path);
+			router.options.defaultViewTransition = true;
+			const transition = deferViewTransitionCommit();
 
-		try {
-			const load = router.load();
-			await transition.updateQueued;
-			expect(router.state.matches).toHaveLength(0);
-			expect(router.state.statusCode).toBe(200);
+			try {
+				const load = router.load();
+				await transition.updateQueued;
+				expect(router.state.matches).toHaveLength(0);
+				expect(router.state.status).toBe('pending');
 
-			await transition.runUpdate();
-			await load;
+				await transition.runUpdate();
+				await load;
 
-			expect(router.state.matches).not.toHaveLength(0);
-			expect(router.state.statusCode).toBe(expectedStatus);
-		} finally {
-			transition.restore();
-		}
-	});
+				expect(router.state.matches).not.toHaveLength(0);
+				expect(
+					router.state.matches.some((match) =>
+						expectedStatus === 404 ? isNotFound(match.error) : match.status === 'error',
+					),
+				).toBe(true);
+			} finally {
+				transition.restore();
+			}
+		},
+	);
 
-	it('resets a stale failure status after a deferred successful reload', async () => {
+	it('replaces failed matches only after a deferred successful reload', async () => {
 		const { router, recover } = makeRecoverableStatusRouter();
 		router.options.defaultViewTransition = true;
 		const failedTransition = deferViewTransitionCommit();
@@ -188,7 +196,7 @@ describe('@octanejs/tanstack-router core seam', () => {
 			await failedTransition.updateQueued;
 			await failedTransition.runUpdate();
 			await failedLoad;
-			expect(router.state.statusCode).toBe(500);
+			expect(router.state.matches.some((match) => match.status === 'error')).toBe(true);
 		} finally {
 			failedTransition.restore();
 		}
@@ -200,14 +208,14 @@ describe('@octanejs/tanstack-router core seam', () => {
 			await successfulTransition.updateQueued;
 			await new Promise((resolve) => setTimeout(resolve, 0));
 
-			// RouterCore has finalized against the still-active failed tree while
-			// the platform holds the successful commit for a later task.
-			expect(router.state.statusCode).toBe(500);
+			// The failed tree remains active while the platform holds the successful
+			// commit for a later task.
+			expect(router.state.matches.some((match) => match.status === 'error')).toBe(true);
 			await successfulTransition.runUpdate();
 			await successfulLoad;
 
 			expect(router.state.matches.some((match: any) => match.status === 'error')).toBe(false);
-			expect(router.state.statusCode).toBe(200);
+			expect(router.state.matches.every((match) => match.status === 'success')).toBe(true);
 		} finally {
 			successfulTransition.restore();
 		}
@@ -235,7 +243,7 @@ describe('@octanejs/tanstack-router core seam', () => {
 		}
 
 		await expect(router.load()).resolves.toBeUndefined();
-		expect(router.state.statusCode).toBe(200);
+		expect(router.state.matches.every((match) => match.status === 'success')).toBe(true);
 	});
 
 	it('waits for a prior platform commit without inheriting its failure', async () => {
@@ -267,7 +275,7 @@ describe('@octanejs/tanstack-router core seam', () => {
 			await transitions.runUpdate(0);
 			await load;
 			expect(loadSettled).toBe(true);
-			expect(router.state.statusCode).toBe(200);
+			expect(router.state.matches.every((match) => match.status === 'success')).toBe(true);
 		} finally {
 			transitions.restore();
 		}

@@ -1,0 +1,15 @@
+diff --git a/tests/upstream/Asset.test.tsx b/tests/upstream/Asset.test.tsx
+--- a/tests/upstream/Asset.test.tsx
++++ b/tests/upstream/Asset.test.tsx
+@@ -59,7 +59,10 @@ test.each([
+     rerender(renderAsset(updated, 'updated'))
+     expect(getByTestId('asset')).toBe(element)
+     expect(element.textContent).toBe(updated)
+-    expect(element.firstChild).not.toBe(text)
++    // DIVERGENCE: Octane updates inert script text through Text.data, retaining
++    // the text node. Style innerHTML keeps the upstream replacement behavior.
++    if (asset.tag === 'script') expect(element.firstChild).toBe(text)
++    else expect(element.firstChild).not.toBe(text)
+ 
+     rerender(renderAsset('', 'empty'))
+     expect(element.textContent).toBe('')

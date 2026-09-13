@@ -31,6 +31,12 @@ baseUIAliases.set('useMediaQuery', {
 // not re-export it. The witness must pass the same npm-byte authentication.
 const jotaiHydrationWitness = '@octanejs/jotai#hydration-types';
 export function publicCompatibilityDeclarations(binding) {
+	if (binding === '@octanejs/tanstack-router')
+		return new Map([
+			['@octanejs/tanstack-router#blocker-types', 'dist/esm/useBlocker.d.ts'],
+			['@octanejs/tanstack-router#serializer-types', 'dist/esm/ssr/serializer.d.ts'],
+		]);
+
 	if (binding === '@octanejs/jotai')
 		return new Map([[jotaiHydrationWitness, 'dist/react/utils/useHydrateAtoms.d.ts']]);
 	if (binding === '@octanejs/tanstack-query')
@@ -41,6 +47,45 @@ export function publicCompatibilityDeclarations(binding) {
 }
 
 export function publicCompatibilityExport(specifier, name) {
+	// Native SSR compiles an App component with router props in a separate graph.
+	if (
+		specifier === '@octanejs/tanstack-router/ssr/server' &&
+		['renderRouterToString', 'renderRouterToStream'].includes(name)
+	)
+		return { specifier: specifier + '#prior-binding', path: name };
+	if (specifier === '@octanejs/tanstack-router' && name === 'SerializerExtensions')
+		return {
+			specifier: specifier + '#serializer-types',
+			path: name,
+			augmentedModule: '@tanstack/router-core',
+		};
+
+	// These named native exports are public return/parameter shapes upstream.
+	// Their declarations are local to the authenticated useBlocker module.
+	if (
+		specifier === '@octanejs/tanstack-router' &&
+		['BlockerResolver', 'ShouldBlockFnArgs'].includes(name)
+	)
+		return { specifier: specifier + '#blocker-types', path: name, localDeclaration: true };
+
+	// Retained native contracts: createRoute/NotFoundRoute keep the file-route,
+	// SSR and handlers slots separate; useRouter accepts an explicit router;
+	// component aliases carry Octane's compiled component calling convention.
+	// Every prior declaration is authenticated against the campaign baseline.
+	if (
+		specifier === '@octanejs/tanstack-router' &&
+		[
+			'createRoute',
+			'NotFoundRoute',
+			'AnyRootRoute',
+			'useRouter',
+			'AsyncRouteComponent',
+			'RouteComponent',
+			'ErrorRouteComponent',
+		].includes(name)
+	)
+		return { specifier: specifier + '#prior-binding', path: name };
+
 	if (specifier === '@octanejs/tanstack-table') {
 		const aliases = {
 			OctaneTable: 'ReactTable',

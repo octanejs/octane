@@ -1,0 +1,332 @@
+diff --git a/tests/upstream/Scripts.test.tsx b/tests/upstream/Scripts.test.tsx
+--- a/tests/upstream/Scripts.test.tsx
++++ b/tests/upstream/Scripts.test.tsx
+@@ -1,3 +1,4 @@
++import { runServerFixture } from '../ssr-fixture'
+ import { afterEach, describe, expect, test, vi } from 'vitest'
+ import {
+   act,
+@@ -121,158 +122,33 @@ describe('ssr scripts', () => {
+   })
+ 
+   test('excludes `undefined` script values', async () => {
+-    const rootRoute = createRootRoute({
+-      scripts: () => [
+-        { src: 'script.js' },
+-        undefined, // 'script2.js' opted out by certain conditions, such as `NODE_ENV=production`.
+-      ],
+-      component: () => {
+-        return (
+-          <div>
+-            <div data-testid="root">root</div>
+-            <Outlet />
+-            <Scripts />
+-          </div>
+-        )
+-      },
+-    })
+-
+-    const indexRoute = createRoute({
+-      path: '/',
+-      getParentRoute: () => rootRoute,
+-      scripts: () => [{ src: 'script3.js' }],
+-      component: () => {
+-        return <div data-testid="index">index</div>
+-      },
+-    })
+-
+-    const router = createRouter({
+-      history: createMemoryHistory({
+-        initialEntries: ['/'],
+-      }),
+-      routeTree: rootRoute.addChildren([indexRoute]),
+-      isServer: true,
+-    })
+-
+-    await router.load()
+-
+-    expect(router.state.matches.map((d) => d.scripts).flat(1)).toEqual([
++    const { html, matches } = await runServerFixture<{ html: string; matches: any[]; jsonLd?: string }>('_fixtures/scripts-ssr-parity.tsx', 'renderDefinedScripts')
++    expect(matches.map((d) => d.scripts).flat(1)).toEqual([
+       { src: 'script.js' },
+       undefined,
+       { src: 'script3.js' },
+     ])
+ 
+-    const html = ReactDOMServer.renderToString(
+-      <RouterProvider router={router} />,
+-    )
+-    expect(html).toContain('<script src="script.js"></script>')
+-    expect(html).toContain('<script src="script3.js"></script>')
++
++    const document = new DOMParser().parseFromString(html, 'text/html')
++    expect(document.querySelector('script[src="script.js"]')).not.toBeNull()
++    expect(document.querySelector('script[src="script3.js"]')).not.toBeNull()
+     expect(html).not.toContain('script2.js')
+   })
+ })
+ 
+ describe('scripts with async/defer attributes', () => {
+   test('server renders scripts with async/defer attributes in output', async () => {
+-    const rootRoute = createRootRoute({
+-      scripts: () => [
+-        {
+-          src: 'script.js',
+-          async: true,
+-        },
+-        {
+-          src: 'script2.js',
+-          defer: true,
+-        },
+-      ],
+-      component: () => {
+-        return (
+-          <div>
+-            <div data-testid="server-root">root</div>
+-            <Outlet />
+-            <Scripts />
+-          </div>
+-        )
+-      },
+-    })
+-
+-    const indexRoute = createRoute({
+-      path: '/',
+-      getParentRoute: () => rootRoute,
+-      component: () => {
+-        return <div data-testid="server-index">index</div>
+-      },
+-    })
+-
+-    const router = createRouter({
+-      history: createMemoryHistory({
+-        initialEntries: ['/'],
+-      }),
+-      routeTree: rootRoute.addChildren([indexRoute]),
+-      isServer: true,
+-    })
+-
+-    await router.load()
++    const { html, matches } = await runServerFixture<{ html: string; matches: any[]; jsonLd?: string }>('_fixtures/scripts-ssr-parity.tsx', 'renderAsyncDeferScripts')
+ 
+-    // Use ReactDOMServer.renderToString to test actual server output
+-    const html = ReactDOMServer.renderToString(
+-      <RouterProvider router={router} />,
+-    )
+ 
+     expect(html).toMatch(/<script[^>]*src="script\.js"[^>]*async=""/)
+     expect(html).toMatch(/<script[^>]*src="script2\.js"[^>]*defer=""/)
+   })
+ 
+   test('server keeps manifest src scripts in document order', async () => {
+-    const clientEntryAsset = {
+-      attrs: {
+-        src: '/entry.js',
+-        type: 'module',
+-        async: true,
+-      },
+-    } satisfies NonNullable<Manifest['routes'][string]['scripts']>[number]
+-
+-    const rootRoute = createRootRoute({
+-      component: () => {
+-        return (
+-          <html>
+-            <head />
+-            <body>
+-              <main data-testid="content">content</main>
+-              <Outlet />
+-              <Scripts />
+-            </body>
+-          </html>
+-        )
+-      },
+-    })
+-
+-    const indexRoute = createRoute({
+-      path: '/',
+-      getParentRoute: () => rootRoute,
+-    })
+-
+-    const router = createRouter({
+-      history: createMemoryHistory({
+-        initialEntries: ['/'],
+-      }),
+-      routeTree: rootRoute.addChildren([indexRoute]),
+-      isServer: true,
+-    })
+-    router.ssr = {
+-      manifest: {
+-        routes: {
+-          [rootRoute.id]: {
+-            scripts: [clientEntryAsset],
+-          },
+-        },
+-      },
+-    }
+-
+-    await router.load()
++    const { html, matches } = await runServerFixture<{ html: string; matches: any[]; jsonLd?: string }>('_fixtures/scripts-ssr-parity.tsx', 'renderManifestScripts')
+ 
+-    const html = ReactDOMServer.renderToString(
+-      <RouterProvider router={router} />,
+-    )
+     const contentIndex = html.indexOf('<main data-testid="content">')
+     const scriptIndex = html.indexOf('src="/entry.js"')
+ 
+@@ -452,82 +328,8 @@ describe('ssr HeadContent', () => {
+   })
+ 
+   test('derives title, dedupes meta, and allows non-loader HeadContent', async () => {
+-    const rootRoute = createRootRoute({
+-      loader: () =>
+-        new Promise((r) => setTimeout(r, 1)).then(() => ({
+-          description: 'Root',
+-        })),
+-      head: ({ loaderData }) => {
+-        return {
+-          meta: [
+-            {
+-              title: 'Root',
+-            },
+-            {
+-              name: 'description',
+-              content: loaderData?.description,
+-            },
+-            {
+-              name: 'image',
+-              content: 'image.jpg',
+-            },
+-            {
+-              property: 'og:image',
+-              content: 'root-image.jpg',
+-            },
+-            {
+-              property: 'og:description',
+-              content: 'Root description',
+-            },
+-          ],
+-        }
+-      },
+-      component: () => {
+-        return <HeadContent />
+-      },
+-    })
+-
+-    const indexRoute = createRoute({
+-      path: '/',
+-      getParentRoute: () => rootRoute,
+-      loader: () =>
+-        new Promise((r) => setTimeout(r, 2)).then(() => ({
+-          description: 'Index',
+-        })),
+-      head: ({ loaderData }) => {
+-        return {
+-          meta: [
+-            {
+-              title: 'Index',
+-            },
+-            {
+-              name: 'description',
+-              content: loaderData?.description,
+-            },
+-            {
+-              name: 'last-modified',
+-              content: '2021-10-10',
+-            },
+-            {
+-              property: 'og:image',
+-              content: 'index-image.jpg',
+-            },
+-          ],
+-        }
+-      },
+-    })
+-
+-    const router = createRouter({
+-      history: createMemoryHistory({
+-        initialEntries: ['/'],
+-      }),
+-      routeTree: rootRoute.addChildren([indexRoute]),
+-      isServer: true,
+-    })
+-
+-    await router.load()
+-
+-    expect(router.state.matches.map((d) => d.meta).flat(1)).toEqual([
++    const { html, matches } = await runServerFixture<{ html: string; matches: any[]; jsonLd?: string }>('_fixtures/scripts-ssr-parity.tsx', 'renderMetadata')
++    expect(matches.map((d) => d.meta).flat(1)).toEqual([
+       { title: 'Root' },
+       { name: 'description', content: 'Root' },
+       { name: 'image', content: 'image.jpg' },
+@@ -539,11 +341,16 @@ describe('ssr HeadContent', () => {
+       { property: 'og:image', content: 'index-image.jpg' },
+     ])
+ 
+-    const html = ReactDOMServer.renderToString(
+-      <RouterProvider router={router} />,
+-    )
+-    expect(html).toEqual(
+-      `<title>Index</title><meta name="image" content="image.jpg"/><meta property="og:description" content="Root description"/><meta name="description" content="Index"/><meta name="last-modified" content="2021-10-10"/><meta property="og:image" content="index-image.jpg"/>`,
++
++    // DIVERGENCE: compare ordered public metadata after native hydration markers
++    // and asset ownership attributes, which are retained for client adoption.
++    const metadata = new DOMParser().parseFromString(html, 'text/html')
++    for (const element of metadata.querySelectorAll('[data-tsr-managed-key]')) {
++      element.removeAttribute('data-tsr-managed-key')
++    }
++    const renderedMetadata = Array.from(metadata.querySelectorAll('title, meta'), element => element.outerHTML).join('')
++    expect(renderedMetadata).toEqual(
++      `<title>Index</title><meta name="image" content="image.jpg"><meta property="og:description" content="Root description"><meta name="description" content="Index"><meta name="last-modified" content="2021-10-10"><meta property="og:image" content="index-image.jpg">`,
+     )
+   })
+ 
+@@ -1081,48 +888,8 @@ describe('ssr HeadContent', () => {
+ 
+ describe('data script rendering', () => {
+   test('data script renders content on server (SSR)', async () => {
+-    const jsonLd = JSON.stringify({
+-      '@context': 'https://schema.org',
+-      '@type': 'Article',
+-      headline: 'Test Article',
+-    })
++    const { html, matches, jsonLd } = await runServerFixture<{ html: string; matches: any[]; jsonLd?: string }>('_fixtures/scripts-ssr-parity.tsx', 'renderDataScript')
+ 
+-    const rootRoute = createRootRoute({
+-      scripts: () => [
+-        {
+-          type: 'application/ld+json',
+-          children: jsonLd,
+-        },
+-      ],
+-      component: () => {
+-        return (
+-          <div>
+-            <div data-testid="ssr-root">root</div>
+-            <Outlet />
+-            <Scripts />
+-          </div>
+-        )
+-      },
+-    })
+-
+-    const indexRoute = createRoute({
+-      path: '/',
+-      getParentRoute: () => rootRoute,
+-    })
+-
+-    const router = createRouter({
+-      history: createMemoryHistory({
+-        initialEntries: ['/'],
+-      }),
+-      routeTree: rootRoute.addChildren([indexRoute]),
+-      isServer: true,
+-    })
+-
+-    await router.load()
+-
+-    const html = ReactDOMServer.renderToString(
+-      <RouterProvider router={router} />,
+-    )
+ 
+     expect(html).toContain('application/ld+json')
+     expect(html).toContain(jsonLd)

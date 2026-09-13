@@ -1,0 +1,367 @@
+diff --git a/tests/upstream/renderRouterToStream.test.tsx b/tests/upstream/renderRouterToStream.test.tsx
+--- a/tests/upstream/renderRouterToStream.test.tsx
++++ b/tests/upstream/renderRouterToStream.test.tsx
+@@ -2,24 +2,44 @@ import { afterEach, describe, expect, onTestFinished, test, vi } from 'vitest'
+ import { attachRouterServerSsrUtils } from '@tanstack/router-core/ssr/server'
+ import { createMemoryHistory, createRootRoute, createRouter } from '../../src'
+ 
+-const reactDomServerMocks = vi.hoisted(() => ({
+-  renderToReadableStream: undefined as undefined | (() => unknown),
+-  renderToPipeableStream: vi.fn(),
+-}))
+-
+-vi.mock('octane/server', () => ({
+-  default: reactDomServerMocks,
+-  ...reactDomServerMocks,
+-}))
+-
++// DIVERGENCE: this binding uses Octane's native ReadableStream and allReady
++// lifecycle. Fatal renderer errors arrive on the stream; onError only reports
++// recoverable errors. The corresponding cases retain body rejection, terminal
++// cleanup, setup failure, and cancellation-before-consumption assertions.
++const nativeServerMocks = vi.hoisted(() => ({ renderToReadableStream: vi.fn() }))
++vi.mock('octane/server', () => nativeServerMocks)
+ const { renderRouterToStream } = await import('../../src/ssr/renderRouterToStream')
+-
+ afterEach(() => {
+-  reactDomServerMocks.renderToReadableStream = undefined
+-  reactDomServerMocks.renderToPipeableStream.mockReset()
++  nativeServerMocks.renderToReadableStream.mockReset()
+   vi.restoreAllMocks()
+ })
+ 
++function createRendererStream(signal?: AbortSignal, aborted = vi.fn()) {
++  let controller!: ReadableStreamDefaultController<Uint8Array>
++  let finish!: () => void
++  let terminal = false
++  const allReady = new Promise<void>((resolve) => { finish = resolve })
++  const fail = (reason: unknown) => {
++    if (terminal) return
++    terminal = true
++    controller.error(reason)
++    signal?.removeEventListener('abort', onAbort)
++    finish()
++  }
++  const onAbort = () => { aborted(); fail(signal!.reason) }
++  const stream = Object.assign(new ReadableStream<Uint8Array>({
++    start(value) { controller = value },
++    cancel() {
++      terminal = true
++      signal?.removeEventListener('abort', onAbort)
++      finish()
++    },
++  }), { allReady })
++  if (signal?.aborted) onAbort()
++  else signal?.addEventListener('abort', onAbort, { once: true })
++  return { stream, fail, aborted }
++}
++
+ async function buildRouter() {
+   const rootRoute = createRootRoute({ component: () => null })
+   const router = createRouter({
+@@ -33,232 +53,115 @@ async function buildRouter() {
+   return router
+ }
+ 
+-async function expectBodyRejects(response: Response, message: string) {
++async function expectBodyRejects(response: Response, reason: unknown) {
+   const reader = response.body!.getReader()
+-  await expect(
+-    (async () => {
+-      for (;;) {
+-        const { done } = await reader.read()
+-        if (done) return
+-      }
+-    })(),
+-  ).rejects.toThrow(message)
++  const consumed = (async () => {
++    for (;;) {
++      const { done } = await reader.read()
++      if (done) return 'unexpected close'
++    }
++  })()
++  await expect(consumed).rejects.toBe(reason)
+ }
+ 
+-function unwrapResponse(
+-  result: Awaited<ReturnType<typeof renderRouterToStream>>,
+-) {
+-  return result.response
++async function renderResponse(router: Awaited<ReturnType<typeof buildRouter>>, signal?: AbortSignal) {
++  const result = await renderRouterToStream({
++    request: new Request('http://localhost/', { signal }),
++    router,
++    responseHeaders: new Headers(),
++    App: () => null,
++  })
++  return result instanceof Response ? result : result.response
+ }
+ 
+ describe('renderRouterToStream - pipeable sync errors', () => {
+   test('request abort cancels readable rendering without consuming the response body', async () => {
+-    const cancel = vi.fn()
+-    const stream = Object.assign(new ReadableStream<Uint8Array>({ cancel }), {
+-      allReady: Promise.resolve(),
+-    })
+-    reactDomServerMocks.renderToReadableStream = vi.fn(() => stream)
+-
++    const cancelled = vi.fn()
++    nativeServerMocks.renderToReadableStream.mockImplementation((_App, _props, options) =>
++      createRendererStream(options.signal, cancelled).stream)
+     const router = await buildRouter()
+     const controller = new AbortController()
+-    onTestFinished(() => {
+-      router.serverSsr?.cleanup()
+-    })
+-
+-    const response = unwrapResponse(
+-      await renderRouterToStream({
+-        request: new Request('http://localhost/', {
+-          signal: controller.signal,
+-        }),
+-        router,
+-        responseHeaders: new Headers(),
+-        children: null,
+-      }),
+-    )
+-
++    onTestFinished(() => router.serverSsr?.cleanup())
++    const response = await renderResponse(router, controller.signal)
+     expect(response.body).not.toBeNull()
+     controller.abort(new Error('request-gone'))
+-    await vi.waitFor(() => expect(cancel).toHaveBeenCalledOnce())
++    await vi.waitFor(() => expect(cancelled).toHaveBeenCalledOnce())
+   })
+ 
+   test('sync onError before pipeable is assigned still aborts pipeable', async () => {
+-    const abort = vi.fn()
+-    reactDomServerMocks.renderToPipeableStream.mockImplementationOnce(
+-      (_children, opts) => {
+-        opts.onError(new Error('sync-react-error'), { componentStack: '' })
+-        return { abort, pipe: vi.fn() }
+-      },
+-    )
+-
++    const failure = new Error('sync-react-error')
++    nativeServerMocks.renderToReadableStream.mockImplementationOnce(() => {
++      const renderer = createRendererStream()
++      renderer.fail(failure)
++      return renderer.stream
++    })
+     const router = await buildRouter()
+-    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+-    try {
+-      const response = unwrapResponse(
+-        await renderRouterToStream({
+-          request: new Request('http://localhost/'),
+-          router,
+-          responseHeaders: new Headers(),
+-          children: null,
+-        }),
+-      )
+-
+-      expect(abort).toHaveBeenCalledOnce()
+-      await expectBodyRejects(response, 'sync-react-error')
+-    } finally {
+-      errorSpy.mockRestore()
+-      router.serverSsr?.cleanup()
+-    }
++    const cleanup = vi.spyOn(router.serverSsr!, 'cleanup')
++    const response = await renderResponse(router)
++    await expectBodyRejects(response, failure)
++    expect(cleanup).toHaveBeenCalledOnce()
+   })
+ 
+   test('sync non-Error onError before pipeable assignment still errors body', async () => {
+-    const abort = vi.fn()
+-    reactDomServerMocks.renderToPipeableStream.mockImplementationOnce(
+-      (_children, opts) => {
+-        opts.onError('string-react-error', { componentStack: '' })
+-        return { abort, pipe: vi.fn() }
+-      },
+-    )
+-
++    const failure = 'string-react-error'
++    nativeServerMocks.renderToReadableStream.mockImplementationOnce(() => {
++      const renderer = createRendererStream()
++      renderer.fail(failure)
++      return renderer.stream
++    })
+     const router = await buildRouter()
+-    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+-    try {
+-      const response = unwrapResponse(
+-        await renderRouterToStream({
+-          request: new Request('http://localhost/'),
+-          router,
+-          responseHeaders: new Headers(),
+-          children: null,
+-        }),
+-      )
+-
+-      expect(abort).toHaveBeenCalledOnce()
+-      await expectBodyRejects(response, 'string-react-error')
+-    } finally {
+-      errorSpy.mockRestore()
+-      router.serverSsr?.cleanup()
+-    }
++    const cleanup = vi.spyOn(router.serverSsr!, 'cleanup')
++    const response = await renderResponse(router)
++    await expectBodyRejects(response, failure)
++    expect(cleanup).toHaveBeenCalledOnce()
+   })
+ 
+   test('sync undefined onError before pipeable assignment still errors body', async () => {
+-    const abort = vi.fn()
+-    reactDomServerMocks.renderToPipeableStream.mockImplementationOnce(
+-      (_children, opts) => {
+-        opts.onError(undefined, { componentStack: '' })
+-        return { abort, pipe: vi.fn() }
+-      },
+-    )
+-
++    nativeServerMocks.renderToReadableStream.mockImplementationOnce(() => {
++      const renderer = createRendererStream()
++      renderer.fail(undefined)
++      return renderer.stream
++    })
+     const router = await buildRouter()
+-    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+-    try {
+-      const response = unwrapResponse(
+-        await renderRouterToStream({
+-          request: new Request('http://localhost/'),
+-          router,
+-          responseHeaders: new Headers(),
+-          children: null,
+-        }),
+-      )
+-
+-      expect(abort).toHaveBeenCalledOnce()
+-      await expectBodyRejects(response, 'SSR aborted')
+-    } finally {
+-      errorSpy.mockRestore()
+-      router.serverSsr?.cleanup()
+-    }
++    const cleanup = vi.spyOn(router.serverSsr!, 'cleanup')
++    const response = await renderResponse(router)
++    await expectBodyRejects(response, undefined)
++    expect(cleanup).toHaveBeenCalledOnce()
+   })
+ 
+   test('undefined onError after response attach errors body', async () => {
+-    const abort = vi.fn()
+-    let onError!: (error: unknown, info: unknown) => void
+-    reactDomServerMocks.renderToPipeableStream.mockImplementationOnce(
+-      (_children, opts) => {
+-        onError = opts.onError
+-        return { abort, pipe: vi.fn() }
+-      },
+-    )
+-
++    const renderer = createRendererStream()
++    nativeServerMocks.renderToReadableStream.mockReturnValueOnce(renderer.stream)
+     const router = await buildRouter()
+-    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+-    try {
+-      const response = unwrapResponse(
+-        await renderRouterToStream({
+-          request: new Request('http://localhost/'),
+-          router,
+-          responseHeaders: new Headers(),
+-          children: null,
+-        }),
+-      )
+-
+-      onError(undefined, { componentStack: '' })
+-      expect(abort).toHaveBeenCalledOnce()
+-      await expectBodyRejects(response, 'SSR aborted')
+-    } finally {
+-      errorSpy.mockRestore()
+-      router.serverSsr?.cleanup()
+-    }
++    const cleanup = vi.spyOn(router.serverSsr!, 'cleanup')
++    const response = await renderResponse(router)
++    renderer.fail(undefined)
++    await expectBodyRejects(response, undefined)
++    expect(cleanup).toHaveBeenCalledOnce()
+   })
+ 
+   test('setup throw rejects instead of returning streamed 200', async () => {
+-    const setupError = new Error('setup-boom')
+-    reactDomServerMocks.renderToPipeableStream.mockImplementationOnce(() => {
+-      throw setupError
+-    })
+-
++    const failure = new Error('setup-boom')
++    nativeServerMocks.renderToReadableStream.mockImplementationOnce(() => { throw failure })
+     const router = await buildRouter()
+     const cleanup = vi.spyOn(router.serverSsr!, 'cleanup')
+-    const originalServerSsr = router.serverSsr!
+-    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+-    try {
+-      await expect(
+-        renderRouterToStream({
+-          request: new Request('http://localhost/'),
+-          router,
+-          responseHeaders: new Headers(),
+-          children: null,
+-        }),
+-      ).rejects.toThrow('setup-boom')
+-
+-      expect(cleanup).toHaveBeenCalledOnce()
+-    } finally {
+-      errorSpy.mockRestore()
+-      originalServerSsr.cleanup()
+-    }
++    await expect(renderResponse(router)).rejects.toBe(failure)
++    expect(cleanup).toHaveBeenCalledOnce()
+   })
+ 
+   test('request abort cancels pipeable rendering before the response body is consumed', async () => {
+-    const abort = vi.fn()
+-    reactDomServerMocks.renderToPipeableStream.mockImplementationOnce(
+-      (_children, opts) => {
+-        queueMicrotask(() => opts.onShellReady())
+-        return { abort, pipe: vi.fn() }
+-      },
+-    )
+-
++    const aborted = vi.fn()
++    nativeServerMocks.renderToReadableStream.mockImplementationOnce((_App, _props, options) =>
++      createRendererStream(options.signal, aborted).stream)
+     const router = await buildRouter()
++    const cleanup = vi.spyOn(router.serverSsr!, 'cleanup')
+     const controller = new AbortController()
+-    try {
+-      const response = unwrapResponse(
+-        await renderRouterToStream({
+-          request: new Request('http://localhost/', {
+-            signal: controller.signal,
+-          }),
+-          router,
+-          responseHeaders: new Headers(),
+-          children: null,
+-        }),
+-      )
+-
+-      expect(response.body).not.toBeNull()
+-      controller.abort(new Error('request-gone'))
+-      await vi.waitFor(() => expect(abort).toHaveBeenCalledOnce())
+-      const terminated = await Promise.race<true | false>([
+-        expectBodyRejects(response, 'request-gone').then(() => true),
+-        new Promise<false>((resolve) => setTimeout(() => resolve(false), 2000)),
+-      ])
+-      expect(terminated).toBe(true)
+-    } finally {
+-      router.serverSsr?.cleanup()
+-    }
++    const response = await renderResponse(router, controller.signal)
++    expect(response.body).not.toBeNull()
++    const failure = new Error('request-gone')
++    controller.abort(failure)
++    await vi.waitFor(() => expect(aborted).toHaveBeenCalledOnce())
++    await expectBodyRejects(response, failure)
++    expect(cleanup).toHaveBeenCalledOnce()
+   })
+ })

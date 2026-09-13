@@ -588,6 +588,36 @@ declare namespace NodeJS { interface Process { env: { NODE_ENV?: string } } }
 		);
 	});
 
+	test('keeps Router client exports in the browser program and its HTTP server export in Node', () => {
+		const name = '@octanejs/tanstack-router';
+		const manifest = {
+			exports: {
+				'.': './src/index.ts',
+				'./history': './src/history.ts',
+				'./ssr/client': './src/ssr/client.ts',
+				'./ssr/server': './src/ssr/server.ts',
+				'./generator-plugin': './src/generator-plugin.d.ts',
+			},
+		};
+		const files = new Set(['src/RouterProvider.tsrx']);
+		const browser = findPackedTsrxSourceConsumerSpecifiers(name, manifest, files, {
+			nodeTypes: false,
+		});
+		assert.deepEqual(browser, [
+			name,
+			`${name}/history`,
+			`${name}/ssr/client`,
+			`${name}/generator-plugin`,
+		]);
+		assert.ok(
+			findPackedTsrxSourceConsumerSpecifiers(name, manifest, files).includes(`${name}/ssr/server`),
+		);
+		assert.ok(PACKED_STRICT_BROWSER_SOURCE_PACKAGES.includes(name));
+		assert.ok(
+			PACKED_STRICT_BROWSER_SOURCE_PACKAGES.includes('@octanejs/tanstack-router-ssr-query'),
+		);
+	});
+
 	test('exercises the published bindings from a real local TSRX component', () => {
 		const source = renderPackedTsrxConsumerSource();
 

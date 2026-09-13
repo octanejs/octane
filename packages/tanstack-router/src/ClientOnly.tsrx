@@ -11,6 +11,7 @@ import { splitSlot, subSlot } from './internal.ts';
 
 const subscribe = () => () => {};
 
+export function useHydrated(slot?: symbol): boolean;
 export function useHydrated(...args: Array<unknown>) {
 	const [, slot] = splitSlot(args);
 	return useSyncExternalStore(subscribe, () => true, () => false, subSlot(slot, 'hydrated'));

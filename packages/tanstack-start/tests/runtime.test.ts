@@ -45,7 +45,7 @@ function createMatchesStore(): TestMatchesStore {
 
 function createRouter(store: TestMatchesStore): AnyRouter {
 	return {
-		stores: { matchesId: store },
+		stores: { ids: store },
 	} as unknown as AnyRouter;
 }
 
@@ -76,6 +76,24 @@ describe('TanStack Start runtime adapters', () => {
 
 		await expect(hydration).resolves.toBe(router);
 		expect(store.subscriberCount()).toBe(0);
+	});
+
+	it('waits for the current Router match store before first hydration', async () => {
+		const { createRouter, createRootRoute } = await vi.importActual<
+			typeof import('@octanejs/tanstack-router')
+		>('@octanejs/tanstack-router');
+		const router = createRouter({ routeTree: createRootRoute(), isServer: false });
+		runtimeMocks.coreHydrateStart.mockResolvedValue(router);
+		let ready = false;
+		const hydration = hydrateStart().then((result) => {
+			ready = true;
+			return result;
+		});
+		await Promise.resolve();
+		await Promise.resolve();
+		expect(ready).toBe(false);
+		router.stores.ids.set(['__root__']);
+		await expect(hydration).resolves.toBe(router);
 	});
 
 	it('renders the client provider before signaling hydration readiness', () => {

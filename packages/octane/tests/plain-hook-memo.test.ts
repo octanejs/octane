@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { mount } from './_helpers';
+import { flushSync } from 'octane';
+import { act, mount } from './_helpers';
 import { loadPlainHookFixtureSource } from './_server-fixture';
 
 describe('memo hooks in plain modules', () => {
@@ -55,6 +56,91 @@ describe('memo hooks in plain modules', () => {
 			root.click('#right');
 			expect(root.find('#right').textContent).toBe('11.0');
 			root.unmount();
+		});
+
+		it(`keeps memo values and stable getters through queued updates and an awaiting Action (inline=${inlineHookMemo})`, async () => {
+			const { App } = load(`
+				import { createElement, useMemo, useReducer, useState, useTransition } from 'octane';
+				export function App(props) {
+					const [value, setValue, getValue] = useState(undefined);
+					const [total, dispatch, getTotal] = useReducer(
+						(previous, action) => action === 'clear' ? undefined : (previous ?? 0) + action,
+						undefined,
+					);
+					const memo = useMemo(() => ({ value, total }), [value, total]);
+					const [pending, start] = useTransition();
+					props.observe({ memo, setValue, getValue, dispatch, getTotal, start });
+					return createElement('p', null, [String(value), String(total), String(pending)].join('|'));
+				}
+			`);
+			let controls!: {
+				memo: { value: number | undefined; total: number | undefined };
+				setValue: (value: undefined | ((previous: number | undefined) => number)) => void;
+				getValue: () => number | undefined;
+				dispatch: (action: number | 'clear') => void;
+				getTotal: () => number | undefined;
+				start: (action: () => Promise<void>) => void;
+			};
+			let finish!: () => void;
+			const waiting = new Promise<void>((resolve) => {
+				finish = resolve;
+			});
+			const props = {
+				observe: (next: typeof controls) => {
+					controls = next;
+				},
+			};
+			const root = mount(App, props);
+			try {
+				const first = controls;
+				expect(root.find('p').textContent).toBe('undefined|undefined|false');
+				flushSync(() => {
+					controls.setValue((previous) => (previous ?? 0) + 1);
+					controls.setValue((previous) => (previous ?? 0) + 2);
+					controls.dispatch(4);
+					controls.dispatch(5);
+					expect(first.getValue()).toBe(3);
+					expect(first.getTotal()).toBe(9);
+				});
+				expect(root.find('p').textContent).toBe('3|9|false');
+				expect(controls.getValue).toBe(first.getValue);
+				expect(controls.getTotal).toBe(first.getTotal);
+				expect(controls.memo).toEqual({ value: 3, total: 9 });
+				expect(controls.memo).not.toBe(first.memo);
+				const committed = controls.memo;
+				root.update(App, props);
+				expect(controls.memo).toBe(committed);
+				await act(() =>
+					controls.start(async () => {
+						controls.setValue(undefined);
+						controls.dispatch('clear');
+						await waiting;
+					}),
+				);
+				expect(root.find('p').textContent).toBe('3|9|true');
+				expect(first.getValue()).toBeUndefined();
+				expect(first.getTotal()).toBeUndefined();
+				expect(controls.memo).toBe(committed);
+				await act(async () => {
+					finish();
+					await waiting;
+				});
+				expect(root.find('p').textContent).toBe('undefined|undefined|false');
+				expect(controls.getValue).toBe(first.getValue);
+				expect(controls.getTotal).toBe(first.getTotal);
+				expect(controls.memo).toEqual({ value: undefined, total: undefined });
+				flushSync(() => {
+					controls.setValue((previous) => (previous ?? 0) + 1);
+					controls.dispatch(2);
+				});
+				expect(root.find('p').textContent).toBe('1|2|false');
+				expect(first.getValue()).toBe(1);
+				expect(first.getTotal()).toBe(2);
+			} finally {
+				finish();
+				await act(() => {});
+				root.unmount();
+			}
 		});
 
 		it(`preserves short-circuit and nested argument evaluation order (inline=${inlineHookMemo})`, () => {

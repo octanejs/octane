@@ -115,7 +115,7 @@ import {
 	hyphenateStyleName,
 } from '../dom-tables.js';
 import { isDelegatedEventProp } from '../event-names.js';
-import { sanitizeURLAttribute } from '../sanitize-url.js';
+import { sanitizeURLAttribute, shouldSanitizeURLAttribute } from '../sanitize-url.js';
 import {
 	invalidHtmlNestingWithAncestor,
 	invalidHtmlNestingWithParent,
@@ -424,7 +424,7 @@ function attrBindingHelper(bind) {
 	if (controlled !== undefined) return controlled;
 	switch (bind.kind) {
 		case 'attr':
-			return 'setAttribute';
+			return bind.attributeHelper ?? 'setAttribute';
 		case 'stringData':
 			return 'setStringData';
 		case 'booleanAttr':
@@ -446,6 +446,38 @@ function attrBindingHelper(bind) {
 		default:
 			return null;
 	}
+}
+
+// Production-only admission: development keeps the full authored-name diagnostic
+// route. Everything with property, boolean, numeric, namespace, or custom-host
+// semantics retains its existing writer. Aliases are resolved once at compile
+// time; opaque destination namespaces do not change these unnamespaced writes.
+function staticAttributeWriter(tag, name) {
+	if (tag.includes('-') || !/^[a-zA-Z_][a-zA-Z0-9_.-]*$/.test(name)) return null;
+	const lower = name.toLowerCase();
+	if (
+		lower.startsWith('on') ||
+		lower.startsWith('aria-') ||
+		MUST_USE_PROPERTY_PROPS.has(lower) ||
+		BOOLEAN_ATTR_PROPS.has(lower) ||
+		POSITIVE_NUMERIC_ATTR_PROPS.has(lower) ||
+		isEnumeratedBooleanAttr(name) ||
+		/^(?:xmlns|class|classname|style|value|checked|defaultvalue|defaultchecked|autofocus|innertext|textcontent|dangerouslysetinnerhtml|download|capture|rowspan|start|suppresscontenteditablewarning|suppressnativechangewarning|__octanenativechangediagnostic)$/.test(
+			lower,
+		)
+	)
+		return null;
+	const canonical = ATTRIBUTE_ALIASES.get(name) ?? name;
+	if (canonical.includes(':')) return null;
+	if (canonical.startsWith('data-')) {
+		return /^[a-z][a-z0-9_-]*$/.test(canonical.slice(5))
+			? { name: canonical, helper: 'setStringData' }
+			: null;
+	}
+	return {
+		name: canonical,
+		helper: shouldSanitizeURLAttribute(tag, canonical) ? 'setURLAttribute' : 'setPlainAttribute',
+	};
 }
 
 // Shared scalar comparisons retain the ordinary writer's semantics without
@@ -1138,6 +1170,7 @@ function importSpecifierPair(entry) {
 // compiled components and authored runtime imports retain their stable shape.
 // New compiler-only helpers use the private, renderer-specific ABI instead.
 const HOOK_MEMO_RUNTIME_HELPERS = new Set([
+	'compilerMemoRegion',
 	'hookMemoCreate',
 	'hookMemoEqual',
 	'hookMemoPublish',
@@ -1178,6 +1211,10 @@ const NATIVE_READ_RUNTIME_HELPERS = new Set([
 const INTERNAL_CLIENT_RUNTIME_HELPERS = new Set([
 	'replaceRef',
 	'queueOwnRefDetach',
+	'setPlainAttribute',
+	'setPlainAttributeIfChanged',
+	'setURLAttribute',
+	'setURLAttributeIfChanged',
 	'setAttributeIfChanged',
 	'setStringDataIfChanged',
 	'setBooleanAttributeIfChanged',
@@ -9192,15 +9229,14 @@ function compileInternal(
 		currentAutoMemoCacheName: null, // collision-free local bound to the body's cache array
 		currentAutoMemoCommittedName: null, // committed cache snapshot (copy-on-write source)
 		currentAutoCalculatedRenderableRefs: null, // proven non-escaping calculation holes, inherited by lexical child bodies
-		nextAutoMemoCacheId: 0, // unique non-index slots property per compiled render function
+		nextAutoMemoCacheId: 0, // per-compiled-body id in the scope's lazy memo regions
 		inlineHookMemo: inlineHookMemoEnabled, // de-callbacked useMemo/useCallback + pu creations
 		hasSlotMemoCandidates: false, // skip the final AST pass when no path-aware site survived
 		_puInlineLowering: false, // true only while a body pipeline ends in inlineHookMemoPass
 		currentHookMemoOffset: 0, // flat hook-memo cell offset for the body being emitted
-		currentHookMemoCacheProperty: null, // per-body `_k$N` slots property for the cell array
+		currentHookMemoBodyId: null, // non-null while compiling a body with inline hook cells
 		currentHookMemoNames: null, // lazily allocated flat-cache and expression-temp locals
 		currentHookMemoOwnerSafe: false, // own scope permits compiler-introduced bindings
-		nextHookMemoCacheId: 0, // unique non-index slots property per compiled render function
 		currentInvariantLocals: null, // Set<string> of component-lifetime-stable local values
 		currentEventInvariantLocals: null, // Set<string> safe to retain in native event slots
 		currentDirtyBindingStates: null, // proven primitive state identities inherited by JSX arms
@@ -13997,16 +14033,16 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 		ctx,
 		compactStateOwnerCache ? `_mp${ctx.nextAutoMemoCacheId}` : '__memoCommitted',
 	);
-	const autoMemoCacheProperty = `_m$${ctx.nextAutoMemoCacheId++}`;
+	const memoRegionId = ctx.nextAutoMemoCacheId++;
 	ctx.currentAutoMemoOffset = 0;
 	ctx.currentAutoMemoCacheName = autoMemoCacheName;
 	ctx.currentAutoMemoCommittedName = autoMemoCommittedName;
 	const prevHookMemoOffset = ctx.currentHookMemoOffset;
-	const prevHookMemoCacheProperty = ctx.currentHookMemoCacheProperty;
+	const prevHookMemoBodyId = ctx.currentHookMemoBodyId;
 	const prevHookMemoNames = ctx.currentHookMemoNames;
 	const prevHookMemoOwnerSafe = ctx.currentHookMemoOwnerSafe;
 	ctx.currentHookMemoOffset = 0;
-	ctx.currentHookMemoCacheProperty = `_k$${ctx.nextHookMemoCacheId++}`;
+	ctx.currentHookMemoBodyId = memoRegionId;
 	ctx.currentHookMemoNames = null;
 
 	// Body splitting. Two shapes to handle:
@@ -14351,10 +14387,28 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 
 	const bodyStatements = [];
 	const autoMemoSize = ctx.currentAutoMemoOffset;
-	const slotsMember = (prop) => b.member(b.member(b.id('__s'), 'slots'), prop);
+	const hookMemoSize = ctx.currentHookMemoOffset;
+	const memoRegionName =
+		autoMemoSize > 0 || hookMemoSize > 0 ? allocCompilerName(ctx, '__memoRegion') : null;
+	const memoCell = (name) => b.member(b.id(memoRegionName), name);
+	if (memoRegionName !== null) {
+		bodyStatements.push(
+			inheritOriginLoc(
+				b.const(
+					memoRegionName,
+					b.call(
+						requireRuntimeForContext(ctx, 'compilerMemoRegion'),
+						b.id('__s'),
+						b.literal(memoRegionId),
+					),
+				),
+				node,
+			),
+		);
+	}
 	if (autoMemoSize > 0) {
 		bodyStatements.push(
-			inheritOriginLoc(b.const(autoMemoCommittedName, slotsMember(autoMemoCacheProperty)), node),
+			inheritOriginLoc(b.const(autoMemoCommittedName, memoCell('auto')), node),
 			inheritOriginLoc(
 				b.let(
 					autoMemoCacheName,
@@ -14372,18 +14426,17 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 	// suspension. Miss-side runtime publication also records the previous/next
 	// site during a held transition. Allocate through the runtime so authored
 	// bindings named Array or undefined cannot change the cache representation.
-	const hookMemoSize = ctx.currentHookMemoOffset;
 	if (hookMemoSize > 0) {
 		const hkName = hookMemoNames(ctx).cache;
 		bodyStatements.push(
-			inheritOriginLoc(b.let(hkName, slotsMember(ctx.currentHookMemoCacheProperty)), node),
+			inheritOriginLoc(b.let(hkName, memoCell('hooks')), node),
 			inheritOriginLoc(
 				b.if(
 					b.binary('===', b.id(hkName), b.void0),
 					b.stmt(
 						b.assignment(
 							'=',
-							slotsMember(ctx.currentHookMemoCacheProperty),
+							memoCell('hooks'),
 							b.assignment(
 								'=',
 								b.id(hkName),
@@ -14520,7 +14573,7 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 			inheritOriginLoc(
 				b.if(
 					b.binary('!==', b.id(autoMemoCacheName), b.id(autoMemoCommittedName)),
-					b.stmt(b.assignment('=', slotsMember(autoMemoCacheProperty), b.id(autoMemoCacheName))),
+					b.stmt(b.assignment('=', memoCell('auto'), b.id(autoMemoCacheName))),
 					null,
 				),
 				node,
@@ -14549,7 +14602,7 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 	ctx.currentAutoMemoCacheName = prevAutoMemoCacheName;
 	ctx.currentAutoMemoCommittedName = prevAutoMemoCommittedName;
 	ctx.currentHookMemoOffset = prevHookMemoOffset;
-	ctx.currentHookMemoCacheProperty = prevHookMemoCacheProperty;
+	ctx.currentHookMemoBodyId = prevHookMemoBodyId;
 	ctx.currentHookMemoNames = prevHookMemoNames;
 	ctx.currentHookMemoOwnerSafe = prevHookMemoOwnerSafe;
 	ctx.currentMapTemps = prevMapTemps;
@@ -16992,10 +17045,10 @@ function markHookSlotLocality(root, enabled) {
 //
 // De-callbacks useMemo/useCallback in proven render-scope bodies: instead of allocating an
 // arrow + a deps array every render and paying a hooks-map lookup, each site
-// becomes an inline region over a per-body flat cell array stored as a
-// non-index property on `__s.slots` (`_k$N`, the same trick as autoMemo's
-// `_m$N` — named properties don't disturb the slots array's packed elements
-// kind). Layout per site: [initFlag, dep0..depK-1, value].
+// becomes an inline region over a per-body flat cell array in the scope's
+// lazy compilerMemo record. The record is independent of the dense DOM slots
+// array; its fixed auto and hooks fields hold the two cell arrays respectively.
+// Layout per hook site: [initFlag, dep0..depK-1, value].
 //
 // Unlike the autoMemo region cache this one publishes IMMEDIATELY: the runtime
 // hooks map these regions replace
@@ -17469,7 +17522,7 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 			!canLowerClientMemo(call, name) ||
 			localSlotMarks.get(call) !== true ||
 			!ctx.currentHookMemoOwnerSafe ||
-			ctx.currentHookMemoCacheProperty === null
+			ctx.currentHookMemoBodyId === null
 		) {
 			return null;
 		}
@@ -24297,15 +24350,22 @@ function emitBindingMount(bind, elVar, bag) {
 	}
 	switch (bind.kind) {
 		case 'textOnlyChild': {
-			// `htext` creates + appends the text node on a fresh mount, ADOPTS the
-			// server text node when hydrating, and coerces the value itself — so the
-			// mount is a bare `htext(el, _v)`. Seeding `_prev` to the client value
+			// Only compiler-admitted native placeholders may be reused. An old
+			// two-argument caller or an excluded custom/template host must retain
+			// htext's append behavior when a separate Text child already exists.
+			// Hydration adopts the server text in either case. Seeding `_prev` to the client value
 			// makes the first update a no-op when it matches the server text (no
 			// hydration mismatch re-render).
 			return st(
 				b.block([
 					b.const('_v', bind.expr),
-					b.stmt(b.assignment('=', local(`_txt$${bind.id}`), b.call('_$htext', el(), V()))),
+					b.stmt(
+						b.assignment(
+							'=',
+							local(`_txt$${bind.id}`),
+							b.call('_$htext', el(), V(), ...(bind.seededText ? [b.literal(1)] : [])),
+						),
+					),
 					b.stmt(b.assignment('=', local(`_prev$${bind.id}`), V())),
 				]),
 			);
@@ -26336,8 +26396,8 @@ function emitElementHtml(
 			// needs none of setAttribute's alias, coercion, namespace, controlled-property,
 			// or invalid-name machinery. Element.setAttribute applies the same unnamespaced
 			// data attribute in HTML, SVG, and MathML, so destination-opaque component
-			// templates can retain this specialization. Unknown values, cased names, and
-			// every non-data attr retain the generic React-parity path.
+			// templates can retain this specialization. Production also admits unknown
+			// scalar data values through staticAttributeWriter below.
 			bindings.push({
 				id: bindings.length,
 				kind: 'stringData',
@@ -26348,13 +26408,15 @@ function emitElementHtml(
 				nameOrigin: attr.name,
 			});
 		} else {
+			const writer = ctx.dev ? null : staticAttributeWriter(tag, attrName);
 			bindings.push({
 				id: bindings.length,
 				kind: 'attr',
+				attributeHelper: writer?.helper,
 				name:
 					ctx.dev && (rawAttrName === 'tabIndex' || rawAttrName === 'htmlFor')
 						? rawAttrName
-						: attrName,
+						: (writer?.name ?? attrName),
 				expr,
 				path,
 				ns: hostNs,
@@ -26521,13 +26583,23 @@ function emitElementHtml(
 					: null;
 			appendTemplatePart(html, escaped, 'text', origins);
 		} else if (isKnownTextChildExpression(txtChild.expression, ctx.knownStringChildLocals)) {
+			const seededText = tag !== 'template' && !tag.includes('-') && !directPropNames.has('is');
 			bindings.push({
 				id: bindings.length,
 				kind: 'textOnlyChild',
 				expr: resolveStyleExpr(txtChild.expression, cssHash),
 				path,
+				seededText,
 			});
-			// The element stays empty in the template — runtime appends a Text node.
+			// A nonempty placeholder survives the HTML parser as one Text node. The
+			// mount writes its actual value before the cloned host is inserted, so
+			// even an empty value retains one stable text binding node. <template>
+			// puts parser children under .content rather than .firstChild. Custom
+			// element constructors can inspect children while the host is cloned;
+			// preserve the old empty template and create/append mount for them.
+			if (seededText) {
+				appendTemplatePart(html, ' ', 'text');
+			}
 		} else {
 			// Bare `{expr}` (no string cast) → RENDERABLE hole. As the host's SOLE
 			// child it lowers MARKERLESS: a primitive value is appended as a single

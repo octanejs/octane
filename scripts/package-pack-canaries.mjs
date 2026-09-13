@@ -164,6 +164,8 @@ export const PACKED_STRICT_BROWSER_SOURCE_PACKAGES = [
 	'@octanejs/remix-router',
 	'@octanejs/visx',
 	'@octanejs/recharts',
+	'@octanejs/tanstack-router',
+	'@octanejs/tanstack-router-ssr-query',
 ];
 
 const strictBrowserSourcePackages = new Set(PACKED_STRICT_BROWSER_SOURCE_PACKAGES);
@@ -219,7 +221,12 @@ function collectExportTargets(value, output = []) {
 	return output;
 }
 
-export function findPackedTsrxSourceConsumerSpecifiers(packageName, manifest, files) {
+export function findPackedTsrxSourceConsumerSpecifiers(
+	packageName,
+	manifest,
+	files,
+	{ nodeTypes = true } = {},
+) {
 	if (!hasPackedSourceConsumer(packageName, files)) return [];
 
 	const exports = manifest.exports;
@@ -233,6 +240,12 @@ export function findPackedTsrxSourceConsumerSpecifiers(packageName, manifest, fi
 
 	const specifiers = [];
 	for (const [subpath, target] of Object.entries(exports)) {
+		// This server entry exposes the upstream Node HTTP header type. Keep it
+		// in the Node program while compiling the client and history entries,
+		// and all shipped TSRX implementations, without Node ambient types.
+		if (!nodeTypes && packageName === '@octanejs/tanstack-router' && subpath === './ssr/server') {
+			continue;
+		}
 		if (subpath === '.') {
 			specifiers.push(packageName);
 			continue;
@@ -486,6 +499,10 @@ export function renderPackedStrictBrowserConsumerTypeProbe() {
 import { sumTypedPair } from './App.tsrx';
 import { compileToVolarMappings, compileTypesInspection } from 'octane/compiler/volar';
 import { atom, useAtom } from '@octanejs/jotai';
+import { createRootRoute, createRoute, createRouter, useMatchRoute } from '@octanejs/tanstack-router';
+import { setupRouterSsrQueryIntegration } from '@octanejs/tanstack-router-ssr-query';
+import { hydrate, json, mergeHeaders } from '@octanejs/tanstack-router/ssr/client';
+import { QueryClient } from '@tanstack/query-core';
 import { useSelector } from '@octanejs/redux';
 import { Form, Link, NavLink } from '@octanejs/remix-router';
 import { Group } from '@octanejs/visx/group';
@@ -515,6 +532,41 @@ import { Brush } from '@octanejs/recharts';
 import { Treemap } from '@octanejs/recharts';
 
 type AssertNotAny<T> = 0 extends 1 & T ? never : true;
+const packedRouteRoot = createRootRoute();
+const packedPostRoute = createRoute({
+	getParentRoute: () => packedRouteRoot,
+	path: 'posts/$postId',
+	ssr: false,
+});
+const packedRouter = createRouter({ routeTree: packedRouteRoot.addChildren([packedPostRoute]) });
+export function verifyPackedRouterTypes() {
+	const matchRoute = useMatchRoute<typeof packedRouter>();
+	const params = matchRoute({ to: '/posts/$postId' });
+	if (params !== false) {
+		const postId: string = params.postId;
+		// @ts-expect-error Matched path parameters retain their string type.
+		const invalidPostId: number = params.postId;
+		void [postId, invalidPostId];
+	}
+	// @ts-expect-error The chosen router rejects unknown destinations.
+	matchRoute({ to: '/missing' });
+	const hydrated: Promise<void> = hydrate(packedRouter);
+	const merged: Headers = mergeHeaders({ 'content-length': 12, 'set-cookie': ['a=1', 'b=2'] });
+	const payload: Promise<{ value: number }> = json({ value: 1 }).json();
+	// @ts-expect-error Header values cannot contain arbitrary objects.
+	mergeHeaders({ invalid: { nested: true } });
+	// @ts-expect-error JSON payload types survive the client entry.
+	const invalidPayload: Promise<string> = json({ value: 1 }).json();
+	void [hydrated, merged, payload, invalidPayload];
+	const clientOnly: false = packedPostRoute.types.ssr;
+	const options = { router: packedRouter, queryClient: new QueryClient(), wrapQueryClient: true };
+	const integrated: void = setupRouterSsrQueryIntegration(options);
+	// @ts-expect-error Integration options preserve the boolean wrapper contract.
+	setupRouterSsrQueryIntegration({ ...options, wrapQueryClient: 'yes' });
+	// @ts-expect-error Integration requires a real QueryClient.
+	setupRouterSsrQueryIntegration({ ...options, queryClient: {} });
+	void [clientOnly, integrated];
+}
 export function verifyPackedCompilerTypes() {
 	const mappings = compileToVolarMappings('export const value = 1;', 'Probe.tsrx');
 	const inspection = compileTypesInspection('export const value = 1;', 'Probe.tsrx');

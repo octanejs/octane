@@ -1,0 +1,110 @@
+diff --git a/tests/upstream/link-state-props.test.tsx b/tests/upstream/link-state-props.test.tsx
+--- a/tests/upstream/link-state-props.test.tsx
++++ b/tests/upstream/link-state-props.test.tsx
+@@ -1,5 +1,7 @@
+ import * as React from 'octane'
+-import { renderToString } from 'octane/server'
++// OCTANE DIVERGENCE[ssr-compiler]: use separately compiled twins for hydration.
++import { runServerFixture } from '../ssr-fixture'
++import { LinkParity } from '../_fixtures/link-parity.tsrx'
+ import { hydrateRoot } from 'octane'
+ import { act, cleanup, render } from '@octanejs/testing-library'
+ import { afterEach, expect, test, vi } from 'vitest'
+@@ -15,20 +17,13 @@ import {
+ 
+ afterEach(cleanup)
+ 
+-test('blocked custom links keep the validated props and forwarded ref', () => {
+-  const CustomLink = createLink(
+-    React.forwardRef<
+-      HTMLAnchorElement,
+-      React.ComponentProps<'a'> & { disabled?: boolean }
+-    >((props, ref) => (
+-      <a {...props} data-disabled={String(props.disabled)} ref={ref} />
+-    )),
+-  )
++test('blocked custom links keep the validated props and forwarded ref', async () => {
+   const router = createRouter({
+     routeTree: createRootRoute(),
+     history: createMemoryHistory(),
+   })
+-  const ref = React.createRef<HTMLAnchorElement>()
++  // OCTANE DIVERGENCE[ref-prop]: an object ref has the native public shape.
++  const ref = { current: null as HTMLAnchorElement | null }
+   const unwantedRef = vi.fn()
+   const search = vi.fn(() => ({}))
+   const buildLocation = vi.spyOn(router, 'buildLocation')
+@@ -39,22 +34,16 @@ test('blocked custom links keep the validated props and forwarded ref', () => {
+     className: 'inactive-state',
+     title: 'Inactive',
+   }))
+-  const tree = (
+-    <RouterContextProvider router={router}>
+-      <CustomLink
+-        to="javascript:blocked()"
+-        ref={ref}
+-        search={search}
+-        inactiveProps={inactiveProps}
+-      >
+-        Target
+-      </CustomLink>
+-    </RouterContextProvider>
+-  )
++  const fixture = {
++    router, custom: true,
++    linkProps: { to: 'javascript:blocked()', ref, search, inactiveProps },
++    children: 'Target',
++  }
++  const tree = <LinkParity {...fixture} />
+   const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+   try {
+     router.isServer = true
+-    const html = renderToString(tree)
++    const html = await runServerFixture<string>('_fixtures/link-parity.tsrx', 'renderLink', fixture)
+     expect(html).toContain('data-disabled="true"')
+     expect(html).toContain('class="inactive-state"')
+     expect(html).not.toContain('href=')
+@@ -87,24 +76,20 @@ test.each([false, true])(
+       href: 'javascript:inactive()',
+       title: 'Inactive',
+     }
+-    const tree = (
+-      <RouterContextProvider router={router}>
+-        <Link
+-          to="javascript:blocked()"
+-          disabled={disabled}
+-          className="base"
+-          style={{ fontWeight: 700 }}
+-          inactiveProps={inactiveProps}
+-        >
+-          {({ isActive }) => String(isActive)}
+-        </Link>
+-      </RouterContextProvider>
+-    )
++    const fixture = {
++      router,
++      linkProps: {
++        to: 'javascript:blocked()', disabled, className: 'base',
++        style: { fontWeight: 700 }, inactiveProps,
++      },
++      children: ({ isActive }: { isActive: boolean }) => String(isActive),
++    }
++    const tree = <LinkParity {...fixture} />
+     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+     try {
+       router.isServer = true
+       const serverContainer = document.createElement('div')
+-      serverContainer.innerHTML = renderToString(tree)
++      serverContainer.innerHTML = await runServerFixture<string>('_fixtures/link-parity.tsrx', 'renderLink', fixture)
+       const serverLink = serverContainer.querySelector('a')!
+       router.isServer = false
+       const clientLink = render(tree).container.querySelector('a')!
+@@ -140,7 +125,7 @@ test.each([false, true])(
+       let hydrated: ReturnType<typeof hydrateRoot> | undefined
+       try {
+         await act(() => {
+-          hydrated = hydrateRoot(serverContainer, tree, {
++          hydrated = hydrateRoot(serverContainer, LinkParity, fixture, {
+             onRecoverableError: recoverableError,
+           })
+         })

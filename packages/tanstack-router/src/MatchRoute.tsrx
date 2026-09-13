@@ -1,3 +1,8 @@
+import type { AnyRouter, RegisteredRouter } from '@tanstack/router-core';
+import type { OctaneNode } from 'octane';
+import type { MatchRouteMatcher, MakeMatchRouteOptions } from './matchRouteTypes';
+
+export type { UseMatchRouteOptions, MakeMatchRouteOptions } from './matchRouteTypes';
 // useMatchRoute / MatchRoute — port of react-router's Matches.tsx matcher pair.
 // The hook subscribes to `matchRouteDeps` (location href + resolved href +
 // status) so the matcher re-evaluates per navigation, and returns
@@ -8,24 +13,31 @@ import { useCallback, isChildrenBlock } from 'octane';
 import { useRouter } from './context.ts';
 import { useStore } from './useStore.ts';
 
-export function useMatchRoute() {
-	const router = useRouter();
-	useStore(router.stores.matchRouteDeps, (d) => d);
+export function useMatchRoute<TRouter extends AnyRouter = RegisteredRouter>(): MatchRouteMatcher<
+	TRouter
+> {
+	const router = useRouter<TRouter>();
+	const locationHref = useStore(router.stores.location, (location) => location.href);
+	const resolvedHref = useStore(router.stores.resolvedLocation, (location) => location?.href);
+	const status = useStore(router.stores.status);
 	return useCallback((opts: Record<string, any>) => {
 		const { pending, caseSensitive, fuzzy, includeSearch, ...rest } = opts;
 		return router.matchRoute(rest as any, { pending, caseSensitive, fuzzy, includeSearch });
-	}, [router]);
+	}, [router, locationHref, resolvedHref, status]);
 }
 
-// Props are permissive (`Record<string, any>` + optional render-prop children) —
-// upstream's MakeMatchRouteOptions generics are the type-safe facade; the octane
-// binding keeps the loose v1 surface (see Link).
-export function MatchRoute(props: Record<string, any>) @{
+export function MatchRoute<
+	TRouter extends AnyRouter = RegisteredRouter,
+	TFrom extends string = string,
+	TTo extends string | undefined = undefined,
+	TMaskFrom extends string = TFrom,
+	TMaskTo extends string = '',
+>(props: MakeMatchRouteOptions<TRouter, TFrom, TTo, TMaskFrom, TMaskTo>) @{
 	const matchRoute = useMatchRoute();
-	const params = matchRoute(props);
+	const params = matchRoute(props as any);
 	const out =
 		typeof props.children === 'function' && !isChildrenBlock(props.children)
-			? props.children(params)
+			? (props.children as (params: unknown) => OctaneNode)(params)
 			: params
 				? props.children
 				: null;

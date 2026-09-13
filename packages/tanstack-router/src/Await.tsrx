@@ -7,15 +7,15 @@ import { use } from 'octane';
 import type { OctaneNode } from 'octane';
 import { toExternalHydrationThenable } from './externalHydration.ts';
 
-function AwaitInner(props: { promise: Promise<any>; render: (data: any) => OctaneNode }) {
+function AwaitInner<T>(props: { promise: Promise<T>; render: (data: T) => OctaneNode }) {
 	const data = use(toExternalHydrationThenable(props.promise));
 	return props.render(data);
 }
 
-export function Await(props: {
-	promise: Promise<any>;
+export function Await<T>(props: {
+	promise: Promise<T>;
 	fallback?: OctaneNode;
-	children: (data: any) => OctaneNode;
+	children: (data: T) => OctaneNode;
 }) @{
 	@try {
 		<AwaitInner promise={props.promise} render={props.children} />

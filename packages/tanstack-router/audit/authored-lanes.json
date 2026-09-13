@@ -1,0 +1,79 @@
+[
+  {
+    "id": "tanstack-router-runtime-differential",
+    "type": "differential",
+    "oracle": "required",
+    "environment": "workspace-node",
+    "project": "tanstack-router-differential",
+    "evidenceOrigin": "repo-authored",
+    "files": [
+      {
+        "path": "packages/tanstack-router/tests/differential/parity.test.ts",
+        "role": "test",
+        "cases": [
+          {
+            "id": "differential:tanstack-router-initial",
+            "testName": "initial load renders byte-identical layout + index route + link states",
+            "fullName": "differential: @octanejs/tanstack-router vs real @tanstack/react-router initial load renders byte-identical layout + index route + link states"
+          },
+          {
+            "id": "differential:tanstack-router-navigation",
+            "testName": "Link navigation: index \u2192 about \u2192 params route \u2192 back to index",
+            "fullName": "differential: @octanejs/tanstack-router vs real @tanstack/react-router Link navigation: index \u2192 about \u2192 params route \u2192 back to index"
+          },
+          {
+            "id": "differential:tanstack-router-not-found",
+            "testName": "unknown URL renders the notFoundComponent identically inside the layout",
+            "fullName": "differential: @octanejs/tanstack-router vs real @tanstack/react-router unknown URL renders the notFoundComponent identically inside the layout"
+          }
+        ]
+      },
+      {
+        "path": "packages/tanstack-router/tests/differential/_setup.ts",
+        "role": "support"
+      },
+      {
+        "path": "packages/tanstack-router/tests/differential/fixture-compiler.ts",
+        "role": "support"
+      },
+      {
+        "path": "packages/tanstack-router/tests/_fixtures/router-diff.tsrx",
+        "role": "support"
+      }
+    ]
+  },
+  {
+    "id": "tanstack-router-public-types",
+    "type": "adapted-types",
+    "oracle": "required",
+    "environment": "workspace-node",
+    "project": "tanstack-router-public-types",
+    "evidenceOrigin": "repo-authored",
+    "execution": {
+      "kind": "typescript",
+      "compiler": "tsrx-tsc",
+      "project": "packages/tanstack-router/typetests/tsconfig.json"
+    },
+    "files": [
+      {
+        "path": "packages/tanstack-router/audit/adapted-types.json",
+        "role": "test",
+        "cases": [
+          {
+            "id": "types:tanstack-router-public-api",
+            "testName": "registered route inference and link validation",
+            "fullName": "registered route inference and link validation"
+          }
+        ]
+      },
+      {
+        "path": "packages/tanstack-router/typetests/public-api.test-d.ts",
+        "role": "support"
+      },
+      {
+        "path": "packages/tanstack-router/typetests/tsconfig.json",
+        "role": "support"
+      }
+    ]
+  }
+]
