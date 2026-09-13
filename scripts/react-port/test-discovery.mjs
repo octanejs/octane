@@ -237,7 +237,7 @@ export function configuredTestSelectors(
 						project && typeof project === 'object' && !Array.isArray(project)
 							? runner === 'playwright'
 								? { ...shared, ...project }
-								: project.extends === true
+								: vitestInlineProjectInheritsRoot(project.extends, vitestVersion)
 									? { ...project, test: mergeConfiguration(shared, project.test ?? {}) }
 									: project
 							: project,
@@ -340,10 +340,22 @@ export function resolveConfigurationImport(fileName, specifier, available) {
 	return candidates.find((candidate) => available.has(candidate));
 }
 
+// Vitest 3/4 inherit only when extends is true. Vitest 5 defaults extends to
+// true and uses extends: false to isolate an inline project.
+function vitestInlineProjectInheritsRoot(extendsValue, version) {
+	if (extendsValue === true) return true;
+	if (extendsValue === false) return false;
+	return vitestMajor(version) === '5';
+}
+
 // Vitest 3 and 4/5 have different selector defaults. Unknown versions must not
 // inherit the locally installed runner's selectors during immutable intake.
+function vitestMajor(version) {
+	return /^[~^]?([345])\.\d+\.\d+$/.exec(version ?? '')?.[1];
+}
+
 function vitestSelectorDefaults(version) {
-	const major = /^[~^]?([345])\.\d+\.\d+$/.exec(version ?? '')?.[1];
+	const major = vitestMajor(version);
 	if (!major) return undefined;
 	return {
 		include: ['**/*.{test,spec}.?(c|m)[jt]s?(x)'],

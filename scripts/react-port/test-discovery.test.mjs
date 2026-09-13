@@ -293,6 +293,27 @@ test('Vitest projects inherit selectors only when extends is true and match with
 	);
 });
 
+test('Vitest 5 inline projects inherit root selectors unless extends is false', () => {
+	const omitted = `export default defineConfig({ test: { exclude: ['**/e2e/**'], projects: [
+ { test: { include: ['**/*.test.ts'] } }
+ ] } });`;
+	const isolated = `export default defineConfig({ test: { exclude: ['**/e2e/**'], projects: [
+ { extends: false, test: { include: ['**/*.test.ts'] } }
+ ] } });`;
+	const files = ['src/widget.test.ts', 'e2e/flow.test.ts'];
+	assert.deepEqual(selected(omitted, files, { runner: 'vitest', vitestVersion: '^5.0.0' }), [
+		'src/widget.test.ts',
+	]);
+	assert.deepEqual(selected(omitted, files, { runner: 'vitest', vitestVersion: '^4.1.0' }), [
+		'src/widget.test.ts',
+		'e2e/flow.test.ts',
+	]);
+	assert.deepEqual(selected(isolated, files, { runner: 'vitest', vitestVersion: '^5.0.0' }), [
+		'src/widget.test.ts',
+		'e2e/flow.test.ts',
+	]);
+});
+
 test('reads versioned Vitest config defaults and retains explicit exclusions', () => {
 	const source = `import { configDefaults as defaults, defineConfig } from 'vitest/config'; export default defineConfig({ test: { exclude: [...defaults.exclude, 'src/index.test.ts'] } });`;
 	const files = [
