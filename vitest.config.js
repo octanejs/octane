@@ -5778,6 +5778,49 @@ export default defineConfig({
 				plugins: [octane()],
 			},
 			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'react-error-boundary-browser',
+					include: ['packages/react-error-boundary/tests/browser/**/*.test.ts'],
+					environment: 'node',
+					testTimeout: 30000,
+					hookTimeout: 60000,
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'react-error-boundary-pristine',
+					include: ['packages/react-error-boundary/upstream/lib/**/*.test.tsx'],
+					environment: 'jsdom',
+					setupFiles: ['packages/react-error-boundary/upstream/vitest.setup.ts'],
+					globals: false,
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'react-error-boundary-adapted',
+					include: ['packages/react-error-boundary/tests/upstream/**/*.test.tsx'],
+					environment: 'jsdom',
+					setupFiles: ['packages/react-error-boundary/upstream/vitest.setup.ts'],
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/index.ts'),
+						},
+						{
+							find: /^@testing-library\/react$/,
+							replacement: resolve(import.meta.dirname, 'packages/testing-library/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
 				test: {
 					name: 'react-error-boundary',
 					include: [
@@ -5785,7 +5828,10 @@ export default defineConfig({
 						'!packages/react-error-boundary/tests/ssr/**/*.test.ts',
 					],
 					environment: 'jsdom',
-					exclude: ['packages/react-error-boundary/tests/differential/**/*.test.ts'],
+					exclude: [
+						'packages/react-error-boundary/tests/differential/**/*.test.ts',
+						'packages/react-error-boundary/tests/browser/**/*.test.ts',
+					],
 					globals: false,
 				},
 				plugins: [octane()],

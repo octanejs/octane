@@ -1,0 +1,204 @@
+{
+  "schemaVersion": 1,
+  "identity": {
+    "packageName": "react-error-boundary",
+    "version": "6.1.5",
+    "repository": {
+      "owner": "bvaughn",
+      "repo": "react-error-boundary",
+      "subdirectory": null
+    },
+    "commit": "83b0f856e650b143d3d74d397f0cea5204a37460",
+    "integrity": "sha512-l2nk+KhgM6e79tAiHEs3tXTdiTW4ARniKYMQN+cLY5vQFpDOkxuXKIC4uIwYuIKoMpFQ6jEbQz9wBArUmq7GWA=="
+  },
+  "license": {
+    "spdx": "MIT",
+    "evidence": [
+      {
+        "path": "LICENSE",
+        "sha256": "2cdb493db15b320c5787535f9dadd37b13cae6fe0a1cdd7849ccfbce70c389fd"
+      }
+    ],
+    "notices": []
+  },
+  "scopes": [
+    "LICENSE",
+    "lib",
+    "package.json",
+    "vite.config.ts",
+    "vitest.config.ts",
+    "vitest.d.ts",
+    "vitest.setup.ts"
+  ],
+  "adaptedMappings": [
+    {
+      "fromRoot": "lib",
+      "toRoot": "tests/upstream",
+      "include": "(?:\\.test\\.tsx$|utils/assert\\.ts$)"
+    }
+  ],
+  "adaptedRewrites": [
+    {
+      "find": "import {\n",
+      "replace": "/** @jsxImportSource octane */\nimport { createRef } from \"../../upstream-support\";\nimport {\n"
+    },
+    {
+      "find": "  createRef,\n",
+      "replace": ""
+    },
+    {
+      "find": "import { act, useLayoutEffect, type ReactNode } from \"react\";",
+      "replace": "/** @jsxImportSource octane */\nimport { act, useLayoutEffect, type OctaneNode } from \"octane\";"
+    },
+    {
+      "find": "\"react-dom/client\"",
+      "replace": "\"octane\""
+    },
+    {
+      "find": "\"react-dom/test-utils\"",
+      "replace": "\"octane\""
+    },
+    {
+      "find": "\"react\"",
+      "replace": "\"octane\""
+    },
+    {
+      "find": "ReactElement",
+      "replace": "OctaneNode"
+    },
+    {
+      "find": "ReactNode",
+      "replace": "OctaneNode"
+    },
+    {
+      "find": "\"./ErrorBoundary\"",
+      "replace": "\"../../../src/error-boundary.tsrx\""
+    },
+    {
+      "find": "\"../components/ErrorBoundary\"",
+      "replace": "\"../../../src/error-boundary.tsrx\""
+    },
+    {
+      "find": "\"./useErrorBoundary\"",
+      "replace": "\"../../../src/use-error-boundary.ts\""
+    },
+    {
+      "find": "\"./withErrorBoundary\"",
+      "replace": "\"../../../src/with-error-boundary.tsrx\""
+    },
+    {
+      "find": "\"../types\"",
+      "replace": "\"../../../src/types.ts\""
+    },
+    {
+      "find": "\"../utils/getErrorMessage\"",
+      "replace": "\"../../../src/utils.ts\""
+    },
+    {
+      "find": "  Component,\n",
+      "replace": ""
+    },
+    {
+      "find": "  forwardRef,\n",
+      "replace": ""
+    }
+  ],
+  "files": [
+    {
+      "path": "lib/components/ErrorBoundary.test.tsx",
+      "gitBlob": "eb195955ce8f321aebee634911fd57e78d8eb6ef",
+      "size": 11976
+    },
+    {
+      "path": "lib/components/ErrorBoundary.tsx",
+      "gitBlob": "5468fd306f9c47ad3abcc97f43a24afe44dd961c",
+      "size": 4362
+    },
+    {
+      "path": "lib/context/ErrorBoundaryContext.ts",
+      "gitBlob": "205aec128cbbf9b95b9ef2f4e1718eb306868fed",
+      "size": 275
+    },
+    {
+      "path": "lib/hooks/useErrorBoundary.test.tsx",
+      "gitBlob": "ffb0ad9dc52cf9b7c91329b5a4d0854f04568bc6",
+      "size": 2501
+    },
+    {
+      "path": "lib/hooks/useErrorBoundary.ts",
+      "gitBlob": "a3f0abf05f7b762c2e00a5ab995117c4afdc166e",
+      "size": 1920
+    },
+    {
+      "path": "lib/index.ts",
+      "gitBlob": "8da9b98589712dd0b03d15d152ea899548793b6b",
+      "size": 670
+    },
+    {
+      "path": "lib/types.ts",
+      "gitBlob": "082cac1c3a4a2cad741890b52a5beb1630b1485a",
+      "size": 2600
+    },
+    {
+      "path": "lib/utils/assert.ts",
+      "gitBlob": "ed60414dceb4e7e140fd71dadd729b4c1ad2ecf5",
+      "size": 184
+    },
+    {
+      "path": "lib/utils/assertErrorBoundaryContext.ts",
+      "gitBlob": "12c75fa3791d84005e26cc310fd09617c88f89c2",
+      "size": 359
+    },
+    {
+      "path": "lib/utils/getErrorMessage.ts",
+      "gitBlob": "f23a1dbc41c49417844837a1f6841aa27e80f311",
+      "size": 353
+    },
+    {
+      "path": "lib/utils/isErrorBoundaryContext.ts",
+      "gitBlob": "aab544ba3b75ed5ea934826ef112b024f019a5c2",
+      "size": 434
+    },
+    {
+      "path": "lib/utils/withErrorBoundary.test.tsx",
+      "gitBlob": "a4f585e2b1d070c43b6c1a3a8b8864ca6d2d8b65",
+      "size": 3449
+    },
+    {
+      "path": "lib/utils/withErrorBoundary.ts",
+      "gitBlob": "c99113336ad40a316c95e6dd289e5ac0b7a10f06",
+      "size": 1003
+    },
+    {
+      "path": "LICENSE",
+      "gitBlob": "632353bfd28a7eea330f606b98091e653c3a6ee0",
+      "size": 1078
+    },
+    {
+      "path": "package.json",
+      "gitBlob": "d102de8b1b715a7e5624512963945b95a0801391",
+      "size": 4072
+    },
+    {
+      "path": "vite.config.ts",
+      "gitBlob": "531050f1d5f3713de6d33d1da89e3478367fd80c",
+      "size": 1854
+    },
+    {
+      "path": "vitest.config.ts",
+      "gitBlob": "64885ff8643ad5d917f49861a0279ec329540da0",
+      "size": 560
+    },
+    {
+      "path": "vitest.d.ts",
+      "gitBlob": "4a8c6141d34541d9f83b1bcdc53cf4c89daa2fdd",
+      "size": 128
+    },
+    {
+      "path": "vitest.setup.ts",
+      "gitBlob": "70f7b3031cb9d5c456dcf137f0c52d040c9dd14d",
+      "size": 1558
+    }
+  ],
+  "fingerprint": "6089903fd5250d3d95701bc23c18123f526b02ea8576bcfd1c300b5d04c9e1af"
+}

@@ -39,7 +39,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "78cd4cb7135906ef118ca72e671f08447f52f0ede3e093c7dde5df6049db49fe"
+      "lockfileSha256": "a4c071fb1703ec3598a3f416daaec794e9e365836ff6c7341d05e485489c2bc9"
     }
   },
   "lanes": [
@@ -153,7 +153,7 @@
         {
           "path": "packages/octane/tests/_hydration-ssr.ts",
           "role": "support",
-          "sha256": "0a3e13ee14895dc1587f8f1d92dd57815e756a3caaf88ac981781d4a9e79061a"
+          "sha256": "faacae234a0bd953e14b5c5815b446a21b64980eb776b1c1dddd8971cecd3d81"
         }
       ],
       "notes": "Real Chromium canvas comparisons against React across all states, sizes and explicit themes; SSR hydration preserves nodes; native events, focus, refs, keyed moves, pause/resume and unmount cleanup."

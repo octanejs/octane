@@ -24,7 +24,10 @@
   "types": "src/index.ts",
   "files": [
     "src",
-    "README.md"
+    "README.md",
+    "LICENSE",
+    "LICENSE.upstream",
+    "UPSTREAM.md"
   ],
   "exports": {
     ".": "./src/index.ts",
@@ -38,18 +41,25 @@
     }
   },
   "scripts": {
-    "test": "vitest run --root ../.. --project react-error-boundary --project react-error-boundary-ssr"
+    "test": "pnpm upstream:verify && vitest run --root ../.. --project react-error-boundary --project react-error-boundary-ssr --project react-error-boundary-differential && node ../../scripts/react-parity/harness.mjs run-required --manifest packages/react-error-boundary/audit/react-parity.json",
+    "upstream:verify": "node ../../scripts/react-parity/verify-provenance.mjs"
   },
   "peerDependencies": {
     "octane": "workspace:^0.1.51 || ^0.2.0"
   },
   "devDependencies": {
+    "@octanejs/testing-library": "workspace:*",
+    "@testing-library/jest-dom": "catalog:default",
+    "@testing-library/react": "16.3.2",
+    "@types/react": "catalog:default",
+    "@types/react-dom": "catalog:default",
     "@tsrx/react": "catalog:default",
     "esbuild": "catalog:default",
     "octane": "workspace:*",
     "react": "catalog:default",
     "react-dom": "catalog:default",
-    "react-error-boundary": "catalog:default",
-    "vitest": "catalog:default"
+    "react-error-boundary": "6.1.5",
+    "vitest": "catalog:default",
+    "vitest-fail-on-console": "0.10.1"
   }
 }

@@ -1,0 +1,152 @@
+[
+  {
+    "id": "react-case-v1:8afcff747c85425fb4e4",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/ErrorBoundary.test.tsx",
+    "rationale": "The byte-exact React case and mechanically generated Octane case execute with the same assertions; class/ref authoring adaptations are recorded in the divergence patch."
+  },
+  {
+    "id": "react-case-v1:61fc9fa6a3bc01ef6d6a",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/ErrorBoundary.test.tsx",
+    "rationale": "The byte-exact React case and mechanically generated Octane case execute with the same assertions; class/ref authoring adaptations are recorded in the divergence patch."
+  },
+  {
+    "id": "react-case-v1:8e4e5aa68f64ad2fe55c",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/ErrorBoundary.test.tsx",
+    "rationale": "The byte-exact React case and mechanically generated Octane case execute with the same assertions; class/ref authoring adaptations are recorded in the divergence patch."
+  },
+  {
+    "id": "react-case-v1:8b4e4c0c06cf80f78dc3",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/ErrorBoundary.test.tsx",
+    "rationale": "The byte-exact React case and mechanically generated Octane case execute with the same assertions; class/ref authoring adaptations are recorded in the divergence patch."
+  },
+  {
+    "id": "react-case-v1:0dc9c04f22479d7d5408",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/ErrorBoundary.test.tsx",
+    "rationale": "The byte-exact React case and mechanically generated Octane case execute with the same assertions; class/ref authoring adaptations are recorded in the divergence patch."
+  },
+  {
+    "id": "react-case-v1:30e99bfc9ac56e3582c4",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/ErrorBoundary.test.tsx",
+    "rationale": "The byte-exact React case and mechanically generated Octane case execute with the same assertions; class/ref authoring adaptations are recorded in the divergence patch."
+  },
+  {
+    "id": "react-case-v1:5c0d743f09ba32a0ee00",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/ErrorBoundary.test.tsx",
+    "rationale": "The byte-exact React case and mechanically generated Octane case execute with the same assertions; class/ref authoring adaptations are recorded in the divergence patch."
+  },
+  {
+    "id": "react-case-v1:1ea0cf124fe34044a66b",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/ErrorBoundary.test.tsx",
+    "rationale": "The byte-exact React case and mechanically generated Octane case execute with the same assertions; class/ref authoring adaptations are recorded in the divergence patch."
+  },
+  {
+    "id": "react-case-v1:563937d0092aefaea318",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/ErrorBoundary.test.tsx",
+    "rationale": "The byte-exact React case and mechanically generated Octane case execute with the same assertions; class/ref authoring adaptations are recorded in the divergence patch."
+  },
+  {
+    "id": "react-case-v1:502fe38aeaee21c4a606",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/ErrorBoundary.test.tsx",
+    "rationale": "The byte-exact React case and mechanically generated Octane case execute with the same assertions; class/ref authoring adaptations are recorded in the divergence patch."
+  },
+  {
+    "id": "react-case-v1:df324db90928cc653e96",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/ErrorBoundary.test.tsx",
+    "rationale": "The byte-exact React case and mechanically generated Octane case execute with the same assertions; class/ref authoring adaptations are recorded in the divergence patch."
+  },
+  {
+    "id": "react-case-v1:d0ce3c8051e761562aab",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/ErrorBoundary.test.tsx",
+    "rationale": "The byte-exact React case and mechanically generated Octane case execute with the same assertions; class/ref authoring adaptations are recorded in the divergence patch."
+  },
+  {
+    "id": "react-case-v1:010ea77fd38ad5386744",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/ErrorBoundary.test.tsx",
+    "rationale": "The byte-exact React case and mechanically generated Octane case execute with the same assertions; class/ref authoring adaptations are recorded in the divergence patch."
+  },
+  {
+    "id": "react-case-v1:1ff221e4895205c6ca3b",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/ErrorBoundary.test.tsx",
+    "rationale": "The byte-exact React case and mechanically generated Octane case execute with the same assertions; class/ref authoring adaptations are recorded in the divergence patch."
+  },
+  {
+    "id": "react-case-v1:81786563fc15ef7c954f",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/ErrorBoundary.test.tsx",
+    "rationale": "The byte-exact React case and mechanically generated Octane case execute with the same assertions; class/ref authoring adaptations are recorded in the divergence patch."
+  },
+  {
+    "id": "react-case-v1:f915585329a98f514a61",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/ErrorBoundary.test.tsx",
+    "rationale": "The byte-exact React case and mechanically generated Octane case execute with the same assertions; class/ref authoring adaptations are recorded in the divergence patch."
+  },
+  {
+    "id": "react-case-v1:9d36707111ec89b11a12",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/ErrorBoundary.test.tsx",
+    "rationale": "The byte-exact React case and mechanically generated Octane case execute with the same assertions; class/ref authoring adaptations are recorded in the divergence patch."
+  },
+  {
+    "id": "react-case-v1:e596d2bc56944bfb45e3",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/ErrorBoundary.test.tsx",
+    "rationale": "The byte-exact React case and mechanically generated Octane case execute with the same assertions; class/ref authoring adaptations are recorded in the divergence patch."
+  },
+  {
+    "id": "react-case-v1:7acb1ed0956ebc285af6",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/hooks/useErrorBoundary.test.tsx",
+    "rationale": "The byte-exact React case and mechanically generated Octane case execute with the same assertions; class/ref authoring adaptations are recorded in the divergence patch."
+  },
+  {
+    "id": "react-case-v1:166db52c1a892b9087c2",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/hooks/useErrorBoundary.test.tsx",
+    "rationale": "The byte-exact React case and mechanically generated Octane case execute with the same assertions; class/ref authoring adaptations are recorded in the divergence patch."
+  },
+  {
+    "id": "react-case-v1:66cca8c2055a03858592",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/utils/withErrorBoundary.test.tsx",
+    "rationale": "The byte-exact React case and mechanically generated Octane case execute with the same assertions; class/ref authoring adaptations are recorded in the divergence patch."
+  },
+  {
+    "id": "react-case-v1:c3eace7684aea4114d03",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/utils/withErrorBoundary.test.tsx",
+    "rationale": "The byte-exact React case and mechanically generated Octane case execute with the same assertions; class/ref authoring adaptations are recorded in the divergence patch."
+  },
+  {
+    "id": "react-case-v1:9861194ba30f38d39476",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/utils/withErrorBoundary.test.tsx",
+    "rationale": "The byte-exact React case and mechanically generated Octane case execute with the same assertions; class/ref authoring adaptations are recorded in the divergence patch."
+  },
+  {
+    "id": "react-case-v1:f4f45d9727f009f228a6",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/utils/withErrorBoundary.test.tsx",
+    "rationale": "The byte-exact React case and mechanically generated Octane case execute with the same assertions; class/ref authoring adaptations are recorded in the divergence patch."
+  },
+  {
+    "id": "react-case-v1:216edd8d7c989e18688c",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/utils/withErrorBoundary.test.tsx",
+    "rationale": "The byte-exact React case and mechanically generated Octane case execute with the same assertions; class/ref authoring adaptations are recorded in the divergence patch."
+  }
+]

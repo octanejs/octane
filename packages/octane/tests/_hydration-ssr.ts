@@ -14,6 +14,7 @@ type HydrationBinding =
 	| 'monaco-editor'
 	| 'pdf'
 	| 'rainbowkit'
+	| 'react-error-boundary'
 	| 'react-map-gl'
 	| 'react-window'
 	| 'select'
@@ -42,6 +43,12 @@ function bindingAliases(binding: HydrationBinding) {
 	const source = resolve(repositoryRoot, 'packages', binding, 'src');
 	if (binding === 'thinking-orbs')
 		return [{ find: /^@octanejs\/thinking-orbs$/, replacement: resolve(source, 'index.ts') }];
+	if (binding === 'react-error-boundary') {
+		return [
+			{ find: /^@octanejs\/react-error-boundary$/, replacement: resolve(source, 'server.tsrx') },
+		];
+	}
+
 	if (binding === 'alien-signals') {
 		return [{ find: /^@octanejs\/alien-signals$/, replacement: resolve(source, 'index.ts') }];
 	}

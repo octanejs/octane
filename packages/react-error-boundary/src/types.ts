@@ -1,4 +1,8 @@
-import type { ComponentBody, OctaneNode } from 'octane';
+import type { ComponentBody, OctaneNode, Ref } from 'octane';
+
+export type ErrorBoundaryHandle = {
+	resetErrorBoundary: (...args: unknown[]) => void;
+};
 
 export type FallbackProps = {
 	error: unknown;
@@ -9,6 +13,7 @@ export type OnErrorCallback = (error: unknown, info: { componentStack: string })
 
 type ErrorBoundarySharedProps = {
 	children?: OctaneNode;
+	ref?: Ref<ErrorBoundaryHandle>;
 	onError?: OnErrorCallback;
 	onReset?: (
 		details:

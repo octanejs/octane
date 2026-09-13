@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "binding": "@octanejs/react-error-boundary",
+  "repository": "https://github.com/octanejs/octane.git",
+  "commit": "48c967524e5cad442e97bb290edea390fb21f0aa",
+  "sourceRoot": "upstream-artifact/previous-binding",
+  "files": [
+    {
+      "path": "package.json",
+      "sha256": "41a05f92dc4eeb9ed27da7e8817c8cf3efade2d07e614869b59b69769e0db2a1"
+    },
+    {
+      "path": "src/context.ts",
+      "sha256": "df598faa2bd5dfe9426f80ab3bbb2e8344f91c0dce023ce3912a98755a24fe63"
+    },
+    {
+      "path": "src/error-boundary.tsrx",
+      "sha256": "44da6d1c3004581ffe87500e4bcefc68415387ed2a19e13a41c80239ef8a2f11"
+    },
+    {
+      "path": "src/index.ts",
+      "sha256": "2a78da3b2682f88871b1d4ab0746b8f84e896b8c05526076fc0c7248d7318495"
+    },
+    {
+      "path": "src/internal.ts",
+      "sha256": "85315e71d7789c685234abc0508bff3935c3fcee7bbc549d3392414bd0134d77"
+    },
+    {
+      "path": "src/server.tsrx",
+      "sha256": "f4b27505e2424a485e8ccf7d53eb2adf0b32bf869f7ca68b3cf8386f5cae1fa2"
+    },
+    {
+      "path": "src/types.ts",
+      "sha256": "5682abf31adb0bf83e5bcf30614a9752221981804e8e5319c042010bd6f1e432"
+    },
+    {
+      "path": "src/use-error-boundary.ts",
+      "sha256": "8d141ab5e5c9ad64b2990faad8fdc472d2272df86fb284f9d04d69783368909a"
+    },
+    {
+      "path": "src/utils.ts",
+      "sha256": "68d50bfd9d3793ff2370c178f5bc0590518dba22337a495bad9ec8af09e23476"
+    },
+    {
+      "path": "src/with-error-boundary.tsrx",
+      "sha256": "53b8a1e04e501061240822ea8c2e3632cfacbf8aaa353f38f5de3b721849777b"
+    }
+  ]
+}

@@ -1,14 +1,22 @@
+import { ErrorBoundary as NativeErrorBoundary } from 'octane';
 import type { OctaneNode } from 'octane';
 import { ErrorBoundaryContext } from './context.ts';
-import type { ComponentType, ErrorBoundaryProps } from './types.ts';
+import type { ComponentType, ErrorBoundaryHandle, ErrorBoundaryProps } from './types.ts';
 
-// Upstream react-error-boundary does not catch errors during server rendering.
-// This explicit server entry therefore renders children without installing
-// Octane's native server boundary.
+export type ErrorBoundary = ErrorBoundaryHandle;
+
+// Keep the client boundary's hydration structure while propagating server errors.
+// Upstream never renders a fallback during server rendering.
 export function ErrorBoundary(props: ErrorBoundaryProps) @{
-	<ErrorBoundaryContext.Provider
-		value={{ didCatch: false, error: null, resetErrorBoundary: () => {} }}
-	>{props.children as OctaneNode}</ErrorBoundaryContext.Provider>
+	<NativeErrorBoundary
+		fallback={(error: unknown) => {
+			throw error;
+		}}
+	>
+		<ErrorBoundaryContext.Provider
+			value={{ didCatch: false, error: null, resetErrorBoundary: () => {} }}
+		>{props.children as OctaneNode}</ErrorBoundaryContext.Provider>
+	</NativeErrorBoundary>
 }
 
 export function withErrorBoundary<Props extends object>(

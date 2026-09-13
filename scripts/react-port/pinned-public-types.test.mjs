@@ -654,3 +654,12 @@ test('resolves a legacy types entry only from authenticated npm declarations', (
 		},
 		{ legacy: true },
 	));
+
+test('pristine declarations do not import native compatibility entrypoints', () => {
+	pinnedFixture(({ directory, node, put }) => {
+		put('audit/compatibility-baseline.json', JSON.stringify({ binding: node.binding }));
+		assert.throws(() => pinnedPublicEntries(directory, node), /Compatibility evidence requires/);
+		const entries = pinnedPublicEntries(directory, { ...node, binding: node.identity.packageName });
+		assert.deepEqual([...entries.keys()], [node.identity.packageName]);
+	});
+});

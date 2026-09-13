@@ -1,7 +1,15 @@
-import { ErrorBoundary as NativeErrorBoundary, useCallback, useLayoutEffect, useRef } from 'octane';
+import {
+	ErrorBoundary as NativeErrorBoundary,
+	useCallback,
+	useImperativeHandle,
+	useLayoutEffect,
+	useRef,
+} from 'octane';
 import type { OctaneNode } from 'octane';
 import { ErrorBoundaryContext } from './context.ts';
-import type { ErrorBoundaryProps, FallbackProps } from './types.ts';
+import type { ErrorBoundaryHandle, ErrorBoundaryProps, FallbackProps } from './types.ts';
+
+export type ErrorBoundary = ErrorBoundaryHandle;
 
 export function ErrorBoundary(props: ErrorBoundaryProps) @{
 	const nativeResetRef = useRef<(() => void) | null>(null);
@@ -15,6 +23,7 @@ export function ErrorBoundary(props: ErrorBoundaryProps) @{
 		caughtRef.current = false;
 		nativeResetRef.current?.();
 	}, []);
+	useImperativeHandle(props.ref, () => ({ resetErrorBoundary }), [resetErrorBoundary]);
 	const idleContext = {
 		didCatch: false,
 		error: null,

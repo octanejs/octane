@@ -1,0 +1,72 @@
+{
+  "runtimeDependencies": ["octane"],
+  "adaptedSources": [
+    {
+      "packageName": "react-error-boundary",
+      "paths": [
+        "src/context.ts",
+        "src/error-boundary.tsrx",
+        "src/index.ts",
+        "src/types.ts",
+        "src/use-error-boundary.ts",
+        "src/utils.ts",
+        "src/with-error-boundary.tsrx"
+      ]
+    }
+  ],
+  "sourceLedger": [
+    {
+      "path": "src/context.ts",
+      "origin": "adapted",
+      "sha256": "df598faa2bd5dfe9426f80ab3bbb2e8344f91c0dce023ce3912a98755a24fe63",
+      "packageName": "react-error-boundary"
+    },
+    {
+      "path": "src/error-boundary.tsrx",
+      "origin": "adapted",
+      "sha256": "3600701d2fd6bb393286ebdeea7d4ebf0a26cbef1cb8c280ac2bc06543503bdd",
+      "packageName": "react-error-boundary"
+    },
+    {
+      "path": "src/index.ts",
+      "origin": "adapted",
+      "sha256": "2a78da3b2682f88871b1d4ab0746b8f84e896b8c05526076fc0c7248d7318495",
+      "packageName": "react-error-boundary"
+    },
+    {
+      "path": "src/internal.ts",
+      "origin": "authored",
+      "sha256": "85315e71d7789c685234abc0508bff3935c3fcee7bbc549d3392414bd0134d77"
+    },
+    {
+      "path": "src/server.tsrx",
+      "origin": "authored",
+      "sha256": "f5a5b3073fa5e7c5eec366d59a065844dda9ea6dba1f49fd7ebcdd45ed5c6c30"
+    },
+    {
+      "path": "src/types.ts",
+      "origin": "adapted",
+      "sha256": "ac3412101fa93deff4dd83ca3db63317b38f581eb869a606c92c9d2c92aa28ce",
+      "packageName": "react-error-boundary"
+    },
+    {
+      "path": "src/use-error-boundary.ts",
+      "origin": "adapted",
+      "sha256": "8d141ab5e5c9ad64b2990faad8fdc472d2272df86fb284f9d04d69783368909a",
+      "packageName": "react-error-boundary"
+    },
+    {
+      "path": "src/utils.ts",
+      "origin": "adapted",
+      "sha256": "68d50bfd9d3793ff2370c178f5bc0590518dba22337a495bad9ec8af09e23476",
+      "packageName": "react-error-boundary"
+    },
+    {
+      "path": "src/with-error-boundary.tsrx",
+      "origin": "adapted",
+      "sha256": "53b8a1e04e501061240822ea8c2e3632cfacbf8aaa353f38f5de3b721849777b",
+      "packageName": "react-error-boundary"
+    }
+  ],
+  "reimplementedDependencies": []
+}

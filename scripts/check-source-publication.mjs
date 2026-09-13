@@ -114,7 +114,6 @@ export const SOURCE_PUBLICATION_DEBT = {
 		'packages/popper/tsconfig.json',
 		'packages/radix/tsconfig.json',
 		'packages/rainbowkit/tsconfig.json',
-		'packages/react-error-boundary/tsconfig.json',
 		'packages/react-map-gl/tsconfig.json',
 		'packages/redux-toolkit/tsconfig.json',
 		'packages/rsbuild-plugin-octane/tsconfig.typecheck.json',

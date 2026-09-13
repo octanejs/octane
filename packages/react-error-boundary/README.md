@@ -1,8 +1,7 @@
 # @octanejs/react-error-boundary
 
-Octane adapter for the public `react-error-boundary@6.1.2` API. It uses
-Octane's native `@try`/`@catch` boundary rather than shipping another error
-catching engine.
+Octane adapter for the public `react-error-boundary@6.1.5` API. It uses
+Octane's native error boundary for catching and preserves the compatibility APIs.
 
 ## Installation
 
@@ -29,10 +28,10 @@ function App() @{
 
 `fallback`, `FallbackComponent`, `fallbackRender`, `onError`, `onReset`,
 `resetKeys`, `ErrorBoundaryContext`, `getErrorMessage`, `useErrorBoundary`, and
-`withErrorBoundary` are supported.
+`withErrorBoundary`, and `ref.current.resetErrorBoundary(...args)` are supported.
 Errors from event handlers and async callbacks are not render errors; forward
 them with `useErrorBoundary().showBoundary(error)`.
 
 For server rendering, import `ErrorBoundary` from
-`@octanejs/react-error-boundary/server`. That entry deliberately does not catch
-descendant errors, matching upstream React server behavior.
+`@octanejs/react-error-boundary/server`. That entry propagates descendant errors, matching upstream React server behavior,
+and retains the client boundary structure for hydration.

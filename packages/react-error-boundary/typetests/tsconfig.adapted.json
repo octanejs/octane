@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "target": "esnext",
+    "lib": ["esnext", "dom", "dom.iterable"],
+    "jsx": "react-jsx",
+    "jsxImportSource": "octane",
+    "noEmit": true,
+    "strict": true,
+    "skipLibCheck": false,
+    "types": [],
+    "allowImportingTsExtensions": true
+  },
+  "include": ["../tests/types/**/*.ts", "../tests/types/**/*.tsx"],
+  "reactPortEvidence": {
+    "gate": "upstream-types-adapted",
+    "upstreamRegistrations": [],
+    "publicMode": "pinned"
+  }
+}
