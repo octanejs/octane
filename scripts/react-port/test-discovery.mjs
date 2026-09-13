@@ -114,10 +114,13 @@ export function configuredTestSelectors(source, fileName, { runner, scope = '' }
 	const selectors = [];
 	function collect(value, inheritedRoot) {
 		if (Array.isArray(value)) {
+			if (value.length === 0)
+				selectors.push({ runner, root: inheritedRoot, scope, fileName, testMatch: [] });
 			for (const entry of value) collect(entry, inheritedRoot);
 			return;
 		}
-		if (!value || typeof value !== 'object') return;
+		if (!value || typeof value !== 'object')
+			throw new Error(`Cannot resolve upstream test configuration or project ${fileName}`);
 		for (const key of [...selectorKeys, 'test', 'projects']) {
 			if (value[key] === unknown || (Array.isArray(value[key]) && value[key].includes(unknown)))
 				throw new Error(`Cannot resolve upstream test selector ${fileName}:${key}`);
@@ -185,9 +188,16 @@ export function selectedByTestConfiguration(relativePath, selector, conventional
 			return false;
 	}
 	if (selector.testMatch !== undefined || selector.include !== undefined) {
-		return patterns(selector.testMatch ?? selector.include).some((pattern) =>
-			glob(relativePath, token(pattern)),
-		);
+		return patterns(selector.testMatch ?? selector.include).some((pattern) => {
+			const expanded = token(pattern);
+			// Playwright prepends **/ to filename and path globs before matching.
+			return glob(
+				relativePath,
+				selector.runner === 'playwright' && !expanded.startsWith('**/')
+					? `**/${expanded}`
+					: expanded,
+			);
+		});
 	}
 	if (selector.testRegex !== undefined) {
 		return patterns(selector.testRegex).some((pattern) =>

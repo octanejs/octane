@@ -105,6 +105,36 @@ test('explicit empty selectors do not fall back to conventional names', () => {
 	);
 });
 
+test('project paths cannot silently fall back to conventional discovery', () => {
+	for (const source of [
+		'export default { projects: ["<rootDir>/packages/*"] };',
+		'export default { projects: [{ testMatch: ["known/*.ts"] }, "./extra.config.js"] };',
+	]) {
+		assert.throws(
+			() => configuredTestSelectors(source, 'jest.config.ts', { runner: 'jest' }),
+			/Cannot resolve/,
+		);
+	}
+});
+
+test('an empty project list selects no tests', () => {
+	assert.deepEqual(selected('export default { projects: [] };', ['src/example.test.ts']), []);
+});
+
+test('Playwright expands filename globs within the configured test directory', () => {
+	const source = 'export default { testDir: "./specs", testMatch: "*.spec.ts" };';
+	assert.deepEqual(
+		selected(
+			source,
+			['specs/browser.spec.ts', 'specs/nested/browser.spec.ts', 'outside/browser.spec.ts'],
+			{
+				runner: 'playwright',
+			},
+		),
+		['specs/browser.spec.ts', 'specs/nested/browser.spec.ts'],
+	);
+});
+
 test('Playwright testDir confines an explicit testMatch relative to its config', () => {
 	const selectors = configuredTestSelectors(
 		'export default { testDir: "./specs", testMatch: "**/*.spec.ts" };',
