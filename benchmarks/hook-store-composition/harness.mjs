@@ -1,12 +1,16 @@
 import fs from 'node:fs';
+import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { gzipSync } from 'node:zlib';
 
 const HERE = fileURLToPath(new URL('.', import.meta.url));
+const SOURCE_ROOT = path.resolve(process.env.OCTANE_HOOKS_ROOT || path.join(HERE, '../..'));
+const hash = (value) => createHash('sha256').update(value).digest('hex');
 const requireFromNews = createRequire(new URL('../news/package.json', import.meta.url));
 const packageResolvers = [
-	['octane', createRequire(new URL('../../packages/octane/package.json', import.meta.url))],
+	['octane', createRequire(path.join(SOURCE_ROOT, 'packages/octane/package.json'))],
 	[
 		'@octanejs/zustand',
 		createRequire(new URL('../../packages/zustand/package.json', import.meta.url)),
@@ -37,7 +41,12 @@ export async function startFixture({ work = false, noBuild = false } = {}) {
 	const { octane } = await import(
 		pathToFileURL(packageResolvers[0][1].resolve('octane/compiler/vite')).href
 	);
-	const outDir = path.join(HERE, 'dist', work ? 'work' : 'timing');
+	const outDir = path.join(
+		HERE,
+		'dist',
+		(work ? 'work' : 'timing') +
+			(process.env.OCTANE_HOOKS_ROOT ? '-' + hash(SOURCE_ROOT).slice(0, 12) : ''),
+	);
 	if (!noBuild) {
 		await build({
 			configFile: false,
@@ -62,6 +71,29 @@ export async function startFixture({ work = false, noBuild = false } = {}) {
 				},
 			},
 		});
+		const assets = fs
+			.readdirSync(path.join(outDir, 'assets'))
+			.filter((name) => name.endsWith('.js'))
+			.sort()
+			.map((name) => {
+				const content = fs.readFileSync(path.join(outDir, 'assets', name));
+				return {
+					name,
+					sha256: hash(content),
+					bytes: content.length,
+					gzip: gzipSync(content, { level: 9 }).length,
+				};
+			});
+		fs.writeFileSync(
+			path.join(outDir, 'artifact.json'),
+			JSON.stringify({
+				sourceRoot: SOURCE_ROOT,
+				runtimeSha256: hash(
+					fs.readFileSync(path.join(SOURCE_ROOT, 'packages/octane/src/runtime.ts')),
+				),
+				assets,
+			}),
+		);
 	}
 	if (!fs.existsSync(path.join(outDir, 'index.html'))) {
 		throw new Error(`Missing production hook/store fixture: ${outDir}`);
@@ -80,6 +112,9 @@ export async function startFixture({ work = false, noBuild = false } = {}) {
 	}
 	return {
 		url: `http://127.0.0.1:${address.port}/`,
+		artifact: fs.existsSync(path.join(outDir, 'artifact.json'))
+			? JSON.parse(fs.readFileSync(path.join(outDir, 'artifact.json'), 'utf8'))
+			: null,
 		close: () => closeServer(server),
 	};
 }

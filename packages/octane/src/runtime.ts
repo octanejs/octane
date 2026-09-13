@@ -19,6 +19,8 @@
 // a browser app that has no `@types/node`.
 declare const process: { env: { NODE_ENV?: string } };
 
+import { resolveHookPath } from './hook-slot-cache.js';
+
 import {
 	SUSPENSE_SCRIPT_ATTR,
 	SUSPENSE_RESOLVED_COMMENT,
@@ -1207,7 +1209,9 @@ export interface Block extends Scope {
 	 * many times it rendered within that pass. A block that keeps re-queueing
 	 * itself from its own render body (an unguarded render-phase setState) is a
 	 * non-converging loop — drainQueue throws after RENDER_PHASE_UPDATE_LIMIT,
-	 * mirroring React's "Too many re-renders".
+	 * mirroring React's "Too many re-renders". Negative stamps are transient
+	 * scheduler-sort epochs: drainRenders holds depth until the first render
+	 * resets it under the positive drain id.
 	 */
 	drainStamp: number;
 	drainRenders: number;
@@ -4377,6 +4381,8 @@ interface StoreInst<T> {
 	pending: T;
 	/** The subscribe last seen at enqueue — a store swap re-arms the tear check. */
 	subscribe: (onStoreChange: () => void) => () => void;
+	/** Immutable passive-effect deps, replaced only when subscribe changes. */
+	effectDeps: [StoreInst<T>, (onStoreChange: () => void) => () => void] | null;
 	/** Force a re-render of the owning block (same path as a useState setter). */
 	forceUpdate: () => void;
 	/** Stable notify handler handed to subscribe(); re-renders iff the snapshot
@@ -4802,34 +4808,41 @@ function drainHydrationRenderPhaseUpdates(root: Block): void {
 	}
 }
 
-// Sort a render wave shallow-first (ancestors before descendants). If A is an
-// ancestor of B then depth(A) < depth(B), so A renders first and its cascade can
-// clear B's `pending` (skipping B's redundant standalone render) regardless of
-// the order their setStates were queued. Depths are precomputed so the comparator
-// doesn't re-walk the chain on every compare. Resolve each unknown path to its
-// nearest cached queued ancestor, retaining depths only for blocks in this wave.
-function sortWaveByDepth(wave: Block[]): Block[] {
-	const queued = new Set(wave);
-	const depth = new Map<Block, number>();
-	const path: Block[] = [];
+// Sort a render wave shallow-first so an ancestor can consume or remove queued
+// descendants before their standalone updates. No user code runs during this
+// sort. Negative drain stamps temporarily reuse the loop-guard fields for depth;
+// the positive drain id resets them to a render count before executing a block.
+// Cache every real ancestor for this wave, including unqueued intermediates.
+// Two walks over each unknown path avoid allocating a path stack or collections.
+function sortWaveByDepth(wave: Block[], drainId: number): Block[] {
+	const stamp = -drainId;
 	for (let i = 0; i < wave.length; i++) {
-		let current: Block | null = wave[i];
-		let knownDepth: number | undefined;
-		while (current !== null) {
-			knownDepth = depth.get(current);
-			if (knownDepth !== undefined) break;
-			path.push(current);
+		const start = wave[i];
+		if (start.drainStamp === stamp) continue;
+		let current: Block | null = start;
+		let depth = 0;
+		while (current !== null && current.drainStamp !== stamp) {
+			depth++;
 			current = current.parentBlock;
 		}
-		let currentDepth = knownDepth ?? -1;
-		while (path.length > 0) {
-			const block = path.pop()!;
-			currentDepth++;
-			if (queued.has(block)) depth.set(block, currentDepth);
+		depth += current === null ? -1 : current.drainRenders;
+		current = start;
+		while (current !== null && current.drainStamp !== stamp) {
+			// Lite ancestry proxies intentionally have no scheduler fields.
+			if (current.drainStamp !== undefined) {
+				current.drainStamp = stamp;
+				current.drainRenders = depth;
+			}
+			depth--;
+			current = current.parentBlock;
 		}
 	}
-	wave.sort((a, b) => depth.get(a)! - depth.get(b)!);
+	wave.sort(compareWaveDepth);
 	return wave;
+}
+
+function compareWaveDepth(a: Block, b: Block): number {
+	return a.drainRenders - b.drainRenders;
 }
 
 // Visibility-owner scheduling is optional: roots without Suspense or hidden
@@ -4881,7 +4894,7 @@ function drainQueue(): { err: any } | null {
 	let pendingError: { err: any; all: any[] } | null = null;
 	let activitiesToRehide: Set<ActivitySlot> | null = null;
 	const drainId = ++DRAIN_ID;
-	if (QUEUE.length > 1) sortWaveByDepth(QUEUE);
+	if (QUEUE.length > 1) sortWaveByDepth(QUEUE, drainId);
 	// Iterate by index. A render may enqueue MORE work (e.g. a setState during
 	// render) — it appends to QUEUE, and `i < QUEUE.length` is re-evaluated every
 	// step, so those are drained in this same pass. The loop only exits once i has
@@ -5992,7 +6005,17 @@ function drainRefAttaches(): void {
 	const q = refAttachQueue.splice(0);
 	// ES stable sort preserves the queue's DFS/source order for disjoint subtrees;
 	// comparePostOrder moves only descendants ahead of their queued ancestors.
-	q.sort((a, b) => comparePostOrder(a.block, 0, b.block, 0));
+	// Entries with one immediate parent are siblings (or on the same block), so
+	// every comparison is zero and their existing queue order is already final.
+	if (q.length > 1) {
+		const parent = q[0].block?.parentBlock ?? null;
+		for (let i = 1; i < q.length; i++) {
+			if ((q[i].block?.parentBlock ?? null) !== parent) {
+				q.sort(compareRefPostOrder);
+				break;
+			}
+		}
+	}
 	for (const r of q) {
 		// Skip attaches whose owning subtree was unmounted earlier in THIS flush
 		// (e.g. a try boundary caught a mount-time throw and ran unmountBlock +
@@ -6468,6 +6491,9 @@ function comparePostOrder(
 function compareEffectPostOrder(a: PendingEffect, b: PendingEffect): number {
 	if (a.scope === b.scope) return a.order - b.order || a.seq - b.seq;
 	return comparePostOrder(a.scope.block, a.seq, b.scope.block, b.seq);
+}
+function compareRefPostOrder(a: RefAttach, b: RefAttach): number {
+	return comparePostOrder(a.block, 0, b.block, 0);
 }
 
 function finishEffectCommit(): void {
@@ -8434,10 +8460,7 @@ function resolveSlot(slot: HookSlot | undefined): HookSlot | undefined {
 	const n = slotStack.length;
 	if (n === 0) return slot;
 	if (slot === undefined && n === 1) return slotStack[0];
-	let key = '@octane:hook:';
-	for (let i = 0; i < n; i++) key = appendSlotKey(key, slotStack[i]);
-	if (slot !== undefined) key = appendSlotKey(key, slot);
-	const resolved = Symbol.for(key);
+	const resolved = resolveHookPath(slotStack, slot, false);
 	return typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__
 		? __profileResolveHook(resolved, typeof slot === 'symbol' ? slot : undefined)
 		: resolved;
@@ -8484,6 +8507,17 @@ type StateTuple<T> = [T, StateSetter<T>, () => T];
 export function useState<T = undefined>(): StateTuple<T | undefined>;
 export function useState<T>(initial: T | (() => T), slot?: symbol): StateTuple<T>;
 export function useState<T>(initial?: T | (() => T), slot?: HookSlot): StateTuple<T> {
+	const s = readStateHook(initial, slot, arguments.length === 1);
+	// The compiler selects the getter variant only when the third member is observed.
+	return [s.value, s.setter] as unknown as StateTuple<T>;
+}
+
+/** Both tuple forms consume the same resolved cell without a second hook lookup. */
+function readStateHook<T>(
+	initial: T | (() => T) | undefined,
+	slot: HookSlot | undefined,
+	loneArgument: boolean,
+): StateSlot<T> {
 	// Compiled base calls supply the slot separately, padding omitted initial
 	// values with undefined. Manual providers retain the legacy lone-slot form;
 	// automatic aliases (including bound/forwarding functions) receive authored
@@ -8492,7 +8526,7 @@ export function useState<T>(initial?: T | (() => T), slot?: HookSlot): StateTupl
 	if (
 		slot === undefined &&
 		typeof initial === 'symbol' &&
-		arguments.length === 1 &&
+		loneArgument &&
 		(slotStack.length === 0 || MANUAL_HOOK_DRIVER?.active === true)
 	) {
 		slot = initial as unknown as symbol;
@@ -8613,10 +8647,7 @@ export function useState<T>(initial?: T | (() => T), slot?: HookSlot): StateTupl
 			s.updates = undefined;
 		}
 	}
-	// Source-level useState has a third getState member, but this physical base
-	// path stays allocation-free. The compiler selects __useStateWithGetter only
-	// when index 2 can be observed (including escaped or ambiguous tuples).
-	return [s.value, s.setter] as unknown as StateTuple<T>;
+	return s;
 }
 
 function readQueuedState<T>(state: StateSlot<T>): T {
@@ -8742,21 +8773,7 @@ type _UseStateAcceptsNoArguments = AssertUseStateType<
 /** Compiler-emitted useState variant for a tuple whose third member is observable. */
 export function __useStateWithGetter<T>(initial: T | (() => T), slot?: symbol): StateTuple<T>;
 export function __useStateWithGetter<T>(initial: T | (() => T), slot?: HookSlot): StateTuple<T> {
-	// Normalize the legacy lone-slot form before delegating so the getter looks
-	// up the same cell. Aliases inside a path retain their authored initial value.
-	if (
-		slot === undefined &&
-		typeof initial === 'symbol' &&
-		arguments.length === 1 &&
-		(slotStack.length === 0 || MANUAL_HOOK_DRIVER?.active === true)
-	) {
-		slot = initial as unknown as symbol;
-		initial = undefined as T;
-	}
-	const pair = (useState as any)(initial, slot) as StateTuple<T>;
-	const resolved = resolveSlot(slot);
-	if (resolved === undefined) missingSlot('useState');
-	const s = CURRENT_SCOPE!.hooks!.get(resolved) as StateSlot<T>;
+	const s = readStateHook(initial, slot, arguments.length === 1);
 	const getter =
 		s.getter ??
 		(s.getter = () => {
@@ -8765,7 +8782,7 @@ export function __useStateWithGetter<T>(initial: T | (() => T), slot?: HookSlot)
 			const update = batch.updates.get(s) as TransitionActionUpdate<T> | undefined;
 			return update === undefined ? readQueuedState(s) : readQueuedTransition(update, false);
 		});
-	return [pair[0], pair[1], getter];
+	return [s.value, s.setter, getter];
 }
 
 /** The last successfully published source and its locally editable value. */
@@ -9131,6 +9148,16 @@ export function useReducer<S, A, I = S>(
 	initOrSlot?: ((arg: I) => S) | symbol,
 	slot?: HookSlot,
 ): ReducerTuple<S, A> {
+	const s = readReducerHook(reducer, initialArg, initOrSlot, slot);
+	return [s.value, s.dispatch] as unknown as ReducerTuple<S, A>;
+}
+
+function readReducerHook<S, A, I>(
+	reducer: (s: S, a: A) => S,
+	initialArg: I,
+	initOrSlot: ((arg: I) => S) | symbol | undefined,
+	slot: HookSlot | undefined,
+): ReducerSlot<S, A> {
 	// The compiler appends the hook slot as the final argument. In Symbol builds,
 	// the React 2-arg form `useReducer(reducer, initialState)` arrives as
 	// `(reducer, initialState, slot)`; numeric builds reserve the omitted init
@@ -9230,9 +9257,7 @@ export function useReducer<S, A, I = S>(
 			}
 		}
 	}
-	// See useState: the compiler selects __useReducerWithGetter whenever the
-	// source can observe the third tuple member.
-	return [s.value, s.dispatch] as unknown as ReducerTuple<S, A>;
+	return s;
 }
 
 function readQueuedReducer<S, A>(state: ReducerSlot<S, A>): S {
@@ -9262,11 +9287,7 @@ export function __useReducerWithGetter<S, A, I = S>(
 	initOrSlot?: ((arg: I) => S) | symbol,
 	slot?: HookSlot,
 ): ReducerTuple<S, A> {
-	const resolvedInput = typeof initOrSlot === 'symbol' ? initOrSlot : slot;
-	const pair = (useReducer as any)(reducer, initialArg, initOrSlot, slot) as ReducerTuple<S, A>;
-	const resolved = resolveSlot(resolvedInput);
-	if (resolved === undefined) missingSlot('useReducer');
-	const s = CURRENT_SCOPE!.hooks!.get(resolved) as ReducerSlot<S, A>;
+	const s = readReducerHook(reducer, initialArg, initOrSlot, slot);
 	const getter =
 		s.getter ??
 		(s.getter = () => {
@@ -9277,7 +9298,7 @@ export function __useReducerWithGetter<S, A, I = S>(
 				? readQueuedReducer(s)
 				: readQueuedTransition(update, false, s.reducer);
 		});
-	return [pair[0], pair[1], getter];
+	return [s.value, s.dispatch, getter];
 }
 
 function depsChanged(prev: any[] | undefined, next: any[] | undefined, hook = false): boolean {
@@ -10030,17 +10051,20 @@ export function useSyncExternalStore<T>(
 export function useSyncExternalStore<T>(
 	subscribe: (onStoreChange: () => void) => () => void,
 	getSnapshot: () => T,
-	...rest: any[]
+	serverSnapshotOrSlot: (() => T) | HookSlot | undefined = undefined,
+	lastSlot?: HookSlot,
 ): T {
 	// React-19 shape: `useSyncExternalStore(subscribe, getSnapshot,
 	// getServerSnapshot?)`. The compiler appends the hook slot as the
-	// LAST argument, so we detect the user-vs-compiler args by counting from
-	// the end. One trailing slot → user passed no getServerSnapshot; one slot
-	// preceded by another arg → user passed getServerSnapshot.
-	let slot = rest[rest.length - 1] as HookSlot | undefined;
+	// LAST argument. Count arguments, including an explicitly passed undefined,
+	// to distinguish an authored server snapshot from the trailing slot without
+	// materializing a rest array on every render.
+	const count = arguments.length;
+	let slot = (count > 4 ? arguments[count - 1] : count === 4 ? lastSlot : serverSnapshotOrSlot) as
+		HookSlot | undefined;
 	slot = resolveSlot(slot);
 	if (slot === undefined) missingSlot('useSyncExternalStore');
-	const getServerSnapshot = rest.length >= 2 ? (rest[0] as () => T) : undefined;
+	const getServerSnapshot = count >= 4 ? (serverSnapshotOrSlot as () => T) : undefined;
 	const subs = usesSubslots(slot);
 
 	// Fresh read on every render — the anti-tearing snapshot. DURING HYDRATION the
@@ -10077,6 +10101,7 @@ export function useSyncExternalStore<T>(
 			getSnapshot,
 			pending: value,
 			subscribe,
+			effectDeps: null,
 			forceUpdate:
 				typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__
 					? () => {
@@ -10112,6 +10137,7 @@ export function useSyncExternalStore<T>(
 			queued: false,
 		};
 		inst = created;
+		created.effectDeps = [created, subscribe];
 		ensureHooks(scope).set(subs.inst, inst);
 		// Always enqueue on mount: the first commit must run the tear check — for
 		// hydrate-then-sync, and for any store mutation in the render→commit window.
@@ -10133,8 +10159,11 @@ export function useSyncExternalStore<T>(
 	// entry can't carry. inst is identity-stable, so the deps `[inst, subscribe]`
 	// fire exactly when the old `[subscribe]` deps did. Body is the module-level
 	// deps-as-args fn (cast: EffectFn is nominally zero-arg, but the effect drain applies
-	// the deps positionally — see subscribeToStore).
-	useEffect(subscribeToStore as unknown as EffectFn, [inst, subscribe], subs.effect);
+	// the deps positionally — see subscribeToStore). Keep the pair immutable once
+	// passed to the effect slot; a failed swap may leave this pointer on inst, but
+	// the next render compares subscribe again before sharing it with useEffect.
+	if (inst.effectDeps![1] !== subscribe) inst.effectDeps = [inst, subscribe];
+	useEffect(subscribeToStore as unknown as EffectFn, inst.effectDeps!, subs.effect);
 
 	return value;
 }
@@ -12973,30 +13002,6 @@ function retainDiscardedWarmMemos(scope: Scope): void {
 	forEachSubtreeChild(scope, retainDiscardedWarmMemos);
 }
 
-function runWarm(fn: () => void, owner: Block = CURRENT_BLOCK!): void {
-	// Reuse the nearest OWNER ancestor's cache when one exists: a descendant that
-	// suspends mid-cascade re-warms its own subtree, and its entries must
-	// dedup against what the ancestor's walk already started (one cache per
-	// warming subtree, not per suspending block). Starting at owner is important:
-	// a stale source-child cache is not visible to adjacent siblings warmed by an
-	// enclosing plan.
-	const cache = warmCacheForOwner(owner);
-	WARM_EVER = true;
-	const prev = CURRENT_WARM;
-	const prevClaims = CURRENT_WARM_CLAIMS;
-	CURRENT_WARM = cache;
-	CURRENT_WARM_CLAIMS = new Set();
-	try {
-		fn();
-	} catch {
-		// Warming is speculative — it must never break the render that
-		// triggered it. A throwing warm plan just means fewer prefetches.
-	} finally {
-		CURRENT_WARM = prev;
-		CURRENT_WARM_CLAIMS = prevClaims;
-	}
-}
-
 function blockIsAncestor(ancestor: Block, block: Block): boolean {
 	for (let current: Block | null = block; current !== null; current = current.parentBlock) {
 		if (current === ancestor) return true;
@@ -13009,26 +13014,34 @@ function blockIsAncestor(ancestor: Block, block: Block): boolean {
  * adjacent descendants as well as the source branch. */
 function runActiveWarmPlans(local?: () => void): void {
 	const block = CURRENT_BLOCK!;
-	let plans: number[] | null = null;
+	// Render checkpoints restore the registration stack after nested renders.
+	// Freeze its current end so a plan cannot activate newly registered work here.
+	const end = ACTIVE_WARM_PLANS.length;
+	let first = 0;
 	let owner = block;
-	for (let i = 0; i < ACTIVE_WARM_PLANS.length; i += 3) {
-		const planBlock = ACTIVE_WARM_PLANS[i] as Block;
-		if (!blockIsAncestor(planBlock, block)) continue;
-		(plans ??= []).push(i);
-		if (plans.length === 1) owner = planBlock;
+	for (; first < end; first += 3) {
+		const planBlock = ACTIVE_WARM_PLANS[first] as Block;
+		if (blockIsAncestor(planBlock, block)) {
+			owner = planBlock;
+			break;
+		}
 	}
-	if (plans === null && local === undefined) return;
-	runWarm(() => {
-		if (plans !== null) {
-			for (let i = 0; i < plans.length; i++) {
-				CURRENT_WARM_CLAIMS = new Set();
-				try {
-					const index = plans[i];
-					(ACTIVE_WARM_PLANS[index + 1] as (props: any) => void)(ACTIVE_WARM_PLANS[index + 2]);
-				} catch {
-					// Each speculative plan is independent. One throwing getter or
-					// creation must not prevent adjacent plans from warming.
-				}
+	if (first === end && local === undefined) return;
+	// Cache above adjacent siblings, reusing an enclosing owner's current cache.
+	const cache = warmCacheForOwner(owner);
+	WARM_EVER = true;
+	const previous = CURRENT_WARM;
+	const previousClaims = CURRENT_WARM_CLAIMS;
+	CURRENT_WARM = cache;
+	try {
+		for (let i = first; i < end; i += 3) {
+			if (i !== first && !blockIsAncestor(ACTIVE_WARM_PLANS[i] as Block, block)) continue;
+			CURRENT_WARM_CLAIMS = new Set();
+			try {
+				(ACTIVE_WARM_PLANS[i + 1] as (props: any) => void)(ACTIVE_WARM_PLANS[i + 2]);
+			} catch {
+				// Each speculative plan is independent. One throwing getter or
+				// creation must not prevent adjacent plans from warming.
 			}
 		}
 		if (local !== undefined) {
@@ -13039,7 +13052,12 @@ function runActiveWarmPlans(local?: () => void): void {
 				// Speculative and independent from the registered ancestor plans.
 			}
 		}
-	}, owner);
+	} catch {
+		// Warming is speculative; failed bookkeeping must not break its render.
+	} finally {
+		CURRENT_WARM = previous;
+		CURRENT_WARM_CLAIMS = previousClaims;
+	}
 }
 
 function activeMemoMatch(
@@ -32337,17 +32355,22 @@ function hasHeldDeferredSwap(slot: DeferredSlot<unknown>): boolean {
 	return false;
 }
 
-export function useDeferredValue<T>(value: T, ...rest: any[]): T {
+export function useDeferredValue<T>(value: T, ...rest: any[]): T;
+export function useDeferredValue<T>(
+	value: T,
+	initialValueOrSlot: T | HookSlot | undefined = undefined,
+	lastSlot?: HookSlot,
+): T {
 	// React-19 shape: `useDeferredValue(value, initialValue?)`. The compiler
-	// appends the hook slot as the LAST argument, so we detect the
-	// user-vs-compiler args by counting from the end. One trailing slot →
-	// user passed no initialValue; one slot preceded by another
-	// arg → user passed initialValue. Same hook-slot semantics either way.
-	let slot = rest[rest.length - 1] as HookSlot | undefined;
+	// appends the hook slot last. Argument count distinguishes an authored
+	// initialValue (even undefined or a symbol) from the compiler slot.
+	const count = arguments.length;
+	let slot = (count > 3 ? arguments[count - 1] : count === 3 ? lastSlot : initialValueOrSlot) as
+		HookSlot | undefined;
 	slot = resolveSlot(slot);
 	if (slot === undefined) missingSlot('useDeferredValue');
-	const initialValue = rest.length >= 2 ? (rest[0] as T) : undefined;
-	const hasInitial = rest.length >= 2;
+	const hasInitial = count >= 3;
+	const initialValue = hasInitial ? (initialValueOrSlot as T) : undefined;
 	const scope = CURRENT_SCOPE!;
 	const block = CURRENT_BLOCK!;
 	const hidden = inInactiveSubtree(block);
