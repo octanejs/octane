@@ -5087,5 +5087,85 @@
     "reference": "branch-argumentsEscape-work-budget",
     "maxRatio": 0,
     "note": "Escaped argument tuples remain independent under real nested branch updates; absent branches omit unused captures."
+  },
+  {
+    "suite": "root-transactions",
+    "op": "retirement_closures",
+    "target": "retirement-remove-half",
+    "reference": "retirement-remove-half-work",
+    "maxRatio": 0,
+    "note": "Retiring keyed rows reaches no per-block undo closure; both host nodes and connected cleanup are verified in the same run."
+  },
+  {
+    "suite": "root-transactions",
+    "op": "retirement_closures",
+    "target": "retirement-clear",
+    "reference": "retirement-clear-work",
+    "maxRatio": 0,
+    "note": "Retiring keyed rows reaches no per-block undo closure; both host nodes and connected cleanup are verified in the same run."
+  },
+  {
+    "suite": "root-transactions",
+    "op": "input_slots",
+    "target": "inputs-both",
+    "reference": "inputs-both-work",
+    "maxRatio": 1,
+    "note": "Keyed survivor input journaling stays within its flat-slot budget, with native events, state, and survivor identity checked in clean and observed bundles."
+  },
+  {
+    "suite": "root-transactions",
+    "op": "input_slots",
+    "target": "inputs-props-only",
+    "reference": "inputs-props-only-work",
+    "maxRatio": 1,
+    "note": "Keyed survivor input journaling stays within its flat-slot budget, with native events, state, and survivor identity checked in clean and observed bundles."
+  },
+  {
+    "suite": "root-transactions",
+    "op": "input_slots",
+    "target": "inputs-environment-only",
+    "reference": "inputs-environment-only-work",
+    "maxRatio": 1,
+    "note": "Keyed survivor input journaling stays within its flat-slot budget, with native events, state, and survivor identity checked in clean and observed bundles."
+  },
+  {
+    "suite": "root-transactions",
+    "op": "input_slots",
+    "target": "inputs-unchanged",
+    "reference": "inputs-unchanged-work",
+    "maxRatio": 0,
+    "note": "Keyed survivor input journaling stays within its flat-slot budget, with native events, state, and survivor identity checked in clean and observed bundles."
+  },
+  {
+    "suite": "root-transactions",
+    "op": "changed_reads",
+    "target": "text-compiled",
+    "reference": "text-compiled-work",
+    "maxRatio": 1,
+    "note": "Live DOM getter calls preserve first raw-thenable rollback and external edits; descriptor updates reuse the value already read for comparison."
+  },
+  {
+    "suite": "root-transactions",
+    "op": "changed_reads",
+    "target": "text-descriptor",
+    "reference": "text-descriptor-work",
+    "maxRatio": 1,
+    "note": "Live DOM getter calls preserve first raw-thenable rollback and external edits; descriptor updates reuse the value already read for comparison."
+  },
+  {
+    "suite": "root-transactions",
+    "op": "equal_reads",
+    "target": "text-compiled",
+    "reference": "text-compiled-work",
+    "maxRatio": 0,
+    "note": "Live DOM getter calls preserve first raw-thenable rollback and external edits; descriptor updates reuse the value already read for comparison."
+  },
+  {
+    "suite": "root-transactions",
+    "op": "equal_reads",
+    "target": "text-descriptor",
+    "reference": "text-descriptor-work",
+    "maxRatio": 1,
+    "note": "Live DOM getter calls preserve first raw-thenable rollback and external edits; descriptor updates reuse the value already read for comparison."
   }
 ]

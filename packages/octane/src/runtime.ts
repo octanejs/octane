@@ -2414,6 +2414,8 @@ const JOURNAL_PROP = 3;
 const JOURNAL_CREATED = 4;
 const JOURNAL_RENDER = 5;
 const JOURNAL_UNDO = 6;
+const JOURNAL_RETIRED = 7;
+const JOURNAL_INPUTS = 8;
 /** Flat undo log, four slots per entry: kind, target, a, b. */
 let TRANSITION_JOURNAL: any[] | null = null;
 /** Bags already captured in the open window, so each is snapshotted once. */
@@ -2656,9 +2658,7 @@ function retireRootBlock(block: Block): void {
 	const retired = (transaction.retired ??= new Set());
 	if (!retired.has(block)) {
 		retired.add(block);
-		journalUndo(() => {
-			retired.delete(block);
-		});
+		TRANSITION_JOURNAL!.push(JOURNAL_RETIRED, retired, block, null);
 	}
 	if (block.pending) {
 		journalRootProperty(block, 'pending', block.pending);
@@ -2819,6 +2819,8 @@ function rollbackRootRender(transaction: RootRenderTransaction): void {
 				if (transaction.log[i] === JOURNAL_UNDO) transaction.log[i + 1]();
 				else if (transaction.log[i] === JOURNAL_CREATED)
 					undoCreatedInRootRender(transaction.log[i + 1], transaction.log[i + 2]);
+				else if (transaction.log[i] === JOURNAL_RETIRED)
+					transaction.log[i + 1].delete(transaction.log[i + 2]);
 			}
 			transaction.log.length = 0;
 		}
@@ -3461,8 +3463,8 @@ function collectBlockRange(block: Block): Node[] {
 	return nodes;
 }
 
-function journalText(node: Text): void {
-	TRANSITION_JOURNAL!.push(JOURNAL_TEXT, node, node.nodeValue, null);
+function journalText(node: Text, previous: string | null): void {
+	TRANSITION_JOURNAL!.push(JOURNAL_TEXT, node, previous, null);
 	journalBag();
 }
 
@@ -3567,8 +3569,15 @@ function rollbackTransitionJournal(checkpoint: number, owner: Block): void {
 			case JOURNAL_PROP:
 				(target as any)[a] = b;
 				break;
+			case JOURNAL_INPUTS:
+				(target as Block).extra = b;
+				(target as Block).props = a;
+				break;
 			case JOURNAL_CREATED:
 				undoCreatedInRootRender(target as Block, a as RootRenderTransaction);
+				break;
+			case JOURNAL_RETIRED:
+				(target as Set<Block>).delete(a as Block);
 				break;
 			case JOURNAL_RENDER:
 				if (!target.disposed && (target === owner || blockIsAncestorOf(owner, target))) {
@@ -3579,10 +3588,25 @@ function rollbackTransitionJournal(checkpoint: number, owner: Block): void {
 				target();
 				break;
 			default:
-				for (const key of Object.keys(target)) {
-					if (!Object.prototype.hasOwnProperty.call(a, key)) delete target[key];
+				// Spread snapshots include enumerable symbols as well as strings.
+				// Leave non-enumerable state outside the snapshot, including an
+				// array's length, which has its own restoration below.
+				for (const key of Reflect.ownKeys(target)) {
+					if (
+						!Object.prototype.hasOwnProperty.call(a, key) &&
+						Object.prototype.propertyIsEnumerable.call(target, key)
+					)
+						delete target[key];
 				}
-				for (const key of Object.keys(a)) target[key] = a[key];
+				for (const key of Reflect.ownKeys(a)) {
+					// Symbol constants were never assigned by the string-only path.
+					// Keep an unchanged read-only symbol valid while still invoking
+					// symbol setters and rejecting a value that cannot be restored.
+					if (typeof key === 'symbol') {
+						if (Reflect.set(target, key, a[key]) || Object.is(target[key], a[key])) continue;
+					}
+					target[key] = a[key];
+				}
 				if (b !== null) target.length = b;
 				// This bag is back to its pre-window values, so a later write in an
 				// enclosing window has to snapshot it again rather than trust the
@@ -15160,10 +15184,12 @@ let hiddenStyleWriter:
 
 function updateTextValue(node: Text, value: string): void {
 	if (hiddenTextWriter !== null && hiddenTextWriter(node, value)) return;
-	if (node.nodeValue !== value) {
+	const previous = node.nodeValue;
+	if (previous !== value) {
 		// Descriptor text updates participate in the same held-transition undo
-		// window as compiled text bindings.
-		if (TRANSITION_JOURNAL !== null) journalText(node);
+		// window as compiled text bindings. Reuse the live value just compared;
+		// an authored-value cache cannot restore a later external DOM edit.
+		if (TRANSITION_JOURNAL !== null) journalText(node, previous);
 		node.nodeValue = value;
 	}
 }
@@ -15179,7 +15205,7 @@ export function setText(node: Text, value: any): void {
 	// View-transition dirty tracking and journaling remain at this write boundary.
 	// The optional driver marks the innermost boundary only during a wrapped drain.
 	VIEW_TRANSITION_DRIVER?.markDirty();
-	if (TRANSITION_JOURNAL !== null) journalText(node);
+	if (TRANSITION_JOURNAL !== null) journalText(node, node.nodeValue);
 	//
 	// Write via `nodeValue` (a `Node`-level accessor) rather than `data` (which
 	// lives on `CharacterData` one prototype hop deeper) — it's measurably faster
@@ -28475,6 +28501,12 @@ export function tryBlock(
 		state.catchBody = catchBody;
 		state.pendingBody = pendingBody;
 		state.propagateSuspense = propagateSuspense;
+		// The boundary's own hold must keep these candidate inputs for retry.
+		// A whole-origin unwind instead restores its driving cells; restore the
+		// matching environment before a queued descendant can retry this primary,
+		// rather than waiting for the origin's later pending-cue render to do it.
+		if (ACTIVE_TRANSITION_ATTEMPT !== null && state.env !== env)
+			TRANSITION_JOURNAL!.push(JOURNAL_PROP, state, 'env', state.env);
 		state.env = env;
 	}
 	const s = state;
@@ -33901,8 +33933,10 @@ function updateSurvivor<T>(
 		block.itemIndex = newIdx;
 		block.body = itemBody as ComponentBody;
 	} else {
-		if (journal && block.props !== newItem) journalRootProperty(block, 'props', block.props);
-		if (journal && block.extra !== env) journalRootProperty(block, 'extra', block.extra);
+		// Item and captured inputs change together before the body can run. One
+		// entry restores both without a second property key or journal guard.
+		if (journal && (block.props !== newItem || block.extra !== env))
+			TRANSITION_JOURNAL!.push(JOURNAL_INPUTS, block, block.props, block.extra);
 		block.props = newItem;
 		block.body = itemBody as ComponentBody;
 		block.itemIndex = newIdx;

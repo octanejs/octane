@@ -1,4 +1,5 @@
 import {
+	createElement,
 	createPortal,
 	memo,
 	use,
@@ -141,6 +142,18 @@ export function RawRootSuspensionAfterSiblingApp(props: { label: string; read: (
 		<span id="raw-root-suspension-label" title={props.label}>{props.label}</span>
 		<RawRootSuspensionReader read={props.read} />
 	</section>
+}
+
+export function DescriptorRootSuspensionAfterSiblingApp(props: {
+	label: string;
+	read: () => string;
+}) {
+	return createElement(
+		'section',
+		{ id: 'raw-root-suspension-shell' },
+		createElement('span', { id: 'raw-root-suspension-label', title: props.label }, props.label),
+		createElement(RawRootSuspensionReader, { read: props.read }),
+	);
 }
 
 function RootSuspensionReader(props: { promise: PromiseLike<string> }) @{

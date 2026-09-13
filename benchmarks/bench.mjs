@@ -1195,6 +1195,17 @@ const SUITES = [
 		runs: [{ script: 'run-size.mjs', args: () => [] }],
 	},
 	{
+		name: 'root-transactions',
+		cwd: 'root-transactions',
+		servers: [],
+		iter: { normal: 1, quick: 1 },
+		runs: [
+			{ script: 'retirement.mjs', args: () => [] },
+			{ script: 'inputs.mjs', args: () => [] },
+			{ script: 'contracts.mjs', args: () => [] },
+		],
+	},
+	{
 		name: 'compiler-output',
 		cwd: 'compiler-output',
 		servers: [],
