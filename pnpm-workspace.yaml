@@ -257,8 +257,8 @@ catalogs:
     '@sanity/icons': 5.2.1
     '@sanity/logos': 2.2.5
     '@sanity/client': 7.26.2
-    '@sanity/core-loader': 2.2.1
-    '@sanity/react-loader': 2.2.1
+    '@sanity/core-loader': 2.2.2
+    '@sanity/react-loader': 2.2.2
     '@ripple-ts/adapter': ^0.3.125
     '@ripple-ts/vite-plugin': ^0.3.125
     '@solidjs/web': '2.0.0-beta.20'

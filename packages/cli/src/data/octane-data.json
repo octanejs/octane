@@ -957,8 +957,8 @@
       "category": "Sanity Content",
       "upstream": {
         "package": "@sanity/react-loader",
-        "version": "2.2.1",
-        "commit": "2e3f5720173acfe67a771d92bb7fc5b51e6ac014"
+        "version": "2.2.2",
+        "commit": "baf6458a64aba4011a484caa7d10019549cde087"
       },
       "surface": "Query-store milestone: createQueryStore, loadQuery, setServerClient, useQuery, useLiveMode, useEncodeDataAttribute, create-data-attribute exports, browser conditions, and the server-only rsc entry.",
       "divergences": [
@@ -967,7 +967,7 @@
         "The ./rsc entry models a server-only Octane environment rather than React Server Component conditions."
       ],
       "ssr": "Supported through loadQuery/setServerClient and the server-only rsc entry; initial query state is SSR-tested.",
-      "verified": "2026-08-24"
+      "verified": "2026-09-13"
     },
     {
       "name": "@octanejs/sanity-logos",

@@ -290,8 +290,8 @@ catalogs:
       specifier: 7.26.2
       version: 7.26.2
     '@sanity/core-loader':
-      specifier: 2.2.1
-      version: 2.2.1
+      specifier: 2.2.2
+      version: 2.2.2
     '@sanity/icons':
       specifier: 5.2.1
       version: 5.2.1
@@ -299,8 +299,8 @@ catalogs:
       specifier: 2.2.5
       version: 2.2.5
     '@sanity/react-loader':
-      specifier: 2.2.1
-      version: 2.2.1
+      specifier: 2.2.2
+      version: 2.2.2
     '@shikijs/rehype':
       specifier: ^3.23.0
       version: 3.23.0
@@ -7944,14 +7944,14 @@ importers:
         version: 7.26.2
       '@sanity/core-loader':
         specifier: catalog:default
-        version: 2.2.1(typescript@7.0.2)
+        version: 2.2.2(typescript@7.0.2)
       fast-deep-equal:
         specifier: 3.1.3
         version: 3.1.3
     devDependencies:
       '@sanity/react-loader':
         specifier: catalog:default
-        version: 2.2.1(react@19.2.7)(typescript@7.0.2)
+        version: 2.2.2(react@19.2.7)(typescript@7.0.2)
       '@tsrx/react':
         specifier: catalog:default
         version: 0.2.71(react@19.2.7)
@@ -18259,8 +18259,8 @@ packages:
     resolution: {integrity: sha512-gCnltbeB8BmXVLSr/6XHAA3tQmhJDMKXufOVRXYxAhIEv+5n9CtnxupjY5IzmdI+7v+G67TZV/8zCQhvaFlVww==}
     engines: {node: '>=20.19 <22 || >=22.12'}
 
-  '@sanity/core-loader@2.2.1':
-    resolution: {integrity: sha512-9GkwfvRSwq94GGs17doPXMO0YnbWI5C7iadNlOEbrgGcfOVSsEYHlmE6R8fsd8fW4iRUfH2egtTY9JtpbiiWWw==}
+  '@sanity/core-loader@2.2.2':
+    resolution: {integrity: sha512-8hPZQbCp2+JRQUq6pTSuRLU02k/b5OKGljzQQJ1iVRkHGwwCAD943Y+4kOwHijGHP3cenUI+ovch384eYc81/g==}
     engines: {node: '>=18'}
 
   '@sanity/eventsource@5.0.4':
@@ -18282,14 +18282,14 @@ packages:
     resolution: {integrity: sha512-XRsLYFNq6DhMm+Ddt+lWzV4nuARmteYAYHrrbKFzpOpt9hCBsLjWbvTELxohEzhIFNoxbVBaRcY6GDB1/ANRFw==}
     engines: {node: '>=20.19 <22 || >=22.12'}
 
-  '@sanity/react-loader@2.2.1':
-    resolution: {integrity: sha512-EoZKMiFlgIUo9RgLp0QAOtxbe0+SKh/vK0a7RcHouu7pGLx6TbtUmeYgfM4NaoK+K+EDXFj9PPyVjsTd1c/TuQ==}
+  '@sanity/react-loader@2.2.2':
+    resolution: {integrity: sha512-NjxfCHPAaeKRS11opDnqlB7JELN+3yle2VXQW8MEyKEnyJhqPzZ83+0AnBGY8jK84rv78nFcJyC2JmCQHrKaZQ==}
     engines: {node: '>=18'}
     peerDependencies:
       react: ^18.3 || ^19
 
-  '@sanity/visual-editing-csm@3.0.17':
-    resolution: {integrity: sha512-QE62zkJ388KlBbZiej7mYwmGKRYEe+NOnaTfIiVu8PJYbFBkyOEyttAxjclBYji0+utFmHIl77hZ6DxujtLlYg==}
+  '@sanity/visual-editing-csm@3.0.18':
+    resolution: {integrity: sha512-s+54hWA0g/YIVLP8Vq0JzQqRS34OP5tiV/m0AkF3ycBaaUX+9H1Lobc0lZv5w0rHc+FXwSy0Y55Kn1Rh0CvMOA==}
     engines: {node: '>=20.19 <22 || >=22.12'}
     peerDependencies:
       '@sanity/client': ^7.26.2 || ^8.0.0
@@ -45155,12 +45155,12 @@ snapshots:
       uuid: 14.0.1
       xstate: 5.32.5
 
-  '@sanity/core-loader@2.2.1(typescript@7.0.2)':
+  '@sanity/core-loader@2.2.2(typescript@7.0.2)':
     dependencies:
       '@sanity/client': 7.26.2
       '@sanity/comlink': 4.0.3
       '@sanity/presentation-comlink': 2.2.3
-      '@sanity/visual-editing-csm': 3.0.17(@sanity/client@7.26.2)(typescript@7.0.2)
+      '@sanity/visual-editing-csm': 3.0.18(@sanity/client@7.26.2)(typescript@7.0.2)
       '@sanity/visual-editing-types': 2.1.1(@sanity/client@7.26.2)
     transitivePeerDependencies:
       - '@sanity/types'
@@ -45191,17 +45191,17 @@ snapshots:
     transitivePeerDependencies:
       - '@sanity/types'
 
-  '@sanity/react-loader@2.2.1(react@19.2.7)(typescript@7.0.2)':
+  '@sanity/react-loader@2.2.2(react@19.2.7)(typescript@7.0.2)':
     dependencies:
       '@sanity/client': 7.26.2
-      '@sanity/core-loader': 2.2.1(typescript@7.0.2)
-      '@sanity/visual-editing-csm': 3.0.17(@sanity/client@7.26.2)(typescript@7.0.2)
+      '@sanity/core-loader': 2.2.2(typescript@7.0.2)
+      '@sanity/visual-editing-csm': 3.0.18(@sanity/client@7.26.2)(typescript@7.0.2)
       react: 19.2.7
     transitivePeerDependencies:
       - '@sanity/types'
       - typescript
 
-  '@sanity/visual-editing-csm@3.0.17(@sanity/client@7.26.2)(typescript@7.0.2)':
+  '@sanity/visual-editing-csm@3.0.18(@sanity/client@7.26.2)(typescript@7.0.2)':
     dependencies:
       '@sanity/client': 7.26.2
       '@sanity/visual-editing-types': 2.1.1(@sanity/client@7.26.2)
