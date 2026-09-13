@@ -1,10 +1,18 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	symlinkSync,
+	writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
-import { validateAuditReport } from './bindings-audit-lib.mjs';
+import { repositoryIdentity, validateAuditReport } from './bindings-audit-lib.mjs';
 
 const cli = new URL('./bindings-audit.mjs', import.meta.url).href;
 
@@ -738,4 +746,115 @@ test('outputs inside repositories are refused and unusable Octane roots exit one
 	);
 	assert.equal(help.status, 0);
 	assert.match(help.stdout, /origin:"assessment"/);
+});
+
+test('audit selects the matching repository-root package when examples repeat its name', (t) => {
+	const f = fixture(t);
+	f.write(f.library, 'package.json', {
+		name: 'engine',
+		version: '2.2.0-dev.1',
+		exports: { '.': './index.js' },
+		license: 'MIT',
+	});
+	f.write(f.library, 'app/package.json', { name: 'engine', version: '0.0.0' });
+	f.commit(f.library);
+	for (const version of Object.values(f.registry.engine.versions))
+		delete version.repository.directory;
+	const result = f.audit(['--binding', 'alpha']);
+	assert.equal(result.status, 0, result.stderr);
+	const report = JSON.parse(result.stdout);
+	assert.equal(report.bindings[0].collection, 'complete');
+	assert.equal(report.bindings[0].releases[0].defaultBranchVersion, '2.2.0-dev.1');
+	assert.equal(report.bindings[0].releases[0].packageDirectory, '.');
+});
+
+test('audit retains explicit package directories and rejects ambiguous non-root names', (t) => {
+	const f = fixture(t);
+	f.write(f.library, 'app/package.json', { name: 'engine', version: '0.0.0' });
+	f.commit(f.library);
+	const explicit = f.audit(['--binding', 'alpha']);
+	assert.equal(explicit.status, 0, explicit.stderr);
+	assert.equal(
+		JSON.parse(explicit.stdout).bindings[0].releases[0].packageDirectory,
+		'packages/engine',
+	);
+	for (const version of Object.values(f.registry.engine.versions))
+		delete version.repository.directory;
+	const ambiguous = f.audit(['--binding', 'alpha']);
+	assert.equal(ambiguous.status, 2);
+	assert.match(JSON.stringify(JSON.parse(ambiguous.stdout).bindings[0].failures), /found 2/);
+});
+
+test('release lookup retains annotated source labels without interpreting them as npm selectors', (t) => {
+	const f = fixture(t);
+	f.write(f.source, 'packages/alpha/status.json', {
+		upstream: { package: 'engine', version: '1.0.0 (2a528745)' },
+	});
+	f.commit(f.source);
+	const result = f.audit(['--binding', 'alpha']);
+	assert.equal(result.status, 0, result.stdout + result.stderr);
+	const release = JSON.parse(result.stdout).bindings[0].releases[0];
+	assert.equal(release.versionSpec, '1.0.0 (2a528745)');
+	assert.equal(release.pinnedVersion, '1.0.0');
+	assert.equal(release.latestStableVersion, '2.0.0');
+	f.write(f.source, 'packages/alpha/status.json', {
+		upstream: { package: 'engine', version: '1.0.0 (unknown revision)' },
+	});
+	f.commit(f.source);
+	const invalid = f.audit(['--binding', 'alpha']);
+	assert.equal(invalid.status, 2);
+	assert.ok(
+		JSON.parse(invalid.stdout).bindings[0].failures.some(
+			(failure) => failure.code === 'release-unavailable',
+		),
+	);
+});
+
+test('audits confined source aliases as link bytes while rejecting links outside the binding', (t) => {
+	const f = fixture(t);
+	f.write(f.source, 'packages/alpha/upstream/__mocks__/mock.ts', 'export const mock = true;');
+	f.write(f.source, 'packages/alpha/link-target-text.txt', 'upstream/__mocks__');
+	symlinkSync('upstream/__mocks__', path.join(f.source, 'packages/alpha/__mocks__'));
+	f.commit(f.source);
+	const result = f.audit(['--binding', 'alpha']);
+	assert.equal(result.status, 0, result.stdout + result.stderr);
+	const files = JSON.parse(result.stdout).bindings[0].facts.files;
+	const link = files.find((file) => file.path === '__mocks__');
+	assert.equal(link.kind, 'symlink');
+	assert.equal(link.target, 'upstream/__mocks__');
+	assert.equal(link.bytes, Buffer.byteLength(link.target));
+	assert.notEqual(
+		link.fingerprint,
+		files.find((file) => file.path === 'link-target-text.txt').fingerprint,
+	);
+	assert.equal(files.filter((file) => file.path.endsWith('mock.ts')).length, 1);
+	symlinkSync('../beta/src/index.ts', path.join(f.source, 'packages/alpha/escape'));
+	f.commit(f.source);
+	const escaped = f.audit(['--binding', 'alpha']);
+	assert.equal(escaped.status, 2);
+	assert.ok(
+		JSON.parse(escaped.stdout).bindings[0].failures.some(
+			(failure) => failure.code === 'collection-failed',
+		),
+	);
+});
+
+test('GitHub SSH repository metadata uses the same public HTTPS identity without SSH credentials', () => {
+	for (const url of [
+		'git+ssh://git@github.com/sanity-io/visual-editing.git',
+		'git@github.com:sanity-io/visual-editing.git',
+	]) {
+		assert.deepEqual(repositoryIdentity({ url, directory: 'packages/react-loader' }), {
+			repositoryUrl: 'https://github.com/sanity-io/visual-editing.git',
+			packageDirectory: 'packages/react-loader',
+		});
+	}
+	assert.throws(
+		() => repositoryIdentity('git+ssh://git@github.com/owner/repo.git?token=secret'),
+		/Invalid repository URL/,
+	);
+	assert.throws(
+		() => repositoryIdentity('https://github.com/owner/repo.git#main'),
+		/Invalid repository URL/,
+	);
 });

@@ -320,6 +320,130 @@ function makeTar(files) {
 	return makeTarEntries(Object.entries(files).map(([name, value]) => ({ name, value })));
 }
 
+function packageRootResolverFixture(files, repositoryDirectory) {
+	const commit = '1'.repeat(40);
+	const tree = '2'.repeat(40);
+	const manifest = {
+		name: 'react-root-discovery',
+		version: '1.0.0',
+		license: 'MIT',
+		gitHead: commit,
+		repository: {
+			type: 'git',
+			url: 'git+https://github.com/example/root-discovery.git',
+			...(repositoryDirectory ? { directory: repositoryDirectory } : {}),
+		},
+		scripts: { test: 'vitest run' },
+	};
+	const tarball = gzipSync(
+		makeTar({ 'package/package.json': JSON.stringify(manifest), 'package/LICENSE': MIT_TEXT }),
+	);
+	const dist = {
+		tarball: 'https://registry.npmjs.org/react-root-discovery/-/react-root-discovery-1.0.0.tgz',
+		integrity: `sha512-${createHash('sha512').update(tarball).digest('base64')}`,
+	};
+	const metadata = { ...manifest, dist };
+	const content = new Map(
+		Object.entries(files(manifest)).map(([name, value]) => [
+			name,
+			Buffer.from(typeof value === 'string' ? value : JSON.stringify(value)),
+		]),
+	);
+	const api = 'https://api.github.com/repos/example/root-discovery';
+	const entries = [...content].map(([name, bytes]) => ({
+		path: name,
+		mode: '100644',
+		type: 'blob',
+		size: bytes.length,
+		sha: gitBlobSha(bytes),
+		url: `${api}/git/blobs/${gitBlobSha(bytes)}`,
+	}));
+	return async (url) => {
+		url = String(url);
+		if (url === dist.tarball) return new Response(tarball);
+		if (url === 'https://registry.npmjs.org/react-root-discovery')
+			return Response.json({
+				name: manifest.name,
+				'dist-tags': { latest: manifest.version },
+				versions: { [manifest.version]: metadata },
+			});
+		if (url === 'https://registry.npmjs.org/react-root-discovery/1.0.0')
+			return Response.json(metadata);
+		if (url === `${api}/commits/${commit}`)
+			return Response.json({ sha: commit, commit: { tree: { sha: tree } } });
+		if (url === `${api}/git/trees/${tree}?recursive=1`)
+			return Response.json({ sha: tree, tree: entries, truncated: false });
+		const entry = entries.find((entry) => entry.url === url);
+		if (entry)
+			return Response.json({
+				encoding: 'base64',
+				content: content.get(entry.path).toString('base64'),
+				size: entry.size,
+			});
+		throw new Error(`Unexpected fixture request ${url}`);
+	};
+}
+
+test('resolves an omitted npm directory from the immutable package name and scopes its tests', async () => {
+	const input = 'react-root-discovery@1.0.0';
+	const fetchImpl = packageRootResolverFixture((manifest) => ({
+		'package.json': { name: 'private-workspace', private: true },
+		LICENSE: MIT_TEXT,
+		'packages/adapter/package.json': manifest,
+		'packages/adapter/tests/adapter.test.ts': "test('preserves behavior', () => {});",
+		'packages/unrelated/tests/support.test.ts': 'export const support = true;',
+	}));
+	const result = await resolveRemoteInput(parseInput(input), input, { fetchImpl });
+	assert.equal(result.status, 'licensed');
+	assert.equal(result.identity.repository.subdirectory, 'packages/adapter');
+	assert.deepEqual(
+		result.upstreamTestInventory.map(({ path }) => path),
+		['packages/adapter/tests/adapter.test.ts'],
+	);
+});
+
+test('keeps a matching public root canonical and rejects ambiguous or contradictory locations', async () => {
+	const input = 'react-root-discovery@1.0.0';
+	const resolve = (files, directory) =>
+		resolveRemoteInput(parseInput(input), input, {
+			fetchImpl: packageRootResolverFixture(files, directory),
+		});
+	const canonical = await resolve((manifest) => ({
+		'package.json': manifest,
+		LICENSE: MIT_TEXT,
+		'example/package.json': manifest,
+	}));
+	assert.equal(canonical.status, 'licensed');
+	assert.equal(canonical.identity.repository.subdirectory, null);
+	const stagedRoot = await resolve((manifest) => ({
+		'package.json': { ...manifest, private: true },
+		LICENSE: MIT_TEXT,
+		'example/package.json': manifest,
+	}));
+	assert.equal(stagedRoot.status, 'licensed');
+	assert.equal(stagedRoot.identity.repository.subdirectory, null);
+	await assert.rejects(
+		resolve((manifest) => ({
+			'package.json': { private: true },
+			'one/package.json': manifest,
+			'two/package.json': manifest,
+			LICENSE: MIT_TEXT,
+		})),
+		/found 2/,
+	);
+	await assert.rejects(
+		resolve(
+			(manifest) => ({
+				'package.json': { private: true },
+				'actual/package.json': manifest,
+				LICENSE: MIT_TEXT,
+			}),
+			'declared',
+		),
+		/no declared\/package.json/,
+	);
+});
+
 describe('resolved evidence', () => {
 	test('accepts an explicit package location when published metadata omits its directory', () => {
 		const registry = {

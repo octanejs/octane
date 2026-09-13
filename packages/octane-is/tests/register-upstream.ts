@@ -6,11 +6,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as Octane from 'octane';
 import * as OctaneIs from '../src/index.js';
 
-const oracleRequire = createRequire(resolve(import.meta.dirname, '../../octane/package.json'));
+const oracleRequire = createRequire(resolve(import.meta.dirname, '../package.json'));
 const React = oracleRequire('react');
 const ReactDOM = oracleRequire('react-dom');
-const ReactIs = oracleRequire('../octane-is/upstream-artifact/package/index.js');
-if (React.version !== '19.2.7') throw new Error('The pristine React oracle must be 19.2.7');
+const ReactIs = oracleRequire('./upstream-artifact/package/index.js');
+if (React.version !== '19.3.0') throw new Error('The pristine React oracle must be 19.3.0');
 
 /** Execute pinned test bytes with syntax-only JSX lowering and the upstream stable feature gate. */
 export function registerUpstream(sourcePath: string, adapted: boolean): void {
@@ -33,7 +33,7 @@ export function registerUpstream(sourcePath: string, adapted: boolean): void {
 	};
 	const register = (title: string, callback: () => void): void => {
 		// React's upstream harness applies @gate enableSuspenseList to this case;
-		// 19.2.7 stable does not expose the experimental component. The adaptation
+		// 19.3.0 stable does not expose the experimental component. The adaptation
 		// executes its explicit unsupported-kind negative control instead.
 		if (!adapted && title === 'should identify suspense list') return;
 		it(title, callback);

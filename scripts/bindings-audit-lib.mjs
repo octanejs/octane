@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, lstatSync, readFileSync, realpathSync } from 'node:fs';
+import { existsSync, lstatSync, readFileSync, readlinkSync, realpathSync } from 'node:fs';
 import path from 'node:path';
 import { getBindingPackages } from './workspace-packages.mjs';
 import { readBindingSurfacePolicy } from './binding-surface-policy.mjs';
@@ -73,13 +73,21 @@ function confined(root, relative) {
 	return resolved;
 }
 
-function repositoryIdentity(input) {
+export function repositoryIdentity(input) {
 	let url = typeof input === 'string' ? input : input?.url;
 	requireValue(nonempty(url), 'No repository identity is available');
 	url = url.replace(/^git\+/, '').replace(/^github:/, 'https://github.com/');
+	url = url
+		.replace(/^ssh:\/\/git@github\.com\//, 'https://github.com/')
+		.replace(/^git@github\.com:/, 'https://github.com/');
 	let directory = typeof input === 'object' ? (input.directory ?? input.subdirectory) : null;
 	if (url.startsWith('https://github.com/')) {
-		const parsed = parseGitHubUrl(new URL(url));
+		const githubUrl = new URL(url);
+		requireValue(
+			!githubUrl.username && !githubUrl.password && !githubUrl.search && !githubUrl.hash,
+			'Invalid repository URL',
+		);
+		const parsed = parseGitHubUrl(githubUrl);
 		url = `https://github.com/${parsed.owner}/${parsed.repo}.git`;
 		directory ??= parsed.subdirectory;
 	} else if (URL.canParse(url)) {
@@ -142,6 +150,14 @@ function verifyReceiptCheckout(receipt) {
 }
 
 function packageAt(receipt, packageName, directory) {
+	// A published root package remains canonical when an example repeats its name.
+	// Explicit monorepo directories still win; a private workspace root does not.
+	if (!directory && existsSync(path.join(receipt.checkoutPath, 'package.json'))) {
+		const manifest = readJson(confined(receipt.checkoutPath, 'package.json'));
+		if (manifest.name === packageName && manifest.private !== true) {
+			return { manifest, directory: '.' };
+		}
+	}
 	const paths = directory
 		? [`${directory}/package.json`]
 		: git(receipt.checkoutPath, 'ls-files', '-z')
@@ -192,10 +208,14 @@ async function registryPackage(packageName, options, cache) {
 async function releaseIdentity(dependency, options, cache) {
 	const { data, fetchedAt } = await registryPackage(dependency.package, options, cache);
 	requireValue(nonempty(dependency.version), `Missing version specifier for ${dependency.package}`);
-	const pinnedVersion = selectHighestSatisfyingVersion(
-		Object.keys(data.versions),
-		dependency.version,
+	// Older status files display a source commit beside an exact release. Keep
+	// that label in versionSpec; it is not part of the npm version selector and
+	// does not, by itself, prove the source/artifact relationship.
+	const lookupVersion = dependency.version.replace(
+		/^(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?) \([0-9a-f]{7,40}\)$/i,
+		'$1',
 	);
+	const pinnedVersion = selectHighestSatisfyingVersion(Object.keys(data.versions), lookupVersion);
 	requireValue(
 		pinnedVersion,
 		`No published release matches ${dependency.package}@${dependency.version}`,
@@ -277,10 +297,23 @@ function bindingFacts(root, binding, status, policy) {
 		.filter(Boolean)
 		.map((file) => {
 			const absolute = path.join(root, file);
-			requireValue(
-				!lstatSync(absolute).isSymbolicLink(),
-				`Symlink requires manual inspection: ${file}`,
-			);
+			if (lstatSync(absolute).isSymbolicLink()) {
+				const target = readlinkSync(absolute);
+				requireValue(!path.isAbsolute(target), `Absolute symlink requires inspection: ${file}`);
+				// Record the Git link bytes, never traverse its target as another tree.
+				// Both lexical and resolved targets must remain inside this binding.
+				confined(
+					binding.directory,
+					path.relative(binding.directory, path.resolve(path.dirname(absolute), target)),
+				);
+				return {
+					path: path.posix.relative(relative, file),
+					kind: 'symlink',
+					target,
+					bytes: Buffer.byteLength(target),
+					fingerprint: fingerprint({ kind: 'symlink', target }),
+				};
+			}
 			const bytes = readFileSync(confined(root, file));
 			return {
 				path: path.posix.relative(relative, file),
