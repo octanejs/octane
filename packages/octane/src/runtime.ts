@@ -10149,24 +10149,56 @@ export function renderClientContextProvider<T>(
 	// outgoing one's record as its own and corrupt the tree. Remount the children on a
 	// flip instead: the two sides are structurally different code, which is the same
 	// contract React gives an element-type change.
-	if (props.children != null) {
-		// Steady state is one map read and an integer compare — the write happens only on the
-		// first render and on an actual flip.
-		const dialect = typeof props.children === 'function' ? 1 : 2;
+	const children = props.children;
+	if (children != null) {
+		// Compiled closures carry their stable source-body identity. Their function
+		// identity changes when a parent supplies fresh captures, but their output
+		// still owns the same slots and may retain its auto-memo dependencies.
+		const dialect =
+			typeof children === 'function' ? ((children as any)[CHILDREN_BODY] ?? children) : 2;
 		const previous = scope.hooks?.get(CHILDREN_DIALECT_SLOT);
 		if (previous !== dialect) {
-			if (previous !== undefined) {
+			if (previous !== undefined && (previous === 2 || dialect === 2)) {
 				resetScopeChildren(scope);
 				// The reset runs user cleanups, so it can throw into the enclosing boundary and
 				// switch it to its catch arm — which disposes this block. Rendering children
 				// into a disposed block writes into the catch range, so bail out here, as every
 				// other mid-render teardown site does after `unmountBlock`.
 				if (scope.block.disposed) return;
+			} else if (previous !== undefined) {
+				// A different body reused the same DOM/control slots. Its predecessor's
+				// output dependencies no longer prove what those slots contain. Hook
+				// values remain per-body and keep their mounted lifetime.
+				invalidateProviderOutput(scope);
+				if (TRANSITION_JOURNAL !== null && !ROOT_RENDER_ROLLBACK) {
+					const hooks = scope.hooks!;
+					journalUndo(() => hooks.set(CHILDREN_DIALECT_SLOT, previous));
+				}
 			}
 			ensureHooks(scope).set(CHILDREN_DIALECT_SLOT, dialect);
 		}
-		childrenAsBody(props.children)(undefined, scope, undefined);
+		childrenAsBody(children)(undefined, scope, undefined);
 	}
+}
+
+/** Body handoffs are cold; ordinary Provider updates keep their cache arrays. */
+function invalidateProviderOutput(scope: Scope): void {
+	const first = scope.compilerMemo;
+	if (first === null) return;
+	invalidateProviderMemoRegion(first);
+	if (first.overflow !== null) {
+		for (const region of first.overflow.values()) invalidateProviderMemoRegion(region);
+	}
+}
+
+function invalidateProviderMemoRegion(region: CompilerMemoRegion): void {
+	if (region.auto === undefined) return;
+	// A candidate may complete before a later sibling suspends. Rollback must
+	// restore the accepted body's dependencies along with its visible output.
+	if (TRANSITION_JOURNAL !== null && !ROOT_RENDER_ROLLBACK) {
+		TRANSITION_JOURNAL.push(JOURNAL_PROP, region, 'auto', region.auto);
+	}
+	region.auto = undefined;
 }
 
 /**
@@ -10206,6 +10238,7 @@ export function provideContext<T>(scope: Scope, context: Context<T>, value: T): 
 // this symbol so `isChildrenBlock()` can exclude it. `Symbol.for` so the identity survives multiple
 // runtime copies (e.g. a binding bundled against its own octane).
 const CHILDREN_BLOCK: unique symbol = Symbol.for('octane.childrenBlock') as any;
+const CHILDREN_BODY: unique symbol = Symbol.for('octane.childrenBody') as any;
 
 /**
  * Compiler-emitted: attach markerless single-host-root metadata while a fresh
@@ -10223,9 +10256,12 @@ export function markSingleRoot<T extends Function>(component: T): T {
  * Returns the function for inline use (`{ children: markChildrenBlock(__children$N) }`).
  * @internal
  */
-export function markChildrenBlock<T>(fn: T): T {
+export function markChildrenBlock<T>(fn: T, body?: object): T {
 	if (typeof fn === 'function') {
 		(fn as any)[CHILDREN_BLOCK] = true;
+		// Keep the boolean ABI for consumers using another runtime copy. Only
+		// auto-memoized client output supplies this module-owned identity token.
+		if (body !== undefined) (fn as any)[CHILDREN_BODY] = body;
 	}
 	return fn;
 }
@@ -10274,7 +10310,7 @@ function scopedChildrenAsBody(props: { children: unknown }): ComponentBody {
 }
 
 /**
- * Records which children dialect (1 = compiled body, 2 = descriptor) a scope last rendered, so a
+ * Records which children body (function/token = compiled, 2 = descriptor) a scope last rendered, so a
  * flip can be detected. Lives in the hook map, whose Symbol keys are disjoint from the numeric
  * `slots` indices the two dialects contend over.
  */

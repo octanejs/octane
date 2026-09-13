@@ -1000,7 +1000,10 @@ const SUITES = [
 		cwd: 'hook-memo',
 		servers: [],
 		iter: { normal: 1, quick: 1 },
-		runs: [{ script: 'run.mjs', args: () => [] }],
+		runs: [
+			{ script: 'run.mjs', args: () => [] },
+			{ script: 'provider-output.mjs', args: () => [] },
+		],
 	},
 	{
 		// Production static attributes and live head reapplication, with exact

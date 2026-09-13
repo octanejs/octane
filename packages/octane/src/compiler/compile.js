@@ -28125,12 +28125,17 @@ function makeCompCall(
 			// exclude compiled element/text children. See runtime `markChildrenBlock`/`isChildrenBlock`.
 			ctx.runtimeNeeded.add('markChildrenBlock');
 			hasChildrenProp = true;
+			const childrenArgs = [b.id(childrenHelperName)];
+			if (ctx.autoMemo && ctx.mode !== 'server') {
+				// These functions close over parent locals and are recreated on every
+				// render. A module-owned token distinguishes a real Provider body
+				// handoff from fresh captures without invalidating ordinary cache hits.
+				const bodyIdentity = allocCompilerName(ctx, '__childrenBody');
+				ctx.hoistedHelpers.push(inheritOriginLoc(b.const(bodyIdentity, b.object([])), node));
+				childrenArgs.push(b.id(bodyIdentity));
+			}
 			propNodes.push(
-				b.prop(
-					'init',
-					b.literal('children'),
-					b.call('_$markChildrenBlock', b.id(childrenHelperName)),
-				),
+				b.prop('init', b.literal('children'), b.call('_$markChildrenBlock', ...childrenArgs)),
 			);
 		}
 	}
