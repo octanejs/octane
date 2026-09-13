@@ -765,7 +765,7 @@ export function conventionalTestPath(relativePath, { runner } = {}) {
 	) {
 		return false;
 	}
-	if (runner === 'vitest' || runner === 'jest') {
+	if (runner === 'vitest' || runner === 'jest' || runner === 'playwright') {
 		return (
 			/(?:^|[.-])(?:test|spec|test-d|d-test)\.[cm]?[jt]sx?$/.test(baseName) ||
 			segments.some((segment) => ['typetests', 'type-tests', 'test-d'].includes(segment)) ||
@@ -1161,7 +1161,7 @@ export async function immutableTestInventory(tree, subdirectory, manifest, optio
 			(relativePath !== null && explicitConfigurationPaths.includes(relativePath))
 		);
 	});
-	const runner = ['vitest', 'jest'].find(
+	const runner = ['vitest', 'jest', 'playwright'].find(
 		(name) =>
 			Object.values(testScripts).some((command) => new RegExp(`\\b${name}\\b`).test(command)) ||
 			configurationEntries.some((entry) => path.posix.basename(entry.path).startsWith(`${name}.`)),
@@ -1195,6 +1195,8 @@ export async function immutableTestInventory(tree, subdirectory, manifest, optio
 		for (const pattern of selections.inlineSources) inlineSourcePatterns.add(pattern);
 	}
 	const configuredTestPatterns = [...configurationPatterns];
+	if (runner === 'playwright' && selectors.length === 0)
+		selectors.push({ runner, scope: subdirectory ?? '', root: '', fileName: 'package.json' });
 	const configuredInlineSourcePatterns = [...inlineSourcePatterns];
 	const configurationEntryPaths = new Set(configurationEntries.map((entry) => entry.path));
 	const candidateEntries = tree.flatMap((entry) => {

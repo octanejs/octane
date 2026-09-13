@@ -11,6 +11,35 @@ function selected(source, files, options = { runner: 'jest' }) {
 	);
 }
 
+test('Playwright projects inherit root selectors and preserve project overrides', () => {
+	assert.deepEqual(
+		selected(
+			`export default defineConfig({ testDir: './test', projects: [{ name: 'chromium' }, { name: 'webkit', testDir: './other', testMatch: '*.e2e.ts' }] });`,
+			[
+				'test/notifications.spec.ts',
+				'test/next.config.js',
+				'test/helpers.ts',
+				'outside/unrelated.spec.ts',
+				'other/smoke.e2e.ts',
+				'other/not-selected.spec.ts',
+			],
+			{ runner: 'playwright' },
+		),
+		['test/notifications.spec.ts', 'other/smoke.e2e.ts'],
+	);
+});
+
+test('Playwright defaults select named test files rather than support modules', () => {
+	assert.equal(conventionalTestPath('tests/helpers.ts', { runner: 'playwright' }), false);
+	assert.equal(conventionalTestPath('tests/next.config.js', { runner: 'playwright' }), false);
+	assert.equal(conventionalTestPath('tests/widget.spec.ts', { runner: 'playwright' }), true);
+	assert.equal(conventionalTestPath('tests/widget.test.mjs', { runner: 'playwright' }), true);
+	assert.deepEqual(
+		selected('export default {};', ['tests/widget.test-d.ts'], { runner: 'playwright' }),
+		[],
+	);
+});
+
 test('keeps the union of Jest projects while honoring inherited roots and helper exclusions', () => {
 	const source = `
 const defaults = { rootDir: 'src' };

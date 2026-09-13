@@ -127,7 +127,17 @@ export function configuredTestSelectors(source, fileName, { runner, scope = '' }
 		}
 		const root = typeof value.root === 'string' ? value.root : inheritedRoot;
 		if ('projects' in value) {
-			collect(value.projects, root);
+			if (runner === 'playwright' && Array.isArray(value.projects)) {
+				const { projects, ...shared } = value;
+				collect(
+					projects.map((project) =>
+						project && typeof project === 'object' && !Array.isArray(project)
+							? { ...shared, ...project }
+							: project,
+					),
+					root,
+				);
+			} else collect(value.projects, root);
 			return;
 		}
 		if ('test' in value) {
@@ -204,5 +214,7 @@ export function selectedByTestConfiguration(relativePath, selector, conventional
 			new RegExp(token(pattern)).test(regexPath),
 		);
 	}
+	if (selector.runner === 'playwright')
+		return glob(relativePath, '**/*.@(spec|test).?(c|m)[jt]s?(x)');
 	return conventional(relativePath, { runner: selector.runner });
 }

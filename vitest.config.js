@@ -8687,6 +8687,10 @@ export default defineConfig({
 				plugins: [octane()],
 			},
 			{
+				testExecution: {
+					group: 'react-parity',
+					include: ['packages/colorful/tests/runtime/lifecycle.test.ts'],
+				},
 				test: {
 					name: 'colorful',
 					include: ['packages/colorful/tests/runtime/**/*.test.ts'],
@@ -8707,6 +8711,7 @@ export default defineConfig({
 				plugins: [octane()],
 			},
 			{
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'colorful-hydration',
 					include: ['packages/colorful/tests/hydration/**/*.test.ts'],
@@ -8716,6 +8721,7 @@ export default defineConfig({
 				plugins: [octane()],
 			},
 			{
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'colorful-ssr',
 					include: ['packages/colorful/tests/ssr/**/*.test.ts'],
@@ -8733,7 +8739,7 @@ export default defineConfig({
 				},
 			},
 			{
-				testExecution: { group: 'heavy-browser' },
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'colorful-browser',
 					include: ['packages/colorful/tests/browser/**/*.test.ts'],

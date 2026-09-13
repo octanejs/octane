@@ -424,12 +424,17 @@
         {
           "path": "packages/colorful/tests/ssr/server.test.ts",
           "role": "test",
-          "sha256": "3223dcdc26a04a75582037f77ac7d7a2e33148b8f930c2de85ccc8e5c006334b",
+          "sha256": "c99ae8d809c3321e61cba82d0b0705608dc68e7504e3d01d354118659168666c",
           "cases": [
             {
               "id": "adapted:react-colorful-ssr",
               "testName": "renders deterministic picker and input markup without browser globals",
               "fullName": "@octanejs/colorful \u2014 server rendering renders deterministic picker and input markup without browser globals"
+            },
+            {
+              "id": "adapted:react-colorful-hydration-markup",
+              "testName": "renders the hydration fixture",
+              "fullName": "@octanejs/colorful \u2014 server rendering renders the hydration fixture"
             }
           ]
         }
