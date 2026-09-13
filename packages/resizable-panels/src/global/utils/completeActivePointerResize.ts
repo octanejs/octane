@@ -1,9 +1,14 @@
 import { updateCursorStyle } from '../cursor/updateCursorStyle.ts';
-import { getMountedGroupState, updateMountedGroup } from '../mutable-state/groups.ts';
+import {
+	getMountedGroups,
+	getMountedGroupState,
+	updateMountedGroup,
+} from '../mutable-state/groups.ts';
 import { getInteractionState, updateInteractionState } from '../mutable-state/interactions.ts';
 
 export function completeActivePointerResize(document: Document) {
 	const interactionState = getInteractionState();
+	const mountedGroups = getMountedGroups();
 
 	let match = false;
 
@@ -24,6 +29,8 @@ export function completeActivePointerResize(document: Document) {
 				// This is the canonical user-pointer-up site, so flag the dispatch with
 				// isUserInteraction: true. See #716.
 				interactionState.hitRegions.forEach((hitRegion) => {
+					// Replaced registrations must not be restored when the gesture ends.
+					if (!mountedGroups.has(hitRegion.group)) return;
 					const groupState = getMountedGroupState(hitRegion.group.id, true);
 					updateMountedGroup(hitRegion.group, groupState, {
 						isUserInteraction: true,

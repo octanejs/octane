@@ -11,7 +11,7 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 type Identity = { file: string; fullName: string; status?: string };
 
 // @parity-case pristine:react-resizable-panels-original-suite
-it('runs the pinned react-resizable-panels 4.12.2 suite unchanged', function runsPinnedReactResizablePanelsSuite() {
+it('runs the pinned react-resizable-panels 4.12.4 suite unchanged', function runsPinnedReactResizablePanelsSuite() {
 	const expected = JSON.parse(
 		readFileSync(
 			resolve(repoRoot, 'packages/resizable-panels/audit/pristine-runtime.json'),

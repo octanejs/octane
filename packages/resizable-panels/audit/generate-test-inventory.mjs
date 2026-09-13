@@ -11,6 +11,7 @@ const paths = readdirSync(sourceRoot, { recursive: true })
 	.filter((path) => statSync(path).isFile())
 	.filter((path) => /\.(?:test|spec)\.[cm]?[jt]sx?$/.test(path))
 	.sort();
+const runtime = JSON.parse(readFileSync(join(auditRoot, 'pristine-runtime.json'), 'utf8'));
 const artifacts = paths.map((path) => {
 	const source = readFileSync(path, 'utf8');
 	const identities = [...source.matchAll(/\b(?:it|test)\s*\(\s*(["'])(.*?)\1/gs)].map(
@@ -22,7 +23,10 @@ const artifacts = paths.map((path) => {
 	const isAdapted = statExists(adaptedAbsolute);
 	return {
 		path: upstreamPath,
-		registrationCount: identities.length,
+		registrationCount: runtime.tests.filter(
+			(test) => test.file === `packages/resizable-panels/upstream/lib/${upstreamPath}`,
+		).length,
+		directLiteralTitleCount: identities.length,
 		identities,
 		disposition: isAdapted ? 'adapted' : 'accounted-not-adapted',
 		...(isAdapted ? { adaptedPath: `tests/upstream/${adaptedPath}` } : {}),

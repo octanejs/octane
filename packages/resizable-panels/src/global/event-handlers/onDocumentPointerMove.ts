@@ -34,6 +34,8 @@ export function onDocumentPointerMove(event: PointerEvent) {
 				// This is the missed-pointerup fallback (pointer released outside a
 				// cross-origin iframe, see #340) — still a real user interaction.
 				interactionState.hitRegions.forEach((hitRegion) => {
+					// Replaced registrations must not be restored by a missed pointer-up.
+					if (!mountedGroups.has(hitRegion.group)) return;
 					const groupState = getMountedGroupState(hitRegion.group.id, true);
 					updateMountedGroup(hitRegion.group, groupState, {
 						isUserInteraction: true,
@@ -46,7 +48,7 @@ export function onDocumentPointerMove(event: PointerEvent) {
 			for (const hitRegion of interactionState.hitRegions) {
 				if (hitRegion.separator) {
 					const { element } = hitRegion.separator;
-					if (!element.hasPointerCapture?.(event.pointerId)) {
+					if (element.isConnected && !element.hasPointerCapture?.(event.pointerId)) {
 						element.setPointerCapture?.(event.pointerId);
 					}
 				}

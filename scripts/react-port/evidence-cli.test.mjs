@@ -3644,3 +3644,27 @@ describe('evidence CLI', () => {
 		);
 	});
 });
+
+test('counts workspace binary paths alongside a delegated pristine test runner', (t) => {
+	const { workspaceRoot } = createReadyBatch();
+	t.after(() => rmSync(workspaceRoot, { recursive: true, force: true }));
+	const directory = createCompletePackage(workspaceRoot);
+	const file = path.join(directory, 'package.json');
+	const manifest = JSON.parse(readFileSync(file, 'utf8'));
+	manifest.scripts.test =
+		'../../node_modules/.bin/vitest run --project adapted && pnpm test:pristine && ../../node_modules/.bin/vitest run --project browser';
+	manifest.scripts['test:pristine'] = 'vitest run --config pristine.config.ts';
+	writeFileSync(file, JSON.stringify(manifest));
+	const inspect = () =>
+		assertApprovedGateCommand(
+			['package-tests'],
+			['pnpm', '--dir', 'packages/widget', 'test'],
+			{ bindingDirectory: 'packages/widget' },
+			{ workspaceRoot },
+		).packageTestPlan;
+	assert.deepEqual(inspect().runners, ['vitest', 'vitest', 'vitest']);
+	manifest.scripts.test =
+		'../../node_modules/.bin/vitest list && pnpm test:pristine && ../../node_modules/.bin/vitest --help';
+	writeFileSync(file, JSON.stringify(manifest));
+	assert.deepEqual(inspect().runners, ['vitest']);
+});

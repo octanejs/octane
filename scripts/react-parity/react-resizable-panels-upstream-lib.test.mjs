@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { cp, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -27,9 +27,9 @@ function readRepo(relativePath) {
 
 test('pristine-to-adapted case ledger covers the pinned suite', function coversPinnedSuite() {
 	const result = verifyReactResizablePanelsUpstream(repo);
-	assert.equal(result.artifacts, 29);
+	assert.equal(result.artifacts, 31);
 	assert.equal(result.upstreamCases, result.portedCases);
-	assert.equal(result.runtimeIdentities, 426);
+	assert.equal(result.runtimeIdentities, 439);
 	assert.ok(result.assertionGroups > 0);
 	assert.ok(result.permittedTransformations > 0);
 	assert.equal(result.supportFiles, 7);
@@ -196,7 +196,8 @@ test('test.each bodies enter the case ledger with table, title, and assertions',
 	assert.equal(expected.length, 1);
 	assert.equal(actual.length, 1);
 	assert.equal(expected[0].parameterization.kind, 'test.each');
-	assert.ok(expected[0].parameterization.table.includes('EMPTY'));
+	assert.ok(expected[0].parameterization.table.includes('a: 25'));
+	assert.ok(expected[0].parameterization.table.includes('false'));
 	assert.equal(expected[0].title, 'objectsEqual: %o, %o -> %o');
 	assert.deepEqual(expected[0].assertions, actual[0].assertions);
 	assert.deepEqual(expected[0].scenarioSteps, actual[0].scenarioSteps);
@@ -260,4 +261,23 @@ test('useId divergence transform keeps unrelated weakening fail-closed', functio
 	});
 	assert.ok(weakenedFallback);
 	assert.notDeepEqual(weakenedFallback.assertions, transformed.assertions);
+});
+
+test('browser support mappings reject fixture mutations and missing files', async (t) => {
+	const root = await mkdtemp(join(tmpdir(), 'rrp-browser-support-'));
+	t.after(() => rm(root, { recursive: true, force: true }));
+	const relative = 'packages/resizable-panels';
+	for (const subtree of ['audit', 'upstream', 'tests/upstream', 'tests/support']) {
+		await cp(join(repo, relative, subtree), join(root, relative, subtree), { recursive: true });
+	}
+	assert.ok(verifyReactResizablePanelsSupportFiles(root).browserSupportFiles > 0);
+	const fixture = join(root, relative, 'tests/upstream/browser/src/components/Clickable.tsx');
+	const source = await readFile(fixture, 'utf8');
+	await writeFile(fixture, source + '\nthrow new Error("fixture drift");\n');
+	assert.throws(
+		() => verifyReactResizablePanelsSupportFiles(root),
+		/browser support fixture drifted/,
+	);
+	await rm(fixture);
+	assert.throws(() => verifyReactResizablePanelsSupportFiles(root), /ENOENT/);
 });

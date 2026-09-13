@@ -1,0 +1,7 @@
+@import 'tailwindcss';
+@source '../../../upstream/integrations/tests';
+@source '../../upstream/browser/src';
+
+#root {
+	height: 100vh;
+}

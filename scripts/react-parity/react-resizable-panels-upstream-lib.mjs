@@ -2,6 +2,12 @@ import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync } from 'node:fs';
 import { relative, resolve, sep } from 'node:path';
 import ts from 'typescript';
+import {
+	applyAdaptedRewrites,
+	gitBlobSha1,
+	planAdaptedFiles,
+	validateUpstreamLock,
+} from '../react-port/materialize-lib.mjs';
 
 const UPSTREAM_TEST_ROOT = 'packages/resizable-panels/upstream/lib';
 const PORTED_TEST_ROOT = 'packages/resizable-panels/tests/upstream';
@@ -755,6 +761,30 @@ export function verifyReactResizablePanelsSupportFiles(repoRoot) {
 		}
 	}
 
+	const bindingRoot = resolve(repoRoot, 'packages/resizable-panels');
+	const lock = validateUpstreamLock(
+		JSON.parse(readFileSync(resolve(bindingRoot, 'audit/upstream.lock.json'), 'utf8')),
+	);
+	const browserMappings = planAdaptedFiles(lock).filter((entry) =>
+		entry.targetPath.startsWith('tests/upstream/browser/'),
+	);
+	for (const mapping of browserMappings) {
+		const source = readFileSync(resolve(bindingRoot, 'upstream', mapping.sourcePath));
+		if (gitBlobSha1(source) !== mapping.gitBlob)
+			throw new Error(`${mapping.sourcePath}: pinned browser fixture bytes drifted`);
+		const expected = applyAdaptedRewrites(
+			source.toString('utf8'),
+			lock.adaptedRewrites,
+			mapping.targetPath,
+		);
+		const actual = readFileSync(resolve(bindingRoot, mapping.targetPath), 'utf8');
+		if (actual !== expected)
+			throw new Error(
+				`${mapping.targetPath}: browser support fixture drifted from declared transformations`,
+			);
+		declaredAdapted.add(portableRelative(portedRoot, resolve(bindingRoot, mapping.targetPath)));
+	}
+
 	// Every non-test adapted file must be covered by a support contract or the
 	// case-ledger inventory (test files). Fail closed on undeclared helpers.
 	for (const file of filesBelow(portedRoot)) {
@@ -764,7 +794,10 @@ export function verifyReactResizablePanelsSupportFiles(repoRoot) {
 			throw new Error(`${relative}: adapted support fixture has no declared support-file mapping`);
 		}
 	}
-	return { supportFiles: SUPPORT_FILE_CONTRACTS.length };
+	return {
+		supportFiles: SUPPORT_FILE_CONTRACTS.length,
+		browserSupportFiles: browserMappings.length,
+	};
 }
 
 export function verifyReactResizablePanelsUpstream(repoRoot) {

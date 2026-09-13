@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "cases": [
+    {
+      "id": "react-case-v1:a2b7b10764d103c354dd",
+      "source": "integrations/tests/tests/default-layout.spec.tsx:6:3",
+      "title": "should not cause layout shift for client components",
+      "disposition": "conformance",
+      "reason": "The upstream case depends on an application server outside the binding. Equivalent Octane coverage observes persisted panel geometry and actual layout-shift entries across reload.",
+      "testFile": "tests/browser/interactions.browser.test.ts",
+      "testTitle": "preserves saved layout without shifting on client startup"
+    },
+    {
+      "id": "react-case-v1:3ca31eb7fed7acbf129e",
+      "source": "integrations/tests/tests/default-layout.spec.tsx:19:3",
+      "title": "should not cause layout shift for server-rendered client components",
+      "disposition": "conformance",
+      "reason": "The upstream case depends on an application server outside the binding. Equivalent Octane coverage observes persisted panel geometry and actual layout-shift entries across reload and server DOM adoption during hydration.",
+      "testFile": "tests/browser/interactions.browser.test.ts",
+      "testTitle": "preserves saved layout without shifting on SSR hydration"
+    },
+    {
+      "id": "react-case-v1:f94dcd9ed587a4840736",
+      "source": "integrations/tests/tests/default-layout.spec.tsx:32:3",
+      "title": "should not cause layout shift for server components",
+      "disposition": "inapplicable",
+      "reason": "Octane does not support React Server Components; this case exercises the upstream Next.js RSC application.",
+      "testFile": null,
+      "testTitle": null
+    }
+  ]
+}

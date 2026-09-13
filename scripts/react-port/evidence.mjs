@@ -278,7 +278,9 @@ function packageTestInvocations(manifest, scriptName = 'test', visiting = new Se
 		.map((segment) => segment.trim().replace(/^(?:[A-Za-z_][A-Za-z0-9_]*=[^\s]+\s+)+/, ''));
 	const invocations = [];
 	for (const segment of segments) {
-		const direct = segment.match(/^(?:(?:pnpm\s+(?:exec\s+)?)?)(vitest|jest)(?:\s+(.*))?$/);
+		const direct = segment.match(
+			/^(?:(?:pnpm\s+(?:exec\s+)?)?)(?:(?:\.\.?\/)*node_modules\/\.bin\/)?(vitest|jest)(?:\s+(.*))?$/,
+		);
 		if (direct) {
 			const [, runner, rawArguments = ''] = direct;
 			if (

@@ -1,0 +1,18 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "skipLibCheck": false,
+    "paths": {
+      "react-lib-tools": ["./tests/browser/upstream-harness/lib-tools.tsrx"]
+    }
+  },
+  "include": [
+    "tests/_fixtures/*.tsrx",
+    "tests/browser/harness/*.tsrx",
+    "tests/browser/upstream-harness/lib-tools.tsrx",
+    "tests/upstream/browser/src/**/*.ts",
+    "tests/upstream/browser/src/**/*.tsx"
+  ],
+  "exclude": ["node_modules", "upstream", "upstream-artifact"]
+}

@@ -66,7 +66,7 @@ diff --git a/tests/upstream/components/separator/Separator.test.tsx b/tests/upst
      });
  
      describe("ARIA attributes", () => {
-@@ -150,13 +171,10 @@ describe("Separator", () => {
+@@ -162,15 +183,11 @@ describe("Separator", () => {
            </Group>
          );
  
@@ -80,5 +80,7 @@ diff --git a/tests/upstream/components/separator/Separator.test.tsx b/tests/upst
 -        );
 +        expect(screen.getByTestId("right-separator").hasAttribute("aria-controls")).toBe(true);
        });
-     });
-   });
+-
+       test("should compute values relative to the Group (not the Separator's own panel pair)", () => {
+         render(
+           <Group>

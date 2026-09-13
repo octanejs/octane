@@ -1,12 +1,13 @@
 {
   "schemaVersion": 1,
   "root": "upstream/lib",
-  "artifactCount": 29,
-  "registrationCount": 329,
+  "artifactCount": 31,
+  "registrationCount": 439,
   "artifacts": [
     {
       "path": "components/group/Group.test.tsx",
       "registrationCount": 27,
+      "directLiteralTitleCount": 27,
       "identities": [
         "changes to defaultProps or disableCursor should not cause Group to remount",
         "should support updates to either Group or Panel ids",
@@ -42,6 +43,7 @@
     {
       "path": "components/group/sortByElementOffset.test.ts",
       "registrationCount": 5,
+      "directLiteralTitleCount": 5,
       "identities": [
         "should handle empty elements array",
         "should sort horizontal elements",
@@ -55,6 +57,7 @@
     {
       "path": "components/group/useDefaultLayout.test.tsx",
       "registrationCount": 26,
+      "directLiteralTitleCount": 26,
       "identities": [
         "should read/write from the provided Storage API",
         "should ignore debounce param when using onLayoutChanged",
@@ -89,6 +92,7 @@
     {
       "path": "components/panel/Panel.test.tsx",
       "registrationCount": 9,
+      "directLiteralTitleCount": 9,
       "identities": [
         "changes to disabled prop should not cause the Panel to remount",
         "changes to this prop should update Panel behavior",
@@ -105,20 +109,24 @@
     },
     {
       "path": "components/separator/Separator.test.tsx",
-      "registrationCount": 5,
+      "registrationCount": 7,
+      "directLiteralTitleCount": 7,
       "identities": [
         "changes to disabled prop should not cause the Separator to remount",
         "changes to this prop should update Separator behavior",
         "should expose id and data-testid",
         "should pass through ...rest attributes",
-        "should identify its primary panel if and only if it has an explicit id"
+        "should identify its primary panel if and only if it has an explicit id",
+        "should compute values relative to the Group (not the Separator's own panel pair)",
+        "should blah"
       ],
       "disposition": "adapted",
       "adaptedPath": "tests/upstream/components/separator/Separator.test.tsx"
     },
     {
       "path": "global/cursor/getCursorStyle.test.ts",
-      "registrationCount": 20,
+      "registrationCount": 36,
+      "directLiteralTitleCount": 20,
       "identities": [
         "should return null",
         "horizontal",
@@ -145,8 +153,20 @@
       "adaptedPath": "tests/upstream/global/cursor/getCursorStyle.test.ts"
     },
     {
+      "path": "global/cursor/updateCursorStyle.test.ts",
+      "registrationCount": 2,
+      "directLiteralTitleCount": 2,
+      "identities": [
+        "should not throw if the environment doesn't support constructable stylesheets",
+        "should apply cursor styles when constructable stylesheets are supported"
+      ],
+      "disposition": "adapted",
+      "adaptedPath": "tests/upstream/global/cursor/updateCursorStyle.test.ts"
+    },
+    {
       "path": "global/dom/calculateAvailableGroupSize.test.ts",
       "registrationCount": 4,
+      "directLiteralTitleCount": 4,
       "identities": [
         "panel widths",
         "panel widths, excluding separators",
@@ -159,6 +179,7 @@
     {
       "path": "global/dom/calculateHitRegions.test.ts",
       "registrationCount": 15,
+      "directLiteralTitleCount": 15,
       "identities": [
         "empty panels",
         "one panel",
@@ -182,6 +203,7 @@
     {
       "path": "global/styles/parseSizeAndUnit.test.ts",
       "registrationCount": 8,
+      "directLiteralTitleCount": 8,
       "identities": [
         "% units",
         "px units",
@@ -198,6 +220,7 @@
     {
       "path": "global/styles/sizeStyleToPixels.test.ts",
       "registrationCount": 8,
+      "directLiteralTitleCount": 8,
       "identities": [
         "% units",
         "px units",
@@ -213,7 +236,8 @@
     },
     {
       "path": "global/utils/adjustLayoutByDelta.test.ts",
-      "registrationCount": 132,
+      "registrationCount": 148,
+      "directLiteralTitleCount": 132,
       "identities": [
         "[1++,2]",
         "[1++,2]",
@@ -354,6 +378,7 @@
     {
       "path": "global/utils/calculateDefaultLayout.test.ts",
       "registrationCount": 3,
+      "directLiteralTitleCount": 3,
       "identities": ["inferred", "explicit", "mix of explicit and inferred"],
       "disposition": "adapted",
       "adaptedPath": "tests/upstream/global/utils/calculateDefaultLayout.test.ts"
@@ -361,6 +386,7 @@
     {
       "path": "global/utils/calculateSeparatorAriaValues.test.ts",
       "registrationCount": 3,
+      "directLiteralTitleCount": 3,
       "identities": [
         "should calculate the correct min/max/now values for collapsible panels",
         "should consider other panel constraints when computing min/max values",
@@ -371,14 +397,16 @@
     },
     {
       "path": "global/utils/compareLayoutNumbers.test.ts",
-      "registrationCount": 0,
+      "registrationCount": 7,
+      "directLiteralTitleCount": 0,
       "identities": [],
       "disposition": "adapted",
       "adaptedPath": "tests/upstream/global/utils/compareLayoutNumbers.test.ts"
     },
     {
       "path": "global/utils/doRectsIntersect.test.ts",
-      "registrationCount": 3,
+      "registrationCount": 17,
+      "directLiteralTitleCount": 3,
       "identities": [
         "should handle empty rects",
         "should support fully overlapping rects",
@@ -390,6 +418,7 @@
     {
       "path": "global/utils/findMatchingHitRegions.test.ts",
       "registrationCount": 5,
+      "directLiteralTitleCount": 5,
       "identities": [
         "empty groups",
         "group with no separator",
@@ -402,7 +431,8 @@
     },
     {
       "path": "global/utils/formatLayoutNumber.test.ts",
-      "registrationCount": 0,
+      "registrationCount": 14,
+      "directLiteralTitleCount": 0,
       "identities": [],
       "disposition": "adapted",
       "adaptedPath": "tests/upstream/global/utils/formatLayoutNumber.test.ts"
@@ -410,6 +440,7 @@
     {
       "path": "global/utils/getDistanceBetweenPointAndRect.test.ts",
       "registrationCount": 3,
+      "directLiteralTitleCount": 3,
       "identities": [
         "should report the distance between the nearest border and an external point",
         "should report the distance between the nearest border and an external point alt",
@@ -421,6 +452,7 @@
     {
       "path": "global/utils/getImperativeGroupMethods.test.ts",
       "registrationCount": 7,
+      "directLiteralTitleCount": 7,
       "identities": [
         "throws if group not mounted",
         "returns the current group layout",
@@ -435,7 +467,8 @@
     },
     {
       "path": "global/utils/getImperativePanelMethods.test.ts",
-      "registrationCount": 25,
+      "registrationCount": 30,
+      "directLiteralTitleCount": 25,
       "identities": [
         "does nothing if panel is not collapsible",
         "does nothing if panel is already collapsed",
@@ -468,28 +501,40 @@
     },
     {
       "path": "global/utils/layoutNumbersEqual.test.ts",
-      "registrationCount": 0,
+      "registrationCount": 7,
+      "directLiteralTitleCount": 0,
       "identities": [],
       "disposition": "adapted",
       "adaptedPath": "tests/upstream/global/utils/layoutNumbersEqual.test.ts"
     },
     {
       "path": "global/utils/layoutsEqual.test.ts",
-      "registrationCount": 0,
+      "registrationCount": 9,
+      "directLiteralTitleCount": 0,
       "identities": [],
       "disposition": "adapted",
       "adaptedPath": "tests/upstream/global/utils/layoutsEqual.test.ts"
     },
     {
       "path": "global/utils/objectsEqual.test.ts",
-      "registrationCount": 0,
+      "registrationCount": 9,
+      "directLiteralTitleCount": 0,
       "identities": [],
       "disposition": "adapted",
       "adaptedPath": "tests/upstream/global/utils/objectsEqual.test.ts"
     },
     {
+      "path": "global/utils/panelConstraintsEqual.test.ts",
+      "registrationCount": 9,
+      "directLiteralTitleCount": 0,
+      "identities": [],
+      "disposition": "adapted",
+      "adaptedPath": "tests/upstream/global/utils/panelConstraintsEqual.test.ts"
+    },
+    {
       "path": "global/utils/validatePanelGroupLayout.test.ts",
       "registrationCount": 9,
+      "directLiteralTitleCount": 9,
       "identities": [
         "should accept requested layout if there are no constraints provided",
         "should normalize layouts that do not total 100%",
@@ -507,6 +552,7 @@
     {
       "path": "hooks/useId.test.ts",
       "registrationCount": 2,
+      "directLiteralTitleCount": 2,
       "identities": ["should prefer explicit id", "should fallback ot React useId"],
       "disposition": "adapted",
       "adaptedPath": "tests/upstream/hooks/useId.test.ts"
@@ -514,6 +560,7 @@
     {
       "path": "hooks/useMergedRefs.test.tsx",
       "registrationCount": 2,
+      "directLiteralTitleCount": 2,
       "identities": [
         "should support ref objects and callback refs",
         "should gracefully ignore undefined refs"
@@ -524,6 +571,7 @@
     {
       "path": "hooks/useStableCallback.test.tsx",
       "registrationCount": 2,
+      "directLiteralTitleCount": 2,
       "identities": [
         "should not execute the callback",
         "should call the callback when the event is triggered"
@@ -534,6 +582,7 @@
     {
       "path": "utils/isArrayEqual.test.ts",
       "registrationCount": 1,
+      "directLiteralTitleCount": 1,
       "identities": ["should work"],
       "disposition": "adapted",
       "adaptedPath": "tests/upstream/utils/isArrayEqual.test.ts"
@@ -541,6 +590,7 @@
     {
       "path": "utils/parseNumericStyleValue.test.ts",
       "registrationCount": 5,
+      "directLiteralTitleCount": 5,
       "identities": [
         "should handle undefined styles",
         "should return numeric styles",

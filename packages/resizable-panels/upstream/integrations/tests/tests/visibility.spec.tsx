@@ -1,0 +1,86 @@
+import { expect, test } from "@playwright/test";
+import { Group, Panel, Separator } from "react-resizable-panels";
+import { DisplayModeToggle } from "../src/components/DisplayModeToggle";
+import { assertLayoutChangeCounts } from "../src/utils/assertLayoutChangeCounts";
+import { goToUrl } from "../src/utils/goToUrl";
+
+test.describe("visibility", () => {
+  test("Activity API should defer default layout calculation until visible", async ({
+    page: mainPage
+  }) => {
+    const page = await goToUrl(
+      mainPage,
+      <DisplayModeToggle mode="activity">
+        <Group>
+          <Panel defaultSize="25%" id="left" minSize={150} />
+          <Separator />
+          <Panel id="right" />
+        </Group>
+      </DisplayModeToggle>
+    );
+
+    await assertLayoutChangeCounts(mainPage, 0);
+
+    await page.getByText("hidden → visible").click();
+
+    await assertLayoutChangeCounts(mainPage, 1);
+    await expect(page.getByText("id: left")).toContainText("25%");
+    await expect(page.getByRole("separator")).toBeVisible();
+    await expect(page.getByText("id: right")).toContainText("75%");
+
+    await page.getByText("visible → hidden").click();
+
+    await assertLayoutChangeCounts(mainPage, 1);
+
+    await page.setViewportSize({
+      width: 500,
+      height: 500
+    });
+    await page.getByText("hidden → visible").click();
+
+    await assertLayoutChangeCounts(mainPage, 2);
+    await expect(page.getByText("id: left")).toContainText("32%");
+    await expect(page.getByRole("separator")).toBeVisible();
+    await expect(page.getByText("id: right")).toContainText("68%");
+  });
+
+  test("display:hidden should defer default layout calculation until visible", async ({
+    page: mainPage
+  }) => {
+    const page = await goToUrl(
+      mainPage,
+      <DisplayModeToggle mode="css">
+        <Group>
+          <Panel defaultSize="25%" id="left" minSize={150} />
+          <Separator />
+          <Panel id="right" />
+        </Group>
+      </DisplayModeToggle>
+    );
+
+    await assertLayoutChangeCounts(mainPage, 0);
+
+    await page.getByText("hidden → visible").click();
+
+    await assertLayoutChangeCounts(mainPage, 1);
+    await expect(page.getByText("id: left")).toContainText("25%");
+    await expect(page.getByRole("separator")).toBeVisible();
+    await expect(page.getByText("id: right")).toContainText("75%");
+
+    await page.getByText("visible → hidden").click();
+
+    await assertLayoutChangeCounts(mainPage, 1);
+    // Actual layout values are not meaningful since the Group is not visible
+
+    await page.setViewportSize({
+      width: 500,
+      height: 500
+    });
+    await page.getByText("hidden → visible").click();
+
+    await assertLayoutChangeCounts(mainPage, 2);
+    await expect(page.getByText("id: left")).toContainText("32%");
+    await expect(page.getByRole("separator")).toBeVisible();
+    await expect(page.getByText("id: right")).toContainText("68%");
+  });
+});

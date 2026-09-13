@@ -163,7 +163,7 @@ export function pinnedPublicEntries(packageDirectory, node, { baseline } = {}) {
 		};
 		visit(source);
 	}
-	for (const [subpath, target] of Object.entries(manifest.exports)) {
+	for (const [subpath, target] of Object.entries(manifest.exports ?? { '.': null })) {
 		if (subpath === './package.json') continue;
 		let file = target?.import?.types ?? target?.types ?? target?.default?.types;
 		if (typeof file !== 'string') {

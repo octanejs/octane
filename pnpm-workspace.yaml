@@ -461,7 +461,7 @@ catalogs:
     '@react-email/components': 1.0.12
     '@react-email/render': 2.0.6
     react-error-boundary: 6.1.2
-    react-resizable-panels: 4.12.2
+    react-resizable-panels: 4.12.4
     ripple: ^0.3.125
     rxjs: ^7.8.2
     rulesync: ^8.32.0
