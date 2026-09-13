@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { act, mount, nextPaint } from './_helpers';
 import {
+	DescriptorRootSuspensionAfterSiblingApp,
 	HiddenPrimaryRefCatchApp,
 	HiddenInsertionCleanupApp,
 	IndependentRefApp,
@@ -131,6 +132,36 @@ function setupNestedPortal(onDetach?: (mounted: ReturnType<typeof mount>) => voi
 }
 
 describe('Suspense preserves committed host DOM', () => {
+	it('restores externally edited descriptor text when a later sibling suspends', async () => {
+		const pending = deferred<string>();
+		let value: string | null = 'A';
+		const read = () => {
+			if (value === null) throw pending.promise;
+			return value;
+		};
+		const root = mount(DescriptorRootSuspensionAfterSiblingApp, { label: 'original', read });
+		try {
+			const label = root.find('#raw-root-suspension-label');
+			const text = label.firstChild!;
+			text.nodeValue = 'external text';
+			value = null;
+			root.update(DescriptorRootSuspensionAfterSiblingApp, { label: 'replacement', read });
+			expect(root.find('#raw-root-suspension-label')).toBe(label);
+			expect(label.firstChild).toBe(text);
+			expect(text.nodeValue).toBe('external text');
+			expect(root.find('#raw-root-suspension-reader').textContent).toBe('resource:A');
+
+			value = 'B';
+			await act(() => pending.resolve('ready'));
+			expect(root.find('#raw-root-suspension-label')).toBe(label);
+			expect(label.firstChild).toBe(text);
+			expect(text.nodeValue).toBe('replacement');
+			expect(root.find('#raw-root-suspension-reader').textContent).toBe('resource:B');
+		} finally {
+			root.unmount();
+		}
+	});
+
 	it('keeps committed siblings when a previously synchronous reader throws its first thenable', async () => {
 		const pending = deferred<string>();
 		let value: string | null = 'A';
@@ -211,6 +242,61 @@ describe('Suspense preserves committed host DOM', () => {
 			root.unmount();
 		}
 	});
+
+	it.each([
+		{ state: 'absent', title: null },
+		{ state: 'empty', title: '' },
+	])(
+		'preserves an externally $state title through successive suspended refreshes',
+		async ({ title }) => {
+			const pending = deferred<string>();
+			const root = mount(RootSuspensionAfterSiblingApp, {
+				label: 'original',
+				promise: fulfilled('A'),
+			});
+			try {
+				const label = root.find('#root-suspension-label');
+				const text = label.firstChild!;
+				if (title === null) label.removeAttribute('title');
+				else label.setAttribute('title', title);
+				text.nodeValue = 'first external text';
+				root.update(RootSuspensionAfterSiblingApp, {
+					label: 'first replacement',
+					promise: pending.promise,
+				});
+				expect(root.find('#root-suspension-label')).toBe(label);
+				expect(label.firstChild).toBe(text);
+				expect(text.nodeValue).toBe('first external text');
+				expect(label.getAttribute('title')).toBe(title);
+				expect(label.hasAttribute('title')).toBe(title !== null);
+
+				// Each attempt restores its immediately preceding DOM, including an edit
+				// made while the same resource is already holding the committed screen.
+				text.nodeValue = 'second external text';
+				const nextTitle = title === null ? '' : null;
+				if (nextTitle === null) label.removeAttribute('title');
+				else label.setAttribute('title', nextTitle);
+				root.update(RootSuspensionAfterSiblingApp, {
+					label: 'latest replacement',
+					promise: pending.promise,
+				});
+				expect(root.find('#root-suspension-label')).toBe(label);
+				expect(label.firstChild).toBe(text);
+				expect(text.nodeValue).toBe('second external text');
+				expect(label.getAttribute('title')).toBe(nextTitle);
+				expect(label.hasAttribute('title')).toBe(nextTitle !== null);
+
+				await act(() => pending.resolve('B'));
+				expect(root.find('#root-suspension-label')).toBe(label);
+				expect(label.firstChild).toBe(text);
+				expect(text.nodeValue).toBe('latest replacement');
+				expect(label.getAttribute('title')).toBe('latest replacement');
+				expect(root.find('#root-suspension-reader').textContent).toBe('resource:B');
+			} finally {
+				root.unmount();
+			}
+		},
+	);
 
 	async function expectPreservedHosts(shape: 'same' | 'swap'): Promise<void> {
 		const t = setup(shape);
