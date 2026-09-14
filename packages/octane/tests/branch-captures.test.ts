@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { renderToString } from 'octane/server';
-import { flushSync, hydrateRoot } from '../src/index.js';
+import { createRoot, flushSync, hydrateRoot } from '../src/index.js';
 import { mount } from './_helpers.js';
 import { loadServerFixture } from './_server-fixture.js';
 import {
 	NestedCaptures,
+	BranchHoldCaptures,
 	ShadowedCaptures,
 	FoldedCaptures,
 	ElseCaptures,
@@ -17,6 +18,89 @@ import {
 const fixture = 'packages/octane/tests/_fixtures/branch-captures.tsrx';
 
 describe('branch captures', () => {
+	it.each(['render', 'hydrate'] as const)(
+		'%s preserves branch captures and lifetimes across a held root update',
+		async (mode) => {
+			const effects: string[] = [];
+			const cleanups: string[] = [];
+			const picks: string[] = [];
+			const ready = { status: 'fulfilled', value: 'ready', then() {} };
+			const props = {
+				visible: true,
+				label: 'initial',
+				promise: ready as PromiseLike<string>,
+				ifRef: { current: null as HTMLButtonElement | null },
+				switchRef: { current: null as HTMLButtonElement | null },
+				effects,
+				cleanups,
+				pick: (value: string) => picks.push(value),
+			};
+			const container = document.createElement('div');
+			document.body.appendChild(container);
+			let adopted: Element[] | null = null;
+			if (mode === 'hydrate') {
+				const server = await loadServerFixture(fixture, { hmr: false, dev: false });
+				container.innerHTML = renderToString(server.BranchHoldCaptures, props).html;
+				adopted = [...container.querySelectorAll('button')];
+			}
+			const errors: unknown[] = [];
+			const root =
+				mode === 'render'
+					? createRoot(container)
+					: hydrateRoot(container, BranchHoldCaptures, props, {
+							onRecoverableError: (error) => errors.push(error),
+						});
+			if (mode === 'render') root.render(BranchHoldCaptures, props);
+			const host = container;
+			try {
+				flushSync(() => {});
+				const buttons = [...host.querySelectorAll('button')];
+				if (adopted !== null) {
+					for (const [index, button] of buttons.entries()) expect(button).toBe(adopted[index]);
+				}
+				flushSync(() =>
+					root.render(BranchHoldCaptures, {
+						...props,
+						label: 'held',
+						promise: new Promise<string>(() => {}),
+					}),
+				);
+				for (const button of buttons) {
+					expect(button.textContent).toBe('initial:0');
+					flushSync(() => button.click());
+					expect(button.textContent).toBe('initial:1');
+				}
+				expect(picks).toEqual(['if:initial', 'switch:initial']);
+				expect(effects).toEqual(['if:initial', 'switch:initial']);
+				expect(cleanups).toEqual([]);
+				flushSync(() => root.render(BranchHoldCaptures, { ...props, label: 'accepted' }));
+				expect([...host.querySelectorAll('button')]).toEqual(buttons);
+				expect(props.ifRef.current).toBe(buttons[0]);
+				expect(props.switchRef.current).toBe(buttons[1]);
+				for (const button of buttons) expect(button.textContent).toBe('accepted:1');
+				flushSync(() => root.render(BranchHoldCaptures, { ...props, visible: false }));
+				expect(host.querySelector('button')).toBeNull();
+				expect(props.ifRef.current).toBeNull();
+				expect(props.switchRef.current).toBeNull();
+				expect([...cleanups].sort()).toEqual([...effects].sort());
+				flushSync(() => root.render(BranchHoldCaptures, { ...props, label: 'returned' }));
+				const returned = [...host.querySelectorAll('button')];
+				expect(returned.map((button) => button.textContent)).toEqual(['returned:0', 'returned:0']);
+				for (const [index, button] of returned.entries()) {
+					expect(button).not.toBe(buttons[index]);
+					expect(button.textContent).toBe('returned:0');
+				}
+				expect(errors).toEqual([]);
+			} finally {
+				root.unmount();
+				container.remove();
+			}
+			expect(props.ifRef.current).toBeNull();
+			expect(props.switchRef.current).toBeNull();
+			expect([...cleanups].sort()).toEqual([...effects].sort());
+		},
+	);
+
 	it.each([
 		['outer arguments', ArgumentMutation, 'original'],
 		['nested arguments', NestedArgumentMutation, 'originaloriginal'],

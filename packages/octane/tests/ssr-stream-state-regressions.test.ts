@@ -55,6 +55,121 @@ function activateChunks(chunks: string[]): HTMLElement {
 	return container;
 }
 
+it('keeps a later boundary streaming after an earlier sibling has completed', async () => {
+	const first = deferred<string>();
+	const last = deferred<string>();
+	const output = collector();
+	const errors: unknown[] = [];
+	const { createElement: h, Suspense, use, renderToPipeableStream } = ServerRuntime;
+	const Child = ({ promise }: { promise: Promise<string> }) => h('b', null, use(promise));
+	const App = () =>
+		h(
+			'main',
+			null,
+			h(
+				Suspense,
+				{ fallback: h('i', null, 'first waiting') },
+				h(Child, { promise: first.promise }),
+			),
+			h(Suspense, { fallback: h('i', null, 'last waiting') }, h(Child, { promise: last.promise })),
+		);
+	let ended = false;
+	void output.ended.then(() => {
+		ended = true;
+	});
+	const stream = renderToPipeableStream(App, undefined, { onError: (error) => errors.push(error) });
+	stream.pipe(output.destination);
+	try {
+		await vi.waitFor(() => expect(output.chunks.join('')).toContain('last waiting'));
+		first.resolve('first ready');
+		await vi.waitFor(() => expect(output.chunks.join('')).toContain('first ready'));
+		expect(ended).toBe(false);
+		last.resolve('last ready');
+		await output.ended;
+		expect(errors).toEqual([]);
+		const container = activateChunks(output.chunks);
+		try {
+			expect(container.querySelector('main')?.textContent).toBe('first readylast ready');
+			expect(container.querySelector('i')).toBeNull();
+		} finally {
+			container.remove();
+		}
+	} finally {
+		stream.abort();
+		resetStreamRuntimeGlobals();
+	}
+});
+
+it('keeps revealed resources while repeatedly discarding a completed boundary fallback', async () => {
+	const fixture = loadCompiledFixtureSource(
+		`
+		import { use, useId, preload, preinit } from 'octane';
+		function Prefix() @{
+			preload('/established-replay.css', {as:'style',integrity:'established'});
+			<span class="prefix"><style>:global(.prefix) { --established-replay: 1; }</style>prefix</span>
+		}
+		function Ready(p) @{
+			const id=useId();
+			preload('/accepted-replay.css', {as:'style'});
+			<b class="ready" id={id}><style>:global(.ready) { --accepted-replay: 1; }</style>{p.value as string}</b>
+		}
+		function Discarded() @{
+			preinit('/established-replay.css', {as:'style',precedence:'discarded'});
+			preload('/discarded-replay.js', {as:'script'});
+			<i class="discarded"><style>:global(.discarded) { --discarded-replay: 1; }</style>discarded</i>
+		}
+		function Boundary(p) @{
+			@try { const value=use(p.promise); <Ready value={value} /> }
+			@pending { @if(p.late()) { <Discarded /> } @else { <i>waiting</i> } }
+		}
+		export function App(p) @{
+			<main><Prefix /><Boundary promise={p.first} late={p.late} /><Boundary promise={p.second} late={() => false} /><Boundary promise={p.third} late={() => false} /></main>
+		}
+	`,
+		{ id: 'ssr-repeated-fallback-resources.tsrx', mode: 'server' },
+	);
+	const first = deferred<string>(),
+		second = deferred<string>(),
+		third = deferred<string>();
+	const output = collector();
+	const errors: unknown[] = [];
+	let late = false;
+	const stream = ServerRuntime.renderToPipeableStream(
+		fixture.App,
+		{ first: first.promise, second: second.promise, third: third.promise, late: () => late },
+		{ onError: (error) => errors.push(error) },
+	);
+	stream.pipe(output.destination);
+	try {
+		await vi.waitFor(() => expect(output.chunks.join('')).toContain('--established-replay'));
+		late = true;
+		first.resolve('first ready');
+		await vi.waitFor(() => expect(output.chunks.join('')).toContain('first ready'));
+		expect(output.chunks.join('')).toContain('--accepted-replay');
+		second.resolve('second ready');
+		await vi.waitFor(() => expect(output.chunks.join('')).toContain('second ready'));
+		third.resolve('third ready');
+		await output.ended;
+		expect(errors).toEqual([]);
+		expect(output.chunks.join('')).not.toContain('--discarded-replay');
+		expect(output.chunks.join('')).not.toContain('/discarded-replay.js');
+		const container = activateChunks(output.chunks);
+		try {
+			expect(container.querySelector('main')?.textContent).toBe(
+				'prefixfirst readysecond readythird ready',
+			);
+			const ids = Array.from(container.querySelectorAll('b'), (node) => node.id);
+			expect(ids.every(Boolean)).toBe(true);
+			expect(new Set(ids).size).toBe(ids.length);
+		} finally {
+			container.remove();
+		}
+	} finally {
+		stream.abort();
+		resetStreamRuntimeGlobals();
+	}
+});
+
 const mod = evalServer(
 	`
     import { use, useId, useState } from 'octane';

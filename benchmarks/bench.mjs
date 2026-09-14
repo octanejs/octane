@@ -703,6 +703,33 @@ const SUITES = [
 		],
 	},
 	{
+		// Final SSR metadata/identity controls and measured retained alternatives.
+		name: 'ssr-final-metadata',
+		cwd: 'ssr-final-metadata',
+		servers: [],
+		iter: { normal: 1, quick: 1 },
+		runs: [{ script: 'audit.mjs', args: () => [] }],
+	},
+	{
+		// Streaming boundary scans and immutable replay/thenable controls.
+		name: 'ssr-final-replay',
+		cwd: 'ssr-final-replay',
+		servers: [],
+		iter: { normal: 1, quick: 1 },
+		runs: [{ script: 'work.mjs', args: () => [] }],
+	},
+	{
+		// Real naive JSX/TSRX app work and compiled Suspense list coverage.
+		name: 'audit-981-coverage',
+		cwd: 'audit-981-coverage',
+		servers: [],
+		iter: { normal: 1, quick: 1 },
+		runs: [
+			{ script: 'naive.mjs', args: () => [] },
+			{ script: 'suspense-list.mjs', args: () => [] },
+		],
+	},
+	{
 		// Raw streaming API over REAL HTTP, cold and warm: fresh-process import
 		// cost, spawn→listen→first-byte cold TTFB, and warm shell/total/throughput
 		// for octane renderToPipeableStream vs React Fizz behind one identical
@@ -1284,6 +1311,27 @@ const SUITES = [
 			{ script: 'props.mjs', args: () => [] },
 			{ script: 'forms.mjs', args: () => [] },
 			{ script: 'events.mjs', args: () => [] },
+		],
+	},
+	{
+		// Deterministic branch hydration lookups and descriptor-key work, with
+		// output, identity, event/effect, coercion, and hydration controls.
+		name: 'client-hot-paths',
+		cwd: 'client-hot-paths',
+		servers: [],
+		iter: { normal: 1, quick: 1 },
+		runs: [
+			{
+				script: 'branches.mjs',
+				args: () => [],
+				env: (_n, quick) => ({
+					BRANCH_CYCLES: quick ? '16' : '128',
+					BRANCH_SAMPLES: quick ? '1' : '7',
+					BRANCH_WARMUP: quick ? '2' : '128',
+				}),
+			},
+			{ script: 'keys.mjs', args: () => [] },
+			{ script: 'functions.mjs', args: () => [], env: () => ({ CLIENT_FUNCTION_SET: 'slots' }) },
 		],
 	},
 	{

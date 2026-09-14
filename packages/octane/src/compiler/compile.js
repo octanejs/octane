@@ -448,7 +448,7 @@ function attrBindingHelper(bind) {
 		case 'styleProperty':
 			return 'setStyleProperty';
 		case 'styleProperties':
-			return 'setStyleProperties';
+			return bind.spread ? 'setStyle' : 'setStyleProperties';
 		// SVG/MathML `className` is read-only — setClassAttr sets the attribute and
 		// clsx-composes (setClassName composes on HTML).
 		case 'class':
@@ -1390,6 +1390,7 @@ const INTERNAL_CLIENT_RUNTIME_HELPERS = new Set([
 	'bindSignalValue',
 	'bindSignalChecked',
 	'bindSignalHostPropSources',
+	'canSplitStyleProperties',
 	'replaceRef',
 	'queueOwnRefDetach',
 	'setPlainAttribute',
@@ -2394,15 +2395,23 @@ function staticObjectToCssString(obj) {
 // A literal prefix can live in the template when all following properties have
 // fixed, unique names. The values still evaluate together at the authored
 // style attribute, before any DOM writes. Fixed literal values
-// after the first dynamic property stay in the ordered suffix. Spreads,
-// computed names, and accessors retain ordinary object evaluation and diffing.
+// after the first dynamic property stay in the ordered suffix. Leading spreads
+// retain an object snapshot; only their fixed trailing properties are split.
+// Computed names and accessors retain ordinary object evaluation and diffing.
 function mixedStaticStyle(obj) {
 	if (obj?.type !== 'ObjectExpression' || obj.properties.length === 0) return null;
+	let spreadCount = 0;
+	while (obj.properties[spreadCount]?.type === 'SpreadElement') spreadCount++;
+	if (spreadCount === obj.properties.length) return null;
+	const spread = spreadCount
+		? inheritOriginLoc(b.object(obj.properties.slice(0, spreadCount)), obj)
+		: null;
+	const properties = spreadCount ? obj.properties.slice(spreadCount) : obj.properties;
 	const seen = new Map();
 	let duplicates = false;
 	const prefix = [];
 	const dynamics = [];
-	for (const property of obj.properties) {
+	for (const property of properties) {
 		if (
 			(property.type !== 'Property' && property.type !== 'ObjectProperty') ||
 			property.computed ||
@@ -2420,6 +2429,9 @@ function mixedStaticStyle(obj) {
 		if (
 			name === '__proto__' ||
 			name === 'dangerouslySetInnerHTML' ||
+			// Integer keys enumerate before the spread's string keys, regardless
+			// of their authored position. Keep their coercion order on the object path.
+			(spread !== null && String(Number(name) >>> 0) === name && name !== '4294967295') ||
 			(seen.has(normalized) && seen.get(normalized) !== name)
 		) {
 			return null;
@@ -2441,6 +2453,7 @@ function mixedStaticStyle(obj) {
 			return null;
 		}
 		if (
+			spread === null &&
 			value?.type === 'Literal' &&
 			dynamics.length === 0 &&
 			(typeof value.value === 'string' || typeof value.value === 'number') &&
@@ -2457,7 +2470,8 @@ function mixedStaticStyle(obj) {
 	if (duplicates) {
 		return {
 			css: '',
-			dynamics: obj.properties.map((property) => ({
+			spread,
+			dynamics: properties.map((property) => ({
 				name: property.key.type === 'Identifier' ? property.key.name : property.key.value,
 				key: property.key,
 				value: property.value,
@@ -2466,7 +2480,7 @@ function mixedStaticStyle(obj) {
 	}
 	if (dynamics.length === 0) return null;
 	const css = staticObjectToCssString({ properties: prefix });
-	return prefix.length !== 0 && css === '' ? null : { css, dynamics };
+	return prefix.length !== 0 && css === '' ? null : { css, dynamics, spread };
 }
 
 // ===========================================================================
@@ -23542,7 +23556,7 @@ function planJsx(
 		}
 		if (b.kind === 'styleProperties') {
 			ctx.runtimeNeeded.add('setStyleProperty');
-			ctx.runtimeNeeded.add('isHydratingStyle');
+			ctx.runtimeNeeded.add(b.spread ? 'canSplitStyleProperties' : 'isHydratingStyle');
 		}
 		if (b.kind === 'spread') {
 			ctx.runtimeNeeded.add('setSpread');
@@ -24934,6 +24948,22 @@ function commitSourceRows(sources, valueOf) {
 	return b.array(rows);
 }
 
+// Recombine a native spread snapshot only for mount/hydration or a key collision.
+// Spreading the snapshot cannot replay getters: the authored spreads already
+// copied their values before any of the trailing expressions were evaluated.
+function styleSpreadObject(bind, spread, valueOf) {
+	return b.object([
+		b.spread(spread),
+		...bind.properties.map((property, i) =>
+			b.prop(
+				'init',
+				inheritOriginLoc(b.literal(property.name), property.key),
+				valueOf(property, i),
+			),
+		),
+	]);
+}
+
 // Mount for a DEFERRED property-write binding: store the element ref + seed the
 // diff field to `undefined`. The every-render diff then performs the actual
 // write — including on the first render, since the `undefined` seed makes its
@@ -25285,6 +25315,25 @@ function emitBindingMount(bind, elVar, bag) {
 		}
 		case 'styleProperties': {
 			for (let i = 0; i < bind.properties.length; i++) bag.local(`_prev$${bind.id}_${i}`);
+			if (bind.spread) {
+				const spreadValues = () => b.id(bind.spreadName);
+				const spread = () => b.member(spreadValues(), b.literal(0), true);
+				const valueOf = (property) =>
+					b.member(spreadValues(), b.literal(property.evaluationIndex + 1), true);
+				return st(
+					b.block([
+						b.const(bind.spreadName, bind.expr),
+						b.stmt(
+							b.call(callee(), el(), styleSpreadObject(bind, spread(), valueOf), undefinedNode()),
+						),
+						...mountHost(),
+						b.stmt(b.assignment('=', local(`_sty$${bind.id}`), spread())),
+						...bind.properties.map((property, i) =>
+							b.stmt(b.assignment('=', local(`_prev$${bind.id}_${i}`), valueOf(property))),
+						),
+					]),
+				);
+			}
 			const entries =
 				bind.properties.length === bind.evaluations.length
 					? V()
@@ -25696,8 +25745,68 @@ function emitBindingUpdate(bind, bag, inlineBindingGuards = false) {
 			// Evaluate every authored value before the first CSS write, including
 			// fixed literal suffix values. Mount and hydration compare one complete
 			// style; ordinary updates only call the scalar setter for changed cells.
-			const values = bind.evaluations.map((value, i) => b.const(`_v${i}`, value));
-			const valueOf = (property) => b.id(`_v${property.evaluationIndex}`);
+			const valueName = (i) => bind.valueNames?.[i] ?? `_v${i}`;
+			const values = bind.evaluations.map((value, i) => b.const(valueName(i), value));
+			const valueOf = (property) => b.id(valueName(property.evaluationIndex));
+			if (bind.spread) {
+				const spread = b.id(bind.spreadName);
+				const previous = (property, i) => bagFieldNode(bag, `_prev$${bind.id}_${i}`);
+				const initial = bind.deferred ? b.binary('===', F('_sty'), b.id('__s')) : b.literal(false);
+				const collisions = bind.properties.flatMap((property) => [
+					b.binary('in', b.literal(property.name), spread),
+					b.binary('in', b.literal(property.name), F('_sty')),
+				]);
+				const full = b.stmt(
+					b.call(
+						callee(),
+						F('_el'),
+						styleSpreadObject(bind, spread, valueOf),
+						bind.deferred
+							? b.conditional(
+									initial,
+									undefinedNode(),
+									styleSpreadObject(bind, F('_sty'), previous),
+								)
+							: styleSpreadObject(bind, F('_sty'), previous),
+					),
+				);
+				const scalar = bind.properties.map((property, i) =>
+					b.if(
+						b.binary('!==', previous(property, i), valueOf(property)),
+						b.block([
+							b.stmt(
+								b.call(
+									attrLoweringToken(b.id('_$setStyleProperty'), bind),
+									F('_el'),
+									inheritOriginLoc(b.literal(property.name), property.key),
+									valueOf(property),
+									b.literal(''),
+									previous(property, i),
+								),
+							),
+						]),
+						null,
+					),
+				);
+				// A spread can insert a trailing key before a shorthand. Check both
+				// snapshots: leaving that case also needs a complete diff so prefix
+				// removal cannot erase an unchanged trailing declaration.
+				return st(
+					b.block([
+						b.const(bind.spreadName, bind.spread),
+						...values,
+						b.if(
+							orChain([initial, b.unary('!', b.call('_$canSplitStyleProperties')), ...collisions]),
+							b.block([full]),
+							b.block([b.stmt(b.call(callee(), F('_el'), spread, F('_sty'))), ...scalar]),
+						),
+						b.stmt(b.assignment('=', F('_sty'), spread)),
+						...bind.properties.map((property, i) =>
+							b.stmt(b.assignment('=', previous(property, i), valueOf(property))),
+						),
+					]),
+				);
+			}
 			const entries = b.array(
 				bind.properties.flatMap((property) => [
 					inheritOriginLoc(b.literal(property.name), property.key),
@@ -27070,7 +27179,7 @@ function emitElementHtml(
 								),
 							);
 						}
-					} else if (mixed.dynamics.length === 1) {
+					} else if (mixed.dynamics.length === 1 && mixed.spread === null) {
 						const entry = mixed.dynamics[0];
 						bindings.push({
 							id: bindings.length,
@@ -27085,6 +27194,9 @@ function emitElementHtml(
 							staticCss: mixed.css,
 						});
 					} else {
+						const spread = mixed.spread
+							? tsrxExprNode(mixed.spread, ctx, componentName, inlinedSubs)
+							: null;
 						const entries = [];
 						const propertyBindings = new Map();
 						const evaluations = [];
@@ -27101,7 +27213,12 @@ function emitElementHtml(
 						bindings.push({
 							id: bindings.length,
 							kind: 'styleProperties',
-							expr: inheritOriginLoc(b.array(entries), inner),
+							expr: inheritOriginLoc(b.array(spread ? [spread, ...evaluations] : entries), inner),
+							spread,
+							spreadName: spread ? allocCompilerName(ctx, '__styleSpread') : null,
+							valueNames: spread
+								? evaluations.map(() => allocCompilerName(ctx, '__styleValue'))
+								: null,
 							properties: [...propertyBindings.values()],
 							evaluations,
 							path,
