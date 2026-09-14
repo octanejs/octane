@@ -1,8 +1,8 @@
-import { loadCompiledFixtureSource } from './_server-fixture.js';
 import { describe, expect, it, vi } from 'vitest';
 import * as ServerRuntime from 'octane/server';
 import { prerender } from 'octane/static';
 import { resetStreamRuntimeGlobals } from './_server-stream.js';
+import { loadCompiledFixtureSource } from './_server-fixture.js';
 
 function evalServer(source: string, filename: string): Record<string, any> {
 	return loadCompiledFixtureSource(source, {
