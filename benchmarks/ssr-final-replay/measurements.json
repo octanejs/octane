@@ -1,0 +1,3986 @@
+{
+  "baselineCommit": "248af4edc30c80498dec13dad4f6d7508f10f220",
+  "baseline": {
+    "suite": "ssr-final-replay",
+    "iterations": 1,
+    "targets": [
+      {
+        "name": "resources-retry",
+        "ops": {
+          "boundary_arrays": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "copied_boundaries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "pending_visits": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "full_passes": {
+            "score": 1,
+            "median": 1,
+            "min": 1,
+            "samples": 1
+          },
+          "discovery_rounds": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "suspended_visits": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "read_probes": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "try_calls": {
+            "score": 4,
+            "median": 4,
+            "min": 4,
+            "samples": 1
+          },
+          "try_closures": {
+            "score": 40,
+            "median": 40,
+            "min": 40,
+            "samples": 1
+          },
+          "hook_positions": {
+            "score": 3,
+            "median": 3,
+            "min": 3,
+            "samples": 1
+          },
+          "hook_maps": {
+            "score": 4,
+            "median": 4,
+            "min": 4,
+            "samples": 1
+          },
+          "collection_copies": {
+            "score": 75,
+            "median": 75,
+            "min": 75,
+            "samples": 1
+          },
+          "collection_entries": {
+            "score": 720,
+            "median": 720,
+            "min": 720,
+            "samples": 1
+          },
+          "list_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "list_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "vt_copies": {
+            "score": 8,
+            "median": 8,
+            "min": 8,
+            "samples": 1
+          },
+          "vt_entries": {
+            "score": 8,
+            "median": 8,
+            "min": 8,
+            "samples": 1
+          },
+          "frame_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "frame_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          }
+        },
+        "meta": {
+          "semanticHash": "3f8a9b8fbe4585f6fe309bff6e3c312ef67046d110ef9f75d4e7e2e427d24128"
+        }
+      },
+      {
+        "name": "resources-settled",
+        "ops": {
+          "boundary_arrays": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "copied_boundaries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "pending_visits": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "full_passes": {
+            "score": 1,
+            "median": 1,
+            "min": 1,
+            "samples": 1
+          },
+          "discovery_rounds": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "suspended_visits": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "read_probes": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "try_calls": {
+            "score": 2,
+            "median": 2,
+            "min": 2,
+            "samples": 1
+          },
+          "try_closures": {
+            "score": 20,
+            "median": 20,
+            "min": 20,
+            "samples": 1
+          },
+          "hook_positions": {
+            "score": 1,
+            "median": 1,
+            "min": 1,
+            "samples": 1
+          },
+          "hook_maps": {
+            "score": 2,
+            "median": 2,
+            "min": 2,
+            "samples": 1
+          },
+          "collection_copies": {
+            "score": 64,
+            "median": 64,
+            "min": 64,
+            "samples": 1
+          },
+          "collection_entries": {
+            "score": 544,
+            "median": 544,
+            "min": 544,
+            "samples": 1
+          },
+          "list_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "list_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "vt_copies": {
+            "score": 4,
+            "median": 4,
+            "min": 4,
+            "samples": 1
+          },
+          "vt_entries": {
+            "score": 4,
+            "median": 4,
+            "min": 4,
+            "samples": 1
+          },
+          "frame_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "frame_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          }
+        },
+        "meta": {
+          "semanticHash": "3f8a9b8fbe4585f6fe309bff6e3c312ef67046d110ef9f75d4e7e2e427d24128"
+        }
+      },
+      {
+        "name": "resources-nested-stream",
+        "ops": {
+          "boundary_arrays": {
+            "score": 3,
+            "median": 3,
+            "min": 3,
+            "samples": 1
+          },
+          "copied_boundaries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "pending_visits": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "full_passes": {
+            "score": 1,
+            "median": 1,
+            "min": 1,
+            "samples": 1
+          },
+          "discovery_rounds": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "suspended_visits": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "read_probes": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "try_calls": {
+            "score": 4,
+            "median": 4,
+            "min": 4,
+            "samples": 1
+          },
+          "try_closures": {
+            "score": 40,
+            "median": 40,
+            "min": 40,
+            "samples": 1
+          },
+          "hook_positions": {
+            "score": 3,
+            "median": 3,
+            "min": 3,
+            "samples": 1
+          },
+          "hook_maps": {
+            "score": 4,
+            "median": 4,
+            "min": 4,
+            "samples": 1
+          },
+          "collection_copies": {
+            "score": 75,
+            "median": 75,
+            "min": 75,
+            "samples": 1
+          },
+          "collection_entries": {
+            "score": 720,
+            "median": 720,
+            "min": 720,
+            "samples": 1
+          },
+          "list_copies": {
+            "score": 20,
+            "median": 20,
+            "min": 20,
+            "samples": 1
+          },
+          "list_entries": {
+            "score": 26,
+            "median": 26,
+            "min": 26,
+            "samples": 1
+          },
+          "vt_copies": {
+            "score": 8,
+            "median": 8,
+            "min": 8,
+            "samples": 1
+          },
+          "vt_entries": {
+            "score": 8,
+            "median": 8,
+            "min": 8,
+            "samples": 1
+          },
+          "frame_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "frame_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          }
+        },
+        "meta": {
+          "semanticHash": "f1b124630d72ba3d8940a0f4ed59a31843084f5391a2162817fe3705e044f677"
+        }
+      },
+      {
+        "name": "thenable-protocol",
+        "ops": {
+          "boundary_arrays": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "copied_boundaries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "pending_visits": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "full_passes": {
+            "score": 3,
+            "median": 3,
+            "min": 3,
+            "samples": 1
+          },
+          "discovery_rounds": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "suspended_visits": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "read_probes": {
+            "score": 2,
+            "median": 2,
+            "min": 2,
+            "samples": 1
+          },
+          "try_calls": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "try_closures": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "hook_positions": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "hook_maps": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "collection_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "collection_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "list_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "list_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "vt_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "vt_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "frame_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "frame_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          }
+        },
+        "meta": {
+          "semanticHash": "939c5e54740b5d7315c187e14ec66d0faa9677a028491440e43ab3462354324b"
+        }
+      },
+      {
+        "name": "hook-reentrancy",
+        "ops": {
+          "boundary_arrays": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "copied_boundaries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "pending_visits": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "full_passes": {
+            "score": 2,
+            "median": 2,
+            "min": 2,
+            "samples": 1
+          },
+          "discovery_rounds": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "suspended_visits": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "read_probes": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "try_calls": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "try_closures": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "hook_positions": {
+            "score": 5,
+            "median": 5,
+            "min": 5,
+            "samples": 1
+          },
+          "hook_maps": {
+            "score": 5,
+            "median": 5,
+            "min": 5,
+            "samples": 1
+          },
+          "collection_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "collection_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "list_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "list_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "vt_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "vt_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "frame_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "frame_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          }
+        },
+        "meta": {
+          "semanticHash": "8d8eb146e1ecc638c13e44c641f881018d7a62eb3af248f214e54aef55448f7c"
+        }
+      },
+      {
+        "name": "buffered-discovery",
+        "ops": {
+          "boundary_arrays": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "copied_boundaries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "pending_visits": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "full_passes": {
+            "score": 2,
+            "median": 2,
+            "min": 2,
+            "samples": 1
+          },
+          "discovery_rounds": {
+            "score": 2,
+            "median": 2,
+            "min": 2,
+            "samples": 1
+          },
+          "suspended_visits": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "read_probes": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "try_calls": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "try_closures": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "hook_positions": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "hook_maps": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "collection_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "collection_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "list_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "list_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "vt_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "vt_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "frame_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "frame_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          }
+        },
+        "meta": {
+          "semanticHash": "b214e2653f5a467b6ed1a533d033230f7c70b91ddb9ca17ab257d7421523cd83"
+        }
+      },
+      {
+        "name": "stream-errors",
+        "ops": {
+          "boundary_arrays": {
+            "score": 7,
+            "median": 7,
+            "min": 7,
+            "samples": 1
+          },
+          "copied_boundaries": {
+            "score": 21,
+            "median": 21,
+            "min": 21,
+            "samples": 1
+          },
+          "pending_visits": {
+            "score": 4,
+            "median": 4,
+            "min": 4,
+            "samples": 1
+          },
+          "full_passes": {
+            "score": 2,
+            "median": 2,
+            "min": 2,
+            "samples": 1
+          },
+          "discovery_rounds": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "suspended_visits": {
+            "score": 3,
+            "median": 3,
+            "min": 3,
+            "samples": 1
+          },
+          "read_probes": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "try_calls": {
+            "score": 6,
+            "median": 6,
+            "min": 6,
+            "samples": 1
+          },
+          "try_closures": {
+            "score": 78,
+            "median": 78,
+            "min": 78,
+            "samples": 1
+          },
+          "hook_positions": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "hook_maps": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "collection_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "collection_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "list_copies": {
+            "score": 12,
+            "median": 12,
+            "min": 12,
+            "samples": 1
+          },
+          "list_entries": {
+            "score": 12,
+            "median": 12,
+            "min": 12,
+            "samples": 1
+          },
+          "vt_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "vt_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "frame_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "frame_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          }
+        },
+        "meta": {
+          "semanticHash": "f7b92582b9065008945f5451b57d222882f8ff4adccf21998639d6a1327efa07"
+        }
+      },
+      {
+        "name": "stream-abort",
+        "ops": {
+          "boundary_arrays": {
+            "score": 8,
+            "median": 8,
+            "min": 8,
+            "samples": 1
+          },
+          "copied_boundaries": {
+            "score": 24,
+            "median": 24,
+            "min": 24,
+            "samples": 1
+          },
+          "pending_visits": {
+            "score": 3,
+            "median": 3,
+            "min": 3,
+            "samples": 1
+          },
+          "full_passes": {
+            "score": 2,
+            "median": 2,
+            "min": 2,
+            "samples": 1
+          },
+          "discovery_rounds": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "suspended_visits": {
+            "score": 3,
+            "median": 3,
+            "min": 3,
+            "samples": 1
+          },
+          "read_probes": {
+            "score": 2,
+            "median": 2,
+            "min": 2,
+            "samples": 1
+          },
+          "try_calls": {
+            "score": 6,
+            "median": 6,
+            "min": 6,
+            "samples": 1
+          },
+          "try_closures": {
+            "score": 78,
+            "median": 78,
+            "min": 78,
+            "samples": 1
+          },
+          "hook_positions": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "hook_maps": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "collection_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "collection_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "list_copies": {
+            "score": 12,
+            "median": 12,
+            "min": 12,
+            "samples": 1
+          },
+          "list_entries": {
+            "score": 12,
+            "median": 12,
+            "min": 12,
+            "samples": 1
+          },
+          "vt_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "vt_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "frame_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "frame_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          }
+        },
+        "meta": {
+          "semanticHash": "c07b3fe72bb0e64247ca063d3b77d38e1b06ef876092c6956fb808097ef6ea52"
+        }
+      },
+      {
+        "name": "stream-populated",
+        "ops": {
+          "boundary_arrays": {
+            "score": 35,
+            "median": 35,
+            "min": 35,
+            "samples": 1
+          },
+          "copied_boundaries": {
+            "score": 280,
+            "median": 280,
+            "min": 280,
+            "samples": 1
+          },
+          "pending_visits": {
+            "score": 16,
+            "median": 16,
+            "min": 16,
+            "samples": 1
+          },
+          "full_passes": {
+            "score": 9,
+            "median": 9,
+            "min": 9,
+            "samples": 1
+          },
+          "discovery_rounds": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "suspended_visits": {
+            "score": 36,
+            "median": 36,
+            "min": 36,
+            "samples": 1
+          },
+          "read_probes": {
+            "score": 28,
+            "median": 28,
+            "min": 28,
+            "samples": 1
+          },
+          "try_calls": {
+            "score": 90,
+            "median": 90,
+            "min": 90,
+            "samples": 1
+          },
+          "try_closures": {
+            "score": 1116,
+            "median": 1116,
+            "min": 1116,
+            "samples": 1
+          },
+          "hook_positions": {
+            "score": 9,
+            "median": 9,
+            "min": 9,
+            "samples": 1
+          },
+          "hook_maps": {
+            "score": 18,
+            "median": 18,
+            "min": 18,
+            "samples": 1
+          },
+          "collection_copies": {
+            "score": 832,
+            "median": 832,
+            "min": 832,
+            "samples": 1
+          },
+          "collection_entries": {
+            "score": 8992,
+            "median": 8992,
+            "min": 8992,
+            "samples": 1
+          },
+          "list_copies": {
+            "score": 216,
+            "median": 216,
+            "min": 216,
+            "samples": 1
+          },
+          "list_entries": {
+            "score": 234,
+            "median": 234,
+            "min": 234,
+            "samples": 1
+          },
+          "vt_copies": {
+            "score": 36,
+            "median": 36,
+            "min": 36,
+            "samples": 1
+          },
+          "vt_entries": {
+            "score": 36,
+            "median": 36,
+            "min": 36,
+            "samples": 1
+          },
+          "frame_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "frame_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          }
+        },
+        "meta": {
+          "semanticHash": "7aef88135725e9381af2d7e9fc3a5717f12743a86c89a2fb3ebb88039f64e5cc",
+          "chunks": 9,
+          "values": 8,
+          "outputHash": "e57d6b345f3a82ca20e3c588552aec7d045dc5ddc0e7e1aac7b32888f31469e0"
+        }
+      },
+      {
+        "name": "stream-0-1",
+        "ops": {
+          "boundary_arrays": {
+            "score": 3,
+            "median": 3,
+            "min": 3,
+            "samples": 1
+          },
+          "copied_boundaries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "pending_visits": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "full_passes": {
+            "score": 1,
+            "median": 1,
+            "min": 1,
+            "samples": 1
+          },
+          "discovery_rounds": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "suspended_visits": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "read_probes": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "try_calls": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "try_closures": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "hook_positions": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "hook_maps": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "collection_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "collection_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "list_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "list_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "vt_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "vt_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "frame_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "frame_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          }
+        },
+        "meta": {
+          "semanticHash": "1795a4597d4b607bca68d83f89711a654095c769722403248d53d2e2ac1335c9",
+          "chunks": 1,
+          "values": 0,
+          "outputHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+        }
+      },
+      {
+        "name": "stream-1-1",
+        "ops": {
+          "boundary_arrays": {
+            "score": 7,
+            "median": 7,
+            "min": 7,
+            "samples": 1
+          },
+          "copied_boundaries": {
+            "score": 7,
+            "median": 7,
+            "min": 7,
+            "samples": 1
+          },
+          "pending_visits": {
+            "score": 2,
+            "median": 2,
+            "min": 2,
+            "samples": 1
+          },
+          "full_passes": {
+            "score": 2,
+            "median": 2,
+            "min": 2,
+            "samples": 1
+          },
+          "discovery_rounds": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "suspended_visits": {
+            "score": 1,
+            "median": 1,
+            "min": 1,
+            "samples": 1
+          },
+          "read_probes": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "try_calls": {
+            "score": 2,
+            "median": 2,
+            "min": 2,
+            "samples": 1
+          },
+          "try_closures": {
+            "score": 26,
+            "median": 26,
+            "min": 26,
+            "samples": 1
+          },
+          "hook_positions": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "hook_maps": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "collection_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "collection_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "list_copies": {
+            "score": 4,
+            "median": 4,
+            "min": 4,
+            "samples": 1
+          },
+          "list_entries": {
+            "score": 4,
+            "median": 4,
+            "min": 4,
+            "samples": 1
+          },
+          "vt_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "vt_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "frame_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "frame_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          }
+        },
+        "meta": {
+          "semanticHash": "15d6c9587ce9e21496e548c9eaf63a4b61d249cc0c9c20fd9ae42439da8983ab",
+          "chunks": 2,
+          "values": 1,
+          "outputHash": "d0bca111f8628137adc4c16f123496dcdd1d590d06cb5d9acd68b39fe656fb97"
+        }
+      },
+      {
+        "name": "stream-8-1",
+        "ops": {
+          "boundary_arrays": {
+            "score": 35,
+            "median": 35,
+            "min": 35,
+            "samples": 1
+          },
+          "copied_boundaries": {
+            "score": 280,
+            "median": 280,
+            "min": 280,
+            "samples": 1
+          },
+          "pending_visits": {
+            "score": 16,
+            "median": 16,
+            "min": 16,
+            "samples": 1
+          },
+          "full_passes": {
+            "score": 9,
+            "median": 9,
+            "min": 9,
+            "samples": 1
+          },
+          "discovery_rounds": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "suspended_visits": {
+            "score": 36,
+            "median": 36,
+            "min": 36,
+            "samples": 1
+          },
+          "read_probes": {
+            "score": 28,
+            "median": 28,
+            "min": 28,
+            "samples": 1
+          },
+          "try_calls": {
+            "score": 72,
+            "median": 72,
+            "min": 72,
+            "samples": 1
+          },
+          "try_closures": {
+            "score": 936,
+            "median": 936,
+            "min": 936,
+            "samples": 1
+          },
+          "hook_positions": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "hook_maps": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "collection_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "collection_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "list_copies": {
+            "score": 144,
+            "median": 144,
+            "min": 144,
+            "samples": 1
+          },
+          "list_entries": {
+            "score": 144,
+            "median": 144,
+            "min": 144,
+            "samples": 1
+          },
+          "vt_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "vt_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "frame_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "frame_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          }
+        },
+        "meta": {
+          "semanticHash": "7aef88135725e9381af2d7e9fc3a5717f12743a86c89a2fb3ebb88039f64e5cc",
+          "chunks": 9,
+          "values": 8,
+          "outputHash": "e57d6b345f3a82ca20e3c588552aec7d045dc5ddc0e7e1aac7b32888f31469e0"
+        }
+      },
+      {
+        "name": "stream-8-8",
+        "ops": {
+          "boundary_arrays": {
+            "score": 7,
+            "median": 7,
+            "min": 7,
+            "samples": 1
+          },
+          "copied_boundaries": {
+            "score": 56,
+            "median": 56,
+            "min": 56,
+            "samples": 1
+          },
+          "pending_visits": {
+            "score": 9,
+            "median": 9,
+            "min": 9,
+            "samples": 1
+          },
+          "full_passes": {
+            "score": 2,
+            "median": 2,
+            "min": 2,
+            "samples": 1
+          },
+          "discovery_rounds": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "suspended_visits": {
+            "score": 8,
+            "median": 8,
+            "min": 8,
+            "samples": 1
+          },
+          "read_probes": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "try_calls": {
+            "score": 16,
+            "median": 16,
+            "min": 16,
+            "samples": 1
+          },
+          "try_closures": {
+            "score": 208,
+            "median": 208,
+            "min": 208,
+            "samples": 1
+          },
+          "hook_positions": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "hook_maps": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "collection_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "collection_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "list_copies": {
+            "score": 32,
+            "median": 32,
+            "min": 32,
+            "samples": 1
+          },
+          "list_entries": {
+            "score": 32,
+            "median": 32,
+            "min": 32,
+            "samples": 1
+          },
+          "vt_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "vt_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "frame_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "frame_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          }
+        },
+        "meta": {
+          "semanticHash": "07dd8dbd3126b48ad70cf3ce15065d7cbc7db100cbc63c68d6678303d3265637",
+          "chunks": 2,
+          "values": 8,
+          "outputHash": "29101ebf1ead685029508789eee51c4d4fff65524064d8e32a48efded7036982"
+        }
+      },
+      {
+        "name": "stream-32-1",
+        "ops": {
+          "boundary_arrays": {
+            "score": 131,
+            "median": 131,
+            "min": 131,
+            "samples": 1
+          },
+          "copied_boundaries": {
+            "score": 4192,
+            "median": 4192,
+            "min": 4192,
+            "samples": 1
+          },
+          "pending_visits": {
+            "score": 64,
+            "median": 64,
+            "min": 64,
+            "samples": 1
+          },
+          "full_passes": {
+            "score": 33,
+            "median": 33,
+            "min": 33,
+            "samples": 1
+          },
+          "discovery_rounds": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "suspended_visits": {
+            "score": 528,
+            "median": 528,
+            "min": 528,
+            "samples": 1
+          },
+          "read_probes": {
+            "score": 496,
+            "median": 496,
+            "min": 496,
+            "samples": 1
+          },
+          "try_calls": {
+            "score": 1056,
+            "median": 1056,
+            "min": 1056,
+            "samples": 1
+          },
+          "try_closures": {
+            "score": 13728,
+            "median": 13728,
+            "min": 13728,
+            "samples": 1
+          },
+          "hook_positions": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "hook_maps": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "collection_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "collection_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "list_copies": {
+            "score": 2112,
+            "median": 2112,
+            "min": 2112,
+            "samples": 1
+          },
+          "list_entries": {
+            "score": 2112,
+            "median": 2112,
+            "min": 2112,
+            "samples": 1
+          },
+          "vt_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "vt_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "frame_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "frame_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          }
+        },
+        "meta": {
+          "semanticHash": "6295e443f6e6c46531d0e38af0ea39bbaf819bba36fd2e371817d36ef1b6e00c",
+          "chunks": 33,
+          "values": 32,
+          "outputHash": "ed2df54b950639376a04d3d2f5168962268b3d23b4d7834eded325017f4a2169"
+        }
+      },
+      {
+        "name": "stream-32-32",
+        "ops": {
+          "boundary_arrays": {
+            "score": 7,
+            "median": 7,
+            "min": 7,
+            "samples": 1
+          },
+          "copied_boundaries": {
+            "score": 224,
+            "median": 224,
+            "min": 224,
+            "samples": 1
+          },
+          "pending_visits": {
+            "score": 33,
+            "median": 33,
+            "min": 33,
+            "samples": 1
+          },
+          "full_passes": {
+            "score": 2,
+            "median": 2,
+            "min": 2,
+            "samples": 1
+          },
+          "discovery_rounds": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "suspended_visits": {
+            "score": 32,
+            "median": 32,
+            "min": 32,
+            "samples": 1
+          },
+          "read_probes": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "try_calls": {
+            "score": 64,
+            "median": 64,
+            "min": 64,
+            "samples": 1
+          },
+          "try_closures": {
+            "score": 832,
+            "median": 832,
+            "min": 832,
+            "samples": 1
+          },
+          "hook_positions": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "hook_maps": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "collection_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "collection_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "list_copies": {
+            "score": 128,
+            "median": 128,
+            "min": 128,
+            "samples": 1
+          },
+          "list_entries": {
+            "score": 128,
+            "median": 128,
+            "min": 128,
+            "samples": 1
+          },
+          "vt_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "vt_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "frame_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "frame_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          }
+        },
+        "meta": {
+          "semanticHash": "5dc155449a04f16070a4cb7c6e97d65b1f4d3e8fa7de6748eb2b6eaad5b8298c",
+          "chunks": 2,
+          "values": 32,
+          "outputHash": "23b22df6bf551a4e788327db3b3d3d96e1eca49078d2c6bd0049da2d390eca8b"
+        }
+      },
+      {
+        "name": "scan-budget",
+        "ops": {
+          "boundary_arrays": {
+            "score": 1,
+            "median": 1,
+            "min": 1,
+            "samples": 1
+          },
+          "copied_boundaries": {
+            "score": 1,
+            "median": 1,
+            "min": 1,
+            "samples": 1
+          }
+        }
+      },
+      {
+        "name": "populated-budget",
+        "ops": {
+          "collection_copies": {
+            "score": 688,
+            "median": 688,
+            "min": 688,
+            "samples": 1
+          },
+          "collection_entries": {
+            "score": 6688,
+            "median": 6688,
+            "min": 6688,
+            "samples": 1
+          }
+        }
+      },
+      {
+        "name": "wave-budget",
+        "ops": {
+          "full_passes": {
+            "score": 33,
+            "median": 33,
+            "min": 33,
+            "samples": 1
+          },
+          "suspended_visits": {
+            "score": 528,
+            "median": 528,
+            "min": 528,
+            "samples": 1
+          },
+          "read_probes": {
+            "score": 496,
+            "median": 496,
+            "min": 496,
+            "samples": 1
+          },
+          "try_closures": {
+            "score": 13728,
+            "median": 13728,
+            "min": 13728,
+            "samples": 1
+          }
+        }
+      }
+    ],
+    "meta": {
+      "node": "v24.20.0",
+      "v8": "13.6.233.17-node.53",
+      "platform": "darwin",
+      "arch": "arm64",
+      "sourceHash": "47649d48f930f3c19648943a5f05cbfb454a35feadfdfe5495e6a985e20cc881",
+      "fixtureHash": "dfb8412e0eb42973eca26fb3355de7a77e4e37d0aadee80c7d63d68dbad5b4f9",
+      "bundleBytes": 114555,
+      "bundleGzip": 37635,
+      "bundleHash": "bc887d9cd9ee79d0cebf45a9d3bb750558b46ffad1d1a4d3293ee74750689a54",
+      "negativeControls": [
+        "missing pending probe rejected",
+        "aliased mutable snapshot rejected",
+        "shared hook position scratch rejected"
+      ]
+    }
+  },
+  "candidate": {
+    "suite": "ssr-final-replay",
+    "iterations": 1,
+    "targets": [
+      {
+        "name": "resources-retry",
+        "ops": {
+          "boundary_arrays": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "copied_boundaries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "pending_visits": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "full_passes": {
+            "score": 1,
+            "median": 1,
+            "min": 1,
+            "samples": 1
+          },
+          "discovery_rounds": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "suspended_visits": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "read_probes": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "try_calls": {
+            "score": 4,
+            "median": 4,
+            "min": 4,
+            "samples": 1
+          },
+          "try_closures": {
+            "score": 40,
+            "median": 40,
+            "min": 40,
+            "samples": 1
+          },
+          "hook_positions": {
+            "score": 3,
+            "median": 3,
+            "min": 3,
+            "samples": 1
+          },
+          "hook_maps": {
+            "score": 4,
+            "median": 4,
+            "min": 4,
+            "samples": 1
+          },
+          "collection_copies": {
+            "score": 75,
+            "median": 75,
+            "min": 75,
+            "samples": 1
+          },
+          "collection_entries": {
+            "score": 720,
+            "median": 720,
+            "min": 720,
+            "samples": 1
+          },
+          "list_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "list_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "vt_copies": {
+            "score": 8,
+            "median": 8,
+            "min": 8,
+            "samples": 1
+          },
+          "vt_entries": {
+            "score": 8,
+            "median": 8,
+            "min": 8,
+            "samples": 1
+          },
+          "frame_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "frame_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          }
+        },
+        "meta": {
+          "semanticHash": "3f8a9b8fbe4585f6fe309bff6e3c312ef67046d110ef9f75d4e7e2e427d24128"
+        }
+      },
+      {
+        "name": "resources-settled",
+        "ops": {
+          "boundary_arrays": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "copied_boundaries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "pending_visits": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "full_passes": {
+            "score": 1,
+            "median": 1,
+            "min": 1,
+            "samples": 1
+          },
+          "discovery_rounds": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "suspended_visits": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "read_probes": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "try_calls": {
+            "score": 2,
+            "median": 2,
+            "min": 2,
+            "samples": 1
+          },
+          "try_closures": {
+            "score": 20,
+            "median": 20,
+            "min": 20,
+            "samples": 1
+          },
+          "hook_positions": {
+            "score": 1,
+            "median": 1,
+            "min": 1,
+            "samples": 1
+          },
+          "hook_maps": {
+            "score": 2,
+            "median": 2,
+            "min": 2,
+            "samples": 1
+          },
+          "collection_copies": {
+            "score": 64,
+            "median": 64,
+            "min": 64,
+            "samples": 1
+          },
+          "collection_entries": {
+            "score": 544,
+            "median": 544,
+            "min": 544,
+            "samples": 1
+          },
+          "list_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "list_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "vt_copies": {
+            "score": 4,
+            "median": 4,
+            "min": 4,
+            "samples": 1
+          },
+          "vt_entries": {
+            "score": 4,
+            "median": 4,
+            "min": 4,
+            "samples": 1
+          },
+          "frame_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "frame_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          }
+        },
+        "meta": {
+          "semanticHash": "3f8a9b8fbe4585f6fe309bff6e3c312ef67046d110ef9f75d4e7e2e427d24128"
+        }
+      },
+      {
+        "name": "resources-nested-stream",
+        "ops": {
+          "boundary_arrays": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "copied_boundaries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "pending_visits": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "full_passes": {
+            "score": 1,
+            "median": 1,
+            "min": 1,
+            "samples": 1
+          },
+          "discovery_rounds": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "suspended_visits": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "read_probes": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "try_calls": {
+            "score": 4,
+            "median": 4,
+            "min": 4,
+            "samples": 1
+          },
+          "try_closures": {
+            "score": 40,
+            "median": 40,
+            "min": 40,
+            "samples": 1
+          },
+          "hook_positions": {
+            "score": 3,
+            "median": 3,
+            "min": 3,
+            "samples": 1
+          },
+          "hook_maps": {
+            "score": 4,
+            "median": 4,
+            "min": 4,
+            "samples": 1
+          },
+          "collection_copies": {
+            "score": 75,
+            "median": 75,
+            "min": 75,
+            "samples": 1
+          },
+          "collection_entries": {
+            "score": 720,
+            "median": 720,
+            "min": 720,
+            "samples": 1
+          },
+          "list_copies": {
+            "score": 20,
+            "median": 20,
+            "min": 20,
+            "samples": 1
+          },
+          "list_entries": {
+            "score": 26,
+            "median": 26,
+            "min": 26,
+            "samples": 1
+          },
+          "vt_copies": {
+            "score": 8,
+            "median": 8,
+            "min": 8,
+            "samples": 1
+          },
+          "vt_entries": {
+            "score": 8,
+            "median": 8,
+            "min": 8,
+            "samples": 1
+          },
+          "frame_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "frame_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          }
+        },
+        "meta": {
+          "semanticHash": "f1b124630d72ba3d8940a0f4ed59a31843084f5391a2162817fe3705e044f677"
+        }
+      },
+      {
+        "name": "thenable-protocol",
+        "ops": {
+          "boundary_arrays": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "copied_boundaries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "pending_visits": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "full_passes": {
+            "score": 3,
+            "median": 3,
+            "min": 3,
+            "samples": 1
+          },
+          "discovery_rounds": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "suspended_visits": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "read_probes": {
+            "score": 2,
+            "median": 2,
+            "min": 2,
+            "samples": 1
+          },
+          "try_calls": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "try_closures": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "hook_positions": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "hook_maps": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "collection_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "collection_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "list_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "list_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "vt_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "vt_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "frame_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "frame_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          }
+        },
+        "meta": {
+          "semanticHash": "939c5e54740b5d7315c187e14ec66d0faa9677a028491440e43ab3462354324b"
+        }
+      },
+      {
+        "name": "hook-reentrancy",
+        "ops": {
+          "boundary_arrays": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "copied_boundaries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "pending_visits": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "full_passes": {
+            "score": 2,
+            "median": 2,
+            "min": 2,
+            "samples": 1
+          },
+          "discovery_rounds": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "suspended_visits": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "read_probes": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "try_calls": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "try_closures": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "hook_positions": {
+            "score": 5,
+            "median": 5,
+            "min": 5,
+            "samples": 1
+          },
+          "hook_maps": {
+            "score": 5,
+            "median": 5,
+            "min": 5,
+            "samples": 1
+          },
+          "collection_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "collection_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "list_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "list_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "vt_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "vt_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "frame_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "frame_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          }
+        },
+        "meta": {
+          "semanticHash": "8d8eb146e1ecc638c13e44c641f881018d7a62eb3af248f214e54aef55448f7c"
+        }
+      },
+      {
+        "name": "buffered-discovery",
+        "ops": {
+          "boundary_arrays": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "copied_boundaries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "pending_visits": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "full_passes": {
+            "score": 2,
+            "median": 2,
+            "min": 2,
+            "samples": 1
+          },
+          "discovery_rounds": {
+            "score": 2,
+            "median": 2,
+            "min": 2,
+            "samples": 1
+          },
+          "suspended_visits": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "read_probes": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "try_calls": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "try_closures": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "hook_positions": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "hook_maps": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "collection_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "collection_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "list_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "list_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "vt_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "vt_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "frame_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "frame_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          }
+        },
+        "meta": {
+          "semanticHash": "b214e2653f5a467b6ed1a533d033230f7c70b91ddb9ca17ab257d7421523cd83"
+        }
+      },
+      {
+        "name": "stream-errors",
+        "ops": {
+          "boundary_arrays": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "copied_boundaries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "pending_visits": {
+            "score": 4,
+            "median": 4,
+            "min": 4,
+            "samples": 1
+          },
+          "full_passes": {
+            "score": 2,
+            "median": 2,
+            "min": 2,
+            "samples": 1
+          },
+          "discovery_rounds": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "suspended_visits": {
+            "score": 3,
+            "median": 3,
+            "min": 3,
+            "samples": 1
+          },
+          "read_probes": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "try_calls": {
+            "score": 6,
+            "median": 6,
+            "min": 6,
+            "samples": 1
+          },
+          "try_closures": {
+            "score": 78,
+            "median": 78,
+            "min": 78,
+            "samples": 1
+          },
+          "hook_positions": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "hook_maps": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "collection_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "collection_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "list_copies": {
+            "score": 12,
+            "median": 12,
+            "min": 12,
+            "samples": 1
+          },
+          "list_entries": {
+            "score": 12,
+            "median": 12,
+            "min": 12,
+            "samples": 1
+          },
+          "vt_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "vt_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "frame_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "frame_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          }
+        },
+        "meta": {
+          "semanticHash": "f7b92582b9065008945f5451b57d222882f8ff4adccf21998639d6a1327efa07"
+        }
+      },
+      {
+        "name": "stream-abort",
+        "ops": {
+          "boundary_arrays": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "copied_boundaries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "pending_visits": {
+            "score": 3,
+            "median": 3,
+            "min": 3,
+            "samples": 1
+          },
+          "full_passes": {
+            "score": 2,
+            "median": 2,
+            "min": 2,
+            "samples": 1
+          },
+          "discovery_rounds": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "suspended_visits": {
+            "score": 3,
+            "median": 3,
+            "min": 3,
+            "samples": 1
+          },
+          "read_probes": {
+            "score": 2,
+            "median": 2,
+            "min": 2,
+            "samples": 1
+          },
+          "try_calls": {
+            "score": 6,
+            "median": 6,
+            "min": 6,
+            "samples": 1
+          },
+          "try_closures": {
+            "score": 78,
+            "median": 78,
+            "min": 78,
+            "samples": 1
+          },
+          "hook_positions": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "hook_maps": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "collection_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "collection_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "list_copies": {
+            "score": 12,
+            "median": 12,
+            "min": 12,
+            "samples": 1
+          },
+          "list_entries": {
+            "score": 12,
+            "median": 12,
+            "min": 12,
+            "samples": 1
+          },
+          "vt_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "vt_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "frame_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "frame_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          }
+        },
+        "meta": {
+          "semanticHash": "c07b3fe72bb0e64247ca063d3b77d38e1b06ef876092c6956fb808097ef6ea52"
+        }
+      },
+      {
+        "name": "stream-populated",
+        "ops": {
+          "boundary_arrays": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "copied_boundaries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "pending_visits": {
+            "score": 16,
+            "median": 16,
+            "min": 16,
+            "samples": 1
+          },
+          "full_passes": {
+            "score": 9,
+            "median": 9,
+            "min": 9,
+            "samples": 1
+          },
+          "discovery_rounds": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "suspended_visits": {
+            "score": 36,
+            "median": 36,
+            "min": 36,
+            "samples": 1
+          },
+          "read_probes": {
+            "score": 28,
+            "median": 28,
+            "min": 28,
+            "samples": 1
+          },
+          "try_calls": {
+            "score": 90,
+            "median": 90,
+            "min": 90,
+            "samples": 1
+          },
+          "try_closures": {
+            "score": 1116,
+            "median": 1116,
+            "min": 1116,
+            "samples": 1
+          },
+          "hook_positions": {
+            "score": 9,
+            "median": 9,
+            "min": 9,
+            "samples": 1
+          },
+          "hook_maps": {
+            "score": 18,
+            "median": 18,
+            "min": 18,
+            "samples": 1
+          },
+          "collection_copies": {
+            "score": 688,
+            "median": 688,
+            "min": 688,
+            "samples": 1
+          },
+          "collection_entries": {
+            "score": 6688,
+            "median": 6688,
+            "min": 6688,
+            "samples": 1
+          },
+          "list_copies": {
+            "score": 216,
+            "median": 216,
+            "min": 216,
+            "samples": 1
+          },
+          "list_entries": {
+            "score": 234,
+            "median": 234,
+            "min": 234,
+            "samples": 1
+          },
+          "vt_copies": {
+            "score": 36,
+            "median": 36,
+            "min": 36,
+            "samples": 1
+          },
+          "vt_entries": {
+            "score": 36,
+            "median": 36,
+            "min": 36,
+            "samples": 1
+          },
+          "frame_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "frame_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          }
+        },
+        "meta": {
+          "semanticHash": "7aef88135725e9381af2d7e9fc3a5717f12743a86c89a2fb3ebb88039f64e5cc",
+          "chunks": 9,
+          "values": 8,
+          "outputHash": "e57d6b345f3a82ca20e3c588552aec7d045dc5ddc0e7e1aac7b32888f31469e0"
+        }
+      },
+      {
+        "name": "stream-0-1",
+        "ops": {
+          "boundary_arrays": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "copied_boundaries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "pending_visits": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "full_passes": {
+            "score": 1,
+            "median": 1,
+            "min": 1,
+            "samples": 1
+          },
+          "discovery_rounds": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "suspended_visits": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "read_probes": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "try_calls": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "try_closures": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "hook_positions": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "hook_maps": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "collection_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "collection_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "list_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "list_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "vt_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "vt_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "frame_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "frame_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          }
+        },
+        "meta": {
+          "semanticHash": "1795a4597d4b607bca68d83f89711a654095c769722403248d53d2e2ac1335c9",
+          "chunks": 1,
+          "values": 0,
+          "outputHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+        }
+      },
+      {
+        "name": "stream-1-1",
+        "ops": {
+          "boundary_arrays": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "copied_boundaries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "pending_visits": {
+            "score": 2,
+            "median": 2,
+            "min": 2,
+            "samples": 1
+          },
+          "full_passes": {
+            "score": 2,
+            "median": 2,
+            "min": 2,
+            "samples": 1
+          },
+          "discovery_rounds": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "suspended_visits": {
+            "score": 1,
+            "median": 1,
+            "min": 1,
+            "samples": 1
+          },
+          "read_probes": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "try_calls": {
+            "score": 2,
+            "median": 2,
+            "min": 2,
+            "samples": 1
+          },
+          "try_closures": {
+            "score": 26,
+            "median": 26,
+            "min": 26,
+            "samples": 1
+          },
+          "hook_positions": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "hook_maps": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "collection_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "collection_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "list_copies": {
+            "score": 4,
+            "median": 4,
+            "min": 4,
+            "samples": 1
+          },
+          "list_entries": {
+            "score": 4,
+            "median": 4,
+            "min": 4,
+            "samples": 1
+          },
+          "vt_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "vt_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "frame_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "frame_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          }
+        },
+        "meta": {
+          "semanticHash": "15d6c9587ce9e21496e548c9eaf63a4b61d249cc0c9c20fd9ae42439da8983ab",
+          "chunks": 2,
+          "values": 1,
+          "outputHash": "d0bca111f8628137adc4c16f123496dcdd1d590d06cb5d9acd68b39fe656fb97"
+        }
+      },
+      {
+        "name": "stream-8-1",
+        "ops": {
+          "boundary_arrays": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "copied_boundaries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "pending_visits": {
+            "score": 16,
+            "median": 16,
+            "min": 16,
+            "samples": 1
+          },
+          "full_passes": {
+            "score": 9,
+            "median": 9,
+            "min": 9,
+            "samples": 1
+          },
+          "discovery_rounds": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "suspended_visits": {
+            "score": 36,
+            "median": 36,
+            "min": 36,
+            "samples": 1
+          },
+          "read_probes": {
+            "score": 28,
+            "median": 28,
+            "min": 28,
+            "samples": 1
+          },
+          "try_calls": {
+            "score": 72,
+            "median": 72,
+            "min": 72,
+            "samples": 1
+          },
+          "try_closures": {
+            "score": 936,
+            "median": 936,
+            "min": 936,
+            "samples": 1
+          },
+          "hook_positions": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "hook_maps": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "collection_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "collection_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "list_copies": {
+            "score": 144,
+            "median": 144,
+            "min": 144,
+            "samples": 1
+          },
+          "list_entries": {
+            "score": 144,
+            "median": 144,
+            "min": 144,
+            "samples": 1
+          },
+          "vt_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "vt_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "frame_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "frame_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          }
+        },
+        "meta": {
+          "semanticHash": "7aef88135725e9381af2d7e9fc3a5717f12743a86c89a2fb3ebb88039f64e5cc",
+          "chunks": 9,
+          "values": 8,
+          "outputHash": "e57d6b345f3a82ca20e3c588552aec7d045dc5ddc0e7e1aac7b32888f31469e0"
+        }
+      },
+      {
+        "name": "stream-8-8",
+        "ops": {
+          "boundary_arrays": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "copied_boundaries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "pending_visits": {
+            "score": 9,
+            "median": 9,
+            "min": 9,
+            "samples": 1
+          },
+          "full_passes": {
+            "score": 2,
+            "median": 2,
+            "min": 2,
+            "samples": 1
+          },
+          "discovery_rounds": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "suspended_visits": {
+            "score": 8,
+            "median": 8,
+            "min": 8,
+            "samples": 1
+          },
+          "read_probes": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "try_calls": {
+            "score": 16,
+            "median": 16,
+            "min": 16,
+            "samples": 1
+          },
+          "try_closures": {
+            "score": 208,
+            "median": 208,
+            "min": 208,
+            "samples": 1
+          },
+          "hook_positions": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "hook_maps": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "collection_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "collection_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "list_copies": {
+            "score": 32,
+            "median": 32,
+            "min": 32,
+            "samples": 1
+          },
+          "list_entries": {
+            "score": 32,
+            "median": 32,
+            "min": 32,
+            "samples": 1
+          },
+          "vt_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "vt_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "frame_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "frame_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          }
+        },
+        "meta": {
+          "semanticHash": "07dd8dbd3126b48ad70cf3ce15065d7cbc7db100cbc63c68d6678303d3265637",
+          "chunks": 2,
+          "values": 8,
+          "outputHash": "29101ebf1ead685029508789eee51c4d4fff65524064d8e32a48efded7036982"
+        }
+      },
+      {
+        "name": "stream-32-1",
+        "ops": {
+          "boundary_arrays": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "copied_boundaries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "pending_visits": {
+            "score": 64,
+            "median": 64,
+            "min": 64,
+            "samples": 1
+          },
+          "full_passes": {
+            "score": 33,
+            "median": 33,
+            "min": 33,
+            "samples": 1
+          },
+          "discovery_rounds": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "suspended_visits": {
+            "score": 528,
+            "median": 528,
+            "min": 528,
+            "samples": 1
+          },
+          "read_probes": {
+            "score": 496,
+            "median": 496,
+            "min": 496,
+            "samples": 1
+          },
+          "try_calls": {
+            "score": 1056,
+            "median": 1056,
+            "min": 1056,
+            "samples": 1
+          },
+          "try_closures": {
+            "score": 13728,
+            "median": 13728,
+            "min": 13728,
+            "samples": 1
+          },
+          "hook_positions": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "hook_maps": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "collection_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "collection_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "list_copies": {
+            "score": 2112,
+            "median": 2112,
+            "min": 2112,
+            "samples": 1
+          },
+          "list_entries": {
+            "score": 2112,
+            "median": 2112,
+            "min": 2112,
+            "samples": 1
+          },
+          "vt_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "vt_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "frame_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "frame_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          }
+        },
+        "meta": {
+          "semanticHash": "6295e443f6e6c46531d0e38af0ea39bbaf819bba36fd2e371817d36ef1b6e00c",
+          "chunks": 33,
+          "values": 32,
+          "outputHash": "ed2df54b950639376a04d3d2f5168962268b3d23b4d7834eded325017f4a2169"
+        }
+      },
+      {
+        "name": "stream-32-32",
+        "ops": {
+          "boundary_arrays": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "copied_boundaries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "pending_visits": {
+            "score": 33,
+            "median": 33,
+            "min": 33,
+            "samples": 1
+          },
+          "full_passes": {
+            "score": 2,
+            "median": 2,
+            "min": 2,
+            "samples": 1
+          },
+          "discovery_rounds": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "suspended_visits": {
+            "score": 32,
+            "median": 32,
+            "min": 32,
+            "samples": 1
+          },
+          "read_probes": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "try_calls": {
+            "score": 64,
+            "median": 64,
+            "min": 64,
+            "samples": 1
+          },
+          "try_closures": {
+            "score": 832,
+            "median": 832,
+            "min": 832,
+            "samples": 1
+          },
+          "hook_positions": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "hook_maps": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "collection_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "collection_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "list_copies": {
+            "score": 128,
+            "median": 128,
+            "min": 128,
+            "samples": 1
+          },
+          "list_entries": {
+            "score": 128,
+            "median": 128,
+            "min": 128,
+            "samples": 1
+          },
+          "vt_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "vt_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "frame_copies": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "frame_entries": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          }
+        },
+        "meta": {
+          "semanticHash": "5dc155449a04f16070a4cb7c6e97d65b1f4d3e8fa7de6748eb2b6eaad5b8298c",
+          "chunks": 2,
+          "values": 32,
+          "outputHash": "23b22df6bf551a4e788327db3b3d3d96e1eca49078d2c6bd0049da2d390eca8b"
+        }
+      },
+      {
+        "name": "scan-budget",
+        "ops": {
+          "boundary_arrays": {
+            "score": 1,
+            "median": 1,
+            "min": 1,
+            "samples": 1
+          },
+          "copied_boundaries": {
+            "score": 1,
+            "median": 1,
+            "min": 1,
+            "samples": 1
+          }
+        }
+      },
+      {
+        "name": "populated-budget",
+        "ops": {
+          "collection_copies": {
+            "score": 688,
+            "median": 688,
+            "min": 688,
+            "samples": 1
+          },
+          "collection_entries": {
+            "score": 6688,
+            "median": 6688,
+            "min": 6688,
+            "samples": 1
+          }
+        }
+      },
+      {
+        "name": "wave-budget",
+        "ops": {
+          "full_passes": {
+            "score": 33,
+            "median": 33,
+            "min": 33,
+            "samples": 1
+          },
+          "suspended_visits": {
+            "score": 528,
+            "median": 528,
+            "min": 528,
+            "samples": 1
+          },
+          "read_probes": {
+            "score": 496,
+            "median": 496,
+            "min": 496,
+            "samples": 1
+          },
+          "try_closures": {
+            "score": 13728,
+            "median": 13728,
+            "min": 13728,
+            "samples": 1
+          }
+        }
+      }
+    ],
+    "meta": {
+      "node": "v24.20.0",
+      "v8": "13.6.233.17-node.53",
+      "platform": "darwin",
+      "arch": "arm64",
+      "sourceHash": "019bb224b8afee7b2675ff80ed1e95bc355f1871f1e399bd1271849ba8af609f",
+      "fixtureHash": "dfb8412e0eb42973eca26fb3355de7a77e4e37d0aadee80c7d63d68dbad5b4f9",
+      "bundleBytes": 114677,
+      "bundleGzip": 37662,
+      "bundleHash": "04c73b3e8675bcf50a01a47a54297ca99085708755ab8191821ce199b2893ad4",
+      "negativeControls": [
+        "missing pending probe rejected",
+        "aliased mutable snapshot rejected",
+        "shared hook position scratch rejected"
+      ]
+    }
+  },
+  "functions": {
+    "suite": "ssr-hot-functions",
+    "sourceRoot": "/private/tmp/octane-981-closeout-baseline",
+    "sourceSha": "47649d48f930f3c19648943a5f05cbfb454a35feadfdfe5495e6a985e20cc881",
+    "node": "v24.20.0",
+    "v8": "13.6.233.17-node.53",
+    "platform": "darwin",
+    "arch": "arm64",
+    "configuration": {
+      "coverageRounds": 2,
+      "warmRounds": 300,
+      "hosts": 128,
+      "concurrentCompilation": false,
+      "forcedOptimization": false
+    },
+    "cleanBundle": {
+      "minified": 48109,
+      "gzip": 16709,
+      "sha": "4aae42cba2172dc085922741a00e24143cdc8a6aaa2bf7a0cb94b4e221e276c1"
+    },
+    "diagnosticSha": "ecc5a551174a812d72afbca37e56b07cf410bd4e7074c1aedaa30d0573fae048",
+    "semanticSha": "9fb12b0a7f2353a9b805d0bffce6119d8799e7bf6155c0cdde6c7d14b5ecd961",
+    "coverageCalls": {
+      "ssrTry": 385,
+      "ssrAttr": 1536,
+      "ssrHostElement": 388
+    },
+    "bytecode": {
+      "ssrHostElement": 1292,
+      "ssrTry": 3098,
+      "ssrAttr": 1598
+    },
+    "tiers": {
+      "ssrTry": ["MAGLEV", "TURBOFAN_JS"],
+      "ssrAttr": ["MAGLEV", "TURBOFAN_JS"],
+      "ssrHostElement": ["MAGLEV", "TURBOFAN_JS"]
+    },
+    "tierTraceStatus": "matched-events",
+    "naturalStatus": {
+      "ssrTry": 32769,
+      "ssrAttr": 81,
+      "ssrHostElement": 81
+    },
+    "optimizationTrace": [
+      "[marking <address> <JSFunction ssrAttr (sfi = <address>)> for optimization to MAGLEV, ConcurrencyMode::kConcurrent, reason: hot and stable]",
+      "[compiling method <address> <JSFunction ssrAttr (sfi = <address>)> (target MAGLEV), mode: ConcurrencyMode::kSynchronous]",
+      "[completed compiling <address> <JSFunction ssrAttr (sfi = <address>)> (target MAGLEV)",
+      "[marking <address> <JSFunction ssrHostElement (sfi = <address>)> for optimization to MAGLEV, ConcurrencyMode::kConcurrent, reason: hot and stable]",
+      "[compiling method <address> <JSFunction ssrHostElement (sfi = <address>)> (target MAGLEV), mode: ConcurrencyMode::kSynchronous]",
+      "[completed compiling <address> <JSFunction ssrHostElement (sfi = <address>)> (target MAGLEV)",
+      "[marking <address> <JSFunction ssrTry (sfi = <address>)> for optimization to MAGLEV, ConcurrencyMode::kConcurrent, reason: hot and stable]",
+      "[compiling method <address> <JSFunction ssrTry (sfi = <address>)> (target MAGLEV), mode: ConcurrencyMode::kSynchronous]",
+      "[completed compiling <address> <JSFunction ssrTry (sfi = <address>)> (target MAGLEV)",
+      "[marking <address> <JSFunction ssrAttr (sfi = <address>)> for optimization to TURBOFAN_JS, ConcurrencyMode::kConcurrent, reason: hot and stable]",
+      "[compiling method <address> <JSFunction ssrAttr (sfi = <address>)> (target TURBOFAN_JS), mode: ConcurrencyMode::kSynchronous]",
+      "[completed compiling <address> <JSFunction ssrAttr (sfi = <address>)> (target TURBOFAN_JS)",
+      "[marking <address> <JSFunction ssrHostElement (sfi = <address>)> for optimization to TURBOFAN_JS, ConcurrencyMode::kConcurrent, reason: hot and stable]",
+      "[compiling method <address> <JSFunction ssrHostElement (sfi = <address>)> (target TURBOFAN_JS), mode: ConcurrencyMode::kSynchronous]",
+      "[completed compiling <address> <JSFunction ssrHostElement (sfi = <address>)> (target TURBOFAN_JS)",
+      "[marking <address> <JSFunction ssrTry (sfi = <address>)> for optimization to TURBOFAN_JS, ConcurrencyMode::kConcurrent, reason: hot and stable]",
+      "[compiling method <address> <JSFunction ssrTry (sfi = <address>)> (target TURBOFAN_JS), mode: ConcurrencyMode::kSynchronous]",
+      "[completed compiling <address> <JSFunction ssrTry (sfi = <address>)> (target TURBOFAN_JS)",
+      "[bailout (kind: deopt-eager, reason: Insufficient type feedback for compare operation): begin. deoptimizing <address> <JSFunction ssrTry (sfi = <address>)>, <address> <Code TURBOFAN_JS>, opt id 102, bytecode offset 1402, deopt exit 1, FP to SP delta 240, caller SP <address>, pc <address>]"
+    ]
+  },
+  "strings": {
+    "suite": "ssr-output-strings",
+    "node": "v24.20.0",
+    "v8": "13.6.233.17-node.53",
+    "sourceHash": "47649d48f930f3c19648943a5f05cbfb454a35feadfdfe5495e6a985e20cc881",
+    "bundleHash": "be1d7e505004693c8adcdc6bb051b96e6b955a1c6b11ccc967ef8e2aeca5100d",
+    "wireBytes": 73834,
+    "wireHash": "58ce5ac706db51690953d8b32d873fcc1b0345521f8a4915a369e3386052c1ce",
+    "records": [
+      {
+        "label": "predicate-before",
+        "utf16Length": 73563,
+        "cons": 1183,
+        "sequential": 514,
+        "other": 0
+      },
+      {
+        "label": "predicate-observer-control",
+        "utf16Length": 73563,
+        "cons": 1183,
+        "sequential": 514,
+        "other": 0
+      },
+      {
+        "label": "predicate-after",
+        "utf16Length": 73563,
+        "cons": 1,
+        "sequential": 2,
+        "other": 0
+      },
+      {
+        "label": "writer-before-encoding",
+        "utf16Length": 73578,
+        "cons": 2,
+        "sequential": 2,
+        "other": 2
+      },
+      {
+        "label": "writer-after-encoding",
+        "utf16Length": 73578,
+        "cons": 1,
+        "sequential": 2,
+        "other": 0
+      }
+    ]
+  }
+}

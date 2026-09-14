@@ -1,0 +1,2345 @@
+{
+  "baselineCommit": "248af4edc30c80498dec13dad4f6d7508f10f220",
+  "measure": "Named production function entries and forwarded native style writes; no latency or heap-allocation measurement",
+  "runs": {
+    "naive": {
+      "environment": {
+        "node": "v24.20.0",
+        "chromium": "149.0.7827.55",
+        "platform": "darwin",
+        "arch": "arm64"
+      },
+      "baseline": {
+        "suite": "audit-981-coverage",
+        "iterations": 1,
+        "environment": {
+          "node": "v24.20.0",
+          "platform": "darwin",
+          "arch": "arm64"
+        },
+        "builds": [
+          {
+            "dialect": "jsx",
+            "assets": [
+              {
+                "name": "index-DoJUqasY.js",
+                "sha256": "1c795ce1d9b59e05e2dcfaea954e9b337d1043da3f9771acaea02f8bb2668333"
+              }
+            ]
+          },
+          {
+            "dialect": "tsrx",
+            "assets": [
+              {
+                "name": "index-1eanBFN_.js",
+                "sha256": "71c105d0f112b9208ab6f40b593982f5c1916ca68d54501939f3a71f7040fa33"
+              }
+            ]
+          }
+        ],
+        "targets": [
+          {
+            "name": "naive-jsx-mount_1k",
+            "ops": {
+              "setStyle": {
+                "median": 1000,
+                "min": 1000
+              },
+              "applyStyleValue": {
+                "median": 1000,
+                "min": 1000
+              },
+              "applyStyleProperty": {
+                "median": 1000,
+                "min": 1000
+              },
+              "setStyleProperty": {
+                "median": 0,
+                "min": 0
+              },
+              "Row": {
+                "median": 1000,
+                "min": 1000
+              },
+              "renderBlockInner": {
+                "median": 3002,
+                "min": 3002
+              },
+              "styleSets": {
+                "median": 1000,
+                "min": 1000
+              },
+              "styleRemoves": {
+                "median": 0,
+                "min": 0
+              },
+              "fontWeightWrites": {
+                "median": 1000,
+                "min": 1000
+              },
+              "fontStyleWrites": {
+                "median": 0,
+                "min": 0
+              }
+            },
+            "semantic": {
+              "htmlSha256": "71884fd151225241ae67070ef1b85272ab1e9f435186bb0759eed4debb7193ae",
+              "rows": 1000,
+              "selected": 0
+            }
+          },
+          {
+            "name": "naive-jsx-mount_1k-rows",
+            "ops": {
+              "setStyle": {
+                "median": 1000,
+                "min": 1000
+              },
+              "applyStyleValue": {
+                "median": 1000,
+                "min": 1000
+              },
+              "applyStyleProperty": {
+                "median": 1000,
+                "min": 1000
+              },
+              "setStyleProperty": {
+                "median": 1000,
+                "min": 1000
+              },
+              "Row": {
+                "median": 1000,
+                "min": 1000
+              },
+              "renderBlockInner": {
+                "median": 1000,
+                "min": 1000
+              },
+              "styleSets": {
+                "median": 1000,
+                "min": 1000
+              },
+              "styleRemoves": {
+                "median": 1000,
+                "min": 1000
+              },
+              "fontWeightWrites": {
+                "median": 1000,
+                "min": 1000
+              },
+              "fontStyleWrites": {
+                "median": 1000,
+                "min": 1000
+              }
+            }
+          },
+          {
+            "name": "naive-jsx-select_one",
+            "ops": {
+              "setStyle": {
+                "median": 1000,
+                "min": 1000
+              },
+              "applyStyleValue": {
+                "median": 1000,
+                "min": 1000
+              },
+              "applyStyleProperty": {
+                "median": 1,
+                "min": 1
+              },
+              "setStyleProperty": {
+                "median": 0,
+                "min": 0
+              },
+              "Row": {
+                "median": 1000,
+                "min": 1000
+              },
+              "renderBlockInner": {
+                "median": 3002,
+                "min": 3002
+              },
+              "styleSets": {
+                "median": 1,
+                "min": 1
+              },
+              "styleRemoves": {
+                "median": 0,
+                "min": 0
+              },
+              "fontWeightWrites": {
+                "median": 1,
+                "min": 1
+              },
+              "fontStyleWrites": {
+                "median": 0,
+                "min": 0
+              }
+            },
+            "semantic": {
+              "htmlSha256": "0e4544de048338663e8bdc156151bfca68975b20f021b47d050472ac1c615eac",
+              "rows": 1000,
+              "selected": 1
+            }
+          },
+          {
+            "name": "naive-jsx-select_one-rows",
+            "ops": {
+              "setStyle": {
+                "median": 1000,
+                "min": 1000
+              },
+              "applyStyleValue": {
+                "median": 1000,
+                "min": 1000
+              },
+              "applyStyleProperty": {
+                "median": 1000,
+                "min": 1000
+              },
+              "setStyleProperty": {
+                "median": 1000,
+                "min": 1000
+              },
+              "Row": {
+                "median": 1000,
+                "min": 1000
+              },
+              "renderBlockInner": {
+                "median": 1000,
+                "min": 1000
+              },
+              "styleSets": {
+                "median": 1000,
+                "min": 1000
+              },
+              "styleRemoves": {
+                "median": 1000,
+                "min": 1000
+              },
+              "fontWeightWrites": {
+                "median": 1000,
+                "min": 1000
+              },
+              "fontStyleWrites": {
+                "median": 1000,
+                "min": 1000
+              }
+            }
+          },
+          {
+            "name": "naive-jsx-select_another",
+            "ops": {
+              "setStyle": {
+                "median": 1000,
+                "min": 1000
+              },
+              "applyStyleValue": {
+                "median": 1000,
+                "min": 1000
+              },
+              "applyStyleProperty": {
+                "median": 2,
+                "min": 2
+              },
+              "setStyleProperty": {
+                "median": 0,
+                "min": 0
+              },
+              "Row": {
+                "median": 1000,
+                "min": 1000
+              },
+              "renderBlockInner": {
+                "median": 3002,
+                "min": 3002
+              },
+              "styleSets": {
+                "median": 2,
+                "min": 2
+              },
+              "styleRemoves": {
+                "median": 0,
+                "min": 0
+              },
+              "fontWeightWrites": {
+                "median": 2,
+                "min": 2
+              },
+              "fontStyleWrites": {
+                "median": 0,
+                "min": 0
+              }
+            },
+            "semantic": {
+              "htmlSha256": "04a9c3a28f9b6ee6f0b9637ddd67654b96a6155299379c08437ded2447d036a0",
+              "rows": 1000,
+              "selected": 1
+            }
+          },
+          {
+            "name": "naive-jsx-select_another-rows",
+            "ops": {
+              "setStyle": {
+                "median": 1000,
+                "min": 1000
+              },
+              "applyStyleValue": {
+                "median": 1000,
+                "min": 1000
+              },
+              "applyStyleProperty": {
+                "median": 1000,
+                "min": 1000
+              },
+              "setStyleProperty": {
+                "median": 1000,
+                "min": 1000
+              },
+              "Row": {
+                "median": 1000,
+                "min": 1000
+              },
+              "renderBlockInner": {
+                "median": 1000,
+                "min": 1000
+              },
+              "styleSets": {
+                "median": 1000,
+                "min": 1000
+              },
+              "styleRemoves": {
+                "median": 1000,
+                "min": 1000
+              },
+              "fontWeightWrites": {
+                "median": 1000,
+                "min": 1000
+              },
+              "fontStyleWrites": {
+                "median": 1000,
+                "min": 1000
+              }
+            }
+          },
+          {
+            "name": "naive-jsx-unrelated_update",
+            "ops": {
+              "setStyle": {
+                "median": 1000,
+                "min": 1000
+              },
+              "applyStyleValue": {
+                "median": 1000,
+                "min": 1000
+              },
+              "applyStyleProperty": {
+                "median": 0,
+                "min": 0
+              },
+              "setStyleProperty": {
+                "median": 0,
+                "min": 0
+              },
+              "Row": {
+                "median": 1000,
+                "min": 1000
+              },
+              "renderBlockInner": {
+                "median": 3002,
+                "min": 3002
+              },
+              "styleSets": {
+                "median": 0,
+                "min": 0
+              },
+              "styleRemoves": {
+                "median": 0,
+                "min": 0
+              },
+              "fontWeightWrites": {
+                "median": 0,
+                "min": 0
+              },
+              "fontStyleWrites": {
+                "median": 0,
+                "min": 0
+              }
+            },
+            "semantic": {
+              "htmlSha256": "f3536c5489834f4648ded5a327757d4bfb9768bf8cc5f856a7af7f2e1da65d39",
+              "rows": 1000,
+              "selected": 0
+            }
+          },
+          {
+            "name": "naive-jsx-unrelated_update-rows",
+            "ops": {
+              "setStyle": {
+                "median": 1000,
+                "min": 1000
+              },
+              "applyStyleValue": {
+                "median": 1000,
+                "min": 1000
+              },
+              "applyStyleProperty": {
+                "median": 1000,
+                "min": 1000
+              },
+              "setStyleProperty": {
+                "median": 1000,
+                "min": 1000
+              },
+              "Row": {
+                "median": 1000,
+                "min": 1000
+              },
+              "renderBlockInner": {
+                "median": 1000,
+                "min": 1000
+              },
+              "styleSets": {
+                "median": 1000,
+                "min": 1000
+              },
+              "styleRemoves": {
+                "median": 1000,
+                "min": 1000
+              },
+              "fontWeightWrites": {
+                "median": 1000,
+                "min": 1000
+              },
+              "fontStyleWrites": {
+                "median": 1000,
+                "min": 1000
+              }
+            }
+          },
+          {
+            "name": "naive-tsrx-mount_1k",
+            "ops": {
+              "setStyle": {
+                "median": 0,
+                "min": 0
+              },
+              "applyStyleValue": {
+                "median": 0,
+                "min": 0
+              },
+              "applyStyleProperty": {
+                "median": 1000,
+                "min": 1000
+              },
+              "setStyleProperty": {
+                "median": 1000,
+                "min": 1000
+              },
+              "Row": {
+                "median": 1000,
+                "min": 1000
+              },
+              "renderBlockInner": {
+                "median": 2001,
+                "min": 2001
+              },
+              "styleSets": {
+                "median": 1000,
+                "min": 1000
+              },
+              "styleRemoves": {
+                "median": 0,
+                "min": 0
+              },
+              "fontWeightWrites": {
+                "median": 1000,
+                "min": 1000
+              },
+              "fontStyleWrites": {
+                "median": 0,
+                "min": 0
+              }
+            },
+            "semantic": {
+              "htmlSha256": "d63b5e2b96dd207e4146ee1f97556c006c9819e3b0240c90dd38b5bee4288956",
+              "rows": 1000,
+              "selected": 0
+            }
+          },
+          {
+            "name": "naive-tsrx-mount_1k-rows",
+            "ops": {
+              "setStyle": {
+                "median": 1000,
+                "min": 1000
+              },
+              "applyStyleValue": {
+                "median": 1000,
+                "min": 1000
+              },
+              "applyStyleProperty": {
+                "median": 1000,
+                "min": 1000
+              },
+              "setStyleProperty": {
+                "median": 1000,
+                "min": 1000
+              },
+              "Row": {
+                "median": 1000,
+                "min": 1000
+              },
+              "renderBlockInner": {
+                "median": 1000,
+                "min": 1000
+              },
+              "styleSets": {
+                "median": 1000,
+                "min": 1000
+              },
+              "styleRemoves": {
+                "median": 1000,
+                "min": 1000
+              },
+              "fontWeightWrites": {
+                "median": 1000,
+                "min": 1000
+              },
+              "fontStyleWrites": {
+                "median": 1000,
+                "min": 1000
+              }
+            }
+          },
+          {
+            "name": "naive-tsrx-select_one",
+            "ops": {
+              "setStyle": {
+                "median": 0,
+                "min": 0
+              },
+              "applyStyleValue": {
+                "median": 0,
+                "min": 0
+              },
+              "applyStyleProperty": {
+                "median": 1,
+                "min": 1
+              },
+              "setStyleProperty": {
+                "median": 1,
+                "min": 1
+              },
+              "Row": {
+                "median": 1000,
+                "min": 1000
+              },
+              "renderBlockInner": {
+                "median": 2001,
+                "min": 2001
+              },
+              "styleSets": {
+                "median": 1,
+                "min": 1
+              },
+              "styleRemoves": {
+                "median": 0,
+                "min": 0
+              },
+              "fontWeightWrites": {
+                "median": 1,
+                "min": 1
+              },
+              "fontStyleWrites": {
+                "median": 0,
+                "min": 0
+              }
+            },
+            "semantic": {
+              "htmlSha256": "a6259d45bea97bf4fdd0fe4d8fc34d1a2dd18df7bee6789c24c295c7e267d1b7",
+              "rows": 1000,
+              "selected": 1
+            }
+          },
+          {
+            "name": "naive-tsrx-select_one-rows",
+            "ops": {
+              "setStyle": {
+                "median": 1000,
+                "min": 1000
+              },
+              "applyStyleValue": {
+                "median": 1000,
+                "min": 1000
+              },
+              "applyStyleProperty": {
+                "median": 1000,
+                "min": 1000
+              },
+              "setStyleProperty": {
+                "median": 1000,
+                "min": 1000
+              },
+              "Row": {
+                "median": 1000,
+                "min": 1000
+              },
+              "renderBlockInner": {
+                "median": 1000,
+                "min": 1000
+              },
+              "styleSets": {
+                "median": 1000,
+                "min": 1000
+              },
+              "styleRemoves": {
+                "median": 1000,
+                "min": 1000
+              },
+              "fontWeightWrites": {
+                "median": 1000,
+                "min": 1000
+              },
+              "fontStyleWrites": {
+                "median": 1000,
+                "min": 1000
+              }
+            }
+          },
+          {
+            "name": "naive-tsrx-select_another",
+            "ops": {
+              "setStyle": {
+                "median": 0,
+                "min": 0
+              },
+              "applyStyleValue": {
+                "median": 0,
+                "min": 0
+              },
+              "applyStyleProperty": {
+                "median": 2,
+                "min": 2
+              },
+              "setStyleProperty": {
+                "median": 2,
+                "min": 2
+              },
+              "Row": {
+                "median": 1000,
+                "min": 1000
+              },
+              "renderBlockInner": {
+                "median": 2001,
+                "min": 2001
+              },
+              "styleSets": {
+                "median": 2,
+                "min": 2
+              },
+              "styleRemoves": {
+                "median": 0,
+                "min": 0
+              },
+              "fontWeightWrites": {
+                "median": 2,
+                "min": 2
+              },
+              "fontStyleWrites": {
+                "median": 0,
+                "min": 0
+              }
+            },
+            "semantic": {
+              "htmlSha256": "4129354e1ea512172320571fe47ea70eef4ddf2b64318912490a69e0f219a121",
+              "rows": 1000,
+              "selected": 1
+            }
+          },
+          {
+            "name": "naive-tsrx-select_another-rows",
+            "ops": {
+              "setStyle": {
+                "median": 1000,
+                "min": 1000
+              },
+              "applyStyleValue": {
+                "median": 1000,
+                "min": 1000
+              },
+              "applyStyleProperty": {
+                "median": 1000,
+                "min": 1000
+              },
+              "setStyleProperty": {
+                "median": 1000,
+                "min": 1000
+              },
+              "Row": {
+                "median": 1000,
+                "min": 1000
+              },
+              "renderBlockInner": {
+                "median": 1000,
+                "min": 1000
+              },
+              "styleSets": {
+                "median": 1000,
+                "min": 1000
+              },
+              "styleRemoves": {
+                "median": 1000,
+                "min": 1000
+              },
+              "fontWeightWrites": {
+                "median": 1000,
+                "min": 1000
+              },
+              "fontStyleWrites": {
+                "median": 1000,
+                "min": 1000
+              }
+            }
+          },
+          {
+            "name": "naive-tsrx-unrelated_update",
+            "ops": {
+              "setStyle": {
+                "median": 0,
+                "min": 0
+              },
+              "applyStyleValue": {
+                "median": 0,
+                "min": 0
+              },
+              "applyStyleProperty": {
+                "median": 0,
+                "min": 0
+              },
+              "setStyleProperty": {
+                "median": 0,
+                "min": 0
+              },
+              "Row": {
+                "median": 1000,
+                "min": 1000
+              },
+              "renderBlockInner": {
+                "median": 2001,
+                "min": 2001
+              },
+              "styleSets": {
+                "median": 0,
+                "min": 0
+              },
+              "styleRemoves": {
+                "median": 0,
+                "min": 0
+              },
+              "fontWeightWrites": {
+                "median": 0,
+                "min": 0
+              },
+              "fontStyleWrites": {
+                "median": 0,
+                "min": 0
+              }
+            },
+            "semantic": {
+              "htmlSha256": "32dcdecf4e75ee0e2fe177e9a390e20a1757cec8f23bb507ff1991696fc70e88",
+              "rows": 1000,
+              "selected": 0
+            }
+          },
+          {
+            "name": "naive-tsrx-unrelated_update-rows",
+            "ops": {
+              "setStyle": {
+                "median": 1000,
+                "min": 1000
+              },
+              "applyStyleValue": {
+                "median": 1000,
+                "min": 1000
+              },
+              "applyStyleProperty": {
+                "median": 1000,
+                "min": 1000
+              },
+              "setStyleProperty": {
+                "median": 1000,
+                "min": 1000
+              },
+              "Row": {
+                "median": 1000,
+                "min": 1000
+              },
+              "renderBlockInner": {
+                "median": 1000,
+                "min": 1000
+              },
+              "styleSets": {
+                "median": 1000,
+                "min": 1000
+              },
+              "styleRemoves": {
+                "median": 1000,
+                "min": 1000
+              },
+              "fontWeightWrites": {
+                "median": 1000,
+                "min": 1000
+              },
+              "fontStyleWrites": {
+                "median": 1000,
+                "min": 1000
+              }
+            }
+          }
+        ]
+      },
+      "final": {
+        "suite": "audit-981-coverage",
+        "iterations": 1,
+        "environment": {
+          "node": "v24.20.0",
+          "chromium": "149.0.7827.55",
+          "platform": "darwin",
+          "arch": "arm64"
+        },
+        "builds": [
+          {
+            "dialect": "jsx",
+            "assets": [
+              {
+                "name": "index-DoJUqasY.js",
+                "sha256": "1c795ce1d9b59e05e2dcfaea954e9b337d1043da3f9771acaea02f8bb2668333"
+              }
+            ]
+          },
+          {
+            "dialect": "tsrx",
+            "assets": [
+              {
+                "name": "index-1eanBFN_.js",
+                "sha256": "71c105d0f112b9208ab6f40b593982f5c1916ca68d54501939f3a71f7040fa33"
+              }
+            ]
+          }
+        ],
+        "targets": [
+          {
+            "name": "naive-jsx-mount_1k",
+            "ops": {
+              "setStyle": {
+                "median": 1000,
+                "min": 1000
+              },
+              "applyStyleValue": {
+                "median": 1000,
+                "min": 1000
+              },
+              "applyStyleProperty": {
+                "median": 1000,
+                "min": 1000
+              },
+              "setStyleProperty": {
+                "median": 0,
+                "min": 0
+              },
+              "Row": {
+                "median": 1000,
+                "min": 1000
+              },
+              "renderBlockInner": {
+                "median": 3002,
+                "min": 3002
+              },
+              "styleSets": {
+                "median": 1000,
+                "min": 1000
+              },
+              "styleRemoves": {
+                "median": 0,
+                "min": 0
+              },
+              "fontWeightWrites": {
+                "median": 1000,
+                "min": 1000
+              },
+              "fontStyleWrites": {
+                "median": 0,
+                "min": 0
+              }
+            },
+            "semantic": {
+              "htmlSha256": "71884fd151225241ae67070ef1b85272ab1e9f435186bb0759eed4debb7193ae",
+              "rows": 1000,
+              "selected": 0
+            }
+          },
+          {
+            "name": "naive-jsx-mount_1k-rows",
+            "ops": {
+              "setStyle": {
+                "median": 1000,
+                "min": 1000
+              },
+              "applyStyleValue": {
+                "median": 1000,
+                "min": 1000
+              },
+              "applyStyleProperty": {
+                "median": 1000,
+                "min": 1000
+              },
+              "setStyleProperty": {
+                "median": 1000,
+                "min": 1000
+              },
+              "Row": {
+                "median": 1000,
+                "min": 1000
+              },
+              "renderBlockInner": {
+                "median": 1000,
+                "min": 1000
+              },
+              "styleSets": {
+                "median": 1000,
+                "min": 1000
+              },
+              "styleRemoves": {
+                "median": 1000,
+                "min": 1000
+              },
+              "fontWeightWrites": {
+                "median": 1000,
+                "min": 1000
+              },
+              "fontStyleWrites": {
+                "median": 1000,
+                "min": 1000
+              }
+            }
+          },
+          {
+            "name": "naive-jsx-select_one",
+            "ops": {
+              "setStyle": {
+                "median": 1000,
+                "min": 1000
+              },
+              "applyStyleValue": {
+                "median": 1000,
+                "min": 1000
+              },
+              "applyStyleProperty": {
+                "median": 1,
+                "min": 1
+              },
+              "setStyleProperty": {
+                "median": 0,
+                "min": 0
+              },
+              "Row": {
+                "median": 1000,
+                "min": 1000
+              },
+              "renderBlockInner": {
+                "median": 3002,
+                "min": 3002
+              },
+              "styleSets": {
+                "median": 1,
+                "min": 1
+              },
+              "styleRemoves": {
+                "median": 0,
+                "min": 0
+              },
+              "fontWeightWrites": {
+                "median": 1,
+                "min": 1
+              },
+              "fontStyleWrites": {
+                "median": 0,
+                "min": 0
+              }
+            },
+            "semantic": {
+              "htmlSha256": "0e4544de048338663e8bdc156151bfca68975b20f021b47d050472ac1c615eac",
+              "rows": 1000,
+              "selected": 1
+            }
+          },
+          {
+            "name": "naive-jsx-select_one-rows",
+            "ops": {
+              "setStyle": {
+                "median": 1000,
+                "min": 1000
+              },
+              "applyStyleValue": {
+                "median": 1000,
+                "min": 1000
+              },
+              "applyStyleProperty": {
+                "median": 1000,
+                "min": 1000
+              },
+              "setStyleProperty": {
+                "median": 1000,
+                "min": 1000
+              },
+              "Row": {
+                "median": 1000,
+                "min": 1000
+              },
+              "renderBlockInner": {
+                "median": 1000,
+                "min": 1000
+              },
+              "styleSets": {
+                "median": 1000,
+                "min": 1000
+              },
+              "styleRemoves": {
+                "median": 1000,
+                "min": 1000
+              },
+              "fontWeightWrites": {
+                "median": 1000,
+                "min": 1000
+              },
+              "fontStyleWrites": {
+                "median": 1000,
+                "min": 1000
+              }
+            }
+          },
+          {
+            "name": "naive-jsx-select_another",
+            "ops": {
+              "setStyle": {
+                "median": 1000,
+                "min": 1000
+              },
+              "applyStyleValue": {
+                "median": 1000,
+                "min": 1000
+              },
+              "applyStyleProperty": {
+                "median": 2,
+                "min": 2
+              },
+              "setStyleProperty": {
+                "median": 0,
+                "min": 0
+              },
+              "Row": {
+                "median": 1000,
+                "min": 1000
+              },
+              "renderBlockInner": {
+                "median": 3002,
+                "min": 3002
+              },
+              "styleSets": {
+                "median": 2,
+                "min": 2
+              },
+              "styleRemoves": {
+                "median": 0,
+                "min": 0
+              },
+              "fontWeightWrites": {
+                "median": 2,
+                "min": 2
+              },
+              "fontStyleWrites": {
+                "median": 0,
+                "min": 0
+              }
+            },
+            "semantic": {
+              "htmlSha256": "04a9c3a28f9b6ee6f0b9637ddd67654b96a6155299379c08437ded2447d036a0",
+              "rows": 1000,
+              "selected": 1
+            }
+          },
+          {
+            "name": "naive-jsx-select_another-rows",
+            "ops": {
+              "setStyle": {
+                "median": 1000,
+                "min": 1000
+              },
+              "applyStyleValue": {
+                "median": 1000,
+                "min": 1000
+              },
+              "applyStyleProperty": {
+                "median": 1000,
+                "min": 1000
+              },
+              "setStyleProperty": {
+                "median": 1000,
+                "min": 1000
+              },
+              "Row": {
+                "median": 1000,
+                "min": 1000
+              },
+              "renderBlockInner": {
+                "median": 1000,
+                "min": 1000
+              },
+              "styleSets": {
+                "median": 1000,
+                "min": 1000
+              },
+              "styleRemoves": {
+                "median": 1000,
+                "min": 1000
+              },
+              "fontWeightWrites": {
+                "median": 1000,
+                "min": 1000
+              },
+              "fontStyleWrites": {
+                "median": 1000,
+                "min": 1000
+              }
+            }
+          },
+          {
+            "name": "naive-jsx-unrelated_update",
+            "ops": {
+              "setStyle": {
+                "median": 1000,
+                "min": 1000
+              },
+              "applyStyleValue": {
+                "median": 1000,
+                "min": 1000
+              },
+              "applyStyleProperty": {
+                "median": 0,
+                "min": 0
+              },
+              "setStyleProperty": {
+                "median": 0,
+                "min": 0
+              },
+              "Row": {
+                "median": 1000,
+                "min": 1000
+              },
+              "renderBlockInner": {
+                "median": 3002,
+                "min": 3002
+              },
+              "styleSets": {
+                "median": 0,
+                "min": 0
+              },
+              "styleRemoves": {
+                "median": 0,
+                "min": 0
+              },
+              "fontWeightWrites": {
+                "median": 0,
+                "min": 0
+              },
+              "fontStyleWrites": {
+                "median": 0,
+                "min": 0
+              }
+            },
+            "semantic": {
+              "htmlSha256": "f3536c5489834f4648ded5a327757d4bfb9768bf8cc5f856a7af7f2e1da65d39",
+              "rows": 1000,
+              "selected": 0
+            }
+          },
+          {
+            "name": "naive-jsx-unrelated_update-rows",
+            "ops": {
+              "setStyle": {
+                "median": 1000,
+                "min": 1000
+              },
+              "applyStyleValue": {
+                "median": 1000,
+                "min": 1000
+              },
+              "applyStyleProperty": {
+                "median": 1000,
+                "min": 1000
+              },
+              "setStyleProperty": {
+                "median": 1000,
+                "min": 1000
+              },
+              "Row": {
+                "median": 1000,
+                "min": 1000
+              },
+              "renderBlockInner": {
+                "median": 1000,
+                "min": 1000
+              },
+              "styleSets": {
+                "median": 1000,
+                "min": 1000
+              },
+              "styleRemoves": {
+                "median": 1000,
+                "min": 1000
+              },
+              "fontWeightWrites": {
+                "median": 1000,
+                "min": 1000
+              },
+              "fontStyleWrites": {
+                "median": 1000,
+                "min": 1000
+              }
+            }
+          },
+          {
+            "name": "naive-tsrx-mount_1k",
+            "ops": {
+              "setStyle": {
+                "median": 0,
+                "min": 0
+              },
+              "applyStyleValue": {
+                "median": 0,
+                "min": 0
+              },
+              "applyStyleProperty": {
+                "median": 1000,
+                "min": 1000
+              },
+              "setStyleProperty": {
+                "median": 1000,
+                "min": 1000
+              },
+              "Row": {
+                "median": 1000,
+                "min": 1000
+              },
+              "renderBlockInner": {
+                "median": 2001,
+                "min": 2001
+              },
+              "styleSets": {
+                "median": 1000,
+                "min": 1000
+              },
+              "styleRemoves": {
+                "median": 0,
+                "min": 0
+              },
+              "fontWeightWrites": {
+                "median": 1000,
+                "min": 1000
+              },
+              "fontStyleWrites": {
+                "median": 0,
+                "min": 0
+              }
+            },
+            "semantic": {
+              "htmlSha256": "d63b5e2b96dd207e4146ee1f97556c006c9819e3b0240c90dd38b5bee4288956",
+              "rows": 1000,
+              "selected": 0
+            }
+          },
+          {
+            "name": "naive-tsrx-mount_1k-rows",
+            "ops": {
+              "setStyle": {
+                "median": 1000,
+                "min": 1000
+              },
+              "applyStyleValue": {
+                "median": 1000,
+                "min": 1000
+              },
+              "applyStyleProperty": {
+                "median": 1000,
+                "min": 1000
+              },
+              "setStyleProperty": {
+                "median": 1000,
+                "min": 1000
+              },
+              "Row": {
+                "median": 1000,
+                "min": 1000
+              },
+              "renderBlockInner": {
+                "median": 1000,
+                "min": 1000
+              },
+              "styleSets": {
+                "median": 1000,
+                "min": 1000
+              },
+              "styleRemoves": {
+                "median": 1000,
+                "min": 1000
+              },
+              "fontWeightWrites": {
+                "median": 1000,
+                "min": 1000
+              },
+              "fontStyleWrites": {
+                "median": 1000,
+                "min": 1000
+              }
+            }
+          },
+          {
+            "name": "naive-tsrx-select_one",
+            "ops": {
+              "setStyle": {
+                "median": 0,
+                "min": 0
+              },
+              "applyStyleValue": {
+                "median": 0,
+                "min": 0
+              },
+              "applyStyleProperty": {
+                "median": 1,
+                "min": 1
+              },
+              "setStyleProperty": {
+                "median": 1,
+                "min": 1
+              },
+              "Row": {
+                "median": 1000,
+                "min": 1000
+              },
+              "renderBlockInner": {
+                "median": 2001,
+                "min": 2001
+              },
+              "styleSets": {
+                "median": 1,
+                "min": 1
+              },
+              "styleRemoves": {
+                "median": 0,
+                "min": 0
+              },
+              "fontWeightWrites": {
+                "median": 1,
+                "min": 1
+              },
+              "fontStyleWrites": {
+                "median": 0,
+                "min": 0
+              }
+            },
+            "semantic": {
+              "htmlSha256": "a6259d45bea97bf4fdd0fe4d8fc34d1a2dd18df7bee6789c24c295c7e267d1b7",
+              "rows": 1000,
+              "selected": 1
+            }
+          },
+          {
+            "name": "naive-tsrx-select_one-rows",
+            "ops": {
+              "setStyle": {
+                "median": 1000,
+                "min": 1000
+              },
+              "applyStyleValue": {
+                "median": 1000,
+                "min": 1000
+              },
+              "applyStyleProperty": {
+                "median": 1000,
+                "min": 1000
+              },
+              "setStyleProperty": {
+                "median": 1000,
+                "min": 1000
+              },
+              "Row": {
+                "median": 1000,
+                "min": 1000
+              },
+              "renderBlockInner": {
+                "median": 1000,
+                "min": 1000
+              },
+              "styleSets": {
+                "median": 1000,
+                "min": 1000
+              },
+              "styleRemoves": {
+                "median": 1000,
+                "min": 1000
+              },
+              "fontWeightWrites": {
+                "median": 1000,
+                "min": 1000
+              },
+              "fontStyleWrites": {
+                "median": 1000,
+                "min": 1000
+              }
+            }
+          },
+          {
+            "name": "naive-tsrx-select_another",
+            "ops": {
+              "setStyle": {
+                "median": 0,
+                "min": 0
+              },
+              "applyStyleValue": {
+                "median": 0,
+                "min": 0
+              },
+              "applyStyleProperty": {
+                "median": 2,
+                "min": 2
+              },
+              "setStyleProperty": {
+                "median": 2,
+                "min": 2
+              },
+              "Row": {
+                "median": 1000,
+                "min": 1000
+              },
+              "renderBlockInner": {
+                "median": 2001,
+                "min": 2001
+              },
+              "styleSets": {
+                "median": 2,
+                "min": 2
+              },
+              "styleRemoves": {
+                "median": 0,
+                "min": 0
+              },
+              "fontWeightWrites": {
+                "median": 2,
+                "min": 2
+              },
+              "fontStyleWrites": {
+                "median": 0,
+                "min": 0
+              }
+            },
+            "semantic": {
+              "htmlSha256": "4129354e1ea512172320571fe47ea70eef4ddf2b64318912490a69e0f219a121",
+              "rows": 1000,
+              "selected": 1
+            }
+          },
+          {
+            "name": "naive-tsrx-select_another-rows",
+            "ops": {
+              "setStyle": {
+                "median": 1000,
+                "min": 1000
+              },
+              "applyStyleValue": {
+                "median": 1000,
+                "min": 1000
+              },
+              "applyStyleProperty": {
+                "median": 1000,
+                "min": 1000
+              },
+              "setStyleProperty": {
+                "median": 1000,
+                "min": 1000
+              },
+              "Row": {
+                "median": 1000,
+                "min": 1000
+              },
+              "renderBlockInner": {
+                "median": 1000,
+                "min": 1000
+              },
+              "styleSets": {
+                "median": 1000,
+                "min": 1000
+              },
+              "styleRemoves": {
+                "median": 1000,
+                "min": 1000
+              },
+              "fontWeightWrites": {
+                "median": 1000,
+                "min": 1000
+              },
+              "fontStyleWrites": {
+                "median": 1000,
+                "min": 1000
+              }
+            }
+          },
+          {
+            "name": "naive-tsrx-unrelated_update",
+            "ops": {
+              "setStyle": {
+                "median": 0,
+                "min": 0
+              },
+              "applyStyleValue": {
+                "median": 0,
+                "min": 0
+              },
+              "applyStyleProperty": {
+                "median": 0,
+                "min": 0
+              },
+              "setStyleProperty": {
+                "median": 0,
+                "min": 0
+              },
+              "Row": {
+                "median": 1000,
+                "min": 1000
+              },
+              "renderBlockInner": {
+                "median": 2001,
+                "min": 2001
+              },
+              "styleSets": {
+                "median": 0,
+                "min": 0
+              },
+              "styleRemoves": {
+                "median": 0,
+                "min": 0
+              },
+              "fontWeightWrites": {
+                "median": 0,
+                "min": 0
+              },
+              "fontStyleWrites": {
+                "median": 0,
+                "min": 0
+              }
+            },
+            "semantic": {
+              "htmlSha256": "32dcdecf4e75ee0e2fe177e9a390e20a1757cec8f23bb507ff1991696fc70e88",
+              "rows": 1000,
+              "selected": 0
+            }
+          },
+          {
+            "name": "naive-tsrx-unrelated_update-rows",
+            "ops": {
+              "setStyle": {
+                "median": 1000,
+                "min": 1000
+              },
+              "applyStyleValue": {
+                "median": 1000,
+                "min": 1000
+              },
+              "applyStyleProperty": {
+                "median": 1000,
+                "min": 1000
+              },
+              "setStyleProperty": {
+                "median": 1000,
+                "min": 1000
+              },
+              "Row": {
+                "median": 1000,
+                "min": 1000
+              },
+              "renderBlockInner": {
+                "median": 1000,
+                "min": 1000
+              },
+              "styleSets": {
+                "median": 1000,
+                "min": 1000
+              },
+              "styleRemoves": {
+                "median": 1000,
+                "min": 1000
+              },
+              "fontWeightWrites": {
+                "median": 1000,
+                "min": 1000
+              },
+              "fontStyleWrites": {
+                "median": 1000,
+                "min": 1000
+              }
+            }
+          }
+        ]
+      }
+    },
+    "suspense-list": {
+      "environment": {
+        "node": "v24.20.0",
+        "chromium": "149.0.7827.55",
+        "platform": "darwin",
+        "arch": "arm64"
+      },
+      "baseline": {
+        "suite": "audit-981-coverage",
+        "iterations": 1,
+        "environment": {
+          "node": "v24.20.0",
+          "chromium": "149.0.7827.55",
+          "platform": "darwin",
+          "arch": "arm64"
+        },
+        "rows": 64,
+        "fixtureSha256": "216fdf2258a1c4a1231aa3a582ced7e01300af15598036ce516508ac154c14aa",
+        "cleanSha256": "02ab460db5f2fcdf98706f3d7e0cbf408ff5182147a2b7b641964f83d06a28ae",
+        "observedSha256": "df27b66db8d2d009c5f90ec8868c5695bcb180f062b7857d8dce67ec691bee36",
+        "targets": [
+          {
+            "name": "suspense-list-mount",
+            "ops": {
+              "createBlock": {
+                "median": 321,
+                "min": 321
+              },
+              "renderBlockInner": {
+                "median": 321,
+                "min": 321
+              },
+              "RowImpl": {
+                "median": 64,
+                "min": 64
+              },
+              "AsyncCellImpl": {
+                "median": 64,
+                "min": 64
+              },
+              "forBlock": {
+                "median": 1,
+                "min": 1
+              },
+              "reconcileKeyed": {
+                "median": 0,
+                "min": 0
+              }
+            },
+            "semanticSha256": "c98b903ffde01b5d4e367eec748541ea5bc9010efe16efe0555013bb144ad9f4"
+          },
+          {
+            "name": "suspense-list-mount-rows",
+            "ops": {
+              "createBlock": {
+                "median": 64,
+                "min": 64
+              },
+              "renderBlockInner": {
+                "median": 64,
+                "min": 64
+              },
+              "RowImpl": {
+                "median": 64,
+                "min": 64
+              },
+              "AsyncCellImpl": {
+                "median": 64,
+                "min": 64
+              },
+              "forBlock": {
+                "median": 64,
+                "min": 64
+              },
+              "reconcileKeyed": {
+                "median": 64,
+                "min": 64
+              }
+            }
+          },
+          {
+            "name": "suspense-list-settle-odd",
+            "ops": {
+              "createBlock": {
+                "median": 0,
+                "min": 0
+              },
+              "renderBlockInner": {
+                "median": 64,
+                "min": 64
+              },
+              "RowImpl": {
+                "median": 0,
+                "min": 0
+              },
+              "AsyncCellImpl": {
+                "median": 32,
+                "min": 32
+              },
+              "forBlock": {
+                "median": 0,
+                "min": 0
+              },
+              "reconcileKeyed": {
+                "median": 0,
+                "min": 0
+              }
+            },
+            "semanticSha256": "b30042b9970a345e8d0801a88e5cccafb5e78523eb5851bda8dff8886536cc3f"
+          },
+          {
+            "name": "suspense-list-settle-odd-rows",
+            "ops": {
+              "createBlock": {
+                "median": 64,
+                "min": 64
+              },
+              "renderBlockInner": {
+                "median": 64,
+                "min": 64
+              },
+              "RowImpl": {
+                "median": 64,
+                "min": 64
+              },
+              "AsyncCellImpl": {
+                "median": 64,
+                "min": 64
+              },
+              "forBlock": {
+                "median": 64,
+                "min": 64
+              },
+              "reconcileKeyed": {
+                "median": 64,
+                "min": 64
+              }
+            }
+          },
+          {
+            "name": "suspense-list-settle-even",
+            "ops": {
+              "createBlock": {
+                "median": 0,
+                "min": 0
+              },
+              "renderBlockInner": {
+                "median": 64,
+                "min": 64
+              },
+              "RowImpl": {
+                "median": 0,
+                "min": 0
+              },
+              "AsyncCellImpl": {
+                "median": 32,
+                "min": 32
+              },
+              "forBlock": {
+                "median": 0,
+                "min": 0
+              },
+              "reconcileKeyed": {
+                "median": 0,
+                "min": 0
+              }
+            },
+            "semanticSha256": "853919a6099da1ea359cf99a89424836dc04ed1870c9b6cff555bf27fd57e984"
+          },
+          {
+            "name": "suspense-list-settle-even-rows",
+            "ops": {
+              "createBlock": {
+                "median": 64,
+                "min": 64
+              },
+              "renderBlockInner": {
+                "median": 64,
+                "min": 64
+              },
+              "RowImpl": {
+                "median": 64,
+                "min": 64
+              },
+              "AsyncCellImpl": {
+                "median": 64,
+                "min": 64
+              },
+              "forBlock": {
+                "median": 64,
+                "min": 64
+              },
+              "reconcileKeyed": {
+                "median": 64,
+                "min": 64
+              }
+            }
+          },
+          {
+            "name": "suspense-list-equal",
+            "ops": {
+              "createBlock": {
+                "median": 0,
+                "min": 0
+              },
+              "renderBlockInner": {
+                "median": 1,
+                "min": 1
+              },
+              "RowImpl": {
+                "median": 0,
+                "min": 0
+              },
+              "AsyncCellImpl": {
+                "median": 0,
+                "min": 0
+              },
+              "forBlock": {
+                "median": 0,
+                "min": 0
+              },
+              "reconcileKeyed": {
+                "median": 0,
+                "min": 0
+              }
+            },
+            "semanticSha256": "9394c9cf6556fd13b2e6c0ddb907b2d6e6c3b581e77aa347879362149abb2bc3"
+          },
+          {
+            "name": "suspense-list-equal-rows",
+            "ops": {
+              "createBlock": {
+                "median": 64,
+                "min": 64
+              },
+              "renderBlockInner": {
+                "median": 64,
+                "min": 64
+              },
+              "RowImpl": {
+                "median": 64,
+                "min": 64
+              },
+              "AsyncCellImpl": {
+                "median": 64,
+                "min": 64
+              },
+              "forBlock": {
+                "median": 64,
+                "min": 64
+              },
+              "reconcileKeyed": {
+                "median": 64,
+                "min": 64
+              }
+            }
+          },
+          {
+            "name": "suspense-list-reverse",
+            "ops": {
+              "createBlock": {
+                "median": 0,
+                "min": 0
+              },
+              "renderBlockInner": {
+                "median": 1,
+                "min": 1
+              },
+              "RowImpl": {
+                "median": 0,
+                "min": 0
+              },
+              "AsyncCellImpl": {
+                "median": 0,
+                "min": 0
+              },
+              "forBlock": {
+                "median": 1,
+                "min": 1
+              },
+              "reconcileKeyed": {
+                "median": 1,
+                "min": 1
+              }
+            },
+            "semanticSha256": "50cb0d396b9b5cc02b620a7d739c44c6fad25969c5db0ee19c469f964b95c9b0"
+          },
+          {
+            "name": "suspense-list-reverse-rows",
+            "ops": {
+              "createBlock": {
+                "median": 64,
+                "min": 64
+              },
+              "renderBlockInner": {
+                "median": 64,
+                "min": 64
+              },
+              "RowImpl": {
+                "median": 64,
+                "min": 64
+              },
+              "AsyncCellImpl": {
+                "median": 64,
+                "min": 64
+              },
+              "forBlock": {
+                "median": 64,
+                "min": 64
+              },
+              "reconcileKeyed": {
+                "median": 64,
+                "min": 64
+              }
+            }
+          },
+          {
+            "name": "suspense-list-unmount",
+            "ops": {
+              "createBlock": {
+                "median": 0,
+                "min": 0
+              },
+              "renderBlockInner": {
+                "median": 0,
+                "min": 0
+              },
+              "RowImpl": {
+                "median": 0,
+                "min": 0
+              },
+              "AsyncCellImpl": {
+                "median": 0,
+                "min": 0
+              },
+              "forBlock": {
+                "median": 0,
+                "min": 0
+              },
+              "reconcileKeyed": {
+                "median": 0,
+                "min": 0
+              }
+            },
+            "semanticSha256": "c4c708f3e7e150cb373e0e0af954e4099ba4546e74f35e7c792403489ca925a8"
+          },
+          {
+            "name": "suspense-list-unmount-rows",
+            "ops": {
+              "createBlock": {
+                "median": 64,
+                "min": 64
+              },
+              "renderBlockInner": {
+                "median": 64,
+                "min": 64
+              },
+              "RowImpl": {
+                "median": 64,
+                "min": 64
+              },
+              "AsyncCellImpl": {
+                "median": 64,
+                "min": 64
+              },
+              "forBlock": {
+                "median": 64,
+                "min": 64
+              },
+              "reconcileKeyed": {
+                "median": 64,
+                "min": 64
+              }
+            }
+          }
+        ]
+      },
+      "final": {
+        "suite": "audit-981-coverage",
+        "iterations": 1,
+        "environment": {
+          "node": "v24.20.0",
+          "chromium": "149.0.7827.55",
+          "platform": "darwin",
+          "arch": "arm64"
+        },
+        "rows": 64,
+        "fixtureSha256": "216fdf2258a1c4a1231aa3a582ced7e01300af15598036ce516508ac154c14aa",
+        "cleanSha256": "02ab460db5f2fcdf98706f3d7e0cbf408ff5182147a2b7b641964f83d06a28ae",
+        "observedSha256": "df27b66db8d2d009c5f90ec8868c5695bcb180f062b7857d8dce67ec691bee36",
+        "targets": [
+          {
+            "name": "suspense-list-mount",
+            "ops": {
+              "createBlock": {
+                "median": 321,
+                "min": 321
+              },
+              "renderBlockInner": {
+                "median": 321,
+                "min": 321
+              },
+              "RowImpl": {
+                "median": 64,
+                "min": 64
+              },
+              "AsyncCellImpl": {
+                "median": 64,
+                "min": 64
+              },
+              "forBlock": {
+                "median": 1,
+                "min": 1
+              },
+              "reconcileKeyed": {
+                "median": 0,
+                "min": 0
+              }
+            },
+            "semanticSha256": "c98b903ffde01b5d4e367eec748541ea5bc9010efe16efe0555013bb144ad9f4"
+          },
+          {
+            "name": "suspense-list-mount-rows",
+            "ops": {
+              "createBlock": {
+                "median": 64,
+                "min": 64
+              },
+              "renderBlockInner": {
+                "median": 64,
+                "min": 64
+              },
+              "RowImpl": {
+                "median": 64,
+                "min": 64
+              },
+              "AsyncCellImpl": {
+                "median": 64,
+                "min": 64
+              },
+              "forBlock": {
+                "median": 64,
+                "min": 64
+              },
+              "reconcileKeyed": {
+                "median": 64,
+                "min": 64
+              }
+            }
+          },
+          {
+            "name": "suspense-list-settle-odd",
+            "ops": {
+              "createBlock": {
+                "median": 0,
+                "min": 0
+              },
+              "renderBlockInner": {
+                "median": 64,
+                "min": 64
+              },
+              "RowImpl": {
+                "median": 0,
+                "min": 0
+              },
+              "AsyncCellImpl": {
+                "median": 32,
+                "min": 32
+              },
+              "forBlock": {
+                "median": 0,
+                "min": 0
+              },
+              "reconcileKeyed": {
+                "median": 0,
+                "min": 0
+              }
+            },
+            "semanticSha256": "b30042b9970a345e8d0801a88e5cccafb5e78523eb5851bda8dff8886536cc3f"
+          },
+          {
+            "name": "suspense-list-settle-odd-rows",
+            "ops": {
+              "createBlock": {
+                "median": 64,
+                "min": 64
+              },
+              "renderBlockInner": {
+                "median": 64,
+                "min": 64
+              },
+              "RowImpl": {
+                "median": 64,
+                "min": 64
+              },
+              "AsyncCellImpl": {
+                "median": 64,
+                "min": 64
+              },
+              "forBlock": {
+                "median": 64,
+                "min": 64
+              },
+              "reconcileKeyed": {
+                "median": 64,
+                "min": 64
+              }
+            }
+          },
+          {
+            "name": "suspense-list-settle-even",
+            "ops": {
+              "createBlock": {
+                "median": 0,
+                "min": 0
+              },
+              "renderBlockInner": {
+                "median": 64,
+                "min": 64
+              },
+              "RowImpl": {
+                "median": 0,
+                "min": 0
+              },
+              "AsyncCellImpl": {
+                "median": 32,
+                "min": 32
+              },
+              "forBlock": {
+                "median": 0,
+                "min": 0
+              },
+              "reconcileKeyed": {
+                "median": 0,
+                "min": 0
+              }
+            },
+            "semanticSha256": "853919a6099da1ea359cf99a89424836dc04ed1870c9b6cff555bf27fd57e984"
+          },
+          {
+            "name": "suspense-list-settle-even-rows",
+            "ops": {
+              "createBlock": {
+                "median": 64,
+                "min": 64
+              },
+              "renderBlockInner": {
+                "median": 64,
+                "min": 64
+              },
+              "RowImpl": {
+                "median": 64,
+                "min": 64
+              },
+              "AsyncCellImpl": {
+                "median": 64,
+                "min": 64
+              },
+              "forBlock": {
+                "median": 64,
+                "min": 64
+              },
+              "reconcileKeyed": {
+                "median": 64,
+                "min": 64
+              }
+            }
+          },
+          {
+            "name": "suspense-list-equal",
+            "ops": {
+              "createBlock": {
+                "median": 0,
+                "min": 0
+              },
+              "renderBlockInner": {
+                "median": 1,
+                "min": 1
+              },
+              "RowImpl": {
+                "median": 0,
+                "min": 0
+              },
+              "AsyncCellImpl": {
+                "median": 0,
+                "min": 0
+              },
+              "forBlock": {
+                "median": 0,
+                "min": 0
+              },
+              "reconcileKeyed": {
+                "median": 0,
+                "min": 0
+              }
+            },
+            "semanticSha256": "9394c9cf6556fd13b2e6c0ddb907b2d6e6c3b581e77aa347879362149abb2bc3"
+          },
+          {
+            "name": "suspense-list-equal-rows",
+            "ops": {
+              "createBlock": {
+                "median": 64,
+                "min": 64
+              },
+              "renderBlockInner": {
+                "median": 64,
+                "min": 64
+              },
+              "RowImpl": {
+                "median": 64,
+                "min": 64
+              },
+              "AsyncCellImpl": {
+                "median": 64,
+                "min": 64
+              },
+              "forBlock": {
+                "median": 64,
+                "min": 64
+              },
+              "reconcileKeyed": {
+                "median": 64,
+                "min": 64
+              }
+            }
+          },
+          {
+            "name": "suspense-list-reverse",
+            "ops": {
+              "createBlock": {
+                "median": 0,
+                "min": 0
+              },
+              "renderBlockInner": {
+                "median": 1,
+                "min": 1
+              },
+              "RowImpl": {
+                "median": 0,
+                "min": 0
+              },
+              "AsyncCellImpl": {
+                "median": 0,
+                "min": 0
+              },
+              "forBlock": {
+                "median": 1,
+                "min": 1
+              },
+              "reconcileKeyed": {
+                "median": 1,
+                "min": 1
+              }
+            },
+            "semanticSha256": "50cb0d396b9b5cc02b620a7d739c44c6fad25969c5db0ee19c469f964b95c9b0"
+          },
+          {
+            "name": "suspense-list-reverse-rows",
+            "ops": {
+              "createBlock": {
+                "median": 64,
+                "min": 64
+              },
+              "renderBlockInner": {
+                "median": 64,
+                "min": 64
+              },
+              "RowImpl": {
+                "median": 64,
+                "min": 64
+              },
+              "AsyncCellImpl": {
+                "median": 64,
+                "min": 64
+              },
+              "forBlock": {
+                "median": 64,
+                "min": 64
+              },
+              "reconcileKeyed": {
+                "median": 64,
+                "min": 64
+              }
+            }
+          },
+          {
+            "name": "suspense-list-unmount",
+            "ops": {
+              "createBlock": {
+                "median": 0,
+                "min": 0
+              },
+              "renderBlockInner": {
+                "median": 0,
+                "min": 0
+              },
+              "RowImpl": {
+                "median": 0,
+                "min": 0
+              },
+              "AsyncCellImpl": {
+                "median": 0,
+                "min": 0
+              },
+              "forBlock": {
+                "median": 0,
+                "min": 0
+              },
+              "reconcileKeyed": {
+                "median": 0,
+                "min": 0
+              }
+            },
+            "semanticSha256": "c4c708f3e7e150cb373e0e0af954e4099ba4546e74f35e7c792403489ca925a8"
+          },
+          {
+            "name": "suspense-list-unmount-rows",
+            "ops": {
+              "createBlock": {
+                "median": 64,
+                "min": 64
+              },
+              "renderBlockInner": {
+                "median": 64,
+                "min": 64
+              },
+              "RowImpl": {
+                "median": 64,
+                "min": 64
+              },
+              "AsyncCellImpl": {
+                "median": 64,
+                "min": 64
+              },
+              "forBlock": {
+                "median": 64,
+                "min": 64
+              },
+              "reconcileKeyed": {
+                "median": 64,
+                "min": 64
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}
