@@ -1,4 +1,7 @@
 import { body$, draft$, draftLength$, history$, selectedDay$ } from './State.ts';
+import { PrimaryAction } from './PrimaryAction.tsrx';
+import { primaryActionBenchmark } from './primary-action-mode.ts';
+import { initialPrimaryAction } from './primary-action-state.ts';
 
 // Server-owned DOM. This component is never an entry in the browser graph.
 export function Shell() @{
@@ -9,6 +12,11 @@ export function Shell() @{
 		<output id="draft-length">{draftLength$}</output>
 		<button id="day" type="button">Next day</button>
 		<output id="selected-day">{String(selectedDay$.get())}</output>
+		@if (primaryActionBenchmark) {
+			<form id="primary-action-form">
+				<PrimaryAction {...initialPrimaryAction} />
+			</form>
+		}
 		<button id="optional" type="button">Load optional controller</button>
 		<output id="optional-value" />
 		<section aria-label="Conversation">

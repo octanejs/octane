@@ -2,11 +2,106 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { attachBehaviorRoot, flushSync, hydrateRoot } from 'octane';
 import { renderToReadableStream, renderToString } from 'octane/server';
 import { flushEffects } from './_helpers.js';
-import { loadServerFixture } from './_server-fixture.js';
+import { loadCompiledFixtureSource, loadServerFixture } from './_server-fixture.js';
+import * as DomBindings from '../src/dom-bindings.js';
 import * as staticClient from './hydration/_fixtures/deferred-hydration-static.tsrx';
 
 const STATIC_FIXTURE = 'packages/octane/tests/hydration/_fixtures/deferred-hydration-static.tsrx';
 const staticServer = loadServerFixture<typeof staticClient>(STATIC_FIXTURE);
+
+function authoredBindings(dev = false) {
+	const id = '/src/behavior-action.tsrx';
+	const source = `import { unbound } from 'octane/behavior';
+export function Action(props) @{
+  'use dom bindings';
+  <button hidden={unbound(props.hidden)} type={props.type} disabled={props.disabled} aria-disabled={props.disabled}
+    aria-label={props.label} data-active={props.active ? '' : null} class={props.classes}
+    style={{ opacity: props.opacity, width: props.width, '--tone': props.tone }}>
+    <span hidden={props.active}><svg viewBox="0 0 24 24"><path d="M1 1h5" /></svg></span>
+    <span hidden={!props.active}><svg viewBox="0 0 24 24"><path d="M2 2h4" /></svg></span>
+  </button>
+}`;
+	const options = {
+		compileOptions: { dev, hmr: false },
+		runtimeModules: { 'octane/behavior': DomBindings },
+	};
+	const server = loadCompiledFixtureSource(source, { ...options, id, mode: 'server' });
+	const descriptor = loadCompiledFixtureSource(source, {
+		...options,
+		id: id + '?octane-bindings=Action',
+		mode: 'client',
+	});
+	const client = loadCompiledFixtureSource(
+		`
+import { adoptBindings } from 'octane/behavior';
+import { Action } from './behavior-action.tsrx';
+export function attach(root, source, options) { return adoptBindings(root, Action, source, options); }
+export function attachPair(first, second, source) {
+  let inner;
+  const outer = adoptBindings(first, Action, {
+    getSnapshot: source.getSnapshot,
+    subscribe(notify) {
+      inner = adoptBindings(second, Action, source);
+      return source.subscribe(notify);
+    },
+  });
+  return { outer, inner };
+}
+`,
+		{
+			...options,
+			id: '/src/behavior-activation.tsrx',
+			mode: 'client',
+			runtimeModules: {
+				'octane/behavior': DomBindings,
+				'octane/dom-bindings': DomBindings,
+				'./behavior-action.tsrx?octane-bindings=Action': descriptor,
+			},
+		},
+	);
+	let snapshot: Record<string, unknown> = {
+		type: 'submit',
+		disabled: false,
+		active: false,
+		label: 'Send',
+		classes: ['action', { ready: true }],
+		hidden: true,
+		opacity: 1,
+		width: 0,
+		tone: 'black',
+	};
+	const subscriptions = new Set<() => void>();
+	const cleanup = vi.fn();
+	const state = {
+		getSnapshot: () => snapshot,
+		subscribe(notify: () => void) {
+			subscriptions.add(notify);
+			return () => {
+				subscriptions.delete(notify);
+				cleanup();
+			};
+		},
+	};
+	return {
+		html: renderToString(server.Action, snapshot).html,
+		state,
+		cleanup,
+		attach: client.attach as (
+			root: Element,
+			source: typeof state,
+			options?: DomBindings.BindingOptions,
+		) => DomBindings.BindingHandle,
+		attachPair: client.attachPair as (
+			first: Element,
+			second: Element,
+			source: typeof state,
+		) => { outer: DomBindings.BindingHandle; inner: DomBindings.BindingHandle },
+		publish(next: Record<string, unknown>, notify = true) {
+			snapshot = { ...snapshot, ...next };
+			if (notify) for (const callback of subscriptions) callback();
+		},
+	};
+}
 
 function deferred<T>(): {
 	promise: Promise<T>;
@@ -71,6 +166,68 @@ describe('behavior-only roots', () => {
 		expect(article.firstElementChild).toBe(button);
 		expect(article.getAttribute('data-owned')).toBe('server');
 		expect(article.getAttribute('aria-live')).toBe('polite');
+		for (const dev of [false, true]) {
+			const fixture = authoredBindings(dev);
+			article.innerHTML = fixture.html;
+			const action = article.querySelector('button')!;
+			const nodes = [action, ...action.querySelectorAll('*')];
+			expect(action.hidden).toBe(true);
+			action.hidden = false;
+			action.style.marginLeft = '7px';
+			const binding = fixture.attach(action, fixture.state);
+			try {
+				fixture.publish({
+					type: 'button',
+					disabled: true,
+					active: true,
+					label: 'Stop',
+					classes: ['action', ['active'], { busy: true }],
+					opacity: 0.5,
+					width: 12,
+					tone: 'red',
+				});
+				expect(action.type).toBe('button');
+				expect(action.disabled).toBe(true);
+				expect(action.getAttribute('aria-disabled')).toBe('true');
+				expect(action.getAttribute('aria-label')).toBe('Stop');
+				expect(action.getAttribute('data-active')).toBe('');
+				expect(action.className).toBe('action active busy');
+				expect(action.style.opacity).toBe('0.5');
+				expect(action.style.width).toBe('12px');
+				expect(action.style.getPropertyValue('--tone')).toBe('red');
+				expect([...action.querySelectorAll('span')].map((node) => node.hidden)).toEqual([
+					true,
+					false,
+				]);
+				fixture.publish(
+					{
+						type: 'submit',
+						disabled: false,
+						active: false,
+						label: 'Send',
+						classes: '',
+						opacity: null,
+						width: 0,
+						tone: null,
+					},
+					false,
+				);
+				binding.refresh();
+				expect(action.type).toBe('submit');
+				expect(action.disabled).toBe(false);
+				expect(action.getAttribute('aria-disabled')).toBe('false');
+				expect(action.hasAttribute('data-active')).toBe(false);
+				expect(action.getAttribute('class')).toBe('');
+				expect(action.style.opacity).toBe('');
+				expect(action.style.width).toBe('0px');
+				expect(action.style.getPropertyValue('--tone')).toBe('');
+				expect(action.hidden).toBe(false);
+				expect(action.style.marginLeft).toBe('7px');
+				expect([action, ...action.querySelectorAll('*')]).toEqual(nodes);
+			} finally {
+				binding.dispose();
+			}
+		}
 	});
 
 	it('preserves externally owned DOM when disposed by default', async () => {
@@ -95,6 +252,36 @@ describe('behavior-only roots', () => {
 		expect(container.firstElementChild).toBe(section);
 		expect(section.firstElementChild).toBe(button);
 		expect(section.getAttribute('data-owner')).toBe('stream');
+		const fixture = authoredBindings();
+		section.innerHTML = fixture.html;
+		const action = section.querySelector('button')!;
+		const binding = fixture.attach(action, fixture.state);
+		binding.dispose();
+		binding.dispose();
+		const retained = action.outerHTML;
+		fixture.publish({ label: 'Disposed' });
+		binding.refresh();
+		expect(fixture.cleanup).toHaveBeenCalledOnce();
+		expect(action.outerHTML).toBe(retained);
+		expect(section.firstElementChild).toBe(action);
+		const replacement = fixture.attach(action, fixture.state);
+		expect(action.getAttribute('aria-label')).toBe('Disposed');
+		replacement.dispose();
+		section.innerHTML = fixture.html + fixture.html;
+		const [first, second] = section.querySelectorAll('button');
+		const pair = fixture.attachPair(first, second, fixture.state);
+		try {
+			fixture.publish({ label: 'Both live' });
+			expect(first.getAttribute('aria-label')).toBe('Both live');
+			expect(second.getAttribute('aria-label')).toBe('Both live');
+			pair.outer.dispose();
+			fixture.publish({ label: 'Independent survivor' });
+			expect(first.getAttribute('aria-label')).toBe('Both live');
+			expect(second.getAttribute('aria-label')).toBe('Independent survivor');
+		} finally {
+			pair.outer.dispose();
+			pair.inner.dispose();
+		}
 	});
 
 	it('removes externally managed descendants only when explicitly requested', () => {
@@ -890,6 +1077,19 @@ describe('behavior-only roots', () => {
 				adopt() {},
 			}),
 		).toThrow(/conflict/i);
+		const fixture = authoredBindings();
+		const target = document.createElement('section');
+		target.innerHTML = fixture.html;
+		container.append(target);
+		const action = target.querySelector('button')!;
+		const binding = fixture.attach(action, fixture.state);
+		try {
+			expect(() => fixture.attach(action, fixture.state)).toThrow(/already.*binding/i);
+			fixture.publish({ label: 'Original owner still works' });
+			expect(action.getAttribute('aria-label')).toBe('Original owner still works');
+		} finally {
+			binding.dispose();
+		}
 	});
 
 	it('propagates a rejected external range readiness without adopting protected descendants', async () => {
@@ -911,6 +1111,57 @@ describe('behavior-only roots', () => {
 
 		expect(adopted).not.toHaveBeenCalled();
 		expect(container.firstElementChild).toBe(range);
+		const fixture = authoredBindings();
+		range.innerHTML = fixture.html;
+		const action = range.querySelector('button')!;
+		const tail = action.lastElementChild!.firstElementChild!;
+		const original = tail.firstElementChild!;
+		const wrong = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+		tail.replaceChild(wrong, original);
+		const retained = action.outerHTML;
+		fixture.publish({ label: 'Must not partially apply', disabled: true });
+		expect(() => fixture.attach(action, fixture.state)).toThrow(/topology|mismatch/i);
+		expect(action.outerHTML).toBe(retained);
+		expect(fixture.cleanup).not.toHaveBeenCalled();
+		tail.replaceChild(original, wrong);
+		const binding = fixture.attach(action, fixture.state);
+		expect(action.getAttribute('aria-label')).toBe('Must not partially apply');
+		binding.dispose();
+		const failedSnapshot = {
+			...fixture.state.getSnapshot(),
+			label: {
+				toString() {
+					throw failure;
+				},
+			},
+		};
+		const cleanup = vi.fn();
+		const source = { getSnapshot: () => failedSnapshot, subscribe: () => cleanup };
+		const before = action.outerHTML;
+		expect(() => fixture.attach(action, source)).toThrow(failure);
+		expect(action.outerHTML).toBe(before);
+		expect(cleanup).toHaveBeenCalledOnce();
+		fixture.attach(action, fixture.state).dispose();
+		const asyncCleanup = vi.fn();
+		expect(() =>
+			fixture.attach(action, {
+				getSnapshot: () => Promise.resolve(fixture.state.getSnapshot()),
+				subscribe: () => asyncCleanup,
+			} as unknown as typeof fixture.state),
+		).toThrow(/synchronous.*snapshot/i);
+		expect(asyncCleanup).toHaveBeenCalledOnce();
+		fixture.attach(action, fixture.state).dispose();
+		for (const markup of ['<svg><span /></svg>', '<svg><desc><g /></desc></svg>']) {
+			const source = `export function Invalid(props) @{ 'use dom bindings'; ${markup} }`;
+			for (const mode of ['server', 'client'] as const) {
+				expect(() =>
+					loadCompiledFixtureSource(source, {
+						id: '/src/invalid-svg.tsrx' + (mode === 'client' ? '?octane-bindings=Invalid' : ''),
+						mode,
+					}),
+				).toThrow(/SVG|static DOM bindings/i);
+			}
+		}
 	});
 
 	it('finalizes a rejected external range when an affected behavior cleanup throws', async () => {
@@ -1117,6 +1368,43 @@ describe('behavior-only roots', () => {
 		const replacement = attach();
 		expect(replacement.signal.aborted).toBe(false);
 		expect(container.firstElementChild).toBe(button);
+		const fixture = authoredBindings();
+		container.innerHTML = fixture.html;
+		const action = container.querySelector('button')!;
+		fixture.publish({ label: 'Not activated' });
+		const subscribe = vi.spyOn(fixture.state, 'subscribe');
+		const canceledBinding = fixture.attach(action, fixture.state, { signal: canceled.signal });
+		canceledBinding.refresh();
+		canceledBinding.dispose();
+		expect(action.getAttribute('aria-label')).toBe('Send');
+		expect(subscribe).not.toHaveBeenCalled();
+		const lifetime = new AbortController();
+		const binding = fixture.attach(action, fixture.state, { signal: lifetime.signal });
+		lifetime.abort();
+		fixture.publish({ label: 'Aborted' });
+		binding.refresh();
+		expect(action.getAttribute('aria-label')).toBe('Not activated');
+		expect(fixture.cleanup).toHaveBeenCalledOnce();
+		fixture.attach(action, fixture.state).dispose();
+		const duringSubscribe = new AbortController();
+		const subscribeCleanup = vi.fn();
+		const readSnapshot = vi.fn(() => fixture.state.getSnapshot());
+		fixture
+			.attach(
+				action,
+				{
+					getSnapshot: readSnapshot,
+					subscribe() {
+						duringSubscribe.abort();
+						return subscribeCleanup;
+					},
+				},
+				{ signal: duringSubscribe.signal },
+			)
+			.dispose();
+		expect(subscribeCleanup).toHaveBeenCalledOnce();
+		expect(readSnapshot).not.toHaveBeenCalled();
+		fixture.attach(action, fixture.state).dispose();
 	});
 
 	it('does not evict a healthy root when its explicitly requested replacement is already canceled', async () => {
@@ -1334,6 +1622,40 @@ describe('behavior-only roots', () => {
 		root.dispose();
 		expect(cleanup).toHaveBeenCalledOnce();
 		expect(container.querySelector('[data-action]')).not.toBeNull();
+		const fixture = authoredBindings();
+		container.innerHTML = fixture.html;
+		const action = container.querySelector('button')!;
+		let raced = false;
+		fixture.publish({
+			label: {
+				toString() {
+					if (!raced) {
+						raced = true;
+						fixture.publish({ label: 'Newest', disabled: false });
+					}
+					return 'Obsolete';
+				},
+			},
+			disabled: true,
+		});
+		const binding = fixture.attach(action, fixture.state);
+		expect(raced).toBe(true);
+		expect(action.getAttribute('aria-label')).toBe('Newest');
+		expect(action.disabled).toBe(false);
+		binding.dispose();
+		const lifetime = new AbortController();
+		fixture.publish({
+			label: {
+				toString() {
+					lifetime.abort();
+					return 'Canceled';
+				},
+			},
+		});
+		const retained = action.outerHTML;
+		fixture.attach(action, fixture.state, { signal: lifetime.signal }).dispose();
+		expect(action.outerHTML).toBe(retained);
+		expect(fixture.cleanup).toHaveBeenCalledTimes(2);
 	});
 
 	it('does not let a removed pending adoption delay behavior readiness', async () => {

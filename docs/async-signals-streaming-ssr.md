@@ -86,6 +86,15 @@ optional native island takes ownership. Controllers and behavior roots may be
 installed early; deferring their code does not magically provide synchronous
 navigation cancellation or trusted user activation.
 
+Fixed native presentation has an explicit compiler-backed path through
+[`adoptBindings`](./deferred-hydration.md#compiled-presentation-on-existing-dom).
+An opted-in static view projects one owned snapshot onto matching existing SSR
+elements without retaining the renderer. The application hands over only the
+declared dynamic properties and retains event, structure, and document lifetime
+ownership. This first slice excludes structural rendering and direct
+`value`/`checked` authoring; the existing control adapter above remains in use.
+It is not a new signal graph or a replacement for stream-result authority.
+
 Integration should replace the host's bespoke state carrier, early-control
 handoff, and stream receiver where these primitives cover the same responsibility,
 not mirror state through old and new stores. Storage keys, draft recovery policy,

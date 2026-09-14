@@ -43,6 +43,7 @@
     "./hydration": "./src/hydration/index.ts",
     "./hydration/streamed-signals": "./src/hydration/streamed-signals.ts",
     "./behavior": "./src/behavior-root.ts",
+    "./dom-bindings": "./src/dom-bindings.ts",
     "./react/server": "./src/react/server.ts",
     "./server": "./src/server/index.ts",
     "./signals": "./src/signals/index.ts",
@@ -122,6 +123,10 @@
       "./behavior": {
         "types": "./dist/behavior-root.d.ts",
         "default": "./dist/behavior-root.js"
+      },
+      "./dom-bindings": {
+        "types": "./dist/dom-bindings.d.ts",
+        "default": "./dist/dom-bindings.js"
       },
       "./react/server": {
         "types": "./dist/react/server.d.ts",

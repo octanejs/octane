@@ -618,3 +618,194 @@ Removing that remaining coupling requires a separate compatible design; this
 patch neither strips those methods nor changes compiler directives. A pre-existing
 candidate snapshot-before-capture-initialization conservative rejection was
 reproduced at both baseline and candidate and left unchanged.
+
+## Experimental authored DOM adoption (2026-09-13)
+
+The first renderer-free authored-view slice uses a fixed native button, two icon
+spans and SVG descendants. A compiler-generated projector replaces only the
+manual presentation callback; both variants retain the same source, events,
+streamed results, early-control behavior, final DOM and lifetime. Unsupported
+structure fails at compilation. Static and explicitly `unbound` attributes do
+not enter the projector. No renderer module resolves, even if it would otherwise
+be tree-shaken away.
+
+Matched Vite 8.1.5 / Rolldown 1.1.5 production builds:
+
+| Delivery | Manual | Authored | Change |
+| --- | ---: | ---: | ---: |
+| Initial JS, raw bytes | 65,563 | 68,947 | +3,384 |
+| Initial JS, gzip-9 bytes | 19,983 | 21,165 | +1,182 |
+| Initial JS, Brotli-11 bytes | 18,077 | 19,079 | +1,002 |
+| Optional JS, gzip-9 bytes | 4,090 | 4,090 | 0 |
+| Inline capture, gzip-9 bytes | 457 | 457 | 0 |
+
+This is **not a bundle-size win for one small view**. The generic adoption,
+validation and cleanup runtime costs more than this deliberately small manual
+control. The no-adoption control is byte-identical to the pre-sprint build
+(19,370 initial gzip bytes, identical initial/optional/inline hashes), so unused
+support adds no cost to that workload. These numbers are not Home budget proof.
+
+The emitted raw-byte difference is fully attributable: 3,165 bytes for the
+adoption runtime, 283 for shared class normalization, 656 for the generated
+descriptor/projector and 48 for activation, minus 768 removed manual-projection
+bytes. Most of the first-view cost is reusable validation/lifetime machinery,
+not copied rendering code. Compressed contributions cannot be added independently;
+the measured paired gzip difference remains 1,182 bytes.
+
+For 1,000 unchanged publications, observed attribute mutations drop from 5,000
+to zero in both Chromium and WebKit. Alternating state is the real-work control:
+7,000 mutations become 6,000 while preserving the same final DOM. Instrumented
+durations include event dispatch, snapshots and MutationObserver overhead;
+same-machine packaging activity may overlap some samples. WebKit's alternating
+case did not demonstrate a speedup. No general CPU, paint, INP or latency
+improvement is claimed.
+
+Validation: 732 focused dev/prod/Strong case executions, 70 neighboring compiler
+cases, core/public/fixture typechecks, four deliberate runtime faults and a
+renderer-import guard fault. Chromium 149.0.7827.55 and WebKit 26.5 each pass
+manual/authored lanes: 48 measured scenarios plus 16 warmups total, no failures.
+Installed desktop Safari 26.6.2 separately passes both variants with external
+modules held, trusted early typing, original nodes retained, native same-stack
+`requestSubmit`, external visibility retained, and cleanup. This is not iOS,
+IME/BFCache, application deployment or CI qualification.
+
+Native iOS Safari 26.5 (23F77) was reached on the task's dedicated simulator, but
+two bounded attempts could not deliver native text into the unchanged manual
+control before module release. Focus and native clearing worked; typing produced
+no text or trusted input events. The authored path was not reached. This is an
+automation qualification gap, not a demonstrated binding regression; the input
+assertion was not weakened. Driver/server cleanup completed and the simulator
+was returned to its prior shutdown state.
+
+Evidence lives under `/Users/callie/code/playwright-runs/`:
+`octane-dom-bindings-final-{chromium,webkit}-{manual,authored}-20260913/`,
+`octane-dom-bindings-final-none-20260913/`,
+`octane-dom-bindings-final-tests-20260913.json`, and
+`octane-dom-bindings-native-safari-20260913/report.json`. Builds record consumed
+source and output hashes; each variant's browser assets are identical across
+engines. All Safari sessions, drivers, proxies and fixture servers were closed.
+
+### Lightweight Home integration before the class-helper packaging fix
+
+The first application replacement preserves the existing Send/Stop, input,
+submission and Voice owners. Against immutable application control
+`f678b2cfce01b00132e4df4bc49dbce8caec6fbb`, the uncommitted integration's preserved
+production build has matching build conditions/toolchain and 2,318 unchanged
+inputs during its build. Node's default gzip/Brotli entity-size accounting is
+used here, separately from the fixture's explicit compression levels above.
+
+| Modern Home delivery | Control gzip bytes | Authored gzip bytes | Change |
+| --- | ---: | ---: | ---: |
+| Initial JavaScript | 69,774 | 69,914 | +140 |
+| Initial plus prewarm JavaScript | 75,522 | 75,667 | +145 |
+
+Initial raw JavaScript grows 460 bytes; initial/prewarm JavaScript requests stay
+at 9/12. First-Send and full-controller cumulative scenarios grow 98/69 gzip
+bytes respectively. These are alternative scenarios, not additive phases.
+The union of all reachable alternatives grows 2,380 gzip bytes and one file;
+that union includes mutually exclusive paths and is not a page-load estimate.
+Authenticated synthetic SSR captures grow 153 gzip bytes on Home and 3 on a
+saved conversation, with unchanged critical CSS. These named-closure figures do
+not establish a bundle saving or achievement of the application's startup
+target. Independent final review found that the existing phase/scenario
+roots omit the automatically idle-loaded `native-composer-draft-bootstrap`,
+which delivers the adopter. Therefore the figures above do **not** establish
+the replacement's total automatic cost. The corrected deduplicated Home unions
+are **71,033 → 75,370 gzip bytes for initial plus idle (+4,337)** and
+**76,781 → 81,123 for prewarm plus idle (+4,342)**, each adding one response.
+The declared automatic union including idle grows 4,309 gzip bytes. These
+correct the composer omission, not every conditional future request: the
+unchanged visibility/idle/interaction-dependent telemetry chain is recorded
+separately. The original incomplete report is retained; the minimal profile
+correction adds the scheduled root for both routes and targets. No caps changed.
+
+The app finalizer, 332 existing focused cases and eight real-SSR/adopter DOM
+integration checks pass, as do all 99 existing composer browser cases. Genuine
+local anonymous flows preserve early input and complete two backend turns. A
+fresh staging Free account completes an initial turn, stops a follow-up at the
+product's stopped terminal state, retains all seven original button elements,
+then completes another follow-up. Chromium/Pixel7 and the maintained Worker
+browser lanes pass, including WebKit follow-up input continuity. No uncaught
+errors were observed in the real-account flows.
+
+The static runner remains failed: its 87 clause outcomes, including 13 failures,
+are identical against the exact immutable `f678b2cf` control, with no
+candidate-only failure. No assertions or caps were relaxed. Native iOS remains
+unqualified as described above; no app publication or current-head CI success
+is implied. Evidence is under
+`/Users/callie/code/playwright-runs/lw-renderer-free-primary-20260913/`, including
+`measurements/delivery-comparison.json`, `candidate/source-state.json` and
+`candidate/authenticated-documents/document-sizes.json`. The unchanged static
+control is recorded in `static-control/comparison.json`.
+
+### Pure class-normalization leaf follow-up
+
+The unoptimized application's adopter needs only `normalizeClass`, but the
+shared `css.ts` module made a 6,142 raw / 2,469 gzip-byte chunk automatic. That
+chunk also contains DOM/CSS tables needed by the deferred renderer and initializes
+five Sets, three Maps and 220 unitless-property entries. This is module
+co-location, not a requirement of DOM adoption.
+
+The correction moves the existing normalization function unchanged into a
+dependency-free `class-names.ts` leaf. `css.ts` imports/re-exports it for existing
+renderer and SSR callers; the adopter imports the leaf directly. Style behavior,
+public APIs and loading schedules do not change.
+
+A matched Vite split fixture includes real compiler/SSR output, eager adoption
+and a genuinely later renderer consumer. Eager delivery drops from 10,952 raw /
+4,718 gzip to 5,173 raw / 2,478 gzip bytes (**−2,240 gzip**). Eventual delivery
+changes only 168,535 raw / 54,084 gzip → 168,452 raw / 53,994 gzip (−90 gzip):
+most of the eager saving keeps style machinery with its deferred consumer,
+rather than deleting functionality. Both variants execute the same DOM semantics.
+
+The resolved-dependency regression fails before the correction and passes after,
+including cases where single-entry tree-shaking would hide the import. All 984
+existing class/style/adopter and neighboring cases pass across dev/prod/Strong;
+core/public typechecks, scoped formatting, generation guards and sync pass.
+Two independent reviews confirm the exact function move and internal package
+discovery. Maintained receipt client assets and the inline script are byte-identical
+to the earlier browser controls. Rebuilt-server Chromium/WebKit smokes and both
+installed desktop Safari variants pass; native iOS remains unqualified. Split
+evidence is under
+`/Users/callie/code/playwright-runs/octane-class-leaf-split-{baseline,candidate}-semantic-20260913/`.
+
+The actual application rebuild verifies 2,339 unchanged build inputs and confirms
+the saving using complete named closures plus the automatic composer-idle root:
+these are deduplicated response-entity sizes and source-declared request counts,
+not observed browser transfers.
+
+| Modern Home union | Prior `f678b2cf` | Unoptimized adoption | Class-leaf adoption |
+| --- | ---: | ---: | ---: |
+| Initial + idle, gzip bytes | 71,033 | 75,370 | 73,098 |
+| Initial + idle, JS requests | 10 | 11 | 11 |
+| Prewarm + idle, gzip bytes | 76,781 | 81,123 | 78,849 |
+| Prewarm + idle, JS requests | 13 | 14 | 14 |
+
+The packaging correction saves **2,274 prewarm-plus-idle gzip bytes**, but the
+new capability still costs **2,068 gzip bytes and one response over `f678b2cf`**.
+It is not a net size win or achievement of the larger Home target. Named initial
+and prewarm alone are 69,906/75,657 gzip bytes; these exclude the adopter's idle
+delivery and must not substitute for the corrected union. Existing visibility/
+idle/interaction-dependent telemetry remains a separately documented condition.
+
+The optimized installed package matches all 357 distribution files from its
+verified isolated build. Fresh application runs pass the same 332 focused cases,
+eight real-SSR/adopter checks and 99 composer browser cases. The optimized app's
+final real-account screenshot shows two assistant replies after a Stop/recovery
+flow where one was expected. The retained saved graph identifies two sibling
+alternatives under one backend-recorded request, with explicit
+`num_variants_in_stream=2` and `display_treatment=skippable` metadata. The saved
+selected branch still points to the preceding long answer, omitting the recovery
+turn on reload. Ten relevant application request, stream, history and Stop owners
+are byte-identical to `f678b2cf`: that path ignores the variant-count event and
+presents distinct assistant IDs as consecutive rows, without an alternative
+selector. This supports an existing app compatibility gap rather than evidence
+of duplicate submission or a class-extraction regression. The original transport
+trace was not retained, so exact timing and selected-branch causality remain
+unresolved; this is not qualified as clean real-account QA. Proposed matched
+Sends were held before execution, and no response-selection behavior was changed.
+No publication, green CI or fresh native iOS result is implied. Evidence is under
+`/Users/callie/code/playwright-runs/lw-renderer-free-primary-20260913/packaging/`,
+including `measurements/primary-packaging-comparison.md`, `paragen-compatibility.md` and
+`app-paragen-source-audit.json`. The original unoptimized build
+and the first incomplete accounting report remain preserved.

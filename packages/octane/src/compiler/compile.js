@@ -102,6 +102,7 @@ import {
 import { createTextTypeFactsLookup, normalizeTextTypeFilename } from './text-type-facts.js';
 import { lowerSignalDeclarations } from './signal-declarations.js';
 import { lowerSignalAttemptReads } from './signal-attempt-reads.js';
+import { domBindingExportFromId, prepareDomBindings } from './dom-bindings.js';
 import { collectProvenContextBindings, isProvenContextUse } from './context-use.js';
 import { applyCssModuleConstants } from './css-module-constants.js';
 import { assertUniversalRuntimeTarget, normalizeUniversalRuntime } from './universal-runtime.js';
@@ -9073,7 +9074,24 @@ function compileAuthored(source, filename, options, bundlerMetadata) {
 	assertNativeReadDiagnostics(analyzedAst, source, cleanFilename, options);
 	const strongAnalysis = assertStrongMode(analyzedAst, source, cleanFilename, options);
 	const strongModeEnabled = strongAnalysis?.enabled === true;
-	const attemptAst = lowerSignalAttemptReads(analyzedAst);
+	const bindingExport = domBindingExportFromId(filename);
+	if (
+		bindingExport !== null &&
+		(mode !== 'client' ||
+			hydrateBoundaryPathFromId(filename) !== null ||
+			(options?.renderer?.target && options.renderer.target !== 'dom'))
+	) {
+		throw new Error(
+			'Octane DOM binding queries require the client DOM target without a Hydrate query.',
+		);
+	}
+	const bindingAst =
+		bindingExport !== null ||
+		source.includes('use dom bindings') ||
+		source.includes('adoptBindings')
+			? prepareDomBindings(analyzedAst, source, cleanFilename, bindingExport)
+			: analyzedAst;
+	const attemptAst = lowerSignalAttemptReads(bindingAst);
 	const signalAst = lowerSignalDeclarations(attemptAst, cleanFilename);
 	if (bundlerMetadata !== null) bundlerMetadata.hydrateAst = signalAst;
 	const memoizedAst = strongModeEnabled

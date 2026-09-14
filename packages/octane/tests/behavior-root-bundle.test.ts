@@ -27,6 +27,7 @@ async function bundleConsumer(contents: string) {
 
 	return {
 		contents: result.outputFiles[0].contents,
+		resolvedInputs: Object.keys(result.metafile.inputs).map((input) => input.split(sep).join('/')),
 		inputs: Object.entries(Object.values(result.metafile.outputs)[0].inputs)
 			.filter(([, metadata]) => metadata.bytesInOutput > 0)
 			.map(([input]) => input.split(sep).join('/')),
@@ -59,6 +60,16 @@ describe('production behavior-root entry points', () => {
 
 			root.dispose();
 			expect(container.firstElementChild).toBe(existing);
+			// Resolved dependencies matter when a later renderer consumer co-locates
+			// other exports from the same module in a shared eager chunk.
+			const bindings = await bundleConsumer(
+				"export { __adoptBindings } from 'octane/dom-bindings';",
+			);
+			expect(
+				bindings.resolvedInputs.filter((input) =>
+					/packages\/octane\/src\/(?:css|dom-tables)\.[jt]s$/.test(input),
+				),
+			).toEqual([]);
 		});
 	}
 

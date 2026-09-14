@@ -81,6 +81,9 @@ Build only, with existing installed dependencies:
 node benchmarks/conversation-streaming/behavior-only/build.mjs
 # Separate query-free composer startup with a later real query consumer:
 node benchmarks/conversation-streaming/behavior-only/build.mjs --composer-receipts --bundler=vite
+# Equal-work primary-action projection comparison, in separate output directories:
+node benchmarks/conversation-streaming/behavior-only/build.mjs --composer-receipts --bundler=vite --projection=manual
+node benchmarks/conversation-streaming/behavior-only/build.mjs --composer-receipts --bundler=vite --projection=authored
 ```
 
 `BENCH_BUILD_DIR=/absolute/artifact/directory` selects a durable output directory.
@@ -89,6 +92,27 @@ The default client bundler remains esbuild for historical comparisons.
 same public Octane compiler and authored fixture. The Node server remains an
 esbuild bundle in both cases. Do not compare differently bundled results as a
 runtime-change delta: build the same baseline and candidate with the same option.
+
+The optional `projection` comparison adds the same server-authored button, two
+icon spans and SVG descendants to both candidates. `manual` uses an ordinary
+subscribe-to-DOM projection; `authored` lowers the typed `adoptBindings` call to
+the compiler-proven view artifact. Both retain the same application snapshot
+source, native listeners, explicit refresh, document signals, streams, and final
+DOM. The default `none` preserves the original workload. Compare manual against
+authored, not the original smaller fixture against the larger authored fixture.
+
+Pass `projection: 'manual'` or `'authored'` to `runBrowser` with
+`composerReceipts: true, bundler: 'vite'`. The runner checks reflected button
+properties and real native `requestSubmit` in the same stack, the distinction
+between boolean/ARIA/presence attributes, retained SVG/span identity, and
+unowned visibility/style preservation. It separately records 1,000 repeated
+unchanged projections and 1,000 alternating projections with equal final DOM.
+`attributeMutations` is a deterministic browser MutationObserver record count,
+not a render count. `durationMs` includes native event dispatch, shared snapshot
+creation, projection and observer instrumentation, not paint or INP. The
+alternating lane challenges a gain attributable only to skipping unchanged
+writes. Compare identical browser/build/iteration settings, exclude warmups,
+and keep these projection samples separate from auth-gated stream marks.
 
 The build writes `build.json`, `client-metafile.json`, a Node server bundle and
 split production browser chunks. It records client/server bundler versions and

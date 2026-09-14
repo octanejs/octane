@@ -13,6 +13,41 @@ Chromium, feature-off shared support cost, complete mobile/application performan
 evidence, and publication/CI remain separate open gates. The evidence
 log below is chronological: earlier setup blockers do not override later results.
 
+### Experimental authored static DOM bindings (2026-09-13)
+
+`adoptBindings` now compiles an explicitly opted-in element-only native view into
+a renderer-free snapshot projector. It updates matching existing SSR nodes,
+preserves external event ownership, rejects conflicting property owners and
+unsupported structure, and provides synchronous refresh plus abort/disposal.
+`unbound(value)` retains ordinary SSR values without handing those attributes to
+the adopter. Static SVG data is excluded from the live projector.
+
+Two-pass review repaired nested intrinsic lowering and SVG parser-breakout
+diagnostics. Focused development/production/Strong validation, matching real
+browser controls, and installed desktop Safari pass. The
+[performance report](./async-signals-performance.md#experimental-authored-dom-adoption-2026-09-13)
+records the evidence and important limit: one small authored view costs 1,182
+more initial gzip bytes than its manual control, while unused support costs
+zero and unchanged publications produce no DOM mutations. This establishes the
+capability, not the application's Home budget target. Application integration,
+now locally verified, costs 140 initial / 145 prewarm gzip bytes over the prior
+candidate in the existing named closures with unchanged requests. Final review
+found those closures omit an automatically idle-loaded bootstrap that delivers
+the adopter; corrected prewarm-plus-idle cost is 4,342 additional gzip bytes.
+A subsequent pure class-helper extraction passes 984 existing cases and removes
+2,240 eager gzip bytes in a genuine split-renderer fixture. The matched application
+rebuild saves 2,274 prewarm-plus-idle gzip bytes, leaving 2,068 additional bytes
+and one response over the prior app candidate. The larger Home target remains
+unmet. The app's 99 existing browser cases pass. Real-account verification also
+exposed backend alternative replies that the unchanged application stream path
+presents as consecutive answers; the saved selected branch omitted that recovery
+turn. Retained variant metadata and baseline-identical source support an existing
+app compatibility gap, not evidence of a binding regression, but missing original
+transport prevents a complete timing/selection diagnosis. Clean app QA, an
+unchanged baseline static-runner failure, fresh iOS proof, budget qualification
+and publication remain separate gates. See the same performance report for exact
+controls and limitations.
+
 ### Static result-only receiver follow-up (2026-09-13)
 
 Hosts that accept signal results but own their HTML placement can select

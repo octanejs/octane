@@ -401,6 +401,110 @@ when elements leave the container. Importing the focused `octane/behavior`
 entry does not load the component runtime, compiler, or server renderer. The
 same API and public types are also exported by `octane`.
 
+### Compiled presentation on existing DOM
+
+For a fixed native element tree, `adoptBindings` from `octane/behavior` can
+replace a manual attribute/class presentation callback without creating a
+component root. This experimental path is explicit: mark a named component
+with `'use dom bindings'` and activate it from an Octane-compiled `.tsrx` or
+`.tsx` module. The ordinary component remains usable by the server renderer.
+
+```tsrx
+// PrimaryAction.tsrx
+import { unbound } from 'octane/behavior';
+
+export interface PrimaryActionProps {
+	type: 'button' | 'submit';
+	disabled: boolean;
+	label: string;
+	showSend: boolean;
+	showStop: boolean;
+	initiallyHidden: boolean;
+}
+
+export function PrimaryAction(props: PrimaryActionProps) @{
+	'use dom bindings';
+	<button
+		type={props.type}
+		disabled={props.disabled}
+		aria-label={props.label}
+		hidden={unbound(props.initiallyHidden)}
+	>
+		<span hidden={!props.showSend}>
+			<svg aria-hidden="true" viewBox="0 0 16 16">
+				<path d="M8 2 2 8h4v6h4V8h4Z" />
+			</svg>
+		</span>
+		<span hidden={!props.showStop}>
+			<svg aria-hidden="true" viewBox="0 0 16 16">
+				<path d="M3 3h10v10H3Z" />
+			</svg>
+		</span>
+	</button>
+}
+```
+
+```ts
+// activate-primary-action.tsrx — compiled even though it contains no JSX.
+import { adoptBindings, type BindingSource } from 'octane/behavior';
+import { PrimaryAction, type PrimaryActionProps } from './PrimaryAction.tsrx';
+
+export function activatePrimaryAction(
+	root: Element,
+	source: BindingSource<PrimaryActionProps>,
+	signal: AbortSignal,
+) {
+	return adoptBindings(root, PrimaryAction, source, { signal });
+}
+```
+
+`BindingSource` supplies `getSnapshot()` and `subscribe(notify)`. It can be an
+existing owned signal projection or external store; adoption does not create a
+second reactive graph. Each notification reads one snapshot and prepares all
+bound values before synchronously writing them. The handle's `refresh()` also
+publishes synchronously, including when the enclosing signal batch has not yet
+delivered subscriptions. Use it before a native operation such as
+`form.requestSubmit()` that immediately depends on updated button properties.
+
+The compiler selects a separate binding artifact; authors keep normal typed
+component imports. Do not import generated query modules by hand. A direct call
+from an uncompiled plain `.ts` file throws; import a compiled activation function
+instead. Keep that activation module free of ordinary rendered-component uses
+if its browser graph must exclude the renderer.
+
+Import the named view directly from its defining module, not through a barrel.
+Keep that leaf module free of eager state initialization. Imported projection
+helpers must be pure; pass live values through the source snapshot rather than
+reading ambient state inside a projection. Snapshots must be synchronous values,
+never promises or other thenables.
+
+The first supported shape is one intrinsic HTML root with fixed native HTML/SVG
+descendants and explicit attribute/class/fixed-style projections. Visible text
+children (including static text), structural
+conditions and loops, component children, hooks, events, refs, spreads,
+`value`/`checked` control bindings, and raw HTML are not part of this path.
+Unsupported authoring produces a diagnostic, not a renderer fallback.
+
+Pass the exact element emitted by the matching server build. Adoption validates
+template compatibility, native topology, and conflicting binding ownership
+before modifying it. It never inserts or replaces nodes. Only declared dynamic
+properties are owned; unrelated properties and existing event listeners remain
+with their current owner. An application must stop previous manual writers for
+the channels it hands over. Template compatibility is not document or request
+authorization: retain the enclosing application's lifetime and stream fencing.
+
+`unbound(value)` marks an explicitly external-owned attribute in an opted-in
+view. The ordinary component uses its value during SSR and normal rendering;
+the adopter neither evaluates nor writes that attribute. Above, the server can
+initially hide the button while an existing Voice controller retains ownership
+of `button.hidden`. This is not signal untracking or a delayed write.
+
+Call `dispose()` or abort the supplied signal to unsubscribe and release the
+binding claims. Both retain existing DOM. Compose this with a behavior root's
+adoption callback when discovery, externally streamed ranges, or automatic
+element-removal cleanup is needed; the small binding runtime does not require
+that machinery itself.
+
 Each external range belongs to its declared `owner`. Strictly nested ranges are
 allowed, and the closest registered range determines ownership for behaviors
 with an `owner` constraint. Registering the same element for another owner

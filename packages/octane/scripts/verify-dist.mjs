@@ -212,7 +212,8 @@ export const REQUIRED_PUBLIC_VALUE_EXPORTS = {
 		'bootstrapStreamedSignalResults',
 		'installSignalDocumentLifecycle',
 	],
-	'./behavior': ['attachBehaviorRoot'],
+	'./behavior': ['adoptBindings', 'attachBehaviorRoot', 'unbound'],
+	'./dom-bindings': ['__adoptBindings'],
 	'./signals': [
 		'createResource',
 		'createScope',

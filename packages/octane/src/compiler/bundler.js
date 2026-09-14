@@ -23,6 +23,7 @@ import {
 } from './compile.js';
 import { validateRendererModuleSource } from './compile-universal.js';
 import { HYDRATE_QUERY_PARAM, hydrateBoundaryPathFromId } from './hydrate-boundaries.js';
+import { DOM_BINDINGS_QUERY, domBindingExportFromId } from './dom-bindings.js';
 import {
 	DOM_RENDERER_MODULE,
 	normalizeRendererConfig,
@@ -1065,6 +1066,10 @@ class OctaneBundlerCompiler {
 		);
 		const file = cleanModuleId(id);
 		const hydrateBoundaryPath = hydrateBoundaryPathFromId(id);
+		const domBindingExport = domBindingExportFromId(id);
+		if (domBindingExport !== null && hydrateBoundaryPath !== null) {
+			throw new Error('Octane DOM binding and Hydrate queries cannot be combined.');
+		}
 		const collected = {
 			dependencies: new Set(),
 			missingDependencies: new Set(),
@@ -1133,6 +1138,9 @@ class OctaneBundlerCompiler {
 		const fullCompile =
 			this._isFullCompileSource(file, collected) &&
 			this._passesOwnershipGate(file, filename, pragmaOwned);
+		if (domBindingExport !== null && !fullCompile) {
+			throw new Error('Octane DOM binding queries require a compiler-owned .tsrx/.tsx view.');
+		}
 		// The narrow-the-rule config error concerns modules Octane owns. Under
 		// the ownership gate a host-owned project module (unmarked, or in an
 		// excluded path) may legitimately sit inside a client-only include in a
@@ -1179,9 +1187,11 @@ class OctaneBundlerCompiler {
 				!hasRendererBoundaries &&
 				typeof options.resolveCssModuleConstant === 'function';
 			const compileFilename =
-				hydrateBoundaryPath === null
-					? filename
-					: `${filename}?${HYDRATE_QUERY_PARAM}=${encodeURIComponent(hydrateBoundaryPath)}`;
+				domBindingExport !== null
+					? `${filename}?${DOM_BINDINGS_QUERY}=${encodeURIComponent(domBindingExport)}`
+					: hydrateBoundaryPath === null
+						? filename
+						: `${filename}?${HYDRATE_QUERY_PARAM}=${encodeURIComponent(hydrateBoundaryPath)}`;
 			const compileOptions = {
 				hmr,
 				mode: environment,

@@ -7,7 +7,13 @@ import {
 	type BehaviorRoot,
 	type ExternalRange,
 } from 'octane';
-import { attachBehaviorRoot as attachFocusedBehaviorRoot } from 'octane/behavior';
+import {
+	adoptBindings,
+	attachBehaviorRoot as attachFocusedBehaviorRoot,
+	type BindingHandle,
+	type BindingOptions,
+	type BindingSource,
+} from 'octane/behavior';
 
 const container = document.createElement('main');
 const owner = Symbol('external stream');
@@ -63,3 +69,36 @@ focusedRoot.registerBehavior({ target: 123, adopt() {} });
 
 // @ts-expect-error — adoption cleanup cannot return an arbitrary value.
 focusedRoot.registerBehavior({ target: 'button', adopt: () => 123 });
+
+declare function PrimaryAction(props: { type: 'button' | 'submit'; disabled: boolean }): unknown;
+const presentation: BindingSource<{ type: 'button' | 'submit'; disabled: boolean }> = {
+	getSnapshot: () => ({ type: 'submit', disabled: false }),
+	subscribe: () => () => {},
+};
+const bindingOptions: BindingOptions = { signal: lifetime.signal };
+const binding: BindingHandle = adoptBindings(
+	container,
+	PrimaryAction,
+	presentation,
+	bindingOptions,
+);
+binding.refresh();
+binding.dispose();
+
+adoptBindings(container, PrimaryAction, {
+	// @ts-expect-error — the source cannot widen the component's required prop types.
+	getSnapshot: () => ({ type: 1, disabled: false }),
+	subscribe: () => () => {},
+});
+adoptBindings(container, PrimaryAction, {
+	// @ts-expect-error — the source must supply every required component prop.
+	getSnapshot: () => ({ type: 'submit' as const }),
+	subscribe: () => () => {},
+});
+adoptBindings(container, PrimaryAction, {
+	getSnapshot: presentation.getSnapshot,
+	// @ts-expect-error — an owned subscription must supply cleanup.
+	subscribe: () => {},
+});
+// @ts-expect-error — adoption takes an exact element, not a selector or a text node.
+adoptBindings('#primary-action', PrimaryAction, presentation);

@@ -5,6 +5,8 @@ import {
 	installSignalDocumentLifecycle,
 } from 'octane/hydration/streamed-signals';
 import { draft$, selectedDay$ } from './receipt-state.ts';
+import { initializePrimaryAction } from './primary-action-client.ts';
+import { primaryActionBenchmark } from './primary-action-mode.ts';
 
 const readIdentity = () => JSON.parse(document.getElementById('behavior-identity')!.textContent!);
 const metadata = readIdentity();
@@ -42,6 +44,7 @@ const cleanups = [
 	receipt$.subscribe(renderReceipt),
 	selectedDay$.subscribe(renderDay),
 ];
+if (primaryActionBenchmark) cleanups.push(initializePrimaryAction());
 const edited = () => scope.set(revision$, (revision) => revision + 1);
 control.addEventListener('input', edited);
 renderReceipt();

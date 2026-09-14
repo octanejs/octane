@@ -1,3 +1,6 @@
+export { adoptBindings, unbound } from './dom-bindings.js';
+export type { BindingSource, BindingOptions, BindingHandle } from './dom-bindings.js';
+
 /** A behavior-only root observes existing DOM without taking reconciliation ownership. */
 export interface BehaviorRootOptions {
 	/** Dispose this root when the enclosing page or document lifetime ends. */

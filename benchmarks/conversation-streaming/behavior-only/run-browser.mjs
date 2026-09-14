@@ -9,10 +9,16 @@ import { buildFixture, startServer } from './build.mjs';
 // Playwright WebKit without mislabelling WebKit as installed Safari/iOS proof.
 export async function runBrowser(
 	browser,
-	{ output, iterations = 3, composerReceipts = false, bundler = 'esbuild' } = {},
+	{
+		output,
+		iterations = 3,
+		composerReceipts = false,
+		bundler = 'esbuild',
+		projection = 'none',
+	} = {},
 ) {
 	assert.ok(Number.isInteger(iterations) && iterations > 0 && iterations <= 50);
-	const build = await buildFixture(output, { composerReceipts, bundler });
+	const build = await buildFixture(output, { composerReceipts, bundler, projection });
 	const server = await startServer(build);
 	const result = {
 		suite: build.suite,
@@ -21,6 +27,7 @@ export async function runBrowser(
 		iterations,
 		composerReceipts,
 		bundler,
+		projection,
 		samples: [],
 		failures: [],
 		limitations: build.limitations,
@@ -47,6 +54,7 @@ export async function runBrowser(
 					if (request.url().includes('/assets/')) network.push(request.url().split('/assets/')[1]);
 				});
 				let releaseModules;
+				let projectionSamples;
 				const run = randomUUID();
 				try {
 					await page.addInitScript(() => {
@@ -110,6 +118,94 @@ export async function runBrowser(
 						'loading',
 						'Classic import launcher must activate before auth-gated parser EOF',
 					);
+					if (projection !== 'none') {
+						const proof = await page.evaluate(() => {
+							const button = document.getElementById('primary-action');
+							const form = document.getElementById('primary-action-form');
+							const nodes = [button, ...button.querySelectorAll('*')];
+							const send = button.querySelector('[data-send-icon]');
+							const stop = button.querySelector('[data-stop-icon]');
+							button.hidden = true;
+							button.style.marginLeft = '7px';
+							const update = (detail) =>
+								button.dispatchEvent(new CustomEvent('primary-action-update', { detail }));
+							update({ active: true, disabled: true, stopRequested: false });
+							const active =
+								button.type === 'button' &&
+								button.disabled &&
+								button.getAttribute('aria-disabled') === 'true' &&
+								button.getAttribute('aria-label') === 'Stop generating' &&
+								!button.hasAttribute('data-stop-generating') &&
+								button.hasAttribute('data-visually-disabled') &&
+								send.hidden &&
+								!stop.hidden &&
+								button.className === 'primary-action active' &&
+								button.style.opacity === '0.5' &&
+								button.style.getPropertyValue('--action-tone') === 'red';
+							let rejectsNonSubmitter = false;
+							try {
+								form.requestSubmit(button);
+							} catch (error) {
+								rejectsNonSubmitter = error instanceof TypeError;
+							}
+							update({ active: false, stopRequested: true, defer: true });
+							const synchronous =
+								button.type === 'submit' &&
+								!button.disabled &&
+								button.getAttribute('aria-disabled') === 'false' &&
+								button.getAttribute('data-stop-generating') === '' &&
+								!button.hasAttribute('data-visually-disabled') &&
+								!send.hidden &&
+								stop.hidden &&
+								button.className === 'primary-action ready' &&
+								button.style.opacity === '1' &&
+								button.style.getPropertyValue('--action-tone') === 'black';
+							form.requestSubmit(button);
+							const measure = (changing) => {
+								update({ active: false });
+								const before = button.outerHTML;
+								const observer = new MutationObserver(() => {});
+								observer.observe(button, { attributes: true, subtree: true });
+								const start = performance.now();
+								for (let index = 0; index < 1000; index++)
+									update({ active: changing && index % 2 === 0 });
+								const durationMs = performance.now() - start;
+								const attributeMutations = observer.takeRecords().length;
+								observer.disconnect();
+								return {
+									updates: 1000,
+									durationMs,
+									attributeMutations,
+									stableFinalDOM: before === button.outerHTML,
+								};
+							};
+							const measurements = { unchanged: measure(false), alternating: measure(true) };
+							return {
+								measurements,
+								active,
+								rejectsNonSubmitter,
+								synchronous,
+								submitted: document.documentElement.dataset.primaryActionSubmitted === 'true',
+								identity: nodes.every(
+									(node, index) => [button, ...button.querySelectorAll('*')][index] === node,
+								),
+								externalOwnership: button.hidden && button.style.marginLeft === '7px',
+							};
+						});
+						const { measurements, ...semantics } = proof;
+						projectionSamples = measurements;
+						assert.ok(
+							measurements.unchanged.stableFinalDOM && measurements.alternating.stableFinalDOM,
+						);
+						assert.deepEqual(semantics, {
+							active: true,
+							rejectsNonSubmitter: true,
+							synchronous: true,
+							submitted: true,
+							identity: true,
+							externalOwnership: true,
+						});
+					}
 					if (composerReceipts && heldModules) {
 						const receipt = JSON.parse(
 							await page.locator('html').getAttribute('data-draft-receipt'),
@@ -257,7 +353,15 @@ export async function runBrowser(
 						...window.__behaviorMarks,
 						behavior: performance.getEntriesByName('behavior-ready')[0].startTime,
 					}));
-					if (iteration >= 0) result.samples.push({ iteration, mode, marks, network, trace });
+					if (iteration >= 0)
+						result.samples.push({
+							iteration,
+							mode,
+							marks,
+							network,
+							trace,
+							projection: projectionSamples,
+						});
 				} catch (error) {
 					result.failures.push({
 						trace: await (

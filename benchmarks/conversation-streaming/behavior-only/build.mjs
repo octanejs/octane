@@ -27,9 +27,14 @@ function sizes(bytes) {
 
 export async function buildFixture(
 	output = fs.mkdtempSync(path.join(os.tmpdir(), 'octane-behavior-only-')),
-	{ composerReceipts = false, bundler = 'esbuild' } = {},
+	{ composerReceipts = false, bundler = 'esbuild', projection = 'none' } = {},
 ) {
 	assert.ok(bundler === 'esbuild' || bundler === 'vite', 'Unknown client bundler');
+	assert.ok(['none', 'manual', 'authored'].includes(projection), 'Unknown projection variant');
+	assert.ok(
+		projection === 'none' || composerReceipts,
+		'Projection comparison uses composer receipts',
+	);
 	fs.mkdirSync(output, { recursive: true });
 	const { build, version } = await import(pathToFileURL(require.resolve('esbuild')).href);
 	const compilerEntry = require.resolve('octane/compiler/bundler');
@@ -68,10 +73,15 @@ export async function buildFixture(
 	};
 	const compilations = [];
 	const loadSource = (compiler, environment, file) => {
-		const bytes = source(file);
+		const physical = file.split('?')[0];
+		const bytes = source(physical);
+		const authored =
+			physical === path.join(HERE, 'primary-action-mode.ts')
+				? `export const primaryActionBenchmark = ${projection !== 'none'};`
+				: bytes.toString();
 		const compiled =
 			file.startsWith(HERE + path.sep) && !file.endsWith('.mjs')
-				? compiler.transform(bytes.toString(), file)
+				? compiler.transform(authored, file)
 				: null;
 		if (compiled)
 			compilations.push({
@@ -81,9 +91,15 @@ export async function buildFixture(
 				sourceSha256: hash(bytes),
 				outputSha256: hash(compiled.code),
 			});
-		return compiled?.code ?? bytes.toString();
+		return compiled?.code ?? authored;
 	};
 	const resolveSource = (request, importer, environment) => {
+		if (request.includes('?octane-bindings=')) {
+			const [file, query] = request.split('?');
+			return path.resolve(path.dirname(importer), file) + '?' + query;
+		}
+		if (request === './primary-action-manual.ts' && projection === 'authored')
+			return path.join(HERE, 'primary-action-authored.tsrx');
 		if (/^octane(?:\/|$)/.test(request))
 			return require.resolve(
 				request === 'octane' && environment === 'server' ? 'octane/server' : request,
@@ -107,25 +123,31 @@ export async function buildFixture(
 			name: 'behavior-only-public-compiler',
 			setup(builder) {
 				builder.onResolve(
-					{ filter: /^octane(?:\/|$)|^\.\/(?:State|loaders)\.ts$/ },
+					{
+						filter:
+							/^octane(?:\/|$)|^\.\/(?:State|loaders|primary-action-manual)\.ts$|\?octane-bindings=/,
+					},
 					({ path: request, importer }) => {
 						const resolved = resolveSource(request, importer, environment);
 						return resolved ? { path: resolved } : undefined;
 					},
 				);
-				builder.onLoad({ filter: /\.(?:[cm]?[jt]s|tsx|jsx|tsrx|json)$/ }, ({ path: file }) => {
-					return {
-						contents: loadSource(compiler, environment, file),
-						loader: /\.tsx$/.test(file)
-							? 'tsx'
-							: /\.ts$/.test(file)
-								? 'ts'
-								: /\.json$/.test(file)
-									? 'json'
-									: 'js',
-						resolveDir: path.dirname(file),
-					};
-				});
+				builder.onLoad(
+					{ filter: /\.(?:[cm]?[jt]s|tsx|jsx|tsrx|json)(?:\?octane-bindings=[^?]+)?$/ },
+					({ path: file }) => {
+						return {
+							contents: loadSource(compiler, environment, file),
+							loader: /\.tsx$/.test(file)
+								? 'tsx'
+								: /\.ts$/.test(file)
+									? 'ts'
+									: /\.json$/.test(file)
+										? 'json'
+										: 'js',
+							resolveDir: path.dirname(file),
+						};
+					},
+				);
 			},
 		};
 	};
@@ -148,8 +170,10 @@ export async function buildFixture(
 			path.join(output, 'client-metafile.json'),
 			JSON.stringify(client.metafile, null, 2),
 		);
-		clientInputs = Object.keys(client.metafile.inputs).map((file) =>
-			fs.realpathSync(path.resolve(REPO, file)),
+		clientInputs = Object.keys(client.metafile.inputs).map(
+			(file) =>
+				fs.realpathSync(path.resolve(REPO, file.split('?')[0])) +
+				(file.includes('?') ? '?' + file.split('?')[1] : ''),
 		);
 		clientBundler = { name: bundler, version, options: buildOptions };
 		for (const [file, detail] of Object.entries(client.metafile.outputs)) {
@@ -194,8 +218,13 @@ export async function buildFixture(
 					enforce: 'pre',
 					resolveId: (request, importer) => resolveSource(request, importer, 'client'),
 					load(id) {
-						if (!path.isAbsolute(id) || !/\.(?:[cm]?[jt]s|tsx|jsx|tsrx|json)$/.test(id)) return;
-						const file = fs.realpathSync(id);
+						if (
+							!path.isAbsolute(id) ||
+							!/\.(?:[cm]?[jt]s|tsx|jsx|tsrx|json)(?:\?octane-bindings=[^?]+)?$/.test(id)
+						)
+							return;
+						const [physical, query] = id.split('?');
+						const file = fs.realpathSync(physical) + (query ? '?' + query : '');
 						loaded.add(file);
 						return loadSource(compiler, 'client', file);
 					},
@@ -347,6 +376,7 @@ export async function buildFixture(
 		clientBundler,
 		serverBundler: { name: 'esbuild', version },
 		bundler,
+		projection,
 		composerReceipts,
 		eagerOutputs: [...eagerOutputs],
 		compilations,
@@ -471,6 +501,10 @@ if (process.argv[1] === import.meta.filename) {
 			process.argv
 				.find((argument) => argument.startsWith('--bundler='))
 				?.slice('--bundler='.length) ?? 'esbuild',
+		projection:
+			process.argv
+				.find((argument) => argument.startsWith('--projection='))
+				?.slice('--projection='.length) ?? 'none',
 	});
 	console.log(
 		JSON.stringify(

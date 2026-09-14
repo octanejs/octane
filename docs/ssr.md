@@ -44,6 +44,11 @@ behavior without claiming reconciliation ownership. The
 covers range readiness, nested owners, delegated native interactions, and
 disposal.
 
+Fixed native presentation can also be authored once and adopted without the
+renderer through [compiled DOM bindings](./deferred-hydration.md#compiled-presentation-on-existing-dom).
+This updates declared properties on matching existing SSR nodes; structural
+rendering and application event ownership remain separate.
+
 ### Run an SSG script directly
 
 When a server or SSG entry runs outside Vite, preload Octane's compiler before
