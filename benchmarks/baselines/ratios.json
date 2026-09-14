@@ -6914,5 +6914,229 @@
     "reference": "preparation-work",
     "maxRatio": 0,
     "note": "Ordinary trees without compact markers skip optional compact builder/expansion walks, with compact controls preserving required work and host identity."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "collection_copies",
+    "target": "populated-stable",
+    "reference": "populated-seed",
+    "maxRatio": 1.04,
+    "note": "Unchanged descendants share pristine populated CSS/head snapshots; both scenarios preserve complete HTML/CSS and resource ordering."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "collection_copies",
+    "target": "empty",
+    "reference": "populated-seed",
+    "maxRatio": 0,
+    "note": "Empty collectors do not allocate populated collection copies."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "copied_entries",
+    "target": "populated-stable",
+    "reference": "populated-seed",
+    "maxRatio": 1.07,
+    "note": "Unchanged descendants share pristine populated CSS/head snapshots; both scenarios preserve complete HTML/CSS and resource ordering."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "copied_entries",
+    "target": "empty",
+    "reference": "populated-seed",
+    "maxRatio": 0,
+    "note": "Empty collectors do not allocate populated collection copies."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "recorders",
+    "target": "stream-8-onewave",
+    "reference": "stream-budget-8",
+    "maxRatio": 1,
+    "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "subscriptions",
+    "target": "stream-8-onewave",
+    "reference": "stream-budget-8",
+    "maxRatio": 2,
+    "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "raceSubscriptions",
+    "target": "stream-8-onewave",
+    "reference": "stream-budget-8",
+    "maxRatio": 0,
+    "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "recorders",
+    "target": "stream-8-waves",
+    "reference": "stream-budget-8",
+    "maxRatio": 1,
+    "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "subscriptions",
+    "target": "stream-8-waves",
+    "reference": "stream-budget-8",
+    "maxRatio": 5.5,
+    "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "raceSubscriptions",
+    "target": "stream-8-waves",
+    "reference": "stream-budget-8",
+    "maxRatio": 0,
+    "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "recorders",
+    "target": "stream-32-onewave",
+    "reference": "stream-budget-32",
+    "maxRatio": 1,
+    "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "subscriptions",
+    "target": "stream-32-onewave",
+    "reference": "stream-budget-32",
+    "maxRatio": 2,
+    "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "raceSubscriptions",
+    "target": "stream-32-onewave",
+    "reference": "stream-budget-32",
+    "maxRatio": 0,
+    "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "recorders",
+    "target": "stream-32-waves",
+    "reference": "stream-budget-32",
+    "maxRatio": 1,
+    "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "subscriptions",
+    "target": "stream-32-waves",
+    "reference": "stream-budget-32",
+    "maxRatio": 17.5,
+    "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "raceSubscriptions",
+    "target": "stream-32-waves",
+    "reference": "stream-budget-32",
+    "maxRatio": 0,
+    "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "recorders",
+    "target": "stream-plain-8-onewave",
+    "reference": "stream-budget-8",
+    "maxRatio": 1,
+    "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "subscriptions",
+    "target": "stream-plain-8-onewave",
+    "reference": "stream-budget-8",
+    "maxRatio": 2,
+    "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "raceSubscriptions",
+    "target": "stream-plain-8-onewave",
+    "reference": "stream-budget-8",
+    "maxRatio": 0,
+    "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "recorders",
+    "target": "stream-plain-8-waves",
+    "reference": "stream-budget-8",
+    "maxRatio": 1,
+    "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "subscriptions",
+    "target": "stream-plain-8-waves",
+    "reference": "stream-budget-8",
+    "maxRatio": 5.5,
+    "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "raceSubscriptions",
+    "target": "stream-plain-8-waves",
+    "reference": "stream-budget-8",
+    "maxRatio": 0,
+    "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "recorders",
+    "target": "stream-plain-32-onewave",
+    "reference": "stream-budget-32",
+    "maxRatio": 1,
+    "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "subscriptions",
+    "target": "stream-plain-32-onewave",
+    "reference": "stream-budget-32",
+    "maxRatio": 2,
+    "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "raceSubscriptions",
+    "target": "stream-plain-32-onewave",
+    "reference": "stream-budget-32",
+    "maxRatio": 0,
+    "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "recorders",
+    "target": "stream-plain-32-waves",
+    "reference": "stream-budget-32",
+    "maxRatio": 1,
+    "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "subscriptions",
+    "target": "stream-plain-32-waves",
+    "reference": "stream-budget-32",
+    "maxRatio": 17.5,
+    "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "raceSubscriptions",
+    "target": "stream-plain-32-waves",
+    "reference": "stream-budget-32",
+    "maxRatio": 0,
+    "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
   }
 ]
