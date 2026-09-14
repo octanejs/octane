@@ -27,8 +27,16 @@ const oracleEnvironmentPath = join(packageRoot, 'audit/pristine-oracle-environme
 const require = createRequire(import.meta.url);
 
 export function resolveInstalledPackageVersion(packageName, fromPath = packageRoot) {
-	const packageJsonPath = require.resolve(`${packageName}/package.json`, { paths: [fromPath] });
-	return JSON.parse(readFileSync(packageJsonPath, 'utf8')).version;
+	const packageRequire = createRequire(join(fromPath, 'package.json'));
+	const packageJsonPath = packageRequire.resolve
+		.paths(packageName)
+		?.map((directory) => join(directory, packageName, 'package.json'))
+		.find((file) => existsSync(file));
+	if (!packageJsonPath) throw new Error(`Pristine oracle package is not installed: ${packageName}`);
+	const manifest = JSON.parse(readFileSync(packageJsonPath, 'utf8'));
+	if (manifest.name !== packageName)
+		throw new Error(`Pristine oracle package identity differs: ${packageName}`);
+	return manifest.version;
 }
 
 export function assertPristineOracleEnvironment({
@@ -104,7 +112,10 @@ export function parseJUnitIdentities(xml) {
 				: 'passed';
 		identities.push({
 			file: portableFile,
-			fullName: `${classname} ${name}`.replaceAll(' > ', ' ').trim(),
+			// Bun 1.3.14 emits nested classnames inner-first with a double-escaped separator.
+			fullName: `${classname.split(' &gt; ').reverse().join(' ')} ${name}`
+				.replaceAll(' > ', ' ')
+				.trim(),
 			status,
 		});
 	}
@@ -176,6 +187,7 @@ export function runPristineUpstreamSuite({ repoRoot = resolve(packageRoot, '../.
 				encoding: 'utf8',
 			},
 		);
+		if (result.error) throw result.error;
 		const stdout = result.stdout ?? '';
 		const stderr = result.stderr ?? '';
 		const identities = parseJUnitIdentities(

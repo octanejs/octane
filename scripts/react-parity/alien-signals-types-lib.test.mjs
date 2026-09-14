@@ -3,7 +3,7 @@ import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import test from 'node:test';
-import { buildTypeInventory } from './alien-signals-types-lib.mjs';
+import { acceptedApiCalls, buildTypeInventory } from './alien-signals-types-lib.mjs';
 
 async function fixture() {
 	const root = await mkdtemp(join(tmpdir(), 'alien-signals-types-'));
@@ -113,18 +113,31 @@ test('rejects removing an adapted @ts-expect-error', async function rejectsRemov
 	}, /assertion groups differ/);
 });
 
-test('rejects removing the upstream-typecheck @ts-expect-error', async function rejectsTypecheckExpectError(t) {
+test('rejects removing a negative assertion from a typecheck counterpart', async (t) => {
 	const value = await fixture();
-	t.after(function cleanup() {
-		return rm(value.root, { recursive: true, force: true });
-	});
-	const file = join(value.adaptedRoot, 'upstream-typecheck.test-d.ts');
-	const source = await readFile(file, 'utf8');
-	assert.equal(source.includes('@ts-expect-error'), true, 'fixture must contain @ts-expect-error');
-	await writeFile(file, source.replace(/\s*\/\/\s*@ts-expect-error[^\n]*\n/, '\n'));
-	assert.throws(function run() {
-		buildTypeInventory(value.root, value.config);
-	}, /assertion groups differ/);
+	t.after(() => rm(value.root, { recursive: true, force: true }));
+	const upstream = join(value.typecheckRoot, 'src/index.test.ts');
+	const adapted = join(value.adaptedRoot, 'upstream-typecheck.test-d.ts');
+	const negative = '\n// @ts-expect-error\nconst invalid: string = 1;\n';
+	await writeFile(upstream, (await readFile(upstream, 'utf8')) + negative);
+	await writeFile(adapted, (await readFile(adapted, 'utf8')) + negative);
+	assert.doesNotThrow(() => buildTypeInventory(value.root, value.config));
+	await writeFile(adapted, (await readFile(adapted, 'utf8')).replace('// @ts-expect-error\n', ''));
+	assert.throws(() => buildTypeInventory(value.root, value.config), /assertion groups differ/);
+});
+
+test('accepts a source typecheck with matching API calls and no negative assertions', async (t) => {
+	const value = await fixture();
+	t.after(() => rm(value.root, { recursive: true, force: true }));
+	const inventory = buildTypeInventory(value.root, value.config);
+	assert.equal(inventory.upstream[0].assertionGroups.length, 0);
+	assert.equal(
+		acceptedApiCalls(
+			await readFile(join(value.typecheckRoot, 'src/index.test.ts'), 'utf8'),
+			'src/index.test.ts',
+		).length,
+		90,
+	);
 });
 
 test('rejects an unauthorized non-assertion structural change', async function rejectsStructuralChange(t) {
@@ -199,4 +212,30 @@ test('rejects inventoried probes missing from the pristine compiler program', as
 	assert.throws(function run() {
 		buildTypeInventory(value.root, value.config);
 	}, /not included in compiler program/);
+});
+
+test('inventories every new signal API call, including nested callbacks', () => {
+	const source = `batch(() => trigger(source)); useDeferredSignalValue(source); useSignalSelector(source, select); useSignalPassiveEffect(signals, run); useSignalLayoutEffect(signals, run); useSignalInsertionEffect(signals, run);`;
+	assert.equal(acceptedApiCalls(source, 'consumer.ts').length, 7);
+	assert.equal(
+		acceptedApiCalls(source.replace('useSignalSelector(source, select);', ''), 'consumer.ts')
+			.length,
+		6,
+	);
+});
+
+test('compares type-call string values independently of source quote style', () => {
+	const single = acceptedApiCalls(
+		"useSignalPassiveEffect(signals, () => log('passive'));",
+		'consumer.ts',
+	);
+	const double = acceptedApiCalls(
+		'useSignalPassiveEffect(signals, () => log("passive"));',
+		'consumer.ts',
+	);
+	assert.deepEqual(single, double);
+	assert.notDeepEqual(
+		single,
+		acceptedApiCalls("useSignalPassiveEffect(signals, () => log('different'));", 'consumer.ts'),
+	);
 });

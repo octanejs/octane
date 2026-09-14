@@ -10,8 +10,10 @@
  * - Compute derived state with [createComputed].
  * - Run reactive side-effects with [createEffect].
  * - Manage effect lifecycles using [createSignalScope].
- * - React hooks for subscribing to signal updates: [useSignal], [useSignalValue], [useSetSignal],
- *   [useSignalEffect] and [useSignalScope].
+ * - React hooks for reading, selecting, deferring, and updating signal values.
+ * - Signal effects aligned with React's insertion, layout, and passive phases.
+ * - Effect scopes that start after commit and clean up on unmount.
+ * - React automatically batches component renders from signal writes in the same event or task.
  * - Additional hooks like [useComputed] for easier use of computed signals.
  *
  * > **Note:** This library is built on top of [Alien Signals](https://github.com/stackblitz/alien-signals)
@@ -22,28 +24,42 @@
 
 import {
   computed as alienComputed,
+  endBatch,
   effect as alienEffect,
   effectScope as alienEffectScope,
   signal as alienSignal,
+  startBatch,
+  trigger as alienTrigger,
 } from "alien-signals";
 import {
-  useEffect,
-  useMemo,
-  useSyncExternalStore,
   useCallback,
+  useDeferredValue,
+  useEffect,
+  useInsertionEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useSyncExternalStore,
   type DependencyList,
 } from "react";
 
 /**
  * WritableSignal is a function that returns the current signal value when called without arguments,
- * or updates the signal when passed a new value or updater function.
+ * or updates the signal when passed a new value. React hook setters additionally accept updater functions.
  *
  * @template T - The type of the signal value.
  */
+export type ReadableSignal<T> = () => T;
+
 export type WritableSignal<T> = {
   (): T;
-  (value: T | ((prev: T) => T)): void;
+  (value: T): void;
 };
+
+export type SignalSetter<T> = (value: T | ((previous: T) => T)) => void;
+
+export type SignalEffectCallback = () => void | (() => void);
+export type SignalEffectDependencies = readonly ReadableSignal<unknown>[];
 
 /**
  * Creates a writable Alien Signal.
@@ -77,7 +93,7 @@ export function createSignal<T>(initialValue: T): WritableSignal<T> {
  * const double = createComputed(() => count() * 2);
  * ```
  */
-export function createComputed<T>(fn: () => T): () => T {
+export function createComputed<T>(fn: (previousValue?: T) => T): ReadableSignal<T> {
   return alienComputed(fn);
 }
 
@@ -99,7 +115,7 @@ export function createComputed<T>(fn: () => T): () => T {
  * stopEffect();
  * ```
  */
-export function createEffect<T>(fn: () => T): () => void {
+export function createEffect(fn: SignalEffectCallback): () => void {
   return alienEffect(fn);
 }
 
@@ -122,9 +138,100 @@ export function createEffect<T>(fn: () => T): () => void {
  * stopScope();
  * ```
  */
-export function createSignalScope<T>(callback: () => T): () => void {
+export function createSignalScope(callback: () => void): () => void {
   return alienEffectScope(callback);
 }
+
+/** Runs signal writes as one propagation batch. Nested batches are supported. */
+export function batch<T>(callback: () => T): T {
+  startBatch();
+  try {
+    return callback();
+  } finally {
+    endBatch();
+  }
+}
+
+/** Notifies dependents after mutating one or more signal values in place. */
+export function trigger(signalOrCollector: ReadableSignal<unknown>): void {
+  alienTrigger(signalOrCollector);
+}
+
+interface ExternalSignalStore<T> {
+  getSnapshot: () => T;
+  subscribe: (notify: () => void) => () => void;
+}
+
+const externalStores = new WeakMap<ReadableSignal<unknown>, ExternalSignalStore<unknown>>();
+
+function getExternalStore<T>(signal: ReadableSignal<T>): ExternalSignalStore<T> {
+  const cached = externalStores.get(signal) as ExternalSignalStore<T> | undefined;
+  if (cached) return cached;
+
+  let firstListener: (() => void) | undefined;
+  let additionalListeners: Set<() => void> | undefined;
+  let notifyListeners = doNothing;
+  let stop: (() => void) | undefined;
+  const notifyAllListeners = () => {
+    firstListener!();
+    additionalListeners!.forEach(callListener);
+  };
+
+  const store: ExternalSignalStore<T> = {
+    getSnapshot: signal,
+    subscribe(notify) {
+      if (firstListener === undefined) {
+        firstListener = notify;
+        notifyListeners = notify;
+      } else {
+        (additionalListeners ??= new Set()).add(notify);
+        notifyListeners = notifyAllListeners;
+      }
+
+      if (stop === undefined) {
+        let initialized = false;
+        stop = createEffect(() => {
+          signal();
+          if (initialized) {
+            notifyListeners();
+          } else {
+            initialized = true;
+          }
+        });
+      }
+
+      return () => {
+        if (firstListener === notify) {
+          const replacement = additionalListeners?.values().next().value;
+          firstListener = replacement;
+          if (replacement !== undefined) additionalListeners!.delete(replacement);
+        } else {
+          additionalListeners?.delete(notify);
+        }
+
+        if (firstListener === undefined) {
+          stop?.();
+          stop = undefined;
+          additionalListeners = undefined;
+          notifyListeners = doNothing;
+        } else if (additionalListeners?.size) {
+          notifyListeners = notifyAllListeners;
+        } else {
+          notifyListeners = firstListener;
+        }
+      };
+    },
+  };
+
+  externalStores.set(signal, store as ExternalSignalStore<unknown>);
+  return store;
+}
+
+function callListener(listener: () => void): void {
+  listener();
+}
+
+function doNothing(): void {}
 
 /**
  * React hook that subscribes to a writable signal—returning its current value plus a setter function.
@@ -145,7 +252,7 @@ export function createSignalScope<T>(callback: () => T): () => void {
  */
 export function useSignal<T>(
   signal: WritableSignal<T>,
-): [T, (val: T | ((oldVal: T) => T)) => void] {
+): [T, SignalSetter<T>] {
   const value = useSignalValue(signal);
   const setValue = useSetSignal(signal);
 
@@ -170,29 +277,38 @@ export function useSignal<T>(
  * }
  * ```
  */
-export function useSignalValue<T>(signal: WritableSignal<T>): T {
-  const subscribe = useCallback(
-    (callback: () => void) => {
-      let isFirst = true;
+export function useSignalValue<T>(signal: WritableSignal<T>): T;
+export function useSignalValue<T>(signal: ReadableSignal<T>): T;
+export function useSignalValue<T>(signal: ReadableSignal<T>): T {
+  const store = getExternalStore(signal);
+  return useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
+}
 
-      return createEffect(() => {
-        signal(); // track dependencies
+/** Returns a React-deferred snapshot while keeping the source subscription tear-free. */
+export function useDeferredSignalValue<T>(signal: WritableSignal<T>): T;
+export function useDeferredSignalValue<T>(signal: ReadableSignal<T>): T;
+export function useDeferredSignalValue<T>(signal: ReadableSignal<T>): T {
+  return useDeferredValue(useSignalValue(signal));
+}
 
-        if (isFirst) {
-          isFirst = false;
-        } else {
-          callback(); // notify React only on actual changes
-        }
-      });
-    },
-    [signal],
+/** Subscribes to a memoized slice and skips renders while the selected value is `Object.is` equal. */
+export function useSignalSelector<T, Selected>(
+  signal: WritableSignal<T>,
+  selector: (value: T) => Selected,
+): Selected;
+export function useSignalSelector<T, Selected>(
+  signal: ReadableSignal<T>,
+  selector: (value: T) => Selected,
+): Selected;
+export function useSignalSelector<T, Selected>(
+  signal: ReadableSignal<T>,
+  selector: (value: T) => Selected,
+): Selected {
+  const selected = useMemo(
+    () => createComputed(() => selector(signal())),
+    [signal, selector],
   );
-
-  return useSyncExternalStore(
-    subscribe,
-    () => signal(),
-    () => signal(),
-  );
+  return useSignalValue(selected);
 }
 
 /**
@@ -214,7 +330,7 @@ export function useSignalValue<T>(signal: WritableSignal<T>): T {
  */
 export function useSetSignal<T>(
   signal: WritableSignal<T>,
-): (val: T | ((oldVal: T) => T)) => void {
+): SignalSetter<T> {
   return useCallback(
     (val) => {
       if (typeof val === "function") {
@@ -230,19 +346,53 @@ export function useSetSignal<T>(
 /**
  * React hook for running a side effect that depends on Alien Signals.
  */
-export function useSignalEffect(fn: () => void | (() => void)): void {
-  useEffect(() => {
-    let cleanup: void | (() => void);
-    const stop = createEffect(() => {
-      if (cleanup) cleanup();
-      cleanup = fn();
-    });
+export function useSignalEffect(
+  fn: SignalEffectCallback,
+  deps: DependencyList = [fn],
+): void {
+  useEffect(() => createEffect(fn), deps);
+}
 
-    return () => {
-      if (cleanup) cleanup();
-      stop();
-    };
-  }, [fn]);
+function useSignalRevision(signals: SignalEffectDependencies): number {
+  const revision = useMemo(
+    () =>
+      createComputed<number>((previous = -1) => {
+        for (const signal of signals) signal();
+        return previous + 1;
+      }),
+    [signals],
+  );
+  return useSignalValue(revision);
+}
+
+/** Runs signal-dependent work in React's passive-effect phase. Keep `signals` referentially stable. */
+export function useSignalPassiveEffect(
+  signals: SignalEffectDependencies,
+  fn: SignalEffectCallback,
+  deps: DependencyList = [],
+): void {
+  const revision = useSignalRevision(signals);
+  useEffect(fn, [revision, ...deps]);
+}
+
+/** Runs signal-dependent work in React's layout-effect phase. Keep `signals` referentially stable. */
+export function useSignalLayoutEffect(
+  signals: SignalEffectDependencies,
+  fn: SignalEffectCallback,
+  deps: DependencyList = [],
+): void {
+  const revision = useSignalRevision(signals);
+  useLayoutEffect(fn, [revision, ...deps]);
+}
+
+/** Runs signal-dependent insertion work before DOM mutations. Keep `signals` referentially stable. */
+export function useSignalInsertionEffect(
+  signals: SignalEffectDependencies,
+  fn: SignalEffectCallback,
+  deps: DependencyList = [],
+): void {
+  const revision = useSignalRevision(signals);
+  useInsertionEffect(fn, [revision, ...deps]);
 }
 
 /**
@@ -269,9 +419,27 @@ export function useSignalEffect(fn: () => void | (() => void)): void {
  * }
  * ```
  */
-export function useSignalScope<T>(callback: () => T): () => void {
-  const stopScope = useMemo(() => createSignalScope(callback), [callback]);
-  useEffect(() => () => stopScope(), [stopScope]);
+export function useSignalScope(
+  callback: () => void,
+  deps: DependencyList = [callback],
+): () => void {
+  const activeScope = useRef<(() => void) | undefined>(undefined);
+  const stopScope = useCallback(() => activeScope.current?.(), []);
+
+  useEffect(() => {
+    const dispose = createSignalScope(callback);
+    let active = true;
+    const stopOnce = () => {
+      if (!active) return;
+      active = false;
+      dispose();
+      if (activeScope.current === stopOnce) activeScope.current = undefined;
+    };
+
+    activeScope.current = stopOnce;
+    return stopOnce;
+  }, deps);
+
   return stopScope;
 }
 

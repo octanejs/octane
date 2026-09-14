@@ -158,6 +158,7 @@ process.stdout.write(JSON.stringify(['default', 'DraggableCore'].filter((key) =>
 }
 
 export const PACKED_STRICT_BROWSER_SOURCE_PACKAGES = [
+	'@octanejs/alien-signals',
 	'@octanejs/octane-is',
 	'@octanejs/jotai',
 	'@octanejs/redux',
@@ -494,8 +495,47 @@ void packedIsWrong;
 `;
 }
 
+function renderPackedAlienSignalsTypeProbe() {
+	return `import * as PackedAlien from '@octanejs/alien-signals';
+type PackedAlienEqual<A, B> = (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? true : false;
+type PackedAlienAssert<T extends true> = T;
+type PackedAlienExports = PackedAlienAssert<PackedAlienEqual<keyof typeof PackedAlien, 'createSignal' | 'createComputed' | 'createEffect' | 'createSignalScope' | 'batch' | 'trigger' | 'useSignal' | 'useSignalValue' | 'useDeferredSignalValue' | 'useSignalSelector' | 'useSetSignal' | 'useSignalEffect' | 'useSignalPassiveEffect' | 'useSignalLayoutEffect' | 'useSignalInsertionEffect' | 'useSignalScope' | 'useComputed'>>;
+type PackedAlienReadable = PackedAlienAssert<PackedAlienEqual<PackedAlien.ReadableSignal<number>, () => number>>;
+type PackedAlienWritable = PackedAlienAssert<PackedAlienEqual<PackedAlien.WritableSignal<number>, { (value: number | ((previous: number) => number)): void; (): number }>>;
+type PackedAlienDependencies = PackedAlienAssert<PackedAlienEqual<PackedAlien.DependencyList, readonly unknown[]>>;
+type PackedAlienSetter = PackedAlienAssert<PackedAlienEqual<PackedAlien.SignalSetter<number>, (value: number | ((previous: number) => number)) => void>>;
+type PackedAlienEffect = PackedAlienAssert<PackedAlienEqual<PackedAlien.SignalEffectCallback, () => void | (() => void)>>;
+type PackedAlienEffectDependencies = PackedAlienAssert<PackedAlienEqual<PackedAlien.SignalEffectDependencies, readonly (() => unknown)[]>>;
+const packedAlienCount = PackedAlien.createSignal(1);
+const packedAlienComputed = PackedAlien.createComputed<number>((previous = 0) => packedAlienCount() + previous);
+const packedAlienSelected = PackedAlien.useSignalSelector(packedAlienComputed, value => String(value));
+type PackedAlienSelection = PackedAlienAssert<PackedAlienEqual<typeof packedAlienSelected, string>>;
+const packedAlienDeferred: number = PackedAlien.useDeferredSignalValue(packedAlienComputed);
+const packedAlienValue: number = PackedAlien.useSignalValue(packedAlienComputed);
+const packedAlienTuple: [number, PackedAlien.SignalSetter<number>] = PackedAlien.useSignal(packedAlienCount);
+const packedAlienMemo: number = PackedAlien.useComputed(() => packedAlienCount() * 2, []);
+const packedAlienBatch: string = PackedAlien.batch(() => { packedAlienCount(2); return 'updated'; });
+const packedAlienStop: () => void = PackedAlien.createEffect(() => { packedAlienCount(); return () => {}; });
+const packedAlienScope: () => void = PackedAlien.createSignalScope(() => {});
+PackedAlien.trigger(packedAlienCount);
+PackedAlien.useSignalEffect(() => {}, []);
+PackedAlien.useSignalPassiveEffect([packedAlienCount], () => {}, []);
+PackedAlien.useSignalLayoutEffect([packedAlienCount], () => {}, []);
+PackedAlien.useSignalInsertionEffect([packedAlienCount], () => {}, []);
+const packedAlienScopeStop: () => void = PackedAlien.useSignalScope(() => {}, []);
+PackedAlien.useSetSignal(packedAlienCount)(value => value + 1);
+// @ts-expect-error numeric signals reject string writes
+PackedAlien.useSetSignal(packedAlienCount)('wrong');
+// @ts-expect-error computed snapshots remain read-only
+packedAlienComputed(1);
+// @ts-expect-error the selector receives a number
+PackedAlien.useSignalSelector(packedAlienCount, (value: string) => value);
+`;
+}
+
 export function renderPackedStrictBrowserConsumerTypeProbe() {
 	return `${renderPackedOctaneIsTypeProbe()}
+${renderPackedAlienSignalsTypeProbe()}
 import { sumTypedPair } from './App.tsrx';
 import { compileToVolarMappings, compileTypesInspection } from 'octane/compiler/volar';
 import { atom, useAtom } from '@octanejs/jotai';
@@ -864,6 +904,7 @@ export function PublishedSourceConsumer() @{
 
 export function renderPackedTsrxConsumerTypeProbe() {
 	return `${renderPackedOctaneIsTypeProbe()}
+${renderPackedAlienSignalsTypeProbe()}
 import { Command, type CommandProps } from '@octanejs/cmdk';
 import {
 	Bar,

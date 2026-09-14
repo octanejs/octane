@@ -74,7 +74,6 @@ export const SOURCE_PUBLICATION_DEBT = {
 	[RULES.nodeTypes]: [
 		'packages/adapter-cloudflare/tsconfig.typecheck.json',
 		'packages/adapter-vercel/tsconfig.typecheck.json',
-		'packages/alien-signals/tsconfig.json',
 		'packages/animejs/tsconfig.json',
 		'packages/apollo-client/tsconfig.json',
 		'packages/app-core/tsconfig.typecheck.json',

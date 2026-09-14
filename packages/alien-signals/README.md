@@ -2,7 +2,7 @@
 
 [Alien Signals](https://github.com/stackblitz/alien-signals) bindings for
 [Octane](https://github.com/octanejs/octane). This package ports the public
-`react-alien-signals@0.3.0` API over the unchanged `alien-signals@1.0.4` core,
+`react-alien-signals@0.4.0` API over the reused `alien-signals@3.2.1` core,
 without React or React types.
 
 ## Installation
@@ -36,7 +36,10 @@ export function Counter() @{
 The package exports `WritableSignal`, `ReadableSignal`, `DependencyList`,
 `createSignal`, `createComputed`, `createEffect`, `createSignalScope`,
 `useSignal`, `useSignalValue`, `useSetSignal`, `useSignalEffect`,
-`useSignalScope`, and `useComputed`.
+`useSignalScope`, `useComputed`, `batch`, `trigger`, `useSignalSelector`,
+`useDeferredSignalValue`, `useSignalPassiveEffect`, `useSignalLayoutEffect`,
+`useSignalInsertionEffect`, `SignalSetter`, `SignalEffectCallback`, and
+`SignalEffectDependencies`.
 
 `useComputed(getter, dependencies)` passes its dependency list directly to
 Octane memoization. Signal dependencies read by `getter` remain reactive; the
@@ -52,9 +55,24 @@ after commit, and during later unmount cleanup.
 
 Replace imports from `react-alien-signals` with
 `@octanejs/alien-signals`. The hook names and authored call shapes are the same.
-Unlike the published adapter's narrow declaration, `useSignalValue` explicitly
-accepts both writable and computed readable signals, matching its documented
-runtime behavior.
+Both packages accept writable and computed readable signals. Existing direct
+functional signal setters remain supported. Hook setters also accept raw core
+signals and can store function values through an updater without invoking the
+returned function.
+
+`batch(callback)` groups signal propagation, including nested batches.
+`trigger(signalOrCollector)` notifies readers after an in-place mutation.
+`useSignalSelector(signal, selector)` subscribes to a derived snapshot;
+`useDeferredSignalValue(signal)` defers that snapshot through Octane's scheduler.
+
+Phase effects accept `(signals, callback, dependencies?)`. Keep `signals`
+referentially stable, for example with `useMemo(() => [source], [source])`.
+They follow Octane's insertion, layout, and passive phases and dispose the prior
+callback on change and unmount. They do not run during SSR.
+
+The scope stop controller remembers cancellation for the rest of its mounted
+lifetime, including calls before commit. Upstream 0.4.0 also starts scopes after
+commit but may create a new scope after a dependency change following a stop.
 
 ## Status
 

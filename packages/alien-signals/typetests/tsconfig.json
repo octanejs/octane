@@ -6,7 +6,7 @@
     "moduleResolution": "bundler",
     "esModuleInterop": true,
     "lib": ["dom", "dom.iterable", "esnext"],
-    "skipLibCheck": true,
+    "skipLibCheck": false,
     "types": ["node"],
     "noEmit": true,
     "noErrorTruncation": true,

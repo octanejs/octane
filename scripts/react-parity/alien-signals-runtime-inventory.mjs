@@ -55,7 +55,7 @@ const pristineInventory = inventoryFromIdentities(
 );
 writeInventory('packages/alien-signals/audit/pristine-runtime.json', pristineInventory);
 
-const wrapperFullName = 'runs the pinned react-alien-signals 0.3.0 suite unchanged';
+const wrapperFullName = 'runs the pinned react-alien-signals 0.4.0 suite unchanged';
 const wrapperFile = 'packages/alien-signals/tests/upstream-original.test.ts';
 const wrapperInventory = {
 	schemaVersion: 1,
@@ -145,6 +145,11 @@ for (const side of ['upstream', 'adapted']) {
 	writeInventory(destination, typeInventory[side]);
 }
 
+writeInventory(
+	'packages/alien-signals/audit/pristine-type-probes.json',
+	typeInventory.upstream.filter((entry) => entry.origin === 'repo-authored-probe'),
+);
+
 const summary = summarizeRuntimeInventories([adaptedInventory]);
 console.log('adaptedRuntimeSummary', JSON.stringify(summary));
 
@@ -176,6 +181,9 @@ const supportPaths = [
 	'packages/alien-signals/typetests/public-api.test-d.ts',
 	'packages/alien-signals/typetests/tsconfig.adapted.json',
 	'packages/alien-signals/typetests/tsconfig.json',
+	'packages/alien-signals/typetests/tsconfig.pristine.json',
+	'packages/alien-signals/typetests/pristine/public-contract.ts',
+	'packages/alien-signals/tests/types/public-api.ts',
 ];
 for (const path of supportPaths) {
 	console.log(`${path}: ${sha256File(path)}`);

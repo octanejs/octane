@@ -20,9 +20,6 @@ const doubled = createComputed(function double() {
 });
 
 count(2);
-count(function increment(previous) {
-	return previous + 1;
-});
 createEffect(function track() {
 	count();
 });
@@ -34,6 +31,7 @@ createSignalScope(function scoped() {
 
 const tuple: [number, (value: number | ((previous: number) => number)) => void] = useSignal(count);
 const value: number = useSignalValue(count);
+const derivedValue: number = useSignalValue(doubled);
 const setValue = useSetSignal(count);
 setValue(3);
 setValue(function increment(previous) {
@@ -55,6 +53,7 @@ expectType<typeof createSignal>(createSignal);
 expectType<typeof useSignal>(useSignal);
 void tuple;
 void value;
+void derivedValue;
 void stop;
 void computedValue;
 void doubled;

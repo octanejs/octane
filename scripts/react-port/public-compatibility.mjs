@@ -55,6 +55,11 @@ export function publicCompatibilityDeclarations(binding) {
 }
 
 export function publicCompatibilityExport(specifier, name) {
+	// The existing binding names React's dependency-list shape. The exact npm
+	// declaration imports that type for its hook parameters without re-exporting it.
+	if (specifier === '@octanejs/alien-signals' && name === 'DependencyList')
+		return { specifier, path: name, localDeclaration: true };
+
 	if (
 		specifier === '@octanejs/motion' &&
 		[

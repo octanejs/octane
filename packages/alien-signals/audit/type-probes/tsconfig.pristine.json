@@ -7,7 +7,7 @@
     "target": "ES2022",
     "jsx": "react-jsx",
     "jsxImportSource": "react",
-    "skipLibCheck": true,
+    "skipLibCheck": false,
     "allowImportingTsExtensions": true,
     "types": ["node"]
   },

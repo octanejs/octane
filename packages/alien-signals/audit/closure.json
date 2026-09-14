@@ -1,0 +1,23 @@
+{
+  "runtimeDependencies": ["alien-signals", "octane"],
+  "adaptedSources": [
+    {
+      "packageName": "react-alien-signals",
+      "paths": ["src/index.ts"]
+    }
+  ],
+  "sourceLedger": [
+    {
+      "path": "src/index.ts",
+      "origin": "adapted",
+      "packageName": "react-alien-signals",
+      "sha256": "8a9b4e0767d8aeed21b1b5425c9d1527cb37b41806b057333d434c5d920ff11d"
+    },
+    {
+      "path": "src/internal.ts",
+      "origin": "authored",
+      "sha256": "580e6ec407c996459ed308155d05d617dbdeb53442659f92d7b7bc16daa5c4a5"
+    }
+  ],
+  "reimplementedDependencies": []
+}

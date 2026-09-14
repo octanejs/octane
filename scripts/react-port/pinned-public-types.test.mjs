@@ -876,3 +876,51 @@ test('rejects a compatibility declaration absent from the authenticated tarball'
 		{ ...jotaiCompatibilityFixture, extraDeclarations: [] },
 	);
 });
+
+test('retained dependency-list aliases resolve only from an explicit pinned import', () => {
+	const directory = mkdtempSync(path.join(tmpdir(), 'pinned-import-alias-'));
+	try {
+		const witness = path.join(directory, 'index.d.ts');
+		const dependency = path.join(directory, 'dependency.d.ts');
+		writeFileSync(dependency, 'export type DependencyList = readonly unknown[];');
+		writeFileSync(
+			witness,
+			"import type { DependencyList } from './dependency'; export declare function effect(deps: DependencyList): void;",
+		);
+		const entries = new Map([['@octanejs/alien-signals', witness]]);
+		const lookup = () => {
+			const program = ts.createProgram([witness, dependency], {
+				strict: true,
+				types: [],
+				noEmit: true,
+			});
+			const checker = program.getTypeChecker();
+			return {
+				checker,
+				symbol: pinnedPublicExport(
+					entries,
+					program,
+					checker,
+					'@octanejs/alien-signals',
+					'DependencyList',
+				),
+			};
+		};
+		const { checker, symbol } = lookup();
+		assert.equal(symbol?.name, 'DependencyList');
+		assert.ok(symbol.flags & ts.SymbolFlags.Alias);
+		assert.equal(
+			checker.getAliasedSymbol(symbol).declarations[0].getSourceFile().fileName,
+			dependency,
+		);
+		assert.equal(publicCompatibilityExport('@octanejs/alien-signals', 'InventedType'), undefined);
+		writeFileSync(witness, 'export declare function effect(): void;');
+		assert.equal(
+			lookup().symbol,
+			undefined,
+			'a same-named type in another file is not a pinned import',
+		);
+	} finally {
+		rmSync(directory, { recursive: true, force: true });
+	}
+});

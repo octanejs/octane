@@ -1341,6 +1341,38 @@ describe('evidence CLI', () => {
 		);
 	});
 
+	test('checks a named imported generic interface as a type rather than a value', () => {
+		const { workspaceRoot } = createReadyBatch();
+		const packageDirectory = createCompletePackage(workspaceRoot);
+		writeFileSync(
+			path.join(packageDirectory, 'src/index.ts'),
+			'export interface Readable<T> { (): T; }\n',
+		);
+		writeFileSync(
+			path.join(packageDirectory, 'tests/types/public/public.ts'),
+			"import type { Readable } from '@octanejs/widget';\nimport type { Assert, Equal } from '../../../../../scripts/react-port/type-assertions.js';\ntype Shape = Assert<Equal<ReturnType<Readable<string>>, string>>;\n// @ts-expect-error a string reader cannot return a number\nconst invalid: Readable<string> = () => 1;\n",
+		);
+		assert.doesNotThrow(() =>
+			assertApprovedGateCommand(
+				['public-types'],
+				[
+					'pnpm',
+					'exec',
+					'tsrx-tsc',
+					'--noEmit',
+					'-p',
+					'packages/widget/tests/types/public/tsconfig.json',
+				],
+				{
+					binding: '@octanejs/widget',
+					bindingDirectory: 'packages/widget',
+					upstreamTestInventory: [],
+				},
+				{ workspaceRoot },
+			),
+		);
+	});
+
 	test('rejects unsafe defaults on public generic type aliases', () => {
 		for (const defaultType of ['any', 'unknown']) {
 			const { workspaceRoot } = createReadyBatch();

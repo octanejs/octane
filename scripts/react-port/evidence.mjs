@@ -28,6 +28,7 @@ import {
 	pinnedPublicEntries,
 	pinnedPublicExport,
 	newOpaquePublicSymbol,
+	publicSymbolType,
 } from './pinned-public-types.mjs';
 import {
 	auditShippedClosure,
@@ -1256,7 +1257,9 @@ function analyzeTypeEvidence(
 		}
 	}
 	for (const imported of importedBindings) {
-		if (checker.getTypeAtLocation(imported).flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown)) {
+		const symbol = checker.getSymbolAtLocation(imported);
+		const type = symbol ? publicSymbolType(symbol, checker) : checker.getTypeAtLocation(imported);
+		if (type.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown)) {
 			throw new Error(`Imported public type ${imported.text} resolves to any or unknown`);
 		}
 	}

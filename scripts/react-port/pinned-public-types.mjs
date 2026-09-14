@@ -227,7 +227,7 @@ export function pinnedPublicExport(entries, program, checker, specifier, name) {
 
 	if (compatibility?.localDeclaration) {
 		return checker
-			.getSymbolsInScope(source, ts.SymbolFlags.Type)
+			.getSymbolsInScope(source, ts.SymbolFlags.Type | ts.SymbolFlags.Alias)
 			.find(
 				(entry) =>
 					entry.name === compatibility.path &&

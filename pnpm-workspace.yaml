@@ -502,7 +502,7 @@ catalogs:
     "@zag-js/store": 1.42.0
     "@zag-js/types": 1.42.0
     "@zag-js/utils": 1.42.0
-    alien-signals: 1.0.4
+    alien-signals: 3.2.1
     react-transition-group: 4.4.5
     "@date-fns/tz": ^1.4.1
     date-fns: ^4.1.0

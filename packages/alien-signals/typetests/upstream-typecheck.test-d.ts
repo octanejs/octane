@@ -2,9 +2,7 @@
  * Adapted counterpart of the upstream typecheck program
  * (`upstream/src/index.test.ts` under `upstream/tsconfig.json`).
  *
- * Pins both:
- * - the single `@ts-expect-error` assertion group at upstream line 392
- * - every accepted public-API call occurrence from the upstream type suite
+ * Pins every accepted public-API call occurrence from the upstream type suite
  *   (multiset: duplicate shapes in distinct scenarios remain distinct)
  *
  * One helper per upstream scenario keeps local bindings so conflicting
@@ -13,6 +11,13 @@
  */
 
 import {
+	batch,
+	trigger,
+	useDeferredSignalValue,
+	useSignalSelector,
+	useSignalInsertionEffect,
+	useSignalLayoutEffect,
+	useSignalPassiveEffect,
 	createComputed,
 	createEffect,
 	createSignal,
@@ -24,12 +29,6 @@ import {
 	useSignalScope,
 	useSignalValue,
 } from '@octanejs/alien-signals';
-
-type BunMatchers<T> = {
-	toBe(expected: Exclude<T, undefined>): void;
-};
-
-declare function expect<T>(actual: T): BunMatchers<T>;
 
 function shouldCreateAWritableSignal() {
 	createSignal(0);
@@ -178,8 +177,7 @@ function shouldHandleUndefinedNullSignalValues() {
 		current: useSignal(signal),
 	};
 
-	// @ts-expect-error
-	expect(result.current[0]).toBe(undefined);
+	void result.current[0];
 }
 
 function shouldHandleComputedDependenciesCorrectly() {
@@ -246,3 +244,84 @@ shouldHandleComputedDependenciesCorrectly();
 shouldCleanupAllSubscriptionsOnUnmount();
 shouldHandleMultipleMountUnmountCycles();
 shouldHandleConcurrentUpdatesCorrectly();
+
+function automaticBatching() {
+	const first = createSignal(0);
+	const second = createSignal(0);
+	useSignalValue(first);
+	useSignalValue(second);
+}
+
+function propagationBatching() {
+	const first = createSignal(1);
+	const second = createSignal(2);
+	const snapshots: number[] = [];
+	createEffect(() => {
+		snapshots.push(first() + second());
+	});
+	batch(() => {
+		first(10);
+		second(20);
+	});
+}
+
+function manualInvalidation() {
+	const items = createSignal<number[]>([]);
+	createComputed(() => items().length);
+	trigger(items);
+}
+
+function sharedSubscribers() {
+	const count = createSignal(0);
+	useSignalValue(count);
+	useSignalValue(count);
+	useSignalValue(count);
+}
+
+function selectedSnapshot() {
+	const state = createSignal({ selected: 1, unrelated: 1 });
+	const select = (value: { selected: number; unrelated: number }) => value.selected;
+	useSignalSelector(state, select);
+}
+
+function serverScope() {
+	const callback = () => {};
+	useSignalScope(callback, []);
+}
+
+function transitionSnapshot() {
+	const count = createSignal(0);
+	useSignalValue(count);
+}
+
+function deferredSnapshot() {
+	const count = createSignal(0);
+	useSignalValue(count);
+	useDeferredSignalValue(count);
+}
+
+function phasedEffects() {
+	const order: string[] = [];
+	const source = createSignal(0);
+	const dependencies = [source] as const;
+	useSignalInsertionEffect(dependencies, () => {
+		order.push('insertion');
+	});
+	useSignalLayoutEffect(dependencies, () => {
+		order.push('layout');
+	});
+	useSignalPassiveEffect(dependencies, () => {
+		order.push('passive');
+	});
+}
+
+function scopeCleanup() {
+	const source = createSignal(0);
+	const cleanupEffect = () => {};
+	useSignalScope(() => {
+		createEffect(() => {
+			source();
+			return cleanupEffect;
+		});
+	}, []);
+}

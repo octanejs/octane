@@ -81,6 +81,13 @@ const PUBLIC_API_CALLEES = new Set([
 	'useSignalEffect',
 	'useSignalScope',
 	'useComputed',
+	'batch',
+	'trigger',
+	'useDeferredSignalValue',
+	'useSignalSelector',
+	'useSignalPassiveEffect',
+	'useSignalLayoutEffect',
+	'useSignalInsertionEffect',
 ]);
 
 export function assertionGroups(source, fileName) {
@@ -130,6 +137,13 @@ export function acceptedApiCalls(source, fileName) {
 		ts.ScriptKind.TS,
 	);
 	const printer = ts.createPrinter({ removeComments: true });
+	const normalizeStrings = (context) => {
+		const visit = (node) =>
+			ts.isStringLiteral(node)
+				? ts.factory.createStringLiteral(node.text)
+				: ts.visitEachChild(node, visit, context);
+		return visit;
+	};
 	const expectErrorLines = new Set();
 	for (const match of source.matchAll(/\/\/\s*@ts-expect-error[^\n]*\n/g)) {
 		const nextLine = source.slice(0, match.index + match[0].length).split('\n').length;
@@ -144,9 +158,17 @@ export function acceptedApiCalls(source, fileName) {
 		) {
 			const line = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1;
 			if (!expectErrorLines.has(line)) {
-				calls.push(
-					printer.printNode(ts.EmitHint.Unspecified, node, sourceFile).replace(/\s+/g, ' ').trim(),
-				);
+				const transformed = ts.transform(node, [normalizeStrings]);
+				try {
+					calls.push(
+						printer
+							.printNode(ts.EmitHint.Unspecified, transformed.transformed[0], sourceFile)
+							.replace(/\s+/g, ' ')
+							.trim(),
+					);
+				} finally {
+					transformed.dispose();
+				}
 			}
 		}
 		ts.forEachChild(node, visit);
@@ -258,9 +280,6 @@ function inventoryTypecheckPairs(root, config) {
 		const adaptedSource = readFileSync(resolve(root, config.adaptedRoot, entry.adapted), 'utf8');
 		const upstreamGroups = assertionGroups(upstreamSource, entry.upstream);
 		const adaptedGroups = assertionGroups(adaptedSource, entry.adapted);
-		if (upstreamGroups.length === 0) {
-			throw new Error(`${entry.upstream}: upstream typecheck file has no assertion groups`);
-		}
 		if (JSON.stringify(upstreamGroups) !== JSON.stringify(adaptedGroups)) {
 			throw new Error(
 				`${entry.adapted}: assertion groups differ between pristine and adapted type suites`,
