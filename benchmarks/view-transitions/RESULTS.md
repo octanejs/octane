@@ -1,8 +1,159 @@
 # View Transition parity performance evidence
 
-## Final element-scope comparison
+## Review-feedback performance comparison
 
-The final implementation is compared with main `277c10c3fa80f56ef162959832dba35c1b43b32e`.
+Compared the reviewed head `e36dec2b41d61bf5c0ea118b98565fc30f7b94ce` with the
+feedback implementation. Raw reports identify exact source revisions and package
+hashes in [review-feedback.json](measurements/review-feedback.json). These results
+supersede the historical comparisons below.
+
+The environment remains Node 24.20.0, Chromium 149.0.7827.55, Vite 8.1.5,
+esbuild 0.28.1, @tsrx/core 0.1.71 and Playwright 1.61.1 on macOS arm64. Each
+paired runner uses identical authored fixtures, dependencies and build settings.
+Byte/work measurements run both clean minified and observed readable assets,
+with the same public output, retained-node and native-capture observations.
+
+### Bundle bytes and native work
+
+| Fixture | Reviewed raw → candidate | Reviewed gzip → candidate | Gzip delta |
+| --- | ---: | ---: | ---: |
+| Ordinary static root | 168,394 → 166,474 | 53,774 → 53,663 | −111 B |
+| Ordinary stateful root | 176,596 → 174,676 | 56,723 → 56,565 | −158 B |
+| Document transition fixture | 322,644 → 323,694 | 89,670 → 90,391 | +721 B |
+| Scoped transition fixture | 317,647 → 318,636 | 88,076 → 88,750 | +674 B |
+
+Compared with main, the ordinary static/stateful gzip sizes remain +886/+903 B;
+removing the scope style hooks reduces their earlier shared cost.
+
+Ordinary controls still exclude the transition driver/DOM adapter and perform
+zero native captures, rectangle reads and computed-style reads. The two positive
+fixtures include their observation code; these are comparable fixture sizes,
+not minimal framework import sizes. Correctness repairs and the new adapter
+state increase positive fixture bytes despite the shared-path reductions.
+
+Four document updates retain 8 rectangle reads and 4 captures; computed-style
+reads fall 28→24. For single/sibling/nested/mixed scoped batches, rectangle reads
+stay 4/8/8/14 and total captures stay 1/2/2/4. Computed-style reads fall
+22/44/44/71→20/40/40/64. Removing unused old clip reads explains this reduction;
+post-layout clip behavior remains covered. Counters include fixture observations.
+
+### Ordinary styles and staged large-tree work
+
+All ten ordinary style modes × four operations retain identical semantic and
+work counts against main `277c10c3f`. The scope lease hooks and their scanner
+accommodation are removed. Main/candidate minified style assets are
+115,862/117,064 raw bytes and 36,957/37,601 gzip bytes (+644 gzip B). Both exclude
+the optional transition driver and DOM adapter.
+
+The complementary native adapter workload compares the maintainer's interim
+fix `5c3823293` with the candidate. For 1,024 retained rows plus 1,024 appends and
+a full-parent clear, copied sibling slots fall 3,672,576→0 and searched slots
+2,100,224→0. Publishing the full-parent clear changes 2,048 native removals into
+one clear. At 256 rows the same result holds. A 24-radio group on a page with
+1,024 unrelated hosts reduces imported projection nodes 51,694→1,102, while
+retaining form associations, checked state and original result identities.
+Template freshness scanning eliminates 3,084 child-list reads in its 1,024-subtree
+case. Raw counters and hashes are in
+[dom-stage-feedback.json](measurements/dom-stage-feedback.json).
+
+These are scoped work measurements, not end-to-end active-render latency or
+heap-allocation measurements. The bulk-clear case isolates full-parent clearing;
+journaled shared-row parking still performs its required per-row work. Document
+mutation observers still collect unrelated commit writes, and owner lookup is
+recomputed across phases to preserve portal/scope invalidation. A driver that
+has been installed can stage an all-transition batch even with no currently
+mounted boundary, to discover newly entering boundaries. No cost elimination
+is claimed for those paths.
+
+### Ordinary client timing
+
+The existing branch control compares main `277c10c3f` with the feedback client
+runtime in `9aa4d7621`. Both builds use the same authored and compiled fixture
+hashes, with no active ViewTransition. A quiet Chromium run alternates 30 paired
+samples after 4,096 warmup updates, using 4,096 updates per sample.
+
+| Mode | Main median µs | Candidate median µs | Main range µs | Candidate range µs |
+| --- | ---: | ---: | ---: | ---: |
+| Stable host updates | 12.280 | 12.354 | 11.938–14.966 | 12.012–13.818 |
+| Toggled host updates | 16.821 | 17.139 | 15.601–23.486 | 16.211–24.048 |
+| Absent branch | 0.610 | 0.610 | 0.562–0.806 | 0.586–0.757 |
+
+Final output, retained button count and effect/cleanup lifetimes agree. The
+observed distributions overlap; these small median differences do not establish
+an ordinary-render latency change. This control does not measure active staged
+transitions, mount cost, browser paint or allocations. Its minified fixture is
+196,544→198,422 raw bytes and 60,371→61,268 gzip bytes; shared host routing still
+has a bundle cost against main. Raw timings, bundle hashes and preparatory build
+metadata are included in the review record; preparatory one-sample timings are
+not used for conclusions.
+
+Reproduce byte/work comparisons with the commands in [README.md](README.md),
+using `--octane-revision=e36dec2b4` for the reviewed baseline and omitting the
+revision for the candidate. Both scope revisions support the semantic oracle,
+so leave `VT_SCOPES_BYTES_ONLY` unset. For ordinary style controls, retain main
+`277c10c3f` as the baseline. Build the branch fixtures with `branches.mjs` and
+`BRANCH_BUNDLE_DIRECTORY`, then run:
+
+```sh
+BRANCH_BROWSER_SAMPLES=30 BRANCH_BROWSER_CYCLES=4096 BRANCH_BROWSER_WARMUP=4096 \
+BENCH_JSON=/tmp/branches-timing.json node benchmarks/client-hot-paths/branches-browser.mjs \
+/tmp/baseline/branches.mjs /tmp/candidate/branches.mjs
+```
+
+### SSR review-fix comparison
+
+`e36dec2b4` → `fc0dbf32`, Node 24.20.0, macOS arm64. Both revisions use identical compiled input and production minified bundles: five warmup batches, then 11 alternating paired batches. Ready: 50,000 warmup operations / 10,000 per sample; streams: 5,000 / 1,000. Agent-owned workloads were serialized.
+
+| Scenario | Median µs, baseline → final | Median ratio | Paired ratio median [min–max] | Baseline p25–p75 µs | Final p25–p75 µs |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Plain | 0.366 → 0.374 | 1.024× | 0.994 [0.914–1.103] | 0.355–0.391 | 0.357–0.386 |
+| View | 1.282 → 2.314 | 1.805× | 1.833 [1.755–2.034] | 1.249–1.302 | 2.289–2.406 |
+| PlainStream | 23.182 → 21.813 | 0.941× | 0.972 [0.812–1.071] | 21.203–23.811 | 21.045–24.837 |
+| ViewStream | 33.646 → 30.853 | 0.917× | 0.923 [0.858–1.056] | 31.048–35.988 | 28.696–35.670 |
+| ScopedView | 7.608 → 6.003 | 0.789× | 0.808 [0.776–0.834] | 7.310–7.787 | 5.827–6.427 |
+| ScopedViewStream | 47.196 → 41.833 | 0.886× | 0.843 [0.801–1.083] | 46.022–48.328 | 38.634–47.528 |
+
+**Remaining cost:** document-ready rendering is 1.805× the reviewed baseline (+1.032 µs), slower in every pair. Quote-aware parsing still costs more than the former unsafe global-regexp removal. Scoped-ready is faster in every pair; shared CSS replaces inline-style rewriting. Plain-ready and stream distributions overlap, so their median differences do not establish a general speedup.
+
+**Optimization evidence:** the first correctness implementation (`9aa4d762`) measured 4.687 versus 1.181 µs for document-ready rendering (3.967×). Repeated attribute scans were replaced with one deduplication pass, one removal pass, and `indexOf` for quoted values. Quote boundaries and case-insensitive, boolean, spaced/unquoted attributes remain supported. A separate paired comparison isolates the reduction:
+
+| Scenario | Intermediate → final median µs | Median ratio | Paired ratio median [min–max] |
+| --- | ---: | ---: | ---: |
+| View | 5.174 → 2.438 | 0.471× | 0.470 [0.425–0.488] |
+| ScopedView | 8.431 → 4.890 | 0.580× | 0.576 [0.558–0.594] |
+| ViewStream | 31.497 → 27.569 | 0.875× | 0.875 [0.832–0.927] |
+| ScopedViewStream | 40.689 → 34.570 | 0.850× | 0.850 [0.739–0.888] |
+
+The intermediate comparison’s plain controls overlap: Plain 0.403 → 0.401 µs and PlainStream 20.684 → 20.626 µs.
+
+**Noise accounting:** one final-source trial was retained but excluded: its PlainStream baseline rose to 91.384 µs, and the median ratio 1.442× conflicted with the paired median 0.895×. The table reports the single repeat with identical source/bundle hashes. Plain-ready returned to overlapping sub-microsecond distributions; streams still show spread. No further runs were selected.
+
+| Response | Raw bytes, baseline → final (delta) | gzip bytes, baseline → final (delta) |
+| --- | ---: | ---: |
+| Plain | 31 → 31 (+0) | 45 → 45 (+0) |
+| View | 113 → 113 (+0) | 105 → 105 (+0) |
+| PlainStream | 2,443 → 2,830 (+387) | 1,040 → 1,176 (+136) |
+| ViewStream | 12,621 → 13,118 (+497) | 3,925 → 4,133 (+208) |
+| ScopedView | 213 → 266 (+53) | 155 → 176 (+21) |
+| ScopedViewStream | 12,663 → 13,213 (+550) | 3,938 → 4,163 (+225) |
+
+The six-scenario server bundle is 75,775 → 76,517 bytes (**+742 raw**), or 25,598 → 25,879 (**+281 gzip**). The optimization adds 255 raw/105 gzip bytes versus `9aa4d762`, with unchanged response lengths. Ready bytes include `RenderResult.css + html`; the final scoped response includes a 115-byte shared style block. Streams include CSS; transport recovery/shared helpers add 387 raw bytes to ordinary streaming. Gzip uses level 9 and varies with stream IDs. This is a fixture bundle, not a standalone runtime import.
+
+**Limits:** small synthetic server-only cases; browser animation, resource waits, backpressure, concurrency, and allocation/GC behavior are not measured. Distributions describe batches, not individual-request latency guarantees.
+
+Raw samples, wire counts, distributions, and provenance are in [`measurements/review-feedback.json`](measurements/review-feedback.json): `ssr.final` (reviewed baseline → final), `ssr.optimization` (intermediate → final), `ssr.intermediate` (reviewed baseline → first correctness implementation), and `ssr.noisy` (the retained noisy final-source run).
+
+Reproduce from the final checkout with Node 24.20.0, serializing these runs with other workloads:
+
+```sh
+BENCH_JSON=/tmp/vt-ssr-final.json node benchmarks/view-transitions/ssr.mjs --octane-revision=e36dec2b4
+BENCH_JSON=/tmp/vt-ssr-optimization.json node benchmarks/view-transitions/ssr.mjs --octane-revision=9aa4d762
+```
+
+
+## Historical element-scope comparison before review feedback
+
+The pre-feedback implementation is compared with main `277c10c3fa80f56ef162959832dba35c1b43b32e`.
 Byte and browser-work results use `4986632290779bc13466b75479ee0e92029f518b`; timing records
 retain their exact source revisions below. The `elementScopes` entry in
 [measurements.json](./measurements.json) contains raw counts, samples, semantic
@@ -13,7 +164,7 @@ Environment: macOS arm64, Node 24.20.0, Chromium 149.0.7827.55, Vite 8.1.5,
 esbuild 0.28.1, @tsrx/core 0.1.71 and Playwright 1.61.1. The same authored fixtures,
 dependency installation and production settings are used for both revisions.
 
-### Final bundle cost
+### Historical bundle cost
 
 | Fixture | Raw main → candidate | Raw delta | Gzip main → candidate | Gzip delta |
 | --- | ---: | ---: | ---: | ---: |

@@ -174,9 +174,9 @@ rule. Removing the scope removes its marker and leaves authored styles intact.
 ## Commit ordering
 
 Octane prepares the next tree before the old snapshot, while existing DOM and
-committed handlers remain visible. It uses the finished boundary props to select
-old capture names, including nested `update="none"` suppression. The native update
-callback publishes the ordered DOM changes once, together with insertion effects
+committed handlers remain visible. The finished boundary props select old-capture
+participation and classes, including nested `update="none"` suppression. Old and
+new snapshots each retain their corresponding name. The native update callback publishes the ordered DOM changes once, together with insertion effects
 and outgoing layout cleanup. Newly requested fonts and eligible visible images can delay layout refs
 and effects by up to 500 ms. The new snapshot waits for a navigation that was
 already pending before mutations. Resource failures or the timeout allow the
