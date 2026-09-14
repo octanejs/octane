@@ -11,7 +11,10 @@
     "integrity": "sha256:58254acdc7357e94b9ce6b0097e1601db8cdbf9f44d0e8f44e3e09b0ab77a011",
     "verification": "verified"
   },
-  "upstreamSuites": { "runtime": "present", "types": "absent" },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "absent"
+  },
   "adaptedRoots": {
     "source": {
       "roots": ["packages/react-error-boundary/src"],
@@ -57,8 +60,8 @@
           "cases": [
             {
               "id": "differential:react-error-boundary-reset",
-              "testName": "imperative reset: fallback → content renders byte-identical",
-              "fullName": "differential: @octanejs/react-error-boundary vs real react-error-boundary imperative reset: fallback → content renders byte-identical"
+              "testName": "imperative reset: fallback \u2192 content renders byte-identical",
+              "fullName": "differential: @octanejs/react-error-boundary vs real react-error-boundary imperative reset: fallback \u2192 content renders byte-identical"
             }
           ]
         },
@@ -281,7 +284,7 @@
         {
           "path": "packages/octane/tests/_hydration-ssr.ts",
           "role": "support",
-          "sha256": "46961a4ff84e72ec807e5b83626dca96284bc2d76614f60e4adbfb1ba2be9351"
+          "sha256": "2140e4ed078ad56e70a3449ff557b0450ee598cf523f5e0c9013a793ff07e48b"
         }
       ],
       "execution": {

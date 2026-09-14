@@ -11,7 +11,10 @@
     "integrity": "sha256:c6e035f0c9c353ab35d6fa8f76724082d9699283d04e716539e5b960ca969db2",
     "verification": "verified"
   },
-  "upstreamSuites": { "runtime": "present", "types": "present" },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "present"
+  },
   "adaptedRoots": {
     "source": {
       "roots": ["packages/alien-signals/src"],
@@ -77,7 +80,7 @@
         {
           "path": "scripts/react-parity/run-pristine.mjs",
           "role": "support",
-          "sha256": "47ee2d34c0093e6693dfc75e9a528326bc1cfb01d2470ade1df32348b56ebfd7"
+          "sha256": "6f52cac811baf4a9c67ffdcd1fe4ae9eebfd8b9cf497af40bb69ccbc7a0eca0b"
         },
         {
           "path": "packages/alien-signals/audit/pristine-oracle-environment.json",
@@ -410,7 +413,7 @@
         {
           "path": "packages/octane/tests/_hydration-ssr.ts",
           "role": "support",
-          "sha256": "46961a4ff84e72ec807e5b83626dca96284bc2d76614f60e4adbfb1ba2be9351"
+          "sha256": "2140e4ed078ad56e70a3449ff557b0450ee598cf523f5e0c9013a793ff07e48b"
         }
       ]
     },

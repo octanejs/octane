@@ -9,22 +9,22 @@ type Store = {
 
 export function CallbackRegion(props: { store: Store }) @{
 	<Observer>
-		{() => <span id="callback-count">{props.store.count as string}</span>}
+		{() => <span id="callback-count">{String(props.store.count)}</span>}
 	</Observer>
 }
 
 export function CallbackHook(props: { store: Store }) {
-	return useObserver(() => <span id="callback-count">{props.store.count as string}</span>);
+	return useObserver(() => <span id="callback-count">{String(props.store.count)}</span>);
 }
 
 export const CallbackObserver = observer(
-	(props: { store: Store }) => <span id="callback-count">{props.store.count as string}</span>,
+	(props: { store: Store }) => <span id="callback-count">{String(props.store.count)}</span>,
 );
 
 function CounterBody(props: { store: Store; rendered: () => void }) @{
 	props.rendered();
 	<div>
-		<span id="count">{props.store.count as string}</span>
+		<span id="count">{String(props.store.count)}</span>
 		<button id="increment" onClick={() => props.store.count++}>increment</button>
 	</div>
 }
@@ -38,7 +38,7 @@ export const NestedValue = observer(NestedValueBody);
 function SwitchingValueBody(props: { store: Store }) @{
 	const [other, setOther] = useState(false);
 	<div>
-		<span id="selected">{(other ? props.store.other : props.store.count) as string}</span>
+		<span id="selected">{String((other ? props.store.other : props.store.count))}</span>
 		<button id="switch" onClick={() => setOther(true)}>switch</button>
 	</div>
 }
@@ -53,7 +53,7 @@ function LocalObservableBody() @{
 			},
 		}),
 	);
-	<button id="local" onClick={store.increment}>{store.count as string}</button>
+	<button id="local" onClick={store.increment}>{String(store.count)}</button>
 }
 export const LocalObservable = observer(LocalObservableBody);
 
@@ -62,13 +62,13 @@ function TwoCountersBody(props: {
 	right: Store;
 }) @{
 	<div>
-		<span id="left">{props.left.count as string}</span>
-		<span id="right">{props.right.count as string}</span>
+		<span id="left">{String(props.left.count)}</span>
+		<span id="right">{String(props.right.count)}</span>
 	</div>
 }
 export const TwoCounters = observer(TwoCountersBody);
 
 function ServerCounterBody(props: { store: Store }) @{
-	<span id="server-count">{props.store.count as string}</span>
+	<span id="server-count">{String(props.store.count)}</span>
 }
 export const ServerCounter = observer(ServerCounterBody);

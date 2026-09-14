@@ -19675,6 +19675,19 @@ function rewriteCallbackBody(body, ctx, eagerMapCallbackRoots, owner) {
 	}
 }
 
+// A JSX-valued prop is a stored subtree even when its enclosing callback is
+// evaluated eagerly. Its consumer decides when to render it (for example an
+// unused Suspense fallback). Callable prop bodies enable their own evaluation.
+function rewriteJsxPropValue(value, ctx) {
+	const previous = ctx._eagerCallbackJsx;
+	ctx._eagerCallbackJsx = false;
+	try {
+		return rewriteJsxValues(value, ctx);
+	} finally {
+		ctx._eagerCallbackJsx = previous;
+	}
+}
+
 function nativeValueFunction(node, authored, ctx) {
 	if (
 		!ctx.nativeReads ||
@@ -20184,7 +20197,7 @@ function jsxElementToCreateElement(node, ctx, eagerRoot = false) {
 	const properties = [];
 	for (const attr of attrs) {
 		if (attr.type === 'SpreadAttribute' || attr.type === 'JSXSpreadAttribute') {
-			properties.push(b.spread(rewriteJsxValues(attr.argument, ctx)));
+			properties.push(b.spread(rewriteJsxPropValue(attr.argument, ctx)));
 			continue;
 		}
 		if (attr.type !== 'Attribute' && attr.type !== 'JSXAttribute') continue;
@@ -20209,7 +20222,7 @@ function jsxElementToCreateElement(node, ctx, eagerRoot = false) {
 		} else {
 			const inner =
 				attr.value.type === 'JSXExpressionContainer' ? attr.value.expression : attr.value;
-			valNode = rewriteJsxValues(inner, ctx);
+			valNode = rewriteJsxPropValue(inner, ctx);
 		}
 		const keyIsIdent = /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(attrName);
 		properties.push(

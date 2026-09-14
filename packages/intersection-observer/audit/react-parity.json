@@ -11,7 +11,10 @@
     "integrity": "sha256:afeb46b9611e3f167427bd1f355a89edd9f34384e688d77402cefd3dcc1f99d3",
     "verification": "verified"
   },
-  "upstreamSuites": { "runtime": "present", "types": "absent" },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "absent"
+  },
   "adaptedRoots": {
     "source": {
       "roots": ["packages/intersection-observer/src"],
@@ -702,7 +705,7 @@
         {
           "path": "packages/octane/tests/_hydration-ssr.ts",
           "role": "support",
-          "sha256": "46961a4ff84e72ec807e5b83626dca96284bc2d76614f60e4adbfb1ba2be9351"
+          "sha256": "2140e4ed078ad56e70a3449ff557b0450ee598cf523f5e0c9013a793ff07e48b"
         }
       ]
     }

@@ -6136,6 +6136,13 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: {
+					group: 'react-parity',
+					include: [
+						'packages/mobx/tests/conformance/binding.test.ts',
+						'packages/mobx/tests/conformance/hydration.test.ts',
+					],
+				},
 				test: {
 					name: 'mobx',
 					include: ['packages/mobx/tests/conformance/**/*.test.ts'],
@@ -6172,6 +6179,7 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'mobx-ssr',
 					include: ['packages/mobx/tests/ssr/**/*.test.ts'],

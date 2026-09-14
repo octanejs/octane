@@ -11,9 +11,16 @@
     "integrity": "sha256:ad832a02d979a8b249ccf9d47fac8f57315c46259572f071fae406c778e1b912",
     "verification": "verified"
   },
-  "upstreamSuites": { "runtime": "present", "types": "absent" },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "absent"
+  },
   "adaptedRoots": {
-    "source": { "roots": ["packages/mantine-hooks/src"], "include": ["\\.ts$"], "exclude": [] },
+    "source": {
+      "roots": ["packages/mantine-hooks/src"],
+      "include": ["\\.ts$"],
+      "exclude": []
+    },
     "tests": {
       "roots": ["packages/mantine-hooks/tests/upstream"],
       "include": ["\\.test\\.tsx?$"],
@@ -320,7 +327,7 @@
         {
           "path": "packages/octane/tests/_hydration-ssr.ts",
           "role": "support",
-          "sha256": "46961a4ff84e72ec807e5b83626dca96284bc2d76614f60e4adbfb1ba2be9351"
+          "sha256": "2140e4ed078ad56e70a3449ff557b0450ee598cf523f5e0c9013a793ff07e48b"
         },
         {
           "path": "packages/mantine-hooks/tests/browser/harness/fixture.tsx",
@@ -353,7 +360,7 @@
       ],
       "upstreamResult": "The React suite counts every global scheduling call as if each belonged to the hook.",
       "octaneResult": "The native suite identifies the hook timer by its requested delay and returned handle, then verifies its exact cancellation and the same observable callback/state behavior.",
-      "rationale": "Octane uses additional scheduler timers; their global count is not part of Mantine’s hook API. The idle case also explicitly advances the fake clock so its deadline assertion executes.",
+      "rationale": "Octane uses additional scheduler timers; their global count is not part of Mantine\u2019s hook API. The idle case also explicitly advances the fake clock so its deadline assertion executes.",
       "classification": "framework-abi",
       "consumerImpact": "Hook deadlines, callbacks, state updates and cleanup remain compatible; framework scheduling internals differ.",
       "migrationGuidance": "Observe the timer owned by the hook, its deadline and its callback rather than all global timer activity.",

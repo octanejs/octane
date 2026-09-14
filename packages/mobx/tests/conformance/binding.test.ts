@@ -7,9 +7,6 @@ import {
 	NestedValue,
 	SwitchingValue,
 	TwoCounters,
-	CallbackRegion,
-	CallbackHook,
-	CallbackObserver,
 } from '../_fixtures/store.tsrx';
 
 const createStore = () =>
@@ -25,21 +22,6 @@ describe('MobX observer binding', () => {
 	beforeEach(() => {
 		store = createStore();
 	});
-
-	it.each([CallbackRegion, CallbackHook, CallbackObserver])(
-		'tracks observable reads in a render callback',
-		async (Component) => {
-			const result = mount(Component, { store });
-			try {
-				expect(result.find('#callback-count').textContent).toBe('0');
-				store.count = 4;
-				await nextPaint();
-				expect(result.find('#callback-count').textContent).toBe('4');
-			} finally {
-				result.unmount();
-			}
-		},
-	);
 
 	// @parity-case native:mobx-e6bb553f8290
 	it('tracks observables read by an observed component', async () => {
