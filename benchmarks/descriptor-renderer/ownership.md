@@ -150,11 +150,12 @@ remains `3c1cc55d8`. Source hashes for this recording:
 - Entry: `03ca158a0df9149dd415c2ee257a33be677005034e04a1e1eb1b1e97f4ca256c`.
 
 
-## Separate remaining context-propagation defect
+## Context-propagation follow-up
 
 A bounded production probe found another preexisting stale-output case on both
-main `239dab04c` and this candidate. It uses the runtime's scoped descriptor
-helpers directly; an authored `.tsrx` equivalent has not been established.
+main `239dab04c` and the original descriptor-renderer candidate. The initial
+probe used runtime scoped-descriptor helpers directly. The follow-up now also
+reproduces this through authored TSRX in `descriptor-context-array.tsrx`.
 With a DOM container available, the following keeps the nested `span` after
 `active` changes to true instead of rendering `strong` with `next`:
 
@@ -177,7 +178,7 @@ const root = createRoot(container);
 root.render(App, { active: false });
 flushSync(() => root.render(App, { active: true }));
 // Expected: <strong data-child="nested">next</strong>
-// Current:  <span data-child="nested">first</span>
+// Baseline: <span data-child="nested">first</span>
 console.log(container.querySelector('[data-child]').outerHTML);
 root.unmount();
 ```
@@ -186,7 +187,9 @@ The nested resolver runs only once in both versions. Classification first
 resolves it in the previewing parent; the cached resolution then crosses into
 the host/item Blocks without replaying its captured context dependencies there.
 The outer resolver returns the same array and reads no context itself, so its
-identity bailout does not see the nested dependency. This needs a separate
-context-dependency ownership fix and is not claimed resolved here. The present
-PR fixes the accepted descriptor/adoption cases whose resolution changes are
-observed by their owning render.
+identity bailout does not see the nested dependency. The
+[body ownership follow-up](../hook-memo/body-ownership.md) now replays these
+dependencies into the consuming block and enclosing scoped capture. Its tests
+cover repeated updates, Provider isolation, memo boundaries, hydration, held
+retries and caught inner reads; its production guard keeps unchanged resolutions
+cached while requiring every changed context to render current output.

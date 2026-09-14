@@ -672,9 +672,9 @@ function takeNativeFreshArm(
 }
 
 // Production helper/custom-hook ABI: reserve a disjoint numeric range for each
-// evaluated module that needs globally composable Symbol descriptions. Direct
-// sites in compiler-owned render Scopes use smaller local numbers and never call
-// this helper. Evaluation order is irrelevant; reserved ranges never overlap,
+// evaluated module. Base-hook slots and compiler memo regions also need module
+// ownership: Providers and lazy wrappers may run different bodies in one Scope.
+// Evaluation order is irrelevant; reserved ranges never overlap,
 // including duplicate/dynamically loaded module instances.
 let nextHookSlot = 0;
 export function hookSlots(count: number): number {
@@ -1178,6 +1178,9 @@ let NEXT_WARM_EPISODE = 1;
 let CURRENT_WARM_EPISODE = 0;
 const RENDERER_REGION_OWNER = Symbol.for('octane.renderer-region.owner');
 const RENDERER_REGION_DOM_OWNERS = new WeakMap<Block, RendererRegionOwnerBridge>();
+// Live region-owner roots (WeakMap exposes no size). Ordinary apps never bind
+// one, so this collapses the per-read bridge check to a single integer test.
+let RENDERER_REGION_OWNER_COUNT = 0;
 const RENDERER_REGION_DOM_BINDINGS = new WeakMap<
 	Block,
 	{
@@ -7751,6 +7754,25 @@ export function componentSlotLite<P>(
 	anchor?: Node,
 ): void {
 	if (CURRENT_BLOCK?.pending && !CURRENT_BLOCK.crossRenderUpdate) return;
+	// Providers and lazy wrappers can execute independently compiled bodies in
+	// the same Scope. Their direct children need an identity-aware slot, including
+	// when one body selected the lite representation and another selected full.
+	if (parentScope === SHARED_BODY_SCOPE) {
+		componentSlotImpl(
+			null,
+			parentScope,
+			slotKey,
+			host,
+			comp,
+			comp,
+			props,
+			props,
+			anchor,
+			undefined,
+			2,
+		);
+		return;
+	}
 	const hydration = activeHydration();
 	let scope = parentScope.slots[slotKey] as Scope | undefined;
 	// The server `<!--]-->` this call adopted as its range end (hydration first
@@ -10169,7 +10191,7 @@ export function renderClientContextProvider<T>(
 				// A different body reused the same DOM/control slots. Its predecessor's
 				// output dependencies no longer prove what those slots contain. Hook
 				// values remain per-body and keep their mounted lifetime.
-				invalidateProviderOutput(scope);
+				invalidateSharedBodyOutput(scope);
 				if (TRANSITION_JOURNAL !== null && !ROOT_RENDER_ROLLBACK) {
 					const hooks = scope.hooks!;
 					journalUndo(() => hooks.set(CHILDREN_DIALECT_SLOT, previous));
@@ -10177,21 +10199,36 @@ export function renderClientContextProvider<T>(
 			}
 			ensureHooks(scope).set(CHILDREN_DIALECT_SLOT, dialect);
 		}
-		childrenAsBody(children)(undefined, scope, undefined);
+		renderSharedBody(childrenAsBody(children), undefined, scope, undefined);
+	}
+}
+
+// Only the directly shared Scope needs stronger component ownership. Ordinary
+// descendants retain their lite paths, and nested shared bodies restore the
+// outer owner without allocating a stack or adding state to every Scope.
+let SHARED_BODY_SCOPE: Scope | null = null;
+
+function renderSharedBody(body: ComponentBody, props: any, scope: Scope, extra: any): any {
+	const previous = SHARED_BODY_SCOPE;
+	SHARED_BODY_SCOPE = scope;
+	try {
+		return body(props, scope, extra);
+	} finally {
+		SHARED_BODY_SCOPE = previous;
 	}
 }
 
 /** Body handoffs are cold; ordinary Provider updates keep their cache arrays. */
-function invalidateProviderOutput(scope: Scope): void {
+function invalidateSharedBodyOutput(scope: Scope): void {
 	const first = scope.compilerMemo;
 	if (first === null) return;
-	invalidateProviderMemoRegion(first);
+	invalidateSharedBodyMemoRegion(first);
 	if (first.overflow !== null) {
-		for (const region of first.overflow.values()) invalidateProviderMemoRegion(region);
+		for (const region of first.overflow.values()) invalidateSharedBodyMemoRegion(region);
 	}
 }
 
-function invalidateProviderMemoRegion(region: CompilerMemoRegion): void {
+function invalidateSharedBodyMemoRegion(region: CompilerMemoRegion): void {
 	if (region.auto === undefined) return;
 	// A candidate may complete before a later sibling suspends. Rollback must
 	// restore the accepted body's dependencies along with its visible output.
@@ -11978,13 +12015,16 @@ export function useContext<T>(context: Context<T> | ForeignHostContext<T>): T {
 const DEFAULT_CTX: unique symbol = Symbol('octane.ctx.default');
 
 function rendererRegionOwnerForBlock(block: Block | null): RendererRegionOwnerBridge | null {
+	// bindRendererRegionOwner throws unless the block is a top-level root
+	// (kind 'root', no parent), so ancestors below the chain top can never be
+	// keys — climb straight there and pay one lookup per call instead of one
+	// per ancestor on every no-provider context read.
+	if (RENDERER_REGION_OWNER_COUNT === 0) return null;
 	let current = block;
-	while (current !== null) {
-		const bridge = RENDERER_REGION_DOM_OWNERS.get(current);
-		if (bridge !== undefined && bridge.active) return bridge;
-		current = current.parentBlock;
-	}
-	return null;
+	while (current !== null && current.parentBlock !== null) current = current.parentBlock;
+	if (current === null) return null;
+	const bridge = RENDERER_REGION_DOM_OWNERS.get(current);
+	return bridge !== undefined && bridge.active ? bridge : null;
 }
 
 function rendererRegionTryHandler(block: Block | null): ((error: unknown) => void) | null {
@@ -12046,12 +12086,14 @@ export function bindRendererRegionOwner(props: unknown): void {
 	root.$$ctxCache = null;
 	root.$$ctxCacheOwner = null;
 	if (previous === undefined) {
+		RENDERER_REGION_OWNER_COUNT++;
 		(root.cleanups ??= []).push(() => {
 			const current = RENDERER_REGION_DOM_BINDINGS.get(root);
 			if (current === undefined) return;
 			current.release();
 			RENDERER_REGION_DOM_BINDINGS.delete(root);
 			RENDERER_REGION_DOM_OWNERS.delete(root);
+			RENDERER_REGION_OWNER_COUNT--;
 		});
 	}
 }
@@ -12121,6 +12163,17 @@ function scopedReadsChanged(reads: Map<Context<any>, number> | null): boolean {
 	return false;
 }
 
+// Classification can resolve a descriptor before its host/item Block owns it.
+// A cache hit must transfer those reads to the current render, just like an
+// actual useContext call. Nested resolvers also contribute to their enclosing
+// resolver's capture, or caching the outer record would hide the nested reads.
+function replayScopedContextReads(reads: Map<Context<any>, number>, block: Block | null): void {
+	for (const [context, version] of reads) {
+		if (block !== null) recordContextDependency(block, context);
+		if (SCOPED_READ_TRACKING) (SCOPED_READS ??= new Map()).set(context, version);
+	}
+}
+
 function createScopedResolver<T>(read: () => T): () => T {
 	let resolved = false;
 	let resolvedScope: Scope | null = null;
@@ -12145,20 +12198,26 @@ function createScopedResolver<T>(read: () => T): () => T {
 			SCOPED_READ_TRACKING = true;
 			SCOPED_READS = null;
 			let next: T;
+			let nextReads: Map<Context<any>, number> | null;
 			try {
 				next = read();
 			} finally {
-				resolvedReads = SCOPED_READS;
+				nextReads = SCOPED_READS;
 				SCOPED_READ_TRACKING = previousTracking;
 				SCOPED_READS = previousReads;
+				// An enclosing resolver may catch this read's error and cache its
+				// fallback, so even an unsuccessful attempt contributes dependencies.
+				if (previousTracking && nextReads !== null) replayScopedContextReads(nextReads, null);
 			}
 			resolvedScope = scope;
+			resolvedReads = nextReads;
 			resolvedValue = next;
 			resolved = true;
-		} else if (resolvedScope !== scope) {
+		} else {
 			// Move ownership from the previewing parent to its direct child so a
 			// later sibling or provider scope still resolves independently.
 			resolvedScope = scope;
+			if (resolvedReads !== null) replayScopedContextReads(resolvedReads, CURRENT_BLOCK);
 		}
 		return resolvedValue;
 	};
@@ -12212,6 +12271,7 @@ function createNativeScopedResolver<T>(read: () => T): () => T {
 					nextReads = SCOPED_READS;
 					SCOPED_READ_TRACKING = previousTracking;
 					SCOPED_READS = previousReads;
+					if (previousTracking && nextReads !== null) replayScopedContextReads(nextReads, null);
 					nextWitness = finishNativeReadWitness(witnessToken, readCompleted);
 				}
 				resolvedScope = scope;
@@ -12223,6 +12283,7 @@ function createNativeScopedResolver<T>(read: () => T): () => T {
 				resolved = true;
 			} else {
 				resolvedScope = scope;
+				if (resolvedReads !== null) replayScopedContextReads(resolvedReads, CURRENT_BLOCK);
 				if (collecting) replayNativeReadWitness(resolvedWitness);
 			}
 			completed = true;
@@ -13550,6 +13611,17 @@ export function memoPublishAlways<T>(slot: HookSlot, value: T): T {
 // ---------------------------------------------------------------------------
 
 const LAZY_COMPONENT = Symbol.for('octane.lazy');
+const LAZY_BODY_CHECK = Symbol.for('octane.lazyBodyCheck');
+type LazyBodyCheck = (scope: Scope) => boolean;
+
+function markLazyBodyCheck(body: ComponentBody<any>, check: LazyBodyCheck): void {
+	// Static-hoisting HOCs must not inherit the wrapped lazy's ownership check.
+	Object.defineProperty(body, LAZY_BODY_CHECK, {
+		get() {
+			return this === body ? check : undefined;
+		},
+	});
+}
 
 /**
  * Resolve a lazy module payload to its component. Accepts React's canonical
@@ -13606,6 +13678,9 @@ export function lazy<C extends ComponentBody<any>>(
 	let displayName: string | undefined;
 	let resolvedName = 'Lazy';
 	let lazyWrapper!: ComponentBody<any>;
+	// A wrapper may own many mounted scopes. Remember each scope's accepted
+	// module body separately so another mount cannot hide a body handoff.
+	const bodySlot = Symbol();
 
 	const initializeLazy = (): void => {
 		if (status !== 'uninitialized') return;
@@ -13651,6 +13726,18 @@ export function lazy<C extends ComponentBody<any>>(
 		// throwing/accessor default export is a render-time failure in React: a later
 		// render reads it again without re-running the loader.
 		const comp = resolveLazyModule(result);
+		const previousBody = scope.hooks?.get(bodySlot) as ComponentBody<any> | undefined;
+		if (previousBody !== comp) {
+			if (previousBody !== undefined) invalidateSharedBodyOutput(scope);
+			const hooks = ensureHooks(scope);
+			if (TRANSITION_JOURNAL !== null && !ROOT_RENDER_ROLLBACK) {
+				journalUndo(() => {
+					if (previousBody === undefined) hooks.delete(bodySlot);
+					else hooks.set(bodySlot, previousBody);
+				});
+			}
+			hooks.set(bodySlot, comp);
+		}
 		resolvedName = (comp as any).displayName || comp.name || 'Lazy';
 		if ((comp as any).__memo === true) {
 			// The lazy wrapper owns the live Block, so a resolved memo wrapper would
@@ -13665,13 +13752,25 @@ export function lazy<C extends ComponentBody<any>>(
 					},
 				});
 				Object.defineProperty(lazyWrapper, '__compare', {
-					value: (prev: any, next: any): boolean => {
+					value: (prev: any, next: any, renderScope: Scope): boolean => {
 						const current = resolveLazyModule(result);
+						// Equal props cannot reuse a different module body's output. This
+						// check belongs to the mounted scope, not the shared lazy payload.
+						if (renderScope.hooks?.get(bodySlot) !== current || (current as any).__memo !== true)
+							return false;
 						const compare = (current as any).__compare as
 							((previous: any, incoming: any) => boolean) | undefined;
 						const previous = lazyResolvedProps(current, prev);
 						const incoming = lazyResolvedProps(current, next);
-						return compare ? compare(previous, incoming) : shallowEqualProps(previous, incoming);
+						return compare
+							? (current as any)[LAZY_BODY_CHECK] !== undefined
+								? (compare as (prev: any, next: any, scope: Scope) => boolean)(
+										previous,
+										incoming,
+										renderScope,
+									)
+								: compare(previous, incoming)
+							: shallowEqualProps(previous, incoming);
 					},
 				});
 				memoMetadataInstalled = true;
@@ -13689,7 +13788,7 @@ export function lazy<C extends ComponentBody<any>>(
 			__profileComponentSource(lazyWrapper, comp);
 			profiledComponent = comp;
 		}
-		return comp(lazyResolvedProps(comp, props), scope, extra);
+		return renderSharedBody(comp, lazyResolvedProps(comp, props), scope, extra);
 	};
 
 	lazyWrapper = (props: any, scope: Scope, extra: any): unknown => {
@@ -13722,6 +13821,15 @@ export function lazy<C extends ComponentBody<any>>(
 	// Existing ancestor warm plans can start an independently reachable module,
 	// but resolution, component execution, and deferred hydration remain lazy.
 	markWarm(lazyWrapper, initializeLazy);
+	markLazyBodyCheck(lazyWrapper, (scope) => {
+		// Checking a bailout never starts the loader or accepts speculative output.
+		if (status !== 'fulfilled') return false;
+		const current = resolveLazyModule(result);
+		if (scope.hooks?.get(bodySlot) !== current) return false;
+		// Direct lazy -> lazy is invalid, but lazy -> memo -> lazy is supported.
+		const nestedCheck = (current as any)[LAZY_BODY_CHECK] as LazyBodyCheck | undefined;
+		return nestedCheck === undefined || nestedCheck(scope);
+	});
 	Object.defineProperty(lazyWrapper, LAZY_COMPONENT, {
 		get() {
 			return this === lazyWrapper;
@@ -27164,7 +27272,11 @@ function tryMemoBail(block: Block, comp: any, props: any): boolean {
 	const compare = (comp as any).__compare as ((prev: any, next: any) => boolean) | undefined;
 	// React.memo's optional comparator: returns true when props are equal
 	// (→ skip the render). Falls back to a shallow Object.is comparison.
-	const equal = compare ? compare(block.props, props) : shallowEqualProps(block.props, props);
+	const equal = compare
+		? (comp as any)[LAZY_BODY_CHECK] !== undefined
+			? (compare as (prev: any, next: any, scope: Scope) => boolean)(block.props, props, block)
+			: compare(block.props, props)
+		: shallowEqualProps(block.props, props);
 	if (!equal) return false;
 	if (ctxDirectChanged(block)) return false;
 	if (ctxDepsChanged(block)) refreshContextConsumers(block);
@@ -27188,6 +27300,8 @@ function tryImplicitBail(block: Block): boolean {
 	// A first attempt that suspended or threw has no committed output to reuse.
 	// Its identity-equal retry must execute until this Block mounts successfully.
 	if (!block.mounted || block.renderStatus !== RENDER_VALID) return false;
+	const checkLazyBody = (block.body as any)[LAZY_BODY_CHECK] as LazyBodyCheck | undefined;
+	if (checkLazyBody !== undefined && !checkLazyBody(block)) return false;
 	if (ctxDirectChanged(block)) return false;
 	if (ctxDepsChanged(block)) refreshContextConsumers(block);
 	restampCtxDeps(block);
@@ -27482,7 +27596,18 @@ export function memo<P>(
 	Object.defineProperty(memoWrapper, 'defaultProps', MEMO_DEFAULT_PROPS_DESCRIPTOR);
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileComponentSource(memoWrapper, component);
-	if (arePropsEqual) Object.defineProperty(memoWrapper, '__compare', { value: arePropsEqual });
+	const checkLazyBody = (component as any)[LAZY_BODY_CHECK] as LazyBodyCheck | undefined;
+	if (checkLazyBody !== undefined) {
+		markLazyBodyCheck(memoWrapper, checkLazyBody);
+		// Even the default comparator must remain explicit for this family: a
+		// compiler memo witness may otherwise skip the slot before its body check.
+		Object.defineProperty(memoWrapper, '__compare', {
+			value: (prev: any, next: any, scope: Scope): boolean =>
+				checkLazyBody(scope) &&
+				(arePropsEqual ? arePropsEqual(prev, next) : shallowEqualProps(prev, next)),
+		});
+	} else if (arePropsEqual)
+		Object.defineProperty(memoWrapper, '__compare', { value: arePropsEqual });
 	return memoWrapper as ComponentBody<P> & {
 		readonly type: ComponentBody<P>;
 		displayName?: string;

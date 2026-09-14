@@ -949,12 +949,9 @@ describe('hmr — runtime wrapper', () => {
 		expect(code).not.toMatch(/import\.meta\.hot/);
 	});
 
-	it('hmr option off → proven render-scope hooks use tiny local numbers', async () => {
-		// Only HMR's re-import needs Symbol.for registry identity. Production
-		// component bodies run in a fresh Scope, so direct base hooks need only a
-		// local integer. The app output carries neither a range reservation nor the
-		// module id (an absolute Vite path). Arbitrary helpers and custom-hook
-		// boundaries retain runtime-ranged Symbols.
+	it('hmr option off omits registry identities and source paths for direct hooks', async () => {
+		// Production module ownership must not embed absolute development paths
+		// or retain HMR's global Symbol registry entries.
 		const { compile } = await import('octane/compiler');
 		const src =
 			"import { useState } from 'octane';\n" +
@@ -963,9 +960,6 @@ describe('hmr — runtime wrapper', () => {
 			'  <button onClick={() => setN(n + 1)}>{n as string}</button>\n' +
 			'}\n';
 		const { code } = compile(src, '/abs/path/to/file.tsrx'); // no { hmr: true }
-		expect(code).toMatch(/useState\(0, 0\)/);
-		expect(code).not.toMatch(/const _h\$\d+ = \d+;/);
-		expect(code).not.toContain('_$hookSlots');
 		expect(code).not.toMatch(/Symbol\(/);
 		expect(code).not.toMatch(/Symbol\.for/);
 		expect(code).not.toMatch(/abs\/path/);
