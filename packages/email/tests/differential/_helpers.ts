@@ -1,20 +1,12 @@
 import { existsSync } from 'node:fs';
-import { basename, join } from 'node:path';
+import { fixtureCachePath } from '../../../../test-utils/differential-precompile.js';
 import { normaliseHtml } from '../../../octane/tests/differential/_rig.js';
-
-function hashString(value: string): string {
-	let hash = 5381;
-	for (let index = 0; index < value.length; index++) {
-		hash = ((hash << 5) + hash + value.charCodeAt(index)) | 0;
-	}
-	return Math.abs(hash).toString(36);
-}
 
 export function loadReactFixture(
 	fixturePath: string,
 	cacheDir: string,
 ): Promise<Record<string, unknown>> {
-	const outFile = join(cacheDir, `${basename(fixturePath, '.tsrx')}-${hashString(fixturePath)}.js`);
+	const outFile = fixtureCachePath(cacheDir, fixturePath);
 	if (!existsSync(outFile)) {
 		throw new Error(`Precompiled React fixture not found for ${fixturePath}. Expected ${outFile}.`);
 	}

@@ -365,14 +365,14 @@
           ]
         },
         {
-          "path": "packages/motion/tests/differential/fixture-compiler.mjs",
+          "path": "test-utils/differential-precompile.ts",
           "role": "support",
-          "sha256": "3a20526c952c99632d38cebcf0c362af27efc034b0439a73645ebf128444088e"
+          "sha256": "e19e4676206e05f50ff8d7c8da155c191ae0dbfd4a523f20fa28f182a9384d57"
         },
         {
           "path": "packages/motion/tests/differential/_setup.ts",
           "role": "support",
-          "sha256": "6d1d3ab1d18c48f6597dc4637f8ac252fcf1ebf4b8667f80d26ef51978ee94fc"
+          "sha256": "cc0dc51f8d9b6ce5e09502d6751be8a1ac9758184e7b544e99cf4c7772168042"
         },
         {
           "path": "packages/motion/tests/_fixtures/render-diff.tsrx",

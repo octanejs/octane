@@ -178,12 +178,17 @@
         {
           "path": "packages/octane/tests/differential/_rig.ts",
           "role": "support",
-          "sha256": "364c0595b08b26343fa3cd9ff7ddbdaa5fd227cfcd390437aa67ae9a173ebe1b"
+          "sha256": "a384af64ffbeebcac95446a53edfe336146177ad9bc78b2b50e9e0d1143ed427"
         },
         {
           "path": "packages/xyflow/tests/differential/_setup.ts",
           "role": "support",
-          "sha256": "897efdd4751f2397fe53003c131f24975710209d886cc64406149b9763432c62"
+          "sha256": "5ec34a4a8cf402a72ec21869cddb400a09cdc9d6158cc0ce816dcfeac7f936c8"
+        },
+        {
+          "path": "test-utils/differential-precompile.ts",
+          "role": "support",
+          "sha256": "e19e4676206e05f50ff8d7c8da155c191ae0dbfd4a523f20fa28f182a9384d57"
         }
       ]
     }

@@ -1,38 +1,56 @@
-import { describe, expect, it, vi } from 'vitest';
-import { compileFixture } from './fixture-compiler.mjs';
-import { DIFFERENTIAL_FIXTURE_FILENAMES } from './fixtures';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { compileReactFixture } from '../../../../test-utils/differential-precompile.js';
+import { differentialConfig } from './_setup.js';
 
-function dependencies(
-	compile: (source: string, sourcePath: string) => { code: string; errors?: unknown[] },
-) {
+let dir: string;
+
+afterEach(() => {
+	if (dir) rmSync(dir, { recursive: true, force: true });
+});
+
+function stage() {
+	dir = mkdtempSync(join(tmpdir(), 'differential-setup-'));
+	const fixture = join(dir, 'broken.tsrx');
+	writeFileSync(fixture, 'fixture source');
+	mkdirSync(join(dir, 'cache'));
+	return fixture;
+}
+
+function compileDeps(compile: () => { code: string; errors?: unknown[] }) {
 	return {
-		readFile: vi.fn(() => 'fixture source'),
 		compile: vi.fn(compile),
 		transform: vi.fn(() => ({ code: 'compiled' })),
-		writeFile: vi.fn(),
 	};
 }
 
-describe('Floating UI differential setup', () => {
+function run(fixture: string, deps: ReturnType<typeof compileDeps>) {
+	return compileReactFixture(fixture, {
+		...differentialConfig,
+		fixtureDir: dir,
+		cacheDir: join(dir, 'cache'),
+		deps,
+	});
+}
+
+import { DIFFERENTIAL_FIXTURE_FILENAMES } from './fixtures';
+
+describe('differential setup', () => {
 	it('declares the exact fixture consumed by the parity test', () => {
 		expect(DIFFERENTIAL_FIXTURE_FILENAMES).toEqual(['tooltip.tsx']);
 	});
 
 	it('fails closed when the TSRX compiler reports errors', () => {
-		const deps = dependencies(() => ({ code: '', errors: [{ message: 'invalid fixture' }] }));
-		expect(() => compileFixture('/fixtures/broken.tsrx', '/cache', deps)).toThrow(
-			/invalid fixture/,
-		);
-		expect(deps.writeFile).not.toHaveBeenCalled();
+		const deps = compileDeps(() => ({ code: '', errors: [{ message: 'invalid fixture' }] }));
+		expect(() => run(stage(), deps)).toThrow(/invalid fixture/);
 	});
 
 	it('propagates compiler exceptions without writing cache output', () => {
-		const deps = dependencies(() => {
+		const deps = compileDeps(() => {
 			throw new Error('compiler exploded');
 		});
-		expect(() => compileFixture('/fixtures/broken.tsrx', '/cache', deps)).toThrow(
-			'compiler exploded',
-		);
-		expect(deps.writeFile).not.toHaveBeenCalled();
+		expect(() => run(stage(), deps)).toThrow('compiler exploded');
 	});
 });

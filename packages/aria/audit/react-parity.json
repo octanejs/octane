@@ -307,7 +307,7 @@
         {
           "path": "packages/aria/tests/differential/_setup.ts",
           "role": "support",
-          "sha256": "1316104ea9caf5dd23a96545a29119a648ed92d2d86d11883d397bc9bf2bc3d4"
+          "sha256": "b36b213f5c23fab48cfd1c32718d3b5d84fea8e23f677126e994d09bad0eb827"
         },
         {
           "path": "packages/aria/tests/_fixtures/aria-diff.tsrx",
@@ -375,6 +375,11 @@
           "path": "packages/aria/tests/_fixtures/aria-120.tsrx",
           "role": "support",
           "sha256": "7618c849315ed83fabc4d7e7850fb9f3826551f3c23dc0c35f9e013f661d48b8"
+        },
+        {
+          "path": "test-utils/differential-precompile.ts",
+          "role": "support",
+          "sha256": "e19e4676206e05f50ff8d7c8da155c191ae0dbfd4a523f20fa28f182a9384d57"
         }
       ]
     },

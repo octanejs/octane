@@ -158,7 +158,7 @@
         {
           "path": "packages/gsap/tests/differential/_setup.ts",
           "role": "support",
-          "sha256": "49b55266bbadee17faa7d285a2203bb03a4ae241c0c0cc685650e09e3e25e994"
+          "sha256": "88591ae3ac9b43257e95b1b579e6a554d51298e367e2c0ef19686e61fca1f990"
         },
         {
           "path": "packages/gsap/tests/_fixtures/differential/lifecycle-diff.tsrx",
@@ -168,7 +168,12 @@
         {
           "path": "packages/octane/tests/differential/_rig.ts",
           "role": "support",
-          "sha256": "364c0595b08b26343fa3cd9ff7ddbdaa5fd227cfcd390437aa67ae9a173ebe1b"
+          "sha256": "a384af64ffbeebcac95446a53edfe336146177ad9bc78b2b50e9e0d1143ed427"
+        },
+        {
+          "path": "test-utils/differential-precompile.ts",
+          "role": "support",
+          "sha256": "e19e4676206e05f50ff8d7c8da155c191ae0dbfd4a523f20fa28f182a9384d57"
         }
       ]
     }

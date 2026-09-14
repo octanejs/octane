@@ -129,12 +129,17 @@
         {
           "path": "packages/base-ui/tests/differential/_setup.ts",
           "role": "support",
-          "sha256": "887878cfaa58b5213e5bcc3d71caf0f97ab63bee7778e24d56c3cf71173f369e"
+          "sha256": "de820a86817f34998ad4f85a40f574c12e84ac64c12eba548c2030212ca9af9f"
         },
         {
           "path": "packages/base-ui/tests/_fixtures/base-ui-diff.tsrx",
           "role": "support",
           "sha256": "7260bf8da6f79bbb4bd12a654917f9551d933fe9b1c51c36218956241079a543"
+        },
+        {
+          "path": "test-utils/differential-precompile.ts",
+          "role": "support",
+          "sha256": "e19e4676206e05f50ff8d7c8da155c191ae0dbfd4a523f20fa28f182a9384d57"
         }
       ]
     },

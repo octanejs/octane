@@ -145,12 +145,12 @@
         {
           "path": "packages/remix-router/tests/differential/_setup.ts",
           "role": "support",
-          "sha256": "7ce3cb7161473003c27ff100a3c871044ffc8b62148488cefc1f28d234823346"
+          "sha256": "83bdd13c7595c536b593ce95e886bd95aeb5313b28582a0ae51b37d62ac28278"
         },
         {
-          "path": "packages/remix-router/tests/differential/_compile-fixtures.ts",
+          "path": "test-utils/differential-precompile.ts",
           "role": "support",
-          "sha256": "640f12d36abd94c286fe0c52c03a2a197b6181cf5f1d6198c4c139c85aee6532"
+          "sha256": "e19e4676206e05f50ff8d7c8da155c191ae0dbfd4a523f20fa28f182a9384d57"
         },
         {
           "path": "packages/remix-router/audit/test-classifications.json",
@@ -160,7 +160,7 @@
         {
           "path": "packages/octane/tests/differential/_rig.ts",
           "role": "support",
-          "sha256": "364c0595b08b26343fa3cd9ff7ddbdaa5fd227cfcd390437aa67ae9a173ebe1b"
+          "sha256": "a384af64ffbeebcac95446a53edfe336146177ad9bc78b2b50e9e0d1143ed427"
         }
       ]
     },
@@ -176,7 +176,7 @@
         {
           "path": "packages/remix-router/tests/ssr/ssr-static.test.ts",
           "role": "test",
-          "sha256": "1d29f5c22a374ebab41f1d3289bbcf52b0624dbf2ed0e7d3417291d4d06cee27",
+          "sha256": "abaa11b3ca189fec73e6556e48728045eb3c3c590b6450af59deb26f02116438",
           "cases": [
             {
               "id": "differential:remix-router-ssr-index",
@@ -213,12 +213,12 @@
         {
           "path": "packages/remix-router/tests/differential/_setup-ssr.ts",
           "role": "support",
-          "sha256": "f82d95758cff72d33ddb1930cb84c21cca0197ee43465080c80e1645d569facc"
+          "sha256": "65de39ce419b0c2a11c74c5f5e928fefa93b9472a0b30368f6f21a9a49147f2b"
         },
         {
-          "path": "packages/remix-router/tests/differential/_compile-fixtures.ts",
+          "path": "test-utils/differential-precompile.ts",
           "role": "support",
-          "sha256": "640f12d36abd94c286fe0c52c03a2a197b6181cf5f1d6198c4c139c85aee6532"
+          "sha256": "e19e4676206e05f50ff8d7c8da155c191ae0dbfd4a523f20fa28f182a9384d57"
         },
         {
           "path": "packages/remix-router/audit/test-classifications.json",

@@ -1,21 +1,15 @@
-import { compile as compileToReact } from '@tsrx/react';
-import { transformSync } from 'esbuild';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { compileFixture } from './fixture-compiler';
+import {
+	packageRewrite,
+	differentialSetup,
+	type DifferentialPrecompileConfig,
+} from '../../../../test-utils/differential-precompile.js';
 
-const fixture = join(dirname(fileURLToPath(import.meta.url)), '../_fixtures/store.tsrx');
-const cacheDirectory = join(dirname(fileURLToPath(import.meta.url)), '.react-cache');
+export const differentialConfig: DifferentialPrecompileConfig = {
+	fixtureDir: new URL('../_fixtures/', import.meta.url),
+	cacheDir: new URL('./.react-cache/', import.meta.url),
+	rewrites: [packageRewrite('@octanejs/valtio', 'valtio')],
+	fixtures: ['store.tsrx'],
+	depsFrom: import.meta.url,
+};
 
-export async function setup(): Promise<void> {
-	if (!existsSync(cacheDirectory)) mkdirSync(cacheDirectory, { recursive: true });
-	compileFixture(fixture, cacheDirectory, {
-		readFile: readFileSync,
-		compile: compileToReact,
-		transform: transformSync,
-		writeFile: writeFileSync,
-	});
-}
-
-export async function teardown(): Promise<void> {}
+export const { setup, teardown } = differentialSetup(differentialConfig);

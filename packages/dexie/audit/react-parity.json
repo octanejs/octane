@@ -55,14 +55,14 @@
           ]
         },
         {
-          "path": "packages/dexie/tests/differential/fixture-compiler.mjs",
+          "path": "test-utils/differential-precompile.ts",
           "role": "support",
-          "sha256": "abea83ed4f82cca271694c8180e881dbcdfcf5af5e56c222ca5dcb8c9776968c"
+          "sha256": "e19e4676206e05f50ff8d7c8da155c191ae0dbfd4a523f20fa28f182a9384d57"
         },
         {
           "path": "packages/dexie/tests/differential/compile-runner.mjs",
           "role": "support",
-          "sha256": "8ad98bceb3a298463c9c3ceda0dca3ef995eb991fc4cc3af147a8e6d6c28d39d"
+          "sha256": "fcd9d74ffc99b16a93975b0f658c5b6bfbaf15a11bb33b1d5aee37f73a2e6f01"
         },
         {
           "path": "packages/dexie/tests/_fixtures/live-query.tsrx",

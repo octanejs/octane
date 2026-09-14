@@ -709,7 +709,7 @@ const manifest = {
 				]),
 				evidenceFile('packages/floating-ui/tests/differential/_setup.ts'),
 				evidenceFile('packages/floating-ui/tests/differential/fixtures.ts'),
-				evidenceFile('packages/floating-ui/tests/differential/fixture-compiler.mjs'),
+				evidenceFile('test-utils/differential-precompile.ts'),
 				evidenceFile('packages/floating-ui/tests/differential/compile-runner.mjs'),
 				evidenceFile('packages/floating-ui/tests/_fixtures/tooltip.tsx'),
 			],

@@ -292,7 +292,7 @@
         {
           "path": "packages/floating-ui/scripts/generate-parity-evidence.mjs",
           "role": "support",
-          "sha256": "eca41d24d80cbc572c607b94a2fc32295bcf96ab813b4876cff0eba637b5d12a"
+          "sha256": "7ca3412543116bfb9207ddbc2c14d209f66d8e0cdd9256f79355d8b883da4bf2"
         },
         {
           "path": "packages/floating-ui/audit/upstream-patches/tests/upstream/react-dom/index.test-d.tsx.patch",
@@ -497,7 +497,7 @@
         {
           "path": "packages/floating-ui/tests/differential/_setup.ts",
           "role": "support",
-          "sha256": "c7f25f8ac18b9aadf2a776acff0f290bf076c46f047773fadb39e53ace2edc46"
+          "sha256": "6bcc24d60c54ed0336a1ad8273e01679cd64daada17a265f44b2d1dae878826d"
         },
         {
           "path": "packages/floating-ui/tests/differential/fixtures.ts",
@@ -505,14 +505,14 @@
           "sha256": "d578f696a72514a2297948311b0352822c1ab589703235f316a04297cecc0b08"
         },
         {
-          "path": "packages/floating-ui/tests/differential/fixture-compiler.mjs",
+          "path": "test-utils/differential-precompile.ts",
           "role": "support",
-          "sha256": "a0a1ad1531266f9d32a25bb5299c23e99312e9d8350ba1f124e5d5783c0e8c38"
+          "sha256": "e19e4676206e05f50ff8d7c8da155c191ae0dbfd4a523f20fa28f182a9384d57"
         },
         {
           "path": "packages/floating-ui/tests/differential/compile-runner.mjs",
           "role": "support",
-          "sha256": "8ad98bceb3a298463c9c3ceda0dca3ef995eb991fc4cc3af147a8e6d6c28d39d"
+          "sha256": "c7c6afba6415c2e5c98a80b701f2459918560118501fd53156ec9484b6c76799"
         },
         {
           "path": "packages/floating-ui/tests/_fixtures/tooltip.tsx",

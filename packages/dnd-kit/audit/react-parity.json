@@ -71,7 +71,7 @@
         {
           "path": "packages/dnd-kit/tests/differential/_setup.ts",
           "role": "support",
-          "sha256": "d982970ac68712f7ac3ce51ac133b22bee4879dafde32902adb7bffbe1bfca88"
+          "sha256": "e07d055a4e83a23aa88e3f5cbc5939577c4548257b910cea6307f5d547e298dd"
         },
         {
           "path": "packages/dnd-kit/tests/_fixtures/differential.tsrx",
@@ -81,7 +81,7 @@
         {
           "path": "packages/octane/tests/differential/_rig.ts",
           "role": "support",
-          "sha256": "364c0595b08b26343fa3cd9ff7ddbdaa5fd227cfcd390437aa67ae9a173ebe1b"
+          "sha256": "a384af64ffbeebcac95446a53edfe336146177ad9bc78b2b50e9e0d1143ed427"
         },
         {
           "path": "packages/dnd-kit/audit/test-classifications.json",
@@ -97,6 +97,11 @@
           "path": "packages/dnd-kit/audit/upstream.lock.json",
           "role": "support",
           "sha256": "ea9f6defc5d432488525eb7a003c04218c63c236147a03809711d58e289b8923"
+        },
+        {
+          "path": "test-utils/differential-precompile.ts",
+          "role": "support",
+          "sha256": "e19e4676206e05f50ff8d7c8da155c191ae0dbfd4a523f20fa28f182a9384d57"
         }
       ]
     }

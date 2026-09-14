@@ -1,29 +1,30 @@
-import { compile as compileToReact } from '@tsrx/react';
-import { transformSync } from 'esbuild';
-import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { realpathSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { compileFixture } from './fixture-compiler';
+import {
+	differentialSetup,
+	type DifferentialPrecompileConfig,
+} from '../../../../test-utils/differential-precompile.js';
 
-const currentDirectory = dirname(fileURLToPath(import.meta.url));
-const fixture = join(currentDirectory, '../_fixtures/differential.tsrx');
-const cacheDirectory = join(currentDirectory, '.react-cache');
 const upstreamPackageRoot = dirname(
-	realpathSync(join(currentDirectory, '../../node_modules/@visx/visx')),
+	realpathSync(join(import.meta.dirname, '../../node_modules/@visx/visx')),
 );
 
-function compileOne(sourcePath: string): void {
-	compileFixture(sourcePath, cacheDirectory, upstreamPackageRoot, {
-		readFile: readFileSync,
-		compile: compileToReact,
-		transform: transformSync,
-		writeFile: writeFileSync,
-	});
-}
+export const differentialConfig: DifferentialPrecompileConfig = {
+	fixtureDir: new URL('../_fixtures/', import.meta.url),
+	cacheDir: new URL('./.react-cache/', import.meta.url),
+	rewrites: [
+		[
+			/from\s+["']@octanejs\/visx["']/g,
+			`from ${JSON.stringify(join(upstreamPackageRoot, 'visx/esm/index.js'))}`,
+		],
+		[
+			/from\s+["']@octanejs\/visx\/([^"']+)["']/g,
+			(_match, subpath: string) =>
+				`from ${JSON.stringify(join(upstreamPackageRoot, subpath, 'esm/index.js'))}`,
+		],
+	],
+	fixtures: ['differential.tsrx'],
+	depsFrom: import.meta.url,
+};
 
-export async function setup(): Promise<void> {
-	if (!existsSync(cacheDirectory)) mkdirSync(cacheDirectory, { recursive: true });
-	compileOne(fixture);
-}
-
-export async function teardown(): Promise<void> {}
+export const { setup, teardown } = differentialSetup(differentialConfig);

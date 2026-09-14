@@ -90,12 +90,12 @@
         {
           "path": "packages/styled-components/tests/differential/_styled-rig.ts",
           "role": "support",
-          "sha256": "503c43be7a4efee3e8148e4d174bc2a5b084f44e95d446003727dd78f7ecabde"
+          "sha256": "6c875452786d2105804f8d58dea782d3b450398892d1b61db64f79c2261bdfd8"
         },
         {
           "path": "packages/styled-components/tests/differential/_setup.ts",
           "role": "support",
-          "sha256": "e939eafcf56ffb6649b72a1f2efd2fa29897ab56d9445b43ae92acdae139e78b"
+          "sha256": "3efa6664e9c16057667963b9f472f8585f35a95b676067e930ed21ba25449505"
         },
         {
           "path": "packages/styled-components/tests/_fixtures/basic-smoke.tsrx",
@@ -135,7 +135,12 @@
         {
           "path": "packages/octane/tests/differential/_rig.ts",
           "role": "support",
-          "sha256": "364c0595b08b26343fa3cd9ff7ddbdaa5fd227cfcd390437aa67ae9a173ebe1b"
+          "sha256": "a384af64ffbeebcac95446a53edfe336146177ad9bc78b2b50e9e0d1143ed427"
+        },
+        {
+          "path": "test-utils/differential-precompile.ts",
+          "role": "support",
+          "sha256": "e19e4676206e05f50ff8d7c8da155c191ae0dbfd4a523f20fa28f182a9384d57"
         }
       ]
     }

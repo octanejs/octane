@@ -14,6 +14,7 @@ import {
 	preloadDifferentialFixture,
 	normaliseHtml,
 } from '../../../octane/tests/differential/_rig.js';
+import { fixtureCachePath } from '../../../../test-utils/differential-precompile.js';
 import { clearConsoleErrors, consoleErrorCalls } from '../_setup.js';
 
 const FIXTURE = resolve(__dirname, '../_fixtures/cmdk-diff.tsrx');
@@ -21,15 +22,6 @@ const CACHE = resolve(__dirname, '.react-cache');
 
 // Match the differential rig: React 18+ requires this for act() to flush.
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-
-/** Must match packages/cmdk/tests/differential/_setup.ts and the differential rig. */
-function hashString(value: string): string {
-	let hash = 5381;
-	for (let index = 0; index < value.length; index++) {
-		hash = ((hash << 5) + hash + value.charCodeAt(index)) | 0;
-	}
-	return Math.abs(hash).toString(36);
-}
 
 function duplicateValueWarns(calls: unknown[][]): string[] {
 	return calls
@@ -538,9 +530,7 @@ describe('differential: @octanejs/cmdk vs cmdk@1.1.1', function () {
 		octaneHost.remove();
 		warn.mockClear();
 
-		const reactMod = await import(
-			/* @vite-ignore */ join(CACHE, `cmdk-diff-${hashString(FIXTURE)}.js`)
-		);
+		const reactMod = await import(/* @vite-ignore */ fixtureCachePath(CACHE, FIXTURE));
 		const reactHost = document.createElement('div');
 		document.body.appendChild(reactHost);
 		const reactRoot = reactCreateRoot(reactHost);

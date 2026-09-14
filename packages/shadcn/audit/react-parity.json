@@ -113,7 +113,7 @@
         {
           "path": "packages/shadcn/tests/differential/_setup.ts",
           "role": "support",
-          "sha256": "58eb4bdcba11e19441a0eb83bf3ea7b5bddf86b514f1d9394e04268f010fd1a8"
+          "sha256": "0893dbe6188a83dcf3b54cb5c1e3e24ca7d0772f226baa175a08a5bf26d9a49a"
         },
         {
           "path": "packages/shadcn/tests/differential/upstream/index.ts",
@@ -163,7 +163,12 @@
         {
           "path": "packages/octane/tests/differential/_rig.ts",
           "role": "support",
-          "sha256": "364c0595b08b26343fa3cd9ff7ddbdaa5fd227cfcd390437aa67ae9a173ebe1b"
+          "sha256": "a384af64ffbeebcac95446a53edfe336146177ad9bc78b2b50e9e0d1143ed427"
+        },
+        {
+          "path": "test-utils/differential-precompile.ts",
+          "role": "support",
+          "sha256": "e19e4676206e05f50ff8d7c8da155c191ae0dbfd4a523f20fa28f182a9384d57"
         }
       ]
     },
@@ -236,7 +241,7 @@
         {
           "path": "packages/shadcn/tests/differential/_setup.ts",
           "role": "support",
-          "sha256": "58eb4bdcba11e19441a0eb83bf3ea7b5bddf86b514f1d9394e04268f010fd1a8"
+          "sha256": "0893dbe6188a83dcf3b54cb5c1e3e24ca7d0772f226baa175a08a5bf26d9a49a"
         },
         {
           "path": "packages/shadcn/upstream/style-nova.css",
@@ -247,6 +252,11 @@
           "path": "packages/shadcn/audit/shadcn-4.21.0.json",
           "role": "support",
           "sha256": "4da160e4ba1df9223e3370569293cbffe922cfb57c600074a84a5ed49e829e1a"
+        },
+        {
+          "path": "test-utils/differential-precompile.ts",
+          "role": "support",
+          "sha256": "e19e4676206e05f50ff8d7c8da155c191ae0dbfd4a523f20fa28f182a9384d57"
         }
       ]
     }

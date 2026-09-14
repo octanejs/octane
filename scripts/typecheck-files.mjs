@@ -106,7 +106,17 @@ function findOwningProjects(file, projectForConfig, searchRoot) {
 
 	let directory = path.dirname(file);
 	for (;;) {
-		const projects = configsInDirectory(directory).map(projectForConfig);
+		// A config that fails `--showConfig` (e.g. an include list that matches
+		// nothing) owns no files — skip it so a degenerate tsconfig beside the
+		// real project config doesn't abort the whole selection.
+		const projects = [];
+		for (const config of configsInDirectory(directory)) {
+			try {
+				projects.push(projectForConfig(config));
+			} catch {
+				continue;
+			}
+		}
 		if (projects.length > 0) {
 			const includingProjects = projects.filter((project) => project.fileSet.has(file));
 			if (includingProjects.length > 0) return includingProjects;

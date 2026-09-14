@@ -556,7 +556,7 @@
         {
           "path": "packages/react-map-gl/tests/differential/_setup.ts",
           "role": "support",
-          "sha256": "6243b34d6d98314f8fc888fce4d01175ea10b7807f239c7bacc42bdfd0ab4897"
+          "sha256": "353947dafb265e6b642d6cd327338e138cf0edfc233c6d383a4441f5d6aedf7a"
         },
         {
           "path": "packages/react-map-gl/tests/_fixtures/differential/map-diff.tsrx",
@@ -592,6 +592,11 @@
           "path": "packages/react-map-gl/tests/_mocks/mapbox-gl.ts",
           "role": "support",
           "sha256": "ba922849c42f4756360689ba772e6d9c484971e61c00ef65d4a3bd0f188dc509"
+        },
+        {
+          "path": "test-utils/differential-precompile.ts",
+          "role": "support",
+          "sha256": "e19e4676206e05f50ff8d7c8da155c191ae0dbfd4a523f20fa28f182a9384d57"
         }
       ]
     }

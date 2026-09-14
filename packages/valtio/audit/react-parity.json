@@ -95,12 +95,12 @@
         {
           "path": "packages/valtio/tests/differential/_setup.ts",
           "role": "support",
-          "sha256": "f44418aef38ea7f997470c2ddda6964f71b8287f2f9b290d27bb408a28520bc9"
+          "sha256": "a382d9cd6cb4d11bf354e8b0d9664e5ff3e91a71b911f69e55395846debbbbc8"
         },
         {
-          "path": "packages/valtio/tests/differential/fixture-compiler.ts",
+          "path": "test-utils/differential-precompile.ts",
           "role": "support",
-          "sha256": "35644601b67415e7cd2f1255fee7664442e288cafce47bb894d61172fee45fb4"
+          "sha256": "e19e4676206e05f50ff8d7c8da155c191ae0dbfd4a523f20fa28f182a9384d57"
         },
         {
           "path": "packages/valtio/tests/_fixtures/store.tsrx",
@@ -110,7 +110,7 @@
         {
           "path": "packages/octane/tests/differential/_rig.ts",
           "role": "support",
-          "sha256": "364c0595b08b26343fa3cd9ff7ddbdaa5fd227cfcd390437aa67ae9a173ebe1b"
+          "sha256": "a384af64ffbeebcac95446a53edfe336146177ad9bc78b2b50e9e0d1143ed427"
         }
       ]
     },

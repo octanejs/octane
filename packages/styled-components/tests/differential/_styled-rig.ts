@@ -8,7 +8,7 @@
  */
 import { expect } from 'vitest';
 import { existsSync } from 'node:fs';
-import { basename, join } from 'node:path';
+import { fixtureCachePath } from '../../../../test-utils/differential-precompile.js';
 import * as React from 'react';
 import { act as reactAct } from 'react';
 import { createRoot as reactCreateRoot, type Root as ReactRoot } from 'react-dom/client';
@@ -36,20 +36,11 @@ import {
 
 const reactImportCache = new Map<string, Promise<any>>();
 
-function hashString(value: string): string {
-	let hash = 5381;
-	for (let index = 0; index < value.length; index++) {
-		hash = ((hash << 5) + hash + value.charCodeAt(index)) | 0;
-	}
-	return Math.abs(hash).toString(36);
-}
-
 function loadReactFixture(srcPath: string, cacheDir: string): Promise<any> {
 	const cacheKey = `${cacheDir}\0${srcPath}`;
 	const cached = reactImportCache.get(cacheKey);
 	if (cached) return cached;
-	const slug = basename(srcPath).replace(/\.tsrx$/, '');
-	const outFile = join(cacheDir, `${slug}-${hashString(srcPath)}.js`);
+	const outFile = fixtureCachePath(cacheDir, srcPath);
 	if (!existsSync(outFile)) {
 		return Promise.reject(
 			new Error(

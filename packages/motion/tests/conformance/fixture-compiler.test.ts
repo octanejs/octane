@@ -1,32 +1,45 @@
-import { describe, expect, it, vi } from 'vitest';
-import { compileFixture } from '../differential/fixture-compiler.mjs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { compileReactFixture } from '../../../../test-utils/differential-precompile.js';
 
-function dependencies(compile: (source: string, path: string) => any) {
-	return {
-		readFile: vi.fn(() => 'fixture source') as any,
-		compile: vi.fn(compile) as any,
-		transform: vi.fn(() => ({ code: 'compiled' })) as any,
-		writeFile: vi.fn() as any,
-	};
+let dir: string;
+
+afterEach(() => {
+	if (dir) rmSync(dir, { recursive: true, force: true });
+});
+
+function run(compile: () => { code: string; errors?: unknown[] }) {
+	dir = mkdtempSync(join(tmpdir(), 'fixture-compiler-'));
+	const fixture = join(dir, 'broken.tsrx');
+	writeFileSync(fixture, 'fixture source');
+	const transform = vi.fn(() => ({ code: 'compiled' }));
+	const call = () =>
+		compileReactFixture(fixture, {
+			fixtureDir: dir,
+			cacheDir: join(dir, 'cache'),
+			fixtures: 'all',
+			deps: { compile: vi.fn(compile), transform },
+		});
+	return { call, transform };
 }
 
 describe('Motion differential setup', () => {
 	it('fails closed when the TSRX compiler reports errors', () => {
-		const deps = dependencies(() => ({ code: '', errors: [{ message: 'invalid fixture' }] }));
-		expect(() => compileFixture('/fixtures/broken.tsrx', '/cache', deps)).toThrow(
-			/invalid fixture/,
-		);
-		expect(deps.transform).not.toHaveBeenCalled();
-		expect(deps.writeFile).not.toHaveBeenCalled();
+		const { call, transform } = run(() => ({
+			code: '',
+			errors: [{ message: 'invalid fixture' }],
+		}));
+		expect(call).toThrow(/invalid fixture/);
+		expect(transform).not.toHaveBeenCalled();
 	});
 
 	it('propagates compiler exceptions without writing cache output', () => {
-		const deps = dependencies(() => {
+		const { call, transform } = run(() => {
 			throw new Error('compiler exploded');
 		});
-		expect(() => compileFixture('/fixtures/broken.tsrx', '/cache', deps)).toThrow(
-			'compiler exploded',
-		);
-		expect(deps.writeFile).not.toHaveBeenCalled();
+		expect(call).toThrow('compiler exploded');
+		expect(transform).not.toHaveBeenCalled();
 	});
 });

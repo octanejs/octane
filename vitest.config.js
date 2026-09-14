@@ -8257,6 +8257,7 @@ export default defineConfig({
 					include: [
 						'test-utils/playwright-browser.test.ts',
 						'test-utils/three-playwright-launch.test.ts',
+						'test-utils/differential-precompile.test.ts',
 					],
 					environment: 'node',
 					globals: false,

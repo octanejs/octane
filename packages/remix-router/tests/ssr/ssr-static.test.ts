@@ -9,7 +9,7 @@
  * payload must match exactly (same dual-stringified JSON, same escaping).
  */
 import { describe, it, expect } from 'vitest';
-import { basename, join, resolve } from 'node:path';
+import { resolve } from 'node:path';
 import { renderToString as octaneRenderToString } from 'octane/server';
 import { createElement as reactCreateElement } from 'react';
 import { renderToString as reactRenderToString } from 'react-dom/server';
@@ -18,21 +18,13 @@ import {
 	createStaticRouter as octaneCreateStaticRouter,
 } from '@octanejs/remix-router';
 import * as octaneFixture from '../_fixtures/static-ssr-diff.tsrx';
+import { fixtureCachePath } from '../../../../test-utils/differential-precompile.js';
 
 const FIXTURE = resolve(__dirname, '../_fixtures/static-ssr-diff.tsrx');
 const CACHE = resolve(__dirname, '../differential/.react-cache-ssr');
 
-// Must match _setup.ts / _rig.ts so the cache file name lines up.
-function hashString(s: string): string {
-	let h = 5381;
-	for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
-	return Math.abs(h).toString(36);
-}
-
 async function loadReactFixture(): Promise<any> {
-	const slug = basename(FIXTURE).replace(/\.tsrx$/, '');
-	const file = join(CACHE, `${slug}-${hashString(FIXTURE)}.js`);
-	return import(/* @vite-ignore */ file);
+	return import(/* @vite-ignore */ fixtureCachePath(CACHE, FIXTURE));
 }
 
 // Strip framework-internal comment markers and collapse whitespace-only text

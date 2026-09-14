@@ -106,7 +106,7 @@
         {
           "path": "packages/streamdown/tests/differential/_setup.ts",
           "role": "support",
-          "sha256": "e97875029695f4aa901e629430ba1be8ab234e3ff6f3f66e383866f33282a1e8"
+          "sha256": "b0272e2c614388870c37d5269d8820465346a729da511e025028d6b1f6de3ffb"
         },
         {
           "path": "packages/streamdown/audit/test-classifications.json",
@@ -116,12 +116,17 @@
         {
           "path": "packages/octane/tests/differential/_rig.ts",
           "role": "support",
-          "sha256": "364c0595b08b26343fa3cd9ff7ddbdaa5fd227cfcd390437aa67ae9a173ebe1b"
+          "sha256": "a384af64ffbeebcac95446a53edfe336146177ad9bc78b2b50e9e0d1143ed427"
         },
         {
           "path": "packages/streamdown/audit/upstream-suite-artifacts.json",
           "role": "support",
           "sha256": "d123884660d085b071ce791b60889b54c04a62f38d6e79c3b753402d55c17c09"
+        },
+        {
+          "path": "test-utils/differential-precompile.ts",
+          "role": "support",
+          "sha256": "e19e4676206e05f50ff8d7c8da155c191ae0dbfd4a523f20fa28f182a9384d57"
         }
       ]
     }

@@ -325,7 +325,7 @@
         {
           "path": "packages/jotai/tests/differential/_setup.ts",
           "role": "support",
-          "sha256": "4ed8564d86835eef591614bb4594d6bb416c178d51f389b07bf4bc25d3fca73a"
+          "sha256": "b07c041b0065da3747c16a6edc09fd37ca77d057ff03ed7c19929c4bf1b2b313"
         },
         {
           "path": "packages/jotai/audit/test-classifications.json",
@@ -335,7 +335,12 @@
         {
           "path": "packages/octane/tests/differential/_rig.ts",
           "role": "support",
-          "sha256": "364c0595b08b26343fa3cd9ff7ddbdaa5fd227cfcd390437aa67ae9a173ebe1b"
+          "sha256": "a384af64ffbeebcac95446a53edfe336146177ad9bc78b2b50e9e0d1143ed427"
+        },
+        {
+          "path": "test-utils/differential-precompile.ts",
+          "role": "support",
+          "sha256": "e19e4676206e05f50ff8d7c8da155c191ae0dbfd4a523f20fa28f182a9384d57"
         }
       ]
     },

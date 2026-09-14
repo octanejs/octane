@@ -66,12 +66,12 @@
         {
           "path": "packages/better-auth/tests/differential/_setup.ts",
           "role": "support",
-          "sha256": "d0589c6638d85df77b0ccf8e105570e1a08c220dd9aef9ef4924dd3f73223765"
+          "sha256": "68f923b6edfc730af3551b39472d9ce1cb27c54af253e107fe1531e60a910598"
         },
         {
-          "path": "packages/better-auth/tests/differential/fixture-compiler.ts",
+          "path": "test-utils/differential-precompile.ts",
           "role": "support",
-          "sha256": "1108d0d7f3a852252f86627b5763991be1f4a9df228b3862656ac2321f9f6bc5"
+          "sha256": "e19e4676206e05f50ff8d7c8da155c191ae0dbfd4a523f20fa28f182a9384d57"
         },
         {
           "path": "packages/better-auth/audit/adapted-runtime.json",

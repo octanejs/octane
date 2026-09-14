@@ -70,12 +70,17 @@
         {
           "path": "packages/wagmi/tests/differential/_setup.ts",
           "role": "support",
-          "sha256": "f4edcfee7b6ae6ace49fe420a757c2afc929f0058f794caf22fbf6f52031b5ab"
+          "sha256": "83bd86a1dfa50bb4a47c6b7d189a7c2242a7ede99845acb613c59229fcc14a75"
         },
         {
           "path": "packages/octane/tests/differential/_rig.ts",
           "role": "support",
-          "sha256": "364c0595b08b26343fa3cd9ff7ddbdaa5fd227cfcd390437aa67ae9a173ebe1b"
+          "sha256": "a384af64ffbeebcac95446a53edfe336146177ad9bc78b2b50e9e0d1143ed427"
+        },
+        {
+          "path": "test-utils/differential-precompile.ts",
+          "role": "support",
+          "sha256": "e19e4676206e05f50ff8d7c8da155c191ae0dbfd4a523f20fa28f182a9384d57"
         }
       ]
     }

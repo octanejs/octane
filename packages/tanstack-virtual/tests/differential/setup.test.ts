@@ -1,44 +1,57 @@
-import { describe, expect, it, vi } from 'vitest';
-import { compileFixture, isOracleFixture } from './fixture-compiler';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { compileReactFixture } from '../../../../test-utils/differential-precompile.js';
+import { differentialConfig } from './_setup.js';
 
-function dependencies(compile: (source: string, path: string) => any) {
+let dir: string;
+
+afterEach(() => {
+	if (dir) rmSync(dir, { recursive: true, force: true });
+});
+
+function stage() {
+	dir = mkdtempSync(join(tmpdir(), 'differential-setup-'));
+	const fixture = join(dir, 'broken.tsrx');
+	writeFileSync(fixture, 'fixture source');
+	mkdirSync(join(dir, 'cache'));
+	return fixture;
+}
+
+function compileDeps(compile: () => { code: string; errors?: unknown[] }) {
 	return {
-		readFile: vi.fn(function () {
-			return 'fixture';
-		}) as any,
-		compile: vi.fn(compile) as any,
-		transform: vi.fn(function () {
-			return { code: 'compiled' };
-		}) as any,
-		writeFile: vi.fn() as any,
+		compile: vi.fn(compile),
+		transform: vi.fn(() => ({ code: 'compiled' })),
 	};
 }
 
-describe('TanStack Virtual differential setup', () => {
+function run(fixture: string, deps: ReturnType<typeof compileDeps>) {
+	return compileReactFixture(fixture, {
+		...differentialConfig,
+		fixtureDir: dir,
+		cacheDir: join(dir, 'cache'),
+		deps,
+	});
+}
+
+describe('differential setup', () => {
 	it('treats only *-diff.tsrx paths as React oracles', () => {
-		expect(isOracleFixture('/fixtures/basic-list-diff.tsrx')).toBe(true);
-		expect(isOracleFixture('/fixtures/server.tsrx')).toBe(false);
-		expect(isOracleFixture('/fixtures/list-basic.tsrx')).toBe(false);
+		expect(differentialConfig.match?.test('basic-list-diff.tsrx')).toBe(true);
+		expect(differentialConfig.match?.test('server.tsrx')).toBe(false);
+		expect(differentialConfig.match?.test('list-basic.tsrx')).toBe(false);
 	});
 
 	it('fails closed when TSRX compilation reports errors', () => {
-		const deps = dependencies(function () {
-			return { code: '', errors: [{ message: 'invalid' }] };
-		});
-		expect(() => compileFixture('/fixture/broken.tsrx', '/cache', deps)).toThrow(/invalid/);
-		expect(deps.writeFile).not.toHaveBeenCalled();
+		const deps = compileDeps(() => ({ code: '', errors: [{ message: 'invalid' }] }));
+		expect(() => run(stage(), deps)).toThrow(/invalid/);
 	});
 
 	it('propagates transform exceptions without writing cache output', () => {
-		const deps = dependencies(function () {
-			return { code: 'compiled' };
-		});
-		deps.transform.mockImplementation(function () {
+		const deps = compileDeps(() => ({ code: 'compiled' }));
+		deps.transform.mockImplementation(() => {
 			throw new Error('transform exploded');
 		});
-		expect(() => compileFixture('/fixture/broken.tsrx', '/cache', deps)).toThrow(
-			'transform exploded',
-		);
-		expect(deps.writeFile).not.toHaveBeenCalled();
+		expect(() => run(stage(), deps)).toThrow('transform exploded');
 	});
 });

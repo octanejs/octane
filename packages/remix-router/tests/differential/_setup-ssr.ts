@@ -1,13 +1,12 @@
-/** Compile only the SSR oracle fixture into an isolated cache. */
-import { join } from 'node:path';
-import { compileFixtures } from './_compile-fixtures.js';
+import {
+	packageRewrite,
+	differentialSetup,
+} from '../../../../test-utils/differential-precompile.js';
 
-const SSR_CACHE_DIR = join(import.meta.dirname, '.react-cache-ssr');
-
-export async function setup(): Promise<void> {
-	compileFixtures(SSR_CACHE_DIR, ['static-ssr-diff.tsrx']);
-}
-
-export async function teardown(): Promise<void> {
-	// Cache is regenerated on each run; nothing to clean up.
-}
+export const { setup, teardown } = differentialSetup({
+	fixtureDir: new URL('../_fixtures/', import.meta.url),
+	cacheDir: new URL('./.react-cache-ssr/', import.meta.url),
+	rewrites: [packageRewrite('@octanejs/remix-router', 'react-router')],
+	fixtures: ['static-ssr-diff.tsrx'],
+	depsFrom: import.meta.url,
+});

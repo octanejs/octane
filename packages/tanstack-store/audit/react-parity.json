@@ -314,12 +314,12 @@
         {
           "path": "packages/tanstack-store/tests/differential/_setup.ts",
           "role": "support",
-          "sha256": "f9f5a54a2fa499c0ee2c9a112ef36394e729dbc302156d72291244ce9725fa7d"
+          "sha256": "5a627bdfd7081187e18d01acbe66b84cfce54106f4f3533bf4c98d1f1d8de002"
         },
         {
-          "path": "packages/tanstack-store/tests/differential/fixture-compiler.ts",
+          "path": "test-utils/differential-precompile.ts",
           "role": "support",
-          "sha256": "1657529172f3d6beab732c51edd124d3a54b1caf679806a5bc8f405a7dc2d33c"
+          "sha256": "e19e4676206e05f50ff8d7c8da155c191ae0dbfd4a523f20fa28f182a9384d57"
         },
         {
           "path": "packages/tanstack-store/tests/_fixtures/differential/parity.tsrx",
@@ -334,7 +334,7 @@
         {
           "path": "packages/octane/tests/differential/_rig.ts",
           "role": "support",
-          "sha256": "364c0595b08b26343fa3cd9ff7ddbdaa5fd227cfcd390437aa67ae9a173ebe1b"
+          "sha256": "a384af64ffbeebcac95446a53edfe336146177ad9bc78b2b50e9e0d1143ed427"
         }
       ]
     }

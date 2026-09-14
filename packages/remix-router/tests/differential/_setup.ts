@@ -1,11 +1,13 @@
-/** Compile the declared client parity fixtures into an isolated React cache. */
-import { join } from 'node:path';
-import { compileFixtures } from './_compile-fixtures.js';
+import {
+	packageRewrite,
+	differentialSetup,
+} from '../../../../test-utils/differential-precompile.js';
 
-const CLIENT_CACHE_DIR = join(import.meta.dirname, '.react-cache');
-
-export async function setup(): Promise<void> {
-	compileFixtures(CLIENT_CACHE_DIR, [
+export const { setup, teardown } = differentialSetup({
+	fixtureDir: new URL('../_fixtures/', import.meta.url),
+	cacheDir: new URL('./.react-cache/', import.meta.url),
+	rewrites: [packageRewrite('@octanejs/remix-router', 'react-router')],
+	fixtures: [
 		'nested-layouts-diff.tsrx',
 		'loader-redirect-error-diff.tsrx',
 		'await-deferred-diff.tsrx',
@@ -14,9 +16,6 @@ export async function setup(): Promise<void> {
 		'navlink-diff.tsrx',
 		'forms-diff.tsrx',
 		'guards-diff.tsrx',
-	]);
-}
-
-export async function teardown(): Promise<void> {
-	// Cache is regenerated on each run; nothing to clean up.
-}
+	],
+	depsFrom: import.meta.url,
+});

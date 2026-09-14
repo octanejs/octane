@@ -71,12 +71,17 @@
         {
           "path": "packages/email/tests/differential/_setup.ts",
           "role": "support",
-          "sha256": "84df2a6c975438b0d638f052654ee62c38a91836a4ef4b8030b28ceedf2383cc"
+          "sha256": "8b02cb0c42703f6c320cabc49f3f4ebb3ce18d8064fffedcc133c92d3b9263d2"
         },
         {
           "path": "packages/email/audit/test-classifications.json",
           "role": "support",
           "sha256": "7d482b2a609dd3e44d4cef6d5450844e621bcaecf71df86a120c46222f5e426a"
+        },
+        {
+          "path": "test-utils/differential-precompile.ts",
+          "role": "support",
+          "sha256": "e19e4676206e05f50ff8d7c8da155c191ae0dbfd4a523f20fa28f182a9384d57"
         }
       ]
     }

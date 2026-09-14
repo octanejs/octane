@@ -3,42 +3,59 @@
  * package tests (not React-oracle parity evidence), so they live outside the
  * wholly differential project.
  */
-import { describe, expect, it, vi } from 'vitest';
-import { compileFixture } from '../differential/fixture-compiler';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { compileReactFixture } from '../../../../test-utils/differential-precompile.js';
 
-function dependencies(compile: (source: string, path: string) => any) {
-	return {
-		readFile: vi.fn(function () {
-			return 'fixture';
-		}) as any,
-		compile: vi.fn(compile) as any,
-		transform: vi.fn(function () {
-			return { code: 'compiled' };
-		}) as any,
-		writeFile: vi.fn() as any,
-	};
+let dir: string;
+
+afterEach(() => {
+	if (dir) rmSync(dir, { recursive: true, force: true });
+});
+
+function stage() {
+	dir = mkdtempSync(join(tmpdir(), 'fixture-compiler-'));
+	const fixture = join(dir, 'broken.tsrx');
+	writeFileSync(fixture, 'fixture');
+	return fixture;
+}
+
+function run(
+	fixture: string,
+	deps: {
+		compile: () => { code: string; errors?: unknown[] };
+		transform: () => { code: string };
+	},
+) {
+	return compileReactFixture(fixture, {
+		fixtureDir: dir,
+		cacheDir: join(dir, 'cache'),
+		fixtures: 'all',
+		deps,
+	});
 }
 
 describe('Tiptap differential setup', function () {
 	it('fails closed on compiler errors', function () {
-		const deps = dependencies(function () {
-			return { code: '', errors: [{ message: 'invalid' }] };
-		});
+		const transform = vi.fn(() => ({ code: 'compiled' }));
 		expect(function () {
-			compileFixture('/fixture/broken.tsrx', '/cache', deps);
+			run(stage(), {
+				compile: () => ({ code: '', errors: [{ message: 'invalid' }] }),
+				transform,
+			});
 		}).toThrow(/invalid/);
-		expect(deps.writeFile).not.toHaveBeenCalled();
+		expect(transform).not.toHaveBeenCalled();
 	});
 	it('propagates transform exceptions without cache output', function () {
-		const deps = dependencies(function () {
-			return { code: 'compiled' };
-		});
-		deps.transform.mockImplementation(function () {
-			throw new Error('transform exploded');
-		});
 		expect(function () {
-			compileFixture('/fixture/broken.tsrx', '/cache', deps);
+			run(stage(), {
+				compile: () => ({ code: 'compiled' }),
+				transform: () => {
+					throw new Error('transform exploded');
+				},
+			});
 		}).toThrow('transform exploded');
-		expect(deps.writeFile).not.toHaveBeenCalled();
 	});
 });

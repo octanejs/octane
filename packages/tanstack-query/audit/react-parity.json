@@ -75,7 +75,7 @@
         {
           "path": "packages/tanstack-query/tests/differential/_setup.ts",
           "role": "support",
-          "sha256": "8cf12195e5fe493461684961480acaf19ca03acc614bd2d7f2ef71c4f17a3dbf"
+          "sha256": "84790b4593cb59fea27020f6c340a7c51a3430ef4466389cdb955e8e9334a101"
         },
         {
           "path": "packages/tanstack-query/tests/_fixtures/cached-diff.tsrx",
@@ -86,6 +86,11 @@
           "path": "packages/tanstack-query/tests/_fixtures/async-diff.tsrx",
           "role": "support",
           "sha256": "12015b62a30e93c32120d866f8124ab758a789043a8d351da627b3d8b11b515e"
+        },
+        {
+          "path": "test-utils/differential-precompile.ts",
+          "role": "support",
+          "sha256": "e19e4676206e05f50ff8d7c8da155c191ae0dbfd4a523f20fa28f182a9384d57"
         }
       ]
     },

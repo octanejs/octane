@@ -546,12 +546,17 @@
         {
           "path": "packages/octane/tests/differential/_rig.ts",
           "role": "support",
-          "sha256": "364c0595b08b26343fa3cd9ff7ddbdaa5fd227cfcd390437aa67ae9a173ebe1b"
+          "sha256": "a384af64ffbeebcac95446a53edfe336146177ad9bc78b2b50e9e0d1143ed427"
         },
         {
           "path": "packages/formisch/tests/differential/_setup.ts",
           "role": "support",
-          "sha256": "25a42f1f6a730f8eb5a8a8e7de0e6ea2f7b3fd6f2bd8e05843445e61a6b1b8d3"
+          "sha256": "bea23a057ff71fcec30f1e431da2db453e49992b95e7f221bf8d895e0b3c53b7"
+        },
+        {
+          "path": "test-utils/differential-precompile.ts",
+          "role": "support",
+          "sha256": "e19e4676206e05f50ff8d7c8da155c191ae0dbfd4a523f20fa28f182a9384d57"
         }
       ]
     }

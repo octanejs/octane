@@ -195,12 +195,12 @@
         {
           "path": "packages/tiptap/tests/differential/_setup.ts",
           "role": "support",
-          "sha256": "ef02c12eaf28e2f8d68770cd8ddcdc288c8724c302fba6ad9df850557471d9a0"
+          "sha256": "9aee581d263fcfcfacc6d72a6554098fb1c8e1215b6727a7abe63f05de4b1595"
         },
         {
-          "path": "packages/tiptap/tests/differential/fixture-compiler.ts",
+          "path": "test-utils/differential-precompile.ts",
           "role": "support",
-          "sha256": "c061012a921df2062e9d0cfc61cc3bb1c97aaeec5022b911439dfd4bdd666595"
+          "sha256": "e19e4676206e05f50ff8d7c8da155c191ae0dbfd4a523f20fa28f182a9384d57"
         },
         {
           "path": "packages/tiptap/tests/_fixtures/basic-editor.tsrx",

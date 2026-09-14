@@ -1,19 +1,11 @@
-import { compile as compileToReact } from '@tsrx/react';
 import { transformSync } from 'esbuild';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { basename, dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { compileReactFixture } from '../../../../test-utils/differential-precompile.js';
 
-const fixture = join(dirname(fileURLToPath(import.meta.url)), '../_fixtures/devtools-diff.tsrx');
-const cacheDirectory = join(dirname(fileURLToPath(import.meta.url)), '.react-cache');
-const upstreamSrc = join(dirname(fileURLToPath(import.meta.url)), '../../upstream/src');
-
-function hashString(value: string): string {
-	let hash = 5381;
-	for (let index = 0; index < value.length; index++)
-		hash = ((hash << 5) + hash + value.charCodeAt(index)) | 0;
-	return Math.abs(hash).toString(36);
-}
+const fixture = join(import.meta.dirname, '../_fixtures/devtools-diff.tsrx');
+const cacheDirectory = join(import.meta.dirname, '.react-cache');
+const upstreamSrc = join(import.meta.dirname, '../../upstream/src');
 
 function compileUpstreamModule(name: string, extension: '.ts' | '.tsx'): string {
 	const sourcePath = join(upstreamSrc, `${name}${extension}`);
@@ -35,29 +27,20 @@ function compileUpstreamModule(name: string, extension: '.ts' | '.tsx'): string 
 }
 
 export async function setup(): Promise<void> {
-	if (!existsSync(cacheDirectory)) mkdirSync(cacheDirectory, { recursive: true });
+	rmSync(cacheDirectory, { recursive: true, force: true });
+	mkdirSync(cacheDirectory, { recursive: true });
 	// Compile the internal module first, then the public index barrel so the
 	// differential resolves the same entrypoint consumers import.
 	compileUpstreamModule('devtools', '.tsx');
 	const publicEntry = compileUpstreamModule('index', '.ts');
 	writeFileSync(join(cacheDirectory, 'react-devtools.js'), readFileSync(publicEntry));
-	const compiled = compileToReact(readFileSync(fixture, 'utf8'), fixture);
-	if (compiled.errors?.length)
-		throw new Error(`Unable to compile ${fixture}:\n${compiled.errors.join('\n')}`);
-	const transformed = transformSync(compiled.code, {
-		loader: 'tsx',
-		jsx: 'automatic',
-		jsxImportSource: 'react',
-		target: 'esnext',
-		format: 'esm',
-		sourcefile: fixture,
+	compileReactFixture(fixture, {
+		fixtureDir: join(import.meta.dirname, '../_fixtures'),
+		cacheDir: cacheDirectory,
+		rewrites: [[/from\s+["']@octanejs\/tanstack-devtools["']/g, 'from "@tanstack/react-devtools"']],
+		fixtures: ['devtools-diff.tsrx'],
+		depsFrom: import.meta.url,
 	});
-	const rewritten = transformed.code.replace(
-		/from\s+["']@octanejs\/tanstack-devtools["']/g,
-		'from "@tanstack/react-devtools"',
-	);
-	const slug = basename(fixture).replace(/\.tsrx$/, '');
-	writeFileSync(join(cacheDirectory, `${slug}-${hashString(fixture)}.js`), rewritten);
 }
 
 export async function teardown(): Promise<void> {}

@@ -49,7 +49,7 @@
         {
           "path": "packages/cmdk/tests/differential/parity.test.ts",
           "role": "test",
-          "sha256": "26db2d7ede1098fc3e8fe7db36322525c8a2308a14aa7f57c4fa6a3492abed4d",
+          "sha256": "1b2d629d6186f61a1fd8e348afea9845a6bc322b5a830b7a5a674b56fc94cc7d",
           "cases": [
             {
               "id": "differential:cmdk-filter-selection-empty",
@@ -116,7 +116,7 @@
         {
           "path": "packages/cmdk/tests/differential/_setup.ts",
           "role": "support",
-          "sha256": "844814cbfb25f4478279811e81ca3d8c39b3bfd00ce22c0bf7fa6a93ee460569"
+          "sha256": "52004019c0c33253f5295ffe57ae34b661971aaee2d92835787c6a9135d6be93"
         },
         {
           "path": "packages/cmdk/tests/_fixtures/cmdk-diff.tsrx",
@@ -126,7 +126,7 @@
         {
           "path": "packages/octane/tests/differential/_rig.ts",
           "role": "support",
-          "sha256": "364c0595b08b26343fa3cd9ff7ddbdaa5fd227cfcd390437aa67ae9a173ebe1b"
+          "sha256": "a384af64ffbeebcac95446a53edfe336146177ad9bc78b2b50e9e0d1143ed427"
         },
         {
           "path": "packages/cmdk/audit/test-classifications.json",
@@ -167,6 +167,11 @@
           "path": "packages/cmdk/audit/upstream.lock.json",
           "role": "support",
           "sha256": "60c744f3e15819f932bb58b6eda4c1e32f4eac788f1dd39b5676d77e3ffdae53"
+        },
+        {
+          "path": "test-utils/differential-precompile.ts",
+          "role": "support",
+          "sha256": "e19e4676206e05f50ff8d7c8da155c191ae0dbfd4a523f20fa28f182a9384d57"
         }
       ]
     },

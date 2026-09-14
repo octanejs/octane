@@ -1,4 +1,4 @@
-import { basename, join, resolve } from 'node:path';
+import { join, resolve } from 'node:path';
 import { createElement } from 'react';
 import { renderToString as renderReactToString } from 'react-dom/server';
 import { QueryClient as ReactQueryClient } from '@tanstack/react-query';
@@ -8,20 +8,12 @@ import { renderToString as renderOctaneToString } from 'octane/server';
 import { QueryClient as OctaneQueryClient } from '@octanejs/tanstack-query';
 import { setupRouterSsrQueryIntegration as setupOctane } from '@octanejs/tanstack-router-ssr-query';
 import * as octaneFixture from '../_fixtures/ssr-query-diff.tsrx';
+import { fixtureCachePath } from '../../../../test-utils/differential-precompile.js';
 
 const fixturePath = resolve(__dirname, '../_fixtures/ssr-query-diff.tsrx');
 
-function hashString(value: string): string {
-	let hash = 5381;
-	for (let index = 0; index < value.length; index++)
-		hash = ((hash << 5) + hash + value.charCodeAt(index)) | 0;
-	return Math.abs(hash).toString(36);
-}
-
 async function loadReactFixture(): Promise<typeof octaneFixture> {
-	const slug = basename(fixturePath).replace(/\.tsrx$/, '');
-	const file = join(__dirname, '.react-cache', `${slug}-${hashString(fixturePath)}.js`);
-	return import(/* @vite-ignore */ file);
+	return import(/* @vite-ignore */ fixtureCachePath(join(__dirname, '.react-cache'), fixturePath));
 }
 
 function makeRouter(Wrap?: unknown): any {

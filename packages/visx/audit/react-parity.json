@@ -225,12 +225,12 @@
         {
           "path": "packages/visx/tests/differential/_setup.ts",
           "role": "support",
-          "sha256": "43fb2a21e8d50f998a38684bd7711059dbcfc9f3ed291337f7e8d12a309f5be0"
+          "sha256": "27cdc224ac19a1f8cc0a427fc2dcbd5d13c5c0e2058fea725a6569ab83b47618"
         },
         {
-          "path": "packages/visx/tests/differential/fixture-compiler.ts",
+          "path": "test-utils/differential-precompile.ts",
           "role": "support",
-          "sha256": "af1785adbd89da07cd17342526dfe87e6ebff26a406ca51207a56144661a4c87"
+          "sha256": "e19e4676206e05f50ff8d7c8da155c191ae0dbfd4a523f20fa28f182a9384d57"
         },
         {
           "path": "packages/visx/tests/_fixtures/differential.tsrx",

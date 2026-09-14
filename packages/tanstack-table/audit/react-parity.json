@@ -85,12 +85,12 @@
         {
           "path": "packages/tanstack-table/tests/differential/_setup.ts",
           "role": "support",
-          "sha256": "ec7ad41f79b5d1d1c85d12e05942a5fa4017f0a7150071ddb29d3aada6d0d460"
+          "sha256": "a1f10c29a874d927aae93ebbba43e8520a87930b31768e234a99ad214c735021"
         },
         {
-          "path": "packages/tanstack-table/tests/differential/fixture-compiler.ts",
+          "path": "test-utils/differential-precompile.ts",
           "role": "support",
-          "sha256": "dc753997ee0edb8a82dca4fb6a5b737f35b5cd8805326bb970f1a631edf49a95"
+          "sha256": "e19e4676206e05f50ff8d7c8da155c191ae0dbfd4a523f20fa28f182a9384d57"
         },
         {
           "path": "packages/tanstack-table/tests/_fixtures/app-table.tsrx",

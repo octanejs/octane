@@ -354,7 +354,12 @@
         {
           "path": "packages/monaco-editor/tests/differential/_setup.ts",
           "role": "support",
-          "sha256": "4eca985bca3efaa7a3914d30fcddb1f5f6a94226476071db479e5fd9bdf79b60"
+          "sha256": "5945f5ce38df0a393b6875cc89de110e7c3fbdcc62e753a3a90bba7b8dfab572"
+        },
+        {
+          "path": "test-utils/differential-precompile.ts",
+          "role": "support",
+          "sha256": "e19e4676206e05f50ff8d7c8da155c191ae0dbfd4a523f20fa28f182a9384d57"
         }
       ]
     }

@@ -133,14 +133,14 @@
           ]
         },
         {
-          "path": "packages/apollo-client/tests/differential/fixture-compiler.mjs",
+          "path": "test-utils/differential-precompile.ts",
           "role": "support",
-          "sha256": "1f9c2dbbf7f40b0f212555f208e67579fae16fdce337acbf219e95ad17798e95"
+          "sha256": "e19e4676206e05f50ff8d7c8da155c191ae0dbfd4a523f20fa28f182a9384d57"
         },
         {
           "path": "packages/apollo-client/tests/differential/_setup.ts",
           "role": "support",
-          "sha256": "c738756007b512f69275f460f42edf2eecec8f96ab9aac2977d692501036dc77"
+          "sha256": "f4f702918bd8a1ecb9224e379ceb1f898805d11aad8ce73f59a3de936dff7455"
         },
         {
           "path": "packages/apollo-client/tests/_fixtures/differential/query-diff.tsrx",

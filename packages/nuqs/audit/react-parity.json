@@ -59,9 +59,9 @@
           ]
         },
         {
-          "path": "packages/nuqs/tests/differential/fixture-compiler.mjs",
+          "path": "test-utils/differential-precompile.ts",
           "role": "support",
-          "sha256": "fa7e006bc8324b4d8d8a0cef8d319831a9d1aa273ea99db2c878cbcb4938ba9d"
+          "sha256": "e19e4676206e05f50ff8d7c8da155c191ae0dbfd4a523f20fa28f182a9384d57"
         },
         {
           "path": "packages/nuqs/tests/_fixtures/query.tsrx",
@@ -71,12 +71,12 @@
         {
           "path": "packages/nuqs/tests/differential/_setup.ts",
           "role": "support",
-          "sha256": "9b1c002294a83e6155b2beedcb36265f004b9740624440fcee40d6c9d61f8ac7"
+          "sha256": "7538939c6faa3d7f01f048cf26f51e4ea8774156b8a0fb09e4c2d6dcfec2261a"
         },
         {
           "path": "packages/octane/tests/differential/_rig.ts",
           "role": "support",
-          "sha256": "364c0595b08b26343fa3cd9ff7ddbdaa5fd227cfcd390437aa67ae9a173ebe1b"
+          "sha256": "a384af64ffbeebcac95446a53edfe336146177ad9bc78b2b50e9e0d1143ed427"
         }
       ]
     },

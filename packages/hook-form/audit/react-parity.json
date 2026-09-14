@@ -495,12 +495,17 @@
         {
           "path": "packages/octane/tests/differential/_rig.ts",
           "role": "support",
-          "sha256": "364c0595b08b26343fa3cd9ff7ddbdaa5fd227cfcd390437aa67ae9a173ebe1b"
+          "sha256": "a384af64ffbeebcac95446a53edfe336146177ad9bc78b2b50e9e0d1143ed427"
         },
         {
           "path": "packages/hook-form/tests/differential/_setup.ts",
           "role": "support",
-          "sha256": "6b70dcb998d5bb012dbde1410301e9a8b99924f982900cfc116cab1792e49320"
+          "sha256": "b8d76280955986be3221dbddf1c530a1f0e8020b54ed6f5a5b603da71f879d0a"
+        },
+        {
+          "path": "test-utils/differential-precompile.ts",
+          "role": "support",
+          "sha256": "e19e4676206e05f50ff8d7c8da155c191ae0dbfd4a523f20fa28f182a9384d57"
         }
       ]
     }

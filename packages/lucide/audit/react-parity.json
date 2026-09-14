@@ -77,7 +77,7 @@
         {
           "path": "packages/lucide/tests/differential/_setup.ts",
           "role": "support",
-          "sha256": "ede9d977d2edca69030bb3f1bdc01abe0b4426315fd2b798985ceaed155e2fff"
+          "sha256": "3d01894c233125ff6a6adf84b940ed2815f9cf492803b6126c5d57f1a49a191a"
         },
         {
           "path": "packages/lucide/audit/test-classifications.json",
@@ -87,7 +87,12 @@
         {
           "path": "packages/octane/tests/differential/_rig.ts",
           "role": "support",
-          "sha256": "364c0595b08b26343fa3cd9ff7ddbdaa5fd227cfcd390437aa67ae9a173ebe1b"
+          "sha256": "a384af64ffbeebcac95446a53edfe336146177ad9bc78b2b50e9e0d1143ed427"
+        },
+        {
+          "path": "test-utils/differential-precompile.ts",
+          "role": "support",
+          "sha256": "e19e4676206e05f50ff8d7c8da155c191ae0dbfd4a523f20fa28f182a9384d57"
         }
       ]
     }

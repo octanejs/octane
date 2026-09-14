@@ -29,8 +29,9 @@ import {
 	act as octaneAct,
 } from '../../src/index.js';
 import { existsSync } from 'node:fs';
-import { join, basename, dirname } from 'node:path';
+import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { fixtureCachePath } from '../../../../test-utils/differential-precompile.js';
 import * as React from 'react';
 import { createRoot as reactCreateRoot, type Root as ReactRoot } from 'react-dom/client';
 import { act as reactAct } from 'react';
@@ -71,8 +72,7 @@ function loadReactFixture(
 	const cacheKey = `${cacheDir}\0${srcPath}`;
 	const cached = reactImportCache.get(cacheKey);
 	if (cached) return cached;
-	const slug = basename(srcPath).replace(/\.tsrx$/, '');
-	const outFile = join(cacheDir, `${slug}-${hashString(srcPath)}.js`);
+	const outFile = fixtureCachePath(cacheDir, srcPath);
 	if (!existsSync(outFile)) {
 		return Promise.reject(
 			new Error(
@@ -99,15 +99,6 @@ export function preloadDifferentialFixture(
 	cacheDir?: string,
 ): Promise<[any, any]> {
 	return Promise.all([import(/* @vite-ignore */ srcPath), loadReactFixture(srcPath, cacheDir)]);
-}
-
-function hashString(s: string): string {
-	// Cheap deterministic id — collisions across the test suite are
-	// astronomically unlikely; we're cache-keying by the fixture's source
-	// path, which is itself unique.
-	let h = 5381;
-	for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
-	return Math.abs(h).toString(36);
 }
 
 /**

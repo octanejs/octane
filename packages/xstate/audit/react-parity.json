@@ -308,12 +308,12 @@
         {
           "path": "packages/xstate/tests/differential/_setup.ts",
           "role": "support",
-          "sha256": "108e5bf431d37e73fce63afd07456816753b63b0687cc2dcee0ff2bf99da4a8d"
+          "sha256": "6026a4af3fd9c454f1906a0d646a8214fe0325d1b1056c19e430c06ff8fb1422"
         },
         {
-          "path": "packages/xstate/tests/differential/fixture-compiler.ts",
+          "path": "test-utils/differential-precompile.ts",
           "role": "support",
-          "sha256": "ef6156664659a2818b4772250c76f13b87b131c8b5cf40268ec6cf0b004af7a6"
+          "sha256": "e19e4676206e05f50ff8d7c8da155c191ae0dbfd4a523f20fa28f182a9384d57"
         },
         {
           "path": "packages/xstate/tests/_fixtures/differential/parity.tsrx",
@@ -328,7 +328,7 @@
         {
           "path": "packages/octane/tests/differential/_rig.ts",
           "role": "support",
-          "sha256": "364c0595b08b26343fa3cd9ff7ddbdaa5fd227cfcd390437aa67ae9a173ebe1b"
+          "sha256": "a384af64ffbeebcac95446a53edfe336146177ad9bc78b2b50e9e0d1143ed427"
         }
       ]
     }

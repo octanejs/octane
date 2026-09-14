@@ -53,7 +53,7 @@
         {
           "path": "packages/tanstack-router-ssr-query/tests/differential/parity.test.ts",
           "role": "test",
-          "sha256": "6ae3e69fe62023f30c330f742177db04176f99a22a060a30e09d9c1f2c8f9974",
+          "sha256": "e124ea214bb8d8323cb929fea6ff20bf2f70bc4bba435ac3668113104b1504c2",
           "cases": [
             {
               "id": "differential:tanstack-router-ssr-query-provider-ssr",
@@ -70,7 +70,7 @@
         {
           "path": "packages/tanstack-router-ssr-query/tests/differential/_setup.ts",
           "role": "support",
-          "sha256": "24ec7b28d813f027029997cc42f80c454edf43d29cbee222738b5b2a7f0ee53f"
+          "sha256": "feae455be69142482c84f3108b00db7279da50eb2badcf3db65c4d253309aab4"
         },
         {
           "path": "packages/tanstack-router-ssr-query/tests/_fixtures/ssr-query-diff.tsrx",
@@ -96,6 +96,11 @@
           "path": "packages/tanstack-router-ssr-query/audit/upstream.lock.json",
           "role": "support",
           "sha256": "8b2667a6309a69c03506ddeb1b4594f49fc655a69e8dfda75fe7123314328322"
+        },
+        {
+          "path": "test-utils/differential-precompile.ts",
+          "role": "support",
+          "sha256": "e19e4676206e05f50ff8d7c8da155c191ae0dbfd4a523f20fa28f182a9384d57"
         }
       ]
     },

@@ -75,12 +75,12 @@
         {
           "path": "packages/tanstack-router/tests/differential/_setup.ts",
           "role": "support",
-          "sha256": "667a8c24aa4653ffcd27983366e56ca1295f9763afcab3ff5a8157e67b96537d"
+          "sha256": "e318f1a7d763ef028786b173a7237d09b11449217526ad1ce4418dc7158b856b"
         },
         {
-          "path": "packages/tanstack-router/tests/differential/fixture-compiler.ts",
+          "path": "test-utils/differential-precompile.ts",
           "role": "support",
-          "sha256": "ba84778c666bb73de61cc72c4140a840c4e94f89b0cec10159b990ececabf9c0"
+          "sha256": "e19e4676206e05f50ff8d7c8da155c191ae0dbfd4a523f20fa28f182a9384d57"
         },
         {
           "path": "packages/tanstack-router/tests/_fixtures/router-diff.tsrx",
