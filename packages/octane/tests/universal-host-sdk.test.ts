@@ -152,6 +152,59 @@ function createTemplateObjectDriver(
 }
 
 describe('universal prepared host SDK', () => {
+	it('retires descendant listeners after retaining a host template through parent renders', () => {
+		const container = createObjectContainer();
+		const root = createUniversalRoot(container, createTemplateObjectDriver(true, true));
+		const template = universalPlan('object', {
+			kind: 'host',
+			type: 'group',
+			children: [{ kind: 'host', type: 'button', bindings: [['onClick', 0]] }],
+		});
+		const label = universalPlan('object', {
+			kind: 'host',
+			type: 'label',
+			bindings: [['value', 0]],
+		});
+		const clicks: string[] = [];
+		const click = () => clicks.push('clicked');
+		const Child = defineUniversalComponent('object', (props: { active: boolean }) =>
+			universalValue(template, [props.active ? click : null]),
+		);
+		const Scene = defineUniversalComponent(
+			'object',
+			(props: { version: number; active: boolean }) => [
+				universalValue(label, [props.version]),
+				universalComponent('object', Child, { active: props.active }),
+			],
+		);
+		root.render(Scene, { version: 0, active: true });
+		const group = container.children[1];
+		const button = group.children[0];
+		const listener = container.commits[0].commands.flatMap((command) => {
+			if (command.op === 'event') return command.listener === null ? [] : [command.listener.id];
+			if (command.op === 'mount-template') {
+				return command.nodes.flatMap(
+					(node) => node.events?.map((event) => event.listener.id) ?? [],
+				);
+			}
+			if (command.op === 'mount-template-range' || command.op === 'mount-template-run') {
+				return command.firstListenerId === null ? [] : [command.firstListenerId];
+			}
+			return [];
+		})[0];
+		for (const version of [1, 2]) root.render(Scene, { version, active: true });
+		expect(container.children[1]).toBe(group);
+		expect(group.children[0]).toBe(button);
+		container.dispatchEvent(button, 'click', undefined);
+		root.dispatchEvent(listener, undefined);
+		expect(clicks).toEqual(['clicked', 'clicked']);
+		root.render(Scene, { version: 3, active: false });
+		expect(group.children[0]).toBe(button);
+		expect(() => root.dispatchEvent(listener, undefined)).toThrow(/Unknown or inactive/);
+		expect(clicks).toEqual(['clicked', 'clicked']);
+		root.unmount();
+	});
+
 	it('rejects invalid prepared tokens without publishing or losing accepted hosts', () => {
 		const container = createObjectContainer();
 		const objectDriver = createObjectDriver();

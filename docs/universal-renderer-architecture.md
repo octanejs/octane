@@ -729,7 +729,11 @@ and an ordered delivery list; `dispatchTransportEvent()` validates its root and
 accepted batch version before expanding the whole message inside one such scope.
 
 Host props pass through a codec as serializable values, root-scoped resource
-handles, or explicit unsupported results. Event, lifecycle, and local-callback
+handles, or explicit unsupported results. Each encoding call receives its own
+context; codecs may retain its host type, prop name, input value, and resource
+handle factory across later props and renders. The input value remains the
+caller's value, while a successful `value` result is cloned for the host batch.
+Event, lifecycle, and local-callback
 functions become listener IDs rather than entering a batch. Styles, asset
 loading, layout, and specialized collection attachment remain optional
 extensions rather than mandatory methods every driver must fake.

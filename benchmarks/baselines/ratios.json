@@ -6602,5 +6602,317 @@
     "maxRatio": 1,
     "note": "Changed context recomputes the nested scoped value once per requested value.",
     "minRatio": 1
+  },
+  {
+    "suite": "universal-retention",
+    "op": "feature_node_visits",
+    "target": "retained-0",
+    "reference": "update-work",
+    "maxRatio": 0,
+    "note": "After cold observer-validated traversal, unchanged committed subtrees reuse feature unions across 64 state updates while retaining host identity and labels."
+  },
+  {
+    "suite": "universal-retention",
+    "op": "feature_node_visits",
+    "target": "retained-128",
+    "reference": "update-work",
+    "maxRatio": 0,
+    "note": "After cold observer-validated traversal, unchanged committed subtrees reuse feature unions across 64 state updates while retaining host identity and labels."
+  },
+  {
+    "suite": "universal-retention",
+    "op": "feature_node_visits",
+    "target": "retained-1024",
+    "reference": "update-work",
+    "maxRatio": 0,
+    "note": "After cold observer-validated traversal, unchanged committed subtrees reuse feature unions across 64 state updates while retaining host identity and labels."
+  },
+  {
+    "suite": "universal-materialization",
+    "op": "update_materializeArrays",
+    "target": "static-128",
+    "reference": "static-128-budget",
+    "maxRatio": 1,
+    "note": "Deterministic production allocation work with clean/observed output, keyed state, identity, abort and teardown controls."
+  },
+  {
+    "suite": "universal-materialization",
+    "op": "update_runtimeSets",
+    "target": "static-128",
+    "reference": "static-128-budget",
+    "maxRatio": 1,
+    "note": "Deterministic production allocation work with clean/observed output, keyed state, identity, abort and teardown controls."
+  },
+  {
+    "suite": "universal-materialization",
+    "op": "update_materializeArrays",
+    "target": "scoped-128",
+    "reference": "scoped-128-budget",
+    "maxRatio": 1,
+    "note": "Deterministic production allocation work with clean/observed output, keyed state, identity, abort and teardown controls."
+  },
+  {
+    "suite": "universal-materialization",
+    "op": "update_runtimeSets",
+    "target": "scoped-128",
+    "reference": "scoped-128-budget",
+    "maxRatio": 1,
+    "note": "Deterministic production allocation work with clean/observed output, keyed state, identity, abort and teardown controls."
+  },
+  {
+    "suite": "universal-materialization",
+    "op": "update_materializeArrays",
+    "target": "unkeyed-128",
+    "reference": "unkeyed-128-budget",
+    "maxRatio": 1,
+    "note": "Deterministic production allocation work with clean/observed output, keyed state, identity, abort and teardown controls."
+  },
+  {
+    "suite": "universal-materialization",
+    "op": "update_runtimeSets",
+    "target": "unkeyed-128",
+    "reference": "unkeyed-128-budget",
+    "maxRatio": 1,
+    "note": "Deterministic production allocation work with clean/observed output, keyed state, identity, abort and teardown controls."
+  },
+  {
+    "suite": "universal-prop-shapes",
+    "op": "dictionary_props",
+    "target": "plain-component",
+    "reference": "normalization-work",
+    "maxRatio": 0,
+    "note": "Actual component snapshots and public host command props retain V8 fast properties; output, identity and callback/cleanup controls match."
+  },
+  {
+    "suite": "universal-prop-shapes",
+    "op": "dictionary_props",
+    "target": "keyed-component",
+    "reference": "normalization-work",
+    "maxRatio": 0,
+    "note": "Actual component snapshots and public host command props retain V8 fast properties; output, identity and callback/cleanup controls match."
+  },
+  {
+    "suite": "universal-prop-shapes",
+    "op": "dictionary_props",
+    "target": "spread-keyed-component",
+    "reference": "normalization-work",
+    "maxRatio": 0,
+    "note": "Actual component snapshots and public host command props retain V8 fast properties; output, identity and callback/cleanup controls match."
+  },
+  {
+    "suite": "universal-prop-shapes",
+    "op": "dictionary_props",
+    "target": "plain-host",
+    "reference": "normalization-work",
+    "maxRatio": 0,
+    "note": "Actual component snapshots and public host command props retain V8 fast properties; output, identity and callback/cleanup controls match."
+  },
+  {
+    "suite": "universal-prop-shapes",
+    "op": "dictionary_props",
+    "target": "event-host",
+    "reference": "normalization-work",
+    "maxRatio": 0,
+    "note": "Actual component snapshots and public host command props retain V8 fast properties; output, identity and callback/cleanup controls match."
+  },
+  {
+    "suite": "universal-prop-shapes",
+    "op": "dictionary_props",
+    "target": "null-event-host",
+    "reference": "normalization-work",
+    "maxRatio": 0,
+    "note": "Actual component snapshots and public host command props retain V8 fast properties; output, identity and callback/cleanup controls match."
+  },
+  {
+    "suite": "universal-prop-shapes",
+    "op": "dictionary_props",
+    "target": "reserved-host",
+    "reference": "normalization-work",
+    "maxRatio": 0,
+    "note": "Actual component snapshots and public host command props retain V8 fast properties; output, identity and callback/cleanup controls match."
+  },
+  {
+    "suite": "universal-prop-shapes",
+    "op": "dictionary_props",
+    "target": "lifecycle-host",
+    "reference": "normalization-work",
+    "maxRatio": 0,
+    "note": "Actual component snapshots and public host command props retain V8 fast properties; output, identity and callback/cleanup controls match."
+  },
+  {
+    "suite": "universal-prop-shapes",
+    "op": "dictionary_props",
+    "target": "local-callback-host",
+    "reference": "normalization-work",
+    "maxRatio": 0,
+    "note": "Actual component snapshots and public host command props retain V8 fast properties; output, identity and callback/cleanup controls match."
+  },
+  {
+    "suite": "universal-prop-shapes",
+    "op": "dictionary_props",
+    "target": "fallback-event-host",
+    "reference": "normalization-work",
+    "maxRatio": 0,
+    "note": "Actual component snapshots and public host command props retain V8 fast properties; output, identity and callback/cleanup controls match."
+  },
+  {
+    "suite": "universal-prop-shapes",
+    "op": "dictionary_props",
+    "target": "ownerless-leaf-host",
+    "reference": "normalization-work",
+    "maxRatio": 0,
+    "note": "Ownerless and compact compiler-leaf controls retain ordinary host prop shapes and public output."
+  },
+  {
+    "suite": "universal-prop-shapes",
+    "op": "dictionary_props",
+    "target": "compact-leaf-host",
+    "reference": "normalization-work",
+    "maxRatio": 0,
+    "note": "Ownerless and compact compiler-leaf controls retain ordinary host prop shapes and public output."
+  },
+  {
+    "suite": "universal-preparation",
+    "op": "update_templateNodes",
+    "target": "ordinary-0",
+    "reference": "preparation-work",
+    "maxRatio": 0,
+    "note": "Ordinary trees without compact markers skip optional compact builder/expansion walks, with compact controls preserving required work and host identity."
+  },
+  {
+    "suite": "universal-preparation",
+    "op": "update_leafNodes",
+    "target": "ordinary-0",
+    "reference": "preparation-work",
+    "maxRatio": 0,
+    "note": "Ordinary trees without compact markers skip optional compact builder/expansion walks, with compact controls preserving required work and host identity."
+  },
+  {
+    "suite": "universal-preparation",
+    "op": "update_expansionNodes",
+    "target": "ordinary-0",
+    "reference": "preparation-work",
+    "maxRatio": 0,
+    "note": "Ordinary trees without compact markers skip optional compact builder/expansion walks, with compact controls preserving required work and host identity."
+  },
+  {
+    "suite": "universal-preparation",
+    "op": "update_templateNodes",
+    "target": "ordinary-128",
+    "reference": "preparation-work",
+    "maxRatio": 0,
+    "note": "Ordinary trees without compact markers skip optional compact builder/expansion walks, with compact controls preserving required work and host identity."
+  },
+  {
+    "suite": "universal-preparation",
+    "op": "update_leafNodes",
+    "target": "ordinary-128",
+    "reference": "preparation-work",
+    "maxRatio": 0,
+    "note": "Ordinary trees without compact markers skip optional compact builder/expansion walks, with compact controls preserving required work and host identity."
+  },
+  {
+    "suite": "universal-preparation",
+    "op": "update_expansionNodes",
+    "target": "ordinary-128",
+    "reference": "preparation-work",
+    "maxRatio": 0,
+    "note": "Ordinary trees without compact markers skip optional compact builder/expansion walks, with compact controls preserving required work and host identity."
+  },
+  {
+    "suite": "universal-preparation",
+    "op": "update_templateNodes",
+    "target": "ordinary-1024",
+    "reference": "preparation-work",
+    "maxRatio": 0,
+    "note": "Ordinary trees without compact markers skip optional compact builder/expansion walks, with compact controls preserving required work and host identity."
+  },
+  {
+    "suite": "universal-preparation",
+    "op": "update_leafNodes",
+    "target": "ordinary-1024",
+    "reference": "preparation-work",
+    "maxRatio": 0,
+    "note": "Ordinary trees without compact markers skip optional compact builder/expansion walks, with compact controls preserving required work and host identity."
+  },
+  {
+    "suite": "universal-preparation",
+    "op": "update_expansionNodes",
+    "target": "ordinary-1024",
+    "reference": "preparation-work",
+    "maxRatio": 0,
+    "note": "Ordinary trees without compact markers skip optional compact builder/expansion walks, with compact controls preserving required work and host identity."
+  },
+  {
+    "suite": "universal-preparation",
+    "op": "update_templateNodes",
+    "target": "owners-0",
+    "reference": "preparation-work",
+    "maxRatio": 0,
+    "note": "Ordinary trees without compact markers skip optional compact builder/expansion walks, with compact controls preserving required work and host identity."
+  },
+  {
+    "suite": "universal-preparation",
+    "op": "update_leafNodes",
+    "target": "owners-0",
+    "reference": "preparation-work",
+    "maxRatio": 0,
+    "note": "Ordinary trees without compact markers skip optional compact builder/expansion walks, with compact controls preserving required work and host identity."
+  },
+  {
+    "suite": "universal-preparation",
+    "op": "update_expansionNodes",
+    "target": "owners-0",
+    "reference": "preparation-work",
+    "maxRatio": 0,
+    "note": "Ordinary trees without compact markers skip optional compact builder/expansion walks, with compact controls preserving required work and host identity."
+  },
+  {
+    "suite": "universal-preparation",
+    "op": "update_templateNodes",
+    "target": "owners-128",
+    "reference": "preparation-work",
+    "maxRatio": 0,
+    "note": "Ordinary trees without compact markers skip optional compact builder/expansion walks, with compact controls preserving required work and host identity."
+  },
+  {
+    "suite": "universal-preparation",
+    "op": "update_leafNodes",
+    "target": "owners-128",
+    "reference": "preparation-work",
+    "maxRatio": 0,
+    "note": "Ordinary trees without compact markers skip optional compact builder/expansion walks, with compact controls preserving required work and host identity."
+  },
+  {
+    "suite": "universal-preparation",
+    "op": "update_expansionNodes",
+    "target": "owners-128",
+    "reference": "preparation-work",
+    "maxRatio": 0,
+    "note": "Ordinary trees without compact markers skip optional compact builder/expansion walks, with compact controls preserving required work and host identity."
+  },
+  {
+    "suite": "universal-preparation",
+    "op": "update_templateNodes",
+    "target": "owners-1024",
+    "reference": "preparation-work",
+    "maxRatio": 0,
+    "note": "Ordinary trees without compact markers skip optional compact builder/expansion walks, with compact controls preserving required work and host identity."
+  },
+  {
+    "suite": "universal-preparation",
+    "op": "update_leafNodes",
+    "target": "owners-1024",
+    "reference": "preparation-work",
+    "maxRatio": 0,
+    "note": "Ordinary trees without compact markers skip optional compact builder/expansion walks, with compact controls preserving required work and host identity."
+  },
+  {
+    "suite": "universal-preparation",
+    "op": "update_expansionNodes",
+    "target": "owners-1024",
+    "reference": "preparation-work",
+    "maxRatio": 0,
+    "note": "Ordinary trees without compact markers skip optional compact builder/expansion walks, with compact controls preserving required work and host identity."
   }
 ]

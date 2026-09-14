@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
 	type UniversalHostPropCodec,
+	type UniversalHostPropCodecContext,
 	type UniversalResourceHandle,
 	createObjectContainer,
 	createObjectDriver,
@@ -18,6 +19,60 @@ const propsPlan = universalPlan('object', {
 });
 
 describe('universal host prop codecs', () => {
+	it('preserves retained encoding contexts across props, aborted attempts, and roots', () => {
+		const saved = new Map<
+			string,
+			UniversalHostPropCodecContext<ReturnType<typeof createObjectContainer>>
+		>();
+		const codec: UniversalHostPropCodec<ReturnType<typeof createObjectContainer>> = {
+			encode(context) {
+				saved.set(`${context.hostType}:${context.name}:${context.value}`, context);
+				return { kind: 'value', value: context.value as never };
+			},
+		};
+		const firstContainer = createObjectContainer();
+		const secondContainer = createObjectContainer();
+		const driver = { ...createObjectDriver(), props: codec };
+		const firstRoot = createUniversalRoot(firstContainer, driver);
+		const secondRoot = createUniversalRoot(secondContainer, driver);
+		const otherPlan = universalPlan('object', { kind: 'host', type: 'other', propsSlot: 0 });
+		const Scene = defineUniversalComponent('object', (props: { version: string }) => [
+			universalValue(propsPlan, [universalProps([['set', 'label', props.version]])]),
+			universalValue(otherPlan, [universalProps([['set', 'title', props.version]])]),
+		]);
+		firstRoot.render(Scene, { version: 'accepted' });
+		firstRoot.prepare(Scene, { version: 'aborted' }).abort();
+		secondRoot.render(Scene, { version: 'other root' });
+		firstRoot.render(Scene, { version: 'updated' });
+
+		const contexts = [...saved.values()];
+		expect(contexts.map(({ hostType, name, value }) => [hostType, name, value])).toEqual([
+			['node', 'label', 'accepted'],
+			['other', 'title', 'accepted'],
+			['node', 'label', 'aborted'],
+			['other', 'title', 'aborted'],
+			['node', 'label', 'other root'],
+			['other', 'title', 'other root'],
+			['node', 'label', 'updated'],
+			['other', 'title', 'updated'],
+		]);
+		expect(contexts[0].container).toBe(firstContainer);
+		expect(contexts[4].container).toBe(secondContainer);
+		const acceptedHandle = contexts[0].createResourceHandle('retained');
+		expect(contexts[6].createResourceHandle('retained')).toEqual(acceptedHandle);
+		expect(contexts[4].createResourceHandle('retained').root).not.toBe(acceptedHandle.root);
+		expect(firstContainer.children.map((child) => child.props)).toEqual([
+			{ label: 'updated' },
+			{ title: 'updated' },
+		]);
+		expect(secondContainer.children.map((child) => child.props)).toEqual([
+			{ label: 'other root' },
+			{ title: 'other root' },
+		]);
+		firstRoot.unmount();
+		secondRoot.unmount();
+	});
+
 	it('snapshots serializable values and validates root-scoped resource handles', () => {
 		let handle: UniversalResourceHandle | undefined;
 		const codec: UniversalHostPropCodec<ReturnType<typeof createObjectContainer>> = {

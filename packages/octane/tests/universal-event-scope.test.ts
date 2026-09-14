@@ -30,6 +30,84 @@ const eventPlan = universalPlan('object', {
 });
 
 describe('universal event scopes', () => {
+	it('keeps nested listeners and refs live after child updates, parent retention, and aborted preparation', () => {
+		const container = createObjectContainer();
+		const root = createUniversalRoot(container, createObjectDriver());
+		const host = universalPlan('object', { kind: 'host', type: 'button', propsSlot: 0 });
+		const versionPlan = universalPlan('object', {
+			kind: 'host',
+			type: 'version',
+			bindings: [['value', 0]],
+		});
+		const log: string[] = [];
+		let setEnabled!: (value: boolean) => void;
+		let setVersion!: (value: number) => void;
+		let attached: unknown = null;
+		const ref = (value: unknown) => {
+			attached = value;
+		};
+		const Child = defineUniversalComponent('object', ({ forceOff }: { forceOff: boolean }) => {
+			const [enabled, update] = useState(false, 'enabled');
+			setEnabled = update;
+			return universalValue(host, [
+				universalProps(
+					enabled && !forceOff
+						? [
+								['set', 'label', 'enabled'],
+								['set', 'onPress', () => log.push('press')],
+								['set', 'ref', ref],
+							]
+						: [['set', 'label', 'disabled']],
+				),
+			]);
+		});
+		const Middle = defineUniversalComponent('object', ({ forceOff }: { forceOff: boolean }) =>
+			universalComponent('object', Child, { forceOff }),
+		);
+		const Scene = defineUniversalComponent('object', ({ forceOff }: { forceOff: boolean }) => {
+			const [version, update] = useState(0, 'version');
+			setVersion = update;
+			return [
+				universalComponent('object', Middle, { forceOff }),
+				universalValue(versionPlan, [version]),
+			];
+		});
+		root.render(Scene, { forceOff: false });
+		const button = container.children[0];
+		flushUniversalSync(() => setVersion(1));
+		flushUniversalSync(() => setVersion(2));
+		flushUniversalSync(() => setEnabled(true));
+		expect(attached).toBe(button);
+		flushUniversalSync(() => setVersion(3));
+		container.dispatchEvent(button, 'press', undefined);
+		expect(log).toEqual(['press']);
+		expect(attached).toBe(button);
+
+		const abandoned = root.prepare(Scene, { forceOff: true });
+		abandoned.abort();
+		flushUniversalSync(() => setVersion(4));
+		container.dispatchEvent(button, 'press', undefined);
+		expect(log).toEqual(['press', 'press']);
+		expect(attached).toBe(button);
+		expect(button.props.label).toBe('enabled');
+
+		flushUniversalSync(() => setEnabled(false));
+		flushUniversalSync(() => setVersion(5));
+		expect(attached).toBe(null);
+		expect(() => container.dispatchEvent(button, 'press', undefined)).toThrow(
+			'has no "press" listener',
+		);
+		flushUniversalSync(() => setEnabled(true));
+		flushUniversalSync(() => setVersion(6));
+		container.dispatchEvent(button, 'press', undefined);
+		expect(log).toEqual(['press', 'press', 'press']);
+		expect(container.children[0]).toBe(button);
+		expect(container.children[1].props.value).toBe(6);
+		root.unmount();
+		expect(attached).toBe(null);
+		expect(container.children).toEqual([]);
+	});
+
 	it('publishes scheduled direct-root work before a synchronous host boundary returns', () => {
 		const container = createObjectContainer();
 		const root = createUniversalRoot(container, createObjectDriver());

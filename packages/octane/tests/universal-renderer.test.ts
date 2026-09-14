@@ -2394,7 +2394,7 @@ export function Scene() @{ <><Shared0 /><Native><Shared0 /></Native></> }
 		root.unmount();
 	});
 
-	it('expands compact leaves nested below an ordinary host and across an empty transition', () => {
+	it('preserves nested leaves across ordinary, compact, aborted, and empty renders', () => {
 		const container = createObjectContainer();
 		const baseDriver = createObjectDriver();
 		const root = createUniversalRoot(container, {
@@ -2411,30 +2411,87 @@ export function Scene() @{ <><Shared0 /><Native><Shared0 /></Native></> }
 			type: 'scene',
 			children: [{ kind: 'slot', slot: 0 }],
 		});
-		const Scene = defineUniversalComponent('object', (props: { values: readonly number[] }) =>
-			universalValue(parentPlan, [
-				universalFor(
-					props.values,
-					(_value, index) => index,
-					(value) => universalValue(leafPlan, [value]),
-					null,
-					true,
-					true,
-				),
-			]),
+		const Scene = defineUniversalComponent(
+			'object',
+			(props: { values: readonly number[]; compact: boolean }) =>
+				universalValue(parentPlan, [
+					props.compact
+						? universalFor(
+								props.values,
+								(_value, index) => index,
+								(value) => universalValue(leafPlan, [value]),
+								null,
+								true,
+								true,
+							)
+						: props.values.map((value, index) =>
+								universalKey(index, universalValue(leafPlan, [value])),
+							),
+				]),
 		);
 
-		root.render(Scene, { values: [1, 2] });
+		root.render(Scene, { values: [1, 2], compact: true });
 		const parent = container.children[0];
 		const leaves = [...parent.children];
-		root.render(Scene, { values: [3, 4] });
+		root.render(Scene, { values: [3, 4], compact: false });
 		expect(container.children[0]).toBe(parent);
 		expect(parent.children).toEqual(leaves);
 		expect(parent.children.map((child) => child.props.value)).toEqual([3, 4]);
 
-		root.render(Scene, { values: [] });
+		root.prepare(Scene, { values: [5, 6], compact: true }).abort();
+		expect(parent.children).toEqual(leaves);
+		expect(parent.children.map((child) => child.props.value)).toEqual([3, 4]);
+		root.render(Scene, { values: [7, 8], compact: false });
+		root.render(Scene, { values: [9, 10], compact: true });
+		expect(parent.children).toEqual(leaves);
+		expect(parent.children.map((child) => child.props.value)).toEqual([9, 10]);
+
+		root.render(Scene, { values: [], compact: true });
 		expect(container.children[0]).toBe(parent);
 		expect(parent.children).toEqual([]);
+		root.render(Scene, { values: [11, 12], compact: true });
+		expect(container.children[0]).toBe(parent);
+		expect(parent.children.map((child) => child.props.value)).toEqual([11, 12]);
+		root.unmount();
+	});
+
+	it('preserves compact leaf updates owned by a child component', () => {
+		const container = createObjectContainer();
+		const baseDriver = createObjectDriver();
+		const root = createUniversalRoot(container, {
+			...baseDriver,
+			capabilities: { ...baseDriver.capabilities, compilerLeafProps: true },
+		});
+		const leafPlan = universalPlan('object', {
+			kind: 'host',
+			type: 'node',
+			bindings: [['value', 0]],
+		});
+		let update!: (value: number[]) => void;
+		const Child = defineUniversalComponent('object', () => {
+			const [values, setValues] = useUniversalState([1, 2], 'compact-values');
+			update = setValues;
+			return universalFor(
+				values,
+				(_value, index) => index,
+				(value) => universalValue(leafPlan, [value]),
+				null,
+				true,
+				true,
+			);
+		});
+		const Scene = defineUniversalComponent('object', () =>
+			UniversalRuntime.universalComponent('object', Child, {}),
+		);
+		root.render(Scene, undefined);
+		const leaves = [...container.children];
+		UniversalRuntime.flushUniversalSync(() => update([3, 4]));
+		expect(container.children).toEqual(leaves);
+		expect(container.children.map((child) => child.props.value)).toEqual([3, 4]);
+		UniversalRuntime.flushUniversalSync(() => update([]));
+		expect(container.children).toEqual([]);
+		UniversalRuntime.flushUniversalSync(() => update([5]));
+		expect(container.children.map((child) => child.props.value)).toEqual([5]);
 		root.unmount();
 	});
 
