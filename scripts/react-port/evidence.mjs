@@ -1447,7 +1447,12 @@ function assertTypeProjectSemantics(gateId, commandArguments, node, workspaceRoo
 				concretePublicSpecifiers(packageDirectory, node.binding, { excludePackageMetadata: true }),
 				trustedTypeAssertionModulePath,
 				loaded.config.reactPortEvidence?.publicMode === 'pinned'
-					? pinnedPublicEntries(packageDirectory, node, { baseline })
+					? pinnedPublicEntries(packageDirectory, node, {
+							baseline,
+							publicSpecifiers: concretePublicSpecifiers(packageDirectory, node.binding, {
+								excludePackageMetadata: true,
+							}),
+						})
 					: undefined,
 			);
 			if (!semantics.hasPositiveAssertion) {

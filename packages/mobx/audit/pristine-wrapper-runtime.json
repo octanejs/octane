@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "project": "mobx-pristine-runtime",
+  "roots": ["packages/mobx/tests"],
+  "files": ["packages/mobx/tests/upstream-original.test.ts"],
+  "tests": [
+    {
+      "id": "runtime:ebd2def47f7b925a",
+      "file": "packages/mobx/tests/upstream-original.test.ts",
+      "fullName": "runs the pinned mobx-react-lite 5.0.3 suite unchanged"
+    }
+  ],
+  "snapshots": 0
+}

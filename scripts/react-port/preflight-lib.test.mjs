@@ -1091,6 +1091,33 @@ export function Wrapper(props: Widget.Props<string>) { return <Widget {...props}
 		assert.ok(typeInventory.registrations.every(({ kind }) => kind === 'type-assertion'));
 		assert.match(typeInventory.registrations[1].title, /invalid/);
 
+		// Some libraries compile exported assertion functions from types/test.tsx
+		// instead of naming individual files *.test-d.ts.
+		responses.set(
+			`https://api.github.com/repos/example/widgets/git/trees/${tree}?recursive=1`,
+			githubTreeResponse(
+				sourceTree.map((entry) =>
+					entry.path === 'packages/react-widget/quality/widget.behavior.ts'
+						? {
+								...entry,
+								path: 'packages/react-widget/types/test.tsx',
+								size: typeTestBytes.length,
+								sha: gitBlobSha(typeTestBytes),
+							}
+						: entry,
+				),
+			),
+		);
+		const directoryTypeResult = await resolveRemoteInput(parseInput(githubInput), githubInput, {
+			fetchImpl,
+		});
+		const directoryTypeInventory = directoryTypeResult.upstreamTestInventory.find((entry) =>
+			entry.path.endsWith('types/test.tsx'),
+		);
+		assert.equal(directoryTypeInventory.kind, 'type');
+		assert.equal(directoryTypeInventory.gitBlob, gitBlobSha(typeTestBytes));
+		assert.equal(directoryTypeInventory.registrations.length, 3);
+
 		const namedTypeTestBytes = Buffer.from(`import { describe, expectTypeOf, it } from 'vitest';
 import { Widget } from 'react-widget';
 describe('Widget types', () => {
@@ -1630,6 +1657,7 @@ test('immutable test discovery follows bounded shared config imports outside the
 			'package.json': { private: true },
 			'packages/widget/package.json': manifest,
 			LICENSE: MIT_TEXT,
+			'jest.config.js': `module.exports = { projects: ['<rootDir>/packages/*/jest.config.js'] };`,
 			'packages/widget/jest.config.js': `const base = require('../../shared/jest'); module.exports = { ...base };`,
 			'shared/jest.js': `throw new Error('must not run'); module.exports = { testMatch: ['tests/**/*-test.ts'], testPathIgnorePatterns: ['helper'] };`,
 			'packages/widget/tests/widget-test.ts': "test('renders', () => {});",
@@ -1643,6 +1671,26 @@ test('immutable test discovery follows bounded shared config imports outside the
 	assert.deepEqual(
 		result.upstreamTestInventory.map(({ path }) => path),
 		['packages/widget/tests/widget-test.ts'],
+	);
+});
+
+test('an explicit ancestor Jest config is not hidden by a package config', async () => {
+	const input = 'react-root-discovery@1.0.0';
+	const fetchImpl = packageRootResolverFixture(
+		(manifest) => ({
+			'package.json': { private: true },
+			'packages/widget/package.json': manifest,
+			LICENSE: MIT_TEXT,
+			'jest.config.js': 'module.exports = unknownConfiguration;',
+			'packages/widget/jest.config.js': `module.exports = {testMatch:['tests/*.test.ts']};`,
+			'packages/widget/tests/widget.test.ts': "test('renders', () => {});",
+		}),
+		'packages/widget',
+		{ scripts: { test: 'jest --config ../../jest.config.js' } },
+	);
+	await assert.rejects(
+		() => resolveRemoteInput(parseInput(input), input, { fetchImpl }),
+		/Cannot resolve upstream test configuration/,
 	);
 });
 

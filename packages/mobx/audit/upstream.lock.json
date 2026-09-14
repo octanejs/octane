@@ -1,0 +1,280 @@
+{
+  "schemaVersion": 1,
+  "identity": {
+    "packageName": "mobx-react-lite",
+    "version": "5.0.3",
+    "repository": {
+      "owner": "mobxjs",
+      "repo": "mobx",
+      "subdirectory": "packages/mobx-react-lite"
+    },
+    "commit": "5dbb04a15f7eb0ef6b844904c43955357a9bbdfc",
+    "integrity": "sha512-8qT/d/8Cg8ljt+heKhoFHNoqgedyeSGzdTixT0lgbFMMFlWfHUcXHZ8UD63eQi3ELjkxaH1VU07lXWhRwM0cVA=="
+  },
+  "license": {
+    "spdx": "MIT",
+    "evidence": [
+      {
+        "path": "LICENSE",
+        "sha256": "8fc7f323662b01cdbfcae37b82644cfb52dceb3101afb2ce8c50c78b0fb47d42"
+      },
+      {
+        "path": "packages/mobx-react-lite/LICENSE",
+        "sha256": "8fc7f323662b01cdbfcae37b82644cfb52dceb3101afb2ce8c50c78b0fb47d42"
+      }
+    ],
+    "notices": []
+  },
+  "scopes": [],
+  "adaptedMappings": [
+    {
+      "fromRoot": "__tests__",
+      "toRoot": "tests/upstream"
+    }
+  ],
+  "adaptedRewrites": [
+    {
+      "find": "from \"react\"",
+      "replace": "from \"octane\""
+    },
+    {
+      "find": "from \"@testing-library/react\"",
+      "replace": "from \"@octanejs/testing-library\""
+    },
+    {
+      "find": "from \"../src\"",
+      "replace": "from \"../../src\""
+    },
+    {
+      "find": "require(\"../src",
+      "replace": "require(\"../../src"
+    },
+    {
+      "find": "from \"../src/",
+      "replace": "from \"../../src/"
+    },
+    {
+      "find": "React.ReactNode",
+      "replace": "React.OctaneNode"
+    },
+    {
+      "find": "React.ReactElement",
+      "replace": "React.ElementDescriptor"
+    },
+    {
+      "find": "\"react\"",
+      "replace": "\"octane\""
+    },
+    {
+      "find": "import React from \"octane\"",
+      "replace": "import * as React from \"octane\""
+    },
+    {
+      "find": "jest.SpyInstance",
+      "replace": "import(\"vitest\").MockInstance"
+    },
+    {
+      "find": "jest.setTimeout(30_000)",
+      "replace": "vi.setConfig({ testTimeout: 30_000 })"
+    },
+    {
+      "find": "jest.",
+      "replace": "vi."
+    },
+    {
+      "find": "require(\"../../src/index.ts\")",
+      "replace": "await import(\"../../src/index\")"
+    },
+    {
+      "find": "React.useRef<HTMLInputElement>(null)",
+      "replace": "React.useRef<HTMLInputElement | null>(null)"
+    },
+    {
+      "find": "JSX.Element",
+      "replace": "React.ElementDescriptor"
+    }
+  ],
+  "files": [
+    {
+      "path": "__tests__/__snapshots__/observer.test.tsx.snap",
+      "gitBlob": "802eb2588b02c48dec3f0ff79504dffe18763703",
+      "size": 885
+    },
+    {
+      "path": "__tests__/.eslintrc.yaml",
+      "gitBlob": "111b92a95aa8be5f11d04a304be0d850f43b3ed8",
+      "size": 89
+    },
+    {
+      "path": "__tests__/api.test.tsx",
+      "gitBlob": "d14bd4138e640dfadf402fc45c562a1a9e091054",
+      "size": 479
+    },
+    {
+      "path": "__tests__/assertEnvironment.test.tsx",
+      "gitBlob": "64ebec3afaf09c746fc1b7766b47bc4c37dcd7c8",
+      "size": 1129
+    },
+    {
+      "path": "__tests__/enforceActions.test.tsx",
+      "gitBlob": "1758129dc3540f7a536cceaca6a0b60b4b3261cb",
+      "size": 1851
+    },
+    {
+      "path": "__tests__/observer.test.tsx",
+      "gitBlob": "f522c2e73acc84cd52045455b4fa2de2ae9d3ead",
+      "size": 31910
+    },
+    {
+      "path": "__tests__/ObserverComponent.test.tsx",
+      "gitBlob": "8f5a0446dc9c6a46430b169a992233a039184dd1",
+      "size": 1857
+    },
+    {
+      "path": "__tests__/strictAndConcurrentMode.test.tsx",
+      "gitBlob": "ff5121223517f17d3bb547e39bf947fa5aea9f38",
+      "size": 2072
+    },
+    {
+      "path": "__tests__/strictAndConcurrentModeUsingFinalizationRegistry.test.tsx",
+      "gitBlob": "4e4698ed30803cb7456b9484425f04289c2235be",
+      "size": 2248
+    },
+    {
+      "path": "__tests__/strictAndConcurrentModeUsingTimers.test.tsx",
+      "gitBlob": "7fc37b26db1c52d5761fc0a6f542af91a9d4cd4c",
+      "size": 7813
+    },
+    {
+      "path": "__tests__/transactions.test.tsx",
+      "gitBlob": "8fede3c85421f531c96b0ddee95259087561c4f1",
+      "size": 1804
+    },
+    {
+      "path": "__tests__/tsconfig.json",
+      "gitBlob": "206aeaf88e5c714448cd78dbd8ae8d2b773c5d01",
+      "size": 43
+    },
+    {
+      "path": "__tests__/useLocalObservable.test.tsx",
+      "gitBlob": "0f11b499bf2f83897ac62b21d4278891e748ec66",
+      "size": 17855
+    },
+    {
+      "path": "__tests__/useObserverRetention.test.tsx",
+      "gitBlob": "4dba59eaeddbee02541563f55ade76d07f9361e2",
+      "size": 1867
+    },
+    {
+      "path": "__tests__/utils/killFinalizationRegistry.ts",
+      "gitBlob": "cc8a15bd94426a626043fe92bf249afd761138c6",
+      "size": 290
+    },
+    {
+      "path": ".eslintignore",
+      "gitBlob": "26e0cb464f586d81e0e29a429c8c88ca87a3d082",
+      "size": 15
+    },
+    {
+      "path": ".gitignore",
+      "gitBlob": "89c580aa2b5a009f1e106a775bc7006eb7ce0d76",
+      "size": 68
+    },
+    {
+      "path": "CHANGELOG.md",
+      "gitBlob": "f621040bc18ab2180149a7083fa100293d7765cc",
+      "size": 19570
+    },
+    {
+      "path": "jest.config.js",
+      "gitBlob": "0811da7c62e9772b9a3d6f3cd564ae7f86ffa4de",
+      "size": 266
+    },
+    {
+      "path": "jest.setup.ts",
+      "gitBlob": "4a2d3994c5f5a808d551e0b3c776515eb93fbab4",
+      "size": 837
+    },
+    {
+      "path": "LICENSE",
+      "gitBlob": "b58becae8c671cf324c7aa4febe59869e2fe2a95",
+      "size": 1084
+    },
+    {
+      "path": "package.json",
+      "gitBlob": "957a066b1c90581c78a3b7c3bb429e238b3ec2aa",
+      "size": 2639
+    },
+    {
+      "path": "README.md",
+      "gitBlob": "209516a8b5806d607da251c78b857ce3be52c673",
+      "size": 4131
+    },
+    {
+      "path": "rollup.config.mjs",
+      "gitBlob": "91446e47e184d577942b18b3a6ae25f25efc31af",
+      "size": 273
+    },
+    {
+      "path": "src/index.ts",
+      "gitBlob": "0ffe271ed6e76d1f455ed63a8ee700c6617afb6c",
+      "size": 516
+    },
+    {
+      "path": "src/observer.ts",
+      "gitBlob": "c43931d6c9d95928e0ad58e5555a1d5b7e8f8c0b",
+      "size": 4501
+    },
+    {
+      "path": "src/ObserverComponent.ts",
+      "gitBlob": "09778c8f2e6e471555e807d203c1423267df985e",
+      "size": 712
+    },
+    {
+      "path": "src/staticRendering.ts",
+      "gitBlob": "525bdbb7337488b48abb6d49167a9b5e591655e2",
+      "size": 238
+    },
+    {
+      "path": "src/useLocalObservable.ts",
+      "gitBlob": "665d3d2b258ae3c0340a88f2f0318e9f07004602",
+      "size": 325
+    },
+    {
+      "path": "src/useObserver.ts",
+      "gitBlob": "2c26a9cc3912fcfbe5151330a6b50b9e9e078e08",
+      "size": 5177
+    },
+    {
+      "path": "src/utils/assertEnvironment.ts",
+      "gitBlob": "4fa7aad31d499943d03914496d3e7a9ab053ae2b",
+      "size": 339
+    },
+    {
+      "path": "src/utils/observerFinalizationRegistry.ts",
+      "gitBlob": "e139ac2105e95cc3de8bf218650b596b95a33ff8",
+      "size": 306
+    },
+    {
+      "path": "src/utils/UniversalFinalizationRegistry.ts",
+      "gitBlob": "3d463733e96472dfa46a7b1f965261eddd8c1e0f",
+      "size": 2116
+    },
+    {
+      "path": "src/utils/utils.ts",
+      "gitBlob": "50e4173ab8197e2da7bf341124da3388e6d691ae",
+      "size": 202
+    },
+    {
+      "path": "tsconfig.json",
+      "gitBlob": "1bbccaf7282301709d44d4e4d2f0a127ea4b3e7b",
+      "size": 156
+    },
+    {
+      "path": "tsconfig.test.json",
+      "gitBlob": "7bf229ec276edb85137c581f6ed3c8f054194a16",
+      "size": 111
+    }
+  ],
+  "fingerprint": "da458638ac05565ba79a2984019c268432b710ee780729e7e2ce99256e3eb731"
+}

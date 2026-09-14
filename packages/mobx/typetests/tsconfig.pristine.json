@@ -1,0 +1,32 @@
+{
+  "extends": "../tests/pristine.tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "skipLibCheck": false,
+    "types": [
+      "mobx-pristine-react-types",
+      "mobx-pristine-react-dom-types",
+      "jest",
+      "node",
+      "@testing-library/jest-dom"
+    ],
+    "paths": {
+      "react": ["../node_modules/mobx-pristine-react-types/index.d.ts"],
+      "react-dom": ["../node_modules/mobx-pristine-react-dom-types/index.d.ts"],
+      "react-dom/*": ["../node_modules/mobx-pristine-react-dom-types/*"]
+    }
+  },
+  "include": [
+    "../upstream/src",
+    "../upstream/__tests__",
+    "./pristine-globals.d.ts",
+    "./test-tools.d.ts",
+    "./pristine/public-contract.ts"
+  ],
+  "exclude": [],
+  "reactPortEvidence": {
+    "gate": "upstream-types-pristine",
+    "upstreamRegistrations": [],
+    "publicMode": "pinned"
+  }
+}

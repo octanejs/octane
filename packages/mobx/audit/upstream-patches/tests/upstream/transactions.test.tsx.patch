@@ -1,0 +1,34 @@
+diff --git a/tests/upstream/transactions.test.tsx b/tests/upstream/transactions.test.tsx
+--- a/tests/upstream/transactions.test.tsx
++++ b/tests/upstream/transactions.test.tsx
+@@ -4,7 +4,8 @@ import { act, render } from "@octanejs/testing-library"
+ 
+ import { observer } from "../../src"
+ 
+-test("mobx issue 50", done => {
++// OCTANE DIVERGENCE[mobx-async-completion]: Vitest uses a returned promise for asynchronous completion.
++test("mobx issue 50", async () => {
+     const foo = {
+         a: mobx.observable.box(true),
+         b: mobx.observable.box(false),
+@@ -29,15 +30,17 @@ test("mobx issue 50", done => {
+ 
+     render(<Test />)
+ 
+-    setImmediate(() => {
++    await new Promise<void>((resolve, reject) => setImmediate(() => {
++        try {
+         act(() => {
+             flipStuff()
+         })
+         expect(asText).toBe("false:true:true")
+         expect(document.getElementById("x")!.innerHTML).toBe("false,true,true")
+         expect(willReactCount).toBe(2)
+-        done()
+-    })
++        resolve()
++        } catch (error) { reject(error) }
++    }))
+ })
+ 
+ it("should respect transaction", async () => {

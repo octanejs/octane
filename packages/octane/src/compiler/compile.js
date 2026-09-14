@@ -19661,6 +19661,20 @@ function rewriteMapCallbackJsxValues(callback, ctx) {
 	return rewriteJsxValues(callback, ctx, true, unwrapTsExpr(callback));
 }
 
+// A render prop is invoked by user code, which may synchronously inspect its
+// result or collect property reads (for example an external-store observer).
+// Evaluate that callback's JSX during the invocation. Stored JSX and mapped
+// subtrees outside such callbacks retain their represented render scopes.
+function rewriteCallbackBody(body, ctx, eagerMapCallbackRoots, owner) {
+	const previous = ctx._eagerCallbackJsx;
+	ctx._eagerCallbackJsx = previous || !eagerMapCallbackRoots;
+	try {
+		return rewriteJsxValues(body, ctx, eagerMapCallbackRoots, owner);
+	} finally {
+		ctx._eagerCallbackJsx = previous;
+	}
+}
+
 function nativeValueFunction(node, authored, ctx) {
 	if (
 		!ctx.nativeReads ||
@@ -19710,6 +19724,8 @@ function rewriteJsxValues(node, ctx, eagerMapCallbackRoots = false, eagerMapCall
 		if (isFunctionNode(n) && n.body?.type === 'JSXCodeBlock') {
 			const name = n.id?.name ?? allocCompilerName(ctx, '__template');
 			const previousLocals = ctx.currentComponentLocals;
+			const previousCallbackJsx = ctx._eagerCallbackJsx;
+			ctx._eagerCallbackJsx = false;
 			ctx.currentComponentLocals = collectComponentLocals(n);
 			try {
 				const compiled =
@@ -19719,6 +19735,7 @@ function rewriteJsxValues(node, ctx, eagerMapCallbackRoots = false, eagerMapCall
 				return functionExpressionFromDeclaration({ ...compiled, id: n.id ?? null }, n);
 			} finally {
 				ctx.currentComponentLocals = previousLocals;
+				ctx._eagerCallbackJsx = previousCallbackJsx;
 			}
 		}
 		if (
@@ -19729,7 +19746,7 @@ function rewriteJsxValues(node, ctx, eagerMapCallbackRoots = false, eagerMapCall
 			functionProducesJsx(n) &&
 			n.body?.type !== 'JSXCodeBlock'
 		) {
-			const body = rewriteJsxValues(n.body, ctx, eagerMapCallbackRoots, n);
+			const body = rewriteCallbackBody(n.body, ctx, eagerMapCallbackRoots, n);
 			const params = n.params.map((parameter) => rewriteJsxValues(parameter, ctx));
 			return nativeValueFunction({ ...n, body, params }, n, ctx);
 		}
@@ -19768,6 +19785,11 @@ function rewriteJsxValues(node, ctx, eagerMapCallbackRoots = false, eagerMapCall
 			n !== eagerMapCallbackOwner
 		) {
 			return rewriteJsxValues(n, ctx);
+		}
+		if (lower == null && isFunctionNode(n)) {
+			const body = rewriteCallbackBody(n.body, ctx, eagerMapCallbackRoots, n);
+			const params = n.params.map((parameter) => rewriteJsxValues(parameter, ctx));
+			return { ...n, body, params };
 		}
 		// A nested function is a separate LEXICAL owner, but a folded arm never needs
 		// lexical access to it: arms are hoisted to module scope and receive what they
@@ -19813,7 +19835,7 @@ function rewriteJsxValues(node, ctx, eagerMapCallbackRoots = false, eagerMapCall
 					if (key === 'loc' || key === 'start' || key === 'end' || key === 'metadata') continue;
 					const child = n[key];
 					if (child === null || typeof child !== 'object') continue;
-					const mapped = rewriteJsxValues(
+					const mapped = (key === 'body' ? rewriteCallbackBody : rewriteJsxValues)(
 						child,
 						ctx,
 						eagerMapCallbackRoots && n === eagerMapCallbackOwner && key === 'body',
@@ -19917,7 +19939,7 @@ function lowerJsxChild(child, ctx) {
 		// server export is the identity (`ssrChild` just renders the array).
 		ctx.runtimeNeeded.add('positionalChildren');
 		const children = inheritOriginLoc(b.call(rtAlias('positionalChildren'), b.array(els)), child);
-		if (!jsxValueChildrenNeedRenderScope(child, true)) return children;
+		if (ctx._eagerCallbackJsx || !jsxValueChildrenNeedRenderScope(child, true)) return children;
 
 		// A bare expression in a fragment has no parent element descriptor to
 		// defer it, so the fragment itself must own the represented render scope.
@@ -20218,7 +20240,7 @@ function jsxElementToCreateElement(node, ctx, eagerRoot = false) {
 		}
 	}
 	const propsNode = inheritOriginLoc(b.object(properties), node);
-	const childrenNeedRenderScope = jsxValueChildrenNeedRenderScope(node);
+	const childrenNeedRenderScope = !ctx._eagerCallbackJsx && jsxValueChildrenNeedRenderScope(node);
 	const eagerProviderChildren =
 		eagerRoot &&
 		componentTag &&
@@ -20354,7 +20376,7 @@ function jsxElementToCreateElement(node, ctx, eagerRoot = false) {
 			node,
 		);
 	}
-	if (eagerRoot || !jsxValueRootNeedsRenderScope(node)) return descriptor;
+	if (ctx._eagerCallbackJsx || eagerRoot || !jsxValueRootNeedsRenderScope(node)) return descriptor;
 	if (!ctx.nativeReads) ctx.runtimeNeeded.add('createScopedValue');
 	const scopedValue = ctx.nativeReads
 		? requireRuntimeForContext(ctx, 'nativeCreateScopedValue')

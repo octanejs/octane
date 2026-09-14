@@ -31,13 +31,21 @@
   "types": "src/index.ts",
   "files": [
     "src",
-    "README.md"
+    "README.md",
+    "UPSTREAM.md",
+    "status.json",
+    "LICENSE",
+    "LICENSE.upstream"
   ],
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
   },
   "scripts": {
-    "test": "vitest run --root ../.. --project mobx --project mobx-differential --project mobx-ssr"
+    "test": "pnpm upstream:materialize && vitest run --root ../.. --project mobx && node ../../scripts/react-parity/harness.mjs run-required --manifest packages/mobx/audit/react-parity.json",
+    "typecheck": "tsrx-tsc --noEmit",
+    "upstream:materialize": "node ../../scripts/react-port/materialize.mjs run --package-dir .",
+    "upstream:verify": "node ../../scripts/react-parity/verify-provenance.mjs"
   },
   "dependencies": {
     "mobx": "catalog:default"
@@ -48,10 +56,25 @@
   "devDependencies": {
     "@tsrx/react": "catalog:default",
     "esbuild": "catalog:default",
-    "mobx-react-lite": "4.1.1",
+    "mobx-react-lite": "5.0.3",
     "octane": "workspace:*",
     "react": "catalog:default",
     "react-dom": "catalog:default",
-    "vitest": "catalog:default"
+    "vitest": "catalog:default",
+    "@testing-library/react": "16.3.2",
+    "@testing-library/jest-dom": "catalog:default",
+    "jest": "30.4.2",
+    "jest-environment-jsdom": "30.4.1",
+    "expose-gc": "1.0.0",
+    "jest-mock-console": "1.3.0",
+    "ts-jest": "29.4.6",
+    "mobx-pristine-react": "npm:react@19.0.0",
+    "mobx-pristine-react-dom": "npm:react-dom@19.0.0",
+    "@types/jest": "30.0.0",
+    "@types/react": "catalog:default",
+    "@types/react-dom": "catalog:default",
+    "@octanejs/testing-library": "workspace:*",
+    "mobx-pristine-react-types": "npm:@types/react@18.3.3",
+    "mobx-pristine-react-dom-types": "npm:@types/react-dom@18.3.0"
   }
 }

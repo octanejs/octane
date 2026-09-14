@@ -89,7 +89,11 @@ export function readCompatibilityBaseline(packageDirectory, node, baseline) {
 // An upstream declaration is an authority only after its complete source tree
 // has matched the immutable inventory. No package-local list of allowed `any`
 // paths can manufacture an exception to the public precision check.
-export function pinnedPublicEntries(packageDirectory, node, { baseline } = {}) {
+export function pinnedPublicEntries(
+	packageDirectory,
+	node,
+	{ baseline, publicSpecifiers = [] } = {},
+) {
 	const lock = validateUpstreamLock(
 		JSON.parse(readFileSync(path.join(packageDirectory, 'audit/upstream.lock.json'), 'utf8')),
 	);
@@ -163,7 +167,26 @@ export function pinnedPublicEntries(packageDirectory, node, { baseline } = {}) {
 		};
 		visit(source);
 	}
-	for (const subpath of Object.keys(manifest.exports ?? { '.': null })) {
+	const exportKeys = Object.keys(manifest.exports ?? { '.': null });
+	const subpaths = new Set(
+		exportKeys.filter((key) => !key.includes('*') && manifest.exports?.[key] !== null),
+	);
+	// A wildcard is not an import. Resolve concrete consumer entries through
+	// TypeScript so export precedence and null exclusions still apply, then
+	// authenticate each resulting declaration against the registry bytes below.
+	for (const specifier of publicSpecifiers) {
+		if (!specifier.startsWith(node.binding + '/')) continue;
+		const subpath = '.' + specifier.slice(node.binding.length);
+		if (
+			exportKeys.some((key) => {
+				if (!key.includes('*')) return false;
+				const [prefix, suffix] = key.split('*');
+				return subpath.startsWith(prefix) && subpath.endsWith(suffix);
+			})
+		)
+			subpaths.add(subpath);
+	}
+	for (const subpath of subpaths) {
 		if (subpath === './package.json') continue;
 		const request = subpath === '.' ? manifest.name : manifest.name + subpath.slice(1);
 		const resolved = ts.resolveModuleName(

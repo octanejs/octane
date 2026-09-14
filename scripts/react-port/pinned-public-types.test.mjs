@@ -180,7 +180,13 @@ test('matches an inlined generic public contract', () =>
 
 function pinnedFixture(
 	run,
-	{ adjacent = false, opaque = false, hiddenManifest = false, legacy = false } = {},
+	{
+		adjacent = false,
+		opaque = false,
+		hiddenManifest = false,
+		legacy = false,
+		wildcard = false,
+	} = {},
 ) {
 	const workspaceRoot = realpathSync(mkdtempSync(path.join(tmpdir(), 'pinned-public-artifact-')));
 	const directory = path.join(workspaceRoot, 'packages/widget');
@@ -197,6 +203,7 @@ function pinnedFixture(
 								? { import: './index.mjs' }
 								: { import: { types: './index.d.mts', default: './index.mjs' } },
 							...(hiddenManifest ? {} : { './package.json': './package.json' }),
+							...(wildcard ? { './dist/*': './dist/*', './dist/blocked.mjs': null } : {}),
 						},
 					}),
 		});
@@ -209,6 +216,12 @@ function pinnedFixture(
 		const artifact = buildTarGz([
 			['package/package.json', published],
 			['package/index.d.mts', declaration],
+			...(wildcard
+				? [
+						['package/dist/leaf.d.mts', declaration],
+						['package/dist/blocked.d.mts', declaration],
+					]
+				: []),
 		]);
 		const identity = fixtureIdentity({
 			integrity: `sha512-${createHash('sha512').update(artifact).digest('base64')}`,
@@ -235,12 +248,53 @@ function pinnedFixture(
 		put('upstream-artifact/widget.tgz', artifact);
 		put('node_modules/mit-widget/package.json', published);
 		put('node_modules/mit-widget/index.d.mts', declaration);
+		if (wildcard) {
+			put('node_modules/mit-widget/dist/leaf.d.mts', declaration);
+			put('node_modules/mit-widget/dist/blocked.d.mts', declaration);
+		}
 		const node = { identity, binding: '@octanejs/widget' };
 		run({ directory, workspaceRoot, node, put, artifact, declaration });
 	} finally {
 		rmSync(workspaceRoot, { recursive: true, force: true });
 	}
 }
+
+test('resolves concrete wildcard witnesses without treating the wildcard as an import', () =>
+	pinnedFixture(
+		({ directory, node }) => {
+			const entries = pinnedPublicEntries(directory, node, {
+				publicSpecifiers: ['@octanejs/widget', '@octanejs/widget/dist/leaf.mjs'],
+			});
+			assert.deepEqual([...entries.keys()], ['@octanejs/widget', '@octanejs/widget/dist/leaf.mjs']);
+			assert.equal(
+				entries.get('@octanejs/widget/dist/leaf.mjs'),
+				path.join(directory, 'node_modules/mit-widget/dist/leaf.d.mts'),
+			);
+		},
+		{ wildcard: true },
+	));
+
+test('keeps a root-only witness when the upstream also publishes implementation wildcards', () =>
+	pinnedFixture(
+		({ directory, node }) => {
+			assert.deepEqual([...pinnedPublicEntries(directory, node).keys()], ['@octanejs/widget']);
+		},
+		{ wildcard: true },
+	));
+
+test('rejects a requested concrete wildcard entry without an authenticated declaration', () =>
+	pinnedFixture(
+		({ directory, node }) => {
+			assert.throws(
+				() =>
+					pinnedPublicEntries(directory, node, {
+						publicSpecifiers: ['@octanejs/widget/dist/missing.mjs'],
+					}),
+				/no pinned declaration/,
+			);
+		},
+		{ wildcard: true },
+	));
 
 test('uses published declarations only after source, tarball, and installed bytes agree', () =>
 	pinnedFixture(({ directory, node }) => {
@@ -954,3 +1008,17 @@ test('nullable React elements retain renderer ownership without erasing unrelate
 	);
 	assert.match(check(native.replace('unknown', 'any'), pinned), /any/);
 });
+
+test('rejects an excluded wildcard entry even when its declaration is authenticated', () =>
+	pinnedFixture(
+		({ directory, node }) => {
+			assert.throws(
+				() =>
+					pinnedPublicEntries(directory, node, {
+						publicSpecifiers: ['@octanejs/widget/dist/blocked.mjs'],
+					}),
+				/no pinned declaration/,
+			);
+		},
+		{ wildcard: true },
+	));

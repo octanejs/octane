@@ -1,0 +1,106 @@
+{
+  "schemaVersion": 1,
+  "artifacts": [
+    {
+      "path": "upstream-artifact/LICENSE",
+      "sha256": "8fc7f323662b01cdbfcae37b82644cfb52dceb3101afb2ce8c50c78b0fb47d42"
+    },
+    {
+      "path": "upstream-artifact/dist/ObserverComponent.d.ts",
+      "sha256": "d8c212b833268df450a6093097f7c31867bbf6a677dcdc1e8799ee1113bb18dc"
+    },
+    {
+      "path": "upstream-artifact/dist/index.d.ts",
+      "sha256": "1cfe30bd6f1dde664b323f4c552bf28d12b5f591a9b7db962fc44fe5b629449c"
+    },
+    {
+      "path": "upstream-artifact/dist/observer.d.ts",
+      "sha256": "410adba6eaecfd195e8d14eeaca5859e467a8c741edada5b09a619c165996c44"
+    },
+    {
+      "path": "upstream-artifact/dist/staticRendering.d.ts",
+      "sha256": "567e539302fcf0cff85868ba28b1d377e577b7df2f9bd8f15ff294db6eab8f41"
+    },
+    {
+      "path": "upstream-artifact/dist/useLocalObservable.d.ts",
+      "sha256": "9fb8af28fd9d7fffbc9d074abb3d44d08b59e3ad2759b5559040d76b473c73b4"
+    },
+    {
+      "path": "upstream-artifact/dist/useObserver.d.ts",
+      "sha256": "27030249726611d8fb1638d48d0135f1911e149757252fe431b6551e3a56e010"
+    },
+    {
+      "path": "upstream-artifact/dist/utils/UniversalFinalizationRegistry.d.ts",
+      "sha256": "79e16f645be25b58b2aba1a34c0cccf312eee59e99a37a2e1c32ff2f5b5f9fa0"
+    },
+    {
+      "path": "upstream-artifact/dist/utils/assertEnvironment.d.ts",
+      "sha256": "8e609bb71c20b858c77f0e9f90bb1319db8477b13f9f965f1a1e18524bf50881"
+    },
+    {
+      "path": "upstream-artifact/dist/utils/observerFinalizationRegistry.d.ts",
+      "sha256": "2aee4866aaadd28a511b8ccbbf5de09b05d3fef4c3d4e2b925df67bd56379e32"
+    },
+    {
+      "path": "upstream-artifact/dist/utils/utils.d.ts",
+      "sha256": "564f2883a0efd679519ee941715f7c3a34d1ba0dafab587a136e723c606e0107"
+    },
+    {
+      "path": "upstream-artifact/mobx-react-lite-5.0.3.tgz",
+      "sha256": "52a871b8502ecb39e2014d7c76569eb4b656e68af32be8f9d66541de3ed53280"
+    },
+    {
+      "path": "upstream-artifact/package.json",
+      "sha256": "043cf7521031d338a6306c335b280c2cc8b45361d9c2e7720550bde3e32e164c"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/package.json",
+      "sha256": "99185040aca5d9b111bb5a912e65340616505c148187f7bc213242a3cdc9c248"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/ObserverComponent.ts",
+      "sha256": "7e5ca981f181cb42bad0561a418614fb550e1fc3402342783873bf5f4d83f1b8"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/index.ts",
+      "sha256": "e8d1881efcc6a3de2fe1052c758404bd40fbe24b6b9efc00cf6e1333223ee07c"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/internal.ts",
+      "sha256": "98ec22e8b98999f6a745a0d3d94b1fed438cb09fe29c12a4b740c350fe53b909"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/observer.ts",
+      "sha256": "565ac0e93cbb469bcd88d9d10f788639d86d1ff0b928cbc0f68640382abe0427"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/staticRendering.ts",
+      "sha256": "5d834be7df9436afa2dcb717c2ee2d70ea78c927b08ab75d97be342dd43f04e7"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/useLocalObservable.ts",
+      "sha256": "a2b45a058086022e21cd4b341307fce1ef314a3ddd9b27dcaae62b227694db62"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/useObserver.ts",
+      "sha256": "6953646d2ccbb521e04d1c5040874c4c7374a9fa150d752b6e9aa52d200d37ae"
+    }
+  ],
+  "packageIdentity": {
+    "path": "upstream-artifact/package.json",
+    "name": "mobx-react-lite",
+    "version": "5.0.3",
+    "license": "MIT"
+  },
+  "unpublishedDirs": ["audit", "tests", "typetests", "upstream", "upstream-artifact"],
+  "filesEqual": [
+    {
+      "path": "LICENSE.upstream",
+      "equalsPath": "upstream/LICENSE"
+    },
+    {
+      "path": "LICENSE.upstream",
+      "equalsPath": "upstream-artifact/LICENSE"
+    }
+  ]
+}

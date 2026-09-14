@@ -1,11 +1,25 @@
 import { useState } from 'octane';
-import { observer, useLocalObservable } from '@octanejs/mobx';
+import { Observer, observer, useLocalObservable, useObserver } from '@octanejs/mobx';
 
 type Store = {
 	count: number;
 	other: number;
 	nested: { label: string };
 };
+
+export function CallbackRegion(props: { store: Store }) @{
+	<Observer>
+		{() => <span id="callback-count">{props.store.count as string}</span>}
+	</Observer>
+}
+
+export function CallbackHook(props: { store: Store }) {
+	return useObserver(() => <span id="callback-count">{props.store.count as string}</span>);
+}
+
+export const CallbackObserver = observer(
+	(props: { store: Store }) => <span id="callback-count">{props.store.count as string}</span>,
+);
 
 function CounterBody(props: { store: Store; rendered: () => void }) @{
 	props.rendered();

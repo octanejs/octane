@@ -1,0 +1,14 @@
+diff --git a/tests/upstream/strictAndConcurrentMode.test.tsx b/tests/upstream/strictAndConcurrentMode.test.tsx
+--- a/tests/upstream/strictAndConcurrentMode.test.tsx
++++ b/tests/upstream/strictAndConcurrentMode.test.tsx
+@@ -60,5 +60,10 @@ test(`observable changes before first commit are not lost`, async () => {
+         </React.StrictMode>
+     )
+ 
++    // OCTANE DIVERGENCE[mobx-strict-mode]: there is no StrictMode double render. The unchanged
++    // React reference also shows "initial" without StrictMode; an explicit
++    // subsequent render observes the value changed by the first render.
++    expect(rendering.baseElement.textContent).toBe("initial")
++    rendering.rerender(<TestComponent />)
+     expect(rendering.baseElement.textContent).toBe("changed")
+ })

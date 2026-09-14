@@ -9,6 +9,10 @@ export type ObserverComponent<P> = ComponentBody<P> & {
 	displayName?: string;
 };
 
+export function observer<C extends ComponentBody<any>>(
+	baseComponent: C,
+): C & { displayName?: string };
+export function observer<P>(baseComponent: ComponentBody<P>): ObserverComponent<P>;
 export function observer<P>(baseComponent: ComponentBody<P>): ObserverComponent<P> {
 	const observedBase = baseComponent as ObserverComponent<P>;
 	if ((observedBase as ObserverComponent<P> & { [OBSERVED]?: true })[OBSERVED]) {
@@ -31,6 +35,17 @@ export function observer<P>(baseComponent: ComponentBody<P>): ObserverComponent<
 		});
 	}
 	const memoized = memo(observerComponent) as ObserverComponent<P>;
+	for (const key of Object.keys(baseComponent)) {
+		if (
+			key === '$$typeof' ||
+			key === 'render' ||
+			key === 'compare' ||
+			key === 'type' ||
+			key === 'displayName'
+		)
+			continue;
+		Object.defineProperty(memoized, key, Object.getOwnPropertyDescriptor(baseComponent, key)!);
+	}
 	Object.defineProperty(memoized, OBSERVED, { value: true });
 	return memoized;
 }

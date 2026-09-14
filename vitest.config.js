@@ -1,4 +1,5 @@
 import tanstackRouterAdapted from './packages/tanstack-router/tests/vitest.adapted.config.ts';
+import mobxAdapted from './packages/mobx/tests/vitest.adapted.config.ts';
 import tanstackAiAdapted from './packages/tanstack-ai/tests/vitest.adapted.config.ts';
 import tanstackAiAdaptedSSR from './packages/tanstack-ai/tests/vitest.adapted-ssr.config.ts';
 import tanstackDbAdapted from './packages/tanstack-db/tests/vitest.adapted.config.ts';
@@ -622,6 +623,37 @@ export default defineConfig({
 				},
 			},
 			{ ...tanstackRouterAdapted, testExecution: { group: 'react-parity' } },
+			{ ...mobxAdapted, testExecution: { group: 'react-parity' } },
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'mobx-pristine-runtime',
+					include: ['packages/mobx/tests/upstream-original.test.ts'],
+					environment: 'node',
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'mobx-browser',
+					include: ['packages/mobx/tests/browser/**/*.test.ts'],
+					browser: {
+						enabled: true,
+						headless: true,
+						provider: playwright(),
+						instances: [{ browser: 'chromium' }],
+					},
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/mobx$/,
+							replacement: resolve(import.meta.dirname, 'packages/mobx/src/index.ts'),
+						},
+					],
+				},
+			},
 			{
 				testExecution: { group: 'react-parity' },
 				test: {

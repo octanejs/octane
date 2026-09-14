@@ -1,0 +1,78 @@
+diff --git a/tests/upstream/useLocalObservable.test.tsx b/tests/upstream/useLocalObservable.test.tsx
+--- a/tests/upstream/useLocalObservable.test.tsx
++++ b/tests/upstream/useLocalObservable.test.tsx
+@@ -140,7 +140,7 @@ describe("is used to keep observable within component body", () => {
+             const obs = useLocalObservable(() => ({
+                 x: 1,
+                 y: 2,
+-                get z() {
++                get z(): number {
+                     return obs.x + obs.y
+                 }
+             }))
+@@ -161,7 +161,7 @@ describe("is used to keep observable within component body", () => {
+                 getMeThatX() {
+                     return this.x
+                 },
+-                get z() {
++                get z(): number {
+                     return this.getMeThatX() + obs.y
+                 }
+             }))
+@@ -454,12 +454,12 @@ describe("enforcing actions", () => {
+                 useEffect(() => setMultiplier(3), [])
+             },
+             {
+-                wrapper: class extends React.Component<React.PropsWithChildren> {
+-                    componentDidCatch = onError
+-                    render() {
+-                        return this.props.children
+-                    }
+-                }
++                // OCTANE DIVERGENCE[mobx-local-errors]: native error boundaries replace React class lifecycles.
++                wrapper: ({ children }: { children: React.OctaneNode }) => (
++                    <React.ErrorBoundary fallback={(error: unknown) => { onError(error); return null }}>
++                        {children}
++                    </React.ErrorBoundary>
++                )
+             }
+         )
+ 
+@@ -490,12 +490,12 @@ describe("enforcing actions", () => {
+                 useEffect(() => setMultiplier(3), [])
+             },
+             {
+-                wrapper: class extends React.Component<React.PropsWithChildren> {
+-                    componentDidCatch = onError
+-                    render() {
+-                        return this.props.children
+-                    }
+-                }
++                // OCTANE DIVERGENCE[mobx-local-errors]: native error boundaries replace React class lifecycles.
++                wrapper: ({ children }: { children: React.OctaneNode }) => (
++                    <React.ErrorBoundary fallback={(error: unknown) => { onError(error); return null }}>
++                        {children}
++                    </React.ErrorBoundary>
++                )
+             }
+         )
+ 
+@@ -526,12 +526,12 @@ describe("enforcing actions", () => {
+                 useEffect(() => setMultiplier(3), [])
+             },
+             {
+-                wrapper: class extends React.Component<React.PropsWithChildren> {
+-                    componentDidCatch = onError
+-                    render() {
+-                        return this.props.children
+-                    }
+-                }
++                // OCTANE DIVERGENCE[mobx-local-errors]: native error boundaries replace React class lifecycles.
++                wrapper: ({ children }: { children: React.OctaneNode }) => (
++                    <React.ErrorBoundary fallback={(error: unknown) => { onError(error); return null }}>
++                        {children}
++                    </React.ErrorBoundary>
++                )
+             }
+         )
+ 

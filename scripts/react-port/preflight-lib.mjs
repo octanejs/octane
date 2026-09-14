@@ -784,7 +784,7 @@ export function conventionalTestPath(relativePath, { runner } = {}) {
 }
 
 export function isUpstreamTypeTestPath(relativePath) {
-	return /(?:^|\/)(?:typetests|type-tests|test-d)(?:\/|$)|(?:^|[.-])(?:test-d|d-test)\.[cm]?[jt]sx?$|(?:^|[\/.-])types?\.test\.[cm]?tsx?$/i.test(
+	return /(?:^|\/)(?:typetests|type-tests|test-d)(?:\/|$)|(?:^|[.-])(?:test-d|d-test)\.[cm]?[jt]sx?$|(?:^|[\/.-])types?\.test\.[cm]?tsx?$|(?:^|\/)types\/(?:[^/]+\.)?(?:test|spec)\.[cm]?tsx?$/i.test(
 		relativePath,
 	);
 }
@@ -931,11 +931,7 @@ function containsInlineTestMarker(source, fileName) {
 }
 
 function extractTypeAssertionGroups(source, file) {
-	if (
-		!/(?:^|\/)(?:typetests|type-tests|test-d)(?:\/|$)|\.(?:spec|test-d|d-test)\.[cm]?tsx?$|(?:^|[.-])types?\.test\.[cm]?tsx?$/i.test(
-			file,
-		)
-	) {
+	if (!isUpstreamTypeTestPath(file) && !/\.spec\.[cm]?tsx?$/i.test(file)) {
 		return [];
 	}
 	const sourceFile = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
@@ -1194,9 +1190,26 @@ export async function immutableTestInventory(tree, subdirectory, manifest, optio
 	const explicitConfigurationPaths = [
 		...initialConfigurationSource.matchAll(/(?:--config|-c)(?:=|\s+)([^\s"']+)/g),
 	].map((match) => match[1].replace(/^\.\//, ''));
+	const usesPackageJestConfig =
+		subdirectory &&
+		explicitConfigurationPaths.length === 0 &&
+		tree.some(
+			(entry) =>
+				isGitHubRegularBlob(entry) &&
+				path.posix.dirname(entry.path) === subdirectory &&
+				/^jest\.config\.[cm]?[jt]s$/i.test(path.posix.basename(entry.path)),
+		);
 	const configurationEntries = tree.filter((entry) => {
 		if (!isGitHubRegularBlob(entry)) return false;
 		const directory = path.posix.dirname(entry.path);
+		// Jest resolves the package's own config before searching its ancestors.
+		// A workspace project aggregator is not an additional package test lane.
+		if (
+			usesPackageJestConfig &&
+			directory === '.' &&
+			/^jest\.config\.[cm]?[jt]s$/i.test(entry.path)
+		)
+			return false;
 		const conventionalConfiguration =
 			(directory === '.' || directory === (subdirectory ?? '.')) &&
 			TEST_CONFIG_PATTERN.test(path.posix.basename(entry.path));
@@ -1297,10 +1310,7 @@ export async function immutableTestInventory(tree, subdirectory, manifest, optio
 		// module beneath a test/ support directory. Explicit include patterns
 		// still admit nonstandard names, and compile-only specs remain inventoried.
 		const conventional = conventionalTestPath(relativePath, { runner });
-		const typeSuite =
-			/(?:^|\/)(?:typetests|type-tests|test-d)(?:\/|$)|[.-](?:test-d|d-test)\.[cm]?[jt]sx?$|[.-]types?\.test\.[cm]?[jt]sx?$/i.test(
-				relativePath,
-			);
+		const typeSuite = isUpstreamTypeTestPath(relativePath);
 		const directTest =
 			selectors.length > 0
 				? selectors.some((selector) =>

@@ -16,6 +16,7 @@ type HydrationBinding =
 	| 'mantine-hooks'
 	| 'monaco-editor'
 	| 'motion'
+	| 'mobx'
 	| 'pdf'
 	| 'rainbowkit'
 	| 'react-error-boundary'
@@ -55,6 +56,7 @@ function bindingAliases(binding: HydrationBinding) {
 
 	if (
 		binding === 'mantine-hooks' ||
+		binding === 'mobx' ||
 		binding === 'motion' ||
 		binding === 'intersection-observer' ||
 		binding === 'hook-form'

@@ -27,3 +27,27 @@ export function AppFrag() @{
 		</>}
 	</Provide>
 }
+
+function Evaluate(props) @{
+	const value = { current: 'during callback' };
+	const result = props.children(value);
+	value.current = 'after callback';
+	<section>{result}</section>
+}
+
+export function CallbackEvaluation() @{
+	<Evaluate>
+		{(value) => <div data-value={value.current}>
+			<span>{value.current as string}</span>
+		</div>}
+	</Evaluate>
+}
+
+export function FragmentCallbackEvaluation() @{
+	<Evaluate>
+		{(value) => <>
+			<span>{value.current as string}</span>
+			<b>{value.current as string}</b>
+		</>}
+	</Evaluate>
+}

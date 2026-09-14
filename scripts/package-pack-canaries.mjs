@@ -158,6 +158,7 @@ process.stdout.write(JSON.stringify(['default', 'DraggableCore'].filter((key) =>
 }
 
 export const PACKED_STRICT_BROWSER_SOURCE_PACKAGES = [
+	'@octanejs/mobx',
 	'@octanejs/intersection-observer',
 	'@octanejs/alien-signals',
 	'@octanejs/octane-is',
@@ -600,9 +601,41 @@ PackedAlien.useSignalSelector(packedAlienCount, (value: string) => value);
 `;
 }
 
+function renderPackedMobxTypeProbe() {
+	return `import * as PackedMobx from '@octanejs/mobx';
+import type { Ref as PackedMobxRef } from 'octane';
+type PackedMobxEqual<A, B> = (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? true : false;
+type PackedMobxAssert<T extends true> = T;
+const PackedMobxInput = PackedMobx.observer((props: {value: string; ref?: PackedMobxRef<HTMLInputElement>}) => null);
+const packedMobxGeneric = PackedMobx.observer(<T>(props: {value: T; onValue: (value: T) => void}) => null);
+packedMobxGeneric({value: 1, onValue: value => value.toFixed()});
+// @ts-expect-error observer retains the relationship between generic props
+packedMobxGeneric({value: 1, onValue: (value: string) => value.toUpperCase()});
+// @ts-expect-error element refs retain their input type
+PackedMobxInput({value: 'value', ref: {current: document.createElement('button')}});
+const packedMobxLocal = PackedMobx.useLocalObservable(() => new Map<string, number>());
+packedMobxLocal.set('count', 1);
+// @ts-expect-error Map values remain numeric
+packedMobxLocal.set('count', 'invalid');
+const packedMobxCount = PackedMobx.useObserver(() => packedMobxLocal.get('count'));
+type PackedMobxCount = PackedMobxAssert<PackedMobxEqual<typeof packedMobxCount, number | undefined>>;
+type PackedMobxMap = PackedMobxAssert<PackedMobxEqual<typeof packedMobxLocal, Map<string, number>>>;
+type PackedMobxName = PackedMobxAssert<PackedMobxEqual<typeof PackedMobx.Observer.displayName, string>>;
+const packedMobxCore = PackedMobx.observable({count: 0});
+PackedMobx.runInAction(() => { packedMobxCore.count++; });
+PackedMobx.enableStaticRendering(true);
+PackedMobx.useStaticRendering(false);
+PackedMobx.clearTimers();
+const packedMobxRegion: PackedMobx.ObserverProps = {children: () => null};
+// @ts-expect-error Observer callbacks remain mutually exclusive
+const packedMobxInvalidRegion: PackedMobx.ObserverProps = {children: () => null, render: () => null};
+`;
+}
+
 export function renderPackedStrictBrowserConsumerTypeProbe() {
 	return `${renderPackedOctaneIsTypeProbe()}
 ${renderPackedAlienSignalsTypeProbe()}
+${renderPackedMobxTypeProbe()}
 ${renderPackedIntersectionObserverTypeProbe()}
 import { sumTypedPair } from './App.tsrx';
 import { compileToVolarMappings, compileTypesInspection } from 'octane/compiler/volar';
@@ -973,6 +1006,7 @@ export function PublishedSourceConsumer() @{
 export function renderPackedTsrxConsumerTypeProbe() {
 	return `${renderPackedOctaneIsTypeProbe()}
 ${renderPackedAlienSignalsTypeProbe()}
+${renderPackedMobxTypeProbe()}
 ${renderPackedIntersectionObserverTypeProbe()}
 import { Command, type CommandProps } from '@octanejs/cmdk';
 import {

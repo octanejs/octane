@@ -7,6 +7,9 @@ import {
 	NestedValue,
 	SwitchingValue,
 	TwoCounters,
+	CallbackRegion,
+	CallbackHook,
+	CallbackObserver,
 } from '../_fixtures/store.tsrx';
 
 const createStore = () =>
@@ -23,6 +26,22 @@ describe('MobX observer binding', () => {
 		store = createStore();
 	});
 
+	it.each([CallbackRegion, CallbackHook, CallbackObserver])(
+		'tracks observable reads in a render callback',
+		async (Component) => {
+			const result = mount(Component, { store });
+			try {
+				expect(result.find('#callback-count').textContent).toBe('0');
+				store.count = 4;
+				await nextPaint();
+				expect(result.find('#callback-count').textContent).toBe('4');
+			} finally {
+				result.unmount();
+			}
+		},
+	);
+
+	// @parity-case native:mobx-e6bb553f8290
 	it('tracks observables read by an observed component', async () => {
 		let renders = 0;
 		const result = mount(Counter, { store, rendered: () => renders++ });
@@ -36,6 +55,7 @@ describe('MobX observer binding', () => {
 		result.unmount();
 	});
 
+	// @parity-case native:mobx-405b5d245cdc
 	it('does not rerender for observables that were not read', async () => {
 		let renders = 0;
 		const result = mount(Counter, { store, rendered: () => renders++ });
@@ -45,6 +65,7 @@ describe('MobX observer binding', () => {
 		result.unmount();
 	});
 
+	// @parity-case native:mobx-533352b3496b
 	it('switches tracked dependencies after a local-state update', async () => {
 		const result = mount(SwitchingValue, { store });
 		expect(result.find('#selected').textContent).toBe('0');
@@ -61,6 +82,7 @@ describe('MobX observer binding', () => {
 		result.unmount();
 	});
 
+	// @parity-case native:mobx-0ebcd8f4a8a2
 	it('tracks nested observable reads', async () => {
 		const result = mount(NestedValue, { store });
 		store.nested.label = 'Grace';
@@ -69,6 +91,7 @@ describe('MobX observer binding', () => {
 		result.unmount();
 	});
 
+	// @parity-case native:mobx-b41501881aa6
 	it('keeps multiple observed stores independent', async () => {
 		const right = createStore();
 		right.count = 10;
@@ -81,6 +104,7 @@ describe('MobX observer binding', () => {
 		result.unmount();
 	});
 
+	// @parity-case native:mobx-4cb7657963b3
 	it('creates a stable auto-bound local observable', async () => {
 		const result = mount(LocalObservable, {});
 		result.click('#local');
@@ -89,6 +113,7 @@ describe('MobX observer binding', () => {
 		result.unmount();
 	});
 
+	// @parity-case native:mobx-e48dd9045c11
 	it('disposes the MobX reaction on unmount', async () => {
 		const result = mount(Counter, { store, rendered: () => {} });
 		await nextPaint();

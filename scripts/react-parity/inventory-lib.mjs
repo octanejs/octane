@@ -465,6 +465,7 @@ function loopContexts(source, tokens, pairs, staticCounts) {
 			if (close === undefined || close > searchEnd) continue;
 			contexts.push({
 				kind,
+				offset: tokens[labelStart].start,
 				rowCount,
 				start: tokens[index].end,
 				end: tokens[close].start,
@@ -784,7 +785,7 @@ export function extractTestCases(
 	if (file.endsWith('.coffee')) return extractCoffeeScriptTestCases(source, file);
 	const { tokens, comments } = tokenizeJavaScript(source);
 	const pairs = buildPairMap(tokens);
-	const staticCounts = staticArrayInventory(source, file);
+	const { counts: staticCounts, countLoops } = staticArrayInventory(source);
 	const describeContexts = describeEachContexts(source, tokens, pairs, staticCounts);
 	const loops = loopContexts(source, tokens, pairs, staticCounts);
 	const nodeSubtestOffsets = nodeSubtestRegistrarOffsets(source, file);
@@ -849,11 +850,13 @@ export function extractTestCases(
 					? 1
 					: parsed.each.rowCount
 				: 1;
-		const factors = [
-			primaryFactor,
-			...outerLoops.map((context) => context.rowCount),
-			...outerEach.map((context) => context.rowCount),
-		];
+		const loopCount = outerLoops.some((context) => context.rowCount === null)
+			? countLoops(
+					outerLoops.map((context) => context.offset),
+					token.start,
+				)
+			: outerLoops.reduce((total, context) => total * context.rowCount, 1);
+		const factors = [primaryFactor, loopCount, ...outerEach.map((context) => context.rowCount)];
 		const estimatedRegistrations = factors.some((factor) => factor === null)
 			? null
 			: factors.reduce((total, factor) => total * factor, 1);
@@ -924,7 +927,7 @@ export function extractTestCases(
 				manualReviewReason:
 					rowVariant.title === null
 						? 'The upstream title is a dynamic expression.'
-						: outerLoops.some((context) => context.rowCount === null)
+						: loopCount === null
 							? 'The test is registered inside a loop with an unknown expansion count.'
 							: estimatedRegistrations === null
 								? 'The upstream parameter matrix has a dynamic row count.'
