@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/drei",
-  "version": "0.0.19",
+  "version": "0.0.20",
   "description": "Octane port of @react-three/drei",
   "type": "module",
   "sideEffects": false,
