@@ -103,28 +103,28 @@ Measured on 14 September 2026 with Node v26.4.0, V8
 darwin 25.6.0 arm64. Tests and builds were idle during
 the measured run. All source and dependency hashes stayed stable.
 
-- Immutable main baseline: `1bc1926e809b6f1958dbc274dc68ad1334f68efc`.
-- Candidate worktree based on `c2e90295cab14dc5c81fee76405cf25a63040240`,
-  including the review fixes; aggregate source SHA-256
-  `65f43ad29e06ddab655193a363b052ecd4a56efbfe5a0c39eb42ae9b853bca87`.
+- Immutable main baseline: `361e51886879e1b50cd0cfd7823a8fc2966c824f`.
+- Candidate worktree based on `6be8889f3b619b09d1bf385049fa4fe3f98c1ba9`,
+  including the review fixes and Octane 0.2.11 release merge; aggregate source SHA-256
+  `9fdce3ea7520f3ac8bf84c4d17e1448e521a400ba736419e8785d9297284e4bf`.
 - [All 28 cases, raw samples, command, environment and per-file hashes](./results-2026-09-14.json).
 
 ### Cache workload, Strong enabled
 
 | Lane | Functions | Baseline median ms | Candidate median ms | Baseline p95 ms | Candidate p95 ms | Paired median ratio | Emitted bytes, baseline → candidate |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| prod-client | 100 | 39.05 | 69.07 | 57.03 | 95.45 | 1.744 | 75,680 → 147,150 |
-| prod-client | 1,000 | 433.31 | 723.88 | 492.86 | 770.43 | 1.668 | 761,481 → 1,505,151 |
-| dev-hmr | 100 | 45.29 | 61.09 | 61.76 | 93.94 | 1.351 | 149,894 → 189,930 |
-| dev-hmr | 1,000 | 479.94 | 636.27 | 526.01 | 695.48 | 1.292 | 1,526,325 → 1,941,061 |
-| server | 100 | 20.04 | 31.12 | 24.32 | 38.89 | 1.593 | 40,462 → 55,528 |
-| server | 1,000 | 231.47 | 368.55 | 260.05 | 424.18 | 1.603 | 409,463 → 562,529 |
-| plain | 100 | 5.60 | 8.43 | 10.66 | 15.75 | 1.548 | 39,437 → 77,459 |
-| plain | 1,000 | 95.12 | 97.39 | 119.56 | 113.56 | 1.036 | 403,137 → 797,859 |
+| prod-client | 100 | 37.34 | 66.00 | 56.54 | 98.56 | 1.739 | 75,680 → 147,150 |
+| prod-client | 1,000 | 398.85 | 693.95 | 518.51 | 752.15 | 1.817 | 761,481 → 1,505,151 |
+| dev-hmr | 100 | 41.59 | 58.84 | 67.55 | 78.78 | 1.404 | 149,894 → 189,930 |
+| dev-hmr | 1,000 | 464.42 | 609.22 | 524.65 | 826.20 | 1.344 | 1,526,325 → 1,941,061 |
+| server | 100 | 17.86 | 29.00 | 21.38 | 31.93 | 1.589 | 40,462 → 55,528 |
+| server | 1,000 | 199.33 | 343.73 | 338.94 | 391.99 | 1.590 | 409,463 → 562,529 |
+| plain | 100 | 6.02 | 9.10 | 10.24 | 12.93 | 1.424 | 39,437 → 77,459 |
+| plain | 1,000 | 94.31 | 114.67 | 247.44 | 157.77 | 1.091 | 403,137 → 797,859 |
 
 The new caches intentionally increase generated code. These byte counts are
 unminified compiler output, not application bundle measurements. Across the
-cache workloads, Strong paired ratios are **1.036–1.744**: roughly **3.6–74.4%**
+cache workloads, Strong paired ratios are **1.091–1.817**: roughly **9.1–81.7%**
 additional compile time versus main. The mode, size and output difference matter;
 these results do not establish an application-wide budget or a runtime speedup.
 
@@ -132,28 +132,28 @@ these results do not establish an application-wide budget or a runtime speedup.
 
 | Workload | Functions | Baseline median ms | Candidate median ms | Paired median ratio |
 | --- | ---: | ---: | ---: | ---: |
-| normal | 100 | 47.60 | 56.13 | 1.057 |
-| normal | 1,000 | 488.02 | 529.35 | 1.104 |
-| ambient | 100 | 36.67 | 43.79 | 1.157 |
-| ambient | 1,000 | 436.48 | 496.95 | 1.139 |
-| alias-heavy | 100 | 40.02 | 46.47 | 1.165 |
-| alias-heavy | 1,000 | 464.17 | 563.27 | 1.160 |
+| normal | 100 | 39.80 | 45.08 | 1.101 |
+| normal | 1,000 | 451.28 | 497.75 | 1.079 |
+| ambient | 100 | 40.40 | 45.10 | 1.160 |
+| ambient | 1,000 | 417.23 | 483.50 | 1.167 |
+| alias-heavy | 100 | 39.42 | 47.25 | 1.176 |
+| alias-heavy | 1,000 | 444.82 | 520.47 | 1.177 |
 
 All 24 client/server comparisons for these controls remain byte-identical.
-Their Strong paired ratios range from **1.057–1.165**. They measure
+Their Strong paired ratios range from **1.079–1.177**. They measure
 analysis overhead without new declaration caches.
 
 ### Compatibility controls
 
 | Workload / lane | Paired ratio, 100 functions | Paired ratio, 1,000 functions |
 | --- | ---: | ---: |
-| normal / prod-client | 1.021 | 0.975 |
-| ambient / prod-client | 1.004 | 1.022 |
-| alias-heavy / prod-client | 1.007 | 1.025 |
-| cached / prod-client | 1.006 | 0.974 |
-| cached / dev-hmr | 1.007 | 1.044 |
-| cached / server | 0.994 | 1.012 |
-| cached / plain | 1.015 | 0.622 |
+| normal / prod-client | 0.987 | 0.981 |
+| ambient / prod-client | 1.002 | 0.973 |
+| alias-heavy / prod-client | 1.002 | 1.025 |
+| cached / prod-client | 1.014 | 1.042 |
+| cached / dev-hmr | 1.018 | 0.994 |
+| cached / server | 1.001 | 1.015 |
+| cached / plain | 0.917 | 0.613 |
 
 Compatibility output and executed value/identity controls agree with main. The
 large plain-module control benefits from assembling disjoint source edits once.
@@ -163,13 +163,17 @@ so isolated timing changes are not mistaken for general speed improvements.
 ### Improvement found by the expanded audit
 
 The first full run exposed repeated whole-source copying for each plain-module
-edit: the 1,000-function Strong case had a **4.246** paired ratio against main.
+edit: the 1,000-function Strong case had a **4.246** paired ratio against
+main `1bc1926e809b6f1958dbc274dc68ad1334f68efc`.
 The slotter now assembles disjoint edits from chunks and preserves the existing
 sequential behavior for overlapping ranges. A mutation-tested regression covers
-nested edits, authored comments/lines, and live state. The final ratio is
-**1.036**. These are separate full runs; a five-pair direct before/after check
-also confirmed the improvement, but its timings are not mixed into the table.
-All 28 emitted output records match the pre-optimization run exactly.
+nested edits, authored comments/lines, and live state. The follow-up run against
+that same baseline measured **1.036**; the final release-baseline run above
+measured **1.091**. These are separate full runs; a five-pair direct before/after
+check also confirmed the improvement, but its timings are not mixed into the
+table. All 28 emitted output records match both the pre-optimization and
+pre-release runs exactly. The release merge changes package/version metadata
+without changing compiler or runtime implementation.
 
 The eight executed lane/policy controls pass. A baseline-as-candidate negative
 control fails the new identity requirement, so unchanged observations alone
