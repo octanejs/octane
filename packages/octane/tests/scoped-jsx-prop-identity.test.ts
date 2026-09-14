@@ -4,10 +4,10 @@ import { mount } from './_helpers.js';
 import { NestedFailureOwner, Owner } from './_fixtures/scoped-jsx-prop-identity.tsx';
 
 // A component's children resolve lazily, in the scope they render in. That
-// deferral must not cost the owner's identities: props an owner wrote once stay
-// the same objects until the owner itself renders again. Effect and memo deps
-// are built on those identities, so a rebuild that re-creates them re-runs
-// effects forever when one of them writes state back into the same provider.
+// deferral must preserve context-independent props while refreshing deferred
+// computations whose context changes. Effect and memo deps are built on those
+// identities, so rebuilding unrelated callbacks can re-run effects forever
+// when one of them writes state back into the same provider.
 describe('scoped JSX child props', () => {
 	function setup() {
 		const seen: Array<() => void> = [];
@@ -54,19 +54,23 @@ describe('scoped JSX child props', () => {
 		result.unmount();
 	});
 
-	it('isolates a nested deferred record that throws', () => {
-		const seen: Array<() => void> = [];
+	it('refreshes a callback derived from a caught nested inspection when context changes', () => {
+		const events: string[] = [];
 		let bump = (): void => {};
 		const result = mount(NestedFailureOwner, {
-			seen,
+			events,
 			bind: (fn: () => void) => (bump = fn),
 		});
-
-		flushSync(bump);
-		flushSync(bump);
-
-		expect(seen.length).toBeGreaterThan(2);
-		for (const cb of seen) expect(cb).toBe(seen[0]);
-		result.unmount();
+		try {
+			result.click('button');
+			for (const expected of ['1', 'caught', '3']) {
+				flushSync(bump);
+				result.click('button');
+				expect(events.at(-1)).toBe(expected);
+			}
+			expect(events).toEqual(['caught', '1', 'caught', '3']);
+		} finally {
+			result.unmount();
+		}
 	});
 });

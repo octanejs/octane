@@ -122,6 +122,7 @@ export const BENCHMARK_SUITES = [
 	'lynx-bundle-size',
 	'codegen-size',
 	'hook-memo',
+	'body-ownership',
 	'dom-attributes',
 	'transition-hooks',
 	'template-call-memo',

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { compile } from 'octane/compiler';
+import { parseModule } from '@tsrx/core';
+import { walkAst } from '../_profile-output.js';
 import { slotHooks } from '../../src/compiler/slot-hooks.js';
 
 // Which captures a compiler-inferred dependency array may omit, and which it
@@ -29,20 +31,43 @@ const c = (source: string, options?: { mode?: 'client' | 'server'; filename?: st
 		...options,
 	}).code;
 
-// The inferred array, read back from the emitted hook call. The trailing slot
-// argument is a numeric index in `.tsrx` output and a Symbol alias in `.tsx`
-// output; both forms anchor the match without being asserted themselves.
-// One-level method calls compile their dependency to a helper call (the
-// own-property discriminator — auto-hook-deps.test.ts pins that emission);
-// normalize it back to the authored member spelling because this suite's
-// subject is WHICH captures are tracked or omitted, not the comparison form.
-const depsOf = (code: string): string[] =>
-	[...code.matchAll(/\[([^[\]]*)\],\s*(?:\d+|_h\$\d+)\s*\)/g)].map((match) =>
-		match[1]
-			.replace(/[\w$]*__methodDep[\w$]*\((\w+), "([^"]+)"\)/g, '$1.$2')
-			.replace(/\s+/g, ' ')
-			.trim(),
-	);
+// Inspect the inferred argument independently of the compiler's hook-slot ABI.
+// This suite compares captured paths; method dependencies normalize to the
+// authored member, whose receiver-vs-member behavior is covered separately.
+const depsOf = (code: string): string[] => {
+	const ast = parseModule(code, 'auto-deps-stability.js');
+	const imports = new Map<string, string>();
+	for (const statement of ast.body) {
+		if (statement.type !== 'ImportDeclaration') continue;
+		for (const specifier of statement.specifiers) {
+			if (specifier.type === 'ImportSpecifier') {
+				imports.set(specifier.local.name, specifier.imported.name);
+			}
+		}
+	}
+	const dependencies: string[] = [];
+	walkAst(ast, (node) => {
+		if (node.type !== 'CallExpression' || node.callee.type !== 'Identifier') return;
+		if (!['useEffect', 'useMemo'].includes(imports.get(node.callee.name)!)) return;
+		const argument = node.arguments[1];
+		if (argument?.type !== 'ArrayExpression') return;
+		dependencies.push(
+			argument.elements
+				.map((dependency: any) => {
+					if (
+						dependency.type === 'CallExpression' &&
+						imports.get(dependency.callee.name) === '__methodDep'
+					) {
+						const [receiver, property] = dependency.arguments;
+						return `${code.slice(receiver.start, receiver.end)}.${property.value}`;
+					}
+					return code.slice(dependency.start, dependency.end).replace(/\s+/g, ' ').trim();
+				})
+				.join(', '),
+		);
+	});
+	return dependencies;
+};
 
 describe('dependency stability — module-scope immutable identities', () => {
 	it('omits a module-scope const binding', () => {
@@ -192,7 +217,7 @@ export function useThing(value: number) {
 		const code = slotHooks(source, 'use-thing.ts')!.code;
 
 		// The `.tsrx` compiler and this pass must agree on the same source.
-		expect(code).toMatch(/useEffect\([^;]*?, \[value\], _h\$\d+\)/);
+		expect(depsOf(code)).toEqual(['value']);
 	});
 });
 

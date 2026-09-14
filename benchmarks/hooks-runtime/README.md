@@ -19,11 +19,12 @@ the existing benchmark runner, with same-run ratio guards in
 ## Preserved storage and invocation contracts
 
 `Scope.hooks` remains a lazily allocated canonical `Map<HookSlot, cell>`.
-Direct compiler numeric keys come from a module-level counter, so a body
-appearing late in a module can have only one hook with a large numeric key.
+Direct compiler numeric keys use a per-module offset within a globally reserved
+module range, so a body can have only one hook with a large numeric key.
 Indexing a dense array by that key would create sparse storage; rebasing it
-requires a compiler/storage ABI change. Production helper paths reserve
-disjoint numeric ranges when their slots must compose across modules. Explicit symbols and HMR-stable symbols enter the same
+requires a compiler/storage ABI change. The range also prevents independently compiled Provider/lazy bodies from
+aliasing hooks when they share a render scope. Production helper paths use
+the same allocator for composable symbolic identities. Explicit symbols and HMR-stable symbols enter the same
 hook store. A dense array indexed by direct numbers alone would require a
 separate key and lifetime design for composed paths, symbols, HMR preservation,
 and rollback of speculative insertions or replacements. The getter improvement

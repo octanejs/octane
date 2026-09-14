@@ -53,6 +53,119 @@ describe('retained Provider output', () => {
 		}
 	}
 
+	for (const inlineHookMemo of [false, true]) {
+		it(`keeps independently compiled child memos separate (inline=${inlineHookMemo})`, () => {
+			const options = { hmr: false, dev: false, autoMemo: true, inlineHookMemo };
+			const first = loadCompiledFixtureSource(source, {
+				id: 'provider-module-first.tsrx',
+				mode: 'client',
+				compileOptions: options,
+			});
+			const second = loadCompiledFixtureSource(
+				source.replaceAll("text: 'first'", "text: 'second'"),
+				{
+					id: 'provider-module-second.tsrx',
+					mode: 'client',
+					compileOptions: options,
+				},
+			);
+			const Context = createContext('default');
+			const view = mount(Context.Provider, { value: 'value', children: first.First });
+			try {
+				for (const [children, text] of [
+					[second.First, 'second'],
+					[first.First, 'first'],
+					[second.First, 'second'],
+				] as const) {
+					view.update(Context.Provider, { value: text, children });
+					expect(view.find('span').textContent).toBe(text);
+				}
+			} finally {
+				view.unmount();
+			}
+		});
+	}
+
+	it.each([false, true])(
+		'supports switching independent compilation modes (optimized first=%s)',
+		(optimizedFirst) => {
+			const bodies = [false, true].map((optimized) =>
+				loadCompiledFixtureSource(source, {
+					id: `provider-compiled-${optimized}.tsrx`,
+					mode: 'client',
+					compileOptions: {
+						hmr: false,
+						dev: false,
+						autoMemo: optimized,
+						inlineHookMemo: optimized,
+					},
+				}),
+			);
+			const first = bodies[Number(optimizedFirst)];
+			const second = bodies[Number(!optimizedFirst)];
+			const Context = createContext('default');
+			const view = mount(Context.Provider, { value: 'value', children: first.First });
+			try {
+				for (const [children, text] of [
+					[second.Second, 'second'],
+					[first.First, 'first'],
+					[second.Second, 'second'],
+				] as const) {
+					view.update(Context.Provider, { value: text, children });
+					expect(view.find('span').textContent).toBe(text);
+					view.click('button');
+					expect(view.find('button').textContent).toBe('1');
+				}
+			} finally {
+				view.unmount();
+			}
+		},
+	);
+
+	for (const inlineHookMemo of [false, true]) {
+		it(`retains each independent body's own hooks (inline=${inlineHookMemo})`, () => {
+			const ownedSource = readFileSync(
+				'packages/octane/tests/_fixtures/provider-owned-hooks.tsrx',
+				'utf8',
+			);
+			const compileOptions = { hmr: false, dev: false, autoMemo: true, inlineHookMemo };
+			const first = loadCompiledFixtureSource(ownedSource, {
+				id: 'owned-first.tsrx',
+				mode: 'client',
+				compileOptions,
+			});
+			const second = loadCompiledFixtureSource(ownedSource.replaceAll("'first'", "'second'"), {
+				id: 'owned-second.tsrx',
+				mode: 'client',
+				compileOptions,
+			});
+			const Context = createContext('default');
+			const view = mount(Context.Provider, { value: 'value', children: first.Content });
+			try {
+				const input = view.find('input') as HTMLInputElement;
+				input.value = 'typed across bodies';
+				view.click('button');
+				expect(view.find('button').textContent).toBe('1');
+				view.update(Context.Provider, { value: 'value', children: second.Content });
+				expect(view.find('span').textContent).toBe('second');
+				expect(view.find('p').textContent).toBe('second');
+				expect(view.find('button').textContent).toBe('0');
+				view.click('button');
+				view.click('button');
+				view.update(Context.Provider, { value: 'value', children: first.Content });
+				expect(view.find('span').textContent).toBe('first');
+				expect(view.find('p').textContent).toBe('first');
+				expect(view.find('button').textContent).toBe('1');
+				view.update(Context.Provider, { value: 'value', children: second.Content });
+				expect(view.find('button').textContent).toBe('2');
+				expect(view.find('input')).toBe(input);
+				expect(input.value).toBe('typed across bodies');
+			} finally {
+				view.unmount();
+			}
+		});
+	}
+
 	it('restores a memoized body after an intermediate body compiled without memoization', () => {
 		const options = { hmr: false, dev: false, autoMemo: true, inlineHookMemo: true };
 		const shared = loadCompiledFixtureSource(source, {
@@ -90,6 +203,23 @@ describe('retained Provider output', () => {
 			expect(input.value).toBe('retained');
 		} finally {
 			view.unmount();
+		}
+	});
+
+	it('keeps server hook slots distinct across independently evaluated modules and render retries', () => {
+		const ownedSource = readFileSync(
+			'packages/octane/tests/_fixtures/provider-owned-hooks.tsrx',
+			'utf8',
+		);
+		for (const id of ['server-owned-first.tsrx', 'server-owned-second.tsrx']) {
+			const server = loadCompiledFixtureSource(ownedSource, {
+				id,
+				mode: 'server',
+				compileOptions: { hmr: false, dev: false },
+			});
+			const container = document.createElement('div');
+			container.innerHTML = ServerRuntime.renderToString(server.Retry).html;
+			expect(container.querySelector('span')!.textContent).toBe('accepted');
 		}
 	});
 
@@ -234,6 +364,136 @@ describe('retained Provider output', () => {
 				expect(label.textContent).toBe(acceptedText);
 				view.click('button');
 				expect(button.textContent).toBe('3');
+			} finally {
+				ready = true;
+				resolve();
+				view.unmount();
+			}
+		},
+	);
+
+	it.each([false, true])(
+		'hydrates then switches independent body compilations (optimized first=%s)',
+		(optimizedFirst) => {
+			const modeOptions = (optimized: boolean) => ({
+				hmr: false,
+				dev: false,
+				autoMemo: optimized,
+				inlineHookMemo: optimized,
+			});
+			const first = loadCompiledFixtureSource(source, {
+				id: 'provider-independent-hydrate-first.tsrx',
+				mode: 'client',
+				compileOptions: modeOptions(optimizedFirst),
+			});
+			const second = loadCompiledFixtureSource(source, {
+				id: 'provider-independent-hydrate-second.tsrx',
+				mode: 'client',
+				compileOptions: modeOptions(!optimizedFirst),
+			});
+			const server = loadCompiledFixtureSource(source, {
+				id: 'provider-independent-hydrate-first.tsrx',
+				mode: 'server',
+				compileOptions: modeOptions(optimizedFirst),
+			});
+			const serverContext = ServerRuntime.createContext('default');
+			const Context = createContext('default');
+			const container = document.createElement('div');
+			container.innerHTML = ServerRuntime.renderToString(serverContext.Provider, {
+				value: 'server',
+				children: server.First,
+			}).html;
+			document.body.appendChild(container);
+			const input = container.querySelector('input')!;
+			const label = container.querySelector('span')!;
+			input.value = 'typed before hydration';
+			const root = hydrateRoot(container, Context.Provider, {
+				value: 'server',
+				children: first.First,
+			});
+			try {
+				expect(container.querySelector('span')).toBe(label);
+				for (const [children, text] of [
+					[second.Second, 'second'],
+					[first.First, 'first'],
+				] as const) {
+					flushSync(() => root.render(Context.Provider, { value: text, children }));
+					expect(container.querySelector('span')!.textContent).toBe(text);
+					expect(container.querySelector('input')).toBe(input);
+					expect(input.value).toBe('typed before hydration');
+					flushSync(() => container.querySelector('button')!.click());
+					expect(container.querySelector('button')!.textContent).toBe('1');
+				}
+			} finally {
+				root.unmount();
+				container.remove();
+			}
+		},
+	);
+
+	it.each([false, true])(
+		'abandons a suspended independent body switch (optimized first=%s)',
+		async (optimizedFirst) => {
+			const modeOptions = (optimized: boolean) => ({
+				hmr: false,
+				dev: false,
+				autoMemo: optimized,
+				inlineHookMemo: optimized,
+			});
+			const first = loadCompiledFixtureSource(source, {
+				id: 'provider-independent-held-first.tsrx',
+				mode: 'client',
+				compileOptions: modeOptions(optimizedFirst),
+			});
+			const second = loadCompiledFixtureSource(source, {
+				id: 'provider-independent-held-second.tsrx',
+				mode: 'client',
+				compileOptions: modeOptions(!optimizedFirst),
+			});
+			let resolve!: () => void;
+			const pending = new Promise<void>((done) => {
+				resolve = done;
+			});
+			let ready = false;
+			const Context = createContext('default');
+			const view = mount(first.Shell, { Context, children: first.First, read: () => 'accepted' });
+			try {
+				const input = view.find('input') as HTMLInputElement;
+				const label = view.find('span');
+				const button = view.find('button');
+				input.value = 'accepted input';
+				view.click('button');
+				view.update(first.Shell, {
+					Context,
+					children: second.Second,
+					read() {
+						if (!ready) throw pending;
+						return 'obsolete';
+					},
+				});
+				expect(view.find('span')).toBe(label);
+				expect(label.textContent).toBe('first');
+				expect(view.find('button')).toBe(button);
+				expect(button.textContent).toBe('1');
+				view.click('button');
+				view.update(first.Shell, { Context, children: first.First, read: () => 'latest' });
+				ready = true;
+				await act(async () => {
+					resolve();
+					await pending;
+				});
+				expect(view.find('span')).toBe(label);
+				expect(label.textContent).toBe('first');
+				expect(view.find('p').textContent).toBe('latest');
+				expect(view.find('input')).toBe(input);
+				expect(input.value).toBe('accepted input');
+				expect(view.find('button')).toBe(button);
+				expect(button.textContent).toBe('2');
+				view.update(first.Shell, { Context, children: second.Second, read: () => 'complete' });
+				expect(view.find('span').textContent).toBe('second');
+				expect(view.find('p').textContent).toBe('complete');
+				view.click('button');
+				expect(view.find('button').textContent).toBe('1');
 			} finally {
 				ready = true;
 				resolve();

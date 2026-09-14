@@ -26,8 +26,6 @@ describe('compiler-owned native event callbacks', () => {
 		// Raw output is supplemental here: the DOM test owns behavior, while this
 		// protects the code-size property that no callback hook is emitted.
 		expect(code).not.toContain('useCallback');
-		expect(code).toMatch(/useState\(0, 0\)/);
-		expect(code).not.toMatch(/const _h\$\d+ = \d+;/);
 		expect(code).not.toMatch(/\bconst singleton\b/);
 		expect(code.match(/\bconst shared\b/g)).toHaveLength(1);
 		expect(code.match(/\bshared\b/g)).toHaveLength(3);

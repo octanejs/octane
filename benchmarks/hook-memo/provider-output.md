@@ -110,10 +110,10 @@ arrays 320, identifier hit/miss runtime functions 64 each, and null-dependency
 hit functions/arrays 96/320. These pre-existing breaches are not corrected or
 relaxed here. All eight new Provider guards pass.
 
-This correction covers retained Provider scopes receiving different compiled
-children bodies from the same module. Two related families remain separate:
-compiler hook/cache identifiers can alias across independently compiled modules,
-and lazy resolved-body replacement needs its own identity/invalidation audit.
-They are not established as fixed by this benchmark or the targeted Provider
-change. Neither the descriptor-renderer performance checklist nor these broader
-body-identity cases should be marked complete from this result.
+The original correction covered different compiled children bodies from the same
+module. The follow-up [body ownership audit](body-ownership.md) covers independently
+compiled modules, mixed component-slot representations, lazy body replacement,
+and nested scoped context propagation. It also records the additional full Block
+on the ordinary inline Provider mount; unchanged update work remains protected
+by the existing guards. These correctness fixes do not close the separate SSR
+and universal performance proposals in issue #981.
