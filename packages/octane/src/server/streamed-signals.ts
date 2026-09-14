@@ -72,12 +72,14 @@ export async function* createStreamedSignalResultFrames(
 ): AsyncGenerator<StreamedSignalResultFrame> {
 	if (!isStreamFrameIdentity(identity)) throw new TypeError('Invalid streamed signal identity.');
 	let sequence = 0;
+	let resource: 'promise' | 'stream' = 'promise';
 	let iterator: AsyncIterator<unknown> | undefined;
 	const run = options.run ?? ((callback) => callback());
 	try {
 		const resolved = await result;
 		options.signal?.throwIfAborted();
 		if (isAsyncIterable(resolved)) {
+			resource = 'stream';
 			iterator = run(() => resolved[Symbol.asyncIterator]());
 			yield { identity, sequence: sequence++, channel: 'result', kind: 'open', resource: 'stream' };
 			for (;;) {
@@ -112,6 +114,11 @@ export async function* createStreamedSignalResultFrames(
 		}
 		yield { identity, sequence, channel: 'result', kind: 'complete' };
 	} catch {
+		// Rejection or iterator construction can fail before the normal open.
+		// Keep the same grammar so consumers observe the sanitized result error.
+		if (sequence === 0) {
+			yield { identity, sequence: sequence++, channel: 'result', kind: 'open', resource };
+		}
 		yield { identity, sequence, channel: 'result', kind: 'error', code: 'SERVER_RESULT_FAILED' };
 	} finally {
 		if (iterator !== undefined) {

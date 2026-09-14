@@ -189,23 +189,62 @@ describe('streamed renderer delivery', () => {
 	});
 
 	it('connects the server producer through the progressive reader to pre-code signal adoption', async () => {
-		const state = setup();
-		await readStreamedRendererResponse(new Response(state.stream), state.receiver);
-		let browserStarts = 0;
-		const value$ = __queryAt(
-			'g:stream-delivery',
-			() => 'one',
-			() => {
-				browserStarts++;
-				return Promise.resolve('browser');
-			},
-		);
-
-		expect(browserStarts).toBe(0);
-		expect(runWithSignalOwner(state.rendererOwner, () => value$.get())).toBe('server');
-		state.detach();
-		state.receiver.dispose();
-		retireSignalOwnerIdentity(state.documentOwner);
+		for (const live of [false, true]) {
+			for (const outcome of [
+				'value',
+				'rejection',
+				'iterator-construction',
+				'iterator-next',
+			] as const) {
+				const kind = outcome.startsWith('iterator') ? 'stream' : 'promise';
+				const state = setup(
+					outcome === 'value'
+						? 'server'
+						: outcome === 'rejection'
+							? Promise.reject(new Error('private server detail'))
+							: {
+									[Symbol.asyncIterator]() {
+										if (outcome === 'iterator-construction') throw new Error('private iterator');
+										return {
+											next: async () => {
+												throw new Error('private next');
+											},
+										};
+									},
+								},
+				);
+				let browserStarts = 0;
+				const value$ = __queryAt(
+					'g:stream-delivery',
+					() => 'one',
+					() => {
+						browserStarts++;
+						return kind === 'promise'
+							? Promise.resolve('browser')
+							: (async function* () {
+									yield 'browser';
+								})();
+					},
+					{ kind },
+				);
+				try {
+					if (live) runWithSignalOwner(state.rendererOwner, () => value$.snapshot());
+					await readStreamedRendererResponse(new Response(state.stream), state.receiver);
+					if (outcome === 'value') {
+						expect(runWithSignalOwner(state.rendererOwner, () => value$.get())).toBe('server');
+					} else {
+						expect(() => runWithSignalOwner(state.rendererOwner, () => value$.get())).toThrow(
+							'"SERVER_RESULT_FAILED"',
+						);
+					}
+					expect(browserStarts).toBe(0);
+				} finally {
+					state.detach();
+					state.receiver.dispose();
+					retireSignalOwnerIdentity(state.documentOwner);
+				}
+			}
+		}
 	});
 
 	it('installs the initial pre-module global without replacing another document receiver', () => {
