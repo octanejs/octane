@@ -322,7 +322,7 @@
         {
           "path": "packages/mantine-hooks/tests/browser/mantine-hooks.browser.test.ts",
           "role": "support",
-          "sha256": "a49f95196f8f98060a757a2101433f8cb4740987ff4cc986028b80b591f9f06d"
+          "sha256": "67e8c2b0897095da65356234bbb5e484886e98bd26ed255daf094c65b33dfa8f"
         },
         {
           "path": "packages/octane/tests/_hydration-ssr.ts",

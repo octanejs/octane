@@ -80,7 +80,10 @@ describe('Mantine hooks browser compatibility', () => {
 			const errors: string[] = [];
 			page.on('pageerror', (error) => errors.push(error.message));
 			try {
-				await page.goto(`${origin}/fixture?ssr=${ssr ? 1 : 0}`, { waitUntil: 'networkidle' });
+				await page.goto(`${origin}/fixture?ssr=${ssr ? 1 : 0}`, {
+					waitUntil: 'networkidle',
+					timeout: 30_000,
+				});
 				await page.locator('#root[data-ready="true"]').waitFor();
 				if (ssr) expect(await page.locator('#root').getAttribute('data-adopted')).toBe('true');
 				const events = async (): Promise<Array<{ kind: string; value: string | number }>> =>
