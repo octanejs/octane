@@ -1,0 +1,61 @@
+{
+  "suite": "client-slot-functions",
+  "sourceRoot": "baseline 248af4edc30c80498dec13dad4f6d7508f10f220 (client source unchanged)",
+  "sourceSha": "81295bdbb3b5151d2d694a6ac87f46d5b22c0f72fab3a49b463d0fbac389dd59",
+  "node": "v24.20.0",
+  "v8": "13.6.233.17-node.53",
+  "platform": "darwin",
+  "arch": "arm64",
+  "configuration": {
+    "coverageRounds": 2,
+    "warmRounds": 300,
+    "workload": "compiled components and child shape transitions",
+    "concurrentCompilation": false,
+    "forcedOptimization": false
+  },
+  "cleanBundle": {
+    "minified": 174222,
+    "gzip": 56660,
+    "sha": "a465ddc8c4196c2c4f098a87ed6f1aef0036cc1b6535c68556208f578f0b23d6"
+  },
+  "diagnosticSha": "2723b96e11f22c34e71ad04ca765bf3920ddb8e9d2346cd41e751acc5e775cba",
+  "semanticSha": "e809b737f8f943f81e56c2e5295a4a202422222c931dc4110aa1482cc1b8c6f0",
+  "coverageCalls": {
+    "childSlot": 14,
+    "componentSlotImpl": 38
+  },
+  "bytecode": {
+    "componentSlotImpl": 3539,
+    "childSlot": 8977
+  },
+  "frames": {
+    "componentSlotImpl": {
+      "parametersIncludingReceiver": 14,
+      "registers": 63,
+      "bytes": 504
+    },
+    "childSlot": {
+      "parametersIncludingReceiver": 15,
+      "registers": 75,
+      "bytes": 600
+    }
+  },
+  "tiers": {
+    "childSlot": ["MAGLEV"],
+    "componentSlotImpl": ["MAGLEV"]
+  },
+  "tierTraceStatus": "matched-events",
+  "naturalStatus": {
+    "childSlot": 49,
+    "componentSlotImpl": 49
+  },
+  "optimizationTrace": [
+    "[marking <address> <JSFunction componentSlotImpl (sfi = <address>)> for optimization to MAGLEV, ConcurrencyMode::kConcurrent, reason: hot and stable]",
+    "[compiling method <address> <JSFunction componentSlotImpl (sfi = <address>)> (target MAGLEV), mode: ConcurrencyMode::kSynchronous]",
+    "[completed compiling <address> <JSFunction componentSlotImpl (sfi = <address>)> (target MAGLEV)",
+    "[marking <address> <JSFunction childSlot (sfi = <address>)> for optimization to MAGLEV, ConcurrencyMode::kConcurrent, reason: hot and stable]",
+    "[compiling method <address> <JSFunction childSlot (sfi = <address>)> (target MAGLEV), mode: ConcurrencyMode::kSynchronous]",
+    "[completed compiling <address> <JSFunction childSlot (sfi = <address>)> (target MAGLEV)"
+  ],
+  "diagnosticSha_note": "Diagnostic hash includes esbuild source-path comments; clean hash excludes them."
+}

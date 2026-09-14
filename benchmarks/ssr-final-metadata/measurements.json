@@ -1,0 +1,625 @@
+{
+  "baselineCommit": "248af4edc30c80498dec13dad4f6d7508f10f220",
+  "environment": {
+    "node": "v24.20.0",
+    "v8": "13.6.233.17-node.53",
+    "platform": "darwin",
+    "arch": "arm64"
+  },
+  "baseline": {
+    "source": "47649d48f930f3c19648943a5f05cbfb454a35feadfdfe5495e6a985e20cc881",
+    "bundle": {
+      "bytes": 111301,
+      "gzip": 37171,
+      "sha256": "273cea1b3bbe42306b4cf08903a1280c5b7105bc28bd68f919dd9aeddde2433c"
+    },
+    "controls": "cffecee1bb25815fd7e09e771d2af4b0f042c41904d6a8226efa7383b7ec2d1a",
+    "asyncControls": {
+      "visible": "<ul><li data-id=\"b\">B</li><li data-id=\"a\">A</li></ul>",
+      "css": "",
+      "values": [
+        ["a", "a:0"],
+        ["b", "b:0"]
+      ]
+    },
+    "rejectedControls": {
+      "shared-hook-position": "memo storage keeps its owner across a reentrant factory and render-phase retry",
+      "skip-element-guards": "native map snapshots length before invoking accessors",
+      "skip-constructor-guard": "Expected values to be strictly deep-equal:",
+      "skip-species-guard": "Expected values to be strictly equal:",
+      "skip-children-mark": "Expected values to be strictly equal:",
+      "unscoped-child-segments": "keyed async identities retain their first settled value when every retry reorders"
+    },
+    "work": {
+      "hooks": {
+        "counts": {
+          "url_tag_lowercase": 128,
+          "url_attribute_lowercase": 128,
+          "namespace_records": 129,
+          "host_tag_lowercase": 129,
+          "occurrences": 1,
+          "scoped_segments": 128,
+          "hook_positions": 256,
+          "identity_membranes": 386,
+          "identity_key_encodings": 514,
+          "descriptor_render_closures": 514,
+          "encoded_units": 258,
+          "attribute_lowercase": 128,
+          "host_contexts": 129,
+          "descriptor_props": 385
+        },
+        "rows": 128,
+        "outputHash": "86f387d0bd5916058e0e25c6016dd43a456fac57e4eabc0dcf4fd538dcf54fdb"
+      },
+      "mapped": {
+        "counts": {
+          "url_tag_lowercase": 128,
+          "url_attribute_lowercase": 128,
+          "element_descriptors": 128,
+          "constructor_probes": 1,
+          "species_probes": 1,
+          "occurrences": 129,
+          "identity_membranes": 1,
+          "identity_key_encodings": 129,
+          "encoded_units": 786,
+          "attribute_lowercase": 128
+        },
+        "rows": 128,
+        "outputHash": "0ea92e160045d20a681af7f3b02d7c578350ae9dddfa6869e01035d106ae3e5f"
+      },
+      "keyed": {
+        "counts": {
+          "url_tag_lowercase": 128,
+          "url_attribute_lowercase": 128,
+          "occurrences": 129,
+          "scoped_segments": 128,
+          "identity_membranes": 1,
+          "identity_key_encodings": 257,
+          "encoded_units": 786,
+          "attribute_lowercase": 128
+        },
+        "rows": 128,
+        "outputHash": "4edf8972afb9840f292135474919595660a3f7e0502914657631a19c24d1911f"
+      },
+      "descriptors": {
+        "counts": {
+          "url_tag_lowercase": 128,
+          "url_attribute_lowercase": 128,
+          "namespace_records": 1,
+          "host_tag_lowercase": 1,
+          "occurrences": 1,
+          "scoped_segments": 128,
+          "identity_membranes": 386,
+          "identity_key_encodings": 514,
+          "descriptor_render_closures": 258,
+          "encoded_units": 3238,
+          "attribute_lowercase": 128,
+          "host_contexts": 1,
+          "descriptor_props": 129
+        },
+        "rows": 128,
+        "outputHash": "b3f593de0dc7c85914197ef72d8e3e5f5a048d9e2a2411632c4f0a8f4c0488fa"
+      },
+      "nested-descriptors": {
+        "counts": {
+          "url_tag_lowercase": 128,
+          "url_attribute_lowercase": 128,
+          "namespace_records": 1,
+          "host_tag_lowercase": 1,
+          "occurrences": 1,
+          "scoped_segments": 128,
+          "identity_membranes": 386,
+          "identity_key_encodings": 514,
+          "descriptor_render_closures": 258,
+          "encoded_units": 6712,
+          "attribute_lowercase": 128,
+          "host_contexts": 1,
+          "descriptor_props": 257
+        },
+        "rows": 128,
+        "outputHash": "b3f593de0dc7c85914197ef72d8e3e5f5a048d9e2a2411632c4f0a8f4c0488fa"
+      },
+      "children": {
+        "counts": {
+          "url_tag_lowercase": 128,
+          "url_attribute_lowercase": 128,
+          "namespace_records": 1,
+          "host_tag_lowercase": 1,
+          "occurrences": 1,
+          "direct_segments": 128,
+          "scoped_segments": 256,
+          "identity_membranes": 258,
+          "identity_key_encodings": 514,
+          "descriptor_render_closures": 258,
+          "encoded_units": 4,
+          "attribute_lowercase": 128,
+          "host_contexts": 1,
+          "descriptor_props": 129,
+          "children_marks": 128
+        },
+        "rows": 128,
+        "outputHash": "8923ca6d56cc79cb7a5dae3cbae5d92093a2b5d5ac5b2b4347c8b71e55f570b5"
+      },
+      "attributes": {
+        "counts": {
+          "url_tag_lowercase": 512,
+          "url_attribute_lowercase": 512,
+          "namespace_records": 1,
+          "host_tag_lowercase": 1,
+          "occurrences": 1,
+          "scoped_segments": 128,
+          "identity_membranes": 258,
+          "identity_key_encodings": 386,
+          "descriptor_render_closures": 258,
+          "encoded_units": 4,
+          "attribute_lowercase": 512,
+          "host_contexts": 1,
+          "descriptor_props": 129
+        },
+        "rows": 128,
+        "outputHash": "cc6ec82ed5362242c93da4c77f53b493fb4aaf77f5ef71800de815235c24739f"
+      },
+      "spread-attributes": {
+        "counts": {
+          "url_tag_lowercase": 512,
+          "url_attribute_lowercase": 512,
+          "aggregate_attribute_lowercase": 512,
+          "namespace_records": 1,
+          "host_tag_lowercase": 1,
+          "occurrences": 1,
+          "scoped_segments": 128,
+          "identity_membranes": 258,
+          "identity_key_encodings": 386,
+          "descriptor_render_closures": 258,
+          "encoded_units": 4,
+          "attribute_lowercase": 512,
+          "host_contexts": 1,
+          "descriptor_props": 129
+        },
+        "rows": 128,
+        "outputHash": "a8afa65145c664feed39468248f25cc7b6ef7b36a315caa2734504bc903f6ad2"
+      },
+      "hosts": {
+        "counts": {
+          "url_tag_lowercase": 384,
+          "url_attribute_lowercase": 384,
+          "namespace_records": 129,
+          "host_tag_lowercase": 129,
+          "identity_membranes": 1,
+          "identity_key_encodings": 1,
+          "descriptor_render_closures": 2,
+          "encoded_units": 4,
+          "attribute_lowercase": 384,
+          "host_contexts": 129,
+          "descriptor_props": 129
+        },
+        "rows": 128,
+        "outputHash": "37e91050dc2f5e9a0917493c803aaf565c40ebac6c673a3e843dab308ad1df95"
+      },
+      "unique-hosts": {
+        "counts": {
+          "url_tag_lowercase": 128,
+          "namespace_records": 129,
+          "host_tag_lowercase": 129,
+          "identity_membranes": 1,
+          "identity_key_encodings": 1,
+          "descriptor_render_closures": 2,
+          "encoded_units": 4,
+          "host_contexts": 129,
+          "descriptor_props": 129
+        },
+        "rows": 128,
+        "outputHash": "cf45877499fde829b7a371ecd2def8ea417510d5e400507aadfc10467ceae97a"
+      }
+    }
+  },
+  "candidate": {
+    "source": "019bb224b8afee7b2675ff80ed1e95bc355f1871f1e399bd1271849ba8af609f",
+    "bundle": {
+      "bytes": 111419,
+      "gzip": 37224,
+      "sha256": "b2d4b76e8f8bd602be44da33e18e2c12861c215ddcb518644caeed53695045b4"
+    },
+    "controls": "cffecee1bb25815fd7e09e771d2af4b0f042c41904d6a8226efa7383b7ec2d1a",
+    "asyncControls": {
+      "visible": "<ul><li data-id=\"b\">B</li><li data-id=\"a\">A</li></ul>",
+      "css": "",
+      "values": [
+        ["a", "a:0"],
+        ["b", "b:0"]
+      ]
+    },
+    "rejectedControls": {
+      "shared-hook-position": "memo storage keeps its owner across a reentrant factory and render-phase retry",
+      "skip-element-guards": "native map snapshots length before invoking accessors",
+      "skip-constructor-guard": "Expected values to be strictly deep-equal:",
+      "skip-species-guard": "Expected values to be strictly equal:",
+      "skip-children-mark": "Expected values to be strictly equal:",
+      "unscoped-child-segments": "keyed async identities retain their first settled value when every retry reorders"
+    },
+    "work": {
+      "hooks": {
+        "counts": {
+          "url_tag_lowercase": 128,
+          "url_attribute_lowercase": 128,
+          "namespace_records": 129,
+          "host_tag_lowercase": 129,
+          "occurrences": 1,
+          "scoped_segments": 128,
+          "hook_positions": 256,
+          "identity_membranes": 386,
+          "identity_key_encodings": 514,
+          "descriptor_render_closures": 514,
+          "encoded_units": 258,
+          "attribute_lowercase": 128,
+          "host_contexts": 129,
+          "descriptor_props": 385
+        },
+        "rows": 128,
+        "outputHash": "86f387d0bd5916058e0e25c6016dd43a456fac57e4eabc0dcf4fd538dcf54fdb"
+      },
+      "mapped": {
+        "counts": {
+          "url_tag_lowercase": 128,
+          "url_attribute_lowercase": 128,
+          "element_descriptors": 128,
+          "constructor_probes": 1,
+          "species_probes": 1,
+          "occurrences": 129,
+          "identity_membranes": 1,
+          "identity_key_encodings": 129,
+          "encoded_units": 786,
+          "attribute_lowercase": 128
+        },
+        "rows": 128,
+        "outputHash": "0ea92e160045d20a681af7f3b02d7c578350ae9dddfa6869e01035d106ae3e5f"
+      },
+      "keyed": {
+        "counts": {
+          "url_tag_lowercase": 128,
+          "url_attribute_lowercase": 128,
+          "occurrences": 129,
+          "scoped_segments": 128,
+          "identity_membranes": 1,
+          "identity_key_encodings": 257,
+          "encoded_units": 786,
+          "attribute_lowercase": 128
+        },
+        "rows": 128,
+        "outputHash": "4edf8972afb9840f292135474919595660a3f7e0502914657631a19c24d1911f"
+      },
+      "descriptors": {
+        "counts": {
+          "url_tag_lowercase": 128,
+          "url_attribute_lowercase": 128,
+          "namespace_records": 1,
+          "host_tag_lowercase": 1,
+          "occurrences": 1,
+          "scoped_segments": 128,
+          "identity_membranes": 386,
+          "identity_key_encodings": 514,
+          "descriptor_render_closures": 258,
+          "encoded_units": 3238,
+          "attribute_lowercase": 128,
+          "host_contexts": 1,
+          "descriptor_props": 129
+        },
+        "rows": 128,
+        "outputHash": "b3f593de0dc7c85914197ef72d8e3e5f5a048d9e2a2411632c4f0a8f4c0488fa"
+      },
+      "nested-descriptors": {
+        "counts": {
+          "url_tag_lowercase": 128,
+          "url_attribute_lowercase": 128,
+          "namespace_records": 1,
+          "host_tag_lowercase": 1,
+          "occurrences": 1,
+          "scoped_segments": 128,
+          "identity_membranes": 386,
+          "identity_key_encodings": 514,
+          "descriptor_render_closures": 258,
+          "encoded_units": 6712,
+          "attribute_lowercase": 128,
+          "host_contexts": 1,
+          "descriptor_props": 257
+        },
+        "rows": 128,
+        "outputHash": "b3f593de0dc7c85914197ef72d8e3e5f5a048d9e2a2411632c4f0a8f4c0488fa"
+      },
+      "children": {
+        "counts": {
+          "url_tag_lowercase": 128,
+          "url_attribute_lowercase": 128,
+          "namespace_records": 1,
+          "host_tag_lowercase": 1,
+          "occurrences": 1,
+          "direct_segments": 128,
+          "scoped_segments": 256,
+          "identity_membranes": 258,
+          "identity_key_encodings": 514,
+          "descriptor_render_closures": 258,
+          "encoded_units": 4,
+          "attribute_lowercase": 128,
+          "host_contexts": 1,
+          "descriptor_props": 129,
+          "children_marks": 128
+        },
+        "rows": 128,
+        "outputHash": "8923ca6d56cc79cb7a5dae3cbae5d92093a2b5d5ac5b2b4347c8b71e55f570b5"
+      },
+      "attributes": {
+        "counts": {
+          "url_tag_lowercase": 512,
+          "url_attribute_lowercase": 512,
+          "namespace_records": 1,
+          "host_tag_lowercase": 1,
+          "occurrences": 1,
+          "scoped_segments": 128,
+          "identity_membranes": 258,
+          "identity_key_encodings": 386,
+          "descriptor_render_closures": 258,
+          "encoded_units": 4,
+          "attribute_lowercase": 512,
+          "host_contexts": 1,
+          "descriptor_props": 129
+        },
+        "rows": 128,
+        "outputHash": "cc6ec82ed5362242c93da4c77f53b493fb4aaf77f5ef71800de815235c24739f"
+      },
+      "spread-attributes": {
+        "counts": {
+          "url_tag_lowercase": 512,
+          "url_attribute_lowercase": 512,
+          "aggregate_attribute_lowercase": 512,
+          "namespace_records": 1,
+          "host_tag_lowercase": 1,
+          "occurrences": 1,
+          "scoped_segments": 128,
+          "identity_membranes": 258,
+          "identity_key_encodings": 386,
+          "descriptor_render_closures": 258,
+          "encoded_units": 4,
+          "attribute_lowercase": 512,
+          "host_contexts": 1,
+          "descriptor_props": 129
+        },
+        "rows": 128,
+        "outputHash": "a8afa65145c664feed39468248f25cc7b6ef7b36a315caa2734504bc903f6ad2"
+      },
+      "hosts": {
+        "counts": {
+          "url_tag_lowercase": 384,
+          "url_attribute_lowercase": 384,
+          "namespace_records": 129,
+          "host_tag_lowercase": 129,
+          "identity_membranes": 1,
+          "identity_key_encodings": 1,
+          "descriptor_render_closures": 2,
+          "encoded_units": 4,
+          "attribute_lowercase": 384,
+          "host_contexts": 129,
+          "descriptor_props": 129
+        },
+        "rows": 128,
+        "outputHash": "37e91050dc2f5e9a0917493c803aaf565c40ebac6c673a3e843dab308ad1df95"
+      },
+      "unique-hosts": {
+        "counts": {
+          "url_tag_lowercase": 128,
+          "namespace_records": 129,
+          "host_tag_lowercase": 129,
+          "identity_membranes": 1,
+          "identity_key_encodings": 1,
+          "descriptor_render_closures": 2,
+          "encoded_units": 4,
+          "host_contexts": 129,
+          "descriptor_props": 129
+        },
+        "rows": 128,
+        "outputHash": "cf45877499fde829b7a371ecd2def8ea417510d5e400507aadfc10467ceae97a"
+      }
+    }
+  },
+  "alternatives": {
+    "lowerScanBundle": {
+      "bytes": 111404,
+      "gzip": 37214,
+      "sha256": "9f6617ff55c3d036ec33974307132474053b1b2c955497797f567194ad5653bc"
+    },
+    "hostCacheBundle": {
+      "bytes": 111536,
+      "gzip": 37269,
+      "sha256": "0af54e81eff7b3558e5221d52bce2cb7ffe09fb00b31d379a2ac340c376f16b6"
+    },
+    "timings": {
+      "attributes": {
+        "clean": {
+          "median": 0.1509166249999936,
+          "min": 0.14018749999999613,
+          "max": 0.19716662500000837,
+          "samples": [
+            0.1774478749999986, 0.19716662500000837, 0.14786974999999813, 0.1533384999999896,
+            0.15104175000000453, 0.17279687500000307, 0.15786975000000325, 0.160614625000008,
+            0.17602087500000607, 0.18201562500000534, 0.1429843749999975, 0.14490625000000534,
+            0.15185412499999984, 0.1429062499999958, 0.14018749999999613, 0.14205737500000737,
+            0.14425512500000082, 0.16144787500000746, 0.15126562499999352, 0.143036500000008,
+            0.1452656250000075, 0.14634900000000073, 0.14662500000000023, 0.14514062499999625,
+            0.14452087499999777, 0.1509166249999936, 0.1591875000000016, 0.15976562500000568,
+            0.14020312499999932, 0.14413024999998925, 0.16313537499999597
+          ]
+        },
+        "scan": {
+          "median": 0.15538012499999354,
+          "min": 0.14582287500000746,
+          "max": 0.19007287499999848,
+          "samples": [
+            0.16442187499998795, 0.16945312500000398, 0.15441149999999482, 0.18709887499998956,
+            0.1531042499999984, 0.1800417500000009, 0.18728124999999807, 0.19007287499999848,
+            0.16206250000000466, 0.15710937499999034, 0.14701050000000748, 0.15755212499999516,
+            0.14752599999999916, 0.1531823750000001, 0.1530364999999989, 0.14582287500000746,
+            0.17924999999999613, 0.1512968749999999, 0.15538012499999354, 0.1648645000000073,
+            0.1503385000000037, 0.15240099999999757, 0.15448437500000978, 0.16383337499999584,
+            0.16796875, 0.16116149999999152, 0.15131774999998981, 0.1502083750000054,
+            0.14796875000000398, 0.15864587500000482, 0.1522761250000002
+          ]
+        },
+        "cached": {
+          "median": 0.1517136249999993,
+          "min": 0.14051562500000614,
+          "max": 0.22005199999999547,
+          "samples": [
+            0.1871613750000023, 0.22005199999999547, 0.15893225000000655, 0.1502083750000054,
+            0.17218224999999165, 0.15813024999999925, 0.1631562500000001, 0.153484375000005,
+            0.1458802499999905, 0.14282299999999282, 0.1450051249999973, 0.14051562500000614,
+            0.14631774999999436, 0.16634887499999707, 0.15728124999999693, 0.14168237499998781,
+            0.14851037500000075, 0.14326562499999795, 0.16454687500001342, 0.14313537499999995,
+            0.14673950000000957, 0.1933698750000019, 0.16685937500000136, 0.14596349999999347,
+            0.1517136249999993, 0.15118749999999181, 0.15061975000000416, 0.1518437499999976,
+            0.15398949999999445, 0.1407447500000103, 0.1623073750000117
+          ]
+        }
+      },
+      "descriptors": {
+        "clean": {
+          "median": 0.1598021249999988,
+          "min": 0.15091150000000653,
+          "max": 0.1964010000000087,
+          "samples": [
+            0.15435937499999852, 0.18086974999999939, 0.17841149999999573, 0.17143237499999486,
+            0.152604249999996, 0.18018237500000112, 0.1598021249999988, 0.18723437499998852,
+            0.1772760000000062, 0.1964010000000087, 0.15664587500000948, 0.18449474999999893,
+            0.15633325000000298, 0.16726562500001307, 0.17553650000000687, 0.1806041250000021,
+            0.15443237499999896, 0.15531775000000891, 0.1528019999999941, 0.15427612500000976,
+            0.1891406250000074, 0.18074999999998909, 0.15455724999999632, 0.15764575000000036,
+            0.15330212499999618, 0.15461449999999388, 0.17264575000000093, 0.1651614999999964,
+            0.1555416249999979, 0.15246362499999577, 0.15091150000000653
+          ]
+        },
+        "scan": {
+          "median": 0.16192187500000443,
+          "min": 0.1560937499999966,
+          "max": 0.17261975000000973,
+          "samples": [
+            0.1589791250000019, 0.1628853750000019, 0.16618237500000532, 0.16003124999998875,
+            0.1648488750000041, 0.17261975000000973, 0.16380212500000368, 0.16192187500000443,
+            0.16408337500000414, 0.16620837500001073, 0.16537499999999739, 0.17213024999999504,
+            0.16502600000001166, 0.16517187499999864, 0.16033337500000755, 0.16320312499999545,
+            0.15875524999999868, 0.1560937499999966, 0.1582708750000137, 0.15703125000000284,
+            0.16729687500000523, 0.16270824999999434, 0.15840624999999875, 0.1616250000000008,
+            0.15975525000000346, 0.1567083749999938, 0.1603229999999911, 0.15852599999999484,
+            0.1627239999999972, 0.15736975000000086, 0.1584114999999997
+          ]
+        },
+        "cached": {
+          "median": 0.16500000000000625,
+          "min": 0.1544426250000015,
+          "max": 0.2482447499999978,
+          "samples": [
+            0.17006250000000023, 0.16938549999998997, 0.16339062500000523, 0.1632760000000104,
+            0.16433337500001244, 0.18704687499999295, 0.18045312499999966, 0.16109375000000625,
+            0.1643384999999995, 0.1657656249999917, 0.1675884999999937, 0.1854531249999951,
+            0.2482447499999978, 0.16249474999999336, 0.16362499999999613, 0.1589791250000019,
+            0.1610103750000036, 0.17197387500000616, 0.17218224999999165, 0.15493750000000261,
+            0.16545837500000005, 0.1641822499999961, 0.1586614999999938, 0.17628650000000334,
+            0.17238025000000334, 0.1545988750000049, 0.15867187500001023, 0.1544426250000015,
+            0.16500000000000625, 0.16640625000000853, 0.1702343749999926
+          ]
+        }
+      },
+      "hosts": {
+        "clean": {
+          "median": 0.06509375000000261,
+          "min": 0.06277612499999918,
+          "max": 0.12114574999999661,
+          "samples": [
+            0.06834899999999777, 0.06741675000000669, 0.06713550000000623, 0.06779162499999813,
+            0.06895825000000855, 0.12114574999999661, 0.07472912500000461, 0.06958324999999377,
+            0.06898437499999943, 0.06838025000000414, 0.06654174999999896, 0.06482300000000407,
+            0.06342712500000403, 0.06410424999999975, 0.08207812499999534, 0.06432812499998875,
+            0.06277612499999918, 0.07535412500000405, 0.06482812500000534, 0.06445837499998675,
+            0.06386974999999495, 0.0780208750000071, 0.06317187499999477, 0.06385412499999177,
+            0.06392187500000546, 0.06639062500001103, 0.06509375000000261, 0.06451049999999725,
+            0.06363012500000309, 0.06308849999999211, 0.06279687500000364
+          ]
+        },
+        "scan": {
+          "median": 0.06815625000000125,
+          "min": 0.06499474999999677,
+          "max": 0.08898437499999545,
+          "samples": [
+            0.07043749999999704, 0.06955725000000257, 0.06896349999999529, 0.06955737500000225,
+            0.0713333749999947, 0.07501562499999181, 0.08216137499999832, 0.06943224999999131,
+            0.06860412499999313, 0.06923437500000773, 0.08898437499999545, 0.06619274999999902,
+            0.06618749999999807, 0.06747912500000552, 0.06901037500000484, 0.06633850000000052,
+            0.06577087499999834, 0.06861462499999504, 0.06815625000000125, 0.0668124999999975,
+            0.06682299999999941, 0.06669275000000141, 0.06499474999999677, 0.066536499999998,
+            0.06749475000000871, 0.08677087499999914, 0.07339574999998888, 0.06700512499999434,
+            0.06619262499999934, 0.0654894999999982, 0.06556762499999991
+          ]
+        },
+        "cached": {
+          "median": 0.06338024999999448,
+          "min": 0.06126562499999011,
+          "max": 0.08199474999999268,
+          "samples": [
+            0.06513012499999604, 0.06377600000000427, 0.07566149999999539, 0.06553124999999227,
+            0.06598962500000027, 0.0674687500000033, 0.08199474999999268, 0.06739575000000286,
+            0.06374999999999886, 0.06471874999999727, 0.06752074999999991, 0.06174475000000257,
+            0.06177074999999377, 0.06126562499999011, 0.06333862500000009, 0.06170837499999493,
+            0.061390625000001364, 0.06174475000000257, 0.0642447500000003, 0.06271875000000193,
+            0.06464574999999684, 0.06207287500001257, 0.06189062500000375, 0.06338024999999448,
+            0.06385937500000693, 0.06291674999999941, 0.06241150000001028, 0.0625,
+            0.0617656249999925, 0.0757394999999974, 0.06173437500000034
+          ]
+        }
+      },
+      "unique-hosts": {
+        "clean": {
+          "median": 0.0701667499999985,
+          "min": 0.06848950000001253,
+          "max": 0.11667187500000864,
+          "samples": [
+            0.0698541250000062, 0.11667187500000864, 0.07050512499999684, 0.07003124999999955,
+            0.06951037500000723, 0.07072924999999941, 0.06895837499999402, 0.07082287500000461,
+            0.0706666250000012, 0.06997924999998872, 0.06981774999999857, 0.06947912500000086,
+            0.06907287500000336, 0.07107812499999966, 0.07056774999999504, 0.10970312500001,
+            0.07059900000000141, 0.07151037500000257, 0.07216137500000741, 0.07032812500000318,
+            0.0701667499999985, 0.07014587499999436, 0.0701146250000022, 0.06986987499999486,
+            0.06848950000001253, 0.07002087500001153, 0.06903637499999604, 0.07170312499999909,
+            0.06907300000000305, 0.0705363750000032, 0.10390112499999304
+          ]
+        },
+        "scan": {
+          "median": 0.07010937500000125,
+          "min": 0.06866674999999134,
+          "max": 0.10988025000000334,
+          "samples": [
+            0.07050524999999652, 0.06978125000000546, 0.07041674999999259, 0.06968224999999961,
+            0.07101562500000114, 0.0702343749999983, 0.06934900000000255, 0.07103125000000432,
+            0.0692499999999967, 0.07000000000000739, 0.06866674999999134, 0.06891149999999868,
+            0.10477087499999982, 0.06921350000000359, 0.06991675000000441, 0.0688332500000115,
+            0.07082812499999136, 0.07243237500000532, 0.07146349999999302, 0.1049583750000096,
+            0.06956250000000352, 0.06984375000000398, 0.0712292500000018, 0.07334887500000775,
+            0.06930725000000848, 0.07068237499998986, 0.10988025000000334, 0.0694218750000033,
+            0.07010937500000125, 0.06909887499999456, 0.07088537499998893
+          ]
+        },
+        "cached": {
+          "median": 0.08120312500000182,
+          "min": 0.07871874999999307,
+          "max": 0.11920837499999948,
+          "samples": [
+            0.08195837499999925, 0.08587500000000148, 0.08391137499999957, 0.081151124999991,
+            0.08670837500000061, 0.11920837499999948, 0.08750000000000568, 0.08855737500000771,
+            0.11761450000000195, 0.08212499999999068, 0.07907812499999523, 0.07871874999999307,
+            0.08042712499999993, 0.07907287499999427, 0.08079162500000336, 0.07975512499999127,
+            0.08255212500000653, 0.08063537499999995, 0.08215624999999704, 0.08120312500000182,
+            0.08241149999999209, 0.0791875000000033, 0.11718225000001325, 0.07993237500001271,
+            0.0791458749999947, 0.08028124999999875, 0.08350525000000175, 0.08066137499999115,
+            0.08011462499999311, 0.08044787500000439, 0.08151037500000768
+          ]
+        }
+      }
+    }
+  }
+}

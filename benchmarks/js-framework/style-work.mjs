@@ -3,6 +3,7 @@
 // to authored components or changing the compiler's optimization input.
 
 import fs from 'node:fs';
+import { createHash } from 'node:crypto';
 import { chromium } from 'playwright';
 
 // An opt-in work case shares this already-registered benchmark entry. Its
@@ -30,6 +31,7 @@ if (DIALECT !== 'tsrx' && DIALECT !== 'jsx') {
 }
 
 const TSRX = DIALECT === 'tsrx';
+const CLEAN = process.env.WORK_CLEAN === '1';
 const URL = process.env.TARGET_URL || `http://localhost:${TSRX ? 5213 : 5214}/`;
 const ROWS = 1000;
 const METRICS = [
@@ -84,36 +86,48 @@ async function measure(browser, operation) {
 	const page = await context.newPage();
 	const cdp = await context.newCDPSession(page);
 	let profiling = false;
+	const errors = [];
+	page.on('pageerror', (error) => errors.push(error.message));
+	page.on('console', (message) => {
+		if (message.type() === 'error') errors.push(message.text());
+	});
 	try {
-		await cdp.send('Profiler.enable');
-		await cdp.send('Profiler.startPreciseCoverage', {
-			callCount: true,
-			detailed: true,
-			allowTriggeredUpdates: false,
+		await page.addInitScript(() => {
+			Math.random = () => 0.5;
 		});
-		profiling = true;
+		if (!CLEAN) {
+			await cdp.send('Profiler.enable');
+			await cdp.send('Profiler.startPreciseCoverage', {
+				callCount: true,
+				detailed: true,
+				allowTriggeredUpdates: false,
+			});
+			profiling = true;
+		}
 		await page.goto(URL, { waitUntil: 'load' });
 		await page.waitForSelector('#run', { timeout: 10_000 });
 		for (const action of operation.setup) await invoke(page, action);
-		await cdp.send('Profiler.takePreciseCoverage');
+		if (!CLEAN) await cdp.send('Profiler.takePreciseCoverage');
 
 		const observed = await page.evaluate(
-			async ({ action, staticStyle, expectedRows }) => {
+			async ({ action, staticStyle, expectedRows, clean }) => {
 				const before = Array.from(document.querySelectorAll('tbody tr'));
 				const labels = before.map((row) => row.querySelector('td:nth-child(2)').textContent);
 				const writes = { styleSets: 0, styleRemoves: 0, fontWeightWrites: 0, fontStyleWrites: 0 };
 				const set = CSSStyleDeclaration.prototype.setProperty;
 				const remove = CSSStyleDeclaration.prototype.removeProperty;
-				CSSStyleDeclaration.prototype.setProperty = function (name, value, priority) {
-					writes.styleSets++;
-					if (name === 'font-weight') writes.fontWeightWrites++;
-					if (name === 'font-style') writes.fontStyleWrites++;
-					return Reflect.apply(set, this, [name, value, priority]);
-				};
-				CSSStyleDeclaration.prototype.removeProperty = function (name) {
-					writes.styleRemoves++;
-					return Reflect.apply(remove, this, [name]);
-				};
+				if (!clean) {
+					CSSStyleDeclaration.prototype.setProperty = function (name, value, priority) {
+						writes.styleSets++;
+						if (name === 'font-weight') writes.fontWeightWrites++;
+						if (name === 'font-style') writes.fontStyleWrites++;
+						return Reflect.apply(set, this, [name, value, priority]);
+					};
+					CSSStyleDeclaration.prototype.removeProperty = function (name) {
+						writes.styleRemoves++;
+						return Reflect.apply(remove, this, [name]);
+					};
+				}
 				try {
 					if (action === 'mount') {
 						document.getElementById('run').click();
@@ -125,8 +139,10 @@ async function measure(browser, operation) {
 					}
 					if (window.__benchFlush) await window.__benchFlush();
 				} finally {
-					CSSStyleDeclaration.prototype.setProperty = set;
-					CSSStyleDeclaration.prototype.removeProperty = remove;
+					if (!clean) {
+						CSSStyleDeclaration.prototype.setProperty = set;
+						CSSStyleDeclaration.prototype.removeProperty = remove;
+					}
 				}
 
 				const rows = Array.from(document.querySelectorAll('tbody tr'));
@@ -166,12 +182,23 @@ async function measure(browser, operation) {
 				} else if (selected.length !== 0) {
 					throw new Error(`${action}: an unexpected row remained selected.`);
 				}
-				return { rows: rows.length, selected: selected.length, ...writes };
+				return {
+					rows: rows.length,
+					selected: selected.length,
+					html: rows.map((row) => row.outerHTML).join(''),
+					...writes,
+				};
 			},
-			{ action: operation.action, staticStyle: TSRX, expectedRows: ROWS },
+			{ action: operation.action, staticStyle: TSRX, expectedRows: ROWS, clean: CLEAN },
 		);
 
-		return { ...countCalls(await cdp.send('Profiler.takePreciseCoverage')), ...observed };
+		if (errors.length) throw new Error(errors.join('; '));
+		const { html, ...controls } = observed;
+		return {
+			...(CLEAN ? {} : countCalls(await cdp.send('Profiler.takePreciseCoverage'))),
+			...controls,
+			htmlSha256: createHash('sha256').update(html).digest('hex'),
+		};
 	} finally {
 		if (profiling) {
 			await cdp.send('Profiler.stopPreciseCoverage').catch(() => {});
@@ -206,6 +233,7 @@ try {
 			selected: operation.action.startsWith('select') ? 1 : 0,
 		};
 		for (const [metric, value] of Object.entries(expected)) {
+			if (CLEAN && metric !== 'rows' && metric !== 'selected') continue;
 			if (counts[metric] !== value) {
 				failures.push(`${operation.name}.${metric}: ${counts[metric]} !== expected ${value}`);
 			}
@@ -228,7 +256,15 @@ if (process.env.WORK_JSON) {
 	fs.writeFileSync(
 		process.env.WORK_JSON,
 		JSON.stringify(
-			{ suite: 'js-framework-style-work', dialect: DIALECT, target: URL, results, failures },
+			{
+				suite: 'js-framework-style-work',
+				dialect: DIALECT,
+				clean: CLEAN,
+				chromium: browser.version(),
+				target: URL,
+				results,
+				failures,
+			},
 			null,
 			'\t',
 		) + '\n',
