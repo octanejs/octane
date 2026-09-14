@@ -610,6 +610,11 @@ function octaneSourceTestProject({ aliases, ssr = false, test }) {
 export default defineConfig({
 	test: {
 		...configDefaults,
+		// Many lanes boot per-test infrastructure (Vite SSR servers, browser
+		// fixtures, CLI subprocesses) whose cold start can exceed the 5s default
+		// under full-shard CI contention. 30s covers the slowest observed cold
+		// start; projects that need more already override it.
+		testTimeout: 30_000,
 		// This root-only option applies to every project below. For local
 		// diagnostics, a CLI value such as `--silent=false` or
 		// `--silent=passed-only` overrides this default.
