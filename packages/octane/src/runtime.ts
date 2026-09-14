@@ -1178,6 +1178,9 @@ let NEXT_WARM_EPISODE = 1;
 let CURRENT_WARM_EPISODE = 0;
 const RENDERER_REGION_OWNER = Symbol.for('octane.renderer-region.owner');
 const RENDERER_REGION_DOM_OWNERS = new WeakMap<Block, RendererRegionOwnerBridge>();
+// Live region-owner roots (WeakMap exposes no size). Ordinary apps never bind
+// one, so this collapses the per-read bridge check to a single integer test.
+let RENDERER_REGION_OWNER_COUNT = 0;
 const RENDERER_REGION_DOM_BINDINGS = new WeakMap<
 	Block,
 	{
@@ -11978,13 +11981,16 @@ export function useContext<T>(context: Context<T> | ForeignHostContext<T>): T {
 const DEFAULT_CTX: unique symbol = Symbol('octane.ctx.default');
 
 function rendererRegionOwnerForBlock(block: Block | null): RendererRegionOwnerBridge | null {
+	// bindRendererRegionOwner throws unless the block is a top-level root
+	// (kind 'root', no parent), so ancestors below the chain top can never be
+	// keys — climb straight there and pay one lookup per call instead of one
+	// per ancestor on every no-provider context read.
+	if (RENDERER_REGION_OWNER_COUNT === 0) return null;
 	let current = block;
-	while (current !== null) {
-		const bridge = RENDERER_REGION_DOM_OWNERS.get(current);
-		if (bridge !== undefined && bridge.active) return bridge;
-		current = current.parentBlock;
-	}
-	return null;
+	while (current !== null && current.parentBlock !== null) current = current.parentBlock;
+	if (current === null) return null;
+	const bridge = RENDERER_REGION_DOM_OWNERS.get(current);
+	return bridge !== undefined && bridge.active ? bridge : null;
 }
 
 function rendererRegionTryHandler(block: Block | null): ((error: unknown) => void) | null {
@@ -12046,12 +12052,14 @@ export function bindRendererRegionOwner(props: unknown): void {
 	root.$$ctxCache = null;
 	root.$$ctxCacheOwner = null;
 	if (previous === undefined) {
+		RENDERER_REGION_OWNER_COUNT++;
 		(root.cleanups ??= []).push(() => {
 			const current = RENDERER_REGION_DOM_BINDINGS.get(root);
 			if (current === undefined) return;
 			current.release();
 			RENDERER_REGION_DOM_BINDINGS.delete(root);
 			RENDERER_REGION_DOM_OWNERS.delete(root);
+			RENDERER_REGION_OWNER_COUNT--;
 		});
 	}
 }
