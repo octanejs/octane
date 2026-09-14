@@ -7,6 +7,8 @@ import {
 	ComponentApisApp,
 	HookApp,
 	IcuApp,
+	KeylessIcuApp,
+	LanguageSnapshotApp,
 	MultipleHooksApp,
 	ProviderApp,
 	SSRSeedApp,
@@ -73,6 +75,30 @@ describe('@octanejs/i18next runtime', () => {
 	});
 
 	afterEach(() => cleanup());
+
+	it('refreshes resolved language snapshots when resources arrive for the same language', async () => {
+		const delayed = createInstance();
+		await delayed.init({
+			lng: 'de',
+			fallbackLng: 'en',
+			resources: { en: { translation: { greeting: 'Hello' } } },
+		});
+		const view = render(LanguageSnapshotApp, { props: { i18n: delayed } });
+		expect(view.container.querySelector('output')).toHaveAttribute('data-language', 'de');
+		expect(view.container.querySelector('output')).toHaveAttribute('data-resolved', 'en');
+		await act(async () => {
+			delayed.addResourceBundle('de', 'translation', { greeting: 'Hallo' });
+			await delayed.changeLanguage('de');
+		});
+		expect(view.container.querySelector('output')).toHaveAttribute('data-language', 'de');
+		expect(view.container.querySelector('output')).toHaveAttribute('data-resolved', 'de');
+	});
+
+	it('renders the default ICU translation when no translation key is supplied', () => {
+		const view = render(KeylessIcuApp, { props: { i18n: instance } });
+		expect(view.container).toHaveTextContent('Welcome friend!');
+		expect(view.container.querySelector('strong')).toHaveTextContent('friend');
+	});
 
 	it('translates through the hook and reacts to language changes', async () => {
 		const view = render(HookApp, { props: { i18n: instance, name: 'Ada' } });

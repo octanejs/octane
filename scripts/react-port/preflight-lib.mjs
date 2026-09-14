@@ -784,7 +784,7 @@ export function conventionalTestPath(relativePath, { runner } = {}) {
 }
 
 export function isUpstreamTypeTestPath(relativePath) {
-	return /(?:^|\/)(?:typetests|type-tests|test-d)(?:\/|$)|(?:^|[.-])(?:test-d|d-test)\.[cm]?[jt]sx?$|(?:^|[\/.-])types?\.test\.[cm]?tsx?$|(?:^|\/)types\/(?:[^/]+\.)?(?:test|spec)\.[cm]?tsx?$/i.test(
+	return /(?:^|\/)(?:typetests|type-tests|test-d)(?:\/|$)|(?:^|\/)(?:test|tests)\/typescript\/|(?:^|[.-])(?:test-d|d-test)\.[cm]?[jt]sx?$|(?:^|[\/.-])types?\.test\.[cm]?tsx?$|(?:^|\/)types\/(?:[^/]+\.)?(?:test|spec)\.[cm]?tsx?$/i.test(
 		relativePath,
 	);
 }
@@ -1086,6 +1086,53 @@ export function pinnedLiteralRows(source, { arrayName, excludeFirstColumn = [] }
 	return rows.filter((row) => !excludeFirstColumn.includes(row[0]));
 }
 
+// Some upstream type-only workspaces enumerate directories at configuration
+// time. A reviewed immutable profile maps that exact expression to discovery
+// selectors derived from the same Git tree, without executing filesystem code.
+export function expandPinnedDirectoryProjects(source, entry, expansion, tree) {
+	if (entry.path !== expansion.path || entry.sha !== expansion.gitBlob)
+		throw new Error(`Directory project profile source mismatch: ${entry.path}`);
+	const { directory, expression, testPattern } = expansion;
+	if (
+		typeof expression !== 'string' ||
+		!expression.trim() ||
+		typeof directory !== 'string' ||
+		!directory ||
+		directory !== path.posix.normalize(directory) ||
+		directory.split('/').some((part) => !part || part === '..') ||
+		typeof testPattern !== 'string' ||
+		!testPattern ||
+		testPattern.includes('/') ||
+		testPattern.includes('..') ||
+		!Array.isArray(expansion.excludedDirectories) ||
+		expansion.excludedDirectories.some((name) => typeof name !== 'string') ||
+		['configPrefix', 'configSuffix', 'excludedConfigSubstring'].some(
+			(key) => typeof expansion[key] !== 'string' || !expansion[key],
+		)
+	)
+		throw new Error('Invalid directory project profile');
+	if (source.split(expression).length !== 2)
+		throw new Error(`Directory project expression count mismatch: ${entry.path}`);
+	const projects = [];
+	for (const file of tree) {
+		if (!isGitHubRegularBlob(file) || !file.path.startsWith(`${directory}/`)) continue;
+		const parts = file.path.slice(directory.length + 1).split('/');
+		if (parts.length !== 2) continue;
+		const [name, config] = parts;
+		if (
+			expansion.excludedDirectories.includes(name) ||
+			!config.startsWith(expansion.configPrefix) ||
+			!config.endsWith(expansion.configSuffix) ||
+			config.includes(expansion.excludedConfigSubstring)
+		)
+			continue;
+		projects.push({ test: { include: [`${directory}/${name}/${testPattern}`] } });
+	}
+	if (projects.length === 0 || projects.length > MAX_UPSTREAM_TEST_FILES)
+		throw new Error(`Directory project expansion has an invalid project count: ${entry.path}`);
+	return source.replace(expression, JSON.stringify(projects));
+}
+
 export function verifyNonTestArtifact(source, entry, disposition) {
 	if (
 		disposition.path !== entry.path ||
@@ -1275,7 +1322,11 @@ export async function immutableTestInventory(tree, subdirectory, manifest, optio
 	}
 	for (const entry of configurationEntries) await readConfiguration(entry);
 	for (const entry of configurationEntries) {
-		const source = configurationSources.get(entry.path);
+		let source = configurationSources.get(entry.path);
+		for (const expansion of profile?.configurationProjects ?? []) {
+			if (expansion.path === entry.path)
+				source = expandPinnedDirectoryProjects(source, entry, expansion, tree);
+		}
 		const configurationRunner =
 			['vitest', 'jest', 'playwright'].find((name) =>
 				path.posix.basename(entry.path).startsWith(`${name}.`),

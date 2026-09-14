@@ -1,4 +1,4 @@
-// Ported from react-i18next@17.0.9 (8b4a9ea). The subscription contract maps
+// Ported from react-i18next@17.0.14 (5f8c5f9). The subscription contract maps
 // directly to octane; Suspense unwraps through use(thenable) instead of a raw
 // Promise throw, and composed base hooks receive deterministic sub-slots.
 import {
@@ -80,7 +80,7 @@ export const useTranslation = (...args) => {
 		warnOnce(
 			i18n,
 			'NO_I18NEXT_INSTANCE',
-			'useTranslation: You will need to pass in an i18next instance by using initReactI18next',
+			'useTranslation: You will need to pass in an i18next instance by using initReactI18next or by passing it via props or context. In monorepo setups, make sure there is only one instance of @octanejs/i18next.',
 		);
 	}
 
@@ -200,7 +200,7 @@ export const useTranslation = (...args) => {
 
 	const finalI18n = i18n || {};
 
-	// cache one wrapper per hook caller and only recreate it when language changes
+	// cache one wrapper per hook caller and only recreate it when language state changes
 	const wrapperRef = useRef(null, subSlot(slot, 'ut:wrapper'));
 	const wrapperLangRef = useRef(undefined, subSlot(slot, 'ut:wrapperLang'));
 
@@ -229,7 +229,7 @@ export const useTranslation = (...args) => {
 	const ret = useMemo(
 		() => {
 			const original = finalI18n;
-			const lang = original?.language;
+			const lang = `${original.language}|${original.resolvedLanguage}|${original.languages?.join(',')}`;
 
 			let i18nWrapper = original;
 
@@ -278,6 +278,20 @@ export const useTranslation = (...args) => {
 	);
 
 	if (i18n && useSuspense && !ready) {
+		let inDevelopment = false;
+		try {
+			// statically replaced by bundlers; evaluated at runtime in Node
+			inDevelopment = process.env.NODE_ENV !== 'production';
+		} catch (e) {
+			// no `process` in this runtime (raw ESM in the browser, some edge runtimes): stay quiet
+		}
+		if (inDevelopment) {
+			warnOnce(
+				i18n,
+				'SUSPENDED_WHILE_LOADING',
+				'useTranslation: suspended while translations are loading (useSuspense is true by default). Add a <Suspense> boundary above this component, or set react.useSuspense: false in the i18next init options. https://react.i18next.com/latest/usetranslation-hook',
+			);
+		}
 		use(getSuspenseLoadPromise(i18n, props.lng, namespaces));
 	}
 

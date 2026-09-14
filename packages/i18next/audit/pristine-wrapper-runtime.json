@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "project": "i18next-pristine-runtime",
+  "roots": ["packages/i18next/tests"],
+  "files": ["packages/i18next/tests/upstream-original.test.ts"],
+  "tests": [
+    {
+      "id": "runtime:bc986e17e183fcbf",
+      "file": "packages/i18next/tests/upstream-original.test.ts",
+      "fullName": "runs the pinned react-i18next 17.0.14 suite unchanged"
+    }
+  ],
+  "snapshots": 0
+}

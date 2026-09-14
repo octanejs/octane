@@ -8,6 +8,7 @@ import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 export const runners = new Map([
+	['i18next', { packagePath: 'packages/i18next', label: 'react-i18next' }],
 	['mobx', { module: './mobx-pristine-runtime.mjs', label: 'MobX React Lite' }],
 	['motion', { module: './motion-pristine-runtime.mjs', label: 'Motion' }],
 	['tanstack-ai', { module: './tanstack-ai-pristine-runtime.mjs', label: 'TanStack AI' }],
@@ -47,8 +48,12 @@ if (isMain) {
 		);
 		process.exit(2);
 	}
-	const { runPristineUpstreamSuite } = await import(runner.module);
-	const result = runPristineUpstreamSuite();
+	const result = runner.packagePath
+		? (await import('./pristine-suite-lib.mjs')).runConfiguredPristineSuite(
+				resolve(import.meta.dirname, '../..'),
+				runner.packagePath,
+			)
+		: (await import(runner.module)).runPristineUpstreamSuite();
 	if (result.stdout) process.stdout.write(result.stdout);
 	if (result.stderr) process.stderr.write(result.stderr);
 	const passed = result.identities.filter(function isPassed(test) {

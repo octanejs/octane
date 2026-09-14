@@ -778,6 +778,111 @@ function pinnedRegistrarWrappers(source, wrappers) {
 	return { calls, bodies };
 }
 
+// babel-plugin-tester registers one test per string/object in its literal tests
+// array. Keep this deliberately bounded: indirect calls, fixture directories,
+// dynamic matrices, and control flow need their own reviewed inventory.
+function extractBabelPluginTesterCases(source, file) {
+	if (!source.includes('babel-plugin-tester')) return [];
+	const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+	const imports = new Map();
+	for (const statement of ast.statements) {
+		if (
+			!ts.isImportDeclaration(statement) ||
+			statement.moduleSpecifier.text !== 'babel-plugin-tester'
+		)
+			continue;
+		const bindings = statement.importClause?.namedBindings;
+		if (bindings && ts.isNamedImports(bindings)) {
+			for (const specifier of bindings.elements) {
+				if ((specifier.propertyName ?? specifier.name).text === 'pluginTester')
+					imports.set(specifier.name.text, specifier);
+			}
+		}
+	}
+	const fail = () => {
+		throw new Error(`Cannot statically inventory babel-plugin-tester in ${file}`);
+	};
+	const properties = (node) => {
+		if (!node || !ts.isObjectLiteralExpression(node)) return fail();
+		const result = new Map();
+		for (const property of node.properties) {
+			if (
+				!(ts.isPropertyAssignment(property) || ts.isShorthandPropertyAssignment(property)) ||
+				!(ts.isIdentifier(property.name) || ts.isStringLiteral(property.name)) ||
+				result.has(property.name.text)
+			)
+				return fail();
+			result.set(property.name.text, property.initializer ?? property.name);
+		}
+		return result;
+	};
+	const literal = (node) =>
+		node && (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node))
+			? node.text
+			: null;
+	const cases = [];
+	const occurrences = new Map();
+	const visit = (node) => {
+		if (ts.isIdentifier(node) && imports.has(node.text) && node.parent !== imports.get(node.text)) {
+			const call = node.parent;
+			if (
+				!ts.isCallExpression(call) ||
+				call.expression !== node ||
+				call.arguments.length !== 1 ||
+				!ts.isExpressionStatement(call.parent) ||
+				call.parent.parent !== ast
+			)
+				return fail();
+			const options = properties(call.arguments[0]);
+			if (options.has('fixtures')) return fail();
+			const tests = options.get('tests');
+			if (!tests || !ts.isArrayLiteralExpression(tests)) return fail();
+			for (const [rowIndex, row] of tests.elements.entries()) {
+				const rowOptions = literal(row) === null ? properties(row) : new Map([['code', row]]);
+				if (literal(rowOptions.get('code')) === null) return fail();
+				const title = rowOptions.has('title') ? literal(rowOptions.get('title')) : null;
+				if (rowOptions.has('title') && title === null) return fail();
+				const modifiers = [];
+				for (const modifier of ['skip', 'only']) {
+					const value = rowOptions.get(modifier);
+					if (
+						value &&
+						value.kind !== ts.SyntaxKind.TrueKeyword &&
+						value.kind !== ts.SyntaxKind.FalseKeyword
+					)
+						return fail();
+					if (value?.kind === ts.SyntaxKind.TrueKeyword) modifiers.push(modifier);
+				}
+				const identity = row.getText(ast);
+				const occurrence = occurrences.get(identity) ?? 0;
+				occurrences.set(identity, occurrence + 1);
+				const declarationId = makeCaseId(file, 'pluginTester', identity, occurrence);
+				cases.push({
+					caseId: declarationId,
+					declarationId,
+					kind: 'pluginTester',
+					title,
+					declaredTitle: title,
+					titleExpression: title === null ? `${node.text}.tests[${rowIndex}]` : null,
+					...lineAndColumn(source, row.getStart(ast)),
+					modifiers,
+					gate: null,
+					parameterization: null,
+					dynamicExpansion: null,
+					helperExpansion: null,
+					estimatedRegistrations: 1,
+					sourceSnippet: identity.slice(0, 320).replace(/\s+/g, ' ').trim(),
+					manualReviewReason:
+						title === null ? 'The test title defaults to the Babel plugin name.' : null,
+				});
+			}
+		}
+		ts.forEachChild(node, visit);
+	};
+	visit(ast);
+	return cases;
+}
+
 export function extractTestCases(
 	source,
 	{ file = '<unknown>', helperExpansions = DEFAULT_HELPER_EXPANSIONS, registrarWrappers = [] } = {},
@@ -978,7 +1083,7 @@ export function extractTestCases(
 				'ESLint RuleTester expands valid and invalid fixture matrices at runtime.',
 		});
 	}
-	return cases;
+	return [...cases, ...extractBabelPluginTesterCases(source, file)];
 }
 
 export function discoverReactTestFiles(reactRoot, discovery) {

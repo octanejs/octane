@@ -223,3 +223,161 @@ for (const [name, change, reason] of [
 		assert.throws(() => assertMaterializedTypeEvidence(input), reason);
 	});
 }
+
+// Multi-program upstream suites pin several independent compiler configurations
+// whose module augmentations cannot coexist in one program. Each program
+// declares the inventory subset it owns; the file set must match exactly.
+function multiFixture() {
+	const root = realpathSync(mkdtempSync(path.join(tmpdir(), 'materialized-type-evidence-multi-')));
+	roots.push(root);
+	execFileSync('git', ['init', '--quiet', root]);
+	const packageDirectory = path.join(root, 'packages/widget');
+	const identity = {
+		packageName: 'widget',
+		integrity: 'sha512-fixture',
+		version: '1.0.0',
+		commit: 'a'.repeat(40),
+		repository: { owner: 'fixture', repo: 'widget', subdirectory: 'packages/widget' },
+	};
+	const source = (label) =>
+		`import { api } from 'widget/subpath';\nexpectType<string>(api());\n// @ts-expect-error wrong argument\napi(${label});\n`;
+	const files = {
+		'src/a.spec.ts': source('1'),
+		'src/b.spec.ts': source('2'),
+		'package.json': '{"name":"widget","version":"1.0.0"}\n',
+	};
+	const lock = buildUpstreamLock({
+		identity,
+		license: { spdx: 'MIT' },
+		treeEntries: Object.entries(files).map(([file, content]) => ({
+			type: 'blob',
+			path: `packages/widget/${file}`,
+			sha: gitBlobSha1(Buffer.from(content)),
+			size: Buffer.byteLength(content),
+		})),
+		adaptedMappings: [{ fromRoot: 'src', toRoot: 'tests/upstream' }],
+		adaptedRewrites: [{ find: 'widget/subpath', replace: '@octanejs/widget/subpath' }],
+	});
+	for (const [file, content] of Object.entries(files)) {
+		const target = path.join(packageDirectory, 'upstream', file);
+		mkdirSync(path.dirname(target), { recursive: true });
+		writeFileSync(target, content);
+	}
+	mkdirSync(path.join(packageDirectory, 'audit'), { recursive: true });
+	writeFileSync(path.join(packageDirectory, 'audit/upstream.lock.json'), JSON.stringify(lock));
+	writeFileSync(
+		path.join(packageDirectory, 'upstream/.octane-materialize.json'),
+		JSON.stringify({ schemaVersion: 1, lockFingerprint: lock.fingerprint }),
+	);
+	execFileSync(
+		process.execPath,
+		[
+			fileURLToPath(new URL('./materialize.mjs', import.meta.url)),
+			'run',
+			'--package-dir',
+			packageDirectory,
+		],
+		{ encoding: 'utf8' },
+	);
+	const registration = (id, file, index) => ({
+		id,
+		declarationId: id,
+		source: `packages/widget/${file}:${index}`,
+		kind: 'it',
+		title: id,
+		estimatedRegistrations: 1,
+		registrationIndex: index,
+	});
+	const node = {
+		identity,
+		upstreamTestInventory: ['src/a.spec.ts', 'src/b.spec.ts'].map((file, index) => ({
+			kind: 'type',
+			path: `packages/widget/${file}`,
+			gitBlob: gitBlobSha1(Buffer.from(files[file])),
+			size: Buffer.byteLength(files[file]),
+			registrations: [registration(`reg-${index === 0 ? 'a' : 'b'}`, file, index)],
+		})),
+	};
+	const program = (lane, file) => ({
+		gateId: `upstream-types-${lane}`,
+		node,
+		packageDirectory,
+		programFiles: [
+			path.join(
+				packageDirectory,
+				lane === 'pristine' ? `upstream/${file}` : `tests/upstream/${path.basename(file)}`,
+			),
+		],
+	});
+	return { node, packageDirectory, program };
+}
+
+test('accepts a program declaring exactly the inventory subset it compiles', () => {
+	const { program } = multiFixture();
+	for (const lane of ['pristine', 'adapted']) {
+		assert.doesNotThrow(() =>
+			assertMaterializedTypeEvidence({
+				...program(lane, 'src/a.spec.ts'),
+				declaredRegistrations: ['reg-a'],
+			}),
+		);
+		assert.doesNotThrow(() =>
+			assertMaterializedTypeEvidence({
+				...program(lane, 'src/b.spec.ts'),
+				declaredRegistrations: ['reg-b'],
+			}),
+		);
+	}
+});
+
+test('rejects a program compiling inventory files it does not declare', () => {
+	const { program, packageDirectory } = multiFixture();
+	for (const lane of ['pristine', 'adapted']) {
+		const input = program(lane, 'src/a.spec.ts');
+		input.programFiles.push(
+			path.join(
+				packageDirectory,
+				lane === 'pristine' ? 'upstream/src/b.spec.ts' : 'tests/upstream/b.spec.ts',
+			),
+		);
+		assert.throws(
+			() => assertMaterializedTypeEvidence({ ...input, declaredRegistrations: ['reg-a'] }),
+			/compile exactly the inventory files it declares/,
+		);
+	}
+});
+
+test('rejects a program declaring registrations whose file it omits', () => {
+	const { program } = multiFixture();
+	for (const lane of ['pristine', 'adapted']) {
+		assert.throws(
+			() =>
+				assertMaterializedTypeEvidence({
+					...program(lane, 'src/a.spec.ts'),
+					declaredRegistrations: ['reg-a', 'reg-b'],
+				}),
+			/compile exactly the inventory files it declares/,
+		);
+		assert.throws(
+			() =>
+				assertMaterializedTypeEvidence({
+					...program(lane, 'src/a.spec.ts'),
+					declaredRegistrations: ['reg-b'],
+				}),
+			/compile exactly the inventory files it declares/,
+		);
+	}
+});
+
+test('rejects an empty program subset', () => {
+	const { program } = multiFixture();
+	assert.throws(
+		() =>
+			assertMaterializedTypeEvidence({
+				...program('pristine', 'src/a.spec.ts'),
+				programFiles: [],
+				declaredRegistrations: [],
+			}),
+		/non-empty inventory subset/,
+	);
+});

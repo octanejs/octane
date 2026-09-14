@@ -1,5 +1,6 @@
 import tanstackRouterAdapted from './packages/tanstack-router/tests/vitest.adapted.config.ts';
 import mobxAdapted from './packages/mobx/tests/vitest.adapted.config.ts';
+import i18nextAdapted from './packages/i18next/tests/vitest.adapted.config.ts';
 import tanstackAiAdapted from './packages/tanstack-ai/tests/vitest.adapted.config.ts';
 import tanstackAiAdaptedSSR from './packages/tanstack-ai/tests/vitest.adapted-ssr.config.ts';
 import tanstackDbAdapted from './packages/tanstack-db/tests/vitest.adapted.config.ts';
@@ -624,11 +625,20 @@ export default defineConfig({
 			},
 			{ ...tanstackRouterAdapted, testExecution: { group: 'react-parity' } },
 			{ ...mobxAdapted, testExecution: { group: 'react-parity' } },
+			{ ...i18nextAdapted, testExecution: { group: 'react-parity' } },
 			{
 				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'mobx-pristine-runtime',
 					include: ['packages/mobx/tests/upstream-original.test.ts'],
+					environment: 'node',
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'i18next-pristine-runtime',
+					include: ['packages/i18next/tests/upstream-original.test.ts'],
 					environment: 'node',
 				},
 			},
@@ -1552,6 +1562,8 @@ export default defineConfig({
 						...configDefaults.exclude,
 						'packages/i18next/tests/differential/**/*.test.ts',
 						'packages/i18next/tests/ssr/**/*.test.ts',
+						'packages/i18next/tests/upstream/**',
+						'packages/i18next/tests/upstream-original.test.ts',
 					],
 					environment: 'jsdom',
 					setupFiles: ['packages/i18next/tests/_setup.ts'],
@@ -1603,6 +1615,7 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'i18next-ssr',
 					include: ['packages/i18next/tests/ssr/**/*.test.ts'],

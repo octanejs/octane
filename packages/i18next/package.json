@@ -33,7 +33,10 @@
   "files": [
     "src",
     "README.md",
-    "LICENSE"
+    "UPSTREAM.md",
+    "status.json",
+    "LICENSE",
+    "LICENSE.upstream"
   ],
   "exports": {
     ".": {
@@ -50,7 +53,10 @@
     }
   },
   "scripts": {
-    "test": "vitest run"
+    "test": "pnpm upstream:materialize && vitest run --root ../.. --project i18next --project i18next-differential --project i18next-ssr --project i18next-pristine-runtime && node ../../scripts/react-parity/harness.mjs run-required --manifest packages/i18next/audit/react-parity.json",
+    "upstream:materialize": "node ../../scripts/react-port/materialize.mjs run --package-dir .",
+    "upstream:verify": "node ../../scripts/react-parity/verify-provenance.mjs",
+    "typecheck": "tsrx-tsc --noEmit"
   },
   "dependencies": {
     "html-parse-stringify": "catalog:default"
@@ -68,6 +74,13 @@
     "react": "catalog:default",
     "react-dom": "catalog:default",
     "react-i18next": "catalog:default",
-    "vitest": "catalog:default"
+    "vitest": "catalog:default",
+    "@babel/core": "catalog:default",
+    "@octanejs/testing-library": "workspace:*",
+    "@testing-library/react": "16.3.2",
+    "@types/react": "19.2.18",
+    "babel-plugin-macros": "3.1.0",
+    "babel-plugin-tester": "11.0.4",
+    "use-sync-external-store": "1.6.0"
   }
 }

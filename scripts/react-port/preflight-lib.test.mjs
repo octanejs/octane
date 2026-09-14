@@ -11,6 +11,7 @@ import {
 	assessResolvedEvidence,
 	collectArchiveEvidence,
 	conventionalTestPath,
+	isUpstreamTypeTestPath,
 	evaluateApprovedLicense,
 	parseTarArchive,
 	parseInput,
@@ -18,6 +19,7 @@ import {
 	pinnedObjectValues,
 	pinnedLiteralRows,
 	expandPinnedStaticArray,
+	expandPinnedDirectoryProjects,
 	resolveRemoteInput,
 	runPreflight,
 	sanitizeForReport,
@@ -25,6 +27,79 @@ import {
 	verifyIntegrity,
 	verifyNonTestArtifact,
 } from './preflight-lib.mjs';
+import { configuredTestSelectors, selectedByTestConfiguration } from './test-discovery.mjs';
+
+test('separates explicit TypeScript test directories from runtime TypeScript suites', () => {
+	assert.equal(
+		isUpstreamTypeTestPath('test/typescript/selector-strict/useTranslation.test.ts'),
+		true,
+	);
+	assert.equal(isUpstreamTypeTestPath('tests/typescript/custom/Trans.test.tsx'), true);
+	assert.equal(isUpstreamTypeTestPath('test/useTranslation.spec.tsx'), false);
+	assert.equal(isUpstreamTypeTestPath('src/typescript/parser.test.ts'), false);
+});
+
+test('pinned directory projects select the complete type suites without running upstream code', () => {
+	const expression = 'readProjectsFromDisk()';
+	const entry = { path: 'vitest.workspace.typescript.mts', sha: 'a'.repeat(40) };
+	const expansion = {
+		path: entry.path,
+		gitBlob: entry.sha,
+		expression,
+		directory: 'test/typescript',
+		excludedDirectories: ['issue-1899'],
+		configPrefix: 'tsconfig.',
+		configSuffix: '.json',
+		excludedConfigSubstring: 'vitest-temp',
+		testPattern: '*.test.{ts,tsx}',
+	};
+	const tree = [
+		'test/typescript/custom/tsconfig.json',
+		'test/typescript/misc/tsconfig.json',
+		'test/typescript/misc/tsconfig.nonEsModuleInterop.json',
+		'test/typescript/issue-1899/tsconfig.json',
+		'test/typescript/temporary/tsconfig.vitest-temp.json',
+		'test/typescript/helper/nested/tsconfig.json',
+		'other/tsconfig.json',
+	].map((path) => ({ path, type: 'blob', mode: '100644' }));
+	const source = `export default {test:{projects:${expression}}};`;
+	const result = expandPinnedDirectoryProjects(source, entry, expansion, tree);
+	const selectors = configuredTestSelectors(result, entry.path, {
+		runner: 'vitest',
+		vitestVersion: '^4.1.11',
+	});
+	assert.equal(selectors.length, 3);
+	const files = [
+		'test/typescript/custom/translation.test.ts',
+		'test/typescript/misc/translation.test.tsx',
+		'test/typescript/custom/helper.ts',
+		'test/typescript/issue-1899/translation.test.tsx',
+		'test/typescript/temporary/translation.test.ts',
+		'test/runtime.test.js',
+	];
+	assert.deepEqual(
+		files.filter((file) =>
+			selectors.some((selector) =>
+				selectedByTestConfiguration(file, selector, conventionalTestPath),
+			),
+		),
+		files.slice(0, 2),
+	);
+	assert.throws(
+		() => expandPinnedDirectoryProjects(source, { ...entry, sha: 'b'.repeat(40) }, expansion, tree),
+		/source mismatch/,
+	);
+	assert.throws(
+		() => expandPinnedDirectoryProjects(`${source}\n${expression}`, entry, expansion, tree),
+		/expression count mismatch/,
+	);
+	assert.throws(() => expandPinnedDirectoryProjects(source, entry, expansion, []), /project count/);
+	assert.throws(
+		() =>
+			expandPinnedDirectoryProjects(source, entry, { ...expansion, directory: '../test' }, tree),
+		/Invalid directory project/,
+	);
+});
 
 test('conventional test discovery excludes fixture modules beside runnable suites', () => {
 	assert.equal(conventionalTestPath('tests/image.test.tsx'), true);

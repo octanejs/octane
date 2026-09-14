@@ -1,3 +1,4 @@
+import type { i18n } from 'i18next';
 import { I18nextProvider, Trans, useTranslation } from '@octanejs/i18next';
 
 function ServerContent() @{
@@ -11,7 +12,7 @@ function ServerContent() @{
 	</main>
 }
 
-export function ServerApp(props) @{
+export function ServerApp(props: { i18n: i18n }) @{
 	<I18nextProvider i18n={props.i18n}>
 		<ServerContent />
 	</I18nextProvider>

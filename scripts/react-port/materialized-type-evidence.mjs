@@ -92,7 +92,17 @@ function assertionCounts(source, file) {
 // pinned files (including their setup declarations) or the checked adaptations;
 // wrapping every statement in an extra invented assertion would change that
 // authority and exclude libraries that publish only subpath entry points.
-export function assertMaterializedTypeEvidence({ gateId, node, packageDirectory, programFiles }) {
+// `declaredRegistrations` scopes a program to the inventory files it owns:
+// every declared registration's file must be in the program, and every
+// inventory file in the program must be fully declared. Full coverage is
+// accumulated across named upstream programs at the gate.
+export function assertMaterializedTypeEvidence({
+	gateId,
+	node,
+	packageDirectory,
+	programFiles,
+	declaredRegistrations = null,
+}) {
 	const policy = assertBindingSurfacePolicy(packageDirectory);
 	if (!requiresUpstreamEvidence(policy, node.identity?.packageName))
 		throw new Error(
@@ -129,6 +139,9 @@ export function assertMaterializedTypeEvidence({ gateId, node, packageDirectory,
 		planAdaptedFiles(lock).map((file) => [file.sourcePath, file.targetPath]),
 	);
 	const selected = new Set(programFiles.map((file) => path.resolve(file)));
+	const declared = declaredRegistrations ? new Set(declaredRegistrations) : null;
+	if (declared && declared.size === 0)
+		throw new Error('Type program must declare a non-empty inventory subset');
 	for (const entry of inventory) {
 		if (!entry.path.startsWith(prefix))
 			throw new Error(`Type inventory escapes the pinned subtree: ${entry.path}`);
@@ -143,7 +156,18 @@ export function assertMaterializedTypeEvidence({ gateId, node, packageDirectory,
 				: adaptedFiles.get(sourcePath);
 		if (!target) throw new Error(`Type inventory has no adapted mapping: ${entry.path}`);
 		const absolute = path.resolve(packageDirectory, target);
-		if (!selected.has(absolute)) throw new Error(`Type project omits pinned type file: ${target}`);
+		const entryDeclared =
+			!declared ||
+			(Boolean(entry.registrations?.length) &&
+				entry.registrations.every(({ id }) => declared.has(id)));
+		if (entryDeclared !== selected.has(absolute)) {
+			throw new Error(
+				declared
+					? `Type program must compile exactly the inventory files it declares: ${target}`
+					: `Type project omits pinned type file: ${target}`,
+			);
+		}
+		if (!entryDeclared) continue;
 		if (realpathSync(absolute) !== absolute)
 			throw new Error(`Type project redirects a pinned type file: ${target}`);
 		const original = readFileSync(path.join(packageDirectory, 'upstream', sourcePath), 'utf8');

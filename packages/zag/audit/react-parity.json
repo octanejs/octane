@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "f065303a885cd301a07db342a56aaf236d38a29b655711fb7fa03a4a171c9554"
+      "lockfileSha256": "58c3fe12ba7287d269ae84f83f2c94b1c3936787f409ff80eb4550f45b485127"
     }
   },
   "lanes": [
@@ -90,7 +90,7 @@
         {
           "path": "scripts/react-parity/run-pristine.mjs",
           "role": "support",
-          "sha256": "6f52cac811baf4a9c67ffdcd1fe4ae9eebfd8b9cf497af40bb69ccbc7a0eca0b"
+          "sha256": "b22925d67cfa0bed1b0b7fbcdd1a4e924b588d9724dd5b33ac4072df8f317a62"
         },
         {
           "path": "packages/zag/tests/upstream-vitest.config.ts",

@@ -25,6 +25,12 @@ export { initReactI18next } from './initReactI18next.js';
 
 export type OctaneNode = unknown;
 export type OctaneElement<P = any> = ElementDescriptor<P>;
+// OCTANE DIVERGENCE[component-signature][types:i18next-adapted-misc/provider-signature]
+// Octane component bodies carry the internal (props, scope, extra) signature, so
+// the public callable surface is expressed through the first (props) parameter.
+// OCTANE DIVERGENCE[class-components][types:i18next-adapted-misc/class-rejection]
+// OctaneComponentType accepts function-component bodies only; there is no class
+// component surface to substitute for upstream's React.Component acceptance.
 export type OctaneComponentType<P = any> = ComponentBody<P>;
 type ComponentProps<C> = C extends ComponentBody<infer P> ? P : never;
 
@@ -206,7 +212,7 @@ export type FallbackNs<Ns> = Ns extends undefined
 		? Ns
 		: _DefaultNamespace;
 
-export const useTranslation: _EnableSelector extends true | 'optimize'
+export const useTranslation: _EnableSelector extends true | 'optimize' | 'strict'
 	? UseTranslationSelector
 	: UseTranslationLegacy;
 

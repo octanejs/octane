@@ -30,6 +30,51 @@ test('distinguishes custom registrars from render helpers with test-prefixed nam
 });
 
 describe('extractTestCases', () => {
+	test('counts imported Babel plugin tester cases, preserving errors and skipped cases', () => {
+		const source = `import { pluginTester as check } from 'babel-plugin-tester';
+		check({ plugin, tests: ['first', { code: 'bad', error: /bad/, snapshot: false },
+			{ title: 'skipped', code: 'last', skip: true }, 'first'] });`;
+		const cases = extractTestCases(source, { file: 'macro.spec.js' });
+		assert.equal(cases.length, 4);
+		assert.deepEqual(
+			cases.map((c) => c.estimatedRegistrations),
+			[1, 1, 1, 1],
+		);
+		assert.deepEqual(
+			cases.map((c) => c.modifiers),
+			[[], [], ['skip'], []],
+		);
+		assert.equal(cases[1].titleExpression, 'check.tests[1]');
+		assert.equal(cases[2].title, 'skipped');
+		assert.equal(new Set(cases.map((c) => c.caseId)).size, 4);
+		assert.deepEqual(
+			extractTestCases(`\n${source}`, { file: 'macro.spec.js' }).map((c) => c.caseId),
+			cases.map((c) => c.caseId),
+		);
+		assert.deepEqual(extractTestCases("pluginTester({ tests: ['unrelated'] });"), []);
+	});
+
+	test('rejects unbounded or ambiguous Babel plugin tester registration', () => {
+		for (const body of [
+			`pluginTester({ tests: cases });`,
+			`pluginTester({ tests: [...cases] });`,
+			`pluginTester({ tests: ['literal'], fixtures: './fixtures' });`,
+			`pluginTester({ tests: [{ ...options, code: 'literal' }] });`,
+			`pluginTester({ tests: [{ code: 'literal', skip: condition }] });`,
+			`pluginTester({ tests: [null] });`,
+			`pluginTester({ tests: ['first'], tests: ['second'] });`,
+			`if (condition) pluginTester({ tests: ['literal'] });`,
+			`for (const mode of modes) pluginTester({ tests: ['literal'] });`,
+			`const run = pluginTester; run({ tests: ['literal'] });`,
+			`function f(pluginTester) { pluginTester({ tests: ['literal'] }); }`,
+		])
+			assert.throws(
+				() => extractTestCases(`import { pluginTester } from 'babel-plugin-tester'; ${body}`),
+				/Cannot statically inventory babel-plugin-tester/,
+				body,
+			);
+	});
+
 	test('counts conditional direct registrar aliases and retains their gate', () => {
 		const source = "const itBrowser = isWebKit() ? it.skip : it; itBrowser('works', () => {});";
 		assert.deepEqual(findPossibleUnexpandedRegistrars(source), []);

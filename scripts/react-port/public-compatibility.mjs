@@ -180,6 +180,34 @@ export function publicCompatibilityExport(specifier, name) {
 	)
 		return { specifier: jotaiHydrationWitness, path: name };
 
+	// i18next's Trans family keeps the Octane children contract: TransChild is
+	// `unknown` because Octane renderables are not React nodes, and
+	// withTranslation keeps the plain `ref` prop Octane passes through. The
+	// complete pre-update receipt authenticates every retained declaration.
+	if (
+		specifier === '@octanejs/i18next' &&
+		[
+			'Trans',
+			'TransWithoutContext',
+			'TransProps',
+			'TransSelectorProps',
+			'withTranslation',
+		].includes(name)
+	)
+		return { specifier: specifier + '#prior-binding', path: name };
+	if (
+		specifier === '@octanejs/i18next/TransWithoutContext' &&
+		[
+			'Trans',
+			'TransChild',
+			'TransProps',
+			'TransLegacy',
+			'TransSelector',
+			'TransSelectorProps',
+		].includes(name)
+	)
+		return { specifier: specifier + '#prior-binding', path: name };
+
 	const alias = baseUIAliases.get(name);
 	if (!alias) return undefined;
 	const witnessSpecifier = `@octanejs/base-ui/${alias.entry}`;
