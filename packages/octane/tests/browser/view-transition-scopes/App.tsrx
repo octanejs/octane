@@ -10,6 +10,9 @@ export interface AppProps {
 	rootName?: string;
 	boundaryName?: string;
 	classFollowsText?: boolean;
+	scopeValue?: string;
+	elementScope?: boolean;
+	outerScope?: boolean;
 	scopeRefs: Record<string, { current: ViewTransitionInstance | null }>;
 	onLayout: (generation: number) => void;
 	onOutsideClick: () => void;
@@ -24,6 +27,8 @@ interface PanelProps {
 	rootName?: string;
 	boundaryName?: string;
 	classFollowsText?: boolean;
+	scopeValue?: string;
+	elementScope?: boolean;
 	scopeRefs: AppProps['scopeRefs'];
 	onTransition: AppProps['onTransition'];
 	onPanelControl: AppProps['onPanelControl'];
@@ -31,7 +36,7 @@ interface PanelProps {
 
 function Panel(props: PanelProps) @{
 	<ViewTransition
-		scope="element"
+		scope={props.elementScope === false ? undefined : 'element'}
 		name={props.boundaryName}
 		ref={props.scopeRefs[props.id]}
 		update="scope-update"
@@ -52,7 +57,7 @@ function PanelHost(props: PanelProps) @{
 		id={props.id}
 		class={props.classFollowsText ? text : undefined}
 		title={text}
-		style={props.rootName === undefined ? {} : { viewTransitionName: props.rootName }}
+		style={{ viewTransitionName: props.rootName, viewTransitionScope: props.scopeValue }}
 	>
 		<h2>{text as string}</h2>
 		<ViewTransition
@@ -87,17 +92,21 @@ export function App(props: AppProps) @{
 				<aside data-content="page">{props.page as string}</aside>
 			</ViewTransition>
 		}
-		<Panel
-			id="left"
-			text={props.left}
-			inner={props.mode === 'nested' || props.mode === 'mixed' ? props.inner : undefined}
-			rootName={props.rootName}
-			boundaryName={props.boundaryName}
-			classFollowsText={props.classFollowsText}
-			scopeRefs={props.scopeRefs}
-			onTransition={props.onTransition}
-			onPanelControl={props.onPanelControl}
-		/>
+		<ViewTransition scope={props.outerScope ? 'element' : undefined}>
+			<Panel
+				id="left"
+				text={props.left}
+				inner={props.mode === 'nested' || props.mode === 'mixed' ? props.inner : undefined}
+				rootName={props.rootName}
+				boundaryName={props.boundaryName}
+				classFollowsText={props.classFollowsText}
+				scopeValue={props.scopeValue}
+				elementScope={props.elementScope}
+				scopeRefs={props.scopeRefs}
+				onTransition={props.onTransition}
+				onPanelControl={props.onPanelControl}
+			/>
+		</ViewTransition>
 		@if (props.mode === 'siblings' || props.mode === 'mixed') {
 			<Panel
 				id="right"

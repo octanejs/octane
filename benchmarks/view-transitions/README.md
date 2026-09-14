@@ -101,8 +101,9 @@ backpressure or concurrent-request benchmark; see [the recorded limits](./RESULT
 
 ## Ordinary inline-style control
 
-The scope declaration ownership hook also sits on the ordinary style setter
-path. Reuse all ten cases and four operations from `style-literals-work.mjs`
+Element scopes use a shared stylesheet rule; they add no declaration-ownership
+hooks to ordinary style setters. Reuse all ten cases and four operations from
+`style-literals-work.mjs`
 with the same authored fixture and the selected revision's complete package
 and compiler:
 
@@ -146,6 +147,33 @@ runner remains the baseline positive native control.
 
 The SSR runner also retains its four ordinary/document controls and adds ready
 and streamed element scopes. The candidate must emit exactly one persistent
-section with `vt-scope="element"` and `view-transition-scope:all!important`.
+section with `vt-scope="element"` and the shared stylesheet rule declaring
+`view-transition-scope:all!important`. Ready response byte counts include both
+`RenderResult.css` and `RenderResult.html`; streamed CSS is already in the response.
 The same authored input runs on the baseline, where the scope prop is ignored;
 its wire-size and timing differences likewise include new functionality.
+
+## DOM preparation work
+
+`dom-stage.mjs` isolates deterministic adapter costs in native Chromium. It runs
+the same append, sibling traversal, clear, radio association, and nested-template
+scenarios against selected source revisions. All counters delegate to the native
+operation; each case also verifies planned and committed DOM state and retained
+host identity. Public renderer integration remains covered by
+`view-transition-host-state.test.ts` and the staging suites.
+
+```sh
+node benchmarks/view-transitions/dom-stage.mjs --octane-revision=5c3823293 > /tmp/vt-dom-stage-baseline.json
+node benchmarks/view-transitions/dom-stage.mjs > /tmp/vt-dom-stage-candidate.json
+```
+
+The recorded feedback comparison is in `measurements/dom-stage-feedback.json`.
+For 1,024 retained hosts plus 1,024 inserts, copied array slots fall from
+3,672,576 to zero, searched array slots from 2,100,224 to zero, and clearing uses
+one parent write instead of 2,048 individual removals. The radio case performs
+48 association reads across 24 controls and 1,024 unrelated elements: imported
+projection nodes fall from 51,694 to 1,102. Discovering two nested templates
+among 2,049 ordinary elements uses zero JavaScript child collections instead of
+3,084. These are operation counts, not elapsed-time or allocation measurements.
+The candidate's adapter hash identifies the measured working tree exactly;
+`workingTree` distinguishes it from a selected commit snapshot.

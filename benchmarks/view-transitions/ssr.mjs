@@ -121,9 +121,8 @@ try {
 		};
 		for (const label of ['baseline', 'candidate']) {
 			const rt = mods[label];
-			const html = isStream
-				? await stream(rt, name)
-				: rt.renderToString(rt[name], { text: 'Content' }).html;
+			const rendered = isStream ? null : rt.renderToString(rt[name], { text: 'Content' });
+			const html = isStream ? await stream(rt, name) : rendered.css + rendered.html;
 			const scripts = [...html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g)].map((x) => x[1]);
 			if (!html.includes('Content') || (isStream && !html.includes('Loading')))
 				throw new Error('Missing authored output in ' + label + '/' + name);
@@ -135,10 +134,11 @@ try {
 					'One persistent scope host must wrap ready/streamed content',
 				);
 				assert.match(scopeRoots[0][0], /vt-scope="element"/);
-				assert.match(scopeRoots[0][0], /view-transition-scope:all!important/);
+				assert.match(html, /\[vt-scope="element"\]\{view-transition-scope:all!important\}/);
 			}
 			samples[name].wire[label] = {
 				bytes: Buffer.byteLength(html),
+				separateCssBytes: rendered === null ? 0 : Buffer.byteLength(rendered.css),
 				gzip: gzipSync(html, { level: 9 }).length,
 				hasAnimationDriver: html.includes('$OCTVT'),
 				hasElementScope: /vt-scope="element"/.test(html),
@@ -192,8 +192,17 @@ try {
 			: 'Identical compiled fixture; production minified bundles; five warmup batches per side; 11 paired alternating batches; same process/dependencies; per-operation batch times in milliseconds. Ready:50000 warmup/10000 per sample; streamed:5000 warmup/1000 per sample.',
 		limitations: [
 			'Small synthetic server-only scenarios; browser capture/animation/resource waits, backpressure, concurrency, and allocation/GC behavior are not measured.',
-			'The streamed VT candidate performs additional functionality and emits an animation driver; its wire output is intentionally larger.',
-			'The baseline ignores scope=element. Scoped cases compare the cost of new functionality using identical authored input; they do not claim behavioral equivalence.',
+			'Ready response bytes include RenderResult.css followed by RenderResult.html; timing still measures renderToString itself. Streamed CSS is already included in the response.',
+			...(samples.ViewStream.wire.baseline.hasAnimationDriver
+				? []
+				: [
+						'The baseline lacks the streamed animation driver; streamed VT cases therefore compare additional functionality.',
+					]),
+			...(samples.ScopedView.wire.baseline.hasElementScope
+				? []
+				: [
+						'The baseline ignores scope=element. Scoped cases compare the cost of new functionality using identical authored input; they do not claim behavioral equivalence.',
+					]),
 			'Batch timings and observed spread limit conclusions about individual latency; distributions are descriptive, not a performance guarantee.',
 		],
 		meta,

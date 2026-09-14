@@ -1,16 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { act } from '../_helpers';
+import { act } from './_helpers';
 import {
 	addTransitionType,
 	createRoot,
 	flushSync,
 	startTransition,
 	type Root,
-} from '../../src/index.js';
+} from '../src/index.js';
 import {
 	installViewTransitionMocks,
 	type ViewTransitionMocks,
-} from './_helpers/view-transition-mocks';
+} from './conformance/_helpers/view-transition-mocks';
 import {
 	HandlerRelayApp,
 	DeferredOwnershipApp,

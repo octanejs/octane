@@ -28,6 +28,7 @@ interface Observation {
 	hasComputedStyle: boolean;
 	handleAnimation: string | null;
 	hasAnimation: boolean;
+	animations: string[];
 	nested: {
 		animations: string[];
 		oldOpacity: string;
@@ -221,6 +222,9 @@ function record(kind: Kind, instance: ViewTransitionInstance, types: string[]) {
 		hasComputedStyle: typeof computed === 'function',
 		handleAnimation: computed?.call(handle).animationName ?? null,
 		hasAnimation: handle.getAnimations().length > 0,
+		animations: document.documentElement
+			.getAnimations({ subtree: true })
+			.map((animation) => (animation.effect as KeyframeEffect | null)?.pseudoElement ?? ''),
 		nested:
 			nestedOld && nestedGroup
 				? {

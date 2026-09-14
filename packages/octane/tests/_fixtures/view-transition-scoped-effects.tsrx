@@ -14,6 +14,7 @@ interface Props {
 	onEffect?: (id: string, value: string) => void;
 	promise?: Promise<string>;
 	scopeEvents?: string[];
+	invalidScope?: boolean;
 }
 
 function Content(props: Props & { id: string }) @{
@@ -72,6 +73,14 @@ export function ScopedEffectsApp(props: Props) @{
 			</section>
 		</ViewTransition>
 		<Content {...props} id="outside" />
+		@if (props.invalidScope) {
+			<ViewTransition scope="element">
+				<>
+					<Content {...props} id="invalid" />
+					<span>Second host</span>
+				</>
+			</ViewTransition>
+		}
 	</div>
 }
 
@@ -81,6 +90,22 @@ function AsyncContent(props: Props & { promise: Promise<string> }) @{
 		props.events.push('right:' + value);
 	}, [value]);
 	<span data-value="right">{value as string}</span>
+}
+
+export function ClippedScopeApp(props: Props) @{
+	<ViewTransition
+		scope="element"
+		name="clip"
+		onUpdate={() => {
+			props.scopeEvents?.push('clipped');
+		}}
+	>
+		<section data-scope="left" style={{ overflow: 'hidden' }}>
+			<ViewTransition name="child">
+				<Content {...props} id="child" />
+			</ViewTransition>
+		</section>
+	</ViewTransition>
 }
 
 export function ScopeShapeApp(props: {

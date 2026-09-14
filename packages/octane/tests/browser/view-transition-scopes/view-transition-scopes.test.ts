@@ -202,6 +202,67 @@ describe.sequential.each(['dev', 'prod'] as const)(
 				await fixture.close();
 			}
 		});
+		it('preserves authored inline scope declarations and lets important opt out of persistent isolation', async () => {
+			const fixture = await openPage(mode);
+			try {
+				const { page, errors } = fixture;
+				await update(page, { scopeValue: 'none!important', left: 'authored' }, [], true);
+				expect(
+					await page.locator('#left').evaluate((el) => ({
+						computed: getComputedStyle(el).getPropertyValue('view-transition-scope'),
+						inline: (el as HTMLElement).style.getPropertyValue('view-transition-scope'),
+						priority: (el as HTMLElement).style.getPropertyPriority('view-transition-scope'),
+					})),
+				).toEqual({ computed: 'none', inline: 'none', priority: 'important' });
+				await update(page, { scopeValue: 'none', left: 'isolated' }, [], true);
+				expect(
+					(await page.evaluate(() => window.__viewTransitionScopes.snapshot())).roots[0]!.scope,
+				).toBe('all');
+				expect(
+					await page
+						.locator('#left')
+						.evaluate((el) => (el as HTMLElement).style.getPropertyValue('view-transition-scope')),
+				).toBe('none');
+				const { result } = await update(page, { left: 'animated' });
+				expect(result.calls[0]!.ready).toBe('fulfilled');
+				expect(result.events.some((event) => event.id === 'left')).toBe(true);
+				expect(errors).toEqual([]);
+			} finally {
+				await fixture.close();
+			}
+		});
+		it('keeps shared-host isolation until its final scope declaration is removed', async () => {
+			const fixture = await openPage(mode);
+			try {
+				const { page, errors } = fixture;
+				const host = await page.locator('#left').elementHandle();
+				await update(page, { outerScope: true, scopeValue: 'none' }, [], true);
+				await update(page, { elementScope: false }, [], true);
+				expect(
+					(await page.evaluate(() => window.__viewTransitionScopes.snapshot())).roots[0]!.scope,
+				).toBe('all');
+				await update(page, { outerScope: false }, [], true);
+				expect(
+					(await page.evaluate(() => window.__viewTransitionScopes.snapshot())).roots[0]!.scope,
+				).toBe('none');
+				expect(await host!.evaluate((el) => el === document.querySelector('#left'))).toBe(true);
+				expect(errors).toEqual([]);
+			} finally {
+				await fixture.close();
+			}
+		});
+		it('does not activate a scope entirely outside the viewport at its bottom edge', async () => {
+			const fixture = await openPage(mode);
+			try {
+				const { page, errors } = fixture;
+				await page.addStyleTag({ content: '#left{position:fixed;left:0;top:100vh;margin:0}' });
+				const { result } = await update(page, { left: 'outside' });
+				expect(result.events).toEqual([]);
+				expect(errors).toEqual([]);
+			} finally {
+				await fixture.close();
+			}
+		});
 
 		it('commits sibling, nested and document scopes together with independent names and one layout publication', async () => {
 			const fixture = await openPage(mode, 'mixed');

@@ -6,11 +6,17 @@
  * Real capture evidence lives in browser/view-transition-streaming.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { compile } from 'octane/compiler';
-import { act, hydrateRoot, startTransition, type ViewTransitionInstance } from '../../src/index.js';
-import * as ServerRT from '../../src/server/index.js';
+import { interaction } from 'octane/hydration';
+import { loadServerFixture } from './_server-fixture.js';
+import {
+	deferred,
+	createPipeableCollector,
+	activateStreamedMarkup as activate,
+	resetStreamRuntimeGlobals,
+} from './_server-stream.js';
+import { act, hydrateRoot, startTransition, type ViewTransitionInstance } from '../src/index.js';
+import * as ServerRT from '../src/server/index.js';
 // CLIENT-compiled fixture (for hydration).
 import {
 	AnnotationsApp,
@@ -23,51 +29,15 @@ import {
 	StaticScopeStyleApp,
 	ScopedRefNameApp,
 	InvalidScopeApp,
+	QueuedHydrationApp,
 } from './_fixtures/view-transition-ssr.tsrx';
 
-const FIXTURE = join(
-	process.cwd(),
-	'packages/octane/tests/conformance/_fixtures/view-transition-ssr.tsrx',
-);
+const FIXTURE = join(process.cwd(), 'packages/octane/tests/_fixtures/view-transition-ssr.tsrx');
 
-function serverModule(): Record<string, any> {
-	let { code } = compile(readFileSync(FIXTURE, 'utf8'), FIXTURE, { mode: 'server' });
-	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/server['"];?/g,
-		(_m: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
-	);
-	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
-	code = code.replace(/export function (\w+)/g, '__exports.$1 = function $1');
-	return new Function('__rt', '__exports', code + '\nreturn __exports;')(ServerRT, {});
-}
-const server = serverModule();
-
-function deferred<T>() {
-	let resolve!: (v: T) => void;
-	const promise = new Promise<T>((res) => {
-		resolve = res;
-	});
-	return { promise, resolve };
-}
-
+const server = loadServerFixture(FIXTURE);
 function collector() {
-	const chunks: string[] = [];
-	let end!: () => void;
-	const ended = new Promise<void>((res) => (end = res));
-	return {
-		chunks,
-		ended,
-		dest: { write: (c: string) => chunks.push(c), end: () => end() },
-	};
-}
-
-/** Execute the stream's inline swap scripts the way a browser would. */
-function activate(root: HTMLElement): void {
-	for (const s of Array.from(root.querySelectorAll('script'))) {
-		if (s.getAttribute('type') === 'application/json') continue;
-		(0, eval)(s.textContent || '');
-		s.remove();
-	}
+	const collection = createPipeableCollector();
+	return { ...collection, dest: collection.destination };
 }
 
 const vt = (el: Element | null) => {
@@ -156,12 +126,7 @@ describe('ReactDOMFizzViewTransition (ported)', () => {
 		expect(errorSpy).not.toHaveBeenCalled();
 		errorSpy.mockRestore();
 		container.remove();
-		delete (window as any).$OCTS;
-		delete (window as any).$OCTRC;
-		delete (window as any).$OCTRX;
-		delete (window as any).$OCTVT;
-		delete (document as any).__octaneViewTransition;
-		delete (document as any).__octaneViewTransitionScopes;
+		resetStreamRuntimeGlobals();
 	});
 
 	// Per ReactDOMFizzViewTransition-test.js:99
@@ -477,6 +442,116 @@ describe('ReactDOMFizzViewTransition (ported)', () => {
 		}
 	});
 
+	it.each(['reject', 'abort'] as const)(
+		'recovers dormant hydration when a child %s arrives before its queued parent reveal',
+		async (failure) => {
+			const native = mockNativeTransitions();
+			let root: ReturnType<typeof hydrateRoot> | undefined;
+			try {
+				const first = deferred<string>();
+				const firstStream = collector();
+				ServerRT.renderToPipeableStream(server.StreamTextApp, {
+					promise: first.promise,
+					id: 'blocking',
+				}).pipe(firstStream.dest);
+				first.resolve('First');
+				await firstStream.ended;
+				const blocker = document.createElement('div');
+				blocker.innerHTML = firstStream.chunks.join('');
+				container.appendChild(blocker);
+
+				const parent = deferred<string>();
+				const child = deferred<string>();
+				const onHydrated = vi.fn();
+				const onClick = vi.fn();
+				const onError = vi.fn();
+				const props = {
+					parent: parent.promise,
+					child: child.promise,
+					when: interaction(),
+					onHydrated,
+					onClick,
+				};
+				const chunks = collector();
+				const controller = ServerRT.renderToPipeableStream(server.QueuedHydrationApp, props, {
+					onError,
+				});
+				controller.pipe(chunks.dest);
+				const host = document.createElement('div');
+				host.innerHTML = chunks.chunks.join('');
+				container.appendChild(host);
+				let consumed = chunks.chunks.length;
+				root = hydrateRoot(
+					host,
+					QueuedHydrationApp,
+					{ ...props, recover: true },
+					{ onRecoverableError() {} },
+				);
+				await act(() => host.querySelector<HTMLButtonElement>('#activate-hydration')!.click());
+				expect(onHydrated).not.toHaveBeenCalled();
+				activate(blocker);
+				await Promise.resolve();
+				expect(native.frames).toHaveLength(1);
+
+				parent.resolve('Live button');
+				await vi.waitFor(() => expect(chunks.chunks.length).toBeGreaterThan(consumed));
+				const transport = document.createElement('div');
+				transport.innerHTML = chunks.chunks.slice(consumed).join('');
+				container.appendChild(transport);
+				activate(transport);
+				consumed = chunks.chunks.length;
+				await Promise.resolve();
+				expect(host.querySelector('#queued-parent')).toBeNull();
+				const error = new Error('Child unavailable');
+				if (failure === 'reject') child.reject(error);
+				else controller.abort(error);
+				await chunks.ended;
+				transport.insertAdjacentHTML('beforeend', chunks.chunks.slice(consumed).join(''));
+				activate(transport);
+				await act(async () => {
+					native.frames[0].skip();
+					await Promise.resolve();
+					expect(native.frames).toHaveLength(2);
+					native.frames[1].skip();
+				});
+				await vi.waitFor(() => expect(onHydrated).toHaveBeenCalledOnce());
+				expect(host.querySelector('#recovered-child')!.textContent).toBe('Recovered child');
+				await act(() => host.querySelector<HTMLButtonElement>('#recovered-button')!.click());
+				expect(onClick).toHaveBeenCalledOnce();
+				expect(onError).toHaveBeenCalledWith(error);
+			} finally {
+				root?.unmount();
+				native.restore();
+			}
+		},
+	);
+
+	it('captures a document boundary around an invalid streamed element scope', async () => {
+		const native = mockNativeTransitions();
+		try {
+			const value = deferred<string>();
+			const chunks = collector();
+			ServerRT.renderToPipeableStream(server.InvalidScopeOuterStreamApp, {
+				promise: value.promise,
+			}).pipe(chunks.dest);
+			value.resolve('Content');
+			await chunks.ended;
+			container.innerHTML = chunks.chunks.join('');
+			activate(container);
+			await Promise.resolve();
+			expect(native.frames).toHaveLength(1);
+			expect(native.frames[0].owner).toBe(document);
+			expect(
+				container.querySelector<HTMLElement>('#invalid-stream-fallback')!.style.viewTransitionName,
+			).toBe('document-outer');
+			native.frames[0].skip();
+			await Promise.resolve();
+			expect(container.textContent).toBe('ContentSibling');
+		} finally {
+			native.restore();
+		}
+	});
+
 	it('shares one capture across sibling boundaries completed in the same stream wave', async () => {
 		const native = mockNativeTransitions();
 		try {
@@ -532,7 +607,7 @@ describe('ReactDOMFizzViewTransition (ported)', () => {
 				container.querySelectorAll<HTMLElement>('#left-scope, #right-scope'),
 			);
 			for (const scope of scopes) {
-				expect(scope.style.getPropertyValue('view-transition-scope')).toBe('all');
+				expect(getComputedStyle(scope).getPropertyValue('view-transition-scope')).toBe('all');
 				expect(scope.querySelector<HTMLElement>('#wave-old')!.style.viewTransitionName).toBe(
 					'wave-hero',
 				);
@@ -683,7 +758,57 @@ describe('ReactDOMFizzViewTransition (ported)', () => {
 		}
 	});
 
-	it('adopts SSR scope style ownership and restores the authored scope property on removal', async () => {
+	it('ignores annotation lookalikes inside trusted HTML attribute values', async () => {
+		const native = mockNativeTransitions();
+		try {
+			const value = deferred<string>();
+			const chunks = collector();
+			const title = ' vt-parent-exit-x="none"';
+			const markup = `<span id="raw-relay" title='${title}' vt-parent-exit-x="relay-exit">Leaving</span>`;
+			ServerRT.renderToPipeableStream(server.RawAttributeRelayApp, {
+				promise: value.promise,
+				markup,
+			}).pipe(chunks.dest);
+			value.resolve('Content');
+			await chunks.ended;
+			container.innerHTML = chunks.chunks.join('');
+			activate(container);
+			await Promise.resolve();
+			const relay = container.querySelector<HTMLElement>('#raw-relay')!;
+			expect(relay.title).toBe(title);
+			expect(relay.style.viewTransitionClass).toBe('relay-exit');
+			native.frames[0].skip();
+			await Promise.resolve();
+			expect(container.textContent).toBe('Content');
+		} finally {
+			native.restore();
+		}
+	});
+
+	it('preserves authored inline scope styles while emitting the shared scope rule', () => {
+		const props = {
+			scope: 'element',
+			style: 'color:red;view-transition-scope:none!important',
+			text: 'Server',
+		};
+		const rendered = ServerRT.renderToString(server.ScopedStylesApp, props);
+		container.innerHTML = rendered.css + rendered.html;
+		const host = container.querySelector<HTMLElement>('#scope-styles')!;
+		expect(host.getAttribute('style')).toBe(props.style);
+		expect(getComputedStyle(host).getPropertyValue('view-transition-scope')).toBe('none');
+		const rules = [...container.querySelectorAll('style')].flatMap((style) => [
+			...(style.sheet?.cssRules ?? []),
+		]);
+		expect(
+			rules.some(
+				(rule) =>
+					rule.cssText.includes('[vt-scope="element"]') &&
+					rule.cssText.includes('view-transition-scope: all !important'),
+			),
+		).toBe(true);
+	});
+
+	it('adopts SSR scopes without changing authored inline scope styles', async () => {
 		const props = {
 			scope: 'element' as 'element' | undefined,
 			title: 'quoted style="not a style attribute"',
@@ -696,7 +821,7 @@ describe('ReactDOMFizzViewTransition (ported)', () => {
 		const root = hydrateRoot(container, ScopedStylesApp, props);
 		try {
 			expect(container.querySelector('#scope-styles')).toBe(host);
-			expect(host.style.getPropertyValue('view-transition-scope')).toBe('all');
+			expect(host.style.getPropertyValue('view-transition-scope')).toBe('none');
 			expect(host.style.getPropertyPriority('view-transition-scope')).toBe('important');
 			host.style.color = 'blue';
 			await act(() => root.render(ScopedStylesApp, { ...props, scope: undefined, text: 'Client' }));
@@ -797,6 +922,12 @@ describe('ReactDOMFizzViewTransition (ported)', () => {
 		} finally {
 			root.unmount();
 			native.restore();
+			if (process.env.NODE_ENV !== 'production') {
+				expect(errorSpy).toHaveBeenCalledWith(
+					expect.stringContaining('requires exactly one host element'),
+				);
+				errorSpy.mockClear();
+			}
 		}
 	});
 
@@ -811,7 +942,7 @@ describe('ReactDOMFizzViewTransition (ported)', () => {
 				const hydrated = container.querySelector<HTMLElement>('#static-scope-style')!;
 				expect(hydrated === host).toBe(!mismatch);
 				expect(hydrated.style.color).toBe('red');
-				expect(hydrated.style.getPropertyValue('view-transition-scope')).toBe('all');
+				expect(hydrated.style.getPropertyValue('view-transition-scope')).toBe('none');
 				expect(hydrated.style.getPropertyPriority('view-transition-scope')).toBe('important');
 			} finally {
 				root.unmount();
@@ -917,6 +1048,73 @@ describe('ReactDOMFizzViewTransition (ported)', () => {
 		}
 	});
 
+	it('animates sequential streamed reveals on callback-only native implementations', async () => {
+		const native = mockNativeTransitions();
+		const start = document.startViewTransition;
+		(document as any).startViewTransition = function (update: unknown) {
+			if (typeof update !== 'function') throw new TypeError('Expected an update callback');
+			return start.call(this, { update: update as () => void });
+		};
+		try {
+			for (const id of ['legacy-first', 'legacy-second']) {
+				const value = deferred<string>();
+				const chunks = collector();
+				ServerRT.renderToPipeableStream(server.StreamTextApp, { promise: value.promise, id }).pipe(
+					chunks.dest,
+				);
+				value.resolve(id);
+				await chunks.ended;
+				const host = document.createElement('div');
+				host.innerHTML = chunks.chunks.join('');
+				container.appendChild(host);
+				activate(host);
+				await Promise.resolve();
+				expect(host.querySelector('p')!.style.viewTransitionName).not.toBe('');
+				expect(native.frames.length).toBeGreaterThan(0);
+				native.frames.at(-1)!.skip();
+				await Promise.resolve();
+				expect(host.querySelector('#' + id)!.textContent).toBe(id);
+			}
+		} finally {
+			native.restore();
+		}
+	});
+
+	it.each(['Error', 'TypeError', 'AbortError', 'InvalidStateError'])(
+		'commits a streamed reveal and reports only actionable native start failures (%s)',
+		async (name) => {
+			const native = mockNativeTransitions();
+			const error =
+				name === 'TypeError'
+					? new TypeError('Failed callback overload')
+					: new DOMException('Native start failed', name);
+			(document as any).startViewTransition = () => {
+				throw error;
+			};
+			try {
+				const value = deferred<string>();
+				const chunks = collector();
+				ServerRT.renderToPipeableStream(server.StreamTextApp, {
+					promise: value.promise,
+					id: 'failed-native',
+				}).pipe(chunks.dest);
+				value.resolve('Content');
+				await chunks.ended;
+				container.innerHTML = chunks.chunks.join('');
+				activate(container);
+				await Promise.resolve();
+				expect(container.querySelector('#failed-native')!.textContent).toBe('Content');
+				expect(container.querySelector('p')).toBeNull();
+				if (name === 'AbortError' || name === 'InvalidStateError')
+					expect(errorSpy).not.toHaveBeenCalled();
+				else expect(errorSpy).toHaveBeenCalledWith(error);
+			} finally {
+				errorSpy.mockClear();
+				native.restore();
+			}
+		},
+	);
+
 	it('reveals content and restores authored styles when native capture fails', async () => {
 		const native = mockNativeTransitions();
 		(document as any).startViewTransition = () => {
@@ -941,7 +1139,11 @@ describe('ReactDOMFizzViewTransition (ported)', () => {
 			expect(el.style.viewTransitionClass).toBe('authored-class');
 			expect(el.style.color).toBe('red');
 			expect(container.querySelector('p')).toBeNull();
+			expect(errorSpy).toHaveBeenCalledWith(
+				expect.objectContaining({ message: 'Capture unavailable' }),
+			);
 		} finally {
+			errorSpy.mockClear();
 			native.restore();
 		}
 	});

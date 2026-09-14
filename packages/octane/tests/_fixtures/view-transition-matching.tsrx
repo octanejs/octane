@@ -1,6 +1,7 @@
 import {
 	ViewTransition,
 	createElement,
+	createPortal,
 	useInsertionEffect,
 	useLayoutEffect,
 	useEffect,
@@ -29,7 +30,11 @@ export function MatchingApp(props: MatchingProps) @{
 	</>
 }
 
-export function NestedShareApp(props) @{
+export function NestedShareApp(props: {
+	page: boolean;
+	onShare?: ViewTransitionProps['onShare'];
+	onExit?: ViewTransitionProps['onExit'];
+}) @{
 	<>
 		@if (props.page) {
 			<ViewTransition enter="page-enter">
@@ -47,7 +52,10 @@ export function NestedShareApp(props) @{
 	</>
 }
 
-export function MultiHostLayoutApp(props) @{
+export function MultiHostLayoutApp(props: {
+	offset: string;
+	onUpdate?: ViewTransitionProps['onUpdate'];
+}) @{
 	<>
 		<aside id="layout-driver">{props.offset as string}</aside>
 		<ViewTransition onUpdate={props.onUpdate}>
@@ -59,7 +67,11 @@ export function MultiHostLayoutApp(props) @{
 	</>
 }
 
-export function HandlerRelayApp(props) @{
+export function HandlerRelayApp(props: {
+	show: boolean;
+	onEnter?: ViewTransitionProps['onParentEnter'];
+	onExit?: ViewTransitionProps['onParentExit'];
+}) @{
 	<>
 		@if (props.show) {
 			<ViewTransition enter="outer" exit="outer">
@@ -73,7 +85,12 @@ export function HandlerRelayApp(props) @{
 	</>
 }
 
-export function LayoutReadinessApp(props) @{
+export function LayoutReadinessApp(props: {
+	text: string;
+	events: string[];
+	requestFont: () => void;
+	onLayout?: (text: string) => void;
+}) @{
 	useInsertionEffect(() => {
 		props.events.push('insertion:' + props.text);
 		if (props.text === 'after') props.requestFont();
@@ -81,7 +98,9 @@ export function LayoutReadinessApp(props) @{
 	useLayoutEffect(() => {
 		props.events.push('layout:' + props.text);
 		props.onLayout?.(props.text);
-		return () => props.events.push('destroy:' + props.text);
+		return () => {
+			props.events.push('destroy:' + props.text);
+		};
 	}, [props.text]);
 	<ViewTransition>
 		<div
@@ -92,15 +111,23 @@ export function LayoutReadinessApp(props) @{
 	</ViewTransition>
 }
 
-function DeferredSubscription(props) @{
+function DeferredSubscription(props: { events: string[] }) @{
 	useEffect(() => {
 		props.events.push('subscribe');
-		return () => props.events.push('unsubscribe');
+		return () => {
+			props.events.push('unsubscribe');
+		};
 	}, []);
 	<span>{'subscribed'}</span>
 }
 
-export function DeferredOwnershipApp(props) @{
+export function DeferredOwnershipApp(props: {
+	generation: number;
+	cascade?: boolean;
+	subscription?: boolean;
+	events: string[];
+	requestFont?: () => void;
+}) @{
 	const [derived, setDerived] = useState(0);
 	useInsertionEffect(() => {
 		if (props.generation === 1) props.requestFont?.();
@@ -114,7 +141,7 @@ export function DeferredOwnershipApp(props) @{
 	}, [props.generation, derived]);
 	<ViewTransition>
 		<div>
-			{props.generation as string}
+			{String(props.generation)}
 			{String(derived)}
 			@if (props.subscription) {
 				<DeferredSubscription events={props.events} />
@@ -123,7 +150,11 @@ export function DeferredOwnershipApp(props) @{
 	</ViewTransition>
 }
 
-function StagedChild(props) @{
+function StagedChild(props: {
+	name: string;
+	events: string[];
+	onDelete?: (name: string) => void;
+}) @{
 	const node = useRef<HTMLDivElement | null>(null);
 	useInsertionEffect(() => {
 		props.events.push('insert:' + props.name);
@@ -134,29 +165,45 @@ function StagedChild(props) @{
 	}, []);
 	useLayoutEffect(() => {
 		props.events.push('layout:' + props.name);
-		return () => props.events.push('remove-layout:' + props.name + ':' + node.current?.isConnected);
+		return () => {
+			props.events.push('remove-layout:' + props.name + ':' + node.current?.isConnected);
+		};
 	}, []);
 	useEffect(() => {
 		props.events.push('subscribe:' + props.name);
-		return () => props.events.push('unsubscribe:' + props.name);
+		return () => {
+			props.events.push('unsubscribe:' + props.name);
+		};
 	}, []);
 	<div ref={node} data-child={props.name}>{props.name as string}</div>
 }
 
-export function StagingLifecycleApp(props) @{
+export function StagingLifecycleApp(props: {
+	value: string;
+	events: string[];
+	clicks: string[];
+	children: boolean;
+	onDelete?: (name: string) => void;
+}) @{
 	useInsertionEffect(() => {
 		props.events.push('insertion:' + props.value);
-		return () => props.events.push('destroy-insertion:' + props.value);
+		return () => {
+			props.events.push('destroy-insertion:' + props.value);
+		};
 	}, [props.value]);
 	useLayoutEffect(() => {
 		props.events.push('layout:' + props.value);
-		return () => props.events.push('destroy-layout:' + props.value);
+		return () => {
+			props.events.push('destroy-layout:' + props.value);
+		};
 	}, [props.value]);
 	<ViewTransition>
 		<section>
 			<button
 				onClick={() => props.clicks.push(props.value)}
-				ref={(node) => props.events.push((node === null ? 'detach:' : 'attach:') + props.value)}
+				ref={(node) => {
+					props.events.push((node === null ? 'detach:' : 'attach:') + props.value);
+				}}
 			>{props.value as string}</button>
 			@if (props.children) {
 				<>
@@ -168,12 +215,12 @@ export function StagingLifecycleApp(props) @{
 	</ViewTransition>
 }
 
-function StagedSuspender(props) @{
+function StagedSuspender(props: { pending: Promise<void> | null }) @{
 	if (props.pending !== null) throw props.pending;
 	<span>{'ready'}</span>
 }
 
-export function StagingRollbackApp(props) @{
+export function StagingRollbackApp(props: { value: string; pending: Promise<void> | null }) @{
 	<ViewTransition>
 		<section>
 			<span data-rollback="target" title={props.value}>{props.value as string}</span>
@@ -182,11 +229,17 @@ export function StagingRollbackApp(props) @{
 	</ViewTransition>
 }
 
-function StagingReentrantTail(props) @{
+function StagingReentrantTail(props: { tail: string }) @{
 	<span data-staged-tail="target">{props.tail as string}</span>
 }
 
-export function StagingReentrantApp(props) @{
+export function StagingReentrantApp(props: {
+	value: string;
+	tail: string;
+	expose?: (update: (value: string) => void) => void;
+	requestFont?: () => void;
+	events?: string[];
+}) @{
 	const [external, setExternal] = useState('');
 	props.expose?.(setExternal);
 	useInsertionEffect(() => {
@@ -199,6 +252,50 @@ export function StagingReentrantApp(props) @{
 		<section>
 			{createElement('vt-stage-hook', { 'data-value': props.value })}
 			<StagingReentrantTail tail={external || props.tail} />
+		</section>
+	</ViewTransition>
+}
+
+export function StagingDelegationApp(props: {
+	show: boolean;
+	state: { pending: Promise<void> | null };
+	inputs: string[];
+	onPrepare?: () => void;
+}) @{
+	if (props.show) props.onPrepare?.();
+	<ViewTransition>
+		<section>
+			@if (props.show) {
+				<>
+					{createElement('input', {
+						value: 'controlled',
+						onInput: (event: Event) => {
+							props.inputs.push((event.target as HTMLInputElement).value);
+						},
+					})}
+					<StagedSuspender pending={props.state.pending} />
+				</>
+			} @else {
+				<span>{'before'}</span>
+			}
+		</section>
+	</ViewTransition>
+}
+
+export function StagingPortalApp(props: { show: boolean; target: Element; clicks: string[] }) @{
+	<ViewTransition>
+		<section>
+			@if (props.show) {
+				<>
+					{createPortal(
+						<button onClick={() => props.clicks.push('portal')}>{'Portal'}</button>,
+						props.target,
+					)}
+				</>
+			}
+			<span>
+				{props.show ? 'before' : 'after'}
+			</span>
 		</section>
 	</ViewTransition>
 }

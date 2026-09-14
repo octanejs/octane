@@ -4730,6 +4730,7 @@ function vtSsrMapTags(
 	visit: (open: string, depth: number, tag: string) => string,
 	visitText?: (text: string, depth: number) => void,
 	visitAllElements = false,
+	rootOnly = false,
 ): string {
 	let depth = 0;
 	let from = 0;
@@ -4737,7 +4738,8 @@ function vtSsrMapTags(
 	let out = '';
 	while (from < html.length) {
 		const start = html.indexOf('<', from);
-		if (visitText) visitText(html.slice(from, start < 0 ? html.length : start), depth);
+		if (visitText && (!rootOnly || depth === 0))
+			visitText(html.slice(from, start < 0 ? html.length : start), depth);
 		if (start < 0) break;
 		if (html.startsWith('<!--', start)) {
 			const end = html.indexOf('-->', start + 4);
@@ -4765,8 +4767,9 @@ function vtSsrMapTags(
 		const inert = tag === 'template' || tag === 'script' || tag === 'style' || tag === 'title';
 		const isVoid = VOID_ELEMENTS.has(tag) || html[end - 1] === '/';
 		if (
-			visitAllElements ||
-			(!inert && tag !== 'link' && tag !== 'meta' && tag !== 'base' && tag !== 'option')
+			(!rootOnly || depth === 0) &&
+			(visitAllElements ||
+				(!inert && tag !== 'link' && tag !== 'meta' && tag !== 'base' && tag !== 'option'))
 		) {
 			const open = html.slice(start, end + 1);
 			const next = visit(open, depth, tag);
@@ -4790,8 +4793,7 @@ function vtSsrMapTags(
 function vtSsrInject(open: string, attrs: Array<[string, string]>): string {
 	let inject = '';
 	for (const [name, value] of attrs) {
-		if (open.indexOf(' ' + name + '="') === -1)
-			inject += ' ' + name + '="' + escapeAttr(value) + '"';
+		if (vtSsrAttribute(open, name) === null) inject += ' ' + name + '="' + escapeAttr(value) + '"';
 	}
 	if (inject === '') return open;
 	const insertion = open[open.length - 2] === '/' ? open.length - 2 : open.length - 1;
@@ -4801,23 +4803,29 @@ function vtSsrInject(open: string, attrs: Array<[string, string]>): string {
 /** Every direct host participates; inner boundaries retain their own classes. */
 function vtSsrAnnotate(html: string, attrs: Array<[string, string]>): string {
 	let index = 0;
-	return vtSsrMapTags(html, (open, depth) => {
-		if (depth !== 0) return open;
-		const suffix = index++;
-		return vtSsrInject(
-			open,
-			suffix === 0
-				? attrs
-				: attrs.map(([name, value]) => [name, name === 'vt-name' ? value + '-' + suffix : value]),
-		);
-	});
+	return vtSsrMapTags(
+		html,
+		(open, depth) => {
+			if (depth !== 0) return open;
+			const suffix = index++;
+			return vtSsrInject(
+				open,
+				suffix === 0
+					? attrs
+					: attrs.map(([name, value]) => [name, name === 'vt-name' ? value + '-' + suffix : value]),
+			);
+		},
+		undefined,
+		false,
+		true,
+	);
 }
 
 /** Read an actual attribute, skipping quoted text in other attribute values. */
 function vtSsrAttribute(
 	open: string,
 	wanted: string,
-): { start: number; end: number; quote: string } | null {
+): { start: number; end: number; quote: string; nameStart: number; nameEnd: number } | null {
 	let i = 1;
 	while (i < open.length && !/[\s/>]/.test(open[i])) i++;
 	while (i < open.length) {
@@ -4825,9 +4833,14 @@ function vtSsrAttribute(
 		if (i >= open.length || open[i] === '>' || open[i] === '/') break;
 		const start = i;
 		while (i < open.length && !/[\s=/>]/.test(open[i])) i++;
+		const nameEnd = i;
 		const name = open.slice(start, i).toLowerCase();
 		while (/\s/.test(open[i] ?? '')) i++;
-		if (open[i] !== '=') continue;
+		if (open[i] !== '=') {
+			if (name === wanted)
+				return { start: nameEnd, end: nameEnd, quote: '', nameStart: start, nameEnd };
+			continue;
+		}
 		i++;
 		while (/\s/.test(open[i] ?? '')) i++;
 		const quote = open[i] === '"' || open[i] === "'" ? open[i++] : '';
@@ -4835,7 +4848,8 @@ function vtSsrAttribute(
 		while (i < open.length && (quote ? open[i] !== quote : !/[\s>]/.test(open[i]))) i++;
 		const valueEnd = i;
 		if (quote) i++;
-		if (name === wanted) return { start: valueStart, end: valueEnd, quote };
+		if (name === wanted)
+			return { start: valueStart, end: valueEnd, quote, nameStart: start, nameEnd };
 	}
 	return null;
 }
@@ -4859,36 +4873,19 @@ function vtSsrAnnotateScope(html: string): string {
 			if (depth === 0 && /\S/.test(value)) text = true;
 		},
 		true,
+		true,
 	);
 	const valid = roots === 1 && !sentinel && !text;
+	if (valid)
+		injectStyle(
+			'octane-view-transition-scope',
+			'[vt-scope="element"]{view-transition-scope:all!important}',
+		);
 	return vtSsrMapTags(
 		html,
-		(open, depth, tag) => {
-			if (depth !== 0 || vtSsrAttribute(open, 'vt-scope') !== null) return open;
-			open = vtSsrInject(open, [['vt-scope', valid ? 'element' : 'none']]);
-			if (!valid) return open;
-			const style = vtSsrAttribute(open, 'style');
-			if (style === null)
-				return vtSsrInject(open, [
-					['vt-scope-style', ''],
-					['style', 'view-transition-scope:all!important'],
-				]);
-			// Reuse the attribute's original quoting/escaping, preserving the author's
-			// CSS exactly for hydration to recover only the owned scope property.
-			const authored = open.slice(style.start, style.end);
-			const quote = style.quote || '"';
-			const saved = ' vt-scope-style=' + quote + authored + quote + ' vt-scope-had-style=""';
-			const next =
-				open.slice(0, style.start) +
-				(style.quote ? '' : '"') +
-				authored +
-				';view-transition-scope:all!important' +
-				(style.quote ? '' : '"') +
-				open.slice(style.end);
-			const insertion = next[next.length - 2] === '/' ? next.length - 2 : next.length - 1;
-			return next.slice(0, insertion) + saved + next.slice(insertion);
-		},
+		(open) => vtSsrInject(open, [['vt-scope', valid ? 'element' : 'none']]),
 		undefined,
+		true,
 		true,
 	);
 }
@@ -4901,21 +4898,22 @@ function vtSsrClaimArm(html: string, kind: 'enter' | 'exit'): string {
 	const parentName = 'vt-parent-' + kind;
 	return vtSsrMapTags(html, (open, depth) => {
 		const read = (name: string): string | undefined => {
-			const marker = ' ' + name + '="';
-			const start = open.indexOf(marker);
-			if (start < 0) return undefined;
-			const valueStart = start + marker.length;
-			return open.slice(valueStart, open.indexOf('"', valueStart));
+			const attribute = vtSsrAttribute(open, name);
+			return attribute === null ? undefined : open.slice(attribute.start, attribute.end);
+		};
+		const claim = (name: string) => {
+			const attribute = vtSsrAttribute(open, name + '-x');
+			if (attribute !== null)
+				open = open.slice(0, attribute.nameEnd - 2) + open.slice(attribute.nameEnd);
 		};
 		const candidate = read(eventName + '-x');
-		if (depth === 0 && candidate !== undefined && candidate !== 'none')
-			open = open.replace(' ' + eventName + '-x="', ' ' + eventName + '="');
+		if (depth === 0 && candidate !== undefined && candidate !== 'none') claim(eventName);
 		const event = read(eventName);
 		const relay = read(parentName + '-x');
 		const parentActive = depth > 0 && active[depth - 1];
 		if (parentActive && relay !== undefined && relay !== 'none' && relay !== 'auto') {
 			// The candidate is already escaped HTML; rename it without double escaping.
-			open = open.replace(' ' + parentName + '-x="', ' ' + parentName + '="');
+			claim(parentName);
 		}
 		active[depth] =
 			(event !== undefined && event !== 'none') ||
@@ -4926,8 +4924,18 @@ function vtSsrClaimArm(html: string, kind: 'enter' | 'exit'): string {
 
 /** Strip staging attributes, including blocked and unclaimed relay candidates. */
 function vtSsrStrip(html: string): string {
-	if (html.indexOf(' vt-') === -1) return html;
-	return html.replace(/ vt-(?:(?:enter|exit)|parent-(?:enter|exit))-x="[^"]*"/g, '');
+	if (html.indexOf('-x=') === -1) return html;
+	return vtSsrMapTags(html, (open) => {
+		if (open.indexOf('-x=') === -1) return open;
+		for (const name of ['vt-enter-x', 'vt-exit-x', 'vt-parent-enter-x', 'vt-parent-exit-x']) {
+			const attribute = vtSsrAttribute(open, name);
+			if (attribute !== null)
+				open =
+					open.slice(0, attribute.nameStart - 1) +
+					open.slice(attribute.end + (attribute.quote ? 1 : 0));
+		}
+		return open;
+	});
 }
 
 /**
@@ -9010,17 +9018,26 @@ export function ssrTry(
 // `<!--oct-seed:id-->` scoping comment. `id` is the full render-scoped opaque
 // key, so both document queries and the seed stash remain disjoint when output
 // from multiple streams is composed into one page. $OCTRX(id) marks the
-// boundary errored (hydration client-renders it via mismatch recovery). A
+// boundary errored (hydration client-renders it via mismatch recovery). Error
+// instructions that arrive before a queued parent reveal are retained until
+// insertion exposes their sentinel; transport order alone does not imply DOM
+// availability when an optional animation driver delays the parent swap. A
 // truthy second argument removes only a server-owned permanent-static sentinel,
 // retaining its already-flushed fallback because no client graph can recover it.
 let STREAM_RUNTIME_JS: string | undefined;
 function streamRuntimeJs(): string {
 	return (STREAM_RUNTIME_JS ??=
-		'(function(){if(window.$OCTRC)return;var d=document;var S=window.$OCTS=window.$OCTS||{};' +
+		'(function(){if(window.$OCTRC)return;var d=document;var S=window.$OCTS=window.$OCTS||{},E;' +
 		// Legacy `[` / `]` means one physical range; `[N` / `]N` is canonical only
 		// for safe integer N >= 2. Keep this in sync with hydrationMarkerMultiplicity.
 		'var M=function(v,c){if(v===c)return 1;if(!v||v.charAt(0)!==c)return 0;' +
 		'var s=v.slice(1),n=+s;return n>=2&&Number.isSafeInteger(n)&&String(n)===s;};' +
+		// Share parser/range rules with the optional driver; the base swap owns
+		// transport even when animation prepares its carrier before insertion.
+		'var P=function(s){var q=s.firstElementChild;if(q&&q.localName==="script"&&q.hasAttribute("' +
+		STREAM_SCRIPT_ATTR +
+		'")){var z=d.createElement("template");try{z.innerHTML=JSON.parse(q.textContent);return z.content;}catch(e){return null;}}return s;};' +
+		'var C=function(c,nc){if(!nc)return c;var n=c.firstElementChild;while(n&&n.localName==="script")n=n.nextElementSibling;return n;};' +
 		'window.$OCTRC=function(id,nc){' +
 		"var t=d.querySelector('template[" +
 		STREAM_BOUNDARY_ATTR +
@@ -9029,10 +9046,7 @@ function streamRuntimeJs(): string {
 		STREAM_SEGMENT_ATTR +
 		"=\"'+id+'\"]');" +
 		'if(!s)return;if(!t){s.remove();return;}' +
-		'var q=s.firstElementChild,z=d.createElement("template"),c=s;' +
-		'if(q&&q.localName==="script"&&q.hasAttribute("' +
-		STREAM_SCRIPT_ATTR +
-		'")){try{z.innerHTML=JSON.parse(q.textContent);c=z.content;}catch(e){return;}}' +
+		'var c=P(s);if(!c)return;' +
 		'var sd=c.querySelector("script[' +
 		STREAM_SEED_ATTR +
 		']");' +
@@ -9041,7 +9055,7 @@ function streamRuntimeJs(): string {
 		NATIVE_SIGNAL_SEED_ATTR +
 		'")))ns=ns.nextElementSibling;' +
 		'if(ns){S[id+"$signals"]=ns.textContent;ns.parentNode.removeChild(ns);}' +
-		'if(nc)c=c.firstElementChild;' +
+		'c=C(c,nc);if(!c)return;' +
 		'var n=t.nextSibling,depth=1;' +
 		'while(n){var x=n.nextSibling,v=n.nodeType===8?n.data:null;' +
 		'if(M(v,"["))depth++;else if(M(v,"]")){depth--;if(depth===0)break;}' +
@@ -9051,12 +9065,13 @@ function streamRuntimeJs(): string {
 		'p.replaceChild(d.createComment("' +
 		STREAM_SEED_COMMENT +
 		'"+id),t);' +
-		's.parentNode.removeChild(s);};' +
-		'window.$OCTRX=function(id,so){' +
+		's.parentNode.removeChild(s);if(E){var errors=E;E=undefined;for(var i=0;i<errors.length;i++)X(errors[i][0],errors[i][1]);}};' +
+		'window.$OCTRC.marker=M;window.$OCTRC.parse=P;window.$OCTRC.content=C;' +
+		'var X=window.$OCTRX=function(id,so){' +
 		"var t=d.querySelector('template[" +
 		STREAM_BOUNDARY_ATTR +
 		"=\"'+id+'\"]');" +
-		'if(t){if(so)t.remove();else t.setAttribute("data-oct-err","");}};' +
+		'if(t){if(so)t.remove();else t.setAttribute("data-oct-err","");}else(E||(E=[])).push([id,so]);};' +
 		// $OCTRH(id): hoist a wave carrier's Float sheet tags into document.head.
 		// With a live client runtime (window.$OCTFR, installed once client Float
 		// resource state exists) each tag is handed over so ONE authority keeps
@@ -9095,7 +9110,7 @@ function streamViewTransitionRuntimeJs(): string {
 var w=window,d=document;
 if(w.$OCTVT)return;
 w.$OCTVT=true;
-var reveal=w.$OCTRC,queue=[],scheduled=false,ready=new WeakSet(),waitReady=new WeakSet(),waitFinish=new WeakSet();
+var reveal=w.$OCTRC,queue=[],scheduled=false,callbackOnly=new WeakSet(),ready=new WeakSet(),waitReady=new WeakSet(),waitFinish=new WeakSet();
 w.$OCTRC=function(id,nc){
  if(typeof d.startViewTransition!=="function"&&typeof Element.prototype.startViewTransition!=="function"){reveal(id,nc);return;}
  queue.push([id,nc]);later();
@@ -9182,7 +9197,7 @@ function drain(){
   function owns(el,content){
    for(var node=el;node&&node.nodeType===1;node=node.parentElement){
     if(node===owner)return true;
-    if(node.hasAttribute("vt-scope"))return false;
+    if(node.getAttribute("vt-scope")==="element")return false;
     if(node===content)return true;
    }
    return owner===d;
@@ -9211,12 +9226,10 @@ function drain(){
    if(!t||!s)continue;
    var parent=t.parentNode,rect=parent.getBoundingClientRect();
    if(!rect.width&&!rect.height&&!rect.left&&!rect.top)continue;
-   var q=s.firstElementChild;
-   if(q&&q.localName==="script"&&q.hasAttribute("${STREAM_SCRIPT_ATTR}")){
-    var parsed=d.createElement("template");parsed.innerHTML=JSON.parse(q.textContent);s.replaceChildren(parsed.content);
-   }
-   var content=s;
-   if(nc){content=s.firstElementChild;while(content&&content.localName==="script")content=content.nextElementSibling;}
+   var parsed=reveal.parse(s);
+   if(!parsed)continue;
+   if(parsed!==s)s.replaceChildren(parsed);
+   var content=reveal.content(s,nc);
    if(!content)continue;
    group.prepared.push([t,content,parent]);
    var matches=content.querySelectorAll("[vt-share]");
@@ -9237,8 +9250,8 @@ function drain(){
    var node=t.nextSibling,depth=1;
    while(node){
     if(node.nodeType===8){
-     var v=node.data,c=v.charAt(0),n=+v.slice(1),marker=v.length===1||(n>=2&&Number.isSafeInteger(n)&&String(n)===v.slice(1));
-     if(marker&&c==="[")depth++;else if(marker&&c==="]"&&!--depth)break;
+     var v=node.data;
+     if(reveal.marker(v,"["))depth++;else if(reveal.marker(v,"]")&&!--depth)break;
     }else if(node.nodeType===1){
      if(!pair(node))apply(node,"vt-exit");
      matches=node.querySelectorAll("[vt-share]");for(var j=0;j<matches.length;j++)pair(matches[j]);
@@ -9273,9 +9286,16 @@ function drain(){
  }
  function start(group){
   if(group.started)return;group.started=true;
-  var owner=group.owner,transition;
+  var owner=group.owner,transition,startNative=owner.startViewTransition,update=function(){return arrive(group);};
   try{
-   transition=owner.startViewTransition({update:function(){return arrive(group);},types:[]});
+   if(callbackOnly.has(startNative))transition=startNative.call(owner,update);
+   else{
+    try{transition=startNative.call(owner,{update:update,types:[]});}
+    catch(error){
+     if(!(error instanceof TypeError))throw error;
+     transition=startNative.call(owner,update);callbackOnly.add(startNative);
+    }
+   }
    if(owner===d)d.__octaneViewTransition=transition;
    else (d.__octaneViewTransitionScopes||(d.__octaneViewTransitionScopes=new Map())).set(owner,transition);
    transition.ready.then(function(){ready.add(transition);reset(group);later();},function(){reset(group);});
@@ -9286,7 +9306,7 @@ function drain(){
     drain();
    }
    transition.finished.then(complete,complete);
-  }catch(error){reset(group);arrive(group);}
+  }catch(error){reset(group);arrive(group);if(!error||(error.name!=="AbortError"&&error.name!=="InvalidStateError"))console.error(error);}
  }
  for(var i=0;i<captures.length;i++)if(captures[i].owner!==d)start(captures[i]);
  if(!elementsToEnter&&documentGroup&&!documentGroup.arrived)start(documentGroup);

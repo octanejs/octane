@@ -1,4 +1,5 @@
-import { ViewTransition, use, type ViewTransitionProps } from 'octane';
+import type { HydrationStrategy } from 'octane/hydration';
+import { Hydrate, ViewTransition, use, type ViewTransitionProps } from 'octane';
 
 interface StreamProps {
 	promise: Promise<string>;
@@ -14,7 +15,7 @@ interface StreamTextProps extends StreamProps {
 	name?: string;
 }
 
-// Fixtures for conformance/view-transition-ssr.test.ts — ports of
+// Fixtures for view-transition-ssr.test.ts — ports of
 // facebook/react ReactDOMFizzViewTransition-test.js (the test file carries
 // the per-`it` citations). Octane's @try/@pending is the directive form of
 // the same Suspense tryBlock React drives with <Suspense>.
@@ -405,4 +406,84 @@ export function InvalidScopeApp(props: { text: string; onUpdate: () => void }) @
 			</>
 		</ViewTransition>
 	</ViewTransition>
+}
+
+interface QueuedHydrationProps {
+	parent: Promise<string>;
+	child: Promise<string>;
+	when: HydrationStrategy;
+	recover?: boolean;
+	onHydrated?: () => void;
+	onClick?: () => void;
+}
+function QueuedHydrationChild(props: QueuedHydrationProps) @{
+	const text =
+		props.recover ? 'Recovered child' : use(props.child);
+	<span id="recovered-child">{text as string}</span>
+}
+function QueuedHydrationParent(props: QueuedHydrationProps) @{
+	const text = use(props.parent);
+	<div id="queued-parent">
+		<button id="recovered-button" onClick={props.onClick}>{text as string}</button>
+		@try {
+			<QueuedHydrationChild {...props} />
+		} @pending {
+			<span id="pending-child">{'Waiting for child'}</span>
+		}
+	</div>
+}
+export function QueuedHydrationApp(props: QueuedHydrationProps) @{
+	<Hydrate when={props.when} split={false} onHydrated={props.onHydrated}>
+		<section>
+			<button id="activate-hydration">{'Activate'}</button>
+			@try {
+				<ViewTransition enter="parent-enter">
+					<QueuedHydrationParent {...props} />
+				</ViewTransition>
+			} @pending {
+				<ViewTransition exit="parent-exit">
+					<p id="pending-parent">{'Waiting for parent'}</p>
+				</ViewTransition>
+			}
+		</section>
+	</Hydrate>
+}
+function InvalidScopeStreamContent(props: StreamProps) @{
+	const text = use(props.promise);
+	<ViewTransition scope="element">
+		<>
+			<section id="invalid-stream-owner">{text as string}</section>
+			<aside>{'Sibling'}</aside>
+		</>
+	</ViewTransition>
+}
+export function InvalidScopeOuterStreamApp(props: StreamProps) @{
+	<div>
+		<ViewTransition name="document-outer" update="outer-update">
+			@try {
+				<InvalidScopeStreamContent {...props} />
+			} @pending {
+				<ViewTransition scope="element">
+					<>
+						<p id="invalid-stream-fallback">{'Loading'}</p>
+						<aside>{'Sibling'}</aside>
+					</>
+				</ViewTransition>
+			}
+		</ViewTransition>
+	</div>
+}
+
+export function RawAttributeRelayApp(props: StreamProps & { markup: string }) @{
+	<section>
+		@try {
+			<ViewTransition enter="content-enter">
+				<ArmsContent promise={props.promise} />
+			</ViewTransition>
+		} @pending {
+			<ViewTransition exit="content-exit">
+				<div dangerouslySetInnerHTML={{ __html: props.markup }} />
+			</ViewTransition>
+		}
+	</section>
 }

@@ -11,7 +11,16 @@ type Status = 'pending' | 'fulfilled' | 'rejected';
 type Update = Partial<
 	Pick<
 		AppProps,
-		'left' | 'right' | 'inner' | 'page' | 'rootName' | 'boundaryName' | 'classFollowsText'
+		| 'left'
+		| 'right'
+		| 'inner'
+		| 'page'
+		| 'rootName'
+		| 'boundaryName'
+		| 'classFollowsText'
+		| 'scopeValue'
+		| 'elementScope'
+		| 'outerScope'
 	>
 >;
 type NativeUpdate = () => void | Promise<void>;

@@ -37,6 +37,7 @@ export interface AppProps {
 	rows: readonly { id: string; label: string; editable?: boolean }[];
 	measure: boolean;
 	nested: boolean;
+	nestedTransition?: ViewTransitionProps;
 	onInsertion: (generation: number) => void;
 	onPassive: (generation: number, kind: 'mount' | 'cleanup') => void;
 	onLayout: (generation: number) => void;
@@ -96,7 +97,7 @@ export function App(props: AppProps) @{
 						<strong id="measured" ref={props.onMeasuredRef}>Font sample</strong>
 					}
 					@if (props.nested) {
-						<ViewTransition name="inner" update="none">
+						<ViewTransition name="inner" update="none" {...props.nestedTransition}>
 							<div id="nested-panel">{props.text as string}</div>
 						</ViewTransition>
 					}

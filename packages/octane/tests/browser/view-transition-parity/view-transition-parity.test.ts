@@ -474,6 +474,69 @@ describe.sequential.each(['dev', 'prod'] as const)('native View Transition parit
 		}
 	});
 
+	it('uses a nested boundary’s own next update prop when selecting the old capture', async () => {
+		const fixture = await openPage(mode);
+		try {
+			const { page, errors } = fixture;
+			await start(
+				page,
+				{
+					nested: true,
+					nestedTransition: { update: 'update-class' },
+					transition: { name: 'panel', update: 'update-class' },
+				},
+				[],
+				true,
+			);
+			const result = await transition(page, {
+				text: 'nested disabled now',
+				nestedTransition: { update: 'none' },
+			});
+			expect(result.events).toMatchObject([{ kind: 'update', name: 'panel', hasAnimation: true }]);
+			const nested = result.events[0].nested;
+			if (!nested) throw new Error('The nested snapshot observation is missing');
+			const visible =
+				nested.oldDisplay !== 'none' &&
+				nested.groupDisplay !== 'none' &&
+				Number(nested.oldOpacity) > 0 &&
+				Number(nested.groupOpacity) > 0;
+			expect(visible ? nested.animations : []).toEqual([]);
+			expect(await page.locator('#nested-panel').textContent()).toBe('nested disabled now');
+			expect(errors).toEqual([]);
+		} finally {
+			await fixture.close();
+		}
+	});
+
+	it('preserves each snapshot’s name when a boundary changes its own name', async () => {
+		const fixture = await openPage(mode);
+		try {
+			const { page, errors } = fixture;
+			await start(page, { transition: { name: 'before-name', update: 'update-class' } }, [], true);
+			const result = await transition(page, {
+				text: 'renamed',
+				transition: { name: 'after-name', update: 'update-class' },
+			});
+			expect(result.events).toMatchObject([
+				{
+					kind: 'update',
+					name: 'after-name',
+					oldAnimation: 'none',
+					newAnimation: 'update-new',
+					hasAnimation: true,
+				},
+			]);
+			expect(result.events[0].animations).toContain('::view-transition-old(before-name)');
+			expect(result.events[0].animations).toContain('::view-transition-new(after-name)');
+			expect(result.calls).toMatchObject([
+				{ ready: 'fulfilled', update: 'fulfilled', finished: 'fulfilled' },
+			]);
+			expect(errors).toEqual([]);
+		} finally {
+			await fixture.close();
+		}
+	});
+
 	it('waits for an already pending native navigation before exposing animation snapshots', async () => {
 		const fixture = await openPage(mode);
 		try {

@@ -1,15 +1,23 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act } from '../_helpers';
-import { createRoot, flushSync, startTransition, type Root } from '../../src/index.js';
+import {
+	act,
+	createElement,
+	createRoot,
+	flushSync,
+	startTransition,
+	type Root,
+} from '../src/index.js';
 import {
 	installViewTransitionMocks,
 	type ViewTransitionMocks,
-} from './_helpers/view-transition-mocks';
+} from './conformance/_helpers/view-transition-mocks';
 import {
 	StagingLifecycleApp,
 	StagingRollbackApp,
 	StagingReentrantApp,
 	LayoutReadinessApp,
+	StagingDelegationApp,
+	StagingPortalApp,
 } from './_fixtures/view-transition-matching.tsrx';
 
 function deferred() {
@@ -70,6 +78,61 @@ describe('ViewTransition staged commits', () => {
 		mocks.restore();
 	});
 
+	it('animates repeated updates with callback-only native implementations', async () => {
+		let optionsAttempts = 0;
+		let captures = 0;
+		(document as any).startViewTransition = (
+			input: (() => void | Promise<void>) | { update: () => void | Promise<void> },
+		) => {
+			if (typeof input !== 'function') {
+				optionsAttempts++;
+				throw new TypeError('Expected an update callback');
+			}
+			captures++;
+			const ready = Promise.resolve().then(input);
+			return { ready, finished: ready, skipTransition() {} };
+		};
+		const events: string[] = [];
+		const clicks: string[] = [];
+		await act(() =>
+			root.render(StagingLifecycleApp, { value: 'before', children: false, events, clicks }),
+		);
+		for (const value of ['first', 'second']) {
+			await act(() =>
+				startTransition(() =>
+					root.render(StagingLifecycleApp, { value, children: false, events, clicks }),
+				),
+			);
+			expect(container.textContent).toBe(value);
+			expect(events).toContain('layout:' + value);
+		}
+		expect(captures).toBe(2);
+		// The native overload probe is work, not a failed capture on each update.
+		expect(optionsAttempts).toBe(1);
+		expect(recoverable).toEqual([]);
+	});
+
+	it('reports unexpected synchronous native failures and publishes the commit once', async () => {
+		const error = new Error('Native capture failed');
+		(document as any).startViewTransition = () => {
+			throw error;
+		};
+		const events: string[] = [];
+		const clicks: string[] = [];
+		await act(() =>
+			root.render(StagingLifecycleApp, { value: 'before', children: false, events, clicks }),
+		);
+		events.length = 0;
+		await act(() =>
+			startTransition(() =>
+				root.render(StagingLifecycleApp, { value: 'after', children: false, events, clicks }),
+			),
+		);
+		expect(container.textContent).toBe('after');
+		expect(events.filter((event) => event === 'layout:after')).toEqual(['layout:after']);
+		expect(recoverable).toEqual([error]);
+	});
+
 	it('keeps DOM, event handlers and commit callbacks unchanged until the native update', async () => {
 		const events: string[] = [];
 		const clicks: string[] = [];
@@ -104,6 +167,155 @@ describe('ViewTransition staged commits', () => {
 		expect(events.filter((event) => event === 'unsubscribe:first')).toHaveLength(1);
 		expect(events.filter((event) => event === 'unsubscribe:second')).toHaveLength(1);
 	});
+
+	it('keeps newly registered input events working after a suspended attempt is retried', async () => {
+		const inputs: string[] = [];
+		let resume!: () => void;
+		const pending = new Promise<void>((resolve) => {
+			resume = resolve;
+		});
+		const state = { pending: pending as Promise<void> | null };
+		await act(() => root.render(StagingDelegationApp, { show: false, state, inputs }));
+		startTransition(() => root.render(StagingDelegationApp, { show: true, state, inputs }));
+		await vi.waitFor(() => expect(handles).toHaveLength(1));
+		await handles[0].update();
+		handles[0].ready.resolve();
+		handles[0].finished.resolve();
+		expect(container.querySelector('input')).toBeNull();
+		state.pending = null;
+		resume();
+		await vi.waitFor(() =>
+			expect(container.querySelector('input') !== null || handles.length === 2).toBe(true),
+		);
+		if (handles[1] !== undefined) {
+			await handles[1].update();
+			handles[1].ready.resolve();
+			handles[1].finished.resolve();
+		}
+		const input = container.querySelector('input')!;
+		expect(input.value).toBe('controlled');
+		input.value = 'draft';
+		await act(() => input.dispatchEvent(new Event('input', { bubbles: true })));
+		expect(inputs).toEqual(['draft']);
+		expect(input.value).toBe('controlled');
+	});
+
+	it('keeps a root created during a suspended preparation registered for events', async () => {
+		const target = document.createElement('div');
+		document.body.append(target);
+		let externalRoot: Root | undefined;
+		const onPrepare = () => {
+			externalRoot ??= createRoot(target);
+		};
+		const pending = deferred();
+		const state = { pending: pending.promise as Promise<void> | null };
+		const inputs: string[] = [];
+		try {
+			await act(() => root.render(StagingDelegationApp, { show: false, state, inputs, onPrepare }));
+			startTransition(() =>
+				root.render(StagingDelegationApp, { show: true, state, inputs, onPrepare }),
+			);
+			await vi.waitFor(() => expect(handles).toHaveLength(1));
+			expect(externalRoot).toBeDefined();
+			await handles[0].update();
+			handles[0].ready.resolve();
+			handles[0].finished.resolve();
+			state.pending = null;
+			pending.resolve();
+			await vi.waitFor(() =>
+				expect(container.querySelector('input') !== null || handles.length === 2).toBe(true),
+			);
+			if (handles[1] !== undefined) {
+				await handles[1].update();
+				handles[1].ready.resolve();
+				handles[1].finished.resolve();
+			}
+			const clicks: string[] = [];
+			await act(() =>
+				externalRoot!.render(
+					createElement('button', { children: 'External', onClick: () => clicks.push('external') }),
+				),
+			);
+			await act(() => target.querySelector('button')!.click());
+			expect(clicks).toEqual(['external']);
+		} finally {
+			flushSync(() => externalRoot?.unmount());
+			target.remove();
+		}
+	});
+
+	it('retains a portal target’s committed event handlers until staged deletion publishes', async () => {
+		const target = document.createElement('div');
+		document.body.append(target);
+		const clicks: string[] = [];
+		try {
+			await act(() => root.render(StagingPortalApp, { show: true, target, clicks }));
+			const button = target.querySelector('button')!;
+			expect(target.innerHTML, container.innerHTML).toContain('Portal');
+			startTransition(() => root.render(StagingPortalApp, { show: false, target, clicks }));
+			await vi.waitFor(() => expect(handles).toHaveLength(1));
+			expect(button.isConnected).toBe(true);
+			button.click();
+			expect(clicks).toEqual(['portal']);
+			await handles[0].update();
+			expect(button.isConnected).toBe(false);
+			expect(target.textContent).toBe('');
+			handles[0].ready.resolve();
+			handles[0].finished.resolve();
+		} finally {
+			target.remove();
+		}
+	});
+
+	it('publishes a prepared branch switch despite another same-component root render', async () => {
+		const events: string[] = [];
+		const clicks: string[] = [];
+		await act(() =>
+			root.render(StagingLifecycleApp, { value: 'before', children: true, events, clicks }),
+		);
+		const button = container.querySelector('button');
+		const next = { value: 'after', children: false, events, clicks };
+		startTransition(() => root.render(StagingLifecycleApp, next));
+		await vi.waitFor(() => expect(handles).toHaveLength(1));
+		startTransition(() => root.render(StagingLifecycleApp, next));
+		expect(container.textContent).toBe('beforefirstsecond');
+		await handles[0].update();
+		expect(container.textContent).toBe('after');
+		handles[0].ready.resolve();
+		handles[0].finished.resolve();
+		await vi.waitFor(() => expect(handles).toHaveLength(2));
+		await handles[1].update();
+		handles[1].ready.resolve();
+		handles[1].finished.resolve();
+		expect(container.textContent).toBe('after');
+		expect(container.querySelector('button')).toBe(button);
+	});
+
+	it.each(['candidate', 'newest'])(
+		'preserves a prepared root commit when another same-component render arrives (%s)',
+		async (next) => {
+			await act(() => root.render(StagingReentrantApp, { value: 'before', tail: 'old-tail' }));
+			const tail = container.querySelector('[data-staged-tail]')!;
+			startTransition(() =>
+				root.render(StagingReentrantApp, { value: 'candidate', tail: 'candidate-tail' }),
+			);
+			await vi.waitFor(() => expect(handles).toHaveLength(1));
+			startTransition(() =>
+				root.render(StagingReentrantApp, { value: next, tail: next + '-tail' }),
+			);
+			expect(tail.textContent).toBe('old-tail');
+			await handles[0].update();
+			expect(tail.textContent).toBe('candidate-tail');
+			handles[0].ready.resolve();
+			handles[0].finished.resolve();
+			await vi.waitFor(() => expect(handles).toHaveLength(2));
+			await handles[1].update();
+			handles[1].ready.resolve();
+			handles[1].finished.resolve();
+			expect(container.querySelector('[data-staged-tail]')).toBe(tail);
+			expect(tail.textContent).toBe(next + '-tail');
+		},
+	);
 
 	it('fulfils every retired cleanup once if the first deletion unmounts the root', async () => {
 		const events: string[] = [];

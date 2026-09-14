@@ -81,18 +81,12 @@ async function countStyleScans(cdp, coverage) {
 			if (!node || typeof node !== 'object') return;
 			if (
 				node.type === 'ForInStatement' &&
-				(node.body.type === 'BlockStatement' ||
-					node.body.type === 'IfStatement' ||
-					node.body.type === 'ExpressionStatement')
+				(node.body.type === 'BlockStatement' || node.body.type === 'IfStatement')
 			) {
 				const name = node.right.name;
 				if (name === 'prev' || name === 'value') {
 					const statement =
-						node.body.type === 'BlockStatement'
-							? node.body.body[0]
-							: node.body.type === 'IfStatement'
-								? node.body.test
-								: node.body;
+						node.body.type === 'BlockStatement' ? node.body.body[0] : node.body.test;
 					const range = fn.ranges
 						.filter(
 							(entry) => entry.startOffset <= statement.start && entry.endOffset >= statement.end,
@@ -110,9 +104,7 @@ async function countStyleScans(cdp, coverage) {
 			}
 		}
 		visit(declaration.body);
-		// Include object clearing even when an older revision emits a single
-		// expression instead of a block. All four property loops contribute work.
-		if (found !== 4) throw new Error(`Expected four object-property loops; saw ${found}`);
+		if (found !== 3) throw new Error(`Expected three object-diff loops; saw ${found}`);
 	}
 	return scans;
 }

@@ -9,7 +9,7 @@ and callback cleanup at animation finish. Forward native transition types, keep
 unanimated controls interactive, and wait for relevant resources and navigation.
 Animate streamed Suspense reveals with coordinated hydration and client updates.
 
-Prepare ViewTransition renders with staged DOM commits so snapshot naming uses the finished boundary props while preserving existing node identity and committed lifecycle visibility.
+Prepare ViewTransition renders with staged DOM commits so snapshot activation uses the finished boundary props while preserving existing node identity and committed lifecycle visibility.
 
 Add opt-in `scope="element"` boundaries with local names and pseudo-element handles,
 independent sibling and nested animations, coordinated streamed reveals, and

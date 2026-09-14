@@ -5,14 +5,26 @@
  * detached trees. Explicitly created trees may be assembled while detached so
  * compiler template walks continue to use ordinary native getters.
  */
+// These expandos describe renderer ownership or already-installed event/form
+// infrastructure, not the pending visible DOM. They must stay on the original
+// node so dispatch and cleanup can find the same records before publication.
+// Their writers own rollback/lifecycle semantics; adding a key here requires
+// auditing that writer rather than opting visible state out of staging.
 const EAGER_METADATA = /* @__PURE__ */ new Set([
+	// reconcileDeoptChildren: renderer keys used while planning retained hosts.
 	'$$deoptKey',
+	// renderPortalState: fixed end marker on a newly created portal start marker.
 	'$$portalEnd',
+	// attr: listener identity ledger; actual native registrations are staged.
 	'$$ceListeners',
+	// setAutoFocus: one-time mount ownership; focusing uses the commit queue.
 	'$$afSeen',
+	// setFormAction: one-time submit driver installation, shared across renders.
 	'$$formSubmitWired',
+	// maybeEnqueueRestore: native input/change event sequence state.
 	'$$checkableActivation',
 	'$$selectPick',
+	// handleFormSubmit/publishManualFormPending: native submit lifetime counter.
 	'$$pendingSubmits',
 ]);
 
@@ -81,9 +93,27 @@ const PROJECTED_PROPERTIES = /* @__PURE__ */ new Set([
 	'loop',
 ]);
 
+interface ChildList {
+	first: Node | null;
+	last: Node | null;
+	length: number;
+	snapshot: Node[] | null;
+}
+interface ChildLink {
+	previous: Node | null;
+	next: Node | null;
+}
+interface Projection {
+	root: Node;
+	copies: Map<Node, Node>;
+	originals: Map<Node, Node>;
+}
+
 export class DOMStage {
 	private views = new Map<Node, Node>();
-	private children = new Map<Node, Node[]>();
+	private children = new Map<Node, ChildList>();
+	private links = new Map<Node, ChildLink>();
+	private projections = new Map<Node, Projection>();
 	private parents = new Map<Node, Node | null>();
 	private values = new Map<Node, Map<PropertyKey, unknown>>();
 	private states = new Map<Element, Element>();
@@ -98,15 +128,19 @@ export class DOMStage {
 	/** Mark an actual creation/clone result, never an arbitrary detached node. */
 	created<T extends Node>(node: T): T {
 		this.fresh.add(node);
-		const templates = (current: Node): void => {
-			if (current.nodeType === 1 && (current as Element).localName === 'template') {
-				const content = (current as HTMLTemplateElement).content;
-				if (content !== undefined) {
-					this.fresh.add(content);
-					templates(content);
-				}
-			}
-			for (const child of Array.from(current.childNodes)) templates(child);
+		// A template content fragment is not parented to its template. Mark just
+		// those disconnected roots; ordinary descendants inherit freshness.
+		const templates = (root: Node): void => {
+			if (root.nodeType !== 1 && root.nodeType !== 11) return;
+			const mark = (template: HTMLTemplateElement): void => {
+				if (template.content === undefined) return;
+				this.fresh.add(template.content);
+				templates(template.content);
+			};
+			if (root.nodeType === 1 && (root as Element).localName === 'template')
+				mark(root as HTMLTemplateElement);
+			for (const template of (root as Element | DocumentFragment).querySelectorAll('template'))
+				mark(template);
 		};
 		templates(node);
 		return node;
@@ -165,6 +199,8 @@ export class DOMStage {
 		this.actions = [];
 		this.views.clear();
 		this.children.clear();
+		this.links.clear();
+		this.projections.clear();
 		this.parents.clear();
 		this.values.clear();
 		this.states.clear();
@@ -180,19 +216,33 @@ export class DOMStage {
 		return false;
 	}
 
-	private childNodes(node: Node): Node[] {
-		return this.children.get(node) ?? Array.from(node.childNodes);
+	private childList(node: Node): ChildList {
+		let list = this.children.get(node);
+		if (list !== undefined) return list;
+		list = { first: node.firstChild, last: node.lastChild, length: 0, snapshot: null };
+		let previous: Node | null = null;
+		for (let child = node.firstChild; child !== null; child = child.nextSibling) {
+			this.links.set(child, { previous, next: child.nextSibling });
+			previous = child;
+			list.length++;
+		}
+		this.children.set(node, list);
+		return list;
 	}
 
-	/**
-	 * Every staged structural write records the parent's logical child list, so
-	 * a parent without an entry still has its native list and can be read
-	 * without copying it.
-	 */
+	private childNodes(node: Node): Node[] {
+		const list = this.children.get(node);
+		if (list === undefined) return Array.from(node.childNodes);
+		if (list.snapshot !== null) return list.snapshot;
+		const result: Node[] = [];
+		for (let child = list.first; child !== null; child = this.links.get(child)!.next)
+			result.push(child);
+		return (list.snapshot = result);
+	}
+
 	private child(node: Node, key: 'firstChild' | 'lastChild'): Node | null {
-		if (!this.children.has(node)) return node[key];
-		const children = this.childNodes(node);
-		return (key === 'firstChild' ? children[0] : children.at(-1)) ?? null;
+		const list = this.children.get(node);
+		return list === undefined ? node[key] : key === 'firstChild' ? list.first : list.last;
 	}
 
 	private parent(node: Node): Node | null {
@@ -203,22 +253,19 @@ export class DOMStage {
 		const parent = this.parent(node);
 		if (parent === null) return null;
 		if (!this.children.has(parent)) {
-			if (elements) {
-				const sibling = node as Element;
-				return direction > 0 ? sibling.nextElementSibling : sibling.previousElementSibling;
-			}
+			if (elements)
+				return direction > 0
+					? (node as Element).nextElementSibling
+					: (node as Element).previousElementSibling;
 			return direction > 0 ? node.nextSibling : node.previousSibling;
 		}
-		const children = this.childNodes(parent);
-		for (
-			let index = children.indexOf(node) + direction;
-			index >= 0 && index < children.length;
-			index += direction
-		) {
-			const child = children[index]!;
-			if (!elements || child.nodeType === 1) return child;
+		let current = node;
+		while (true) {
+			const link = this.links.get(current)!;
+			const next = direction > 0 ? link.next : link.previous;
+			if (next === null || !elements || next.nodeType === 1) return next;
+			current = next;
 		}
-		return null;
 	}
 
 	private root(node: Node, composed = false): Node {
@@ -297,10 +344,13 @@ export class DOMStage {
 	}
 
 	/** Cold selector/form reads use an inert projection and map results back. */
-	private projection(node: Node, ancestors = false): { node: Node; originals: Map<Node, Node> } {
+	private projection(node: Node, ancestors = false): Projection & { node: Node } {
 		const originalRoot = ancestors ? this.root(node) : node;
+		const cached = this.projections.get(originalRoot);
+		if (cached !== undefined) return { ...cached, node: cached.copies.get(node)! };
 		const doc = this.inertDocument(node);
 		const originals = new Map<Node, Node>();
+		const copies = new Map<Node, Node>();
 		let target: Node | undefined;
 		const project = (original: Node): Node => {
 			let copy: Node;
@@ -316,11 +366,20 @@ export class DOMStage {
 				case 8:
 					copy = doc.createComment(this.get(original, 'nodeValue') as string);
 					break;
+				case 9: {
+					// A fragment loses native form=id association in Chromium. Keep
+					// document-root projections connected to their own inert document.
+					const document = doc.implementation.createHTMLDocument('');
+					document.replaceChildren();
+					copy = document;
+					break;
+				}
 				default:
 					copy = doc.createDocumentFragment();
 					break;
 			}
 			originals.set(copy, original);
+			copies.set(original, copy);
 			if (original === node) target = copy;
 			const isTemplate =
 				original.nodeType === 1 &&
@@ -344,7 +403,9 @@ export class DOMStage {
 			return copy;
 		};
 		project(originalRoot);
-		return { node: target!, originals };
+		const projection = { root: originalRoot, originals, copies };
+		this.projections.set(originalRoot, projection);
+		return { ...projection, node: target! };
 	}
 
 	private textContent(node: Node): string | null {
@@ -462,6 +523,12 @@ export class DOMStage {
 			Reflect.set(node, key, value, node);
 			return;
 		}
+		const radioWrite =
+			node.nodeType === 1 &&
+			(node as Element).localName === 'input' &&
+			(key === 'checked' || key === 'defaultChecked') &&
+			(this.state(node as Element) as HTMLInputElement).type === 'radio';
+		if (!radioWrite) this.projections.clear();
 		if (
 			(node.nodeType === 3 || node.nodeType === 8) &&
 			(key === 'data' || key === 'textContent' || key === 'nodeValue')
@@ -506,6 +573,12 @@ export class DOMStage {
 		}
 		if (key === 'style') {
 			this.style(node as Element).cssText = value as string;
+			return;
+		}
+		if (key === 'scrollTop' || key === 'scrollLeft') {
+			this.write(node, () => {
+				Reflect.set(node, key, value, node);
+			});
 			return;
 		}
 		if (node.nodeType === 1 && this.setFormProperty(node as Element, key, value)) return;
@@ -555,6 +628,8 @@ export class DOMStage {
 				this.states.set(original as Element, this.inertDocument(original).importNode(input, false));
 				this.values.get(original)?.delete('checked');
 			}
+			this.projections.clear();
+			this.projections.set(projected.root, projected);
 			this.enqueue(() => {
 				Reflect.set(node, key, value, node);
 			});
@@ -630,9 +705,9 @@ export class DOMStage {
 	}
 
 	private classList(node: Element): DOMTokenList {
-		const list = this.state(node).classList;
-		return new Proxy(list, {
+		return new Proxy(node.classList, {
 			get: (_, key) => {
+				const list = this.state(node).classList;
 				const value = Reflect.get(list, key, list);
 				if (key === 'add' || key === 'remove' || key === 'toggle' || key === 'replace')
 					return (...args: unknown[]) => {
@@ -645,7 +720,7 @@ export class DOMStage {
 				return typeof value === 'function' ? value.bind(list) : value;
 			},
 			set: (_, key, value) => {
-				Reflect.set(list, key, value);
+				Reflect.set(this.state(node).classList, key, value);
 				this.write(node, () => {
 					Reflect.set(node.classList, key, value);
 				});
@@ -655,18 +730,25 @@ export class DOMStage {
 	}
 
 	private write(node: Node, action: () => void): void {
+		this.projections.clear();
 		if (this.isFresh(node)) action();
 		else this.enqueue(action);
 	}
 
 	private remove(parent: Node, child: Node): void {
-		const children = this.childNodes(parent).slice();
-		const index = children.indexOf(child);
-		if (index === -1)
+		const list = this.childList(parent);
+		if (this.parent(child) !== parent)
 			throw new DOMException('The node is not a child of this parent.', 'NotFoundError');
-		children.splice(index, 1);
-		this.children.set(parent, children);
+		const link = this.links.get(child)!;
+		if (link.previous === null) list.first = link.next;
+		else this.links.get(link.previous)!.next = link.next;
+		if (link.next === null) list.last = link.previous;
+		else this.links.get(link.next)!.previous = link.previous;
+		list.length--;
+		list.snapshot = null;
+		this.links.delete(child);
 		this.parents.set(child, null);
+		this.projections.clear();
 	}
 
 	private insert(parent: Node, child: Node, anchor: Node | null, move = false): void {
@@ -688,14 +770,21 @@ export class DOMStage {
 			(anchor === null || anchor.parentNode === parent);
 		if (eager) {
 			parent.insertBefore(child, anchor);
+			this.projections.clear();
 			return;
 		}
 		if (oldParent !== null) this.remove(oldParent, child);
-		const children = this.childNodes(parent).slice();
-		const index = anchor === null ? children.length : children.indexOf(anchor);
-		children.splice(index, 0, child);
-		this.children.set(parent, children);
+		const list = this.childList(parent);
+		const previous = anchor === null ? list.last : this.links.get(anchor)!.previous;
+		this.links.set(child, { previous, next: anchor });
+		if (previous === null) list.first = child;
+		else this.links.get(previous)!.next = child;
+		if (anchor === null) list.last = child;
+		else this.links.get(anchor)!.previous = child;
+		list.length++;
+		list.snapshot = null;
 		this.parents.set(child, parent);
+		this.projections.clear();
 		this.enqueue(() => {
 			if (move)
 				(parent as Element & { moveBefore(child: Node, anchor: Node | null): void }).moveBefore(
@@ -707,8 +796,48 @@ export class DOMStage {
 	}
 
 	private replaceChildren(node: Node, children: Node[]): void {
-		for (const child of this.childNodes(node).slice()) this.call(node, 'removeChild', [child]);
+		const list = this.childList(node);
+		for (let child = list.first; child !== null;) {
+			const next = this.links.get(child)!.next;
+			this.parents.set(child, null);
+			this.links.delete(child);
+			child = next;
+		}
+		list.first = list.last = null;
+		list.length = 0;
+		list.snapshot = null;
+		this.projections.clear();
+		// Even a fresh parent may have earlier queued insertions of retained
+		// children. Keep the clear ordered after them in the publication log.
+		this.enqueue(() => {
+			node.textContent = '';
+		});
 		for (const child of children) this.insert(node, child, null);
+	}
+
+	/** Clear a shared-parent range once while retaining both live anchors. */
+	clearBetween(start: Node, end: Node): void {
+		const parent = this.parent(start);
+		if (parent === null || this.parent(end) !== parent)
+			throw new DOMException('Range anchors have different parents.', 'NotFoundError');
+		this.childList(parent);
+		let child = this.siblings(start, 1, false);
+		while (child !== null && child !== end) child = this.siblings(child, 1, false);
+		if (child !== end)
+			throw new DOMException('The end anchor precedes the start.', 'NotFoundError');
+		child = this.siblings(start, 1, false);
+		while (child !== null && child !== end) {
+			const next = this.siblings(child, 1, false);
+			this.remove(parent, child);
+			child = next;
+		}
+		this.enqueue(() => {
+			if (start.parentNode !== parent || end.parentNode !== parent) return;
+			const range = parent.ownerDocument!.createRange();
+			range.setStartAfter(start);
+			range.setEndBefore(end);
+			range.deleteContents();
+		});
 	}
 
 	private nodes(node: Node, args: unknown[]): Node[] {
@@ -757,9 +886,10 @@ export class DOMStage {
 				return;
 			case 'removeChild': {
 				const child = args[0] as Node;
-				if (this.isFresh(node) && this.isFresh(child) && !this.children.has(node))
+				if (this.isFresh(node) && this.isFresh(child) && !this.children.has(node)) {
 					node.removeChild(child);
-				else {
+					this.projections.clear();
+				} else {
 					this.remove(node, child);
 					this.enqueue(() => {
 						// A preceding deletion cleanup can remove or relocate its host.

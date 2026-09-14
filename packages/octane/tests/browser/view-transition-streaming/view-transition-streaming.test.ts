@@ -1,16 +1,39 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Browser, Page } from 'playwright';
 import { resolve } from 'node:path';
+import { build } from 'vite';
+import { octane } from 'octane/compiler/vite';
+import { interaction } from 'octane/hydration';
 import * as ServerRuntime from 'octane/server';
 import { launchBrowser } from '../../../../../test-utils/playwright-browser.js';
 import { loadServerFixture } from '../../_server-fixture.js';
 import { createPipeableCollector, deferred } from '../../_server-stream.js';
 
 const fixture = loadServerFixture(
-	resolve('packages/octane/tests/conformance/_fixtures/view-transition-ssr.tsrx'),
+	resolve('packages/octane/tests/_fixtures/view-transition-ssr.tsrx'),
 );
 let browser: Browser;
+let hydrationBundle: string;
 beforeAll(async () => {
+	const result = await build({
+		configFile: false,
+		logLevel: 'error',
+		define: { 'process.env.NODE_ENV': '"production"' },
+		plugins: [octane({ hmr: false })],
+		build: {
+			write: false,
+			minify: false,
+			lib: {
+				entry: resolve('packages/octane/tests/browser/view-transition-streaming/hydration.ts'),
+				formats: ['iife'],
+				name: 'OctaneStreamHydration',
+			},
+		},
+	});
+	const output = Array.isArray(result) ? result[0].output : 'output' in result ? result.output : [];
+	const chunk = output.find((item) => item.type === 'chunk');
+	if (!chunk || chunk.type !== 'chunk') throw new Error('Missing hydration client bundle');
+	hydrationBundle = chunk.code;
 	browser = await launchBrowser({ headless: true });
 });
 afterAll(async () => {
@@ -137,6 +160,78 @@ async function settle(page: Page, count = 1) {
 }
 
 describe.sequential('native streaming ViewTransition capture', () => {
+	it.each(['reject', 'abort'] as const)(
+		'activates dormant hydration after a queued parent exposes its child %s',
+		async (failure) => {
+			const parent = deferred<string>();
+			const child = deferred<string>();
+			const collector = createPipeableCollector();
+			const serverErrors: unknown[] = [];
+			const controller = ServerRuntime.renderToPipeableStream(
+				fixture.QueuedHydrationApp,
+				{
+					parent: parent.promise,
+					child: child.promise,
+					when: interaction(),
+				},
+				{
+					onError(error) {
+						serverErrors.push(error);
+					},
+				},
+			);
+			controller.pipe(collector.destination);
+			const blocker = await streamed('StreamTextApp', { id: 'blocker' });
+			const { page, errors } = await open(
+				blocker.shell + '<div id="hydration-target">' + collector.chunks.join('') + '</div>',
+			);
+			let consumed = collector.chunks.length;
+			try {
+				await page.addScriptTag({ content: hydrationBundle });
+				expect(errors).toEqual([]);
+				await page.evaluate(() => {
+					(window as any).__hydration = (window as any).OctaneStreamHydration.hydrate(
+						document.querySelector('#hydration-target'),
+					);
+				});
+				await page.locator('#activate-hydration').click();
+				expect(await page.evaluate(() => (window as any).__hydration.state.hydrated)).toBe(0);
+				await page.addStyleTag({
+					content: '::view-transition-group(*) { animation-duration: 60s; }',
+				});
+				await reveal(page, blocker.reveal);
+				await page.waitForFunction(() => (window as any).__streamCaptures[0]?.new);
+				parent.resolve('Live button');
+				await expect.poll(() => collector.chunks.length).toBeGreaterThan(consumed);
+				await reveal(page, collector.chunks.slice(consumed).join(''));
+				consumed = collector.chunks.length;
+				await page.waitForFunction(() => document.querySelector('#pending-parent'));
+				expect(await page.locator('#queued-parent').count()).toBe(0);
+				const reason = new Error('Child unavailable');
+				if (failure === 'reject') child.reject(reason);
+				else controller.abort(reason);
+				await collector.ended;
+				await reveal(page, collector.chunks.slice(consumed).join(''));
+				await page.evaluate(() => (window as any).__streamCaptures[0].handle.skipTransition());
+				await page.waitForFunction(() => (window as any).__streamCaptures.length === 2);
+				await page.evaluate(() => (window as any).__streamCaptures[1].handle.skipTransition());
+				await page.waitForFunction(() => (window as any).__hydration.state.hydrated === 1);
+				expect(await page.locator('#recovered-child').textContent()).toBe('Recovered child');
+				await page.locator('#recovered-button').click();
+				expect(await page.evaluate(() => (window as any).__hydration.state.clicks)).toBe(1);
+				expect(serverErrors).toEqual([reason]);
+				expect(errors).toEqual([]);
+			} finally {
+				try {
+					await page.evaluate(() => (window as any).__hydration?.unmount());
+				} finally {
+					controller.abort();
+					await page.close();
+				}
+			}
+		},
+	);
+
 	it.each([
 		{ css: '', expected: 'root', name: undefined },
 		{ css: 'view-transition-name:scope-css;', expected: 'scope-css', name: undefined },
@@ -163,14 +258,49 @@ describe.sequential('native streaming ViewTransition capture', () => {
 		}
 	});
 
+	it.each(['none', 'none!important'])(
+		'respects authored inline scope precedence before and after streamed reveal (%s)',
+		async (authored) => {
+			const html = await streamed('ScopedStreamApp', {
+				id: 'authored-scope',
+				style: 'view-transition-scope:' + authored,
+			});
+			const { page, errors } = await open(html.shell);
+			try {
+				const host = page.locator('#authored-scope');
+				const expected = authored.endsWith('!important') ? 'none' : 'all';
+				expect(
+					await host.evaluate((el) =>
+						getComputedStyle(el).getPropertyValue('view-transition-scope'),
+					),
+				).toBe(expected);
+				const style = await host.evaluate((el) => (el as HTMLElement).style.cssText);
+				await reveal(page, html.reveal);
+				const [capture] = await settle(page);
+				expect(capture.owner).toBe('authored-scope');
+				expect(capture.error).toBeUndefined();
+				expect(capture.animations).toContain('::view-transition-group(wave-hero)');
+				expect(await host.evaluate((el) => (el as HTMLElement).style.cssText)).toBe(style);
+				expect(
+					await host.evaluate((el) =>
+						getComputedStyle(el).getPropertyValue('view-transition-scope'),
+					),
+				).toBe(expected);
+				expect(errors).toEqual([]);
+			} finally {
+				await page.close();
+			}
+		},
+	);
+
 	it('runs sibling stream scopes with identical shared names and keeps an outside control interactive', async () => {
 		const left = await streamed('ScopedStreamApp', {
 			id: 'left-scope',
-			style: 'view-transition-scope:none!important',
+			style: 'color:blue',
 		});
 		const right = await streamed('ScopedStreamApp', {
 			id: 'right-scope',
-			style: 'color:red;view-transition-scope:none!important',
+			style: 'color:red',
 		});
 		const { page, errors } = await open(
 			left.shell + right.shell + '<button id="outside-control">Outside</button>',
@@ -184,8 +314,8 @@ describe.sequential('native streaming ViewTransition capture', () => {
 					})),
 				),
 			).toEqual([
-				{ value: 'all', priority: 'important' },
-				{ value: 'all', priority: 'important' },
+				{ value: 'all', priority: '' },
+				{ value: 'all', priority: '' },
 			]);
 			await page.addStyleTag({
 				content: '::view-transition-group(*) { animation-duration: 600ms; }',

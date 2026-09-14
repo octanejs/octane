@@ -29,9 +29,11 @@ A boundary only activates on **transition-lane** commits — updates inside
 `startTransition`, `useDeferredValue` re-renders, and Suspense reveals
 (fallback → content). Urgent updates and `flushSync` never animate. An urgent
 update skips active transitions it touches; `flushSync` skips all active scopes.
-Event handlers can opt updates into animation with `startTransition`. Without browser
-support for the native options overload (`document.startViewTransition({ update, types })`), updates commit
-with no animation — the API is a progressive enhancement.
+Event handlers can opt updates into animation with `startTransition`. Octane uses the native options overload (`document.startViewTransition({ update, types })`)
+and detects older callback-only implementations once per native function. Those
+implementations animate without native transition types. Without the native API,
+updates commit without animation. Unexpected native failures reach the root’s
+`onRecoverableError` handler (or the console) and still publish the update.
 
 Activation kinds:
 
@@ -153,7 +155,8 @@ Hydration adopts the existing hosts. Server reveals and client commits coordinat
 through the native handle for their document or element scope.
 
 `scope="element"` also works before hydration. Its one persistent direct host
-receives `view-transition-scope: all !important`; nested streamed replacements
+matches the shared `[vt-scope="element"]` stylesheet rule declaring
+`view-transition-scope: all !important`; nested streamed replacements
 use that element's native transition. Sibling scopes may animate independently,
 and nested scopes keep their names and captures separate. A reveal waits for an
 earlier animation on the same scope, while an independent scope can proceed.
@@ -164,9 +167,9 @@ Keep the scope host outside the Suspense boundary whose fallback will be
 replaced. Missing or multiple hosts, direct visible text beside the host, and a
 replaceable fallback host skip animation. Browsers without element transition
 support also reveal scoped content without animation. These cases do not widen
-the capture to the document. Hydration preserves the host and adopts the scope
-style; removing the scope restores its authored scope property without reverting
-unrelated style changes.
+the capture to the document. Hydration preserves the host and its authored inline
+styles. An inline `view-transition-scope: none !important` overrides the shared
+rule. Removing the scope removes its marker and leaves authored styles intact.
 
 ## Commit ordering
 
@@ -196,7 +199,7 @@ otherwise they are logged, and the update still commits.
 - Gesture transitions (`useSwipeTransition` /
   `unstable_startGestureTransition`) are not implemented — they are still
   experimental in React and explicitly deferred until React stabilizes them.
-- The full behavior matrix is pinned by the conformance ports in
-  `packages/octane/tests/conformance/view-transition*.test.ts`; the
-  implementation plan and its documented edge cases live in
-  `docs/view-transitions-plan.md`.
+- React ports live in `packages/octane/tests/conformance/view-transition*.test.ts`.
+  Octane feature coverage lives in `packages/octane/tests/view-transition*.test.ts`
+  and the native browser suites. `docs/view-transitions-plan.md` records the
+  architecture, the decision to add staged commits, and remaining limits.

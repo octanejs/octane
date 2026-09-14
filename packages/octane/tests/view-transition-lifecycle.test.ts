@@ -7,11 +7,11 @@ import {
 	ViewTransition,
 	type Root,
 	type ViewTransitionInstance,
-} from '../../src/index.js';
+} from '../src/index.js';
 import {
 	installViewTransitionMocks,
 	type ViewTransitionMocks,
-} from './_helpers/view-transition-mocks';
+} from './conformance/_helpers/view-transition-mocks';
 import { MatchingApp } from './_fixtures/view-transition-matching.tsrx';
 
 function deferred<T = void>() {

@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
 	createRoot,
+	createElement,
+	Activity,
+	ViewTransition,
 	flushSync,
 	startTransition,
 	type Root,
@@ -18,6 +21,7 @@ import {
 	ScopedImageApp,
 	ScopedPortalMoveApp,
 	ForeignScopedPortalApp,
+	ClippedScopeApp,
 } from './_fixtures/view-transition-scoped-effects.tsrx';
 
 function deferred() {
@@ -99,7 +103,7 @@ describe('element-scoped ViewTransition commit lifetimes', () => {
 			root.render(ScopedEffectsApp, {
 				controls,
 				events,
-				onEffect: (id, value) => onEffect?.(id, value),
+				onEffect: (id: string, value: string) => onEffect?.(id, value),
 			}),
 		);
 		events.length = 0;
@@ -171,6 +175,15 @@ describe('element-scoped ViewTransition commit lifetimes', () => {
 		expect(text('right')).toBe('right changed');
 		expect(left.skipped).toBe(false);
 	});
+	it('activates an unchanged clipping scope when only a nested boundary changes', async () => {
+		const scopeEvents: string[] = [];
+		await act(() => root.render(ClippedScopeApp, { controls, events, scopeEvents }));
+		startTransition(() => controls.child('changed'));
+		const capture = await nextCapture('left');
+		await updateAndReady(capture);
+		expect(text('child')).toBe('changed');
+		expect(scopeEvents).toEqual(['clipped']);
+	});
 
 	it('waits an atomic update that touches both a busy and a free scope', async () => {
 		startTransition(() => controls.left('first'));
@@ -212,6 +225,18 @@ describe('element-scoped ViewTransition commit lifetimes', () => {
 		right.ready.resolve();
 		expect(text('left')).toBe('left changed');
 		expect(text('right')).toBe('from-effect');
+	});
+
+	it('commits without animation when a pre-render passive adds urgent sibling work', async () => {
+		onEffect = (id, value) => {
+			if (id === 'right' && value === 'trigger') controls.right('urgent from effect');
+		};
+		flushSync(() => controls.right('trigger'));
+		startTransition(() => controls.left('left changed'));
+		await Promise.resolve();
+		expect(captures).toEqual([]);
+		expect(text('left')).toBe('left changed');
+		expect(text('right')).toBe('urgent from effect');
 	});
 
 	it('runs unrelated urgent effects without skipping an animating scope', async () => {
@@ -260,11 +285,51 @@ describe('element-scoped ViewTransition commit lifetimes', () => {
 	});
 
 	it('commits an invalid multiple-host scope without promoting it to a document animation', async () => {
-		vi.spyOn(console, 'error').mockImplementation(() => {});
+		const warning = vi.spyOn(console, 'error').mockImplementation(() => {});
 		await act(() => root.render(ScopeShapeApp, { value: 'initial', shape: 'multiple' }));
 		startTransition(() => root.render(ScopeShapeApp, { value: 'changed', shape: 'multiple' }));
 		await vi.waitFor(() => expect(container.textContent).toBe('changedsecond host'));
 		expect(captures).toEqual([]);
+		const invalid = warning.mock.calls.filter(([message]) =>
+			String(message).includes('requires exactly one host element'),
+		);
+		expect(invalid).toHaveLength(process.env.NODE_ENV === 'production' ? 0 : 1);
+	});
+	it.each([false, true])(
+		'commits an invalid local scope without waiting for or skipping an unrelated animation (urgent=%s)',
+		async (urgent) => {
+			vi.spyOn(console, 'error').mockImplementation(() => {});
+			await act(() => root.render(ScopedEffectsApp, { controls, events, invalidScope: true }));
+			startTransition(() => controls.left('animating'));
+			const left = await nextCapture('left');
+			await updateAndReady(left);
+			if (urgent) controls.invalid('changed');
+			else startTransition(() => controls.invalid('changed'));
+			await vi.waitFor(() => expect(text('invalid')).toBe('changed'));
+			expect(left.skipped).toBe(false);
+			expect(captures).toEqual([left]);
+		},
+	);
+	it('does not diagnose a valid scope whose Activity is hidden', async () => {
+		const warning = vi.spyOn(console, 'error').mockImplementation(() => {});
+		await act(() =>
+			root.render(
+				createElement(
+					Activity,
+					{ mode: 'hidden' },
+					createElement(
+						ViewTransition,
+						{ scope: 'element' },
+						createElement('section', null, 'hidden'),
+					),
+				),
+			),
+		);
+		expect(
+			warning.mock.calls.filter(([message]) =>
+				String(message).includes('requires exactly one host element'),
+			),
+		).toEqual([]);
 	});
 
 	it('commits scope host replacement without capturing the disconnected old host', async () => {

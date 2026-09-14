@@ -1,6 +1,8 @@
 import {
 	ErrorBoundary,
 	Hydrate,
+	type HydrateProps,
+	type HydrationPrefetchFunction,
 	ViewTransition,
 	use,
 	useEffect,
@@ -156,12 +158,23 @@ export function ErrorCatchingPartiallyAdoptedSuspendingHydration(props) @{
 	</ErrorBoundary>
 }
 
-function TransitionHydrationSuffix(props) @{
+function TransitionHydrationSuffix(props: {
+	suspend: boolean;
+	promise: Promise<void>;
+	label: string;
+}) @{
 	if (props.suspend) use(props.promise);
 	<span id="transition-hydration-suffix">{props.label as string}</span>
 }
 
-export function TransitionHydration(props) @{
+export function TransitionHydration(props: {
+	show: boolean;
+	when: HydrateProps['when'];
+	prefetch?: HydrationPrefetchFunction;
+	suspend: boolean;
+	promise: Promise<void>;
+	label: string;
+}) @{
 	<ViewTransition>
 		<main>
 			@if (props.show) {

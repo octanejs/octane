@@ -1,0 +1,97 @@
+{
+  "baseline": {
+    "suite": "view-transition-dom-stage-work",
+    "metadata": {
+      "revision": "5c3823293651b692bb5cd96be136a526c4054299",
+      "workingTree": false,
+      "adapterSha256": "4bc833b2b007cee7b22fb07a2473bab409653c93bab338035812336c40e1c823",
+      "fixtureSha256": "d70be48d64e4a7dbd05c08b0f6f2cc5244b8b1377c0fd13054479c89657e37cf",
+      "node": "v24.20.0",
+      "chromium": "149.0.7827.55"
+    },
+    "cases": {
+      "structure-256": {
+        "valid": true,
+        "retainedHosts": 256,
+        "insertedHosts": 256,
+        "copiedNodeSlots": 230016,
+        "searchedNodeSlots": 131840,
+        "removedHosts": 512,
+        "clearedParents": 0
+      },
+      "structure-1024": {
+        "valid": true,
+        "retainedHosts": 1024,
+        "insertedHosts": 1024,
+        "copiedNodeSlots": 3672576,
+        "searchedNodeSlots": 2100224,
+        "removedHosts": 2048,
+        "clearedParents": 0
+      },
+      "radio-projection": {
+        "valid": true,
+        "controls": 24,
+        "associationReads": 48,
+        "backgroundElements": 1024,
+        "importedNodes": 51694,
+        "createdElements": 1030
+      },
+      "created-template": {
+        "valid": true,
+        "ordinaryElements": 2049,
+        "templateElements": 2,
+        "childCollectionReads": 3084
+      }
+    }
+  },
+  "candidate": {
+    "suite": "view-transition-dom-stage-work",
+    "metadata": {
+      "revision": "5c3823293651b692bb5cd96be136a526c4054299",
+      "workingTree": true,
+      "adapterSha256": "5468e10995cdf7853ef6cb7fad252121fee78187fa4550dfebf9adf35e6e3ac6",
+      "fixtureSha256": "d70be48d64e4a7dbd05c08b0f6f2cc5244b8b1377c0fd13054479c89657e37cf",
+      "node": "v24.20.0",
+      "chromium": "149.0.7827.55"
+    },
+    "cases": {
+      "structure-256": {
+        "valid": true,
+        "retainedHosts": 256,
+        "insertedHosts": 256,
+        "copiedNodeSlots": 0,
+        "searchedNodeSlots": 0,
+        "removedHosts": 0,
+        "clearedParents": 1
+      },
+      "structure-1024": {
+        "valid": true,
+        "retainedHosts": 1024,
+        "insertedHosts": 1024,
+        "copiedNodeSlots": 0,
+        "searchedNodeSlots": 0,
+        "removedHosts": 0,
+        "clearedParents": 1
+      },
+      "radio-projection": {
+        "valid": true,
+        "controls": 24,
+        "associationReads": 48,
+        "backgroundElements": 1024,
+        "importedNodes": 1102,
+        "createdElements": 1030
+      },
+      "created-template": {
+        "valid": true,
+        "ordinaryElements": 2049,
+        "templateElements": 2,
+        "childCollectionReads": 0
+      }
+    }
+  },
+  "notes": [
+    "Deterministic adapter operation counts, not elapsed-time speed measurements.",
+    "Both revisions ran the identical scenario and passed retained-host identity and DOM publication assertions.",
+    "Candidate is the working tree identified by adapterSha256; a commit measurement can reproduce the same adapter hash."
+  ]
+}
