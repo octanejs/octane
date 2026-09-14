@@ -1211,6 +1211,7 @@ const NATIVE_READ_RUNTIME_HELPERS = new Set([
 ]);
 const INTERNAL_CLIENT_RUNTIME_HELPERS = new Set([
 	'canSplitStyleProperties',
+	'styleObjectPrototype',
 	'replaceRef',
 	'queueOwnRefDetach',
 	'setPlainAttribute',
@@ -23156,6 +23157,7 @@ function planJsx(
 		if (b.kind === 'styleProperties') {
 			ctx.runtimeNeeded.add('setStyleProperty');
 			ctx.runtimeNeeded.add(b.spread ? 'canSplitStyleProperties' : 'isHydratingStyle');
+			if (b.spread) ctx.runtimeNeeded.add('styleObjectPrototype');
 		}
 		if (b.kind === 'spread') {
 			ctx.runtimeNeeded.add('setSpread');
@@ -24554,6 +24556,37 @@ function styleSpreadNeedsFullStyle(bind, spread) {
 	]);
 }
 
+// Native spreads create writable own data properties. Complete that fresh
+// snapshot in place only when it will be retained as the full style, and no
+// inherited setter or read-only property could intercept a trailing assignment.
+function completeStyleSpread(bind, spread, valueOf, needsFull) {
+	return b.conditional(
+		b.logical(
+			'&&',
+			needsFull,
+			b.unary(
+				'!',
+				orChain(
+					bind.properties.map((property) =>
+						b.binary('in', b.literal(property.name), b.id('_$styleObjectPrototype')),
+					),
+				),
+			),
+		),
+		b.sequence([
+			...bind.properties.map((property, i) =>
+				b.assignment(
+					'=',
+					b.member(spread, inheritOriginLoc(b.literal(property.name), property.key), true),
+					valueOf(property, i),
+				),
+			),
+			spread,
+		]),
+		styleSpreadObject(bind, spread, valueOf),
+	);
+}
+
 // Mount for a DEFERRED property-write binding: store the element ref + seed the
 // diff field to `undefined`. The every-render diff then performs the actual
 // write — including on the first render, since the `undefined` seed makes its
@@ -24823,7 +24856,7 @@ function emitBindingMount(bind, elVar, bag) {
 					b.block([
 						b.const(bind.spreadName, bind.expr),
 						b.const(bind.fullName, styleSpreadNeedsFullStyle(bind, spread())),
-						b.const(bind.mergedName, styleSpreadObject(bind, spread(), valueOf)),
+						b.const(bind.mergedName, completeStyleSpread(bind, spread(), valueOf, full())),
 						b.stmt(b.call(callee(), el(), merged(), undefinedNode())),
 						...mountHost(),
 						b.stmt(
@@ -25270,7 +25303,7 @@ function emitBindingUpdate(bind, bag, inlineBindingGuards = false) {
 						b.if(
 							orChain([initial, needsFull, F('_styFull')]),
 							b.block([
-								b.const(bind.mergedName, styleSpreadObject(bind, spread, valueOf)),
+								b.const(bind.mergedName, completeStyleSpread(bind, spread, valueOf, needsFull)),
 								full,
 								b.stmt(b.assignment('=', F('_sty'), b.conditional(needsFull, merged, spread))),
 							]),

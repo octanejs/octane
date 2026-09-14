@@ -637,6 +637,60 @@ export function Variable(props) @{
 		},
 	);
 
+	it.each([false, true].flatMap((dev) => ['setter', 'readonly'].map((kind) => ({ dev, kind }))))(
+		'defines own style declarations over an inherited $kind in dev=$dev',
+		({ dev, kind }) => {
+			const client = compiled(SPREAD_SOURCE, `spread-inherited-${kind}-${dev}.tsrx`, 'client', dev);
+			const previous = Object.getOwnPropertyDescriptor(Object.prototype, 'left');
+			const restore = () => {
+				if (previous) Object.defineProperty(Object.prototype, 'left', previous);
+				else Reflect.deleteProperty(Object.prototype, 'left');
+			};
+			const assignments: unknown[] = [];
+			const styles: string[][] = [[], []];
+			const offsets: string[] = [];
+			let root: ReturnType<typeof mount> | undefined;
+			let control: ReturnType<typeof mount> | undefined;
+			try {
+				Object.defineProperty(Object.prototype, 'left', {
+					configurable: true,
+					enumerable: false,
+					...(kind === 'setter'
+						? { set: (value: unknown) => assignments.push(value) }
+						: { value: 'inherited', writable: false }),
+				});
+				const steps = [
+					{ first: { color: 'green', position: 'absolute' }, left: 10, color: 'red' },
+					{ first: {}, left: 20, color: 'blue' },
+					{ first: {}, left: 30, color: 'purple' },
+					{ first: {}, left: 40, color: 'green' },
+				];
+				for (const [step, props] of steps.entries()) {
+					if (step === 2) restore();
+					const style = { ...props.first, left: props.left, color: props.color, display: 'block' };
+					if (root === undefined || control === undefined) {
+						root = mount(client.Spread, props);
+						control = mount(client.Control, { style });
+					} else {
+						root.update(client.Spread, props);
+						control.update(client.Control, { style });
+					}
+					const element = root.find('div') as HTMLElement;
+					styles[0].push(element.style.cssText);
+					styles[1].push((control.find('div') as HTMLElement).style.cssText);
+					offsets.push(element.style.left);
+				}
+			} finally {
+				restore();
+				root?.unmount();
+				control?.unmount();
+			}
+			expect(assignments).toEqual([]);
+			expect(offsets).toEqual(['10px', '20px', '30px', '40px']);
+			expect(styles[0]).toEqual(styles[1]);
+		},
+	);
+
 	it.each([false, true])(
 		'coerces integer style keys before spread string keys in dev=%s',
 		(dev) => {
