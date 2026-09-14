@@ -17258,6 +17258,16 @@ export function isHydratingStyle(): boolean {
 	return activeHydration() !== null;
 }
 
+/** Whether a spread prefix and its fixed trailing declarations can be diffed separately. @internal */
+export function canSplitStyleProperties(): boolean {
+	if (activeHydration() !== null) return false;
+	// A native object spread copies own values, but the object style writer also
+	// visits enumerable Object.prototype properties. Those must see the complete
+	// object as their receiver and follow all of its own declarations.
+	for (const _key in Object.prototype) return false;
+	return true;
+}
+
 export function setStyle(el: HTMLElement | SVGElement, value: any, prev: any): void {
 	const style = (el as HTMLElement).style;
 	// Hydration treats the authored style as a complete value: rebuild it once so

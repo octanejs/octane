@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { flushSync, hydrateRoot } from 'octane';
+import { flushSync, hydrateRoot, startTransition } from 'octane';
 import { renderToString } from 'octane/server';
 import { createScope } from 'octane/signals';
-import { mount } from './_helpers';
+import { act, mount } from './_helpers';
 import { loadCompiledFixtureSource } from './_server-fixture';
 
 const SOURCE = `
@@ -44,6 +44,20 @@ export function LiteralDuplicates() @{
 }
 `;
 
+const SPREAD_SOURCE = `
+export function Spread(props) @{
+	<div style={{ ...props.first, ...props.second, left: props.left, color: props.color, '--accent': props.accent, display: 'block' }} />
+}
+
+export function Ordered(props) @{
+	<div style={{ ...props.prefix, marginTop: props.discarded, margin: props.margin, marginTop: props.top }} />
+}
+
+export function Control(props) @{
+	<div style={props.style} />
+}
+`;
+
 function compiled(source: string, id: string, mode: 'client' | 'server', dev = false) {
 	return loadCompiledFixtureSource(source, {
 		id,
@@ -53,6 +67,526 @@ function compiled(source: string, id: string, mode: 'client' | 'server', dev = f
 }
 
 describe('inline object styles', () => {
+	it.each([false, true])(
+		'updates and removes spread styles before explicit suffixes in dev=%s',
+		(dev) => {
+			const client = compiled(SPREAD_SOURCE, `spread-suffix-${dev}.tsrx`, 'client', dev);
+			const inherited = Object.create({ height: '99px' });
+			Object.defineProperty(inherited, 'width', { value: '99px', enumerable: false });
+			Object.assign(inherited, { color: 'green', left: 1, opacity: 0.5, '--obsolete': 'old' });
+			const steps = [
+				{
+					first: inherited,
+					second: { left: 2, backgroundColor: 'black' },
+					left: 5,
+					color: 'red !important',
+					accent: 10,
+				},
+				{ first: { position: 'fixed' }, second: null, left: null, color: 'blue', accent: null },
+				{
+					first: undefined,
+					second: { opacity: 1, color: 'green' },
+					left: 0,
+					color: false,
+					accent: 'new',
+				},
+				{ first: null, second: undefined, left: 12, color: null, accent: null },
+			];
+			const styleFor = (props: (typeof steps)[number]) => ({
+				...props.first,
+				...props.second,
+				left: props.left,
+				color: props.color,
+				'--accent': props.accent,
+				display: 'block',
+			});
+			const root = mount(client.Spread, steps[0]);
+			const control = mount(client.Control, { style: styleFor(steps[0]) });
+			const element = root.find('div') as HTMLElement;
+			const reference = control.find('div') as HTMLElement;
+			try {
+				expect(element.style.cssText).toBe(reference.style.cssText);
+				expect(element.style.left).toBe('5px');
+				expect(element.style.color).toBe('red');
+				expect(element.style.getPropertyPriority('color')).toBe('important');
+				expect(element.style.height).toBe('');
+				expect(element.style.width).toBe('');
+				for (const props of steps.slice(1)) {
+					root.update(client.Spread, props);
+					control.update(client.Control, { style: styleFor(props) });
+					expect(root.find('div')).toBe(element);
+					expect(element.style.cssText).toBe(reference.style.cssText);
+					expect(element.style.getPropertyValue('--obsolete')).toBe('');
+					expect(element.style.backgroundColor).toBe('');
+					expect(element.style.getPropertyPriority('color')).toBe('');
+					expect(element.style.display).toBe('block');
+				}
+				expect(element.style.left).toBe('12px');
+				expect(element.style.opacity).toBe('');
+				expect(element.style.position).toBe('');
+				expect(element.style.color).toBe('');
+				expect(element.style.getPropertyValue('--accent')).toBe('');
+			} finally {
+				root.unmount();
+				control.unmount();
+			}
+		},
+	);
+
+	it.each([false, true])(
+		'preserves spread insertion order for duplicate shorthand keys in dev=%s',
+		(dev) => {
+			const client = compiled(SPREAD_SOURCE, `spread-order-${dev}.tsrx`, 'client', dev);
+			for (const prefix of [
+				{ marginTop: '1px', margin: '2px' },
+				{ margin: '2px', marginTop: '1px' },
+				{},
+			]) {
+				const steps = [
+					{ prefix, discarded: '3px', margin: '4px', top: '8px' },
+					{ prefix, discarded: '5px', margin: '12px', top: '8px' },
+					{ prefix: { marginTop: '2px' }, discarded: '6px', margin: '12px', top: '16px' },
+					{ prefix: {}, discarded: '7px', margin: '20px', top: null },
+				];
+				const styleFor = (props: (typeof steps)[number]) => {
+					const style = { ...props.prefix, marginTop: props.discarded, margin: props.margin };
+					return Object.assign(style, { marginTop: props.top });
+				};
+				const root = mount(client.Ordered, steps[0]);
+				const control = mount(client.Control, { style: styleFor(steps[0]) });
+				const element = root.find('div') as HTMLElement;
+				const reference = control.find('div') as HTMLElement;
+				try {
+					expect(element.style.cssText).toBe(reference.style.cssText);
+					expect(element.style.marginTop).toBe(Object.keys(prefix)[0] === 'margin' ? '8px' : '4px');
+					for (const props of steps.slice(1)) {
+						root.update(client.Ordered, props);
+						control.update(client.Control, { style: styleFor(props) });
+						expect(root.find('div')).toBe(element);
+						expect(element.style.cssText).toBe(reference.style.cssText);
+					}
+				} finally {
+					root.unmount();
+					control.unmount();
+				}
+			}
+		},
+	);
+
+	it.each([false, true])(
+		'evaluates spread getters and suffixes before writing CSS in dev=%s',
+		(dev) => {
+			const source = `
+export function App(props) @{
+	<div data-before={props.read('before')} style={{ ...props.first(), ...props.second(), left: props.read('left'), color: props.read('color') }} data-after={props.read('after')} />
+}`;
+			const client = compiled(source, `spread-getters-${dev}.tsrx`, 'client', dev);
+			const calls: string[] = [];
+			let failure: string | undefined;
+			let element: HTMLElement | undefined;
+			let before: string | undefined;
+			let next = false;
+			const read = (key: string) => {
+				calls.push(key);
+				if (element !== undefined && key !== 'after') expect(element.style.cssText).toBe(before);
+				if (key === failure) throw new Error(`failed ${key}`);
+				return key === 'left' ? (next ? 12 : 5) : key === 'color' ? (next ? 'blue' : 'red') : key;
+			};
+			const props = {
+				read,
+				first: () => {
+					read('first');
+					return {
+						get left() {
+							read('first getter');
+							return 1;
+						},
+					};
+				},
+				second: () => {
+					read('second');
+					return {
+						get color() {
+							read('second getter');
+							return 'green';
+						},
+					};
+				},
+			};
+			const order = [
+				'before',
+				'first',
+				'first getter',
+				'second',
+				'second getter',
+				'left',
+				'color',
+				'after',
+			];
+			for (const error of [undefined, 'first getter', 'second getter', 'color']) {
+				failure = undefined;
+				next = false;
+				element = undefined;
+				calls.length = 0;
+				const root = mount(client.App, props);
+				element = root.find('div') as HTMLElement;
+				try {
+					expect(calls).toEqual(order);
+					expect(element.style.left).toBe('5px');
+					expect(element.style.color).toBe('red');
+					before = element.style.cssText;
+					next = true;
+					failure = error;
+					calls.length = 0;
+					if (error === undefined) {
+						root.update(client.App, props);
+						expect(calls).toEqual(order);
+						expect(root.find('div')).toBe(element);
+						expect(element.style.left).toBe('12px');
+						expect(element.style.color).toBe('blue');
+					} else {
+						expect(() => root.update(client.App, props)).toThrow(`failed ${error}`);
+						expect(calls).toEqual(order.slice(0, order.indexOf(error) + 1));
+						expect(element.style.cssText).toBe(before);
+					}
+				} finally {
+					root.unmount();
+				}
+			}
+		},
+	);
+
+	it.each([false, true])(
+		'hydrates spread styles with suffix overrides and duplicate key order in dev=%s',
+		(dev) => {
+			const id = `spread-hydration-${dev}.tsrx`;
+			const server = compiled(SPREAD_SOURCE, id, 'server', dev);
+			const client = compiled(SPREAD_SOURCE, id, 'client', dev);
+			const cases = [
+				{
+					name: 'Spread',
+					initial: {
+						first: { color: 'green', opacity: 0.5 },
+						second: { backgroundColor: 'black' },
+						left: 5,
+						color: 'red',
+						accent: 10,
+					},
+					next: { first: null, second: null, left: 12, color: 'blue', accent: null },
+					style: {
+						color: 'red',
+						opacity: 0.5,
+						backgroundColor: 'black',
+						left: 5,
+						'--accent': 10,
+						display: 'block',
+					},
+					nextStyle: { left: 12, color: 'blue', '--accent': null, display: 'block' },
+				},
+				{
+					name: 'Ordered',
+					initial: {
+						prefix: { marginTop: '1px', margin: '2px' },
+						discarded: '3px',
+						margin: '4px',
+						top: '8px',
+					},
+					next: { prefix: {}, discarded: '5px', margin: '12px', top: '16px' },
+					style: { marginTop: '8px', margin: '4px' },
+					nextStyle: { marginTop: '16px', margin: '12px' },
+				},
+			];
+			for (const { name, initial, next, style, nextStyle } of cases) {
+				const container = document.createElement('div');
+				container.innerHTML = renderToString(server[name], initial).html;
+				document.body.appendChild(container);
+				const element = container.querySelector('div') as HTMLElement;
+				const original = element.getAttribute('style');
+				const control = mount(client.Control, { style });
+				const reference = control.find('div') as HTMLElement;
+				const warnings = vi.spyOn(console, 'error').mockImplementation(() => {});
+				let root: ReturnType<typeof hydrateRoot> | undefined;
+				try {
+					expect(element.style.cssText).toBe(reference.style.cssText);
+					root = hydrateRoot(container, client[name], initial);
+					flushSync(() => {});
+					expect(container.querySelector('div')).toBe(element);
+					expect(element.getAttribute('style')).toBe(original);
+					expect(
+						warnings.mock.calls.filter((args) => /hydrat|mismatch/i.test(String(args[0]))),
+					).toEqual([]);
+					flushSync(() => root!.render(client[name], next));
+					control.update(client.Control, { style: nextStyle });
+					expect(container.querySelector('div')).toBe(element);
+					expect(element.style.cssText).toBe(reference.style.cssText);
+				} finally {
+					root?.unmount();
+					control.unmount();
+					warnings.mockRestore();
+					container.remove();
+				}
+			}
+		},
+	);
+
+	it.each([false, true])(
+		'preserves normalized CSS aliases across spread changes in dev=%s',
+		(dev) => {
+			const source = `
+export function App(props) @{
+	<div style={{ ...props.prefix, fontSize: props.size, float: props.float }} />
+}
+export function Control(props) @{
+	<div style={props.style} />
+}`;
+			const client = compiled(source, `spread-aliases-${dev}.tsrx`, 'client', dev);
+			const steps = [
+				{ prefix: { 'font-size': 20, cssFloat: 'left' }, size: 12, float: 'right' },
+				{ prefix: { fontSize: 9, 'font-size': 24 }, size: 14, float: 'left' },
+				{ prefix: {}, size: 16, float: 'none' },
+				{ prefix: { fontSize: 11, 'font-size': 18, cssFloat: 'right' }, size: 16, float: 'none' },
+			];
+			const styleFor = (props: (typeof steps)[number]) => ({
+				...props.prefix,
+				fontSize: props.size,
+				float: props.float,
+			});
+			const root = mount(client.App, steps[0]);
+			const control = mount(client.Control, { style: styleFor(steps[0]) });
+			const element = root.find('div') as HTMLElement;
+			const reference = control.find('div') as HTMLElement;
+			try {
+				expect(element.style.fontSize).toBe('12px');
+				expect(element.style.cssFloat).toBe('right');
+				for (const props of steps.slice(1)) {
+					root.update(client.App, props);
+					control.update(client.Control, { style: styleFor(props) });
+					expect(root.find('div')).toBe(element);
+					expect(element.style.cssText).toBe(reference.style.cssText);
+				}
+				expect(element.style.fontSize).toBe('18px');
+			} finally {
+				root.unmount();
+				control.unmount();
+			}
+		},
+	);
+
+	it.each([false, true])(
+		'restores spread display suffixes after Activity reveals in dev=%s',
+		async (dev) => {
+			const source = `
+import { Activity } from 'octane';
+export function App(props) @{
+	<Activity mode={props.mode}>
+		<div id="activity-spread" style={{ ...props.prefix, display: props.display, color: props.color }} />
+	</Activity>
+}`;
+			const client = compiled(source, `spread-activity-${dev}.tsrx`, 'client', dev);
+			const root = mount(client.App, {
+				mode: 'visible',
+				prefix: { opacity: 0.5 },
+				display: 'block',
+				color: 'red',
+			});
+			const element = root.find('#activity-spread') as HTMLElement;
+			try {
+				expect(element.style.display).toBe('block');
+				await act(() =>
+					root.root.render(client.App, {
+						mode: 'hidden',
+						prefix: { display: 'flex', color: 'green' },
+						display: 'grid',
+						color: 'blue',
+					}),
+				);
+				expect(root.find('#activity-spread')).toBe(element);
+				expect(element.style.display).toBe('none');
+				await act(() =>
+					root.root.render(client.App, {
+						mode: 'hidden',
+						prefix: { opacity: 1 },
+						display: 'inline-flex',
+						color: 'purple',
+					}),
+				);
+				expect(element.style.display).toBe('none');
+				await act(() =>
+					root.root.render(client.App, {
+						mode: 'visible',
+						prefix: { opacity: 1 },
+						display: 'inline-flex',
+						color: 'purple',
+					}),
+				);
+				expect(root.find('#activity-spread')).toBe(element);
+				expect(element.style.display).toBe('inline-flex');
+				expect(element.style.color).toBe('purple');
+				expect(element.style.opacity).toBe('1');
+			} finally {
+				root.unmount();
+			}
+		},
+	);
+
+	it.each([false, true])(
+		'restores spread and suffix styles when a transition is superseded in dev=%s',
+		async (dev) => {
+			const source = `
+import { Suspense, use } from 'octane';
+function Gate(props) {
+	if (props.request) use(props.request);
+	return <span id="spread-label">{props.label as string}</span>;
+}
+export function App(props) @{
+	<Suspense fallback={<p id="spread-pending">{'pending'}</p>}>
+		<div id="transition-spread" style={{ ...props.prefix, display: props.display, color: props.color }} />
+		<Gate request={props.request} label={props.label} />
+	</Suspense>
+}`;
+			const client = compiled(source, `spread-transition-${dev}.tsrx`, 'client', dev);
+			let resolve!: () => void;
+			const request = new Promise<void>((done) => {
+				resolve = done;
+			});
+			const root = mount(client.App, {
+				prefix: { opacity: 0.5 },
+				display: 'block',
+				color: 'red',
+				request: null,
+				label: 'initial',
+			});
+			const element = root.find('#transition-spread') as HTMLElement;
+			const original = element.style.cssText;
+			try {
+				await act(() =>
+					startTransition(() =>
+						root.root.render(client.App, {
+							prefix: { color: 'green', width: 12 },
+							display: 'grid',
+							color: 'blue',
+							request,
+							label: 'pending',
+						}),
+					),
+				);
+				expect(root.find('#transition-spread')).toBe(element);
+				expect(element.style.cssText).toBe(original);
+				expect(root.find('#spread-label').textContent).toBe('initial');
+				expect(root.findAll('#spread-pending')).toHaveLength(0);
+				await act(() =>
+					root.root.render(client.App, {
+						prefix: { opacity: 1 },
+						display: 'grid',
+						color: 'blue',
+						request: null,
+						label: 'urgent',
+					}),
+				);
+				expect(root.find('#transition-spread')).toBe(element);
+				expect(element.style.display).toBe('grid');
+				expect(element.style.color).toBe('blue');
+				expect(element.style.opacity).toBe('1');
+				expect(element.style.width).toBe('');
+				const committed = element.style.cssText;
+				await act(() => resolve());
+				expect(root.find('#transition-spread')).toBe(element);
+				expect(element.style.cssText).toBe(committed);
+				expect(root.find('#spread-label').textContent).toBe('urgent');
+			} finally {
+				root.unmount();
+			}
+		},
+	);
+
+	it.each([false, true])(
+		'evaluates inherited style getters against the complete spread object in dev=%s',
+		(dev) => {
+			const source = `
+export function App(props) @{
+	<div style={{ ...props.prefix, left: props.left, right: props.right }} />
+}`;
+			const client = compiled(source, `spread-inherited-${dev}.tsrx`, 'client', dev);
+			const previous = Object.getOwnPropertyDescriptor(Object.prototype, '--spread-left');
+			let root: ReturnType<typeof mount> | undefined;
+			let element: HTMLElement | undefined;
+			let updated: HTMLElement | undefined;
+			const styles: string[][] = [];
+			try {
+				Object.defineProperty(Object.prototype, '--spread-left', {
+					configurable: true,
+					enumerable: true,
+					get(this: { position?: string; left?: number }) {
+						return Object.hasOwn(this, 'position') ? this.left : undefined;
+					},
+				});
+				root = mount(client.App, { prefix: { position: 'absolute' }, left: 10, right: 5 });
+				element = root.find('div') as HTMLElement;
+				styles.push([
+					element.style.left,
+					element.style.right,
+					element.style.getPropertyValue('--spread-left'),
+				]);
+				root.update(client.App, { prefix: { position: 'absolute' }, left: 20, right: 8 });
+				updated = root.find('div') as HTMLElement;
+				styles.push([
+					updated.style.left,
+					updated.style.right,
+					updated.style.getPropertyValue('--spread-left'),
+				]);
+			} finally {
+				if (previous) Object.defineProperty(Object.prototype, '--spread-left', previous);
+				else Reflect.deleteProperty(Object.prototype, '--spread-left');
+				root?.unmount();
+			}
+			expect(updated).toBe(element);
+			expect(styles).toEqual([
+				['10px', '5px', '10'],
+				['20px', '8px', '20'],
+			]);
+		},
+	);
+
+	it.each([false, true])(
+		'coerces integer style keys before spread string keys in dev=%s',
+		(dev) => {
+			const source = `
+export function App(props) @{
+	<div style={{ ...props.prefix, '0': props.index, left: props.left }} />
+}`;
+			const client = compiled(source, `spread-integer-${dev}.tsrx`, 'client', dev);
+			const calls: string[] = [];
+			const value = (key: string, text: string) => ({
+				toString() {
+					calls.push(key);
+					return text;
+				},
+			});
+			const root = mount(client.App, {
+				prefix: { '--token': value('spread', 'initial') },
+				index: value('integer', 'ignored'),
+				left: 5,
+			});
+			const element = root.find('div') as HTMLElement;
+			try {
+				expect(calls).toEqual(['integer', 'spread']);
+				expect(element.style.getPropertyValue('--token')).toBe('initial');
+				calls.length = 0;
+				root.update(client.App, {
+					prefix: { '--token': value('spread', 'updated') },
+					index: value('integer', 'ignored'),
+					left: 12,
+				});
+				expect(calls).toEqual(['integer', 'spread']);
+				expect(root.find('div')).toBe(element);
+				expect(element.style.getPropertyValue('--token')).toBe('updated');
+				expect(element.style.left).toBe('12px');
+			} finally {
+				root.unmount();
+			}
+		},
+	);
+
 	it.each([false, true])('resolves duplicate literal keys before applying CSS in dev=%s', (dev) => {
 		const client = compiled(DUPLICATE_SOURCE, `duplicate-literals-${dev}.tsrx`, 'client', dev);
 		const root = mount(client.LiteralDuplicates);
