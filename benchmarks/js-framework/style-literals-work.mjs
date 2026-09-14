@@ -7,6 +7,7 @@ import { parseModule } from '../../packages/octane/src/compiler/parser.node.js';
 
 const URL = process.env.TARGET_URL || 'http://127.0.0.1:5233/style-literals.html';
 const TIMING_URL = process.env.WORK_TIMING_URL || URL;
+const BASELINE_TIMING_URL = process.env.WORK_TIMING_BASELINE_URL;
 const ROWS = 1000;
 const OPTIMIZED_MULTI = process.env.WORK_EXPECT_MULTI_OPTIMIZED !== '0';
 const OPTIMIZED_DUPLICATES = process.env.WORK_EXPECT_DUPLICATES_OPTIMIZED !== '0';
@@ -32,6 +33,13 @@ const OPS = [
 	{ name: 'select_another', setup: ['mount', 'select4'], action: 'select5', changedRows: 2 },
 	{ name: 'unrelated_update', setup: ['mount'], action: 'update', changedRows: 0 },
 ];
+const TIMING_OPERATION_NAMES = process.env.WORK_TIMING_OPERATIONS?.split(',');
+if (TIMING_OPERATION_NAMES?.some((name) => !OPS.some((operation) => operation.name === name))) {
+	throw new Error('Unsupported WORK_TIMING_OPERATIONS');
+}
+const TIMING_OPS = OPS.filter(
+	(operation) => !TIMING_OPERATION_NAMES || TIMING_OPERATION_NAMES.includes(operation.name),
+);
 const METRICS = [
 	'setStyle',
 	'setStyleProperty',
@@ -302,11 +310,11 @@ function expected(mode, operation) {
 	};
 }
 
-async function sampleTiming(browser, mode, operation) {
+async function sampleTiming(browser, mode, operation, timingUrl = TIMING_URL) {
 	const context = await browser.newContext();
 	try {
 		const page = await context.newPage();
-		await page.goto(`${TIMING_URL}?case=${mode}`, { waitUntil: 'load' });
+		await page.goto(`${timingUrl}?case=${mode}`, { waitUntil: 'load' });
 		await page.waitForSelector('#run');
 		for (const action of operation.setup) await invoke(page, action);
 		return await page.evaluate(
@@ -351,6 +359,58 @@ async function sampleTiming(browser, mode, operation) {
 	}
 }
 
+// Alternate artifact order and rotate modes each round so a changing machine
+// load cannot consistently favor one revision or separate it from its control.
+async function measurePairedTiming(browser) {
+	const timing = Object.fromEntries(MODES.map((mode) => [mode, {}]));
+	const median = (values) => values.sort((a, b) => a - b)[Math.floor((values.length - 1) / 2)];
+	for (const operation of TIMING_OPS) {
+		const pairs = Object.fromEntries(MODES.map((mode) => [mode, []]));
+		for (let round = -2; round < TIMING_SAMPLES; round++) {
+			for (let index = 0; index < MODES.length; index++) {
+				const mode = MODES[(index + round + 2) % MODES.length];
+				const pair = {};
+				for (const baseline of round % 2 === 0 ? [true, false] : [false, true]) {
+					pair[baseline ? 'baselineMs' : 'candidateMs'] = await sampleTiming(
+						browser,
+						mode,
+						operation,
+						baseline ? BASELINE_TIMING_URL : TIMING_URL,
+					);
+				}
+				if (round >= 0) pairs[mode].push(pair);
+			}
+		}
+		for (const mode of MODES) {
+			const samples = pairs[mode].map((pair) => pair.candidateMs).sort((a, b) => a - b);
+			const quantile = (fraction) => samples[Math.floor(fraction * (samples.length - 1))];
+			const control = pairs[mode.replace(/Spread$/, 'Generic')];
+			timing[mode][operation.name] = {
+				medianMs: quantile(0.5),
+				p25Ms: quantile(0.25),
+				p75Ms: quantile(0.75),
+				samplesMs: samples,
+				baselineMedianMs: median(pairs[mode].map((pair) => pair.baselineMs)),
+				pairedMedianRatio: median(pairs[mode].map((pair) => pair.candidateMs / pair.baselineMs)),
+				...(control && control !== pairs[mode]
+					? {
+							controlAdjustedMedianRatio: median(
+								pairs[mode].map(
+									(pair, index) =>
+										pair.candidateMs /
+										pair.baselineMs /
+										(control[index].candidateMs / control[index].baselineMs),
+								),
+							),
+						}
+					: {}),
+				pairedSamples: pairs[mode],
+			};
+		}
+	}
+	return timing;
+}
+
 async function measureTiming() {
 	if (!Number.isSafeInteger(TIMING_SAMPLES) || TIMING_SAMPLES < 0) {
 		throw new Error('WORK_SAMPLES must be a nonnegative integer');
@@ -359,9 +419,10 @@ async function measureTiming() {
 	const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
 	const timing = {};
 	try {
+		if (BASELINE_TIMING_URL) return await measurePairedTiming(browser);
 		for (const mode of MODES) {
 			timing[mode] = {};
-			for (const operation of OPS) {
+			for (const operation of TIMING_OPS) {
 				// Browser warmup is separate from measured trials; no profiler or CSSOM
 				// instrumentation runs in these browser contexts.
 				await sampleTiming(browser, mode, operation);
@@ -434,11 +495,17 @@ for (const mode of MODES) {
 if (timing !== null) {
 	console.log('\nUninstrumented timing (median ms [p25, p75]):');
 	for (const mode of MODES) {
-		for (const operation of OPS) {
+		for (const operation of TIMING_OPS) {
 			const t = timing[mode][operation.name];
 			console.log(
 				`${mode.padEnd(16)} ${operation.name.padEnd(16)} ` +
-					`${t.medianMs.toFixed(2)} [${t.p25Ms.toFixed(2)}, ${t.p75Ms.toFixed(2)}]`,
+					`${t.medianMs.toFixed(2)} [${t.p25Ms.toFixed(2)}, ${t.p75Ms.toFixed(2)}]` +
+					(t.pairedMedianRatio === undefined
+						? ''
+						: ` baseline=${t.baselineMedianMs.toFixed(2)} ratio=${t.pairedMedianRatio.toFixed(3)}`) +
+					(t.controlAdjustedMedianRatio === undefined
+						? ''
+						: ` control-adjusted=${t.controlAdjustedMedianRatio.toFixed(3)}`),
 			);
 		}
 	}

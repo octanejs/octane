@@ -91,6 +91,11 @@ describe('inline object styles', () => {
 					accent: 'new',
 				},
 				{ first: null, second: undefined, left: 12, color: null, accent: null },
+				{ first: { color: 'green', left: 1 }, second: null, left: 12, color: 'blue', accent: 10 },
+				{ first: { left: 2, color: 'red' }, second: null, left: 12, color: 'blue', accent: 10 },
+				{ first: null, second: null, left: 12, color: 'blue', accent: 10 },
+				{ first: {}, second: null, left: 12, color: 'blue', accent: 10 },
+				{ first: {}, second: null, left: 12, color: null, accent: null },
 			];
 			const styleFor = (props: (typeof steps)[number]) => ({
 				...props.first,
@@ -147,6 +152,16 @@ describe('inline object styles', () => {
 					{ prefix, discarded: '5px', margin: '12px', top: '8px' },
 					{ prefix: { marginTop: '2px' }, discarded: '6px', margin: '12px', top: '16px' },
 					{ prefix: {}, discarded: '7px', margin: '20px', top: null },
+					{ prefix: {}, discarded: '8px', margin: '20px', top: '8px' },
+					{ prefix: { margin: '2px' }, discarded: '9px', margin: '20px', top: '8px' },
+					{
+						prefix: { marginTop: '1px', margin: '2px' },
+						discarded: '10px',
+						margin: '28px',
+						top: '8px',
+					},
+					{ prefix: {}, discarded: '11px', margin: '28px', top: '8px' },
+					{ prefix: {}, discarded: '12px', margin: '32px', top: '8px' },
 				];
 				const styleFor = (props: (typeof steps)[number]) => {
 					const style = { ...props.prefix, marginTop: props.discarded, margin: props.margin };
@@ -163,7 +178,9 @@ describe('inline object styles', () => {
 						root.update(client.Ordered, props);
 						control.update(client.Control, { style: styleFor(props) });
 						expect(root.find('div')).toBe(element);
-						expect(element.style.cssText).toBe(reference.style.cssText);
+						expect(element.style.cssText, JSON.stringify({ prefix, props })).toBe(
+							reference.style.cssText,
+						);
 					}
 				} finally {
 					root.unmount();
@@ -383,48 +400,51 @@ export function App(props) @{
 	</Activity>
 }`;
 			const client = compiled(source, `spread-activity-${dev}.tsrx`, 'client', dev);
-			const root = mount(client.App, {
-				mode: 'visible',
-				prefix: { opacity: 0.5 },
-				display: 'block',
-				color: 'red',
-			});
-			const element = root.find('#activity-spread') as HTMLElement;
-			try {
-				expect(element.style.display).toBe('block');
-				await act(() =>
-					root.root.render(client.App, {
-						mode: 'hidden',
-						prefix: { display: 'flex', color: 'green' },
-						display: 'grid',
-						color: 'blue',
-					}),
-				);
-				expect(root.find('#activity-spread')).toBe(element);
-				expect(element.style.display).toBe('none');
-				await act(() =>
-					root.root.render(client.App, {
-						mode: 'hidden',
-						prefix: { opacity: 1 },
-						display: 'inline-flex',
-						color: 'purple',
-					}),
-				);
-				expect(element.style.display).toBe('none');
-				await act(() =>
-					root.root.render(client.App, {
-						mode: 'visible',
-						prefix: { opacity: 1 },
-						display: 'inline-flex',
-						color: 'purple',
-					}),
-				);
-				expect(root.find('#activity-spread')).toBe(element);
-				expect(element.style.display).toBe('inline-flex');
-				expect(element.style.color).toBe('purple');
-				expect(element.style.opacity).toBe('1');
-			} finally {
-				root.unmount();
+			for (const mode of ['visible', 'hidden']) {
+				const root = mount(client.App, {
+					mode,
+					prefix: { opacity: 0.5 },
+					display: 'block',
+					color: 'red',
+				});
+				await act(() => {});
+				const element = root.find('#activity-spread') as HTMLElement;
+				try {
+					expect(element.style.display).toBe(mode === 'hidden' ? 'none' : 'block');
+					await act(() =>
+						root.root.render(client.App, {
+							mode: 'hidden',
+							prefix: { display: 'flex', color: 'green' },
+							display: 'grid',
+							color: 'blue',
+						}),
+					);
+					expect(root.find('#activity-spread')).toBe(element);
+					expect(element.style.display).toBe('none');
+					await act(() =>
+						root.root.render(client.App, {
+							mode: 'hidden',
+							prefix: { opacity: 1 },
+							display: 'inline-flex',
+							color: 'purple',
+						}),
+					);
+					expect(element.style.display).toBe('none');
+					await act(() =>
+						root.root.render(client.App, {
+							mode: 'visible',
+							prefix: { opacity: 1 },
+							display: 'inline-flex',
+							color: 'purple',
+						}),
+					);
+					expect(root.find('#activity-spread')).toBe(element);
+					expect(element.style.display).toBe('inline-flex');
+					expect(element.style.color).toBe('purple');
+					expect(element.style.opacity).toBe('1');
+				} finally {
+					root.unmount();
+				}
 			}
 		},
 	);
@@ -544,6 +564,76 @@ export function App(props) @{
 				['10px', '5px', '10'],
 				['20px', '8px', '20'],
 			]);
+		},
+	);
+
+	it.each([false, true])(
+		'preserves inherited getter mutations when comparing previous spread styles in dev=%s',
+		(dev) => {
+			const source = `
+export function Inline(props) @{
+	<div style={{ ...props.prefix, left: props.left, right: props.right }} />
+}
+export function Variable(props) @{
+	const style = { ...props.prefix, left: props.left, right: props.right };
+	<div style={style} />
+}`;
+			const client = compiled(source, `spread-inherited-mutation-${dev}.tsrx`, 'client', dev);
+			const previous = Object.getOwnPropertyDescriptor(Object.prototype, '--spread-touch');
+			const roots: ReturnType<typeof mount>[] = [];
+			const elements: HTMLElement[] = [];
+			const updated: HTMLElement[] = [];
+			const styles: string[][][] = [[], []];
+			try {
+				Object.defineProperty(Object.prototype, '--spread-touch', {
+					configurable: true,
+					enumerable: true,
+					get(this: { position?: string; left?: number }) {
+						if (!Object.hasOwn(this, 'position')) return undefined;
+						this.left = 99;
+						return 'visited';
+					},
+				});
+				for (const App of [client.Inline, client.Variable]) {
+					const root = mount(App, { prefix: { position: 'absolute' }, left: 10, right: 5 });
+					roots.push(root);
+					elements.push(root.find('div') as HTMLElement);
+				}
+				for (const [step, [left, right]] of [
+					[10, 5],
+					[99, 8],
+					[20, 3],
+				].entries()) {
+					for (const [index, root] of roots.entries()) {
+						if (step !== 0) {
+							root.update(index === 0 ? client.Inline : client.Variable, {
+								prefix: { position: 'absolute' },
+								left,
+								right,
+							});
+						}
+						const element = root.find('div') as HTMLElement;
+						updated[index] = element;
+						styles[index].push([
+							element.style.left,
+							element.style.right,
+							element.style.getPropertyValue('--spread-touch'),
+						]);
+					}
+				}
+			} finally {
+				if (previous) Object.defineProperty(Object.prototype, '--spread-touch', previous);
+				else Reflect.deleteProperty(Object.prototype, '--spread-touch');
+				for (const root of roots) root.unmount();
+			}
+			expect(updated[0]).toBe(elements[0]);
+			expect(updated[1]).toBe(elements[1]);
+			expect(styles[1]).toEqual([
+				['10px', '5px', 'visited'],
+				['10px', '8px', 'visited'],
+				['20px', '3px', 'visited'],
+			]);
+			expect(styles[0]).toEqual(styles[1]);
 		},
 	);
 
