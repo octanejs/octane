@@ -7138,5 +7138,269 @@
     "reference": "stream-budget-32",
     "maxRatio": 0,
     "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
+  },
+  {
+    "suite": "client-hot-paths",
+    "op": "hydration_lookups",
+    "target": "branches-stable",
+    "reference": "branches-stable-work-budget",
+    "maxRatio": 1,
+    "note": "Mounted branch updates use at most one hydration lookup per branch, including stable, changed, and absent arms. Clean production controls verify output, identity, event captures, and effects."
+  },
+  {
+    "suite": "client-hot-paths",
+    "op": "hydration_lookups",
+    "target": "branches-toggle",
+    "reference": "branches-toggle-work-budget",
+    "maxRatio": 1,
+    "note": "Mounted branch updates use at most one hydration lookup per branch, including stable, changed, and absent arms. Clean production controls verify output, identity, event captures, and effects."
+  },
+  {
+    "suite": "client-hot-paths",
+    "op": "hydration_lookups",
+    "target": "branches-absent",
+    "reference": "branches-absent-work-budget",
+    "maxRatio": 1,
+    "note": "Mounted branch updates use at most one hydration lookup per branch, including stable, changed, and absent arms. Clean production controls verify output, identity, event captures, and effects."
+  },
+  {
+    "suite": "client-hot-paths",
+    "op": "hydration_lookups",
+    "target": "branches-mount",
+    "reference": "branches-mount-work-budget",
+    "maxRatio": 1,
+    "note": "Fresh branch mounts retain at most two hydration lookups per branch; output, event captures, layout effects, and cleanup match the clean production bundle."
+  },
+  {
+    "suite": "client-hot-paths",
+    "op": "flat_explicit",
+    "target": "keys-flat-implicit",
+    "reference": "keys-work-budget",
+    "maxRatio": 1,
+    "note": "Deterministic production key work for 128 rows plus explicit sentinels, or one keyed component. Preserve scoped identity, escaping, custom JSON fallback, and observable default-hint coercion under clean output, survivor, input/focus, and hydration controls. The reference is one work unit, not another implementation."
+  },
+  {
+    "suite": "client-hot-paths",
+    "op": "flat_implicit",
+    "target": "keys-flat-implicit",
+    "reference": "keys-work-budget",
+    "maxRatio": 128,
+    "note": "Deterministic production key work for 128 rows plus explicit sentinels, or one keyed component. Preserve scoped identity, escaping, custom JSON fallback, and observable default-hint coercion under clean output, survivor, input/focus, and hydration controls. The reference is one work unit, not another implementation."
+  },
+  {
+    "suite": "client-hot-paths",
+    "op": "path_json",
+    "target": "keys-flat-implicit",
+    "reference": "keys-work-budget",
+    "maxRatio": 0,
+    "note": "Deterministic production key work for 128 rows plus explicit sentinels, or one keyed component. Preserve scoped identity, escaping, custom JSON fallback, and observable default-hint coercion under clean output, survivor, input/focus, and hydration controls. The reference is one work unit, not another implementation."
+  },
+  {
+    "suite": "client-hot-paths",
+    "op": "scalar_json",
+    "target": "keys-flat-implicit",
+    "reference": "keys-work-budget",
+    "maxRatio": 0,
+    "note": "Deterministic production key work for 128 rows plus explicit sentinels, or one keyed component. Preserve scoped identity, escaping, custom JSON fallback, and observable default-hint coercion under clean output, survivor, input/focus, and hydration controls. The reference is one work unit, not another implementation."
+  },
+  {
+    "suite": "client-hot-paths",
+    "op": "tuple_json",
+    "target": "keys-flat-implicit",
+    "reference": "keys-work-budget",
+    "maxRatio": 0,
+    "note": "Deterministic production key work for 128 rows plus explicit sentinels, or one keyed component. Preserve scoped identity, escaping, custom JSON fallback, and observable default-hint coercion under clean output, survivor, input/focus, and hydration controls. The reference is one work unit, not another implementation."
+  },
+  {
+    "suite": "client-hot-paths",
+    "op": "flat_explicit",
+    "target": "keys-flat-explicit",
+    "reference": "keys-work-budget",
+    "maxRatio": 129,
+    "note": "Deterministic production key work for 128 rows plus explicit sentinels, or one keyed component. Preserve scoped identity, escaping, custom JSON fallback, and observable default-hint coercion under clean output, survivor, input/focus, and hydration controls. The reference is one work unit, not another implementation."
+  },
+  {
+    "suite": "client-hot-paths",
+    "op": "flat_implicit",
+    "target": "keys-flat-explicit",
+    "reference": "keys-work-budget",
+    "maxRatio": 0,
+    "note": "Deterministic production key work for 128 rows plus explicit sentinels, or one keyed component. Preserve scoped identity, escaping, custom JSON fallback, and observable default-hint coercion under clean output, survivor, input/focus, and hydration controls. The reference is one work unit, not another implementation."
+  },
+  {
+    "suite": "client-hot-paths",
+    "op": "path_json",
+    "target": "keys-flat-explicit",
+    "reference": "keys-work-budget",
+    "maxRatio": 0,
+    "note": "Deterministic production key work for 128 rows plus explicit sentinels, or one keyed component. Preserve scoped identity, escaping, custom JSON fallback, and observable default-hint coercion under clean output, survivor, input/focus, and hydration controls. The reference is one work unit, not another implementation."
+  },
+  {
+    "suite": "client-hot-paths",
+    "op": "scalar_json",
+    "target": "keys-flat-explicit",
+    "reference": "keys-work-budget",
+    "maxRatio": 0,
+    "note": "Deterministic production key work for 128 rows plus explicit sentinels, or one keyed component. Preserve scoped identity, escaping, custom JSON fallback, and observable default-hint coercion under clean output, survivor, input/focus, and hydration controls. The reference is one work unit, not another implementation."
+  },
+  {
+    "suite": "client-hot-paths",
+    "op": "tuple_json",
+    "target": "keys-flat-explicit",
+    "reference": "keys-work-budget",
+    "maxRatio": 0,
+    "note": "Deterministic production key work for 128 rows plus explicit sentinels, or one keyed component. Preserve scoped identity, escaping, custom JSON fallback, and observable default-hint coercion under clean output, survivor, input/focus, and hydration controls. The reference is one work unit, not another implementation."
+  },
+  {
+    "suite": "client-hot-paths",
+    "op": "flat_explicit",
+    "target": "keys-nested-implicit",
+    "reference": "keys-work-budget",
+    "maxRatio": 1,
+    "note": "Deterministic production key work for 128 rows plus explicit sentinels, or one keyed component. Preserve scoped identity, escaping, custom JSON fallback, and observable default-hint coercion under clean output, survivor, input/focus, and hydration controls. The reference is one work unit, not another implementation."
+  },
+  {
+    "suite": "client-hot-paths",
+    "op": "path_json",
+    "target": "keys-nested-implicit",
+    "reference": "keys-work-budget",
+    "maxRatio": 1,
+    "note": "Deterministic production key work for 128 rows plus explicit sentinels, or one keyed component. Preserve scoped identity, escaping, custom JSON fallback, and observable default-hint coercion under clean output, survivor, input/focus, and hydration controls. The reference is one work unit, not another implementation."
+  },
+  {
+    "suite": "client-hot-paths",
+    "op": "scalar_json",
+    "target": "keys-nested-implicit",
+    "reference": "keys-work-budget",
+    "maxRatio": 1,
+    "note": "Deterministic production key work for 128 rows plus explicit sentinels, or one keyed component. Preserve scoped identity, escaping, custom JSON fallback, and observable default-hint coercion under clean output, survivor, input/focus, and hydration controls. The reference is one work unit, not another implementation."
+  },
+  {
+    "suite": "client-hot-paths",
+    "op": "nested_implicit",
+    "target": "keys-nested-implicit",
+    "reference": "keys-work-budget",
+    "maxRatio": 128,
+    "note": "Deterministic production key work for 128 rows plus explicit sentinels, or one keyed component. Preserve scoped identity, escaping, custom JSON fallback, and observable default-hint coercion under clean output, survivor, input/focus, and hydration controls. The reference is one work unit, not another implementation."
+  },
+  {
+    "suite": "client-hot-paths",
+    "op": "tuple_json",
+    "target": "keys-nested-implicit",
+    "reference": "keys-work-budget",
+    "maxRatio": 0,
+    "note": "Deterministic production key work for 128 rows plus explicit sentinels, or one keyed component. Preserve scoped identity, escaping, custom JSON fallback, and observable default-hint coercion under clean output, survivor, input/focus, and hydration controls. The reference is one work unit, not another implementation."
+  },
+  {
+    "suite": "client-hot-paths",
+    "op": "flat_explicit",
+    "target": "keys-nested-explicit",
+    "reference": "keys-work-budget",
+    "maxRatio": 1,
+    "note": "Deterministic production key work for 128 rows plus explicit sentinels, or one keyed component. Preserve scoped identity, escaping, custom JSON fallback, and observable default-hint coercion under clean output, survivor, input/focus, and hydration controls. The reference is one work unit, not another implementation."
+  },
+  {
+    "suite": "client-hot-paths",
+    "op": "path_json",
+    "target": "keys-nested-explicit",
+    "reference": "keys-work-budget",
+    "maxRatio": 1,
+    "note": "Deterministic production key work for 128 rows plus explicit sentinels, or one keyed component. Preserve scoped identity, escaping, custom JSON fallback, and observable default-hint coercion under clean output, survivor, input/focus, and hydration controls. The reference is one work unit, not another implementation."
+  },
+  {
+    "suite": "client-hot-paths",
+    "op": "scalar_json",
+    "target": "keys-nested-explicit",
+    "reference": "keys-work-budget",
+    "maxRatio": 129,
+    "note": "Deterministic production key work for 128 rows plus explicit sentinels, or one keyed component. Preserve scoped identity, escaping, custom JSON fallback, and observable default-hint coercion under clean output, survivor, input/focus, and hydration controls. The reference is one work unit, not another implementation."
+  },
+  {
+    "suite": "client-hot-paths",
+    "op": "tuple_json",
+    "target": "keys-nested-explicit",
+    "reference": "keys-work-budget",
+    "maxRatio": 0,
+    "note": "Deterministic production key work for 128 rows plus explicit sentinels, or one keyed component. Preserve scoped identity, escaping, custom JSON fallback, and observable default-hint coercion under clean output, survivor, input/focus, and hydration controls. The reference is one work unit, not another implementation."
+  },
+  {
+    "suite": "client-hot-paths",
+    "op": "flat_explicit",
+    "target": "keys-escaped-explicit",
+    "reference": "keys-work-budget",
+    "maxRatio": 1,
+    "note": "Deterministic production key work for 128 rows plus explicit sentinels, or one keyed component. Preserve scoped identity, escaping, custom JSON fallback, and observable default-hint coercion under clean output, survivor, input/focus, and hydration controls. The reference is one work unit, not another implementation."
+  },
+  {
+    "suite": "client-hot-paths",
+    "op": "path_json",
+    "target": "keys-escaped-explicit",
+    "reference": "keys-work-budget",
+    "maxRatio": 1,
+    "note": "Deterministic production key work for 128 rows plus explicit sentinels, or one keyed component. Preserve scoped identity, escaping, custom JSON fallback, and observable default-hint coercion under clean output, survivor, input/focus, and hydration controls. The reference is one work unit, not another implementation."
+  },
+  {
+    "suite": "client-hot-paths",
+    "op": "scalar_json",
+    "target": "keys-escaped-explicit",
+    "reference": "keys-work-budget",
+    "maxRatio": 129,
+    "note": "Deterministic production key work for 128 rows plus explicit sentinels, or one keyed component. Preserve scoped identity, escaping, custom JSON fallback, and observable default-hint coercion under clean output, survivor, input/focus, and hydration controls. The reference is one work unit, not another implementation."
+  },
+  {
+    "suite": "client-hot-paths",
+    "op": "tuple_json",
+    "target": "keys-escaped-explicit",
+    "reference": "keys-work-budget",
+    "maxRatio": 0,
+    "note": "Deterministic production key work for 128 rows plus explicit sentinels, or one keyed component. Preserve scoped identity, escaping, custom JSON fallback, and observable default-hint coercion under clean output, survivor, input/focus, and hydration controls. The reference is one work unit, not another implementation."
+  },
+  {
+    "suite": "client-hot-paths",
+    "op": "flat_explicit",
+    "target": "keys-custom-json-explicit",
+    "reference": "keys-work-budget",
+    "maxRatio": 1,
+    "note": "Deterministic production key work for 128 rows plus explicit sentinels, or one keyed component. Preserve scoped identity, escaping, custom JSON fallback, and observable default-hint coercion under clean output, survivor, input/focus, and hydration controls. The reference is one work unit, not another implementation."
+  },
+  {
+    "suite": "client-hot-paths",
+    "op": "path_json",
+    "target": "keys-custom-json-explicit",
+    "reference": "keys-work-budget",
+    "maxRatio": 0,
+    "note": "Deterministic production key work for 128 rows plus explicit sentinels, or one keyed component. Preserve scoped identity, escaping, custom JSON fallback, and observable default-hint coercion under clean output, survivor, input/focus, and hydration controls. The reference is one work unit, not another implementation."
+  },
+  {
+    "suite": "client-hot-paths",
+    "op": "scalar_json",
+    "target": "keys-custom-json-explicit",
+    "reference": "keys-work-budget",
+    "maxRatio": 0,
+    "note": "Deterministic production key work for 128 rows plus explicit sentinels, or one keyed component. Preserve scoped identity, escaping, custom JSON fallback, and observable default-hint coercion under clean output, survivor, input/focus, and hydration controls. The reference is one work unit, not another implementation."
+  },
+  {
+    "suite": "client-hot-paths",
+    "op": "tuple_json",
+    "target": "keys-custom-json-explicit",
+    "reference": "keys-work-budget",
+    "maxRatio": 129,
+    "note": "Deterministic production key work for 128 rows plus explicit sentinels, or one keyed component. Preserve scoped identity, escaping, custom JSON fallback, and observable default-hint coercion under clean output, survivor, input/focus, and hydration controls. The reference is one work unit, not another implementation."
+  },
+  {
+    "suite": "client-hot-paths",
+    "op": "component_coercions",
+    "target": "keys-component-primitive",
+    "reference": "keys-work-budget",
+    "maxRatio": 1,
+    "note": "Deterministic production key work for 128 rows plus explicit sentinels, or one keyed component. Preserve scoped identity, escaping, custom JSON fallback, and observable default-hint coercion under clean output, survivor, input/focus, and hydration controls. The reference is one work unit, not another implementation."
+  },
+  {
+    "suite": "client-hot-paths",
+    "op": "component_coercions",
+    "target": "keys-component-object",
+    "reference": "keys-work-budget",
+    "maxRatio": 1,
+    "note": "Deterministic production key work for 128 rows plus explicit sentinels, or one keyed component. Preserve scoped identity, escaping, custom JSON fallback, and observable default-hint coercion under clean output, survivor, input/focus, and hydration controls. The reference is one work unit, not another implementation."
   }
 ]
