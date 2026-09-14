@@ -317,6 +317,49 @@ describe('react-hosted island — transparent context via the owner bridge', () 
 		expect(mounted.host().querySelector('.themed')?.textContent).toBe('theme:mirror-default-theme');
 		await mounted.unmount();
 	});
+
+	it('keeps the surviving root on its owner when a sibling owner root unmounts', () => {
+		// Two bound roots coexist (the common react-hosted deployment); tearing
+		// one down must leave the survivor's bridge resolution intact.
+		const Theme = createContext('unbound-default');
+		function Envelope(props: { owner?: object }) {
+			if (props.owner !== undefined) bindRendererRegionOwner(props);
+			return createElement('output', { className: 'sibling-theme' }, use(Theme));
+		}
+		function ownedProps(value: string) {
+			const owner = {
+				active: true,
+				readContext: () => value,
+				routeError: () => false,
+				routeSuspense: () => false,
+				registerDispose: () => () => {},
+			};
+			const props = { owner };
+			Object.defineProperty(props, RENDERER_REGION_OWNER, { value: owner });
+			return props;
+		}
+		const containerA = document.createElement('div');
+		const containerB = document.createElement('div');
+		document.body.append(containerA, containerB);
+		const rootA = createRoot(containerA);
+		const rootB = createRoot(containerB);
+		try {
+			rootA.render(Envelope, ownedProps('owner-a'));
+			rootB.render(Envelope, ownedProps('owner-b'));
+			const outputA = containerA.querySelector('.sibling-theme')!;
+			const outputB = containerB.querySelector('.sibling-theme')!;
+			expect(outputA.textContent).toBe('owner-a');
+			expect(outputB.textContent).toBe('owner-b');
+
+			rootA.unmount();
+			octaneFlushSync(() => rootB.render(Envelope, ownedProps('owner-b2')));
+			expect(outputB.textContent).toBe('owner-b2');
+		} finally {
+			rootB.unmount();
+			containerA.remove();
+			containerB.remove();
+		}
+	});
 });
 
 describe('react-hosted island — suspension and error escape', () => {
