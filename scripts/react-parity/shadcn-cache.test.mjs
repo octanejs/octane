@@ -26,13 +26,19 @@ test("Shadcn project setup preserves the other project's compiled React cache", 
 			{ recursive: true },
 		);
 		const require = createRequire(join(repo, 'packages/shadcn/package.json'));
-		const source = readFileSync(
-			join(repo, 'packages/shadcn/tests/differential/_setup.ts'),
-			'utf8',
-		).replace(
-			/from '(@tsrx\/react|esbuild)'/g,
-			(_, name) => `from '${pathToFileURL(require.resolve(name)).href}'`,
-		);
+		const source = readFileSync(join(repo, 'packages/shadcn/tests/differential/_setup.ts'), 'utf8')
+			.replace(
+				/from '(@tsrx\/react|esbuild)'/g,
+				(_, name) => `from '${pathToFileURL(require.resolve(name)).href}'`,
+			)
+			.replace(
+				/from '[^']*test-utils\/differential-precompile\.js'/g,
+				`from '${pathToFileURL(join(repo, 'test-utils/differential-precompile.ts')).href}'`,
+			)
+			.replace(
+				/depsFrom: import\.meta\.url/g,
+				`depsFrom: ${JSON.stringify(pathToFileURL(join(repo, 'packages/shadcn/package.json')).href)}`,
+			);
 		const modulePath = join(differential, '_setup.mjs');
 		writeFileSync(
 			modulePath,
