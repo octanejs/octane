@@ -4,9 +4,18 @@ import { colorEvaluations } from './style-literal-values.js';
 
 const mode = new URL(location.href).searchParams.get('case') || 'single';
 if (
-	!['single', 'multi', 'generic', 'interleaved', 'duplicateStatic', 'duplicateDynamic'].includes(
-		mode,
-	)
+	![
+		'single',
+		'multi',
+		'generic',
+		'interleaved',
+		'duplicateStatic',
+		'duplicateDynamic',
+		'leadingSpread',
+		'leadingGeneric',
+		'collisionSpread',
+		'collisionGeneric',
+	].includes(mode)
 ) {
 	throw new Error(`Unknown inline style benchmark case: ${mode}`);
 }
