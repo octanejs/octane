@@ -1,3 +1,4 @@
+export { trustHTML, type TrustedHTML } from '../trusted-html.js';
 /**
  * `octane/server` — server-rendering entry.
  *

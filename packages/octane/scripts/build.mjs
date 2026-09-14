@@ -82,6 +82,7 @@ cpSync(join(src, 'dom-tables.d.ts'), join(dist, 'dom-tables.d.ts'));
 cpSync(join(src, 'event-names.d.ts'), join(dist, 'event-names.d.ts'));
 cpSync(join(src, 'html-tree-validation.d.ts'), join(dist, 'html-tree-validation.d.ts'));
 cpSync(join(src, 'jsx-runtime.d.ts'), join(dist, 'jsx-runtime.d.ts'));
+cpSync(join(src, 'jsx-runtime-strong.d.ts'), join(dist, 'jsx-runtime-strong.d.ts'));
 
 execFileSync(join(root, 'node_modules/.bin/tsc'), ['-p', join(pkgDir, 'tsconfig.build.json')], {
 	stdio: 'inherit',

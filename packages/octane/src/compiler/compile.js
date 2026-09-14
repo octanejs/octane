@@ -82,6 +82,7 @@ import { assertNoLiveClientOnlyImports } from './client-only-server.js';
 import { nsForChildren, nsForSelf } from './jsx-namespace.js';
 import { analyzeNativeChangeDiagnostics } from './native-change-diagnostics.js';
 import { assertStrongMode } from './strong-mode.js';
+import { applyStrongAutomaticMemo } from './strong-auto-memo.js';
 import {
 	assertNativeReadDiagnostics,
 	assertNativeReadOptions,
@@ -8871,11 +8872,18 @@ function compileAuthored(source, filename, options, bundlerMetadata) {
 	adoptParserAst(analyzedAst);
 	options = nativeReadOptions(analyzedAst, options);
 	assertNativeReadDiagnostics(analyzedAst, source, cleanFilename, options);
-	const strongModeEnabled =
-		assertStrongMode(analyzedAst, source, cleanFilename, options)?.enabled === true;
+	const strongAnalysis = assertStrongMode(analyzedAst, source, cleanFilename, options);
+	const strongModeEnabled = strongAnalysis?.enabled === true;
 	if (bundlerMetadata !== null) bundlerMetadata.hydrateAst = analyzedAst;
+	const memoizedAst = strongModeEnabled
+		? applyStrongAutomaticMemo(analyzedAst, {
+				...options,
+				filename: cleanFilename,
+				strongHookAnalysis: strongAnalysis.strongHookAnalysis,
+			})
+		: analyzedAst;
 	const textTypedAst = applyStringChildProofs(
-		analyzedAst,
+		memoizedAst,
 		source,
 		cleanFilename,
 		options?.textTypeFacts,
@@ -8892,16 +8900,28 @@ function compileAuthored(source, filename, options, bundlerMetadata) {
 			bundlerMetadata.cssModuleConstantImports = constants.imports;
 		}
 	}
-	return compileInternal(
+	const result = compileInternal(
 		source,
 		filename,
-		options,
+		strongAnalysis?.nativeChangeAnalysis
+			? {
+					...options,
+					// Strong already analyzed the authored hosts. The classifications use
+					// source offsets, which the copy-on-write transforms preserve.
+					__nativeChangeAnalysis: strongAnalysis.nativeChangeAnalysis,
+					__nativeChangeDiagnostics: strongAnalysis.nativeChangeAnalysis.diagnostics,
+				}
+			: options,
 		constantAst,
 		mode,
 		bundlerMetadata,
-		textTypedAst !== analyzedAst,
+		textTypedAst !== memoizedAst,
 		strongModeEnabled,
 	);
+	if (strongAnalysis?.diagnostics.length > 0) {
+		result.diagnostics = [...strongAnalysis.diagnostics, ...(result.diagnostics ?? [])];
+	}
+	return result;
 }
 
 function compileInternal(
