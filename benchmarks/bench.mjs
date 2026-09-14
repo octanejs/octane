@@ -1277,6 +1277,26 @@ const SUITES = [
 		],
 	},
 	{
+		// Deterministic branch hydration lookups and descriptor-key work, with
+		// output, identity, event/effect, coercion, and hydration controls.
+		name: 'client-hot-paths',
+		cwd: 'client-hot-paths',
+		servers: [],
+		iter: { normal: 1, quick: 1 },
+		runs: [
+			{
+				script: 'branches.mjs',
+				args: () => [],
+				env: (_n, quick) => ({
+					BRANCH_CYCLES: quick ? '16' : '128',
+					BRANCH_SAMPLES: quick ? '1' : '7',
+					BRANCH_WARMUP: quick ? '2' : '128',
+				}),
+			},
+			{ script: 'keys.mjs', args: () => [] },
+		],
+	},
+	{
 		name: 'compiler-output',
 		cwd: 'compiler-output',
 		servers: [],

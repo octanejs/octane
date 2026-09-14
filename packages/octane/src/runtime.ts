@@ -32395,9 +32395,9 @@ export function ifBlock(
 	// Hoisted-helper env tuple (compiled-output Phase 2) — see renderBranchSlot.
 	env?: any[],
 ): void {
-	const hydration = activeHydration();
 	let state = parentScope.slots[slotKey] as IfSlot | undefined;
 	if (state === undefined) {
+		const hydration = activeHydration();
 		let start: Comment | null = null;
 		let end: Node | null = null;
 		const passthrough = hydration?.passthroughRanges === true;
@@ -33303,9 +33303,9 @@ export function switchBlock(
 	// Hoisted-helper env tuple (compiled-output Phase 2) — see renderBranchSlot.
 	env?: any[],
 ): void {
-	const hydration = activeHydration();
 	let state = parentScope.slots[slotKey] as SwitchSlot | undefined;
 	if (state === undefined) {
+		const hydration = activeHydration();
 		let start: Comment | null = null;
 		let end: Node | null = null;
 		const passthrough = hydration?.passthroughRanges === true;
