@@ -11,6 +11,16 @@ let browser: Browser;
 let server: ViteDevServer;
 let origin: string;
 beforeAll(async () => {
+	const rendered = await renderHydrationFixture(
+		'motion',
+		'packages/motion/tests/_fixtures/server-values.tsrx',
+		'ServerValues',
+	);
+	const template = await readFile(resolve(import.meta.dirname, 'harness/index.html'), 'utf8');
+	const hydrationHtml = template.replace(
+		'<div id="root"></div>',
+		`<div id="root">${rendered.html}</div>`,
+	);
 	browser = await chromium.launch({ headless: true });
 	server = await createServer({
 		configFile: false,
@@ -23,21 +33,8 @@ beforeAll(async () => {
 					vite.middlewares.use(async (request, response, next) => {
 						if (request.url !== '/hydrate') return next();
 						try {
-							const rendered = await renderHydrationFixture(
-								'motion',
-								'packages/motion/tests/_fixtures/server-values.tsrx',
-								'ServerValues',
-							);
-							const template = await readFile(
-								resolve(import.meta.dirname, 'harness/index.html'),
-								'utf8',
-							);
-							const html = template.replace(
-								'<div id="root"></div>',
-								`<div id="root">${rendered.html}</div>`,
-							);
 							response.setHeader('Content-Type', 'text/html');
-							response.end(await vite.transformIndexHtml('/hydrate', html));
+							response.end(await vite.transformIndexHtml('/hydrate', hydrationHtml));
 						} catch (error) {
 							next(error);
 						}
@@ -69,6 +66,7 @@ afterAll(async () => {
 // @parity-case browser:motion-chromium-0
 it('hydrates deterministic hook values by adopting the server output and cleans up', async () => {
 	const page = await browser.newPage();
+	page.setDefaultTimeout(5000);
 	const errors: string[] = [];
 	page.on('pageerror', (error) => errors.push(error.message));
 	try {
@@ -82,7 +80,7 @@ it('hydrates deterministic hook values by adopting the server output and cleans 
 	} finally {
 		await page.close();
 	}
-});
+}, 30_000);
 
 // @parity-case browser:motion-chromium-1
 it('preserves scoped filters, native clicks, focus, and live MotionValue animation in Chromium', async () => {

@@ -122,7 +122,7 @@ writeInventory(
 	wrapperInventory(
 		'intersection-observer-pristine',
 		'packages/intersection-observer/tests/upstream-original.test.ts',
-		'runs the pinned react-intersection-observer 10.1.0 suite unchanged',
+		'runs the pinned react-intersection-observer 11.0.1 suite unchanged',
 	),
 );
 
@@ -141,7 +141,7 @@ writeInventory(
 	wrapperInventory(
 		'intersection-observer-pristine-browser',
 		'packages/intersection-observer/tests/upstream-browser-original.test.ts',
-		'runs the pinned react-intersection-observer 10.1.0 browser suite unchanged',
+		'runs the pinned react-intersection-observer 11.0.1 browser suite unchanged',
 	),
 );
 
@@ -151,11 +151,19 @@ const adapted = inventoryFromListed(
 	function keepJsdom(file) {
 		return (
 			file.startsWith('packages/intersection-observer/tests/upstream/') &&
-			file !== 'packages/intersection-observer/tests/upstream/browser.test.tsx'
+			file !== 'packages/intersection-observer/tests/upstream/browser.test.tsx' &&
+			file !== 'packages/intersection-observer/tests/upstream/useInView.ssr.test.ts'
 		);
 	},
 );
 writeInventory('packages/intersection-observer/audit/adapted-runtime.json', adapted);
+
+const adaptedSsr = inventoryFromListed(
+	'intersection-observer-adapted-ssr',
+	listProjectTests('intersection-observer-adapted-ssr'),
+	(file) => file === 'packages/intersection-observer/tests/upstream/useInView.ssr.test.ts',
+);
+writeInventory('packages/intersection-observer/audit/adapted-ssr-runtime.json', adaptedSsr);
 
 const adaptedBrowser = inventoryFromListed(
 	'intersection-observer-adapted-browser',
@@ -166,12 +174,23 @@ const adaptedBrowser = inventoryFromListed(
 );
 writeInventory('packages/intersection-observer/audit/adapted-browser-runtime.json', adaptedBrowser);
 
+const native = inventoryFromListed(
+	'intersection-observer',
+	listProjectTests('intersection-observer'),
+	(file) => file.startsWith('packages/intersection-observer/tests/') && !file.includes('/upstream'),
+);
+native.roots = ['packages/intersection-observer/tests'];
+writeInventory('packages/intersection-observer/audit/native-runtime.json', native);
+
 const { inventory: typeInventory } = renderTypeInventories(root);
 writeInventory('packages/intersection-observer/audit/pristine-types.json', typeInventory.upstream);
 writeInventory('packages/intersection-observer/audit/adapted-types.json', typeInventory.adapted);
 
 const crosswalk = verifyIntersectionObserverRuntimeCrosswalk(root);
-console.log('adapted runtime summary', summarizeRuntimeInventories([adapted, adaptedBrowser]));
+console.log(
+	'adapted runtime summary',
+	summarizeRuntimeInventories([adapted, adaptedSsr, adaptedBrowser]),
+);
 console.log(
 	`pristine/adapted crosswalk ok (unit=${crosswalk.unitCases}, browser=${crosswalk.browserCases})`,
 );

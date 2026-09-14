@@ -1,0 +1,56 @@
+diff --git a/tests/upstream/useOnInView.test.tsx b/tests/upstream/useOnInView.test.tsx
+--- a/tests/upstream/useOnInView.test.tsx
++++ b/tests/upstream/useOnInView.test.tsx
+@@ -1,8 +1,7 @@
+ import { render, screen } from "@octanejs/testing-library";
+-import { Profiler, StrictMode, useCallback, useEffect, useState } from "octane";
++import { StrictMode, useCallback, useEffect, useState } from "octane";
+ import type { IntersectionChangeEffect, IntersectionEffectOptions } from "../../src/index";
+ import { intersectionMockInstance, mockAllIsIntersecting } from "../../src/test-utils";
+-import { supportsRefCleanup } from "../../src/useIntersectionObserverRef.tsrx";
+ import { useOnInView } from "../../src/useOnInView.tsrx";
+ 
+ const OnInViewChangedComponent = ({
+@@ -152,21 +151,8 @@ const UseOnInViewLifecycleProbe = ({
+   );
+ };
+ 
+-test.each([
+-  ["19.0.0", true],
+-  ["19.0.0-rc.1", true],
+-  ["19.0.0-experimental-abcdef", true],
+-  ["20.1.0", false],
+-  ["18.3.1", false],
+-  ["17.0.2", false],
+-  [undefined, false],
+-  ["unknown", false],
+-  ["19unknown", false],
+-  ["19", false],
+-  ["v19.0.0", false],
+-])("detects ref cleanup support for React version %s", (version, expected) => {
+-  expect(supportsRefCleanup(version)).toBe(expected);
+-});
++// OCTANE DIVERGENCE[intersection-observer-ref-cleanup-version]: The 11 React-version detection cases run only in the unchanged React oracle; Octane always supports callback-ref cleanup.
++
+ 
+ test("should create a hook with useOnInView", () => {
+   const { getByTestId } = render(<OnInViewChangedComponent />);
+@@ -536,16 +522,11 @@ test("should track thresholds when crossing multiple in a single update", () =>
+ 
+ test("mounting useOnInView does not cause a hook-owned rerender", () => {
+   const onRender = vi.fn();
+-  const onCommit = vi.fn();
+ 
+-  render(
+-    <Profiler id="useOnInView" onRender={onCommit}>
+-      <UseOnInViewLifecycleProbe onRender={onRender} />
+-    </Profiler>,
+-  );
++  // OCTANE DIVERGENCE[intersection-observer-profiler]: Octane has no React Profiler commit callback. Preserve the hook's render and observer assertions.
++  render(<UseOnInViewLifecycleProbe onRender={onRender} />);
+ 
+   expect(onRender).toHaveBeenCalledTimes(1);
+-  expect(onCommit).toHaveBeenCalledTimes(1);
+   expect(window.IntersectionObserver).toHaveBeenCalledTimes(1);
+ });
+ 

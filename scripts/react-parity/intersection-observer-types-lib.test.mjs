@@ -15,7 +15,7 @@ async function fixture() {
 		{ recursive: true },
 	);
 	await cp(
-		new URL('../../packages/intersection-observer/typetests', import.meta.url),
+		new URL('../../packages/intersection-observer/typetests/paired', import.meta.url),
 		adaptedRoot,
 		{ recursive: true },
 	);
@@ -47,7 +47,7 @@ test('rejects deleting an adapted assertion', async function rejectsDeletedAsser
 	});
 	const file = join(value.adaptedRoot, 'public-api.test-d.ts');
 	const source = await readFile(file, 'utf8');
-	await writeFile(file, source.replace(/\nexpectType<typeof InView>\(InView\);/, ''));
+	await writeFile(file, source.replace(/\nexpectType<boolean>\(hook.inView\);/, ''));
 	assert.throws(function run() {
 		buildTypeInventory(value.root, value.config);
 	}, /assertion groups differ/);

@@ -45,9 +45,10 @@ export function EffectSwapProbe(props: {
 
 export function HookSwapProbe(props: {
 	alternate: boolean;
+	initialInView?: boolean;
 	onChange(inView: boolean, entry: IntersectionObserverEntry): void;
 }) {
-	const { ref } = useInView({ onChange: props.onChange });
+	const { ref } = useInView({ onChange: props.onChange, initialInView: props.initialInView });
 	if (props.alternate) return <span ref={ref} data-testid="hook-swap">alternate</span>;
 	return <div ref={ref} data-testid="hook-swap">initial</div>;
 }

@@ -11,6 +11,7 @@ type HydrationBinding =
 	| 'base-ui'
 	| 'docusaurus'
 	| 'formisch'
+	| 'intersection-observer'
 	| 'mantine-hooks'
 	| 'monaco-editor'
 	| 'motion'
@@ -51,7 +52,7 @@ function bindingAliases(binding: HydrationBinding) {
 		];
 	}
 
-	if (binding === 'mantine-hooks' || binding === 'motion') {
+	if (binding === 'mantine-hooks' || binding === 'motion' || binding === 'intersection-observer') {
 		return [
 			{ find: new RegExp(`^@octanejs/${binding}$`), replacement: resolve(source, 'index.ts') },
 		];

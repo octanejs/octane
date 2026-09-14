@@ -9,6 +9,8 @@ export type {
 	IntersectionChangeEffect,
 	IntersectionEffectOptions,
 	IntersectionObserverInitWithOptions,
+	IntersectionObserverProps,
 	IntersectionOptions,
 	ObserverInstanceCallback,
+	PlainChildrenProps,
 } from './types.js';

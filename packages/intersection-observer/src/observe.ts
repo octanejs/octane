@@ -90,7 +90,10 @@ export function observe(
 	}
 	callbacks.push(callback);
 
+	let unobserved = false;
 	return () => {
+		if (unobserved) return;
+		unobserved = true;
 		const current = elements.get(element);
 		if (!current) return;
 		const index = current.indexOf(callback);

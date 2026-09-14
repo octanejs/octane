@@ -11,16 +11,9 @@
     "integrity": "sha256:6d96212b304a73247aaf9fe58e45dc1ba980edd2a4bb828f3af93da1b1e9dde4",
     "verification": "recorded-unverified"
   },
-  "upstreamSuites": {
-    "runtime": "present",
-    "types": "present"
-  },
+  "upstreamSuites": { "runtime": "present", "types": "present" },
   "adaptedRoots": {
-    "source": {
-      "roots": ["packages/motion/src"],
-      "include": ["\\.ts$"],
-      "exclude": []
-    },
+    "source": { "roots": ["packages/motion/src"], "include": ["\\.ts$"], "exclude": [] },
     "tests": {
       "roots": ["packages/motion/tests/upstream"],
       "include": ["\\.test\\.tsx?$"],
@@ -40,7 +33,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "5d0ef3193d6165baec9ebfa9554b1198601fd8bf3c87322b2582cc287230f56a"
+      "lockfileSha256": "ea8728b67a5f6e8d80125b4813431d3bb39ad0615fd89f6ec5eb1dab273ac7dc"
     }
   },
   "lanes": [
@@ -478,7 +471,7 @@
         {
           "path": "packages/motion/tests/browser/motion.browser.test.ts",
           "role": "test",
-          "sha256": "86e249a8cd4f218843f628507a3bd551d15e1a4d4a786d2dd6d84a09426ad2f3",
+          "sha256": "ebe22ac2801012454e7312595a00ac025c9f5ae8c33a1f3b7a593dbd9143f8e7",
           "cases": [
             {
               "id": "browser:motion-chromium-0",
@@ -532,7 +525,7 @@
         {
           "path": "packages/octane/tests/_hydration-ssr.ts",
           "role": "support",
-          "sha256": "3f414a9a4ec6668304f6b51ee33f4eeeb83ff642b6730c88ca9311e99b73bf51"
+          "sha256": "2836641eb447656ffc8cd5d910a4073362c1899777d510b6bc05ffa930c2c86e"
         },
         {
           "path": "packages/motion/tests/_fixtures/host-contracts.tsrx",

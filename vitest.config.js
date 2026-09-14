@@ -6441,6 +6441,24 @@ export default defineConfig({
 			{
 				testExecution: { group: 'react-parity' },
 				test: {
+					name: 'intersection-observer-adapted-ssr',
+					include: ['packages/intersection-observer/tests/upstream/useInView.ssr.test.ts'],
+					environment: 'node',
+					globals: true,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
 					name: 'intersection-observer-pristine',
 					include: ['packages/intersection-observer/tests/upstream-original.test.ts'],
 					environment: 'node',
@@ -6461,6 +6479,7 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'intersection-observer',
 					include: [
@@ -6504,7 +6523,10 @@ export default defineConfig({
 						'packages/intersection-observer/tests/upstream/**/*.test.ts',
 						'packages/intersection-observer/tests/upstream/**/*.test.tsx',
 					],
-					exclude: ['packages/intersection-observer/tests/upstream/browser.test.tsx'],
+					exclude: [
+						'packages/intersection-observer/tests/upstream/browser.test.tsx',
+						'packages/intersection-observer/tests/upstream/useInView.ssr.test.ts',
+					],
 					environment: 'jsdom',
 					globals: true,
 					setupFiles: ['packages/intersection-observer/tests/upstream-adapted.setup.ts'],

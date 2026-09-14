@@ -1,0 +1,20 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "strict": true,
+    "skipLibCheck": false,
+    "types": []
+  },
+  "include": [
+    "../src/**/*.ts",
+    "../src/**/*.tsrx",
+    "../tests/types/public-api.ts",
+    "./paired/public-api.test-d.ts"
+  ],
+  "exclude": [],
+  "reactPortEvidence": {
+    "gate": "upstream-types-adapted",
+    "upstreamRegistrations": [],
+    "publicMode": "pinned"
+  }
+}

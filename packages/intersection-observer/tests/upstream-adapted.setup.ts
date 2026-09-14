@@ -1,4 +1,8 @@
 import { afterEach, beforeEach, vi } from 'vitest';
+import * as matchers from '@testing-library/jest-dom/matchers';
+
+// Use this project's active expect instance, including its snapshot state.
+expect.extend(matchers);
 
 /**
  * Install a non-mock IntersectionObserver before test-utils captures

@@ -1,8 +1,9 @@
 import { createElement, isChildrenBlock, useRef } from 'octane';
+import type { OctaneNode } from 'octane';
 import { useInView } from './useInView.tsrx';
 import type { InViewProps, InViewRenderProps } from './types.js';
 
-export function InView(props: InViewProps) {
+export function InView(props: InViewProps): OctaneNode {
 	const {
 		children,
 		as = 'div',

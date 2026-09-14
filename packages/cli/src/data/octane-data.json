@@ -535,21 +535,23 @@
       "category": "UI Utilities",
       "upstream": {
         "package": "react-intersection-observer",
-        "version": "10.1.0",
-        "source": "https://github.com/thebuilder/react-intersection-observer/tree/v10.1.0",
+        "version": "11.0.1",
+        "source": "https://github.com/thebuilder/react-intersection-observer/tree/aa231b3a23ec000db0edb434693f9661ff422970/packages/react-intersection-observer",
         "license": "MIT"
       },
-      "surface": "Public runtime surface at react-intersection-observer 10.1.0: useInView, useOnInView, InView, observe, defaultFallbackInView, and test utilities. Pinned upstream unit and browser suites plus one-for-one adapted runtime/type probes are registered with react-parity:check.",
+      "surface": "Complete react-intersection-observer 11.0.1 public hooks, component, observer and test-utils surface. Ref cleanup, generic effect targets and all named public types are preserved, with strict types and unchanged React unit/SSR/browser oracles.",
       "divergences": [
         "Public node and prop types use Octane structural types and do not import React.",
         "InView is implemented as a function component while preserving the upstream render-prop and wrapper behavior.",
         "In TSRX, an InView render function must be supplied through the children prop; nested children compile to an opaque render block.",
         "Unsupported false fallback (`fallbackInView={false}` / `defaultFallbackInView(false)`) does not emit `onChange(false)` on mount under Octane (`intersection-observer-initial-false-onchange`): treat the default hidden state as authoritative rather than waiting for that callback.",
-        "Unsupported IntersectionObserver without a fallback surfaces as a passive-effect `console.error` under Octane rather than a synchronous mount throw (`intersection-observer-unsupported-mount-error-surface`); wrap with an error boundary/`tryBlock` or supply `fallbackInView`/`defaultFallbackInView` instead of try/catch around render.",
-        "`@octanejs/intersection-observer/test-utils` does not auto-register Vitest/Jest beforeEach/afterEach (`intersection-observer-test-utils-manual-setup`); call `setupIntersectionMocking`/`resetIntersectionMocking` in the test setup file."
+        "Unsupported IntersectionObserver without a fallback surfaces as a ref-commit `console.error` under Octane rather than a synchronous mount throw (`intersection-observer-unsupported-mount-error-surface`); wrap with an error boundary/`tryBlock` or supply `fallbackInView`/`defaultFallbackInView` instead of try/catch around render.",
+        "`@octanejs/intersection-observer/test-utils` does not auto-register Vitest/Jest beforeEach/afterEach (`intersection-observer-test-utils-manual-setup`); call `setupIntersectionMocking`/`resetIntersectionMocking` in the test setup file.",
+        "Ref callbacks return cleanup functions on every supported Octane version; the private React-version detection table is inapplicable.",
+        "React Profiler is not an Octane API. Adapted performance cases retain their component render and observer-construction counts."
       ],
-      "ssr": "Supported. Observation begins in an effect; initialInView controls deterministic server output.",
-      "verified": "2026-07-30"
+      "ssr": "Supported. initialInView controls deterministic server output; observation starts when the client ref is committed. Hydration adopts server nodes and unmount disconnects observation.",
+      "verified": "2026-09-13"
     },
     {
       "name": "@octanejs/jotai",

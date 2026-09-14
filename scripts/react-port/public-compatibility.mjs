@@ -55,6 +55,21 @@ export function publicCompatibilityDeclarations(binding) {
 }
 
 export function publicCompatibilityExport(specifier, name) {
+	// Upstream test-utils declares the ambient vi.fn symbol. The native
+	// binding keeps its existing standalone mock-factory contract, without
+	// publishing a dependency on Vitest ambient globals.
+	if (
+		specifier === '@octanejs/intersection-observer/test-utils' &&
+		name === 'setupIntersectionMocking'
+	)
+		return { specifier: specifier + '#prior-binding', path: name };
+
+	// InView was already a native function component. Preserve its Octane
+	// children/ref/host-prop contract against the complete pre-update receipt;
+	// a React class instance is not the native function's render result.
+	if (specifier === '@octanejs/intersection-observer' && name === 'InView')
+		return { specifier: specifier + '#prior-binding', path: name };
+
 	// The existing binding names React's dependency-list shape. The exact npm
 	// declaration imports that type for its hook parameters without re-exporting it.
 	if (specifier === '@octanejs/alien-signals' && name === 'DependencyList')
