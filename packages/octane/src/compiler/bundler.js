@@ -524,17 +524,17 @@ class OctaneBundlerCompiler {
 		// Octane islands): when enabled, a project `.tsrx` is Octane's by
 		// extension (nothing else compiles the syntax), and a project
 		// `.tsx`/`.ts`/`.js` is Octane's only if it opens with a leading
-		// `/** @jsxImportSource octane */` pragma (any registered renderer's
-		// intrinsics module also counts) — full compilation for `.tsx`, hook
-		// slotting for plain `.ts`/`.js`. A leading pragma naming a foreign
-		// source (`react`, …) does NOT claim the file. Unmarked project
+		// `/** @jsxImportSource octane */` pragma (the `octane/strong` type
+		// surface and registered renderer intrinsics also count) — full
+		// compilation for `.tsx`, hook slotting for plain `.ts`/`.js`. A leading
+		// pragma naming a foreign source (`react`, …) does NOT claim the file. Unmarked project
 		// modules pass through to the host toolchain. Installed/linked
 		// packages keep their manifest `usesOctane` decision. The pragma
 		// always ships unchanged — it is meaningful to TypeScript and
 		// downstream tools (in a JSX-less `.ts`/`.js` module TypeScript
 		// ignores it, so there it acts purely as the ownership marker).
 		this.requireDirective = options.requireDirective === true;
-		this.pragmaOwnedModules = new Set([DOM_RENDERER_MODULE]);
+		this.pragmaOwnedModules = new Set([DOM_RENDERER_MODULE, 'octane/strong']);
 		for (const renderer of Object.values(this.renderers.registry)) {
 			if (renderer.intrinsics !== undefined) this.pragmaOwnedModules.add(renderer.intrinsics);
 		}
@@ -692,7 +692,7 @@ class OctaneBundlerCompiler {
 
 	/**
 	 * Does a leading `@jsxImportSource` pragma claim this module for Octane?
-	 * `octane` itself and every registered renderer's intrinsics module count;
+	 * `octane`, its Strong type surface, and registered renderer intrinsics count;
 	 * a pragma naming a FOREIGN source (`react`, `@emotion/react`, …) does not
 	 * claim the file — under the requireDirective gate the module behaves
 	 * exactly like an unmarked one.
@@ -707,9 +707,9 @@ class OctaneBundlerCompiler {
 	 * A project `.tsrx` is Octane's by extension — in an Octane pipeline
 	 * nothing else compiles the syntax, so there is nothing to opt into;
 	 * every other project module is Octane's only when `pragmaOwned` (its
-	 * leading `@jsxImportSource` pragma names octane or a registered
-	 * renderer's intrinsics module). This gate covers full compilation; the
-	 * plain `.ts`/`.js` hook-slotting branch of `transform` applies the same
+	 * leading `@jsxImportSource` pragma names octane, octane/strong, or a
+	 * registered renderer's intrinsics module). This gate covers full compilation;
+	 * the plain `.ts`/`.js` hook-slotting branch of `transform` applies the same
 	 * pragma rule inline.
 	 * Two carve-outs: installed and linked packages are exempt (their
 	 * manifest `usesOctane` rule is already the explicit per-package
@@ -1347,15 +1347,16 @@ class OctaneBundlerCompiler {
 					: {}),
 			});
 			if (out === null) return passThrough();
-			return (
-				targetRuntimeRequests(out.code, 'slots', out.streamedSignals) ?? {
-					code: out.code,
-					map: out.map,
-					kind: 'slots',
-					...(out.streamedSignals === true ? { streamedSignals: true } : null),
-					...finishMetadata(collected),
-				}
-			);
+			// Strong plain modules report nonfatal hints like compiled modules do.
+			this._forwardCompileDiagnostics(out.diagnostics);
+			const slotted = targetRuntimeRequests(out.code, 'slots', out.streamedSignals) ?? {
+				code: out.code,
+				map: out.map,
+				kind: 'slots',
+				...(out.streamedSignals === true ? { streamedSignals: true } : null),
+				...finishMetadata(collected),
+			};
+			return out.diagnostics === undefined ? slotted : { ...slotted, diagnostics: out.diagnostics };
 		}
 
 		return passThrough();

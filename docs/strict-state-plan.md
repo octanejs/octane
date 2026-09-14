@@ -55,8 +55,10 @@ analysis follows synchronous calls through `useCallback`, `useEffectEvent`, and
 functions returned by analyzable `useMemo` factories. Statically known Effect
 Event calls during render (`OCTANE_STRONG_RENDER_EFFECT_EVENT_CALL`) and Effect
 Events in explicit hook dependency lists
-(`OCTANE_STRONG_EFFECT_EVENT_DEPENDENCY`) are also errors. The hooks themselves
-remain supported; other explicit dependency lists keep their existing semantics.
+(`OCTANE_STRONG_EFFECT_EVENT_DEPENDENCY`) are also errors. Effect Events remain supported. Strong now rejects manual memo hooks and
+non-equivalent explicit dependency lists; equivalent arrays retain their
+behavior and produce a redundancy hint. See the
+[complete current compiler checks](./strong-compiler-checks.md).
 Synchronously evaluated state initializers, linked-state reconcilers, and
 linked-state equality callbacks are render contexts too. Genuinely deferred
 callbacks and effect cleanup remain valid. There is no runtime phase guard,

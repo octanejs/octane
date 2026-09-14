@@ -357,7 +357,7 @@ function readCount$() { return scope.get(count$); }
 		expect(() => compile(source, FILENAME, {})).toThrow(MEMO_READ);
 	});
 
-	it.each(modes)('accepts inferred native memo reads in %j', (options) => {
+	it.each(modes)('validates inferred native memo reads and Strong hook policy in %j', (options) => {
 		const source = app(
 			`const value = useMemo(() => scope.get(count$));
 const alias = memo(readCount$);
@@ -367,7 +367,11 @@ import * as Octane from 'octane';
 ${PREFIX}
 function readCount$() { return scope.get(count$); }`,
 		);
-		expect(() => compile(source, FILENAME, { ...options })).not.toThrow();
+		if ('strong' in options && options.strong) {
+			expect(() => compile(source, FILENAME, { ...options })).toThrow('OCTANE_STRONG_MANUAL_MEMO');
+		} else {
+			expect(() => compile(source, FILENAME, { ...options })).not.toThrow();
+		}
 	});
 
 	it('diagnoses a live read inside a memoized JSX result', () => {

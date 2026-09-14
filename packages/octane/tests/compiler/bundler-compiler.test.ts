@@ -1580,6 +1580,66 @@ describe('requireDirective ownership gate', () => {
 		expect(pragmaTs?.kind).toBe('slots');
 	});
 
+	it.each(['client', 'server'] as const)(
+		'owns the Strong JSX type pragma in the %s pipeline',
+		(environment) => {
+			const compiler = createOctaneCompiler({ root: resolve('/project'), requireDirective: true });
+			const pragma = '/** @jsxImportSource octane/strong */\n';
+			const trusted =
+				pragma +
+				"'use strong';\nimport { trustHTML } from 'octane';\n" +
+				'export function App() { return <div dangerouslySetInnerHTML={trustHTML("<b>safe</b>")} />; }';
+			expect(compiler.transform(trusted, '/project/src/Strong.tsx', { environment })?.kind).toBe(
+				'compile',
+			);
+			expect(() =>
+				compiler.transform(
+					pragma +
+						"'use strong';\nexport function Raw() { return <div dangerouslySetInnerHTML={{__html: 'raw'}} />; }",
+					'/project/src/Raw.tsx',
+					{ environment },
+				),
+			).toThrow(/OCTANE_STRONG_UNTRUSTED_HTML/);
+			expect(
+				compiler.transform(
+					'// @jsxImportSource octane/strong\n' + HOOK,
+					'/project/src/useCount.ts',
+					{
+						environment,
+					},
+				)?.kind,
+			).toBe('slots');
+			// The Strong pragma is explicit ownership for plain modules too: a
+			// custom-hook-only module is slotted, and Strong hints are forwarded.
+			const warnings: string[] = [];
+			const hinting = createOctaneCompiler({
+				root: resolve('/project'),
+				requireDirective: true,
+				warn: (message: string) => warnings.push(message),
+			});
+			const wrapped = hinting.transform(
+				pragma +
+					"import { useThing } from '@octanejs/thing';\nexport function useWrapped(x) { return useThing(x); }",
+				'/project/src/useWrapped.ts',
+				{ environment },
+			);
+			expect(wrapped?.kind).toBe('slots');
+			expect(wrapped?.code).toContain('_$withSlot');
+			const hinted = hinting.transform(
+				pragma +
+					"'use strong';\nimport { useEffect } from 'octane';\nexport function useLog(value: string) { useEffect(() => console.log(value), [value]); }",
+				'/project/src/useLog.ts',
+				{ environment },
+			);
+			expect(hinted).toMatchObject({
+				kind: 'slots',
+				diagnostics: [expect.objectContaining({ severity: 'hint' })],
+			});
+			expect(warnings.filter((message) => message.includes('/src/useLog.ts'))).toHaveLength(1);
+			expect(warnings.find((message) => message.includes('/src/useLog.ts'))).toContain('hint:');
+		},
+	);
+
 	it('does not let a foreign @jsxImportSource pragma claim a file', () => {
 		const compiler = createOctaneCompiler({
 			root: resolve('/project'),

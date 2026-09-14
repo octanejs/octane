@@ -1062,6 +1062,231 @@ describe('renderToPipeableStream — chunk protocol', () => {
 		expect(second.at).toBeGreaterThanOrEqual(LATE - 5);
 	});
 
+	it.each(['pipeable', 'readable'] as const)(
+		'keeps pending sibling values and errors live across %s stream reveals',
+		async (kind) => {
+			const early = deferred<string>();
+			const middle = deferred<string>();
+			const shared = deferred<string>();
+			const rejected = deferred<string>();
+			const values = [
+				early.promise,
+				shared.promise,
+				middle.promise,
+				shared.promise,
+				rejected.promise,
+			];
+			const App = () =>
+				ServerRT.createElement(
+					'main',
+					null,
+					...values.map((promise, key) =>
+						ServerRT.createElement(server.Boundary, { promise, key }),
+					),
+				);
+			const chunks: string[] = [];
+			const errors: unknown[] = [];
+			let ended: Promise<unknown>;
+			let stop: () => void;
+			if (kind === 'pipeable') {
+				const output = collector();
+				const render = ServerRT.renderToPipeableStream(App, undefined, {
+					onError: (error) => errors.push(error),
+					timeoutMs: 1000,
+				});
+				render.pipe({
+					write(chunk) {
+						chunks.push(chunk);
+					},
+					end: output.dest.end,
+				});
+				ended = output.ended;
+				stop = () => render.abort(new Error('test completed'));
+			} else {
+				const aborter = new AbortController();
+				const stream = await ServerRT.renderToReadableStream(App, undefined, {
+					onError: (error) => errors.push(error),
+					timeoutMs: 1000,
+					signal: aborter.signal,
+				});
+				ended = (async () => {
+					const reader = stream.getReader();
+					const decoder = new TextDecoder();
+					for (;;) {
+						const result = await reader.read();
+						if (result.done) break;
+						chunks.push(decoder.decode(result.value));
+					}
+					await stream.allReady;
+				})();
+				stop = () => aborter.abort(new Error('test completed'));
+			}
+			void ended.catch(() => {});
+			try {
+				early.resolve('first-ready');
+				await vi.waitFor(() => expect(chunks.join('')).toContain('first-ready'));
+				expect(chunks.join('')).not.toContain('last-ready');
+				middle.resolve('middle-ready');
+				await vi.waitFor(() => expect(chunks.join('')).toContain('middle-ready'));
+				expect(chunks.join('')).not.toContain('last-ready');
+				// Two occurrences share one source, while an independent sibling
+				// rejects in the same event-loop turn. All three must record before
+				// their eventual content/catch arms are sent to the consumer.
+				shared.resolve('last-ready');
+				rejected.reject(new Error('last-rejected'));
+				await ended;
+				container.innerHTML = chunks.join('');
+				activate(container);
+				expect(Array.from(container.querySelectorAll('.ok'), (node) => node.textContent)).toEqual([
+					'first-ready',
+					'last-ready',
+					'middle-ready',
+					'last-ready',
+				]);
+				expect(container.querySelector('.err')?.textContent).toContain('last-rejected');
+				expect(container.textContent).not.toContain('loading');
+				expect(errors).toEqual([]);
+			} finally {
+				stop();
+				await ended.catch(() => {});
+			}
+		},
+	);
+
+	it('keeps separate occurrence replay when shared pending data is replaced through props', async () => {
+		const first = deferred<string>();
+		const shared = deferred<string>();
+		let selected = [shared.promise, shared.promise];
+		const Leaf = ({ index }: { index: number }) =>
+			ServerRT.createElement(
+				'span',
+				{ className: 'shared-occurrence' },
+				ServerRT.use(selected[index], 'shared-value'),
+			);
+		const App = () =>
+			ServerRT.createElement(
+				'main',
+				null,
+				ServerRT.createElement(server.Boundary, { promise: first.promise }),
+				...[0, 1].map((index) =>
+					ServerRT.createElement(
+						ServerRT.Suspense,
+						{ key: index, fallback: 'waiting for shared data' },
+						ServerRT.createElement(Leaf, { index }),
+					),
+				),
+			);
+		const output = collector();
+		const onError = vi.fn();
+		const render = ServerRT.renderToPipeableStream(App, undefined, { timeoutMs: 1000, onError });
+		render.pipe(output.dest);
+		try {
+			first.resolve('first-reveal');
+			await vi.waitFor(() => expect(output.chunks.join('')).toContain('first-reveal'));
+			// Every original use occurrence owns its settled result, even when a
+			// parent supplies fresh still-pending sources on the resolving pass.
+			selected = [new Promise(() => {}), new Promise(() => {})];
+			shared.resolve('original-shared-value');
+			await output.ended;
+			container.innerHTML = output.chunks.join('');
+			activate(container);
+			expect(
+				Array.from(container.querySelectorAll('.shared-occurrence'), (node) => node.textContent),
+			).toEqual(['original-shared-value', 'original-shared-value']);
+			expect(container.textContent).not.toContain('waiting for shared data');
+			expect(onError).not.toHaveBeenCalled();
+		} finally {
+			render.abort(new Error('test completed'));
+		}
+	});
+
+	it('observes a replacement pending source at the same occurrence during later reveals', async () => {
+		const first = deferred<string>();
+		const second = deferred<string>();
+		const old = deferred<string>();
+		const replacement = deferred<string>();
+		let selected = old.promise;
+		const App = () =>
+			ServerRT.createElement(
+				'main',
+				null,
+				ServerRT.createElement(server.Boundary, { key: 'first', promise: first.promise }),
+				ServerRT.createElement(server.Boundary, { key: 'second', promise: second.promise }),
+				ServerRT.createElement(server.Boundary, { key: 'changing', promise: selected }),
+			);
+		const output = collector();
+		const onError = vi.fn();
+		const render = ServerRT.renderToPipeableStream(App, undefined, { timeoutMs: 1000, onError });
+		render.pipe(output.dest);
+		try {
+			selected = replacement.promise;
+			first.resolve('first-reveal');
+			await vi.waitFor(() => expect(output.chunks.join('')).toContain('first-reveal'));
+			second.resolve('second-reveal');
+			await vi.waitFor(() => expect(output.chunks.join('')).toContain('second-reveal'));
+			replacement.resolve('replacement-ready');
+			await output.ended;
+			container.innerHTML = output.chunks.join('');
+			activate(container);
+			expect(Array.from(container.querySelectorAll('.ok'), (node) => node.textContent)).toEqual([
+				'first-reveal',
+				'second-reveal',
+				'replacement-ready',
+			]);
+			const html = output.chunks.join('');
+			old.reject(new Error('obsolete source failed'));
+			await nextHostTurn();
+			expect(output.chunks.join('')).toBe(html);
+			expect(onError).not.toHaveBeenCalled();
+		} finally {
+			render.abort(new Error('test completed'));
+		}
+	});
+
+	it.each(['abort', 'timeout'] as const)(
+		'isolates another request sharing pending data after a stream %s',
+		async (termination) => {
+			const shared = deferred<string>();
+			const early = deferred<string>();
+			const stopped = collector();
+			const remaining = collector();
+			const firstErrors = vi.fn();
+			const secondErrors = vi.fn();
+			const first = ServerRT.renderToPipeableStream(
+				server.Siblings,
+				{ a: early.promise, b: shared.promise },
+				{ timeoutMs: termination === 'timeout' ? 100 : 1000, onError: firstErrors },
+			);
+			first.pipe(stopped.dest);
+			const second = ServerRT.renderToPipeableStream(
+				server.Boundary,
+				{ promise: shared.promise },
+				{ timeoutMs: 1000, onError: secondErrors },
+			);
+			second.pipe(remaining.dest);
+			try {
+				early.resolve('first-only');
+				await vi.waitFor(() => expect(stopped.chunks.join('')).toContain('first-only'));
+				if (termination === 'abort') first.abort(new Error('request ended'));
+				await stopped.ended;
+				const stoppedHtml = stopped.chunks.join('');
+				shared.resolve('other-request-ready');
+				await remaining.ended;
+				await nextHostTurn();
+				expect(stopped.chunks.join('')).toBe(stoppedHtml);
+				expect(stoppedHtml).not.toContain('other-request-ready');
+				container.innerHTML = remaining.chunks.join('');
+				activate(container);
+				expect(container.querySelector('.ok')?.textContent).toBe('other-request-ready');
+				expect(firstErrors).toHaveBeenCalled();
+				expect(secondErrors).not.toHaveBeenCalled();
+			} finally {
+				first.abort(new Error('test completed'));
+				second.abort(new Error('test completed'));
+			}
+		},
+	);
+
 	it('coalesces resolutions landing in the same wave into one chunk/pass', async () => {
 		let ra!: (v: string) => void;
 		let rb!: (v: string) => void;

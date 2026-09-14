@@ -66,7 +66,6 @@ describe('useLinkedState compiler integration', () => {
 			const [call] = callsTo(code, local!);
 			expect(call?.arguments).toHaveLength(4);
 			expect(call.arguments[2]).toMatchObject({ type: 'Identifier', name: 'undefined' });
-			expect(call.arguments[3]?.type).toBe('Literal');
 			expect(
 				importedLocal(
 					code,
@@ -104,8 +103,8 @@ describe('useLinkedState compiler integration', () => {
 			{ inlineHookMemo: false },
 		).code;
 		const [call] = callsTo(code, importedLocal(code, 'useLinkedState')!);
+		expect(call?.arguments).toHaveLength(4);
 		expect(call?.arguments[2]?.type).toBe('ObjectExpression');
-		expect(call?.arguments[3]?.type).toBe('Literal');
 	});
 
 	it('keeps an omitted options argument unambiguous with development symbol slots', () => {

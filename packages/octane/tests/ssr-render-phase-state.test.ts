@@ -13,7 +13,7 @@ import { prerender } from 'octane/static';
 // that renders the settled state in a single pass.
 
 const SRC = `
-import { useState, useId, use, preload } from 'octane';
+import { useState, useId, use, preload, preinit, preconnect } from 'octane';
 
 export function Updater() @{
 	const [count, setCount] = useState(0);
@@ -119,6 +119,61 @@ export function ArtifactUpdater() @{
 			<SettledStyle />
 		}
 	</section>
+}
+
+function EstablishedResources() @{
+	preload('/established-sheet.css', { as: 'style', integrity: 'established-sheet' });
+	preload('/established-script.js', { as: 'script', integrity: 'established-script' });
+	preconnect('https://established.example');
+	<div class="established"><style>.established { --established: 1; }</style>established</div>
+}
+function LaterResources() @{
+	preinit('/later-sheet.css', { as: 'style', precedence: 'later' });
+	preload('/later-script.js', { as: 'script', integrity: 'later-script' });
+	<div class="later"><style>.later { --later: 1; }</style>later</div>
+}
+function FinalResources() @{
+	preinit('/established-script.js', { as: 'script' });
+	preinit('/later-script.js', { as: 'script' });
+	<span>final</span>
+}
+function PopulatedRetry(p) @{
+	const [phase, setPhase] = useState(p.initial);
+	p.nested();
+	if (phase < 2) {
+		preinit('/established-sheet.css', { as: 'style', precedence: 'discarded-' + phase });
+		preload('/established-script.js', { as: 'script', integrity: 'discarded-' + phase });
+		preload('/discarded-' + phase + '.js', { as: 'script' });
+		setPhase(phase + 1);
+	}
+	<section>
+		@if (phase < 2) {<DiscardedStyle />} @else {<b>settled</b>}
+	</section>
+}
+export function PopulatedResources(p) @{
+	<><EstablishedResources /><LaterResources /><PopulatedRetry initial={p.initial} nested={p.nested} /><FinalResources /></>
+}
+export function NestedResources() @{
+	preinit('/nested-only.css', { as: 'style', precedence: 'nested' });
+	<div class="nested"><style>.nested { --nested-only: 1; }</style>nested</div>
+}
+
+function CoercionLeaf() @{ <i>probe</i> }
+function CoercionProbe() @{ <CoercionLeaf /> }
+function CoercionRetry(p) @{
+	const [phase, setPhase] = useState(p.initial);
+	if (phase === 0) setPhase(1);
+	<b>{phase as string}</b>
+}
+export function CoercedResources(p) @{
+	const precedence = { toString() { CoercionProbe(); return 'default'; } };
+	if (!p.inline) preinit('/coerced.css', { as: 'style', precedence });
+	<main>
+		@if (p.inline) {
+			<style href="coerced-inline" precedence={precedence}>.coerced { color: teal; }</style>
+		}
+		<CoercionRetry initial={p.initial} />
+	</main>
 }
 
 export function Runaway() @{
@@ -403,6 +458,44 @@ describe('SSR render-phase state updates — rewind bookkeeping', () => {
 		expect(html).toBe((await prerender(mod.JobRef, props)).html);
 		for (let i = 0; i < 3; i++) expect(html).toContain(`j${i}=J${i}`);
 	});
+
+	it('preserves earlier CSS, resource order and preload options across repeated retries and nested renders', () => {
+		const nestedResults: RT.RenderResult[] = [];
+		const nested = () => nestedResults.push(RT.renderToString(mod.NestedResources));
+		for (const render of [RT.renderToString, RT.renderToStaticMarkup]) {
+			const actual = render(mod.PopulatedResources, { initial: 0, nested });
+			const settled = render(mod.PopulatedResources, { initial: 2, nested });
+			expect(actual).toEqual(settled);
+			expect(actual.html).toContain('integrity="established-script"');
+			expect(actual.html).toContain('integrity="later-script"');
+			expect(actual.html).not.toContain('discarded-');
+			expect(actual.html).not.toContain('nested-only');
+			expect(actual.css).toContain('--established');
+			expect(actual.css).toContain('--later');
+			expect(actual.css).not.toContain('--discarded-render-pass');
+			expect(actual.css).not.toContain('--nested-only');
+			// A subsequent request starts with fresh resources in the same order.
+			expect(render(mod.PopulatedResources, { initial: 0, nested })).toEqual(actual);
+		}
+		for (const result of nestedResults) {
+			expect(result.html).toContain('/nested-only.css');
+			expect(result.css).toContain('--nested-only');
+			expect(result.html).not.toContain('established');
+		}
+	});
+
+	it.each([false, true])(
+		'keeps resources whose attribute coercion renders a nested component before a later retry (inline: %s)',
+		(inline) => {
+			for (const render of [RT.renderToString, RT.renderToStaticMarkup]) {
+				const actual = render(mod.CoercedResources, { inline, initial: 0 });
+				expect(actual).toEqual(render(mod.CoercedResources, { inline, initial: 1 }));
+				expect(actual.html).toContain(inline ? 'coerced-inline' : '/coerced.css');
+				expect(actual.html).toContain('data-precedence="default"');
+				expect(actual.html).not.toContain('probe');
+			}
+		},
+	);
 
 	it('throws after 25 passes when a render-phase update never settles', () => {
 		expect(() => RT.renderToString(mod.Runaway)).toThrow(/Too many re-renders/);

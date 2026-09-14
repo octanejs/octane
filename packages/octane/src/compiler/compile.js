@@ -88,6 +88,7 @@ import { assertNoLiveClientOnlyImports } from './client-only-server.js';
 import { nsForChildren, nsForSelf } from './jsx-namespace.js';
 import { analyzeNativeChangeDiagnostics } from './native-change-diagnostics.js';
 import { assertStrongMode } from './strong-mode.js';
+import { applyStrongAutomaticMemo } from './strong-auto-memo.js';
 import {
 	assertNativeReadDiagnostics,
 	assertNativeReadOptions,
@@ -9070,13 +9071,20 @@ function compileAuthored(source, filename, options, bundlerMetadata) {
 	adoptParserAst(analyzedAst);
 	options = nativeReadOptions(analyzedAst, options);
 	assertNativeReadDiagnostics(analyzedAst, source, cleanFilename, options);
-	const strongModeEnabled =
-		assertStrongMode(analyzedAst, source, cleanFilename, options)?.enabled === true;
+	const strongAnalysis = assertStrongMode(analyzedAst, source, cleanFilename, options);
+	const strongModeEnabled = strongAnalysis?.enabled === true;
 	const attemptAst = lowerSignalAttemptReads(analyzedAst);
 	const signalAst = lowerSignalDeclarations(attemptAst, cleanFilename);
 	if (bundlerMetadata !== null) bundlerMetadata.hydrateAst = signalAst;
+	const memoizedAst = strongModeEnabled
+		? applyStrongAutomaticMemo(signalAst, {
+				...options,
+				filename: cleanFilename,
+				strongHookAnalysis: strongAnalysis.strongHookAnalysis,
+			})
+		: signalAst;
 	const textTypedAst = applyStringChildProofs(
-		signalAst,
+		memoizedAst,
 		source,
 		cleanFilename,
 		options?.textTypeFacts,
@@ -9093,16 +9101,28 @@ function compileAuthored(source, filename, options, bundlerMetadata) {
 			bundlerMetadata.cssModuleConstantImports = constants.imports;
 		}
 	}
-	return compileInternal(
+	const result = compileInternal(
 		source,
 		filename,
-		options,
+		strongAnalysis?.nativeChangeAnalysis
+			? {
+					...options,
+					// Strong already analyzed the authored hosts. The classifications use
+					// source offsets, which the copy-on-write transforms preserve.
+					__nativeChangeAnalysis: strongAnalysis.nativeChangeAnalysis,
+					__nativeChangeDiagnostics: strongAnalysis.nativeChangeAnalysis.diagnostics,
+				}
+			: options,
 		constantAst,
 		mode,
 		bundlerMetadata,
-		textTypedAst !== signalAst,
+		textTypedAst !== memoizedAst,
 		strongModeEnabled,
 	);
+	if (strongAnalysis?.diagnostics.length > 0) {
+		result.diagnostics = [...strongAnalysis.diagnostics, ...(result.diagnostics ?? [])];
+	}
+	return result;
 }
 
 function compileInternal(
@@ -9550,7 +9570,7 @@ function compileInternal(
 		currentAutoMemoCacheName: null, // collision-free local bound to the body's cache array
 		currentAutoMemoCommittedName: null, // committed cache snapshot (copy-on-write source)
 		currentAutoCalculatedRenderableRefs: null, // proven non-escaping calculation holes, inherited by lexical child bodies
-		nextAutoMemoCacheId: 0, // per-compiled-body id in the scope's lazy memo regions
+		nextAutoMemoCacheId: 0, // per-body offset within the module's reserved memo range
 		inlineHookMemo: inlineHookMemoEnabled, // de-callbacked useMemo/useCallback + pu creations
 		hasSlotMemoCandidates: false, // skip the final AST pass when no path-aware site survived
 		_puInlineLowering: false, // true only while a body pipeline ends in inlineHookMemoPass
@@ -14906,7 +14926,7 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 					b.call(
 						requireRuntimeForContext(ctx, 'compilerMemoRegion'),
 						b.id('__s'),
-						b.literal(memoRegionId),
+						b.binary('+', b.id(ensureHookSlotBase(ctx).baseName), b.literal(memoRegionId)),
 					),
 				),
 				node,
@@ -17512,7 +17532,7 @@ function markStateGetterUsage(root, ctx) {
 }
 
 // A compiled `@{}` render body always executes inside a runtime-owned Scope, so
-// its direct base-hook sites can use tiny module-local numbers. Do not extend
+// its direct base-hook sites can use module-ranged numbers. Do not extend
 // that proof through an arbitrary nested function or class initializer: render
 // props, callbacks, helpers and later-created instances can execute in a caller's
 // Scope, including alongside code from a different module. Those sites retain
@@ -18141,7 +18161,7 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 					slot = null;
 				} else if (numericSlot) {
 					const id = ctx.nextHookSymId++;
-					slot = b.literal(id, String(id));
+					slot = b.binary('+', b.id(ensureHookSlotBase(ctx).baseName), b.literal(id, String(id)));
 				} else {
 					const debug = isServerUse
 						? `${profileOwner}.use#${ctx.nextHookSymId}`
@@ -18246,7 +18266,7 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 					slot = null;
 				} else if (numericSlot) {
 					const id = ctx.nextHookSymId++;
-					slot = b.literal(id, String(id));
+					slot = b.binary('+', b.id(ensureHookSlotBase(ctx).baseName), b.literal(id, String(id)));
 				} else {
 					slot = allocHookSymbol(
 						ctx,
@@ -20779,7 +20799,9 @@ function ensureHookSlotBase(ctx) {
 	ctx.runtimeNeeded.add('hookSlots');
 	// This marker is always pushed before the first eager per-site declaration.
 	// hoistedHelperNodes fills in the final site count once the whole module has
-	// been compiled, avoiding fixed-size ranges and cross-module collisions.
+	// been compiled, avoiding fixed-size ranges and cross-module collisions. Hook
+	// slots and memo regions use separate stores, so the larger count reserves
+	// enough space for both without changing hook numbering across render modes.
 	ctx.hoistedHelpers.push(HOOK_SLOT_BASE_HELPER);
 	return { baseName: ctx._hookSlotBaseName, helperName: ctx._hookSlotsHelperName };
 }
@@ -20805,14 +20827,27 @@ function hoistedHelperNodes(ctx) {
 			return inheritOriginLoc(
 				b.const(
 					ctx._hookSlotBaseName,
-					markPure(b.call(ctx._hookSlotsHelperName, b.literal(ctx.nextHookSymId))),
+					markPure(
+						b.call(
+							ctx._hookSlotsHelperName,
+							b.literal(Math.max(ctx.nextHookSymId, ctx.nextAutoMemoCacheId ?? 0)),
+						),
+					),
 				),
 				ctx._moduleOrigin,
 			);
 		}
 		if (helper?.kind === 'hookSlotBase') {
 			return inheritOriginLoc(
-				b.const(helper.baseName, markPure(b.call(helper.helperName, b.literal(ctx.nextHookSymId)))),
+				b.const(
+					helper.baseName,
+					markPure(
+						b.call(
+							helper.helperName,
+							b.literal(Math.max(ctx.nextHookSymId, ctx.nextAutoMemoCacheId ?? 0)),
+						),
+					),
+				),
 				ctx._moduleOrigin,
 			);
 		}
@@ -20874,10 +20909,10 @@ function allocHookSymbol(ctx, debugName, profile = null, forceSymbol = false, pr
 		const description = `${ctx._hookHash}#${id}`;
 		symbolExpr = markPure(b.call('Symbol', b.literal(description, JSON.stringify(description))));
 	} else {
-		// Direct sites in a compiler-created render Scope only need a tiny local
-		// integer. Arbitrary callable helpers and custom-hook boundaries can share a
-		// caller's Scope with other modules, so reserve a runtime-global range and
-		// keep a Symbol description that resolveSlot can safely compose.
+		// Production callers here request Symbols for native calculations, warm
+		// caches, arbitrary callable helpers and custom-hook boundaries. Direct
+		// numeric base-hook sites are emitted by rewriteHookCalls using the same
+		// module range; these Symbol descriptions let resolveSlot compose paths.
 		if (forceSymbol) {
 			const { baseName } = ensureHookSlotBase(ctx);
 			const numericExpr = id === 0 ? b.id(baseName) : b.binary('+', b.id(baseName), b.literal(id));
@@ -28843,12 +28878,17 @@ function makeCompCall(
 			// exclude compiled element/text children. See runtime `markChildrenBlock`/`isChildrenBlock`.
 			ctx.runtimeNeeded.add('markChildrenBlock');
 			hasChildrenProp = true;
+			const childrenArgs = [b.id(childrenHelperName)];
+			if (ctx.autoMemo && ctx.mode !== 'server') {
+				// These functions close over parent locals and are recreated on every
+				// render. A module-owned token distinguishes a real Provider body
+				// handoff from fresh captures without invalidating ordinary cache hits.
+				const bodyIdentity = allocCompilerName(ctx, '__childrenBody');
+				ctx.hoistedHelpers.push(inheritOriginLoc(b.const(bodyIdentity, b.object([])), node));
+				childrenArgs.push(b.id(bodyIdentity));
+			}
 			propNodes.push(
-				b.prop(
-					'init',
-					b.literal('children'),
-					b.call('_$markChildrenBlock', b.id(childrenHelperName)),
-				),
+				b.prop('init', b.literal('children'), b.call('_$markChildrenBlock', ...childrenArgs)),
 			);
 		}
 	}

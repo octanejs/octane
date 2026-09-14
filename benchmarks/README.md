@@ -271,6 +271,7 @@ internally, get their own baseline and guard namespace.
 | `ssr-throughput` | ssr-throughput | none (Node-only) | comparative news SSR including Inferno + Octane-only stress fixtures |
 | `streaming-ssr` | streaming-ssr | none (Node-only) | streaming targets incl. Inferno and Preact; Svelte N/A |
 | `conversation-streaming` | conversation-streaming | none (production app, Node runner; optional WebKit runner) | public shell, shared auth, independent conversation/history SSR and composer activation |
+| `ssr-replay-streaming` | ssr-replay-streaming | none (Node-only) | populated replay collection copies and streaming promise subscriptions, with clean output and unchanged/one-wave controls |
 | `ssr-http` | ssr-http | none (boots its own node:http hosts) | raw streaming API over real HTTP: fresh-process import cost, cold spawn→listen→first-byte, warm shell/total/throughput across the streaming-ssr fixtures |
 | `streaming-backpressure` | streaming-backpressure | none (builds) | real one-byte Node Writable pressure, delayed drains, three concurrent destinations, and public-stream abort across supported renderers |
 | `ssr-workerd` | ssr-workerd | none (boots workerd via miniflare) | streaming SSR inside the real Cloudflare Workers runtime: cold isolate→first-byte, warm shell/total, worker-script bytes (octane vs Fizz edge, plus the vite-plugin + adapter-cloudflare deployment shape) |
@@ -295,6 +296,7 @@ internally, get their own baseline and guard namespace.
 | `lynx-table-web` | lynx-table | none (headless Chromium) | Lynx-for-Web wall clock: the same table app for Octane and the vendored ReactLynx / Vue Lynx reference bundles under one byte-identical page driver; host-bound medians, no ratio guards |
 | `lynx-bundle-size` | lynx-bundle-size | none (builds) | semantic-checksummed production Rspeedy artifact bytes for background preview and dual-thread IFR modes; source/build evidence only |
 | `codegen-size` | codegen-size | none (Node-only) | compiled-output bytes: fixed corpus through octane/compiler, raw/min/gzip, `compiled` vs `source` |
+| `root-transactions` | root-transactions | none | retirement undo closures, keyed input journal slots, and live text reads under rollback, identity, and cleanup controls; see the suite audit for retained cases |
 | `compiler-output` | compiler-output | none | branch capture arrays, lifted native-event handlers, and SSR wrapper work under rendering/identity/evaluation controls; see the suite audit for retained cases |
 | `hook-memo` | hook-memo | none (Node-only) | production hook-memo compiler on/off, clean semantic controls, deterministic function/array creation events, and compiled/bundled bytes |
 | `transition-hooks` | transition-hooks | none (Node-only) | production transition/hook hot paths: `useTransition` start → pending → settle cycles with replacement and functional updaters, a suspended hold + release, urgent functional dispatch and same-value bailout, delegated click dispatch, and an urgent update beside a queued transition; render counts, deterministic function/array/object/constructor creation events, bytes, and secondary µs timings |

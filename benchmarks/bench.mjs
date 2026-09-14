@@ -691,6 +691,18 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
+		// Populated replay collection copies and promise subscriptions across
+		// consumer-driven streaming waves, with unchanged/one-wave controls.
+		name: 'ssr-replay-streaming',
+		cwd: 'ssr-replay-streaming',
+		servers: [],
+		iter: { normal: 1, quick: 1 },
+		runs: [
+			{ script: 'snapshots.mjs', args: () => [] },
+			{ script: 'streaming.mjs', args: () => [] },
+		],
+	},
+	{
 		// Raw streaming API over REAL HTTP, cold and warm: fresh-process import
 		// cost, spawn→listen→first-byte cold TTFB, and warm shell/total/throughput
 		// for octane renderToPipeableStream vs React Fizz behind one identical
@@ -883,6 +895,38 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
+		// V8 shape controls for keyed component and classified host props.
+		name: 'universal-prop-shapes',
+		cwd: 'universal-prop-shapes',
+		servers: [],
+		iter: { normal: 1, quick: 1 },
+		runs: [{ script: 'run.mjs', args: () => [] }],
+	},
+	{
+		// Array and Set work in universal host/list materialization.
+		name: 'universal-materialization',
+		cwd: 'universal-materialization',
+		servers: [],
+		iter: { normal: 1, quick: 1 },
+		runs: [{ script: 'run.mjs', args: () => [] }],
+	},
+	{
+		// Optional compact preparation work with ordinary-tree controls.
+		name: 'universal-preparation',
+		cwd: 'universal-preparation',
+		servers: [],
+		iter: { normal: 1, quick: 1 },
+		runs: [{ script: 'run.mjs', args: () => [] }],
+	},
+	{
+		// Committed feature-cache work across unchanged subtree updates.
+		name: 'universal-retention',
+		cwd: 'universal-retention',
+		servers: [],
+		iter: { normal: 1, quick: 1 },
+		runs: [{ script: 'run.mjs', args: () => [] }],
+	},
+	{
 		// Universal owner drafts (Node-only): changed child props force 128 and
 		// 1,024 retained component owners through the public object root.
 		name: 'universal-owner-drafts',
@@ -1010,8 +1054,21 @@ const SUITES = [
 		cwd: 'hook-memo',
 		servers: [],
 		iter: { normal: 1, quick: 1 },
-		runs: [{ script: 'run.mjs', args: () => [] }],
+		runs: [
+			{ script: 'run.mjs', args: () => [] },
+			{ script: 'provider-output.mjs', args: () => [] },
+		],
 	},
+
+	{
+		// Same-source production body ownership and context cache controls.
+		name: 'body-ownership',
+		cwd: 'hook-memo',
+		servers: [],
+		iter: { normal: 1, quick: 1 },
+		runs: [{ script: 'body-ownership.mjs', args: () => [] }],
+	},
+
 	{
 		// Production static attributes and live head reapplication, with exact
 		// generic routing/write counts; timing runs use an uninstrumented bundle.
@@ -1203,6 +1260,31 @@ const SUITES = [
 		servers: [],
 		iter: { normal: 1, quick: 1 },
 		runs: [{ script: 'run-size.mjs', args: () => [] }],
+	},
+	{
+		name: 'root-transactions',
+		cwd: 'root-transactions',
+		servers: [],
+		iter: { normal: 1, quick: 1 },
+		runs: [
+			{ script: 'retirement.mjs', args: () => [] },
+			{ script: 'inputs.mjs', args: () => [] },
+			{ script: 'contracts.mjs', args: () => [] },
+		],
+	},
+	{
+		// Descriptor child traversal, persistent host props, and form-control
+		// source/projection work, with clean semantic controls and exact counts.
+		name: 'descriptor-renderer',
+		cwd: 'descriptor-renderer',
+		servers: [],
+		iter: { normal: 1, quick: 1 },
+		runs: [
+			{ script: 'children.mjs', args: () => [] },
+			{ script: 'props.mjs', args: () => [] },
+			{ script: 'forms.mjs', args: () => [] },
+			{ script: 'events.mjs', args: () => [] },
+		],
 	},
 	{
 		name: 'compiler-output',

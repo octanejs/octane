@@ -3119,6 +3119,70 @@
     "note": "Production compiler output must not publish hook or automatic memo regions through dynamically added named properties on the slot array."
   },
   {
+    "suite": "hook-memo",
+    "op": "stale_output_count",
+    "target": "provider-output",
+    "reference": "provider-output-reference",
+    "maxRatio": 0,
+    "note": "Alternating retained Provider bodies must render the currently requested label. The same-input baseline reported two stale returns; all DOM/input/state/event controls remain checked."
+  },
+  {
+    "suite": "hook-memo",
+    "op": "same_body_label_renders",
+    "target": "provider-output",
+    "reference": "provider-output-reference",
+    "maxRatio": 0,
+    "note": "A repeated direct Provider child body keeps its automatic child memo hit across 128 Provider updates; clearing every region on every render would perform 128 extra Label renders."
+  },
+  {
+    "suite": "hook-memo",
+    "op": "same_body_component_slots",
+    "target": "provider-output",
+    "reference": "provider-output-reference",
+    "maxRatio": 1,
+    "note": "Same-body direct Provider updates retain only the existing Counter dispatch per render; automatic Label memo hits skip its component slot."
+  },
+  {
+    "suite": "hook-memo",
+    "op": "inline_memo_snapshot_slots",
+    "target": "provider-output",
+    "reference": "provider-output-reference",
+    "maxRatio": 0,
+    "note": "Fresh generated Provider children closures with unchanged calculated descriptor arrays must retain their automatic region hit and skip childSlot."
+  },
+  {
+    "suite": "hook-memo",
+    "op": "inline_memo_label_renders",
+    "target": "provider-output",
+    "reference": "provider-output-reference",
+    "maxRatio": 0,
+    "note": "The memoized inline Provider descriptor array must not rerender its Label on 128 unchanged captured inputs."
+  },
+  {
+    "suite": "hook-memo",
+    "op": "inline_memo_changed_renders",
+    "target": "provider-output",
+    "reference": "provider-output-reference",
+    "maxRatio": 1,
+    "note": "Changed calculated-array captures remain live; output controls and the observer require all 128 distinct Labels to render."
+  },
+  {
+    "suite": "hook-memo",
+    "op": "inline_body_component_slots",
+    "target": "provider-output",
+    "reference": "provider-output-reference",
+    "maxRatio": 3,
+    "note": "Ordinary inline Provider children retain their existing three dispatches per update: Provider, Label, and Counter. This fixture deliberately has no child automatic memo region."
+  },
+  {
+    "suite": "hook-memo",
+    "op": "inline_body_children",
+    "target": "provider-output",
+    "reference": "provider-output-reference",
+    "maxRatio": 1,
+    "note": "Each ordinary inline Provider update still reaches exactly one generated children registration; no new registration work is added by stable body identity."
+  },
+  {
     "suite": "transition-hooks",
     "op": "cycle_renders",
     "target": "octane",
@@ -5087,5 +5151,1992 @@
     "reference": "branch-argumentsEscape-work-budget",
     "maxRatio": 0,
     "note": "Escaped argument tuples remain independent under real nested branch updates; absent branches omit unused captures."
+  },
+  {
+    "suite": "root-transactions",
+    "op": "retirement_closures",
+    "target": "retirement-remove-half",
+    "reference": "retirement-remove-half-work",
+    "maxRatio": 0,
+    "note": "Retiring keyed rows reaches no per-block undo closure; both host nodes and connected cleanup are verified in the same run."
+  },
+  {
+    "suite": "root-transactions",
+    "op": "retirement_closures",
+    "target": "retirement-clear",
+    "reference": "retirement-clear-work",
+    "maxRatio": 0,
+    "note": "Retiring keyed rows reaches no per-block undo closure; both host nodes and connected cleanup are verified in the same run."
+  },
+  {
+    "suite": "root-transactions",
+    "op": "input_slots",
+    "target": "inputs-both",
+    "reference": "inputs-both-work",
+    "maxRatio": 1,
+    "note": "Keyed survivor input journaling stays within its flat-slot budget, with native events, state, and survivor identity checked in clean and observed bundles."
+  },
+  {
+    "suite": "root-transactions",
+    "op": "input_slots",
+    "target": "inputs-props-only",
+    "reference": "inputs-props-only-work",
+    "maxRatio": 1,
+    "note": "Keyed survivor input journaling stays within its flat-slot budget, with native events, state, and survivor identity checked in clean and observed bundles."
+  },
+  {
+    "suite": "root-transactions",
+    "op": "input_slots",
+    "target": "inputs-environment-only",
+    "reference": "inputs-environment-only-work",
+    "maxRatio": 1,
+    "note": "Keyed survivor input journaling stays within its flat-slot budget, with native events, state, and survivor identity checked in clean and observed bundles."
+  },
+  {
+    "suite": "root-transactions",
+    "op": "input_slots",
+    "target": "inputs-unchanged",
+    "reference": "inputs-unchanged-work",
+    "maxRatio": 0,
+    "note": "Keyed survivor input journaling stays within its flat-slot budget, with native events, state, and survivor identity checked in clean and observed bundles."
+  },
+  {
+    "suite": "root-transactions",
+    "op": "changed_reads",
+    "target": "text-compiled",
+    "reference": "text-compiled-work",
+    "maxRatio": 1,
+    "note": "Live DOM getter calls preserve first raw-thenable rollback and external edits; descriptor updates reuse the value already read for comparison."
+  },
+  {
+    "suite": "root-transactions",
+    "op": "changed_reads",
+    "target": "text-descriptor",
+    "reference": "text-descriptor-work",
+    "maxRatio": 1,
+    "note": "Live DOM getter calls preserve first raw-thenable rollback and external edits; descriptor updates reuse the value already read for comparison."
+  },
+  {
+    "suite": "root-transactions",
+    "op": "equal_reads",
+    "target": "text-compiled",
+    "reference": "text-compiled-work",
+    "maxRatio": 0,
+    "note": "Live DOM getter calls preserve first raw-thenable rollback and external edits; descriptor updates reuse the value already read for comparison."
+  },
+  {
+    "suite": "root-transactions",
+    "op": "equal_reads",
+    "target": "text-descriptor",
+    "reference": "text-descriptor-work",
+    "maxRatio": 1,
+    "note": "Live DOM getter calls preserve first raw-thenable rollback and external edits; descriptor updates reuse the value already read for comparison."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "live_indexes",
+    "target": "children-128-owned-unchanged",
+    "reference": "children-128-reference",
+    "maxRatio": 0,
+    "note": "Descriptor placement must use sibling traversal, with no live collection indexing; native focus, input, portal and survivor identity controls remain checked."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "sibling_reads",
+    "target": "children-128-owned-unchanged",
+    "reference": "children-128-reference",
+    "maxRatio": 8,
+    "note": "The full nested descriptor workload must stay linear in its starting rows, including foreign-node skipping; the ceiling includes each row's input and button children."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "live_indexes",
+    "target": "children-128-owned-reverse",
+    "reference": "children-128-reference",
+    "maxRatio": 0,
+    "note": "Descriptor placement must use sibling traversal, with no live collection indexing; native focus, input, portal and survivor identity controls remain checked."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "sibling_reads",
+    "target": "children-128-owned-reverse",
+    "reference": "children-128-reference",
+    "maxRatio": 8,
+    "note": "The full nested descriptor workload must stay linear in its starting rows, including foreign-node skipping; the ceiling includes each row's input and button children."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "live_indexes",
+    "target": "children-128-owned-rotate",
+    "reference": "children-128-reference",
+    "maxRatio": 0,
+    "note": "Descriptor placement must use sibling traversal, with no live collection indexing; native focus, input, portal and survivor identity controls remain checked."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "sibling_reads",
+    "target": "children-128-owned-rotate",
+    "reference": "children-128-reference",
+    "maxRatio": 8,
+    "note": "The full nested descriptor workload must stay linear in its starting rows, including foreign-node skipping; the ceiling includes each row's input and button children."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "live_indexes",
+    "target": "children-128-owned-replace",
+    "reference": "children-128-reference",
+    "maxRatio": 0,
+    "note": "Descriptor placement must use sibling traversal, with no live collection indexing; native focus, input, portal and survivor identity controls remain checked."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "sibling_reads",
+    "target": "children-128-owned-replace",
+    "reference": "children-128-reference",
+    "maxRatio": 8,
+    "note": "The full nested descriptor workload must stay linear in its starting rows, including foreign-node skipping; the ceiling includes each row's input and button children."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "live_indexes",
+    "target": "children-128-foreign-unchanged",
+    "reference": "children-128-reference",
+    "maxRatio": 0,
+    "note": "Descriptor placement must use sibling traversal, with no live collection indexing; native focus, input, portal and survivor identity controls remain checked."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "sibling_reads",
+    "target": "children-128-foreign-unchanged",
+    "reference": "children-128-reference",
+    "maxRatio": 8,
+    "note": "The full nested descriptor workload must stay linear in its starting rows, including foreign-node skipping; the ceiling includes each row's input and button children."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "live_indexes",
+    "target": "children-128-foreign-reverse",
+    "reference": "children-128-reference",
+    "maxRatio": 0,
+    "note": "Descriptor placement must use sibling traversal, with no live collection indexing; native focus, input, portal and survivor identity controls remain checked."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "sibling_reads",
+    "target": "children-128-foreign-reverse",
+    "reference": "children-128-reference",
+    "maxRatio": 8,
+    "note": "The full nested descriptor workload must stay linear in its starting rows, including foreign-node skipping; the ceiling includes each row's input and button children."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "live_indexes",
+    "target": "children-128-foreign-rotate",
+    "reference": "children-128-reference",
+    "maxRatio": 0,
+    "note": "Descriptor placement must use sibling traversal, with no live collection indexing; native focus, input, portal and survivor identity controls remain checked."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "sibling_reads",
+    "target": "children-128-foreign-rotate",
+    "reference": "children-128-reference",
+    "maxRatio": 8,
+    "note": "The full nested descriptor workload must stay linear in its starting rows, including foreign-node skipping; the ceiling includes each row's input and button children."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "live_indexes",
+    "target": "children-128-foreign-replace",
+    "reference": "children-128-reference",
+    "maxRatio": 0,
+    "note": "Descriptor placement must use sibling traversal, with no live collection indexing; native focus, input, portal and survivor identity controls remain checked."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "sibling_reads",
+    "target": "children-128-foreign-replace",
+    "reference": "children-128-reference",
+    "maxRatio": 8,
+    "note": "The full nested descriptor workload must stay linear in its starting rows, including foreign-node skipping; the ceiling includes each row's input and button children."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "live_indexes",
+    "target": "children-512-owned-unchanged",
+    "reference": "children-512-reference",
+    "maxRatio": 0,
+    "note": "Descriptor placement must use sibling traversal, with no live collection indexing; native focus, input, portal and survivor identity controls remain checked."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "sibling_reads",
+    "target": "children-512-owned-unchanged",
+    "reference": "children-512-reference",
+    "maxRatio": 8,
+    "note": "The full nested descriptor workload must stay linear in its starting rows, including foreign-node skipping; the ceiling includes each row's input and button children."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "live_indexes",
+    "target": "children-512-owned-reverse",
+    "reference": "children-512-reference",
+    "maxRatio": 0,
+    "note": "Descriptor placement must use sibling traversal, with no live collection indexing; native focus, input, portal and survivor identity controls remain checked."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "sibling_reads",
+    "target": "children-512-owned-reverse",
+    "reference": "children-512-reference",
+    "maxRatio": 8,
+    "note": "The full nested descriptor workload must stay linear in its starting rows, including foreign-node skipping; the ceiling includes each row's input and button children."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "live_indexes",
+    "target": "children-512-owned-rotate",
+    "reference": "children-512-reference",
+    "maxRatio": 0,
+    "note": "Descriptor placement must use sibling traversal, with no live collection indexing; native focus, input, portal and survivor identity controls remain checked."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "sibling_reads",
+    "target": "children-512-owned-rotate",
+    "reference": "children-512-reference",
+    "maxRatio": 8,
+    "note": "The full nested descriptor workload must stay linear in its starting rows, including foreign-node skipping; the ceiling includes each row's input and button children."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "live_indexes",
+    "target": "children-512-owned-replace",
+    "reference": "children-512-reference",
+    "maxRatio": 0,
+    "note": "Descriptor placement must use sibling traversal, with no live collection indexing; native focus, input, portal and survivor identity controls remain checked."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "sibling_reads",
+    "target": "children-512-owned-replace",
+    "reference": "children-512-reference",
+    "maxRatio": 8,
+    "note": "The full nested descriptor workload must stay linear in its starting rows, including foreign-node skipping; the ceiling includes each row's input and button children."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "live_indexes",
+    "target": "children-512-foreign-unchanged",
+    "reference": "children-512-reference",
+    "maxRatio": 0,
+    "note": "Descriptor placement must use sibling traversal, with no live collection indexing; native focus, input, portal and survivor identity controls remain checked."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "sibling_reads",
+    "target": "children-512-foreign-unchanged",
+    "reference": "children-512-reference",
+    "maxRatio": 8,
+    "note": "The full nested descriptor workload must stay linear in its starting rows, including foreign-node skipping; the ceiling includes each row's input and button children."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "live_indexes",
+    "target": "children-512-foreign-reverse",
+    "reference": "children-512-reference",
+    "maxRatio": 0,
+    "note": "Descriptor placement must use sibling traversal, with no live collection indexing; native focus, input, portal and survivor identity controls remain checked."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "sibling_reads",
+    "target": "children-512-foreign-reverse",
+    "reference": "children-512-reference",
+    "maxRatio": 8,
+    "note": "The full nested descriptor workload must stay linear in its starting rows, including foreign-node skipping; the ceiling includes each row's input and button children."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "live_indexes",
+    "target": "children-512-foreign-rotate",
+    "reference": "children-512-reference",
+    "maxRatio": 0,
+    "note": "Descriptor placement must use sibling traversal, with no live collection indexing; native focus, input, portal and survivor identity controls remain checked."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "sibling_reads",
+    "target": "children-512-foreign-rotate",
+    "reference": "children-512-reference",
+    "maxRatio": 8,
+    "note": "The full nested descriptor workload must stay linear in its starting rows, including foreign-node skipping; the ceiling includes each row's input and button children."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "live_indexes",
+    "target": "children-512-foreign-replace",
+    "reference": "children-512-reference",
+    "maxRatio": 0,
+    "note": "Descriptor placement must use sibling traversal, with no live collection indexing; native focus, input, portal and survivor identity controls remain checked."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "sibling_reads",
+    "target": "children-512-foreign-replace",
+    "reference": "children-512-reference",
+    "maxRatio": 8,
+    "note": "The full nested descriptor workload must stay linear in its starting rows, including foreign-node skipping; the ceiling includes each row's input and button children."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "resolver_calls",
+    "target": "forms-spread-changed",
+    "reference": "forms-spread-changed-work",
+    "maxRatio": 0,
+    "note": "Per-row form work: preserve source precedence, controlled values, reset baselines and both select projections while bounding repeated source scans and option indexing. Raw-writer lookups make the transferred work explicit."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "closure_sites",
+    "target": "forms-spread-changed",
+    "reference": "forms-spread-changed-work",
+    "maxRatio": 0,
+    "note": "Per-row form work: preserve source precedence, controlled values, reset baselines and both select projections while bounding repeated source scans and option indexing. Raw-writer lookups make the transferred work explicit."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "enumerable_checks",
+    "target": "forms-spread-changed",
+    "reference": "forms-spread-changed-work",
+    "maxRatio": 0,
+    "note": "Per-row form work: preserve source precedence, controlled values, reset baselines and both select projections while bounding repeated source scans and option indexing. Raw-writer lookups make the transferred work explicit."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "option_reads",
+    "target": "forms-spread-changed",
+    "reference": "forms-spread-changed-work",
+    "maxRatio": 24,
+    "note": "Per-row form work: preserve source precedence, controlled values, reset baselines and both select projections while bounding repeated source scans and option indexing. Raw-writer lookups make the transferred work explicit."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "projections",
+    "target": "forms-spread-changed",
+    "reference": "forms-spread-changed-work",
+    "maxRatio": 2,
+    "note": "Per-row form work: preserve source precedence, controlled values, reset baselines and both select projections while bounding repeated source scans and option indexing. Raw-writer lookups make the transferred work explicit."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "applications",
+    "target": "forms-spread-changed",
+    "reference": "forms-spread-changed-work",
+    "maxRatio": 4,
+    "note": "Per-row form work: preserve source precedence, controlled values, reset baselines and both select projections while bounding repeated source scans and option indexing. Raw-writer lookups make the transferred work explicit."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "writer_lookups",
+    "target": "forms-spread-changed",
+    "reference": "forms-spread-changed-work",
+    "maxRatio": 20,
+    "note": "Per-row form work: preserve source precedence, controlled values, reset baselines and both select projections while bounding repeated source scans and option indexing. Raw-writer lookups make the transferred work explicit."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "resolver_calls",
+    "target": "forms-spread-unchanged",
+    "reference": "forms-spread-unchanged-work",
+    "maxRatio": 0,
+    "note": "Per-row form work: preserve source precedence, controlled values, reset baselines and both select projections while bounding repeated source scans and option indexing. Raw-writer lookups make the transferred work explicit."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "closure_sites",
+    "target": "forms-spread-unchanged",
+    "reference": "forms-spread-unchanged-work",
+    "maxRatio": 0,
+    "note": "Per-row form work: preserve source precedence, controlled values, reset baselines and both select projections while bounding repeated source scans and option indexing. Raw-writer lookups make the transferred work explicit."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "enumerable_checks",
+    "target": "forms-spread-unchanged",
+    "reference": "forms-spread-unchanged-work",
+    "maxRatio": 0,
+    "note": "Per-row form work: preserve source precedence, controlled values, reset baselines and both select projections while bounding repeated source scans and option indexing. Raw-writer lookups make the transferred work explicit."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "option_reads",
+    "target": "forms-spread-unchanged",
+    "reference": "forms-spread-unchanged-work",
+    "maxRatio": 24,
+    "note": "Per-row form work: preserve source precedence, controlled values, reset baselines and both select projections while bounding repeated source scans and option indexing. Raw-writer lookups make the transferred work explicit."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "projections",
+    "target": "forms-spread-unchanged",
+    "reference": "forms-spread-unchanged-work",
+    "maxRatio": 2,
+    "note": "Per-row form work: preserve source precedence, controlled values, reset baselines and both select projections while bounding repeated source scans and option indexing. Raw-writer lookups make the transferred work explicit."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "applications",
+    "target": "forms-spread-unchanged",
+    "reference": "forms-spread-unchanged-work",
+    "maxRatio": 4,
+    "note": "Per-row form work: preserve source precedence, controlled values, reset baselines and both select projections while bounding repeated source scans and option indexing. Raw-writer lookups make the transferred work explicit."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "writer_lookups",
+    "target": "forms-spread-unchanged",
+    "reference": "forms-spread-unchanged-work",
+    "maxRatio": 20,
+    "note": "Per-row form work: preserve source precedence, controlled values, reset baselines and both select projections while bounding repeated source scans and option indexing. Raw-writer lookups make the transferred work explicit."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "resolver_calls",
+    "target": "forms-direct-changed",
+    "reference": "forms-direct-changed-work",
+    "maxRatio": 0,
+    "note": "Per-row form work: preserve source precedence, controlled values, reset baselines and both select projections while bounding repeated source scans and option indexing. Raw-writer lookups make the transferred work explicit."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "closure_sites",
+    "target": "forms-direct-changed",
+    "reference": "forms-direct-changed-work",
+    "maxRatio": 0,
+    "note": "Per-row form work: preserve source precedence, controlled values, reset baselines and both select projections while bounding repeated source scans and option indexing. Raw-writer lookups make the transferred work explicit."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "enumerable_checks",
+    "target": "forms-direct-changed",
+    "reference": "forms-direct-changed-work",
+    "maxRatio": 0,
+    "note": "Per-row form work: preserve source precedence, controlled values, reset baselines and both select projections while bounding repeated source scans and option indexing. Raw-writer lookups make the transferred work explicit."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "option_reads",
+    "target": "forms-direct-changed",
+    "reference": "forms-direct-changed-work",
+    "maxRatio": 24,
+    "note": "Per-row form work: preserve source precedence, controlled values, reset baselines and both select projections while bounding repeated source scans and option indexing. Raw-writer lookups make the transferred work explicit."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "projections",
+    "target": "forms-direct-changed",
+    "reference": "forms-direct-changed-work",
+    "maxRatio": 2,
+    "note": "Per-row form work: preserve source precedence, controlled values, reset baselines and both select projections while bounding repeated source scans and option indexing. Raw-writer lookups make the transferred work explicit."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "applications",
+    "target": "forms-direct-changed",
+    "reference": "forms-direct-changed-work",
+    "maxRatio": 1,
+    "note": "Per-row form work: preserve source precedence, controlled values, reset baselines and both select projections while bounding repeated source scans and option indexing. Raw-writer lookups make the transferred work explicit."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "writer_lookups",
+    "target": "forms-direct-changed",
+    "reference": "forms-direct-changed-work",
+    "maxRatio": 5,
+    "note": "Per-row form work: preserve source precedence, controlled values, reset baselines and both select projections while bounding repeated source scans and option indexing. Raw-writer lookups make the transferred work explicit."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "resolver_calls",
+    "target": "forms-direct-unchanged",
+    "reference": "forms-direct-unchanged-work",
+    "maxRatio": 0,
+    "note": "Per-row form work: preserve source precedence, controlled values, reset baselines and both select projections while bounding repeated source scans and option indexing. Raw-writer lookups make the transferred work explicit."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "closure_sites",
+    "target": "forms-direct-unchanged",
+    "reference": "forms-direct-unchanged-work",
+    "maxRatio": 0,
+    "note": "Per-row form work: preserve source precedence, controlled values, reset baselines and both select projections while bounding repeated source scans and option indexing. Raw-writer lookups make the transferred work explicit."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "enumerable_checks",
+    "target": "forms-direct-unchanged",
+    "reference": "forms-direct-unchanged-work",
+    "maxRatio": 0,
+    "note": "Per-row form work: preserve source precedence, controlled values, reset baselines and both select projections while bounding repeated source scans and option indexing. Raw-writer lookups make the transferred work explicit."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "option_reads",
+    "target": "forms-direct-unchanged",
+    "reference": "forms-direct-unchanged-work",
+    "maxRatio": 24,
+    "note": "Per-row form work: preserve source precedence, controlled values, reset baselines and both select projections while bounding repeated source scans and option indexing. Raw-writer lookups make the transferred work explicit."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "projections",
+    "target": "forms-direct-unchanged",
+    "reference": "forms-direct-unchanged-work",
+    "maxRatio": 2,
+    "note": "Per-row form work: preserve source precedence, controlled values, reset baselines and both select projections while bounding repeated source scans and option indexing. Raw-writer lookups make the transferred work explicit."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "applications",
+    "target": "forms-direct-unchanged",
+    "reference": "forms-direct-unchanged-work",
+    "maxRatio": 1,
+    "note": "Per-row form work: preserve source precedence, controlled values, reset baselines and both select projections while bounding repeated source scans and option indexing. Raw-writer lookups make the transferred work explicit."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "writer_lookups",
+    "target": "forms-direct-unchanged",
+    "reference": "forms-direct-unchanged-work",
+    "maxRatio": 5,
+    "note": "Per-row form work: preserve source precedence, controlled values, reset baselines and both select projections while bounding repeated source scans and option indexing. Raw-writer lookups make the transferred work explicit."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "resolver_calls",
+    "target": "forms-compatibility-changed",
+    "reference": "forms-compatibility-changed-work",
+    "maxRatio": 4,
+    "note": "Per-row form work: preserve source precedence, controlled values, reset baselines and both select projections while bounding repeated source scans and option indexing. Raw-writer lookups make the transferred work explicit."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "closure_sites",
+    "target": "forms-compatibility-changed",
+    "reference": "forms-compatibility-changed-work",
+    "maxRatio": 0,
+    "note": "Per-row form work: preserve source precedence, controlled values, reset baselines and both select projections while bounding repeated source scans and option indexing. Raw-writer lookups make the transferred work explicit."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "enumerable_checks",
+    "target": "forms-compatibility-changed",
+    "reference": "forms-compatibility-changed-work",
+    "maxRatio": 13,
+    "note": "Per-row form work: preserve source precedence, controlled values, reset baselines and both select projections while bounding repeated source scans and option indexing. Raw-writer lookups make the transferred work explicit."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "option_reads",
+    "target": "forms-compatibility-changed",
+    "reference": "forms-compatibility-changed-work",
+    "maxRatio": 24,
+    "note": "Per-row form work: preserve source precedence, controlled values, reset baselines and both select projections while bounding repeated source scans and option indexing. Raw-writer lookups make the transferred work explicit."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "projections",
+    "target": "forms-compatibility-changed",
+    "reference": "forms-compatibility-changed-work",
+    "maxRatio": 2,
+    "note": "Per-row form work: preserve source precedence, controlled values, reset baselines and both select projections while bounding repeated source scans and option indexing. Raw-writer lookups make the transferred work explicit."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "applications",
+    "target": "forms-compatibility-changed",
+    "reference": "forms-compatibility-changed-work",
+    "maxRatio": 4,
+    "note": "Per-row form work: preserve source precedence, controlled values, reset baselines and both select projections while bounding repeated source scans and option indexing. Raw-writer lookups make the transferred work explicit."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "writer_lookups",
+    "target": "forms-compatibility-changed",
+    "reference": "forms-compatibility-changed-work",
+    "maxRatio": 0,
+    "note": "Per-row form work: preserve source precedence, controlled values, reset baselines and both select projections while bounding repeated source scans and option indexing. Raw-writer lookups make the transferred work explicit."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "resolver_calls",
+    "target": "forms-compatibility-unchanged",
+    "reference": "forms-compatibility-unchanged-work",
+    "maxRatio": 4,
+    "note": "Per-row form work: preserve source precedence, controlled values, reset baselines and both select projections while bounding repeated source scans and option indexing. Raw-writer lookups make the transferred work explicit."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "closure_sites",
+    "target": "forms-compatibility-unchanged",
+    "reference": "forms-compatibility-unchanged-work",
+    "maxRatio": 0,
+    "note": "Per-row form work: preserve source precedence, controlled values, reset baselines and both select projections while bounding repeated source scans and option indexing. Raw-writer lookups make the transferred work explicit."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "enumerable_checks",
+    "target": "forms-compatibility-unchanged",
+    "reference": "forms-compatibility-unchanged-work",
+    "maxRatio": 13,
+    "note": "Per-row form work: preserve source precedence, controlled values, reset baselines and both select projections while bounding repeated source scans and option indexing. Raw-writer lookups make the transferred work explicit."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "option_reads",
+    "target": "forms-compatibility-unchanged",
+    "reference": "forms-compatibility-unchanged-work",
+    "maxRatio": 24,
+    "note": "Per-row form work: preserve source precedence, controlled values, reset baselines and both select projections while bounding repeated source scans and option indexing. Raw-writer lookups make the transferred work explicit."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "projections",
+    "target": "forms-compatibility-unchanged",
+    "reference": "forms-compatibility-unchanged-work",
+    "maxRatio": 2,
+    "note": "Per-row form work: preserve source precedence, controlled values, reset baselines and both select projections while bounding repeated source scans and option indexing. Raw-writer lookups make the transferred work explicit."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "applications",
+    "target": "forms-compatibility-unchanged",
+    "reference": "forms-compatibility-unchanged-work",
+    "maxRatio": 4,
+    "note": "Per-row form work: preserve source precedence, controlled values, reset baselines and both select projections while bounding repeated source scans and option indexing. Raw-writer lookups make the transferred work explicit."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "writer_lookups",
+    "target": "forms-compatibility-unchanged",
+    "reference": "forms-compatibility-unchanged-work",
+    "maxRatio": 0,
+    "note": "Per-row form work: preserve source precedence, controlled values, reset baselines and both select projections while bounding repeated source scans and option indexing. Raw-writer lookups make the transferred work explicit."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "same_attributes",
+    "target": "props",
+    "reference": "props-one-per-update",
+    "maxRatio": 0,
+    "note": "Matching live ordinary string attributes/classes and delegated handlers skip redundant publication; changed and foreign-edited DOM values must still be restored with alias order, focus, and native events preserved."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "same_classes",
+    "target": "props",
+    "reference": "props-one-per-update",
+    "maxRatio": 0,
+    "note": "Matching live ordinary string attributes/classes and delegated handlers skip redundant publication; changed and foreign-edited DOM values must still be restored with alias order, focus, and native events preserved."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "same_events",
+    "target": "props",
+    "reference": "props-one-per-update",
+    "maxRatio": 0,
+    "note": "Matching live ordinary string attributes/classes and delegated handlers skip redundant publication; changed and foreign-edited DOM values must still be restored with alias order, focus, and native events preserved."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "changed_attributes",
+    "target": "props",
+    "reference": "props-one-per-update",
+    "maxRatio": 1,
+    "note": "Matching live ordinary string attributes/classes and delegated handlers skip redundant publication; changed and foreign-edited DOM values must still be restored with alias order, focus, and native events preserved."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "changed_classes",
+    "target": "props",
+    "reference": "props-one-per-update",
+    "maxRatio": 1,
+    "note": "Matching live ordinary string attributes/classes and delegated handlers skip redundant publication; changed and foreign-edited DOM values must still be restored with alias order, focus, and native events preserved."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "changed_events",
+    "target": "props",
+    "reference": "props-one-per-update",
+    "maxRatio": 0,
+    "note": "Matching live ordinary string attributes/classes and delegated handlers skip redundant publication; changed and foreign-edited DOM values must still be restored with alias order, focus, and native events preserved."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "foreign_attributes",
+    "target": "props",
+    "reference": "props-one-per-update",
+    "maxRatio": 2,
+    "note": "Matching live ordinary string attributes/classes and delegated handlers skip redundant publication; changed and foreign-edited DOM values must still be restored with alias order, focus, and native events preserved."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "foreign_classes",
+    "target": "props",
+    "reference": "props-one-per-update",
+    "maxRatio": 1,
+    "note": "Matching live ordinary string attributes/classes and delegated handlers skip redundant publication; changed and foreign-edited DOM values must still be restored with alias order, focus, and native events preserved."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "foreign_events",
+    "target": "props",
+    "reference": "props-one-per-update",
+    "maxRatio": 0,
+    "note": "Matching live ordinary string attributes/classes and delegated handlers skip redundant publication; changed and foreign-edited DOM values must still be restored with alias order, focus, and native events preserved."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "parse_records",
+    "target": "events-non-event-mount",
+    "reference": "events-non-event-mount-work",
+    "maxRatio": 0,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "substrings",
+    "target": "events-non-event-mount",
+    "reference": "events-non-event-mount-work",
+    "maxRatio": 0,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "delegate_arrays",
+    "target": "events-non-event-mount",
+    "reference": "events-non-event-mount-work",
+    "maxRatio": 0,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "cache_inserts",
+    "target": "events-non-event-mount",
+    "reference": "events-non-event-mount-work",
+    "maxRatio": 0,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "cache_probes",
+    "target": "events-non-event-mount",
+    "reference": "events-non-event-mount-work",
+    "maxRatio": 0,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "catalog_checks",
+    "target": "events-non-event-mount",
+    "reference": "events-non-event-mount-work",
+    "maxRatio": 0,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "catalog_entries",
+    "target": "events-non-event-mount",
+    "reference": "events-non-event-mount-work",
+    "maxRatio": 0,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "catalog_splits",
+    "target": "events-non-event-mount",
+    "reference": "events-non-event-mount-work",
+    "maxRatio": 0,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "parse_records",
+    "target": "events-non-event-updates",
+    "reference": "events-non-event-updates-work",
+    "maxRatio": 0,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "substrings",
+    "target": "events-non-event-updates",
+    "reference": "events-non-event-updates-work",
+    "maxRatio": 0,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "delegate_arrays",
+    "target": "events-non-event-updates",
+    "reference": "events-non-event-updates-work",
+    "maxRatio": 0,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "cache_inserts",
+    "target": "events-non-event-updates",
+    "reference": "events-non-event-updates-work",
+    "maxRatio": 0,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "cache_probes",
+    "target": "events-non-event-updates",
+    "reference": "events-non-event-updates-work",
+    "maxRatio": 0,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "catalog_checks",
+    "target": "events-non-event-updates",
+    "reference": "events-non-event-updates-work",
+    "maxRatio": 0,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "catalog_entries",
+    "target": "events-non-event-updates",
+    "reference": "events-non-event-updates-work",
+    "maxRatio": 0,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "catalog_splits",
+    "target": "events-non-event-updates",
+    "reference": "events-non-event-updates-work",
+    "maxRatio": 0,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "parse_records",
+    "target": "events-descriptor-known-mount",
+    "reference": "events-descriptor-known-mount-work",
+    "maxRatio": 0.046875,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "substrings",
+    "target": "events-descriptor-known-mount",
+    "reference": "events-descriptor-known-mount-work",
+    "maxRatio": 0.0703125,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "delegate_arrays",
+    "target": "events-descriptor-known-mount",
+    "reference": "events-descriptor-known-mount-work",
+    "maxRatio": 0.046875,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "cache_inserts",
+    "target": "events-descriptor-known-mount",
+    "reference": "events-descriptor-known-mount-work",
+    "maxRatio": 0.046875,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "cache_probes",
+    "target": "events-descriptor-known-mount",
+    "reference": "events-descriptor-known-mount-work",
+    "maxRatio": 6,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "catalog_checks",
+    "target": "events-descriptor-known-mount",
+    "reference": "events-descriptor-known-mount-work",
+    "maxRatio": 0.046875,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "catalog_entries",
+    "target": "events-descriptor-known-mount",
+    "reference": "events-descriptor-known-mount-work",
+    "maxRatio": 1.40625,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "catalog_splits",
+    "target": "events-descriptor-known-mount",
+    "reference": "events-descriptor-known-mount-work",
+    "maxRatio": 0.0078125,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "parse_records",
+    "target": "events-descriptor-known-updates",
+    "reference": "events-descriptor-known-updates-work",
+    "maxRatio": 0,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "substrings",
+    "target": "events-descriptor-known-updates",
+    "reference": "events-descriptor-known-updates-work",
+    "maxRatio": 0,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "delegate_arrays",
+    "target": "events-descriptor-known-updates",
+    "reference": "events-descriptor-known-updates-work",
+    "maxRatio": 0,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "cache_inserts",
+    "target": "events-descriptor-known-updates",
+    "reference": "events-descriptor-known-updates-work",
+    "maxRatio": 0,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "cache_probes",
+    "target": "events-descriptor-known-updates",
+    "reference": "events-descriptor-known-updates-work",
+    "maxRatio": 6,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "catalog_checks",
+    "target": "events-descriptor-known-updates",
+    "reference": "events-descriptor-known-updates-work",
+    "maxRatio": 0,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "catalog_entries",
+    "target": "events-descriptor-known-updates",
+    "reference": "events-descriptor-known-updates-work",
+    "maxRatio": 0,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "catalog_splits",
+    "target": "events-descriptor-known-updates",
+    "reference": "events-descriptor-known-updates-work",
+    "maxRatio": 0,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "parse_records",
+    "target": "events-host-known-mount",
+    "reference": "events-host-known-mount-work",
+    "maxRatio": 0,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "substrings",
+    "target": "events-host-known-mount",
+    "reference": "events-host-known-mount-work",
+    "maxRatio": 0,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "delegate_arrays",
+    "target": "events-host-known-mount",
+    "reference": "events-host-known-mount-work",
+    "maxRatio": 0,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "cache_inserts",
+    "target": "events-host-known-mount",
+    "reference": "events-host-known-mount-work",
+    "maxRatio": 0,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "cache_probes",
+    "target": "events-host-known-mount",
+    "reference": "events-host-known-mount-work",
+    "maxRatio": 6,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "catalog_checks",
+    "target": "events-host-known-mount",
+    "reference": "events-host-known-mount-work",
+    "maxRatio": 0,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "catalog_entries",
+    "target": "events-host-known-mount",
+    "reference": "events-host-known-mount-work",
+    "maxRatio": 0,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "catalog_splits",
+    "target": "events-host-known-mount",
+    "reference": "events-host-known-mount-work",
+    "maxRatio": 0,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "parse_records",
+    "target": "events-host-known-updates",
+    "reference": "events-host-known-updates-work",
+    "maxRatio": 0,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "substrings",
+    "target": "events-host-known-updates",
+    "reference": "events-host-known-updates-work",
+    "maxRatio": 0,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "delegate_arrays",
+    "target": "events-host-known-updates",
+    "reference": "events-host-known-updates-work",
+    "maxRatio": 0,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "cache_inserts",
+    "target": "events-host-known-updates",
+    "reference": "events-host-known-updates-work",
+    "maxRatio": 0,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "cache_probes",
+    "target": "events-host-known-updates",
+    "reference": "events-host-known-updates-work",
+    "maxRatio": 6,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "catalog_checks",
+    "target": "events-host-known-updates",
+    "reference": "events-host-known-updates-work",
+    "maxRatio": 0,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "catalog_entries",
+    "target": "events-host-known-updates",
+    "reference": "events-host-known-updates-work",
+    "maxRatio": 0,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "catalog_splits",
+    "target": "events-host-known-updates",
+    "reference": "events-host-known-updates-work",
+    "maxRatio": 0,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "parse_records",
+    "target": "events-descriptor-unknown-mount",
+    "reference": "events-descriptor-unknown-mount-work",
+    "maxRatio": 2,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "substrings",
+    "target": "events-descriptor-unknown-mount",
+    "reference": "events-descriptor-unknown-mount-work",
+    "maxRatio": 2,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "delegate_arrays",
+    "target": "events-descriptor-unknown-mount",
+    "reference": "events-descriptor-unknown-mount-work",
+    "maxRatio": 0.0078125,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "cache_inserts",
+    "target": "events-descriptor-unknown-mount",
+    "reference": "events-descriptor-unknown-mount-work",
+    "maxRatio": 0,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "cache_probes",
+    "target": "events-descriptor-unknown-mount",
+    "reference": "events-descriptor-unknown-mount-work",
+    "maxRatio": 2,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "catalog_checks",
+    "target": "events-descriptor-unknown-mount",
+    "reference": "events-descriptor-unknown-mount-work",
+    "maxRatio": 2,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "catalog_entries",
+    "target": "events-descriptor-unknown-mount",
+    "reference": "events-descriptor-unknown-mount-work",
+    "maxRatio": 0,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "catalog_splits",
+    "target": "events-descriptor-unknown-mount",
+    "reference": "events-descriptor-unknown-mount-work",
+    "maxRatio": 0,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "parse_records",
+    "target": "events-descriptor-unknown-updates",
+    "reference": "events-descriptor-unknown-updates-work",
+    "maxRatio": 2,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "substrings",
+    "target": "events-descriptor-unknown-updates",
+    "reference": "events-descriptor-unknown-updates-work",
+    "maxRatio": 2,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "delegate_arrays",
+    "target": "events-descriptor-unknown-updates",
+    "reference": "events-descriptor-unknown-updates-work",
+    "maxRatio": 0,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "cache_inserts",
+    "target": "events-descriptor-unknown-updates",
+    "reference": "events-descriptor-unknown-updates-work",
+    "maxRatio": 0,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "cache_probes",
+    "target": "events-descriptor-unknown-updates",
+    "reference": "events-descriptor-unknown-updates-work",
+    "maxRatio": 2,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "catalog_checks",
+    "target": "events-descriptor-unknown-updates",
+    "reference": "events-descriptor-unknown-updates-work",
+    "maxRatio": 2,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "catalog_entries",
+    "target": "events-descriptor-unknown-updates",
+    "reference": "events-descriptor-unknown-updates-work",
+    "maxRatio": 0,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "catalog_splits",
+    "target": "events-descriptor-unknown-updates",
+    "reference": "events-descriptor-unknown-updates-work",
+    "maxRatio": 0,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "parse_records",
+    "target": "events-custom-known-and-unknown-mount",
+    "reference": "events-custom-known-and-unknown-mount-work",
+    "maxRatio": 0,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "substrings",
+    "target": "events-custom-known-and-unknown-mount",
+    "reference": "events-custom-known-and-unknown-mount-work",
+    "maxRatio": 0,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "delegate_arrays",
+    "target": "events-custom-known-and-unknown-mount",
+    "reference": "events-custom-known-and-unknown-mount-work",
+    "maxRatio": 0,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "cache_inserts",
+    "target": "events-custom-known-and-unknown-mount",
+    "reference": "events-custom-known-and-unknown-mount-work",
+    "maxRatio": 0,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "cache_probes",
+    "target": "events-custom-known-and-unknown-mount",
+    "reference": "events-custom-known-and-unknown-mount-work",
+    "maxRatio": 2,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "catalog_checks",
+    "target": "events-custom-known-and-unknown-mount",
+    "reference": "events-custom-known-and-unknown-mount-work",
+    "maxRatio": 4,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "catalog_entries",
+    "target": "events-custom-known-and-unknown-mount",
+    "reference": "events-custom-known-and-unknown-mount-work",
+    "maxRatio": 0,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "catalog_splits",
+    "target": "events-custom-known-and-unknown-mount",
+    "reference": "events-custom-known-and-unknown-mount-work",
+    "maxRatio": 0,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "parse_records",
+    "target": "events-custom-known-and-unknown-updates",
+    "reference": "events-custom-known-and-unknown-updates-work",
+    "maxRatio": 0,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "substrings",
+    "target": "events-custom-known-and-unknown-updates",
+    "reference": "events-custom-known-and-unknown-updates-work",
+    "maxRatio": 0,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "delegate_arrays",
+    "target": "events-custom-known-and-unknown-updates",
+    "reference": "events-custom-known-and-unknown-updates-work",
+    "maxRatio": 0,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "cache_inserts",
+    "target": "events-custom-known-and-unknown-updates",
+    "reference": "events-custom-known-and-unknown-updates-work",
+    "maxRatio": 0,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "cache_probes",
+    "target": "events-custom-known-and-unknown-updates",
+    "reference": "events-custom-known-and-unknown-updates-work",
+    "maxRatio": 2,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "catalog_checks",
+    "target": "events-custom-known-and-unknown-updates",
+    "reference": "events-custom-known-and-unknown-updates-work",
+    "maxRatio": 4,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "catalog_entries",
+    "target": "events-custom-known-and-unknown-updates",
+    "reference": "events-custom-known-and-unknown-updates-work",
+    "maxRatio": 0,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "descriptor-renderer",
+    "op": "catalog_splits",
+    "target": "events-custom-known-and-unknown-updates",
+    "reference": "events-custom-known-and-unknown-updates-work",
+    "maxRatio": 0,
+    "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "body-ownership",
+    "op": "stale_output_count",
+    "target": "octane",
+    "reference": "reference",
+    "maxRatio": 0,
+    "note": "Independent Provider bodies, lazy body switches and nested scoped context must render current output."
+  },
+  {
+    "suite": "body-ownership",
+    "op": "map_memo_hits",
+    "target": "octane",
+    "reference": "reference",
+    "maxRatio": 0,
+    "note": "Unchanged independently compiled body retains ordinary hook memo values."
+  },
+  {
+    "suite": "body-ownership",
+    "op": "inline_memo_hits",
+    "target": "octane",
+    "reference": "reference",
+    "maxRatio": 0,
+    "note": "Unchanged independently compiled body retains inline hook memo values."
+  },
+  {
+    "suite": "body-ownership",
+    "op": "lazy_memo_hits",
+    "target": "octane",
+    "reference": "reference",
+    "maxRatio": 0,
+    "note": "Same resolved lazy body retains its hook memo values."
+  },
+  {
+    "suite": "body-ownership",
+    "op": "context_unchanged_resolutions",
+    "target": "octane",
+    "reference": "reference",
+    "maxRatio": 0,
+    "note": "Stable scoped context values retain cached resolution across ordinary updates."
+  },
+  {
+    "suite": "body-ownership",
+    "op": "map_body_computations",
+    "target": "octane",
+    "reference": "reference",
+    "maxRatio": 1,
+    "note": "Each independent module owns one ordinary memo computation across repeated body switches.",
+    "minRatio": 1
+  },
+  {
+    "suite": "body-ownership",
+    "op": "inline_body_computations",
+    "target": "octane",
+    "reference": "reference",
+    "maxRatio": 1,
+    "note": "Each independent module owns one inline memo computation across repeated body switches.",
+    "minRatio": 1
+  },
+  {
+    "suite": "body-ownership",
+    "op": "context_changed_resolutions",
+    "target": "octane",
+    "reference": "reference",
+    "maxRatio": 1,
+    "note": "Changed context recomputes the nested scoped value once per requested value.",
+    "minRatio": 1
+  },
+  {
+    "suite": "universal-retention",
+    "op": "feature_node_visits",
+    "target": "retained-0",
+    "reference": "update-work",
+    "maxRatio": 0,
+    "note": "After cold observer-validated traversal, unchanged committed subtrees reuse feature unions across 64 state updates while retaining host identity and labels."
+  },
+  {
+    "suite": "universal-retention",
+    "op": "feature_node_visits",
+    "target": "retained-128",
+    "reference": "update-work",
+    "maxRatio": 0,
+    "note": "After cold observer-validated traversal, unchanged committed subtrees reuse feature unions across 64 state updates while retaining host identity and labels."
+  },
+  {
+    "suite": "universal-retention",
+    "op": "feature_node_visits",
+    "target": "retained-1024",
+    "reference": "update-work",
+    "maxRatio": 0,
+    "note": "After cold observer-validated traversal, unchanged committed subtrees reuse feature unions across 64 state updates while retaining host identity and labels."
+  },
+  {
+    "suite": "universal-materialization",
+    "op": "update_materializeArrays",
+    "target": "static-128",
+    "reference": "static-128-budget",
+    "maxRatio": 1,
+    "note": "Deterministic production allocation work with clean/observed output, keyed state, identity, abort and teardown controls."
+  },
+  {
+    "suite": "universal-materialization",
+    "op": "update_runtimeSets",
+    "target": "static-128",
+    "reference": "static-128-budget",
+    "maxRatio": 1,
+    "note": "Deterministic production allocation work with clean/observed output, keyed state, identity, abort and teardown controls."
+  },
+  {
+    "suite": "universal-materialization",
+    "op": "update_materializeArrays",
+    "target": "scoped-128",
+    "reference": "scoped-128-budget",
+    "maxRatio": 1,
+    "note": "Deterministic production allocation work with clean/observed output, keyed state, identity, abort and teardown controls."
+  },
+  {
+    "suite": "universal-materialization",
+    "op": "update_runtimeSets",
+    "target": "scoped-128",
+    "reference": "scoped-128-budget",
+    "maxRatio": 1,
+    "note": "Deterministic production allocation work with clean/observed output, keyed state, identity, abort and teardown controls."
+  },
+  {
+    "suite": "universal-materialization",
+    "op": "update_materializeArrays",
+    "target": "unkeyed-128",
+    "reference": "unkeyed-128-budget",
+    "maxRatio": 1,
+    "note": "Deterministic production allocation work with clean/observed output, keyed state, identity, abort and teardown controls."
+  },
+  {
+    "suite": "universal-materialization",
+    "op": "update_runtimeSets",
+    "target": "unkeyed-128",
+    "reference": "unkeyed-128-budget",
+    "maxRatio": 1,
+    "note": "Deterministic production allocation work with clean/observed output, keyed state, identity, abort and teardown controls."
+  },
+  {
+    "suite": "universal-prop-shapes",
+    "op": "dictionary_props",
+    "target": "plain-component",
+    "reference": "normalization-work",
+    "maxRatio": 0,
+    "note": "Actual component snapshots and public host command props retain V8 fast properties; output, identity and callback/cleanup controls match."
+  },
+  {
+    "suite": "universal-prop-shapes",
+    "op": "dictionary_props",
+    "target": "keyed-component",
+    "reference": "normalization-work",
+    "maxRatio": 0,
+    "note": "Actual component snapshots and public host command props retain V8 fast properties; output, identity and callback/cleanup controls match."
+  },
+  {
+    "suite": "universal-prop-shapes",
+    "op": "dictionary_props",
+    "target": "spread-keyed-component",
+    "reference": "normalization-work",
+    "maxRatio": 0,
+    "note": "Actual component snapshots and public host command props retain V8 fast properties; output, identity and callback/cleanup controls match."
+  },
+  {
+    "suite": "universal-prop-shapes",
+    "op": "dictionary_props",
+    "target": "plain-host",
+    "reference": "normalization-work",
+    "maxRatio": 0,
+    "note": "Actual component snapshots and public host command props retain V8 fast properties; output, identity and callback/cleanup controls match."
+  },
+  {
+    "suite": "universal-prop-shapes",
+    "op": "dictionary_props",
+    "target": "event-host",
+    "reference": "normalization-work",
+    "maxRatio": 0,
+    "note": "Actual component snapshots and public host command props retain V8 fast properties; output, identity and callback/cleanup controls match."
+  },
+  {
+    "suite": "universal-prop-shapes",
+    "op": "dictionary_props",
+    "target": "null-event-host",
+    "reference": "normalization-work",
+    "maxRatio": 0,
+    "note": "Actual component snapshots and public host command props retain V8 fast properties; output, identity and callback/cleanup controls match."
+  },
+  {
+    "suite": "universal-prop-shapes",
+    "op": "dictionary_props",
+    "target": "reserved-host",
+    "reference": "normalization-work",
+    "maxRatio": 0,
+    "note": "Actual component snapshots and public host command props retain V8 fast properties; output, identity and callback/cleanup controls match."
+  },
+  {
+    "suite": "universal-prop-shapes",
+    "op": "dictionary_props",
+    "target": "lifecycle-host",
+    "reference": "normalization-work",
+    "maxRatio": 0,
+    "note": "Actual component snapshots and public host command props retain V8 fast properties; output, identity and callback/cleanup controls match."
+  },
+  {
+    "suite": "universal-prop-shapes",
+    "op": "dictionary_props",
+    "target": "local-callback-host",
+    "reference": "normalization-work",
+    "maxRatio": 0,
+    "note": "Actual component snapshots and public host command props retain V8 fast properties; output, identity and callback/cleanup controls match."
+  },
+  {
+    "suite": "universal-prop-shapes",
+    "op": "dictionary_props",
+    "target": "fallback-event-host",
+    "reference": "normalization-work",
+    "maxRatio": 0,
+    "note": "Actual component snapshots and public host command props retain V8 fast properties; output, identity and callback/cleanup controls match."
+  },
+  {
+    "suite": "universal-prop-shapes",
+    "op": "dictionary_props",
+    "target": "ownerless-leaf-host",
+    "reference": "normalization-work",
+    "maxRatio": 0,
+    "note": "Ownerless and compact compiler-leaf controls retain ordinary host prop shapes and public output."
+  },
+  {
+    "suite": "universal-prop-shapes",
+    "op": "dictionary_props",
+    "target": "compact-leaf-host",
+    "reference": "normalization-work",
+    "maxRatio": 0,
+    "note": "Ownerless and compact compiler-leaf controls retain ordinary host prop shapes and public output."
+  },
+  {
+    "suite": "universal-preparation",
+    "op": "update_templateNodes",
+    "target": "ordinary-0",
+    "reference": "preparation-work",
+    "maxRatio": 0,
+    "note": "Ordinary trees without compact markers skip optional compact builder/expansion walks, with compact controls preserving required work and host identity."
+  },
+  {
+    "suite": "universal-preparation",
+    "op": "update_leafNodes",
+    "target": "ordinary-0",
+    "reference": "preparation-work",
+    "maxRatio": 0,
+    "note": "Ordinary trees without compact markers skip optional compact builder/expansion walks, with compact controls preserving required work and host identity."
+  },
+  {
+    "suite": "universal-preparation",
+    "op": "update_expansionNodes",
+    "target": "ordinary-0",
+    "reference": "preparation-work",
+    "maxRatio": 0,
+    "note": "Ordinary trees without compact markers skip optional compact builder/expansion walks, with compact controls preserving required work and host identity."
+  },
+  {
+    "suite": "universal-preparation",
+    "op": "update_templateNodes",
+    "target": "ordinary-128",
+    "reference": "preparation-work",
+    "maxRatio": 0,
+    "note": "Ordinary trees without compact markers skip optional compact builder/expansion walks, with compact controls preserving required work and host identity."
+  },
+  {
+    "suite": "universal-preparation",
+    "op": "update_leafNodes",
+    "target": "ordinary-128",
+    "reference": "preparation-work",
+    "maxRatio": 0,
+    "note": "Ordinary trees without compact markers skip optional compact builder/expansion walks, with compact controls preserving required work and host identity."
+  },
+  {
+    "suite": "universal-preparation",
+    "op": "update_expansionNodes",
+    "target": "ordinary-128",
+    "reference": "preparation-work",
+    "maxRatio": 0,
+    "note": "Ordinary trees without compact markers skip optional compact builder/expansion walks, with compact controls preserving required work and host identity."
+  },
+  {
+    "suite": "universal-preparation",
+    "op": "update_templateNodes",
+    "target": "ordinary-1024",
+    "reference": "preparation-work",
+    "maxRatio": 0,
+    "note": "Ordinary trees without compact markers skip optional compact builder/expansion walks, with compact controls preserving required work and host identity."
+  },
+  {
+    "suite": "universal-preparation",
+    "op": "update_leafNodes",
+    "target": "ordinary-1024",
+    "reference": "preparation-work",
+    "maxRatio": 0,
+    "note": "Ordinary trees without compact markers skip optional compact builder/expansion walks, with compact controls preserving required work and host identity."
+  },
+  {
+    "suite": "universal-preparation",
+    "op": "update_expansionNodes",
+    "target": "ordinary-1024",
+    "reference": "preparation-work",
+    "maxRatio": 0,
+    "note": "Ordinary trees without compact markers skip optional compact builder/expansion walks, with compact controls preserving required work and host identity."
+  },
+  {
+    "suite": "universal-preparation",
+    "op": "update_templateNodes",
+    "target": "owners-0",
+    "reference": "preparation-work",
+    "maxRatio": 0,
+    "note": "Ordinary trees without compact markers skip optional compact builder/expansion walks, with compact controls preserving required work and host identity."
+  },
+  {
+    "suite": "universal-preparation",
+    "op": "update_leafNodes",
+    "target": "owners-0",
+    "reference": "preparation-work",
+    "maxRatio": 0,
+    "note": "Ordinary trees without compact markers skip optional compact builder/expansion walks, with compact controls preserving required work and host identity."
+  },
+  {
+    "suite": "universal-preparation",
+    "op": "update_expansionNodes",
+    "target": "owners-0",
+    "reference": "preparation-work",
+    "maxRatio": 0,
+    "note": "Ordinary trees without compact markers skip optional compact builder/expansion walks, with compact controls preserving required work and host identity."
+  },
+  {
+    "suite": "universal-preparation",
+    "op": "update_templateNodes",
+    "target": "owners-128",
+    "reference": "preparation-work",
+    "maxRatio": 0,
+    "note": "Ordinary trees without compact markers skip optional compact builder/expansion walks, with compact controls preserving required work and host identity."
+  },
+  {
+    "suite": "universal-preparation",
+    "op": "update_leafNodes",
+    "target": "owners-128",
+    "reference": "preparation-work",
+    "maxRatio": 0,
+    "note": "Ordinary trees without compact markers skip optional compact builder/expansion walks, with compact controls preserving required work and host identity."
+  },
+  {
+    "suite": "universal-preparation",
+    "op": "update_expansionNodes",
+    "target": "owners-128",
+    "reference": "preparation-work",
+    "maxRatio": 0,
+    "note": "Ordinary trees without compact markers skip optional compact builder/expansion walks, with compact controls preserving required work and host identity."
+  },
+  {
+    "suite": "universal-preparation",
+    "op": "update_templateNodes",
+    "target": "owners-1024",
+    "reference": "preparation-work",
+    "maxRatio": 0,
+    "note": "Ordinary trees without compact markers skip optional compact builder/expansion walks, with compact controls preserving required work and host identity."
+  },
+  {
+    "suite": "universal-preparation",
+    "op": "update_leafNodes",
+    "target": "owners-1024",
+    "reference": "preparation-work",
+    "maxRatio": 0,
+    "note": "Ordinary trees without compact markers skip optional compact builder/expansion walks, with compact controls preserving required work and host identity."
+  },
+  {
+    "suite": "universal-preparation",
+    "op": "update_expansionNodes",
+    "target": "owners-1024",
+    "reference": "preparation-work",
+    "maxRatio": 0,
+    "note": "Ordinary trees without compact markers skip optional compact builder/expansion walks, with compact controls preserving required work and host identity."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "collection_copies",
+    "target": "populated-stable",
+    "reference": "populated-seed",
+    "maxRatio": 1.04,
+    "note": "Unchanged descendants share pristine populated CSS/head snapshots; both scenarios preserve complete HTML/CSS and resource ordering."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "collection_copies",
+    "target": "empty",
+    "reference": "populated-seed",
+    "maxRatio": 0,
+    "note": "Empty collectors do not allocate populated collection copies."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "copied_entries",
+    "target": "populated-stable",
+    "reference": "populated-seed",
+    "maxRatio": 1.07,
+    "note": "Unchanged descendants share pristine populated CSS/head snapshots; both scenarios preserve complete HTML/CSS and resource ordering."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "copied_entries",
+    "target": "empty",
+    "reference": "populated-seed",
+    "maxRatio": 0,
+    "note": "Empty collectors do not allocate populated collection copies."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "recorders",
+    "target": "stream-8-onewave",
+    "reference": "stream-budget-8",
+    "maxRatio": 1,
+    "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "subscriptions",
+    "target": "stream-8-onewave",
+    "reference": "stream-budget-8",
+    "maxRatio": 2,
+    "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "raceSubscriptions",
+    "target": "stream-8-onewave",
+    "reference": "stream-budget-8",
+    "maxRatio": 0,
+    "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "recorders",
+    "target": "stream-8-waves",
+    "reference": "stream-budget-8",
+    "maxRatio": 1,
+    "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "subscriptions",
+    "target": "stream-8-waves",
+    "reference": "stream-budget-8",
+    "maxRatio": 5.5,
+    "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "raceSubscriptions",
+    "target": "stream-8-waves",
+    "reference": "stream-budget-8",
+    "maxRatio": 0,
+    "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "recorders",
+    "target": "stream-32-onewave",
+    "reference": "stream-budget-32",
+    "maxRatio": 1,
+    "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "subscriptions",
+    "target": "stream-32-onewave",
+    "reference": "stream-budget-32",
+    "maxRatio": 2,
+    "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "raceSubscriptions",
+    "target": "stream-32-onewave",
+    "reference": "stream-budget-32",
+    "maxRatio": 0,
+    "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "recorders",
+    "target": "stream-32-waves",
+    "reference": "stream-budget-32",
+    "maxRatio": 1,
+    "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "subscriptions",
+    "target": "stream-32-waves",
+    "reference": "stream-budget-32",
+    "maxRatio": 17.5,
+    "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "raceSubscriptions",
+    "target": "stream-32-waves",
+    "reference": "stream-budget-32",
+    "maxRatio": 0,
+    "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "recorders",
+    "target": "stream-plain-8-onewave",
+    "reference": "stream-budget-8",
+    "maxRatio": 1,
+    "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "subscriptions",
+    "target": "stream-plain-8-onewave",
+    "reference": "stream-budget-8",
+    "maxRatio": 2,
+    "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "raceSubscriptions",
+    "target": "stream-plain-8-onewave",
+    "reference": "stream-budget-8",
+    "maxRatio": 0,
+    "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "recorders",
+    "target": "stream-plain-8-waves",
+    "reference": "stream-budget-8",
+    "maxRatio": 1,
+    "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "subscriptions",
+    "target": "stream-plain-8-waves",
+    "reference": "stream-budget-8",
+    "maxRatio": 5.5,
+    "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "raceSubscriptions",
+    "target": "stream-plain-8-waves",
+    "reference": "stream-budget-8",
+    "maxRatio": 0,
+    "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "recorders",
+    "target": "stream-plain-32-onewave",
+    "reference": "stream-budget-32",
+    "maxRatio": 1,
+    "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "subscriptions",
+    "target": "stream-plain-32-onewave",
+    "reference": "stream-budget-32",
+    "maxRatio": 2,
+    "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "raceSubscriptions",
+    "target": "stream-plain-32-onewave",
+    "reference": "stream-budget-32",
+    "maxRatio": 0,
+    "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "recorders",
+    "target": "stream-plain-32-waves",
+    "reference": "stream-budget-32",
+    "maxRatio": 1,
+    "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "subscriptions",
+    "target": "stream-plain-32-waves",
+    "reference": "stream-budget-32",
+    "maxRatio": 17.5,
+    "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "raceSubscriptions",
+    "target": "stream-plain-32-waves",
+    "reference": "stream-budget-32",
+    "maxRatio": 0,
+    "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
   }
 ]
