@@ -308,7 +308,7 @@
       "type": "adapted-octane",
       "oracle": "required",
       "environment": "workspace-node",
-      "project": "alien-signals",
+      "project": "alien-signals-native",
       "notes": "Independent native conformance evidence for subscription ownership, cancellation, function setters and actual SSR markup hydration in JSDOM.",
       "files": [
         {

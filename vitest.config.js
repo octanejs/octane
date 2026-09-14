@@ -6375,6 +6375,8 @@ export default defineConfig({
 						'playground/octane/src/demos/AlienSignals.test.ts',
 						'!packages/alien-signals/tests/ssr/**/*.test.ts',
 						'!packages/alien-signals/tests/upstream-original.test.ts',
+						'!packages/alien-signals/tests/octane-contracts.test.ts',
+						'!packages/alien-signals/tests/hydration.test.ts',
 					],
 					environment: 'jsdom',
 					globals: false,
@@ -6394,6 +6396,28 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'alien-signals-native',
+					include: [
+						'packages/alien-signals/tests/octane-contracts.test.ts',
+						'packages/alien-signals/tests/hydration.test.ts',
+					],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/alien-signals$/,
+							replacement: resolve(import.meta.dirname, 'packages/alien-signals/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'alien-signals-ssr',
 					include: ['packages/alien-signals/tests/ssr/**/*.test.ts'],

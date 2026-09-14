@@ -40,7 +40,7 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "test": "pnpm upstream:verify && vitest run --root ../.. --project alien-signals --project alien-signals-ssr --maxWorkers=1",
+    "test": "pnpm upstream:verify && vitest run --root ../.. --project alien-signals --project alien-signals-native --project alien-signals-ssr --maxWorkers=1",
     "upstream:verify": "node ../../scripts/react-parity/verify-provenance.mjs",
     "parity:inventory": "node ../../scripts/react-parity/alien-signals-runtime-inventory.mjs",
     "typecheck": "tsrx-tsc --noEmit -p tsconfig.json"
