@@ -12214,10 +12214,12 @@ function scopedReadsChanged(reads: ScopedReads | null): boolean {
 // A cache hit must transfer those reads to the current render, just like an
 // actual useContext call. Nested resolvers also contribute to their enclosing
 // resolver's capture, or caching the outer record would hide the nested reads.
-function replayScopedContextReads(reads: Map<Context<any>, number>, block: Block | null): void {
-	for (const [context, version] of reads) {
-		if (block !== null) recordContextDependency(block, context);
-		if (SCOPED_READ_TRACKING) (SCOPED_READS ??= new Map()).set(context, version);
+function replayScopedContextReads(reads: ScopedReads, block: Block | null): void {
+	for (const [source, value] of reads) {
+		if ('$$version' in source) {
+			if (block !== null) recordContextDependency(block, source);
+		}
+		if (SCOPED_READ_TRACKING) (SCOPED_READS ??= new Map()).set(source, value);
 	}
 }
 
