@@ -1,51 +1,36 @@
-// Vendored from react-hook-form@7.81.0 src/useFormState.ts (octane port).
+// Adapted from react-hook-form@7.88.0 src/useFormState.ts for Octane.
 import { useState, useRef, useEffect, useMemo } from 'octane';
 
 import getProxyFormState from './logic/getProxyFormState';
 import type { FieldValues, FormState, UseFormStateProps, UseFormStateReturn } from './types';
 import { useFormControlContext } from './useFormControlContext';
 import { useIsomorphicLayoutEffect } from './useIsomorphicLayoutEffect';
+import { useResyncOnReconnect } from './useResyncOnReconnect';
 
 /**
- * This custom hook allows you to subscribe to each form state, and isolate the re-render at the custom hook level. It has its scope in terms of form state subscription, so it would not affect other useFormState and useForm. Using this hook can reduce the re-render impact on large and complex form application.
+ * Subscribes to form state with re-renders isolated to this hook.
+ * Optionally scope to specific field names to minimize re-render surface.
  *
- * @remarks
- * [API](https://react-hook-form.com/docs/useformstate) • [Demo](https://codesandbox.io/s/useformstate-75xly)
- *
- * @param props - include options on specify fields to subscribe. {@link UseFormStateReturn}
+ * @see [API](https://react-hook-form.com/docs/useformstate)
  *
  * @example
  * ```tsx
- * function App() {
- *   const { register, handleSubmit, control } = useForm({
- *     defaultValues: {
- *     firstName: "firstName"
- *   }});
- *   const { dirtyFields } = useFormState({
- *     control
- *   });
- *   const onSubmit = (data) => console.log(data);
- *
- *   return (
- *     <form onSubmit={handleSubmit(onSubmit)}>
- *       <input {...register("firstName")} placeholder="First Name" />
- *       {dirtyFields.firstName && <p>Field is dirty.</p>}
- *       <input type="submit" />
- *     </form>
- *   );
- * }
+ * const { errors, isDirty } = useFormState({ control, name: "email" });
  * ```
  */
 export function useFormState<
 	TFieldValues extends FieldValues = FieldValues,
 	TTransformedValues = TFieldValues,
 >(props?: UseFormStateProps<TFieldValues, TTransformedValues>): UseFormStateReturn<TFieldValues> {
-	const formControl = useFormControlContext<TFieldValues, any, TTransformedValues>();
+	const formControl = useFormControlContext<TFieldValues, unknown, TTransformedValues>();
 	const { control = formControl, disabled, name, exact } = props || {};
-	const [formState, updateFormState] = useState<FormState<TFieldValues>>(() => ({
+
+	const getCurrentFormState = () => ({
 		...control._formState,
 		defaultValues: control._defaultValues as FormState<TFieldValues>['defaultValues'],
-	}));
+	});
+
+	const [formState, updateFormState] = useState<FormState<TFieldValues>>(getCurrentFormState);
 	const _localProxyFormState = useRef({
 		isDirty: false,
 		isLoading: false,
@@ -57,23 +42,31 @@ export function useFormState<
 		errors: false,
 	});
 
-	useIsomorphicLayoutEffect(
-		() =>
-			control._subscribe({
-				name,
-				formState: _localProxyFormState.current,
-				exact,
-				callback: (formState) => {
-					!disabled &&
-						updateFormState({
-							...control._formState,
-							...formState,
-							defaultValues: control._defaultValues as FormState<TFieldValues>['defaultValues'],
-						});
-				},
-			}),
-		[name, disabled, exact],
-	);
+	const { resyncIfNeeded, snapshot } =
+		useResyncOnReconnect<FormState<TFieldValues>>(getCurrentFormState);
+
+	useIsomorphicLayoutEffect(() => {
+		resyncIfNeeded(!disabled, getCurrentFormState, updateFormState);
+
+		const unsubscribe = control._subscribe({
+			name,
+			formState: _localProxyFormState.current,
+			exact,
+			callback: (formState) => {
+				!disabled &&
+					updateFormState({
+						...control._formState,
+						...formState,
+						defaultValues: control._defaultValues as FormState<TFieldValues>['defaultValues'],
+					});
+			},
+		});
+
+		return () => {
+			unsubscribe();
+			snapshot(!disabled, getCurrentFormState);
+		};
+	}, [control, name, disabled, exact, resyncIfNeeded, snapshot]);
 
 	useEffect(() => {
 		_localProxyFormState.current.isValid && control._setValid(true);

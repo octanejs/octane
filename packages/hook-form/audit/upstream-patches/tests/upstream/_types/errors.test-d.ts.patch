@@ -1,0 +1,12 @@
+diff --git a/tests/upstream/_types/errors.test-d.ts b/tests/upstream/_types/errors.test-d.ts
+--- a/tests/upstream/_types/errors.test-d.ts
++++ b/tests/upstream/_types/errors.test-d.ts
+@@ -4,7 +4,7 @@ import type {
+   FieldPathError,
+   GlobalError,
+   Merge,
+-} from '../../src/types';
++} from '../../../src/types';
+ 
+ import type { Equal, Expect } from './__fixtures__';
+ import { _ } from './__fixtures__';

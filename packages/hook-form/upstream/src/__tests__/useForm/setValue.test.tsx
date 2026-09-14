@@ -551,6 +551,32 @@ describe('setValue', () => {
     });
   });
 
+  it('should apply every own property and skip only an inherited one', () => {
+    const { result } = renderHook(() =>
+      useForm<{
+        test: {
+          bill: string;
+          luo: string;
+        };
+      }>(),
+    );
+
+    result.current.register('test.bill');
+    result.current.register('test.luo');
+
+    const proto = { inherited: 'skip-me' };
+    const value = Object.create(proto);
+    value.bill = '1';
+    value.luo = '2';
+
+    act(() => result.current.setValue('test', value));
+
+    expect(result.current.getValues('test')).toEqual({
+      bill: '1',
+      luo: '2',
+    });
+  });
+
   it('should work for nested fields which are not registered', () => {
     const { result } = renderHook(() => useForm());
 
@@ -928,6 +954,68 @@ describe('setValue', () => {
     );
   });
 
+  describe('with value transforms', () => {
+    it('should not mark field dirty when setValueAs output equals the default value', () => {
+      const { result } = renderHook(() =>
+        useForm<{ test: string }>({
+          defaultValues: { test: 'default' },
+        }),
+      );
+      // NOTE: read dirtyFields only (not isDirty): the stale-dirty bug shows
+      // when isDirty is untracked, because then the per-field fallback branch
+      // compares the raw (untransformed) value.
+      result.current.formState.dirtyFields;
+
+      result.current.register('test', {
+        setValueAs: (value: string) => value.trim(),
+      });
+
+      act(() =>
+        result.current.setValue('test', 'default ', { shouldDirty: true }),
+      );
+
+      expect(result.current.formState.dirtyFields).toEqual({});
+    });
+
+    it('should mark field dirty when setValueAs output differs from the default value', () => {
+      const { result } = renderHook(() =>
+        useForm<{ test: string }>({
+          defaultValues: { test: 'default' },
+        }),
+      );
+      result.current.formState.dirtyFields;
+
+      result.current.register('test', {
+        setValueAs: (value: string) => value.trim(),
+      });
+
+      act(() =>
+        result.current.setValue('test', 'changed ', { shouldDirty: true }),
+      );
+
+      expect(result.current.formState.dirtyFields.test).toBeTruthy();
+    });
+
+    it('should not mark field dirty when valueAsNumber output equals the default value', () => {
+      const { result } = renderHook(() =>
+        useForm<{ test: number }>({
+          defaultValues: { test: 25 },
+        }),
+      );
+      result.current.formState.dirtyFields;
+
+      result.current.register('test', { valueAsNumber: true });
+
+      act(() =>
+        result.current.setValue('test', '25' as unknown as number, {
+          shouldDirty: true,
+        }),
+      );
+
+      expect(result.current.formState.dirtyFields).toEqual({});
+    });
+  });
+
   describe('with touched', () => {
     it('should update touched with shouldTouched config', () => {
       const App = () => {
@@ -1149,6 +1237,47 @@ describe('setValue', () => {
     fireEvent.click(screen.getByText('Update'));
 
     expect(screen.getByTestId(inputId)).toHaveValue('updated value');
+  });
+
+  it('should notify a Controller registered on a field array item root when setValue targets a nested leaf', async () => {
+    const App = () => {
+      const { control, setValue } = useForm<{
+        items: { note: number }[];
+      }>({
+        defaultValues: { items: [{ note: 0 }] },
+      });
+      const { fields } = useFieldArray({ control, name: 'items' });
+
+      return (
+        <div>
+          {fields.map((field, index) => (
+            <Controller
+              key={field.id}
+              control={control}
+              name={`items.${index}` as const}
+              render={({ field: { value } }) => (
+                <p data-testid="note">{value.note}</p>
+              )}
+            />
+          ))}
+          <button
+            onClick={() => setValue('items.0.note', 5, { shouldDirty: true })}
+          >
+            update
+          </button>
+        </div>
+      );
+    };
+
+    render(<App />);
+
+    expect(screen.getByTestId('note').textContent).toEqual('0');
+
+    fireEvent.click(screen.getByRole('button'));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('note').textContent).toEqual('5'),
+    );
   });
 
   it('should set field array correctly without affect the parent field array', async () => {

@@ -36,11 +36,13 @@ function App() {
 const values = () => screen.getAllByRole('textbox').map((el) => (el as HTMLInputElement).value);
 
 describe('field array de-opt list canary', () => {
+	// @parity-case runtime:457a16b656fd574c
 	it('renders defaults through a block-body map', () => {
 		render(<App />);
 		expect(values()).toEqual(['a', 'b', 'c', 'd']);
 	});
 
+	// @parity-case runtime:700e97cc7d360b6f
 	it('swap preserves survivor DOM node identity and untouched-node focus', async () => {
 		render(<App />);
 		const before = screen.getAllByRole('textbox') as HTMLInputElement[];
@@ -62,6 +64,7 @@ describe('field array de-opt list canary', () => {
 		expect(document.activeElement).toBe(before[3]);
 	});
 
+	// @parity-case runtime:c1c3fe3de62b0820
 	it('remove keeps surviving nodes and values', async () => {
 		render(<App />);
 		const inputs = screen.getAllByRole('textbox') as HTMLInputElement[];
@@ -74,6 +77,7 @@ describe('field array de-opt list canary', () => {
 		expect(screen.getAllByRole('textbox')[0]).toBe(inputs[1]);
 	});
 
+	// @parity-case runtime:765351701b2132ae
 	it('append focuses the new field by default', async () => {
 		render(<App />);
 		await act(async () => {

@@ -1,0 +1,18 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "strict": true,
+    "skipLibCheck": false,
+    "types": [],
+    "baseUrl": "../../../..",
+    "paths": {
+      "@octanejs/hook-form": ["packages/hook-form/src/index.ts"]
+    }
+  },
+  "include": ["./public-api.ts"],
+  "exclude": [],
+  "reactPortEvidence": {
+    "gate": "public-types",
+    "publicMode": "pinned"
+  }
+}

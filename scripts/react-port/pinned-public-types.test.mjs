@@ -16,7 +16,7 @@ import {
 import { buildUpstreamLock, gitBlobSha1 } from './materialize-lib.mjs';
 import { buildTarGz, fixtureIdentity } from './__fixtures__/materialize-fixtures.mjs';
 
-function check(actual, expected, constraintWitness = false) {
+function check(actual, expected, constraintWitness = false, options = {}) {
 	const root = mkdtempSync(path.join(tmpdir(), 'public-opacity-'));
 	try {
 		const files = ['native.ts', 'upstream.ts'].map((file) => path.join(root, file));
@@ -53,7 +53,7 @@ function check(actual, expected, constraintWitness = false) {
 					'TableComponentType',
 				)
 			: symbols[1];
-		return newOpaquePublicSymbol(symbols[0], witness, checker);
+		return newOpaquePublicSymbol(symbols[0], witness, checker, options);
 	} finally {
 		rmSync(root, { recursive: true, force: true });
 	}
@@ -923,4 +923,34 @@ test('retained dependency-list aliases resolve only from an explicit pinned impo
 	} finally {
 		rmSync(directory, { recursive: true, force: true });
 	}
+});
+
+test('Hook Form native input members retain their pinned change-handler precision', () => {
+	const native =
+		'type UseFormRegisterReturn = { onInput: (event: { target: any }) => Promise<void> }; export declare const value: UseFormRegisterReturn;';
+	const pinned =
+		'type UseFormRegisterReturn = { onChange: (event: { target: any }) => Promise<void> }; export declare const value: UseFormRegisterReturn;';
+	const options = { binding: '@octanejs/hook-form' };
+	assert.equal(check(native, pinned, false, options), null);
+	assert.match(
+		check(native, pinned.replace('target: any', 'target: string'), false, options),
+		/target/,
+	);
+	assert.match(check(native, pinned, false, { binding: '@octanejs/other' }), /target/);
+	assert.match(
+		check(native.replaceAll('UseFormRegisterReturn', 'Unrelated'), pinned, false, options),
+		/target/,
+	);
+});
+
+test('nullable React elements retain renderer ownership without erasing unrelated union members', () => {
+	const native = 'export declare function value(): unknown;';
+	const pinned =
+		"import type { ReactElement } from 'react'; export declare function value(): ReactElement | null;";
+	assert.equal(check(native, pinned), null);
+	assert.match(
+		check(native, pinned.replace('ReactElement | null', 'ReactElement | { id: string } | null')),
+		/unknown/,
+	);
+	assert.match(check(native.replace('unknown', 'any'), pinned), /any/);
 });

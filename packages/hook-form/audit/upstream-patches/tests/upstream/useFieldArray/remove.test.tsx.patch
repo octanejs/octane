@@ -1,7 +1,7 @@
 diff --git a/tests/upstream/useFieldArray/remove.test.tsx b/tests/upstream/useFieldArray/remove.test.tsx
 --- a/tests/upstream/useFieldArray/remove.test.tsx
 +++ b/tests/upstream/useFieldArray/remove.test.tsx
-@@ -16,10 +16,18 @@ import { useForm } from '../../../src/useForm';
+@@ -18,10 +18,18 @@ import { useWatch } from '../../../src/useWatch';
  import noop from '../../../src/utils/noop';
  
  vi.useFakeTimers();
@@ -21,7 +21,7 @@ diff --git a/tests/upstream/useFieldArray/remove.test.tsx b/tests/upstream/useFi
  
  describe('remove', () => {
    beforeEach(() => {
-@@ -484,6 +492,14 @@ describe('remove', () => {
+@@ -537,6 +545,14 @@ describe('remove', () => {
      await waitFor(() => expect(isValid).toBeFalsy());
      expect(screen.getAllByRole('textbox')).toHaveLength(3);
  

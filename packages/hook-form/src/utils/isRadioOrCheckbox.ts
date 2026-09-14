@@ -1,4 +1,4 @@
-// Vendored from react-hook-form@7.81.0 src/utils/isRadioOrCheckbox.ts (octane port).
+// Adapted from react-hook-form@7.88.0 src/utils/isRadioOrCheckbox.ts for Octane.
 import type { FieldElement } from '../types';
 
 import isCheckBoxInput from './isCheckBoxInput';

@@ -6,6 +6,7 @@ import * as hookForm from '@octanejs/hook-form';
 import * as reactHookForm from 'react-hook-form';
 
 describe('@octanejs/hook-form export surface', () => {
+	// @parity-case runtime:72fed430db6992fe
 	it('provides EVERY runtime export of real react-hook-form', () => {
 		const upstream = Object.keys(reactHookForm).sort();
 		const port = new Set(Object.keys(hookForm));
@@ -13,6 +14,7 @@ describe('@octanejs/hook-form export surface', () => {
 		expect(missing).toEqual([]);
 	});
 
+	// @parity-case runtime:9b29f964982a7043
 	it('exports nothing upstream keeps private (no accidental superset)', () => {
 		const upstream = new Set(Object.keys(reactHookForm));
 		const extras = Object.keys(hookForm)

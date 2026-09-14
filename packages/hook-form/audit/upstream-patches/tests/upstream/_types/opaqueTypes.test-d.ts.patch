@@ -1,0 +1,21 @@
+diff --git a/tests/upstream/_types/opaqueTypes.test-d.ts b/tests/upstream/_types/opaqueTypes.test-d.ts
+--- a/tests/upstream/_types/opaqueTypes.test-d.ts
++++ b/tests/upstream/_types/opaqueTypes.test-d.ts
+@@ -11,7 +11,7 @@ import type {
+   IsFlatObject,
+   Merge,
+   Path,
+-} from '../../src/types';
++} from '../../../src/types';
+ 
+ import type { Equal, Expect } from './__fixtures__';
+ import { _ } from './__fixtures__';
+@@ -31,7 +31,7 @@ interface OpaqueValue {
+   entries: { id: string }[];
+ }
+ 
+-declare module '../types/utils' {
++declare module '../../../src/types/utils' {
+   interface OpaqueTypes {
+     opaqueValue: OpaqueValue;
+   }

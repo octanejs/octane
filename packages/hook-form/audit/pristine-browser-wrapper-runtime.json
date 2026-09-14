@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "project": "hook-form-pristine-browser",
+  "roots": ["packages/hook-form/tests"],
+  "files": ["packages/hook-form/tests/upstream-browser-original.test.ts"],
+  "tests": [
+    {
+      "id": "runtime:da3882f82b6053d9",
+      "file": "packages/hook-form/tests/upstream-browser-original.test.ts",
+      "fullName": "runs every pinned upstream browser registration against React"
+    }
+  ]
+}

@@ -62,16 +62,19 @@ function assertionGroups(source, fileName) {
 	return groups;
 }
 
-function expectedAdaptedSpecifier(specifier, fileName) {
+function expectedAdaptedSpecifier(specifier, fileName, sourcePrefix) {
 	if (
 		!specifier.startsWith('../') ||
 		!posixPath.normalize(posixPath.join(posixPath.dirname(fileName), specifier)).startsWith('../')
 	)
 		return specifier;
-	return specifier.replace(/^((?:\.\.\/)+)/, '$1src/');
+	const sourcePath = posixPath
+		.normalize(posixPath.join(posixPath.dirname(fileName), specifier))
+		.slice(3);
+	return posixPath.relative(posixPath.dirname(fileName), posixPath.join(sourcePrefix, sourcePath));
 }
 
-function structuralSource(source, fileName, side, adaptedSource = '') {
+function structuralSource(source, fileName, side, adaptedSource = '', sourcePrefix = '../src') {
 	const sourceFile = ts.createSourceFile(
 		fileName,
 		source,
@@ -97,7 +100,7 @@ function structuralSource(source, fileName, side, adaptedSource = '') {
 		const specifier = statement.moduleSpecifier.text;
 		let normalized = specifier;
 		if (side === 'upstream') {
-			normalized = expectedAdaptedSpecifier(specifier, fileName);
+			normalized = expectedAdaptedSpecifier(specifier, fileName, sourcePrefix);
 			if (adaptedSpecifiers[importIndex] === `${normalized}.tsrx`) normalized += '.tsrx';
 		}
 		replacements.push({
@@ -106,6 +109,18 @@ function structuralSource(source, fileName, side, adaptedSource = '') {
 			value: normalized,
 		});
 		importIndex++;
+	}
+	for (const statement of sourceFile.statements) {
+		if (!ts.isModuleDeclaration(statement) || !ts.isStringLiteral(statement.name)) continue;
+		const specifier = statement.name.text;
+		replacements.push({
+			start: statement.name.getStart(sourceFile) + 1,
+			end: statement.name.getEnd() - 1,
+			value:
+				side === 'upstream'
+					? expectedAdaptedSpecifier(specifier, fileName, sourcePrefix)
+					: specifier,
+		});
 	}
 	let transformed = source;
 	for (const replacement of replacements.sort((a, b) => b.start - a.start)) {
@@ -146,8 +161,15 @@ export function buildTypeInventory(root, config) {
 			throw new Error(`${file}: assertion groups differ between pristine and adapted type suites`);
 		}
 		if (
-			structuralSource(upstreamSource, file, 'upstream', adaptedSource) !==
-			structuralSource(adaptedSource, file, 'adapted')
+			structuralSource(
+				upstreamSource,
+				file,
+				'upstream',
+				adaptedSource,
+				config.adaptedSourceRoot
+					? posix(relative(adaptedRoot, resolve(root, config.adaptedSourceRoot)))
+					: '../src',
+			) !== structuralSource(adaptedSource, file, 'adapted')
 		) {
 			throw new Error(
 				`${file}: adapted type test contains a change outside the permitted transformations`,

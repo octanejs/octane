@@ -1,0 +1,12 @@
+diff --git a/tests/upstream/_app/setValue.tsx b/tests/upstream/_app/setValue.tsx
+--- a/tests/upstream/_app/setValue.tsx
++++ b/tests/upstream/_app/setValue.tsx
+@@ -94,7 +94,7 @@ const SetValue: React.FC = () => {
+       <input
+         name="lastName"
+         placeholder="lastName"
+-        onChange={() => {
++        onInput={() => {
+           setValue('lastName', 'test');
+         }}
+       />

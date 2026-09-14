@@ -12,33 +12,14 @@ const HookFormContext = React.createContext<UseFormReturn | null>(null);
 HookFormContext.displayName = 'HookFormContext';
 
 /**
- * This custom hook allows you to access the form context. useFormContext is intended to be used in deeply nested structures, where it would become inconvenient to pass the context as a prop. To be used with {@link FormProvider}.
+ * Retrieves all `useForm` methods from the nearest `FormProvider`.
+ * Use in deeply nested components to avoid prop-drilling.
  *
- * @remarks
- * [API](https://react-hook-form.com/docs/useformcontext) • [Demo](https://codesandbox.io/s/react-hook-form-v7-form-context-ytudi)
- *
- * @returns return all useForm methods
+ * @see [API](https://react-hook-form.com/docs/useformcontext)
  *
  * @example
  * ```tsx
- * function App() {
- *   const methods = useForm();
- *   const onSubmit = data => console.log(data);
- *
- *   return (
- *     <FormProvider {...methods} >
- *       <form onSubmit={methods.handleSubmit(onSubmit)}>
- *         <NestedInput />
- *         <input type="submit" />
- *       </form>
- *     </FormProvider>
- *   );
- * }
- *
- *  function NestedInput() {
- *   const { register } = useFormContext(); // retrieve all hook methods
- *   return <input {...register("test")} />;
- * }
+ * const { register } = useFormContext<FormValues>();
  * ```
  */
 export const useFormContext = <
@@ -53,33 +34,16 @@ export const useFormContext = <
   >;
 
 /**
- * A provider component that propagates the `useForm` methods to all children components via [React Context](https://react.dev/reference/react/useContext) API. To be used with {@link useFormContext}.
+ * Provides all `useForm` methods to the component tree via React Context.
+ * Pair with `useFormContext` to consume them in any descendant.
  *
- * @remarks
- * [API](https://react-hook-form.com/docs/useformcontext) • [Demo](https://codesandbox.io/s/react-hook-form-v7-form-context-ytudi)
- *
- * @param props - all useForm methods
+ * @see [API](https://react-hook-form.com/docs/useformcontext)
  *
  * @example
  * ```tsx
- * function App() {
- *   const methods = useForm();
- *   const onSubmit = data => console.log(data);
- *
- *   return (
- *     <FormProvider {...methods} >
- *       <form onSubmit={methods.handleSubmit(onSubmit)}>
- *         <NestedInput />
- *         <input type="submit" />
- *       </form>
- *     </FormProvider>
- *   );
- * }
- *
- *  function NestedInput() {
- *   const { register } = useFormContext(); // retrieve all hook methods
- *   return <input {...register("test")} />;
- * }
+ * <FormProvider {...methods}>
+ *   <form onSubmit={methods.handleSubmit(onSubmit)}>{children}</form>
+ * </FormProvider>
  * ```
  */
 export const FormProvider = <
@@ -90,6 +54,7 @@ export const FormProvider = <
   children,
   watch,
   getValues,
+  getErrors,
   getFieldState,
   setError,
   clearErrors,
@@ -99,6 +64,7 @@ export const FormProvider = <
   formState,
   resetField,
   reset,
+  resetDefaultValues,
   handleSubmit,
   unregister,
   control,
@@ -106,10 +72,13 @@ export const FormProvider = <
   setFocus,
   subscribe,
 }: FormProviderProps<TFieldValues, TContext, TTransformedValues>) => {
-  const memoizedValue = React.useMemo(
+  const memoizedValue = React.useMemo<
+    UseFormReturn<TFieldValues, TContext, TTransformedValues>
+  >(
     () => ({
       watch,
       getValues,
+      getErrors,
       getFieldState,
       setError,
       clearErrors,
@@ -119,6 +88,7 @@ export const FormProvider = <
       formState,
       resetField,
       reset,
+      resetDefaultValues,
       handleSubmit,
       unregister,
       control,
@@ -130,11 +100,13 @@ export const FormProvider = <
       clearErrors,
       control,
       formState,
+      getErrors,
       getFieldState,
       getValues,
       handleSubmit,
       register,
       reset,
+      resetDefaultValues,
       resetField,
       setError,
       setFocus,

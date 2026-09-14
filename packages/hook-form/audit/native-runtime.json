@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "project": "hook-form",
+  "roots": ["packages/hook-form/tests"],
+  "files": [
+    "packages/hook-form/tests/conformance/events.test.tsx",
+    "packages/hook-form/tests/conformance/exports.test.ts",
+    "packages/hook-form/tests/conformance/field-array-canary.test.tsx",
+    "packages/hook-form/tests/hydration.test.ts"
+  ],
+  "tests": [
+    {
+      "id": "runtime:67b6ff4593927e18",
+      "file": "packages/hook-form/tests/conformance/events.test.tsx",
+      "fullName": "register(): native event surface fires the handler exactly once per checkbox click"
+    },
+    {
+      "id": "runtime:d99347b0e61c6d1c",
+      "file": "packages/hook-form/tests/conformance/events.test.tsx",
+      "fullName": "register(): native event surface returns name/ref/onInput/onBlur (no onChange key)"
+    },
+    {
+      "id": "runtime:3866588ac961a83e",
+      "file": "packages/hook-form/tests/conformance/events.test.tsx",
+      "fullName": "register(): native event surface routes blur to the blur path exactly once (touched set, no re-validate double-fire)"
+    },
+    {
+      "id": "runtime:f0789500e799258b",
+      "file": "packages/hook-form/tests/conformance/events.test.tsx",
+      "fullName": "register(): native event surface validates per keystroke with mode: onChange (native input event)"
+    },
+    {
+      "id": "runtime:309be45b9f108d60",
+      "file": "packages/hook-form/tests/conformance/events.test.tsx",
+      "fullName": "unregister ordering (commit-phase ref detach) shouldUnregister: true removes the field value after conditional unmount"
+    },
+    {
+      "id": "runtime:0da664b583ab0df0",
+      "file": "packages/hook-form/tests/conformance/events.test.tsx",
+      "fullName": "useController field: onInput + controlled spread field.onInput accepts a raw value programmatically (upstream field.onChange semantics)"
+    },
+    {
+      "id": "runtime:e59c0e63b4f19a3c",
+      "file": "packages/hook-form/tests/conformance/events.test.tsx",
+      "fullName": "useController field: onInput + controlled spread typing into a {...field} spread controlled input updates the value (no controlled-input dev error)"
+    },
+    {
+      "id": "runtime:9b29f964982a7043",
+      "file": "packages/hook-form/tests/conformance/exports.test.ts",
+      "fullName": "@octanejs/hook-form export surface exports nothing upstream keeps private (no accidental superset)"
+    },
+    {
+      "id": "runtime:72fed430db6992fe",
+      "file": "packages/hook-form/tests/conformance/exports.test.ts",
+      "fullName": "@octanejs/hook-form export surface provides EVERY runtime export of real react-hook-form"
+    },
+    {
+      "id": "runtime:765351701b2132ae",
+      "file": "packages/hook-form/tests/conformance/field-array-canary.test.tsx",
+      "fullName": "field array de-opt list canary append focuses the new field by default"
+    },
+    {
+      "id": "runtime:c1c3fe3de62b0820",
+      "file": "packages/hook-form/tests/conformance/field-array-canary.test.tsx",
+      "fullName": "field array de-opt list canary remove keeps surviving nodes and values"
+    },
+    {
+      "id": "runtime:457a16b656fd574c",
+      "file": "packages/hook-form/tests/conformance/field-array-canary.test.tsx",
+      "fullName": "field array de-opt list canary renders defaults through a block-body map"
+    },
+    {
+      "id": "runtime:700e97cc7d360b6f",
+      "file": "packages/hook-form/tests/conformance/field-array-canary.test.tsx",
+      "fullName": "field array de-opt list canary swap preserves survivor DOM node identity and untouched-node focus"
+    },
+    {
+      "id": "runtime:1053dd4c8a9475a4",
+      "file": "packages/hook-form/tests/hydration.test.ts",
+      "fullName": "adopts the server form and owns live validation, field-array identity, and subscription cleanup"
+    }
+  ]
+}

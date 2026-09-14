@@ -10,7 +10,7 @@ diff --git a/tests/upstream/useForm/handleSubmit.test.tsx b/tests/upstream/useFo
      });
      expect(callback).toHaveBeenCalled();
    });
-@@ -57,7 +57,7 @@ describe('handleSubmit', () => {
+@@ -115,7 +115,7 @@ describe('handleSubmit', () => {
        })({
          preventDefault: noop,
          persist: noop,
@@ -19,7 +19,7 @@ diff --git a/tests/upstream/useForm/handleSubmit.test.tsx b/tests/upstream/useFo
      });
    });
  
-@@ -85,7 +85,7 @@ describe('handleSubmit', () => {
+@@ -143,7 +143,7 @@ describe('handleSubmit', () => {
        })({
          preventDefault: noop,
          persist: noop,
@@ -28,7 +28,7 @@ diff --git a/tests/upstream/useForm/handleSubmit.test.tsx b/tests/upstream/useFo
      });
    });
  
-@@ -108,7 +108,7 @@ describe('handleSubmit', () => {
+@@ -166,7 +166,7 @@ describe('handleSubmit', () => {
        })({
          preventDefault: noop,
          persist: noop,
@@ -37,7 +37,7 @@ diff --git a/tests/upstream/useForm/handleSubmit.test.tsx b/tests/upstream/useFo
      });
  
      await act(async () => {
-@@ -117,7 +117,7 @@ describe('handleSubmit', () => {
+@@ -175,7 +175,7 @@ describe('handleSubmit', () => {
        })({
          preventDefault: noop,
          persist: noop,
@@ -46,7 +46,7 @@ diff --git a/tests/upstream/useForm/handleSubmit.test.tsx b/tests/upstream/useFo
      });
    });
  
-@@ -132,7 +132,7 @@ describe('handleSubmit', () => {
+@@ -190,7 +190,7 @@ describe('handleSubmit', () => {
        await result.current.handleSubmit(callback)({
          preventDefault: noop,
          persist: noop,
@@ -55,7 +55,7 @@ diff --git a/tests/upstream/useForm/handleSubmit.test.tsx b/tests/upstream/useFo
      });
      expect(callback).not.toHaveBeenCalled();
    });
-@@ -154,7 +154,7 @@ describe('handleSubmit', () => {
+@@ -212,7 +212,7 @@ describe('handleSubmit', () => {
        await result.current.handleSubmit(callback)({
          preventDefault: noop,
          persist: noop,
@@ -64,7 +64,7 @@ diff --git a/tests/upstream/useForm/handleSubmit.test.tsx b/tests/upstream/useFo
      });
  
      expect(callback).not.toHaveBeenCalled();
-@@ -179,7 +179,7 @@ describe('handleSubmit', () => {
+@@ -237,7 +237,7 @@ describe('handleSubmit', () => {
        await result.current.handleSubmit(callback)({
          preventDefault: noop,
          persist: noop,
@@ -73,7 +73,7 @@ diff --git a/tests/upstream/useForm/handleSubmit.test.tsx b/tests/upstream/useFo
      });
  
      expect(callback).not.toHaveBeenCalled();
-@@ -236,7 +236,7 @@ describe('handleSubmit', () => {
+@@ -294,7 +294,7 @@ describe('handleSubmit', () => {
        await result.current.handleSubmit(noop)({
          preventDefault: noop,
          persist: noop,
@@ -82,7 +82,7 @@ diff --git a/tests/upstream/useForm/handleSubmit.test.tsx b/tests/upstream/useFo
      });
  
      await act(async () => {
-@@ -269,7 +269,7 @@ describe('handleSubmit', () => {
+@@ -327,7 +327,7 @@ describe('handleSubmit', () => {
        })({
          preventDefault: noop,
          persist: noop,
@@ -91,7 +91,7 @@ diff --git a/tests/upstream/useForm/handleSubmit.test.tsx b/tests/upstream/useFo
      );
    });
  
-@@ -303,7 +303,7 @@ describe('handleSubmit', () => {
+@@ -361,7 +361,7 @@ describe('handleSubmit', () => {
        await result.current.handleSubmit(callback)({
          preventDefault: noop,
          persist: noop,
@@ -100,7 +100,7 @@ diff --git a/tests/upstream/useForm/handleSubmit.test.tsx b/tests/upstream/useFo
      });
  
      expect(callback).not.toHaveBeenCalled();
-@@ -314,7 +314,7 @@ describe('handleSubmit', () => {
+@@ -372,7 +372,7 @@ describe('handleSubmit', () => {
        await result.current.handleSubmit(callback)({
          preventDefault: noop,
          persist: noop,
@@ -109,7 +109,7 @@ diff --git a/tests/upstream/useForm/handleSubmit.test.tsx b/tests/upstream/useFo
      });
  
      expect(callback).toHaveBeenCalled();
-@@ -390,7 +390,7 @@ describe('handleSubmit', () => {
+@@ -448,7 +448,7 @@ describe('handleSubmit', () => {
          await result.current.handleSubmit(callback)({
            preventDefault: noop,
            persist: noop,
@@ -118,7 +118,7 @@ diff --git a/tests/upstream/useForm/handleSubmit.test.tsx b/tests/upstream/useFo
        });
        expect(callback).toHaveBeenCalled();
      });
-@@ -418,7 +418,7 @@ describe('handleSubmit', () => {
+@@ -476,7 +476,7 @@ describe('handleSubmit', () => {
          await result.current.handleSubmit(callback)({
            preventDefault: noop,
            persist: noop,
@@ -127,7 +127,7 @@ diff --git a/tests/upstream/useForm/handleSubmit.test.tsx b/tests/upstream/useFo
        });
        expect(callback.mock.calls[0][0]).toEqual({ test: 'test' });
      });
-@@ -437,7 +437,7 @@ describe('handleSubmit', () => {
+@@ -495,7 +495,7 @@ describe('handleSubmit', () => {
          )({
            preventDefault: noop,
            persist: noop,
@@ -136,7 +136,7 @@ diff --git a/tests/upstream/useForm/handleSubmit.test.tsx b/tests/upstream/useFo
        });
        expect(onValidCallback).toHaveBeenCalledTimes(1);
        expect(onInvalidCallback).not.toHaveBeenCalledTimes(1);
-@@ -460,7 +460,7 @@ describe('handleSubmit', () => {
+@@ -518,7 +518,7 @@ describe('handleSubmit', () => {
          )({
            preventDefault: noop,
            persist: noop,
@@ -145,7 +145,7 @@ diff --git a/tests/upstream/useForm/handleSubmit.test.tsx b/tests/upstream/useFo
        });
  
        expect(onValidCallback).not.toHaveBeenCalledTimes(1);
-@@ -482,7 +482,7 @@ describe('handleSubmit', () => {
+@@ -540,7 +540,7 @@ describe('handleSubmit', () => {
        })({
          preventDefault: noop,
          persist: noop,

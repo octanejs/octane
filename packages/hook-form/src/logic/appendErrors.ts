@@ -1,4 +1,4 @@
-// Vendored from react-hook-form@7.81.0 src/logic/appendErrors.ts (octane port).
+// Adapted from react-hook-form@7.88.0 src/logic/appendErrors.ts for Octane.
 import type { InternalFieldErrors, InternalFieldName, ValidateResult } from '../types';
 
 export default (

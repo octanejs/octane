@@ -1,0 +1,9 @@
+diff --git a/tests/upstream/_types/fieldArray.test-d.ts b/tests/upstream/_types/fieldArray.test-d.ts
+--- a/tests/upstream/_types/fieldArray.test-d.ts
++++ b/tests/upstream/_types/fieldArray.test-d.ts
+@@ -1,4 +1,4 @@
+-import { FieldArray, useFieldArray } from '../index';
++import { FieldArray, useFieldArray } from '../../../src/index';
+ 
+ import type { Expect, NotEqual } from './__fixtures__';
+ 

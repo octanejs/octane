@@ -1,0 +1,12 @@
+diff --git a/tests/upstream/_types/path/common.test-d.ts b/tests/upstream/_types/path/common.test-d.ts
+--- a/tests/upstream/_types/path/common.test-d.ts
++++ b/tests/upstream/_types/path/common.test-d.ts
+@@ -20,7 +20,7 @@ import type {
+   TupleKeys,
+   UnionToIntersection,
+   ValidPathPrefix,
+-} from '../../types/path/common';
++} from '../../../../src/types/path/common';
+ import type {
+   HundredPathString,
+   HundredTuple,

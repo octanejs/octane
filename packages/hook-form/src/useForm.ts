@@ -1,4 +1,4 @@
-// Vendored from react-hook-form@7.81.0 src/useForm.ts (octane port).
+// Adapted from react-hook-form@7.88.0 src/useForm.ts for Octane.
 import { useState, useRef, useEffect, useMemo } from 'octane';
 
 import { DEFAULT_FORM_STATE } from './logic/createFormControl';
@@ -9,34 +9,20 @@ import isFunction from './utils/isFunction';
 import { createFormControl } from './logic';
 import type { FieldValues, FormState, UseFormProps, UseFormReturn } from './types';
 import { useIsomorphicLayoutEffect } from './useIsomorphicLayoutEffect';
+import { useResyncOnReconnect } from './useResyncOnReconnect';
 
 /**
- * Custom hook to manage the entire form.
+ * Core hook for managing a form. Returns all methods and state for
+ * registration, validation, and submission.
  *
- * @remarks
- * [API](https://react-hook-form.com/docs/useform) • [Demo](https://codesandbox.io/s/react-hook-form-get-started-ts-5ksmm) • [Video](https://www.youtube.com/watch?v=RkXv4AXXC_4)
- *
- * @param props - form configuration and validation parameters.
- *
- * @returns methods - individual functions to manage the form state. {@link UseFormReturn}
+ * @see [API](https://react-hook-form.com/docs/useform)
  *
  * @example
  * ```tsx
- * function App() {
- *   const { register, handleSubmit, watch, formState: { errors } } = useForm();
- *   const onSubmit = data => console.log(data);
- *
- *   console.log(watch("example"));
- *
- *   return (
- *     <form onSubmit={handleSubmit(onSubmit)}>
- *       <input defaultValue="test" {...register("example")} />
- *       <input {...register("exampleRequired", { required: true })} />
- *       {errors.exampleRequired && <span>This field is required</span>}
- *       <button>Submit</button>
- *     </form>
- *   );
- * }
+ * const { register, handleSubmit, formState: { errors } } = useForm<FormValues>();
+ * <form onSubmit={handleSubmit(onSubmit)}>
+ *   <input {...register("email", { required: true })} />
+ * </form>
  * ```
  */
 export function useForm<
@@ -86,8 +72,18 @@ export function useForm<
 	const control = _formControl.current.control;
 	control._options = props;
 
+	const getCurrentFormState = () => ({
+		...control._formState,
+		defaultValues: control._defaultValues as FormState<TFieldValues>['defaultValues'],
+	});
+
+	const { resyncIfNeeded, snapshot } =
+		useResyncOnReconnect<FormState<TFieldValues>>(getCurrentFormState);
+
 	useIsomorphicLayoutEffect(() => {
-		const sub = control._subscribe({
+		resyncIfNeeded(true, getCurrentFormState, updateFormState);
+
+		const unsubscribe = control._subscribe({
 			formState: control._proxyFormState,
 			callback: () =>
 				updateFormState({
@@ -104,8 +100,11 @@ export function useForm<
 
 		control._formState.isReady = true;
 
-		return sub;
-	}, [control]);
+		return () => {
+			unsubscribe();
+			snapshot(true, getCurrentFormState);
+		};
+	}, [control, resyncIfNeeded, snapshot]);
 
 	useEffect(() => control._disableForm(props.disabled), [control, props.disabled]);
 

@@ -263,6 +263,146 @@
       "status": "passed"
     },
     {
+      "file": "src/__tests__/errorMessage.test.tsx",
+      "fullName": "ErrorMessage root errors renders root-level errors set via setError",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/errorMessage.test.tsx",
+      "fullName": "ErrorMessage snapshot: prop matrix should render correctly with flat errors",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/errorMessage.test.tsx",
+      "fullName": "ErrorMessage snapshot: prop matrix should render correctly with flat errors and as with component",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/errorMessage.test.tsx",
+      "fullName": "ErrorMessage snapshot: prop matrix should render correctly with flat errors and as with component and render",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/errorMessage.test.tsx",
+      "fullName": "ErrorMessage snapshot: prop matrix should render correctly with flat errors and as with element and render",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/errorMessage.test.tsx",
+      "fullName": "ErrorMessage snapshot: prop matrix should render correctly with flat errors and as with string",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/errorMessage.test.tsx",
+      "fullName": "ErrorMessage snapshot: prop matrix should render correctly with flat multiple errors and as with element and render",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/errorMessage.test.tsx",
+      "fullName": "ErrorMessage snapshot: prop matrix should render correctly with flat multiple errors and render",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/errorMessage.test.tsx",
+      "fullName": "ErrorMessage snapshot: prop matrix should render correctly with nested errors and as with element and render",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/errorMessage.test.tsx",
+      "fullName": "ErrorMessage snapshot: prop matrix should render correctly with nested errors array",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/errorMessage.test.tsx",
+      "fullName": "ErrorMessage snapshot: prop matrix should render correctly with nested errors array and as with element and render",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/errorMessage.test.tsx",
+      "fullName": "ErrorMessage snapshot: prop matrix should render correctly with nested errors array and as with string",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/errorMessage.test.tsx",
+      "fullName": "ErrorMessage snapshot: prop matrix should render correctly with nested errors object",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/errorMessage.test.tsx",
+      "fullName": "ErrorMessage snapshot: prop matrix should render correctly with nested errors object and as with string",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/errorMessage.test.tsx",
+      "fullName": "ErrorMessage snapshot: prop matrix should render correctly with nested multiple errors and as with element and render",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/errorMessage.test.tsx",
+      "fullName": "ErrorMessage snapshot: prop matrix should render correctly with nested multiple errors and render",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/errorMessage.test.tsx",
+      "fullName": "ErrorMessage snapshot: prop matrix should render correctly with nested multiple errors array and as with element and render",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/errorMessage.test.tsx",
+      "fullName": "ErrorMessage snapshot: prop matrix should render correctly with nested multiple errors array and render",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/errorMessage.test.tsx",
+      "fullName": "ErrorMessage snapshot: prop matrix should render correctly with no errors",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/errorMessage.test.tsx",
+      "fullName": "ErrorMessage with FormProvider context reads errors from context without control prop",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/errorMessage.test.tsx",
+      "fullName": "ErrorMessage with control prop clears error message when field becomes valid",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/errorMessage.test.tsx",
+      "fullName": "ErrorMessage with control prop does not re-render parent when only errors change",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/errorMessage.test.tsx",
+      "fullName": "ErrorMessage with control prop handles nested field names",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/errorMessage.test.tsx",
+      "fullName": "ErrorMessage with control prop renders error message after submit with required rule",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/errorMessage.test.tsx",
+      "fullName": "ErrorMessage with control prop renders nothing when field has no error",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/errorMessage.test.tsx",
+      "fullName": "ErrorMessage with control prop renders via render prop",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/errorMessage.test.tsx",
+      "fullName": "ErrorMessage with control prop renders with `as` string element",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/form.test.tsx",
+      "fullName": "Form should call a function action with FormData instead of fetching",
+      "status": "passed"
+    },
+    {
       "file": "src/__tests__/form.test.tsx",
       "fullName": "Form should handle error request callback",
       "status": "passed"
@@ -275,6 +415,26 @@
     {
       "file": "src/__tests__/form.test.tsx",
       "fullName": "Form should include application/json header with encType supplied",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/form.test.tsx",
+      "fullName": "Form should include file values in the submitted FormData",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/form.test.tsx",
+      "fullName": "Form should invoke onError when a function action throws",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/form.test.tsx",
+      "fullName": "Form should not render method/encType on the form element when action is a function",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/form.test.tsx",
+      "fullName": "Form should still render method/encType on the form element when action is a URL string",
       "status": "passed"
     },
     {
@@ -433,6 +593,16 @@
       "status": "passed"
     },
     {
+      "file": "src/__tests__/logic/createFormControl.test.ts",
+      "fullName": "createFormControl should clear the entire internal errors state when `clearErrors()` is called without arguments",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/logic/createFormControl.test.ts",
+      "fullName": "createFormControl should keep dirtyFields reference stable when dirty fields do not change",
+      "status": "passed"
+    },
+    {
       "file": "src/__tests__/logic/generateId.test.ts",
       "fullName": "generateId should fallback to current date if performance is undefined",
       "status": "passed"
@@ -509,7 +679,22 @@
     },
     {
       "file": "src/__tests__/logic/getDirtyFields.test.ts",
+      "fullName": "getDirtyFields should mark an array-valued registered field as dirty with a boolean rather than diffing elements (#13584)",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/logic/getDirtyFields.test.ts",
       "fullName": "getDirtyFields should mark null values as dirty when comparing with defaultValues",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/logic/getDirtyFields.test.ts",
+      "fullName": "getDirtyFields should not leave a stray empty array for a field array with no default value once all items are removed (#13600)",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/logic/getDirtyFields.test.ts",
+      "fullName": "getDirtyFields should not leave a stray empty array for a nested field array with no default value once all items are removed (#13600)",
       "status": "passed"
     },
     {
@@ -549,6 +734,11 @@
     },
     {
       "file": "src/__tests__/logic/getDirtyFields.test.ts",
+      "fullName": "getDirtyFields should still diff a field array element-by-element when the array path itself is not a registered leaf",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/logic/getDirtyFields.test.ts",
       "fullName": "getDirtyFields should unset dirtyFields fields when value matches",
       "status": "passed"
     },
@@ -570,6 +760,11 @@
     {
       "file": "src/__tests__/logic/getEventValue.test.ts",
       "fullName": "getEventValue should return correct value",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/logic/getEventValue.test.ts",
+      "fullName": "getEventValue should return files for a file input target",
       "status": "passed"
     },
     {
@@ -610,16 +805,6 @@
     {
       "file": "src/__tests__/logic/getFocusFieldName.test.ts",
       "fullName": "getFocusFieldName should return expected focus name",
-      "status": "passed"
-    },
-    {
-      "file": "src/__tests__/logic/getNodeParentName.test.ts",
-      "fullName": "getNodeParentName should return empty string when name is not field array",
-      "status": "passed"
-    },
-    {
-      "file": "src/__tests__/logic/getNodeParentName.test.ts",
-      "fullName": "getNodeParentName should return parent name when name is field array",
       "status": "passed"
     },
     {
@@ -704,11 +889,6 @@
     },
     {
       "file": "src/__tests__/logic/hasValidation.test.ts",
-      "fullName": "hasValidation should return false for falsy but valid numeric values like min: 0, max: 0, minLength: 0 or maxLength: 0",
-      "status": "passed"
-    },
-    {
-      "file": "src/__tests__/logic/hasValidation.test.ts",
       "fullName": "hasValidation should return false if mount is not defined",
       "status": "passed"
     },
@@ -739,6 +919,11 @@
     },
     {
       "file": "src/__tests__/logic/hasValidation.test.ts",
+      "fullName": "hasValidation should return true for falsy but valid numeric values like min: 0, max: 0, minLength: 0 or maxLength: 0",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/logic/hasValidation.test.ts",
       "fullName": "hasValidation should return true when any validation rule is provided",
       "status": "passed"
     },
@@ -750,6 +935,11 @@
     {
       "file": "src/__tests__/logic/hasValidation.test.ts",
       "fullName": "hasValidation should return true when required is a string message",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/logic/hasValidation.test.ts",
+      "fullName": "hasValidation should return true when required is an empty message string",
       "status": "passed"
     },
     {
@@ -794,6 +984,11 @@
     },
     {
       "file": "src/__tests__/logic/iterateFieldsByAction.test.ts",
+      "fullName": "iterateFieldsByAction should break out of all loops when the match is nested below a sibling top-level group",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/logic/iterateFieldsByAction.test.ts",
       "fullName": "iterateFieldsByAction should focus on first option when options input error encounters",
       "status": "passed"
     },
@@ -834,7 +1029,17 @@
     },
     {
       "file": "src/__tests__/logic/schemaErrorLookup.test.ts",
+      "fullName": "errorsLookup should not report a nested error container as the exact-name field error",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/logic/schemaErrorLookup.test.ts",
       "fullName": "errorsLookup should prevent error from reported when field is identified",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/logic/schemaErrorLookup.test.ts",
+      "fullName": "errorsLookup should resolve an exact-name root error to the .root path",
       "status": "passed"
     },
     {
@@ -1004,6 +1209,11 @@
     },
     {
       "file": "src/__tests__/logic/validateField.test.tsx",
+      "fullName": "validateField should return min error when the field value is already a Date object (valueAsDate)",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/logic/validateField.test.tsx",
       "fullName": "validateField should return min length error ",
       "status": "passed"
     },
@@ -1059,7 +1269,27 @@
     },
     {
       "file": "src/__tests__/logic/validateField.test.tsx",
+      "fullName": "validateField with Browser native validation should invoke setCustomValidity with an empty string for a valid input when all criteria are collected",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/logic/validateField.test.tsx",
       "fullName": "validateField with Browser native validation should invoke setCustomValidity with empty string for a valid input",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/logic/validateField.test.tsx",
+      "fullName": "validateField with Browser native validation should invoke setCustomValidity with the required message when all criteria are collected",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/logic/validateField.test.tsx",
+      "fullName": "validateField with Browser native validation should invoke setCustomValidity with the validate message when all criteria are collected",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/logic/validateField.test.tsx",
+      "fullName": "validateField with Browser native validation should not invoke setCustomValidity per key when collecting all criteria from a validate object",
       "status": "passed"
     },
     {
@@ -1175,6 +1405,31 @@
     {
       "file": "src/__tests__/performance.test.tsx",
       "fullName": "setValues emission batching emits exactly one state notification regardless of how many fields change",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/performance.test.tsx",
+      "fullName": "unregister _valuesSubscriberCount guard a returning subscriber sees values that changed while it was away",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/performance.test.tsx",
+      "fullName": "unregister _valuesSubscriberCount guard omits the values broadcast when no value subscriber is active",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/performance.test.tsx",
+      "fullName": "unregister _valuesSubscriberCount guard omits values broadcasts while _removeUnmounted drains many fields",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/performance.test.tsx",
+      "fullName": "unregister _valuesSubscriberCount guard still delivers unregistered values to a watch(fn) subscriber",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/performance.test.tsx",
+      "fullName": "unregister _valuesSubscriberCount guard tracks a public values subscriber through unsubscribe",
       "status": "passed"
     },
     {
@@ -1359,6 +1614,11 @@
     },
     {
       "file": "src/__tests__/useController.test.tsx",
+      "fullName": "useController should not mutate an externally-owned object passed to a parent field.onChange when a nested field later changes",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useController.test.tsx",
       "fullName": "useController should not omit form value when disabled is not been presented",
       "status": "passed"
     },
@@ -1429,6 +1689,11 @@
     },
     {
       "file": "src/__tests__/useController.test.tsx",
+      "fullName": "useController should submit null instead of undefined for a nested Controller field under a null parent default value (#13674)",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useController.test.tsx",
       "fullName": "useController should subscribe to exact form state update",
       "status": "passed"
     },
@@ -1460,6 +1725,11 @@
     {
       "file": "src/__tests__/useController.test.tsx",
       "fullName": "useController should update with inline defaultValue",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useController.test.tsx",
+      "fullName": "useController should write onChange updates to the newly-passed control (#13163)",
       "status": "passed"
     },
     {
@@ -1649,6 +1919,16 @@
     },
     {
       "file": "src/__tests__/useFieldArray.test.tsx",
+      "fullName": "useFieldArray with Activity should synchronize field array values after Activity restoration",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useFieldArray.test.tsx",
+      "fullName": "useFieldArray with Activity should synchronize field array values when an Activity subtree becomes visible for the first time",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useFieldArray.test.tsx",
       "fullName": "useFieldArray with checkbox should correctly duplicate checkbox items with their values",
       "status": "passed"
     },
@@ -1754,6 +2034,16 @@
     },
     {
       "file": "src/__tests__/useFieldArray.test.tsx",
+      "fullName": "useFieldArray with rules should keep the root error after append/prepend/insert/remove when triggered before submit",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useFieldArray.test.tsx",
+      "fullName": "useFieldArray with rules should keep the root error after swap/move when triggered before submit",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useFieldArray.test.tsx",
       "fullName": "useFieldArray with rules should no longer validate when unmounted",
       "status": "passed"
     },
@@ -1805,6 +2095,11 @@
     {
       "file": "src/__tests__/useFieldArray.test.tsx",
       "fullName": "useFieldArray with setValue should not remount field-array rows on consecutive descendant setValue calls (key thrashing regression, #13420)",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useFieldArray.test.tsx",
+      "fullName": "useFieldArray with setValue should resize a nested field array when setValue targets an ancestor object path (#13621)",
       "status": "passed"
     },
     {
@@ -1880,6 +2175,16 @@
     {
       "file": "src/__tests__/useFieldArray/append.test.tsx",
       "fullName": "append should focus if shouldFocus is true",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useFieldArray/append.test.tsx",
+      "fullName": "append should keep the value of a controlled field mounted in the same commit as an append to another field array",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useFieldArray/append.test.tsx",
+      "fullName": "append should materialize a controlled field staged at the end of the array appended to in the same commit",
       "status": "passed"
     },
     {
@@ -2005,6 +2310,11 @@
     {
       "file": "src/__tests__/useFieldArray/focus.test.tsx",
       "fullName": "useFieldArray focus should focus correct field array by focus name",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useFieldArray/focus.test.tsx",
+      "fullName": "useFieldArray focus should focus on a checkbox input of the appended field",
       "status": "passed"
     },
     {
@@ -2169,6 +2479,21 @@
     },
     {
       "file": "src/__tests__/useFieldArray/move.test.tsx",
+      "fullName": "move when a render still holds the pre-move arrangement should keep guarding the moved array when another array acts in the same handler",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useFieldArray/move.test.tsx",
+      "fullName": "move when a render still holds the pre-move arrangement should not materialize a vacated path when a leaf re-renders before the move commits",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useFieldArray/move.test.tsx",
+      "fullName": "move when a render still holds the pre-move arrangement should not resize nested arrays when index-keyed children render the pre-move arrangement",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useFieldArray/move.test.tsx",
       "fullName": "move with resolver should invoke resolver when formState.isValid true",
       "status": "passed"
     },
@@ -2264,6 +2589,11 @@
     },
     {
       "file": "src/__tests__/useFieldArray/remove.test.tsx",
+      "fullName": "remove should not copy deleted fields onto a surviving row rendered from useWatch",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useFieldArray/remove.test.tsx",
       "fullName": "remove should not leave empty objects in watched values when removing from field array with values prop",
       "status": "passed"
     },
@@ -2290,6 +2620,16 @@
     {
       "file": "src/__tests__/useFieldArray/remove.test.tsx",
       "fullName": "remove should not reset Controller's value during remove when Field Array name is already registered",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useFieldArray/remove.test.tsx",
+      "fullName": "remove should not resize nested arrays when index-keyed children render the pre-remove arrangement",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useFieldArray/remove.test.tsx",
+      "fullName": "remove should not resurrect removed items when the list itself renders from useWatch",
       "status": "passed"
     },
     {
@@ -2354,6 +2694,11 @@
     },
     {
       "file": "src/__tests__/useFieldArray/remove.test.tsx",
+      "fullName": "remove should treat a controlled field staged at a vacated index as the stale arrangement",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useFieldArray/remove.test.tsx",
       "fullName": "remove should trigger reRender when user is watching the all field array",
       "status": "passed"
     },
@@ -2385,6 +2730,16 @@
     {
       "file": "src/__tests__/useFieldArray/remove.test.tsx",
       "fullName": "remove with resolver should remove the first index correctly",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useFieldArray/replace.test.tsx",
+      "fullName": "replace should drop errors for rows removed by replace",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useFieldArray/replace.test.tsx",
+      "fullName": "replace should drop touched state for rows removed by replace",
       "status": "passed"
     },
     {
@@ -2479,6 +2834,16 @@
     },
     {
       "file": "src/__tests__/useFieldArray/update.test.tsx",
+      "fullName": "update should clear touched state for the updated field",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useFieldArray/update.test.tsx",
+      "fullName": "update should keep errors of other fields when updating an index",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useFieldArray/update.test.tsx",
       "fullName": "update should not omit keyName when provided",
       "status": "passed"
     },
@@ -2489,7 +2854,7 @@
     },
     {
       "file": "src/__tests__/useFieldArray/update.test.tsx",
-      "fullName": "update should not update errors state",
+      "fullName": "update should remove stale errors for the updated field",
       "status": "passed"
     },
     {
@@ -2924,6 +3289,11 @@
     },
     {
       "file": "src/__tests__/useForm.test.tsx",
+      "fullName": "useForm when given formControl should synchronize form state when an Activity subtree becomes visible for the first time",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm.test.tsx",
       "fullName": "useForm when input is not registered trigger should not throw warn",
       "status": "passed"
     },
@@ -2979,6 +3349,21 @@
     },
     {
       "file": "src/__tests__/useForm/clearErrors.test.tsx",
+      "fullName": "clearErrors should cancel a pending delayError timer so the cleared error does not come back",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/clearErrors.test.tsx",
+      "fullName": "clearErrors should cancel pending delayError timers for nested fields when their parent is cleared",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/clearErrors.test.tsx",
+      "fullName": "clearErrors should not cancel a pending delayError timer for a field that only shares a name prefix",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/clearErrors.test.tsx",
       "fullName": "clearErrors should only notify subscribers for the cleared field when using exact: true",
       "status": "passed"
     },
@@ -3015,6 +3400,26 @@
     {
       "file": "src/__tests__/useForm/clearErrors.test.tsx",
       "fullName": "clearErrors should update isValid to true with setError",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/criteriaMode.test.tsx",
+      "fullName": "criteriaMode should narrow back to the first error after switching criteriaMode to firstError at runtime",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/criteriaMode.test.tsx",
+      "fullName": "criteriaMode should report every error after switching criteriaMode to all at runtime",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/formState.test.tsx",
+      "fullName": "formState isValid should not let a stale resolver pass report isValidating as false while a newer one is pending",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/formState.test.tsx",
+      "fullName": "formState isValid should not let a stale whole-form validity check overwrite a newer one",
       "status": "passed"
     },
     {
@@ -3070,6 +3475,21 @@
     {
       "file": "src/__tests__/useForm/formState.test.tsx",
       "fullName": "formState should be a proxy object that returns undefined for unknown properties",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/formState.test.tsx",
+      "fullName": "formState should clear dirty state when setValue restores the default value on a disabled form",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/formState.test.tsx",
+      "fullName": "formState should mark an array-valued registered field dirty as a boolean rather than diffing its elements (#13584)",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/formState.test.tsx",
+      "fullName": "formState should mark field and form as dirty with setValue shouldDirty when the form is disabled",
       "status": "passed"
     },
     {
@@ -3164,7 +3584,22 @@
     },
     {
       "file": "src/__tests__/useForm/formState.test.tsx",
+      "fullName": "formState when delay config is set when delayError is provided should delay, show immediately, or cancel error via setValue depending on delayError option",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/formState.test.tsx",
       "fullName": "formState when delay config is set when delayError is provided should only show error after 500ms with register and render formState instantly",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/formState.test.tsx",
+      "fullName": "formState when delay config is set when delayError is provided should show error immediately when form-level delayError is not configured",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/formState.test.tsx",
+      "fullName": "formState when using with reset API should end with isValid: true after reset() (matches e2e test baseline expectation)",
       "status": "passed"
     },
     {
@@ -3175,6 +3610,86 @@
     {
       "file": "src/__tests__/useForm/formState.test.tsx",
       "fullName": "formState when using with reset API should render isValid as true with reset at useEffect with valid data",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/formState.test.tsx",
+      "fullName": "formState with Activity should resync isSubmitting after Activity restoration when a submit resolves while hidden",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/getErrors.test.tsx",
+      "fullName": "getErrors global errors should include root and form global errors",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/getErrors.test.tsx",
+      "fullName": "getErrors global errors should read a nested form error via its full path",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/getErrors.test.tsx",
+      "fullName": "getErrors nested and array field paths should return the nested error tree for a parent object path",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/getErrors.test.tsx",
+      "fullName": "getErrors nested and array field paths should return the nested error tree for an array parent path",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/getErrors.test.tsx",
+      "fullName": "getErrors should expose getErrors on createFormControl and its formControl",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/getErrors.test.tsx",
+      "fullName": "getErrors should expose getErrors through FormProvider and useFormContext at runtime",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/getErrors.test.tsx",
+      "fullName": "getErrors should not re-render a component that only calls getErrors when setError fires",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/getErrors.test.tsx",
+      "fullName": "getErrors should protect internal errors from top-level mutations",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/getErrors.test.tsx",
+      "fullName": "getErrors should read a field-array root error",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/getErrors.test.tsx",
+      "fullName": "getErrors should reflect the setError -> getErrors -> clearErrors -> getErrors transition",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/getErrors.test.tsx",
+      "fullName": "getErrors should return a single field error",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/getErrors.test.tsx",
+      "fullName": "getErrors should return errors in the requested order, including missing entries",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/getErrors.test.tsx",
+      "fullName": "getErrors should return stored errors without running validation",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/getErrors.test.tsx",
+      "fullName": "getErrors should return the entire errors object without an argument",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/getErrors.test.tsx",
+      "fullName": "getErrors should return undefined when no error is stored for a path",
       "status": "passed"
     },
     {
@@ -3279,6 +3794,11 @@
     },
     {
       "file": "src/__tests__/useForm/getFieldState.test.tsx",
+      "fullName": "getFieldState with form state and field name supplied when input is primitive data type should display isValidating state",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/getFieldState.test.tsx",
       "fullName": "getFieldState with form state and field name supplied when input is primitive data type should not have error",
       "status": "passed"
     },
@@ -3374,6 +3894,11 @@
     },
     {
       "file": "src/__tests__/useForm/handleSubmit.test.tsx",
+      "fullName": "handleSubmit should ignore a stale resolver result when reset() runs mid-submit",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/handleSubmit.test.tsx",
       "fullName": "handleSubmit should invoke onSubmit callback and reset nested errors when submit with valid form values",
       "status": "passed"
     },
@@ -3399,6 +3924,16 @@
     },
     {
       "file": "src/__tests__/useForm/handleSubmit.test.tsx",
+      "fullName": "handleSubmit should not invoke onValid when the resolver reports a root-level error",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/handleSubmit.test.tsx",
+      "fullName": "handleSubmit should not invoke onValid with stale values when reset() runs mid-submit",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/handleSubmit.test.tsx",
       "fullName": "handleSubmit should not pass default value when field is not registered",
       "status": "passed"
     },
@@ -3415,6 +3950,26 @@
     {
       "file": "src/__tests__/useForm/handleSubmit.test.tsx",
       "fullName": "handleSubmit should pass default value",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/handleSubmit.test.tsx",
+      "fullName": "handleSubmit should resolve with the awaited return value when onValid is async",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/handleSubmit.test.tsx",
+      "fullName": "handleSubmit should resolve with the typed return value of onValid",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/handleSubmit.test.tsx",
+      "fullName": "handleSubmit should resolve with undefined when validation fails",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/handleSubmit.test.tsx",
+      "fullName": "handleSubmit should still clear a manually set root error on submit without a resolver",
       "status": "passed"
     },
     {
@@ -3694,7 +4249,27 @@
     },
     {
       "file": "src/__tests__/useForm/reset.test.tsx",
+      "fullName": "reset should apply a delayed resolver error normally when reset() is not called",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/reset.test.tsx",
+      "fullName": "reset should cancel a pending delayError timer so the reset error does not come back",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/reset.test.tsx",
+      "fullName": "reset should clear isValidating when reset is called while a validation is pending",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/reset.test.tsx",
       "fullName": "reset should clear validation errors after reset to prevent false errors on subsequent submissions (Next.js 16 Server Actions fix)",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/reset.test.tsx",
+      "fullName": "reset should keep a newer trigger validation marked as validating when a stale resolver from before reset settles",
       "status": "passed"
     },
     {
@@ -3710,6 +4285,11 @@
     {
       "file": "src/__tests__/useForm/reset.test.tsx",
       "fullName": "reset should keep dirty fields for dynamic controller name when keepDirty and keepDirtyValues are true",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/reset.test.tsx",
+      "fullName": "reset should keep dirtyFields in sync with isDirty when reset with keepValues",
       "status": "passed"
     },
     {
@@ -3734,6 +4314,16 @@
     },
     {
       "file": "src/__tests__/useForm/reset.test.tsx",
+      "fullName": "reset should keep isValidating true after keepIsValidating reset even once the stale resolver settles",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/reset.test.tsx",
+      "fullName": "reset should keep isValidating when reset is called with keepIsValidating option",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/reset.test.tsx",
       "fullName": "reset should keep mounted value after reset with keep dirty values",
       "status": "passed"
     },
@@ -3749,7 +4339,17 @@
     },
     {
       "file": "src/__tests__/useForm/reset.test.tsx",
+      "fullName": "reset should not delay a current error when a pre-reset trigger settles",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/reset.test.tsx",
       "fullName": "reset should not mutate data outside of library",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/reset.test.tsx",
+      "fullName": "reset should not overwrite a keepIsValid-preserved isValid when a stale resolver settles after reset",
       "status": "passed"
     },
     {
@@ -3775,6 +4375,11 @@
     {
       "file": "src/__tests__/useForm/reset.test.tsx",
       "fullName": "reset should not reset value to undefined with onSubmit data",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/reset.test.tsx",
+      "fullName": "reset should not resurrect a resolver error that settles after reset() clears the field",
       "status": "passed"
     },
     {
@@ -3844,6 +4449,11 @@
     },
     {
       "file": "src/__tests__/useForm/reset.test.tsx",
+      "fullName": "reset should return the discarded validation result without touching or focusing reset fields",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/reset.test.tsx",
       "fullName": "reset should set _formValues to empty object after reset({})",
       "status": "passed"
     },
@@ -3875,6 +4485,11 @@
     {
       "file": "src/__tests__/useForm/reset.test.tsx",
       "fullName": "reset should use values passed to reset({}) as new defaultValues on submit",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/reset.test.tsx",
+      "fullName": "reset when reset optional props set to keepDirtyValues should merge nested object at leaf granularity, keeping only the dirty leaf and updating a clean sibling that is not bound to an input (#13627)",
       "status": "passed"
     },
     {
@@ -3924,6 +4539,16 @@
     },
     {
       "file": "src/__tests__/useForm/resetField.test.tsx",
+      "fullName": "resetField should clear stale validating state when reset does not revalidate",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/resetField.test.tsx",
+      "fullName": "resetField should notify a memoized field-scoped subscriber after an unrelated field validated via onChange",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/resetField.test.tsx",
       "fullName": "resetField should reset input dirty field and dirty state",
       "status": "passed"
     },
@@ -3945,6 +4570,11 @@
     {
       "file": "src/__tests__/useForm/resetField.test.tsx",
       "fullName": "resetField should reset input value",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/resetField.test.tsx",
+      "fullName": "resetField should update isValid state for a subscribe only consumer",
       "status": "passed"
     },
     {
@@ -4054,6 +4684,11 @@
     },
     {
       "file": "src/__tests__/useForm/setError.test.tsx",
+      "fullName": "setError should replace types from a previous validation when overwriting an error",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/setError.test.tsx",
       "fullName": "setError should set error message",
       "status": "passed"
     },
@@ -4094,6 +4729,11 @@
     },
     {
       "file": "src/__tests__/useForm/setValue.test.tsx",
+      "fullName": "setValue should apply every own property and skip only an inherited one",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/setValue.test.tsx",
       "fullName": "setValue should empty string when value is null or undefined when registered field is HTMLElement",
       "status": "passed"
     },
@@ -4115,6 +4755,11 @@
     {
       "file": "src/__tests__/useForm/setValue.test.tsx",
       "fullName": "setValue should not setValue for unmounted state with shouldUnregister",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/setValue.test.tsx",
+      "fullName": "setValue should notify a Controller registered on a field array item root when setValue targets a nested leaf",
       "status": "passed"
     },
     {
@@ -4359,6 +5004,21 @@
     },
     {
       "file": "src/__tests__/useForm/setValue.test.tsx",
+      "fullName": "setValue with value transforms should mark field dirty when setValueAs output differs from the default value",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/setValue.test.tsx",
+      "fullName": "setValue with value transforms should not mark field dirty when setValueAs output equals the default value",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/setValue.test.tsx",
+      "fullName": "setValue with value transforms should not mark field dirty when valueAsNumber output equals the default value",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/setValue.test.tsx",
       "fullName": "setValue with watch should get watched value",
       "status": "passed"
     },
@@ -4370,6 +5030,11 @@
     {
       "file": "src/__tests__/useForm/setValues.test.tsx",
       "fullName": "setValues should batch update multiple values",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/setValues.test.tsx",
+      "fullName": "setValues should clear a multiple select when an empty array is provided",
       "status": "passed"
     },
     {
@@ -4439,6 +5104,16 @@
     },
     {
       "file": "src/__tests__/useForm/setValues.test.tsx",
+      "fullName": "setValues should update a checkbox group registered under an array value",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/setValues.test.tsx",
+      "fullName": "setValues should update a multiple select registered under an array value",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/setValues.test.tsx",
       "fullName": "setValues should update controlled input value when setValues is called",
       "status": "passed"
     },
@@ -4470,6 +5145,11 @@
     {
       "file": "src/__tests__/useForm/subscribe.test.tsx",
       "fullName": "call setValue within subscribe does not infinitely recurse when setValue call is conditional",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/subscribe.test.tsx",
+      "fullName": "call setValue within subscribe should invoke the values callback only once per setValue call",
       "status": "passed"
     },
     {
@@ -4545,6 +5225,61 @@
     {
       "file": "src/__tests__/useForm/trigger.test.tsx",
       "fullName": "trigger should focus on first errored input",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/trigger.test.tsx",
+      "fullName": "trigger should keep registered nested resolver errors when trigger targets their parent",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/trigger.test.tsx",
+      "fullName": "trigger should mark all triggered fields as touched when shouldTouch is true with an array of names",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/trigger.test.tsx",
+      "fullName": "trigger should mark each field array item as touched when shouldTouch is true and no name is given",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/trigger.test.tsx",
+      "fullName": "trigger should mark every mounted field as touched when shouldTouch is true and no name is provided",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/trigger.test.tsx",
+      "fullName": "trigger should mark the field as touched when shouldTouch is true with schema validation",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/trigger.test.tsx",
+      "fullName": "trigger should mark the targeted field as touched when shouldTouch is true",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/trigger.test.tsx",
+      "fullName": "trigger should not mark the field as touched when shouldTouch is not supplied",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/trigger.test.tsx",
+      "fullName": "trigger should not overwrite a field array touchedFields entry with true when shouldTouch is true and no name is given",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/trigger.test.tsx",
+      "fullName": "trigger should not overwrite a field array touchedFields entry with true when shouldTouch is true and the array name is passed directly",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/trigger.test.tsx",
+      "fullName": "trigger should not set a parent error when only nested resolver errors exist",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/trigger.test.tsx",
+      "fullName": "trigger should not set a parent error when trigger targets a field with only nested resolver errors",
       "status": "passed"
     },
     {
@@ -4659,12 +5394,47 @@
     },
     {
       "file": "src/__tests__/useForm/unregister.test.tsx",
+      "fullName": "unregister should cancel a pending delayError timer when the field is unregistered",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/unregister.test.tsx",
+      "fullName": "unregister should cancel pending delayError timers for nested fields when their parent is unregistered",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/unregister.test.tsx",
+      "fullName": "unregister should keep isValidating when unregister is called with keepIsValidating option",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/unregister.test.tsx",
+      "fullName": "unregister should keep submitting a value retained by keepValue after a disabled field is unregistered",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/unregister.test.tsx",
       "fullName": "unregister should not flip isDirty to true when a field with no defaultValue is registered from useEffect",
       "status": "passed"
     },
     {
       "file": "src/__tests__/useForm/unregister.test.tsx",
+      "fullName": "unregister should preserve isDirty when a dirty field is unregistered with keepDirty",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/unregister.test.tsx",
       "fullName": "unregister should recompute isDirty after a field is unregistered and re-registered back to its default value (#13397)",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/unregister.test.tsx",
+      "fullName": "unregister should recompute isDirty when a dirty field is unregistered",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useForm/unregister.test.tsx",
+      "fullName": "unregister should recompute isValidating after unregistering a field with a pending validation",
       "status": "passed"
     },
     {
@@ -4834,6 +5604,11 @@
     },
     {
       "file": "src/__tests__/useFormContext.test.tsx",
+      "fullName": "FormProvider should expose resetDefaultValues from useFormContext",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useFormContext.test.tsx",
       "fullName": "FormProvider should expose setValues from useFormContext",
       "status": "passed"
     },
@@ -4924,6 +5699,11 @@
     },
     {
       "file": "src/__tests__/useFormState.test.tsx",
+      "fullName": "useFormState should re-subscribe when the control prop changes identity",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useFormState.test.tsx",
       "fullName": "useFormState should render correct form state with isDirty, dirty, touched",
       "status": "passed"
     },
@@ -4968,8 +5748,28 @@
       "status": "passed"
     },
     {
+      "file": "src/__tests__/useFormState.test.tsx",
+      "fullName": "useFormState with Activity should resync isSubmitting after Activity restoration when a submit resolves while hidden",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useFormState.test.tsx",
+      "fullName": "useFormState with Activity should synchronize Controller field state when an Activity subtree becomes visible for the first time",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useFormState.test.tsx",
+      "fullName": "useFormState with Activity should synchronize form state when an Activity subtree becomes visible for the first time",
+      "status": "passed"
+    },
+    {
       "file": "src/__tests__/useWatch.test.tsx",
       "fullName": "useWatch compute  should only update when value changed within compute",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useWatch.test.tsx",
+      "fullName": "useWatch compute  should update to undefined on the first computed value change",
       "status": "passed"
     },
     {
@@ -5015,6 +5815,16 @@
     {
       "file": "src/__tests__/useWatch.test.tsx",
       "fullName": "useWatch reset should return updated default value with watched field after reset",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useWatch.test.tsx",
+      "fullName": "useWatch reset should synchronize watched and controlled values after Activity restoration",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useWatch.test.tsx",
+      "fullName": "useWatch reset should synchronize watched values when an Activity subtree becomes visible for the first time",
       "status": "passed"
     },
     {
@@ -5070,6 +5880,16 @@
     {
       "file": "src/__tests__/useWatch.test.tsx",
       "fullName": "useWatch should avoid triggering extra callbacks",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useWatch.test.tsx",
+      "fullName": "useWatch should keep its own default value for array of inputs after a value change",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useWatch.test.tsx",
+      "fullName": "useWatch should prefer the form default value over its own default value for single input",
       "status": "passed"
     },
     {
@@ -5189,6 +6009,11 @@
     },
     {
       "file": "src/__tests__/useWatch.test.tsx",
+      "fullName": "useWatch update should return the new field value synchronously on the same render even when that value is null",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/useWatch.test.tsx",
       "fullName": "useWatch update should return undefined when input get unregistered",
       "status": "passed"
     },
@@ -5255,6 +6080,16 @@
     {
       "file": "src/__tests__/utils/append.test.ts",
       "fullName": "append should work with string arrays when appending multiple strings",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/utils/cloneObject.test.ts",
+      "fullName": "clone Blob not a constructor should skip clone if Blob is not defined",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/utils/cloneObject.test.ts",
+      "fullName": "clone Blob not a constructor should skip clone if Blob is undefined",
       "status": "passed"
     },
     {
@@ -5383,36 +6218,6 @@
       "status": "passed"
     },
     {
-      "file": "src/__tests__/utils/deepMerge.test.ts",
-      "fullName": "deepMerge should deep merge array values  ",
-      "status": "passed"
-    },
-    {
-      "file": "src/__tests__/utils/deepMerge.test.ts",
-      "fullName": "deepMerge should deep merge object correctly",
-      "status": "passed"
-    },
-    {
-      "file": "src/__tests__/utils/deepMerge.test.ts",
-      "fullName": "deepMerge should never merge non-objects, and always return the 'source' object",
-      "status": "passed"
-    },
-    {
-      "file": "src/__tests__/utils/deepMerge.test.ts",
-      "fullName": "deepMerge should not merge object with date type",
-      "status": "passed"
-    },
-    {
-      "file": "src/__tests__/utils/deepMerge.test.ts",
-      "fullName": "deepMerge should overwrite array value ",
-      "status": "passed"
-    },
-    {
-      "file": "src/__tests__/utils/deepMerge.test.ts",
-      "fullName": "deepMerge should overwrite different data type",
-      "status": "passed"
-    },
-    {
       "file": "src/__tests__/utils/extractFormValues.test.ts",
       "fullName": "extractFormValues should return extracted form values based on form state",
       "status": "passed"
@@ -5439,7 +6244,32 @@
     },
     {
       "file": "src/__tests__/utils/flatten.test.ts",
+      "fullName": "flatten should preserve File and Blob values as leaf nodes and not drop them",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/utils/flatten.test.ts",
+      "fullName": "flatten should preserve FileList values as leaf nodes and not split them",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/utils/flatten.test.ts",
       "fullName": "flatten should preserve nested Date values as leaf nodes",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/utils/flatten.test.ts",
+      "fullName": "flatten should preserve nested and indexed File values as leaf nodes",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/utils/formData.test.ts",
+      "fullName": "jsonToFormData should skip undefined values instead of stringifying them",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/utils/formData.test.ts",
+      "fullName": "jsonToFormData should submit FileList values under their field name",
       "status": "passed"
     },
     {
@@ -5485,6 +6315,31 @@
     {
       "file": "src/__tests__/utils/get.test.ts",
       "fullName": "get should return undefined when provided with empty path",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/utils/has.test.ts",
+      "fullName": "has should detect a path that is present but holds an empty or nullish value",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/utils/has.test.ts",
+      "fullName": "has should detect paths that are absent",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/utils/has.test.ts",
+      "fullName": "has should detect paths that resolve to a value",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/utils/has.test.ts",
+      "fullName": "has should not report inherited properties",
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/utils/has.test.ts",
+      "fullName": "has should return false for an empty path or a non-traversable object",
       "status": "passed"
     },
     {
@@ -5968,5 +6823,5 @@
       "status": "passed"
     }
   ],
-  "snapshots": 8
+  "snapshots": 26
 }

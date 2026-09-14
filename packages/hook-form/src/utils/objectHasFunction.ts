@@ -1,4 +1,4 @@
-// Vendored from react-hook-form@7.81.0 src/utils/objectHasFunction.ts (octane port).
+// Adapted from react-hook-form@7.88.0 src/utils/objectHasFunction.ts for Octane.
 import isFunction from './isFunction';
 
 export default <T>(data: T): boolean => {

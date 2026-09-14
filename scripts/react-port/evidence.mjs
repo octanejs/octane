@@ -1240,6 +1240,7 @@ function analyzeTypeEvidence(
 						`Export ${specifier}.${symbol.name} is absent from the pinned public API`,
 					);
 				const failure = newOpaquePublicSymbol(symbol, witness, checker, {
+					binding: specifier,
 					internalMembers: pinnedEntries.internalMembers,
 				});
 				if (failure)

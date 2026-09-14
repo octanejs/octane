@@ -1,4 +1,4 @@
-// Vendored from react-hook-form@7.81.0 src/utils/isObject.ts (octane port).
+// Adapted from react-hook-form@7.88.0 src/utils/isObject.ts for Octane.
 import isDateObject from './isDateObject';
 import isNullOrUndefined from './isNullOrUndefined';
 

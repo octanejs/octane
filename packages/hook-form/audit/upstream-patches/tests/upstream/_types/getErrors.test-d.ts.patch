@@ -1,0 +1,14 @@
+diff --git a/tests/upstream/_types/getErrors.test-d.ts b/tests/upstream/_types/getErrors.test-d.ts
+--- a/tests/upstream/_types/getErrors.test-d.ts
++++ b/tests/upstream/_types/getErrors.test-d.ts
+@@ -4,8 +4,8 @@ import type {
+   FieldValues,
+   GetErrorsResult,
+   GlobalError,
+-} from '../../src/types';
+-import { useForm } from '../../src/useForm';
++} from '../../../src/types';
++import { useForm } from '../../../src/useForm';
+ 
+ import type { Equal, Expect } from './__fixtures__';
+ import { _ } from './__fixtures__';

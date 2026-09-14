@@ -3518,6 +3518,30 @@ export default defineConfig({
 			{
 				testExecution: { group: 'react-parity' },
 				test: {
+					name: 'hook-form-pristine-browser',
+					include: ['packages/hook-form/tests/upstream-browser-original.test.ts'],
+					environment: 'node',
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'hook-form-adapted-browser',
+					include: ['packages/hook-form/tests/upstream-browser-adapted.test.ts'],
+					environment: 'node',
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'hook-form-browser',
+					include: ['packages/hook-form/tests/browser/**/*.test.ts'],
+					environment: 'node',
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
 					name: 'hook-form-pristine',
 					include: ['packages/hook-form/tests/upstream-original.test.ts'],
 					environment: 'node',
@@ -3531,6 +3555,8 @@ export default defineConfig({
 					include: [
 						'packages/hook-form/tests/upstream/**/*.test.ts',
 						'packages/hook-form/tests/upstream/**/*.test.tsx',
+						'packages/hook-form/tests/conformance/**/*.test.*',
+						'packages/hook-form/tests/hydration.test.ts',
 					],
 				},
 				test: {
@@ -3543,6 +3569,8 @@ export default defineConfig({
 						...configDefaults.exclude,
 						'packages/hook-form/tests/**/*.server.test.tsx',
 						'packages/hook-form/tests/upstream-original.test.ts',
+						'packages/hook-form/tests/browser/**/*.test.ts',
+						'packages/hook-form/tests/upstream-browser-*.test.ts',
 						'packages/hook-form/tests/differential/**/*.test.ts',
 						'packages/hook-form/tests/differential/**/*.test.tsx',
 					],

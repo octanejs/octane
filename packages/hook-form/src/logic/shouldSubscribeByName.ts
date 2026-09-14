@@ -1,4 +1,4 @@
-// Vendored from react-hook-form@7.81.0 src/logic/shouldSubscribeByName.ts (octane port).
+// Adapted from react-hook-form@7.88.0 src/logic/shouldSubscribeByName.ts for Octane.
 import convertToArrayPayload from '../utils/convertToArrayPayload';
 
 export default <T extends string | readonly string[] | undefined>(

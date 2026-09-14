@@ -30,7 +30,7 @@ const jestBin = createRequire(resolve(repoRoot, 'packages/hook-form/package.json
 );
 
 // @parity-case pristine:react-hook-form-original-suite
-it('runs all 1,193 pinned react-hook-form tests unchanged', () => {
+it('runs all 1,364 pinned react-hook-form tests unchanged', () => {
 	verifyHookFormUpstream(repoRoot);
 	const report = join(tmpdir(), `octane-hook-form-pristine-${process.pid}.json`);
 	const result = spawnSync(
@@ -50,8 +50,8 @@ it('runs all 1,193 pinned react-hook-form tests unchanged', () => {
 	);
 	const output = `${result.stdout}\n${result.stderr}`;
 	expect(result.status, output).toBe(0);
-	expect(output).toMatch(/Tests:\s+1193 passed, 1193 total/);
-	expect(output).toMatch(/Snapshots:\s+8 passed, 8 total/);
+	expect(output).toMatch(/Tests:\s+1364 passed, 1364 total/);
+	expect(output).toMatch(/Snapshots:\s+26 passed, 26 total/);
 	const expected = JSON.parse(
 		readFileSync(resolve(repoRoot, 'packages/hook-form/audit/pristine-runtime.json'), 'utf8'),
 	).tests;

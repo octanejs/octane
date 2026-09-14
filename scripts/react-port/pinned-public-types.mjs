@@ -304,6 +304,23 @@ function reactRenderable(type, checker, depth = 0) {
 	// Declaration emit can expand ReactNode while preserving its exact union.
 	// Recover the canonical symbol only through a real React element declaration.
 	if (type?.isUnion?.()) {
+		// A nullable element is still a renderer-owned return contract. Keep
+		// unrelated union members precise instead of accepting any union that
+		// merely contains an element somewhere inside it.
+		const rendered = type.types.filter(
+			(part) => !(part.flags & (ts.TypeFlags.Null | ts.TypeFlags.Undefined)),
+		);
+		if (
+			rendered.length > 0 &&
+			rendered.length < type.types.length &&
+			rendered.every(
+				(part) =>
+					!part.isUnion?.() &&
+					['ReactElement', 'Element'].includes(name(part)) &&
+					declarationFiles(part).some((file) => /\/@types\/react\/index\.d\.ts$/.test(file)),
+			)
+		)
+			return true;
 		const parts = [...type.types];
 		const seen = new Set();
 		for (let index = 0; index < parts.length; index++) {
@@ -738,7 +755,19 @@ export function newOpaquePublicType(
 				(declarations.length ? undefined : property.valueDeclaration);
 			if (!declaration) continue;
 			if (options.internalMembers?.has(memberKey(declaration))) continue;
-			const expected = witness && checker.getPropertyOfType(witness, property.name);
+			// Hook Form exposes its per-edit handler as onInput in Octane. The
+			// pinned onChange declaration remains the complete precision witness;
+			// this is a member rename, never permission for new opaque leaves.
+			const nativeInput =
+				options.binding === '@octanejs/hook-form' &&
+				property.name === 'onInput' &&
+				ts.isTypeLiteralNode(declaration.parent) &&
+				ts.isTypeAliasDeclaration(declaration.parent.parent) &&
+				['ControllerRenderProps', 'UseFormRegisterReturn'].includes(
+					declaration.parent.parent.name.text,
+				);
+			const expected =
+				witness && checker.getPropertyOfType(witness, nativeInput ? 'onChange' : property.name);
 			// memo exposes its original callable as `type` in Octane. React's
 			// NamedExoticComponent omits this platform member; compare the original
 			// callable against the same public call contract instead.

@@ -1,4 +1,4 @@
-// Vendored from react-hook-form@7.81.0 src/utils/createSubject.ts (octane port).
+// Adapted from react-hook-form@7.88.0 src/utils/createSubject.ts for Octane.
 import type { Noop } from '../types';
 
 export type Observer<T> = {

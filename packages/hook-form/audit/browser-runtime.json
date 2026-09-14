@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "project": "hook-form-browser",
+  "roots": ["packages/hook-form/tests"],
+  "files": ["packages/hook-form/tests/browser/browser.test.ts"],
+  "tests": [
+    {
+      "id": "runtime:cda190dcec8178a2",
+      "file": "packages/hook-form/tests/browser/browser.test.ts",
+      "fullName": "submits native files once and reports rejected function actions through form state"
+    },
+    {
+      "id": "runtime:6b6c73096ccdc289",
+      "file": "packages/hook-form/tests/browser/browser.test.ts",
+      "fullName": "validates native edits, preserves surviving array inputs, focuses appended fields, and cleans up"
+    }
+  ]
+}

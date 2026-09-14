@@ -1,0 +1,474 @@
+{
+  "schemaVersion": 1,
+  "artifacts": [
+    {
+      "path": "upstream-artifact/LICENSE",
+      "sha256": "e8eeb472f0a5889c2c51625b86a3f9b8630680adb9f49a125352e2e426392780"
+    },
+    {
+      "path": "upstream-artifact/dist/constants.d.ts",
+      "sha256": "d8506a892f158b1450611f33fb2bc0a830155510a9201acc3f5eb00554fcb1e4"
+    },
+    {
+      "path": "upstream-artifact/dist/controller.d.ts",
+      "sha256": "2fd07ea89c8fc36ea2d09a4cb4be01bc776ca162aa22f4474532f834f84f50a3"
+    },
+    {
+      "path": "upstream-artifact/dist/errorMessage.d.ts",
+      "sha256": "183dbedcf01d566e8c50eb2ce881ce03e55464c9cd58cd9ad330b40d2696b095"
+    },
+    {
+      "path": "upstream-artifact/dist/fieldArray.d.ts",
+      "sha256": "30eeee4e971aa250050f38cc9f38d22e8bb3b3478c86118f673667cb862927d1"
+    },
+    {
+      "path": "upstream-artifact/dist/form.d.ts",
+      "sha256": "7d294c6a0923dfe83a3f64bbfd735daab0618ac83e2acd9a30eea21eb1e4188d"
+    },
+    {
+      "path": "upstream-artifact/dist/formState.d.ts",
+      "sha256": "8a1557dead0ef2c47f2080c735bbef26cd1112aff1d5572987b0e8d72a81e690"
+    },
+    {
+      "path": "upstream-artifact/dist/index.d.ts",
+      "sha256": "23b86375a048c8d7e97f94489e1f278481fb3d3d706769a637de300a9b31437f"
+    },
+    {
+      "path": "upstream-artifact/dist/index.react-server.d.ts",
+      "sha256": "5bc722a80ba444421128b17caf4df27425e1f940a1b23754eabe09011631f96e"
+    },
+    {
+      "path": "upstream-artifact/dist/logic/appendErrors.d.ts",
+      "sha256": "3ae7ec8145dc15345b00d07e4f803760e5c6ed4b28e5358048bc3a0f49353532"
+    },
+    {
+      "path": "upstream-artifact/dist/logic/collectDirtyFieldNames.d.ts",
+      "sha256": "0b3db7e786d1c05c1038393136812801a9e860ef8f054888eda7ff145657b019"
+    },
+    {
+      "path": "upstream-artifact/dist/logic/createFormControl.d.ts",
+      "sha256": "b19ed7adf2ee808f410cdfbb57a2e40cd5a17638124ed3145f108e91b95377a1"
+    },
+    {
+      "path": "upstream-artifact/dist/logic/generateId.d.ts",
+      "sha256": "0e7586d114551735741f1c7e43030f284cebd2258cf63dc4d8eda9f9d38d9e95"
+    },
+    {
+      "path": "upstream-artifact/dist/logic/generateWatchOutput.d.ts",
+      "sha256": "6a24af98f82aef30e5ad986e22a43f414a177fc72bb0d4083c54188fad137489"
+    },
+    {
+      "path": "upstream-artifact/dist/logic/getCheckboxValue.d.ts",
+      "sha256": "323c628c848c83f7310d53e633f85d04c98ea8a796f2d64ab865c1590560e125"
+    },
+    {
+      "path": "upstream-artifact/dist/logic/getDirtyFields.d.ts",
+      "sha256": "2aba28391af429604e122742532b8cf66aeb2a2e291e0723ff06104abdcd872d"
+    },
+    {
+      "path": "upstream-artifact/dist/logic/getEventValue.d.ts",
+      "sha256": "750f1513c04a946f65b5c98b1e1f399d142fdfd9b8df3d8eafd0dba315c90574"
+    },
+    {
+      "path": "upstream-artifact/dist/logic/getFieldArrayItemNames.d.ts",
+      "sha256": "5fb489ae80f8e821cd7bbab02cd5c1be086180ffb8a4be78fbae1ea1a54ed645"
+    },
+    {
+      "path": "upstream-artifact/dist/logic/getFieldValue.d.ts",
+      "sha256": "2e6bee100a1582edcdb55adb903a2937043ca2e44563100a8f0fd660903dbfb1"
+    },
+    {
+      "path": "upstream-artifact/dist/logic/getFieldValueAs.d.ts",
+      "sha256": "afc45c6af222eab276b628e986be75816c72721dec2c4f9d9535c8bafa6b49e3"
+    },
+    {
+      "path": "upstream-artifact/dist/logic/getFocusFieldName.d.ts",
+      "sha256": "b717082a1b818a88808b52fe56b75484b47359e1f31d12f97ab8416dc45fb64b"
+    },
+    {
+      "path": "upstream-artifact/dist/logic/getNullAncestorValue.d.ts",
+      "sha256": "6cd6d87ceda3a5da42228ce937593e5b3938e8515014c7af5da02cd3c78a6892"
+    },
+    {
+      "path": "upstream-artifact/dist/logic/getProxyFormState.d.ts",
+      "sha256": "24da7756a62da1d0ed8eb9a666fd1ab309c7330a53bf047ca20096b0ebf161c1"
+    },
+    {
+      "path": "upstream-artifact/dist/logic/getRadioValue.d.ts",
+      "sha256": "36db534d867866f1a28fcacae60067d9d9258176765d0e7bef38ceadd10e2c38"
+    },
+    {
+      "path": "upstream-artifact/dist/logic/getResolverOptions.d.ts",
+      "sha256": "5281ba1bea597bab66d9300527344a82bc7040759f50e422f40136b47fde98d4"
+    },
+    {
+      "path": "upstream-artifact/dist/logic/getRuleValue.d.ts",
+      "sha256": "c360f9f4aade02ccb6710d6ab31180bd525869ee35ae60bd642443ce72f0cc07"
+    },
+    {
+      "path": "upstream-artifact/dist/logic/getValidateError.d.ts",
+      "sha256": "3ab29b2e764e1af962ba4dd0fd2b39247a8dfac57da289f0b39115be9a44e1f5"
+    },
+    {
+      "path": "upstream-artifact/dist/logic/getValidationModes.d.ts",
+      "sha256": "a31244acfd16d8a3b8fa22556d83dff38d3fb70032869425ea0ea00566a9921d"
+    },
+    {
+      "path": "upstream-artifact/dist/logic/getValueAndMessage.d.ts",
+      "sha256": "4f645732d6378196e200c6a08385c7412577527b0cb3e80e6cdc91315eea2891"
+    },
+    {
+      "path": "upstream-artifact/dist/logic/hasPromiseValidation.d.ts",
+      "sha256": "1ba278bfa12dd2f22a0c8cad23bcdbd4a3bf4dc746bd12438fb8dd6497ad272c"
+    },
+    {
+      "path": "upstream-artifact/dist/logic/hasValidation.d.ts",
+      "sha256": "843b50d9ff0d3689866a46182407db829ab5528b721fc2689463702df90d1143"
+    },
+    {
+      "path": "upstream-artifact/dist/logic/index.d.ts",
+      "sha256": "952f1f38e422be5f601e71c47a8daf6d7f0e7922e282e22ec25e0fbcc2e39c75"
+    },
+    {
+      "path": "upstream-artifact/dist/logic/isNameInFieldArray.d.ts",
+      "sha256": "d806e4219121b1430a233aa30a0073ebcd11dd50884ec997a79bac40e2e9c15f"
+    },
+    {
+      "path": "upstream-artifact/dist/logic/isWatched.d.ts",
+      "sha256": "9c96437de8158a365bd1ce523ea31bb37b5558c34a743056d7a166d8fb887e7b"
+    },
+    {
+      "path": "upstream-artifact/dist/logic/iterateFieldsByAction.d.ts",
+      "sha256": "86b6419de5ae5140a47f05453b4355545a1fc2d315e33cb197f5ad70b6cddfbc"
+    },
+    {
+      "path": "upstream-artifact/dist/logic/schemaErrorLookup.d.ts",
+      "sha256": "67ac1d8931c317a7d2b6d39535b6877311bb8ed64f7967183abb588297b29287"
+    },
+    {
+      "path": "upstream-artifact/dist/logic/shouldRenderFormState.d.ts",
+      "sha256": "396154a4593fda3abc35526c0f478a0ad76bcd674009e01d0a1ce35cc5a61398"
+    },
+    {
+      "path": "upstream-artifact/dist/logic/shouldSubscribeByName.d.ts",
+      "sha256": "541199482f1bef889b4bf8e7016ef929c3f002369c9f76eed94e3d552e489504"
+    },
+    {
+      "path": "upstream-artifact/dist/logic/skipValidation.d.ts",
+      "sha256": "dbbd58ced122b7442f3ee4888097f540be1bfac7be6fb3619906b6d0dae4351a"
+    },
+    {
+      "path": "upstream-artifact/dist/logic/unsetEmptyArray.d.ts",
+      "sha256": "047ad769aa3c25429135d4e76239582fa050f6ed92e2447c1ab9b14548a279f0"
+    },
+    {
+      "path": "upstream-artifact/dist/logic/updateFieldArrayRootError.d.ts",
+      "sha256": "251a4406e21b652b0da40de27f42ddb29d82fc80159528e23becc9c9434daf02"
+    },
+    {
+      "path": "upstream-artifact/dist/logic/validateField.d.ts",
+      "sha256": "7ead3cabe0e5ff21f7eace035544441fbabe7e2de69b128fa546111ce690c791"
+    },
+    {
+      "path": "upstream-artifact/dist/types/controller.d.ts",
+      "sha256": "f24f4729157dd6b83f02b4f78a32276b8ee794b309e4e26cbdb8331479e8d230"
+    },
+    {
+      "path": "upstream-artifact/dist/types/errors.d.ts",
+      "sha256": "5655eabdab3790ffeba554c87616674aa09df7aea097f503aababc09158838dc"
+    },
+    {
+      "path": "upstream-artifact/dist/types/events.d.ts",
+      "sha256": "9cf804daa8eeff29e9b5391fc3af02361d0a061d42aec817d7515e25efee0ea9"
+    },
+    {
+      "path": "upstream-artifact/dist/types/fieldArray.d.ts",
+      "sha256": "d01ed438126ead09b92546ad5cafe5dbf72a1e4b2291e761a621ec3cacd70c8c"
+    },
+    {
+      "path": "upstream-artifact/dist/types/fields.d.ts",
+      "sha256": "deb015484a4ea0e9a56d7d885092d63a7a1ce8d922f5fe0ca524e7d0a64abedd"
+    },
+    {
+      "path": "upstream-artifact/dist/types/form.d.ts",
+      "sha256": "3e9b0069b102e28a8db09928ad5022c985b84d8c9de2bb6788a109c5e5e656b3"
+    },
+    {
+      "path": "upstream-artifact/dist/types/index.d.ts",
+      "sha256": "3ce17b8461770e136d74a4006605c24c0d27056e80f9b28698d0b14a29f8b48e"
+    },
+    {
+      "path": "upstream-artifact/dist/types/path/common.d.ts",
+      "sha256": "8cd4602ab3eeb4513fdd54682d3d54434c1ff3391f84340c99ffc13480401661"
+    },
+    {
+      "path": "upstream-artifact/dist/types/path/eager.d.ts",
+      "sha256": "4c6ea69b8359c85d4265b8d7d664ed3ffe2d7c42d5eff3f0b70f2bfcba71cdfc"
+    },
+    {
+      "path": "upstream-artifact/dist/types/path/index.d.ts",
+      "sha256": "a6e32a48af01c521351f3e656f4e0f28ee8a2bdae57de2b04b9475cdd7469a5a"
+    },
+    {
+      "path": "upstream-artifact/dist/types/resolvers.d.ts",
+      "sha256": "3e94be92c2685172777bc8d5de71a145d3e100260b7cb9fffac1b8d9f2429da1"
+    },
+    {
+      "path": "upstream-artifact/dist/types/utils.d.ts",
+      "sha256": "c22e4d188b5811cc32af3adb48fd9f3c2802276a493c19f9d086d6381065d5e1"
+    },
+    {
+      "path": "upstream-artifact/dist/types/validator.d.ts",
+      "sha256": "71076a7ea80a290954426ac517192c1d8ad88d3f778110d27b777098bb6c0960"
+    },
+    {
+      "path": "upstream-artifact/dist/types/watch.d.ts",
+      "sha256": "268fd10a0159a643dea2f3878214ca1665a242543d979563e47611421e4b778b"
+    },
+    {
+      "path": "upstream-artifact/dist/useController.d.ts",
+      "sha256": "bbf4eaee37f4465ffcb6e438b499469cd3fbead879a80defdd01bbcb3b57ef48"
+    },
+    {
+      "path": "upstream-artifact/dist/useFieldArray.d.ts",
+      "sha256": "5e061462365b60adddcd46965c765a1024e6ffa9762c480594e8898f664ec973"
+    },
+    {
+      "path": "upstream-artifact/dist/useForm.d.ts",
+      "sha256": "505900f8a0687f88f38df7eb94fc957782b04d7f75fc68274d7b7966de426700"
+    },
+    {
+      "path": "upstream-artifact/dist/useFormContext.d.ts",
+      "sha256": "a17dc073726ef2be846ed9d607490d092a76c511b74ca6998748f5312ba1fde6"
+    },
+    {
+      "path": "upstream-artifact/dist/useFormControlContext.d.ts",
+      "sha256": "0111fde91dbd5778febca8452346a1764eee96db19a556e1f34ccf088be69774"
+    },
+    {
+      "path": "upstream-artifact/dist/useFormState.d.ts",
+      "sha256": "ea337800a43e4ef545b8a6967c75d7b64603bdbe00a4422084e915c21139ffed"
+    },
+    {
+      "path": "upstream-artifact/dist/useIsomorphicLayoutEffect.d.ts",
+      "sha256": "2ede77a97854cbaf148ac6a0d823d13de691219afb665cb2a4cbe0908cd383fe"
+    },
+    {
+      "path": "upstream-artifact/dist/useResyncOnReconnect.d.ts",
+      "sha256": "530279a8cbf52f14cc766c31e5a0c789e5f3868e1b08053ef143281e1b6fe861"
+    },
+    {
+      "path": "upstream-artifact/dist/useWatch.d.ts",
+      "sha256": "738b8bed38b716bbfdfa4c936f14931a3ff5af1429f39ae2d18e2326af2ee4a5"
+    },
+    {
+      "path": "upstream-artifact/dist/utils/append.d.ts",
+      "sha256": "ace8fe2a5c2695cadc2475755c0ad04c6abe9c81fc2616f9c5ee70c12a574475"
+    },
+    {
+      "path": "upstream-artifact/dist/utils/cloneObject.d.ts",
+      "sha256": "ff6b1c889f2a9f482f851d76248fcd233f246237dcd291eff08c0b1c7e908eb9"
+    },
+    {
+      "path": "upstream-artifact/dist/utils/compact.d.ts",
+      "sha256": "c5baf65e3b03426df23d3a5fcd58cd801f86ad0036ac731cdd14599c91982e65"
+    },
+    {
+      "path": "upstream-artifact/dist/utils/convertToArrayPayload.d.ts",
+      "sha256": "b277f58ba33097813b01ff7becb0ccb370771fb0d512beb6987c320725a7d5a0"
+    },
+    {
+      "path": "upstream-artifact/dist/utils/createSubject.d.ts",
+      "sha256": "fabe3bd6d0cf501b0526bb9b2f1f55357c59d2b9819d2f2051a2fe82dce2e783"
+    },
+    {
+      "path": "upstream-artifact/dist/utils/deepEqual.d.ts",
+      "sha256": "4e80797ecf858a1768096d4330ea724e3adc6dde55e21ea64541f1f0bf8bebde"
+    },
+    {
+      "path": "upstream-artifact/dist/utils/extractFormValues.d.ts",
+      "sha256": "36f79fccff16cecfbd4f04278b345e8488f9495e1e3a9fe81480c55fadc5c1e3"
+    },
+    {
+      "path": "upstream-artifact/dist/utils/fillEmptyArray.d.ts",
+      "sha256": "cbede07d41de21d2d54b3ecc533fa57b061e1df58cdea5d5b0e23a6a1255705a"
+    },
+    {
+      "path": "upstream-artifact/dist/utils/flatten.d.ts",
+      "sha256": "7209fe04bcbadc5189daaf42f14b0e151e29a654f39be9ac5c2b6d99c67813aa"
+    },
+    {
+      "path": "upstream-artifact/dist/utils/formData.d.ts",
+      "sha256": "1af67ad0ef61c1e1f15d8f555f774a51b9205a1369b7f6f923fa6811585d8bb5"
+    },
+    {
+      "path": "upstream-artifact/dist/utils/get.d.ts",
+      "sha256": "8840f166c4618c36877d2bcd5a0b9e5b280ab5392df9085fc4bd6a50ed3e1add"
+    },
+    {
+      "path": "upstream-artifact/dist/utils/has.d.ts",
+      "sha256": "32a624daf29cbe7103c1a4c1884477228b8d9ec30768264e656532e1f5abec23"
+    },
+    {
+      "path": "upstream-artifact/dist/utils/index.d.ts",
+      "sha256": "197aecb7cfddd82533ed4f2d3c511584167512bf3b9d4ce6600f6af2bf99cc9a"
+    },
+    {
+      "path": "upstream-artifact/dist/utils/insert.d.ts",
+      "sha256": "74ec711ac88963a7b7114d45e2a0dd1b8a7eb1427135cc709b5822cb053f0e33"
+    },
+    {
+      "path": "upstream-artifact/dist/utils/isBoolean.d.ts",
+      "sha256": "14205faa45d206ae59f190d94561cd5b6179de3701f27c3217e5fc4bd072565e"
+    },
+    {
+      "path": "upstream-artifact/dist/utils/isCheckBoxInput.d.ts",
+      "sha256": "a11cea849aec606727511cc9ef4d26a3d2e697cff843b51fe490aa4c357a49e8"
+    },
+    {
+      "path": "upstream-artifact/dist/utils/isDateObject.d.ts",
+      "sha256": "967c60110e22b2adb164602bdb28a1eb53643fad9bd414177b3ea2fb43036e8c"
+    },
+    {
+      "path": "upstream-artifact/dist/utils/isEmptyObject.d.ts",
+      "sha256": "2daa0dd01537d3c40ca594792a5737d717a35b93ca8b497b450162ccf5899936"
+    },
+    {
+      "path": "upstream-artifact/dist/utils/isFileInput.d.ts",
+      "sha256": "c0907d73b0e6b5005fb26c8b23f2275f1163520be842b07d201aeac583188cf6"
+    },
+    {
+      "path": "upstream-artifact/dist/utils/isFunction.d.ts",
+      "sha256": "cb8134f386e6764449a87be52fd9a76c3d8ce285153a62d2649a56f970695d6b"
+    },
+    {
+      "path": "upstream-artifact/dist/utils/isHTMLElement.d.ts",
+      "sha256": "c3d224232b64e350353b09049ae4f5650b801429c83d3025b7063cad6707d982"
+    },
+    {
+      "path": "upstream-artifact/dist/utils/isKey.d.ts",
+      "sha256": "b53a2a9c996dda6b610fe448a1c4de931921bbceba00d63e0cb2db77bae730f6"
+    },
+    {
+      "path": "upstream-artifact/dist/utils/isMultipleSelect.d.ts",
+      "sha256": "0005192492273fa75f353b8cbbb4254f75881245b7fe6a39eedf73d7aacc53ec"
+    },
+    {
+      "path": "upstream-artifact/dist/utils/isNullOrUndefined.d.ts",
+      "sha256": "69851205afe9431ee9c3e8b9db1f1829595d5565991ca4be6133c440add2edef"
+    },
+    {
+      "path": "upstream-artifact/dist/utils/isObject.d.ts",
+      "sha256": "f4798cf6a8f84a5679bf918172b1b2d3e1c1069105dc1c77b62d1e12c6d1fc88"
+    },
+    {
+      "path": "upstream-artifact/dist/utils/isPlainObject.d.ts",
+      "sha256": "944391fbc08e8c8fe678b57ea99bc55717a98026f04ffcc7160157b14182f843"
+    },
+    {
+      "path": "upstream-artifact/dist/utils/isPrimitive.d.ts",
+      "sha256": "82a8d7801460642d42ae303d866b22bb8687333b83b2f781d061bbe6ab43bb03"
+    },
+    {
+      "path": "upstream-artifact/dist/utils/isRadioInput.d.ts",
+      "sha256": "0b339baeed3df7a3a68feb849984cce92014e267ff7f88a0550f41c919fb84d7"
+    },
+    {
+      "path": "upstream-artifact/dist/utils/isRadioOrCheckbox.d.ts",
+      "sha256": "11d76cfbed02e78e79e90f7ca6c95e1a6ac8337ee34c2f58efa6e52983d95ab1"
+    },
+    {
+      "path": "upstream-artifact/dist/utils/isRegex.d.ts",
+      "sha256": "e185652643c5ff6fee1173311a9cb5f2ac48a5476c9909ff8a703747fd12c026"
+    },
+    {
+      "path": "upstream-artifact/dist/utils/isString.d.ts",
+      "sha256": "9ef29302a49a0d1f966364ce2e1f144916d62bb1116208dbea5dfb12841e5033"
+    },
+    {
+      "path": "upstream-artifact/dist/utils/isUndefined.d.ts",
+      "sha256": "bb98175e7d943e8dbfd344d9ce89bb1a15b917d0cb841c3acd088ea82fb04be1"
+    },
+    {
+      "path": "upstream-artifact/dist/utils/isWeb.d.ts",
+      "sha256": "f09eed1ba20a428ed9dc6cb3cee65b8b954b9d9b0930d163364074cd41df1b8d"
+    },
+    {
+      "path": "upstream-artifact/dist/utils/json.d.ts",
+      "sha256": "f81647558fe54715dae74039f4712e08b7a4bbadc523e95074542ab1e53e6078"
+    },
+    {
+      "path": "upstream-artifact/dist/utils/live.d.ts",
+      "sha256": "088b07d68e0a8a0a73397f0cea7b9e68466dc492fab1aeb0b918d482474c2612"
+    },
+    {
+      "path": "upstream-artifact/dist/utils/move.d.ts",
+      "sha256": "d14230b26e565705bc2e03b38c00baf345a1a2d21d6bdfaa8a87629248d38f75"
+    },
+    {
+      "path": "upstream-artifact/dist/utils/noop.d.ts",
+      "sha256": "d2b68a67859696594d1e60e9a912a28995ac735a05d156a4fada8f523dca5352"
+    },
+    {
+      "path": "upstream-artifact/dist/utils/objectHasFunction.d.ts",
+      "sha256": "37007207cbd021acbad1e1d55be831da8ee9205cc210a4a688a56c8e88293437"
+    },
+    {
+      "path": "upstream-artifact/dist/utils/prepend.d.ts",
+      "sha256": "1d2b354bc6dd521a14544ee1f14636da9880486b058c9afda78fd08c382f522a"
+    },
+    {
+      "path": "upstream-artifact/dist/utils/remove.d.ts",
+      "sha256": "ad24b68e2e929239438325f699420cea70f33c001b8705d1daebf0c6cc8d1175"
+    },
+    {
+      "path": "upstream-artifact/dist/utils/set.d.ts",
+      "sha256": "f9bf6cdaa4eb36edc149c7f841b7a1cc61dd7559abd149ba2e2684eaa53c2336"
+    },
+    {
+      "path": "upstream-artifact/dist/utils/sleep.d.ts",
+      "sha256": "bb2c0fe98c49666322952711d21f061dc5c108729f176fb12a8b73696e9dcfab"
+    },
+    {
+      "path": "upstream-artifact/dist/utils/stringToPath.d.ts",
+      "sha256": "3480452306900ec6739045eaf7565b43b8f5032ca11e7dea5c6c4f3c5bb94be7"
+    },
+    {
+      "path": "upstream-artifact/dist/utils/swap.d.ts",
+      "sha256": "54c5c735384dfc294c5074a82fd4e4eaf8d9220f669518556b182166eca874a8"
+    },
+    {
+      "path": "upstream-artifact/dist/utils/unset.d.ts",
+      "sha256": "89d8a5655a7ce7a8fab9cdda65d354c6239e2bbc593ef23a49174b26cb4f7a07"
+    },
+    {
+      "path": "upstream-artifact/dist/utils/update.d.ts",
+      "sha256": "fb9756316186e18c9a684bf43ce1bbb988d1d8eab916ecf5d5503f4a9ba182d9"
+    },
+    {
+      "path": "upstream-artifact/dist/watch.d.ts",
+      "sha256": "05c377a2ab0802da5d646abf94a17742fbec33dfa401dace5cb1638355d01c03"
+    },
+    {
+      "path": "upstream-artifact/package.json",
+      "sha256": "c82b07050364024c999ec5a8d3880d9f70030d68c2df180c3b3c65fccfed1821"
+    },
+    {
+      "path": "upstream-artifact/react-hook-form-7.88.0.tgz",
+      "sha256": "1f4935d8658c4d25f38132e96d5c20df73872358ae1fbf451c7efdc95ba294e6"
+    }
+  ],
+  "packageIdentity": {
+    "path": "upstream-artifact/package.json",
+    "name": "react-hook-form",
+    "version": "7.88.0",
+    "license": "MIT"
+  },
+  "unpublishedDirs": ["audit", "tests", "typetests", "upstream", "upstream-artifact"],
+  "filesEqual": [
+    {
+      "path": "LICENSE.upstream",
+      "equalsPath": "upstream-artifact/LICENSE"
+    }
+  ]
+}

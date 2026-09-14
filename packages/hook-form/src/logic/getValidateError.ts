@@ -1,4 +1,4 @@
-// Vendored from react-hook-form@7.81.0 src/logic/getValidateError.ts (octane port).
+// Adapted from react-hook-form@7.88.0 src/logic/getValidateError.ts for Octane.
 import type { FieldError, Ref, ValidateResult } from '../types';
 import isBoolean from '../utils/isBoolean';
 import isString from '../utils/isString';

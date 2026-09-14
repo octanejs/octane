@@ -1,4 +1,4 @@
-// Vendored from react-hook-form@7.81.0 src/logic/isNameInFieldArray.ts (octane port).
+// Adapted from react-hook-form@7.88.0 src/logic/isNameInFieldArray.ts for Octane.
 import type { InternalFieldName } from '../types';
 
 export default (names: Set<InternalFieldName>, name: InternalFieldName) =>

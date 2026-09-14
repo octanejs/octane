@@ -1,10 +1,10 @@
-// Vendored from react-hook-form@7.81.0 src/logic/getProxyFormState.ts (octane port).
+// Adapted from react-hook-form@7.88.0 src/logic/getProxyFormState.ts for Octane.
 import { VALIDATION_MODE } from '../constants';
 import type { Control, FieldValues, FormState, ReadFormState } from '../types';
 
 export default <
 	TFieldValues extends FieldValues,
-	TContext = any,
+	TContext = unknown,
 	TTransformedValues = TFieldValues,
 >(
 	formState: FormState<TFieldValues>,

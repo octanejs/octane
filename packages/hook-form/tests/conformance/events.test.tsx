@@ -12,6 +12,7 @@ import { useForm, useController } from '@octanejs/hook-form';
 import type { Control } from '@octanejs/hook-form';
 
 describe('register(): native event surface', () => {
+	// @parity-case runtime:d99347b0e61c6d1c
 	it('returns name/ref/onInput/onBlur (no onChange key)', () => {
 		let registerProps: Record<string, unknown> = {};
 		function App() {
@@ -27,6 +28,7 @@ describe('register(): native event surface', () => {
 		expect('onChange' in registerProps).toBe(false);
 	});
 
+	// @parity-case runtime:f0789500e799258b
 	it('validates per keystroke with mode: onChange (native input event)', async () => {
 		function App() {
 			const {
@@ -50,6 +52,7 @@ describe('register(): native event surface', () => {
 		await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('ok'));
 	});
 
+	// @parity-case runtime:67b6ff4593927e18
 	it('fires the handler exactly once per checkbox click', async () => {
 		const subscribed: unknown[] = [];
 		let control!: Control<{ checked: boolean }>;
@@ -71,6 +74,7 @@ describe('register(): native event surface', () => {
 		expect(screen.getByRole('checkbox')).toBeChecked();
 	});
 
+	// @parity-case runtime:3866588ac961a83e
 	it('routes blur to the blur path exactly once (touched set, no re-validate double-fire)', async () => {
 		const validate = vi.fn(() => true);
 		let touched = false;
@@ -99,6 +103,7 @@ describe('useController field: onInput + controlled spread', () => {
 		return <input {...field} />;
 	}
 
+	// @parity-case runtime:e59c0e63b4f19a3c
 	it('typing into a {...field} spread controlled input updates the value (no controlled-input dev error)', async () => {
 		const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 		let control!: Control<{ test: string }>;
@@ -117,6 +122,7 @@ describe('useController field: onInput + controlled spread', () => {
 		errorSpy.mockRestore();
 	});
 
+	// @parity-case runtime:0da664b583ab0df0
 	it('field.onInput accepts a raw value programmatically (upstream field.onChange semantics)', async () => {
 		let fieldOnInput!: (value: unknown) => void;
 		let value = '';
@@ -137,6 +143,7 @@ describe('useController field: onInput + controlled spread', () => {
 });
 
 describe('unregister ordering (commit-phase ref detach)', () => {
+	// @parity-case runtime:309be45b9f108d60
 	it('shouldUnregister: true removes the field value after conditional unmount', async () => {
 		let control!: Control<{ test: string }>;
 		function App(props: { show: boolean }) {

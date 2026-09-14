@@ -1,4 +1,4 @@
-// Vendored from react-hook-form@7.81.0 src/logic/getValidationModes.ts (octane port).
+// Adapted from react-hook-form@7.88.0 src/logic/getValidationModes.ts for Octane.
 import { VALIDATION_MODE } from '../constants';
 import type { Mode, ValidationModeFlags } from '../types';
 
