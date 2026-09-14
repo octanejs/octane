@@ -83,6 +83,7 @@ export function analyzeStrongHTML(ast, source, filename, options = {}) {
 	const regions =
 		options.rendererBoundaries && Object.keys(options.rendererBoundaries).length > 0
 			? analyzeRendererBoundaries(source, {
+					ast,
 					filename,
 					rendererBoundaries: options.rendererBoundaries,
 				})

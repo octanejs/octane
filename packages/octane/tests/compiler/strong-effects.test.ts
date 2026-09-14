@@ -73,6 +73,8 @@ export function App() @{
 		`useEffect(() => { (async () => { while (props.active) { if (props.fetch) { try { await fetch('/telemetry'); break; } finally { return; } } } await ready; setData(1); })(); });`,
 		`useEffect(() => { (async () => { for (const item of props.items) { if (item.fetch) { try { await fetch('/telemetry'); continue; } finally { throw error; } } } await ready; setData(1); })(); });`,
 		`const onClick = () => { fetch('/api').then(setData); };`,
+		`const load = () => { fetch('/api').then(setData); return () => {}; }; useEffect(() => load());`,
+		`useEffect(() => (fetch('/api').then(setData), () => {}));`,
 	])('preserves cleanup, subscriptions and non-fetch work: %s', (setup) => {
 		expect(() =>
 			compile(component(`const [data, setData] = useState(null); ${setup}`), '/src/App.tsrx', {
@@ -104,6 +106,8 @@ describe('Strong effect chains', () => {
 		`const value = first + 1; useEffect(() => { Promise.resolve().then(setFirst); }); useEffect(() => { consume(value); });`,
 		`const update = useEffectEvent(setFirst); useEffect(() => { Promise.resolve().then(update); }); useEffect(() => { consume(first); });`,
 		`const read = useEffectEvent(() => consume(second)); useEffect(() => { Promise.resolve().then(setFirst); }); useEffect(() => { read(); consume(first); });`,
+		`const mixed = props.x + first; useEffect(() => { Promise.resolve().then(() => setFirst(1)); }); useEffect(() => { consume(mixed); });`,
+		`const mixed = props.x + first; useEffect(() => { Promise.resolve().then(() => setFirst(1)); }); useEffect(() => { consume(1); }, [mixed]);`,
 	])('rejects dependent effects after an asynchronous state write: %s', (setup) => {
 		rejects(component(`const [first, setFirst] = useState(0); ${setup}`), CHAIN);
 	});
@@ -165,6 +169,27 @@ describe('Strong prop state intent', () => {
 		`const create = () => props.value; const [state] = useState(create);`,
 	])('preserves deliberate capture and linked state: %s', (setup) => {
 		expect(() => compile(component(setup), '/src/App.tsrx', { strong: true })).not.toThrow();
+	});
+
+	it('keeps prop-mixed derived state eligible for the eager initializer check', () => {
+		rejects(
+			component(
+				`const [first] = useState(0); const mixed = props.x + first; const [state] = useState(mixed);`,
+			),
+			PROPS,
+		);
+	});
+
+	it('keeps hook-named JSX builders free of prop-state intent checks', () => {
+		expect(() =>
+			compile(
+				`"use strong";
+import { useState } from 'octane';
+function useDialog(title) { const [label] = useState(title); const dialog = <div>{label as string}</div>; return dialog; }
+export function App() @{ const dialog = useDialog('x'); <div>{dialog}</div> }`,
+				'/src/App.tsrx',
+			),
+		).not.toThrow();
 	});
 
 	it('does not confuse a shadowed hook with useState', () => {

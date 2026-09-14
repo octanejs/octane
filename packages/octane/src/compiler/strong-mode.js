@@ -1393,7 +1393,13 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		renderOutputs.set(fn, result);
 		return result;
 	}
+	// Hook-named module functions keep unknown arguments even when they build
+	// JSX: their callers, not props, supply the values.
+	const hookNamedRoots = new WeakSet();
 	function addNamedRenderRoot(fn, name) {
+		if (FUNCTION_TYPES.has(fn?.type) && /^(?:unstable_)?use[A-Z0-9]/.test(name)) {
+			hookNamedRoots.add(fn);
+		}
 		if (
 			FUNCTION_TYPES.has(fn?.type) &&
 			(/^(?:unstable_)?use[A-Z0-9]/.test(name) || (/^[A-Z]/.test(name) && hasRenderOutput(fn)))
@@ -1438,6 +1444,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 	let currentFunctionChecksRenderReads = false;
 	let currentRetainedRowScope = null;
 	const templatePolicy = createStrongTemplatePolicy({
+		ast,
 		report,
 		resolve,
 		unwrap,
@@ -2225,7 +2232,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		const enclosingFetchContinuation = fetchContinuation;
 		currentFunction = node;
 		if (phase === 'render' && renderOwner === null) renderOwner = node;
-		if (args === null && phase === 'render' && hasRenderOutput(node)) {
+		if (args === null && phase === 'render' && hasRenderOutput(node) && !hookNamedRoots.has(node)) {
 			// Component arguments are immutable prop projections. Custom hook
 			// arguments remain unknown unless a caller supplies a proven value.
 			args = (node.params ?? []).map(() => PROP_BINDING);
@@ -2264,6 +2271,11 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				const executionPhase = visitStatements(body.body, functionScope, phase);
 				if (body.render) visit(body.render, functionScope, executionPhase);
 			} else {
+				// An expression body returns its value, so it can supply the cleanup
+				// exactly like a block body's return statement.
+				if (currentEffect !== null && effectCallbackIsCurrent(currentEffect.callback)) {
+					markEffectCleanup(body, functionScope);
+				}
 				visit(body, functionScope, phase);
 			}
 		} finally {
@@ -2507,11 +2519,14 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			const known =
 				declaration.id?.type === 'Identifier' ? target.bindings.get(declaration.id.name) : null;
 			if (known == null || known.kind === 'other') {
-				if (propProjection(initial, scope)) bindPropPattern(declaration.id, bind);
-				else if (declaration.id?.type === 'Identifier') {
-					const states = projectedStates(initial, scope);
-					if (states !== null) bind(declaration.id, { kind: 'derived-state', states });
-				}
+				const prop = propProjection(initial, scope);
+				// A value mixing props and state keeps its state provenance so effect
+				// reads still link to the writer; the prop flag keeps the eager
+				// initializer check.
+				const states =
+					declaration.id?.type === 'Identifier' ? projectedStates(initial, scope) : null;
+				if (states !== null) bind(declaration.id, { kind: 'derived-state', states, prop });
+				else if (prop) bindPropPattern(declaration.id, bind);
 			}
 		}
 	}
@@ -3242,7 +3257,10 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 	function propProjection(expression, scope) {
 		const node = unwrap(expression);
 		if (node == null || FUNCTION_TYPES.has(node.type)) return false;
-		if (node.type === 'Identifier') return resolve(scope, node.name)?.kind === 'prop';
+		if (node.type === 'Identifier') {
+			const binding = resolve(scope, node.name);
+			return binding?.kind === 'prop' || binding?.prop === true;
+		}
 		if (node.type === 'MemberExpression')
 			return (
 				propProjection(node.object, scope) ||
@@ -3415,6 +3433,20 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		}
 		effectBranchExits.set(statement, exits);
 		return exits;
+	}
+
+	// A returned value counts as cleanup unless it is provably not callable: a
+	// fetch request or a known non-function value.
+	function markEffectCleanup(argument, scope) {
+		const value = unwrap(argument);
+		if (
+			value != null &&
+			(callableValue(value, scope) !== null ||
+				(staticExpressionValue(value, scope) === UNKNOWN_VALUE &&
+					fetchRequest(value, scope) === null))
+		) {
+			currentEffect.cleanup = true;
+		}
 	}
 
 	function effectCallbackIsCurrent(value) {
@@ -3792,14 +3824,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			}
 			case 'ReturnStatement': {
 				if (currentEffect !== null && effectCallbackIsCurrent(currentEffect.callback)) {
-					const value = unwrap(node.argument);
-					if (
-						value != null &&
-						(callableValue(value, scope) !== null ||
-							(staticExpressionValue(value, scope) === UNKNOWN_VALUE &&
-								fetchRequest(value, scope) === null))
-					)
-						currentEffect.cleanup = true;
+					markEffectCleanup(node.argument, scope);
 				}
 				visit(node.argument, scope, phase);
 				return;

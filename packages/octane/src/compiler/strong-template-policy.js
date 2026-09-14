@@ -15,6 +15,7 @@ const SKIP_KEYS = new Set(['type', 'loc', 'start', 'end', 'range', 'metadata', '
 // These checks share the Strong visitor's lexical bindings. The policy itself
 // never annotates the parser tree or changes the output of valid programs.
 export function createStrongTemplatePolicy({
+	ast,
 	report,
 	resolve,
 	unwrap,
@@ -27,7 +28,11 @@ export function createStrongTemplatePolicy({
 	const pending = [];
 	const seen = new WeakMap();
 	const jsxReturns = new WeakMap();
-	const mayHaveHTML = source.includes('dangerouslySetInnerHTML') || source.includes('\\');
+	// The factory check only fires for an Octane createElement call whose props
+	// name the HTML key (or spell it with an escape), so both texts must appear.
+	const mayHaveHTML =
+		source.includes('createElement') &&
+		(source.includes('dangerouslySetInnerHTML') || source.includes('\\'));
 	let keyDepth = 0;
 	let regions;
 	function add(code, node, message) {
@@ -40,7 +45,10 @@ export function createStrongTemplatePolicy({
 	function domAt(node) {
 		let renderer = options.renderer?.id ?? 'dom';
 		if (options.rendererBoundaries && regions === undefined) {
+			// Reuse the module's parsed tree: a second parse would reject shapes the
+			// tolerant editor parser accepts and would throw out of the analysis.
 			regions = analyzeRendererBoundaries(source, {
+				ast,
 				filename,
 				rendererBoundaries: options.rendererBoundaries,
 			}).boundaries;

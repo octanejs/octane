@@ -56,9 +56,24 @@ describe('Strong compiler-owned hook policies', () => {
 		'useEffect(() => console.log("mounted"), []);',
 		'const ref = useRef(null); const [value, setValue] = useState(0); useEffect(() => { console.log(value, ref.current); }, [value]);',
 		'const event = useEffectEvent(() => console.log(props.value)); useEffect(() => { event(); }, []);',
+		'const ref = useRef(null); useEffect(() => { console.log(ref.current, props.value); }, [ref, props.value]);',
 	])('reports equivalent explicit dependencies as a non-fatal redundancy hint', (setup) => {
 		const result = compile(strong(app(setup)), '/src/App.tsrx');
 		expect(result.diagnostics).toEqual(
+			expect.arrayContaining([expect.objectContaining({ code: REDUNDANT, severity: 'hint' })]),
+		);
+	});
+
+	it('treats stable imported and module-invariant entries as redundant rather than conflicting', () => {
+		const source = strong(`import { useEffect, useRef } from 'octane';
+import { observe } from './observe';
+const LIMIT = 10;
+export function App(props) @{
+  const ref = useRef(null);
+  useEffect(() => observe(LIMIT, ref.current, props.value), [observe, LIMIT, ref, props.value]);
+  <div />
+}`);
+		expect(compile(source, '/src/App.tsrx').diagnostics).toEqual(
 			expect.arrayContaining([expect.objectContaining({ code: REDUNDANT, severity: 'hint' })]),
 		);
 	});

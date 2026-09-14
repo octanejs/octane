@@ -96,6 +96,14 @@ describe('Strong trusted HTML', () => {
 			expect(() => compile(source, 'app.tsx', { strong: true })).not.toThrow();
 	});
 
+	it('keeps an authored line-comment pragma readable when selecting Strong JSX types', () => {
+		const result = compileToVolarMappings(
+			`// @jsxImportSource octane\n'use strong';\nexport function App() @{ <div>hi</div> }`,
+			'app.tsrx',
+		);
+		expect(result.code.split('\n')[0]).toBe('// @jsxImportSource octane/strong');
+	});
+
 	it('reports an editor diagnostic at the untrusted HTML expression', () => {
 		const source = `'use strong';\nexport function App() @{ <div dangerouslySetInnerHTML={{ __html: '<b>raw</b>' }} /> }`;
 		const result = compileToVolarMappings(source, 'app.tsrx');

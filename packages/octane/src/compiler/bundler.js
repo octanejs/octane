@@ -1340,14 +1340,15 @@ class OctaneBundlerCompiler {
 					: {}),
 			});
 			if (out === null) return passThrough();
-			return (
-				targetRuntimeRequests(out.code, 'slots') ?? {
-					code: out.code,
-					map: out.map,
-					kind: 'slots',
-					...finishMetadata(collected),
-				}
-			);
+			// Strong plain modules report nonfatal hints like compiled modules do.
+			this._forwardCompileDiagnostics(out.diagnostics);
+			const slotted = targetRuntimeRequests(out.code, 'slots') ?? {
+				code: out.code,
+				map: out.map,
+				kind: 'slots',
+				...finishMetadata(collected),
+			};
+			return out.diagnostics === undefined ? slotted : { ...slotted, diagnostics: out.diagnostics };
 		}
 
 		return passThrough();

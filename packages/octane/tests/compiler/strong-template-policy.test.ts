@@ -117,6 +117,26 @@ describe('Strong template authoring checks', () => {
 		const good = `import { flushSync } from './adapter'; import * as Octane from 'octane'; function helper(Octane) { return Octane.flushSync; } export function App() @{ <div /> }`;
 		expect(() => compile(strong(good), 'App.tsrx')).not.toThrow();
 	});
+	it('reuses the parsed module for renderer regions in editor analysis', () => {
+		// The tolerant editor parser accepts shapes a second strict parse rejects;
+		// region analysis must report diagnostics for them rather than throw.
+		for (const source of [
+			`export function App(props) @{
+  const h0 = () => {};
+  <div>@{ <button onClick={h0}>first</button><button onClick={h0}>last</button> }</div>
+}`,
+			`import { useState } from 'octane';
+export function App(props) @{
+  const [count] = useState(0);
+  <div>@{
+    if (props.ready) { var count = 1; }
+    <span>{count as string}</span>
+  }</div>
+}`,
+		]) {
+			expect(() => compileToVolarMappings(strong(source), 'App.tsrx')).not.toThrow();
+		}
+	});
 	it('provides source locations for editor errors and supports strong:true', () => {
 		const source = `export function App(props) @{ <ul>{props.items.map(item => <li />)}</ul> }`;
 		expect(() => compile(source, 'App.tsrx', { strong: true })).toThrow('OCTANE_STRONG_MAP_JSX');

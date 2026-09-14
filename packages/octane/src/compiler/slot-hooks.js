@@ -1406,7 +1406,7 @@ export function slotHooks(source, id, options) {
 	assertNativeReadDiagnostics(ast, source, id, options);
 	let strongMemoChanged = false;
 	if (strongAnalysis?.enabled) {
-		const memoized = applyStrongAutomaticMemo(ast, options);
+		const memoized = applyStrongAutomaticMemo(ast, { ...options, filename: id });
 		strongMemoChanged = memoized !== ast;
 		if (strongMemoChanged && options?.manualSlots)
 			throw unsupportedStrongAutomaticMemo(
@@ -1419,7 +1419,8 @@ export function slotHooks(source, id, options) {
 	const importInfo = octaneHookLocals(
 		ast,
 		options?.nativeReads === true,
-		findLeadingJsxImportSourcePragma(source) === 'octane',
+		// The bundler claims both pragmas for Octane (see pragmaOwnedModules).
+		['octane', 'octane/strong'].includes(findLeadingJsxImportSourcePragma(source)),
 	);
 	const manualProviders = options?.manualSlots ? findManualHookProviders(ast) : new Map();
 	const nativeReadActivation = options?.nativeReads === true && importsNativeRenderer(ast);

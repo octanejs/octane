@@ -296,8 +296,16 @@ export function compileToVolarMappings(source, filename, options) {
 		authoredPragma &&
 		strongDOM &&
 		jsxImportSourcePragmaModule(authoredPragma.value) === DOM_RENDERER_MODULE;
+	// Keep the authored comment form: a line pragma prints as `// …`, so the
+	// block-comment body would leave TypeScript with no readable pragma.
 	const strongPragma = replacePragma
-		? { ...authoredPragma, value: '*@jsxImportSource octane/strong' }
+		? {
+				...authoredPragma,
+				value:
+					authoredPragma.type === 'Line'
+						? ' @jsxImportSource octane/strong'
+						: '*@jsxImportSource octane/strong',
+			}
 		: null;
 	const printComments = strongPragma
 		? comments.map((comment) => (comment === authoredPragma ? strongPragma : comment))

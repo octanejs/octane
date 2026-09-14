@@ -1649,6 +1649,17 @@ function dependencyExpressionKey(expression, analysis) {
 	return null;
 }
 
+// Inference omits imported and module-invariant roots (including stable hook
+// results) because they cannot change between renders. An authored entry for
+// one adds nothing observable to a callback that ignores its arguments.
+function dependencyInvariantRoot(expression, analysis) {
+	const node = unwrapValue(expression);
+	if (node?.type !== 'Identifier') return false;
+	const scope = analysis.nodeScopes.get(node);
+	const binding = scope ? resolveBinding(scope, node.name) : null;
+	return binding !== null && (binding.imported === true || binding.dependencyInvariant === true);
+}
+
 function equivalentStrongDependencies(authored, callback, inferred, analysis) {
 	if (authored?.type !== 'ArrayExpression' || inferred === null) return false;
 	const expected = [];
@@ -1661,10 +1672,12 @@ function equivalentStrongDependencies(authored, callback, inferred, analysis) {
 		expected.push(key);
 	}
 	const actual = [];
+	const reactive = [];
 	for (const dependency of authored.elements) {
 		const key = dependencyExpressionKey(dependency, analysis);
 		if (key === null) return false;
 		actual.push(key);
+		if (!dependencyInvariantRoot(dependency, analysis)) reactive.push(key);
 	}
 	// Dependency values are also callback arguments in Octane. For callbacks
 	// that observe those arguments (including opaque references), position and
@@ -1674,7 +1687,7 @@ function equivalentStrongDependencies(authored, callback, inferred, analysis) {
 			actual.length === expected.length && actual.every((key, index) => key === expected[index])
 		);
 	}
-	const actualSet = new Set(actual);
+	const actualSet = new Set(reactive);
 	return actualSet.size === new Set(expected).size && expected.every((key) => actualSet.has(key));
 }
 
@@ -2019,6 +2032,8 @@ export function analyzeStrongMemoCandidates(ast, options = {}, existingAnalysis 
 		}
 
 		if (isFunction(node)) loop = false;
+		// A template `@for` body runs once per row, and this analysis does not
+		// model the row bindings, so its declarations keep plain evaluation.
 		if (
 			[
 				'ForStatement',
@@ -2026,10 +2041,20 @@ export function analyzeStrongMemoCandidates(ast, options = {}, existingAnalysis 
 				'ForOfStatement',
 				'WhileStatement',
 				'DoWhileStatement',
+				'JSXForExpression',
 			].includes(node.type)
 		)
 			loop = true;
 		if (loop && node.type === 'VariableDeclarator') inLoop.add(node);
+		if (node.type === 'ClassDeclaration' && node.id) {
+			// A class binding stays in its temporal dead zone until the declaration
+			// runs, so a cache input naming a later class would read it eagerly.
+			const binding = resolveBinding(
+				analysis.nodeScopes.get(node.id) ?? analysis.nodeScopes.get(node) ?? null,
+				node.id.name,
+			);
+			if (binding) declarations.set(binding, node);
+		}
 		if (
 			node.type === 'AssignmentExpression' ||
 			node.type === 'UpdateExpression' ||
@@ -2089,10 +2114,12 @@ export function analyzeStrongMemoCandidates(ast, options = {}, existingAnalysis 
 		return false;
 	}
 	const hookSummaries = new Map();
+	// Nested functions count: a callback argument may run its hook synchronously
+	// (`compute(() => useContext(Ctx))`), and caching that declaration would run
+	// the hook only on cache misses.
 	function executesHook(node, active = new Set(), root = true) {
 		if (!node || typeof node !== 'object') return false;
 		if (Array.isArray(node)) return node.some((child) => executesHook(child, active, false));
-		if (!root && isFunction(node)) return false;
 		if (node.type === 'CallExpression') {
 			const name = hookName(node, analysis.nodeScopes.get(node));
 			if (/^use(?:[A-Z]|$)/.test(name ?? '')) return true;

@@ -375,6 +375,90 @@ export function App(props) @{ const value = { count: 0 }; const alias = value; a
 		}
 	});
 
+	it.each([false, true])('keeps template row declarations live per row (dev=%s)', (dev) => {
+		const { App } = loadCompiledFixtureSource(
+			`"use strong";
+export function App(props) @{
+  <ul>@for (const item of props.items; key item.id) {
+    const style = { color: item.color };
+    <li style={style}>{item.name as string}</li>
+  }</ul>
+}`,
+			{ id: '/src/RowDeclaration.tsrx', mode: 'client', compileOptions: { dev, hmr: false } },
+		);
+		const colors = (mounted: ReturnType<typeof mount>) =>
+			mounted.findAll('li').map((li) => (li as HTMLElement).style.color);
+		const mounted = mount(App, {
+			items: [
+				{ id: 1, name: 'a', color: 'red' },
+				{ id: 2, name: 'b', color: 'blue' },
+			],
+		});
+		try {
+			expect(colors(mounted)).toEqual(['red', 'blue']);
+			mounted.update(App, {
+				items: [
+					{ id: 1, name: 'a', color: 'green' },
+					{ id: 2, name: 'b', color: 'blue' },
+				],
+			});
+			expect(colors(mounted)).toEqual(['green', 'blue']);
+		} finally {
+			mounted.unmount();
+		}
+	});
+
+	it.each([false, true])('re-runs a hook executed through a callback argument (dev=%s)', (dev) => {
+		const { App } = loadCompiledFixtureSource(
+			`"use strong";
+import { createContext, useContext } from 'octane';
+import { compute } from './probe';
+const Ctx = createContext('none');
+function Reader() @{
+  const value = compute(() => useContext(Ctx));
+  <span>{value as string}</span>
+}
+export function App(props) @{ <Ctx.Provider value={props.value}><Reader /></Ctx.Provider> }`,
+			{
+				id: '/src/CallbackHook.tsrx',
+				mode: 'client',
+				compileOptions: { dev, hmr: false },
+				runtimeModules: { './probe': { compute: (read: () => string) => read() } },
+			},
+		);
+		const mounted = mount(App, { value: 'one' });
+		try {
+			expect(mounted.container.textContent).toBe('one');
+			mounted.update(App, { value: 'two' });
+			expect(mounted.container.textContent).toBe('two');
+		} finally {
+			mounted.unmount();
+		}
+	});
+
+	it.each([false, true])(
+		'keeps a later class declaration out of eager cache inputs (dev=%s)',
+		(dev) => {
+			const { App } = loadCompiledFixtureSource(
+				`"use strong";
+export function App(props) @{
+  const options = { make: () => new Model(props.n) };
+  class Model { n: number; constructor(n: number) { this.n = n; } }
+  <p>{String(options.make().n)}</p>
+}`,
+				{ id: '/src/LateClass.tsrx', mode: 'client', compileOptions: { dev, hmr: false } },
+			);
+			const mounted = mount(App, { n: 1 });
+			try {
+				expect(mounted.container.textContent).toBe('1');
+				mounted.update(App, { n: 2 });
+				expect(mounted.container.textContent).toBe('2');
+			} finally {
+				mounted.unmount();
+			}
+		},
+	);
+
 	it('keeps setup hooks live through recursive local helper references', () => {
 		const { App } = loadCompiledFixtureSource(
 			`"use strong"; import { useState } from 'octane';

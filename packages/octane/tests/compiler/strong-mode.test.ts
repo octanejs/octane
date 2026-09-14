@@ -534,8 +534,8 @@ export function App(props) @{
   useEffect(() => props.observe(outer, shared));
   useEffect(() => props.observe(inner, shared));
   <div>@if (props.show) {
-    <><output>{outer as string}</output>
-    @if (props.nested) { <output>{inner as string}</output> }</>
+    <output>{outer as string}</output>
+    @if (props.nested) { <output>{inner as string}</output> }
   }</div>
 }`;
 		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
@@ -840,7 +840,7 @@ export function App() @{
 		const source = `"use strong";
 import { useState } from 'octane';
 export function App(props) @{
-  var [count] = useState(0);
+  const [count] = useState(0);
   <div>@{
     if (props.ready) { var count = 1; }
     <span>{count as string}</span>
@@ -1253,7 +1253,7 @@ export function App(props) @{
 		const source = `"use strong";
 export function App() @{
   ${helpers.join('\n  ')}
-  <div>@{ <><button onClick={h0}>first</button><button onClick={h${length}}>last</button></> }</div>
+  <div>@{ <button onClick={h0}>first</button><button onClick={h${length}}>last</button> }</div>
 }`;
 		const diagnostics = compileToVolarMappings(source, '/src/App.tsrx').diagnostics;
 		expect(diagnostics.filter(({ code }) => code === EVENT_HANDLER_LOCALITY)).toHaveLength(2);

@@ -1589,6 +1589,33 @@ describe('requireDirective ownership gate', () => {
 					},
 				)?.kind,
 			).toBe('slots');
+			// The Strong pragma is explicit ownership for plain modules too: a
+			// custom-hook-only module is slotted, and Strong hints are forwarded.
+			const warnings: string[] = [];
+			const hinting = createOctaneCompiler({
+				root: resolve('/project'),
+				requireDirective: true,
+				warn: (message: string) => warnings.push(message),
+			});
+			const wrapped = hinting.transform(
+				pragma +
+					"import { useThing } from '@octanejs/thing';\nexport function useWrapped(x) { return useThing(x); }",
+				'/project/src/useWrapped.ts',
+				{ environment },
+			);
+			expect(wrapped?.kind).toBe('slots');
+			expect(wrapped?.code).toContain('_$withSlot');
+			const hinted = hinting.transform(
+				pragma +
+					"'use strong';\nimport { useEffect } from 'octane';\nexport function useLog(value: string) { useEffect(() => console.log(value), [value]); }",
+				'/project/src/useLog.ts',
+				{ environment },
+			);
+			expect(hinted).toMatchObject({
+				kind: 'slots',
+				diagnostics: [expect.objectContaining({ severity: 'hint' })],
+			});
+			expect(warnings.filter((message) => message.includes('/src/useLog.ts'))).toHaveLength(1);
 		},
 	);
 
