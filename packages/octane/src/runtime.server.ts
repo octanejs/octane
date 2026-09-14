@@ -4808,7 +4808,7 @@ function vtSsrAnnotate(html: string, attrs: Array<[string, string]>): string {
 			open,
 			suffix === 0
 				? attrs
-				: attrs.map(([name, value]) => [name, name === 'vt-name' ? value + '_' + suffix : value]),
+				: attrs.map(([name, value]) => [name, name === 'vt-name' ? value + '-' + suffix : value]),
 		);
 	});
 }

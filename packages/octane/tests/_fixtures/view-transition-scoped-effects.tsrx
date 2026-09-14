@@ -11,6 +11,7 @@ import {
 interface Props {
 	controls: Record<string, (value: string) => void>;
 	events: string[];
+	onEffect?: (id: string, value: string) => void;
 	promise?: Promise<string>;
 	scopeEvents?: string[];
 }
@@ -22,6 +23,7 @@ function Content(props: Props & { id: string }) @{
 	}, []);
 	useEffect(() => {
 		props.events.push(props.id + ':' + value);
+		props.onEffect?.(props.id, value);
 		return () => {
 			props.events.push('cleanup:' + props.id + ':' + value);
 		};

@@ -22,6 +22,7 @@ import {
 	SameHostScopesApp,
 	StaticScopeStyleApp,
 	ScopedRefNameApp,
+	InvalidScopeApp,
 } from './_fixtures/view-transition-ssr.tsrx';
 
 const FIXTURE = join(
@@ -339,8 +340,11 @@ describe('ReactDOMFizzViewTransition (ported)', () => {
 		const second = container.querySelector('#second')!;
 		expect(first.getAttribute('vt-update')).toBe('resize');
 		expect(second.getAttribute('vt-update')).toBe('resize');
-		expect(second.getAttribute('vt-name')).toBeTruthy();
-		expect(second.getAttribute('vt-name')).not.toBe(first.getAttribute('vt-name'));
+		// Secondary hosts take the same `-N` suffix the client runtime assigns, so
+		// authored `::view-transition-group(siblings-1)` rules match a streamed
+		// reveal and a later client update alike.
+		expect(first.getAttribute('vt-name')).toBe('siblings');
+		expect(second.getAttribute('vt-name')).toBe('siblings-1');
 		expect(container.querySelector('#automatic')!.getAttribute('vt-name')).toBeNull();
 	});
 
@@ -757,6 +761,43 @@ describe('ReactDOMFizzViewTransition (ported)', () => {
 			root.unmount();
 		}
 		expect(cleaned).toEqual(connected);
+	});
+
+	it('keeps hydrated hosts of an invalid element scope in the document capture', async () => {
+		const onUpdate = () => {};
+		const { html } = ServerRT.renderToString(server.InvalidScopeApp, { text: 'One', onUpdate });
+		container.innerHTML = html;
+		// The server still marks the invalid declaration so a streamed reveal
+		// inside it does not widen to a document animation before hydration.
+		expect(container.querySelector('#invalid-first')!.getAttribute('vt-scope')).toBe('none');
+		const native = mockNativeTransitions();
+		const root = hydrateRoot(container, InvalidScopeApp, { text: 'One', onUpdate });
+		try {
+			await act(() => {});
+			await act(() => {
+				startTransition(() => {
+					root.render(InvalidScopeApp, { text: 'One much longer', onUpdate });
+				});
+			});
+			// Same outcome as a client-only mount: one document transition whose old
+			// capture names both of the outer boundary's hosts.
+			expect(native.frames).toHaveLength(1);
+			expect(native.frames[0].owner).toBe(document);
+			const first = container.querySelector<HTMLElement>('#invalid-first')!;
+			const second = container.querySelector<HTMLElement>('#invalid-second')!;
+			const name = first.style.viewTransitionName;
+			expect(name).not.toBe('');
+			expect(second.style.viewTransitionName).toBe(name + '-1');
+			await native.frames[0].update();
+			native.frames[0].ready();
+			native.frames[0].finish();
+			await act(() => {});
+			expect(first.textContent).toBe('One much longer');
+			expect(first.style.viewTransitionName).toBe('');
+		} finally {
+			root.unmount();
+			native.restore();
+		}
 	});
 
 	it.each([false, true])(

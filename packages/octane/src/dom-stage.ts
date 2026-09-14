@@ -161,12 +161,6 @@ export class DOMStage {
 		if (failed) throw firstError;
 	}
 
-	discard(): void {
-		if (this.ended) return;
-		this.ended = true;
-		this.release();
-	}
-
 	private release(): void {
 		this.actions = [];
 		this.views.clear();
@@ -190,6 +184,17 @@ export class DOMStage {
 		return this.children.get(node) ?? Array.from(node.childNodes);
 	}
 
+	/**
+	 * Every staged structural write records the parent's logical child list, so
+	 * a parent without an entry still has its native list and can be read
+	 * without copying it.
+	 */
+	private child(node: Node, key: 'firstChild' | 'lastChild'): Node | null {
+		if (!this.children.has(node)) return node[key];
+		const children = this.childNodes(node);
+		return (key === 'firstChild' ? children[0] : children.at(-1)) ?? null;
+	}
+
 	private parent(node: Node): Node | null {
 		return this.parents.has(node) ? this.parents.get(node)! : node.parentNode;
 	}
@@ -197,6 +202,13 @@ export class DOMStage {
 	private siblings(node: Node, direction: number, elements: boolean): Node | null {
 		const parent = this.parent(node);
 		if (parent === null) return null;
+		if (!this.children.has(parent)) {
+			if (elements) {
+				const sibling = node as Element;
+				return direction > 0 ? sibling.nextElementSibling : sibling.previousElementSibling;
+			}
+			return direction > 0 ? node.nextSibling : node.previousSibling;
+		}
 		const children = this.childNodes(parent);
 		for (
 			let index = children.indexOf(node) + direction;
@@ -364,9 +376,8 @@ export class DOMStage {
 				return parent?.nodeType === 1 ? parent : null;
 			}
 			case 'firstChild':
-				return this.childNodes(node)[0] ?? null;
 			case 'lastChild':
-				return this.childNodes(node).at(-1) ?? null;
+				return this.child(node, key);
 			case 'nextSibling':
 				return this.siblings(node, 1, false);
 			case 'previousSibling':
@@ -798,12 +809,12 @@ export class DOMStage {
 			case 'getAttributeNames':
 			case 'hasAttribute':
 			case 'hasAttributeNS':
-			case 'hasAttributes':
-				return Reflect.apply(
-					Reflect.get(this.state(node as Element), key),
-					this.state(node as Element),
-					args,
-				);
+			case 'hasAttributes': {
+				// Every staged attribute, property, style and class write creates the
+				// twin, so an element without one still has its committed attributes.
+				const state = this.states.get(node as Element) ?? node;
+				return Reflect.apply(Reflect.get(state, key), state, args);
+			}
 			case 'setAttribute':
 			case 'setAttributeNS':
 			case 'removeAttribute':

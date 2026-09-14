@@ -3892,7 +3892,6 @@ interface ViewTransitionDriver {
 	shouldClearTypesAfterFlush(): boolean;
 	clearTypes(): void;
 	interrupt(): void;
-	deferPassives(): boolean;
 	wouldWrap(): boolean;
 	wrapResume(work: () => void, getBlocks?: () => readonly Block[]): boolean;
 	unregister(block: Block): void;
@@ -3982,10 +3981,16 @@ function vtScopeHost(block: Block): Element | null {
 	return els[0];
 }
 
-/** Read projected parents directly; selector cloning would materialize whole subtrees. */
+/**
+ * Read projected parents directly; selector cloning would materialize whole
+ * subtrees. Only a live declaration owns its subtree: the server also stamps
+ * `vt-scope="none"` on the hosts of an invalid declaration for the streaming
+ * driver, and nothing on the client rewrites that marker, so it must read as
+ * "no scope" here or hydrated trees would capture differently from mounted ones.
+ */
 function vtClosestScope(node: Node | null): Element | null {
 	for (; node !== null; node = domNode(node).parentNode) {
-		if (node.nodeType === 1 && domNode(node as Element).hasAttribute('vt-scope'))
+		if (node.nodeType === 1 && domNode(node as Element).getAttribute('vt-scope') === 'element')
 			return node as Element;
 	}
 	return null;
@@ -4014,8 +4019,7 @@ function vtScopeForBlock(block: Block): VTOwner | null {
 	}
 	const parent = block.parentNode;
 	const physical = vtClosestScope(parent);
-	if (physical !== null)
-		return domNode(physical).getAttribute('vt-scope') === 'element' ? (physical as VTOwner) : null;
+	if (physical !== null) return physical as VTOwner;
 	return (parent.nodeType === 9 ? parent : parent.ownerDocument!) as VTOwner;
 }
 
@@ -4765,12 +4769,7 @@ function vtBeginCapture(interrupt: () => void): VTCapture {
 	return capture;
 }
 
-function vtRegisterHandle(
-	_capture: VTCapture,
-	owner: VTOwner,
-	handle: VTHandle,
-	interrupt?: () => void,
-): VTSession {
+function vtRegisterHandle(owner: VTOwner, handle: VTHandle, interrupt?: () => void): VTSession {
 	const session: VTSession = { owner, handle, interrupt };
 	VT_SESSIONS.set(owner, session);
 	const doc = vtOwnerDocument(owner);
@@ -4979,11 +4978,6 @@ function ensureViewTransitionDriver(): ViewTransitionDriver {
 			VT_PENDING_TYPES = [];
 		},
 		interrupt: vtInterrupt,
-		deferPassives() {
-			// Transition passives live on their own deferred-layout receipt. Global
-			// queues can belong to an unrelated scope that is already committed.
-			return false;
-		},
 		wouldWrap: vtWouldWrap,
 		wrapResume(work, getBlocks) {
 			if (inFlush || VT_DRAIN || activeHydration() !== null || typeof document === 'undefined')
@@ -6495,10 +6489,16 @@ function vtFinalizeGroup(group: VtGroup, types: string[]): void {
 /** One logical batch publishes once, even when several native scopes capture it. */
 function vtFlush(
 	work: () => void = flushWork,
-	queuedOwners = vtQueuedOwners(),
-	queuedBlocks: readonly Block[] = QUEUE.slice(),
+	queuedOwners?: Set<VTOwner> | null,
+	queuedBlocks?: readonly Block[],
 ): void {
+	// Pending passives run first and may schedule more transition work into this
+	// same commit, so the batch is snapshotted after them: a scope they touch
+	// must be captured too. (`vtQueuedOwners` returns null for an unknown
+	// owner, so only an omitted argument takes the default.)
 	if (QUEUE.length > 0) drainPassivesBeforeRender();
+	if (queuedOwners === undefined) queuedOwners = vtQueuedOwners();
+	if (queuedBlocks === undefined) queuedBlocks = QUEUE.slice();
 	const parent = QUEUE[0]?.parentNode;
 	const defaultOwner = (
 		parent?.nodeType === 9 ? parent : (parent?.ownerDocument ?? document)
@@ -6832,12 +6832,20 @@ function vtFlush(
 		resolveUpdate();
 		vtCompleteCapture(capture);
 	}
+	// The tree was prepared before any native capture, so a render error is
+	// already known here. It belongs to the caller exactly as on an unwrapped
+	// commit (uncaught, or collected by act()); publish the prepared work and
+	// rethrow rather than starting an animation whose rejection would demote
+	// the error to a recoverable report.
+	if (drainError !== undefined) {
+		interrupt();
+		throw drainError;
+	}
 	if (participants.length === 0) {
 		commit();
 		completeLayout();
 		resolveUpdate();
 		vtCompleteCapture(capture);
-		if (drainError !== undefined) throw drainError;
 		return;
 	}
 	let pendingReady = participants.length;
@@ -6911,7 +6919,7 @@ function vtFlush(
 			return;
 		}
 		group.handle = handle;
-		group.session = vtRegisterHandle(capture, group.owner, handle, () => {
+		group.session = vtRegisterHandle(group.owner, handle, () => {
 			group.interrupted = true;
 			group.skipRequested = true;
 			releasePassives();
@@ -8183,11 +8191,10 @@ function commitEffects(): void {
 function schedulePassiveFlush(): void {
 	passiveScheduled = true;
 	schedulePostPaint(() => {
-		// View-transition ordering (React parity): passive effects wait for the
-		// transition's `finished` — the vtFlush finished handler re-arms this
-		// drain. Direct test-harness drains (drainPassiveEffects) stay ungated.
+		// Passives owed to an animating ViewTransition are held on that capture's
+		// own deferred-layout receipt (see captureDeferredPassives); global queues
+		// may belong to an unrelated, already-committed scope and drain normally.
 		passiveScheduled = false;
-		if (VIEW_TRANSITION_DRIVER?.deferPassives() === true) return;
 		drainPassivePhase();
 	});
 }
@@ -19509,7 +19516,8 @@ export function setStyleProperty(
 	if (remove) {
 		const property = styleName(name);
 		style.removeProperty(property);
-		if (property === 'view-transition-scope') VIEW_TRANSITION_DRIVER?.authoredScopeStyle(el, style);
+		if (VIEW_TRANSITION_DRIVER !== null && property === 'view-transition-scope')
+			VIEW_TRANSITION_DRIVER.authoredScopeStyle(el, style);
 	} else applyStyleProperty(el, style, name, value);
 }
 
@@ -19556,8 +19564,8 @@ function applyStyleValue(
 			for (const key in prev) {
 				const property = styleName(key);
 				style.removeProperty(property);
-				if (property === 'view-transition-scope')
-					VIEW_TRANSITION_DRIVER?.authoredScopeStyle(el, style);
+				if (VIEW_TRANSITION_DRIVER !== null && property === 'view-transition-scope')
+					VIEW_TRANSITION_DRIVER.authoredScopeStyle(el, style);
 			}
 		} else if (typeof prev === 'string') {
 			style.cssText = '';
@@ -19582,8 +19590,8 @@ function applyStyleValue(
 			if (!(k in value)) {
 				const property = styleName(k);
 				style.removeProperty(property);
-				if (property === 'view-transition-scope')
-					VIEW_TRANSITION_DRIVER?.authoredScopeStyle(el, style);
+				if (VIEW_TRANSITION_DRIVER !== null && property === 'view-transition-scope')
+					VIEW_TRANSITION_DRIVER.authoredScopeStyle(el, style);
 			}
 		}
 		for (const k in value) {
@@ -19594,8 +19602,8 @@ function applyStyleValue(
 			if (v == null || typeof v === 'boolean') {
 				const property = styleName(k);
 				style.removeProperty(property);
-				if (property === 'view-transition-scope')
-					VIEW_TRANSITION_DRIVER?.authoredScopeStyle(el, style);
+				if (VIEW_TRANSITION_DRIVER !== null && property === 'view-transition-scope')
+					VIEW_TRANSITION_DRIVER.authoredScopeStyle(el, style);
 			} else applyStyleProperty(el, style, k, v);
 		}
 	} else {
@@ -19643,7 +19651,8 @@ function applyStyleProperty(
 	} else {
 		style.setProperty(prop, s);
 	}
-	if (prop === 'view-transition-scope') VIEW_TRANSITION_DRIVER?.authoredScopeStyle(el, style);
+	if (VIEW_TRANSITION_DRIVER !== null && prop === 'view-transition-scope')
+		VIEW_TRANSITION_DRIVER.authoredScopeStyle(el, style);
 }
 
 // ---------------------------------------------------------------------------

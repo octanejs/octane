@@ -45,6 +45,7 @@ describe('element-scoped ViewTransition commit lifetimes', () => {
 	const captures: Capture[] = [];
 	const events: string[] = [];
 	const controls: Record<string, (value: string) => void> = {};
+	let onEffect: ((id: string, value: string) => void) | undefined;
 
 	beforeEach(async () => {
 		mocks = installViewTransitionMocks();
@@ -93,7 +94,14 @@ describe('element-scoped ViewTransition commit lifetimes', () => {
 		container = document.createElement('div');
 		document.body.append(container);
 		root = createRoot(container);
-		await act(() => root.render(ScopedEffectsApp, { controls, events }));
+		onEffect = undefined;
+		await act(() =>
+			root.render(ScopedEffectsApp, {
+				controls,
+				events,
+				onEffect: (id, value) => onEffect?.(id, value),
+			}),
+		);
 		events.length = 0;
 	});
 
@@ -185,6 +193,25 @@ describe('element-scoped ViewTransition commit lifetimes', () => {
 		right.ready.resolve();
 		expect(text('left')).toBe('second');
 		expect(text('right')).toBe('second');
+	});
+
+	it('captures a scope whose update a pre-render passive effect schedules', async () => {
+		// A passive left pending after a sync commit runs at the start of the next
+		// transition flush; the update it schedules renders in that same commit,
+		// so its scope must join the batch rather than change without a capture.
+		onEffect = (id, value) => {
+			if (id === 'right' && value === 'trigger')
+				startTransition(() => controls.right('from-effect'));
+		};
+		flushSync(() => controls.right('trigger'));
+		startTransition(() => controls.left('left changed'));
+		const left = await nextCapture('left');
+		const right = await nextCapture('right');
+		await Promise.all([left.update(), right.update()]);
+		left.ready.resolve();
+		right.ready.resolve();
+		expect(text('left')).toBe('left changed');
+		expect(text('right')).toBe('from-effect');
 	});
 
 	it('runs unrelated urgent effects without skipping an animating scope', async () => {

@@ -25,6 +25,7 @@ import {
 	FirstBoundaryRevealApp,
 	ClickUpdateApp,
 	PlainClickApp,
+	RenderErrorApp,
 } from './_fixtures/view-transition-features.tsrx';
 
 function evalServer(source: string, filename: string): Record<string, any> {
@@ -565,5 +566,39 @@ describe('ViewTransition features', () => {
 			});
 		});
 		expect(log).toEqual(['fire', 'cleanup', 'fire', 'cleanup']);
+	});
+
+	it('surfaces a render error thrown inside an animated transition to the caller', async () => {
+		const recoverable: unknown[] = [];
+		const errorContainer = document.createElement('div');
+		document.body.appendChild(errorContainer);
+		const errorRoot = createRoot(errorContainer, {
+			onRecoverableError: (error) => {
+				recoverable.push(error);
+			},
+		});
+		try {
+			await act(() => {
+				startTransition(() => {
+					errorRoot.render(RenderErrorApp, { error: null });
+				});
+			});
+			expect(errorContainer.textContent).toBe('ok');
+
+			// The same uncaught render error an unwrapped commit reports: act()
+			// rejects with it, and the recoverable channel stays reserved for native
+			// transition failures.
+			await expect(
+				act(() => {
+					startTransition(() => {
+						errorRoot.render(RenderErrorApp, { error: new Error('boom') });
+					});
+				}),
+			).rejects.toThrow('boom');
+			expect(recoverable).toEqual([]);
+		} finally {
+			errorRoot.unmount();
+			errorContainer.remove();
+		}
 	});
 });

@@ -392,3 +392,17 @@ export function ScopedRefNameApp(props: { name?: string; reference: ViewTransiti
 		<section id="scope-ref-name" style="view-transition-name:hero">{'Content'}</section>
 	</ViewTransition>
 }
+
+// An invalid element scope (two hosts) is stamped `vt-scope="none"` by the
+// server. Hydration must leave the outer document boundary capturing those
+// hosts exactly as a client-only mount does.
+export function InvalidScopeApp(props: { text: string; onUpdate: () => void }) @{
+	<ViewTransition onUpdate={props.onUpdate}>
+		<ViewTransition scope="element">
+			<>
+				<div id="invalid-first">{props.text as string}</div>
+				<div id="invalid-second">{'Two'}</div>
+			</>
+		</ViewTransition>
+	</ViewTransition>
+}
