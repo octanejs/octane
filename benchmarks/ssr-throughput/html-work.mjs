@@ -1,5 +1,6 @@
-// Observe a copy of the clean production bundle after compiler optimization
-// and tree-shaking. This copy is never used for timing or byte measurements.
+// Observe an unminified diagnostic production bundle after compiler optimization
+// and tree-shaking. This copy is never used for timing or byte measurements, and
+// each observed response must equal the clean, minified bundle's response.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

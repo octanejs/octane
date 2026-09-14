@@ -110,14 +110,19 @@ function gen(count) {
 	});
 }
 
-async function buildSsr(root, outDir) {
+async function buildSsr(root, outDir, minify) {
 	await build({
 		root,
 		logLevel: 'warn',
 		// outDir lives under THIS suite's dist/ (outside the app root), so the
 		// target app's own dist/ is untouched; emptyOutDir must be explicit for an
 		// out-of-root outDir.
-		build: { ssr: 'src/entry-server.ts', outDir, emptyOutDir: true },
+		build: {
+			ssr: 'src/entry-server.ts',
+			outDir,
+			emptyOutDir: true,
+			...(minify === undefined ? {} : { minify }),
+		},
 		// The React target compiles `.tsrx` via @tsrx/react, whose output imports
 		// the @tsrx/react runtime helpers (e.g. `@tsrx/react/runtime/iterable`).
 		// By default vite externalizes node_modules in an SSR build, but @tsrx/react
@@ -236,6 +241,7 @@ async function loadEntry(entryPath) {
 //                verify(mod) → meta (throws on gate failure), batch? }.
 
 const FIXTURE_ENTRY = path.join(DIST, 'fixtures', 'entry-server.js');
+const HTML_WORK_ENTRY = path.join(DIST, 'html-work', 'entry-server.js');
 const configs = [];
 
 for (const size of CARD_COUNTS) {
@@ -481,7 +487,13 @@ try {
 			const mod = await loadEntry(cfg.entry);
 			if (cfg.work) Object.assign(result.meta, await cfg.work(mod));
 			if (cfg.htmlWork) {
-				htmlObserver ??= await createHtmlWorkObserver(FIXTURE_ENTRY);
+				if (!htmlObserver) {
+					// Named factory coverage needs an unminified diagnostic bundle. Keep
+					// the normal production bundle for every timing and memory sample;
+					// the observer still verifies its complete response against that bundle.
+					if (!noBuild) await buildSsr(FIXTURES, path.dirname(HTML_WORK_ENTRY), false);
+					htmlObserver = await createHtmlWorkObserver(HTML_WORK_ENTRY);
+				}
 				const work = await htmlObserver.measure(mod, cfg.htmlWork.render);
 				Object.assign(result.meta, work, { htmlFactoryCallBudget: cfg.htmlWork.maxCalls });
 				if (work.htmlFactoryCalls > cfg.htmlWork.maxCalls) {

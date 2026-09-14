@@ -209,13 +209,16 @@ const NON_CLIENT_FALLBACK_CONTROLS = {
 
 // Scaffolding is bounded above so later direct-return lowering can reduce it
 // without rebaselining this gate. The visible update cardinality is exact.
+// Direct Provider children use identity-aware Blocks even at lite call sites:
+// one Node under RootCtx and two under LocalCtx. Include those three Blocks in
+// whole-tree ceilings and the two local Blocks in partial-subtree ceilings.
 const GATES = {
 	'octane-tsrx': {
 		mount: {
 			maxFullSlotCalls: 1027,
 			maxSlotCalls: 3074,
 			max: {
-				renderBlock: 4099,
+				renderBlock: 4102,
 				componentSlot: 2,
 				childSlot: 0,
 				createElement: 0,
@@ -230,7 +233,7 @@ const GATES = {
 			maxFullSlotCalls: 1027,
 			maxSlotCalls: 3074,
 			max: {
-				renderBlock: 4099,
+				renderBlock: 4102,
 				componentSlot: 2,
 				childSlot: 0,
 				createElement: 0,
@@ -245,7 +248,7 @@ const GATES = {
 			maxFullSlotCalls: 33,
 			maxSlotCalls: 95,
 			max: {
-				renderBlock: 127,
+				renderBlock: 129,
 				componentSlot: 1,
 				childSlot: 0,
 				createElement: 0,
@@ -268,7 +271,7 @@ const GATES = {
 				deoptItemBody: 0,
 				reconcileKeyed: 0,
 				updateSurvivor: 0,
-				unmountBlock: 126,
+				unmountBlock: 128,
 				unmountScope: 188,
 			},
 			exact: { useBatch: 0, registerWarmPlan: 0 },
@@ -277,7 +280,7 @@ const GATES = {
 			maxFullSlotCalls: 33,
 			maxSlotCalls: 95,
 			max: {
-				renderBlock: 127,
+				renderBlock: 129,
 				componentSlot: 1,
 				childSlot: 0,
 				createElement: 0,
@@ -291,7 +294,7 @@ const GATES = {
 		unmount: {
 			maxFullSlotCalls: 0,
 			maxSlotCalls: 0,
-			max: { unmountBlock: 4099, unmountScope: 6146 },
+			max: { unmountBlock: 4102, unmountScope: 6146 },
 			exact: { useBatch: 0, registerWarmPlan: 0 },
 		},
 	},

@@ -8,7 +8,9 @@
 // deoptItemBody / reconcileKeyed), and how much of the surviving shell was
 // rebuilt on a nested navigation.
 
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import { censusDomNodes, deterministicCount, deterministicStatForJson } from '../lib/dom-nodes.mjs';
 import { collectPreciseCalls } from '../lib/precise-work.mjs';
@@ -17,6 +19,15 @@ const TARGETS = [
 	{ name: 'octane-tsrx', url: 'http://localhost:5310/' },
 	{ name: 'octane-jsx', url: 'http://localhost:5311/' },
 ];
+
+// The timed run uses minified assets. Rebuild only for this untimed observer so
+// precise coverage can identify runtime functions by their original names.
+for (const target of TARGETS) {
+	execFileSync('pnpm', ['exec', 'vite', 'build', '--minify', 'false'], {
+		cwd: fileURLToPath(new URL(`${target.name}/`, import.meta.url)),
+		stdio: 'inherit',
+	});
+}
 
 const METRICS = [
 	'renderBlock',
@@ -107,6 +118,11 @@ const GATES = {
 const hasOwn = (object, key) => Object.prototype.hasOwnProperty.call(object, key);
 
 function validate(target, op, counts, failures) {
+	// Every navigation renders blocks; an empty observation cannot prove the
+	// upper bounds below, even when the final DOM is correct.
+	if (!(counts.renderBlock > 0)) {
+		failures.push(`${target}.${op}: renderBlock coverage is missing`);
+	}
 	const gate = GATES[target]?.[op];
 	if (!gate) return;
 	for (const [metric, limit] of Object.entries(gate.max ?? {})) {
