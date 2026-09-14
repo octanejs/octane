@@ -1,5 +1,47 @@
 # octane
 
+## 0.2.11
+
+### Patch Changes
+
+- fdb790a: Keep nested scoped JSX responsive to context changes, isolate hooks and memo caches across independently compiled render bodies, and invalidate stale output when lazy bodies change. Preserve component ownership across mixed compilation modes. Expose the production body-ownership benchmark through MCP.
+- 1bc1926: Resolve the renderer-region owner with a single lookup at the top of the block chain instead of a WeakMap read per ancestor on every provider-less context read, preserving context defaults and foreign-renderer routing.
+- 2789eab: Read descriptor list keys directly during reconciliation without creating a key callback for each list render, while preserving keyed identity and hydration behavior.
+
+  Keep mapped component slots compatible when rendering switches between native array mapping and a custom map implementation, preserving hydrated inputs and component identity.
+
+- 8e5ca22: Preserve accepted scoped descriptor children when Providers change host/component child shapes. Reuse known descriptor event names and reduce delegation arrays, child traversal, redundant persistent host writes, repeated form source resolution, and select option reads while preserving live DOM, event, and form-control behavior. Expose the descriptor-renderer benchmark suite through the MCP server.
+- fa11c10: Reuse wrapper-path serialization for nested explicitly keyed children while preserving key identity, hydration, and custom key conversion behavior.
+- ade5be8: Reduce compiler-generated handler, branch capture, and server rendering overhead while preserving event, branch, and SSR evaluation semantics.
+
+  Expose the compiler-output benchmark suite through the MCP benchmark tool.
+
+- 1e12db7: Reduce hook path resolution, optional-argument handling, state getter lookups, and warm-plan bookkeeping. Reuse external-store subscription dependencies when the subscriber is unchanged. Add deterministic Hooks performance diagnostics to the benchmark catalog.
+- 6284156: Reduce scheduler batch bookkeeping and skip ref sorting for sibling-only attachment queues, preserving update ordering, effect lifecycle checks, and render-loop limits. Expose deterministic scheduling benchmarks through the MCP benchmark catalog.
+- 239dab0: Invalidate cached output when a retained Context Provider switches compiled child bodies, so returning to an earlier body renders its current content while preserving mounted DOM and hook state.
+- 3c1cc55: Restore enumerable symbol values when a root render suspends and preserve keyed
+  row state when an urgent update shares a batch with a suspended removal. Reduce row
+  input and retirement bookkeeping, and reuse the live DOM value already read
+  when journaling descriptor text updates. Expose the root transaction benchmark
+  suite through the MCP server.
+- 23b6a75: Speed up server rendering by picking the escape pre-scan by string length in
+  `escapeHtml`: a stateless non-global regexp test for short strings, three
+  `indexOf` scans for long ones.
+
+  The previous global regexp paid `lastIndex` bookkeeping on every call; the
+  length split keeps the cheaper scan in each regime. ~20% faster median render
+  on the 500-card SSR benchmark with byte-identical output.
+
+- 68d1ea1: Reduce per-node SSR bookkeeping cost in the emission hot path: frame-local scoped counters (per-arm child ordinals and per-site `use()` occurrences) now live in a flat pair list — comparing scope strings directly instead of hashing them into a `Map` — and promote to a `Map` only past eight distinct keys. `process.env.NODE_ENV` is sampled once per synchronous render pass rather than read on every attribute/style emission check, with public entry points still reading it directly so out-of-pass calls never see a stale sample.
+- 68d1ea1: Reduce per-component SSR bookkeeping allocation: replay snapshots now share immutable empty collections instead of copying empty `Map`/`Set`/array state, stream boundary ancestor/owner key lists reuse a shared empty, and `HookPass` hook/occurrence maps are allocated lazily on first stateful or native hook call. Component-heavy server renders allocate roughly half the bookkeeping garbage they did before, with identical streamed output and unchanged render-phase replay semantics.
+- 58da344: Keep compiler memo caches off scope slot arrays, stabilize internal hook, host,
+  list, and render-capture records, and initialize memo and template caches without
+  sparse namespace entries. Preserve memo identity, staged hook values, keyed DOM
+  reuse, and commit-time cleanup behavior.
+- 8a45222: Reduce DOM attribute, spread-prop, template mounting, metadata, and delegated-event work while preserving hydration, rollback, native event descriptors, and custom-element connection behavior.
+
+  Expose the DOM attribute, template mount, and spread host benchmark suites through the MCP benchmark tool.
+
 ## 0.2.10
 
 ### Patch Changes
