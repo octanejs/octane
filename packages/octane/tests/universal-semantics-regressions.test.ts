@@ -604,6 +604,168 @@ describe('universal runtime semantic regressions', () => {
 		expect(refs.at(-1)).toBe('detach');
 	});
 
+	it('preserves ordered static, dynamic, and selected children through aborted plan updates', () => {
+		const { container, root } = objectRoot();
+		const leaf = universalPlan('object', { kind: 'host', type: 'dynamic' });
+		const childPlan = universalPlan('object', { kind: 'host', type: 'component' });
+		const Child = defineUniversalComponent('object', () => universalValue(childPlan));
+		const plan = universalPlan('object', {
+			kind: 'host',
+			type: 'ordered',
+			children: [
+				{ kind: 'host', type: 'first' },
+				{ kind: 'range', children: [{ kind: 'host', type: 'range-child' }] },
+				{ kind: 'slot', slot: 0 },
+				{ kind: 'component', renderer: 'object', component: Child },
+				{
+					kind: 'if',
+					conditionSlot: 1,
+					then: { kind: 'host', type: 'yes' },
+					else: { kind: 'host', type: 'no' },
+				},
+				{
+					kind: 'switch',
+					valueSlot: 1,
+					cases: [[true, { kind: 'host', type: 'selected' }]],
+					default: { kind: 'host', type: 'default' },
+				},
+				{ kind: 'host', type: 'last' },
+			],
+		});
+		const Scene = defineUniversalComponent('object', ({ active }: { active: boolean }) =>
+			universalValue(plan, [[null, [universalValue(leaf)], false], active]),
+		);
+		root.render(Scene, { active: true });
+		const host = instance(container, 'ordered');
+		const initial = [...host.children];
+		expect(initial.map((child) => child.type)).toEqual([
+			'first',
+			'range-child',
+			'dynamic',
+			'component',
+			'yes',
+			'selected',
+			'last',
+		]);
+		root.prepare(Scene, { active: false }).abort();
+		expect(host.children).toEqual(initial);
+		root.render(Scene, { active: false });
+		expect(host.children.map((child) => child.type)).toEqual([
+			'first',
+			'range-child',
+			'dynamic',
+			'component',
+			'no',
+			'default',
+			'last',
+		]);
+		for (const index of [0, 1, 2, 3, 6]) expect(host.children[index]).toBe(initial[index]);
+		root.unmount();
+		expect(container.children).toEqual([]);
+	});
+
+	it('keeps keyed scope state independent across list sites, reorder, and aborted work', () => {
+		const { container, root } = objectRoot();
+		const plan = universalPlan('object', {
+			kind: 'host',
+			type: 'scope-value',
+			bindings: [['value', 0]],
+		});
+		const Scene = defineUniversalComponent(
+			'object',
+			({ ids, prefix }: { ids: string[]; prefix: string }) =>
+				['left', 'right'].map((site) =>
+					universalFor(
+						ids,
+						(id) => id,
+						(id) => {
+							const [value] = useUniversalState(`${site}:${id}`, 'value');
+							return universalValue(plan, [`${prefix}:${value}`]);
+						},
+					),
+				),
+		);
+		root.render(Scene, { ids: ['a', 'b'], prefix: 'initial' });
+		const initial = [...container.children];
+		expect(initial.map((child) => child.props.value)).toEqual([
+			'initial:left:a',
+			'initial:left:b',
+			'initial:right:a',
+			'initial:right:b',
+		]);
+		root.prepare(Scene, { ids: ['b', 'c'], prefix: 'aborted' }).abort();
+		expect(container.children).toEqual(initial);
+		expect(container.children.map((child) => child.props.value)).toEqual([
+			'initial:left:a',
+			'initial:left:b',
+			'initial:right:a',
+			'initial:right:b',
+		]);
+		root.render(Scene, { ids: ['b', 'a'], prefix: 'updated' });
+		expect(container.children).toEqual([initial[1], initial[0], initial[3], initial[2]]);
+		expect(container.children.map((child) => child.props.value)).toEqual([
+			'updated:left:b',
+			'updated:left:a',
+			'updated:right:b',
+			'updated:right:a',
+		]);
+		root.unmount();
+	});
+
+	it.each(['array', 'host-props'] as const)(
+		'rejects duplicate %s keys before publishing a mount or update',
+		(mode) => {
+			const { container, root } = objectRoot();
+			const plan = universalPlan('object', { kind: 'host', type: 'keyed-value', propsSlot: 0 });
+			const Scene = defineUniversalComponent(
+				'object',
+				({ keys }: { keys: Array<string | number | symbol> }) =>
+					keys.map((key, index) =>
+						mode === 'array'
+							? universalKey(key, universalValue(plan, [{ value: index }]))
+							: universalValue(plan, [{ key, value: index }]),
+					),
+			);
+			const symbol = Symbol('same');
+			for (const keys of [
+				['same', 'same'],
+				[0, -0],
+				[NaN, NaN],
+				[symbol, symbol],
+			]) {
+				expect(() => root.render(Scene, { keys })).toThrow(/Duplicate universal child key/);
+				expect(container.children).toEqual([]);
+			}
+			root.render(Scene, { keys: ['a'] });
+			const first = container.children[0];
+			root.render(Scene, { keys: ['a', 'b'] });
+			const accepted = [...container.children];
+			expect(accepted[0]).toBe(first);
+			expect(() => root.prepare(Scene, { keys: ['a', 'a'] })).toThrow(
+				/Duplicate universal child key/,
+			);
+			expect(container.children).toEqual(accepted);
+			root.render(Scene, { keys: ['b', 'a'] });
+			expect(container.children).toEqual([accepted[1], accepted[0]]);
+			root.unmount();
+		},
+	);
+
+	it('rejects a duplicate key introduced during an earlier sibling render', () => {
+		const { container, root } = objectRoot();
+		const children: ReturnType<typeof universalComponent>[] = [];
+		const Child = defineUniversalComponent('object', () => {
+			if (children.length > 1) throw new Error('The duplicate child was evaluated.');
+			children.push(children[0]);
+			return null;
+		});
+		const Scene = defineUniversalComponent('object', () => children);
+		children.push(universalComponent('object', Child, {}, 'same'));
+		expect(() => root.render(Scene, undefined)).toThrow('Duplicate universal child key same.');
+		expect(container.children).toEqual([]);
+		root.unmount();
+	});
+
 	it('attaches and cleans recursive multi-ref arrays without publishing aborted work', () => {
 		const { container, root } = objectRoot();
 		const log: string[] = [];

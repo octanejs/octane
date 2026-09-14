@@ -873,6 +873,38 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
+		// V8 shape controls for keyed component and classified host props.
+		name: 'universal-prop-shapes',
+		cwd: 'universal-prop-shapes',
+		servers: [],
+		iter: { normal: 1, quick: 1 },
+		runs: [{ script: 'run.mjs', args: () => [] }],
+	},
+	{
+		// Array and Set work in universal host/list materialization.
+		name: 'universal-materialization',
+		cwd: 'universal-materialization',
+		servers: [],
+		iter: { normal: 1, quick: 1 },
+		runs: [{ script: 'run.mjs', args: () => [] }],
+	},
+	{
+		// Optional compact preparation work with ordinary-tree controls.
+		name: 'universal-preparation',
+		cwd: 'universal-preparation',
+		servers: [],
+		iter: { normal: 1, quick: 1 },
+		runs: [{ script: 'run.mjs', args: () => [] }],
+	},
+	{
+		// Committed feature-cache work across unchanged subtree updates.
+		name: 'universal-retention',
+		cwd: 'universal-retention',
+		servers: [],
+		iter: { normal: 1, quick: 1 },
+		runs: [{ script: 'run.mjs', args: () => [] }],
+	},
+	{
 		// Universal owner drafts (Node-only): changed child props force 128 and
 		// 1,024 retained component owners through the public object root.
 		name: 'universal-owner-drafts',
