@@ -4738,8 +4738,9 @@ function logicalTreeFeatures(record: LogicalRecord): number {
 		if (record.localCallbacks.size !== 0) features |= UNIVERSAL_TREE_LOCAL_CALLBACK;
 		if (record.ref != null) features |= UNIVERSAL_TREE_REF;
 		if (record.visibility !== 'visible') features |= UNIVERSAL_TREE_HIDDEN;
-		for (const name in record.props) {
-			if (hasOwnProp.call(record.props, name) && isRendererRegion(record.props[name])) {
+		// Own-key enumeration preserves props with user-defined prototype traps.
+		for (const name of Object.keys(record.props)) {
+			if (isRendererRegion(record.props[name])) {
 				features |= UNIVERSAL_TREE_REGION;
 				break;
 			}

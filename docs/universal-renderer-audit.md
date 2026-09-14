@@ -21,7 +21,10 @@ changed records too. Aborted preparations publish no draft feature state.
 Feature-free compact updates and compact-template updates preserve their fixed
 feature sets. Collapsed templates include events on unexpanded descendants.
 The cache adds one nullable numeric field per logical record, with no extra
-retained collection. A cold scan remains linear. Checks for owner updates,
+retained collection. Cold scans enumerate own keys, preserving host prop
+prototypes without invoking inherited proxy enumeration traps. A focused
+regression reproduced that failure during final review before correcting the
+scan. A cold scan remains linear. Checks for owner updates,
 visibility, boundary episodes and component revisions remain live.
 
 `benchmarks/universal-retention/run.mjs` compares clean and observed production

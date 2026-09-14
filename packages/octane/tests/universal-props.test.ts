@@ -4,6 +4,8 @@ import {
 	createObjectDriver,
 	createUniversalRoot,
 	defineUniversalComponent,
+	flushUniversalSync,
+	useState,
 	universalComponent,
 	universalPlan,
 	universalProps,
@@ -14,6 +16,42 @@ import {
 const hostPlan = universalPlan('object', { kind: 'host', type: 'item', propsSlot: 0 });
 
 describe('universal props', () => {
+	it('retains own host props without enumerating their prototype', () => {
+		const prototype = new Proxy(
+			{},
+			{
+				ownKeys() {
+					throw new Error('inherited keys were enumerated');
+				},
+			},
+		);
+		const Child = defineUniversalComponent('object', () =>
+			universalValue(hostPlan, [
+				universalProps([
+					['set', '__proto__', prototype],
+					['set', 'label', 'retained'],
+				]),
+			]),
+		);
+		let update!: (value: number) => void;
+		const Scene = defineUniversalComponent('object', () => {
+			const [version, set] = useState(0, 'version');
+			update = set;
+			return [universalComponent('object', Child), String(version)];
+		});
+		const container = createObjectContainer();
+		const root = createUniversalRoot(container, createObjectDriver());
+		root.render(Scene, undefined);
+		const retained = container.children[0];
+		flushUniversalSync(() => update(1));
+		flushUniversalSync(() => update(2));
+		expect(container.children[0]).toBe(retained);
+		expect(retained.props.label).toBe('retained');
+		expect(container.children[1].props.value).toBe('2');
+		root.unmount();
+		expect(container.children).toEqual([]);
+	});
+
 	it('snapshots ordered spreads before resolving key, children, refs, and symbols', () => {
 		const container = createObjectContainer();
 		const root = createUniversalRoot(container, createObjectDriver());

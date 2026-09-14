@@ -68,7 +68,7 @@ The engine was V8 13.6.233.17-node.53 and the bundler was esbuild 0.28.1.
 Production bundle SHA-256 values were stable in each pair:
 
 - Baseline: `0b4c842274dcb2e5af92f473e413c00b4aa655a047b1d6f6b874a8a7b1a250bd`
-- Candidate: `e33b88bf3cd794198e3c7a6d2d9234eb494b76fc19e54dbceee1212897b5b472`
+- Candidate: `6fe7d086b67b1a06684cabe7042982605ce461ef296d0fadae99f603fbf9f74e`
 
 ```bash
 BENCH_ITERATIONS=13 BENCH_JSON=/tmp/props-baseline.json \
@@ -80,18 +80,18 @@ BENCH_ITERATIONS=13 BENCH_JSON=/tmp/props-candidate.json \
 
 | 1,024 hosts | Mount | Update |
 | --- | ---: | ---: |
-| Plain control | 0.96× | 0.90× |
-| Events | 0.98× | 0.82× |
-| Events, lifecycle, local callback | 0.79× | 0.85× |
+| Plain control | 0.93× | 0.87× |
+| Events | 0.93× | 0.77× |
+| Events, lifecycle, local callback | 0.70× | 0.76× |
 
 The candidate includes the accompanying universal materialization and retained
 feature changes. Plain controls therefore account for some of the improvement;
-these results do not isolate prop filtering's contribution. At 128 hosts the
-callback mount medians were 0.369–0.375 ms versus baseline 0.358–0.363 ms
-(1.03×); sample standard deviations were 0.052–0.764 ms, including one candidate
-timing outlier. At 1,024 hosts, event update medians were 1.135–1.174 ms versus
-1.387–1.416 ms baseline; callback update medians were 1.954–1.956 ms versus
-2.293–2.294 ms baseline.
+these results do not isolate prop filtering's contribution. The final pair was
+rerun after the prototype-enumeration correction. At 128 hosts, callback mount
+medians were 0.356 ms versus baseline 0.369–0.380 ms. The corresponding update
+baseline varied from 0.232 to 0.320 ms, illustrating run-to-run noise. At 1,024
+hosts, event update medians were 1.081–1.192 ms versus baseline 1.424–1.516 ms;
+callback updates were 1.875–1.900 ms versus baseline 2.477–2.516 ms.
 The runs show no material regression in these representative mount/update
 cases. They do not establish native-engine throughput or the cost of repeated
 keyed spreads, and the untimed shape result remains the primary regression guard.
