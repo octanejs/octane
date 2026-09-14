@@ -681,6 +681,18 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
+		// Populated replay collection copies and promise subscriptions across
+		// consumer-driven streaming waves, with unchanged/one-wave controls.
+		name: 'ssr-replay-streaming',
+		cwd: 'ssr-replay-streaming',
+		servers: [],
+		iter: { normal: 1, quick: 1 },
+		runs: [
+			{ script: 'snapshots.mjs', args: () => [] },
+			{ script: 'streaming.mjs', args: () => [] },
+		],
+	},
+	{
 		// Raw streaming API over REAL HTTP, cold and warm: fresh-process import
 		// cost, spawn→listen→first-byte cold TTFB, and warm shell/total/throughput
 		// for octane renderToPipeableStream vs React Fizz behind one identical

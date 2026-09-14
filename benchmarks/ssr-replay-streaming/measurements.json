@@ -1,0 +1,1055 @@
+{
+  "baselineCommit": "7d4dc4f51fb1e97203fdcfe2a05d8b5a3e27ab6c",
+  "streamingLatency": {
+    "node": "v24.20.0",
+    "v8": "13.6.233.17-node.53",
+    "platform": "darwin",
+    "arch": "arm64",
+    "warmups": 10,
+    "rounds": 31,
+    "baseline": {
+      "sourceHash": "5a9a29889459f44e75d743414a9087d7e929367e52c489cbf193400b9bbbe75b",
+      "bundleHash": "2c105cafe4086d8430e664bc30975a1d10a89f6ce17667288cbdcb0d2d9b8056",
+      "bytes": 63229,
+      "gzip": 22112
+    },
+    "candidate": {
+      "sourceHash": "47649d48f930f3c19648943a5f05cbfb454a35feadfdfe5495e6a985e20cc881",
+      "bundleHash": "b1f0fd48183956430898979a3468139e5f07a9996fed7176802ed7b6d3860ef4",
+      "bytes": 64394,
+      "gzip": 22471
+    },
+    "targets": [
+      {
+        "cards": 10,
+        "wave": 10,
+        "outputHash": "17e4ef62b3700c97a3ad79f89df38af6da911c70b59e514ead8915ecab176381",
+        "bytes": 20863,
+        "chunks": 2,
+        "baseline": {
+          "median": 0.2313750000000141,
+          "min": 0.14466699999999832,
+          "max": 0.32866599999999835,
+          "samples": [
+            0.32850000000001955, 0.32866599999999835, 0.3001250000000084, 0.2782090000000039,
+            0.28066599999999653, 0.25575000000000614, 0.27308400000001143, 0.30904200000000515,
+            0.2528339999999787, 0.24695800000000645, 0.2313750000000141, 0.22187500000001137,
+            0.19404199999999605, 0.19979100000000471, 0.22675000000000978, 0.23525000000000773,
+            0.3246249999999975, 0.1905829999999753, 0.2342079999999953, 0.18358299999999872,
+            0.17454200000000242, 0.19245800000001623, 0.16408300000000509, 0.2692080000000203,
+            0.2012499999999875, 0.29525000000001, 0.17754200000001674, 0.1514580000000194,
+            0.14466699999999832, 0.1489170000000115, 0.16941599999998402
+          ]
+        },
+        "candidate": {
+          "median": 0.24216600000002586,
+          "min": 0.15108399999999733,
+          "max": 0.4012920000000122,
+          "samples": [
+            0.32383299999997917, 0.4012920000000122, 0.318540999999982, 0.2580829999999992,
+            0.3171250000000043, 0.25166600000000017, 0.27729200000001697, 0.3799579999999878,
+            0.2529999999999859, 0.24216600000002586, 0.21475000000000932, 0.20691699999997581,
+            0.21237500000000864, 0.19779200000002106, 0.2507500000000107, 0.24483399999999733,
+            0.28504100000000676, 0.2518750000000125, 0.2314580000000035, 0.17520899999999529,
+            0.22354099999998311, 0.17987500000000978, 0.16054099999999494, 0.19258399999998232,
+            0.35404199999999264, 0.26829100000000494, 0.17995799999999917, 0.15583300000000122,
+            0.15108399999999733, 0.15516700000000583, 0.164874999999995
+          ]
+        }
+      },
+      {
+        "cards": 100,
+        "wave": 100,
+        "outputHash": "e1f57c44c6e0aca895ed473e36f423ada41095e8cd52851601fabc557f6b2a3f",
+        "bytes": 181193,
+        "chunks": 2,
+        "baseline": {
+          "median": 1.0748749999999632,
+          "min": 0.9816249999999513,
+          "max": 1.4595410000000015,
+          "samples": [
+            1.3734159999999633, 1.0572909999999638, 1.0282080000000065, 1.1179169999999772,
+            1.0593749999999886, 1.0774999999999864, 1.0749169999999708, 1.299082999999996,
+            1.1001660000000015, 1.0469159999999533, 1.2811249999999745, 1.0749169999999708,
+            1.0634580000000255, 1.0687920000000304, 1.0194159999999783, 1.0795420000000036,
+            1.0292079999999828, 1.3004999999999995, 1.0397499999999695, 1.139082999999971,
+            1.4595410000000015, 1.0748749999999632, 1.0746670000000336, 1.0976660000000038,
+            1.0392079999999737, 1.070083000000011, 1.021000000000015, 1.2144999999999868,
+            0.9816249999999513, 1.0365840000000048, 1.4248750000000427
+          ]
+        },
+        "candidate": {
+          "median": 1.09783299999998,
+          "min": 1.0173340000000053,
+          "max": 1.4186660000000302,
+          "samples": [
+            1.1359170000000063, 1.0476249999999823, 1.266999999999996, 1.0725830000000087,
+            1.11016699999999, 1.4186660000000302, 1.097750000000019, 1.0735420000000317,
+            1.1152500000000032, 1.168457999999987, 1.108041999999955, 1.0967500000000427,
+            1.284249999999986, 1.052041000000031, 1.0483750000000214, 1.279374999999959,
+            1.052915999999982, 1.0365409999999997, 1.09783299999998, 1.1028749999999832,
+            1.122458999999992, 1.12741699999998, 1.283834000000013, 1.0199589999999716,
+            1.0291250000000218, 1.4022079999999733, 1.0500000000000114, 1.0173340000000053,
+            1.0440830000000005, 1.0287079999999946, 1.103666999999973
+          ]
+        }
+      },
+      {
+        "cards": 800,
+        "wave": 800,
+        "outputHash": "f9746eeaa0dc1cb3decf360c874e094dccf0da0b53a4ba9fa21059dd75dba4c0",
+        "bytes": 1433471,
+        "chunks": 2,
+        "baseline": {
+          "median": 9.247875000000022,
+          "min": 8.403374999999869,
+          "max": 51.091874999999845,
+          "samples": [
+            8.496499999999969, 9.782250000000204, 9.284208000000035, 9.42554199999995,
+            9.052625000000035, 36.124000000000024, 41.794291999999814, 9.18837499999995,
+            9.242416999999932, 9.712125000000015, 8.403374999999869, 9.237875000000031,
+            10.089457999999922, 8.68083300000012, 8.761915999999928, 9.636999999999944,
+            8.71466600000008, 8.575333, 8.411125000000084, 9.155415999999832, 9.394374999999854,
+            8.862125000000106, 8.549624999999878, 29.436665999999832, 51.091874999999845,
+            9.136708999999883, 9.41716600000018, 9.247875000000022, 9.35550000000012,
+            9.2920409999997, 9.313125000000127
+          ]
+        },
+        "candidate": {
+          "median": 9.243499999999813,
+          "min": 7.986167000000023,
+          "max": 13.024332999999842,
+          "samples": [
+            9.35245800000007, 8.239125000000058, 9.161915999999792, 9.243499999999813,
+            8.727959000000055, 9.741791000000148, 10.609583000000157, 9.433250000000044,
+            8.71162500000014, 9.346000000000004, 9.336125000000038, 9.165207999999893,
+            11.22804199999996, 8.54420899999991, 8.633749999999964, 9.018500000000131,
+            9.195042000000058, 9.065791999999874, 9.059749999999894, 8.516792000000123,
+            8.251749999999902, 7.986167000000023, 9.720666000000165, 9.815791999999874,
+            12.246958000000177, 9.635000000000218, 9.0734580000003, 10.085790999999972,
+            13.024332999999842, 10.519374999999854, 10.808416999999736
+          ]
+        }
+      },
+      {
+        "cards": 50,
+        "wave": 5,
+        "outputHash": "3aed801bc3da6d0071a4bbdaad4525466873921140edcb3a3945fb40ea31655f",
+        "bytes": 92095,
+        "chunks": 11,
+        "baseline": {
+          "median": 1.6197079999997186,
+          "min": 1.461041000000023,
+          "max": 2.568749999999909,
+          "samples": [
+            2.568749999999909, 2.3414999999999964, 2.3577910000003612, 2.035417000000052,
+            1.7616659999998774, 1.9475830000001224, 1.7364159999997355, 1.8401669999998376,
+            2.185334000000239, 1.6655830000004244, 2.114708999999948, 1.5834590000004027,
+            1.6487499999998363, 1.9323750000003201, 1.7589579999998932, 1.5556249999999636,
+            1.5477920000002996, 1.6197079999997186, 1.4677499999997963, 1.5850000000000364,
+            1.4697079999996276, 1.5010830000001079, 1.461041000000023, 1.6140000000000327,
+            1.536750000000211, 1.528124999999818, 1.5226670000001832, 1.5245829999998932,
+            1.4672910000003867, 1.59566599999971, 1.6776660000000447
+          ]
+        },
+        "candidate": {
+          "median": 1.6216669999998885,
+          "min": 1.4392080000002352,
+          "max": 2.6375410000000556,
+          "samples": [
+            2.6375410000000556, 2.459374999999909, 2.5310840000001917, 2.5608750000001237,
+            1.7715830000001915, 1.6706669999998667, 1.810874999999669, 1.7025830000002316,
+            1.6054160000003321, 1.5104169999999613, 1.6523329999999987, 1.6952919999998812,
+            1.6448330000002898, 1.5146249999997963, 1.552708000000166, 1.4603329999999914,
+            1.5515000000000327, 1.8810419999999795, 1.4706249999999272, 1.7059590000003482,
+            1.7641669999998157, 1.4810420000003433, 1.5004170000001977, 1.4836249999998472,
+            1.709875000000011, 1.4555420000001504, 1.6216669999998885, 1.5073339999999007,
+            1.4799159999997755, 1.4392080000002352, 1.5585419999997612
+          ]
+        }
+      }
+    ]
+  },
+  "snapshotRuns": [
+    {
+      "kind": "baseline",
+      "suite": "ssr-replay-streaming",
+      "iterations": 1,
+      "targets": [
+        {
+          "name": "empty",
+          "ops": {
+            "collection_copies": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            },
+            "copied_entries": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            },
+            "list_copies": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            },
+            "copied_list_entries": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            },
+            "render": {
+              "score": 0.07721875000000011,
+              "median": 0.07721875000000011,
+              "min": 0.0657394999999994,
+              "samples": 31
+            }
+          },
+          "meta": {
+            "seeds": 0,
+            "leaves": 128,
+            "mutate": false,
+            "stream": false,
+            "outputHash": "38747ef3a7bf387f9bc23c9348a34091859ecce521d63153d1a786c853dd8985"
+          }
+        },
+        {
+          "name": "populated-seed",
+          "ops": {
+            "collection_copies": {
+              "score": 155,
+              "median": 155,
+              "min": 155,
+              "samples": 1
+            },
+            "copied_entries": {
+              "score": 3968,
+              "median": 3968,
+              "min": 3968,
+              "samples": 1
+            },
+            "list_copies": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            },
+            "copied_list_entries": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            },
+            "render": {
+              "score": 0.14909899999999965,
+              "median": 0.14909899999999965,
+              "min": 0.12952612499999816,
+              "samples": 31
+            }
+          },
+          "meta": {
+            "seeds": 32,
+            "leaves": 0,
+            "mutate": false,
+            "stream": false,
+            "outputHash": "a7d44bfcdb8535f78eec984d48247418af2943ec0689ce38d96cc14d762d76a0"
+          }
+        },
+        {
+          "name": "populated-stable",
+          "ops": {
+            "collection_copies": {
+              "score": 795,
+              "median": 795,
+              "min": 795,
+              "samples": 1
+            },
+            "copied_entries": {
+              "score": 36736,
+              "median": 36736,
+              "min": 36736,
+              "samples": 1
+            },
+            "list_copies": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            },
+            "copied_list_entries": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            },
+            "render": {
+              "score": 0.740124999999999,
+              "median": 0.740124999999999,
+              "min": 0.7087812500000013,
+              "samples": 31
+            }
+          },
+          "meta": {
+            "seeds": 32,
+            "leaves": 128,
+            "mutate": false,
+            "stream": false,
+            "outputHash": "fcaee114bbde529dd77e03ea095d5c8aaa43543bf1980c7ae539e145e2be1da9"
+          }
+        },
+        {
+          "name": "populated-changing",
+          "ops": {
+            "collection_copies": {
+              "score": 795,
+              "median": 795,
+              "min": 795,
+              "samples": 1
+            },
+            "copied_entries": {
+              "score": 61120,
+              "median": 61120,
+              "min": 61120,
+              "samples": 1
+            },
+            "list_copies": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            },
+            "copied_list_entries": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            },
+            "render": {
+              "score": 1.313510375000007,
+              "median": 1.313510375000007,
+              "min": 1.2569062500000001,
+              "samples": 31
+            }
+          },
+          "meta": {
+            "seeds": 32,
+            "leaves": 128,
+            "mutate": true,
+            "stream": false,
+            "outputHash": "61e9a42635f96ff597ad470369989f7634b58e55f102317e32ff53689e3fff36"
+          }
+        },
+        {
+          "name": "nested-stream",
+          "ops": {
+            "collection_copies": {
+              "score": 235,
+              "median": 235,
+              "min": 235,
+              "samples": 1
+            },
+            "copied_entries": {
+              "score": 8064,
+              "median": 8064,
+              "min": 8064,
+              "samples": 1
+            },
+            "list_copies": {
+              "score": 98,
+              "median": 98,
+              "min": 98,
+              "samples": 1
+            },
+            "copied_list_entries": {
+              "score": 98,
+              "median": 98,
+              "min": 98,
+              "samples": 1
+            }
+          },
+          "meta": {
+            "seeds": 32,
+            "leaves": 16,
+            "mutate": false,
+            "stream": true,
+            "outputHash": "ad58d968718240f0ad01e4485a63ceb7cf5a60b72b0a7d183bbd1f3ec2ec20c2"
+          }
+        }
+      ],
+      "meta": {
+        "node": "v24.20.0",
+        "v8": "13.6.233.17-node.53",
+        "platform": "darwin",
+        "arch": "arm64",
+        "source": "5a9a29889459f44e75d743414a9087d7e929367e52c489cbf193400b9bbbe75b",
+        "bundleBytes": 115171,
+        "bundleSha256": "0a1db657261f6229c55319c8f5be89bf07c9ef53c26d361b81ad59bf446684e3"
+      }
+    },
+    {
+      "kind": "candidate",
+      "suite": "ssr-replay-streaming",
+      "iterations": 1,
+      "targets": [
+        {
+          "name": "empty",
+          "ops": {
+            "collection_copies": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            },
+            "copied_entries": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            },
+            "list_copies": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            },
+            "copied_list_entries": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            },
+            "render": {
+              "score": 0.07519274999999936,
+              "median": 0.07519274999999936,
+              "min": 0.06530199999999908,
+              "samples": 31
+            }
+          },
+          "meta": {
+            "seeds": 0,
+            "leaves": 128,
+            "mutate": false,
+            "stream": false,
+            "outputHash": "38747ef3a7bf387f9bc23c9348a34091859ecce521d63153d1a786c853dd8985"
+          }
+        },
+        {
+          "name": "populated-seed",
+          "ops": {
+            "collection_copies": {
+              "score": 155,
+              "median": 155,
+              "min": 155,
+              "samples": 1
+            },
+            "copied_entries": {
+              "score": 3968,
+              "median": 3968,
+              "min": 3968,
+              "samples": 1
+            },
+            "list_copies": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            },
+            "copied_list_entries": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            },
+            "render": {
+              "score": 0.15509374999999892,
+              "median": 0.15509374999999892,
+              "min": 0.13593224999999975,
+              "samples": 31
+            }
+          },
+          "meta": {
+            "seeds": 32,
+            "leaves": 0,
+            "mutate": false,
+            "stream": false,
+            "outputHash": "a7d44bfcdb8535f78eec984d48247418af2943ec0689ce38d96cc14d762d76a0"
+          }
+        },
+        {
+          "name": "populated-stable",
+          "ops": {
+            "collection_copies": {
+              "score": 160,
+              "median": 160,
+              "min": 160,
+              "samples": 1
+            },
+            "copied_entries": {
+              "score": 4224,
+              "median": 4224,
+              "min": 4224,
+              "samples": 1
+            },
+            "list_copies": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            },
+            "copied_list_entries": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            },
+            "render": {
+              "score": 0.20713012499999905,
+              "median": 0.20713012499999905,
+              "min": 0.19583337499999942,
+              "samples": 31
+            }
+          },
+          "meta": {
+            "seeds": 32,
+            "leaves": 128,
+            "mutate": false,
+            "stream": false,
+            "outputHash": "fcaee114bbde529dd77e03ea095d5c8aaa43543bf1980c7ae539e145e2be1da9"
+          }
+        },
+        {
+          "name": "populated-changing",
+          "ops": {
+            "collection_copies": {
+              "score": 668,
+              "median": 668,
+              "min": 668,
+              "samples": 1
+            },
+            "copied_entries": {
+              "score": 57056,
+              "median": 57056,
+              "min": 57056,
+              "samples": 1
+            },
+            "list_copies": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            },
+            "copied_list_entries": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            },
+            "render": {
+              "score": 1.2491562499999986,
+              "median": 1.2491562499999986,
+              "min": 1.190958375000001,
+              "samples": 31
+            }
+          },
+          "meta": {
+            "seeds": 32,
+            "leaves": 128,
+            "mutate": true,
+            "stream": false,
+            "outputHash": "61e9a42635f96ff597ad470369989f7634b58e55f102317e32ff53689e3fff36"
+          }
+        },
+        {
+          "name": "nested-stream",
+          "ops": {
+            "collection_copies": {
+              "score": 160,
+              "median": 160,
+              "min": 160,
+              "samples": 1
+            },
+            "copied_entries": {
+              "score": 4224,
+              "median": 4224,
+              "min": 4224,
+              "samples": 1
+            },
+            "list_copies": {
+              "score": 98,
+              "median": 98,
+              "min": 98,
+              "samples": 1
+            },
+            "copied_list_entries": {
+              "score": 98,
+              "median": 98,
+              "min": 98,
+              "samples": 1
+            }
+          },
+          "meta": {
+            "seeds": 32,
+            "leaves": 16,
+            "mutate": false,
+            "stream": true,
+            "outputHash": "ad58d968718240f0ad01e4485a63ceb7cf5a60b72b0a7d183bbd1f3ec2ec20c2"
+          }
+        }
+      ],
+      "meta": {
+        "node": "v24.20.0",
+        "v8": "13.6.233.17-node.53",
+        "platform": "darwin",
+        "arch": "arm64",
+        "source": "47649d48f930f3c19648943a5f05cbfb454a35feadfdfe5495e6a985e20cc881",
+        "bundleBytes": 116469,
+        "bundleSha256": "b70b98d6d5d96b99b1051bf08a96eb70edc5569e3f67f83618f8bfdc3a374393"
+      }
+    },
+    {
+      "kind": "candidate",
+      "suite": "ssr-replay-streaming",
+      "iterations": 1,
+      "targets": [
+        {
+          "name": "empty",
+          "ops": {
+            "collection_copies": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            },
+            "copied_entries": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            },
+            "list_copies": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            },
+            "copied_list_entries": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            },
+            "render": {
+              "score": 0.0751355000000018,
+              "median": 0.0751355000000018,
+              "min": 0.06444787499999904,
+              "samples": 31
+            }
+          },
+          "meta": {
+            "seeds": 0,
+            "leaves": 128,
+            "mutate": false,
+            "stream": false,
+            "outputHash": "38747ef3a7bf387f9bc23c9348a34091859ecce521d63153d1a786c853dd8985"
+          }
+        },
+        {
+          "name": "populated-seed",
+          "ops": {
+            "collection_copies": {
+              "score": 155,
+              "median": 155,
+              "min": 155,
+              "samples": 1
+            },
+            "copied_entries": {
+              "score": 3968,
+              "median": 3968,
+              "min": 3968,
+              "samples": 1
+            },
+            "list_copies": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            },
+            "copied_list_entries": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            },
+            "render": {
+              "score": 0.13859887499999957,
+              "median": 0.13859887499999957,
+              "min": 0.12900524999999874,
+              "samples": 31
+            }
+          },
+          "meta": {
+            "seeds": 32,
+            "leaves": 0,
+            "mutate": false,
+            "stream": false,
+            "outputHash": "a7d44bfcdb8535f78eec984d48247418af2943ec0689ce38d96cc14d762d76a0"
+          }
+        },
+        {
+          "name": "populated-stable",
+          "ops": {
+            "collection_copies": {
+              "score": 160,
+              "median": 160,
+              "min": 160,
+              "samples": 1
+            },
+            "copied_entries": {
+              "score": 4224,
+              "median": 4224,
+              "min": 4224,
+              "samples": 1
+            },
+            "list_copies": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            },
+            "copied_list_entries": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            },
+            "render": {
+              "score": 0.20445837500000152,
+              "median": 0.20445837500000152,
+              "min": 0.19075524999999516,
+              "samples": 31
+            }
+          },
+          "meta": {
+            "seeds": 32,
+            "leaves": 128,
+            "mutate": false,
+            "stream": false,
+            "outputHash": "fcaee114bbde529dd77e03ea095d5c8aaa43543bf1980c7ae539e145e2be1da9"
+          }
+        },
+        {
+          "name": "populated-changing",
+          "ops": {
+            "collection_copies": {
+              "score": 668,
+              "median": 668,
+              "min": 668,
+              "samples": 1
+            },
+            "copied_entries": {
+              "score": 57056,
+              "median": 57056,
+              "min": 57056,
+              "samples": 1
+            },
+            "list_copies": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            },
+            "copied_list_entries": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            },
+            "render": {
+              "score": 1.183812500000002,
+              "median": 1.183812500000002,
+              "min": 1.1420468749999984,
+              "samples": 31
+            }
+          },
+          "meta": {
+            "seeds": 32,
+            "leaves": 128,
+            "mutate": true,
+            "stream": false,
+            "outputHash": "61e9a42635f96ff597ad470369989f7634b58e55f102317e32ff53689e3fff36"
+          }
+        },
+        {
+          "name": "nested-stream",
+          "ops": {
+            "collection_copies": {
+              "score": 160,
+              "median": 160,
+              "min": 160,
+              "samples": 1
+            },
+            "copied_entries": {
+              "score": 4224,
+              "median": 4224,
+              "min": 4224,
+              "samples": 1
+            },
+            "list_copies": {
+              "score": 98,
+              "median": 98,
+              "min": 98,
+              "samples": 1
+            },
+            "copied_list_entries": {
+              "score": 98,
+              "median": 98,
+              "min": 98,
+              "samples": 1
+            }
+          },
+          "meta": {
+            "seeds": 32,
+            "leaves": 16,
+            "mutate": false,
+            "stream": true,
+            "outputHash": "ad58d968718240f0ad01e4485a63ceb7cf5a60b72b0a7d183bbd1f3ec2ec20c2"
+          }
+        }
+      ],
+      "meta": {
+        "node": "v24.20.0",
+        "v8": "13.6.233.17-node.53",
+        "platform": "darwin",
+        "arch": "arm64",
+        "source": "47649d48f930f3c19648943a5f05cbfb454a35feadfdfe5495e6a985e20cc881",
+        "bundleBytes": 116469,
+        "bundleSha256": "b70b98d6d5d96b99b1051bf08a96eb70edc5569e3f67f83618f8bfdc3a374393"
+      }
+    },
+    {
+      "kind": "baseline",
+      "suite": "ssr-replay-streaming",
+      "iterations": 1,
+      "targets": [
+        {
+          "name": "empty",
+          "ops": {
+            "collection_copies": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            },
+            "copied_entries": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            },
+            "list_copies": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            },
+            "copied_list_entries": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            },
+            "render": {
+              "score": 0.07427600000000112,
+              "median": 0.07427600000000112,
+              "min": 0.0656718749999996,
+              "samples": 31
+            }
+          },
+          "meta": {
+            "seeds": 0,
+            "leaves": 128,
+            "mutate": false,
+            "stream": false,
+            "outputHash": "38747ef3a7bf387f9bc23c9348a34091859ecce521d63153d1a786c853dd8985"
+          }
+        },
+        {
+          "name": "populated-seed",
+          "ops": {
+            "collection_copies": {
+              "score": 155,
+              "median": 155,
+              "min": 155,
+              "samples": 1
+            },
+            "copied_entries": {
+              "score": 3968,
+              "median": 3968,
+              "min": 3968,
+              "samples": 1
+            },
+            "list_copies": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            },
+            "copied_list_entries": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            },
+            "render": {
+              "score": 0.14074999999999704,
+              "median": 0.14074999999999704,
+              "min": 0.131307249999999,
+              "samples": 31
+            }
+          },
+          "meta": {
+            "seeds": 32,
+            "leaves": 0,
+            "mutate": false,
+            "stream": false,
+            "outputHash": "a7d44bfcdb8535f78eec984d48247418af2943ec0689ce38d96cc14d762d76a0"
+          }
+        },
+        {
+          "name": "populated-stable",
+          "ops": {
+            "collection_copies": {
+              "score": 795,
+              "median": 795,
+              "min": 795,
+              "samples": 1
+            },
+            "copied_entries": {
+              "score": 36736,
+              "median": 36736,
+              "min": 36736,
+              "samples": 1
+            },
+            "list_copies": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            },
+            "copied_list_entries": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            },
+            "render": {
+              "score": 0.7117812499999943,
+              "median": 0.7117812499999943,
+              "min": 0.6911355000000015,
+              "samples": 31
+            }
+          },
+          "meta": {
+            "seeds": 32,
+            "leaves": 128,
+            "mutate": false,
+            "stream": false,
+            "outputHash": "fcaee114bbde529dd77e03ea095d5c8aaa43543bf1980c7ae539e145e2be1da9"
+          }
+        },
+        {
+          "name": "populated-changing",
+          "ops": {
+            "collection_copies": {
+              "score": 795,
+              "median": 795,
+              "min": 795,
+              "samples": 1
+            },
+            "copied_entries": {
+              "score": 61120,
+              "median": 61120,
+              "min": 61120,
+              "samples": 1
+            },
+            "list_copies": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            },
+            "copied_list_entries": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            },
+            "render": {
+              "score": 1.2669062500000052,
+              "median": 1.2669062500000052,
+              "min": 1.2372447500000021,
+              "samples": 31
+            }
+          },
+          "meta": {
+            "seeds": 32,
+            "leaves": 128,
+            "mutate": true,
+            "stream": false,
+            "outputHash": "61e9a42635f96ff597ad470369989f7634b58e55f102317e32ff53689e3fff36"
+          }
+        },
+        {
+          "name": "nested-stream",
+          "ops": {
+            "collection_copies": {
+              "score": 235,
+              "median": 235,
+              "min": 235,
+              "samples": 1
+            },
+            "copied_entries": {
+              "score": 8064,
+              "median": 8064,
+              "min": 8064,
+              "samples": 1
+            },
+            "list_copies": {
+              "score": 98,
+              "median": 98,
+              "min": 98,
+              "samples": 1
+            },
+            "copied_list_entries": {
+              "score": 98,
+              "median": 98,
+              "min": 98,
+              "samples": 1
+            }
+          },
+          "meta": {
+            "seeds": 32,
+            "leaves": 16,
+            "mutate": false,
+            "stream": true,
+            "outputHash": "ad58d968718240f0ad01e4485a63ceb7cf5a60b72b0a7d183bbd1f3ec2ec20c2"
+          }
+        }
+      ],
+      "meta": {
+        "node": "v24.20.0",
+        "v8": "13.6.233.17-node.53",
+        "platform": "darwin",
+        "arch": "arm64",
+        "source": "5a9a29889459f44e75d743414a9087d7e929367e52c489cbf193400b9bbbe75b",
+        "bundleBytes": 115171,
+        "bundleSha256": "0a1db657261f6229c55319c8f5be89bf07c9ef53c26d361b81ad59bf446684e3"
+      }
+    }
+  ]
+}

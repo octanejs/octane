@@ -270,6 +270,7 @@ internally, get their own baseline and guard namespace.
 | `portal-swarm` | portal-swarm | Octane + reference frameworks | portal render/dispatch |
 | `ssr-throughput` | ssr-throughput | none (Node-only) | comparative news SSR including Inferno + Octane-only stress fixtures |
 | `streaming-ssr` | streaming-ssr | none (Node-only) | streaming targets incl. Inferno and Preact; Svelte N/A |
+| `ssr-replay-streaming` | ssr-replay-streaming | none (Node-only) | populated replay collection copies and streaming promise subscriptions, with clean output and unchanged/one-wave controls |
 | `ssr-http` | ssr-http | none (boots its own node:http hosts) | raw streaming API over real HTTP: fresh-process import cost, cold spawn→listen→first-byte, warm shell/total/throughput across the streaming-ssr fixtures |
 | `streaming-backpressure` | streaming-backpressure | none (builds) | real one-byte Node Writable pressure, delayed drains, three concurrent destinations, and public-stream abort across supported renderers |
 | `ssr-workerd` | ssr-workerd | none (boots workerd via miniflare) | streaming SSR inside the real Cloudflare Workers runtime: cold isolate→first-byte, warm shell/total, worker-script bytes (octane vs Fizz edge, plus the vite-plugin + adapter-cloudflare deployment shape) |
