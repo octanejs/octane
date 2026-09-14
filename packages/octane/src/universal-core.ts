@@ -11,6 +11,7 @@
  * may change in patch releases until real Three and transported renderers
  * validate the protocol.
  */
+import { bumpContextEpoch } from './context-epoch.js';
 import { hasOwnProp } from './has-own.js';
 import { resolveHookPath } from './hook-slot-cache.js';
 import {
@@ -99,6 +100,11 @@ export type UniversalKey = string | number | symbol | bigint;
 export interface UniversalContext<T> {
 	readonly $$kind: symbol;
 	readonly defaultValue: T;
+	/**
+	 * Bumped on every committed provider change; each bump must move the shared
+	 * context epoch too (bumpContextEpoch in context-epoch.ts) — the
+	 * $$ctxDepsEpoch bail fast path treats an unmoved epoch as "nothing changed".
+	 */
 	$$version: number;
 }
 
@@ -12219,6 +12225,9 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 					? this.treeFeatures | attempt.treeFeatures
 					: attempt.treeFeatures;
 				for (const context of changedContexts) context.$$version++;
+				// Shared epoch must move with every $$version bump — runtime bail
+				// fast paths treat an unmoved epoch as "no context changed".
+				if (changedContexts.size !== 0) bumpContextEpoch();
 				const retainedRegionCells = new Set<RendererRegionBridgeCell>();
 				for (const { next, previous } of stagedRegionBridges) {
 					retainedRegionCells.add(next.activate(previous));
