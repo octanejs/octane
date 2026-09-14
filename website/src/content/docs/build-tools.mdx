@@ -222,6 +222,14 @@ An explicit plugin option wins over `octane.config.ts`. Application-wide mode
 does not change installed dependencies; a dependency can opt in with its own
 `"use strong"` directive.
 
+The complete check reference is in
+[Strong compiler checks](https://github.com/octanejs/octane/blob/main/docs/strong-compiler-checks.md).
+It covers effect data flow, eager prop-derived state, explicit and null
+dependencies, manual memo hooks, JSX list mapping in `.tsrx`, index keys, suppression props,
+trusted HTML, and compatibility imports. Equivalent explicit dependency arrays
+produce hints; conflicting arrays produce errors.
+Strong `.tsx` modules retain standard keyed JSX mapping.
+
 A Strong module cannot:
 
 - Call a state setter or reducer dispatcher while rendering.
@@ -294,11 +302,11 @@ into an arm or nested block changes its lifetime; each keyed row can have its
 own state. These locality checks apply to opted-in modules; `strong: true` in
 the app config enables them for all application-owned modules.
 
-These checks follow provable synchronous calls through local helpers,
-`useCallback` and `useEffectEvent` results, and functions returned by analyzable
-`useMemo` factories. The hooks themselves remain supported. Effect Events are
-non-reactive; leave them out of dependency lists. Other explicit dependency
-arrays retain their existing meaning and are never rewritten.
+These checks follow provable synchronous calls through local helpers and
+`useEffectEvent` results. Effect Events are non-reactive; leave them out of
+dependency lists. Strong uses automatic declaration caching and inferred
+dependencies. Manual memo hooks and conflicting arrays are errors; equivalent
+arrays retain their behavior and produce a redundancy hint.
 
 Factories with unknown return values or complex control flow remain opaque.
 Dependency checks follow literal arrays, including statically selected or spread

@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/jotai",
-  "version": "0.1.49",
+  "version": "0.1.50",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -13,7 +13,7 @@
       ]
     }
   },
-  "description": "jotai bindings for the octane renderer \u2014 reuses jotai's framework-agnostic vanilla atoms/store and swaps the React binding for an octane port of jotai/react.",
+  "description": "jotai bindings for the octane renderer — reuses jotai's framework-agnostic vanilla atoms/store and swaps the React binding for an octane port of jotai/react.",
   "author": {
     "name": "Dominic Gannaway",
     "email": "dg@domgan.com"

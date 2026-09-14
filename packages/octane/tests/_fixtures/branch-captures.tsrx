@@ -1,4 +1,4 @@
-import { useState } from 'octane';
+import { use, useLayoutEffect, useState } from 'octane';
 
 export function NestedCaptures(props) @{
 	<section>
@@ -107,5 +107,52 @@ export function EvalArgumentMutation(props) @{
 				}
 			</div>
 		}
+	</section>
+}
+
+function BranchGate(props) @{
+	const value = use(props.promise);
+	<output>{value as string}</output>
+}
+
+export function BranchHoldCaptures(props) @{
+	<section>
+		@if (props.visible) {
+			const [count, setCount] = useState(0);
+			useLayoutEffect(() => {
+				props.effects.push('if:' + props.label);
+				return () => props.cleanups.push('if:' + props.label);
+			}, [props.label]);
+			<button
+				ref={props.ifRef}
+				data-kind="if"
+				onClick={() => {
+					props.pick('if:' + props.label);
+					setCount(count + 1);
+				}}
+			>
+				{props.label + ':' + count}
+			</button>
+		}
+		@switch (props.visible) {
+			@case true: {
+				const [count, setCount] = useState(0);
+				useLayoutEffect(() => {
+					props.effects.push('switch:' + props.label);
+					return () => props.cleanups.push('switch:' + props.label);
+				}, [props.label]);
+				<button
+					ref={props.switchRef}
+					data-kind="switch"
+					onClick={() => {
+						props.pick('switch:' + props.label);
+						setCount(count + 1);
+					}}
+				>
+					{props.label + ':' + count}
+				</button>
+			}
+		}
+		<BranchGate promise={props.promise} />
 	</section>
 }

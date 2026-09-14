@@ -10,10 +10,7 @@
     "integrity": "sha256:13ec9fc26559a2ab7e09132d80519d13bb0a67e4accd6a48e4a8bf0fde8f1d18",
     "verification": "verified"
   },
-  "upstreamSuites": {
-    "runtime": "insufficient",
-    "types": "absent"
-  },
+  "upstreamSuites": { "runtime": "insufficient", "types": "absent" },
   "adaptedRoots": {
     "source": {
       "roots": ["packages/drei/src"],
@@ -39,7 +36,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "58c3fe12ba7287d269ae84f83f2c94b1c3936787f409ff80eb4550f45b485127"
+      "lockfileSha256": "86e22c8a3652c4663ce8e347d3769f0572c09a1d66c39ed789bd914709b53946"
     }
   },
   "lanes": [
@@ -66,7 +63,7 @@
         {
           "path": "scripts/react-parity/playwright-full-runner.mjs",
           "role": "support",
-          "sha256": "23bfcd3ad08ac13b98aa002a8c55fb05f986d98096f557f716c9124e1df2da65"
+          "sha256": "20701aea9b5e5f5249a2559f847aac79cb28f9e0bb5d24d3ef50b06101205a02"
         },
         {
           "path": "packages/drei/scripts/pristine-playwright.json",

@@ -2,18 +2,15 @@
   "schemaVersion": 1,
   "provenance": {
     "repo": "https://github.com/bvaughn/react-window.git",
-    "version": "2.3.1",
-    "commit": "eb7398fdc0e9d9b54560142caa2f6461474e0014",
+    "version": "2.3.0",
+    "commit": "4d9eebbb510262b3b7e95463cf49a10de53ea77d",
     "sourceRoot": "lib",
     "testRoot": "lib",
     "license": "MIT",
-    "integrity": "sha256:44ff692f9d49c32cd6b8306b164bba7d0029f58437708cc832414ecb5ebc7ee6",
+    "integrity": "sha256:d0b66c0138c6355051a75086ce0681aa5880249c0d14f1e9759185daee16e452",
     "verification": "verified"
   },
-  "upstreamSuites": {
-    "runtime": "present",
-    "types": "absent"
-  },
+  "upstreamSuites": { "runtime": "present", "types": "absent" },
   "adaptedRoots": {
     "source": {
       "roots": ["packages/window/src"],
@@ -27,8 +24,8 @@
     }
   },
   "adaptedRuntimeSummary": {
-    "inventoryEntries": 119,
-    "uniqueIdentities": 119,
+    "inventoryEntries": 117,
+    "uniqueIdentities": 117,
     "duplicateEntriesWithinLanes": 0,
     "identitiesSharedAcrossLanes": 0
   },
@@ -39,7 +36,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "58c3fe12ba7287d269ae84f83f2c94b1c3936787f409ff80eb4550f45b485127"
+      "lockfileSha256": "86e22c8a3652c4663ce8e347d3769f0572c09a1d66c39ed789bd914709b53946"
     }
   },
   "lanes": [
@@ -50,7 +47,7 @@
       "environment": "workspace-node",
       "project": "window-pristine",
       "evidenceOrigin": "upstream-suite",
-      "notes": "Runs all 15 byte-exact upstream React test files and all 119 inventoried cases unchanged.",
+      "notes": "Runs all 14 byte-exact upstream React test files and all 117 inventoried cases unchanged.",
       "execution": {
         "kind": "vitest-full",
         "inventory": "packages/window/audit/pristine-runtime.json"
@@ -59,12 +56,12 @@
         {
           "path": "packages/window/audit/upstream.lock.json",
           "role": "support",
-          "sha256": "51fd8894f339f693a9bca5145167be3b9626e79ccde8a007a6ef078e86c76bf2"
+          "sha256": "11299186085276a238d8b07764e49e02135d3eb8e50b7949bdf255867585e658"
         },
         {
           "path": "packages/window/audit/pristine-runtime.json",
           "role": "support",
-          "sha256": "f2e011d97f9a5eafcd48b74d0b52709b348c69e3c48a486576bb58362087839c"
+          "sha256": "15608b899f5e84a14db173fa4aef4be85fc2efd6a2d5a1c61d77747cb2534afa"
         }
       ]
     },
@@ -75,7 +72,7 @@
       "environment": "workspace-node",
       "project": "window-adapted",
       "evidenceOrigin": "upstream-suite",
-      "notes": "Runs all 119 adapted upstream cases against the source-correspondent Octane production modules, with every transformation generated and audited.",
+      "notes": "Runs all 117 adapted upstream cases against the source-correspondent Octane production modules, with every transformation generated and audited.",
       "execution": {
         "kind": "vitest-full",
         "inventory": "packages/window/audit/adapted-runtime.json"
@@ -84,17 +81,17 @@
         {
           "path": "packages/window/audit/adapted-runtime.json",
           "role": "support",
-          "sha256": "9a0b1ff171cdaae2dced5ddb6a4d873784d89cbff28b83051e889cfcc4fa9b5d"
+          "sha256": "c1a08cb95b56fdcbf517cdf450c80663275daecbc083694fefe5b47309c47920"
         },
         {
           "path": "packages/window/audit/adapted-transformations.json",
           "role": "support",
-          "sha256": "6413b5c82fa0f71a37c415b8dea0f34ed561f4528b047384a649a171399be026"
+          "sha256": "20018a26697f78395f3289e371b8606f4a64604cd77ec7c02908cc05fe143508"
         },
         {
           "path": "packages/window/audit/upstream.lock.json",
           "role": "support",
-          "sha256": "51fd8894f339f693a9bca5145167be3b9626e79ccde8a007a6ef078e86c76bf2"
+          "sha256": "11299186085276a238d8b07764e49e02135d3eb8e50b7949bdf255867585e658"
         },
         {
           "path": "packages/window/audit/upstream-patches/tests/upstream/components/grid/Grid.test.tsx.patch",
@@ -306,46 +303,6 @@
           "sha256": "364c0595b08b26343fa3cd9ff7ddbdaa5fd227cfcd390437aa67ae9a173ebe1b"
         }
       ]
-    },
-    {
-      "id": "react-window-browser",
-      "type": "browser",
-      "oracle": "required",
-      "environment": "workspace-node",
-      "project": "window-browser",
-      "notes": "Chromium startup layout stability, server DOM adoption, bounded scrolling, and mounted direction changes.",
-      "files": [
-        {
-          "path": "packages/window/audit/browser-runtime.json",
-          "role": "support",
-          "sha256": "5110b731b3b595cfc8a9891861393ecbe47c7dcd792cb105bfacb5d247866dd0"
-        },
-        {
-          "path": "packages/window/tests/browser/window.browser.test.ts",
-          "role": "support",
-          "sha256": "417fc6aa66f734ef98c42438fc5e42c0d1542e46da28ed2d9ea48881298510cc"
-        },
-        {
-          "path": "packages/window/tests/browser/harness/fixture.tsx",
-          "role": "support",
-          "sha256": "1f1e9186f26acd22467c2c6d29353aef7886687a16cc6221685234fe1b69d61a"
-        },
-        {
-          "path": "packages/window/tests/browser/harness/main.tsx",
-          "role": "support",
-          "sha256": "fda3681516d47c59c5ceef4be703fa92e93c4fe1d91c6761d4f9819345f02ce5"
-        },
-        {
-          "path": "packages/window/tests/browser/harness/index.html",
-          "role": "support",
-          "sha256": "961a37e85bd2bd5d69ed16f3807ffeb0a5ead9af145e98f41bd98e60c81e0d9f"
-        }
-      ],
-      "execution": {
-        "kind": "vitest-full",
-        "inventory": "packages/window/audit/browser-runtime.json",
-        "fileParallelism": false
-      }
     }
   ],
   "divergences": [

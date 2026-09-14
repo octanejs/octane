@@ -2,24 +2,17 @@
   "schemaVersion": 1,
   "provenance": {
     "repo": "https://github.com/facebook/react.git",
-    "version": "19.3.0",
-    "commit": "1d34f91dfde6bba84d08b683aaba164c7194dacb",
+    "version": "19.2.7",
+    "commit": "6117d7cca4906492c51fe6a03381e35adfd86e7d",
     "sourceRoot": "packages/octane-is/upstream/src",
     "testRoot": "packages/octane-is/upstream/src/__tests__",
     "license": "MIT",
-    "integrity": "sha256:3adffb233a18be2b79c3521cf1b2e26902c0cafc2a1de2d7e9f086afd3a2f7a5",
+    "integrity": "sha256:70e0dac61c6782a508e77c70e0c459f8fbbbed82d5ab341921f2f85f8014f0e0",
     "verification": "verified"
   },
-  "upstreamSuites": {
-    "runtime": "present",
-    "types": "absent"
-  },
+  "upstreamSuites": { "runtime": "present", "types": "absent" },
   "adaptedRoots": {
-    "source": {
-      "roots": ["packages/octane-is/src"],
-      "include": ["\\.ts$"],
-      "exclude": []
-    },
+    "source": { "roots": ["packages/octane-is/src"], "include": ["\\.ts$"], "exclude": [] },
     "tests": {
       "roots": ["packages/octane-is/tests"],
       "include": ["/adapted\\.test\\.ts$"],
@@ -39,7 +32,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "58c3fe12ba7287d269ae84f83f2c94b1c3936787f409ff80eb4550f45b485127"
+      "lockfileSha256": "86e22c8a3652c4663ce8e347d3769f0572c09a1d66c39ed789bd914709b53946"
     }
   },
   "lanes": [
@@ -64,22 +57,22 @@
         {
           "path": "packages/octane-is/audit/upstream.lock.json",
           "role": "support",
-          "sha256": "36ac94ca695419fb09d25f3f5d637d24c65e376b3cbfe30f5ea79eaa48a7170e"
+          "sha256": "c4a00e8946bc9bdfa11f423de8a7a37b80c819848adf1821f849f6824219ea94"
         },
         {
           "path": "packages/octane-is/audit/provenance.json",
           "role": "support",
-          "sha256": "b691f34fc61e94ec425304d0f07d5b88d9ccff36d415085150e46c9b3c0c2b8e"
+          "sha256": "a2dadbde378bf08b7c21c6a28ee5858526fcbf6a204e20baa888a2042ee60740"
         },
         {
           "path": "packages/octane-is/tests/register-upstream.ts",
           "role": "support",
-          "sha256": "75706cc6155242106f6803f0ae8ad4595dda6c51a20bb9483de0dcd2bab365ca"
+          "sha256": "0796e9436a3bfdd81d546767a37b0a7d2f26febaba0bdb981beeb8ecd6ec92af"
         },
         {
           "path": "packages/octane-is/scripts/update-audit.mjs",
           "role": "support",
-          "sha256": "32aec603dd72ea7c9d983d9b83c252ed07ec1d7db2a64608634fc12547d99c1a"
+          "sha256": "daf330fc3332221ef3b261f11efb3ed5e2b41b317e215c75a67752ba2a8a55a0"
         },
         {
           "path": "packages/octane-is/audit/pristine-suite.json",
@@ -114,22 +107,22 @@
         {
           "path": "packages/octane-is/audit/upstream.lock.json",
           "role": "support",
-          "sha256": "36ac94ca695419fb09d25f3f5d637d24c65e376b3cbfe30f5ea79eaa48a7170e"
+          "sha256": "c4a00e8946bc9bdfa11f423de8a7a37b80c819848adf1821f849f6824219ea94"
         },
         {
           "path": "packages/octane-is/audit/provenance.json",
           "role": "support",
-          "sha256": "b691f34fc61e94ec425304d0f07d5b88d9ccff36d415085150e46c9b3c0c2b8e"
+          "sha256": "a2dadbde378bf08b7c21c6a28ee5858526fcbf6a204e20baa888a2042ee60740"
         },
         {
           "path": "packages/octane-is/tests/register-upstream.ts",
           "role": "support",
-          "sha256": "75706cc6155242106f6803f0ae8ad4595dda6c51a20bb9483de0dcd2bab365ca"
+          "sha256": "0796e9436a3bfdd81d546767a37b0a7d2f26febaba0bdb981beeb8ecd6ec92af"
         },
         {
           "path": "packages/octane-is/scripts/update-audit.mjs",
           "role": "support",
-          "sha256": "32aec603dd72ea7c9d983d9b83c252ed07ec1d7db2a64608634fc12547d99c1a"
+          "sha256": "daf330fc3332221ef3b261f11efb3ed5e2b41b317e215c75a67752ba2a8a55a0"
         },
         {
           "path": "packages/octane-is/audit/upstream-patches/tests/upstream/ReactIs-test.js.patch",
@@ -149,7 +142,7 @@
         {
           "path": "packages/octane-is/tests/differential.test.ts",
           "role": "test",
-          "sha256": "79652191aac6ac3ebe0a0243204d9458ba7da91dad2a6c25c15532b1627be0c8",
+          "sha256": "fd36c95e58cfe17f8d6e4c37dcfa1f45b2ac872108884bd7c60ba673a132d28e",
           "cases": [
             {
               "id": "differential:octane-is-supported-surface",

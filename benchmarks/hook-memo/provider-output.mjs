@@ -30,6 +30,7 @@ const exportsMap = JSON.parse(
 const REPEATS = 128;
 const COUNTERS = '__octaneProviderOutputWork';
 const FUNCTIONS = new Map([
+	['createBlock', 'full_blocks'],
 	['componentSlot', 'component_slots'],
 	['componentSlotLite', 'component_slots'],
 	['componentSlotVoid', 'component_slots'],
@@ -79,6 +80,7 @@ const fixture = `
 const hash = (source) => createHash('sha256').update(source).digest('hex');
 const val = (score) => ({ score, median: score, min: score, samples: 1 });
 const empty = () => ({
+	full_blocks: 0,
 	component_slots: 0,
 	children_bodies: 0,
 	snapshot_slots: 0,
@@ -131,7 +133,7 @@ function observe(source) {
 		};
 	}
 	const code = print(visit(parseModule(source, 'provider-output-clean.mjs')), language()).code;
-	for (const required of ['Label', 'Counter', 'markChildrenBlock'])
+	for (const required of ['Label', 'Counter', 'markChildrenBlock', 'createBlock'])
 		assert.ok(found.has(required), `missing observed ${required}`);
 	assert.ok(
 		found.has('componentSlot') || found.has('componentSlotLite'),
@@ -274,7 +276,8 @@ function exercise(app) {
 	const phases = {};
 	const snapshot = [];
 	let stale = 0;
-	function mount(component, props) {
+	function mount(name, component, props) {
+		globalThis[COUNTERS] = empty();
 		const container = document.createElement('div');
 		document.body.appendChild(container);
 		const root = app.createRoot(container);
@@ -305,6 +308,7 @@ function exercise(app) {
 			assert.equal(container.innerHTML, '', 'complete teardown');
 			container.remove();
 		}
+		phases[name + '_mount'] = { ...globalThis[COUNTERS] };
 		return { root, container, label, verify, close };
 	}
 	function phase(name, work) {
@@ -312,7 +316,7 @@ function exercise(app) {
 		work();
 		phases[name] = { ...globalThis[COUNTERS] };
 	}
-	const inline = mount(app.Inline, { tick: 0, label: 'stable' });
+	const inline = mount('inline', app.Inline, { tick: 0, label: 'stable' });
 	phase('inline_body', () => {
 		for (let tick = 1; tick <= REPEATS; tick++) {
 			app.flushSync(() => inline.root.render(app.Inline, { tick, label: 'stable' }));
@@ -327,7 +331,7 @@ function exercise(app) {
 		}
 	});
 	inline.close();
-	const inlineMemo = mount(app.InlineMemo, { tick: 0, label: 'stable' });
+	const inlineMemo = mount('inline_memo', app.InlineMemo, { tick: 0, label: 'stable' });
 	phase('inline_memo', () => {
 		for (let tick = 1; tick <= REPEATS; tick++) {
 			app.flushSync(() => inlineMemo.root.render(app.InlineMemo, { tick, label: 'stable' }));
@@ -348,7 +352,7 @@ function exercise(app) {
 	});
 	inlineMemo.close();
 	const Context = app.createContext('default');
-	const direct = mount(Context.Provider, { value: 'first', children: app.First });
+	const direct = mount('direct', Context.Provider, { value: 'first', children: app.First });
 	direct.verify('first');
 	phase('same_body', () => {
 		for (let tick = 1; tick <= REPEATS; tick++) {
@@ -404,6 +408,10 @@ try {
 	);
 	const minified = transformSync(code, { minify: true, target: 'es2022', format: 'esm' }).code;
 	const ops = {
+		inline_mount_full_blocks: val(observed.phases.inline_mount.full_blocks),
+		inline_memo_mount_full_blocks: val(observed.phases.inline_memo_mount.full_blocks),
+		direct_mount_full_blocks: val(observed.phases.direct_mount.full_blocks),
+		inline_update_full_blocks: val(observed.phases.inline_body.full_blocks),
 		same_body_label_renders: val(observed.phases.same_body.label_renders),
 		same_body_counter_renders: val(observed.phases.same_body.counter_renders),
 		same_body_component_slots: val(observed.phases.same_body.component_slots),

@@ -11,10 +11,7 @@
     "integrity": "sha256:2843a0bbecbb4dfd34eb4f5d97b0fdc48c8c4e5b1b0722999e8f13796371a50d",
     "verification": "verified"
   },
-  "upstreamSuites": {
-    "runtime": "absent",
-    "types": "absent"
-  },
+  "upstreamSuites": { "runtime": "absent", "types": "absent" },
   "adaptedRoots": {
     "source": {
       "roots": ["packages/waypoint/src"],
@@ -40,7 +37,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "58c3fe12ba7287d269ae84f83f2c94b1c3936787f409ff80eb4550f45b485127"
+      "lockfileSha256": "86e22c8a3652c4663ce8e347d3769f0572c09a1d66c39ed789bd914709b53946"
     }
   },
   "lanes": [

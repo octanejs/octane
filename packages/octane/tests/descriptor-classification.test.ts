@@ -20,8 +20,198 @@ const nestedSource = readFileSync(
 	'packages/octane/tests/_fixtures/descriptor-nested-ownership.tsrx',
 	'utf8',
 );
+const contextArraySource = readFileSync(
+	'packages/octane/tests/_fixtures/descriptor-context-array.tsrx',
+	'utf8',
+);
 
 describe('descriptor classification contracts', () => {
+	it.each([
+		{ nativeReads: false, dev: false },
+		{ nativeReads: false, dev: true },
+		{ nativeReads: true, dev: false },
+		{ nativeReads: true, dev: true },
+	])(
+		'updates context in nested descriptors inside a stable array (nativeReads=$nativeReads, dev=$dev)',
+		({ nativeReads, dev }) => {
+			const client = loadCompiledFixtureSource(contextArraySource, {
+				id: 'descriptor-context-array.tsrx',
+				mode: 'client',
+				compileOptions: { ...compileOptions, nativeReads, dev },
+			});
+			const view = mount(client.App, { active: false });
+			try {
+				const section = view.find('section');
+				const input = view.find('input') as HTMLInputElement;
+				const button = view.find('button');
+				input.value = 'typed draft';
+				view.click('button');
+				for (const active of [true, false, true]) {
+					view.update(client.App, { active });
+					expect(view.find('[data-child]').tagName).toBe(active ? 'STRONG' : 'SPAN');
+					expect(view.find('[data-child]').textContent).toBe(active ? 'next' : 'first');
+					expect(view.find('section')).toBe(section);
+					expect(view.find('input')).toBe(input);
+					expect(input.value).toBe('typed draft');
+					expect(view.find('button')).toBe(button);
+					expect(button.textContent).toBe('1');
+				}
+			} finally {
+				view.unmount();
+			}
+		},
+	);
+
+	for (const nativeReads of [false, true]) {
+		it(`retries a caught descriptor inspection when its context changes (nativeReads=${nativeReads})`, () => {
+			const client = loadCompiledFixtureSource(contextArraySource, {
+				id: 'descriptor-context-array.tsrx',
+				mode: 'client',
+				compileOptions: { ...compileOptions, nativeReads },
+			});
+			const view = mount(client.RecoverInspection, { active: false });
+			try {
+				const section = view.find('section');
+				view.click('button');
+				for (const active of [false, true, false, true]) {
+					view.update(client.RecoverInspection, { active });
+					expect(section.getAttribute('data-status')).toBe(active ? 'strong' : 'waiting');
+					expect(view.find('button').textContent).toBe('1');
+				}
+			} finally {
+				view.unmount();
+			}
+		});
+
+		it(`updates attributes derived by inspecting another contextual descriptor (nativeReads=${nativeReads})`, () => {
+			const client = loadCompiledFixtureSource(contextArraySource, {
+				id: 'descriptor-context-array.tsrx',
+				mode: 'client',
+				compileOptions: { ...compileOptions, nativeReads },
+			});
+			const view = mount(client.Inspection, { active: false });
+			try {
+				const section = view.find('section');
+				view.click('button');
+				expect(section.getAttribute('data-inspected-tag')).toBe('span');
+				for (const active of [true, false, true]) {
+					view.update(client.Inspection, { active });
+					expect(view.find('section')).toBe(section);
+					expect(section.getAttribute('data-inspected-tag')).toBe(active ? 'strong' : 'span');
+					expect(view.find('button').textContent).toBe('1');
+				}
+			} finally {
+				view.unmount();
+			}
+		});
+
+		it.each([false, true])(
+			`preserves nested context updates through a memo boundary and held retry (nativeReads=${nativeReads}, hydrate=%s)`,
+			async (hydrate) => {
+				const options = { ...compileOptions, nativeReads };
+				const client = loadCompiledFixtureSource(contextArraySource, {
+					id: 'descriptor-context-array.tsrx',
+					mode: 'client',
+					compileOptions: options,
+				});
+				const props = { active: false, wrapped: true };
+				const container = document.createElement('div');
+				document.body.append(container);
+				if (hydrate) {
+					const server = loadCompiledFixtureSource(contextArraySource, {
+						id: 'descriptor-context-array.tsrx',
+						mode: 'server',
+						compileOptions: options,
+					});
+					container.innerHTML = ServerRuntime.renderToString(server.App, props).html;
+				}
+				const serverInput = container.querySelector('input');
+				const root = hydrate ? hydrateRoot(container, client.App, props) : createRoot(container);
+				if (!hydrate) root.render(client.App, props);
+				let ready = false;
+				let resolve!: () => void;
+				const pending = new Promise<void>((done) => {
+					resolve = done;
+				});
+				try {
+					const section = container.querySelector('section');
+					const input = container.querySelector('input')!;
+					const button = container.querySelector('button')!;
+					if (hydrate) expect(input).toBe(serverInput);
+					input.value = 'typed draft';
+					input.focus();
+					flushSync(() => button.click());
+					flushSync(() =>
+						root.render(client.App, {
+							active: true,
+							wrapped: true,
+							read: () => {
+								if (!ready) throw pending;
+							},
+						}),
+					);
+					expect(container.querySelector('[data-child]')?.outerHTML).toBe(
+						'<span data-child="nested">first</span>',
+					);
+					expect(container.querySelector('button')).toBe(button);
+					expect(button.textContent).toBe('1');
+					await act(async () => {
+						ready = true;
+						resolve();
+						await pending;
+					});
+					expect(container.querySelector('[data-child]')?.outerHTML).toBe(
+						'<strong data-child="nested">next</strong>',
+					);
+					expect(container.querySelector('section')).toBe(section);
+					expect(container.querySelector('input')).toBe(input);
+					expect(input.value).toBe('typed draft');
+					expect(document.activeElement).toBe(input);
+					expect(container.querySelector('button')).toBe(button);
+					expect(button.textContent).toBe('1');
+					flushSync(() => root.render(client.App, props));
+					expect(container.querySelector('[data-child]')?.outerHTML).toBe(
+						'<span data-child="nested">first</span>',
+					);
+				} finally {
+					root.unmount();
+					expect(container.innerHTML).toBe('');
+					container.remove();
+				}
+			},
+		);
+
+		it(`keeps nested stable-array descriptors isolated between Providers (nativeReads=${nativeReads})`, () => {
+			const client = loadCompiledFixtureSource(contextArraySource, {
+				id: 'descriptor-context-array.tsrx',
+				mode: 'client',
+				compileOptions: { ...compileOptions, nativeReads },
+			});
+			const view = mount(client.Providers, { first: false, second: true });
+			try {
+				const sections = view.findAll('section');
+				const observe = () =>
+					sections.map((section) => section.querySelector('[data-child]')?.outerHTML);
+				expect(observe()).toEqual([
+					'<span data-child="nested">first</span>',
+					'<strong data-child="nested">next</strong>',
+				]);
+				view.update(client.Providers, { first: true, second: false });
+				expect(observe()).toEqual([
+					'<strong data-child="nested">next</strong>',
+					'<span data-child="nested">first</span>',
+				]);
+				view.update(client.Providers, { first: false, second: true });
+				expect(observe()).toEqual([
+					'<span data-child="nested">first</span>',
+					'<strong data-child="nested">next</strong>',
+				]);
+			} finally {
+				view.unmount();
+			}
+		});
+	}
+
 	it('classifies one descriptor separately in each resolving Provider', () => {
 		const client = loadCompiledFixtureSource(source, {
 			id: 'descriptor-classification.tsrx',

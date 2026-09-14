@@ -1,3 +1,4 @@
+export { trustHTML, type TrustedHTML } from './trusted-html.js';
 /**
  * octane server runtime (SSR).
  *
@@ -316,7 +317,16 @@ interface InjectedStyle {
 	css: string;
 	nonce?: string;
 }
-let CSS: Map<string, InjectedStyle> | null = null;
+interface StyleCollector extends Map<string, InjectedStyle> {
+	/** Pristine replay copy for the current contents, released by the next write. */
+	replay: Map<string, InjectedStyle> | null;
+}
+function newStyleCollector(): StyleCollector {
+	const collector = new Map<string, InjectedStyle>() as StyleCollector;
+	collector.replay = null;
+	return collector;
+}
+let CSS: StyleCollector | null = null;
 // Pre-escaped ` nonce="..."` fragment for renderer-owned inline tags emitted
 // during the active pass. Saved/restored with every other ambient so nested or
 // concurrent server renders cannot leak a CSP nonce across requests.
@@ -337,7 +347,15 @@ let PERMANENT_STATIC_HYDRATE_DEPTH = 0;
 // per-pass local capture keeps accumulating via `HEAD.html +=` even though
 // strings are immutable). Folded into the result `html` by `spliceHead` (into
 // a document or leading fragment `<head>`, else prepended).
+interface HeadReplayCollections {
+	hints: Set<string>;
+	sheets: HeadBuffer['sheets'];
+	hintHtml: HeadBuffer['hintHtml'];
+	preloadXfer: HeadBuffer['preloadXfer'];
+}
 interface HeadBuffer {
+	/** Pristine collection copies shared until the next resource write. */
+	replay: HeadReplayCollections | null;
 	html: string;
 	/**
 	 * Priority hoistables, folded ahead of everything else (React Fizz parity:
@@ -3695,8 +3713,8 @@ interface NativeLocalHookRec {
 type AnyHookRec = HookRec | LinkedHookRec<any, any> | MemoHookRec | RefHookRec | NativeLocalHookRec;
 type ServerHookSlot = symbol | string | number;
 
-// Server twin of the client helper/custom-hook ABI. Modules reserve a range
-// only when globally composable Symbol descriptions are required.
+// Server twin of the client slot ABI. Modules reserve disjoint ranges for
+// numeric base-hook identities and globally composable Symbol descriptions.
 let nextHookSlot = 0;
 export function hookSlots(count: number): number {
 	const base = nextHookSlot;
@@ -3886,6 +3904,39 @@ function snapshotSet<T>(set: Set<T> | null | undefined): Set<T> | null {
 function snapshotList<T>(list: readonly T[] | null | undefined): T[] {
 	return list == null || list.length === 0 ? EMPTY_SNAPSHOT_LIST : list.slice();
 }
+// A populated collector often stays unchanged across hundreds of components.
+// Its pristine replay copy is shared until a write invalidates it; snapshots
+// already held by ancestor components keep the old copy for repeated rewinds.
+// These caches belong to pass-local collectors, so nested renders and completed
+// requests cannot share resources or retain each other's snapshots. Empty
+// collectors still use the shared empties without allocating a memo record.
+function snapshotStyles(css: StyleCollector | null): Map<string, InjectedStyle> | null {
+	if (css === null || css.size === 0) return snapshotMap(css);
+	return (css.replay ??= snapshotMap(css)!);
+}
+const EMPTY_HEAD_REPLAY: HeadReplayCollections = {
+	hints: EMPTY_SNAPSHOT_SET,
+	sheets: null,
+	hintHtml: null,
+	preloadXfer: null,
+};
+function snapshotHeadCollections(head: HeadBuffer | null): HeadReplayCollections | null {
+	if (head === null) return null;
+	if (head.replay !== null) return head.replay;
+	if (
+		head.hints.size === 0 &&
+		head.sheets === null &&
+		head.hintHtml === null &&
+		head.preloadXfer === null
+	)
+		return EMPTY_HEAD_REPLAY;
+	return (head.replay = {
+		hints: snapshotSet(head.hints)!,
+		sheets: snapshotMap(head.sheets),
+		hintHtml: snapshotMap(head.hintHtml),
+		preloadXfer: snapshotMap(head.preloadXfer),
+	});
+}
 function snapshotVtStack(): Array<{ candidate: VtSsrCandidate; consumed: boolean }> {
 	return VT_SSR_STACK.length === 0
 		? EMPTY_SNAPSHOT_LIST
@@ -3908,6 +3959,7 @@ function restoreScopedCounts(snapshot: ScopedCounts | null): ScopedCounts | null
 function captureComponentReplayState(scope: SSRScope, frame: Frame | null) {
 	const css = CSS;
 	const head = HEAD;
+	const headCollections = snapshotHeadCollections(head);
 	const serial = SERIAL;
 	const susp = SUSPENDED;
 	const jobs = DEFERRED;
@@ -3920,15 +3972,15 @@ function captureComponentReplayState(scope: SSRScope, frame: Frame | null) {
 		nativeMixed: NATIVE_SERVER_READS?.mixed ?? false,
 		nativeFailures: NATIVE_SERVER_FAILURES,
 		css,
-		cssEntries: snapshotMap(css),
+		cssEntries: snapshotStyles(css),
 		head,
 		headLength: head !== null ? head.html.length : 0,
 		headCharsetLength: head !== null ? head.charset.length : 0,
 		headViewportLength: head !== null ? head.viewport.length : 0,
-		headHints: snapshotSet(head?.hints),
-		headSheets: snapshotMap(head?.sheets),
-		headHintHtml: snapshotMap(head?.hintHtml),
-		headXfer: snapshotMap(head?.preloadXfer),
+		headHints: headCollections?.hints ?? null,
+		headSheets: headCollections?.sheets ?? null,
+		headHintHtml: headCollections?.hintHtml ?? null,
+		headXfer: headCollections?.preloadXfer ?? null,
 		serial,
 		serialLength: serial !== null ? serial.length : 0,
 		susp,
@@ -3969,10 +4021,12 @@ function rewindComponentReplayState(
 	NATIVE_SERVER_FAILURES = snapshot.nativeFailures;
 	ASYNC_SCOPE = snapshot.asyncScope;
 	if (snapshot.css !== null && snapshot.cssEntries !== null) {
+		snapshot.css.replay = null;
 		snapshot.css.clear();
 		for (const [hash, sheet] of snapshot.cssEntries) snapshot.css.set(hash, sheet);
 	}
 	if (snapshot.head !== null && snapshot.headHints !== null) {
+		snapshot.head.replay = null;
 		snapshot.head.html = snapshot.head.html.slice(0, snapshot.headLength);
 		snapshot.head.charset = snapshot.head.charset.slice(0, snapshot.headCharsetLength);
 		snapshot.head.viewport = snapshot.head.viewport.slice(0, snapshot.headViewportLength);
@@ -6491,7 +6545,10 @@ export function isChildrenBlock(value: unknown): boolean {
 // ---------------------------------------------------------------------------
 
 export function injectStyle(id: string, css: string, nonce?: string): void {
-	if (CSS !== null) CSS.set(id, nonce === undefined ? { css } : { css, nonce });
+	if (CSS !== null) {
+		CSS.replay = null;
+		CSS.set(id, nonce === undefined ? { css } : { css, nonce });
+	}
 }
 
 /**
@@ -6876,6 +6933,8 @@ type SuspenseOutcome = SuspenseResult & {
 //              can't know the unwraps' string keys, but puMemo makes instance
 //              identity stable across passes);
 type ResolvedMap = Map<string, SuspenseOutcome> & {
+	/** Pending streaming subscriptions shared across this request's settle waves. */
+	streamSettlements?: StreamSettlements;
 	/** Recoverable buffered-boundary errors are reported once across async retries. */
 	bufferedErrors?: Map<string, { error: unknown; reported: boolean }>;
 	/** Undefined for externally hosted passes whose request lifetime is not owned here. */
@@ -6971,6 +7030,16 @@ export function getServerRenderResourceContext(): ServerRenderResourceContext | 
 }
 
 function releaseServerRenderResources(resolved: ResolvedMap): void {
+	const settlements = resolved.streamSettlements;
+	if (settlements !== undefined) {
+		// Promise callbacks cannot be detached, but a late outcome must not retain
+		// or refill the completed request. Shared producers keep running normally.
+		resolved.streamSettlements = undefined;
+		settlements.resolved = null;
+		settlements.wake = null;
+		for (const recorder of settlements.pending.values()) recorder.keys = null;
+		settlements.pending.clear();
+	}
 	const resources = resolved.resources;
 	// Native thenable settlement callbacks can retain this cache after an abort.
 	// They must not also keep a completed request's options or foreign resources.
@@ -7025,7 +7094,7 @@ interface Ambient {
 	warmClaims: Set<object> | null;
 	id: number;
 	idPrefix: string;
-	css: Map<string, InjectedStyle> | null;
+	css: StyleCollector | null;
 	nonceAttr: string;
 	markers: boolean;
 	permanentStaticHydrateDepth: number;
@@ -7169,8 +7238,9 @@ function runFullFramedPass(
 	VT_SSR_TRY_SEQ = 0;
 	VT_SSR_HAS_CANDIDATES = false;
 	VT_SSR_STACK.length = 0;
-	const cssMap = (CSS = new Map<string, InjectedStyle>());
+	const cssMap = (CSS = newStyleCollector());
 	const headBuf = (HEAD = {
+		replay: null,
 		html: '',
 		charset: '',
 		viewport: '',
@@ -7233,7 +7303,14 @@ function runFullFramedPass(
 			if (markers && nativePassCompleted)
 				signals = NATIVE_READ_COLLECTOR?.serialize(NATIVE_SERVER_READS);
 		} finally {
-			restoreAmbient(saved);
+			try {
+				restoreAmbient(saved);
+			} finally {
+				// Cleanup callbacks may render too; release memo copies only after
+				// they finish. Hosted results and streams can retain cssEntries.
+				cssMap.replay = null;
+				headBuf.replay = null;
+			}
 		}
 	}
 	if (resolved.bufferedErrors !== undefined) {
@@ -7298,8 +7375,9 @@ function runDiscoveryRound(
 	VT_SSR_TRY_SEQ = 0;
 	VT_SSR_HAS_CANDIDATES = false;
 	VT_SSR_STACK.length = 0;
-	CSS = new Map();
+	CSS = newStyleCollector();
 	HEAD = {
+		replay: null,
 		html: '',
 		charset: '',
 		viewport: '',
@@ -7445,6 +7523,50 @@ const yieldMacrotask: () => Promise<void> =
 		? () => new Promise((resolve) => setImmediate(resolve))
 		: () => new Promise((resolve) => setTimeout(resolve, 0));
 
+interface StreamSettlementRecorder {
+	promise: PromiseLike<unknown>;
+	key: string;
+	/** Batch registrations get a fresh synthetic key on every pass. */
+	keys: Set<string> | null;
+	batch: boolean;
+	wave: number;
+}
+
+interface StreamSettlements {
+	resolved: ResolvedMap | null;
+	pending: Map<PromiseLike<unknown>, StreamSettlementRecorder>;
+	wave: number;
+	wake: (() => void) | null;
+}
+
+async function recordStreamSettlement(
+	settlements: StreamSettlements,
+	recorder: StreamSettlementRecorder,
+): Promise<void> {
+	let outcome: SuspenseOutcome;
+	try {
+		outcome = { value: await recorder.promise, thenable: recorder.promise };
+	} catch (reason) {
+		outcome = { reason, thenable: recorder.promise };
+	}
+	const resolved = settlements.resolved;
+	if (resolved === null) return;
+	if (!resolved.has(recorder.key)) resolved.set(recorder.key, outcome);
+	if (recorder.keys !== null) {
+		for (const key of recorder.keys) {
+			if (!resolved.has(key)) resolved.set(key, outcome);
+		}
+		recorder.keys = null;
+	}
+	if (recorder.batch && !resolved.pu.resolvedT.has(recorder.promise)) {
+		resolved.pu.resolvedT.set(recorder.promise, outcome);
+	}
+	settlements.pending.delete(recorder.promise);
+	// Only a member of the current suspended list may end its wait. A vanished
+	// branch's late result can warm replay state without starting another pass.
+	if (recorder.wave === settlements.wave) settlements.wake?.();
+}
+
 // The STREAMING settle: await only until the FIRST unresolved thenable
 // settles, then coalesce — one macrotask yield plus microtask drains — so
 // everything else that landed in the same event-loop wave records into
@@ -7461,27 +7583,42 @@ async function settleFirstOfWave(
 ): Promise<void> {
 	const pu = (resolved as ResolvedMap).pu;
 	pu.recreate ??= { strikes: 0, prevCreated: pu.created.size };
-	const recorders: Promise<void>[] = [];
+	const settlements = (resolved.streamSettlements ??= {
+		resolved,
+		pending: new Map(),
+		wave: 0,
+		wake: null,
+	});
+	const wave = ++settlements.wave;
+	let waiting = false;
 	for (const { promise, key } of suspended) {
 		if (resolved.has(key)) continue;
-		const isPu = key.startsWith('|pu#');
-		recorders.push(
-			(async () => {
-				try {
-					const value = await promise;
-					const outcome = { value, thenable: promise };
-					if (!resolved.has(key)) resolved.set(key, outcome);
-					if (isPu && !pu.resolvedT.has(promise)) pu.resolvedT.set(promise, outcome);
-				} catch (reason) {
-					const outcome = { reason, thenable: promise };
-					if (!resolved.has(key)) resolved.set(key, outcome);
-					if (isPu && !pu.resolvedT.has(promise)) pu.resolvedT.set(promise, outcome);
-				}
-			})(),
-		);
+		let recorder = settlements.pending.get(promise);
+		if (recorder === undefined) {
+			recorder = { promise, key, keys: null, batch: key.startsWith('|pu#'), wave };
+			settlements.pending.set(promise, recorder);
+			// Attach once per thenable, preserving a first-writer outcome for each
+			// occurrence key. Even non-native thenables resume after this loop has
+			// installed the wake-up. A shared producer never merges its use sites.
+			void recordStreamSettlement(settlements, recorder);
+		} else {
+			if (key !== recorder.key) (recorder.keys ??= new Set()).add(key);
+			if (key.startsWith('|pu#')) recorder.batch = true;
+			recorder.wave = wave;
+		}
+		waiting = true;
 	}
-	if (recorders.length === 0) return;
-	await raceSettleGuards(Promise.race(recorders), timeoutMs, signal);
+	if (!waiting) return;
+	// A single wake-up replaces Promise.race's reaction on every still-pending
+	// recorder each wave. Recording always precedes waking the next full pass.
+	const first = new Promise<void>((resolve) => {
+		settlements.wake = resolve;
+	});
+	try {
+		await raceSettleGuards(first, timeoutMs, signal);
+	} finally {
+		settlements.wake = null;
+	}
 	// The winning recorder has recorded. Yield one macrotask so the rest of
 	// this turn's burst fires, then drain microtasks while settlements keep
 	// recording (a chained/non-native thenable needs an extra tick or two);
@@ -8111,6 +8248,13 @@ interface StreamState {
 	replay: StreamBoundaryReplayEntry[] | null;
 }
 
+function hasPendingStreamBoundary(stream: StreamState): boolean {
+	for (const boundary of stream.boundaries.values()) {
+		if (boundary.state === 'pending') return true;
+	}
+	return false;
+}
+
 interface StreamBoundaryReplayEntry {
 	key: string;
 	boundary: StreamBoundary | undefined;
@@ -8431,15 +8575,16 @@ export function ssrTry(
 			const deferredStart = DEFERRED?.length ?? 0;
 			const serialStart = SERIAL?.length ?? 0;
 			const css = CSS;
-			const cssSnapshot = snapshotMap(css);
+			const cssSnapshot = snapshotStyles(css);
 			const head = HEAD;
+			const headCollections = snapshotHeadCollections(head);
 			const headHtml = head?.html;
 			const headCharset = head?.charset;
 			const headViewport = head?.viewport;
-			const headHints = snapshotSet(head?.hints);
-			const headSheets = snapshotMap(head?.sheets);
-			const headHintHtml = snapshotMap(head?.hintHtml);
-			const headXfer = snapshotMap(head?.preloadXfer);
+			const headHints = headCollections?.hints ?? null;
+			const headSheets = headCollections?.sheets ?? null;
+			const headHintHtml = headCollections?.hintHtml ?? null;
+			const headXfer = headCollections?.preloadXfer ?? null;
 			const vtTrySeq = VT_SSR_TRY_SEQ;
 			const vtHasCandidates = VT_SSR_HAS_CANDIDATES;
 			const vtStack = snapshotVtStack();
@@ -8459,10 +8604,12 @@ export function ssrTry(
 				if (DEFERRED !== null) DEFERRED.length = deferredStart;
 				if (SERIAL !== null) SERIAL.length = serialStart;
 				if (css !== null && cssSnapshot !== null) {
+					css.replay = null;
 					css.clear();
 					for (const [hash, sheet] of cssSnapshot) css.set(hash, sheet);
 				}
 				if (head !== null && headHints !== null) {
+					head.replay = null;
 					head.html = headHtml!;
 					head.charset = headCharset!;
 					head.viewport = headViewport!;
@@ -9248,16 +9395,22 @@ async function runStream(
 		const done: StreamBoundary[] = [];
 		const reachable = new Set(flushedSegments);
 		for (;;) {
-			const next = [...stream.boundaries.values()]
-				.filter((boundary) => {
-					if (boundary.state !== 'done' || reachable.has(boundary.id)) return false;
-					for (let i = boundary.ancestors.length - 1; i >= 0; i--) {
-						const ancestor = stream.boundaries.get(boundary.ancestors[i]);
-						if (ancestor !== undefined) return reachable.has(ancestor.id);
+			const next: StreamBoundary[] = [];
+			// Selection only reads renderer-owned records; no render or transport
+			// callback can change the registry during this scan.
+			for (const boundary of stream.boundaries.values()) {
+				if (boundary.state !== 'done' || reachable.has(boundary.id)) continue;
+				let visible = true;
+				for (let i = boundary.ancestors.length - 1; i >= 0; i--) {
+					const ancestor = stream.boundaries.get(boundary.ancestors[i]);
+					if (ancestor !== undefined) {
+						visible = reachable.has(ancestor.id);
+						break;
 					}
-					return true;
-				})
-				.sort((a, b) => a.order - b.order);
+				}
+				if (visible) next.push(boundary);
+			}
+			next.sort((a, b) => a.order - b.order);
 			if (next.length === 0) return done;
 			for (const boundary of next) {
 				done.push(boundary);
@@ -9272,17 +9425,22 @@ async function runStream(
 			options?.onError?.(boundary.error);
 		}
 	};
-	const reachableErroredBoundaries = (): StreamBoundary[] =>
-		[...stream.boundaries.values()]
-			.filter((boundary) => {
-				if (boundary.state !== 'errored' || boundary.errorFlushed) return false;
-				for (let i = boundary.ancestors.length - 1; i >= 0; i--) {
-					const ancestor = stream.boundaries.get(boundary.ancestors[i]);
-					if (ancestor !== undefined) return flushedSegments.has(ancestor.id);
+	const reachableErroredBoundaries = (): StreamBoundary[] => {
+		const errors: StreamBoundary[] = [];
+		for (const boundary of stream.boundaries.values()) {
+			if (boundary.state !== 'errored' || boundary.errorFlushed) continue;
+			let visible = true;
+			for (let i = boundary.ancestors.length - 1; i >= 0; i--) {
+				const ancestor = stream.boundaries.get(boundary.ancestors[i]);
+				if (ancestor !== undefined) {
+					visible = flushedSegments.has(ancestor.id);
+					break;
 				}
-				return true;
-			})
-			.sort((a, b) => a.order - b.order);
+			}
+			if (visible) errors.push(boundary);
+		}
+		return errors.sort((a, b) => a.order - b.order);
+	};
 	const flushRecoverableBoundaryErrors = (): void | Promise<void> => {
 		const errors = reachableErroredBoundaries();
 		if (errors.length === 0) return;
@@ -9500,7 +9658,7 @@ async function runStream(
 		}
 		const initialErrorWrite = flushRecoverableBoundaryErrors();
 		if (initialErrorWrite !== undefined) await initialErrorWrite;
-		while ([...stream.boundaries.values()].some((b) => b.state === 'pending')) {
+		while (hasPendingStreamBoundary(stream)) {
 			signal?.throwIfAborted();
 			if (suspended.length === 0) {
 				throw new Error(formatServerError(36));
@@ -9581,9 +9739,10 @@ async function runStream(
 		// boundary whose segment was not accepted. A live consumer receives these
 		// through the same pressure gate; a disconnected consumer rejects and the
 		// renderer simply stops.
-		const pendingBoundaryCount = [...stream.boundaries.values()].filter(
-			(boundary) => boundary.state === 'pending' && !flushedSegments.has(boundary.id),
-		).length;
+		let pendingBoundaryCount = 0;
+		for (const boundary of stream.boundaries.values()) {
+			if (boundary.state === 'pending' && !flushedSegments.has(boundary.id)) pendingBoundaryCount++;
+		}
 		const reports = signal?.aborted ? Math.max(1, pendingBoundaryCount) : 1;
 		for (let i = 0; i < reports; i++) options?.onError?.(err);
 		// Rendering ends here, degraded — the source still gets its completion
@@ -10216,6 +10375,7 @@ export function renderToReadableStream(
 function emitHeadHint(key: string, html: string): void {
 	if (HEAD === null) return;
 	if (HEAD.hints.has(key)) return;
+	HEAD.replay = null;
 	HEAD.hints.add(key);
 	(HEAD.hintHtml ??= new Map()).set(key, html);
 }
@@ -10310,7 +10470,10 @@ export function preload(href: string, options: { as: string } & Record<string, u
 				const v = (options as any)[k];
 				if (v != null) (subset ??= {})[k] = v;
 			}
-			if (subset !== null) (HEAD.preloadXfer ??= new Map()).set(as + ':' + value, subset);
+			if (subset !== null) {
+				HEAD.replay = null;
+				(HEAD.preloadXfer ??= new Map()).set(as + ':' + value, subset);
+			}
 		}
 	}
 	const imageSrcSet = as === 'image' ? options.imageSrcSet : undefined;
@@ -10350,6 +10513,9 @@ export function preinit(href: string, options: { as: string } & Record<string, u
 	if (as !== 'style' && as !== 'script') return;
 	let seeded: Record<string, unknown> | null = null;
 	if (HEAD !== null) {
+		// Preinit may remove an existing hint/transfer even when the resource
+		// itself was already emitted, so invalidate before those deletions.
+		HEAD.replay = null;
 		const xfer = HEAD.preloadXfer?.get(as + ':' + value);
 		if (xfer !== undefined) {
 			seeded = xfer;
@@ -10467,6 +10633,7 @@ export function ssrStylesheetResource(
 	if (typeof href !== 'string' || href === '') return '';
 	const key = 'sheet:' + href;
 	if (HEAD.hints.has(key)) return '';
+	HEAD.replay = null;
 	HEAD.hints.add(key);
 	const precedence = attrs.precedence == null ? '' : String(attrs.precedence);
 	const tag =
@@ -10477,6 +10644,9 @@ export function ssrStylesheetResource(
 		'"' +
 		resourceAttrs(attrs, 'link') +
 		'>';
+	// Attribute coercion may render a child and capture another checkpoint.
+	// Invalidate again at the final write after all caller-controlled reads.
+	HEAD.replay = null;
 	const sheets = (HEAD.sheets ??= new Map());
 	sheets.set(href, { precedence, html: tag });
 	return '';
@@ -10527,6 +10697,7 @@ export function ssrStyleResource(
 		}
 		HEAD.hints.add('dev-inline-style:' + href);
 	}
+	HEAD.replay = null;
 	HEAD.hints.add(key);
 	const precedence = attrs.precedence == null ? '' : String(attrs.precedence);
 	const tag =
@@ -10539,6 +10710,9 @@ export function ssrStyleResource(
 		'>' +
 		css +
 		'</style>';
+	// Attribute coercion may render a child and capture another checkpoint.
+	// Invalidate again at the final write after all caller-controlled reads.
+	HEAD.replay = null;
 	const sheets = (HEAD.sheets ??= new Map());
 	sheets.set(href, { precedence, html: tag });
 	return '';
@@ -10552,6 +10726,7 @@ export function ssrScriptResource(attrs: Record<string, unknown> | null): string
 	const key = 'script:' + src;
 	// One executable per src per pass, across the classic and module forms.
 	if (HEAD.hints.has(key) || HEAD.hints.has('module:' + src)) return '';
+	HEAD.replay = null;
 	HEAD.hints.add(key);
 	HEAD.html +=
 		'<script src="' +

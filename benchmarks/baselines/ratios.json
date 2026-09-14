@@ -6535,5 +6535,1760 @@
     "reference": "events-custom-known-and-unknown-updates-work",
     "maxRatio": 0,
     "note": "Per-host native event work, preserving latest capture/bubble handlers and custom-element classification. Includes optional cache probes, unknown-name fallback, and finite catalog startup."
+  },
+  {
+    "suite": "body-ownership",
+    "op": "stale_output_count",
+    "target": "octane",
+    "reference": "reference",
+    "maxRatio": 0,
+    "note": "Independent Provider bodies, lazy body switches and nested scoped context must render current output."
+  },
+  {
+    "suite": "body-ownership",
+    "op": "map_memo_hits",
+    "target": "octane",
+    "reference": "reference",
+    "maxRatio": 0,
+    "note": "Unchanged independently compiled body retains ordinary hook memo values."
+  },
+  {
+    "suite": "body-ownership",
+    "op": "inline_memo_hits",
+    "target": "octane",
+    "reference": "reference",
+    "maxRatio": 0,
+    "note": "Unchanged independently compiled body retains inline hook memo values."
+  },
+  {
+    "suite": "body-ownership",
+    "op": "lazy_memo_hits",
+    "target": "octane",
+    "reference": "reference",
+    "maxRatio": 0,
+    "note": "Same resolved lazy body retains its hook memo values."
+  },
+  {
+    "suite": "body-ownership",
+    "op": "context_unchanged_resolutions",
+    "target": "octane",
+    "reference": "reference",
+    "maxRatio": 0,
+    "note": "Stable scoped context values retain cached resolution across ordinary updates."
+  },
+  {
+    "suite": "body-ownership",
+    "op": "map_body_computations",
+    "target": "octane",
+    "reference": "reference",
+    "maxRatio": 1,
+    "note": "Each independent module owns one ordinary memo computation across repeated body switches.",
+    "minRatio": 1
+  },
+  {
+    "suite": "body-ownership",
+    "op": "inline_body_computations",
+    "target": "octane",
+    "reference": "reference",
+    "maxRatio": 1,
+    "note": "Each independent module owns one inline memo computation across repeated body switches.",
+    "minRatio": 1
+  },
+  {
+    "suite": "body-ownership",
+    "op": "context_changed_resolutions",
+    "target": "octane",
+    "reference": "reference",
+    "maxRatio": 1,
+    "note": "Changed context recomputes the nested scoped value once per requested value.",
+    "minRatio": 1
+  },
+  {
+    "suite": "universal-retention",
+    "op": "feature_node_visits",
+    "target": "retained-0",
+    "reference": "update-work",
+    "maxRatio": 0,
+    "note": "After cold observer-validated traversal, unchanged committed subtrees reuse feature unions across 64 state updates while retaining host identity and labels."
+  },
+  {
+    "suite": "universal-retention",
+    "op": "feature_node_visits",
+    "target": "retained-128",
+    "reference": "update-work",
+    "maxRatio": 0,
+    "note": "After cold observer-validated traversal, unchanged committed subtrees reuse feature unions across 64 state updates while retaining host identity and labels."
+  },
+  {
+    "suite": "universal-retention",
+    "op": "feature_node_visits",
+    "target": "retained-1024",
+    "reference": "update-work",
+    "maxRatio": 0,
+    "note": "After cold observer-validated traversal, unchanged committed subtrees reuse feature unions across 64 state updates while retaining host identity and labels."
+  },
+  {
+    "suite": "universal-materialization",
+    "op": "update_materializeArrays",
+    "target": "static-128",
+    "reference": "static-128-budget",
+    "maxRatio": 1,
+    "note": "Deterministic production allocation work with clean/observed output, keyed state, identity, abort and teardown controls."
+  },
+  {
+    "suite": "universal-materialization",
+    "op": "update_runtimeSets",
+    "target": "static-128",
+    "reference": "static-128-budget",
+    "maxRatio": 1,
+    "note": "Deterministic production allocation work with clean/observed output, keyed state, identity, abort and teardown controls."
+  },
+  {
+    "suite": "universal-materialization",
+    "op": "update_materializeArrays",
+    "target": "scoped-128",
+    "reference": "scoped-128-budget",
+    "maxRatio": 1,
+    "note": "Deterministic production allocation work with clean/observed output, keyed state, identity, abort and teardown controls."
+  },
+  {
+    "suite": "universal-materialization",
+    "op": "update_runtimeSets",
+    "target": "scoped-128",
+    "reference": "scoped-128-budget",
+    "maxRatio": 1,
+    "note": "Deterministic production allocation work with clean/observed output, keyed state, identity, abort and teardown controls."
+  },
+  {
+    "suite": "universal-materialization",
+    "op": "update_materializeArrays",
+    "target": "unkeyed-128",
+    "reference": "unkeyed-128-budget",
+    "maxRatio": 1,
+    "note": "Deterministic production allocation work with clean/observed output, keyed state, identity, abort and teardown controls."
+  },
+  {
+    "suite": "universal-materialization",
+    "op": "update_runtimeSets",
+    "target": "unkeyed-128",
+    "reference": "unkeyed-128-budget",
+    "maxRatio": 1,
+    "note": "Deterministic production allocation work with clean/observed output, keyed state, identity, abort and teardown controls."
+  },
+  {
+    "suite": "universal-prop-shapes",
+    "op": "dictionary_props",
+    "target": "plain-component",
+    "reference": "normalization-work",
+    "maxRatio": 0,
+    "note": "Actual component snapshots and public host command props retain V8 fast properties; output, identity and callback/cleanup controls match."
+  },
+  {
+    "suite": "universal-prop-shapes",
+    "op": "dictionary_props",
+    "target": "keyed-component",
+    "reference": "normalization-work",
+    "maxRatio": 0,
+    "note": "Actual component snapshots and public host command props retain V8 fast properties; output, identity and callback/cleanup controls match."
+  },
+  {
+    "suite": "universal-prop-shapes",
+    "op": "dictionary_props",
+    "target": "spread-keyed-component",
+    "reference": "normalization-work",
+    "maxRatio": 0,
+    "note": "Actual component snapshots and public host command props retain V8 fast properties; output, identity and callback/cleanup controls match."
+  },
+  {
+    "suite": "universal-prop-shapes",
+    "op": "dictionary_props",
+    "target": "plain-host",
+    "reference": "normalization-work",
+    "maxRatio": 0,
+    "note": "Actual component snapshots and public host command props retain V8 fast properties; output, identity and callback/cleanup controls match."
+  },
+  {
+    "suite": "universal-prop-shapes",
+    "op": "dictionary_props",
+    "target": "event-host",
+    "reference": "normalization-work",
+    "maxRatio": 0,
+    "note": "Actual component snapshots and public host command props retain V8 fast properties; output, identity and callback/cleanup controls match."
+  },
+  {
+    "suite": "universal-prop-shapes",
+    "op": "dictionary_props",
+    "target": "null-event-host",
+    "reference": "normalization-work",
+    "maxRatio": 0,
+    "note": "Actual component snapshots and public host command props retain V8 fast properties; output, identity and callback/cleanup controls match."
+  },
+  {
+    "suite": "universal-prop-shapes",
+    "op": "dictionary_props",
+    "target": "reserved-host",
+    "reference": "normalization-work",
+    "maxRatio": 0,
+    "note": "Actual component snapshots and public host command props retain V8 fast properties; output, identity and callback/cleanup controls match."
+  },
+  {
+    "suite": "universal-prop-shapes",
+    "op": "dictionary_props",
+    "target": "lifecycle-host",
+    "reference": "normalization-work",
+    "maxRatio": 0,
+    "note": "Actual component snapshots and public host command props retain V8 fast properties; output, identity and callback/cleanup controls match."
+  },
+  {
+    "suite": "universal-prop-shapes",
+    "op": "dictionary_props",
+    "target": "local-callback-host",
+    "reference": "normalization-work",
+    "maxRatio": 0,
+    "note": "Actual component snapshots and public host command props retain V8 fast properties; output, identity and callback/cleanup controls match."
+  },
+  {
+    "suite": "universal-prop-shapes",
+    "op": "dictionary_props",
+    "target": "fallback-event-host",
+    "reference": "normalization-work",
+    "maxRatio": 0,
+    "note": "Actual component snapshots and public host command props retain V8 fast properties; output, identity and callback/cleanup controls match."
+  },
+  {
+    "suite": "universal-prop-shapes",
+    "op": "dictionary_props",
+    "target": "ownerless-leaf-host",
+    "reference": "normalization-work",
+    "maxRatio": 0,
+    "note": "Ownerless and compact compiler-leaf controls retain ordinary host prop shapes and public output."
+  },
+  {
+    "suite": "universal-prop-shapes",
+    "op": "dictionary_props",
+    "target": "compact-leaf-host",
+    "reference": "normalization-work",
+    "maxRatio": 0,
+    "note": "Ownerless and compact compiler-leaf controls retain ordinary host prop shapes and public output."
+  },
+  {
+    "suite": "universal-preparation",
+    "op": "update_templateNodes",
+    "target": "ordinary-0",
+    "reference": "preparation-work",
+    "maxRatio": 0,
+    "note": "Ordinary trees without compact markers skip optional compact builder/expansion walks, with compact controls preserving required work and host identity."
+  },
+  {
+    "suite": "universal-preparation",
+    "op": "update_leafNodes",
+    "target": "ordinary-0",
+    "reference": "preparation-work",
+    "maxRatio": 0,
+    "note": "Ordinary trees without compact markers skip optional compact builder/expansion walks, with compact controls preserving required work and host identity."
+  },
+  {
+    "suite": "universal-preparation",
+    "op": "update_expansionNodes",
+    "target": "ordinary-0",
+    "reference": "preparation-work",
+    "maxRatio": 0,
+    "note": "Ordinary trees without compact markers skip optional compact builder/expansion walks, with compact controls preserving required work and host identity."
+  },
+  {
+    "suite": "universal-preparation",
+    "op": "update_templateNodes",
+    "target": "ordinary-128",
+    "reference": "preparation-work",
+    "maxRatio": 0,
+    "note": "Ordinary trees without compact markers skip optional compact builder/expansion walks, with compact controls preserving required work and host identity."
+  },
+  {
+    "suite": "universal-preparation",
+    "op": "update_leafNodes",
+    "target": "ordinary-128",
+    "reference": "preparation-work",
+    "maxRatio": 0,
+    "note": "Ordinary trees without compact markers skip optional compact builder/expansion walks, with compact controls preserving required work and host identity."
+  },
+  {
+    "suite": "universal-preparation",
+    "op": "update_expansionNodes",
+    "target": "ordinary-128",
+    "reference": "preparation-work",
+    "maxRatio": 0,
+    "note": "Ordinary trees without compact markers skip optional compact builder/expansion walks, with compact controls preserving required work and host identity."
+  },
+  {
+    "suite": "universal-preparation",
+    "op": "update_templateNodes",
+    "target": "ordinary-1024",
+    "reference": "preparation-work",
+    "maxRatio": 0,
+    "note": "Ordinary trees without compact markers skip optional compact builder/expansion walks, with compact controls preserving required work and host identity."
+  },
+  {
+    "suite": "universal-preparation",
+    "op": "update_leafNodes",
+    "target": "ordinary-1024",
+    "reference": "preparation-work",
+    "maxRatio": 0,
+    "note": "Ordinary trees without compact markers skip optional compact builder/expansion walks, with compact controls preserving required work and host identity."
+  },
+  {
+    "suite": "universal-preparation",
+    "op": "update_expansionNodes",
+    "target": "ordinary-1024",
+    "reference": "preparation-work",
+    "maxRatio": 0,
+    "note": "Ordinary trees without compact markers skip optional compact builder/expansion walks, with compact controls preserving required work and host identity."
+  },
+  {
+    "suite": "universal-preparation",
+    "op": "update_templateNodes",
+    "target": "owners-0",
+    "reference": "preparation-work",
+    "maxRatio": 0,
+    "note": "Ordinary trees without compact markers skip optional compact builder/expansion walks, with compact controls preserving required work and host identity."
+  },
+  {
+    "suite": "universal-preparation",
+    "op": "update_leafNodes",
+    "target": "owners-0",
+    "reference": "preparation-work",
+    "maxRatio": 0,
+    "note": "Ordinary trees without compact markers skip optional compact builder/expansion walks, with compact controls preserving required work and host identity."
+  },
+  {
+    "suite": "universal-preparation",
+    "op": "update_expansionNodes",
+    "target": "owners-0",
+    "reference": "preparation-work",
+    "maxRatio": 0,
+    "note": "Ordinary trees without compact markers skip optional compact builder/expansion walks, with compact controls preserving required work and host identity."
+  },
+  {
+    "suite": "universal-preparation",
+    "op": "update_templateNodes",
+    "target": "owners-128",
+    "reference": "preparation-work",
+    "maxRatio": 0,
+    "note": "Ordinary trees without compact markers skip optional compact builder/expansion walks, with compact controls preserving required work and host identity."
+  },
+  {
+    "suite": "universal-preparation",
+    "op": "update_leafNodes",
+    "target": "owners-128",
+    "reference": "preparation-work",
+    "maxRatio": 0,
+    "note": "Ordinary trees without compact markers skip optional compact builder/expansion walks, with compact controls preserving required work and host identity."
+  },
+  {
+    "suite": "universal-preparation",
+    "op": "update_expansionNodes",
+    "target": "owners-128",
+    "reference": "preparation-work",
+    "maxRatio": 0,
+    "note": "Ordinary trees without compact markers skip optional compact builder/expansion walks, with compact controls preserving required work and host identity."
+  },
+  {
+    "suite": "universal-preparation",
+    "op": "update_templateNodes",
+    "target": "owners-1024",
+    "reference": "preparation-work",
+    "maxRatio": 0,
+    "note": "Ordinary trees without compact markers skip optional compact builder/expansion walks, with compact controls preserving required work and host identity."
+  },
+  {
+    "suite": "universal-preparation",
+    "op": "update_leafNodes",
+    "target": "owners-1024",
+    "reference": "preparation-work",
+    "maxRatio": 0,
+    "note": "Ordinary trees without compact markers skip optional compact builder/expansion walks, with compact controls preserving required work and host identity."
+  },
+  {
+    "suite": "universal-preparation",
+    "op": "update_expansionNodes",
+    "target": "owners-1024",
+    "reference": "preparation-work",
+    "maxRatio": 0,
+    "note": "Ordinary trees without compact markers skip optional compact builder/expansion walks, with compact controls preserving required work and host identity."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "collection_copies",
+    "target": "populated-stable",
+    "reference": "populated-seed",
+    "maxRatio": 1.04,
+    "note": "Unchanged descendants share pristine populated CSS/head snapshots; both scenarios preserve complete HTML/CSS and resource ordering."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "collection_copies",
+    "target": "empty",
+    "reference": "populated-seed",
+    "maxRatio": 0,
+    "note": "Empty collectors do not allocate populated collection copies."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "copied_entries",
+    "target": "populated-stable",
+    "reference": "populated-seed",
+    "maxRatio": 1.07,
+    "note": "Unchanged descendants share pristine populated CSS/head snapshots; both scenarios preserve complete HTML/CSS and resource ordering."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "copied_entries",
+    "target": "empty",
+    "reference": "populated-seed",
+    "maxRatio": 0,
+    "note": "Empty collectors do not allocate populated collection copies."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "recorders",
+    "target": "stream-8-onewave",
+    "reference": "stream-budget-8",
+    "maxRatio": 1,
+    "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "subscriptions",
+    "target": "stream-8-onewave",
+    "reference": "stream-budget-8",
+    "maxRatio": 2,
+    "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "raceSubscriptions",
+    "target": "stream-8-onewave",
+    "reference": "stream-budget-8",
+    "maxRatio": 0,
+    "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "recorders",
+    "target": "stream-8-waves",
+    "reference": "stream-budget-8",
+    "maxRatio": 1,
+    "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "subscriptions",
+    "target": "stream-8-waves",
+    "reference": "stream-budget-8",
+    "maxRatio": 5.5,
+    "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "raceSubscriptions",
+    "target": "stream-8-waves",
+    "reference": "stream-budget-8",
+    "maxRatio": 0,
+    "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "recorders",
+    "target": "stream-32-onewave",
+    "reference": "stream-budget-32",
+    "maxRatio": 1,
+    "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "subscriptions",
+    "target": "stream-32-onewave",
+    "reference": "stream-budget-32",
+    "maxRatio": 2,
+    "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "raceSubscriptions",
+    "target": "stream-32-onewave",
+    "reference": "stream-budget-32",
+    "maxRatio": 0,
+    "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "recorders",
+    "target": "stream-32-waves",
+    "reference": "stream-budget-32",
+    "maxRatio": 1,
+    "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "subscriptions",
+    "target": "stream-32-waves",
+    "reference": "stream-budget-32",
+    "maxRatio": 17.5,
+    "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "raceSubscriptions",
+    "target": "stream-32-waves",
+    "reference": "stream-budget-32",
+    "maxRatio": 0,
+    "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "recorders",
+    "target": "stream-plain-8-onewave",
+    "reference": "stream-budget-8",
+    "maxRatio": 1,
+    "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "subscriptions",
+    "target": "stream-plain-8-onewave",
+    "reference": "stream-budget-8",
+    "maxRatio": 2,
+    "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "raceSubscriptions",
+    "target": "stream-plain-8-onewave",
+    "reference": "stream-budget-8",
+    "maxRatio": 0,
+    "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "recorders",
+    "target": "stream-plain-8-waves",
+    "reference": "stream-budget-8",
+    "maxRatio": 1,
+    "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "subscriptions",
+    "target": "stream-plain-8-waves",
+    "reference": "stream-budget-8",
+    "maxRatio": 5.5,
+    "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "raceSubscriptions",
+    "target": "stream-plain-8-waves",
+    "reference": "stream-budget-8",
+    "maxRatio": 0,
+    "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "recorders",
+    "target": "stream-plain-32-onewave",
+    "reference": "stream-budget-32",
+    "maxRatio": 1,
+    "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "subscriptions",
+    "target": "stream-plain-32-onewave",
+    "reference": "stream-budget-32",
+    "maxRatio": 2,
+    "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "raceSubscriptions",
+    "target": "stream-plain-32-onewave",
+    "reference": "stream-budget-32",
+    "maxRatio": 0,
+    "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "recorders",
+    "target": "stream-plain-32-waves",
+    "reference": "stream-budget-32",
+    "maxRatio": 1,
+    "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "subscriptions",
+    "target": "stream-plain-32-waves",
+    "reference": "stream-budget-32",
+    "maxRatio": 17.5,
+    "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
+  },
+  {
+    "suite": "ssr-replay-streaming",
+    "op": "raceSubscriptions",
+    "target": "stream-plain-32-waves",
+    "reference": "stream-budget-32",
+    "maxRatio": 0,
+    "note": "Production streaming keeps one pending recorder per producer and no repeated Promise.race reactions; subscriptions include ordinary use probes. Compiled and plain controls verify payloads and consumer-driven chunk order."
+  },
+  {
+    "suite": "client-hot-paths",
+    "op": "hydration_lookups",
+    "target": "branches-stable",
+    "reference": "branches-stable-work-budget",
+    "maxRatio": 1,
+    "note": "Mounted branch updates use at most one hydration lookup per branch, including stable, changed, and absent arms. Clean production controls verify output, identity, event captures, and effects."
+  },
+  {
+    "suite": "client-hot-paths",
+    "op": "hydration_lookups",
+    "target": "branches-toggle",
+    "reference": "branches-toggle-work-budget",
+    "maxRatio": 1,
+    "note": "Mounted branch updates use at most one hydration lookup per branch, including stable, changed, and absent arms. Clean production controls verify output, identity, event captures, and effects."
+  },
+  {
+    "suite": "client-hot-paths",
+    "op": "hydration_lookups",
+    "target": "branches-absent",
+    "reference": "branches-absent-work-budget",
+    "maxRatio": 1,
+    "note": "Mounted branch updates use at most one hydration lookup per branch, including stable, changed, and absent arms. Clean production controls verify output, identity, event captures, and effects."
+  },
+  {
+    "suite": "client-hot-paths",
+    "op": "hydration_lookups",
+    "target": "branches-mount",
+    "reference": "branches-mount-work-budget",
+    "maxRatio": 1,
+    "note": "Fresh branch mounts retain at most two hydration lookups per branch; output, event captures, layout effects, and cleanup match the clean production bundle."
+  },
+  {
+    "suite": "client-hot-paths",
+    "op": "flat_explicit",
+    "target": "keys-flat-implicit",
+    "reference": "keys-work-budget",
+    "maxRatio": 1,
+    "note": "Deterministic production key work for 128 rows plus explicit sentinels, or one keyed component. Preserve scoped identity, escaping, custom JSON fallback, and observable default-hint coercion under clean output, survivor, input/focus, and hydration controls. The reference is one work unit, not another implementation."
+  },
+  {
+    "suite": "client-hot-paths",
+    "op": "flat_implicit",
+    "target": "keys-flat-implicit",
+    "reference": "keys-work-budget",
+    "maxRatio": 128,
+    "note": "Deterministic production key work for 128 rows plus explicit sentinels, or one keyed component. Preserve scoped identity, escaping, custom JSON fallback, and observable default-hint coercion under clean output, survivor, input/focus, and hydration controls. The reference is one work unit, not another implementation."
+  },
+  {
+    "suite": "client-hot-paths",
+    "op": "path_json",
+    "target": "keys-flat-implicit",
+    "reference": "keys-work-budget",
+    "maxRatio": 0,
+    "note": "Deterministic production key work for 128 rows plus explicit sentinels, or one keyed component. Preserve scoped identity, escaping, custom JSON fallback, and observable default-hint coercion under clean output, survivor, input/focus, and hydration controls. The reference is one work unit, not another implementation."
+  },
+  {
+    "suite": "client-hot-paths",
+    "op": "scalar_json",
+    "target": "keys-flat-implicit",
+    "reference": "keys-work-budget",
+    "maxRatio": 0,
+    "note": "Deterministic production key work for 128 rows plus explicit sentinels, or one keyed component. Preserve scoped identity, escaping, custom JSON fallback, and observable default-hint coercion under clean output, survivor, input/focus, and hydration controls. The reference is one work unit, not another implementation."
+  },
+  {
+    "suite": "client-hot-paths",
+    "op": "tuple_json",
+    "target": "keys-flat-implicit",
+    "reference": "keys-work-budget",
+    "maxRatio": 0,
+    "note": "Deterministic production key work for 128 rows plus explicit sentinels, or one keyed component. Preserve scoped identity, escaping, custom JSON fallback, and observable default-hint coercion under clean output, survivor, input/focus, and hydration controls. The reference is one work unit, not another implementation."
+  },
+  {
+    "suite": "client-hot-paths",
+    "op": "flat_explicit",
+    "target": "keys-flat-explicit",
+    "reference": "keys-work-budget",
+    "maxRatio": 129,
+    "note": "Deterministic production key work for 128 rows plus explicit sentinels, or one keyed component. Preserve scoped identity, escaping, custom JSON fallback, and observable default-hint coercion under clean output, survivor, input/focus, and hydration controls. The reference is one work unit, not another implementation."
+  },
+  {
+    "suite": "client-hot-paths",
+    "op": "flat_implicit",
+    "target": "keys-flat-explicit",
+    "reference": "keys-work-budget",
+    "maxRatio": 0,
+    "note": "Deterministic production key work for 128 rows plus explicit sentinels, or one keyed component. Preserve scoped identity, escaping, custom JSON fallback, and observable default-hint coercion under clean output, survivor, input/focus, and hydration controls. The reference is one work unit, not another implementation."
+  },
+  {
+    "suite": "client-hot-paths",
+    "op": "path_json",
+    "target": "keys-flat-explicit",
+    "reference": "keys-work-budget",
+    "maxRatio": 0,
+    "note": "Deterministic production key work for 128 rows plus explicit sentinels, or one keyed component. Preserve scoped identity, escaping, custom JSON fallback, and observable default-hint coercion under clean output, survivor, input/focus, and hydration controls. The reference is one work unit, not another implementation."
+  },
+  {
+    "suite": "client-hot-paths",
+    "op": "scalar_json",
+    "target": "keys-flat-explicit",
+    "reference": "keys-work-budget",
+    "maxRatio": 0,
+    "note": "Deterministic production key work for 128 rows plus explicit sentinels, or one keyed component. Preserve scoped identity, escaping, custom JSON fallback, and observable default-hint coercion under clean output, survivor, input/focus, and hydration controls. The reference is one work unit, not another implementation."
+  },
+  {
+    "suite": "client-hot-paths",
+    "op": "tuple_json",
+    "target": "keys-flat-explicit",
+    "reference": "keys-work-budget",
+    "maxRatio": 0,
+    "note": "Deterministic production key work for 128 rows plus explicit sentinels, or one keyed component. Preserve scoped identity, escaping, custom JSON fallback, and observable default-hint coercion under clean output, survivor, input/focus, and hydration controls. The reference is one work unit, not another implementation."
+  },
+  {
+    "suite": "client-hot-paths",
+    "op": "flat_explicit",
+    "target": "keys-nested-implicit",
+    "reference": "keys-work-budget",
+    "maxRatio": 1,
+    "note": "Deterministic production key work for 128 rows plus explicit sentinels, or one keyed component. Preserve scoped identity, escaping, custom JSON fallback, and observable default-hint coercion under clean output, survivor, input/focus, and hydration controls. The reference is one work unit, not another implementation."
+  },
+  {
+    "suite": "client-hot-paths",
+    "op": "path_json",
+    "target": "keys-nested-implicit",
+    "reference": "keys-work-budget",
+    "maxRatio": 1,
+    "note": "Deterministic production key work for 128 rows plus explicit sentinels, or one keyed component. Preserve scoped identity, escaping, custom JSON fallback, and observable default-hint coercion under clean output, survivor, input/focus, and hydration controls. The reference is one work unit, not another implementation."
+  },
+  {
+    "suite": "client-hot-paths",
+    "op": "scalar_json",
+    "target": "keys-nested-implicit",
+    "reference": "keys-work-budget",
+    "maxRatio": 1,
+    "note": "Deterministic production key work for 128 rows plus explicit sentinels, or one keyed component. Preserve scoped identity, escaping, custom JSON fallback, and observable default-hint coercion under clean output, survivor, input/focus, and hydration controls. The reference is one work unit, not another implementation."
+  },
+  {
+    "suite": "client-hot-paths",
+    "op": "nested_implicit",
+    "target": "keys-nested-implicit",
+    "reference": "keys-work-budget",
+    "maxRatio": 128,
+    "note": "Deterministic production key work for 128 rows plus explicit sentinels, or one keyed component. Preserve scoped identity, escaping, custom JSON fallback, and observable default-hint coercion under clean output, survivor, input/focus, and hydration controls. The reference is one work unit, not another implementation."
+  },
+  {
+    "suite": "client-hot-paths",
+    "op": "tuple_json",
+    "target": "keys-nested-implicit",
+    "reference": "keys-work-budget",
+    "maxRatio": 0,
+    "note": "Deterministic production key work for 128 rows plus explicit sentinels, or one keyed component. Preserve scoped identity, escaping, custom JSON fallback, and observable default-hint coercion under clean output, survivor, input/focus, and hydration controls. The reference is one work unit, not another implementation."
+  },
+  {
+    "suite": "client-hot-paths",
+    "op": "flat_explicit",
+    "target": "keys-nested-explicit",
+    "reference": "keys-work-budget",
+    "maxRatio": 1,
+    "note": "Deterministic production key work for 128 rows plus explicit sentinels, or one keyed component. Preserve scoped identity, escaping, custom JSON fallback, and observable default-hint coercion under clean output, survivor, input/focus, and hydration controls. The reference is one work unit, not another implementation."
+  },
+  {
+    "suite": "client-hot-paths",
+    "op": "path_json",
+    "target": "keys-nested-explicit",
+    "reference": "keys-work-budget",
+    "maxRatio": 1,
+    "note": "Deterministic production key work for 128 rows plus explicit sentinels, or one keyed component. Preserve scoped identity, escaping, custom JSON fallback, and observable default-hint coercion under clean output, survivor, input/focus, and hydration controls. The reference is one work unit, not another implementation."
+  },
+  {
+    "suite": "client-hot-paths",
+    "op": "scalar_json",
+    "target": "keys-nested-explicit",
+    "reference": "keys-work-budget",
+    "maxRatio": 129,
+    "note": "Deterministic production key work for 128 rows plus explicit sentinels, or one keyed component. Preserve scoped identity, escaping, custom JSON fallback, and observable default-hint coercion under clean output, survivor, input/focus, and hydration controls. The reference is one work unit, not another implementation."
+  },
+  {
+    "suite": "client-hot-paths",
+    "op": "tuple_json",
+    "target": "keys-nested-explicit",
+    "reference": "keys-work-budget",
+    "maxRatio": 0,
+    "note": "Deterministic production key work for 128 rows plus explicit sentinels, or one keyed component. Preserve scoped identity, escaping, custom JSON fallback, and observable default-hint coercion under clean output, survivor, input/focus, and hydration controls. The reference is one work unit, not another implementation."
+  },
+  {
+    "suite": "client-hot-paths",
+    "op": "flat_explicit",
+    "target": "keys-escaped-explicit",
+    "reference": "keys-work-budget",
+    "maxRatio": 1,
+    "note": "Deterministic production key work for 128 rows plus explicit sentinels, or one keyed component. Preserve scoped identity, escaping, custom JSON fallback, and observable default-hint coercion under clean output, survivor, input/focus, and hydration controls. The reference is one work unit, not another implementation."
+  },
+  {
+    "suite": "client-hot-paths",
+    "op": "path_json",
+    "target": "keys-escaped-explicit",
+    "reference": "keys-work-budget",
+    "maxRatio": 1,
+    "note": "Deterministic production key work for 128 rows plus explicit sentinels, or one keyed component. Preserve scoped identity, escaping, custom JSON fallback, and observable default-hint coercion under clean output, survivor, input/focus, and hydration controls. The reference is one work unit, not another implementation."
+  },
+  {
+    "suite": "client-hot-paths",
+    "op": "scalar_json",
+    "target": "keys-escaped-explicit",
+    "reference": "keys-work-budget",
+    "maxRatio": 129,
+    "note": "Deterministic production key work for 128 rows plus explicit sentinels, or one keyed component. Preserve scoped identity, escaping, custom JSON fallback, and observable default-hint coercion under clean output, survivor, input/focus, and hydration controls. The reference is one work unit, not another implementation."
+  },
+  {
+    "suite": "client-hot-paths",
+    "op": "tuple_json",
+    "target": "keys-escaped-explicit",
+    "reference": "keys-work-budget",
+    "maxRatio": 0,
+    "note": "Deterministic production key work for 128 rows plus explicit sentinels, or one keyed component. Preserve scoped identity, escaping, custom JSON fallback, and observable default-hint coercion under clean output, survivor, input/focus, and hydration controls. The reference is one work unit, not another implementation."
+  },
+  {
+    "suite": "client-hot-paths",
+    "op": "flat_explicit",
+    "target": "keys-custom-json-explicit",
+    "reference": "keys-work-budget",
+    "maxRatio": 1,
+    "note": "Deterministic production key work for 128 rows plus explicit sentinels, or one keyed component. Preserve scoped identity, escaping, custom JSON fallback, and observable default-hint coercion under clean output, survivor, input/focus, and hydration controls. The reference is one work unit, not another implementation."
+  },
+  {
+    "suite": "client-hot-paths",
+    "op": "path_json",
+    "target": "keys-custom-json-explicit",
+    "reference": "keys-work-budget",
+    "maxRatio": 0,
+    "note": "Deterministic production key work for 128 rows plus explicit sentinels, or one keyed component. Preserve scoped identity, escaping, custom JSON fallback, and observable default-hint coercion under clean output, survivor, input/focus, and hydration controls. The reference is one work unit, not another implementation."
+  },
+  {
+    "suite": "client-hot-paths",
+    "op": "scalar_json",
+    "target": "keys-custom-json-explicit",
+    "reference": "keys-work-budget",
+    "maxRatio": 0,
+    "note": "Deterministic production key work for 128 rows plus explicit sentinels, or one keyed component. Preserve scoped identity, escaping, custom JSON fallback, and observable default-hint coercion under clean output, survivor, input/focus, and hydration controls. The reference is one work unit, not another implementation."
+  },
+  {
+    "suite": "client-hot-paths",
+    "op": "tuple_json",
+    "target": "keys-custom-json-explicit",
+    "reference": "keys-work-budget",
+    "maxRatio": 129,
+    "note": "Deterministic production key work for 128 rows plus explicit sentinels, or one keyed component. Preserve scoped identity, escaping, custom JSON fallback, and observable default-hint coercion under clean output, survivor, input/focus, and hydration controls. The reference is one work unit, not another implementation."
+  },
+  {
+    "suite": "client-hot-paths",
+    "op": "component_coercions",
+    "target": "keys-component-primitive",
+    "reference": "keys-work-budget",
+    "maxRatio": 1,
+    "note": "Deterministic production key work for 128 rows plus explicit sentinels, or one keyed component. Preserve scoped identity, escaping, custom JSON fallback, and observable default-hint coercion under clean output, survivor, input/focus, and hydration controls. The reference is one work unit, not another implementation."
+  },
+  {
+    "suite": "client-hot-paths",
+    "op": "component_coercions",
+    "target": "keys-component-object",
+    "reference": "keys-work-budget",
+    "maxRatio": 1,
+    "note": "Deterministic production key work for 128 rows plus explicit sentinels, or one keyed component. Preserve scoped identity, escaping, custom JSON fallback, and observable default-hint coercion under clean output, survivor, input/focus, and hydration controls. The reference is one work unit, not another implementation."
+  },
+  {
+    "suite": "client-hot-paths",
+    "op": "childSlot_calls",
+    "target": "slots-observed",
+    "reference": "slots-scenarios",
+    "maxRatio": 7,
+    "note": "Executed childSlot calls per completed compiled slot scenario, baseline 7. Clean and observed controls require stable state, input, captures, key/type resets, child shapes, and portal cleanup; no timing inference."
+  },
+  {
+    "suite": "client-hot-paths",
+    "op": "componentSlotImpl_calls",
+    "target": "slots-observed",
+    "reference": "slots-scenarios",
+    "maxRatio": 19,
+    "note": "Executed componentSlotImpl calls per completed compiled slot scenario, baseline 19. Clean and observed controls require stable state, input, captures, key/type resets, child shapes, and portal cleanup; no timing inference."
+  },
+  {
+    "suite": "audit-981-coverage",
+    "target": "naive-jsx-mount_1k",
+    "reference": "naive-jsx-mount_1k-rows",
+    "op": "setStyle",
+    "maxRatio": 1.0,
+    "note": "Existing actual naive JSX/TSRX production fixture, 1000 rows; clean/observed HTML, identity, labels, selection and CSS controls. Named function entries and native style writes; no timing or heap claim."
+  },
+  {
+    "suite": "audit-981-coverage",
+    "target": "naive-jsx-mount_1k",
+    "reference": "naive-jsx-mount_1k-rows",
+    "op": "renderBlockInner",
+    "maxRatio": 3.002,
+    "note": "Existing actual naive JSX/TSRX production fixture, 1000 rows; clean/observed HTML, identity, labels, selection and CSS controls. Named function entries and native style writes; no timing or heap claim."
+  },
+  {
+    "suite": "audit-981-coverage",
+    "target": "naive-jsx-mount_1k",
+    "reference": "naive-jsx-mount_1k-rows",
+    "op": "styleSets",
+    "maxRatio": 1.0,
+    "note": "Existing actual naive JSX/TSRX production fixture, 1000 rows; clean/observed HTML, identity, labels, selection and CSS controls. Named function entries and native style writes; no timing or heap claim."
+  },
+  {
+    "suite": "audit-981-coverage",
+    "target": "naive-jsx-mount_1k",
+    "reference": "naive-jsx-mount_1k-rows",
+    "op": "styleRemoves",
+    "maxRatio": 0.0,
+    "note": "Existing actual naive JSX/TSRX production fixture, 1000 rows; clean/observed HTML, identity, labels, selection and CSS controls. Named function entries and native style writes; no timing or heap claim."
+  },
+  {
+    "suite": "audit-981-coverage",
+    "target": "naive-jsx-select_one",
+    "reference": "naive-jsx-select_one-rows",
+    "op": "setStyle",
+    "maxRatio": 1.0,
+    "note": "Existing actual naive JSX/TSRX production fixture, 1000 rows; clean/observed HTML, identity, labels, selection and CSS controls. Named function entries and native style writes; no timing or heap claim."
+  },
+  {
+    "suite": "audit-981-coverage",
+    "target": "naive-jsx-select_one",
+    "reference": "naive-jsx-select_one-rows",
+    "op": "renderBlockInner",
+    "maxRatio": 3.002,
+    "note": "Existing actual naive JSX/TSRX production fixture, 1000 rows; clean/observed HTML, identity, labels, selection and CSS controls. Named function entries and native style writes; no timing or heap claim."
+  },
+  {
+    "suite": "audit-981-coverage",
+    "target": "naive-jsx-select_one",
+    "reference": "naive-jsx-select_one-rows",
+    "op": "styleSets",
+    "maxRatio": 0.001,
+    "note": "Existing actual naive JSX/TSRX production fixture, 1000 rows; clean/observed HTML, identity, labels, selection and CSS controls. Named function entries and native style writes; no timing or heap claim."
+  },
+  {
+    "suite": "audit-981-coverage",
+    "target": "naive-jsx-select_one",
+    "reference": "naive-jsx-select_one-rows",
+    "op": "styleRemoves",
+    "maxRatio": 0.0,
+    "note": "Existing actual naive JSX/TSRX production fixture, 1000 rows; clean/observed HTML, identity, labels, selection and CSS controls. Named function entries and native style writes; no timing or heap claim."
+  },
+  {
+    "suite": "audit-981-coverage",
+    "target": "naive-jsx-select_another",
+    "reference": "naive-jsx-select_another-rows",
+    "op": "setStyle",
+    "maxRatio": 1.0,
+    "note": "Existing actual naive JSX/TSRX production fixture, 1000 rows; clean/observed HTML, identity, labels, selection and CSS controls. Named function entries and native style writes; no timing or heap claim."
+  },
+  {
+    "suite": "audit-981-coverage",
+    "target": "naive-jsx-select_another",
+    "reference": "naive-jsx-select_another-rows",
+    "op": "renderBlockInner",
+    "maxRatio": 3.002,
+    "note": "Existing actual naive JSX/TSRX production fixture, 1000 rows; clean/observed HTML, identity, labels, selection and CSS controls. Named function entries and native style writes; no timing or heap claim."
+  },
+  {
+    "suite": "audit-981-coverage",
+    "target": "naive-jsx-select_another",
+    "reference": "naive-jsx-select_another-rows",
+    "op": "styleSets",
+    "maxRatio": 0.002,
+    "note": "Existing actual naive JSX/TSRX production fixture, 1000 rows; clean/observed HTML, identity, labels, selection and CSS controls. Named function entries and native style writes; no timing or heap claim."
+  },
+  {
+    "suite": "audit-981-coverage",
+    "target": "naive-jsx-select_another",
+    "reference": "naive-jsx-select_another-rows",
+    "op": "styleRemoves",
+    "maxRatio": 0.0,
+    "note": "Existing actual naive JSX/TSRX production fixture, 1000 rows; clean/observed HTML, identity, labels, selection and CSS controls. Named function entries and native style writes; no timing or heap claim."
+  },
+  {
+    "suite": "audit-981-coverage",
+    "target": "naive-jsx-unrelated_update",
+    "reference": "naive-jsx-unrelated_update-rows",
+    "op": "setStyle",
+    "maxRatio": 1.0,
+    "note": "Existing actual naive JSX/TSRX production fixture, 1000 rows; clean/observed HTML, identity, labels, selection and CSS controls. Named function entries and native style writes; no timing or heap claim."
+  },
+  {
+    "suite": "audit-981-coverage",
+    "target": "naive-jsx-unrelated_update",
+    "reference": "naive-jsx-unrelated_update-rows",
+    "op": "renderBlockInner",
+    "maxRatio": 3.002,
+    "note": "Existing actual naive JSX/TSRX production fixture, 1000 rows; clean/observed HTML, identity, labels, selection and CSS controls. Named function entries and native style writes; no timing or heap claim."
+  },
+  {
+    "suite": "audit-981-coverage",
+    "target": "naive-jsx-unrelated_update",
+    "reference": "naive-jsx-unrelated_update-rows",
+    "op": "styleSets",
+    "maxRatio": 0.0,
+    "note": "Existing actual naive JSX/TSRX production fixture, 1000 rows; clean/observed HTML, identity, labels, selection and CSS controls. Named function entries and native style writes; no timing or heap claim."
+  },
+  {
+    "suite": "audit-981-coverage",
+    "target": "naive-jsx-unrelated_update",
+    "reference": "naive-jsx-unrelated_update-rows",
+    "op": "styleRemoves",
+    "maxRatio": 0.0,
+    "note": "Existing actual naive JSX/TSRX production fixture, 1000 rows; clean/observed HTML, identity, labels, selection and CSS controls. Named function entries and native style writes; no timing or heap claim."
+  },
+  {
+    "suite": "audit-981-coverage",
+    "target": "naive-tsrx-mount_1k",
+    "reference": "naive-tsrx-mount_1k-rows",
+    "op": "setStyle",
+    "maxRatio": 0.0,
+    "note": "Existing actual naive JSX/TSRX production fixture, 1000 rows; clean/observed HTML, identity, labels, selection and CSS controls. Named function entries and native style writes; no timing or heap claim."
+  },
+  {
+    "suite": "audit-981-coverage",
+    "target": "naive-tsrx-mount_1k",
+    "reference": "naive-tsrx-mount_1k-rows",
+    "op": "renderBlockInner",
+    "maxRatio": 2.001,
+    "note": "Existing actual naive JSX/TSRX production fixture, 1000 rows; clean/observed HTML, identity, labels, selection and CSS controls. Named function entries and native style writes; no timing or heap claim."
+  },
+  {
+    "suite": "audit-981-coverage",
+    "target": "naive-tsrx-mount_1k",
+    "reference": "naive-tsrx-mount_1k-rows",
+    "op": "styleSets",
+    "maxRatio": 1.0,
+    "note": "Existing actual naive JSX/TSRX production fixture, 1000 rows; clean/observed HTML, identity, labels, selection and CSS controls. Named function entries and native style writes; no timing or heap claim."
+  },
+  {
+    "suite": "audit-981-coverage",
+    "target": "naive-tsrx-mount_1k",
+    "reference": "naive-tsrx-mount_1k-rows",
+    "op": "styleRemoves",
+    "maxRatio": 0.0,
+    "note": "Existing actual naive JSX/TSRX production fixture, 1000 rows; clean/observed HTML, identity, labels, selection and CSS controls. Named function entries and native style writes; no timing or heap claim."
+  },
+  {
+    "suite": "audit-981-coverage",
+    "target": "naive-tsrx-select_one",
+    "reference": "naive-tsrx-select_one-rows",
+    "op": "setStyle",
+    "maxRatio": 0.0,
+    "note": "Existing actual naive JSX/TSRX production fixture, 1000 rows; clean/observed HTML, identity, labels, selection and CSS controls. Named function entries and native style writes; no timing or heap claim."
+  },
+  {
+    "suite": "audit-981-coverage",
+    "target": "naive-tsrx-select_one",
+    "reference": "naive-tsrx-select_one-rows",
+    "op": "renderBlockInner",
+    "maxRatio": 2.001,
+    "note": "Existing actual naive JSX/TSRX production fixture, 1000 rows; clean/observed HTML, identity, labels, selection and CSS controls. Named function entries and native style writes; no timing or heap claim."
+  },
+  {
+    "suite": "audit-981-coverage",
+    "target": "naive-tsrx-select_one",
+    "reference": "naive-tsrx-select_one-rows",
+    "op": "styleSets",
+    "maxRatio": 0.001,
+    "note": "Existing actual naive JSX/TSRX production fixture, 1000 rows; clean/observed HTML, identity, labels, selection and CSS controls. Named function entries and native style writes; no timing or heap claim."
+  },
+  {
+    "suite": "audit-981-coverage",
+    "target": "naive-tsrx-select_one",
+    "reference": "naive-tsrx-select_one-rows",
+    "op": "styleRemoves",
+    "maxRatio": 0.0,
+    "note": "Existing actual naive JSX/TSRX production fixture, 1000 rows; clean/observed HTML, identity, labels, selection and CSS controls. Named function entries and native style writes; no timing or heap claim."
+  },
+  {
+    "suite": "audit-981-coverage",
+    "target": "naive-tsrx-select_another",
+    "reference": "naive-tsrx-select_another-rows",
+    "op": "setStyle",
+    "maxRatio": 0.0,
+    "note": "Existing actual naive JSX/TSRX production fixture, 1000 rows; clean/observed HTML, identity, labels, selection and CSS controls. Named function entries and native style writes; no timing or heap claim."
+  },
+  {
+    "suite": "audit-981-coverage",
+    "target": "naive-tsrx-select_another",
+    "reference": "naive-tsrx-select_another-rows",
+    "op": "renderBlockInner",
+    "maxRatio": 2.001,
+    "note": "Existing actual naive JSX/TSRX production fixture, 1000 rows; clean/observed HTML, identity, labels, selection and CSS controls. Named function entries and native style writes; no timing or heap claim."
+  },
+  {
+    "suite": "audit-981-coverage",
+    "target": "naive-tsrx-select_another",
+    "reference": "naive-tsrx-select_another-rows",
+    "op": "styleSets",
+    "maxRatio": 0.002,
+    "note": "Existing actual naive JSX/TSRX production fixture, 1000 rows; clean/observed HTML, identity, labels, selection and CSS controls. Named function entries and native style writes; no timing or heap claim."
+  },
+  {
+    "suite": "audit-981-coverage",
+    "target": "naive-tsrx-select_another",
+    "reference": "naive-tsrx-select_another-rows",
+    "op": "styleRemoves",
+    "maxRatio": 0.0,
+    "note": "Existing actual naive JSX/TSRX production fixture, 1000 rows; clean/observed HTML, identity, labels, selection and CSS controls. Named function entries and native style writes; no timing or heap claim."
+  },
+  {
+    "suite": "audit-981-coverage",
+    "target": "naive-tsrx-unrelated_update",
+    "reference": "naive-tsrx-unrelated_update-rows",
+    "op": "setStyle",
+    "maxRatio": 0.0,
+    "note": "Existing actual naive JSX/TSRX production fixture, 1000 rows; clean/observed HTML, identity, labels, selection and CSS controls. Named function entries and native style writes; no timing or heap claim."
+  },
+  {
+    "suite": "audit-981-coverage",
+    "target": "naive-tsrx-unrelated_update",
+    "reference": "naive-tsrx-unrelated_update-rows",
+    "op": "renderBlockInner",
+    "maxRatio": 2.001,
+    "note": "Existing actual naive JSX/TSRX production fixture, 1000 rows; clean/observed HTML, identity, labels, selection and CSS controls. Named function entries and native style writes; no timing or heap claim."
+  },
+  {
+    "suite": "audit-981-coverage",
+    "target": "naive-tsrx-unrelated_update",
+    "reference": "naive-tsrx-unrelated_update-rows",
+    "op": "styleSets",
+    "maxRatio": 0.0,
+    "note": "Existing actual naive JSX/TSRX production fixture, 1000 rows; clean/observed HTML, identity, labels, selection and CSS controls. Named function entries and native style writes; no timing or heap claim."
+  },
+  {
+    "suite": "audit-981-coverage",
+    "target": "naive-tsrx-unrelated_update",
+    "reference": "naive-tsrx-unrelated_update-rows",
+    "op": "styleRemoves",
+    "maxRatio": 0.0,
+    "note": "Existing actual naive JSX/TSRX production fixture, 1000 rows; clean/observed HTML, identity, labels, selection and CSS controls. Named function entries and native style writes; no timing or heap claim."
+  },
+  {
+    "suite": "audit-981-coverage",
+    "target": "suspense-list-mount",
+    "reference": "suspense-list-mount-rows",
+    "op": "createBlock",
+    "maxRatio": 5.015625,
+    "note": "Compiled production list with 64 keyed, independently pending boundaries and 2 memo wrappers. Clean/observed visibility, keyed values, survivor/input identity, native events and exactly-once effects; named function entries per 64 rows."
+  },
+  {
+    "suite": "audit-981-coverage",
+    "target": "suspense-list-mount",
+    "reference": "suspense-list-mount-rows",
+    "op": "renderBlockInner",
+    "maxRatio": 5.015625,
+    "note": "Compiled production list with 64 keyed, independently pending boundaries and 2 memo wrappers. Clean/observed visibility, keyed values, survivor/input identity, native events and exactly-once effects; named function entries per 64 rows."
+  },
+  {
+    "suite": "audit-981-coverage",
+    "target": "suspense-list-mount",
+    "reference": "suspense-list-mount-rows",
+    "op": "RowImpl",
+    "maxRatio": 1.0,
+    "note": "Compiled production list with 64 keyed, independently pending boundaries and 2 memo wrappers. Clean/observed visibility, keyed values, survivor/input identity, native events and exactly-once effects; named function entries per 64 rows."
+  },
+  {
+    "suite": "audit-981-coverage",
+    "target": "suspense-list-mount",
+    "reference": "suspense-list-mount-rows",
+    "op": "AsyncCellImpl",
+    "maxRatio": 1.0,
+    "note": "Compiled production list with 64 keyed, independently pending boundaries and 2 memo wrappers. Clean/observed visibility, keyed values, survivor/input identity, native events and exactly-once effects; named function entries per 64 rows."
+  },
+  {
+    "suite": "audit-981-coverage",
+    "target": "suspense-list-mount",
+    "reference": "suspense-list-mount-rows",
+    "op": "forBlock",
+    "maxRatio": 0.015625,
+    "note": "Compiled production list with 64 keyed, independently pending boundaries and 2 memo wrappers. Clean/observed visibility, keyed values, survivor/input identity, native events and exactly-once effects; named function entries per 64 rows."
+  },
+  {
+    "suite": "audit-981-coverage",
+    "target": "suspense-list-mount",
+    "reference": "suspense-list-mount-rows",
+    "op": "reconcileKeyed",
+    "maxRatio": 0.0,
+    "note": "Compiled production list with 64 keyed, independently pending boundaries and 2 memo wrappers. Clean/observed visibility, keyed values, survivor/input identity, native events and exactly-once effects; named function entries per 64 rows."
+  },
+  {
+    "suite": "audit-981-coverage",
+    "target": "suspense-list-settle-odd",
+    "reference": "suspense-list-settle-odd-rows",
+    "op": "createBlock",
+    "maxRatio": 0.0,
+    "note": "Compiled production list with 64 keyed, independently pending boundaries and 2 memo wrappers. Clean/observed visibility, keyed values, survivor/input identity, native events and exactly-once effects; named function entries per 64 rows."
+  },
+  {
+    "suite": "audit-981-coverage",
+    "target": "suspense-list-settle-odd",
+    "reference": "suspense-list-settle-odd-rows",
+    "op": "renderBlockInner",
+    "maxRatio": 1.0,
+    "note": "Compiled production list with 64 keyed, independently pending boundaries and 2 memo wrappers. Clean/observed visibility, keyed values, survivor/input identity, native events and exactly-once effects; named function entries per 64 rows."
+  },
+  {
+    "suite": "audit-981-coverage",
+    "target": "suspense-list-settle-odd",
+    "reference": "suspense-list-settle-odd-rows",
+    "op": "RowImpl",
+    "maxRatio": 0.0,
+    "note": "Compiled production list with 64 keyed, independently pending boundaries and 2 memo wrappers. Clean/observed visibility, keyed values, survivor/input identity, native events and exactly-once effects; named function entries per 64 rows."
+  },
+  {
+    "suite": "audit-981-coverage",
+    "target": "suspense-list-settle-odd",
+    "reference": "suspense-list-settle-odd-rows",
+    "op": "AsyncCellImpl",
+    "maxRatio": 0.5,
+    "note": "Compiled production list with 64 keyed, independently pending boundaries and 2 memo wrappers. Clean/observed visibility, keyed values, survivor/input identity, native events and exactly-once effects; named function entries per 64 rows."
+  },
+  {
+    "suite": "audit-981-coverage",
+    "target": "suspense-list-settle-odd",
+    "reference": "suspense-list-settle-odd-rows",
+    "op": "forBlock",
+    "maxRatio": 0.0,
+    "note": "Compiled production list with 64 keyed, independently pending boundaries and 2 memo wrappers. Clean/observed visibility, keyed values, survivor/input identity, native events and exactly-once effects; named function entries per 64 rows."
+  },
+  {
+    "suite": "audit-981-coverage",
+    "target": "suspense-list-settle-odd",
+    "reference": "suspense-list-settle-odd-rows",
+    "op": "reconcileKeyed",
+    "maxRatio": 0.0,
+    "note": "Compiled production list with 64 keyed, independently pending boundaries and 2 memo wrappers. Clean/observed visibility, keyed values, survivor/input identity, native events and exactly-once effects; named function entries per 64 rows."
+  },
+  {
+    "suite": "audit-981-coverage",
+    "target": "suspense-list-settle-even",
+    "reference": "suspense-list-settle-even-rows",
+    "op": "createBlock",
+    "maxRatio": 0.0,
+    "note": "Compiled production list with 64 keyed, independently pending boundaries and 2 memo wrappers. Clean/observed visibility, keyed values, survivor/input identity, native events and exactly-once effects; named function entries per 64 rows."
+  },
+  {
+    "suite": "audit-981-coverage",
+    "target": "suspense-list-settle-even",
+    "reference": "suspense-list-settle-even-rows",
+    "op": "renderBlockInner",
+    "maxRatio": 1.0,
+    "note": "Compiled production list with 64 keyed, independently pending boundaries and 2 memo wrappers. Clean/observed visibility, keyed values, survivor/input identity, native events and exactly-once effects; named function entries per 64 rows."
+  },
+  {
+    "suite": "audit-981-coverage",
+    "target": "suspense-list-settle-even",
+    "reference": "suspense-list-settle-even-rows",
+    "op": "RowImpl",
+    "maxRatio": 0.0,
+    "note": "Compiled production list with 64 keyed, independently pending boundaries and 2 memo wrappers. Clean/observed visibility, keyed values, survivor/input identity, native events and exactly-once effects; named function entries per 64 rows."
+  },
+  {
+    "suite": "audit-981-coverage",
+    "target": "suspense-list-settle-even",
+    "reference": "suspense-list-settle-even-rows",
+    "op": "AsyncCellImpl",
+    "maxRatio": 0.5,
+    "note": "Compiled production list with 64 keyed, independently pending boundaries and 2 memo wrappers. Clean/observed visibility, keyed values, survivor/input identity, native events and exactly-once effects; named function entries per 64 rows."
+  },
+  {
+    "suite": "audit-981-coverage",
+    "target": "suspense-list-settle-even",
+    "reference": "suspense-list-settle-even-rows",
+    "op": "forBlock",
+    "maxRatio": 0.0,
+    "note": "Compiled production list with 64 keyed, independently pending boundaries and 2 memo wrappers. Clean/observed visibility, keyed values, survivor/input identity, native events and exactly-once effects; named function entries per 64 rows."
+  },
+  {
+    "suite": "audit-981-coverage",
+    "target": "suspense-list-settle-even",
+    "reference": "suspense-list-settle-even-rows",
+    "op": "reconcileKeyed",
+    "maxRatio": 0.0,
+    "note": "Compiled production list with 64 keyed, independently pending boundaries and 2 memo wrappers. Clean/observed visibility, keyed values, survivor/input identity, native events and exactly-once effects; named function entries per 64 rows."
+  },
+  {
+    "suite": "audit-981-coverage",
+    "target": "suspense-list-equal",
+    "reference": "suspense-list-equal-rows",
+    "op": "createBlock",
+    "maxRatio": 0.0,
+    "note": "Compiled production list with 64 keyed, independently pending boundaries and 2 memo wrappers. Clean/observed visibility, keyed values, survivor/input identity, native events and exactly-once effects; named function entries per 64 rows."
+  },
+  {
+    "suite": "audit-981-coverage",
+    "target": "suspense-list-equal",
+    "reference": "suspense-list-equal-rows",
+    "op": "renderBlockInner",
+    "maxRatio": 0.015625,
+    "note": "Compiled production list with 64 keyed, independently pending boundaries and 2 memo wrappers. Clean/observed visibility, keyed values, survivor/input identity, native events and exactly-once effects; named function entries per 64 rows."
+  },
+  {
+    "suite": "audit-981-coverage",
+    "target": "suspense-list-equal",
+    "reference": "suspense-list-equal-rows",
+    "op": "RowImpl",
+    "maxRatio": 0.0,
+    "note": "Compiled production list with 64 keyed, independently pending boundaries and 2 memo wrappers. Clean/observed visibility, keyed values, survivor/input identity, native events and exactly-once effects; named function entries per 64 rows."
+  },
+  {
+    "suite": "audit-981-coverage",
+    "target": "suspense-list-equal",
+    "reference": "suspense-list-equal-rows",
+    "op": "AsyncCellImpl",
+    "maxRatio": 0.0,
+    "note": "Compiled production list with 64 keyed, independently pending boundaries and 2 memo wrappers. Clean/observed visibility, keyed values, survivor/input identity, native events and exactly-once effects; named function entries per 64 rows."
+  },
+  {
+    "suite": "audit-981-coverage",
+    "target": "suspense-list-equal",
+    "reference": "suspense-list-equal-rows",
+    "op": "forBlock",
+    "maxRatio": 0.0,
+    "note": "Compiled production list with 64 keyed, independently pending boundaries and 2 memo wrappers. Clean/observed visibility, keyed values, survivor/input identity, native events and exactly-once effects; named function entries per 64 rows."
+  },
+  {
+    "suite": "audit-981-coverage",
+    "target": "suspense-list-equal",
+    "reference": "suspense-list-equal-rows",
+    "op": "reconcileKeyed",
+    "maxRatio": 0.0,
+    "note": "Compiled production list with 64 keyed, independently pending boundaries and 2 memo wrappers. Clean/observed visibility, keyed values, survivor/input identity, native events and exactly-once effects; named function entries per 64 rows."
+  },
+  {
+    "suite": "audit-981-coverage",
+    "target": "suspense-list-reverse",
+    "reference": "suspense-list-reverse-rows",
+    "op": "createBlock",
+    "maxRatio": 0.0,
+    "note": "Compiled production list with 64 keyed, independently pending boundaries and 2 memo wrappers. Clean/observed visibility, keyed values, survivor/input identity, native events and exactly-once effects; named function entries per 64 rows."
+  },
+  {
+    "suite": "audit-981-coverage",
+    "target": "suspense-list-reverse",
+    "reference": "suspense-list-reverse-rows",
+    "op": "renderBlockInner",
+    "maxRatio": 0.015625,
+    "note": "Compiled production list with 64 keyed, independently pending boundaries and 2 memo wrappers. Clean/observed visibility, keyed values, survivor/input identity, native events and exactly-once effects; named function entries per 64 rows."
+  },
+  {
+    "suite": "audit-981-coverage",
+    "target": "suspense-list-reverse",
+    "reference": "suspense-list-reverse-rows",
+    "op": "RowImpl",
+    "maxRatio": 0.0,
+    "note": "Compiled production list with 64 keyed, independently pending boundaries and 2 memo wrappers. Clean/observed visibility, keyed values, survivor/input identity, native events and exactly-once effects; named function entries per 64 rows."
+  },
+  {
+    "suite": "audit-981-coverage",
+    "target": "suspense-list-reverse",
+    "reference": "suspense-list-reverse-rows",
+    "op": "AsyncCellImpl",
+    "maxRatio": 0.0,
+    "note": "Compiled production list with 64 keyed, independently pending boundaries and 2 memo wrappers. Clean/observed visibility, keyed values, survivor/input identity, native events and exactly-once effects; named function entries per 64 rows."
+  },
+  {
+    "suite": "audit-981-coverage",
+    "target": "suspense-list-reverse",
+    "reference": "suspense-list-reverse-rows",
+    "op": "forBlock",
+    "maxRatio": 0.015625,
+    "note": "Compiled production list with 64 keyed, independently pending boundaries and 2 memo wrappers. Clean/observed visibility, keyed values, survivor/input identity, native events and exactly-once effects; named function entries per 64 rows."
+  },
+  {
+    "suite": "audit-981-coverage",
+    "target": "suspense-list-reverse",
+    "reference": "suspense-list-reverse-rows",
+    "op": "reconcileKeyed",
+    "maxRatio": 0.015625,
+    "note": "Compiled production list with 64 keyed, independently pending boundaries and 2 memo wrappers. Clean/observed visibility, keyed values, survivor/input identity, native events and exactly-once effects; named function entries per 64 rows."
+  },
+  {
+    "suite": "audit-981-coverage",
+    "target": "suspense-list-unmount",
+    "reference": "suspense-list-unmount-rows",
+    "op": "createBlock",
+    "maxRatio": 0.0,
+    "note": "Compiled production list with 64 keyed, independently pending boundaries and 2 memo wrappers. Clean/observed visibility, keyed values, survivor/input identity, native events and exactly-once effects; named function entries per 64 rows."
+  },
+  {
+    "suite": "audit-981-coverage",
+    "target": "suspense-list-unmount",
+    "reference": "suspense-list-unmount-rows",
+    "op": "renderBlockInner",
+    "maxRatio": 0.0,
+    "note": "Compiled production list with 64 keyed, independently pending boundaries and 2 memo wrappers. Clean/observed visibility, keyed values, survivor/input identity, native events and exactly-once effects; named function entries per 64 rows."
+  },
+  {
+    "suite": "audit-981-coverage",
+    "target": "suspense-list-unmount",
+    "reference": "suspense-list-unmount-rows",
+    "op": "RowImpl",
+    "maxRatio": 0.0,
+    "note": "Compiled production list with 64 keyed, independently pending boundaries and 2 memo wrappers. Clean/observed visibility, keyed values, survivor/input identity, native events and exactly-once effects; named function entries per 64 rows."
+  },
+  {
+    "suite": "audit-981-coverage",
+    "target": "suspense-list-unmount",
+    "reference": "suspense-list-unmount-rows",
+    "op": "AsyncCellImpl",
+    "maxRatio": 0.0,
+    "note": "Compiled production list with 64 keyed, independently pending boundaries and 2 memo wrappers. Clean/observed visibility, keyed values, survivor/input identity, native events and exactly-once effects; named function entries per 64 rows."
+  },
+  {
+    "suite": "audit-981-coverage",
+    "target": "suspense-list-unmount",
+    "reference": "suspense-list-unmount-rows",
+    "op": "forBlock",
+    "maxRatio": 0.0,
+    "note": "Compiled production list with 64 keyed, independently pending boundaries and 2 memo wrappers. Clean/observed visibility, keyed values, survivor/input identity, native events and exactly-once effects; named function entries per 64 rows."
+  },
+  {
+    "suite": "audit-981-coverage",
+    "target": "suspense-list-unmount",
+    "reference": "suspense-list-unmount-rows",
+    "op": "reconcileKeyed",
+    "maxRatio": 0.0,
+    "note": "Compiled production list with 64 keyed, independently pending boundaries and 2 memo wrappers. Clean/observed visibility, keyed values, survivor/input identity, native events and exactly-once effects; named function entries per 64 rows."
+  },
+  {
+    "suite": "ssr-final-metadata",
+    "target": "mapped",
+    "op": "element_descriptors",
+    "reference": "row-budget",
+    "maxRatio": 1,
+    "note": "Final metadata audit: executed element_descriptors work per 128 authored rows; clean output and guard/identity counterexamples must pass. No allocation or latency inference."
+  },
+  {
+    "suite": "ssr-final-metadata",
+    "target": "mapped",
+    "op": "constructor_probes",
+    "reference": "render-budget",
+    "maxRatio": 1,
+    "note": "Final metadata audit: executed constructor_probes work per render; clean output and guard/identity counterexamples must pass. No allocation or latency inference."
+  },
+  {
+    "suite": "ssr-final-metadata",
+    "target": "mapped",
+    "op": "species_probes",
+    "reference": "render-budget",
+    "maxRatio": 1,
+    "note": "Final metadata audit: executed species_probes work per render; clean output and guard/identity counterexamples must pass. No allocation or latency inference."
+  },
+  {
+    "suite": "ssr-final-metadata",
+    "target": "keyed",
+    "op": "scoped_segments",
+    "reference": "row-budget",
+    "maxRatio": 1,
+    "note": "Final metadata audit: executed scoped_segments work per 128 authored rows; clean output and guard/identity counterexamples must pass. No allocation or latency inference."
+  },
+  {
+    "suite": "ssr-final-metadata",
+    "target": "descriptors",
+    "op": "identity_membranes",
+    "reference": "row-budget",
+    "maxRatio": 3.02,
+    "note": "Final metadata audit: executed identity_membranes work per 128 authored rows; clean output and guard/identity counterexamples must pass. No allocation or latency inference."
+  },
+  {
+    "suite": "ssr-final-metadata",
+    "target": "nested-descriptors",
+    "op": "encoded_units",
+    "reference": "row-budget",
+    "maxRatio": 52.5,
+    "note": "Final metadata audit: executed encoded_units work per 128 authored rows; clean output and guard/identity counterexamples must pass. No allocation or latency inference."
+  },
+  {
+    "suite": "ssr-final-metadata",
+    "target": "children",
+    "op": "children_marks",
+    "reference": "row-budget",
+    "maxRatio": 1,
+    "note": "Final metadata audit: executed children_marks work per 128 authored rows; clean output and guard/identity counterexamples must pass. No allocation or latency inference."
+  },
+  {
+    "suite": "ssr-final-metadata",
+    "target": "hosts",
+    "op": "namespace_records",
+    "reference": "row-budget",
+    "maxRatio": 1.01,
+    "note": "Final metadata audit: executed namespace_records work per 128 authored rows; clean output and guard/identity counterexamples must pass. No allocation or latency inference."
+  },
+  {
+    "suite": "ssr-final-metadata",
+    "target": "hosts",
+    "op": "host_contexts",
+    "reference": "row-budget",
+    "maxRatio": 1.01,
+    "note": "Final metadata audit: executed host_contexts work per 128 authored rows; clean output and guard/identity counterexamples must pass. No allocation or latency inference."
+  },
+  {
+    "suite": "ssr-final-metadata",
+    "target": "attributes",
+    "op": "attribute_lowercase",
+    "reference": "row-budget",
+    "maxRatio": 4,
+    "note": "Final metadata audit: executed attribute_lowercase work per 128 authored rows; clean output and guard/identity counterexamples must pass. No allocation or latency inference."
+  },
+  {
+    "suite": "ssr-final-metadata",
+    "target": "spread-attributes",
+    "op": "aggregate_attribute_lowercase",
+    "reference": "row-budget",
+    "maxRatio": 4,
+    "note": "Final metadata audit: executed aggregate_attribute_lowercase work per 128 authored rows; clean output and guard/identity counterexamples must pass. No allocation or latency inference."
+  },
+  {
+    "suite": "ssr-final-metadata",
+    "target": "spread-attributes",
+    "op": "url_attribute_lowercase",
+    "reference": "row-budget",
+    "maxRatio": 4,
+    "note": "Final metadata audit: executed url_attribute_lowercase work per 128 authored rows; clean output and guard/identity counterexamples must pass. No allocation or latency inference."
+  },
+  {
+    "suite": "ssr-final-metadata",
+    "target": "hooks",
+    "op": "hook_positions",
+    "reference": "row-budget",
+    "maxRatio": 2,
+    "note": "Executed hook_positions work divided by 128 authored rows; consumer reentrancy and identity controls must pass. No engine-allocation inference."
+  },
+  {
+    "suite": "ssr-final-metadata",
+    "target": "descriptors",
+    "op": "identity_key_encodings",
+    "reference": "row-budget",
+    "maxRatio": 4.02,
+    "note": "Executed identity_key_encodings work divided by 128 authored rows; consumer reentrancy and identity controls must pass. No engine-allocation inference."
+  },
+  {
+    "suite": "ssr-final-metadata",
+    "target": "descriptors",
+    "op": "descriptor_render_closures",
+    "reference": "row-budget",
+    "maxRatio": 2.02,
+    "note": "Executed descriptor_render_closures work divided by 128 authored rows; consumer reentrancy and identity controls must pass. No engine-allocation inference."
+  },
+  {
+    "suite": "ssr-final-replay",
+    "target": "resources-nested-stream",
+    "op": "boundary_arrays",
+    "reference": "scan-budget",
+    "maxRatio": 0,
+    "note": "Direct scans must not materialize the boundary registry. Positive unit denominator; complete clean/observed output, error, abort and cleanup controls also run."
+  },
+  {
+    "suite": "ssr-final-replay",
+    "target": "resources-nested-stream",
+    "op": "copied_boundaries",
+    "reference": "scan-budget",
+    "maxRatio": 0,
+    "note": "Direct scans must not materialize the boundary registry. Positive unit denominator; complete clean/observed output, error, abort and cleanup controls also run."
+  },
+  {
+    "suite": "ssr-final-replay",
+    "target": "stream-errors",
+    "op": "boundary_arrays",
+    "reference": "scan-budget",
+    "maxRatio": 0,
+    "note": "Direct scans must not materialize the boundary registry. Positive unit denominator; complete clean/observed output, error, abort and cleanup controls also run."
+  },
+  {
+    "suite": "ssr-final-replay",
+    "target": "stream-errors",
+    "op": "copied_boundaries",
+    "reference": "scan-budget",
+    "maxRatio": 0,
+    "note": "Direct scans must not materialize the boundary registry. Positive unit denominator; complete clean/observed output, error, abort and cleanup controls also run."
+  },
+  {
+    "suite": "ssr-final-replay",
+    "target": "stream-abort",
+    "op": "boundary_arrays",
+    "reference": "scan-budget",
+    "maxRatio": 0,
+    "note": "Direct scans must not materialize the boundary registry. Positive unit denominator; complete clean/observed output, error, abort and cleanup controls also run."
+  },
+  {
+    "suite": "ssr-final-replay",
+    "target": "stream-abort",
+    "op": "copied_boundaries",
+    "reference": "scan-budget",
+    "maxRatio": 0,
+    "note": "Direct scans must not materialize the boundary registry. Positive unit denominator; complete clean/observed output, error, abort and cleanup controls also run."
+  },
+  {
+    "suite": "ssr-final-replay",
+    "target": "stream-populated",
+    "op": "boundary_arrays",
+    "reference": "scan-budget",
+    "maxRatio": 0,
+    "note": "Direct scans must not materialize the boundary registry. Positive unit denominator; complete clean/observed output, error, abort and cleanup controls also run."
+  },
+  {
+    "suite": "ssr-final-replay",
+    "target": "stream-populated",
+    "op": "copied_boundaries",
+    "reference": "scan-budget",
+    "maxRatio": 0,
+    "note": "Direct scans must not materialize the boundary registry. Positive unit denominator; complete clean/observed output, error, abort and cleanup controls also run."
+  },
+  {
+    "suite": "ssr-final-replay",
+    "target": "stream-0-1",
+    "op": "boundary_arrays",
+    "reference": "scan-budget",
+    "maxRatio": 0,
+    "note": "Direct scans must not materialize the boundary registry. Positive unit denominator; complete clean/observed output, error, abort and cleanup controls also run."
+  },
+  {
+    "suite": "ssr-final-replay",
+    "target": "stream-0-1",
+    "op": "copied_boundaries",
+    "reference": "scan-budget",
+    "maxRatio": 0,
+    "note": "Direct scans must not materialize the boundary registry. Positive unit denominator; complete clean/observed output, error, abort and cleanup controls also run."
+  },
+  {
+    "suite": "ssr-final-replay",
+    "target": "stream-1-1",
+    "op": "boundary_arrays",
+    "reference": "scan-budget",
+    "maxRatio": 0,
+    "note": "Direct scans must not materialize the boundary registry. Positive unit denominator; complete clean/observed output, error, abort and cleanup controls also run."
+  },
+  {
+    "suite": "ssr-final-replay",
+    "target": "stream-1-1",
+    "op": "copied_boundaries",
+    "reference": "scan-budget",
+    "maxRatio": 0,
+    "note": "Direct scans must not materialize the boundary registry. Positive unit denominator; complete clean/observed output, error, abort and cleanup controls also run."
+  },
+  {
+    "suite": "ssr-final-replay",
+    "target": "stream-8-1",
+    "op": "boundary_arrays",
+    "reference": "scan-budget",
+    "maxRatio": 0,
+    "note": "Direct scans must not materialize the boundary registry. Positive unit denominator; complete clean/observed output, error, abort and cleanup controls also run."
+  },
+  {
+    "suite": "ssr-final-replay",
+    "target": "stream-8-1",
+    "op": "copied_boundaries",
+    "reference": "scan-budget",
+    "maxRatio": 0,
+    "note": "Direct scans must not materialize the boundary registry. Positive unit denominator; complete clean/observed output, error, abort and cleanup controls also run."
+  },
+  {
+    "suite": "ssr-final-replay",
+    "target": "stream-8-8",
+    "op": "boundary_arrays",
+    "reference": "scan-budget",
+    "maxRatio": 0,
+    "note": "Direct scans must not materialize the boundary registry. Positive unit denominator; complete clean/observed output, error, abort and cleanup controls also run."
+  },
+  {
+    "suite": "ssr-final-replay",
+    "target": "stream-8-8",
+    "op": "copied_boundaries",
+    "reference": "scan-budget",
+    "maxRatio": 0,
+    "note": "Direct scans must not materialize the boundary registry. Positive unit denominator; complete clean/observed output, error, abort and cleanup controls also run."
+  },
+  {
+    "suite": "ssr-final-replay",
+    "target": "stream-32-1",
+    "op": "boundary_arrays",
+    "reference": "scan-budget",
+    "maxRatio": 0,
+    "note": "Direct scans must not materialize the boundary registry. Positive unit denominator; complete clean/observed output, error, abort and cleanup controls also run."
+  },
+  {
+    "suite": "ssr-final-replay",
+    "target": "stream-32-1",
+    "op": "copied_boundaries",
+    "reference": "scan-budget",
+    "maxRatio": 0,
+    "note": "Direct scans must not materialize the boundary registry. Positive unit denominator; complete clean/observed output, error, abort and cleanup controls also run."
+  },
+  {
+    "suite": "ssr-final-replay",
+    "target": "stream-32-32",
+    "op": "boundary_arrays",
+    "reference": "scan-budget",
+    "maxRatio": 0,
+    "note": "Direct scans must not materialize the boundary registry. Positive unit denominator; complete clean/observed output, error, abort and cleanup controls also run."
+  },
+  {
+    "suite": "ssr-final-replay",
+    "target": "stream-32-32",
+    "op": "copied_boundaries",
+    "reference": "scan-budget",
+    "maxRatio": 0,
+    "note": "Direct scans must not materialize the boundary registry. Positive unit denominator; complete clean/observed output, error, abort and cleanup controls also run."
+  },
+  {
+    "suite": "ssr-final-replay",
+    "target": "stream-populated",
+    "op": "collection_copies",
+    "reference": "populated-budget",
+    "maxRatio": 1,
+    "note": "Measured 8-wave populated-resource copy budget:688 collections / 6688 entries. Frozen baseline 832 / 8992. Existing immutable snapshots preserve accepted CSS/resources during discarded fallback rewinds."
+  },
+  {
+    "suite": "ssr-final-replay",
+    "target": "stream-populated",
+    "op": "collection_entries",
+    "reference": "populated-budget",
+    "maxRatio": 1,
+    "note": "Measured 8-wave populated-resource copy budget:688 collections / 6688 entries. Frozen baseline 832 / 8992. Existing immutable snapshots preserve accepted CSS/resources during discarded fallback rewinds."
+  },
+  {
+    "suite": "ssr-final-replay",
+    "target": "stream-32-1",
+    "op": "full_passes",
+    "reference": "wave-budget",
+    "maxRatio": 1,
+    "note": "Retained 32-wave work:33 full passes, 528 suspended visits, 496 pending probes, 13,728 closure expression events. Positive measured work budgets, with complete output controls; no latency or engine allocation inference."
+  },
+  {
+    "suite": "ssr-final-replay",
+    "target": "stream-32-1",
+    "op": "suspended_visits",
+    "reference": "wave-budget",
+    "maxRatio": 1,
+    "note": "Retained 32-wave work:33 full passes, 528 suspended visits, 496 pending probes, 13,728 closure expression events. Positive measured work budgets, with complete output controls; no latency or engine allocation inference."
+  },
+  {
+    "suite": "ssr-final-replay",
+    "target": "stream-32-1",
+    "op": "read_probes",
+    "reference": "wave-budget",
+    "maxRatio": 1,
+    "note": "Retained 32-wave work:33 full passes, 528 suspended visits, 496 pending probes, 13,728 closure expression events. Positive measured work budgets, with complete output controls; no latency or engine allocation inference."
+  },
+  {
+    "suite": "ssr-final-replay",
+    "target": "stream-32-1",
+    "op": "try_closures",
+    "reference": "wave-budget",
+    "maxRatio": 1,
+    "note": "Retained 32-wave work:33 full passes, 528 suspended visits, 496 pending probes, 13,728 closure expression events. Positive measured work budgets, with complete output controls; no latency or engine allocation inference."
   }
 ]

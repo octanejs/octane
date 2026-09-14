@@ -20,6 +20,7 @@
 declare const process: { env: { NODE_ENV?: string } };
 
 import { resolveHookPath } from './hook-slot-cache.js';
+import { bumpContextEpoch, contextEpochNow } from './context-epoch.js';
 
 import {
 	SUSPENSE_SCRIPT_ATTR,
@@ -672,9 +673,9 @@ function takeNativeFreshArm(
 }
 
 // Production helper/custom-hook ABI: reserve a disjoint numeric range for each
-// evaluated module that needs globally composable Symbol descriptions. Direct
-// sites in compiler-owned render Scopes use smaller local numbers and never call
-// this helper. Evaluation order is irrelevant; reserved ranges never overlap,
+// evaluated module. Base-hook slots and compiler memo regions also need module
+// ownership: Providers and lazy wrappers may run different bodies in one Scope.
+// Evaluation order is irrelevant; reserved ranges never overlap,
 // including duplicate/dynamically loaded module instances.
 let nextHookSlot = 0;
 export function hookSlots(count: number): number {
@@ -1038,6 +1039,17 @@ export interface Block extends Scope {
 	/** Direct (own) context reads this render — drives memo invalidation alongside $$ctxReads. */
 	$$ctxDirect: Map<Context<any>, any> | null;
 	/**
+	 * The context epoch at which this block's $$ctxReads/$$ctxDirect
+	 * entries were last known consistent with live context versions: sampled when
+	 * renderBlock clears the maps (this render repopulates them at current
+	 * versions) and re-stamped after a bailout verifies every recorded entry.
+	 * While it equals the current epoch NO context anywhere has changed since, so
+	 * the per-bail version scans are provably redundant. restampCtxDeps poisons it
+	 * (-1) when it merges a stale version into this block's map, so a still-pending
+	 * consumer refresh can never be masked by the fast path.
+	 */
+	$$ctxDepsEpoch: number;
+	/**
 	 * Armed for React's IMPLICIT same-element bailout (beginWork's
 	 * oldProps === newProps skip). Set at value-position component mounts
 	 * (childSlot); makes the block a context-stamping target like `__memo` so
@@ -1178,6 +1190,9 @@ let NEXT_WARM_EPISODE = 1;
 let CURRENT_WARM_EPISODE = 0;
 const RENDERER_REGION_OWNER = Symbol.for('octane.renderer-region.owner');
 const RENDERER_REGION_DOM_OWNERS = new WeakMap<Block, RendererRegionOwnerBridge>();
+// Live region-owner roots (WeakMap exposes no size). Ordinary apps never bind
+// one, so this collapses the per-read bridge check to a single integer test.
+let RENDERER_REGION_OWNER_COUNT = 0;
 const RENDERER_REGION_DOM_BINDINGS = new WeakMap<
 	Block,
 	{
@@ -6808,6 +6823,9 @@ class BlockImpl {
 	// version here means THIS block must re-run; if only $$ctxReads changed, the
 	// block can bail its body and refresh just its consuming child blocks.
 	declare $$ctxDirect: Map<Context<any>, any> | null;
+	// Epoch stamp for the two dep maps — see Block.$$ctxDepsEpoch. Number so the
+	// "unverified" poison (-1) stays inside the same monomorphic field type.
+	declare $$ctxDepsEpoch: number;
 	// Resolved-provider cache for `use(ctx)` — see Scope.$$ctxCache.
 	declare $$ctxCache: Context<any> | Map<Context<any>, Scope | typeof DEFAULT_CTX> | null;
 	declare $$ctxCacheOwner: Scope | typeof DEFAULT_CTX | null;
@@ -6907,6 +6925,7 @@ class BlockImpl {
 		this.$$ctxValues = null;
 		this.$$ctxReads = null;
 		this.$$ctxDirect = null;
+		this.$$ctxDepsEpoch = -1;
 		this.$$ctxCache = null;
 		this.$$ctxCacheOwner = null;
 		this.$$implicitBail = false;
@@ -7279,10 +7298,16 @@ function renderBlockInner(block: Block): true | undefined {
 		(block as any).__thenableDone = false;
 	}
 	// Clear last render's recorded context dependencies; this render repopulates
-	// them (its own reads + descendant reads propagated up). Only memo blocks
-	// ever hold a non-null map, so this is a no-op for the common case.
+	// them (its own reads + descendant reads propagated up). Only memo/armed
+	// blocks ever hold a non-null map, so this is a no-op for the common case.
 	if (block.$$ctxReads !== null) block.$$ctxReads.clear();
 	if (block.$$ctxDirect !== null) block.$$ctxDirect.clear();
+	// Stamp the dep maps' consistency epoch: entries written during this render
+	// record live versions, so while the global epoch still equals this sample
+	// no recorded dep can be stale. Sampling at the TOP is deliberate — a
+	// provider commit mid-render advances the epoch past this stamp, so the
+	// bail scans still run and see any mixed-version entries.
+	block.$$ctxDepsEpoch = contextEpochNow();
 	// Capture the render priority. Explicit pendingMode (set by scheduleRender)
 	// wins. Otherwise INHERIT from the outer block — re-entrant renders (try,
 	// if, for, comp slots) called synchronously inside an outer body should
@@ -7755,6 +7780,25 @@ export function componentSlotLite<P>(
 	anchor?: Node,
 ): void {
 	if (CURRENT_BLOCK?.pending && !CURRENT_BLOCK.crossRenderUpdate) return;
+	// Providers and lazy wrappers can execute independently compiled bodies in
+	// the same Scope. Their direct children need an identity-aware slot, including
+	// when one body selected the lite representation and another selected full.
+	if (parentScope === SHARED_BODY_SCOPE) {
+		componentSlotImpl(
+			null,
+			parentScope,
+			slotKey,
+			host,
+			comp,
+			comp,
+			props,
+			props,
+			anchor,
+			undefined,
+			2,
+		);
+		return;
+	}
 	const hydration = activeHydration();
 	let scope = parentScope.slots[slotKey] as Scope | undefined;
 	// The server `<!--]-->` this call adopted as its range end (hydration first
@@ -10062,10 +10106,12 @@ export function useEffectEvent<F extends (...args: any[]) => any>(fn: F, slot?: 
 const CONTEXT_TAG = Symbol.for('octane.context');
 // Compiler-owned output caches compare their own lexical dependencies, but a
 // Provider update is propagated lazily through the already-mounted Block tree
-// rather than scheduling every consumer. One module-wide epoch lets generated
-// cache guards notice that exceptional channel without retaining any concrete
-// Context, boundary, or component identity in the runtime.
-let COMPILER_CACHE_CONTEXT_EPOCH = 0;
+// rather than scheduling every consumer. One process-wide epoch (read as
+// contextEpochNow() from context-epoch.ts, whose Symbol.for'd cell is shared
+// by every module copy so universal renderers and react-hosted mirrors share
+// the same counter) lets generated cache guards and
+// the $$ctxDepsEpoch bail fast path notice that exceptional channel without
+// retaining any concrete Context, boundary, or component identity in the runtime.
 
 export interface Context<T> {
 	(props: { value: T; children?: any }, scope: Scope, extra?: unknown): void;
@@ -10077,6 +10123,11 @@ export interface Context<T> {
 	 * changed value. Consumers record the version they read at; the memo bailout
 	 * (componentSlot) compares it so a context change forces a re-render through
 	 * the push-cascade even when props are shallow-equal. See useContextInternal.
+	 * Every bump must move the shared context epoch too — call bumpContextEpoch
+	 * adjacent to the write, or (for external bumpers like react-hosted mirrors)
+	 * guarantee a root.render commit follows, whose renderResolved entry bumps
+	 * it. The $$ctxDepsEpoch bail fast path treats an unmoved epoch as "nothing
+	 * changed", so an unpaired bump strands consumers.
 	 */
 	$$version: number;
 }
@@ -10176,7 +10227,7 @@ export function renderClientContextProvider<T>(
 				// A different body reused the same DOM/control slots. Its predecessor's
 				// output dependencies no longer prove what those slots contain. Hook
 				// values remain per-body and keep their mounted lifetime.
-				invalidateProviderOutput(scope);
+				invalidateSharedBodyOutput(scope);
 				if (TRANSITION_JOURNAL !== null && !ROOT_RENDER_ROLLBACK) {
 					const hooks = scope.hooks!;
 					journalUndo(() => hooks.set(CHILDREN_DIALECT_SLOT, previous));
@@ -10184,21 +10235,36 @@ export function renderClientContextProvider<T>(
 			}
 			ensureHooks(scope).set(CHILDREN_DIALECT_SLOT, dialect);
 		}
-		childrenAsBody(children)(undefined, scope, undefined);
+		renderSharedBody(childrenAsBody(children), undefined, scope, undefined);
+	}
+}
+
+// Only the directly shared Scope needs stronger component ownership. Ordinary
+// descendants retain their lite paths, and nested shared bodies restore the
+// outer owner without allocating a stack or adding state to every Scope.
+let SHARED_BODY_SCOPE: Scope | null = null;
+
+function renderSharedBody(body: ComponentBody, props: any, scope: Scope, extra: any): any {
+	const previous = SHARED_BODY_SCOPE;
+	SHARED_BODY_SCOPE = scope;
+	try {
+		return body(props, scope, extra);
+	} finally {
+		SHARED_BODY_SCOPE = previous;
 	}
 }
 
 /** Body handoffs are cold; ordinary Provider updates keep their cache arrays. */
-function invalidateProviderOutput(scope: Scope): void {
+function invalidateSharedBodyOutput(scope: Scope): void {
 	const first = scope.compilerMemo;
 	if (first === null) return;
-	invalidateProviderMemoRegion(first);
+	invalidateSharedBodyMemoRegion(first);
 	if (first.overflow !== null) {
-		for (const region of first.overflow.values()) invalidateProviderMemoRegion(region);
+		for (const region of first.overflow.values()) invalidateSharedBodyMemoRegion(region);
 	}
 }
 
-function invalidateProviderMemoRegion(region: CompilerMemoRegion): void {
+function invalidateSharedBodyMemoRegion(region: CompilerMemoRegion): void {
 	if (region.auto === undefined) return;
 	// A candidate may complete before a later sibling suspends. Rollback must
 	// restore the accepted body's dependencies along with its visible output.
@@ -10232,7 +10298,7 @@ export function provideContext<T>(scope: Scope, context: Context<T>, value: T): 
 	// stays monotone so another root's committed Provider is never rewound.
 	if (had) {
 		context.$$version++;
-		COMPILER_CACHE_CONTEXT_EPOCH++;
+		bumpContextEpoch();
 	}
 	values.set(context, value);
 }
@@ -11985,13 +12051,16 @@ export function useContext<T>(context: Context<T> | ForeignHostContext<T>): T {
 const DEFAULT_CTX: unique symbol = Symbol('octane.ctx.default');
 
 function rendererRegionOwnerForBlock(block: Block | null): RendererRegionOwnerBridge | null {
+	// bindRendererRegionOwner throws unless the block is a top-level root
+	// (kind 'root', no parent), so ancestors below the chain top can never be
+	// keys — climb straight there and pay one lookup per call instead of one
+	// per ancestor on every no-provider context read.
+	if (RENDERER_REGION_OWNER_COUNT === 0) return null;
 	let current = block;
-	while (current !== null) {
-		const bridge = RENDERER_REGION_DOM_OWNERS.get(current);
-		if (bridge !== undefined && bridge.active) return bridge;
-		current = current.parentBlock;
-	}
-	return null;
+	while (current !== null && current.parentBlock !== null) current = current.parentBlock;
+	if (current === null) return null;
+	const bridge = RENDERER_REGION_DOM_OWNERS.get(current);
+	return bridge !== undefined && bridge.active ? bridge : null;
 }
 
 function rendererRegionTryHandler(block: Block | null): ((error: unknown) => void) | null {
@@ -12053,12 +12122,14 @@ export function bindRendererRegionOwner(props: unknown): void {
 	root.$$ctxCache = null;
 	root.$$ctxCacheOwner = null;
 	if (previous === undefined) {
+		RENDERER_REGION_OWNER_COUNT++;
 		(root.cleanups ??= []).push(() => {
 			const current = RENDERER_REGION_DOM_BINDINGS.get(root);
 			if (current === undefined) return;
 			current.release();
 			RENDERER_REGION_DOM_BINDINGS.delete(root);
 			RENDERER_REGION_DOM_OWNERS.delete(root);
+			RENDERER_REGION_OWNER_COUNT--;
 		});
 	}
 }
@@ -12139,6 +12210,17 @@ function scopedReadsChanged(reads: ScopedReads | null): boolean {
 	return false;
 }
 
+// Classification can resolve a descriptor before its host/item Block owns it.
+// A cache hit must transfer those reads to the current render, just like an
+// actual useContext call. Nested resolvers also contribute to their enclosing
+// resolver's capture, or caching the outer record would hide the nested reads.
+function replayScopedContextReads(reads: Map<Context<any>, number>, block: Block | null): void {
+	for (const [context, version] of reads) {
+		if (block !== null) recordContextDependency(block, context);
+		if (SCOPED_READ_TRACKING) (SCOPED_READS ??= new Map()).set(context, version);
+	}
+}
+
 function createScopedResolver<T>(read: () => T): () => T {
 	let resolved = false;
 	let resolvedScope: Scope | null = null;
@@ -12163,20 +12245,26 @@ function createScopedResolver<T>(read: () => T): () => T {
 			SCOPED_READ_TRACKING = true;
 			SCOPED_READS = null;
 			let next: T;
+			let nextReads: Map<Context<any>, number> | null;
 			try {
 				next = read();
 			} finally {
-				resolvedReads = SCOPED_READS;
+				nextReads = SCOPED_READS;
 				SCOPED_READ_TRACKING = previousTracking;
 				SCOPED_READS = previousReads;
+				// An enclosing resolver may catch this read's error and cache its
+				// fallback, so even an unsuccessful attempt contributes dependencies.
+				if (previousTracking && nextReads !== null) replayScopedContextReads(nextReads, null);
 			}
 			resolvedScope = scope;
+			resolvedReads = nextReads;
 			resolvedValue = next;
 			resolved = true;
-		} else if (resolvedScope !== scope) {
+		} else {
 			// Move ownership from the previewing parent to its direct child so a
 			// later sibling or provider scope still resolves independently.
 			resolvedScope = scope;
+			if (resolvedReads !== null) replayScopedContextReads(resolvedReads, CURRENT_BLOCK);
 		}
 		return resolvedValue;
 	};
@@ -12230,6 +12318,7 @@ function createNativeScopedResolver<T>(read: () => T): () => T {
 					nextReads = SCOPED_READS;
 					SCOPED_READ_TRACKING = previousTracking;
 					SCOPED_READS = previousReads;
+					if (previousTracking && nextReads !== null) replayScopedContextReads(nextReads, null);
 					nextWitness = finishNativeReadWitness(witnessToken, readCompleted);
 				}
 				resolvedScope = scope;
@@ -12241,6 +12330,7 @@ function createNativeScopedResolver<T>(read: () => T): () => T {
 				resolved = true;
 			} else {
 				resolvedScope = scope;
+				if (resolvedReads !== null) replayScopedContextReads(resolvedReads, CURRENT_BLOCK);
 				if (collecting) replayNativeReadWitness(resolvedWitness);
 			}
 			completed = true;
@@ -13568,6 +13658,17 @@ export function memoPublishAlways<T>(slot: HookSlot, value: T): T {
 // ---------------------------------------------------------------------------
 
 const LAZY_COMPONENT = Symbol.for('octane.lazy');
+const LAZY_BODY_CHECK = Symbol.for('octane.lazyBodyCheck');
+type LazyBodyCheck = (scope: Scope) => boolean;
+
+function markLazyBodyCheck(body: ComponentBody<any>, check: LazyBodyCheck): void {
+	// Static-hoisting HOCs must not inherit the wrapped lazy's ownership check.
+	Object.defineProperty(body, LAZY_BODY_CHECK, {
+		get() {
+			return this === body ? check : undefined;
+		},
+	});
+}
 
 /**
  * Resolve a lazy module payload to its component. Accepts React's canonical
@@ -13624,6 +13725,9 @@ export function lazy<C extends ComponentBody<any>>(
 	let displayName: string | undefined;
 	let resolvedName = 'Lazy';
 	let lazyWrapper!: ComponentBody<any>;
+	// A wrapper may own many mounted scopes. Remember each scope's accepted
+	// module body separately so another mount cannot hide a body handoff.
+	const bodySlot = Symbol();
 
 	const initializeLazy = (): void => {
 		if (status !== 'uninitialized') return;
@@ -13669,6 +13773,18 @@ export function lazy<C extends ComponentBody<any>>(
 		// throwing/accessor default export is a render-time failure in React: a later
 		// render reads it again without re-running the loader.
 		const comp = resolveLazyModule(result);
+		const previousBody = scope.hooks?.get(bodySlot) as ComponentBody<any> | undefined;
+		if (previousBody !== comp) {
+			if (previousBody !== undefined) invalidateSharedBodyOutput(scope);
+			const hooks = ensureHooks(scope);
+			if (TRANSITION_JOURNAL !== null && !ROOT_RENDER_ROLLBACK) {
+				journalUndo(() => {
+					if (previousBody === undefined) hooks.delete(bodySlot);
+					else hooks.set(bodySlot, previousBody);
+				});
+			}
+			hooks.set(bodySlot, comp);
+		}
 		resolvedName = (comp as any).displayName || comp.name || 'Lazy';
 		if ((comp as any).__memo === true) {
 			// The lazy wrapper owns the live Block, so a resolved memo wrapper would
@@ -13683,13 +13799,25 @@ export function lazy<C extends ComponentBody<any>>(
 					},
 				});
 				Object.defineProperty(lazyWrapper, '__compare', {
-					value: (prev: any, next: any): boolean => {
+					value: (prev: any, next: any, renderScope: Scope): boolean => {
 						const current = resolveLazyModule(result);
+						// Equal props cannot reuse a different module body's output. This
+						// check belongs to the mounted scope, not the shared lazy payload.
+						if (renderScope.hooks?.get(bodySlot) !== current || (current as any).__memo !== true)
+							return false;
 						const compare = (current as any).__compare as
 							((previous: any, incoming: any) => boolean) | undefined;
 						const previous = lazyResolvedProps(current, prev);
 						const incoming = lazyResolvedProps(current, next);
-						return compare ? compare(previous, incoming) : shallowEqualProps(previous, incoming);
+						return compare
+							? (current as any)[LAZY_BODY_CHECK] !== undefined
+								? (compare as (prev: any, next: any, scope: Scope) => boolean)(
+										previous,
+										incoming,
+										renderScope,
+									)
+								: compare(previous, incoming)
+							: shallowEqualProps(previous, incoming);
 					},
 				});
 				memoMetadataInstalled = true;
@@ -13707,7 +13835,7 @@ export function lazy<C extends ComponentBody<any>>(
 			__profileComponentSource(lazyWrapper, comp);
 			profiledComponent = comp;
 		}
-		return comp(lazyResolvedProps(comp, props), scope, extra);
+		return renderSharedBody(comp, lazyResolvedProps(comp, props), scope, extra);
 	};
 
 	lazyWrapper = (props: any, scope: Scope, extra: any): unknown => {
@@ -13740,6 +13868,15 @@ export function lazy<C extends ComponentBody<any>>(
 	// Existing ancestor warm plans can start an independently reachable module,
 	// but resolution, component execution, and deferred hydration remain lazy.
 	markWarm(lazyWrapper, initializeLazy);
+	markLazyBodyCheck(lazyWrapper, (scope) => {
+		// Checking a bailout never starts the loader or accepts speculative output.
+		if (status !== 'fulfilled') return false;
+		const current = resolveLazyModule(result);
+		if (scope.hooks?.get(bodySlot) !== current) return false;
+		// Direct lazy -> lazy is invalid, but lazy -> memo -> lazy is supported.
+		const nestedCheck = (current as any)[LAZY_BODY_CHECK] as LazyBodyCheck | undefined;
+		return nestedCheck === undefined || nestedCheck(scope);
+	});
 	Object.defineProperty(lazyWrapper, LAZY_COMPONENT, {
 		get() {
 			return this === lazyWrapper;
@@ -27132,6 +27269,21 @@ function ctxDirectChanged(block: Block): boolean {
 	return false;
 }
 
+// Shared epoch gate for the two bail paths: while no Provider anywhere has
+// committed a value change since this block's deps were recorded/verified,
+// both version scans are provably clean — skip them without even creating the
+// map iterators. A clean scan re-stamps the block; a changed transitive dep
+// refreshes just its consumers. Returns false when a DIRECT dep changed and
+// the block's own body must re-run (bail refused).
+function ctxBailDepsClean(block: Block): boolean {
+	if (block.$$ctxDepsEpoch !== contextEpochNow()) {
+		if (ctxDirectChanged(block)) return false;
+		if (ctxDepsChanged(block)) refreshContextConsumers(block);
+		else block.$$ctxDepsEpoch = contextEpochNow();
+	}
+	return true;
+}
+
 /**
  * React-style lazy context propagation. A memo boundary bailed on props but a
  * context its subtree consumes changed; rather than re-running the boundary's
@@ -27191,10 +27343,13 @@ function tryMemoBail(block: Block, comp: any, props: any): boolean {
 	const compare = (comp as any).__compare as ((prev: any, next: any) => boolean) | undefined;
 	// React.memo's optional comparator: returns true when props are equal
 	// (→ skip the render). Falls back to a shallow Object.is comparison.
-	const equal = compare ? compare(block.props, props) : shallowEqualProps(block.props, props);
+	const equal = compare
+		? (comp as any)[LAZY_BODY_CHECK] !== undefined
+			? (compare as (prev: any, next: any, scope: Scope) => boolean)(block.props, props, block)
+			: compare(block.props, props)
+		: shallowEqualProps(block.props, props);
 	if (!equal) return false;
-	if (ctxDirectChanged(block)) return false;
-	if (ctxDepsChanged(block)) refreshContextConsumers(block);
+	if (!ctxBailDepsClean(block)) return false;
 	restampCtxDeps(block);
 	reconnectBailedEffects(block);
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
@@ -27215,8 +27370,9 @@ function tryImplicitBail(block: Block): boolean {
 	// A first attempt that suspended or threw has no committed output to reuse.
 	// Its identity-equal retry must execute until this Block mounts successfully.
 	if (!block.mounted || block.renderStatus !== RENDER_VALID) return false;
-	if (ctxDirectChanged(block)) return false;
-	if (ctxDepsChanged(block)) refreshContextConsumers(block);
+	const checkLazyBody = (block.body as any)[LAZY_BODY_CHECK] as LazyBodyCheck | undefined;
+	if (checkLazyBody !== undefined && !checkLazyBody(block)) return false;
+	if (!ctxBailDepsClean(block)) return false;
 	restampCtxDeps(block);
 	reconnectBailedEffects(block);
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
@@ -27244,13 +27400,27 @@ function restampCtxDeps(block: Block): void {
 		if (hasReads) {
 			for (const [ctx, v] of reads!) {
 				const cur = m.get(ctx);
-				if (cur === undefined || cur === (ctx as any).$$version) m.set(ctx, v);
+				if (cur !== v) {
+					const live = (ctx as any).$$version;
+					if (cur === undefined || cur === live) {
+						m.set(ctx, v);
+						// A stale version merged in can mask a still-pending consumer
+						// refresh — the receiving map is no longer verifiably current.
+						if (v !== live) b.$$ctxDepsEpoch = -1;
+					}
+				}
 			}
 		}
 		if (hasDirect) {
 			for (const [ctx, v] of direct!) {
 				const cur = m.get(ctx);
-				if (cur === undefined || cur === (ctx as any).$$version) m.set(ctx, v);
+				if (cur !== v) {
+					const live = (ctx as any).$$version;
+					if (cur === undefined || cur === live) {
+						m.set(ctx, v);
+						if (v !== live) b.$$ctxDepsEpoch = -1;
+					}
+				}
 			}
 		}
 	}
@@ -27300,7 +27470,12 @@ function restampCachedSlotContext(slot: any): void {
 }
 
 function refreshBlockForContext(block: Block): void {
-	if (ctxDirectChanged(block)) {
+	// A block whose dep maps were verified at the current context epoch holds no
+	// stale entry: its own direct read cannot have changed, and for a memo/armed
+	// block no DESCENDANT dep changed either. Non-memo intermediates carry no
+	// $$ctxReads aggregate, so they still descend to find unstamped consumers.
+	const verified = block.$$ctxDepsEpoch === contextEpochNow();
+	if (!verified && ctxDirectChanged(block)) {
 		// This child directly consumes the changed context (or shares its block
 		// with a lite descendant that does): re-run it. renderBlock re-renders its
 		// own subtree top-down, so nested consumers below it are reached normally.
@@ -27310,11 +27485,18 @@ function refreshBlockForContext(block: Block): void {
 	} else if ((block.body as any)?.__memo === true || block.$$implicitBail === true) {
 		// A memo'd (or implicit-bail-armed) pure indirection: its $$ctxReads is
 		// stamped, so prune to subtrees that actually hold a changed-context consumer.
-		if (ctxDepsChanged(block)) refreshContextConsumers(block);
+		// A clean scan re-stamps it — direct was already verified above — so a
+		// re-reach inside the same epoch prunes without rescanning.
+		if (!verified) {
+			if (ctxDepsChanged(block)) refreshContextConsumers(block);
+			else block.$$ctxDepsEpoch = contextEpochNow();
+		}
 	} else {
 		// A non-memo intermediate (control-flow branch, plain wrapper) isn't stamped
 		// in $$ctxReads, so we can't prune — descend unconditionally to find any
-		// consumer it strands. Bounded by this bailed boundary's subtree.
+		// consumer it strands. Bounded by this bailed boundary's subtree. Its own
+		// direct map was verified above, so the stamp can only prune a re-check.
+		if (!verified) block.$$ctxDepsEpoch = contextEpochNow();
 		refreshContextConsumers(block);
 	}
 }
@@ -27344,7 +27526,7 @@ export function compilerCacheContext(
 	previous: number | undefined,
 	restampMemoAncestors: boolean = false,
 ): number {
-	const current = COMPILER_CACHE_CONTEXT_EPOCH;
+	const current = contextEpochNow();
 	if (previous === undefined) return current;
 	const reconnect = EFFECT_RECONNECT_CONTEXT !== null;
 	const restamp = restampMemoAncestors && scope.block.memoInChain;
@@ -27509,7 +27691,18 @@ export function memo<P>(
 	Object.defineProperty(memoWrapper, 'defaultProps', MEMO_DEFAULT_PROPS_DESCRIPTOR);
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileComponentSource(memoWrapper, component);
-	if (arePropsEqual) Object.defineProperty(memoWrapper, '__compare', { value: arePropsEqual });
+	const checkLazyBody = (component as any)[LAZY_BODY_CHECK] as LazyBodyCheck | undefined;
+	if (checkLazyBody !== undefined) {
+		markLazyBodyCheck(memoWrapper, checkLazyBody);
+		// Even the default comparator must remain explicit for this family: a
+		// compiler memo witness may otherwise skip the slot before its body check.
+		Object.defineProperty(memoWrapper, '__compare', {
+			value: (prev: any, next: any, scope: Scope): boolean =>
+				checkLazyBody(scope) &&
+				(arePropsEqual ? arePropsEqual(prev, next) : shallowEqualProps(prev, next)),
+		});
+	} else if (arePropsEqual)
+		Object.defineProperty(memoWrapper, '__compare', { value: arePropsEqual });
 	return memoWrapper as ComponentBody<P> & {
 		readonly type: ComponentBody<P>;
 		displayName?: string;
@@ -32359,9 +32552,9 @@ export function ifBlock(
 	// Hoisted-helper env tuple (compiled-output Phase 2) — see renderBranchSlot.
 	env?: any[],
 ): void {
-	const hydration = activeHydration();
 	let state = parentScope.slots[slotKey] as IfSlot | undefined;
 	if (state === undefined) {
+		const hydration = activeHydration();
 		let start: Comment | null = null;
 		let end: Node | null = null;
 		const passthrough = hydration?.passthroughRanges === true;
@@ -33267,9 +33460,9 @@ export function switchBlock(
 	// Hoisted-helper env tuple (compiled-output Phase 2) — see renderBranchSlot.
 	env?: any[],
 ): void {
-	const hydration = activeHydration();
 	let state = parentScope.slots[slotKey] as SwitchSlot | undefined;
 	if (state === undefined) {
+		const hydration = activeHydration();
 		let start: Comment | null = null;
 		let end: Node | null = null;
 		const passthrough = hydration?.passthroughRanges === true;
@@ -36364,6 +36557,17 @@ function makeRoot(
 		mode?: 'urgent' | 'transition',
 	): void => {
 		if (unmounted) return;
+		// Root render entry can carry contexts bumped outside provideContext —
+		// react-hosted mirrors publish version bumps between React commits, then
+		// commit through root.render → this path. Advance the shared epoch so the
+		// $$ctxDepsEpoch fast path can never mask those stale recorded versions.
+		// ponytail: process-global catch-all — every root.render stales all stamps
+		// and defeats compilerCacheContext's previous===current guard for one
+		// rescan cycle, even with no context change (react islands pay it per
+		// commit). Upgrade: bump at the publish site (react/index.ts) so the
+		// epoch tracks only real bumps; kept here because src/react is out of
+		// scope and the catch-all also covers unknown external bumpers.
+		bumpContextEpoch();
 		// Same component as the live root (incl. a just-hydrated root): update
 		// props in place and schedule. This is a NORMAL client render — `hydrating`
 		// is already false, so renderBlock reuses the adopted DOM, not rebuilds it.
