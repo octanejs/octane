@@ -121,3 +121,7 @@ confirmed that its branch helpers are identical to this baseline and have no
 active edits. Preserve signal ownership through `renderBlock`; normalized
 reconciliation keys remain distinct from raw signal-instance keys. No files in
 that task are changed by this investigation.
+
+The separate `childSlot` and `componentSlotImpl` entries are resolved by the
+[final slot audit](functions-slots.md). Their compiled fixture joins this suite
+with reached-call gates; native tier diagnostics remain informational.

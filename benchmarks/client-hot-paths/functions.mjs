@@ -10,17 +10,21 @@ import { pathToFileURL } from 'node:url';
 import { gzipSync } from 'node:zlib';
 import { build } from 'esbuild';
 import { Window } from 'happy-dom';
+import { exerciseSlots } from './slots-work.mjs';
 
-const names = [
-	'reconcileKeyed',
-	'forBlock',
-	'mountItem',
-	'renderBlockInner',
-	'setAttribute',
-	'coerceAttrValue',
-	'useState',
-	'mapSlot',
-];
+const slotAudit = process.env.CLIENT_FUNCTION_SET === 'slots';
+const names = slotAudit
+	? ['childSlot', 'componentSlotImpl']
+	: [
+			'reconcileKeyed',
+			'forBlock',
+			'mountItem',
+			'renderBlockInner',
+			'setAttribute',
+			'coerceAttrValue',
+			'useState',
+			'mapSlot',
+		];
 const repo = resolve(import.meta.dirname, '../..');
 const hash = (value) => createHash('sha256').update(value).digest('hex');
 const exports = [
@@ -60,7 +64,7 @@ async function exercise(artifact, coverage) {
 	const debug = new Function('fn', '%DebugPrint(fn);');
 	const functions = runtime.__clientHotFunctions;
 	const printReferences = (phase) => {
-		if (coverage) return;
+		if (coverage || !functions) return;
 		for (const name of names) {
 			console.log('FUNCTION_REFERENCE ' + phase + ' ' + name);
 			debug(functions[name]);
@@ -73,146 +77,154 @@ async function exercise(artifact, coverage) {
 		await session.post('Profiler.enable');
 		await session.post('Profiler.startPreciseCoverage', { callCount: true, detailed: false });
 	}
-	const custom = [1, 2];
-	custom.map = () => ['custom'];
-	assert.equal(runtime.mapSlot(custom, custom.map), false);
-	assert.equal(runtime.mapSlot([1, , 3], Array.prototype.map), false);
-	assert.equal(runtime.mapSlot([1, 2, 3], Array.prototype.map), true);
-	const slot = Symbol('state');
-	const rows = Array.from({ length: 16 }, (_, id) => ({ id, label: 'row:' + id }));
-	const key = (row) => row.id;
-	const callback = (row) =>
-		runtime.createElement(
-			'li',
-			{ key: row.id, 'data-row': row.id },
-			runtime.createElement('input', { defaultValue: row.label }),
-		);
-	function rowBody(row, scope) {
-		runtime.hostComponent(
-			scope,
-			0,
-			'li',
-			{ 'data-row': row.id },
-			runtime.createElement('input', { defaultValue: row.label }),
-		);
-	}
 	const results = [];
-	let update;
-	let seenState;
-	function Scene(props, scope) {
-		const state = runtime.useState(7, slot);
-		seenState = state[0];
-		update = state[1];
-		runtime.hostComponent(
-			scope,
-			0,
-			'output',
-			{
-				'data-version': props.version,
-				'aria-hidden': props.version % 2 === 0,
-				draggable: props.version % 2 === 0,
-				hidden: props.version % 2 !== 0,
-				title: props.version % 2 === 0 ? 'even' : null,
-			},
-			String(state[0]),
-		);
-		const list = runtime.hostComponent(scope, 1, 'ul', null);
-		if (props.mapped) {
-			// This is the compiler's full map ABI, with its real eligibility query.
-			const native = runtime.mapSlot(props.rows, props.rows.map);
-			runtime.mapSlot(
+	if (slotAudit) {
+		results.push(...exerciseSlots(runtime, coverage ? 2 : 300));
+	} else {
+		const custom = [1, 2];
+		custom.map = () => ['custom'];
+		assert.equal(runtime.mapSlot(custom, custom.map), false);
+		assert.equal(runtime.mapSlot([1, , 3], Array.prototype.map), false);
+		assert.equal(runtime.mapSlot([1, 2, 3], Array.prototype.map), true);
+		const slot = Symbol('state');
+		const rows = Array.from({ length: 16 }, (_, id) => ({ id, label: 'row:' + id }));
+		const key = (row) => row.id;
+		const callback = (row) =>
+			runtime.createElement(
+				'li',
+				{ key: row.id, 'data-row': row.id },
+				runtime.createElement('input', { defaultValue: row.label }),
+			);
+		function rowBody(row, scope) {
+			runtime.hostComponent(
 				scope,
-				2,
-				list,
-				props.rows,
-				props.rows.map,
-				native,
-				callback,
-				key,
-				rowBody,
 				0,
-				[props.version],
+				'li',
+				{ 'data-row': row.id },
+				runtime.createElement('input', { defaultValue: row.label }),
 			);
-		} else {
-			runtime.forBlock(scope, 2, list, props.rows, key, rowBody, props.singleRoot ? 2 : 0);
+		}
+		let update;
+		let seenState;
+		function Scene(props, scope) {
+			const state = runtime.useState(7, slot);
+			seenState = state[0];
+			update = state[1];
+			runtime.hostComponent(
+				scope,
+				0,
+				'output',
+				{
+					'data-version': props.version,
+					'aria-hidden': props.version % 2 === 0,
+					draggable: props.version % 2 === 0,
+					hidden: props.version % 2 !== 0,
+					title: props.version % 2 === 0 ? 'even' : null,
+				},
+				String(state[0]),
+			);
+			const list = runtime.hostComponent(scope, 1, 'ul', null);
+			if (props.mapped) {
+				// This is the compiler's full map ABI, with its real eligibility query.
+				const native = runtime.mapSlot(props.rows, props.rows.map);
+				runtime.mapSlot(
+					scope,
+					2,
+					list,
+					props.rows,
+					props.rows.map,
+					native,
+					callback,
+					key,
+					rowBody,
+					0,
+					[props.version],
+				);
+			} else {
+				runtime.forBlock(scope, 2, list, props.rows, key, rowBody, props.singleRoot ? 2 : 0);
+			}
+		}
+		for (const [mapped, singleRoot] of [
+			[false, false],
+			[false, true],
+			[true, false],
+		]) {
+			const container = document.createElement('div');
+			document.body.append(container);
+			const root = runtime.createRoot(container);
+			try {
+				let current = rows;
+				let version = 0;
+				const render = (next) => {
+					current = next;
+					runtime.flushSync(() =>
+						root.render(Scene, { rows: current, version: ++version, mapped, singleRoot }),
+					);
+				};
+				root.render(Scene, { rows: current, version, mapped, singleRoot });
+				const original = new Map(
+					[...container.querySelectorAll('li')].map((node) => [
+						Number(node.getAttribute('data-row')),
+						node,
+					]),
+				);
+				for (const [id, node] of original) node.querySelector('input').value = 'typed:' + id;
+				// Stable, reverse, rotate, insertion, removal, and empty/refill paths.
+				const rounds = coverage ? 2 : 300;
+				for (let iteration = 0; iteration < rounds; iteration++) {
+					render(current);
+					render(current.toReversed());
+					render([...current.slice(1), current[0]]);
+					const extra = { id: 100 + iteration, label: 'new:' + iteration };
+					render([...current.slice(0, 8), extra, ...current.slice(8)]);
+					render(current.filter((row) => row !== extra));
+				}
+				const after = [...container.querySelectorAll('li')];
+				assert.deepEqual(
+					after.map((node) => Number(node.getAttribute('data-row'))),
+					current.map(key),
+				);
+				for (const row of current) {
+					const node = original.get(row.id);
+					assert.equal(
+						after.find((item) => item.getAttribute('data-row') === String(row.id)),
+						node,
+					);
+					assert.equal(node.querySelector('input').value, 'typed:' + row.id);
+				}
+				const output = container.querySelector('output');
+				for (let parity = 0; parity < 2; parity++) {
+					assert.equal(output.getAttribute('data-version'), String(version));
+					assert.equal(output.getAttribute('aria-hidden'), String(version % 2 === 0));
+					assert.equal(output.getAttribute('draggable'), String(version % 2 === 0));
+					assert.equal(output.hasAttribute('hidden'), version % 2 !== 0);
+					assert.equal(output.getAttribute('title'), version % 2 === 0 ? 'even' : null);
+					render(current);
+				}
+				runtime.flushSync(() => update((value) => value + 5));
+				assert.equal(seenState, 12);
+				assert.equal(container.querySelector('output'), output);
+				assert.equal(output.textContent, '12');
+				render([]);
+				assert.equal(container.querySelectorAll('li').length, 0);
+				render(rows);
+				assert.deepEqual(
+					[...container.querySelectorAll('li')].map((node) =>
+						Number(node.getAttribute('data-row')),
+					),
+					rows.map(key),
+				);
+				results.push({ mapped, singleRoot, state: seenState, rows: rows.map(key), cleanup: true });
+			} finally {
+				root.unmount();
+				assert.equal(container.childNodes.length, 0);
+				container.remove();
+			}
 		}
 	}
-	for (const [mapped, singleRoot] of [
-		[false, false],
-		[false, true],
-		[true, false],
-	]) {
-		const container = document.createElement('div');
-		document.body.append(container);
-		const root = runtime.createRoot(container);
-		try {
-			let current = rows;
-			let version = 0;
-			const render = (next) => {
-				current = next;
-				runtime.flushSync(() =>
-					root.render(Scene, { rows: current, version: ++version, mapped, singleRoot }),
-				);
-			};
-			root.render(Scene, { rows: current, version, mapped, singleRoot });
-			const original = new Map(
-				[...container.querySelectorAll('li')].map((node) => [
-					Number(node.getAttribute('data-row')),
-					node,
-				]),
-			);
-			for (const [id, node] of original) node.querySelector('input').value = 'typed:' + id;
-			// Stable, reverse, rotate, insertion, removal, and empty/refill paths.
-			const rounds = coverage ? 2 : 300;
-			for (let iteration = 0; iteration < rounds; iteration++) {
-				render(current);
-				render(current.toReversed());
-				render([...current.slice(1), current[0]]);
-				const extra = { id: 100 + iteration, label: 'new:' + iteration };
-				render([...current.slice(0, 8), extra, ...current.slice(8)]);
-				render(current.filter((row) => row !== extra));
-			}
-			const after = [...container.querySelectorAll('li')];
-			assert.deepEqual(
-				after.map((node) => Number(node.getAttribute('data-row'))),
-				current.map(key),
-			);
-			for (const row of current) {
-				const node = original.get(row.id);
-				assert.equal(
-					after.find((item) => item.getAttribute('data-row') === String(row.id)),
-					node,
-				);
-				assert.equal(node.querySelector('input').value, 'typed:' + row.id);
-			}
-			const output = container.querySelector('output');
-			for (let parity = 0; parity < 2; parity++) {
-				assert.equal(output.getAttribute('data-version'), String(version));
-				assert.equal(output.getAttribute('aria-hidden'), String(version % 2 === 0));
-				assert.equal(output.getAttribute('draggable'), String(version % 2 === 0));
-				assert.equal(output.hasAttribute('hidden'), version % 2 !== 0);
-				assert.equal(output.getAttribute('title'), version % 2 === 0 ? 'even' : null);
-				render(current);
-			}
-			runtime.flushSync(() => update((value) => value + 5));
-			assert.equal(seenState, 12);
-			assert.equal(container.querySelector('output'), output);
-			assert.equal(output.textContent, '12');
-			render([]);
-			assert.equal(container.querySelectorAll('li').length, 0);
-			render(rows);
-			assert.deepEqual(
-				[...container.querySelectorAll('li')].map((node) => Number(node.getAttribute('data-row'))),
-				rows.map(key),
-			);
-			results.push({ mapped, singleRoot, state: seenState, rows: rows.map(key), cleanup: true });
-		} finally {
-			root.unmount();
-			assert.equal(container.childNodes.length, 0);
-			container.remove();
-		}
-	}
-	const naturalStatus = Object.fromEntries(names.map((name) => [name, status(functions[name])]));
+	const naturalStatus = functions
+		? Object.fromEntries(names.map((name) => [name, status(functions[name])]))
+		: null;
 	printReferences('after');
 	let counts;
 	if (session) {
@@ -226,7 +238,8 @@ async function exercise(artifact, coverage) {
 		}
 		await session.post('Profiler.stopPreciseCoverage');
 		session.disconnect();
-		for (const name of names) assert.ok(counts[name] > 0, name + ' was not exercised');
+		if (functions)
+			for (const name of names) assert.ok(counts[name] > 0, name + ' was not exercised');
 	}
 	await window.happyDOM.close();
 	return { semanticSha: hash(JSON.stringify(results)), counts, naturalStatus };
@@ -238,10 +251,31 @@ if (process.argv[2] === '--worker') {
 } else {
 	const sourceRoot = resolve(process.env.CLIENT_SOURCE_ROOT || process.argv[2] || repo);
 	const sourceFile = join(sourceRoot, 'packages/octane/src/runtime.ts');
-	const source = await readFile(sourceFile, 'utf8');
+	const source = await readFile(process.env.CLIENT_RUNTIME_FILE || sourceFile, 'utf8');
 	const out = join(repo, 'node_modules/.cache/client-hot-functions');
 	await mkdir(out, { recursive: true });
-	const entry = `export {${exports.join(',')}} from './packages/octane/src/runtime.ts';`;
+	let entry = `export {${exports.join(',')}} from './packages/octane/src/runtime.ts';`;
+	if (slotAudit) {
+		const { compile } = await import(
+			pathToFileURL(join(repo, 'packages/octane/src/compiler/compile.js'))
+		);
+		const fixture = await readFile(join(import.meta.dirname, 'slots-fixture.tsrx'), 'utf8');
+		entry =
+			compile(fixture, 'slots-fixture.tsrx', { mode: 'client', dev: false, hmr: false }).code +
+			'\nexport { createRoot, createElement, createPortal, flushSync } from "octane";';
+	}
+	const aliases = {
+		name: 'selected-client-runtime',
+		setup(builder) {
+			builder.onResolve({ filter: /^octane(?:\/internal\/client)?$/ }, ({ path: request }) => ({
+				path: join(
+					sourceRoot,
+					'packages/octane/src',
+					request === 'octane' ? 'index.ts' : 'internal/client.ts',
+				),
+			}));
+		},
+	};
 	const options = {
 		stdin: { contents: entry, resolveDir: sourceRoot },
 		bundle: true,
@@ -251,8 +285,18 @@ if (process.argv[2] === '--worker') {
 		target: 'es2022',
 		define: { 'process.env.NODE_ENV': '"production"', __OCTANE_PROFILE_ENABLED__: 'false' },
 		nodePaths: [join(repo, 'packages/octane/node_modules'), join(repo, 'node_modules')],
+		plugins: [aliases],
 	};
-	const clean = (await build({ ...options, minify: true })).outputFiles[0].text;
+	const selectedSource = {
+		name: 'selected-runtime-source',
+		setup(builder) {
+			builder.onLoad({ filter: /\/runtime\.ts$/ }, ({ path }) =>
+				path === sourceFile ? { contents: source, loader: 'ts' } : undefined,
+			);
+		},
+	};
+	const clean = (await build({ ...options, plugins: [aliases, selectedSource], minify: true }))
+		.outputFiles[0].text;
 	const diagnostic = (
 		await build({
 			...options,
@@ -261,6 +305,7 @@ if (process.argv[2] === '--worker') {
 				resolveDir: sourceRoot,
 			},
 			plugins: [
+				aliases,
 				{
 					name: 'diagnostic-function-references',
 					setup(builder) {
@@ -278,7 +323,9 @@ if (process.argv[2] === '--worker') {
 	).outputFiles[0].text;
 	const artifact = join(out, hash(diagnostic) + '.mjs');
 	await writeFile(artifact, diagnostic);
-	function run(flags, coverage = false) {
+	const cleanArtifact = join(out, hash(clean) + '.mjs');
+	await writeFile(cleanArtifact, clean);
+	function run(flags, coverage = false, selectedArtifact = artifact) {
 		const child = spawnSync(
 			process.execPath,
 			[
@@ -286,7 +333,7 @@ if (process.argv[2] === '--worker') {
 				...flags,
 				import.meta.filename,
 				'--worker',
-				artifact,
+				selectedArtifact,
 				...(coverage ? ['--coverage'] : []),
 			],
 			{ encoding: 'utf8', maxBuffer: 128 * 1024 * 1024, env: process.env },
@@ -301,6 +348,7 @@ if (process.argv[2] === '--worker') {
 			stderr: child.stderr,
 		};
 	}
+	const cleanControl = run([], false, cleanArtifact);
 	const observed = run([], true);
 	const warmed = run([
 		'--no-concurrent-recompilation',
@@ -315,6 +363,7 @@ if (process.argv[2] === '--worker') {
 		await writeFile(join(traces, 'stderr.log'), warmed.stderr);
 	}
 	assert.equal(observed.payload.semanticSha, warmed.payload.semanticSha);
+	assert.equal(cleanControl.payload.semanticSha, warmed.payload.semanticSha);
 	// DebugPrint/bytecode can pad pointers with zeros while tier traces omit
 	// them. Match pointer values, not their engine-specific printed spelling.
 	const address = (value) => BigInt(value).toString(16);
@@ -325,11 +374,18 @@ if (process.argv[2] === '--worker') {
 		references[match[1]].add(address(match[2]));
 	}
 	const bytecode = {};
+	const frames = {};
 	for (const match of warmed.stdout.matchAll(
-		/\[generated bytecode for function: (\w+) \((0x[\da-f]+) [^\n]*\]\nBytecode length: (\d+)/g,
+		/\[generated bytecode for function: (\w+) \((0x[\da-f]+) [^\n]*\]\nBytecode length: (\d+)\nParameter count (\d+)\nRegister count (\d+)\nFrame size (\d+)/g,
 	)) {
-		if (Object.hasOwn(references, match[1]) && references[match[1]].has(address(match[2])))
+		if (Object.hasOwn(references, match[1]) && references[match[1]].has(address(match[2]))) {
 			bytecode[match[1]] = Number(match[3]);
+			frames[match[1]] = {
+				parametersIncludingReceiver: Number(match[4]),
+				registers: Number(match[5]),
+				bytes: Number(match[6]),
+			};
+		}
 	}
 	for (const name of names) assert.ok(bytecode[name] > 0, name + ' bytecode missing');
 	const optimizationTrace = warmed.stdout
@@ -366,40 +422,58 @@ if (process.argv[2] === '--worker') {
 		console.error(
 			'No tier events matched runtime function identities; tier results are inconclusive. Set CLIENT_FUNCTION_TRACE_DIRECTORY to inspect the raw output.',
 		);
-	console.log(
-		JSON.stringify(
-			{
-				suite: 'client-hot-functions',
-				sourceRoot,
-				sourceSha: hash(source),
-				node: process.version,
-				v8: process.versions.v8,
-				platform: process.platform,
-				arch: process.arch,
-				configuration: {
-					coverageRounds: 2,
-					warmRounds: 300,
-					listModes: 3,
-					rows: 16,
-					concurrentCompilation: false,
-					forcedOptimization: false,
+	const report = {
+		suite: slotAudit ? 'client-slot-functions' : 'client-hot-functions',
+		sourceRoot,
+		sourceSha: hash(source),
+		node: process.version,
+		v8: process.versions.v8,
+		platform: process.platform,
+		arch: process.arch,
+		configuration: {
+			coverageRounds: 2,
+			warmRounds: 300,
+			workload: slotAudit
+				? 'compiled components and child shape transitions'
+				: 'three keyed list modes, 16 rows',
+			concurrentCompilation: false,
+			forcedOptimization: false,
+		},
+		cleanBundle: {
+			minified: Buffer.byteLength(clean),
+			gzip: gzipSync(clean).length,
+			sha: hash(clean),
+		},
+		diagnosticSha: hash(diagnostic),
+		semanticSha: warmed.payload.semanticSha,
+		coverageCalls: observed.payload.counts,
+		bytecode,
+		frames,
+		tiers,
+		tierTraceStatus,
+		naturalStatus: warmed.payload.naturalStatus,
+		optimizationTrace,
+	};
+	console.log(JSON.stringify(report, null, 2));
+	if (slotAudit && process.env.BENCH_JSON) {
+		const stat = (score) => ({ median: score, min: score, max: score });
+		const payload = {
+			suite: 'client-hot-paths',
+			iterations: 1,
+			targets: [
+				{
+					name: 'slots-observed',
+					ops: Object.fromEntries(
+						names.map((name) => [name + '_calls', stat(observed.payload.counts[name])]),
+					),
 				},
-				cleanBundle: {
-					minified: Buffer.byteLength(clean),
-					gzip: gzipSync(clean).length,
-					sha: hash(clean),
+				{
+					name: 'slots-scenarios',
+					ops: Object.fromEntries(names.map((name) => [name + '_calls', stat(2)])),
 				},
-				diagnosticSha: hash(diagnostic),
-				semanticSha: warmed.payload.semanticSha,
-				coverageCalls: observed.payload.counts,
-				bytecode,
-				tiers,
-				tierTraceStatus,
-				naturalStatus: warmed.payload.naturalStatus,
-				optimizationTrace,
-			},
-			null,
-			2,
-		),
-	);
+			],
+			evidence: report,
+		};
+		await writeFile(process.env.BENCH_JSON, JSON.stringify(payload, null, 2) + '\n');
+	}
 }

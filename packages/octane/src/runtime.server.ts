@@ -8248,6 +8248,13 @@ interface StreamState {
 	replay: StreamBoundaryReplayEntry[] | null;
 }
 
+function hasPendingStreamBoundary(stream: StreamState): boolean {
+	for (const boundary of stream.boundaries.values()) {
+		if (boundary.state === 'pending') return true;
+	}
+	return false;
+}
+
 interface StreamBoundaryReplayEntry {
 	key: string;
 	boundary: StreamBoundary | undefined;
@@ -8568,15 +8575,16 @@ export function ssrTry(
 			const deferredStart = DEFERRED?.length ?? 0;
 			const serialStart = SERIAL?.length ?? 0;
 			const css = CSS;
-			const cssSnapshot = snapshotMap(css);
+			const cssSnapshot = snapshotStyles(css);
 			const head = HEAD;
+			const headCollections = snapshotHeadCollections(head);
 			const headHtml = head?.html;
 			const headCharset = head?.charset;
 			const headViewport = head?.viewport;
-			const headHints = snapshotSet(head?.hints);
-			const headSheets = snapshotMap(head?.sheets);
-			const headHintHtml = snapshotMap(head?.hintHtml);
-			const headXfer = snapshotMap(head?.preloadXfer);
+			const headHints = headCollections?.hints ?? null;
+			const headSheets = headCollections?.sheets ?? null;
+			const headHintHtml = headCollections?.hintHtml ?? null;
+			const headXfer = headCollections?.preloadXfer ?? null;
 			const vtTrySeq = VT_SSR_TRY_SEQ;
 			const vtHasCandidates = VT_SSR_HAS_CANDIDATES;
 			const vtStack = snapshotVtStack();
@@ -9387,16 +9395,22 @@ async function runStream(
 		const done: StreamBoundary[] = [];
 		const reachable = new Set(flushedSegments);
 		for (;;) {
-			const next = [...stream.boundaries.values()]
-				.filter((boundary) => {
-					if (boundary.state !== 'done' || reachable.has(boundary.id)) return false;
-					for (let i = boundary.ancestors.length - 1; i >= 0; i--) {
-						const ancestor = stream.boundaries.get(boundary.ancestors[i]);
-						if (ancestor !== undefined) return reachable.has(ancestor.id);
+			const next: StreamBoundary[] = [];
+			// Selection only reads renderer-owned records; no render or transport
+			// callback can change the registry during this scan.
+			for (const boundary of stream.boundaries.values()) {
+				if (boundary.state !== 'done' || reachable.has(boundary.id)) continue;
+				let visible = true;
+				for (let i = boundary.ancestors.length - 1; i >= 0; i--) {
+					const ancestor = stream.boundaries.get(boundary.ancestors[i]);
+					if (ancestor !== undefined) {
+						visible = reachable.has(ancestor.id);
+						break;
 					}
-					return true;
-				})
-				.sort((a, b) => a.order - b.order);
+				}
+				if (visible) next.push(boundary);
+			}
+			next.sort((a, b) => a.order - b.order);
 			if (next.length === 0) return done;
 			for (const boundary of next) {
 				done.push(boundary);
@@ -9411,17 +9425,22 @@ async function runStream(
 			options?.onError?.(boundary.error);
 		}
 	};
-	const reachableErroredBoundaries = (): StreamBoundary[] =>
-		[...stream.boundaries.values()]
-			.filter((boundary) => {
-				if (boundary.state !== 'errored' || boundary.errorFlushed) return false;
-				for (let i = boundary.ancestors.length - 1; i >= 0; i--) {
-					const ancestor = stream.boundaries.get(boundary.ancestors[i]);
-					if (ancestor !== undefined) return flushedSegments.has(ancestor.id);
+	const reachableErroredBoundaries = (): StreamBoundary[] => {
+		const errors: StreamBoundary[] = [];
+		for (const boundary of stream.boundaries.values()) {
+			if (boundary.state !== 'errored' || boundary.errorFlushed) continue;
+			let visible = true;
+			for (let i = boundary.ancestors.length - 1; i >= 0; i--) {
+				const ancestor = stream.boundaries.get(boundary.ancestors[i]);
+				if (ancestor !== undefined) {
+					visible = flushedSegments.has(ancestor.id);
+					break;
 				}
-				return true;
-			})
-			.sort((a, b) => a.order - b.order);
+			}
+			if (visible) errors.push(boundary);
+		}
+		return errors.sort((a, b) => a.order - b.order);
+	};
 	const flushRecoverableBoundaryErrors = (): void | Promise<void> => {
 		const errors = reachableErroredBoundaries();
 		if (errors.length === 0) return;
@@ -9639,7 +9658,7 @@ async function runStream(
 		}
 		const initialErrorWrite = flushRecoverableBoundaryErrors();
 		if (initialErrorWrite !== undefined) await initialErrorWrite;
-		while ([...stream.boundaries.values()].some((b) => b.state === 'pending')) {
+		while (hasPendingStreamBoundary(stream)) {
 			signal?.throwIfAborted();
 			if (suspended.length === 0) {
 				throw new Error(formatServerError(36));
@@ -9720,9 +9739,10 @@ async function runStream(
 		// boundary whose segment was not accepted. A live consumer receives these
 		// through the same pressure gate; a disconnected consumer rejects and the
 		// renderer simply stops.
-		const pendingBoundaryCount = [...stream.boundaries.values()].filter(
-			(boundary) => boundary.state === 'pending' && !flushedSegments.has(boundary.id),
-		).length;
+		let pendingBoundaryCount = 0;
+		for (const boundary of stream.boundaries.values()) {
+			if (boundary.state === 'pending' && !flushedSegments.has(boundary.id)) pendingBoundaryCount++;
+		}
 		const reports = signal?.aborted ? Math.max(1, pendingBoundaryCount) : 1;
 		for (let i = 0; i < reports; i++) options?.onError?.(err);
 		// Rendering ends here, degraded — the source still gets its completion
