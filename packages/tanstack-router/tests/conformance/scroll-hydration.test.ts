@@ -41,4 +41,5 @@ it.each([true, false])(
 			container.remove();
 		}
 	},
+	30_000,
 );

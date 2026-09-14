@@ -14,6 +14,8 @@ export default defineConfig({
 		environment: 'jsdom',
 		setupFiles: ['tests/adapted-setup.ts'],
 		restoreMocks: true,
+		// ssr-hydration boots a Vite SSR server per case; shard load makes 5s marginal.
+		testTimeout: 15_000,
 		server: { deps: { inline: ['@tanstack/query-core'] } },
 	},
 	plugins: [
