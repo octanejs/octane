@@ -396,7 +396,7 @@ export async function buildFixture(
 		),
 		changedInputsDuringBuild,
 		limitations: [
-			`Local production ${bundler} split client and esbuild server output, not lightweight-web deployment or its application chunk policy.`,
+			`Local production ${bundler} split client and esbuild server output; fixture measurements do not establish deployed application performance or chunk policy.`,
 			'Server-owned lists keep first-value historical HTML; live outputs observe later signal results without reconciling those lists.',
 			'Payload sizes are raw/gzip9/brotli11; not network transfer, parse, paint, INP, or Safari-device measurements.',
 		],
