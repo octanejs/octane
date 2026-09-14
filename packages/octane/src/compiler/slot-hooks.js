@@ -1420,6 +1420,8 @@ export function slotHooks(source, id, options) {
 	const getterCalls = importInfo.importsHook ? collectStateGetterCalls(ast) : new WeakSet();
 	if (
 		!strongAnalysis?.enabled &&
+		// The whole-AST memo path does not apply declaration identity edits.
+		!signalLowering.usesSignals &&
 		canPrint &&
 		options?.inlineHookMemo === true &&
 		environment === 'client' &&

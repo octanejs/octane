@@ -357,6 +357,21 @@ export const selected$ = signals.signal$('first');`;
 				.map((node: any) => node.source.value),
 		).not.toContain('octane/internal/client');
 		expect(server).toContain('enableServerSignalBindings as');
+		// A sibling memo may select a different production printer, but must not
+		// drop the declaration identity shared with SSR or its activation metadata.
+		const withMemo = `${source}\nimport { useMemo } from 'octane';
+export function useLabel(label) { return useMemo(() => label + '!', [label]); }`;
+		for (const inlineHookMemo of [false, true]) {
+			const client = slotHooks(withMemo, '/src/state.js', {
+				environment: 'client',
+				inlineHookMemo,
+			})!;
+			const server = slotHooks(withMemo, '/src/state.js', { environment: 'server' })!;
+			expect(site(client.code)).toBeDefined();
+			expect(site(client.code)).toBe(site(server.code));
+			expect(client.streamedSignals).toBe(true);
+			expect(server.streamedSignals).toBe(true);
+		}
 	});
 
 	it('does not rewrite explicit scopes, foreign factories, or shadowed imports', () => {
