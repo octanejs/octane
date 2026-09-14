@@ -17,7 +17,7 @@ export interface CompileMdxDiagnosticPosition {
 
 export interface CompileMdxDiagnostic {
 	code: string;
-	severity: 'warning';
+	severity: 'error' | 'warning' | 'hint';
 	message: string;
 	filename: string;
 	start: CompileMdxDiagnosticPosition;

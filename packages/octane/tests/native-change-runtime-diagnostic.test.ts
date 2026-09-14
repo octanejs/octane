@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { flushSync, hydrateRoot } from '../src/index.js';
 import * as ServerRuntime from 'octane/server';
 import { act, mount } from './_helpers.js';
-import { loadServerFixture } from './_server-fixture.js';
+import { loadCompiledFixtureSource, loadServerFixture } from './_server-fixture.js';
 import {
 	DiagnosticBatch,
 	DynamicHost,
@@ -32,6 +32,41 @@ function diagnosticCalls(spy: ReturnType<typeof vi.spyOn>) {
 }
 
 describe('native text change development diagnostic', () => {
+	it('keeps dynamic input diagnostics live in Strong modules with cached hook inputs', () => {
+		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const { Input } = loadCompiledFixtureSource(
+			`"use strong";
+import { useEffect } from 'octane';
+export function Input(props) @{
+  const options = { label: props.label };
+  useEffect(() => props.observe(options));
+  <input type={props.type} value="draft" onChange={props.onChange} />
+}`,
+			{
+				id: '/src/StrongInput.tsrx',
+				mode: 'client',
+				compileOptions: { dev: !PROD_COMPILE, hmr: false },
+			},
+		);
+		const props = { type: 'checkbox', label: 'first', observe: noop, onChange: noop };
+		const result = mount(Input, props);
+		try {
+			expect(diagnosticCalls(error)).toHaveLength(0);
+			const input = result.find('input');
+			result.update(Input, { ...props, type: 'text' });
+			expect(result.find('input')).toBe(input);
+			expect(diagnosticCalls(error)).toHaveLength(PROD_COMPILE ? 0 : 1);
+			error.mockClear();
+			result.update(Input, { ...props, type: 'text', label: 'second' });
+			expect(diagnosticCalls(error)).toHaveLength(0);
+			result.update(Input, props);
+			result.update(Input, { ...props, type: 'text' });
+			expect(diagnosticCalls(error)).toHaveLength(PROD_COMPILE ? 0 : 1);
+		} finally {
+			result.unmount();
+		}
+	});
+
 	it('warns once per broken episode and resets after a valid final-props state', () => {
 		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
 		const broken = { onChange: noop };

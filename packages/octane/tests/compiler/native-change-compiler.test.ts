@@ -360,6 +360,7 @@ export function App(props) @{
 		expect(server?.diagnostics).toHaveLength(1);
 		expect(warn).toHaveBeenCalledTimes(1);
 		expect(warn).toHaveBeenCalledWith(expect.stringContaining('/src/App.tsrx:1:'));
+		expect(warn).toHaveBeenCalledWith(expect.stringContaining('warning:'));
 		expect(warn).toHaveBeenCalledWith(expect.stringContaining(CODE));
 
 		compiler.invalidate(id);

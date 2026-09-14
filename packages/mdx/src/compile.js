@@ -58,7 +58,7 @@ import { SourceMapGenerator } from 'source-map';
  * @property {unknown} map
  * @property {Array<{
  *   code: string,
- *   severity: 'warning',
+ *   severity: 'error' | 'warning' | 'hint',
  *   message: string,
  *   filename: string,
  *   start: { offset: number, line: number, column: number },

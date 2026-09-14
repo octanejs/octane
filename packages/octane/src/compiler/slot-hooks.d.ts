@@ -1,4 +1,4 @@
-import type { CompilerProgram, CompileSourceMap } from './index.js';
+import type { CompilerProgram, CompileDiagnostic, CompileSourceMap } from './index.js';
 
 /** Options for the plain-module hook transform used by compiler adapters. */
 export interface SlotHooksOptions {
@@ -20,6 +20,8 @@ export interface SlotHooksResult {
 	code: string;
 	/** The surgical transform preserves source lines and returns no map. */
 	map: CompileSourceMap | null;
+	/** Nonfatal authored Strong diagnostics, including redundant dependency hints. */
+	diagnostics?: readonly CompileDiagnostic[];
 }
 
 export interface VoidComponentImport {

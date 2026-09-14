@@ -8,7 +8,7 @@ declare module 'octane/compiler' {
 	}
 	export interface CompileDiagnostic {
 		code: string;
-		severity: 'warning';
+		severity: 'error' | 'warning' | 'hint';
 		message: string;
 		filename: string;
 		start: CompileDiagnosticPosition;

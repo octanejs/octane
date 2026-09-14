@@ -107,7 +107,7 @@ export interface CompilePosition {
 
 export interface CompileDiagnostic {
 	code: string;
-	severity: 'warning' | 'error';
+	severity: 'warning' | 'error' | 'hint';
 	message: string;
 	filename: string;
 	start: CompilePosition;

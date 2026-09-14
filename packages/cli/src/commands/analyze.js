@@ -11,7 +11,7 @@ import { SYMBOLS } from '../kernel/ui.js';
  * @property {string} file relative to the project root
  * @property {number} line
  * @property {number} column 1-based, matching editor gutters
- * @property {'error' | 'warning'} severity
+ * @property {'error' | 'warning' | 'hint'} severity
  * @property {string} code
  * @property {string} message
  * @property {string[]} suggestions
@@ -175,7 +175,12 @@ export default defineCommand({
 						file,
 						line: diagnostic.start?.line ?? 1,
 						column: (diagnostic.start?.column ?? 0) + 1,
-						severity: diagnostic.severity === 'error' ? 'error' : 'warning',
+						severity:
+							diagnostic.severity === 'error'
+								? 'error'
+								: diagnostic.severity === 'hint'
+									? 'hint'
+									: 'warning',
 						code: diagnostic.code,
 						// The compiler prefixes its own code; the report already has a
 						// column for it.
@@ -198,7 +203,8 @@ export default defineCommand({
 		render(ctx, selected, targets.length);
 
 		const errors = selected.filter((finding) => finding.severity === 'error').length;
-		const warnings = selected.length - errors;
+		const warnings = selected.filter((finding) => finding.severity === 'warning').length;
+		const hints = selected.filter((finding) => finding.severity === 'hint').length;
 		const failed = errors > 0 || (input.flags.strict && warnings > 0);
 
 		return {
@@ -206,7 +212,7 @@ export default defineCommand({
 			json: {
 				ok: !failed,
 				analyzed: targets.length,
-				summary: { errors, warnings },
+				summary: { errors, warnings, hints },
 				findings: selected,
 			},
 		};
@@ -249,7 +255,11 @@ function render(ctx, findings, analyzed) {
 
 		for (const finding of findings.filter((entry) => entry.file === file)) {
 			const mark =
-				finding.severity === 'error' ? colors.red(SYMBOLS.fail) : colors.yellow(SYMBOLS.warn);
+				finding.severity === 'error'
+					? colors.red(SYMBOLS.fail)
+					: finding.severity === 'hint'
+						? colors.dim('hint')
+						: colors.yellow(SYMBOLS.warn);
 			const where = colors.dim(`${finding.line}:${finding.column}`);
 			ctx.ui.log(`  ${mark} ${where}  ${finding.message}`);
 			ctx.ui.log(`      ${colors.dim(finding.code)}`);
@@ -260,11 +270,13 @@ function render(ctx, findings, analyzed) {
 	}
 
 	const errors = findings.filter((finding) => finding.severity === 'error').length;
-	const warnings = findings.length - errors;
+	const warnings = findings.filter((finding) => finding.severity === 'warning').length;
+	const hints = findings.filter((finding) => finding.severity === 'hint').length;
 	/** @type {string[]} */
 	const parts = [];
 	if (errors > 0) parts.push(colors.red(`${errors} error${errors === 1 ? '' : 's'}`));
 	if (warnings > 0) parts.push(colors.yellow(`${warnings} warning${warnings === 1 ? '' : 's'}`));
+	if (hints > 0) parts.push(colors.dim(`${hints} hint${hints === 1 ? '' : 's'}`));
 
 	ctx.ui.log('');
 	ctx.ui.log(`${parts.join(colors.dim(' · '))} ${colors.dim(`across ${analyzed} file(s)`)}`);

@@ -1,6 +1,6 @@
 import { builders as b } from '@tsrx/core';
 import { nsForChildren, nsForSelf } from './jsx-namespace.js';
-import { analyzeRendererBoundaries } from './renderer-boundaries.js';
+import { createRendererRegionResolver } from './renderer-boundaries.js';
 
 export const NATIVE_TEXT_ONCHANGE_DIAGNOSTIC = 'OCTANE_NATIVE_TEXT_ONCHANGE';
 
@@ -263,15 +263,16 @@ function hostLabel(tag, type) {
 	return tag === 'textarea' ? '<textarea>' : `<input type="${type.display}">`;
 }
 
-function diagnosticFor(source, filename, tag, type, changeAttributes, controlled) {
+function diagnosticFor(source, filename, tag, type, changeAttributes, controlled, strong) {
 	const first = changeAttributes[0];
 	const captureOnly = attributeName(first) === 'onChangeCapture';
 	const replacement = captureOnly ? 'onInputCapture' : 'onInput';
 	let message =
 		`[${NATIVE_TEXT_ONCHANGE_DIAGNOSTIC}] \`${attributeName(first)}\` on ${hostLabel(tag, type)} ` +
 		`is a native commit event in Octane; it does not run for each text edit. Use \`${replacement}\` ` +
-		'for per-edit updates. If commit/blur behavior is intentional, add ' +
-		'`suppressNativeChangeWarning`.';
+		(strong
+			? 'for per-edit updates. Strong mode requires an explicit per-edit handler for editable text controls.'
+			: 'for per-edit updates. If commit/blur behavior is intentional, add `suppressNativeChangeWarning`.');
 	if (controlled) {
 		message +=
 			' This control also has `value`; edits are restored before the later native change. ' +
@@ -280,7 +281,7 @@ function diagnosticFor(source, filename, tag, type, changeAttributes, controlled
 	const primary = rangeFor(source, first.name ?? first);
 	return {
 		code: NATIVE_TEXT_ONCHANGE_DIAGNOSTIC,
-		severity: 'warning',
+		severity: strong ? 'error' : 'warning',
 		message,
 		filename: filename || 'module.tsrx',
 		start: primary.start,
@@ -295,7 +296,16 @@ function diagnosticFor(source, filename, tag, type, changeAttributes, controlled
 	};
 }
 
-function classifyHost(node, scope, namespace, source, filename, diagnostics, classifications) {
+function classifyHost(
+	node,
+	scope,
+	namespace,
+	source,
+	filename,
+	diagnostics,
+	classifications,
+	strong,
+) {
 	const tag = tagName(node);
 	if ((tag !== 'input' && tag !== 'textarea') || namespace !== 'html') return;
 	const attributes = attributesOf(node);
@@ -365,6 +375,7 @@ function classifyHost(node, scope, namespace, source, filename, diagnostics, cla
 			type ?? { kind: 'text', display: 'text' },
 			changeAttributes,
 			lastAttribute(attributes, 'value') !== null,
+			strong,
 		),
 	);
 }
@@ -377,41 +388,15 @@ function classifyHost(node, scope, namespace, source, filename, diagnostics, cla
 export function analyzeNativeChangeDiagnostics(ast, source, filename, options = {}) {
 	// The parser permits trivia after `<` and Unicode escapes in JSX names. A
 	// decoded lowercase input/textarea must still leave either its literal name
-	// or a backslash in the paired authored source. False positives only retain
+	// or a Unicode escape in the paired authored source. False positives only retain
 	// the existing analysis for unrelated identifiers, comments, and strings.
-	if (!source.includes('input') && !source.includes('textarea') && !source.includes('\\')) {
+	if (!source.includes('input') && !source.includes('textarea') && !source.includes('\\u')) {
 		return { diagnostics: [], classifications: new Map() };
 	}
 	const diagnostics = [];
 	const classifications = new Map();
-	const ownerRendererId = options.renderer?.id ?? (options.dom === false ? null : 'dom');
-	let rendererRegions = [];
-	if (options.rendererBoundaries && Object.keys(options.rendererBoundaries).length > 0) {
-		rendererRegions = analyzeRendererBoundaries(source, {
-			filename,
-			rendererBoundaries: options.rendererBoundaries,
-		})
-			.boundaries.map((boundary) => ({
-				childRenderer: boundary.childRenderer,
-				range: boundary.region?.range ?? boundary.region?.valueRange,
-			}))
-			.filter((region) => region.range !== null);
-	}
-	const rendererIsDomAt = (node) => {
-		let rendererId = ownerRendererId;
-		let narrowest = Number.POSITIVE_INFINITY;
-		for (const region of rendererRegions) {
-			const [start, end] = region.range;
-			if (start > node.start || node.end > end) continue;
-			const width = end - start;
-			if (width < narrowest) {
-				rendererId = region.childRenderer;
-				narrowest = width;
-			}
-		}
-		if (rendererId === 'dom') return true;
-		return options.rendererRegistry?.[rendererId]?.target === 'dom';
-	};
+	const rendererIsDomAt =
+		options.rendererRegionResolver ?? createRendererRegionResolver(ast, source, filename, options);
 
 	const programScope = createScope(null, ast?.body ?? []);
 	const seen = new WeakSet();
@@ -484,7 +469,16 @@ export function analyzeNativeChangeDiagnostics(ast, source, filename, options = 
 		const isHost = typeof tag === 'string' && /^[a-z]/.test(tag);
 		const selfNs = isHost ? nsForSelf(tag, parentNs) : parentNs;
 		if (isHost && rendererIsDomAt(node)) {
-			classifyHost(node, scope, selfNs, source, filename, diagnostics, classifications);
+			classifyHost(
+				node,
+				scope,
+				selfNs,
+				source,
+				filename,
+				diagnostics,
+				classifications,
+				options.strong === true,
+			);
 		}
 
 		for (const attribute of attributesOf(node)) {
@@ -508,5 +502,5 @@ export function analyzeNativeChangeDiagnostics(ast, source, filename, options = 
 }
 
 export function formatCompileDiagnostic(diagnostic) {
-	return `${diagnostic.filename}:${diagnostic.start.line}:${diagnostic.start.column + 1} ${diagnostic.message}`;
+	return `${diagnostic.filename}:${diagnostic.start.line}:${diagnostic.start.column + 1} ${diagnostic.severity}: ${diagnostic.message}`;
 }

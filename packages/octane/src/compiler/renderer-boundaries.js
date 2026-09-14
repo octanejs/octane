@@ -8,6 +8,46 @@
  */
 import { parseModule } from '@tsrx/core';
 
+/**
+ * Share renderer ownership across diagnostics for one adopted parser tree.
+ * The lazy proof lives only for that analysis and never reparses editor input.
+ */
+export function createRendererRegionResolver(ast, source, filename, options = {}) {
+	const owner = options.renderer?.id ?? (options.dom === false ? null : 'dom');
+	let regions;
+	return function isDOM(node) {
+		let renderer = owner;
+		if (regions === undefined) {
+			regions =
+				options.rendererBoundaries && Object.keys(options.rendererBoundaries).length > 0
+					? analyzeRendererBoundaries(source, {
+							ast,
+							filename,
+							rendererBoundaries: options.rendererBoundaries,
+						}).boundaries
+					: [];
+		}
+		let narrowest = Infinity;
+		for (const boundary of regions) {
+			const range = boundary.region?.range ?? boundary.region?.valueRange;
+			if (
+				!range ||
+				node.start < range[0] ||
+				node.end > range[1] ||
+				range[1] - range[0] >= narrowest
+			)
+				continue;
+			renderer = boundary.childRenderer;
+			narrowest = range[1] - range[0];
+		}
+		return (
+			renderer === 'dom' ||
+			options.rendererRegistry?.[renderer]?.target === 'dom' ||
+			(renderer === options.renderer?.id && options.renderer?.target === 'dom')
+		);
+	};
+}
+
 const TRANSPARENT_TS_EXPRESSIONS = new Set([
 	'ParenthesizedExpression',
 	'TSAsExpression',
