@@ -872,8 +872,8 @@ catalogs:
       specifier: 5.2.0
       version: 5.2.0
     ripple:
-      specifier: ^0.3.125
-      version: 0.3.125
+      specifier: ^0.3.128
+      version: 0.3.128
     rulesync:
       specifier: ^8.32.0
       version: 8.32.0
@@ -1460,7 +1460,7 @@ importers:
     dependencies:
       ripple:
         specifier: catalog:default
-        version: 0.3.125
+        version: 0.3.128
     devDependencies:
       '@ripple-ts/vite-plugin':
         specifier: catalog:default
@@ -1608,7 +1608,7 @@ importers:
     dependencies:
       ripple:
         specifier: catalog:default
-        version: 0.3.125
+        version: 0.3.128
     devDependencies:
       '@ripple-ts/vite-plugin':
         specifier: catalog:default
@@ -1771,7 +1771,7 @@ importers:
     dependencies:
       ripple:
         specifier: catalog:default
-        version: 0.3.125
+        version: 0.3.128
     devDependencies:
       '@ripple-ts/vite-plugin':
         specifier: catalog:default
@@ -1927,7 +1927,7 @@ importers:
     dependencies:
       ripple:
         specifier: catalog:default
-        version: 0.3.125
+        version: 0.3.128
     devDependencies:
       '@ripple-ts/vite-plugin':
         specifier: catalog:default
@@ -2119,7 +2119,7 @@ importers:
     dependencies:
       ripple:
         specifier: catalog:default
-        version: 0.3.125
+        version: 0.3.128
     devDependencies:
       '@ripple-ts/vite-plugin':
         specifier: catalog:default
@@ -2345,7 +2345,7 @@ importers:
     dependencies:
       ripple:
         specifier: catalog:default
-        version: 0.3.125
+        version: 0.3.128
     devDependencies:
       '@ripple-ts/vite-plugin':
         specifier: catalog:default
@@ -2498,7 +2498,7 @@ importers:
     dependencies:
       ripple:
         specifier: catalog:default
-        version: 0.3.125
+        version: 0.3.128
     devDependencies:
       '@tsrx/ripple':
         specifier: catalog:default
@@ -2635,7 +2635,7 @@ importers:
     dependencies:
       ripple:
         specifier: catalog:default
-        version: 0.3.125
+        version: 0.3.128
     devDependencies:
       '@ripple-ts/vite-plugin':
         specifier: catalog:default
@@ -2791,7 +2791,7 @@ importers:
     dependencies:
       ripple:
         specifier: catalog:default
-        version: 0.3.125
+        version: 0.3.128
     devDependencies:
       '@ripple-ts/vite-plugin':
         specifier: catalog:default
@@ -2929,7 +2929,7 @@ importers:
     dependencies:
       ripple:
         specifier: catalog:default
-        version: 0.3.125
+        version: 0.3.128
     devDependencies:
       '@ripple-ts/vite-plugin':
         specifier: catalog:default
@@ -3348,7 +3348,7 @@ importers:
     dependencies:
       ripple:
         specifier: catalog:default
-        version: 0.3.125
+        version: 0.3.128
     devDependencies:
       '@tsrx/ripple':
         specifier: catalog:default
@@ -4077,7 +4077,7 @@ importers:
     dependencies:
       ripple:
         specifier: catalog:default
-        version: 0.3.125
+        version: 0.3.128
     devDependencies:
       '@ripple-ts/vite-plugin':
         specifier: catalog:default
@@ -4214,7 +4214,7 @@ importers:
     dependencies:
       ripple:
         specifier: catalog:default
-        version: 0.3.125
+        version: 0.3.128
     devDependencies:
       '@ripple-ts/vite-plugin':
         specifier: catalog:default
@@ -31087,8 +31087,8 @@ packages:
     engines: {node: 20 || >=22}
     hasBin: true
 
-  ripple@0.3.125:
-    resolution: {integrity: sha512-Mm08jwKihwlgqkhX8Wz/VMEQGPDU098lIARayCKiIc1dBM/T7ominlLW0LZFicfVh02FyXSmKPCNU7UrXCpoww==}
+  ripple@0.3.128:
+    resolution: {integrity: sha512-puhkwU8oHmVJSO7UcX+JiQddwPxs/2xBSLMOJ2B1uv0tm7ztiJotqy+SH21PXOoSvr+hZ5Z2/4mWuvuN+zsTUg==}
 
   robots-parser@3.0.1:
     resolution: {integrity: sha512-s+pyvQeIKIZ0dx5iJiQk1tPLJAWln39+MI5jtM8wnyws+G5azk+dMnMX0qfbqNetKKNgcWWOdi0sfm+FbQbgdQ==}
@@ -63253,10 +63253,10 @@ snapshots:
       glob: 13.0.6
       package-json-from-dist: 1.0.1
 
-  ripple@0.3.125:
+  ripple@0.3.128:
     dependencies:
-      '@tsrx/core': 0.1.67
-      '@tsrx/ripple': 0.1.62
+      '@tsrx/core': 0.1.71
+      '@tsrx/ripple': 0.1.65
       clsx: 2.1.1
       devalue: 5.8.2
       esm-env: 1.2.2

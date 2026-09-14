@@ -462,7 +462,7 @@ catalogs:
     '@react-email/render': 2.0.6
     react-error-boundary: 6.1.2
     react-resizable-panels: 4.12.2
-    ripple: ^0.3.125
+    ripple: ^0.3.128
     rxjs: ^7.8.2
     rulesync: ^8.32.0
     solid-js: '2.0.0-beta.20'
@@ -613,7 +613,7 @@ minimumReleaseAgeExclude:
   - '@tsrx/typescript-plugin@0.3.138'
   - '@tsrx/vite-plugin-react@0.0.104'
   - '@tsrx/vite-plugin-solid@0.0.101'
-  - ripple@0.3.125
+  - ripple@0.3.128
   - '@tsrx/runtime@0.1.7'
   - '@tsrx/react-runtime@0.1.7'
   - '@tsrx/solid-runtime@0.1.7'
