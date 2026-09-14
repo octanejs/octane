@@ -3,15 +3,18 @@
   "schemaVersion": 1,
   "provenance": {
     "repo": "https://github.com/Rajaniraiyn/react-alien-signals.git",
-    "version": "0.3.0",
-    "commit": "6d883959ddf25a3f486451ff8abff60eb989671c",
+    "version": "0.4.0",
+    "commit": "2d85d8d063d79332ec7c7e99c07bda3a722f491a",
     "sourceRoot": "src",
     "testRoot": "src",
     "license": "MIT",
-    "integrity": "sha256:6cd8b2e5d49973e75033f66cd74024918c8e635621dc5f18aaa556dcfccda06c",
+    "integrity": "sha256:c6e035f0c9c353ab35d6fa8f76724082d9699283d04e716539e5b960ca969db2",
     "verification": "verified"
   },
-  "upstreamSuites": { "runtime": "present", "types": "present" },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "present"
+  },
   "adaptedRoots": {
     "source": {
       "roots": ["packages/alien-signals/src"],
@@ -25,8 +28,8 @@
     }
   },
   "adaptedRuntimeSummary": {
-    "inventoryEntries": 26,
-    "uniqueIdentities": 26,
+    "inventoryEntries": 36,
+    "uniqueIdentities": 36,
     "duplicateEntriesWithinLanes": 0,
     "identitiesSharedAcrossLanes": 0
   },
@@ -48,7 +51,7 @@
       "environment": "workspace-node",
       "project": "alien-signals-pristine",
       "evidenceOrigin": "upstream-suite",
-      "notes": "Runs the byte-exact react-alien-signals 0.3.0 bun:test suite against the vendored React binding and checks every passed identity against the committed inventory.",
+      "notes": "Runs the byte-exact react-alien-signals 0.4.0 bun:test suite against the vendored React binding and checks every passed identity against the committed inventory.",
       "execution": {
         "kind": "vitest-full",
         "inventory": "packages/alien-signals/audit/pristine-wrapper-runtime.json"
@@ -57,37 +60,37 @@
         {
           "path": "packages/alien-signals/audit/pristine-wrapper-runtime.json",
           "role": "support",
-          "sha256": "c0b9b567ca1c007b97833304ab21c728dfe225b29ae3564362f93948fbbfce48"
+          "sha256": "0b2bdb6f5a08b3ddee70d6bb930b97441087f45c8cb31819eddc82930f566231"
         },
         {
           "path": "packages/alien-signals/audit/pristine-runtime.json",
           "role": "support",
-          "sha256": "357c847b911ac0e967f3bd2fd1fa24d04bb38827b8c49cba00f684da524ef51a"
+          "sha256": "d04240407e7257fbe8200110b9618fbd6284ac721009ffaf6098424dece95572"
         },
         {
           "path": "packages/alien-signals/tests/upstream-original.test.ts",
           "role": "support",
-          "sha256": "2049785cbaabd314e64514a1687a80a6be4d81edc588c67ef66b420083211aba"
+          "sha256": "8433af2d89e4c95e89f92f28847507b2489dd6142cb2a6d7bf91fe092b654feb"
         },
         {
           "path": "scripts/react-parity/alien-signals-pristine-runtime.mjs",
           "role": "support",
-          "sha256": "7857350920bd515db8cfe0b5cd2768550cc669baab123564ad02ca6dd4a13747"
+          "sha256": "504ff808aee540440e1af012012bd78e80dc10b453d2c347c37a0db35c0fe295"
         },
         {
           "path": "scripts/react-parity/run-pristine.mjs",
           "role": "support",
-          "sha256": "ff2202a9e829641b6e53b9965588c1bcfc4afd2ce53ec89caf2c4ef3467fb9c5"
+          "sha256": "b22925d67cfa0bed1b0b7fbcdd1a4e924b588d9724dd5b33ac4072df8f317a62"
         },
         {
           "path": "packages/alien-signals/audit/pristine-oracle-environment.json",
           "role": "support",
-          "sha256": "66a9082b9644aa8db0f7257d4c082880b5be7d6f901bdc79cccfc6ce25a4d1b3"
+          "sha256": "cba7fb201a205ca5291152f42fe2477d2527d2e9dd1f30846cdfe3ac69b4982b"
         },
         {
           "path": "packages/alien-signals/audit/upstream.lock.json",
           "role": "support",
-          "sha256": "b2ee1d80678b8bf972ceb7e560567b884821694146a54e9b6bff79f1937154d8"
+          "sha256": "16b414a52066ce00d5f20f0c178f528a5ecab54d22033a771006cf853038bdee"
         }
       ]
     },
@@ -107,42 +110,42 @@
         {
           "path": "packages/alien-signals/audit/adapted-runtime.json",
           "role": "support",
-          "sha256": "7ff8ffffada071328a7741bcc12d03380a384ba42f7053f2b2276f526cfc0174"
+          "sha256": "df31b64d937e2d4e62b95f9d91022e9139f95389819d346dffc00494db82d219"
         },
         {
           "path": "scripts/react-parity/alien-signals-runtime-inventory.mjs",
           "role": "support",
-          "sha256": "187e573ef7b8c1e19360c871a4d8fe03564248af5e0bf007616b4b9814c4730e"
+          "sha256": "9de3dc3b2690d91fe5849147141dfb3808a22485ce1431c3994ea85bab822c98"
         },
         {
           "path": "scripts/react-parity/alien-signals-runtime-lib.mjs",
           "role": "support",
-          "sha256": "f6503ad693b55f06da6e57ac09bf84cca6bff163bcbff3a9702ab060816dabc4"
+          "sha256": "9ee48ac72b0cf3e3d58579484f989ae2a5fed1ba0d29a69f9ab1a4ef581d4258"
         },
         {
           "path": "scripts/react-parity/alien-signals-types-lib.mjs",
           "role": "support",
-          "sha256": "7e90f5b5ae3efd0890dafc0aeef74b06e50f73f4c8d15e6ed324deb389852514"
+          "sha256": "7f117be9b65b3bca3c3830578f30e802fbce7c62a51a5ae27ac373f1fd186542"
         },
         {
           "path": "packages/alien-signals/audit/runtime-transformation-ledger.json",
           "role": "support",
-          "sha256": "b670c3002599d9c302254ab209182c38e297d9124368bb14117334b20ece7d94"
+          "sha256": "1203b4bf539cd8fae8389c5759be3dce1b843f7426e5c24e3cca5ecb54608c3e"
         },
         {
           "path": "packages/alien-signals/audit/test-classifications.json",
           "role": "support",
-          "sha256": "6254e1f78e9ecafbb96036fad90e924a351ec89f83bc29c735ee1238eebb345d"
+          "sha256": "33ffb90b7bef5d0451e3911ac59e16569335e585d26f0d81ffa64ce83957abcb"
         },
         {
           "path": "packages/alien-signals/tests/_fixtures/hooks.tsrx",
           "role": "support",
-          "sha256": "af4c04c6f742e521980cfed5fc07d454395eca016385a52d6b027bc3496e4aca"
+          "sha256": "fc6685739f04e7966c839af423d19e350134256f71e40a6c4140e854e89cbd44"
         },
         {
           "path": "scripts/react-parity/alien-signals-classifications-lib.mjs",
           "role": "support",
-          "sha256": "8bc2ba728bdea2f8aff5fbf3830a09138f5a31e3badd4a6e1c74cb53cc2fafb3"
+          "sha256": "9063b53ad0dce69ff69809db9e5262924b5e2df1713c73a73ba11ad0834e56f9"
         }
       ]
     },
@@ -153,17 +156,17 @@
       "environment": "workspace-node",
       "project": "alien-signals-pristine-types",
       "evidenceOrigin": "upstream-suite",
-      "notes": "Runs the pinned upstream typecheck (tsc --noEmit via vendored tsconfig) over src/index.ts + src/index.test.ts, including the @ts-expect-error at index.test.ts:392.",
+      "notes": "Strict tsc checks the complete byte-exact upstream source and test program (90 accepted API calls, zero negative assertions), with separate repository-authored published-declaration shape checks and negative controls.",
       "execution": {
         "kind": "typescript",
         "compiler": "tsc",
-        "project": "packages/alien-signals/upstream/tsconfig.json"
+        "project": "packages/alien-signals/typetests/tsconfig.pristine.json"
       },
       "files": [
         {
           "path": "packages/alien-signals/audit/pristine-types.json",
           "role": "test",
-          "sha256": "ba1515a38124418ba57c8d0ebd8bfd902a62e0b3f6db33f812baa184a06b8550",
+          "sha256": "67600d904bcde464f104fcbd7c52dcd5d1c42e55c83cb9557e4cd6d914138218",
           "cases": [
             {
               "id": "types:alien-signals-pristine",
@@ -175,22 +178,32 @@
         {
           "path": "packages/alien-signals/upstream/tsconfig.json",
           "role": "support",
-          "sha256": "21b91ad5888e2c1507015b6909d8f64a73d352c22229d74d210b5a4ebe9b6ae2"
+          "sha256": "c420064685461c27e9de2699ac0e6d5272f12e29b184fd1fd5aceacb6eef367d"
         },
         {
           "path": "packages/alien-signals/upstream/package.json",
           "role": "support",
-          "sha256": "4a343737443ed940988641cb14dcdefaacd08d00c1a2b4a78e70d0ed21064386"
+          "sha256": "7881303b560feda2a3f7b88f28c31796759df00891b76ce74be66e98e1f303cb"
         },
         {
           "path": "packages/alien-signals/upstream/src/index.test.ts",
           "role": "support",
-          "sha256": "479232596a061b5226bba6061b1ae8b66698e5bde8dc342d84b27ce01c4af500"
+          "sha256": "57cff6cee5b43ab4c2bbce27f4d057dbdf280f906e9030352da6a73aefb8969f"
         },
         {
           "path": "packages/alien-signals/audit/type-parity.json",
           "role": "support",
-          "sha256": "ea5dc84434e455db6573183ab5337449276a53d4d6983da673995ff1d11c11b7"
+          "sha256": "4295906eca96bb9d9934fa5aa69375e1bd57edc45140e9d23dacf0be29115752"
+        },
+        {
+          "path": "packages/alien-signals/typetests/tsconfig.pristine.json",
+          "role": "support",
+          "sha256": "63a950e32f3afe39dbebd0f07b13d7a04001180664bdbdaba3eff59cfc9a3a53"
+        },
+        {
+          "path": "packages/alien-signals/typetests/pristine/public-contract.ts",
+          "role": "support",
+          "sha256": "b9df6a58e321f5358569d8c35ef68b09f24704214e91c0c53be04bb998c7d11c"
         }
       ]
     },
@@ -211,7 +224,7 @@
         {
           "path": "packages/alien-signals/audit/pristine-type-probes.json",
           "role": "test",
-          "sha256": "0323e55315b3956d397a0e9bfbb31c2e08e882e5520eba0cb07214fd4c6655f4",
+          "sha256": "5dc8b6e4b8601ba5c19326075ee24e9bffe6aeae96aea8c3c54e5d8f93e375e2",
           "cases": [
             {
               "id": "types:alien-signals-pristine-probes",
@@ -223,17 +236,17 @@
         {
           "path": "packages/alien-signals/audit/type-probes/public-api.test-d.ts",
           "role": "support",
-          "sha256": "7205108d1bad438525a8114bdf37793faab70558dd7bdbd9f4679a273d8f8465"
+          "sha256": "0623be40baeecfd602ea9cf1390add5d147ee0a566f072d776de14d046981883"
         },
         {
           "path": "packages/alien-signals/audit/type-probes/tsconfig.pristine.json",
           "role": "support",
-          "sha256": "62d63a5cab0e1fc17ae87132ef75baa469f60be856b13c09f0b6bf8115b87d7b"
+          "sha256": "f87097cdb3de2d93b2a3c779cb02bc3f4a4d0d477812c7275799db17932e5b68"
         },
         {
           "path": "packages/alien-signals/audit/type-parity.json",
           "role": "support",
-          "sha256": "ea5dc84434e455db6573183ab5337449276a53d4d6983da673995ff1d11c11b7"
+          "sha256": "4295906eca96bb9d9934fa5aa69375e1bd57edc45140e9d23dacf0be29115752"
         }
       ]
     },
@@ -244,7 +257,7 @@
       "environment": "workspace-node",
       "project": "alien-signals-adapted-types",
       "evidenceOrigin": "upstream-suite",
-      "notes": "Adapted upstream typecheck assertion groups plus supplemental Octane public-api probes. The readable-computed Octane-only divergence typetest stays outside this parity compiler project.",
+      "notes": "One-for-one adapted upstream typecheck calls and assertion groups plus paired public probes, including readable computed signals.",
       "execution": {
         "kind": "typescript",
         "compiler": "tsrx-tsc",
@@ -254,7 +267,7 @@
         {
           "path": "packages/alien-signals/audit/adapted-types.json",
           "role": "test",
-          "sha256": "f4aa0aaaa669e6160019641dd857e9cce8c50c8aa97e8c952adb72516965242a",
+          "sha256": "952b00f3b57e1e4f2b5f43c63cd8d879a319c8e685f7753efc604b0d8914ba3c",
           "cases": [
             {
               "id": "types:alien-signals-adapted",
@@ -266,50 +279,189 @@
         {
           "path": "packages/alien-signals/typetests/upstream-typecheck.test-d.ts",
           "role": "support",
-          "sha256": "6fffb3e110f4a96c680c9dc5365642b59fa7780aaf4aac50bea8996b4f06ab0e"
+          "sha256": "9da077ec13a25de17a40b439074da5d79543641428208431770988b49a012ac1"
         },
         {
           "path": "packages/alien-signals/typetests/public-api.test-d.ts",
           "role": "support",
-          "sha256": "01fe9ee4df486a82f7f3be99c357d1c18a9afbd1e0748ec9a274da5fb50ea72b"
+          "sha256": "d4788526a3737f6c34e0ad519336ed68b095d12c1f53623585135b60b22df77b"
         },
         {
           "path": "packages/alien-signals/typetests/tsconfig.adapted.json",
           "role": "support",
-          "sha256": "f8d91ead828008bb08a65614ec0808e5e2b0e2ba32bf0147713daa7d25b12e06"
+          "sha256": "4cdafc9fe01e9bd2bdbcf097c79033818b4a36eb153ccc3ccc68f2cbf8c253aa"
         },
         {
           "path": "packages/alien-signals/audit/type-parity.json",
           "role": "support",
-          "sha256": "ea5dc84434e455db6573183ab5337449276a53d4d6983da673995ff1d11c11b7"
+          "sha256": "4295906eca96bb9d9934fa5aa69375e1bd57edc45140e9d23dacf0be29115752"
+        },
+        {
+          "path": "packages/alien-signals/tests/types/public-api.ts",
+          "role": "support",
+          "sha256": "4b80209cd39eb0a4e20ccd4f66da305060c1bd5e95d795c5edcdb3c7a9410de1"
+        }
+      ]
+    },
+    {
+      "id": "alien-signals-native-lifecycle",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "alien-signals-native",
+      "notes": "Independent native conformance evidence for subscription ownership, cancellation, function setters and actual SSR markup hydration in JSDOM.",
+      "files": [
+        {
+          "path": "packages/alien-signals/tests/octane-contracts.test.ts",
+          "role": "test",
+          "sha256": "d5a753805b82ba7b90fba764574ce9fcdeabac968008791a94e64cc3bed16b9a",
+          "cases": [
+            {
+              "id": "native:alien-signals-lifecycle-d300cf36f2a2eec1",
+              "testName": "moves the subscription when signal identity changes",
+              "fullName": "@octanejs/alien-signals Octane contracts moves the subscription when signal identity changes"
+            },
+            {
+              "id": "native:alien-signals-lifecycle-2975ae613797eb16",
+              "testName": "retains setter identity for a stable signal and retargets a replacement",
+              "fullName": "@octanejs/alien-signals Octane contracts retains setter identity for a stable signal and retargets a replacement"
+            },
+            {
+              "id": "native:alien-signals-lifecycle-0d94be15cc58bca2",
+              "testName": "runs effect cleanup before reruns and on unmount",
+              "fullName": "@octanejs/alien-signals Octane contracts runs effect cleanup before reruns and on unmount"
+            },
+            {
+              "id": "native:alien-signals-lifecycle-b838c77a59b24b2d",
+              "testName": "returns a stop controller that disposes every scoped effect",
+              "fullName": "@octanejs/alien-signals Octane contracts returns a stop controller that disposes every scoped effect"
+            },
+            {
+              "id": "native:alien-signals-lifecycle-766c9a06f71b6f01",
+              "testName": "cancels a scope before commit and remains safe during unmount",
+              "fullName": "@octanejs/alien-signals Octane contracts cancels a scope before commit and remains safe during unmount"
+            },
+            {
+              "id": "native:alien-signals-lifecycle-6a223c32bd3d75d3",
+              "testName": "stops the prior scope when callback identity changes",
+              "fullName": "@octanejs/alien-signals Octane contracts stops the prior scope when callback identity changes"
+            },
+            {
+              "id": "native:alien-signals-lifecycle-4a1d5e67f98afd08",
+              "testName": "disposes a scope stopped during synchronous setup",
+              "fullName": "@octanejs/alien-signals Octane contracts disposes a scope stopped during synchronous setup"
+            },
+            {
+              "id": "native:alien-signals-lifecycle-707f8540e96b37fe",
+              "testName": "keeps direct functional updates and supports setters for unwrapped core signals",
+              "fullName": "@octanejs/alien-signals Octane contracts keeps direct functional updates and supports setters for unwrapped core signals"
+            },
+            {
+              "id": "native:alien-signals-lifecycle-e16a03408b640d24",
+              "testName": "stores a function returned by a hook updater without invoking it",
+              "fullName": "@octanejs/alien-signals Octane contracts stores a function returned by a hook updater without invoking it"
+            },
+            {
+              "id": "native:alien-signals-lifecycle-376a8ea81e8a1935",
+              "testName": "ignores incidental effect return values and cleans function results once",
+              "fullName": "@octanejs/alien-signals Octane contracts ignores incidental effect return values and cleans function results once"
+            },
+            {
+              "id": "native:alien-signals-lifecycle-576f3dade0b5641a",
+              "testName": "restores propagation after nested batches and thrown callbacks",
+              "fullName": "@octanejs/alien-signals Octane contracts restores propagation after nested batches and thrown callbacks"
+            },
+            {
+              "id": "native:alien-signals-lifecycle-1bd561598a8f46b3",
+              "testName": "passes the previous computed value and triggers a collected group of signals",
+              "fullName": "@octanejs/alien-signals Octane contracts passes the previous computed value and triggers a collected group of signals"
+            },
+            {
+              "id": "native:alien-signals-lifecycle-e8ecdac29d1d619b",
+              "testName": "keeps effect dependencies explicit while disposing replaced and unmounted effects",
+              "fullName": "@octanejs/alien-signals Octane contracts keeps effect dependencies explicit while disposing replaced and unmounted effects"
+            }
+          ]
+        },
+        {
+          "path": "packages/alien-signals/tests/hydration.test.ts",
+          "role": "test",
+          "sha256": "c74e0a921ee7ac21c3a9375b9320217da9e59456e72f424db0e306a59eaabaaf",
+          "cases": [
+            {
+              "id": "native:alien-signals-lifecycle-f1a1cd48ef54b3ad",
+              "testName": "adopts server markup, starts client lifecycle work, and remains reactive",
+              "fullName": "@octanejs/alien-signals hydration adopts server markup, starts client lifecycle work, and remains reactive"
+            },
+            {
+              "id": "native:alien-signals-lifecycle-12ecc7dbcbaf9efe",
+              "testName": "hydrates selected and deferred snapshots and owns each phase cleanup",
+              "fullName": "hydrates selected and deferred snapshots and owns each phase cleanup"
+            }
+          ]
+        },
+        {
+          "path": "packages/alien-signals/tests/_fixtures/hooks.tsrx",
+          "role": "support",
+          "sha256": "fc6685739f04e7966c839af423d19e350134256f71e40a6c4140e854e89cbd44"
+        },
+        {
+          "path": "packages/alien-signals/tests/_helpers.ts",
+          "role": "support",
+          "sha256": "b3cca77d9fb2a4e4d5829e76abdf9b9205001b5847903d2b0e175332ee347857"
+        },
+        {
+          "path": "packages/octane/tests/_hydration-ssr.ts",
+          "role": "support",
+          "sha256": "2140e4ed078ad56e70a3449ff557b0450ee598cf523f5e0c9013a793ff07e48b"
+        }
+      ]
+    },
+    {
+      "id": "alien-signals-native-server",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "alien-signals-ssr",
+      "notes": "Independent native conformance evidence for Node SSR snapshots and server exclusion of client effects for every hook family.",
+      "files": [
+        {
+          "path": "packages/alien-signals/tests/ssr/render-safety.test.ts",
+          "role": "test",
+          "sha256": "8f5bcdd2d98ce99bbe32561a8ed8885dc1f78ff2620f4d262de509ab684ddaa0",
+          "cases": [
+            {
+              "id": "native:alien-signals-server-52c8675cd45df337",
+              "testName": "reads snapshots without starting client-owned effects or scopes",
+              "fullName": "@octanejs/alien-signals SSR reads snapshots without starting client-owned effects or scopes"
+            },
+            {
+              "id": "native:alien-signals-server-7c1fdab1ce06537c",
+              "testName": "renders selected and deferred snapshots without running phase effects on the server",
+              "fullName": "renders selected and deferred snapshots without running phase effects on the server"
+            }
+          ]
+        },
+        {
+          "path": "packages/alien-signals/tests/_fixtures/hooks.tsrx",
+          "role": "support",
+          "sha256": "fc6685739f04e7966c839af423d19e350134256f71e40a6c4140e854e89cbd44"
         }
       ]
     }
   ],
   "divergences": [
     {
-      "id": "alien-signals-readable-computed",
-      "caseIds": ["types:alien-signals-adapted"],
-      "upstreamResult": "Pinned react-alien-signals declarations narrow useSignalValue to WritableSignal, so readable computed probes are rejected.",
-      "octaneResult": "useSignalValue accepts ReadableSignal, including createComputed results, matching the documented Octane surface.",
-      "rationale": "Upstream docs and runtime treat computed signals as readable; the published React declaration is narrower than that contract. Octane corrects the accept surface without weakening the read-only computed negative control.",
-      "classification": "type-surface",
-      "consumerImpact": "Octane callers may pass createComputed results to useSignalValue; React declaration consumers cannot without casts.",
-      "migrationGuidance": "Prefer ReadableSignal-typed values with useSignalValue on Octane. Keep paired type probes on writable count; use the Octane-only readable-computed typetest (ordinary package typecheck) for computed acceptance.",
-      "owner": "@octanejs/alien-signals",
-      "reviewCondition": "Review if upstream widens useSignalValue to ReadableSignal or Octane reintroduces a writable-only overload."
-    },
-    {
       "id": "alien-signals-use-signal-scope",
       "caseIds": ["runtime:5189801c40af28d9"],
-      "upstreamResult": "useSignalScope starts createSignalScope during React render via useMemo and returns that stop handle; pre-commit cancellation is not modeled.",
-      "octaneResult": "useSignalScope allocates a cancellation-safe controller during render, starts the scope after client commit via useEffect, and returns a stop that can cancel before commit.",
-      "rationale": "Octane forbids render-phase effects. Deferring scope start to commit preserves SSR/hydration safety and makes pre-commit stop a no-op instead of racing a render-created scope.",
+      "upstreamResult": "Upstream 0.4.0 starts scopes after commit. Its returned stop disposes the active scope, but a call before commit does not cancel later startup.",
+      "octaneResult": "The compatibility controller also starts after commit and remembers cancellation before commit or across callback/dependency replacement.",
+      "rationale": "Preserve the existing Octane cancellation-safe stop contract while adopting upstream post-commit startup and optional dependencies.",
       "classification": "lifecycle",
-      "consumerImpact": "Scope callbacks and nested effects do not run until after commit; calling stop before commit cancels startup rather than disposing an already-running scope.",
-      "migrationGuidance": "Do not rely on scope work during the render that calls useSignalScope. Prefer post-commit observations; use the returned stop for cancellation-safe teardown including pre-commit abort.",
+      "consumerImpact": "Calling stop permanently cancels this mounted controller; upstream may start a scope on a later commit or dependency replacement.",
+      "migrationGuidance": "Use the returned stop for permanent cancellation within the mounted component. Remount to create a new controller after cancellation.",
       "owner": "@octanejs/alien-signals",
-      "reviewCondition": "Review if Octane gains a safe render-phase effect primitive or upstream moves scope creation out of useMemo."
+      "reviewCondition": "Review if either package changes the public semantics of manual cancellation."
     }
   ]
 }

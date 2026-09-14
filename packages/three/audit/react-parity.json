@@ -11,10 +11,21 @@
     "integrity": "sha256:01177da508a5551b38908e3da7ce51601f140fd35497e3b3daf73af58f75e67c",
     "verification": "recorded-unverified"
   },
-  "upstreamSuites": { "runtime": "insufficient", "types": "absent" },
+  "upstreamSuites": {
+    "runtime": "insufficient",
+    "types": "absent"
+  },
   "adaptedRoots": {
-    "source": { "roots": ["packages/three/src"], "include": ["\\.(?:ts|tsrx)$"], "exclude": [] },
-    "tests": { "roots": ["packages/three/tests"], "include": ["\\.test\\.ts$"], "exclude": [] }
+    "source": {
+      "roots": ["packages/three/src"],
+      "include": ["\\.(?:ts|tsrx)$"],
+      "exclude": []
+    },
+    "tests": {
+      "roots": ["packages/three/tests"],
+      "include": ["\\.test\\.ts$"],
+      "exclude": []
+    }
   },
   "adaptedRuntimeSummary": {
     "inventoryEntries": 0,

@@ -90,12 +90,12 @@
             {
               "id": "thinking-orbs:refs:1",
               "testName": "preserves canvas initialization and focus when a consumer supplies a ref",
-              "fullName": "@octanejs/thinking-orbs \u2014 render contract preserves canvas initialization and focus when a consumer supplies a ref"
+              "fullName": "@octanejs/thinking-orbs — render contract preserves canvas initialization and focus when a consumer supplies a ref"
             },
             {
               "id": "thinking-orbs:refs:2",
               "testName": "renders an accessible canvas for a shipped state preset",
-              "fullName": "@octanejs/thinking-orbs \u2014 render contract renders an accessible canvas for a shipped state preset"
+              "fullName": "@octanejs/thinking-orbs — render contract renders an accessible canvas for a shipped state preset"
             }
           ]
         },

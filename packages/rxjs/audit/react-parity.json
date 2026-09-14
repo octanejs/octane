@@ -11,7 +11,10 @@
     "integrity": "sha256:f1311219e6503a768463a4319b9fc264438c62b774b9ef81feaa21085edfd65a",
     "verification": "recorded-unverified"
   },
-  "upstreamSuites": { "runtime": "present", "types": "present" },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "present"
+  },
   "adaptedRoots": {
     "source": {
       "roots": ["packages/rxjs/src"],

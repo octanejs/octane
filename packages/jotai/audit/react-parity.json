@@ -297,8 +297,8 @@
             },
             {
               "id": "differential:jotai-async-atom",
-              "testName": "AsyncApp: pending fallback \u2192 resolved value, byte-identical at both steps",
-              "fullName": "differential: @octanejs/jotai vs real jotai on React AsyncApp: pending fallback \u2192 resolved value, byte-identical at both steps"
+              "testName": "AsyncApp: pending fallback → resolved value, byte-identical at both steps",
+              "fullName": "differential: @octanejs/jotai vs real jotai on React AsyncApp: pending fallback → resolved value, byte-identical at both steps"
             }
           ]
         },

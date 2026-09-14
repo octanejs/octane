@@ -11,9 +11,16 @@
     "integrity": "sha256:33ce0c6b148117ab4568669492cd8187e8d04f3d1125cd26c598d9110a14e75e",
     "verification": "recorded-unverified"
   },
-  "upstreamSuites": { "runtime": "absent", "types": "absent" },
+  "upstreamSuites": {
+    "runtime": "absent",
+    "types": "absent"
+  },
   "adaptedRoots": {
-    "source": { "roots": ["packages/dnd-kit/src"], "include": ["\\.(?:ts|tsrx)$"], "exclude": [] },
+    "source": {
+      "roots": ["packages/dnd-kit/src"],
+      "include": ["\\.(?:ts|tsrx)$"],
+      "exclude": []
+    },
     "tests": {
       "roots": ["packages/dnd-kit/tests/parity"],
       "include": ["contracts\\.test\\.ts$"],

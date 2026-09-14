@@ -11,7 +11,10 @@
     "integrity": "sha256:2843a0bbecbb4dfd34eb4f5d97b0fdc48c8c4e5b1b0722999e8f13796371a50d",
     "verification": "verified"
   },
-  "upstreamSuites": { "runtime": "absent", "types": "absent" },
+  "upstreamSuites": {
+    "runtime": "absent",
+    "types": "absent"
+  },
   "adaptedRoots": {
     "source": {
       "roots": ["packages/waypoint/src"],

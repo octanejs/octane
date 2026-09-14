@@ -11,9 +11,16 @@
     "integrity": "sha256:c766aa76100632cccb49c2943a786da9b3bada35836275e5b0e149770616b689",
     "verification": "recorded-unverified"
   },
-  "upstreamSuites": { "runtime": "insufficient", "types": "insufficient" },
+  "upstreamSuites": {
+    "runtime": "insufficient",
+    "types": "insufficient"
+  },
   "adaptedRoots": {
-    "source": { "roots": ["packages/better-auth/src"], "include": ["\\.ts$"], "exclude": [] },
+    "source": {
+      "roots": ["packages/better-auth/src"],
+      "include": ["\\.ts$"],
+      "exclude": []
+    },
     "tests": {
       "roots": ["packages/better-auth/tests/differential"],
       "include": ["parity\\.test\\.ts$"],

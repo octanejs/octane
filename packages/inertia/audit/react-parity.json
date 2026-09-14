@@ -11,7 +11,10 @@
     "integrity": "sha256:15742c04ce626d9f02d78be4c0550dc95a221410e47e1688ebc060a0d7fd2d47",
     "verification": "verified"
   },
-  "upstreamSuites": { "runtime": "absent", "types": "absent" },
+  "upstreamSuites": {
+    "runtime": "absent",
+    "types": "absent"
+  },
   "adaptedRoots": {
     "source": {
       "roots": ["packages/inertia/src"],

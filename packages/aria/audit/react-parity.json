@@ -60,8 +60,8 @@
           "cases": [
             {
               "id": "differential:aria-interactions-press",
-              "testName": "usePress: pointer press start \u2192 pressed state \u2192 press sequence, byte-identical",
-              "fullName": "differential: @octanejs/aria vs real react-aria on React usePress: pointer press start \u2192 pressed state \u2192 press sequence, byte-identical"
+              "testName": "usePress: pointer press start → pressed state → press sequence, byte-identical",
+              "fullName": "differential: @octanejs/aria vs real react-aria on React usePress: pointer press start → pressed state → press sequence, byte-identical"
             },
             {
               "id": "differential:aria-usehover-pointer-enter-leave-toggles-hover-state",

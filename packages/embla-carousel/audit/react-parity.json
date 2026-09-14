@@ -11,7 +11,10 @@
     "integrity": "sha256:61f0e7114c52478a770d114c4b265d0753e80ecd3d362aa6c377e0f70c48f063",
     "verification": "verified"
   },
-  "upstreamSuites": { "runtime": "absent", "types": "absent" },
+  "upstreamSuites": {
+    "runtime": "absent",
+    "types": "absent"
+  },
   "adaptedRoots": {
     "source": {
       "roots": ["packages/embla-carousel/src"],

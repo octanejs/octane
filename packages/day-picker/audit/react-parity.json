@@ -10,7 +10,10 @@
     "integrity": "sha256:7774da7f1d03c4e0b5d15e698fb62a12789d0a65bee58ba53a23ac154ca4dde0",
     "verification": "recorded-unverified"
   },
-  "upstreamSuites": { "runtime": "present", "types": "present" },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "present"
+  },
   "adaptedRoots": {
     "source": {
       "roots": ["packages/day-picker/src"],

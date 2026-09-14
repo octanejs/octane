@@ -11,7 +11,10 @@
     "integrity": "sha256:ddfb74037a3979ed98c8784034071f24040b5a6b7d560254fcb6c6676946da47",
     "verification": "verified"
   },
-  "upstreamSuites": { "runtime": "absent", "types": "absent" },
+  "upstreamSuites": {
+    "runtime": "absent",
+    "types": "absent"
+  },
   "adaptedRoots": {
     "source": {
       "roots": ["packages/xyflow/src"],

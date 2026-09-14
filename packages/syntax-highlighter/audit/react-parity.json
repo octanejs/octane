@@ -11,7 +11,10 @@
     "integrity": "sha256:8a324f3d4d79e6b40b2f2279ee97285a0a85d552ecdf6f1910f178907cda31aa",
     "verification": "verified"
   },
-  "upstreamSuites": { "runtime": "present", "types": "insufficient" },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "insufficient"
+  },
   "adaptedRoots": {
     "source": {
       "roots": ["packages/syntax-highlighter/src"],

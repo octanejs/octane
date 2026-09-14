@@ -11,7 +11,10 @@
     "integrity": "sha256:648a3eae6d4a8708e215b7272907ba018b5f77430acbb568a2c5aebd238ce945",
     "verification": "verified"
   },
-  "upstreamSuites": { "runtime": "present", "types": "insufficient" },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "insufficient"
+  },
   "adaptedRoots": {
     "source": {
       "roots": ["packages/textarea-autosize/src"],
