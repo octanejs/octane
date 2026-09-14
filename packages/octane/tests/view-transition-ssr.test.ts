@@ -758,32 +758,41 @@ describe('ReactDOMFizzViewTransition (ported)', () => {
 		}
 	});
 
-	it('ignores annotation lookalikes inside trusted HTML attribute values', async () => {
-		const native = mockNativeTransitions();
-		try {
-			const value = deferred<string>();
-			const chunks = collector();
-			const title = ' vt-parent-exit-x="none"';
-			const markup = `<span id="raw-relay" title='${title}' vt-parent-exit-x="relay-exit">Leaving</span>`;
-			ServerRT.renderToPipeableStream(server.RawAttributeRelayApp, {
-				promise: value.promise,
-				markup,
-			}).pipe(chunks.dest);
-			value.resolve('Content');
-			await chunks.ended;
-			container.innerHTML = chunks.chunks.join('');
-			activate(container);
-			await Promise.resolve();
-			const relay = container.querySelector<HTMLElement>('#raw-relay')!;
-			expect(relay.title).toBe(title);
-			expect(relay.style.viewTransitionClass).toBe('relay-exit');
-			native.frames[0].skip();
-			await Promise.resolve();
-			expect(container.textContent).toBe('Content');
-		} finally {
-			native.restore();
-		}
-	});
+	it.each(['lowercase', 'mixed syntax'])(
+		'ignores annotation lookalikes inside trusted HTML attribute values (%s)',
+		async (syntax) => {
+			const native = mockNativeTransitions();
+			try {
+				const value = deferred<string>();
+				const chunks = collector();
+				const title =
+					syntax === 'lowercase' ? ' vt-parent-exit-x="none"' : ' vt-parent-exit-x = "none"';
+				const attributes =
+					syntax === 'lowercase'
+						? 'vt-parent-exit-x="relay-exit" vt-parent-enter-x="none"'
+						: 'data-mode="quoted value" data-flag VT-PARENT-EXIT-X = relay-exit VT-PARENT-ENTER-X = \'none\'';
+				const markup = `<span id="raw-relay" title='${title}' ${attributes}>Leaving</span>`;
+				ServerRT.renderToPipeableStream(server.RawAttributeRelayApp, {
+					promise: value.promise,
+					markup,
+				}).pipe(chunks.dest);
+				value.resolve('Content');
+				await chunks.ended;
+				container.innerHTML = chunks.chunks.join('');
+				activate(container);
+				await Promise.resolve();
+				const relay = container.querySelector<HTMLElement>('#raw-relay')!;
+				expect(relay.title).toBe(title);
+				expect(relay.hasAttribute('vt-parent-enter-x')).toBe(false);
+				expect(relay.style.viewTransitionClass).toBe('relay-exit');
+				native.frames[0].skip();
+				await Promise.resolve();
+				expect(container.textContent).toBe('Content');
+			} finally {
+				native.restore();
+			}
+		},
+	);
 
 	it('preserves authored inline scope styles while emitting the shared scope rule', () => {
 		const props = {

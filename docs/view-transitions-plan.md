@@ -55,8 +55,9 @@ those measurements do not establish that preparation is free.
 
 ViewTransition prepares its next tree before the native old capture. An optional
 DOM plan projects structural reads and host writes without changing existing
-native nodes. The finished boundary props select the old capture's names and
-classes, so a nested `update="none"` remains inside its parent's snapshot.
+native nodes. The finished boundary props select old-capture participation and classes, so a
+nested `update="none"` remains inside its parent's snapshot. Each snapshot
+retains its own name.
 The native update callback publishes the ordered plan once, preserving survivor
 identity and connected deletion cleanup. Ordinary rendering keeps its eager
 native DOM path; host views and mutation plans are allocated only while a

@@ -4791,9 +4791,18 @@ function vtSsrMapTags(
 }
 
 function vtSsrInject(open: string, attrs: Array<[string, string]>): string {
+	// Every injected marker starts with vt-. Most authored hosts have none;
+	// only parse once when a marker might already belong to an inner boundary.
+	let existing: Set<string> | undefined;
+	if (/vt-/i.test(open)) {
+		existing = new Set();
+		vtSsrAttributes(open, (name) => {
+			existing!.add(name);
+		});
+	}
 	let inject = '';
 	for (const [name, value] of attrs) {
-		if (vtSsrAttribute(open, name) === null) inject += ' ' + name + '="' + escapeAttr(value) + '"';
+		if (!existing?.has(name)) inject += ' ' + name + '="' + escapeAttr(value) + '"';
 	}
 	if (inject === '') return open;
 	const insertion = open[open.length - 2] === '/' ? open.length - 2 : open.length - 1;
@@ -4821,37 +4830,73 @@ function vtSsrAnnotate(html: string, attrs: Array<[string, string]>): string {
 	);
 }
 
-/** Read an actual attribute, skipping quoted text in other attribute values. */
+/** HTML attribute whitespace (not arbitrary whitespace inside an attribute name). */
+function vtSsrSpace(code: number): boolean {
+	return code === 32 || code === 9 || code === 10 || code === 12 || code === 13;
+}
+
+/** Scan actual attributes once, skipping quoted text in other attribute values. */
+function vtSsrAttributes(
+	open: string,
+	visit: (
+		name: string,
+		start: number,
+		end: number,
+		quote: string,
+		nameStart: number,
+		nameEnd: number,
+	) => boolean | void,
+): void {
+	let i = 1;
+	while (i < open.length && !vtSsrSpace(open.charCodeAt(i)) && open[i] !== '/' && open[i] !== '>')
+		i++;
+	while (i < open.length) {
+		while (vtSsrSpace(open.charCodeAt(i))) i++;
+		if (i >= open.length || open[i] === '>' || open[i] === '/') break;
+		const start = i;
+		while (
+			i < open.length &&
+			!vtSsrSpace(open.charCodeAt(i)) &&
+			open[i] !== '=' &&
+			open[i] !== '/' &&
+			open[i] !== '>'
+		)
+			i++;
+		const nameEnd = i;
+		const name = open.slice(start, i).toLowerCase();
+		while (vtSsrSpace(open.charCodeAt(i))) i++;
+		if (open[i] !== '=') {
+			if (visit(name, nameEnd, nameEnd, '', start, nameEnd)) return;
+			continue;
+		}
+		i++;
+		while (vtSsrSpace(open.charCodeAt(i))) i++;
+		const quote = open[i] === '"' || open[i] === "'" ? open[i++] : '';
+		const valueStart = i;
+		if (quote) {
+			const closing = open.indexOf(quote, i);
+			i = closing < 0 ? open.length : closing;
+		} else {
+			while (i < open.length && !vtSsrSpace(open.charCodeAt(i)) && open[i] !== '>') i++;
+		}
+		const valueEnd = i;
+		if (quote) i++;
+		if (visit(name, valueStart, valueEnd, quote, start, nameEnd)) return;
+	}
+}
+
+/** Read one actual attribute using the shared quote-aware scanner. */
 function vtSsrAttribute(
 	open: string,
 	wanted: string,
 ): { start: number; end: number; quote: string; nameStart: number; nameEnd: number } | null {
-	let i = 1;
-	while (i < open.length && !/[\s/>]/.test(open[i])) i++;
-	while (i < open.length) {
-		while (/\s/.test(open[i] ?? '')) i++;
-		if (i >= open.length || open[i] === '>' || open[i] === '/') break;
-		const start = i;
-		while (i < open.length && !/[\s=/>]/.test(open[i])) i++;
-		const nameEnd = i;
-		const name = open.slice(start, i).toLowerCase();
-		while (/\s/.test(open[i] ?? '')) i++;
-		if (open[i] !== '=') {
-			if (name === wanted)
-				return { start: nameEnd, end: nameEnd, quote: '', nameStart: start, nameEnd };
-			continue;
-		}
-		i++;
-		while (/\s/.test(open[i] ?? '')) i++;
-		const quote = open[i] === '"' || open[i] === "'" ? open[i++] : '';
-		const valueStart = i;
-		while (i < open.length && (quote ? open[i] !== quote : !/[\s>]/.test(open[i]))) i++;
-		const valueEnd = i;
-		if (quote) i++;
-		if (name === wanted)
-			return { start: valueStart, end: valueEnd, quote, nameStart: start, nameEnd };
-	}
-	return null;
+	let result: ReturnType<typeof vtSsrAttribute> = null;
+	vtSsrAttributes(open, (name, start, end, quote, nameStart, nameEnd) => {
+		if (name !== wanted) return;
+		result = { start, end, quote, nameStart, nameEnd };
+		return true;
+	});
+	return result;
 }
 
 /** A scope owns one host that contains, rather than replaces, streamed boundaries. */
@@ -4924,17 +4969,23 @@ function vtSsrClaimArm(html: string, kind: 'enter' | 'exit'): string {
 
 /** Strip staging attributes, including blocked and unclaimed relay candidates. */
 function vtSsrStrip(html: string): string {
-	if (html.indexOf('-x=') === -1) return html;
+	if (!/-x/i.test(html)) return html;
 	return vtSsrMapTags(html, (open) => {
-		if (open.indexOf('-x=') === -1) return open;
-		for (const name of ['vt-enter-x', 'vt-exit-x', 'vt-parent-enter-x', 'vt-parent-exit-x']) {
-			const attribute = vtSsrAttribute(open, name);
-			if (attribute !== null)
-				open =
-					open.slice(0, attribute.nameStart - 1) +
-					open.slice(attribute.end + (attribute.quote ? 1 : 0));
-		}
-		return open;
+		if (!/-x/i.test(open)) return open;
+		let out = '';
+		let copied = 0;
+		vtSsrAttributes(open, (name, _start, end, quote, nameStart) => {
+			if (
+				name === 'vt-enter-x' ||
+				name === 'vt-exit-x' ||
+				name === 'vt-parent-enter-x' ||
+				name === 'vt-parent-exit-x'
+			) {
+				out += open.slice(copied, nameStart - 1);
+				copied = end + (quote ? 1 : 0);
+			}
+		});
+		return copied === 0 ? open : out + open.slice(copied);
 	});
 }
 
