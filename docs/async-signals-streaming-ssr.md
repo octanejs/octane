@@ -1,9 +1,23 @@
 # RFC: Async Signals Across Streaming SSR and Hydration in Octane
 
-Status: accepted September 11 design; implementation is tracked in the
-[acceptance checklist](./async-signals-implementation.md). The integrated RFC
-remains in scope. Trusted Types implementation/enforcement tests are excluded;
-the future-integration discussion remains below.
+## Motivation
+
+A server-rendered page should be useful before all of its JavaScript arrives.
+People should be able to type into a form, choose an item, and keep that state
+when a widget activates. Independent results should appear as they become ready,
+without restarting server work in the browser or overwriting newer user input.
+
+This RFC connects Octane's signals, streaming SSR, and deferred hydration around
+that contract. It supports both native Octane rendering and hosts that keep
+ownership of their HTML.
+
+Status: accepted design, September 11, 2026. The
+[implementation guide and acceptance checklist](./async-signals-implementation.md)
+distinguish implemented APIs from remaining work. The longer host examples below
+are design sketches, not a list of published exports. For executable examples,
+start with [signals](./signals.md), [deferred hydration](./deferred-hydration.md),
+or the [conversation benchmark](../benchmarks/conversation-streaming/README.md).
+Trusted Types integration and enforcement tests remain out of scope.
 
 ## Accepted author model
 
@@ -23,10 +37,13 @@ the future-integration discussion remains below.
   binding. Read-only handles and `value={draft$.get()}` are one-way, without
   setting HTML `readOnly`. Text, attributes, and per-property styles (including
   spreads) subscribe directly; custom component props retain handles.
-- Pre-flush bootstrap initializes live browser cells. Early native listeners
-  update them and advance edit revisions, including clear. Delayed SSR/storage
-  candidates cannot overwrite newer edits. Handoff preserves node/focus/caret/
-  selection/IME without a duplicate write.
+- Pre-flush capture records early native edits and their revisions, including
+  clear. The renderer-free signal engine adopts initial state and those edits
+  before behavior code reads them. Once that engine is running, listeners update
+  live cells and derivations immediately; the inline capture alone cannot run
+  derivations. Delayed SSR/storage candidates cannot overwrite newer edits.
+  Handoff must preserve the original control and its editing state without a
+  duplicate write; native IME coverage remains an acceptance requirement.
 - Explicit independent activation fails with a targeted diagnostic if extraction
   cannot preserve ownership/captures. Lexical nesting alone is not a dependency;
   a parent-created lifecycle resource is. Ordinary parent-first hydration stays.
@@ -40,7 +57,7 @@ the future-integration discussion remains below.
 
 ### Renderer-free hosts and early delivery
 
-A lightweight host can keep its existing server-owned shell, streamed regions,
+A server-owned HTML host can keep its existing shell, streamed regions,
 and ordinary browser controllers. Adopting this RFC must not require converting
 those regions into reconciled roots, importing `octane/internal/client`, or
 fetching the full runtime through a shared bootstrap chunk. A signals-only export
@@ -128,11 +145,10 @@ The host owns completion, timeout, explicit Stop, durable receipts, and reconnec
 Uncertain actions retain their original operation ID and selection, without
 automatic duplicate submission.
 
-## Motivation and relation to Octane today
+## Relation to the original Octane APIs
 
-Hybrid SSR lets a page paint useful HTML and accept native input while optional requests or browser modules remain pending. Octane already has pieces: a renderer-independent [scoped signal engine](https://github.com/octanejs/octane/blob/main/docs/signals.md), native TSRX reads, first accepted [streaming pending boundaries](https://github.com/octanejs/octane), and [deferred hydration](https://github.com/octanejs/octane/blob/main/docs/deferred-hydration.md). Today an application still assembles owner lifetime, independent HTML/data delivery, early intent, and safe adoption. This RFC makes those pieces one author model, with explicit guarantees under concurrent input and transport failure.
-
-The extension builds on four existing contracts:
+The design started from the contracts below. “Existing” here describes the
+baseline inspected for the RFC, not the implementation status of this branch:
 
 - **Signals:** `createScope`, writable `signal$`, synchronous `derived$`, `asyncSignal$`/keyed `query` resources, `get`/`latest`/`snapshot`, and historical seed leases.
     - **Proposed:** A direct owner-bound author facade, unified sync/async/iterable computed signals, `query$` selection, and attempt-bound reads after `await`.
@@ -149,7 +165,7 @@ The [original signals RFC](https://github.com/octanejs/RFCs/discussions/2) made 
 - A boundary leases a historical read frame; it does not necessarily create another data owner. Account transition, document retirement, or an independent feature lifetime retires the relevant owner and work.
 - Module-level declarations are valid without an active request. Server reads/writes require the corresponding request owner; there is no process-global mutable fallback. Explicit standalone scopes remain supported.
 
-This proposal adds capabilities beyond the upstream mainline inspected for this revision:
+This RFC adds capabilities beyond that baseline:
 
 - Native reads are enabled through imports from `octane/signals`, `octane/signals/client`, or `octane/signals/server`. The `$` naming convention identifies capabilities but does not itself opt a module in; the old `nativeReads` compiler option is gone.
 - Existing derived callbacks are synchronous; `scope.isPending(() => handle$.get())` includes initial suspension; `latest` carries complete-result provenance. The async producer and direct author facade are **additions**, not reinterpretations.
@@ -157,7 +173,7 @@ This proposal adds capabilities beyond the upstream mainline inspected for this 
 
 ## Proposed author experience
 
-An author declares state, reads, and pending boundaries. A value may be immediately available, arrive from a Promise, or update from an async iterable; consumers use the same `get()` and `snapshot()` contract. A keyed `query$` adds request selection, deduplication, and refetch. An action owns writes and their uncertain acknowledgments. The API in this section is **proposed**, except where the existing Octane API is identified below.
+An author declares state, reads, and pending boundaries. A value may be immediately available, arrive from a Promise, or update from an async iterable; consumers use the same `get()` and `snapshot()` contract. A keyed `query$` adds request selection, deduplication, and refetch. An action owns writes and their uncertain acknowledgments. The signal declarations are implemented; the combined host examples remain illustrative. In particular, `renderDocument`, `hydrateIsland`, and the `prepare`/`adopt.input` interface below are design sketches, not current exports. Use the linked guides and maintained fixtures for working integration code.
 
 ```typescript
 // todos.tsrx — proposed compiler-owned author module.
@@ -325,11 +341,20 @@ Direct writable bindings perform an atomic handoff; explicit `adopt.input("draft
 - The server emits a compiler-owned binding identity. Early listeners already publish edits into the live cell. Before queued handlers run, handoff validates current DOM value/revision, installs the full binding, and retires the early listener without a duplicate write. It preserves node, focus, caret, and composition.
 - A queued Save therefore sees what the user typed, rather than the factory's empty initial value. Save only renders in a ready arm and rechecks the selected authoritative base at dispatch. A pending base cannot become an optimistic Todo. Other early actions need a tiny explicit descriptor and their own receipt policy.
 
-These samples describe a destination API; they cannot be copied into today's Octane unchanged. The server-function boundary works as follows:
+The host sketches above are not copy-and-paste APIs. The contextual server-call
+boundary, however, is implemented:
 
-- The proposed compiler erases the trusted final `ServerCallContext` from the browser type and stub, injects it on the server, and treats a browser's `{ signal }` as local cancellation options, never a serialized credential. For example, server `getTodo(id, context: ServerCallContext)` becomes browser `getTodo(id, options?: { signal?: AbortSignal })`.
-- An in-process SSR `from "server"` call needs the same generated wrapper: its `{ signal }` remains a local option and only trusted request context becomes `ServerCallContext`. Current compilation binds that import directly, so this lowering is core work.
-- Existing `module server` compilation lacks this context overload; ordinary arguments and results use devalue, and its RPC request-body limit is separate from a streamed response budget. This proposal has no `"use server"` directive: `module server` defines the boundary, and the host authorizes every call. Without server functions, a site can still use the signal graph and render protocol with host loaders.
+- The compiler removes the trusted final `ServerCallContext` from browser types
+  and stubs. The server injects it after authorization. Browser `{ signal }`
+  options stay local; they are never serialized credentials.
+- In-process SSR calls use the corresponding generated wrapper and trusted
+  request context, rather than treating browser-style options as server authority.
+- `module server` defines the boundary; there is no new `"use server"` directive.
+  Request-body limits and streamed-response budgets are separate. Hosts that do
+  not use server functions can supply their own authorized loaders.
+
+See the [implementation map](./async-signals-implementation.md#core-implementation-map)
+for the compiler, server adapter, and transport owners.
 
 ### A dependent request and a URL action
 

@@ -496,7 +496,7 @@ authorization: retain the enclosing application's lifetime and stream fencing.
 `unbound(value)` marks an explicitly external-owned attribute in an opted-in
 view. The ordinary component uses its value during SSR and normal rendering;
 the adopter neither evaluates nor writes that attribute. Above, the server can
-initially hide the button while an existing Voice controller retains ownership
+initially hide the button while an existing visibility controller retains ownership
 of `button.hidden`. This is not signal untracking or a delayed write.
 
 Call `dispose()` or abort the supplied signal to unsubscribe and release the

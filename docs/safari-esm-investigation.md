@@ -4,8 +4,8 @@
 
 Research checked on 2026-09-12. This note identifies public WebKit issues worth
 testing against Octane's **emitted production modules**. It does not establish a
-Safari regression in Octane or explain changes in application usage. No production
-telemetry or private application evidence is included.
+Safari regression in Octane. It covers public engine reports and repository
+fixtures, not deployed application behavior.
 
 Source imports, emitted files, native module-graph edges, repeated `import()`
 calls, and transferred bytes are different quantities. Count them separately.
@@ -131,7 +131,7 @@ Comparing dependency-free and production entries separates document-readiness
 behavior from graph loading cost. Keep current browser/build results separate
 from the historical ledger and preserve the response's security policy.
 
-## Current production fixture inspection
+## September 12 production fixture inspection
 
 The September 12 conversation-streaming build contains 14 physical JavaScript
 assets. TypeScript 5.9.3's JavaScript AST parser reported no parse diagnostics,

@@ -1,8 +1,8 @@
 # Renderer-free streaming behavior workload
 
-This is a separate production-built workload, not the parent suite's independently
-hydrated component fixture and not a lightweight-web deployment. It keeps the
-conversation/history lists server-owned and never imports a client component,
+This production-built workload is separate from the parent suite's independently
+hydrated component fixture. It keeps conversation/history lists server-owned and
+never imports a client component,
 `hydrateRoot`, or a rendering engine in the browser graph.
 
 The host emits public `earlySignalBootstrapScript()` before interactive HTML. The
