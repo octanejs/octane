@@ -96,6 +96,57 @@ describe('Strong declarations used as reactive hook inputs', () => {
 		},
 	);
 
+	it.each([
+		'const value = factory.make(props.label);',
+		'const value = new Box(props.label);',
+		'const value = tag`label:${props.label}`;',
+	])('preserves the evaluation lifetime of an opaque factory: %s', (declaration) => {
+		for (const dev of [false, true]) {
+			const seen: unknown[] = [];
+			let calls = 0;
+			class Box {
+				constructor(public label: string) {
+					calls++;
+				}
+			}
+			const { App } = loadCompiledFixtureSource(
+				`"use strong"; import { useEffect } from 'octane'; import { factory, Box, tag, observe } from './probe'; export function App(props) @{ ${declaration} useEffect(() => observe(value)); <span>{props.noise as string}</span> }`,
+				{
+					id: '/src/OpaqueFactory.tsrx',
+					mode: 'client',
+					compileOptions: { dev, hmr: false },
+					runtimeModules: {
+						'./probe': {
+							factory: {
+								make: (label: string) => {
+									calls++;
+									return { label };
+								},
+							},
+							Box,
+							tag: (_parts: unknown, label: string) => {
+								calls++;
+								return { label };
+							},
+							observe: (value: unknown) => seen.push(value),
+						},
+					},
+				},
+			);
+			const root = mount(App, { label: 'one', noise: 'a' });
+			try {
+				flushEffects();
+				root.update(App, { label: 'one', noise: 'b' });
+				flushEffects();
+				expect(calls).toBe(2);
+				expect(seen).toHaveLength(2);
+				expect(seen[0]).not.toBe(seen[1]);
+			} finally {
+				root.unmount();
+			}
+		}
+	});
+
 	it.each([false, true])(
 		'retains live native reads after automatic cache hits in dev=%s',
 		(dev) => {
@@ -106,9 +157,10 @@ import { useEffect } from 'octane';
 import 'octane/signals';
 import { observe } from './probe';
 export function App(props) @{
-  const value = { label: props.read$() };
+  const label = props.read$();
+  const value = { label };
   useEffect(() => observe(value));
-  <output>{value.label as string}</output>
+  <output>{label as string}</output>
 }`,
 				{
 					id: '/src/StrongNativeCache.tsrx',
@@ -148,24 +200,6 @@ export function App(props) @{
 			'function expression',
 			'const value = function () { return props.label; };',
 			(value: any) => value(),
-		],
-		['constructor', 'const value = new Box(props.label);', (value: any) => value.label],
-		['member projection', 'const value = factory.make(props.label);', (value: any) => value.label],
-		[
-			'hook-spelled pure method',
-			'const value = factory.useValue(props.label);',
-			(value: any) => value.label,
-		],
-		[
-			'optional projection',
-			'const value = factory.make?.(props.label);',
-			(value: any) => value.label,
-		],
-		['tagged template', 'const value = tag`label:${props.label}`;', (value: any) => value.label],
-		[
-			'invoked closure',
-			'const value = (() => ({ label: props.label }))();',
-			(value: any) => value.label,
 		],
 		[
 			'conditional objects',

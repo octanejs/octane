@@ -4,8 +4,9 @@ import {
 	strongHTMLSpreadWriter,
 	STRONG_UNTRUSTED_HTML,
 	STRONG_HTML_MESSAGE,
+	mayHaveStrongHTML,
 } from './strong-html.js';
-import { analyzeRendererBoundaries } from './renderer-boundaries.js';
+import { createRendererRegionResolver } from './renderer-boundaries.js';
 
 const COMPAT_EXPORTS = new Set(['flushSync', 'unstable_batchedUpdates', 'StrictMode']);
 const SUPPRESSION_PROPS = new Set(['suppressHydrationWarning', 'suppressNativeChangeWarning']);
@@ -28,13 +29,14 @@ export function createStrongTemplatePolicy({
 	const pending = [];
 	const seen = new WeakMap();
 	const jsxReturns = new WeakMap();
-	// The factory check only fires for an Octane createElement call whose props
-	// name the HTML key (or spell it with an escape), so both texts must appear.
+	// Import and property names may contain Unicode/hex/identity escapes or
+	// quoted line continuations. Newline string escapes cannot spell these names.
 	const mayHaveHTML =
-		source.includes('createElement') &&
-		(source.includes('dangerouslySetInnerHTML') || source.includes('\\'));
-	let keyDepth = 0;
-	let regions;
+		mayHaveStrongHTML(source) &&
+		(source.includes('createElement') || /\\(?:u|x|[ceaElm]|[\r\n\u2028\u2029])/.test(source));
+	const templateDialect = /\.tsrx(?:[?#]|$)/.test(filename);
+	const domAt =
+		options.rendererRegionResolver ?? createRendererRegionResolver(ast, source, filename, options);
 	function add(code, node, message) {
 		let codes = seen.get(node);
 		if (codes?.has(code)) return;
@@ -42,35 +44,33 @@ export function createStrongTemplatePolicy({
 		codes.add(code);
 		pending.push({ code, node, message });
 	}
-	function domAt(node) {
-		let renderer = options.renderer?.id ?? 'dom';
-		if (options.rendererBoundaries && regions === undefined) {
-			// Reuse the module's parsed tree: a second parse would reject shapes the
-			// tolerant editor parser accepts and would throw out of the analysis.
-			regions = analyzeRendererBoundaries(source, {
-				ast,
-				filename,
-				rendererBoundaries: options.rendererBoundaries,
-			}).boundaries;
+	function checkKey(expression, scope) {
+		const node = unwrap(expression);
+		if (!node || typeof node !== 'object' || FUNCTIONS.has(node.type)) return;
+		if (Array.isArray(node)) {
+			for (const child of node) checkKey(child, scope);
+			return;
 		}
-		let narrowest = Infinity;
-		for (const region of regions ?? []) {
-			const range = region.region?.range ?? region.region?.valueRange;
-			if (
-				!range ||
-				node.start < range[0] ||
-				node.end > range[1] ||
-				range[1] - range[0] >= narrowest
-			)
-				continue;
-			renderer = region.childRenderer;
-			narrowest = range[1] - range[0];
+		if (node.type === 'Identifier' && resolve(scope, node.name)?.strongIndex === true) {
+			add(
+				'OCTANE_STRONG_INDEX_KEY',
+				node,
+				'An `@for` key must identify the item independently of its position. Use a stable item ID instead of the loop index.',
+			);
+			return;
 		}
-		return (
-			renderer === 'dom' ||
-			options.rendererRegistry?.[renderer]?.target === 'dom' ||
-			(renderer === options.renderer?.id && options.renderer.target === 'dom')
-		);
+		// Looking up an item by position does not make the returned identity a
+		// positional key. Only the receiver, not the lookup index, contributes.
+		if (node.type === 'MemberExpression') {
+			checkKey(node.object, scope);
+			return;
+		}
+		if (node.type === 'Property') {
+			checkKey(node.value, scope);
+			return;
+		}
+		for (const key in node)
+			if (!SKIP_KEYS.has(key) && !key.startsWith('_octane')) checkKey(node[key], scope);
 	}
 	function expressionHasJSX(node, aliasIsJSX) {
 		const value = unwrap(node);
@@ -183,10 +183,10 @@ export function createStrongTemplatePolicy({
 			spreadSuppressions(value.alternate, scope);
 		}
 	}
-	function visit(node, scope, reference = true) {
+	function visit(node, scope) {
 		if (
 			node.type === 'ImportDeclaration' &&
-			node.source?.value === 'octane' &&
+			(node.source?.value === 'octane' || node.source?.value === 'octane/server') &&
 			node.importKind !== 'type'
 		) {
 			for (const specifier of node.specifiers ?? []) {
@@ -260,6 +260,7 @@ export function createStrongTemplatePolicy({
 				);
 			}
 			if (
+				templateDialect &&
 				callee?.type === 'MemberExpression' &&
 				name === 'map' &&
 				callbackReturnsJSX(callableValue(node.arguments?.[0], scope))
@@ -293,27 +294,12 @@ export function createStrongTemplatePolicy({
 				if (attribute.type === 'JSXSpreadAttribute') spreadSuppressions(attribute.argument, scope);
 				else suppression(attribute.name?.name, attribute.name);
 			}
-		} else if (
-			keyDepth > 0 &&
-			reference &&
-			node.type === 'Identifier' &&
-			resolve(scope, node.name)?.strongIndex === true
-		) {
-			add(
-				'OCTANE_STRONG_INDEX_KEY',
-				node,
-				'An `@for` key must identify the item independently of its position. Use a stable item ID instead of the loop index.',
-			);
 		}
 	}
 	return {
 		visit,
-		enterKey() {
-			keyDepth++;
-		},
-		exitKey() {
-			keyDepth--;
-		},
+		enterKey: checkKey,
+		exitKey() {},
 		finish() {
 			for (const { code, node, message } of pending) report(code, node, message);
 		},

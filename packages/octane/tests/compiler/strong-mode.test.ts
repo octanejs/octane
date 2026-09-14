@@ -19,26 +19,6 @@ const DIRECTIVE_PLACEMENT = 'OCTANE_STRONG_DIRECTIVE_PLACEMENT';
 const HOOK_LOCALITY = 'OCTANE_STRONG_HOOK_LOCALITY';
 const EVENT_HANDLER_LOCALITY = 'OCTANE_STRONG_EVENT_HANDLER_LOCALITY';
 const MANUAL_MEMO = 'OCTANE_STRONG_MANUAL_MEMO';
-const EXPLICIT_DEPENDENCIES = 'OCTANE_STRONG_EXPLICIT_DEPENDENCIES';
-
-// These fixtures exercise phase analysis of legacy memo callbacks. Strong now
-// rejects manual memo authoring, but must still distinguish callback creation
-// from invocation and must never invent a render/effect violation.
-function expectPhaseSafeLegacyMemo(source: string, filename = '/src/App.tsrx') {
-	const diagnostics = compileToVolarMappings(source, filename).diagnostics;
-	const errors = diagnostics.filter(({ severity }) => severity === 'error');
-	expect(
-		errors.filter(({ code }) => code !== MANUAL_MEMO && code !== EXPLICIT_DEPENDENCIES),
-	).toEqual([]);
-	if (errors.length > 0) {
-		expect(errors).toContainEqual(expect.objectContaining({ code: MANUAL_MEMO }));
-		expect(() => compile(source, filename)).toThrow(
-			/OCTANE_STRONG_(MANUAL_MEMO|EXPLICIT_DEPENDENCIES)/,
-		);
-	} else {
-		expect(() => compile(source, filename)).not.toThrow();
-	}
-}
 
 describe('Strong mode immutable render inputs', () => {
 	const component = (
@@ -1516,7 +1496,7 @@ describe('Strong mode compiler enforcement', () => {
 		).toThrow(RENDER_STATE_UPDATE);
 	});
 
-	it('does not change emitted client or server code for valid globally opted-in modules', () => {
+	it('preserves emitted code for globally opted-in modules without cache-eligible declarations', () => {
 		const source = stateComponent('');
 
 		for (const mode of ['client', 'server'] as const) {
@@ -1527,6 +1507,22 @@ describe('Strong mode compiler enforcement', () => {
 			expect(strong.diagnostics).toEqual(standard.diagnostics);
 		}
 	});
+
+	it.each(['client', 'server'] as const)(
+		'caches eligible effect inputs under global Strong in %s',
+		(mode) => {
+			const source = `import { useEffect } from 'octane';
+export function App(props) @{
+  const input = { label: props.label };
+  useEffect(() => props.observe(input));
+  <div />
+}`;
+			const standard = compile(source, '/src/EffectInput.tsrx', { mode });
+			const strong = compile(source, '/src/EffectInput.tsrx', { mode, strong: true });
+			expect(strong.diagnostics).toEqual([]);
+			expect(strong.code).not.toBe(standard.code);
+		},
+	);
 
 	it('only recognizes the exact module directive prologue', () => {
 		const source = stateComponent('setCount(count + 1);');
@@ -2469,7 +2465,7 @@ export function App(props) @{
   useState(false && unsafe);
   useState(safe || unsafe);
   useState((() => count) ?? unsafe);
-  useMemo(safe || unsafe, [count]);
+  (safe || unsafe)(count);
   useLinkedState(count, props.reconcile ?? safe, {
     ...(props.options ?? { sourceEqual: unsafe }),
     sourceEqual: Object.is,
@@ -2482,7 +2478,7 @@ export function App(props) @{
   <div />
 }`;
 
-		expectPhaseSafeLegacyMemo(source, '/src/App.tsrx');
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
 	});
 
 	it.each([
@@ -2780,20 +2776,20 @@ export function App() @{ const [, update] = Octane.useState(0); Octane['useMemo'
 		expect(() => compile(`"use strong";\n${source}`, '/src/App.tsrx')).toThrow(RENDER_STATE_UPDATE);
 	});
 
-	it('keeps deferred, unknown, and shadowed named memo callbacks legal', () => {
+	it('keeps deferred and unknown callback invocation and callback creation legal', () => {
 		const source = `"use strong";
 import { useMemo, useState } from 'octane';
 export function App(props) @{
   const [count, setCount] = useState(0);
   const apply = () => setTimeout(() => setCount(count + 1), 0);
   const external = props.calculate;
-  useMemo(apply, [count]);
-  useMemo(external, [count]);
-  useMemo(() => () => setCount(count + 1), [count]);
+  apply();
+  external(count);
+  const updateLater = () => setCount(count + 1);
   <div />
 }`;
 
-		expectPhaseSafeLegacyMemo(source, '/src/App.tsrx');
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
 	});
 
 	it('publishes named memo state updates as editor errors', () => {
@@ -3027,16 +3023,16 @@ export function App() @{
 		expect(() => compile(source, '/src/App.tsrx')).toThrow(code);
 	});
 
-	it('allows state tuple memo callbacks after yielded dependency arguments', () => {
+	it('allows state tuple callbacks after an earlier argument yields', () => {
 		const source = `"use strong";
 import { useMemo, useState } from 'octane';
 export function App() @{
   const state = useState(0);
-  (async () => { useMemo(state[1], [await Promise.resolve(state[0])]); })();
+  (async () => { ((apply, value) => apply(value))(state[1], await Promise.resolve(state[0])); })();
   <div />
 }`;
 
-		expectPhaseSafeLegacyMemo(source, '/src/App.tsrx');
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
 	});
 
 	it('catches synchronous local callback invocation inside effect setup', () => {
@@ -3460,19 +3456,25 @@ export function App(props) @{
 	});
 
 	it.each([
-		['inline memo callbacks', 'useMemo(() => setCount(1), [await Promise.resolve(count)]);'],
 		[
-			'named memo callbacks',
-			'const calculate = () => setCount(1); useMemo(calculate, [await Promise.resolve(count)]);',
+			'inline callbacks',
+			'((apply, value) => apply(value))(() => setCount(1), await Promise.resolve(count));',
 		],
-		['state updaters as memo callbacks', 'useMemo(setCount, [await Promise.resolve(count)]);'],
+		[
+			'named callbacks',
+			'const calculate = () => setCount(1); ((apply, value) => apply(value))(calculate, await Promise.resolve(count));',
+		],
+		[
+			'state updaters as callbacks',
+			'((apply, value) => apply(value))(setCount, await Promise.resolve(count));',
+		],
 	])('allows %s when earlier arguments have yielded', (_label, body) => {
 		const source = `"use strong";\n${stateComponent(
 			`(async () => { ${body} })();`,
 			'useState, useMemo',
 		)}`;
 
-		expectPhaseSafeLegacyMemo(source, '/src/Counter.tsrx');
+		expect(() => compile(source, '/src/Counter.tsrx')).not.toThrow();
 	});
 
 	it('still rejects memo callbacks when awaited arguments can be skipped', () => {
@@ -4305,7 +4307,7 @@ export function App() @{
 import { useRef, useEffect, useCallback } from 'octane';
 export function App(props) @{
   const ref = useRef(null);
-  const readLater = useCallback(() => ref.current, []);
+  const readLater = () => ref.current;
   const identity = { ref };
   useEffect(() => {
     const mounted = ref.current;
@@ -4316,7 +4318,7 @@ export function App(props) @{
   <button ref={ref} onClick={() => { const clicked = readLater(); }} />
 }`;
 
-		expectPhaseSafeLegacyMemo(source, '/src/App.tsrx');
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
 	});
 
 	it.each([
@@ -4564,7 +4566,7 @@ export function App() @{
 import { useState, useEffect, useCallback } from 'octane';
 export function App(props) @{
   const [count, setCount, getCount] = useState(0);
-  const readLater = useCallback(() => getCount(), []);
+  const readLater = () => getCount();
   useEffect(() => {
     props.record(getCount());
     return () => { props.record(getCount()); };
@@ -4576,7 +4578,7 @@ export function App(props) @{
     {count as string}
   </button>
 }`;
-		expectPhaseSafeLegacyMemo(source, '/src/App.tsrx');
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
 	});
 
 	it.each([
@@ -5705,12 +5707,12 @@ export function App(props) @{
   const event = useEffectEvent(() => setCount(count + 1));
   const memoized = () => setCount(count + 1);
   useEffect(() => {
-    ref.current = count;
-    setTimeout(update, 0);
-    Promise.resolve().then(event);
+    props.subscribe(update);
+    setTimeout(event, 0);
     queueMicrotask(memoized);
     return () => { update(); event(); memoized(); };
   });
+  useEffect(() => { ref.current = count; });
   <button ref={props.buttonRef} onClick={event}>{count as string}</button>
 }`;
 
@@ -5718,61 +5720,61 @@ export function App(props) @{
 	});
 
 	it('keeps returned callbacks legal after asynchronous work has yielded', () => {
-		const setup = `const update = useCallback(() => setCount(1), []);
+		const setup = `const update = () => setCount(1);
   const event = useEffectEvent(() => setCount(1));
-  const memoized = useMemo(() => () => setCount(1), []);
+  const memoized = () => setCount(1);
   (async () => { await Promise.resolve(); update(); event(); memoized(); })();
   useEffect(() => {
     (async () => { await Promise.resolve(); update(); event(); memoized(); })();
-  }, []);`;
+  });`;
 
-		expectPhaseSafeLegacyMemo(`"use strong";\n${component(setup)}`, '/src/App.tsrx');
+		expect(() => compile(`"use strong";\n${component(setup)}`, '/src/App.tsrx')).not.toThrow();
 	});
 
-	it('does not execute a memo-returned callback until the result is invoked', () => {
+	it('does not execute a factory-returned callback until the result is invoked', () => {
 		const setup = `function makeUpdate(apply) { return () => apply(1); }
-  const update = useMemo(() => makeUpdate(setCount), []);
+  const update = makeUpdate(setCount);
   const event = useEffectEvent(update);
-  useEffect(() => () => event(), []);`;
+  useEffect(() => () => event());`;
 
-		expectPhaseSafeLegacyMemo(`"use strong";\n${component(setup)}`, '/src/App.tsrx');
+		expect(() => compile(`"use strong";\n${component(setup)}`, '/src/App.tsrx')).not.toThrow();
 	});
 
 	it.each([
 		[
 			'separate factory captures',
 			`function makeUpdate(apply) { return () => apply(1); }
-  const deferred = useMemo(() => makeUpdate(setCount), []);
-  const safe = useMemo(() => makeUpdate(() => {}), []);
+  const deferred = makeUpdate(setCount);
+  const safe = makeUpdate(() => {});
   safe();
-  useEffect(() => deferred, []);`,
+  useEffect(() => deferred);`,
 		],
 		[
 			'reassigned factory parameters',
 			`function makeUpdate(apply) { apply = () => {}; return () => apply(1); }
-  const safe = useMemo(() => makeUpdate(setCount), []);
+  const safe = makeUpdate(setCount);
   safe();`,
 		],
 		[
 			'overridden factory returns',
-			`const safe = useMemo(() => {
+			`const safe = (() => {
     try { return () => setCount(1); }
     finally { return () => {}; }
-  }, []);
+  })();
   safe();`,
 		],
 		[
 			'asynchronous factory results',
-			`const pending = useMemo(async () => () => setCount(1), []);
-  useEffect(() => { pending.then((update) => update()); }, []);`,
+			`const pending = (async () => () => setCount(1))();
+  useEffect(() => { pending.then((update) => update()); });`,
 		],
 		[
 			'generator factory results',
-			`const iterator = useMemo(function* () { return () => setCount(1); }, []);
-  useEffect(() => () => { iterator.next().value?.(); }, []);`,
+			`const iterator = (function* () { return () => setCount(1); })();
+  useEffect(() => () => { iterator.next().value?.(); });`,
 		],
 	])('does not invent synchronous writes from %s', (_label, setup) => {
-		expectPhaseSafeLegacyMemo(`"use strong";\n${component(setup)}`, '/src/App.tsrx');
+		expect(() => compile(`"use strong";\n${component(setup)}`, '/src/App.tsrx')).not.toThrow();
 	});
 
 	it('keeps shadowed hooks and opaque callback results legal', () => {
@@ -5788,41 +5790,38 @@ export function App(props) @{
   const unrelated = useEffectEvent(() => { ref.current = 1; });
   ignored();
   unrelated();
-  const external = useMemo(props.makeCallback, []);
+  const external = props.makeCallback();
   const unknown = makeCallback(() => setCount(1));
   external();
   unknown();
   function makeUpdate(setCount) { return () => setCount(1); }
-  const safe = useMemo(() => makeUpdate(props.onUpdate), [props.onUpdate]);
+  const safe = makeUpdate(props.onUpdate);
   safe();
   const event = octaneEvent(() => props.value);
-  useEffect(() => { props.register(event); }, props.dependencies);
+  useEffect(() => { props.register(event); });
   <div />
 }`;
 
-		expectPhaseSafeLegacyMemo(source, '/src/App.tsrx');
+		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
 	});
 
 	it('keeps inferred dependencies, ordinary callbacks, and deferred ref writes legal', () => {
 		const setup = `const event = useEffectEvent(() => count);
-  const callback = useCallback(() => props.value, [props.value]);
-  const write = useMemo(() => () => { ref.current = count; }, [count]);
+  const callback = () => props.value;
+  const write = () => { ref.current = count; };
   useEffect(() => { props.register(event); });
-  useEffect(() => { write(); }, [callback]);
-  useMemo(() => callback, [callback]);`;
+  useEffect(() => { write(); props.record(callback()); });
+  const alias = callback;`;
 
-		expectPhaseSafeLegacyMemo(`"use strong";\n${component(setup)}`, '/src/App.tsrx');
+		expect(() => compile(`"use strong";\n${component(setup)}`, '/src/App.tsrx')).not.toThrow();
 	});
 
 	it.each([
-		['a return', 'const update = useCallback(() => { return; setCount(1); }, []); update();'],
-		[
-			'a false branch',
-			'const update = useCallback(() => { if (false) setCount(1); }, []); update();',
-		],
-		['short-circuiting', 'const update = useCallback(() => false && setCount(1), []); update();'],
+		['a return', 'const update = () => { return; setCount(1); }; update();'],
+		['a false branch', 'const update = () => { if (false) setCount(1); }; update();'],
+		['short-circuiting', 'const update = () => false && setCount(1); update();'],
 	])('does not report callback writes made unreachable by %s', (_label, setup) => {
-		expectPhaseSafeLegacyMemo(`"use strong";\n${component(setup)}`, '/src/App.tsrx');
+		expect(() => compile(`"use strong";\n${component(setup)}`, '/src/App.tsrx')).not.toThrow();
 	});
 
 	it.each([
@@ -5896,12 +5895,12 @@ export function App(props) @{
     return () => {};
   }`;
 		const unsafe = `${make} const update = useMemo(() => make(true, setCount), []); update();`;
-		const safe = `${make} const update = useMemo(() => make(false, setCount), []); update();`;
+		const safe = `${make} const update = make(false, setCount); update();`;
 
 		expect(() => compile(`"use strong";\n${component(unsafe)}`, '/src/App.tsrx')).toThrow(
 			RENDER_STATE_UPDATE,
 		);
-		expectPhaseSafeLegacyMemo(`"use strong";\n${component(safe)}`, '/src/App.tsrx');
+		expect(() => compile(`"use strong";\n${component(safe)}`, '/src/App.tsrx')).not.toThrow();
 	});
 
 	it('keeps the fallback of an optional factory call reachable', () => {
@@ -5915,12 +5914,12 @@ export function App(props) @{
 		);
 	});
 
-	it('preserves a known non-callable memo result when selecting a callback', () => {
-		const setup = `const disabled = useMemo(() => false, []);
-  const update = useCallback(disabled ? setCount : () => {}, []);
+	it('preserves a known non-callable factory result when selecting a callback', () => {
+		const setup = `const disabled = (() => false)();
+  const update = disabled ? setCount : () => {};
   update(1);`;
 
-		expectPhaseSafeLegacyMemo(`"use strong";\n${component(setup)}`, '/src/App.tsrx');
+		expect(() => compile(`"use strong";\n${component(setup)}`, '/src/App.tsrx')).not.toThrow();
 	});
 
 	it('respects function-hoisted vars that shadow an outer setter', () => {
@@ -6048,23 +6047,23 @@ export function App(props) @{
   const selected = useMemo(() => identity(event), []);
   useEffect(() => {}, [selected]);`;
 		const wrapped = `const event = useEffectEvent(() => count);
-  const wrapper = useMemo(() => () => event(), []);
-  useEffect(() => {}, [wrapper, () => event(), false ? event : wrapper]);`;
+  const wrapper = () => event();
+  useEffect(() => { props.register(wrapper, () => event(), false ? event : wrapper); });`;
 
 		expect(() => compile(`"use strong";\n${component(actual)}`, '/src/App.tsrx')).toThrow(
 			EFFECT_EVENT_DEPENDENCY,
 		);
-		expectPhaseSafeLegacyMemo(`"use strong";\n${component(wrapped)}`, '/src/App.tsrx');
+		expect(() => compile(`"use strong";\n${component(wrapped)}`, '/src/App.tsrx')).not.toThrow();
 	});
 
 	it.each([
 		[
 			'generator callback creation',
-			'const make = useCallback(function* () { setCount(1); }, []); const iterator = make(); useEffect(() => () => { iterator.next(); }, []);',
+			'const make = function* () { setCount(1); }; const iterator = make(); useEffect(() => () => { iterator.next(); });',
 		],
 		[
 			'asynchronous callbacks after yielding',
-			'const update = useCallback(async () => { await Promise.resolve(); setCount(1); }, []); useEffect(() => { update(); }, []);',
+			'const update = async () => { await Promise.resolve(); setCount(1); }; useEffect(() => { update(); });',
 		],
 		[
 			'optional calls after yielding',
@@ -6076,14 +6075,14 @@ export function App(props) @{
 		],
 		[
 			'recursive factory returns',
-			'function make(recur) { if (recur) return make(false); return () => {}; } const update = useMemo(() => make(true), []); update();',
+			'function make(recur) { if (recur) return make(false); return () => {}; } const update = make(true); update();',
 		],
 		[
 			'mutually recursive factory returns',
-			'function first(recur) { if (recur) return second(false); return () => {}; } function second(recur) { if (recur) return first(false); return () => {}; } const update = useMemo(() => first(true), []); update();',
+			'function first(recur) { if (recur) return second(false); return () => {}; } function second(recur) { if (recur) return first(false); return () => {}; } const update = first(true); update();',
 		],
 	])('keeps %s legal without inventing synchronous execution', (_label, setup) => {
-		expectPhaseSafeLegacyMemo(`"use strong";\n${component(setup)}`, '/src/App.tsrx');
+		expect(() => compile(`"use strong";\n${component(setup)}`, '/src/App.tsrx')).not.toThrow();
 	});
 
 	it('finishes repeated optional self-return calls and still checks later writes', () => {

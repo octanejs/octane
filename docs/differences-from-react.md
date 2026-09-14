@@ -480,7 +480,8 @@ The tuple also supports the same optional latest-value getter as `useState`.
 ## Optional Strong mode
 
 Strong modules also require inferred dependencies, compiler-owned memoization,
-keyed template lists, and branded HTML values. See the
+keyed template lists in `.tsrx`, and branded HTML values. Standard keyed JSX
+mapping remains supported in `.tsx`. See the
 [Strong compiler checks and migration table](./strong-compiler-checks.md).
 
 Strong mode opts into the immutable render-snapshot contract above and adds
@@ -563,10 +564,13 @@ its JSX, including `<button {onClick} />`. A named callback declared outside
 the sole deeper nested `@{…}` block containing its direct event use reports
 `OCTANE_STRONG_EVENT_HANDLER_LOCALITY`; a callback declared in the same scope
 as the JSX is valid. Shared, imported, and forwarded callbacks remain
-supported. The diagnostics use the authored source location in client, server,
-and editor compilation; they do not move declarations or change emitted code
-for valid modules. Setting `compiler: { strong: true }` applies these checks
-across application-owned modules; installed dependencies opt in separately.
+supported. Locality diagnostics use authored source locations and preserve
+declaration positions in client, server, and editor compilation. Strong also
+adds eligible hook-input caches in development and production, so opting in can
+change generated code. The [eligibility rules](./strong-compiler-checks.md)
+describe which declarations keep a stable identity. Setting
+`compiler: { strong: true }` applies these checks and caches across
+application-owned modules; installed dependencies opt in separately.
 
 Event handlers, genuinely deferred callbacks, effect cleanup, effects that
 synchronize an external system, and normal DOM or timer refs remain supported.

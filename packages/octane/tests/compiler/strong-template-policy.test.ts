@@ -7,16 +7,25 @@ import { compileToVolarMappings } from '../../src/compiler/volar.js';
 const strong = (source: string) => `"use strong";\n${source}`;
 
 describe('Strong template authoring checks', () => {
-	it('keeps the mapped snapshot fixture in compatibility mode and rejects Strong opt-in', () => {
-		const filename = 'packages/octane/tests/_fixtures/for-snapshot-compat.tsx';
+	it('keeps keyed JSX mapping available in Strong TSX client and server modules', () => {
+		const filename = 'packages/octane/tests/_fixtures/for-strong.tsx';
 		const source = readFileSync(filename, 'utf8');
 		for (const mode of ['client', 'server'] as const) {
 			expect(() => compile(source, filename, { mode })).not.toThrow();
-			expect(() => compile(source, filename, { mode, strong: true })).toThrow(
-				'OCTANE_STRONG_MAP_JSX',
-			);
+			expect(() => compile(source, filename, { mode, strong: true })).not.toThrow();
 		}
 	});
+	it.each(['tsx', 'jsx'])(
+		'preserves keyed %s maps for module and global Strong opt-in',
+		(extension) => {
+			const source = `export function App({ items }) { return <ul>{items.map(item => <li key={item.id}>{item.name}</li>)}</ul>; }`;
+			for (const mode of ['client', 'server'] as const) {
+				expect(() => compile(strong(source), `App.${extension}`, { mode })).not.toThrow();
+				expect(() => compile(source, `App.${extension}`, { mode, strong: true })).not.toThrow();
+			}
+			expect(compileToVolarMappings(strong(source), `App.${extension}`).diagnostics).toEqual([]);
+		},
+	);
 	it.each([
 		['inline JSX', 'props.items.map(item => <li>{item.name as string}</li>)'],
 		['computed map', 'props.items["map"](item => <li />)'],
@@ -46,18 +55,33 @@ describe('Strong template authoring checks', () => {
 		}`;
 		expect(() => compile(strong(source), 'App.tsrx')).not.toThrow();
 	});
-	it.each(['position', 'position + 1', '`row-${position}`', 'item.id + position'])(
-		'rejects index key %s',
-		(key) => {
-			const source = `export function App(props) @{ <ul>@for (const item of props.items; index position; key ${key}) { <li /> }</ul> }`;
-			expect(() => compile(source, 'App.tsrx')).not.toThrow();
-			expect(() => compile(strong(source), 'App.tsrx')).toThrow('OCTANE_STRONG_INDEX_KEY');
-		},
-	);
+	it.each([
+		'position',
+		'position + 1',
+		'`row-${position}`',
+		'item.id + position',
+		'String(position)',
+		'position.toString()',
+	])('rejects index key %s', (key) => {
+		const source = `export function App(props) @{ <ul>@for (const item of props.items; index position; key ${key}) { <li /> }</ul> }`;
+		expect(() => compile(source, 'App.tsrx')).not.toThrow();
+		expect(() => compile(strong(source), 'App.tsrx')).toThrow('OCTANE_STRONG_INDEX_KEY');
+	});
 	it('distinguishes an item property from the index binding', () => {
 		const source = `export function App(props) @{ <ul>@for (const item of props.items; index index; key item.index) { <li /> }</ul> }`;
 		expect(() => compile(strong(source), 'App.tsrx')).not.toThrow();
 	});
+	it.each(['props.items[position].id', 'props.items[position]["id"]', 'props.ids[position]'])(
+		'allows an item identity retrieved by index: %s',
+		(key) => {
+			const source = strong(
+				`export function App(props) @{ <ul>@for (const item of props.items; index position; key ${key}) { <li /> }</ul> }`,
+			);
+			for (const mode of ['client', 'server'] as const)
+				expect(() => compile(source, 'App.tsrx', { mode })).not.toThrow();
+			expect(compileToVolarMappings(source, 'App.tsrx').diagnostics).toEqual([]);
+		},
+	);
 	it.each(['suppressHydrationWarning', 'suppressNativeChangeWarning'])(
 		'rejects intrinsic %s including false and object spreads',
 		(prop) => {
@@ -117,6 +141,19 @@ describe('Strong template authoring checks', () => {
 		const good = `import { flushSync } from './adapter'; import * as Octane from 'octane'; function helper(Octane) { return Octane.flushSync; } export function App() @{ <div /> }`;
 		expect(() => compile(strong(good), 'App.tsrx')).not.toThrow();
 	});
+	it.each([
+		`import { flushSync as sync } from 'octane/server';`,
+		`import * as Octane from 'octane/server'; const sync = Octane.flushSync;`,
+		`import * as Octane from 'octane/server'; const { StrictMode } = Octane;`,
+	])('recognizes compatibility APIs from the server entrypoint', (imports) => {
+		const source = `${imports} export function App() { return <div />; }`;
+		for (const mode of ['client', 'server'] as const) {
+			expect(() => compile(source, 'App.tsx', { mode })).not.toThrow();
+			expect(() => compile(source, 'App.tsx', { mode, strong: true })).toThrow(
+				'OCTANE_STRONG_COMPAT_IMPORT',
+			);
+		}
+	});
 	it('reuses the parsed module for renderer regions in editor analysis', () => {
 		// The tolerant editor parser accepts shapes a second strict parse rejects;
 		// region analysis must report diagnostics for them rather than throw.
@@ -135,6 +172,42 @@ export function App(props) @{
 }`,
 		]) {
 			expect(() => compileToVolarMappings(strong(source), 'App.tsrx')).not.toThrow();
+		}
+	});
+	it('shares adopted renderer regions across HTML, suppression, and native editor checks', () => {
+		const source = strong(`import { Canvas, Html } from '@scene/bridge';
+export function App() @{ <main>@{
+  <button />
+  <Canvas><group>
+    <input onChange={() => {}} />
+    <div suppressHydrationWarning />
+    <div dangerouslySetInnerHTML={{ __html: 'object prop' }} />
+    <Html><section>
+      <input onChange={() => {}} />
+      <div suppressHydrationWarning />
+      <div dangerouslySetInnerHTML={{ __html: 'raw DOM' }} />
+    </section></Html>
+  </group></Canvas>
+}</main> }`);
+		const result = compileToVolarMappings(source, 'App.tsrx', {
+			renderers: {
+				registry: { object: 'octane/universal' },
+				boundaries: {
+					'@scene/bridge': {
+						Canvas: { ownerRenderer: 'dom', childRenderer: 'object', prop: 'children' },
+						Html: { ownerRenderer: 'object', childRenderer: 'dom', prop: 'children' },
+					},
+				},
+			},
+		});
+		expect(result.diagnostics.map(({ code }) => code).sort()).toEqual([
+			'OCTANE_NATIVE_TEXT_ONCHANGE',
+			'OCTANE_STRONG_SUPPRESSION_PROP',
+			'OCTANE_STRONG_UNTRUSTED_HTML',
+		]);
+		for (const diagnostic of result.diagnostics) {
+			expect(diagnostic.severity).toBe('error');
+			expect(diagnostic.start.offset).toBeGreaterThan(source.indexOf('<Html>'));
 		}
 	});
 	it('provides source locations for editor errors and supports strong:true', () => {
@@ -170,7 +243,7 @@ describe('Strong template policy lexical boundaries', () => {
 		`item => { { const node = <li />; return node; } }`,
 	])('rejects a JSX mapper returning a local constant alias', (mapper) => {
 		const source = `export function App(props) { return <ul>{props.items.map(${mapper})}</ul>; }`;
-		expect(() => compile(strong(source), 'App.tsx')).toThrow('OCTANE_STRONG_MAP_JSX');
+		expect(() => compile(strong(source), 'App.tsrx')).toThrow('OCTANE_STRONG_MAP_JSX');
 	});
 
 	it.each([
@@ -179,6 +252,6 @@ describe('Strong template policy lexical boundaries', () => {
 		`item => { const first = second; const second = first; return first; }`,
 	])('preserves non-JSX returns and bounded cyclic aliases', (mapper) => {
 		const source = `export function App(props) { return <ul>{props.items.map(${mapper})}</ul>; }`;
-		expect(() => compile(strong(source), 'App.tsx')).not.toThrow();
+		expect(() => compile(strong(source), 'App.tsrx')).not.toThrow();
 	});
 });

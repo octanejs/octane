@@ -1,4 +1,4 @@
-import { analyzeRendererBoundaries } from './renderer-boundaries.js';
+import { createRendererRegionResolver } from './renderer-boundaries.js';
 
 export const STRONG_UNTRUSTED_HTML = 'OCTANE_STRONG_UNTRUSTED_HTML';
 export const STRONG_HTML_MESSAGE =
@@ -12,6 +12,15 @@ const TRANSPARENT = new Set([
 	'TSNonNullExpression',
 	'TSInstantiationExpression',
 ]);
+
+// Identifier escapes use Unicode; quoted property names also admit hex and
+// escaped letters. Ordinary escapes such as a newline cannot spell this key.
+export function mayHaveStrongHTML(source) {
+	return (
+		source.includes('dangerouslySetInnerHTML') ||
+		/\\(?:u|x|[dageoslySIHTML]|[\r\n\u2028\u2029])/.test(source)
+	);
+}
 
 function unwrap(node) {
 	while (node && TRANSPARENT.has(node.type)) node = node.expression;
@@ -77,34 +86,11 @@ export function strongHTMLSpreadWriter(expression) {
  * in Volar/tsrx-tsc; guessing their types here would reject valid trust boundaries.
  */
 export function analyzeStrongHTML(ast, source, filename, options = {}) {
-	if (!source.includes('dangerouslySetInnerHTML') && !source.includes('\\')) return [];
+	if (!mayHaveStrongHTML(source)) return [];
 	const diagnostics = [];
 	const reported = new WeakSet();
-	const regions =
-		options.rendererBoundaries && Object.keys(options.rendererBoundaries).length > 0
-			? analyzeRendererBoundaries(source, {
-					ast,
-					filename,
-					rendererBoundaries: options.rendererBoundaries,
-				})
-					.boundaries.map((boundary) => ({
-						renderer: boundary.childRenderer,
-						range: boundary.region?.range ?? boundary.region?.valueRange,
-					}))
-					.filter((region) => region.range != null)
-			: [];
-	function isDOM(node) {
-		let renderer = options.renderer?.id ?? (options.dom === false ? null : 'dom');
-		let width = Infinity;
-		for (const region of regions) {
-			const [start, end] = region.range;
-			if (start <= node.start && node.end <= end && end - start < width) {
-				renderer = region.renderer;
-				width = end - start;
-			}
-		}
-		return renderer === 'dom' || options.rendererRegistry?.[renderer]?.target === 'dom';
-	}
+	const isDOM =
+		options.rendererRegionResolver ?? createRendererRegionResolver(ast, source, filename, options);
 	function report(node) {
 		if (reported.has(node)) return;
 		reported.add(node);

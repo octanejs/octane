@@ -6,8 +6,6 @@ import { builders as b } from '@tsrx/core';
 import { hasInlineMemoDirectEval } from './inline-hook-memo.js';
 
 export const STRONG_AUTOMATIC_MEMO_UNSUPPORTED = 'OCTANE_STRONG_AUTOMATIC_MEMO_UNSUPPORTED';
-export const STRONG_MEMO_EVAL_MESSAGE =
-	'Strong declaration caching cannot preserve lexical eval semantics. Move the reflective code behind a compatibility-module boundary.';
 
 const DEPENDENCY_HOOKS = new Map([
 	['useEffect', { callback: 0, deps: 1 }],
@@ -179,7 +177,13 @@ function collectHoistedVars(node, functionScope, root = true, bindingsOnly = fal
 		for (const child of node) collectHoistedVars(child, functionScope, false, bindingsOnly);
 		return;
 	}
-	if (!root && isFunction(node)) return;
+	if (!root && (isFunction(node) || node.type === 'JSXCodeBlock')) return;
+	if (
+		['JSXIfExpression', 'JSXForExpression', 'JSXSwitchExpression', 'JSXTryExpression'].includes(
+			node.type,
+		)
+	)
+		return;
 	if (
 		bindingsOnly &&
 		(isFunction(node) ||
@@ -319,6 +323,7 @@ function buildScopes(ast, onlyImported, hookRuntimeModules, bindingsOnly = false
 	const moduleScope = createScope(null, 'module');
 	const nodeScopes = new WeakMap();
 	const functionScopes = new WeakMap();
+	const functionBodies = new WeakSet();
 	const declarators = [];
 	const candidates = [];
 	const calls = [];
@@ -372,6 +377,7 @@ function buildScopes(ast, onlyImported, hookRuntimeModules, bindingsOnly = false
 		}
 
 		if (isFunction(node)) {
+			if (node.body) functionBodies.add(node.body);
 			const fnScope = createScope(scope, 'function');
 			const record = bindingsOnly
 				? null
@@ -469,10 +475,16 @@ function buildScopes(ast, onlyImported, hookRuntimeModules, bindingsOnly = false
 		) {
 			const blockScope = createScope(
 				scope,
-				bindingsOnly && node.type === 'StaticBlock' ? 'function' : 'block',
+				(bindingsOnly && node.type === 'StaticBlock') ||
+					(node.type === 'JSXCodeBlock' && !functionBodies.has(node))
+					? 'function'
+					: 'block',
 			);
-			if (bindingsOnly && node.type === 'StaticBlock') {
-				collectHoistedVars(node, blockScope, true, true);
+			if (
+				(bindingsOnly && node.type === 'StaticBlock') ||
+				(node.type === 'JSXCodeBlock' && !functionBodies.has(node))
+			) {
+				collectHoistedVars(node, blockScope, true, bindingsOnly);
 			}
 			predeclareDirect(node.body, blockScope, hookRuntimeModules, bindingsOnly);
 			for (const statement of node.body || []) walk(statement, blockScope);
@@ -1500,8 +1512,27 @@ function cloneDependency(node) {
 /** @param {any} ast @param {{ onlyImported?: boolean, hookRuntimeModules?: readonly string[], filename?: string, inferDependencies?: boolean }} options */
 function analyzeInternal(ast, options) {
 	const onlyImported = options.onlyImported === true;
-	const hookRuntimeModules = new Set(['octane', ...(options.hookRuntimeModules || [])]);
-	const analysis = buildScopes(ast, onlyImported, hookRuntimeModules);
+	const shared = options.strongHookAnalysis ? analyzeStrongHookBindings(ast, options) : null;
+	let analysis =
+		shared?.analysis ??
+		buildScopes(ast, onlyImported, new Set(['octane', ...(options.hookRuntimeModules || [])]));
+	if (shared) {
+		const callAnnotations = new Map(analysis.callAnnotations);
+		const candidates = [];
+		for (const { call, scope } of analysis.calls) {
+			const name = shared.callNames.get(call);
+			const config = DEPENDENCY_HOOKS.get(name);
+			if (!config) continue;
+			const annotation = { ...callAnnotations.get(call), _octaneImportedHook: name };
+			delete annotation._octaneCustomHookCall;
+			callAnnotations.set(call, annotation);
+			const omitted = call.arguments[config.deps] === undefined;
+			const replaceDependency = isUnshadowedUndefined(call.arguments[config.deps], scope);
+			if (omitted || replaceDependency)
+				candidates.push({ call, scope, name, config, replaceDependency });
+		}
+		analysis = { ...analysis, callAnnotations, candidates };
+	}
 	const inferred = new Map();
 	// A hand-slotted module owns its authored dependency ABI. The production
 	// memo-only pass still needs lexical import provenance, but must not infer
@@ -1532,7 +1563,7 @@ function analyzeInternal(ast, options) {
 		inferred.set(candidate.call, {
 			name: candidate.name,
 			depsIndex: candidate.config.deps,
-			...(candidate.call._octaneStrongOmittedDependency === true
+			...(candidate.call._octaneStrongOmittedDependency === true || candidate.replaceDependency
 				? { replaceDependency: true }
 				: {}),
 			dependencies,
@@ -1626,6 +1657,33 @@ function strongHookNameResolver(analysis, onlyImported) {
 	return (call, scope) => resolve(call.callee, scope);
 }
 
+/** Shared authored hook identity and lexical proof for Strong analyses. */
+export function analyzeStrongHookBindings(ast, options = {}) {
+	const onlyImported = options.onlyImported === true;
+	const hookRuntimeModules = new Set([
+		'octane',
+		'octane/server',
+		...(options.nativeReads ? ['octane/signals/client', 'octane/signals/server'] : []),
+		...(options.hookRuntimeModules ?? []),
+	]);
+	const shared = options.strongHookAnalysis;
+	if (
+		shared?.ast === ast &&
+		shared.onlyImported === onlyImported &&
+		shared.hookRuntimeModules.size === hookRuntimeModules.size &&
+		[...hookRuntimeModules].every((request) => shared.hookRuntimeModules.has(request))
+	)
+		return shared;
+	const analysis = buildScopes(ast, onlyImported, hookRuntimeModules);
+	const nameFor = strongHookNameResolver(analysis, onlyImported);
+	const callNames = new Map();
+	for (const { call, scope } of analysis.calls) {
+		const name = nameFor(call, scope);
+		if (name !== null) callNames.set(call, name);
+	}
+	return { ast, analysis, callNames, onlyImported, hookRuntimeModules };
+}
+
 function dependencyExpressionKey(expression, analysis) {
 	const node = unwrapValue(expression);
 	if (node?.type === 'Identifier') {
@@ -1699,20 +1757,11 @@ function equivalentStrongDependencies(authored, callback, inferred, analysis) {
  * @param {{ onlyImported?: boolean, hookRuntimeModules?: readonly string[], nativeReads?: boolean }} [options]
  */
 export function analyzeStrongHookPolicies(ast, options = {}) {
-	const analysis = buildScopes(
-		ast,
-		options.onlyImported === true,
-		new Set([
-			'octane',
-			...(options.nativeReads ? ['octane/signals/client', 'octane/signals/server'] : []),
-			...(options.hookRuntimeModules ?? []),
-		]),
-	);
-	const nameFor = strongHookNameResolver(analysis, options.onlyImported === true);
+	const { analysis, callNames } = analyzeStrongHookBindings(ast, options);
 	const diagnostics = [];
 	let markedInvariants = false;
 	for (const { call, scope } of analysis.calls) {
-		const name = nameFor(call, scope);
+		const name = callNames.get(call);
 		const config = DEPENDENCY_HOOKS.get(name);
 		if (config === undefined) continue;
 		if (name === 'useMemo' || name === 'useCallback') {
@@ -1761,17 +1810,7 @@ export function analyzeStrongHookPolicies(ast, options = {}) {
 				: 'Strong mode owns dependency inference. Omit this dependency argument; its values are not proven equivalent to the callback’s inferred inputs.',
 		});
 	}
-	if (hasInlineMemoDirectEval(ast)) {
-		const { candidates } = analyzeStrongMemoCandidates(ast, options, analysis);
-		const first = candidates.keys().next().value;
-		if (first)
-			diagnostics.push({
-				code: STRONG_AUTOMATIC_MEMO_UNSUPPORTED,
-				node: first.init,
-				severity: 'error',
-				message: STRONG_MEMO_EVAL_MESSAGE,
-			});
-	}
+
 	return diagnostics;
 }
 
@@ -1884,25 +1923,16 @@ export function applyHookDependencies(ast, options = {}) {
  * authored hooks. Mutable local objects and late-bound captures retain normal
  * JavaScript evaluation; caching them would change their lifetime or read TDZs.
  */
-export function analyzeStrongMemoCandidates(ast, options = {}, existingAnalysis = null) {
-	const analysis =
-		existingAnalysis ??
-		buildScopes(
-			ast,
-			false,
-			new Set([
-				'octane',
-				...(options.nativeReads ? ['octane/signals/client', 'octane/signals/server'] : []),
-				...(options.hookRuntimeModules ?? []),
-			]),
-		);
+export function analyzeStrongMemoCandidates(ast, options = {}) {
+	const shared = analyzeStrongHookBindings(ast, options);
+	const analysis = shared.analysis;
+	const callNames = shared.callNames;
 	markDependencyInvariantBindings(analysis);
-	const hookName = strongHookNameResolver(analysis, false);
-	const importedHookName = strongHookNameResolver(analysis, true);
+	const hookName = (call) => callNames.get(call) ?? null;
 	const hookCalls = new Map();
 	const omittedDependencies = new Set();
 	for (const { call, scope, trustedConfig } of analysis.calls) {
-		const name = importedHookName(call, scope);
+		const name = callNames.get(call);
 		const config = DEPENDENCY_HOOKS.get(name);
 		if (!config) continue;
 		if (!trustedConfig || call.optional) hookCalls.set(call, name);
@@ -1953,6 +1983,8 @@ export function analyzeStrongMemoCandidates(ast, options = {}, existingAnalysis 
 	}
 	const names = new Set();
 	const referenced = new Set();
+	const reads = new Map();
+	const parents = new WeakMap();
 	const bindingNodes = new WeakSet();
 	function markBindingNodes(pattern) {
 		if (!pattern) return;
@@ -2014,6 +2046,7 @@ export function analyzeStrongMemoCandidates(ast, options = {}, existingAnalysis 
 			for (const child of node) scan(child, loop, parent, parentKey);
 			return;
 		}
+		if (parent) parents.set(node, parent);
 		if (node.type === 'Identifier') {
 			names.add(node.name);
 			const structural =
@@ -2027,11 +2060,14 @@ export function analyzeStrongMemoCandidates(ast, options = {}, existingAnalysis 
 				['BreakStatement', 'ContinueStatement', 'MetaProperty'].includes(parent?.type);
 			if (!structural) {
 				const binding = resolveBinding(analysis.nodeScopes.get(node) ?? null, node.name);
-				if (binding) referenced.add(binding);
+				if (binding) {
+					referenced.add(binding);
+					if (!reads.has(binding)) reads.set(binding, []);
+					reads.get(binding).push(node);
+				}
 			}
 		}
 
-		if (isFunction(node)) loop = false;
 		// A template `@for` body runs once per row, and this analysis does not
 		// model the row bindings, so its declarations keep plain evaluation.
 		if (
@@ -2105,14 +2141,6 @@ export function analyzeStrongMemoCandidates(ast, options = {}, existingAnalysis 
 			}
 		}
 	}
-	function hasOwnJSX(node, root = true) {
-		if (!node || typeof node !== 'object') return false;
-		if (Array.isArray(node)) return node.some((child) => hasOwnJSX(child, false));
-		if (!root && isFunction(node)) return false;
-		if (['JSXCodeBlock', 'JSXElement', 'JSXFragment'].includes(node.type)) return true;
-		for (const key in node) if (!AST_META_KEYS.has(key) && hasOwnJSX(node[key], false)) return true;
-		return false;
-	}
 	const hookSummaries = new Map();
 	// Nested functions count: a callback argument may run its hook synchronously
 	// (`compute(() => useContext(Ctx))`), and caching that declaration would run
@@ -2156,6 +2184,10 @@ export function analyzeStrongMemoCandidates(ast, options = {}, existingAnalysis 
 				'ThisExpression',
 				'Super',
 				'ImportExpression',
+				'CallExpression',
+				'NewExpression',
+				'TaggedTemplateExpression',
+				'SpreadElement',
 			].includes(node.type) ||
 			node.type?.startsWith('JSX')
 		)
@@ -2196,16 +2228,89 @@ export function analyzeStrongMemoCandidates(ast, options = {}, existingAnalysis 
 			return createsIdentity(value.left) || createsIdentity(value.right);
 		return false;
 	}
-	const renderOwners = new Map();
-	function ownsRender(record) {
-		if (!renderOwners.has(record))
-			renderOwners.set(
-				record,
-				/^use[A-Z]/.test(record.binding?.name ?? record.node.id?.name ?? '') ||
-					hasOwnJSX(record.node),
-			);
-		return renderOwners.get(record);
+	// A cache inherits an existing authored hook's render scope. Merely
+	// producing JSX (or being named useX) never creates that ownership proof.
+	function effectOwnerForRead(read) {
+		let child = read;
+		for (let node = parents.get(child); node; child = node, node = parents.get(node)) {
+			if (node.type !== 'CallExpression') continue;
+			const name = callNames.get(node);
+			const config = DEPENDENCY_HOOKS.get(name);
+			if (!config || ['useMemo', 'useCallback'].includes(name)) continue;
+			if (node.arguments[config.callback] !== child && node.arguments[config.deps] !== child)
+				continue;
+			return owners.get(nearestFunctionScope(analysis.nodeScopes.get(node)));
+		}
+		return null;
 	}
+	const reflectiveOwners = new Map();
+	function reflectiveOwner(record) {
+		if (!reflectiveOwners.has(record))
+			reflectiveOwners.set(record, hasInlineMemoDirectEval(record.node));
+		return reflectiveOwners.get(record);
+	}
+	// A local custom hook can forward an input into an authored effect without
+	// exposing that value during setup. Full compilation already supplies a
+	// call-site boundary to direct useX calls. Plain modules deliberately do
+	// not slot local custom calls, so only their own builtin effects qualify.
+	const effectParameters = new Map();
+	if (!shared.onlyImported)
+		for (const record of analysis.functions) {
+			if (
+				!record.binding ||
+				record.binding.reassigned ||
+				!record.stableDefinition ||
+				record.node.async ||
+				record.node.generator ||
+				reflectiveOwner(record) ||
+				nearestFunctionScope(record.scope.parent)?.kind !== 'module'
+			)
+				continue;
+			const indices = new Set();
+			for (let index = 0; index < record.parameters.length; index++) {
+				const binding = record.parameters[index];
+				const uses = reads.get(binding) ?? [];
+				if (
+					binding &&
+					!binding.reassigned &&
+					!mutated.has(binding) &&
+					uses.length &&
+					uses.every((read) => effectOwnerForRead(read) === record)
+				)
+					indices.add(index);
+			}
+			if (indices.size) effectParameters.set(record.binding, indices);
+		}
+	function inputOwnerForRead(read) {
+		const effectOwner = effectOwnerForRead(read);
+		if (effectOwner) return effectOwner;
+		let child = read;
+		for (let node = parents.get(child); node; child = node, node = parents.get(node)) {
+			if (node.type !== 'CallExpression') continue;
+			if (
+				node.optional ||
+				node.callee?.type !== 'Identifier' ||
+				!/^use[A-Z]/.test(node.callee.name)
+			)
+				return null;
+			const indices = effectParameters.get(directCallBinding(node, analysis.nodeScopes.get(node)));
+			if (!indices || !indices.has(node.arguments.indexOf(child)) || unwrapValue(child) !== read)
+				return null;
+			return owners.get(nearestFunctionScope(analysis.nodeScopes.get(node)));
+		}
+		return null;
+	}
+	function ownsReads(record, bindings) {
+		if (record.node.async || record.node.generator || reflectiveOwner(record)) return false;
+		// Nested callbacks and local JSX factories are value invocations. A
+		// module function with its own authored slotted effect is already a hook
+		// owner independently of how its name or returned values are spelled.
+		if (nearestFunctionScope(record.scope.parent)?.kind !== 'module') return false;
+		return bindings.every(({ binding }) =>
+			(reads.get(binding) ?? []).every((read) => inputOwnerForRead(read) === record),
+		);
+	}
+	const candidateDependencies = new Map();
 	const candidates = new Map();
 	for (const { decl, kind, bindings } of analysis.declarators) {
 		const initial = unwrapValue(decl.init);
@@ -2225,10 +2330,11 @@ export function analyzeStrongMemoCandidates(ast, options = {}, existingAnalysis 
 				continue;
 		}
 		const owner = owners.get(nearestFunctionScope(analysis.nodeScopes.get(decl)));
-		if (!owner || !ownsRender(owner)) continue;
+		if (!owner || !ownsReads(owner, bindings) || hasInlineMemoDirectEval(initial)) continue;
 		const callback = isFunction(initial);
 		if (
-			(!callback && (prohibited(initial) || executesHook(initial))) ||
+			(!callback && prohibited(initial)) ||
+			executesHook(initial) ||
 			(initial.type === 'ArrowFunctionExpression' && capturesLexicalReceiver(initial))
 		)
 			continue;
@@ -2264,6 +2370,7 @@ export function analyzeStrongMemoCandidates(ast, options = {}, existingAnalysis 
 		)
 			continue;
 		candidates.set(decl, callback ? 'useCallback' : 'useMemo');
+		candidateDependencies.set(decl, dependencies);
 	}
-	return { candidates, names, hookCalls, omittedDependencies };
+	return { candidates, names, hookCalls, omittedDependencies, candidateDependencies };
 }

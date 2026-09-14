@@ -8876,7 +8876,11 @@ function compileAuthored(source, filename, options, bundlerMetadata) {
 	const strongModeEnabled = strongAnalysis?.enabled === true;
 	if (bundlerMetadata !== null) bundlerMetadata.hydrateAst = analyzedAst;
 	const memoizedAst = strongModeEnabled
-		? applyStrongAutomaticMemo(analyzedAst, { ...options, filename: cleanFilename })
+		? applyStrongAutomaticMemo(analyzedAst, {
+				...options,
+				filename: cleanFilename,
+				strongHookAnalysis: strongAnalysis.strongHookAnalysis,
+			})
 		: analyzedAst;
 	const textTypedAst = applyStringChildProofs(
 		memoizedAst,
@@ -8899,7 +8903,15 @@ function compileAuthored(source, filename, options, bundlerMetadata) {
 	const result = compileInternal(
 		source,
 		filename,
-		options,
+		strongAnalysis?.nativeChangeAnalysis
+			? {
+					...options,
+					// Strong already analyzed the authored hosts. The classifications use
+					// source offsets, which the copy-on-write transforms preserve.
+					__nativeChangeAnalysis: strongAnalysis.nativeChangeAnalysis,
+					__nativeChangeDiagnostics: strongAnalysis.nativeChangeAnalysis.diagnostics,
+				}
+			: options,
 		constantAst,
 		mode,
 		bundlerMetadata,

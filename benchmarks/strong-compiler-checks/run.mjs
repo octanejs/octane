@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process';
+import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
@@ -7,6 +8,8 @@ import path from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
+import { build } from 'esbuild';
+import { Window } from 'happy-dom';
 import { summarizeSamples, timingStatForJson } from '../lib/stats.mjs';
 
 const { values: args, positionals } = parseArgs({
@@ -20,6 +23,7 @@ const { values: args, positionals } = parseArgs({
 		warmups: { type: 'string' },
 		counts: { type: 'string' },
 		scenario: { type: 'string' },
+		lane: { type: 'string' },
 		smoke: { type: 'boolean', default: false },
 		help: { type: 'boolean', default: false },
 	},
@@ -29,7 +33,8 @@ if (args.help) {
   --baseline <repository-or-snapshot> --output <results.json>
   [--baseline-revision <commit>] [--candidate <repository>]
   [--iterations <count>] [--warmups <count>] [--counts 100,1000]
-  [--scenario normal|ambient|alias-heavy] [--smoke]
+  [--scenario normal|ambient|alias-heavy|cached]
+  [--lane prod-client|dev-hmr|server|plain] [--smoke]
 
 BENCH_JSON supplies the output path when --output is omitted.
 Defaults: 3 warmups, 17 pairs at 100 components, 11 pairs at 1000.
@@ -59,8 +64,15 @@ const counts = args.counts
 const iterations = args.iterations ?? positionals[0];
 const sampleCount = iterations === undefined ? null : integer(iterations, 'iterations');
 const warmups = integer(args.warmups ?? (args.smoke ? 0 : 3), 'warmups', 0);
-const scenarios = ['normal', 'ambient', 'alias-heavy'];
+const scenarios = ['normal', 'ambient', 'alias-heavy', 'cached'];
 if (args.scenario && !scenarios.includes(args.scenario)) throw new Error('Unknown --scenario.');
+const lanes = {
+	'prod-client': { mode: 'client', hmr: false, dev: false },
+	'dev-hmr': { mode: 'client', hmr: true, dev: true },
+	server: { mode: 'server', hmr: false, dev: false },
+	plain: { mode: 'client', hmr: true, dev: true },
+};
+if (args.lane && !Object.hasOwn(lanes, args.lane)) throw new Error('Unknown --lane.');
 const hash = (value) => createHash('sha256').update(value).digest('hex');
 const compilerRelative = 'packages/octane/src/compiler/compile.js';
 
@@ -98,16 +110,22 @@ function sourceSnapshot(root) {
 function dependencies(root) {
 	const require = createRequire(path.join(root, compilerRelative));
 	return Object.fromEntries(
-		['@tsrx/core', 'oxc-tsrx/tsrx-core-compat', 'entities', 'esrap', 'esrap/languages/tsx'].map(
-			(name) => {
-				const file = fs.realpathSync(require.resolve(name));
-				return [name, { file, sha256: hash(fs.readFileSync(file)) }];
-			},
-		),
+		[
+			'@tsrx/core',
+			'oxc-tsrx/tsrx-core-compat',
+			'entities',
+			'esrap',
+			'esrap/languages/tsx',
+			'esbuild',
+			'happy-dom',
+		].map((name) => {
+			const file = fs.realpathSync(require.resolve(name));
+			return [name, { file, sha256: hash(fs.readFileSync(file)) }];
+		}),
 	);
 }
 
-function sourceFor(count, scenario) {
+function sourceFor(count, scenario, lane = 'prod-client') {
 	let head = "import { useState, useEffect } from 'octane';\nconst moduleConstant = 3;";
 	if (scenario === 'alias-heavy') {
 		head +=
@@ -119,6 +137,21 @@ function sourceFor(count, scenario) {
 		).join('\n');
 	}
 	const rows = Array.from({ length: count }, (_, index) => {
+		if (scenario === 'cached') {
+			const declarations = `const read = () => props.value + ${index};
+  const values = [props.value, ${index}];
+  const record = { value: props.value + ${index} };
+  useEffect(() => { props.onRead(read, values, record); });`;
+			return lane === 'plain'
+				? `export function useRow${index}(props) {
+  ${declarations}
+  return props.value + ${index};
+}`
+				: `export function Row${index}(props) @{
+  ${declarations}
+  <button>{(props.value + ${index}) as string}</button>
+}`;
+		}
 		if (scenario === 'normal')
 			return `export function Row${index}(props) @{
   const [selected, setSelected] = useState(false);
@@ -139,6 +172,211 @@ function sourceFor(count, scenario) {
 }`;
 	});
 	return `${head}\n${rows.join('\n')}`;
+}
+
+// Execute the same declaration shapes with two independent owners before any
+// timing. Bundling uses the selected revision's real runtime without rewriting
+// emitted modules. Browser layout and runtime duration are outside this audit.
+async function cachedSemantics(compilers, root, lane, strong, window) {
+	const options = { ...lanes[lane], strong };
+	const source = sourceFor(2, 'cached', lane);
+	const filename = `/src/Benchmark-cached-2.${lane === 'plain' ? 'ts' : 'tsrx'}`;
+	const output = (lane === 'plain' ? compilers.slots : compilers.compile)(
+		source,
+		filename,
+		options,
+	);
+	assert.ok(output?.code && !output.diagnostics?.length, 'Clean cached semantic output');
+	const isServer = lane === 'server';
+	const wrapper =
+		lane === 'plain'
+			? compilers.compile(
+					`import { useRow0, useRow1 } from 'benchmark:fixture';
+export function Row0(props) @{ const value = useRow0(props); <button>{value as string}</button> }
+export function Row1(props) @{ const value = useRow1(props); <button>{value as string}</button> }`,
+					'/src/Benchmark-wrapper.tsrx',
+					options,
+				).code
+			: output.code;
+	const entry = `export * from 'benchmark:wrapper';
+export { ${isServer ? 'renderToString' : 'createRoot, flushSync, drainPassiveEffects'} } from '${isServer ? 'octane/server' : 'octane'}';`;
+	const require = createRequire(path.join(root, compilerRelative));
+	const bundle = await build({
+		stdin: { contents: entry, sourcefile: 'benchmark-entry.js', resolveDir: root },
+		bundle: true,
+		write: false,
+		format: 'esm',
+		platform: 'node',
+		target: 'node22',
+		logLevel: 'silent',
+		define: { 'process.env.NODE_ENV': JSON.stringify(options.dev ? 'development' : 'production') },
+		plugins: [
+			{
+				name: 'strong-cache-semantic-control',
+				setup(builder) {
+					builder.onResolve({ filter: /^benchmark:/ }, ({ path }) => ({
+						path,
+						namespace: 'benchmark',
+					}));
+					builder.onLoad({ filter: /.*/, namespace: 'benchmark' }, ({ path }) => ({
+						contents: path === 'benchmark:fixture' ? output.code : wrapper,
+						loader: lane === 'plain' && path === 'benchmark:fixture' ? 'ts' : 'js',
+						resolveDir: root,
+					}));
+					builder.onResolve({ filter: /^octane(?:\/|$)/ }, ({ path }) => ({
+						path: require.resolve(path),
+					}));
+				},
+			},
+		],
+	});
+	const api = await import(
+		`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`
+	);
+	const observations = [];
+	const cacheIdentity = [];
+	for (const index of [0, 1]) {
+		const Component = api[`Row${index}`];
+		if (isServer) {
+			let notifications = 0;
+			for (const value of [2, 5, 5, 0]) {
+				const html = api.renderToString(Component, {
+					value,
+					onRead() {
+						notifications++;
+					},
+				}).html;
+				assert.ok(html.includes(`<button>${value + index}</button>`), html);
+				assert.equal(notifications, 0, 'Effects do not run during server rendering');
+				observations.push({ index, value, html });
+			}
+			continue;
+		}
+		const container = window.document.createElement('div');
+		window.document.body.append(container);
+		const rendered = api.createRoot(container);
+		let last;
+		let inputs;
+		try {
+			let previousInputs;
+			for (const [step, value] of [2, 5, 5, 0].entries()) {
+				// A fresh observer forces the effect to expose each allocation even
+				// when its value input is unchanged. This cannot pass merely because
+				// an effect skipped a render and retained an earlier observation.
+				let notified = false;
+				const onRead = (read, values, record) => {
+					notified = true;
+					inputs = [read, values, record];
+					last = [read(), [...values], record.value];
+				};
+				api.flushSync(() => rendered.render(Component, { value, onRead }));
+				api.drainPassiveEffects();
+				assert.ok(notified, "Fresh observer receives this render's values");
+				assert.equal(container.textContent, String(value + index));
+				assert.deepEqual(last, [value + index, [value, index], value + index]);
+				observations.push({ index, value, text: container.textContent, observed: last });
+				if (previousInputs)
+					cacheIdentity.push({
+						index,
+						value,
+						inputChanged: step !== 2,
+						same: inputs.map((input, inputIndex) => input === previousInputs[inputIndex]),
+					});
+				previousInputs = inputs;
+			}
+		} finally {
+			rendered.unmount();
+			container.remove();
+		}
+	}
+	return {
+		observations,
+		cacheIdentity,
+		emitted: { bytes: Buffer.byteLength(output.code), sha256: hash(output.code) },
+	};
+}
+
+async function validateCachedSemantics(compilers) {
+	const window = new Window({ url: 'https://benchmark.invalid/' });
+	// Passive effects are drained explicitly below. Use the DOM shim's timer
+	// fallback so independent runtime bundles do not retain Node message ports.
+	const globals = [
+		'window',
+		'document',
+		'navigator',
+		'Node',
+		'Element',
+		'HTMLElement',
+		'SVGElement',
+		'DocumentFragment',
+		'MutationObserver',
+		'Event',
+		'CustomEvent',
+		'MessageChannel',
+	];
+	const previous = new Map(
+		globals.map((name) => [name, Object.getOwnPropertyDescriptor(globalThis, name)]),
+	);
+	for (const name of globals)
+		Object.defineProperty(globalThis, name, {
+			configurable: true,
+			writable: true,
+			value: name === 'window' ? window : window[name],
+		});
+	const results = [];
+	try {
+		for (const lane of args.lane ? [args.lane] : Object.keys(lanes)) {
+			for (const strong of [true, false]) {
+				const baseline = await cachedSemantics(
+					compilers.baseline,
+					roots.baseline,
+					lane,
+					strong,
+					window,
+				);
+				const candidate = await cachedSemantics(
+					compilers.candidate,
+					roots.candidate,
+					lane,
+					strong,
+					window,
+				);
+				assert.deepEqual(
+					candidate.observations,
+					baseline.observations,
+					`${lane}/${strong}: runtime values differ`,
+				);
+				if (strong && lane !== 'server') {
+					for (const identity of candidate.cacheIdentity)
+						assert.deepEqual(
+							identity.same,
+							Array(3).fill(!identity.inputChanged),
+							`${lane}: callback, array, and object identities must stabilize only while their value input is unchanged`,
+						);
+				}
+				if (!strong)
+					assert.deepEqual(
+						candidate.cacheIdentity,
+						baseline.cacheIdentity,
+						`${lane}: compatibility allocation identity differs`,
+					);
+				results.push({
+					lane,
+					policy: strong ? 'Strong' : 'Compat',
+					sha256: hash(JSON.stringify(candidate.observations)),
+					baseline,
+					candidate,
+				});
+			}
+		}
+	} finally {
+		for (const [name, descriptor] of previous) {
+			if (descriptor) Object.defineProperty(globalThis, name, descriptor);
+			else delete globalThis[name];
+		}
+		await window.happyDOM.close();
+	}
+	return results;
 }
 
 const report = {
@@ -164,8 +402,8 @@ const report = {
 		iterations: sampleCount,
 		defaultIterations: { small: 17, large: 11 },
 		smoke: args.smoke,
-		timedMode: 'client',
-		compilerOptions: { hmr: false, dev: false },
+		lanes,
+		selectedLane: args.lane ?? null,
 	},
 	sources: {},
 	results: [],
@@ -202,87 +440,122 @@ try {
 	}
 	const compilers = {};
 	for (const [name, root] of Object.entries(roots)) {
-		compilers[name] = (await import(pathToFileURL(path.join(root, compilerRelative)).href)).compile;
+		compilers[name] = {
+			compile: (await import(pathToFileURL(path.join(root, compilerRelative)).href)).compile,
+			slots: (
+				await import(
+					pathToFileURL(path.join(root, 'packages/octane/src/compiler/slot-hooks.js')).href
+				)
+			).slotHooks,
+		};
 	}
 	writeReport();
+	if (report.config.scenarios.includes('cached')) {
+		report.cachedSemantics = await validateCachedSemantics(compilers);
+		writeReport();
+	}
 	for (const scenario of report.config.scenarios) {
-		for (const count of counts) {
-			const source = sourceFor(count, scenario);
-			const filename = `/src/Benchmark-${scenario}-${count}.tsrx`;
-			for (const strong of [true, false]) {
-				const options = { ...report.config.compilerOptions, mode: 'client', strong };
-				const samples = { baseline: [], candidate: [] };
-				let expectedCode;
-				function measure(name) {
-					const started = performance.now();
-					const result = compilers[name](source, filename, options);
-					const elapsed = performance.now() - started;
-					const code = result.code;
-					if (!code || result.diagnostics?.length)
-						throw new Error(
-							`${scenario}/${count}/${strong}: ${name} did not produce clean executable output.`,
+		const scenarioLanes = scenario === 'cached' ? Object.keys(lanes) : ['prod-client'];
+		for (const lane of scenarioLanes) {
+			if (args.lane && args.lane !== lane) continue;
+			for (const count of counts) {
+				const source = sourceFor(count, scenario, lane);
+				const filename = `/src/Benchmark-${scenario}-${count}.${lane === 'plain' ? 'ts' : 'tsrx'}`;
+				for (const strong of [true, false]) {
+					const options = { ...lanes[lane], strong };
+					const samples = { baseline: [], candidate: [] };
+					const outputs = {};
+					const method = lane === 'plain' ? 'slots' : 'compile';
+					function measure(name) {
+						const started = performance.now();
+						const result = compilers[name][method](source, filename, options);
+						const elapsed = performance.now() - started;
+						const code = result?.code;
+						if (!code || result.diagnostics?.length)
+							throw new Error(
+								`${scenario}/${lane}/${count}/${strong}: ${name} did not produce clean output.`,
+							);
+						outputs[name] ??= code;
+						if (code !== outputs[name])
+							throw new Error(
+								`${scenario}/${lane}/${count}/${strong}: unstable emitted output for ${name}.`,
+							);
+						if (scenario !== 'cached' && outputs.baseline && outputs.candidate)
+							assert.equal(
+								outputs.candidate,
+								outputs.baseline,
+								`${scenario}/${count}/${strong}: unchanged-output control differs`,
+							);
+						return elapsed;
+					}
+					for (let index = 0; index < warmups; index++) {
+						for (const name of index % 2 ? ['candidate', 'baseline'] : ['baseline', 'candidate'])
+							measure(name);
+					}
+					const iterations = sampleCount ?? (args.smoke ? 1 : count >= 1000 ? 11 : 17);
+					for (let index = 0; index < iterations; index++) {
+						for (const name of index % 2 ? ['candidate', 'baseline'] : ['baseline', 'candidate'])
+							samples[name].push(measure(name));
+					}
+					let serverControl;
+					if (scenario !== 'cached') {
+						const serverOptions = { ...options, mode: 'server' };
+						const baseline = compilers.baseline.compile(source, filename, serverOptions);
+						const candidate = compilers.candidate.compile(source, filename, serverOptions);
+						assert.ok(
+							baseline.code && !baseline.diagnostics?.length && !candidate.diagnostics?.length,
+							'Clean server control',
 						);
-					expectedCode ??= code;
-					if (code !== expectedCode)
-						throw new Error(
-							`${scenario}/${count}/${strong}: client output parity failed for ${name}.`,
+						assert.equal(
+							candidate.code,
+							baseline.code,
+							`${scenario}/${count}/${strong}: server control differs`,
 						);
-					return elapsed;
+						serverControl = {
+							bytes: Buffer.byteLength(baseline.code),
+							sha256: hash(baseline.code),
+						};
+					}
+					const row = {
+						count,
+						scenario,
+						lane,
+						policy: strong ? 'Strong' : 'Compat',
+						control: scenario === 'cached' ? 'executed-cache-workload' : 'unchanged-output',
+						sourceBytes: Buffer.byteLength(source),
+						sourceSha256: hash(source),
+						emitted: Object.fromEntries(
+							Object.entries(outputs).map(([name, code]) => [
+								name,
+								{ bytes: Buffer.byteLength(code), sha256: hash(code) },
+							]),
+						),
+						outputEqual: outputs.baseline === outputs.candidate,
+						serverControl,
+						baselineMs: stats(samples.baseline),
+						candidateMs: stats(samples.candidate),
+						pairedRatio: stats(
+							samples.candidate.map((elapsed, index) => elapsed / samples.baseline[index]),
+						),
+						raw: { baselineMs: samples.baseline, candidateMs: samples.candidate },
+					};
+					report.results.push(row);
+					for (const name of ['baseline', 'candidate'])
+						report.targets.push({
+							name: `${name}-${row.policy.toLowerCase()}-${scenario}-${lane}-${count}`,
+							ops: { compile: row[`${name}Ms`] },
+							meta: {
+								sourceSha256: row.sourceSha256,
+								emitted: row.emitted[name],
+								serverControl,
+								pairedRatio: row.pairedRatio,
+							},
+						});
+					console.log(
+						`${row.policy} ${scenario} ${lane} ${count}: ${row.baselineMs.median.toFixed(2)} → ${row.candidateMs.median.toFixed(2)} ms; paired ratio ${row.pairedRatio.median.toFixed(3)} (min ${row.pairedRatio.min.toFixed(3)}, p95 ${row.pairedRatio.p95.toFixed(3)})`,
+					);
+					writeReport();
 				}
-				for (let index = 0; index < warmups; index++) {
-					for (const name of index % 2 ? ['candidate', 'baseline'] : ['baseline', 'candidate'])
-						measure(name);
-				}
-				const iterations = sampleCount ?? (args.smoke ? 1 : count >= 1000 ? 11 : 17);
-				for (let index = 0; index < iterations; index++) {
-					for (const name of index % 2 ? ['candidate', 'baseline'] : ['baseline', 'candidate'])
-						samples[name].push(measure(name));
-				}
-				const serverOptions = { ...options, mode: 'server' };
-				const serverBaseline = compilers.baseline(source, filename, serverOptions);
-				const serverCandidate = compilers.candidate(source, filename, serverOptions);
-				if (
-					!serverBaseline.code ||
-					serverBaseline.code !== serverCandidate.code ||
-					serverBaseline.diagnostics?.length ||
-					serverCandidate.diagnostics?.length
-				) {
-					throw new Error(`${scenario}/${count}/${strong}: server output parity failed.`);
-				}
-				const row = {
-					count,
-					scenario,
-					policy: strong ? 'Strong' : 'Compat',
-					sourceBytes: Buffer.byteLength(source),
-					sourceSha256: hash(source),
-					client: { bytes: Buffer.byteLength(expectedCode), sha256: hash(expectedCode) },
-					server: {
-						bytes: Buffer.byteLength(serverBaseline.code),
-						sha256: hash(serverBaseline.code),
-					},
-					baselineMs: stats(samples.baseline),
-					candidateMs: stats(samples.candidate),
-					pairedRatio: stats(
-						samples.candidate.map((elapsed, index) => elapsed / samples.baseline[index]),
-					),
-					raw: { baselineMs: samples.baseline, candidateMs: samples.candidate },
-				};
-				report.results.push(row);
-				for (const name of ['baseline', 'candidate'])
-					report.targets.push({
-						name: `${name}-${row.policy.toLowerCase()}-${scenario}-${count}`,
-						ops: { compile: row[`${name}Ms`] },
-						meta: {
-							sourceSha256: row.sourceSha256,
-							client: row.client,
-							server: row.server,
-							pairedRatio: row.pairedRatio,
-						},
-					});
-				console.log(
-					`${row.policy} ${scenario} ${count}: ${row.baselineMs.median.toFixed(2)} → ${row.candidateMs.median.toFixed(2)} ms; paired ratio ${row.pairedRatio.median.toFixed(3)} (min ${row.pairedRatio.min.toFixed(3)}, p95 ${row.pairedRatio.p95.toFixed(3)})`,
-				);
-				writeReport();
 			}
 		}
 	}

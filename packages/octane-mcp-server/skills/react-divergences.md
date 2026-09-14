@@ -39,8 +39,10 @@ dependency arguments, and replace `useMemo` / `useCallback` with normal const
 calculations / callbacks. Equivalent explicit arrays are hints; conflicting
 arrays and `null` are errors. Avoid fetch-to-state effects without cleanup and
 chains of effects linked by state. Use `useLinkedState` for prop-driven state;
-use a lazy `useState` initializer for deliberate initial capture. Render lists
-with keyed `@for` and stable item IDs, never position keys. DOM suppression props
+use a lazy `useState` initializer or an explicit third `useReducer` initializer
+for deliberate initial capture. In `.tsrx`, render lists
+with keyed `@for` and stable item IDs, never position keys. Strong `.tsx` keeps
+standard keyed JSX mapping. DOM suppression props
 and Octane compatibility imports (`flushSync`, `unstable_batchedUpdates`,
 `StrictMode`) are errors. Native text `onChange` warnings become errors.
 Strong DOM JSX requires `dangerouslySetInnerHTML={trustHTML(trustedString)}`;

@@ -10,8 +10,8 @@ support explicit dependencies, manual memo hooks, and ordinary raw HTML props.
 | Diagnostic | What it detects | Replacement |
 | --- | --- | --- |
 | `OCTANE_STRONG_EFFECT_DATA_FETCH` | An effect starts a known fetch and invokes a known state updater in its asynchronous continuation, without returning cleanup. | Read asynchronous render data with `use()`, or implement a cancellable external synchronization with cleanup. |
-| `OCTANE_STRONG_EFFECT_CHAIN` | An effect reads state written by another effect in the same component. | Derive the value during render, use `useLinkedState`, or combine the external synchronization. |
-| `OCTANE_STRONG_UNLINKED_PROP_STATE` | An eager `useState` initializer is derived from component props. | Use `useLinkedState(source, reconcile)` for state that follows a source, or `useState(() => initialValue)` for a deliberate initial capture. |
+| `OCTANE_STRONG_EFFECT_CHAIN` | An effect reads state written by another effect's own execution or promise continuation in the same component. | Derive the value during render, use `useLinkedState`, or combine the external synchronization. External subscription and timer callbacks remain event-driven updates. |
+| `OCTANE_STRONG_UNLINKED_PROP_STATE` | An eager `useState` initializer or two-argument `useReducer` initial state is derived from component props. | Use `useLinkedState(source, reconcile)` for state that follows a source. Use `useState(() => initialValue)` or an explicit third `useReducer` initializer for a deliberate initial capture. |
 | `OCTANE_STRONG_EXPLICIT_DEPENDENCIES` | An explicit dependency argument differs from the compiler's inferred inputs, or cannot be proven equivalent. | Omit the dependency argument. An equivalent array produces a **hint**, not an error; its authored behavior is preserved. |
 | `OCTANE_STRONG_UNTRACKED_EFFECT` | A built-in dependency hook receives `null` dependencies. | Omit the argument so the compiler tracks reactive inputs. |
 | `OCTANE_STRONG_MANUAL_MEMO` | A call to Octane's `useMemo` or `useCallback`, including known import aliases. | Write a normal calculation or callback declaration and let Strong compilation cache eligible declarations. |
@@ -24,18 +24,27 @@ argument counts as omission in Strong mode and receives inferred tracking.
 `octane analyze` reports equivalent-list
 hints without failing `--strict`.
 
-Strong compilation also caches eligible `const` objects, arrays, callbacks, and
-calculation results when they are consumed only by effects or custom hooks. This
-preserves their identity until inferred inputs change in development and
-production. Unused declarations do not receive extra caches. Mutable local data,
-late-bound captures, and setup hook calls retain their required evaluation and
-lifetimes; ordinary JavaScript loops do not acquire generated hook slots.
+Strong compilation caches eligible `const` object and array allocations and
+callbacks inside module-level synchronous functions. Every use must belong to
+an authored effect or another supported dependency hook. Their identities remain
+stable until inferred inputs change, in development and production. This pass
+does not cache arbitrary calculations, calls, constructors, tagged templates,
+spreads, values passed to unknown helpers, or values used only by JSX.
 
-When reflective `eval` or unsupported plain-module syntax prevents the compiler
-from preserving a required cache, it reports
-`OCTANE_STRONG_AUTOMATIC_MEMO_UNSUPPORTED`. Move that reflective code into a
-compatibility module or use supported authoring syntax. Compilation must not
-silently drop the cache after rejecting manual memoization.
+The full compiler also follows stable local custom hooks when it can prove that
+an input is used only by an effect and the call has an existing hook slot.
+Opaque imported custom hooks do not provide that proof. In plain JavaScript or
+TypeScript modules, a custom hook's own effect inputs can qualify; arguments to
+local custom-hook calls are not covered by this new cache.
+
+Mutable values, late captures, unused declarations, and locals inside event
+handlers, render props, nested callbacks, or iteration bodies keep their authored
+evaluation and lifetime. Direct `eval` in the same function prevents this new
+caching. Unrelated `eval`, overloads, abstract classes, and hashbangs remain valid
+in plain modules, whose source is edited only at the relevant hook ranges.
+The `manualSlots` integration option cannot allocate these additional caches;
+an eligible declaration in such a module reports
+`OCTANE_STRONG_AUTOMATIC_MEMO_UNSUPPORTED`.
 
 These are bounded source checks. They follow supported local aliases and known
 callbacks; they do not prove arbitrary imported functions, mutable containers,
@@ -59,8 +68,8 @@ export function Editor({ user }) {
 
 | Diagnostic | What it detects | Replacement |
 | --- | --- | --- |
-| `OCTANE_STRONG_MAP_JSX` | A `.map()` callback returns JSX, including known local callback aliases. | Use `@for` with a stable item key. Data-only mapping remains valid. |
-| `OCTANE_STRONG_INDEX_KEY` | An `@for` key reads a loop index, including an expression combining the index with other values. | Use an item ID that survives insertion, removal, and reordering. |
+| `OCTANE_STRONG_MAP_JSX` | In `.tsrx`, a `.map()` callback returns JSX, including known local callback aliases. | Use `@for` with a stable item key. Data-only mapping and keyed JSX mapping in `.tsx` remain valid. |
+| `OCTANE_STRONG_INDEX_KEY` | An `@for` key uses the loop position as its identity, including arithmetic or text derived from the index. | Use an item ID that survives insertion, removal, and reordering. Looking up an item ID, such as `items[index].id`, remains valid. |
 | `OCTANE_STRONG_SUPPRESSION_PROP` | A DOM intrinsic uses `suppressHydrationWarning` or `suppressNativeChangeWarning`, including statically visible object spreads. | Fix the mismatch or use the intended native event. Component props with these names are unaffected. |
 | `OCTANE_NATIVE_TEXT_ONCHANGE` | The existing native text `onChange` warning, promoted to an error. | Use `onInput` for per-edit changes. Native checkbox, radio, and select `onChange` semantics stay valid. |
 | `OCTANE_STRONG_COMPAT_IMPORT` | Imports or known namespace accesses for `flushSync`, `unstable_batchedUpdates`, or `StrictMode` from `octane`. | Use normal Octane scheduling and component semantics. |
@@ -74,6 +83,9 @@ export function Rows({ items }) @{
   </ul>
 }
 ```
+
+The `@for` directive is `.tsrx` syntax. Strong `.tsx` modules keep standard JSX
+lists such as `items.map(item => <Row key={item.id} item={item} />)`.
 
 The event check retains the existing DOM ownership and input-type analysis.
 Dynamic spreads and dynamic input types may need the existing development

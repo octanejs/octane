@@ -104,7 +104,7 @@ export function Hint({ value }) @{
 		});
 
 		const report = result.json();
-		expect(report.summary).toEqual({ errors: 1, warnings: 0 });
+		expect(report.summary).toEqual({ errors: 1, warnings: 0, hints: 0 });
 		expect(report.analyzed).toBe(2);
 		expect(report.findings[0].code).toBe('OCTANE_PARSE_ERROR');
 		expect(result.exitCode).toBe(3);
@@ -149,7 +149,11 @@ export function Hint({ value }) @{
 			'src/Fine.tsrx': "export function Fine() @{ <div>{'ok' as string}</div> }\n",
 		});
 
-		expect(result.json()).toMatchObject({ ok: true, findings: [] });
+		expect(result.json()).toMatchObject({
+			ok: true,
+			summary: { errors: 0, warnings: 0, hints: 0 },
+			findings: [],
+		});
 		expect(result.exitCode).toBe(0);
 	});
 

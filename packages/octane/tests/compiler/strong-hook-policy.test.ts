@@ -206,33 +206,44 @@ export function App(props) @{
 			).toThrow(EXPLICIT);
 		},
 	);
-	it('reports lexical eval when declaration caching would observe the wrong captures', () => {
+	it('keeps reflective callbacks live without requiring automatic caching', () => {
 		const source = app(
 			"const read = () => eval('props.value'); useEffect(() => console.log(read()));",
 		);
-		expect(() => compile(source, '/src/Reflective.tsrx')).not.toThrow();
-		expect(() => compile(strong(source), '/src/Reflective.tsrx')).toThrow(
+		expect(() => compile(strong(source), '/src/Reflective.tsrx')).not.toThrow();
+		expect(compileToVolarMappings(strong(source), '/src/Reflective.tsrx').diagnostics).toEqual([]);
+	});
+
+	it('retains hashbang syntax when a plain module needs a cache', () => {
+		const source = `#!/usr/bin/env node
+"use strong"; import { useEffect } from 'octane'; export function useOptions(value: string) { const options = { value }; useEffect(() => console.log(options)); }`;
+		const result = slotHooks(source, '/src/useOptions.ts');
+		expect(result?.code.startsWith('#!/usr/bin/env node')).toBe(true);
+	});
+	it('rejects manually managed slots only when a declaration needs a generated cache', () => {
+		const source = `"use strong"; import { useEffect } from 'octane'; export function useOptions(value: string) { const options = { value }; useEffect(() => console.log(options)); }`;
+		expect(() => slotHooks(source, '/src/useOptions.ts', { manualSlots: true })).toThrow(
 			'OCTANE_STRONG_AUTOMATIC_MEMO_UNSUPPORTED',
-		);
-		expect(compileToVolarMappings(strong(source), '/src/Reflective.tsrx').diagnostics).toEqual(
-			expect.arrayContaining([
-				expect.objectContaining({ code: 'OCTANE_STRONG_AUTOMATIC_MEMO_UNSUPPORTED' }),
-			]),
 		);
 	});
 
 	it.each([
-		['a hashbang', '#!/usr/bin/env node\n', {}],
-		['manual slots', '', { manualSlots: true }],
-	])(
-		'reports unsupported automatic caching for %s rather than silently losing identity',
-		(_shape, prefix, options) => {
-			const source = `${prefix}"use strong"; import { useEffect } from 'octane'; export function useOptions(value: string) { const options = { value }; useEffect(() => console.log(options)); return options; }`;
-			expect(() => slotHooks(source, '/src/useOptions.ts', options)).toThrow(
-				'OCTANE_STRONG_AUTOMATIC_MEMO_UNSUPPORTED',
-			);
-		},
-	);
+		['', 'useMemo(() => props.value)', MANUAL_MEMO],
+		['', 'useEffect(() => console.log(props.value), [])', EXPLICIT],
+		["import { useMemo } from 'octane/server';", 'useMemo(() => props.value)', MANUAL_MEMO],
+		[
+			"import * as Octane from 'octane/server'; const {useEffect: effect}=Octane;",
+			'effect(() => console.log(props.value), [])',
+			EXPLICIT,
+		],
+	])('matches compiler hook identity for server and unbound calls %s %s', (imports, call, code) => {
+		const source = strong(`${imports} export function App(props) @{ ${call}; <div/> }`);
+		expect(() => compile(source, '/src/HookIdentity.tsrx')).toThrow(code);
+		expect(compileToVolarMappings(source, '/src/HookIdentity.tsrx').diagnostics).toEqual(
+			expect.arrayContaining([expect.objectContaining({ code })]),
+		);
+	});
+
 	it.each([
 		["import { useMemo } from 'octane';", 'useMemo?.(() => props.value)', MANUAL_MEMO],
 		[

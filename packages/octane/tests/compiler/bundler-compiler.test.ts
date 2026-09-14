@@ -1616,6 +1616,7 @@ describe('requireDirective ownership gate', () => {
 				diagnostics: [expect.objectContaining({ severity: 'hint' })],
 			});
 			expect(warnings.filter((message) => message.includes('/src/useLog.ts'))).toHaveLength(1);
+			expect(warnings.find((message) => message.includes('/src/useLog.ts'))).toContain('hint:');
 		},
 	);
 

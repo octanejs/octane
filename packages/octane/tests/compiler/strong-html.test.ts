@@ -25,6 +25,8 @@ describe('Strong trusted HTML', () => {
 		`<div dangerouslySetInnerHTML />`,
 		`<div dangerouslySetInnerHTML={props.show ? { __html: '<b>raw</b>' } : null} />`,
 		`<div {...{ dangerouslySetInnerHTML: { __html: '<b>raw</b>' } }} />`,
+		String.raw`<div {...{ 'dangerouslySetInnerHTM\L': { __html: 'raw' } }} />`,
+		String.raw`<div {...{ 'dangerouslySetInner\x48TML': { __html: 'raw' } }} />`,
 	])('rejects a visible untrusted final HTML value: %s', (element) => {
 		expect(() =>
 			compile(`export function App(props) { return ${element}; }`, 'app.tsx', { strong: true }),
@@ -77,6 +79,18 @@ describe('Strong trusted HTML', () => {
 		[
 			"import * as Octane from 'octane';",
 			"Octane['createElement']('div', { dangerouslySetInnerHTML: { __html: '<b>raw</b>' } })",
+		],
+		[
+			String.raw`import { create\u0045lement as h } from 'octane';`,
+			"h('div', { dangerouslySetInnerHTML: { __html: '<b>raw</b>' } })",
+		],
+		[
+			"import * as Octane from 'octane';",
+			String.raw`Octane['create\u0045lement']('div', { dangerouslySetInnerHTML: { __html: '<b>raw</b>' } })`,
+		],
+		[
+			"import * as Octane from 'octane';",
+			String.raw`Octane['creat\eElement']('div', { dangerouslySetInnerHTML: { __html: 'raw' } })`,
 		],
 	])('rejects raw HTML in an Octane element factory', (imports, expression) => {
 		expect(() =>

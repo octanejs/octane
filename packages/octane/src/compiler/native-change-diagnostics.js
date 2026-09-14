@@ -1,6 +1,6 @@
 import { builders as b } from '@tsrx/core';
 import { nsForChildren, nsForSelf } from './jsx-namespace.js';
-import { analyzeRendererBoundaries } from './renderer-boundaries.js';
+import { createRendererRegionResolver } from './renderer-boundaries.js';
 
 export const NATIVE_TEXT_ONCHANGE_DIAGNOSTIC = 'OCTANE_NATIVE_TEXT_ONCHANGE';
 
@@ -388,41 +388,15 @@ function classifyHost(
 export function analyzeNativeChangeDiagnostics(ast, source, filename, options = {}) {
 	// The parser permits trivia after `<` and Unicode escapes in JSX names. A
 	// decoded lowercase input/textarea must still leave either its literal name
-	// or a backslash in the paired authored source. False positives only retain
+	// or a Unicode escape in the paired authored source. False positives only retain
 	// the existing analysis for unrelated identifiers, comments, and strings.
-	if (!source.includes('input') && !source.includes('textarea') && !source.includes('\\')) {
+	if (!source.includes('input') && !source.includes('textarea') && !source.includes('\\u')) {
 		return { diagnostics: [], classifications: new Map() };
 	}
 	const diagnostics = [];
 	const classifications = new Map();
-	const ownerRendererId = options.renderer?.id ?? (options.dom === false ? null : 'dom');
-	let rendererRegions = [];
-	if (options.rendererBoundaries && Object.keys(options.rendererBoundaries).length > 0) {
-		rendererRegions = analyzeRendererBoundaries(source, {
-			filename,
-			rendererBoundaries: options.rendererBoundaries,
-		})
-			.boundaries.map((boundary) => ({
-				childRenderer: boundary.childRenderer,
-				range: boundary.region?.range ?? boundary.region?.valueRange,
-			}))
-			.filter((region) => region.range !== null);
-	}
-	const rendererIsDomAt = (node) => {
-		let rendererId = ownerRendererId;
-		let narrowest = Number.POSITIVE_INFINITY;
-		for (const region of rendererRegions) {
-			const [start, end] = region.range;
-			if (start > node.start || node.end > end) continue;
-			const width = end - start;
-			if (width < narrowest) {
-				rendererId = region.childRenderer;
-				narrowest = width;
-			}
-		}
-		if (rendererId === 'dom') return true;
-		return options.rendererRegistry?.[rendererId]?.target === 'dom';
-	};
+	const rendererIsDomAt =
+		options.rendererRegionResolver ?? createRendererRegionResolver(ast, source, filename, options);
 
 	const programScope = createScope(null, ast?.body ?? []);
 	const seen = new WeakSet();
@@ -528,5 +502,5 @@ export function analyzeNativeChangeDiagnostics(ast, source, filename, options = 
 }
 
 export function formatCompileDiagnostic(diagnostic) {
-	return `${diagnostic.filename}:${diagnostic.start.line}:${diagnostic.start.column + 1} ${diagnostic.message}`;
+	return `${diagnostic.filename}:${diagnostic.start.line}:${diagnostic.start.column + 1} ${diagnostic.severity}: ${diagnostic.message}`;
 }

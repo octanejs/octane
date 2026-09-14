@@ -100,43 +100,13 @@ function pure(node) {
 
 function allocateHookSlot(state, origin) {
 	const index = state.slotDeclarations.length;
+	if (state.slotBase === null) state.slotBase = allocName(state, '_hs$');
 	const name = allocName(state, `_h$${index}`);
-	let symbol;
-	if (state.hmr) {
-		symbol = b.call(
-			b.member(b.id('Symbol'), 'for'),
-			b.literal(`octane:${state.id}:strong#${index}`),
-		);
-	} else if (state.profile) {
-		symbol = pure(b.call('Symbol', b.literal(`${state.id}#${index}`)));
-	} else {
-		if (state.slotBase === null) state.slotBase = allocName(state, '_hs$');
-		const offset =
-			index === 0 ? b.id(state.slotBase) : b.binary('+', b.id(state.slotBase), b.literal(index));
-		symbol = pure(b.call('Symbol', offset));
-	}
-	if (state.profile) {
-		const owner = state.owners.get(origin) ?? { name: 'module', line: 0, column: 0 };
-		const componentId = `${state.profileFilename}#${owner.name}@${owner.line}:${owner.column}`;
-		const metadata = {
-			id: `${componentId}#hook:${index}`,
-			componentId,
-			name: origin.callee?.name ?? origin._octaneImportedHook ?? 'use() memo',
-			kind: origin._octaneImportedHook ?? 'useMemo',
-			file: state.profileFilename,
-			line: origin.loc?.start?.line ?? 0,
-			column: origin.loc?.start?.column ?? 0,
-			index,
-		};
-		symbol = b.call(
-			requireHelper(state, '__profileHook', 'octane/profiling'),
-			symbol,
-			b.object(
-				Object.entries(metadata).map(([key, value]) => b.prop('init', b.id(key), b.literal(value))),
-			),
-		);
-	}
-	state.slotDeclarations.push(inheritHookMemoOrigin(b.const(name, symbol), origin));
+	const offset =
+		index === 0 ? b.id(state.slotBase) : b.binary('+', b.id(state.slotBase), b.literal(index));
+	state.slotDeclarations.push(
+		inheritHookMemoOrigin(b.const(name, pure(b.call('Symbol', offset))), origin),
+	);
 	return b.id(name, origin);
 }
 
@@ -233,11 +203,7 @@ function slotBaseHooks(ast, state, options) {
 		const mapped = mapChildren(node, visit);
 		const args = mapped.arguments.slice();
 		if (inferred !== undefined) {
-			args.splice(
-				inferred.depsIndex,
-				inferred.replaceDependency ? 1 : 0,
-				inferredDependencyArray(inferred, state, node),
-			);
+			args.splice(inferred.depsIndex, 0, inferredDependencyArray(inferred, state, node));
 		}
 		let callee = mapped.callee;
 		if (options.getterCalls.has(node) && options.stateGetterHelpers[imported]) {
@@ -301,15 +267,10 @@ function collectComments(ast) {
 	return [...comments.values()].sort((left, right) => left.start - right.start);
 }
 
-function canPrintProgram(ast, visitors, strong = false) {
+function canPrintProgram(ast, visitors) {
 	let supported = true;
 	walkNodes(ast, (node) => {
-		if (
-			typeof node.type === 'string' &&
-			typeof visitors[node.type] !== 'function' &&
-			// esrap's ImportDeclaration visitor prints these structural specifiers.
-			!(strong && ['ImportNamespaceSpecifier', 'ImportDefaultSpecifier'].includes(node.type))
-		) {
+		if (typeof node.type === 'string' && typeof visitors[node.type] !== 'function') {
 			supported = false;
 			return false;
 		}
@@ -336,76 +297,24 @@ export function inlinePlainHookMemos(ast, source, id, options) {
 	});
 	// The existing parallel-use pass has its own grouping and warm behavior.
 	// Keep those modules entirely on that path until both transforms share AST.
-	if (!options.strongAutomaticMemo && (!hasMemo || hasUse)) return null;
+	if (!hasMemo || hasUse) return null;
 	const visitors = esrapTsx({
 		comments: collectComments(ast),
 		getLeadingComments: (node) => (node.__octanePure ? PURE_COMMENTS : undefined),
 	});
-	if (!canPrintProgram(ast, visitors, options.strongAutomaticMemo)) return null;
+	if (!canPrintProgram(ast, visitors)) return null;
 	const state = {
 		usedNames: collectUsedNames(ast),
 		helpers: new Map(),
 		slotBase: null,
 		slotDeclarations: [],
-		hmr: options.hmr === true,
-		profile: options.profile === true,
-		id,
-		profileFilename: options.profileFilename ?? id,
-		owners: new WeakMap(),
 	};
-	function rememberOwners(node, owner = { name: 'module', line: 0, column: 0 }) {
-		if (!node || typeof node !== 'object') return;
-		if (Array.isArray(node)) {
-			for (const child of node) rememberOwners(child, owner);
-			return;
-		}
-		if (
-			(node.type === 'FunctionDeclaration' && node.id) ||
-			(node.type === 'VariableDeclarator' &&
-				['ArrowFunctionExpression', 'FunctionExpression'].includes(node.init?.type))
-		) {
-			owner = {
-				name: node.id?.name ?? owner.name,
-				line: node.loc?.start?.line ?? 0,
-				column: node.loc?.start?.column ?? 0,
-			};
-		}
-		state.owners.set(node, owner);
-		for (const key in node)
-			if (!META_KEYS.has(key) && !key.startsWith('_octane')) rememberOwners(node[key], owner);
-	}
-	if (state.profile) rememberOwners(ast);
-	if (options.prepareParallelUse) {
-		const prepared = options.prepareParallelUse(ast, source, {
-			inferred: options.inferred,
-			nativeReads: options.nativeReads,
-			environment: options.environment,
-			allocateName: (name) => allocName(state, name),
-			allocateSlot: (origin) => allocateHookSlot(state, origin),
-			requireHelper: (imported) =>
-				requireHelper(
-					state,
-					imported,
-					imported === 'nativePuMemo'
-						? options.environment === 'server'
-							? 'octane/internal/server'
-							: 'octane/internal/client'
-						: options.environment === 'server'
-							? 'octane/server'
-							: 'octane',
-				),
-		});
-		ast = prepared.ast;
-		options = { ...options, inferred: prepared.inferred, getterCalls: prepared.getterCalls };
-	}
 	let transformed = slotBaseHooks(ast, state, options);
-	const lowered = options.strongAutomaticMemo
-		? { ast: transformed, lowered: 1 }
-		: lowerSlotMemoFunctions(transformed, {
-				allocateName: (preferred) => allocName(state, preferred),
-				requireRuntime: (imported) => requireHelper(state, imported),
-				allowMissingSlot: options.manualSlots === true,
-			});
+	const lowered = lowerSlotMemoFunctions(transformed, {
+		allocateName: (preferred) => allocName(state, preferred),
+		requireRuntime: (imported) => requireHelper(state, imported),
+		allowMissingSlot: options.manualSlots === true,
+	});
 	if (lowered.lowered === 0) return null;
 	transformed = lowered.ast;
 	if (options.manualSlots) {
@@ -423,16 +332,16 @@ export function inlinePlainHookMemos(ast, source, id, options) {
 			)
 		: null;
 	const trailing = [];
-	if (state.slotBase !== null) {
+	if (state.slotDeclarations.length > 0) {
 		const hookSlots = requireHelper(state, 'hookSlots', 'octane');
 		trailing.push(
 			inheritHookMemoOrigin(
 				b.const(state.slotBase, pure(b.call(hookSlots, b.literal(state.slotDeclarations.length)))),
 				origin,
 			),
+			...state.slotDeclarations,
 		);
 	}
-	trailing.push(...state.slotDeclarations);
 	const byRequest = new Map();
 	for (const helper of state.helpers.values()) {
 		let specifiers = byRequest.get(helper.request);

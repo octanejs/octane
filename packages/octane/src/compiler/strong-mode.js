@@ -1,4 +1,9 @@
-import { analyzeStrongHookPolicies, collectReassignedBindings } from './hook-deps.js';
+import {
+	analyzeStrongHookBindings,
+	analyzeStrongHookPolicies,
+	collectReassignedBindings,
+} from './hook-deps.js';
+import { createRendererRegionResolver } from './renderer-boundaries.js';
 import { analyzeStrongHTML } from './strong-html.js';
 import { analyzeNativeChangeDiagnostics } from './native-change-diagnostics.js';
 import { createStrongTemplatePolicy } from './strong-template-policy.js';
@@ -62,6 +67,7 @@ const TRUTHY_VALUE = 8;
 const UNKNOWN_VALUE = NULLISH_VALUE | FALSY_VALUE | TRUTHY_VALUE;
 const UNKNOWN_PRIMITIVE = Symbol('unknown primitive');
 const NO_RETURN_VALUE = Symbol('no return value');
+const NORMAL_COMPLETIONS = new Set(['normal']);
 const OTHER_BINDING = { kind: 'other' };
 const SNAPSHOT_BINDING = { kind: 'snapshot' };
 const STATE_GETTER_BINDING = { kind: 'getter' };
@@ -320,7 +326,9 @@ function predeclareStatements(statements, scope) {
 	for (const original of statements ?? []) {
 		const node = declarationOf(original);
 		if (node?.type === 'ImportDeclaration') {
-			const octane = node.source?.value === 'octane' && node.importKind !== 'type';
+			const octane =
+				(node.source?.value === 'octane' || node.source?.value === 'octane/server') &&
+				node.importKind !== 'type';
 			for (const specifier of node.specifiers ?? []) {
 				if (!specifier.local?.name || specifier.importKind === 'type') continue;
 				if (octane && specifier.type === 'ImportNamespaceSpecifier') {
@@ -357,6 +365,7 @@ function createScope(
 		kind,
 		bindings: new BindingMap(parent?.bindings.clock ?? { value: 0 }),
 		isReassigned,
+		hookNames: parent?.hookNames,
 	};
 	for (const param of params) addPatternNames(param, scope.bindings, { kind: 'other' });
 	predeclareStatements(statements, scope);
@@ -389,6 +398,7 @@ function resolveScope(scope, name) {
 }
 
 function importedHook(callee, scope) {
+	if (scope.hookNames !== undefined) return scope.hookNames.get(callee) ?? null;
 	const value = unwrap(callee);
 	if (value?.type === 'Identifier') {
 		const binding = resolve(scope, value.name);
@@ -472,7 +482,7 @@ function strongDirectives(ast) {
 // can be declared there; a value used by siblings belongs to their parent.
 // Keep this source-level check separate from the phase analysis above: it never
 // annotates the parser tree or changes the code emitted for a valid module.
-function strongLocalityDiagnostics(ast, source, filename, isReassigned) {
+function strongLocalityDiagnostics(ast, source, filename, isReassigned, hookNames) {
 	const diagnostics = [];
 	const values = [];
 	const effects = [];
@@ -482,6 +492,7 @@ function strongLocalityDiagnostics(ast, source, filename, isReassigned) {
 	const hostAttributes = new WeakSet();
 	const componentHandlers = new WeakSet();
 	const moduleScope = createScope(null, 'module', ast.body ?? []);
+	moduleScope.hookNames = hookNames;
 	const mayHaveHoistedVars = source.includes('var');
 	let activeHandler = null;
 	let activeDerivedValue = null;
@@ -1302,6 +1313,25 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 	}
 	const enabled = options.strong === true || directives.enabled;
 	if (!enabled) return { enabled: false, diagnostics };
+	const strongHookAnalysis = analyzeStrongHookBindings(ast, options);
+	const hookNames = new WeakMap();
+	for (const [call, name] of strongHookAnalysis.callNames) {
+		if (
+			LOCAL_VALUE_HOOKS.has(name) ||
+			EFFECT_HOOKS.has(name) ||
+			name === 'useImperativeHandle' ||
+			name === 'memo' ||
+			name === 'lazy'
+		)
+			hookNames.set(call.callee, name);
+	}
+	options = {
+		...options,
+		strongHookAnalysis,
+		rendererRegionResolver:
+			options.rendererRegionResolver ??
+			createRendererRegionResolver(ast, source, filename, options),
+	};
 
 	let reassignedBindings;
 	function isReassigned(identifier) {
@@ -1309,6 +1339,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		return reassignedBindings.has(identifier);
 	}
 	const moduleScope = createScope(null, 'module', ast.body ?? [], [], isReassigned);
+	moduleScope.hookNames = hookNames;
 	const mutableModuleDeclarations = new Map();
 	const reassignedModuleNames = new Map();
 	const moduleAmbientAliases = new Map();
@@ -1356,6 +1387,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 	let currentFunction = null;
 	let fetchContinuation = false;
 	let collectEffectReads = true;
+	let effectOwnsWrites = true;
 	const reportedDiagnostics = new WeakMap();
 	const hoistedVarNames = new WeakMap();
 	const mayHaveHoistedVars = source.includes('var');
@@ -2114,7 +2146,8 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				statement.type === 'ReturnStatement' ||
 				statement.type === 'ThrowStatement' ||
 				statement.type === 'BreakStatement' ||
-				statement.type === 'ContinueStatement'
+				statement.type === 'ContinueStatement' ||
+				(currentEffect !== null && branchAlwaysExits(statement))
 			) {
 				break;
 			}
@@ -2231,7 +2264,11 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		const enclosingOwner = renderOwner;
 		const enclosingFetchContinuation = fetchContinuation;
 		currentFunction = node;
-		if (phase === 'render' && renderOwner === null) renderOwner = node;
+		if (
+			(phase === 'render' && renderOwner === null) ||
+			(!activeCallbacks.has(node) && hasRenderOutput(node))
+		)
+			renderOwner = node;
 		if (args === null && phase === 'render' && hasRenderOutput(node) && !hookNamedRoots.has(node)) {
 			// Component arguments are immutable prop projections. Custom hook
 			// arguments remain unknown unless a caller supplies a proven value.
@@ -3095,7 +3132,14 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 
 	function argumentValues(args, scope) {
 		if (args?.some((argument) => argument.type === 'SpreadElement')) return null;
-		return (args ?? []).map((argument) => expressionBinding(argument, scope));
+		return (args ?? []).map((argument) => {
+			const value = expressionBinding(argument, scope);
+			// Prop-state intent belongs to the component's own initializer. A
+			// helper's parameter is supplied by callers, independently of spelling.
+			if (value?.kind === 'prop') return OTHER_BINDING;
+			if (value?.kind === 'derived-state' && value.prop) return { ...value, prop: false };
+			return value;
+		});
 	}
 
 	function mergePrimitive(left, right) {
@@ -3365,6 +3409,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 	function visitEffect(node, scope) {
 		const enclosingEffect = currentEffect;
 		const enclosingContinuation = fetchContinuation;
+		const enclosingOwnsWrites = effectOwnsWrites;
 		const callback = callableValue(node.arguments?.[0], scope);
 		const record = {
 			node,
@@ -3378,6 +3423,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		};
 		currentEffect = record;
 		fetchContinuation = false;
+		effectOwnsWrites = true;
 		effectRecords.push(record);
 		try {
 			visitExplicitStateDependencies(node.arguments?.[1], scope, record.reads);
@@ -3385,6 +3431,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		} finally {
 			currentEffect = enclosingEffect;
 			fetchContinuation = enclosingContinuation;
+			effectOwnsWrites = enclosingOwnsWrites;
 		}
 		if (record.fetchUpdater !== null && !record.cleanup) {
 			report(
@@ -3406,39 +3453,133 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		}
 	}
 
-	function branchAlwaysExits(statement) {
-		if (statement == null) return false;
-		const known = effectBranchExits.get(statement);
+	// Keep abrupt completions distinct until their owning statement consumes them.
+	// A break exits a switch/loop, while a return exits the surrounding callback.
+	function statementCompletions(statement, loopLabel = null) {
+		if (statement == null) return NORMAL_COMPLETIONS;
+		const known = loopLabel === null ? effectBranchExits.get(statement) : undefined;
 		if (known !== undefined) return known;
-		let exits = false;
+		let completions;
 		switch (statement.type) {
 			case 'ReturnStatement':
+				completions = new Set(['return']);
+				break;
 			case 'ThrowStatement':
+				completions = new Set(['throw']);
+				break;
 			case 'BreakStatement':
 			case 'ContinueStatement':
-				exits = true;
+				completions = new Set([
+					`${statement.type === 'BreakStatement' ? 'break' : 'continue'}:${statement.label?.name ?? ''}`,
+				]);
 				break;
 			case 'BlockStatement':
-				exits = statement.body.some(branchAlwaysExits);
+				completions = statementsCompletions(statement.body);
 				break;
 			case 'IfStatement':
-				exits = branchAlwaysExits(statement.consequent) && branchAlwaysExits(statement.alternate);
+				completions = new Set([
+					...statementCompletions(statement.consequent),
+					...statementCompletions(statement.alternate),
+				]);
 				break;
-			case 'TryStatement':
-				exits =
-					branchAlwaysExits(statement.finalizer) ||
-					(branchAlwaysExits(statement.block) &&
-						(statement.handler == null || branchAlwaysExits(statement.handler.body)));
+			case 'SwitchStatement': {
+				completions = new Set();
+				let suffix = new Set(['normal']);
+				let hasDefault = false;
+				for (let index = statement.cases.length - 1; index >= 0; index--) {
+					const branch = statement.cases[index];
+					hasDefault ||= branch.test === null;
+					const branchCompletions = statementsCompletions(branch.consequent);
+					if (branchCompletions.delete('normal'))
+						for (const completion of suffix) branchCompletions.add(completion);
+					suffix = branchCompletions;
+					for (const completion of suffix) completions.add(completion);
+				}
+				const breaks = completions.delete('break:');
+				if (!hasDefault || breaks) completions.add('normal');
 				break;
+			}
+			case 'ForStatement':
+			case 'ForInStatement':
+			case 'ForOfStatement':
+			case 'WhileStatement':
+			case 'DoWhileStatement': {
+				const test = unwrap(statement.test);
+				const indefinite =
+					(statement.type === 'ForStatement' && test == null) ||
+					(test?.type === 'Literal' && test.value === true);
+				const neverStarts =
+					statement.type !== 'DoWhileStatement' && test?.type === 'Literal' && test.value === false;
+				completions = neverStarts
+					? new Set(['normal'])
+					: new Set(statementCompletions(statement.body));
+				const repeats = completions.delete('normal');
+				let continues = completions.delete('continue:');
+				if (loopLabel !== null)
+					continues = completions.delete(`continue:${loopLabel}`) || continues;
+				const breaks = completions.delete('break:');
+				if (
+					breaks ||
+					(!indefinite && (statement.type !== 'DoWhileStatement' || repeats || continues))
+				)
+					completions.add('normal');
+				break;
+			}
+			case 'LabeledStatement':
+				completions = new Set(statementCompletions(statement.body, statement.label.name));
+				if (completions.delete(`break:${statement.label.name}`)) completions.add('normal');
+				break;
+			case 'TryStatement': {
+				completions = new Set(statementCompletions(statement.block));
+				if (statement.handler != null) {
+					completions.delete('throw');
+					for (const completion of statementCompletions(statement.handler.body))
+						completions.add(completion);
+				}
+				if (statement.finalizer != null) {
+					const finalizer = statementCompletions(statement.finalizer);
+					if (!finalizer.has('normal')) completions.clear();
+					for (const completion of finalizer)
+						if (completion !== 'normal') completions.add(completion);
+				}
+				break;
+			}
+			default:
+				return NORMAL_COMPLETIONS;
 		}
-		effectBranchExits.set(statement, exits);
-		return exits;
+		if (loopLabel === null) effectBranchExits.set(statement, completions);
+		return completions;
+	}
+
+	function statementsCompletions(statements) {
+		const completions = new Set(['normal']);
+		for (const statement of statements ?? []) {
+			if (!completions.delete('normal')) break;
+			for (const completion of statementCompletions(statement)) completions.add(completion);
+		}
+		return completions;
+	}
+
+	function branchAlwaysExits(statement) {
+		return !statementCompletions(statement).has('normal');
 	}
 
 	// A returned value counts as cleanup unless it is provably not callable: a
 	// fetch request or a known non-function value.
 	function markEffectCleanup(argument, scope) {
+		// Async callbacks return a Promise, even when their resolved value is a function.
+		if (currentFunctionIsAsync) return;
 		const value = unwrap(argument);
+		if (value?.type === 'CallExpression') {
+			const callback = callableValue(value.callee, scope);
+			const callbacks =
+				callback?.kind === 'callback-choice' && callback.complete ? callback.values : [callback];
+			if (
+				callbacks.length > 0 &&
+				callbacks.every((value) => value?.kind === 'callback' && value.node.async)
+			)
+				return;
+		}
 		if (
 			value != null &&
 			(callableValue(value, scope) !== null ||
@@ -3474,7 +3615,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				}
 			}
 		} else if (value?.kind === 'setter') {
-			if (currentEffect !== null && value.state) {
+			if (currentEffect !== null && effectOwnsWrites && value.state) {
 				currentEffect.writes.add(value.state);
 				if (fetchContinuation) currentEffect.fetchUpdater ??= origin;
 			}
@@ -4130,6 +4271,14 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					visitEffect(node, scope);
 					return;
 				}
+				if (
+					hook === 'useReducer' &&
+					executionPhase === 'render' &&
+					(node.arguments?.[2] == null ||
+						staticExpressionValue(node.arguments[2], scope) === UNDEFINED_VALUE) &&
+					propProjection(node.arguments?.[1], scope)
+				)
+					unlinkedPropInitializers.add(unwrap(node.arguments[1]));
 				if (hook === 'useState' || hook === 'useMemo') {
 					if (
 						hook === 'useState' &&
@@ -4188,22 +4337,23 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					}
 				}
 				if (currentEffect !== null && hook === null) {
-					if (executionPhase === 'effect' && fetchFunction(callee, scope))
-						currentEffect.started.add(node);
+					if (effectOwnsWrites && fetchFunction(callee, scope)) currentEffect.started.add(node);
 					const callback = callableValue(callee, scope);
 					if (callback === null) {
-						const request =
+						const promiseContinuation =
 							callee?.type === 'MemberExpression' &&
-							['then', 'catch', 'finally'].includes(ambientPropertyKey(callee, scope))
-								? fetchRequest(callee.object, scope)
-								: null;
+							['then', 'catch', 'finally'].includes(ambientPropertyKey(callee, scope));
+						const request = promiseContinuation ? fetchRequest(callee.object, scope) : null;
 						const before = fetchContinuation;
+						const beforeOwnsWrites = effectOwnsWrites;
+						effectOwnsWrites &&= promiseContinuation;
 						if (request !== null && currentEffect.started.has(request)) fetchContinuation = true;
 						try {
 							for (const argument of node.arguments ?? [])
 								visitCallable(callableValue(argument, scope), unwrap(argument), 'deferred');
 						} finally {
 							fetchContinuation = before;
+							effectOwnsWrites = beforeOwnsWrites;
 						}
 					}
 				}
@@ -4432,7 +4582,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				const enclosingRetainedRowScope = currentRetainedRowScope;
 				currentRetainedRowScope = row;
 				try {
-					templatePolicy.enterKey();
+					templatePolicy.enterKey(node.key, row);
 					try {
 						visit(node.key, row, executionPhase);
 					} finally {
@@ -4464,6 +4614,9 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 						: phase;
 				if (node.left?.type === 'ArrayPattern' || node.left?.type === 'ObjectPattern') {
 					visitPatternExpressions(node.left, loop, executionPhase);
+				} else if (node.left?.type === 'VariableDeclaration') {
+					for (const declaration of node.left.declarations)
+						visitPatternExpressions(declaration.id, loop, executionPhase);
 				} else {
 					visit(node.left, loop, executionPhase, false);
 				}
@@ -4505,7 +4658,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		report(
 			STRONG_UNLINKED_PROP_STATE,
 			initial,
-			'Strong mode requires explicit intent for prop-derived state. Use useLinkedState(value, () => value) to follow the prop, or useState(() => value) to capture only its initial value.',
+			'Strong mode requires explicit intent for prop-derived state. Use useLinkedState(value, () => value) to follow the prop, or a lazy useState initializer (or useReducer third initializer) to capture only its initial value.',
 		);
 	}
 	// Match state identity, not its local spelling. The graph is local to one
@@ -4534,21 +4687,22 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		}
 	}
 	if (hasNestedCodeBlock) {
-		diagnostics.push(...strongLocalityDiagnostics(ast, source, filename, isReassigned));
+		diagnostics.push(...strongLocalityDiagnostics(ast, source, filename, isReassigned, hookNames));
 	}
 	templatePolicy.finish();
-	for (const policy of analyzeStrongHookPolicies(ast, { ...options, onlyImported: true })) {
+	for (const policy of analyzeStrongHookPolicies(ast, options)) {
 		diagnostics.push({
 			...diagnostic(policy.code, filename, policy.node, policy.message),
 			severity: policy.severity,
 		});
 	}
 	diagnostics.push(...analyzeStrongHTML(ast, source, filename, options));
-	diagnostics.push(
-		...analyzeNativeChangeDiagnostics(ast, source, filename, { ...options, strong: true })
-			.diagnostics,
-	);
-	return { enabled, diagnostics };
+	const nativeChangeAnalysis = analyzeNativeChangeDiagnostics(ast, source, filename, {
+		...options,
+		strong: true,
+	});
+	diagnostics.push(...nativeChangeAnalysis.diagnostics);
+	return { enabled, diagnostics, nativeChangeAnalysis, strongHookAnalysis };
 }
 
 /** Throw the first Strong-mode violation using the original authored location. */

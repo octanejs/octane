@@ -1,25 +1,8 @@
 import { builders as b } from '@tsrx/core';
-import {
-	analyzeStrongMemoCandidates,
-	STRONG_AUTOMATIC_MEMO_UNSUPPORTED,
-	STRONG_MEMO_EVAL_MESSAGE,
-} from './hook-deps.js';
-import { hasInlineMemoDirectEval } from './inline-hook-memo.js';
+import { inheritHookMemoOrigin as origin } from './inline-hook-memo.js';
+import { analyzeStrongMemoCandidates, STRONG_AUTOMATIC_MEMO_UNSUPPORTED } from './hook-deps.js';
 
 const SKIP_KEYS = new Set(['loc', 'start', 'end', 'range', 'metadata', 'parent']);
-
-// Stamp only new builder nodes. Authored subtrees retain their own locations
-// and are never mutated, including when the parser supplied a frozen AST.
-function origin(node, source) {
-	if (!node || typeof node !== 'object') return node;
-	if (Array.isArray(node)) return node.map((child) => origin(child, source));
-	if (node.loc !== undefined) return node;
-	const copy = { ...node };
-	if (typeof node.type === 'string')
-		Object.assign(copy, { start: source.start, end: source.end, loc: source.loc });
-	for (const key in node) if (!SKIP_KEYS.has(key)) copy[key] = origin(node[key], source);
-	return copy;
-}
 
 export function unsupportedStrongAutomaticMemo(node, filename, message) {
 	const line = node?.loc?.start?.line ?? 1;
@@ -49,12 +32,6 @@ export function applyStrongAutomaticMemo(ast, options = {}) {
 		options,
 	);
 	if (candidates.size === 0 && hookCalls.size === 0 && omittedDependencies.size === 0) return ast;
-	if (candidates.size > 0 && hasInlineMemoDirectEval(ast))
-		throw unsupportedStrongAutomaticMemo(
-			candidates.keys().next().value.init,
-			options.filename,
-			STRONG_MEMO_EVAL_MESSAGE,
-		);
 	const aliases = new Map();
 	for (const hook of new Set([...candidates.values(), ...hookCalls.values()])) {
 		let alias = `_$strong${hook}`;

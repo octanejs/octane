@@ -212,7 +212,7 @@ export default defineCommand({
 			json: {
 				ok: !failed,
 				analyzed: targets.length,
-				summary: { errors, warnings, ...(hints > 0 ? { hints } : {}) },
+				summary: { errors, warnings, hints },
 				findings: selected,
 			},
 		};
