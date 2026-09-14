@@ -18,7 +18,7 @@ const lanes = [
 		false,
 	],
 	['hook-form', 'packages/hook-form/audit/adapted-runtime.json', true],
-	['hook-form', 'packages/hook-form/audit/native-runtime.json', false],
+	['hook-form-native', 'packages/hook-form/audit/native-runtime.json', false],
 	['hook-form-browser', 'packages/hook-form/audit/browser-runtime.json', false],
 	['hook-form-server', 'packages/hook-form/audit/adapted-runtime-server.json', true],
 ];

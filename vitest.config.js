@@ -3549,31 +3549,21 @@ export default defineConfig({
 					globals: false,
 				},
 			},
-			{
-				testExecution: {
-					group: 'react-parity',
-					include: [
-						'packages/hook-form/tests/upstream/**/*.test.ts',
-						'packages/hook-form/tests/upstream/**/*.test.tsx',
-						'packages/hook-form/tests/conformance/**/*.test.*',
-						'packages/hook-form/tests/hydration.test.ts',
-					],
-				},
+			...['upstream', 'native'].map((suite) => ({
+				testExecution: { group: 'react-parity' },
 				test: {
-					name: 'hook-form',
-					include: [
-						'packages/hook-form/tests/**/*.test.ts',
-						'packages/hook-form/tests/**/*.test.tsx',
-					],
-					exclude: [
-						...configDefaults.exclude,
-						'packages/hook-form/tests/**/*.server.test.tsx',
-						'packages/hook-form/tests/upstream-original.test.ts',
-						'packages/hook-form/tests/browser/**/*.test.ts',
-						'packages/hook-form/tests/upstream-browser-*.test.ts',
-						'packages/hook-form/tests/differential/**/*.test.ts',
-						'packages/hook-form/tests/differential/**/*.test.tsx',
-					],
+					name: suite === 'upstream' ? 'hook-form' : 'hook-form-native',
+					include:
+						suite === 'upstream'
+							? [
+									'packages/hook-form/tests/upstream/**/*.test.ts',
+									'packages/hook-form/tests/upstream/**/*.test.tsx',
+								]
+							: [
+									'packages/hook-form/tests/conformance/**/*.test.*',
+									'packages/hook-form/tests/hydration.test.ts',
+								],
+					exclude: [...configDefaults.exclude, 'packages/hook-form/tests/**/*.server.test.tsx'],
 					environment: 'jsdom',
 					// The ported upstream suite uses @testing-library/jest-dom matchers
 					// (toBeVisible, toBeInTheDocument, …) — same as react-hook-form's own
@@ -3610,7 +3600,7 @@ export default defineConfig({
 						},
 					],
 				},
-			},
+			})),
 			{
 				testExecution: { group: 'react-parity' },
 				test: {

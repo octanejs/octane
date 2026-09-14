@@ -233,13 +233,22 @@ export async function verifyUpstreamBrowser(mode: 'pristine' | 'adapted') {
 			testDir: resolve(packageRoot, mode === 'pristine' ? 'upstream/e2e' : 'tests/upstream/_e2e'),
 			testMatch: '**/*.spec.ts',
 			fullyParallel: true,
-			workers: 2,
+			// The upstream timer cases observe renders between 10 ms updates. Avoid
+			// competing browser workers inside the already parallel Vitest runner.
+			workers: 1,
 			retries: 0,
 			timeout: 30_000,
 			maxFailures: 3,
 			reporter: [['json', { outputFile: reportFile }]],
 			outputDir: join(directory, 'results'),
-			use: { baseURL: `http://127.0.0.1:${address.port}`, headless: true, actionTimeout: 10_000 },
+			use: {
+				baseURL: `http://127.0.0.1:${address.port}`,
+				headless: true,
+				actionTimeout: 10_000,
+				// Preserve the intermediate renders observed by the original form tests
+				// instead of sending an entire input sequence in one scheduler turn.
+				launchOptions: { slowMo: 10 },
+			},
 		};
 		const configPath = join(directory, 'playwright.config.mjs');
 		writeFileSync(configPath, 'export default ' + JSON.stringify(config) + ';\n');

@@ -123,7 +123,7 @@
       "path": "package.json",
       "origin": "adapted",
       "packageName": "react-hook-form",
-      "sha256": "504cb0f74c07da05bcbe48e02555ac566dda3f60f9976c800104f8d2035b5f69"
+      "sha256": "39fca96f26e17736768d42eda92e4e7e72d0c09d5dc2c39cff7e284fd7879b8e"
     },
     {
       "path": "src/FormProvider.tsrx",

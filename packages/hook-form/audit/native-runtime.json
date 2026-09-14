@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "project": "hook-form",
+  "project": "hook-form-native",
   "roots": ["packages/hook-form/tests"],
   "files": [
     "packages/hook-form/tests/conformance/events.test.tsx",

@@ -107,6 +107,11 @@ portal DOM. They remain visible as inapplicable external integrations in
 existing-binding campaign does not introduce a MUI port. All 87 supported browser
 cases execute in Chromium, including the existing Octane Select integration.
 
+Both browser lanes use one worker and a 10 ms browser-command delay. The pinned
+fixtures observe intermediate renders between inputs and closely spaced timers;
+consistent command pacing avoids coalescing those observations during burst
+input. The runners retain all original assertions and use zero retries.
+
 Native text fields expose `onInput`; selects, checkboxes, radios, and component
 callbacks retain their respective contracts. The StrictMode fixture uses a
 Fragment because Octane has no React development double-invoke mode. A resolver

@@ -461,66 +461,6 @@
           "path": "packages/hook-form/typetests/tsconfig.pristine.json",
           "role": "support",
           "sha256": "1925c621c9782d6f54107b659b30d6ddea3d9ce10b0868f1e0cf81ed86f6be15"
-        },
-        {
-          "path": "packages/hook-form/typetests/tsconfig.pristine.json",
-          "role": "support",
-          "sha256": "1925c621c9782d6f54107b659b30d6ddea3d9ce10b0868f1e0cf81ed86f6be15"
-        },
-        {
-          "path": "packages/hook-form/typetests/tsconfig.pristine.json",
-          "role": "support",
-          "sha256": "1925c621c9782d6f54107b659b30d6ddea3d9ce10b0868f1e0cf81ed86f6be15"
-        },
-        {
-          "path": "packages/hook-form/typetests/tsconfig.pristine.json",
-          "role": "support",
-          "sha256": "1925c621c9782d6f54107b659b30d6ddea3d9ce10b0868f1e0cf81ed86f6be15"
-        },
-        {
-          "path": "packages/hook-form/typetests/tsconfig.pristine.json",
-          "role": "support",
-          "sha256": "1925c621c9782d6f54107b659b30d6ddea3d9ce10b0868f1e0cf81ed86f6be15"
-        },
-        {
-          "path": "packages/hook-form/typetests/tsconfig.pristine.json",
-          "role": "support",
-          "sha256": "1925c621c9782d6f54107b659b30d6ddea3d9ce10b0868f1e0cf81ed86f6be15"
-        },
-        {
-          "path": "packages/hook-form/typetests/tsconfig.pristine.json",
-          "role": "support",
-          "sha256": "1925c621c9782d6f54107b659b30d6ddea3d9ce10b0868f1e0cf81ed86f6be15"
-        },
-        {
-          "path": "packages/hook-form/typetests/tsconfig.pristine.json",
-          "role": "support",
-          "sha256": "1925c621c9782d6f54107b659b30d6ddea3d9ce10b0868f1e0cf81ed86f6be15"
-        },
-        {
-          "path": "packages/hook-form/typetests/tsconfig.pristine.json",
-          "role": "support",
-          "sha256": "1925c621c9782d6f54107b659b30d6ddea3d9ce10b0868f1e0cf81ed86f6be15"
-        },
-        {
-          "path": "packages/hook-form/typetests/tsconfig.pristine.json",
-          "role": "support",
-          "sha256": "1925c621c9782d6f54107b659b30d6ddea3d9ce10b0868f1e0cf81ed86f6be15"
-        },
-        {
-          "path": "packages/hook-form/typetests/tsconfig.pristine.json",
-          "role": "support",
-          "sha256": "1925c621c9782d6f54107b659b30d6ddea3d9ce10b0868f1e0cf81ed86f6be15"
-        },
-        {
-          "path": "packages/hook-form/typetests/tsconfig.pristine.json",
-          "role": "support",
-          "sha256": "1925c621c9782d6f54107b659b30d6ddea3d9ce10b0868f1e0cf81ed86f6be15"
-        },
-        {
-          "path": "packages/hook-form/typetests/tsconfig.pristine.json",
-          "role": "support",
-          "sha256": "1925c621c9782d6f54107b659b30d6ddea3d9ce10b0868f1e0cf81ed86f6be15"
         }
       ]
     },
@@ -559,66 +499,6 @@
           "path": "packages/hook-form/typetests/tsconfig.adapted.json",
           "role": "support",
           "sha256": "e31df5fb308f5a26748d26a325e0ff4423683cd8c80bf3053f455b87403ca5d2"
-        },
-        {
-          "path": "packages/hook-form/typetests/tsconfig.adapted.json",
-          "role": "support",
-          "sha256": "e31df5fb308f5a26748d26a325e0ff4423683cd8c80bf3053f455b87403ca5d2"
-        },
-        {
-          "path": "packages/hook-form/typetests/tsconfig.adapted.json",
-          "role": "support",
-          "sha256": "e31df5fb308f5a26748d26a325e0ff4423683cd8c80bf3053f455b87403ca5d2"
-        },
-        {
-          "path": "packages/hook-form/typetests/tsconfig.adapted.json",
-          "role": "support",
-          "sha256": "e31df5fb308f5a26748d26a325e0ff4423683cd8c80bf3053f455b87403ca5d2"
-        },
-        {
-          "path": "packages/hook-form/typetests/tsconfig.adapted.json",
-          "role": "support",
-          "sha256": "e31df5fb308f5a26748d26a325e0ff4423683cd8c80bf3053f455b87403ca5d2"
-        },
-        {
-          "path": "packages/hook-form/typetests/tsconfig.adapted.json",
-          "role": "support",
-          "sha256": "e31df5fb308f5a26748d26a325e0ff4423683cd8c80bf3053f455b87403ca5d2"
-        },
-        {
-          "path": "packages/hook-form/typetests/tsconfig.adapted.json",
-          "role": "support",
-          "sha256": "e31df5fb308f5a26748d26a325e0ff4423683cd8c80bf3053f455b87403ca5d2"
-        },
-        {
-          "path": "packages/hook-form/typetests/tsconfig.adapted.json",
-          "role": "support",
-          "sha256": "e31df5fb308f5a26748d26a325e0ff4423683cd8c80bf3053f455b87403ca5d2"
-        },
-        {
-          "path": "packages/hook-form/typetests/tsconfig.adapted.json",
-          "role": "support",
-          "sha256": "e31df5fb308f5a26748d26a325e0ff4423683cd8c80bf3053f455b87403ca5d2"
-        },
-        {
-          "path": "packages/hook-form/typetests/tsconfig.adapted.json",
-          "role": "support",
-          "sha256": "e31df5fb308f5a26748d26a325e0ff4423683cd8c80bf3053f455b87403ca5d2"
-        },
-        {
-          "path": "packages/hook-form/typetests/tsconfig.adapted.json",
-          "role": "support",
-          "sha256": "e31df5fb308f5a26748d26a325e0ff4423683cd8c80bf3053f455b87403ca5d2"
-        },
-        {
-          "path": "packages/hook-form/typetests/tsconfig.adapted.json",
-          "role": "support",
-          "sha256": "e31df5fb308f5a26748d26a325e0ff4423683cd8c80bf3053f455b87403ca5d2"
-        },
-        {
-          "path": "packages/hook-form/typetests/tsconfig.adapted.json",
-          "role": "support",
-          "sha256": "e31df5fb308f5a26748d26a325e0ff4423683cd8c80bf3053f455b87403ca5d2"
         }
       ]
     },
@@ -643,7 +523,7 @@
         {
           "path": "scripts/react-parity/hook-form-runtime-inventory.mjs",
           "role": "support",
-          "sha256": "0d6dcc0354bc44167b49c2024794c89170df57cf03e82f7d0b5febbe5a1de474"
+          "sha256": "6f087de380f06347277bbaf56fabc12fa94dc9435e4029adb583de6ea058cb2f"
         },
         {
           "path": "packages/hook-form/tests/upstream/useController.test.tsx",
@@ -680,7 +560,7 @@
         {
           "path": "scripts/react-parity/hook-form-runtime-inventory.mjs",
           "role": "support",
-          "sha256": "0d6dcc0354bc44167b49c2024794c89170df57cf03e82f7d0b5febbe5a1de474"
+          "sha256": "6f087de380f06347277bbaf56fabc12fa94dc9435e4029adb583de6ea058cb2f"
         }
       ]
     },
@@ -737,13 +617,13 @@
       "type": "adapted-octane",
       "oracle": "required",
       "environment": "workspace-node",
-      "project": "hook-form",
+      "project": "hook-form-native",
       "notes": "Exercises native events, field-array survivor identity, hydration adoption, cleanup, and package exports.",
       "files": [
         {
           "path": "packages/hook-form/audit/native-runtime.json",
           "role": "support",
-          "sha256": "e4b9586977b83275e85c2f23d38339c6cbb7d0a0b094801d8989b30a4ea4a18b"
+          "sha256": "394759c2aeca44e15d513f9902f6204e37230075ccb9f798eb0ac31088951b93"
         },
         {
           "path": "packages/hook-form/tests/conformance/events.test.tsx",
@@ -905,7 +785,7 @@
         {
           "path": "packages/hook-form/tests/upstream-browser-suite.ts",
           "role": "support",
-          "sha256": "03684b8ccc1310120c9bbf380d9d421ccd2644c5e765cf183fc649c2b4cf0ac4"
+          "sha256": "7aea41a23946dc00c6cbce71f6effae6a04b8afda12673cf49d79af9487e711f"
         },
         {
           "path": "packages/hook-form/audit/registrations.json",
@@ -942,7 +822,7 @@
         {
           "path": "packages/hook-form/tests/upstream-browser-suite.ts",
           "role": "support",
-          "sha256": "03684b8ccc1310120c9bbf380d9d421ccd2644c5e765cf183fc649c2b4cf0ac4"
+          "sha256": "7aea41a23946dc00c6cbce71f6effae6a04b8afda12673cf49d79af9487e711f"
         },
         {
           "path": "packages/hook-form/audit/registrations.json",
