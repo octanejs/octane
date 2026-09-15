@@ -498,8 +498,9 @@ jobs:
           REACT_PARITY_VITEST_REPORT: ${{ runner.temp }}/react-parity-vitest/shard-${{ matrix.shard }}.json
           # Retain browser-process exits and RPC disconnects when a runner stops
           # before it can produce a complete assertion report.
-          DEBUG: pw:browser*,vitest:browser:api,vitest:browser:pool
+          DEBUG: pw:browser*,vitest:browser:api,vitest:browser:pool,vitest:browser:playwright
           VITEST_PW_DEBUG: "1"
+          REACT_PARITY_BROWSER_DIAGNOSTICS: "1"
         run: pnpm react-parity:check --shard ${{ matrix.shard }}/4
 
       - name: Report browser runner resources on failure
