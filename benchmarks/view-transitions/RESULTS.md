@@ -5,6 +5,15 @@
 The ordinary table workloads exposed a regression that the smaller root controls
 missed. Compare main `bb11d0b3e`, reviewed PR `ab2c29e65`, and the final source/asset
 hashes in [js-framework-regression.json](measurements/js-framework-regression.json).
+After measurements, main advanced to `fe1b2b7e6` with a style-spread compiler
+optimization, merged in `b891b99f6`. The current package hash is `9176bbd8…`;
+the timed implementation is `45aa6f0d…`. The separate
+[js-framework-main-equivalence.json](measurements/js-framework-main-equivalence.json)
+retains both source histories and confirms all four canonical assets (main/final
+× TSRX/JSX) remain byte-identical, with identical compiled fixture inputs.
+The original measurements keep their historical hashes. Post-merge guard timings
+run concurrently with correctness work and are not interpreted.
+
 This section supersedes the client-byte observations in the historical sections.
 The report retains complete canonical outputs, failure controls, focused raw
 samples, source/fixture/compiler/dependency hashes, and alternate implementations.
@@ -70,6 +79,9 @@ also run again on final source, with three warmup cycles and eight samples per
 operation in each of four balanced runs. Its original JSON retains per-run
 score, mean, median, min, p95, standard deviation and RME, but not individual
 sample values. Those summaries are not pooled into invented sample distributions.
+Its short JSX selection scores remain 0.34/0.34 ms versus main's 0.22/0.28
+(medians 0.30/0.40 versus 0.30/0.30). The longer warmed comparison does not
+reproduce this smaller difference; early-run effects are not conclusively excluded.
 
 These are local synchronous click/commit timings, excluding paint, not official
 js-framework-benchmark Chrome timeline scores. Short-action timer quantization,

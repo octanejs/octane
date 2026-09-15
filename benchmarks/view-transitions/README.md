@@ -140,7 +140,7 @@ existing TSRX and JSX benchmark applications through their unchanged canonical
 harness with the selected complete Octane package and compiler:
 
 ```sh
-BENCH_JSON=/tmp/vt-js-framework-main.json node benchmarks/view-transitions/js-framework.mjs 8 --octane-revision=bb11d0b3ec9fc0cbe3723fc4e6bf0217d4149892
+BENCH_JSON=/tmp/vt-js-framework-main.json node benchmarks/view-transitions/js-framework.mjs 8 --octane-revision=fe1b2b7e6774c0bb00170ceecd5a5432fbef81c0
 BENCH_JSON=/tmp/vt-js-framework-candidate.json node benchmarks/view-transitions/js-framework.mjs 8
 ```
 
