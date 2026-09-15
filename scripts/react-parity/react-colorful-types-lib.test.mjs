@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { cp, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
@@ -219,5 +219,34 @@ test('type-parity records the native-event divergence and validates against pinn
 
 test('classifies every authored runtime and type test exactly once', function classifiesTests() {
 	const result = verifyReactColorfulTestClassifications(REPO);
-	assert.equal(result.tests, 12);
+	assert.equal(result.tests, 15);
+});
+
+test('requires classifications for generated JavaScript and public declaration probes', async function classifiesGeneratedAndTypes(t) {
+	const root = await mkdtemp(join(tmpdir(), 'colorful-classifications-'));
+	t.after(() => rm(root, { recursive: true, force: true }));
+	const configPath = 'packages/colorful/audit/test-classifications.json';
+	const config = JSON.parse(await readFile(resolve(REPO, configPath), 'utf8'));
+	for (const entry of config.tests) {
+		await mkdir(dirname(resolve(root, entry.path)), { recursive: true });
+		await writeFile(resolve(root, entry.path), '');
+	}
+	await mkdir(resolve(root, 'packages/colorful/audit'), { recursive: true });
+	await cp(
+		resolve(REPO, 'packages/colorful/audit/react-parity.json'),
+		resolve(root, 'packages/colorful/audit/react-parity.json'),
+	);
+	await writeFile(resolve(root, configPath), JSON.stringify(config));
+	assert.equal(verifyReactColorfulTestClassifications(root).tests, 15);
+	for (const missing of [
+		'packages/colorful/tests/upstream/generated/utils.test.js',
+		'packages/colorful/tests/types/public.test-d.ts',
+		'packages/colorful/tests/types/pristine.test-d.ts',
+	]) {
+		await writeFile(
+			resolve(root, configPath),
+			JSON.stringify({ ...config, tests: config.tests.filter((entry) => entry.path !== missing) }),
+		);
+		assert.throws(() => verifyReactColorfulTestClassifications(root), /exactly one classification/);
+	}
 });

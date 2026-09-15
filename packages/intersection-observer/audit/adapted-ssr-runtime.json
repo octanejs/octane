@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "project": "intersection-observer-adapted-ssr",
+  "roots": ["packages/intersection-observer/tests/upstream"],
+  "files": ["packages/intersection-observer/tests/upstream/useInView.ssr.test.ts"],
+  "tests": [
+    {
+      "id": "runtime:4017144ce6354ce9",
+      "file": "packages/intersection-observer/tests/upstream/useInView.ssr.test.ts",
+      "fullName": "useInView renders on the server without diagnostics"
+    }
+  ],
+  "snapshots": 0
+}

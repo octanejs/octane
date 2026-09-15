@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "artifacts": [
+    {
+      "path": "LICENSE.upstream",
+      "sha256": "a405ee70c632bb938acb7ac5f210e814409b3760ea9d2329d8ed8ffcfd11a0e7"
+    },
+    {
+      "path": "upstream-artifact/react-router-ssr-query-1.167.2.tgz",
+      "sha256": "1301a0f79fab7aca720fc2289cf6c9e6157e2e76d4442241fd6a9420f646a7c5"
+    }
+  ],
+  "requiredFiles": ["audit/upstream.lock.json"],
+  "packageIdentity": {
+    "path": "upstream/package.json",
+    "name": "@tanstack/react-router-ssr-query",
+    "version": "1.167.2",
+    "license": "MIT"
+  },
+  "unpublishedDirs": ["audit", "tests", "typetests", "upstream", "upstream-artifact"]
+}

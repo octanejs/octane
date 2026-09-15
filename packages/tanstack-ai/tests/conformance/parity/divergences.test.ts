@@ -6,12 +6,12 @@ import { useChat } from '../../../src/index';
 
 describe('@octanejs/tanstack-ai documented divergences', () => {
 	// Octane divergence note.
-	it('publishes no React-only MCP app renderer subpath', () => {
+	it('publishes native UI and MCP resource subpaths', () => {
 		const packageJson = JSON.parse(
 			readFileSync(resolve(__dirname, '../../../package.json'), 'utf8'),
 		) as { exports: Record<string, string> };
-		expect(Object.keys(packageJson.exports)).toEqual(['.']);
-		expect(packageJson.exports).not.toHaveProperty('./mcp-apps');
+		expect(Object.keys(packageJson.exports)).toEqual(['.', './ui', './mcp-apps']);
+		expect(packageJson.exports['./mcp-apps']).toBe('./src/mcp-apps.ts');
 	});
 
 	// Octane divergence note.

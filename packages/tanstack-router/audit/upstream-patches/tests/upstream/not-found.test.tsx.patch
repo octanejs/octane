@@ -1,0 +1,87 @@
+diff --git a/tests/upstream/not-found.test.tsx b/tests/upstream/not-found.test.tsx
+--- a/tests/upstream/not-found.test.tsx
++++ b/tests/upstream/not-found.test.tsx
+@@ -1,3 +1,4 @@
++import { runServerFixture } from '../ssr-fixture'
+ import { afterEach, beforeEach, expect, test } from 'vitest'
+ import { act, cleanup, render, screen } from '@octanejs/testing-library'
+ 
+@@ -110,39 +111,7 @@ test('a lazy route notFoundComponent handles an eager beforeLoad failure', async
+ })
+ 
+ test('SSR uses a lazy route notFoundComponent for an eager beforeLoad failure', async () => {
+-  const rootRoute = createRootRoute({
+-    component: Outlet,
+-    notFoundComponent: () => <div>Root not found</div>,
+-  })
+-  const failingRoute = createRoute({
+-    getParentRoute: () => rootRoute,
+-    path: '/lazy-not-found',
+-    beforeLoad: () => {
+-      throw notFound()
+-    },
+-  }).lazy(() =>
+-    Promise.resolve(
+-      createLazyRoute('/lazy-not-found')({
+-        notFoundComponent: () => <div>Lazy route not found</div>,
+-      }),
+-    ),
+-  )
+-  const handler = createRequestHandler({
+-    request: new Request('http://localhost/lazy-not-found'),
+-    createRouter: () =>
+-      createRouter({
+-        routeTree: rootRoute.addChildren([failingRoute]),
+-        isServer: true,
+-      }),
+-  })
+-
+-  const response = await handler(({ router, responseHeaders }) =>
+-    renderRouterToString({
+-      router,
+-      responseHeaders,
+-      children: <RouterServer router={router} />,
+-    }),
+-  )
++  const response = await runServerFixture<Response>('_fixtures/error-ssr-parity.tsx', 'renderLazyNotFound')
+ 
+   expect(response.status).toBe(404)
+   const html = await response.text()
+@@ -189,16 +158,7 @@ test.each(['client', 'server'] as const)(
+       return
+     }
+ 
+-    const response = await createRequestHandler({
+-      request: new Request('http://localhost/parent/child/missing'),
+-      createRouter: () => createRouter({ routeTree, isServer: true }),
+-    })(({ router, responseHeaders }) =>
+-      renderRouterToString({
+-        router,
+-        responseHeaders,
+-        children: <RouterServer router={router} />,
+-      }),
+-    )
++    const response = await runServerFixture<Response>('_fixtures/error-ssr-parity.tsx', 'renderFuzzyNotFound')
+ 
+     expect(response.status).toBe(404)
+     const html = await response.text()
+@@ -460,7 +420,8 @@ test('component-thrown bare notFound renders current route notFoundComponent', a
+   })
+ 
+   render(<RouterProvider router={router} />)
+-  await router.navigate({ to: '/parent/child' })
++  // OCTANE DIVERGENCE[native-lifecycle]: settle native commits, including the pending-to-idle boundary reset, before retaining a queried DOM node.
++  await act(async () => { await router.navigate({ to: '/parent/child' }) })
+ 
+   expect(await screen.findByTestId('child-not-found')).toBeInTheDocument()
+   expect(screen.queryByTestId('parent-not-found')).not.toBeInTheDocument()
+@@ -497,7 +458,8 @@ test('component-thrown bare notFound falls back to nearest ancestor notFoundComp
+   })
+ 
+   render(<RouterProvider router={router} />)
+-  await router.navigate({ to: '/parent/child' })
++  // OCTANE DIVERGENCE[native-lifecycle]: settle native commits, including the pending-to-idle boundary reset, before retaining a queried DOM node.
++  await act(async () => { await router.navigate({ to: '/parent/child' }) })
+ 
+   expect(await screen.findByTestId('parent-not-found')).toBeInTheDocument()
+   expect(screen.queryByTestId('root-not-found')).not.toBeInTheDocument()

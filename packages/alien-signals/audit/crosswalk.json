@@ -1,0 +1,434 @@
+[
+  {
+    "id": "react-case-v1:67f4b3306e1e3100beb9",
+    "source": "src/index.test.ts:40:3",
+    "title": "should create a writable signal",
+    "classification": "implemented",
+    "rationale": "The matching upstream title executes against native Octane fixtures with an assertion and fixture crosswalk; the complete unchanged original case also executes in the pinned Bun/React oracle.",
+    "localEvidence": [
+      "tests/upstream-adapted.test.ts",
+      "tests/upstream-original.test.ts",
+      "audit/adapted-runtime.json"
+    ]
+  },
+  {
+    "id": "react-case-v1:4250ae3c9394a7dc61be",
+    "source": "src/index.test.ts:48:3",
+    "title": "should create and update a computed signal",
+    "classification": "implemented",
+    "rationale": "The matching upstream title executes against native Octane fixtures with an assertion and fixture crosswalk; the complete unchanged original case also executes in the pinned Bun/React oracle.",
+    "localEvidence": [
+      "tests/upstream-adapted.test.ts",
+      "tests/upstream-original.test.ts",
+      "audit/adapted-runtime.json"
+    ]
+  },
+  {
+    "id": "react-case-v1:b999e8da4513fff035ca",
+    "source": "src/index.test.ts:65:3",
+    "title": "should create and run an effect",
+    "classification": "implemented",
+    "rationale": "The matching upstream title executes against native Octane fixtures with an assertion and fixture crosswalk; the complete unchanged original case also executes in the pinned Bun/React oracle.",
+    "localEvidence": [
+      "tests/upstream-adapted.test.ts",
+      "tests/upstream-original.test.ts",
+      "audit/adapted-runtime.json"
+    ]
+  },
+  {
+    "id": "react-case-v1:b05a720acc8bcffab5fc",
+    "source": "src/index.test.ts:79:3",
+    "title": "should create a signal scope",
+    "classification": "implemented",
+    "rationale": "The matching upstream title executes against native Octane fixtures with an assertion and fixture crosswalk; the complete unchanged original case also executes in the pinned Bun/React oracle.",
+    "localEvidence": [
+      "tests/upstream-adapted.test.ts",
+      "tests/upstream-original.test.ts",
+      "audit/adapted-runtime.json"
+    ]
+  },
+  {
+    "id": "react-case-v1:938d58a752caccee1fc1",
+    "source": "src/index.test.ts:96:3",
+    "title": "useSignal should return [value, setter]",
+    "classification": "implemented",
+    "rationale": "The matching upstream title executes against native Octane fixtures with an assertion and fixture crosswalk; the complete unchanged original case also executes in the pinned Bun/React oracle.",
+    "localEvidence": [
+      "tests/upstream-adapted.test.ts",
+      "tests/upstream-original.test.ts",
+      "audit/adapted-runtime.json"
+    ]
+  },
+  {
+    "id": "react-case-v1:a671e6677c6701c3f148",
+    "source": "src/index.test.ts:106:3",
+    "title": "useSignalValue should return read-only value from a signal",
+    "classification": "implemented",
+    "rationale": "The matching upstream title executes against native Octane fixtures with an assertion and fixture crosswalk; the complete unchanged original case also executes in the pinned Bun/React oracle.",
+    "localEvidence": [
+      "tests/upstream-adapted.test.ts",
+      "tests/upstream-original.test.ts",
+      "audit/adapted-runtime.json"
+    ]
+  },
+  {
+    "id": "react-case-v1:3d0b9cef25b6856a6356",
+    "source": "src/index.test.ts:115:3",
+    "title": "useSetSignal should return setter only",
+    "classification": "implemented",
+    "rationale": "The matching upstream title executes against native Octane fixtures with an assertion and fixture crosswalk; the complete unchanged original case also executes in the pinned Bun/React oracle.",
+    "localEvidence": [
+      "tests/upstream-adapted.test.ts",
+      "tests/upstream-original.test.ts",
+      "audit/adapted-runtime.json"
+    ]
+  },
+  {
+    "id": "react-case-v1:dc5774e3b15ed66967cf",
+    "source": "src/index.test.ts:131:3",
+    "title": "useSignalEffect should register an effect in React",
+    "classification": "implemented",
+    "rationale": "The matching upstream title executes against native Octane fixtures with an assertion and fixture crosswalk; the complete unchanged original case also executes in the pinned Bun/React oracle.",
+    "localEvidence": [
+      "tests/upstream-adapted.test.ts",
+      "tests/upstream-original.test.ts",
+      "audit/adapted-runtime.json"
+    ]
+  },
+  {
+    "id": "react-case-v1:e706cd757f41af925b7f",
+    "source": "src/index.test.ts:144:3",
+    "title": "useSignalScope should create and manage an effect scope in React",
+    "classification": "implemented",
+    "rationale": "The matching upstream title executes against native Octane fixtures with an assertion and fixture crosswalk; the complete unchanged original case also executes in the pinned Bun/React oracle.",
+    "localEvidence": [
+      "tests/upstream-adapted.test.ts",
+      "tests/upstream-original.test.ts",
+      "audit/adapted-runtime.json"
+    ]
+  },
+  {
+    "id": "react-case-v1:34b2a35617bb8841f792",
+    "source": "src/index.test.ts:150:3",
+    "title": "useComputed should return a computed value",
+    "classification": "implemented",
+    "rationale": "The matching upstream title executes against native Octane fixtures with an assertion and fixture crosswalk; the complete unchanged original case also executes in the pinned Bun/React oracle.",
+    "localEvidence": [
+      "tests/upstream-adapted.test.ts",
+      "tests/upstream-original.test.ts",
+      "audit/adapted-runtime.json"
+    ]
+  },
+  {
+    "id": "react-case-v1:b2f3be7b63419d277391",
+    "source": "src/index.test.ts:164:3",
+    "title": "should handle nested signal updates correctly",
+    "classification": "implemented",
+    "rationale": "The matching upstream title executes against native Octane fixtures with an assertion and fixture crosswalk; the complete unchanged original case also executes in the pinned Bun/React oracle.",
+    "localEvidence": [
+      "tests/upstream-adapted.test.ts",
+      "tests/upstream-original.test.ts",
+      "audit/adapted-runtime.json"
+    ]
+  },
+  {
+    "id": "react-case-v1:f2c9a605b6061eba1c4b",
+    "source": "src/index.test.ts:178:3",
+    "title": "should handle signal updates within effects",
+    "classification": "implemented",
+    "rationale": "The matching upstream title executes against native Octane fixtures with an assertion and fixture crosswalk; the complete unchanged original case also executes in the pinned Bun/React oracle.",
+    "localEvidence": [
+      "tests/upstream-adapted.test.ts",
+      "tests/upstream-original.test.ts",
+      "audit/adapted-runtime.json"
+    ]
+  },
+  {
+    "id": "react-case-v1:a67b7aaf93769dfccea6",
+    "source": "src/index.test.ts:194:3",
+    "title": "should properly cleanup effects when scope is stopped",
+    "classification": "implemented",
+    "rationale": "The matching upstream title executes against native Octane fixtures with an assertion and fixture crosswalk; the complete unchanged original case also executes in the pinned Bun/React oracle.",
+    "localEvidence": [
+      "tests/upstream-adapted.test.ts",
+      "tests/upstream-original.test.ts",
+      "audit/adapted-runtime.json"
+    ]
+  },
+  {
+    "id": "react-case-v1:342516cc55065eaa1cd6",
+    "source": "src/index.test.ts:223:3",
+    "title": "useSignal should handle functional updates correctly",
+    "classification": "implemented",
+    "rationale": "The matching upstream title executes against native Octane fixtures with an assertion and fixture crosswalk; the complete unchanged original case also executes in the pinned Bun/React oracle.",
+    "localEvidence": [
+      "tests/upstream-adapted.test.ts",
+      "tests/upstream-original.test.ts",
+      "audit/adapted-runtime.json"
+    ]
+  },
+  {
+    "id": "react-case-v1:121b735aa2662846cbb2",
+    "source": "src/index.test.ts:235:3",
+    "title": "useComputed should update when dependencies change",
+    "classification": "implemented",
+    "rationale": "The matching upstream title executes against native Octane fixtures with an assertion and fixture crosswalk; the complete unchanged original case also executes in the pinned Bun/React oracle.",
+    "localEvidence": [
+      "tests/upstream-adapted.test.ts",
+      "tests/upstream-original.test.ts",
+      "audit/adapted-runtime.json"
+    ]
+  },
+  {
+    "id": "react-case-v1:cbc5557521989b7d2441",
+    "source": "src/index.test.ts:256:3",
+    "title": "useComputed should not enter a render loop after a dependency update",
+    "classification": "implemented",
+    "rationale": "The matching upstream title executes against native Octane fixtures with an assertion and fixture crosswalk; the complete unchanged original case also executes in the pinned Bun/React oracle.",
+    "localEvidence": [
+      "tests/upstream-adapted.test.ts",
+      "tests/upstream-original.test.ts",
+      "audit/adapted-runtime.json"
+    ]
+  },
+  {
+    "id": "react-case-v1:5119cceebe70a9f98595",
+    "source": "src/index.test.ts:280:3",
+    "title": "useComputed should reuse the computed across re-renders when deps are unchanged",
+    "classification": "implemented",
+    "rationale": "The matching upstream title executes against native Octane fixtures with an assertion and fixture crosswalk; the complete unchanged original case also executes in the pinned Bun/React oracle.",
+    "localEvidence": [
+      "tests/upstream-adapted.test.ts",
+      "tests/upstream-original.test.ts",
+      "audit/adapted-runtime.json"
+    ]
+  },
+  {
+    "id": "react-case-v1:1e22cd6ae013e3646b7e",
+    "source": "src/index.test.ts:305:3",
+    "title": "useComputed should rebuild the computed when deps change",
+    "classification": "implemented",
+    "rationale": "The matching upstream title executes against native Octane fixtures with an assertion and fixture crosswalk; the complete unchanged original case also executes in the pinned Bun/React oracle.",
+    "localEvidence": [
+      "tests/upstream-adapted.test.ts",
+      "tests/upstream-original.test.ts",
+      "audit/adapted-runtime.json"
+    ]
+  },
+  {
+    "id": "react-case-v1:34290c40c18de339ab23",
+    "source": "src/index.test.ts:327:3",
+    "title": "useSignalEffect should handle cleanup correctly",
+    "classification": "implemented",
+    "rationale": "The matching upstream title executes against native Octane fixtures with an assertion and fixture crosswalk; the complete unchanged original case also executes in the pinned Bun/React oracle.",
+    "localEvidence": [
+      "tests/upstream-adapted.test.ts",
+      "tests/upstream-original.test.ts",
+      "audit/adapted-runtime.json"
+    ]
+  },
+  {
+    "id": "react-case-v1:d4f244941e82dff95b1a",
+    "source": "src/index.test.ts:350:3",
+    "title": "should handle signal updates correctly",
+    "classification": "implemented",
+    "rationale": "The matching upstream title executes against native Octane fixtures with an assertion and fixture crosswalk; the complete unchanged original case also executes in the pinned Bun/React oracle.",
+    "localEvidence": [
+      "tests/upstream-adapted.test.ts",
+      "tests/upstream-original.test.ts",
+      "audit/adapted-runtime.json"
+    ]
+  },
+  {
+    "id": "react-case-v1:4ccc48e418748d0fe1d3",
+    "source": "src/index.test.ts:368:3",
+    "title": "should handle multiple signal updates",
+    "classification": "implemented",
+    "rationale": "The matching upstream title executes against native Octane fixtures with an assertion and fixture crosswalk; the complete unchanged original case also executes in the pinned Bun/React oracle.",
+    "localEvidence": [
+      "tests/upstream-adapted.test.ts",
+      "tests/upstream-original.test.ts",
+      "audit/adapted-runtime.json"
+    ]
+  },
+  {
+    "id": "react-case-v1:6eead6c0bab4df6cba92",
+    "source": "src/index.test.ts:394:3",
+    "title": "should handle undefined/null signal values",
+    "classification": "implemented",
+    "rationale": "The matching upstream title executes against native Octane fixtures with an assertion and fixture crosswalk; the complete unchanged original case also executes in the pinned Bun/React oracle.",
+    "localEvidence": [
+      "tests/upstream-adapted.test.ts",
+      "tests/upstream-original.test.ts",
+      "audit/adapted-runtime.json"
+    ]
+  },
+  {
+    "id": "react-case-v1:d8873c9f3a889414c7ae",
+    "source": "src/index.test.ts:409:3",
+    "title": "should handle computed dependencies correctly",
+    "classification": "implemented",
+    "rationale": "The matching upstream title executes against native Octane fixtures with an assertion and fixture crosswalk; the complete unchanged original case also executes in the pinned Bun/React oracle.",
+    "localEvidence": [
+      "tests/upstream-adapted.test.ts",
+      "tests/upstream-original.test.ts",
+      "audit/adapted-runtime.json"
+    ]
+  },
+  {
+    "id": "react-case-v1:391f58d92acaf6731e72",
+    "source": "src/index.test.ts:430:3",
+    "title": "should cleanup all subscriptions on unmount",
+    "classification": "implemented",
+    "rationale": "The matching upstream title executes against native Octane fixtures with an assertion and fixture crosswalk; the complete unchanged original case also executes in the pinned Bun/React oracle.",
+    "localEvidence": [
+      "tests/upstream-adapted.test.ts",
+      "tests/upstream-original.test.ts",
+      "audit/adapted-runtime.json"
+    ]
+  },
+  {
+    "id": "react-case-v1:d8069bc48db95f66e4fa",
+    "source": "src/index.test.ts:457:3",
+    "title": "should handle multiple mount/unmount cycles",
+    "classification": "implemented",
+    "rationale": "The matching upstream title executes against native Octane fixtures with an assertion and fixture crosswalk; the complete unchanged original case also executes in the pinned Bun/React oracle.",
+    "localEvidence": [
+      "tests/upstream-adapted.test.ts",
+      "tests/upstream-original.test.ts",
+      "audit/adapted-runtime.json"
+    ]
+  },
+  {
+    "id": "react-case-v1:cdbc4e2d340efcef68e9",
+    "source": "src/index.test.ts:485:3",
+    "title": "should handle concurrent updates correctly",
+    "classification": "implemented",
+    "rationale": "The matching upstream title executes against native Octane fixtures with an assertion and fixture crosswalk; the complete unchanged original case also executes in the pinned Bun/React oracle.",
+    "localEvidence": [
+      "tests/upstream-adapted.test.ts",
+      "tests/upstream-original.test.ts",
+      "audit/adapted-runtime.json"
+    ]
+  },
+  {
+    "id": "react-case-v1:e63589eaed62700825f1",
+    "source": "src/index.test.ts:511:5",
+    "title": "lets React automatically batch multiple signal notifications into one render",
+    "classification": "implemented",
+    "rationale": "The matching upstream title executes against native Octane fixtures with an assertion and fixture crosswalk; the complete unchanged original case also executes in the pinned Bun/React oracle.",
+    "localEvidence": [
+      "tests/upstream-adapted.test.ts",
+      "tests/upstream-original.test.ts",
+      "audit/adapted-runtime.json"
+    ]
+  },
+  {
+    "id": "react-case-v1:031ad69ccceccf018ac2",
+    "source": "src/index.test.ts:530:5",
+    "title": "batches multiple writes into one propagation",
+    "classification": "implemented",
+    "rationale": "The matching upstream title executes against native Octane fixtures with an assertion and fixture crosswalk; the complete unchanged original case also executes in the pinned Bun/React oracle.",
+    "localEvidence": [
+      "tests/upstream-adapted.test.ts",
+      "tests/upstream-original.test.ts",
+      "audit/adapted-runtime.json"
+    ]
+  },
+  {
+    "id": "react-case-v1:213e0f8076ef193af396",
+    "source": "src/index.test.ts:547:5",
+    "title": "manually triggers dependents after an in-place mutation",
+    "classification": "implemented",
+    "rationale": "The matching upstream title executes against native Octane fixtures with an assertion and fixture crosswalk; the complete unchanged original case also executes in the pinned Bun/React oracle.",
+    "localEvidence": [
+      "tests/upstream-adapted.test.ts",
+      "tests/upstream-original.test.ts",
+      "audit/adapted-runtime.json"
+    ]
+  },
+  {
+    "id": "react-case-v1:701fd5167b47fb5d4078",
+    "source": "src/index.test.ts:558:5",
+    "title": "shares a source safely across multiple React subscribers",
+    "classification": "implemented",
+    "rationale": "The matching upstream title executes against native Octane fixtures with an assertion and fixture crosswalk; the complete unchanged original case also executes in the pinned Bun/React oracle.",
+    "localEvidence": [
+      "tests/upstream-adapted.test.ts",
+      "tests/upstream-original.test.ts",
+      "audit/adapted-runtime.json"
+    ]
+  },
+  {
+    "id": "react-case-v1:c5c34163d8bce4ad9440",
+    "source": "src/index.test.ts:580:5",
+    "title": "skips React renders when a selected signal slice is unchanged",
+    "classification": "implemented",
+    "rationale": "The matching upstream title executes against native Octane fixtures with an assertion and fixture crosswalk; the complete unchanged original case also executes in the pinned Bun/React oracle.",
+    "localEvidence": [
+      "tests/upstream-adapted.test.ts",
+      "tests/upstream-original.test.ts",
+      "audit/adapted-runtime.json"
+    ]
+  },
+  {
+    "id": "react-case-v1:8fe2f02a449730421871",
+    "source": "src/index.test.ts:598:5",
+    "title": "does not create a signal scope during server rendering",
+    "classification": "implemented",
+    "rationale": "The matching upstream title executes against native Octane fixtures with an assertion and fixture crosswalk; the complete unchanged original case also executes in the pinned Bun/React oracle.",
+    "localEvidence": [
+      "tests/upstream-adapted.test.ts",
+      "tests/upstream-original.test.ts",
+      "audit/adapted-runtime.json"
+    ]
+  },
+  {
+    "id": "react-case-v1:2fd6bb79447d0103e1a2",
+    "source": "src/index.test.ts:610:5",
+    "title": "keeps snapshots consistent when a signal write occurs in a transition",
+    "classification": "implemented",
+    "rationale": "The matching upstream title executes against native Octane fixtures with an assertion and fixture crosswalk; the complete unchanged original case also executes in the pinned Bun/React oracle.",
+    "localEvidence": [
+      "tests/upstream-adapted.test.ts",
+      "tests/upstream-original.test.ts",
+      "audit/adapted-runtime.json"
+    ]
+  },
+  {
+    "id": "react-case-v1:ac5c0e25d8aaf23be246",
+    "source": "src/index.test.ts:623:5",
+    "title": "offers a deferred snapshot without changing the source value",
+    "classification": "implemented",
+    "rationale": "The matching upstream title executes against native Octane fixtures with an assertion and fixture crosswalk; the complete unchanged original case also executes in the pinned Bun/React oracle.",
+    "localEvidence": [
+      "tests/upstream-adapted.test.ts",
+      "tests/upstream-original.test.ts",
+      "audit/adapted-runtime.json"
+    ]
+  },
+  {
+    "id": "react-case-v1:855a4da66e18f28b3d7d",
+    "source": "src/index.test.ts:637:5",
+    "title": "runs insertion, layout, and passive signal effects in React order",
+    "classification": "implemented",
+    "rationale": "The matching upstream title executes against native Octane fixtures with an assertion and fixture crosswalk; the complete unchanged original case also executes in the pinned Bun/React oracle.",
+    "localEvidence": [
+      "tests/upstream-adapted.test.ts",
+      "tests/upstream-original.test.ts",
+      "audit/adapted-runtime.json"
+    ]
+  },
+  {
+    "id": "react-case-v1:e6553ca58e0d27e6cd11",
+    "source": "src/index.test.ts:667:5",
+    "title": "cleans a manually stopped React scope exactly once",
+    "classification": "implemented",
+    "rationale": "The matching upstream title executes against native Octane fixtures with an assertion and fixture crosswalk; the complete unchanged original case also executes in the pinned Bun/React oracle.",
+    "localEvidence": [
+      "tests/upstream-adapted.test.ts",
+      "tests/upstream-original.test.ts",
+      "audit/adapted-runtime.json"
+    ]
+  }
+]

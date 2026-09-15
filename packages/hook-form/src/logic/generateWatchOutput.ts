@@ -1,4 +1,4 @@
-// Vendored from react-hook-form@7.81.0 src/logic/generateWatchOutput.ts (octane port).
+// Adapted from react-hook-form@7.88.0 src/logic/generateWatchOutput.ts for Octane.
 import type { DeepPartial, FieldValues, Names } from '../types';
 import get from '../utils/get';
 import isString from '../utils/isString';
@@ -17,7 +17,10 @@ export default <T>(
 
 	if (Array.isArray(names)) {
 		return names.map(
-			(fieldName) => (isGlobal && _names.watch.add(fieldName), get(formValues, fieldName)),
+			(fieldName) => (
+				isGlobal && _names.watch.add(fieldName),
+				get(formValues, fieldName, get(defaultValue, fieldName))
+			),
 		);
 	}
 

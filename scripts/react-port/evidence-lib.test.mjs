@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { mkdir, mkdtemp, readFile, symlink, unlink, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, symlink, unlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, test } from 'node:test';
@@ -11,11 +11,13 @@ import {
 	EVIDENCE_MATRIX_SCHEMA_VERSION,
 	evaluateVerificationReadiness,
 	inspectBindingPackage,
+	inspectShippedSources,
 	migrateEvidenceMatrix,
 	recordEvidence,
 	validateUpstreamCrosswalk,
 } from './evidence-lib.mjs';
 import { readBindingSurfacePolicy } from '../binding-surface-policy.mjs';
+import { gitBlobSha1, upstreamLockFingerprint } from './materialize-lib.mjs';
 
 const MIT_TEXT = `MIT License
 
@@ -405,6 +407,110 @@ describe('package and closure completion', () => {
 			expectedNoticeHashes: [sha256('Fixture attribution\n')],
 		});
 		assert.equal(result.status, 'passed', result.issues.join('\n'));
+		// A wrapper and its implementation can share one binding. The copied
+		// implementation must still prove its exact identity and source bytes.
+		const originalStatus = JSON.parse(await readFile(path.join(packageDirectory, 'status.json')));
+		const source = await readFile(path.join(packageDirectory, 'src/index.ts'));
+		const sourceLedger = [
+			{ path: 'src/index.ts', origin: 'adapted', packageName: 'widget', sha256: sha256(source) },
+		];
+		await writeFile(
+			path.join(packageDirectory, 'status.json'),
+			JSON.stringify({
+				...originalStatus,
+				upstream: { package: 'widget-wrapper', version: '2.0.0' },
+				surfaces: [
+					{
+						entrypoint: '.',
+						exports: ['widget'],
+						ownership: 'copied',
+						files: ['src/index.ts'],
+						dependency: { package: 'widget', version: '1.0.0' },
+						upstreamPaths: ['src'],
+						evidence: ['tests/widget.test.ts'],
+					},
+				],
+			}),
+		);
+		const identity = {
+			packageName: 'widget',
+			version: '1.0.0',
+			commit: 'a'.repeat(40),
+			integrity: 'sha512-fixture',
+			repository: { owner: 'fixture', repo: 'widget' },
+		};
+		const inspectCopiedIdentity = (expected = identity) =>
+			inspectBindingPackage(packageDirectory, {
+				expectedPackageName: '@octanejs/widget',
+				expectedDirectory: 'packages/widget',
+				identity: expected,
+				expectedLicenseHashes: [sha256(MIT_TEXT)],
+				expectedNoticeHashes: [sha256('Fixture attribution\n')],
+				sourceLedger,
+			});
+		assert.match(inspectCopiedIdentity().issues.join('\n'), /upstream identity/);
+		const lock = {
+			schemaVersion: 1,
+			identity,
+			license: { spdx: 'MIT' },
+			scopes: ['src'],
+			files: [{ path: 'src/index.ts', gitBlob: gitBlobSha1(source), size: source.length }],
+		};
+		lock.fingerprint = upstreamLockFingerprint(lock);
+		await mkdir(path.join(packageDirectory, 'audit'));
+		await mkdir(path.join(packageDirectory, 'upstream/src'), { recursive: true });
+		await writeFile(path.join(packageDirectory, 'audit/upstream.lock.json'), JSON.stringify(lock));
+		await writeFile(path.join(packageDirectory, 'upstream/src/index.ts'), source);
+		const copiedIdentity = inspectCopiedIdentity();
+		assert.equal(copiedIdentity.status, 'passed', copiedIdentity.issues.join('\n'));
+		for (const expected of [
+			{ ...identity, commit: 'b'.repeat(40) },
+			{ ...identity, version: '9.0.0' },
+			{ ...identity, integrity: 'sha512-other' },
+			{ ...identity, repository: { owner: 'other', repo: 'widget' } },
+		]) {
+			assert.match(inspectCopiedIdentity(expected).issues.join('\n'), /upstream identity/);
+		}
+		await writeFile(path.join(packageDirectory, 'upstream/src/index.ts'), 'changed source');
+		assert.match(inspectCopiedIdentity().issues.join('\n'), /upstream identity/);
+		await writeFile(path.join(packageDirectory, 'upstream/src/index.ts'), source);
+		await writeFile(
+			path.join(packageDirectory, 'audit/upstream.lock.json'),
+			JSON.stringify({ ...lock, fingerprint: 'invalid' }),
+		);
+		assert.match(inspectCopiedIdentity().issues.join('\n'), /upstream identity/);
+		await writeFile(path.join(packageDirectory, 'status.json'), JSON.stringify(originalStatus));
+		await rm(path.join(packageDirectory, 'audit'), { recursive: true });
+		await rm(path.join(packageDirectory, 'upstream'), { recursive: true });
+		// Existing packages may use the standard Markdown license filename.
+		const licenseManifestPath = path.join(packageDirectory, 'package.json');
+		const licenseManifest = JSON.parse(await readFile(licenseManifestPath, 'utf8'));
+		licenseManifest.files = licenseManifest.files.map((file) =>
+			file === 'LICENSE' ? 'LICENSE.md' : file,
+		);
+		await writeFile(licenseManifestPath, JSON.stringify(licenseManifest));
+		await unlink(path.join(packageDirectory, 'LICENSE'));
+		await writeFile(path.join(packageDirectory, 'LICENSE.md'), MIT_TEXT);
+		const inspectLicense = () =>
+			inspectBindingPackage(packageDirectory, {
+				expectedPackageName: '@octanejs/widget',
+				expectedDirectory: 'packages/widget',
+				identity: { packageName: 'widget', version: '1.0.0', commit: 'a'.repeat(40) },
+				expectedLicenseHashes: [sha256(MIT_TEXT)],
+				expectedNoticeHashes: [sha256('Fixture attribution\n')],
+			});
+		const markdownLicense = inspectLicense();
+		assert.equal(markdownLicense.status, 'passed', markdownLicense.issues.join('\n'));
+		await writeFile(path.join(packageDirectory, 'LICENSE.md'), 'MIT\n');
+		const invalidLicense = inspectLicense();
+		assert.match(invalidLicense.issues.join('\n'), /LICENSE\.md is not recognizable MIT text/);
+		assert.match(invalidLicense.issues.join('\n'), /exact upstream bytes/);
+		await unlink(path.join(packageDirectory, 'LICENSE.md'));
+		await writeFile(path.join(packageDirectory, 'LICENSE'), MIT_TEXT);
+		licenseManifest.files = licenseManifest.files.map((file) =>
+			file === 'LICENSE.md' ? 'LICENSE' : file,
+		);
+		await writeFile(licenseManifestPath, JSON.stringify(licenseManifest));
 		await unlink(path.join(packageDirectory, 'tests/widget.test.ts'));
 		await writeFile(
 			path.join(packageDirectory, 'src/widget.spec.ts'),
@@ -540,6 +646,40 @@ describe('package and closure completion', () => {
 		assert.equal(result.status, 'blocked');
 		assert.match(result.issues.join('\n'), /surprise-runtime.*approved graph/i);
 	});
+
+	for (const [specifier, sourceFile] of [
+		['helper.js', 'helper.ts'],
+		['helper.js', 'helper.tsx'],
+		['helper.jsx', 'helper.tsx'],
+		['helper.mjs', 'helper.mts'],
+		['helper.cjs', 'helper.cts'],
+	]) {
+		test(`audits runtime dependencies behind ${specifier} imports of ${sourceFile}`, async () => {
+			const packageDirectory = await mkdtemp(path.join(tmpdir(), 'react-port-source-extension-'));
+			await mkdir(path.join(packageDirectory, 'src'));
+			await writeFile(
+				path.join(packageDirectory, 'package.json'),
+				JSON.stringify({ name: '@octanejs/widget', exports: { '.': './src/index.ts' } }),
+			);
+			await writeFile(
+				path.join(packageDirectory, 'src/index.ts'),
+				`export { widget } from './${specifier}';\n`,
+			);
+			await writeFile(
+				path.join(packageDirectory, 'src', sourceFile),
+				"import 'surprise-runtime';\nexport const widget = true;\n",
+			);
+			const result = auditShippedClosure({
+				nodeId: 'pkg:widget',
+				graphNodes: { 'pkg:widget': { packageName: 'widget', dependsOn: [] } },
+				packageDirectory,
+				runtimeDependencies: [],
+				adaptedSources: [],
+			});
+			assert.equal(result.status, 'blocked');
+			assert.match(result.issues.join('\n'), /surprise-runtime.*approved graph/i);
+		});
+	}
 
 	test('does not classify TypeScript type-only imports as shipped runtime dependencies', async () => {
 		const packageDirectory = await mkdtemp(path.join(tmpdir(), 'react-port-type-only-closure-'));
@@ -816,5 +956,56 @@ describe('package and closure completion', () => {
 		});
 		assert.equal(readiness.status, 'blocked');
 		assert.ok(readiness.issues.some((issue) => issue.includes('package-tests')));
+	});
+});
+
+test('shipped source closure retains local type-only exports without inventing runtime dependencies', async () => {
+	const directory = await mkdtemp(path.join(tmpdir(), 'react-port-public-type-closure-'));
+	await mkdir(path.join(directory, 'src'));
+	await writeFile(
+		path.join(directory, 'package.json'),
+		JSON.stringify({ exports: './src/index.ts' }),
+	);
+	await writeFile(
+		path.join(directory, 'src/index.ts'),
+		"export type { Props } from './types'; export const name = 'widget';",
+	);
+	await writeFile(
+		path.join(directory, 'src/types.ts'),
+		"import type { External } from 'type-only-authority'; export interface Props { value: External; }",
+	);
+	assert.deepEqual(inspectShippedSources(directory), {
+		files: ['src/index.ts', 'src/types.ts'],
+		runtimeDependencies: [],
+	});
+});
+
+test('source closure follows type imports and inline re-exports while retaining real runtime imports', async () => {
+	const directory = await mkdtemp(path.join(tmpdir(), 'react-port-type-edge-closure-'));
+	await mkdir(path.join(directory, 'src'));
+	await writeFile(
+		path.join(directory, 'package.json'),
+		JSON.stringify({ exports: './src/index.ts' }),
+	);
+	await writeFile(
+		path.join(directory, 'src/index.ts'),
+		[
+			"import type { Props } from './props';",
+			"export { type Details } from './details';",
+			"export type Result = import('./result').Result;",
+			"import { type External } from 'inline-types-only';",
+			"export { type Another } from 'export-types-only';",
+			"import { type Label, value } from 'real-runtime';",
+			'export const current = value;',
+		].join('\n'),
+	);
+	for (const name of ['props', 'details', 'result'])
+		await writeFile(
+			path.join(directory, 'src', name + '.ts'),
+			'export interface Value { name: string }',
+		);
+	assert.deepEqual(inspectShippedSources(directory), {
+		files: ['src/details.ts', 'src/index.ts', 'src/props.ts', 'src/result.ts'],
+		runtimeDependencies: ['real-runtime'],
 	});
 });

@@ -6,17 +6,18 @@
       "category": "State Management",
       "upstream": {
         "package": "react-alien-signals",
-        "version": "0.3.0",
-        "source": "https://github.com/Rajaniraiyn/react-alien-signals/tree/6d883959ddf25a3f486451ff8abff60eb989671c",
+        "version": "0.4.0",
+        "source": "https://github.com/Rajaniraiyn/react-alien-signals/tree/2d85d8d063d79332ec7c7e99c07bda3a722f491a",
         "license": "MIT"
       },
-      "surface": "Complete react-alien-signals hook and helper surface over the unchanged alien-signals@1.0.4 core, with Octane-native subscriptions and lifecycle ownership.",
+      "surface": "Complete react-alien-signals 0.4.0 hook and helper surface over the reused alien-signals 3.2.1 core, including batching, manual triggers, selectors, deferred reads and phase effects.",
       "divergences": [
-        "`useSignalValue` accepts any readable signal, including computed signals, correcting the upstream declaration to match its documented behavior.",
-        "`useSignalScope` starts its scope after client commit and returns a cancellation-safe controller, avoiding render-phase effects."
+        "Direct signal setters retain functional updater support; hook setters store function-valued results without invoking them twice.",
+        "The scope stop controller permanently remembers cancellation, including before commit. Upstream 0.4.0 also starts scopes after commit but does not retain pre-commit cancellation.",
+        "createEffect retains compatibility with callbacks returning incidental non-function values; only function returns own cleanup."
       ],
       "ssr": "Supported and hydration-tested. Reads use the same server snapshot; effects and scopes begin only after client commit and stop on unmount.",
-      "verified": "2026-07-30"
+      "verified": "2026-09-13"
     },
     {
       "name": "@octanejs/animejs",
@@ -186,13 +187,13 @@
       "name": "@octanejs/colorful",
       "version": "0.0.18",
       "category": "UI Libraries",
-      "upstream": { "package": "react-colorful", "version": "5.8.0" },
-      "surface": "Complete against the published react-colorful 5.8.0 root runtime and type surface: all 14 picker variants, HexColorInput, setNonce, six public color types, controlled updates, mouse/touch/keyboard input, commit callbacks, ARIA state, and automatic closest-root styling.",
+      "upstream": { "package": "react-colorful", "version": "5.8.1" },
+      "surface": "Complete against the published react-colorful 5.8.1 root runtime and type surface: all 14 picker variants, HexColorInput, setNonce, six public color types, controlled updates, mouse/touch/keyboard input, commit callbacks, ARIA state, and automatic closest-root styling.",
       "divergences": [
         "React synthetic event attribute types are represented by Octane native DOM event attributes; observable DOM events and callback values retain the upstream contract."
       ],
       "ssr": "All pickers and HexColorInput render deterministically without browser globals, hydrate by adopting existing nodes, install styles only on the client, and become interactive after hydration.",
-      "verified": "2026-08-03"
+      "verified": "2026-09-13"
     },
     {
       "name": "@octanejs/content-loader",
@@ -314,7 +315,7 @@
       "name": "@octanejs/electron",
       "version": "0.0.30",
       "category": "Desktop Apps",
-      "upstream": { "package": "electron", "version": "43.2.0" },
+      "upstream": { "package": "electron", "version": "44.3.0" },
       "surface": "Process-split Electron bindings: ./main registers ipcMain handlers, ./main/native re-exports main-only Electron APIs (Menu, Tray, session, protocol, BrowserWindow, …), ./preload exposes Electron IPC and desktop helpers via contextBridge, and the renderer entry provides Octane hooks (useInvoke, useInvokeState, useIpcEvent, useNativeTheme, useWindowState) plus promise helpers for app/window/dialog/shell/clipboard/screen. Menu/Tray/session/protocol stay intentional main-only under contextIsolation.",
       "divergences": [
         "There is no React binding upstream; Electron is framework-agnostic, so this package mirrors the React Electron process layout rather than porting a React library.",
@@ -326,7 +327,7 @@
         "Built-in desktop helpers use octane:* IPC channels; apps may allowlist additional channels in preload."
       ],
       "ssr": "Server rendering performs no IPC. useInvokeState renders pending and issues the command on the client after hydration; useIpcEvent and reactive desktop hooks subscribe only on the client. useInvoke without a host rejects with ElectronUnavailableError.",
-      "verified": "2026-08-02"
+      "verified": "2026-09-13"
     },
     {
       "name": "@octanejs/email",
@@ -427,14 +428,15 @@
       "name": "@octanejs/hook-form",
       "version": "0.1.49",
       "category": "Forms",
-      "upstream": { "package": "react-hook-form", "version": "7.81.0" },
-      "surface": "Complete port of react-hook-form 7.81.0 (tag commit 46b217e034dd92f7aa3cb3a478815556b416b299). The automated parity check runs all 1,193 original tests against the pinned React package as a pristine baseline; the Octane port separately runs byte-locked, unfiltered DOM and server suites with exact collected/executed inventories containing 1,187 entries representing 1,178 unique file/full-name identities. The nine duplicate entries are repeated titles within the DOM inventory; the server inventory is disjoint. Coverage includes `useForm`, `useController`, `useFieldArray`, `useFormState`, `useWatch`, `useFormContext`/`FormProvider`, schema resolvers, and all validation modes.",
+      "upstream": { "package": "react-hook-form", "version": "7.88.0" },
+      "surface": "Source port of react-hook-form 7.88.0 at 28334faa6105b0475060592c6bf27dca87e3941e. Includes ErrorMessage, FieldArray, FormState and its FormStateSubscribe compatibility alias, getErrors, function form actions, native File/FormData, validation, schema resolvers, subscription and reconnect behavior. Retains all upstream runtime and type registrations with 1,364 pristine Jest executions, 1,355 adapted DOM/server cases, and an explicit 90-case browser crosswalk (87 native cases; three React MUI integrations inapplicable).",
       "divergences": [
         "`register()` returns `onInput` (octane's native per-keystroke event) instead of React's synthetic `onChange`; mode names and `register` option keys keep the upstream spelling.",
-        "The structured parity ledger records native no-op input delivery, microtask batching, duplicate resolver notification, async act flush, reset render-count, and eager `Object.is` bailout differences with executable case identities, consumer impact, and migration guidance; the suite contains no skipped or expected-failure cases."
+        "The structured parity ledger records native no-op input delivery, microtask batching, duplicate resolver notification, async act flush, reset render-count, and eager `Object.is` bailout differences with executable case identities, consumer impact, and migration guidance; the adapted DOM/server suite contains no skipped or expected-failure cases.",
+        "Three original browser registrations mount React MUI components and assert their portal DOM. No Octane MUI binding exists; those external integrations remain inapplicable and visible in the full case crosswalk."
       ],
-      "ssr": "Supported and tested — the upstream `*.server.test.tsx` suite runs via `octane/server` with byte-identical markup.",
-      "verified": "2026-08-01"
+      "ssr": "Supported: adapted server markup checks plus hydration node adoption, server-effect exclusion, client values, and teardown.",
+      "verified": "2026-09-14"
     },
     {
       "name": "@octanejs/html-react-parser",
@@ -461,8 +463,8 @@
       "name": "@octanejs/i18next",
       "version": "0.1.47",
       "category": "Content",
-      "upstream": { "package": "react-i18next", "version": "17.0.9" },
-      "surface": "Complete runtime port of react-i18next 17.0.9: useTranslation, I18nextProvider/context, Trans/TransWithoutContext, IcuTrans/IcuTransWithoutContext, Translation, the withTranslation/withSSR HOCs, useSSR, namespace reporting, initialization/default helpers, and the root ICU helper exports over the unchanged i18next core.",
+      "upstream": { "package": "react-i18next", "version": "17.0.14" },
+      "surface": "Complete runtime port of react-i18next 17.0.14: useTranslation, I18nextProvider/context, Trans/TransWithoutContext, IcuTrans/IcuTransWithoutContext, Translation, the withTranslation/withSSR HOCs, useSSR, namespace reporting, initialization/default helpers, and the root ICU helper exports over the unchanged i18next core.",
       "divergences": [
         "Trans children that must be inspected are passed in prop position (`children={<>…</>}`) or through `defaults` + `components`; natural .tsrx block children are opaque compiled render bodies and fall back with a development warning.",
         "Suspense uses octane's `use(thenable)` instead of throwing a Promise.",
@@ -470,7 +472,7 @@
         "The React/Babel-specific `icu.macro` subpath is not shipped; the runtime IcuTrans APIs are fully supported."
       ],
       "ssr": "Preloaded renderToString output and namespace collection are covered; useSSR, withSSR, getInitialProps, and composeInitialProps are ported. A dedicated hydration differential is still open.",
-      "verified": "2026-08-02"
+      "verified": "2026-09-14"
     },
     {
       "name": "@octanejs/image-crop",
@@ -534,21 +536,23 @@
       "category": "UI Utilities",
       "upstream": {
         "package": "react-intersection-observer",
-        "version": "10.1.0",
-        "source": "https://github.com/thebuilder/react-intersection-observer/tree/v10.1.0",
+        "version": "11.0.1",
+        "source": "https://github.com/thebuilder/react-intersection-observer/tree/aa231b3a23ec000db0edb434693f9661ff422970/packages/react-intersection-observer",
         "license": "MIT"
       },
-      "surface": "Public runtime surface at react-intersection-observer 10.1.0: useInView, useOnInView, InView, observe, defaultFallbackInView, and test utilities. Pinned upstream unit and browser suites plus one-for-one adapted runtime/type probes are registered with react-parity:check.",
+      "surface": "Complete react-intersection-observer 11.0.1 public hooks, component, observer and test-utils surface. Ref cleanup, generic effect targets and all named public types are preserved, with strict types and unchanged React unit/SSR/browser oracles.",
       "divergences": [
         "Public node and prop types use Octane structural types and do not import React.",
         "InView is implemented as a function component while preserving the upstream render-prop and wrapper behavior.",
         "In TSRX, an InView render function must be supplied through the children prop; nested children compile to an opaque render block.",
         "Unsupported false fallback (`fallbackInView={false}` / `defaultFallbackInView(false)`) does not emit `onChange(false)` on mount under Octane (`intersection-observer-initial-false-onchange`): treat the default hidden state as authoritative rather than waiting for that callback.",
-        "Unsupported IntersectionObserver without a fallback surfaces as a passive-effect `console.error` under Octane rather than a synchronous mount throw (`intersection-observer-unsupported-mount-error-surface`); wrap with an error boundary/`tryBlock` or supply `fallbackInView`/`defaultFallbackInView` instead of try/catch around render.",
-        "`@octanejs/intersection-observer/test-utils` does not auto-register Vitest/Jest beforeEach/afterEach (`intersection-observer-test-utils-manual-setup`); call `setupIntersectionMocking`/`resetIntersectionMocking` in the test setup file."
+        "Unsupported IntersectionObserver without a fallback surfaces as a ref-commit `console.error` under Octane rather than a synchronous mount throw (`intersection-observer-unsupported-mount-error-surface`); wrap with an error boundary/`tryBlock` or supply `fallbackInView`/`defaultFallbackInView` instead of try/catch around render.",
+        "`@octanejs/intersection-observer/test-utils` does not auto-register Vitest/Jest beforeEach/afterEach (`intersection-observer-test-utils-manual-setup`); call `setupIntersectionMocking`/`resetIntersectionMocking` in the test setup file.",
+        "Ref callbacks return cleanup functions on every supported Octane version; the private React-version detection table is inapplicable.",
+        "React Profiler is not an Octane API. Adapted performance cases retain their component render and observer-construction counts."
       ],
-      "ssr": "Supported. Observation begins in an effect; initialInView controls deterministic server output.",
-      "verified": "2026-07-30"
+      "ssr": "Supported. initialInView controls deterministic server output; observation starts when the client ref is committed. Hydration adopts server nodes and unmount disconnects observation.",
+      "verified": "2026-09-13"
     },
     {
       "name": "@octanejs/jotai",
@@ -608,15 +612,15 @@
       "name": "@octanejs/mantine-hooks",
       "version": "0.1.33",
       "category": "UI Utilities",
-      "upstream": { "package": "@mantine/hooks", "version": "9.5.0" },
-      "surface": "Complete @mantine/hooks 9.5.0 runtime export surface: state, timing, storage, viewport, input, focus, pointer, observer, hotkey, scrolling, collapse, drag, splitter, mask, and utility hooks.",
+      "upstream": { "package": "@mantine/hooks", "version": "9.6.1" },
+      "surface": "Complete @mantine/hooks 9.6.1 runtime export surface: state, timing, storage, viewport, input, focus, pointer, observer, hotkey, scrolling, collapse, drag, splitter, mask, and utility hooks.",
       "divergences": [
         "Hooks use Octane's compiler-injected hook slots and runtime lifecycle instead of React's dispatcher.",
         "DOM subscriptions receive native browser events.",
         "React is retained only as a source-compatibility type vocabulary for refs, events, actions, and CSS properties; it is not loaded at runtime."
       ],
       "ssr": "Dedicated Node-mode coverage verifies deterministic state-hook output and guarded media-query initial values without a browser. DOM-only effects remain inert during server rendering.",
-      "verified": "2026-08-02"
+      "verified": "2026-09-13"
     },
     {
       "name": "@octanejs/markdown",
@@ -648,15 +652,15 @@
       "name": "@octanejs/mobx",
       "version": "0.1.33",
       "category": "State Management",
-      "upstream": { "package": "mobx-react-lite", "version": "4.1.1", "core": "mobx@6.16.1" },
-      "surface": "The framework-independent MobX core is re-exported verbatim. The function-component binding includes observer, Observer, useObserver, useLocalObservable, enableStaticRendering, isUsingStaticRendering, and the deprecated useStaticRendering alias.",
+      "upstream": { "package": "mobx-react-lite", "version": "5.0.3", "core": "mobx@7.0.3" },
+      "surface": "MobX 7 core re-exports plus observer, Observer, useLocalObservable, static-rendering controls, finalization utilities, and the retained useObserver/useStaticRendering aliases. Generic props, typed Maps, component statics, and native refs are preserved.",
       "divergences": [
         "React class components and the legacy mobx-react Provider/inject APIs are not included.",
         "forwardRef compatibility options are omitted because Octane uses refs as props.",
         "React-specific batching, prop-types validation, React DevTools integration, and useDebugValue output are omitted."
       ],
       "ssr": "enableStaticRendering(true) renders observed components without creating a Reaction or retaining observable subscriptions.",
-      "verified": "2026-08-02"
+      "verified": "2026-09-14"
     },
     {
       "name": "@octanejs/monaco-editor",
@@ -682,15 +686,15 @@
       "name": "@octanejs/motion",
       "version": "0.1.52",
       "category": "Animation",
-      "upstream": { "package": "motion", "version": "12.42.2" },
+      "upstream": { "package": "motion", "version": "13.2.0" },
       "surface": "Core surface: `motion.<tag>` (animate, gestures, variants with propagation/stagger, drag, layout basics), `AnimatePresence`, `MotionConfig`, live `useReducedMotion`, reduced-motion enforcement, `LayoutGroup` layoutId namespaces, `LazyMotion` with `domAnimation`/`domMax`, the `m` proxy and complete `./react-m` named host entry, plus the motion-value hooks (`useMotionValue`, `useScroll`, `useTransform`, `useSpring`, `useAnimate`, `useMotionValueEvent`); motion-dom's animation engine and gesture primitives are reused verbatim.",
       "divergences": [
         "Exit animations run via cleanup-before-detach instead of React's deferred-deletion machinery.",
         "`layout`/`layoutId` use single-element FLIP, not the full projection tree.",
         "An `initial` target without an `animate` target does not materialize inline initial styles; set the starting style explicitly or provide an animation target."
       ],
-      "ssr": "No SSR-specific surface; no dedicated SSR tests.",
-      "verified": "2026-08-02"
+      "ssr": "Dedicated Node-mode tests verify deterministic hook initialization without DOM effects; Chromium verifies hydration adopts that output and unmounts cleanly. Motion host-component SSR remains unsupported.",
+      "verified": "2026-09-13"
     },
     {
       "name": "@octanejs/nuqs",
@@ -711,8 +715,8 @@
       "name": "@octanejs/octane-is",
       "version": "0.0.1",
       "category": "Developer Tools",
-      "upstream": { "package": "react-is", "version": "19.2.7" },
-      "surface": "All 26 published react-is 19.2.7 exports over Octane element descriptors and callable component metadata.",
+      "upstream": { "package": "react-is", "version": "19.3.0" },
+      "surface": "All 26 published react-is 19.3.0 exports over Octane element descriptors and callable component metadata.",
       "divergences": [
         "Kind labels use Octane symbols and reject React elements.",
         "Context.Consumer, forwardRef, Profiler and SuspenseList have no Octane kind; their predicates return false.",
@@ -720,7 +724,7 @@
         "React Server Component references are not valid Octane types."
       ],
       "ssr": "Predicates are pure; they never render a component or start a lazy loader.",
-      "verified": "2026-09-03"
+      "verified": "2026-09-13"
     },
     {
       "name": "@octanejs/opentui",
@@ -830,15 +834,15 @@
       "name": "@octanejs/react-error-boundary",
       "version": "0.1.33",
       "category": "UI Utilities",
-      "upstream": { "package": "react-error-boundary", "version": "6.1.2" },
-      "surface": "Complete against the published react-error-boundary 6.1.2 function/type surface adapted to Octane: ErrorBoundary, ErrorBoundaryContext, getErrorMessage, fallback variants, onError/onReset callbacks, resetKeys, useErrorBoundary (including error), withErrorBoundary, OnErrorCallback, and UseErrorBoundaryApi.",
+      "upstream": { "package": "react-error-boundary", "version": "6.1.5" },
+      "surface": "Complete against the published react-error-boundary 6.1.5 function/type surface adapted to Octane: ErrorBoundary, ErrorBoundaryContext, getErrorMessage, fallback variants, onError/onReset callbacks, resetKeys, useErrorBoundary (including error), withErrorBoundary, OnErrorCallback, and UseErrorBoundaryApi. Imperative boundary refs expose resetErrorBoundary; wrapped component refs remain typed.",
       "divergences": [
         "Component stack information is currently an empty string because Octane does not expose a public component-stack formatter.",
         "Event-handler and asynchronous errors must be passed to useErrorBoundary().showBoundary(), matching upstream's explicit forwarding requirement.",
         "Server rendering that must match upstream error propagation uses the explicit @octanejs/react-error-boundary/server entry."
       ],
-      "ssr": "The explicit server entry renders children without a boundary so descendant errors propagate, matching react-error-boundary 6.1.2.",
-      "verified": "2026-08-02"
+      "ssr": "The explicit server entry propagates render failures like React and preserves the client boundary structure for hydration.",
+      "verified": "2026-09-13"
     },
     {
       "name": "@octanejs/react-map-gl",
@@ -914,13 +918,14 @@
       "name": "@octanejs/resizable-panels",
       "version": "0.0.10",
       "category": "UI Utilities",
-      "upstream": { "package": "react-resizable-panels", "version": "4.12.2" },
-      "surface": "Group, Panel, Separator, persistence hooks, refs, imperative APIs, layout constraints, pointer and keyboard interaction, ARIA, cursor handling, and ResizeObserver behavior are implemented against react-resizable-panels 4.12.2.",
+      "upstream": { "package": "react-resizable-panels", "version": "4.12.4" },
+      "surface": "Group, Panel, Separator, persistence hooks, refs, imperative APIs, layout constraints, pointer and keyboard interaction, ARIA, cursor handling, and ResizeObserver behavior are implemented against react-resizable-panels 4.12.4.",
       "divergences": [
-        "useId(undefined) fallback cannot reproduce React's mocked ':r123:' seam; adapted upstream case asserts a non-empty Octane id and is recorded as react-resizable-panels-useId-fallback."
+        "useId(undefined) fallback cannot reproduce React's mocked ':r123:' seam; adapted upstream case asserts a non-empty Octane id and is recorded as react-resizable-panels-useId-fallback.",
+        "The upstream React Server Components demo scenario is inapplicable because Octane does not support RSC. Client startup and SSR hydration persistence have native conformance coverage."
       ],
       "ssr": "Deterministic server rendering and live hydration adoption are covered by dedicated executable projects.",
-      "verified": "2026-08-02"
+      "verified": "2026-09-13"
     },
     {
       "name": "@octanejs/rxjs",
@@ -961,8 +966,8 @@
       "category": "Sanity Content",
       "upstream": {
         "package": "@sanity/react-loader",
-        "version": "2.2.1",
-        "commit": "2e3f5720173acfe67a771d92bb7fc5b51e6ac014"
+        "version": "2.2.2",
+        "commit": "baf6458a64aba4011a484caa7d10019549cde087"
       },
       "surface": "Query-store milestone: createQueryStore, loadQuery, setServerClient, useQuery, useLiveMode, useEncodeDataAttribute, create-data-attribute exports, browser conditions, and the server-only rsc entry.",
       "divergences": [
@@ -971,7 +976,7 @@
         "The ./rsc entry models a server-only Octane environment rather than React Server Component conditions."
       ],
       "ssr": "Supported through loadQuery/setServerClient and the server-only rsc entry; initial query state is SSR-tested.",
-      "verified": "2026-08-24"
+      "verified": "2026-09-13"
     },
     {
       "name": "@octanejs/sanity-logos",
@@ -1180,35 +1185,37 @@
       "name": "@octanejs/tanstack-ai",
       "version": "0.0.46",
       "category": "Data",
-      "upstream": { "package": "@tanstack/ai-react", "version": "0.17.0" },
-      "surface": "Ports the @tanstack/ai-react 0.17.0 hook surface (useChat, useRealtimeChat, useGeneration, useGenerateImage/Audio/Speech/Video, useTranscription, useSummarize, useAudioRecorder, useMcpAppBridge) while reusing @tanstack/ai 0.41.0 and @tanstack/ai-client 0.21.0 unchanged and mirroring all 30 @tanstack/ai-client convenience re-exports from the upstream index.",
+      "upstream": {
+        "package": "@tanstack/ai-react",
+        "version": "0.24.1",
+        "commit": "0ddaa6cb3c2e948a47dbd19d31c0ad874d176a86",
+        "license": "MIT"
+      },
+      "surface": "All three upstream entry points: chat, realtime, generation, media, persistence, BYOK and WebMCP hooks at the root; typed chat UI factories and widgets at ./ui; MCPAppResource at ./mcp-apps. Uses unchanged @tanstack/ai 0.54.0 and @tanstack/ai-client 0.31.1.",
       "divergences": [
-        "The `./mcp-apps` subpath and its `MCPAppResource` component are not ported: they render `AppRenderer` from the React-only `@mcp-ui/client`, which has no Octane equivalent. The framework-agnostic `useMcpAppBridge` hook is ported and available on the main entry.",
-        "Octane uses native events: text/file/recorder inputs drive updates via `onInput`; there is no synthetic `onChange` layer.",
-        "Octane has no StrictMode double-invoke and always provides `useId`, so no random-id fallback is needed.",
-        "The TanStack AI Devtools bridge is tagged `framework: 'octane'` (upstream `@tanstack/ai-react` sends `'react'`), so the devtools identify this binding correctly.",
-        "Realtime reconnects and token refreshes use the latest `getToken` and adapter supplied to the hook; upstream @tanstack/ai-react 0.17.0 captures the first render's callbacks.",
-        "The declared realtime `onStatusChange` callback is invoked alongside the hook's state update; upstream @tanstack/ai-react 0.17.0 currently drops the external callback.",
-        "Changing `useChat`'s connection or fetcher updates the active ChatClient in place and preserves conversation state; upstream @tanstack/ai-react 0.17.0 captures the initial transport.",
-        "One upstream `useChat` test case (\"auto-resume on mount / when the browser comes back online\") is omitted: it targets `ChatClient.prototype.maybeAutoResume`, an API absent from the pinned (and latest published) `@tanstack/ai-client@0.21.0` and never invoked by `useChat`. It is untestable in this binding until that dependency ships the method."
+        "Octane uses native input events for built-in text controls; the public ChatInput render-prop callback retains its upstream onChange name.",
+        "Octane has no StrictMode double-invoke and always provides useId.",
+        "TanStack AI Devtools identifies this binding as framework: octane.",
+        "Realtime reconnects and token refreshes use the latest getToken and adapter, and onStatusChange calls the latest supplied callback.",
+        "Changing useChat connection or fetcher preserves the ChatClient and conversation. The replacement transport is applied before the next explicit idle sendMessage, append, or reload, preserving in-flight requests and hydration resumes.",
+        "MCPAppResource uses an authored Octane host with the framework-neutral MCP Apps SDK. The React-only @mcp-ui/client is used solely as a differential test oracle."
       ],
-      "ssr": "Supported and tested: useChat renders its initial message snapshot through octane/server without a DOM.",
-      "verified": "2026-08-09"
+      "ssr": "Initial chat snapshots and chat widgets render through octane/server; hydration preserves existing DOM and subsequent thread changes.",
+      "verified": "2026-09-12"
     },
     {
       "name": "@octanejs/tanstack-db",
       "version": "0.0.15",
       "category": "Data",
-      "upstream": { "package": "@tanstack/db", "version": "0.7.0" },
-      "surface": "Re-exports `@tanstack/db@0.7.0` unchanged and ports the React live-query binding surface of `@tanstack/react-db@0.1.96` (`useLiveQuery`, `useLiveInfiniteQuery`, `useLiveSuspenseQuery`, `useLiveQueryEffect`, `usePacedMutations`) onto Octane hooks. `useLiveQuery`/`useLiveSuspenseQuery` are driven by db's shared `createLiveQueryObserver`; `useLiveInfiniteQuery` by the coordinated `createLiveQueryWindowController`.",
+      "upstream": { "package": "@tanstack/react-db", "version": "0.3.8" },
+      "surface": "Complete React DB adapter over imported @tanstack/db@0.9.0: five hooks, database provider/context, hydration boundary, derived query identity, explicit query keys and awaitable pagination.",
       "divergences": [
-        "`useLiveSuspenseQuery` consumes the preload promise through Octane's `use(thenable)` instead of throwing it, although Octane supports both forms. Because Octane keys `use()` by dynamic call-order index (not compiler slot), this binding calls `use()` unconditionally — exactly once per render, handing it an already-resolved thenable on the ready/stale paths — so a sibling `use()` or a second `useLiveSuspenseQuery` in the same component keeps a stable thenable index. Observable behavior (fallback then data) matches.",
-        "`useLiveQuery`/`useLiveInfiniteQuery` subscribe wrappers defer an initial `onStoreChange` to a microtask so an already-ready collection (or a synchronous subscribe-time window growth) is reflected in the first committed snapshot. Octane's `useSyncExternalStore` re-checks the store snapshot before, not after, the subscribe call (React re-checks after), so this nudge stands in for React's post-subscribe reconciliation. Pinned by the `eager-onstorechange` test.",
-        "`useLiveInfiniteQuery` rejects a pre-created collection that lacks an `orderBy` synchronously during render (detected via `getWindow()` returning a window object), so the error is observable to the caller, rather than letting `setWindow()` throw later inside a passive subscribe effect that Octane swallows.",
-        "StrictMode double-invocation is not applicable: Octane has no development double-invoke of component setup/cleanup."
+        "Octane uses compiler-assigned hook slots and OctaneNode children.",
+        "React StrictMode development double invocation is inapplicable.",
+        "Warning callsites exclude Octane compiler bridge frames."
       ],
-      "ssr": "Not yet exercised: no server-render tests are included for the live-query hooks.",
-      "verified": "2026-08-13"
+      "ssr": "Real server/client fixture exercises hydration adoption, live data and provider replacement; the upstream provider and hydration suites also run.",
+      "verified": "2026-09-12"
     },
     {
       "name": "@octanejs/tanstack-devtools",
@@ -1281,7 +1288,7 @@
       "name": "@octanejs/tanstack-router",
       "version": "0.1.53",
       "category": "Routing",
-      "upstream": { "package": "@tanstack/react-router", "version": "1.170.18" },
+      "upstream": { "package": "@tanstack/react-router", "version": "1.170.35" },
       "surface": "Octane's TanStack Router binding: typed route factories and hooks, the full Match pipeline and lifecycle, file routes with TSRX-aware generator integration, full Link navigation/preloading/masking behavior, blocking, Await/deferred hydration, scroll restoration, lazy routes, not-found handling, document/head assets, and client/server SSR entries.",
       "divergences": [
         "Refs are props — `createLink`'s `forwardRef` becomes a `ref` prop.",
@@ -1289,17 +1296,17 @@
         "Router devtools are distributed separately."
       ],
       "ssr": "Full-document buffered and readable-stream SSR through `./ssr/server`, client hydration through `./ssr/client`, route-owned head/scripts, CSP nonce propagation, per-route SSR modes, and native Octane stream injection; covered by Octane-only framework-contract tests in ordinary shards (not a React SSR oracle).",
-      "verified": "2026-08-02"
+      "verified": "2026-09-12"
     },
     {
       "name": "@octanejs/tanstack-router-ssr-query",
       "version": "0.0.43",
       "category": "Routing",
-      "upstream": { "package": "@tanstack/react-router-ssr-query", "version": "1.167.1" },
-      "surface": "Surface-present for the pinned adapter's only runtime entrypoint (`Options` and `setupRouterSsrQueryIntegration`). The metadata-only `./package.json` subpath is intentionally omitted. A representative differential covers provider-backed SSR, existing-wrapper preservation, setup mutations, and the wrapping control; upstream has no runtime suite, and type evidence is the upstream source compile plus the adapted Octane compile, so verification remains recorded-unverified.",
+      "upstream": { "package": "@tanstack/react-router-ssr-query", "version": "1.167.2" },
+      "surface": "Native query-client wrapping and router SSR integration for Options and setupRouterSsrQueryIntegration. The metadata-only upstream ./package.json subpath remains omitted.",
       "divergences": [],
       "ssr": "Supported — this package IS the SSR integration (dehydrates query state into the router stream and wraps the app in the query provider).",
-      "verified": "2026-08-03"
+      "verified": "2026-09-12"
     },
     {
       "name": "@octanejs/tanstack-store",
@@ -1386,11 +1393,11 @@
       "name": "@octanejs/thinking-orbs",
       "version": "0.1.2",
       "category": "Animation",
-      "upstream": { "package": "thinking-orbs", "version": "0.2.0" },
+      "upstream": { "package": "thinking-orbs", "version": "0.3.1" },
       "surface": "ThinkingOrb component, resolvePreset, MODE_DRAWS, and public types — nine animation states, two tuned size presets, auto/dark/light theme, reduced-motion static frame.",
       "divergences": [],
       "ssr": "Canvas is client-only; server render emits the canvas element without animation.",
-      "verified": "2026-08-07"
+      "verified": "2026-09-13"
     },
     {
       "name": "@octanejs/three",
@@ -1569,14 +1576,19 @@
       "name": "@octanejs/window",
       "version": "0.0.19",
       "category": "Tables",
-      "upstream": { "package": "react-window", "version": "2.3.0" },
-      "surface": "Provisional complete exact port of the react-window 2.3.0 root surface: List, Grid, getScrollbarSize, useDynamicRowHeight, four imperative-ref hooks, and all eight public types. The byte-locked pristine React suite and generated Octane adaptation each execute all 14 upstream files and all 117 cases; shared differential, SSR, hydration, and assertion-level public type lanes are required by the React parity manifest. Final Chromium/Firefox browser and executable CommonJS package-condition evidence remain pending shared infrastructure PRs #548 and #550.",
+      "upstream": {
+        "package": "react-window",
+        "version": "2.3.1",
+        "commit": "eb7398fdc0e9d9b54560142caa2f6461474e0014",
+        "license": "MIT"
+      },
+      "surface": "List, Grid, getScrollbarSize, useDynamicRowHeight, four imperative-ref hooks, and all eight public types from react-window 2.3.1. The complete 119-case upstream unit suite runs in pristine React and generated Octane lanes, with differential, SSR, hydration, shared public types, and native Chromium startup, scrolling, and direction-change coverage.",
       "divergences": [
         "Octane reserves the second raw function-component invocation argument for its internal block ABI; public props and rendered behavior match, so instrumentation should not assert React's undocumented undefined second argument.",
         "Keyed state and DOM identity are preserved, but sibling effect-log order and equal-prop rerender counts may differ after reordering because Octane schedules moved blocks and memoizes unchanged children differently."
       ],
       "ssr": "Supported and tested — defaultHeight/defaultWidth produce deterministic bounded List and Grid markup without browser globals, and hydration adopts the server nodes before live scrolling and measurement.",
-      "verified": "2026-08-03"
+      "verified": "2026-09-13"
     },
     {
       "name": "@octanejs/wouter",

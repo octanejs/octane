@@ -1,14 +1,8 @@
 diff --git a/tests/upstream/useInView.test.tsx b/tests/upstream/useInView.test.tsx
 --- a/tests/upstream/useInView.test.tsx
 +++ b/tests/upstream/useInView.test.tsx
-@@ -1,4 +1,4 @@
--import { render, screen } from "@octanejs/testing-library";
-+import { act, render, screen } from "@octanejs/testing-library";
- import { useCallback, useEffect, useState } from "octane";
- import { defaultFallbackInView, type IntersectionOptions } from "../../src/index";
- import {
-@@ -355,7 +355,7 @@ test("should set intersection ratio as the largest threshold smaller than trigge
-   screen.getByText(/intersectionRatio: 0.5/);
+@@ -459,7 +459,7 @@ test("useInView Strict Mode leaves no observer or React diagnostic", () => {
+   }
  });
  
 -test("should handle fallback if unsupported", () => {
@@ -16,7 +10,7 @@ diff --git a/tests/upstream/useInView.test.tsx b/tests/upstream/useInView.test.t
    destroyIntersectionMocking();
    // @ts-expect-error
    window.IntersectionObserver = undefined;
-@@ -367,17 +367,22 @@ test("should handle fallback if unsupported", () => {
+@@ -471,14 +471,17 @@ test("should handle fallback if unsupported", () => {
    rerender(<HookComponent options={{ fallbackInView: false }} />);
    screen.getByText("false");
  
@@ -29,11 +23,9 @@ diff --git a/tests/upstream/useInView.test.tsx b/tests/upstream/useInView.test.t
 -    `[TypeError: IntersectionObserver is not a constructor]`,
 -  );
 +  const seen: unknown[] = [];
-+  const spy = vi.spyOn(console, "error").mockImplementation((arg) => {
-+    seen.push(arg);
-+  });
++  const spy = vi.spyOn(console, "error").mockImplementation((error) => seen.push(error));
 +  try {
-+    // OCTANE DIVERGENCE[intersection-observer-unsupported-mount-error-surface][runtime:4ded56f226061c62]: Upstream rerender throws synchronously; Octane observes in a passive effect and reports via console.error.
++    // OCTANE DIVERGENCE[intersection-observer-unsupported-mount-error-surface]: Ref commit errors are reported through Octane's error channel instead of thrown from rerender.
 +    await act(() => {
 +      rerender(<HookComponent options={{ fallbackInView: undefined }} />);
 +    });
@@ -43,12 +35,17 @@ diff --git a/tests/upstream/useInView.test.tsx b/tests/upstream/useInView.test.t
 +  }
  });
  
+ test("should use the latest onChange when fallback reattaches synchronously", () => {
+@@ -512,7 +515,7 @@ test("should use the latest onChange when fallback reattaches synchronously", ()
+   expect(secondOnChange).toHaveBeenCalledOnce();
+ });
+ 
 -test("should handle defaultFallbackInView if unsupported", () => {
 +test("should handle defaultFallbackInView if unsupported", async () => {
    destroyIntersectionMocking();
    // @ts-expect-error
    window.IntersectionObserver = undefined;
-@@ -390,14 +395,19 @@ test("should handle defaultFallbackInView if unsupported", () => {
+@@ -525,14 +528,17 @@ test("should handle defaultFallbackInView if unsupported", () => {
    screen.getByText("false");
  
    defaultFallbackInView(undefined);
@@ -61,11 +58,9 @@ diff --git a/tests/upstream/useInView.test.tsx b/tests/upstream/useInView.test.t
 -    `[TypeError: IntersectionObserver is not a constructor]`,
 -  );
 +  const seen: unknown[] = [];
-+  const spy = vi.spyOn(console, "error").mockImplementation((arg) => {
-+    seen.push(arg);
-+  });
++  const spy = vi.spyOn(console, "error").mockImplementation((error) => seen.push(error));
 +  try {
-+    // OCTANE DIVERGENCE[intersection-observer-unsupported-mount-error-surface][runtime:c0bb0181b9e6cedf]: Same effect-phase console.error surface as the options fallback case.
++    // OCTANE DIVERGENCE[intersection-observer-unsupported-mount-error-surface]: Ref commit errors are reported through Octane's error channel instead of thrown from rerender.
 +    await act(() => {
 +      rerender(<HookComponent key="undefined" />);
 +    });
@@ -76,3 +71,22 @@ diff --git a/tests/upstream/useInView.test.tsx b/tests/upstream/useInView.test.t
  });
  
  test("should restore the browser IntersectionObserver", () => {
+@@ -585,16 +591,11 @@ test("should trigger all hooks when using triggerOnce with merged refs", () => {
+ 
+ test("mounting useInView does not cause an attachment rerender", () => {
+   const onRender = vi.fn();
+-  const onCommit = vi.fn();
+ 
+-  render(
+-    <React.Profiler id="useInView" onRender={onCommit}>
+-      <UseInViewLifecycleProbe onRender={onRender} />
+-    </React.Profiler>,
+-  );
++  // OCTANE DIVERGENCE[intersection-observer-profiler]: Octane has no React Profiler commit callback. Preserve the hook's render and observer assertions.
++  render(<UseInViewLifecycleProbe onRender={onRender} />);
+ 
+   expect(onRender).toHaveBeenCalledTimes(1);
+-  expect(onCommit).toHaveBeenCalledTimes(1);
+   expect(window.IntersectionObserver).toHaveBeenCalledTimes(1);
+ });
+ 

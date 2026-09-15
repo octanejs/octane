@@ -11,9 +11,9 @@ diff --git a/tests/upstream/useWatch.test.tsx b/tests/upstream/useWatch.test.tsx
 +  default: () => String(i++),
 +}));
  
- describe('useWatch', () => {
-   beforeEach(() => {
-@@ -164,7 +167,7 @@ describe('useWatch', () => {
+ // Activity is a React 19.2+ API. Only run Activity-dependent tests when the
+ // installed React actually provides it.
+@@ -218,7 +221,7 @@ describe('useWatch', () => {
    });
  
    it('should render with FormProvider', () => {
@@ -22,7 +22,7 @@ diff --git a/tests/upstream/useWatch.test.tsx b/tests/upstream/useWatch.test.tsx
        const methods = useForm<{ test: string }>();
        return <FormProvider {...methods}>{children}</FormProvider>;
      };
-@@ -228,6 +231,12 @@ describe('useWatch', () => {
+@@ -282,6 +285,12 @@ describe('useWatch', () => {
      expect(submitData).toEqual({});
    });
  
@@ -35,7 +35,7 @@ diff --git a/tests/upstream/useWatch.test.tsx b/tests/upstream/useWatch.test.tsx
    it('should return defaultValue with shouldUnregister set to true and keepDefaultValues', () => {
      const output: unknown[] = [];
  
-@@ -270,6 +279,7 @@ describe('useWatch', () => {
+@@ -324,6 +333,7 @@ describe('useWatch', () => {
        { test: 'test' },
        { test: 'test' },
        { test: 'test' },
@@ -43,7 +43,7 @@ diff --git a/tests/upstream/useWatch.test.tsx b/tests/upstream/useWatch.test.tsx
      ]);
    });
  
-@@ -533,6 +543,14 @@ describe('useWatch', () => {
+@@ -587,6 +597,14 @@ describe('useWatch', () => {
    });
  
    describe('update', () => {
@@ -58,7 +58,7 @@ diff --git a/tests/upstream/useWatch.test.tsx b/tests/upstream/useWatch.test.tsx
      it('should partial re-render', async () => {
        type FormInputs = {
          child: string;
-@@ -586,8 +604,8 @@ describe('useWatch', () => {
+@@ -640,8 +658,8 @@ describe('useWatch', () => {
  
        fireEvent.submit(screen.getByRole('button', { name: /submit/i }));
  
@@ -69,7 +69,7 @@ diff --git a/tests/upstream/useWatch.test.tsx b/tests/upstream/useWatch.test.tsx
  
        parentCount = 0;
        childCount = 0;
-@@ -598,6 +616,9 @@ describe('useWatch', () => {
+@@ -652,6 +670,9 @@ describe('useWatch', () => {
        expect(childCount).toBe(1);
      });
  
@@ -79,7 +79,7 @@ diff --git a/tests/upstream/useWatch.test.tsx b/tests/upstream/useWatch.test.tsx
      it('should partial re-render with array name and exact option', async () => {
        type FormInputs = {
          child: string;
-@@ -666,9 +687,9 @@ describe('useWatch', () => {
+@@ -720,9 +741,9 @@ describe('useWatch', () => {
  
        fireEvent.submit(screen.getByRole('button', { name: /submit/i }));
  
@@ -92,20 +92,18 @@ diff --git a/tests/upstream/useWatch.test.tsx b/tests/upstream/useWatch.test.tsx
  
        parentCount = 0;
        childCount = 0;
-@@ -1278,6 +1299,12 @@ describe('useWatch', () => {
+@@ -1367,6 +1388,10 @@ describe('useWatch', () => {
          screen.queryByText('Value 2: ShouldBeTHere'),
        ).not.toBeInTheDocument();
  
-+      // octane: snapshot regenerated under octane — the settled values after each
-+      // interaction match upstream exactly (ids included), but the intermediate
-+      // commit grouping differs: octane's scheduler flushes per microtask while
-+      // React coalesces microtask-spaced updates into one committed render, so
-+      // the Watcher render trace duplicates at different steps (upstream dups the
-+      // post-mount entry; octane dups the post-remove entry).
++      // OCTANE DIVERGENCE[hook-form-microtask-batching]: The settled field values
++      // and identities match the upstream assertions above. Octane commits the
++      // intermediate equal-value notifications differently; retain its exact
++      // observed render trace without introducing a redundant notification.
        expect(watchData).toMatchSnapshot();
      });
    });
-@@ -1663,11 +1690,11 @@ describe('useWatch', () => {
+@@ -1916,11 +1941,11 @@ describe('useWatch', () => {
              <Controller
                control={control}
                name="test"
@@ -119,7 +117,7 @@ diff --git a/tests/upstream/useWatch.test.tsx b/tests/upstream/useWatch.test.tsx
                      onChange(e.target.value);
                    }}
                  >
-@@ -1838,7 +1865,7 @@ describe('useWatch', () => {
+@@ -2091,7 +2116,7 @@ describe('useWatch', () => {
          );
        };
  
@@ -128,10 +126,10 @@ diff --git a/tests/upstream/useWatch.test.tsx b/tests/upstream/useWatch.test.tsx
          const form = useForm<FormData>({
            defaultValues: {
              one: {
-@@ -1961,6 +1988,14 @@ describe('useWatch', () => {
-   });
+@@ -2253,6 +2278,14 @@ describe('useWatch', () => {
+       expect(screen.getByText('empty')).toBeVisible();
+     });
  
-   describe('compute ', () => {
 +    // OCTANE DIVERGENCE[hook-form-eager-equal-bailout][runtime:c01c86279535b2d5]: on the first input ('' → '12') compute yields `false`, equal to the
 +    // current useWatch state — React still re-enters the render phase once more
 +    // before bailing out on an Object.is-equal setState (fiber double-buffering
@@ -143,30 +141,3 @@ diff --git a/tests/upstream/useWatch.test.tsx b/tests/upstream/useWatch.test.tsx
      it('should only update when value changed within compute', () => {
        type FormValue = {
          test: string;
-@@ -2005,7 +2040,7 @@ describe('useWatch', () => {
- 
-       screen.getByText('yes');
- 
--      expect(renderCount).toEqual(4);
-+      expect(renderCount).toEqual(3);
- 
-       fireEvent.input(screen.getByRole('textbox'), {
-         target: { value: '12' },
-@@ -2013,7 +2048,7 @@ describe('useWatch', () => {
- 
-       screen.getByText('no');
- 
--      expect(renderCount).toEqual(5);
-+      expect(renderCount).toEqual(4);
- 
-       fireEvent.input(screen.getByRole('textbox'), {
-         target: { value: '1' },
-@@ -2021,7 +2056,7 @@ describe('useWatch', () => {
- 
-       screen.getByText('no');
- 
--      expect(renderCount).toEqual(5);
-+      expect(renderCount).toEqual(4);
-     });
-   });
- });

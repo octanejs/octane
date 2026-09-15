@@ -1,0 +1,2774 @@
+[
+  {
+    "entry": ".",
+    "name": "useLiveQuery",
+    "kind": "value",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.tsx"
+  },
+  {
+    "entry": ".",
+    "name": "ConditionalUseLiveQueryConfig",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.tsx"
+  },
+  {
+    "entry": ".",
+    "name": "LiveQueryKey",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.tsx"
+  },
+  {
+    "entry": ".",
+    "name": "UseLiveQueryConfig",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.tsx"
+  },
+  {
+    "entry": ".",
+    "name": "UseLiveQueryStatus",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.tsx"
+  },
+  {
+    "entry": ".",
+    "name": "Collection",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "createTransaction",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "DbProvider",
+    "kind": "value",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.tsx"
+  },
+  {
+    "entry": ".",
+    "name": "useDbClient",
+    "kind": "value",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.tsx"
+  },
+  {
+    "entry": ".",
+    "name": "useOptionalDbClient",
+    "kind": "value",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.tsx"
+  },
+  {
+    "entry": ".",
+    "name": "DbProviderProps",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.tsx"
+  },
+  {
+    "entry": ".",
+    "name": "HydrationBoundary",
+    "kind": "value",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.tsx"
+  },
+  {
+    "entry": ".",
+    "name": "HydrationBoundaryProps",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.tsx"
+  },
+  {
+    "entry": ".",
+    "name": "useLiveSuspenseQuery",
+    "kind": "value",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.tsx"
+  },
+  {
+    "entry": ".",
+    "name": "usePacedMutations",
+    "kind": "value",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.tsx"
+  },
+  {
+    "entry": ".",
+    "name": "useLiveInfiniteQuery",
+    "kind": "value",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.tsx"
+  },
+  {
+    "entry": ".",
+    "name": "UseLiveInfiniteQueryConfig",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.tsx"
+  },
+  {
+    "entry": ".",
+    "name": "UseLiveInfiniteQueryReturn",
+    "kind": "type",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.tsx"
+  },
+  {
+    "entry": ".",
+    "name": "useLiveQueryEffect",
+    "kind": "value",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.tsx"
+  },
+  {
+    "entry": ".",
+    "name": "withCollectionConfigFactory",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "deepEquals",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "VirtualRowProps",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "VirtualOrigin",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "WithVirtualProps",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "WithoutVirtualProps",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "hasVirtualProps",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "BaseIndex",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "IndexInterface",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "IndexConstructor",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "IndexOperation",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "IndexReader",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "IndexOptions",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "BasicIndex",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "BasicIndexOptions",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "RangeQueryOptions",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "BTreeIndex",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "BTreeRangeQueryOptions",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ReverseIndex",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "optimizeExpressionWithIndexes",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "findIndexForField",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "configureIndexDevMode",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "isDevModeEnabled",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "getIndexDevModeConfig",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "trackQuery",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "clearQueryPatterns",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "getQueryPatterns",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "IndexDevModeConfig",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "IndexSuggestion",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "createEffect",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "DeltaEvent",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "DeltaType",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "EffectConfig",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "EffectContext",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Effect",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "EffectQueryInput",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "safeRandomUUID",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "IR",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "operators",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "OperatorName",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "createCollection",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "CollectionIndexMetadata",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "CollectionImpl",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "SortedMap",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "getActiveTransaction",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "TransactionScope",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Transaction",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "collectionOptions",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "isCollectionOptions",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "CollectionOptions",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "CollectionMaterializeOptions",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "DehydratedCollectionRow",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "DehydratedCollectionChunk",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "DehydratedLiveQuery",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "DehydratedLiveQueryResult",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "DehydratedDbState",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "DbClientLiveQueryState",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "DbClientLiveQuery",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "DbClientEvent",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "DehydrateDbClientOptions",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "DbClientOptions",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "DbClient",
+    "kind": "value",
+    "classification": "ported",
+    "localEvidence": "tests/types/public-contracts.test-d.tsx"
+  },
+  {
+    "entry": ".",
+    "name": "CollectionLike",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "StringCollationConfig",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "InferSchemaOutput",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "InferSchemaInput",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "TransactionState",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Fn",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "UtilsRecord",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ResolveTransactionChanges",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "PendingMutation",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "MutationFnParams",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "MutationFn",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "NonEmptyArray",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "TransactionWithMutations",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "TransactionConfig",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "CreateOptimisticActionsOptions",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Row",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "OperationType",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "SubscriptionStatus",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "SubscriptionStatusChangeEvent",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "SubscriptionStatusEvent",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "SubscriptionLoadSubsetErrorEvent",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "SubscriptionUnsubscribedEvent",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "SubscriptionEvents",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Subscription",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "CursorExpressions",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "LoadSubsetOptions",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "LoadSubsetRequestResult",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "LoadSubsetFn",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "SyncAppliedReceipt",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "UnloadSubsetFn",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "CleanupFn",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "SyncConfigRes",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "SyncConfig",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "SyncMetadataApi",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ChangeMessage",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "DeleteKeyMessage",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ChangeMessageOrDeleteKeyMessage",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "OptimisticChangeMessage",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "StandardSchema",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "StandardSchemaAlias",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "OperationConfig",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "InsertConfig",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "UpdateMutationFnParams",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "InsertMutationFnParams",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "DeleteMutationFnParams",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "InsertMutationFn",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "UpdateMutationFn",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "DeleteMutationFn",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "CollectionStatus",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "SyncMode",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "BaseCollectionConfig",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "CollectionConfig",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "SingleResult",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "NonSingleResult",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "MaybeSingleResult",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "CollectionConfigSingleRowOption",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ChangesPayload",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "InputRow",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "KeyedStream",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ResultStream",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "NamespacedRow",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "KeyedNamespacedRow",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "NamespacedAndKeyedStream",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "SubscribeChangesOptions",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "SubscribeChangesSnapshotOptions",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "CurrentStateAsChangesOptions",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ChangeListener",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "WritableDeep",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "MakeOptional",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "createChangeProxy",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "createArrayChangeProxy",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "withChangeTracking",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "withArrayChangeTracking",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "BaseQueryBuilder",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Query",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "InitialQueryBuilder",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "QueryBuilder",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Context",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ContextSchema",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Source",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "GetResult",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "InferResultType",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ExtractContext",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "QueryResult",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ContextFromSource",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ContextFromUnionBranches",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ContextFromUnionSource",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "SchemaFromSource",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "SingleSource",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "InferCollectionType",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "MergeContextWithJoinType",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "MergeContextForJoinCallback",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ApplyJoinOptionalityToMergedSchema",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ResultTypeFromSelect",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "WithResult",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "JoinOnCallback",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "RefsForContext",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "WhereCallback",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "OrderByCallback",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "GroupByCallback",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "SelectObject",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "FunctionalHavingRow",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Prettify",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "eq",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "gt",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "gte",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "lt",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "lte",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "and",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "or",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "not",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "inArray",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "like",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ilike",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "isUndefined",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "isNull",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "upper",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "lower",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "length",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "concat",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "coalesce",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "caseWhen",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "add",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "subtract",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "multiply",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "divide",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "count",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "avg",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "sum",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "min",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "max",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "toArray",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "materialize",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Ref",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "compileQuery",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "compileExpression",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "compileSingleRowExpression",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "toBooleanPredicate",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "createLiveQueryCollection",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "liveQueryCollectionOptions",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "queryOnce",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "QueryOnceConfig",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "LiveQueryCollectionConfig",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "LiveQueryCollectionUtils",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "UnhashableQueryIRError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "canonicalizeQueryIR",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "getLoadSubsetDemandKey",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "getQueryIdentity",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "getStableQueryBuilderHash",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "getStableQueryIRHash",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "getStableValueHash",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "DemandKey",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "QueryIdentity",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "DeduplicatedLoadSubset",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "createOptimisticAction",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "isCollection",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "isSingleResultCollection",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "getLiveQueryStatusFlags",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "LiveQueryStatusFlags",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "createLiveQueryObserver",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "LiveQuerySnapshot",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "LiveQueryObserverListener",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "LiveQueryObserver",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "CreateLiveQueryObserverOptions",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "prepareLiveQueryValue",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "getPreparedLiveQueryIdentity",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "getLiveQueryHash",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "LiveQueryOptions",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "DeferredLiveQueryCollections",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "getLiveQueryWindowInputKind",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "resolveLiveQueryWindowInput",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "normalizeLiveQueryWindowPageSize",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "hasLiveQueryWindowLeases",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "assertLiveQueryWindowManyResult",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "isLiveQueryWindowCollection",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "getLiveQueryWindowCollectionWarning",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "compareLiveQueryWindowDependencies",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "shouldPreserveLiveQueryWindowPageCount",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "fetchNextLiveQueryWindowPage",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "createLiveQueryWindowController",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "LiveQueryWindowInputKind",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ResolvedLiveQueryWindowInput",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "LiveQueryWindowCollection",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "LiveQueryWindowSnapshot",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "CreateLiveQueryWindowControllerOptions",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "LiveQueryWindowController",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "localOnlyCollectionOptions",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "LocalOnlyCollectionConfig",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "LocalOnlyCollectionUtils",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "localStorageCollectionOptions",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "StorageApi",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "StorageEventApi",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Parser",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "LocalStorageCollectionConfig",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ClearStorageFn",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "GetStorageSizeFn",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "LocalStorageCollectionUtils",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "TanStackDBError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "NonRetriableError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "SchemaValidationError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "DuplicateDbInstanceError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "CollectionConfigurationError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "CollectionRequiresConfigError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "CollectionRequiresSyncConfigError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "InvalidSchemaError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "SchemaMustBeSynchronousError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "CollectionStateError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "CollectionInErrorStateError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "InvalidCollectionStatusTransitionError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "CollectionIsInErrorStateError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "NegativeActiveSubscribersError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "LiveQueryObserverDisposedError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "LiveQueryWindowControllerDisposedError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "CollectionOperationError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "UndefinedKeyError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "InvalidKeyError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "DuplicateKeyError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "DuplicateKeySyncError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "MissingUpdateArgumentError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "NoKeysPassedToUpdateError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "UpdateKeyNotFoundError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "KeyUpdateNotAllowedError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "NoKeysPassedToDeleteError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "DeleteKeyNotFoundError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "MissingHandlerError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "MissingInsertHandlerError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "MissingUpdateHandlerError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "MissingDeleteHandlerError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "TransactionError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "MissingMutationFunctionError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "OnMutateMustBeSynchronousError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "TransactionNotPendingMutateError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "TransactionAlreadyCompletedRollbackError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "TransactionNotPendingCommitError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "NoPendingSyncTransactionWriteError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "SyncTransactionAlreadyCommittedWriteError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "NoPendingSyncTransactionCommitError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "SyncTransactionAlreadyCommittedError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "QueryBuilderError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "OnlyOneSourceAllowedError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "SubQueryMustHaveFromClauseError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "InvalidSourceError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "SourceClauseContext",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "InvalidSourceTypeError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "JoinConditionMustBeEqualityError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "QueryMustHaveFromClauseError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "InvalidWhereExpressionError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "QueryCompilationError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "UnsafeAliasPathError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "DistinctRequiresSelectError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "FnSelectWithGroupByError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "UnsupportedFnSelectResultError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "UnsupportedRootScalarSelectError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "HavingRequiresGroupByError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "LimitOffsetRequireOrderByError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "CollectionInputNotFoundError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "DuplicateAliasInSubqueryError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "UnsupportedFromTypeError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "UnknownExpressionTypeError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "EmptyReferencePathError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "UnknownFunctionError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "JoinCollectionNotFoundError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "JoinError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "UnsupportedJoinTypeError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "InvalidJoinConditionSameSourceError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "InvalidJoinConditionSourceMismatchError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "InvalidJoinConditionLeftSourceError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "InvalidJoinConditionRightSourceError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "InvalidJoinCondition",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "UnsupportedJoinSourceTypeError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "GroupByError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "NonAggregateExpressionNotInGroupByError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "UnsupportedAggregateFunctionError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "AggregateFunctionNotInSelectError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "UnknownHavingExpressionTypeError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "StorageError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "SerializationError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "LocalStorageCollectionError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "StorageKeyRequiredError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "InvalidStorageDataFormatError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "InvalidStorageObjectFormatError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "SyncCleanupError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "SyncTransactionAbortedError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "CollectionPreloadAbortedError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "LoadSubsetOperationAbortedError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "QueryOptimizerError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "CannotCombineEmptyExpressionListError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "MissingAliasInputsError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "SetWindowRequiresOrderByError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "SetWindowReentrancyError",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "createPacedMutations",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "PacedMutationsConfig",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "debounceStrategy",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "queueStrategy",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "throttleStrategy",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "Strategy",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "BaseStrategy",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "DebounceStrategy",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "DebounceStrategyOptions",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "QueueStrategy",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "QueueStrategyOptions",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ThrottleStrategy",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ThrottleStrategyOptions",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "StrategyOptions",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "extractFieldPath",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "extractValue",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "walkExpression",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "parseWhereExpression",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "parseOrderByExpression",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "extractSimpleComparisons",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "parseLoadSubsetOptions",
+    "kind": "value",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "FieldPath",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "SimpleComparison",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ParseWhereOptions",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  },
+  {
+    "entry": ".",
+    "name": "ParsedOrderBy",
+    "kind": "type",
+    "classification": "imported",
+    "localEvidence": "tests/types/core-exports.test-d.ts"
+  }
+]

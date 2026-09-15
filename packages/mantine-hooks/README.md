@@ -1,7 +1,7 @@
 # @octanejs/mantine-hooks
 
 Mantine hooks for Octane. This package ports the complete
-`@mantine/hooks@9.5.0` runtime surface to Octane hooks while preserving Mantine's
+`@mantine/hooks@9.6.1` runtime surface to Octane hooks while preserving Mantine's
 public names, arguments, return values, and browser behavior.
 
 ## Installation
@@ -27,7 +27,7 @@ export function Controls() @{
 
 ## Compatibility
 
-- All runtime exports from `@mantine/hooks@9.5.0` are present.
+- All runtime exports from `@mantine/hooks@9.6.1` are present.
 - Hook implementations use Octane state, effects, refs, memoization, and
   compiler-injected hook slots.
 - DOM subscriptions use native browser events, matching Mantine's underlying

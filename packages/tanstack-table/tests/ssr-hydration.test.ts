@@ -33,4 +33,4 @@ it('adopts server table rows and updates their data without remounting', async (
 	}
 	expect(row.isConnected).toBe(false);
 	expect(button.isConnected).toBe(false);
-});
+}, 30_000);

@@ -41,10 +41,11 @@ export type UseMatchRoute<out TFrom> = <
 	TRouter extends AnyRouter = RegisteredRouter,
 	TSelected = unknown,
 	TStructuralSharing extends boolean = boolean,
+	TThrow extends boolean = true,
 >(
-	opts?: UseMatchBaseOptions<TRouter, TFrom, true, true, TSelected, TStructuralSharing> &
+	opts?: UseMatchBaseOptions<TRouter, TFrom, true, TThrow, TSelected, TStructuralSharing> &
 		StructuralSharingOption<TRouter, TSelected, TStructuralSharing>,
-) => UseMatchResult<TRouter, TFrom, true, TSelected>;
+) => ThrowOrOptional<UseMatchResult<TRouter, TFrom, true, TSelected>, TThrow>;
 
 export type UseMatchOptions<
 	TRouter extends AnyRouter,
@@ -86,10 +87,11 @@ export type UseParamsRoute<out TFrom> = <
 	TRouter extends AnyRouter = RegisteredRouter,
 	TSelected = unknown,
 	TStructuralSharing extends boolean = boolean,
+	TThrow extends boolean = true,
 >(
-	opts?: UseParamsBaseOptions<TRouter, TFrom, true, true, TSelected, TStructuralSharing> &
+	opts?: UseParamsBaseOptions<TRouter, TFrom, true, TThrow, TSelected, TStructuralSharing> &
 		StructuralSharingOption<TRouter, TSelected, TStructuralSharing>,
-) => UseParamsResult<TRouter, TFrom, true, TSelected>;
+) => ThrowOrOptional<UseParamsResult<TRouter, TFrom, true, TSelected>, TThrow>;
 
 export type UseParamsOptions<
 	TRouter extends AnyRouter,
@@ -120,10 +122,11 @@ export type UseSearchRoute<out TFrom> = <
 	TRouter extends AnyRouter = RegisteredRouter,
 	TSelected = unknown,
 	TStructuralSharing extends boolean = boolean,
+	TThrow extends boolean = true,
 >(
-	opts?: UseSearchBaseOptions<TRouter, TFrom, true, true, TSelected, TStructuralSharing> &
+	opts?: UseSearchBaseOptions<TRouter, TFrom, true, TThrow, TSelected, TStructuralSharing> &
 		StructuralSharingOption<TRouter, TSelected, TStructuralSharing>,
-) => UseSearchResult<TRouter, TFrom, true, TSelected>;
+) => ThrowOrOptional<UseSearchResult<TRouter, TFrom, true, TSelected>, TThrow>;
 
 export type UseSearchOptions<
 	TRouter extends AnyRouter,

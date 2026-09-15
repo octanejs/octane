@@ -6,7 +6,7 @@
     "moduleResolution": "bundler",
     "esModuleInterop": true,
     "lib": ["dom", "dom.iterable", "esnext"],
-    "skipLibCheck": true,
+    "skipLibCheck": false,
     "types": ["node"],
     "noEmit": true,
     "noErrorTruncation": true,
@@ -19,5 +19,14 @@
       "@octanejs/alien-signals": ["../src/index.ts"]
     }
   },
-  "include": ["./upstream-typecheck.test-d.ts", "./public-api.test-d.ts"]
+  "include": [
+    "./upstream-typecheck.test-d.ts",
+    "./public-api.test-d.ts",
+    "../tests/types/public-api.ts"
+  ],
+  "reactPortEvidence": {
+    "gate": "upstream-types-adapted",
+    "upstreamRegistrations": [],
+    "publicMode": "pinned"
+  }
 }

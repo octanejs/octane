@@ -1,0 +1,2595 @@
+[
+  {
+    "id": "react-case-v1:b049f5b22de6801b566e",
+    "classification": "implemented",
+    "localEvidence": "tests/browser/upstream.browser.test.ts",
+    "rationale": "The pinned browser driver executes unchanged assertions in ordinary and popup Chromium windows; upstream-runner.mjs only redirects its fixture origin."
+  },
+  {
+    "id": "react-case-v1:6188d532ed876b59e608",
+    "classification": "implemented",
+    "localEvidence": "tests/browser/upstream.browser.test.ts",
+    "rationale": "The pinned browser driver executes unchanged assertions in ordinary and popup Chromium windows; upstream-runner.mjs only redirects its fixture origin."
+  },
+  {
+    "id": "react-case-v1:6d35be6b70e101d9cad0",
+    "classification": "implemented",
+    "localEvidence": "tests/browser/upstream.browser.test.ts",
+    "rationale": "The pinned browser driver executes unchanged assertions in ordinary and popup Chromium windows; upstream-runner.mjs only redirects its fixture origin."
+  },
+  {
+    "id": "react-case-v1:1e35d0fd707b0b770370",
+    "classification": "implemented",
+    "localEvidence": "tests/browser/upstream.browser.test.ts",
+    "rationale": "The pinned browser driver executes unchanged assertions in ordinary and popup Chromium windows; upstream-runner.mjs only redirects its fixture origin."
+  },
+  {
+    "id": "react-case-v1:d4fea5ea61ec0d45907c",
+    "classification": "implemented",
+    "localEvidence": "tests/browser/upstream.browser.test.ts",
+    "rationale": "The pinned browser driver executes unchanged assertions in ordinary and popup Chromium windows; upstream-runner.mjs only redirects its fixture origin."
+  },
+  {
+    "id": "react-case-v1:3c18e4e8bb0f52346414",
+    "classification": "implemented",
+    "localEvidence": "tests/browser/upstream.browser.test.ts",
+    "rationale": "The pinned browser driver executes unchanged assertions in ordinary and popup Chromium windows; upstream-runner.mjs only redirects its fixture origin."
+  },
+  {
+    "id": "react-case-v1:ad30007c80be8c646f66",
+    "classification": "implemented",
+    "localEvidence": "tests/browser/upstream.browser.test.ts",
+    "rationale": "The pinned browser driver executes unchanged assertions in ordinary and popup Chromium windows; upstream-runner.mjs only redirects its fixture origin."
+  },
+  {
+    "id": "react-case-v1:ad79df8c5bce231b45bd",
+    "classification": "implemented",
+    "localEvidence": "tests/browser/upstream.browser.test.ts",
+    "rationale": "The pinned browser driver executes unchanged assertions in ordinary and popup Chromium windows; upstream-runner.mjs only redirects its fixture origin."
+  },
+  {
+    "id": "react-case-v1:ad5f16b4a8639d85733d",
+    "classification": "implemented",
+    "localEvidence": "tests/browser/upstream.browser.test.ts",
+    "rationale": "The pinned browser driver executes unchanged assertions in ordinary and popup Chromium windows; upstream-runner.mjs only redirects its fixture origin."
+  },
+  {
+    "id": "react-case-v1:336dfa5565ceadd37998",
+    "classification": "implemented",
+    "localEvidence": "tests/browser/upstream.browser.test.ts",
+    "rationale": "The pinned browser driver executes unchanged assertions in ordinary and popup Chromium windows; upstream-runner.mjs only redirects its fixture origin."
+  },
+  {
+    "id": "react-case-v1:9c68c5a1ab434b129ea2",
+    "classification": "implemented",
+    "localEvidence": "tests/browser/upstream.browser.test.ts",
+    "rationale": "The pinned browser driver executes unchanged assertions in ordinary and popup Chromium windows; upstream-runner.mjs only redirects its fixture origin."
+  },
+  {
+    "id": "react-case-v1:a0bcaa444f55c901c7a8",
+    "classification": "implemented",
+    "localEvidence": "tests/browser/upstream.browser.test.ts",
+    "rationale": "The pinned browser driver executes unchanged assertions in ordinary and popup Chromium windows; upstream-runner.mjs only redirects its fixture origin."
+  },
+  {
+    "id": "react-case-v1:a2b7b10764d103c354dd",
+    "classification": "conformance",
+    "rationale": "The upstream case depends on an application server outside the binding. Equivalent Octane coverage observes persisted panel geometry and actual layout-shift entries across reload.",
+    "localEvidence": "tests/browser/interactions.browser.test.ts",
+    "testTitle": "preserves saved layout without shifting on client startup"
+  },
+  {
+    "id": "react-case-v1:3ca31eb7fed7acbf129e",
+    "classification": "conformance",
+    "rationale": "The upstream case depends on an application server outside the binding. Equivalent Octane coverage observes persisted panel geometry and actual layout-shift entries across reload and server DOM adoption during hydration.",
+    "localEvidence": "tests/browser/interactions.browser.test.ts",
+    "testTitle": "preserves saved layout without shifting on SSR hydration"
+  },
+  {
+    "id": "react-case-v1:f94dcd9ed587a4840736",
+    "classification": "inapplicable",
+    "rationale": "Octane does not support React Server Components; this case exercises the upstream Next.js RSC application."
+  },
+  {
+    "id": "react-case-v1:4d05a32a9d7a0f74deab",
+    "classification": "implemented",
+    "localEvidence": "tests/browser/upstream.browser.test.ts",
+    "rationale": "The pinned browser driver executes unchanged assertions in ordinary and popup Chromium windows; upstream-runner.mjs only redirects its fixture origin."
+  },
+  {
+    "id": "react-case-v1:aa4f301b050a7bf13147",
+    "classification": "implemented",
+    "localEvidence": "tests/browser/upstream.browser.test.ts",
+    "rationale": "The pinned browser driver executes unchanged assertions in ordinary and popup Chromium windows; upstream-runner.mjs only redirects its fixture origin."
+  },
+  {
+    "id": "react-case-v1:8b93fc494a4fce939eae",
+    "classification": "implemented",
+    "localEvidence": "tests/browser/upstream.browser.test.ts",
+    "rationale": "The pinned browser driver executes unchanged assertions in ordinary and popup Chromium windows; upstream-runner.mjs only redirects its fixture origin."
+  },
+  {
+    "id": "react-case-v1:ad6e20a33021c2e3e44f",
+    "classification": "implemented",
+    "localEvidence": "tests/browser/upstream.browser.test.ts",
+    "rationale": "The pinned browser driver executes unchanged assertions in ordinary and popup Chromium windows; upstream-runner.mjs only redirects its fixture origin."
+  },
+  {
+    "id": "react-case-v1:e67a32f123762c3d2d4b",
+    "classification": "implemented",
+    "localEvidence": "tests/browser/upstream.browser.test.ts",
+    "rationale": "The pinned browser driver executes unchanged assertions in ordinary and popup Chromium windows; upstream-runner.mjs only redirects its fixture origin."
+  },
+  {
+    "id": "react-case-v1:2369925408dbc69b5532",
+    "classification": "implemented",
+    "localEvidence": "tests/browser/upstream.browser.test.ts",
+    "rationale": "The pinned browser driver executes unchanged assertions in ordinary and popup Chromium windows; upstream-runner.mjs only redirects its fixture origin."
+  },
+  {
+    "id": "react-case-v1:d489bfcc37fea6eb98dc",
+    "classification": "implemented",
+    "localEvidence": "tests/browser/upstream.browser.test.ts",
+    "rationale": "The pinned browser driver executes unchanged assertions in ordinary and popup Chromium windows; upstream-runner.mjs only redirects its fixture origin."
+  },
+  {
+    "id": "react-case-v1:d1a1cfb83b6d2f43c431",
+    "classification": "implemented",
+    "localEvidence": "tests/browser/upstream.browser.test.ts",
+    "rationale": "The pinned browser driver executes unchanged assertions in ordinary and popup Chromium windows; upstream-runner.mjs only redirects its fixture origin."
+  },
+  {
+    "id": "react-registration-v1:f0605b97b814d3e4bd86",
+    "classification": "implemented",
+    "localEvidence": "tests/browser/upstream.browser.test.ts",
+    "rationale": "The pinned browser driver executes unchanged assertions in ordinary and popup Chromium windows; upstream-runner.mjs only redirects its fixture origin."
+  },
+  {
+    "id": "react-registration-v1:93cbe27edaa1d55febaa",
+    "classification": "implemented",
+    "localEvidence": "tests/browser/upstream.browser.test.ts",
+    "rationale": "The pinned browser driver executes unchanged assertions in ordinary and popup Chromium windows; upstream-runner.mjs only redirects its fixture origin."
+  },
+  {
+    "id": "react-registration-v1:b5b867004b03c8359554",
+    "classification": "implemented",
+    "localEvidence": "tests/browser/upstream.browser.test.ts",
+    "rationale": "The pinned browser driver executes unchanged assertions in ordinary and popup Chromium windows; upstream-runner.mjs only redirects its fixture origin."
+  },
+  {
+    "id": "react-registration-v1:dc0b1375c44a25ece8a7",
+    "classification": "implemented",
+    "localEvidence": "tests/browser/upstream.browser.test.ts",
+    "rationale": "The pinned browser driver executes unchanged assertions in ordinary and popup Chromium windows; upstream-runner.mjs only redirects its fixture origin."
+  },
+  {
+    "id": "react-case-v1:ee90af5cadc23bb4cba4",
+    "classification": "implemented",
+    "localEvidence": "tests/browser/upstream.browser.test.ts",
+    "rationale": "The pinned browser driver executes unchanged assertions in ordinary and popup Chromium windows; upstream-runner.mjs only redirects its fixture origin."
+  },
+  {
+    "id": "react-case-v1:8f03671c62539e3c3162",
+    "classification": "implemented",
+    "localEvidence": "tests/browser/upstream.browser.test.ts",
+    "rationale": "The pinned browser driver executes unchanged assertions in ordinary and popup Chromium windows; upstream-runner.mjs only redirects its fixture origin."
+  },
+  {
+    "id": "react-case-v1:223e07997bf9befd078b",
+    "classification": "implemented",
+    "localEvidence": "tests/browser/upstream.browser.test.ts",
+    "rationale": "The pinned browser driver executes unchanged assertions in ordinary and popup Chromium windows; upstream-runner.mjs only redirects its fixture origin."
+  },
+  {
+    "id": "react-case-v1:536ccfe9eef80a8bfa69",
+    "classification": "implemented",
+    "localEvidence": "tests/browser/upstream.browser.test.ts",
+    "rationale": "The pinned browser driver executes unchanged assertions in ordinary and popup Chromium windows; upstream-runner.mjs only redirects its fixture origin."
+  },
+  {
+    "id": "react-case-v1:995f13a42d17bad0dbd1",
+    "classification": "implemented",
+    "localEvidence": "tests/browser/upstream.browser.test.ts",
+    "rationale": "The pinned browser driver executes unchanged assertions in ordinary and popup Chromium windows; upstream-runner.mjs only redirects its fixture origin."
+  },
+  {
+    "id": "react-case-v1:1d5f62a7322e6f8fc7b4",
+    "classification": "implemented",
+    "localEvidence": "tests/browser/upstream.browser.test.ts",
+    "rationale": "The pinned browser driver executes unchanged assertions in ordinary and popup Chromium windows; upstream-runner.mjs only redirects its fixture origin."
+  },
+  {
+    "id": "react-case-v1:b35f2e0b92e69efd618e",
+    "classification": "implemented",
+    "localEvidence": "tests/browser/upstream.browser.test.ts",
+    "rationale": "The pinned browser driver executes unchanged assertions in ordinary and popup Chromium windows; upstream-runner.mjs only redirects its fixture origin."
+  },
+  {
+    "id": "react-case-v1:8af506d78ee13e03a595",
+    "classification": "implemented",
+    "localEvidence": "tests/browser/upstream.browser.test.ts",
+    "rationale": "The pinned browser driver executes unchanged assertions in ordinary and popup Chromium windows; upstream-runner.mjs only redirects its fixture origin."
+  },
+  {
+    "id": "react-case-v1:229d45e6af64a35a759d",
+    "classification": "implemented",
+    "localEvidence": "tests/browser/upstream.browser.test.ts",
+    "rationale": "The pinned browser driver executes unchanged assertions in ordinary and popup Chromium windows; upstream-runner.mjs only redirects its fixture origin."
+  },
+  {
+    "id": "react-case-v1:9b13d106e2a2d4c3500f",
+    "classification": "implemented",
+    "localEvidence": "tests/browser/upstream.browser.test.ts",
+    "rationale": "The pinned browser driver executes unchanged assertions in ordinary and popup Chromium windows; upstream-runner.mjs only redirects its fixture origin."
+  },
+  {
+    "id": "react-case-v1:4538a9e9659f9999eec5",
+    "classification": "implemented",
+    "localEvidence": "tests/browser/upstream.browser.test.ts",
+    "rationale": "The pinned browser driver executes unchanged assertions in ordinary and popup Chromium windows; upstream-runner.mjs only redirects its fixture origin."
+  },
+  {
+    "id": "react-case-v1:ec8d0dd75c9b15437923",
+    "classification": "implemented",
+    "localEvidence": "tests/browser/upstream.browser.test.ts",
+    "rationale": "The pinned browser driver executes unchanged assertions in ordinary and popup Chromium windows; upstream-runner.mjs only redirects its fixture origin."
+  },
+  {
+    "id": "react-case-v1:d41b789baf02d654add5",
+    "classification": "implemented",
+    "localEvidence": "tests/browser/upstream.browser.test.ts",
+    "rationale": "The pinned browser driver executes unchanged assertions in ordinary and popup Chromium windows; upstream-runner.mjs only redirects its fixture origin."
+  },
+  {
+    "id": "react-case-v1:56507e23f2cad44f2f6f",
+    "classification": "implemented",
+    "localEvidence": "tests/browser/upstream.browser.test.ts",
+    "rationale": "The pinned browser driver executes unchanged assertions in ordinary and popup Chromium windows; upstream-runner.mjs only redirects its fixture origin."
+  },
+  {
+    "id": "react-case-v1:7a937ec54741cf167b8e",
+    "classification": "implemented",
+    "localEvidence": "tests/browser/upstream.browser.test.ts",
+    "rationale": "The pinned browser driver executes unchanged assertions in ordinary and popup Chromium windows; upstream-runner.mjs only redirects its fixture origin."
+  },
+  {
+    "id": "react-case-v1:0be9206cc03ce878d105",
+    "classification": "implemented",
+    "localEvidence": "tests/browser/upstream.browser.test.ts",
+    "rationale": "The pinned browser driver executes unchanged assertions in ordinary and popup Chromium windows; upstream-runner.mjs only redirects its fixture origin."
+  },
+  {
+    "id": "react-case-v1:560192031b0eed1262b7",
+    "classification": "implemented",
+    "localEvidence": "tests/browser/upstream.browser.test.ts",
+    "rationale": "The pinned browser driver executes unchanged assertions in ordinary and popup Chromium windows; upstream-runner.mjs only redirects its fixture origin."
+  },
+  {
+    "id": "react-case-v1:4e9611dd0848bf25ce24",
+    "classification": "implemented",
+    "localEvidence": "tests/browser/upstream.browser.test.ts",
+    "rationale": "The pinned browser driver executes unchanged assertions in ordinary and popup Chromium windows; upstream-runner.mjs only redirects its fixture origin."
+  },
+  {
+    "id": "react-case-v1:436b7b623e5ae9cf3853",
+    "classification": "implemented",
+    "localEvidence": "tests/browser/upstream.browser.test.ts",
+    "rationale": "The pinned browser driver executes unchanged assertions in ordinary and popup Chromium windows; upstream-runner.mjs only redirects its fixture origin."
+  },
+  {
+    "id": "react-case-v1:cead60230c655a2865b1",
+    "classification": "implemented",
+    "localEvidence": "tests/browser/upstream.browser.test.ts",
+    "rationale": "The pinned browser driver executes unchanged assertions in ordinary and popup Chromium windows; upstream-runner.mjs only redirects its fixture origin."
+  },
+  {
+    "id": "react-case-v1:5dc590a8503d297166ae",
+    "classification": "implemented",
+    "localEvidence": "tests/browser/upstream.browser.test.ts",
+    "rationale": "The pinned browser driver executes unchanged assertions in ordinary and popup Chromium windows; upstream-runner.mjs only redirects its fixture origin."
+  },
+  {
+    "id": "react-case-v1:4411d457aebb833cb807",
+    "classification": "implemented",
+    "localEvidence": "tests/browser/upstream.browser.test.ts",
+    "rationale": "The pinned browser driver executes unchanged assertions in ordinary and popup Chromium windows; upstream-runner.mjs only redirects its fixture origin."
+  },
+  {
+    "id": "react-case-v1:15b6ad1014dc33cf22ed",
+    "classification": "implemented",
+    "localEvidence": "tests/browser/upstream.browser.test.ts",
+    "rationale": "The pinned browser driver executes unchanged assertions in ordinary and popup Chromium windows; upstream-runner.mjs only redirects its fixture origin."
+  },
+  {
+    "id": "react-case-v1:f41d729f836aa9cc856b",
+    "classification": "implemented",
+    "localEvidence": "tests/browser/upstream.browser.test.ts",
+    "rationale": "The pinned browser driver executes unchanged assertions in ordinary and popup Chromium windows; upstream-runner.mjs only redirects its fixture origin."
+  },
+  {
+    "id": "react-case-v1:10208331985e2ade0c90",
+    "classification": "implemented",
+    "localEvidence": "tests/browser/upstream.browser.test.ts",
+    "rationale": "The pinned browser driver executes unchanged assertions in ordinary and popup Chromium windows; upstream-runner.mjs only redirects its fixture origin."
+  },
+  {
+    "id": "react-case-v1:59811fde07e0823c7885",
+    "classification": "implemented",
+    "localEvidence": "tests/browser/upstream.browser.test.ts",
+    "rationale": "The pinned browser driver executes unchanged assertions in ordinary and popup Chromium windows; upstream-runner.mjs only redirects its fixture origin."
+  },
+  {
+    "id": "react-case-v1:5b195847c735f7848ce0",
+    "classification": "implemented",
+    "localEvidence": "tests/browser/upstream.browser.test.ts",
+    "rationale": "The pinned browser driver executes unchanged assertions in ordinary and popup Chromium windows; upstream-runner.mjs only redirects its fixture origin."
+  },
+  {
+    "id": "react-case-v1:8e404e03ede1b95118be",
+    "classification": "implemented",
+    "localEvidence": "tests/browser/upstream.browser.test.ts",
+    "rationale": "The pinned browser driver executes unchanged assertions in ordinary and popup Chromium windows; upstream-runner.mjs only redirects its fixture origin."
+  },
+  {
+    "id": "react-case-v1:49d032278b1ecdec076e",
+    "classification": "implemented",
+    "localEvidence": "tests/browser/upstream.browser.test.ts",
+    "rationale": "The pinned browser driver executes unchanged assertions in ordinary and popup Chromium windows; upstream-runner.mjs only redirects its fixture origin."
+  },
+  {
+    "id": "react-case-v1:0698fa6958d963f2e735",
+    "classification": "implemented",
+    "localEvidence": "tests/browser/upstream.browser.test.ts",
+    "rationale": "The pinned browser driver executes unchanged assertions in ordinary and popup Chromium windows; upstream-runner.mjs only redirects its fixture origin."
+  },
+  {
+    "id": "react-case-v1:542c7b1b8e386c14ec22",
+    "classification": "implemented",
+    "localEvidence": "tests/browser/upstream.browser.test.ts",
+    "rationale": "The pinned browser driver executes unchanged assertions in ordinary and popup Chromium windows; upstream-runner.mjs only redirects its fixture origin."
+  },
+  {
+    "id": "react-case-v1:98c9ca25c8a3e8f5feab",
+    "classification": "implemented",
+    "localEvidence": "tests/browser/upstream.browser.test.ts",
+    "rationale": "The pinned browser driver executes unchanged assertions in ordinary and popup Chromium windows; upstream-runner.mjs only redirects its fixture origin."
+  },
+  {
+    "id": "react-case-v1:9c7a154fdad7ed024284",
+    "classification": "implemented",
+    "localEvidence": "tests/browser/upstream.browser.test.ts",
+    "rationale": "The pinned browser driver executes unchanged assertions in ordinary and popup Chromium windows; upstream-runner.mjs only redirects its fixture origin."
+  },
+  {
+    "id": "react-case-v1:6906b216a27235809cf5",
+    "classification": "implemented",
+    "localEvidence": "tests/browser/upstream.browser.test.ts",
+    "rationale": "The pinned browser driver executes unchanged assertions in ordinary and popup Chromium windows; upstream-runner.mjs only redirects its fixture origin."
+  },
+  {
+    "id": "react-case-v1:d3138778c373f7b1a66e",
+    "classification": "implemented",
+    "localEvidence": "tests/browser/upstream.browser.test.ts",
+    "rationale": "The pinned browser driver executes unchanged assertions in ordinary and popup Chromium windows; upstream-runner.mjs only redirects its fixture origin."
+  },
+  {
+    "id": "react-case-v1:535ab5061f542f526f3d",
+    "classification": "implemented",
+    "localEvidence": "tests/browser/upstream.browser.test.ts",
+    "rationale": "The pinned browser driver executes unchanged assertions in ordinary and popup Chromium windows; upstream-runner.mjs only redirects its fixture origin."
+  },
+  {
+    "id": "react-case-v1:ce59c140364a0960dac3",
+    "classification": "implemented",
+    "localEvidence": "tests/browser/upstream.browser.test.ts",
+    "rationale": "The pinned browser driver executes unchanged assertions in ordinary and popup Chromium windows; upstream-runner.mjs only redirects its fixture origin."
+  },
+  {
+    "id": "react-case-v1:2510b7013595ac9db6d3",
+    "classification": "implemented",
+    "localEvidence": "tests/browser/upstream.browser.test.ts",
+    "rationale": "The pinned browser driver executes unchanged assertions in ordinary and popup Chromium windows; upstream-runner.mjs only redirects its fixture origin."
+  },
+  {
+    "id": "react-case-v1:7bd7bd5c65389c06074d",
+    "classification": "implemented",
+    "localEvidence": "tests/browser/upstream.browser.test.ts",
+    "rationale": "The pinned browser driver executes unchanged assertions in ordinary and popup Chromium windows; upstream-runner.mjs only redirects its fixture origin."
+  },
+  {
+    "id": "react-case-v1:cd1e4e08f472a803e24f",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/group/Group.test.tsx"
+  },
+  {
+    "id": "react-case-v1:03a71138afff81868068",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/group/Group.test.tsx"
+  },
+  {
+    "id": "react-case-v1:0d380d9af367ce328dc1",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/group/Group.test.tsx"
+  },
+  {
+    "id": "react-case-v1:d7249bd47c13c0055a15",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/group/Group.test.tsx"
+  },
+  {
+    "id": "react-case-v1:97df72acae916078dff6",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/group/Group.test.tsx"
+  },
+  {
+    "id": "react-case-v1:da76a8ca3e780328272c",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/group/Group.test.tsx"
+  },
+  {
+    "id": "react-case-v1:45719cbb998bf1b3a2c3",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/group/Group.test.tsx"
+  },
+  {
+    "id": "react-case-v1:ca97bd5fd7fe6b977182",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/group/Group.test.tsx"
+  },
+  {
+    "id": "react-case-v1:df60d93126c63b3b0886",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/group/Group.test.tsx"
+  },
+  {
+    "id": "react-case-v1:a39244a0cd5a9f4b422f",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/group/Group.test.tsx"
+  },
+  {
+    "id": "react-case-v1:985347e2ced258fc59a1",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/group/Group.test.tsx"
+  },
+  {
+    "id": "react-case-v1:d14958970c75818e3982",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/group/Group.test.tsx"
+  },
+  {
+    "id": "react-case-v1:048b147a9e5c2ff9ad24",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/group/Group.test.tsx"
+  },
+  {
+    "id": "react-case-v1:ba05e5dfeda69956dd12",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/group/Group.test.tsx"
+  },
+  {
+    "id": "react-case-v1:a10eecef1f6a6e6c7a54",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/group/Group.test.tsx"
+  },
+  {
+    "id": "react-case-v1:c4417fef2001c38fc7cd",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/group/Group.test.tsx"
+  },
+  {
+    "id": "react-case-v1:b7a8d2bafacf381a25d8",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/group/Group.test.tsx"
+  },
+  {
+    "id": "react-case-v1:45c168a5687726aec770",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/group/Group.test.tsx"
+  },
+  {
+    "id": "react-case-v1:63e5adfed420f3c1ebcd",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/group/Group.test.tsx"
+  },
+  {
+    "id": "react-case-v1:ba4821340ee33e78df07",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/group/Group.test.tsx"
+  },
+  {
+    "id": "react-case-v1:a439539c4aeeac91af46",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/group/Group.test.tsx"
+  },
+  {
+    "id": "react-case-v1:87e154db3b938295527f",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/group/Group.test.tsx"
+  },
+  {
+    "id": "react-case-v1:6c0247a6a6341695e3f3",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/group/Group.test.tsx"
+  },
+  {
+    "id": "react-case-v1:9f94e9d7b4f234d0c4db",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/group/Group.test.tsx"
+  },
+  {
+    "id": "react-case-v1:a55d2327fd84ef4bf260",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/group/Group.test.tsx"
+  },
+  {
+    "id": "react-case-v1:9dae3296a015e250fef6",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/group/Group.test.tsx"
+  },
+  {
+    "id": "react-case-v1:a71793b12b492af0e47f",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/group/Group.test.tsx"
+  },
+  {
+    "id": "react-case-v1:b642be094f755ac8fe18",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/group/sortByElementOffset.test.ts"
+  },
+  {
+    "id": "react-case-v1:76b9f5896807cd32fa08",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/group/sortByElementOffset.test.ts"
+  },
+  {
+    "id": "react-case-v1:3231318224b1c4b305cd",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/group/sortByElementOffset.test.ts"
+  },
+  {
+    "id": "react-case-v1:a34f0e2f80be3ab3ffe7",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/group/sortByElementOffset.test.ts"
+  },
+  {
+    "id": "react-case-v1:52276fe5338621303c75",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/group/sortByElementOffset.test.ts"
+  },
+  {
+    "id": "react-case-v1:5bc950d275c58886b339",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/group/useDefaultLayout.test.tsx"
+  },
+  {
+    "id": "react-case-v1:57f4c26745b6b498fb5b",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/group/useDefaultLayout.test.tsx"
+  },
+  {
+    "id": "react-case-v1:cb5955a49fd21fc4e5c4",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/group/useDefaultLayout.test.tsx"
+  },
+  {
+    "id": "react-case-v1:0d96b18ba39fd84e4c63",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/group/useDefaultLayout.test.tsx"
+  },
+  {
+    "id": "react-case-v1:07d946d3df56a33ad139",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/group/useDefaultLayout.test.tsx"
+  },
+  {
+    "id": "react-case-v1:b081db292982287dacb3",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/group/useDefaultLayout.test.tsx"
+  },
+  {
+    "id": "react-case-v1:b6301d623eeae8701810",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/group/useDefaultLayout.test.tsx"
+  },
+  {
+    "id": "react-case-v1:24a1630a651cc4f967d6",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/group/useDefaultLayout.test.tsx"
+  },
+  {
+    "id": "react-case-v1:9733c7994ffbf334e93a",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/group/useDefaultLayout.test.tsx"
+  },
+  {
+    "id": "react-case-v1:421c7e98f6941203c2be",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/group/useDefaultLayout.test.tsx"
+  },
+  {
+    "id": "react-case-v1:5fa27b3d1554aeb463ea",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/group/useDefaultLayout.test.tsx"
+  },
+  {
+    "id": "react-case-v1:f3b0b1eef4a28886e156",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/group/useDefaultLayout.test.tsx"
+  },
+  {
+    "id": "react-case-v1:80513634a946509d1f92",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/group/useDefaultLayout.test.tsx"
+  },
+  {
+    "id": "react-case-v1:ee89a51006ffc9c9d81e",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/group/useDefaultLayout.test.tsx"
+  },
+  {
+    "id": "react-case-v1:b04c349b66e67b96c7f3",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/group/useDefaultLayout.test.tsx"
+  },
+  {
+    "id": "react-case-v1:481ac2ac5197c4751264",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/group/useDefaultLayout.test.tsx"
+  },
+  {
+    "id": "react-case-v1:025ad20753cd0657820e",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/group/useDefaultLayout.test.tsx"
+  },
+  {
+    "id": "react-case-v1:f911b393fea09ade4974",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/group/useDefaultLayout.test.tsx"
+  },
+  {
+    "id": "react-case-v1:30e6dd062f002a656e84",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/group/useDefaultLayout.test.tsx"
+  },
+  {
+    "id": "react-case-v1:931de31c6c2bfb9152f8",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/group/useDefaultLayout.test.tsx"
+  },
+  {
+    "id": "react-case-v1:0585956d227819a8119c",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/group/useDefaultLayout.test.tsx"
+  },
+  {
+    "id": "react-case-v1:57b4513c3b36ea6dec2f",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/group/useDefaultLayout.test.tsx"
+  },
+  {
+    "id": "react-case-v1:8aab69d2291a9aeab8ea",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/group/useDefaultLayout.test.tsx"
+  },
+  {
+    "id": "react-case-v1:0fe5e64147bcc72251b7",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/group/useDefaultLayout.test.tsx"
+  },
+  {
+    "id": "react-case-v1:626d52746ecea2e71443",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/group/useDefaultLayout.test.tsx"
+  },
+  {
+    "id": "react-case-v1:3f9b7c9e12b1859bc04d",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/group/useDefaultLayout.test.tsx"
+  },
+  {
+    "id": "react-case-v1:0bbfd7326c4b143319b2",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/panel/Panel.test.tsx"
+  },
+  {
+    "id": "react-case-v1:9ee0eefef2d62739e328",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/panel/Panel.test.tsx"
+  },
+  {
+    "id": "react-case-v1:7bfb1497ed353058d15d",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/panel/Panel.test.tsx"
+  },
+  {
+    "id": "react-case-v1:b0fcda56dbe59d0a1b6a",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/panel/Panel.test.tsx"
+  },
+  {
+    "id": "react-case-v1:5ec054b2c9428708b6da",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/panel/Panel.test.tsx"
+  },
+  {
+    "id": "react-case-v1:ffc17a99874e6a1e4334",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/panel/Panel.test.tsx"
+  },
+  {
+    "id": "react-case-v1:22e1f6a5a09f8c5fab9a",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/panel/Panel.test.tsx"
+  },
+  {
+    "id": "react-case-v1:4c7243da6c9f03b9329d",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/panel/Panel.test.tsx"
+  },
+  {
+    "id": "react-case-v1:87719a47bf6b9e194a4d",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/panel/Panel.test.tsx"
+  },
+  {
+    "id": "react-case-v1:470f6506ac9988f43739",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/separator/Separator.test.tsx"
+  },
+  {
+    "id": "react-case-v1:5b0e564c78668b99771c",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/separator/Separator.test.tsx"
+  },
+  {
+    "id": "react-case-v1:2275eb09c92358f81c45",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/separator/Separator.test.tsx"
+  },
+  {
+    "id": "react-case-v1:181f9f2ab33e19bd4bb8",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/separator/Separator.test.tsx"
+  },
+  {
+    "id": "react-case-v1:4b744f18a58fabc08396",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/separator/Separator.test.tsx"
+  },
+  {
+    "id": "react-case-v1:34d39183bab6c0e7e945",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/separator/Separator.test.tsx"
+  },
+  {
+    "id": "react-case-v1:b114c835e4d64438091b",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/components/separator/Separator.test.tsx"
+  },
+  {
+    "id": "react-case-v1:9166b4d34fe317cfc469",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/cursor/getCursorStyle.test.ts"
+  },
+  {
+    "id": "react-case-v1:c99e8a18c2791d299414",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/cursor/getCursorStyle.test.ts"
+  },
+  {
+    "id": "react-case-v1:7c697e45200ad51cea9c",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/cursor/getCursorStyle.test.ts"
+  },
+  {
+    "id": "react-case-v1:39710500849e4c692410",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/cursor/getCursorStyle.test.ts"
+  },
+  {
+    "id": "react-case-v1:18cc93fa0e179bfe2591",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/cursor/getCursorStyle.test.ts"
+  },
+  {
+    "id": "react-case-v1:fd1722e5fec363340d07",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/cursor/getCursorStyle.test.ts"
+  },
+  {
+    "id": "react-case-v1:bffff94f40a7cdf1b466",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/cursor/getCursorStyle.test.ts"
+  },
+  {
+    "id": "react-case-v1:5cdf19e72b3bb87a7bea",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/cursor/getCursorStyle.test.ts"
+  },
+  {
+    "id": "react-case-v1:7cb6f8062032f93625f3",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/cursor/getCursorStyle.test.ts"
+  },
+  {
+    "id": "react-registration-v1:3a29bb7bbd64ffc99737",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/cursor/getCursorStyle.test.ts"
+  },
+  {
+    "id": "react-registration-v1:f33ccd1b1517551c0aca",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/cursor/getCursorStyle.test.ts"
+  },
+  {
+    "id": "react-registration-v1:87d46514a3fdb82e1a57",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/cursor/getCursorStyle.test.ts"
+  },
+  {
+    "id": "react-registration-v1:319cf616071f2a9d2b67",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/cursor/getCursorStyle.test.ts"
+  },
+  {
+    "id": "react-registration-v1:0d2b88b311233792abcd",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/cursor/getCursorStyle.test.ts"
+  },
+  {
+    "id": "react-registration-v1:e93c85a094abdcd5cddc",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/cursor/getCursorStyle.test.ts"
+  },
+  {
+    "id": "react-registration-v1:2c1f6422d7760f8745b5",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/cursor/getCursorStyle.test.ts"
+  },
+  {
+    "id": "react-registration-v1:3451478f13f63bf5d329",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/cursor/getCursorStyle.test.ts"
+  },
+  {
+    "id": "react-case-v1:6642f3630f7577d770b3",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/cursor/getCursorStyle.test.ts"
+  },
+  {
+    "id": "react-case-v1:e9743d3a60de9c687027",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/cursor/getCursorStyle.test.ts"
+  },
+  {
+    "id": "react-case-v1:26d875c292b2c51bad66",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/cursor/getCursorStyle.test.ts"
+  },
+  {
+    "id": "react-case-v1:5b98d9f7b4cddd762f36",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/cursor/getCursorStyle.test.ts"
+  },
+  {
+    "id": "react-case-v1:a6113c0a9600ce9ad525",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/cursor/getCursorStyle.test.ts"
+  },
+  {
+    "id": "react-case-v1:72c389ce89842acd3f31",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/cursor/getCursorStyle.test.ts"
+  },
+  {
+    "id": "react-case-v1:57df0ba06fb3ca1705a8",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/cursor/getCursorStyle.test.ts"
+  },
+  {
+    "id": "react-case-v1:775d4123504e45f0e3ee",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/cursor/getCursorStyle.test.ts"
+  },
+  {
+    "id": "react-case-v1:863fb914278ed8222cbb",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/cursor/getCursorStyle.test.ts"
+  },
+  {
+    "id": "react-case-v1:ee8b3f6e0d5e4bac0605",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/cursor/getCursorStyle.test.ts"
+  },
+  {
+    "id": "react-registration-v1:83fe24124f4930fc45da",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/cursor/getCursorStyle.test.ts"
+  },
+  {
+    "id": "react-registration-v1:29702f0d93723c14583d",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/cursor/getCursorStyle.test.ts"
+  },
+  {
+    "id": "react-registration-v1:cbb0afca1409419a1ea3",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/cursor/getCursorStyle.test.ts"
+  },
+  {
+    "id": "react-registration-v1:549eb3ac03b9ea4615e7",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/cursor/getCursorStyle.test.ts"
+  },
+  {
+    "id": "react-registration-v1:9bf091b7aeefefa98682",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/cursor/getCursorStyle.test.ts"
+  },
+  {
+    "id": "react-registration-v1:0949b39562c043826f1b",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/cursor/getCursorStyle.test.ts"
+  },
+  {
+    "id": "react-registration-v1:034b53f17f44ec6d8264",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/cursor/getCursorStyle.test.ts"
+  },
+  {
+    "id": "react-registration-v1:7266d79c48584a089fa9",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/cursor/getCursorStyle.test.ts"
+  },
+  {
+    "id": "react-case-v1:0d0d19a001ddcb1786e7",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/cursor/getCursorStyle.test.ts"
+  },
+  {
+    "id": "react-case-v1:85ccc440f1e17975af8a",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/cursor/updateCursorStyle.test.ts"
+  },
+  {
+    "id": "react-case-v1:b4b6e0807a297f8c7422",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/cursor/updateCursorStyle.test.ts"
+  },
+  {
+    "id": "react-case-v1:6dac2ba195846b2fd561",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/dom/calculateAvailableGroupSize.test.ts"
+  },
+  {
+    "id": "react-case-v1:810bde28ece11cfe7dcb",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/dom/calculateAvailableGroupSize.test.ts"
+  },
+  {
+    "id": "react-case-v1:a3cbb5575adaca908ae0",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/dom/calculateAvailableGroupSize.test.ts"
+  },
+  {
+    "id": "react-case-v1:a0be28652821f708731f",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/dom/calculateAvailableGroupSize.test.ts"
+  },
+  {
+    "id": "react-case-v1:d7acb2458cf9a801b165",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/dom/calculateHitRegions.test.ts"
+  },
+  {
+    "id": "react-case-v1:51ca10071444ee8f9909",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/dom/calculateHitRegions.test.ts"
+  },
+  {
+    "id": "react-case-v1:65d998c5286127bbbb2f",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/dom/calculateHitRegions.test.ts"
+  },
+  {
+    "id": "react-case-v1:650de754632c84b45bf7",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/dom/calculateHitRegions.test.ts"
+  },
+  {
+    "id": "react-case-v1:9b5a54b2198ab90b1db4",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/dom/calculateHitRegions.test.ts"
+  },
+  {
+    "id": "react-case-v1:374e09e6a7a80e6ced8b",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/dom/calculateHitRegions.test.ts"
+  },
+  {
+    "id": "react-case-v1:07f7d7a9b2f2990a553a",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/dom/calculateHitRegions.test.ts"
+  },
+  {
+    "id": "react-case-v1:73cdcbbf4f2540c08d73",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/dom/calculateHitRegions.test.ts"
+  },
+  {
+    "id": "react-case-v1:e9c3b9ce471b8f83d310",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/dom/calculateHitRegions.test.ts"
+  },
+  {
+    "id": "react-case-v1:1d97833c4619d7cd8ccb",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/dom/calculateHitRegions.test.ts"
+  },
+  {
+    "id": "react-case-v1:d0701c4fed58431b7ed2",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/dom/calculateHitRegions.test.ts"
+  },
+  {
+    "id": "react-case-v1:5cbd22012baccfd4bca5",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/dom/calculateHitRegions.test.ts"
+  },
+  {
+    "id": "react-case-v1:296baede4ebdb35151b3",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/dom/calculateHitRegions.test.ts"
+  },
+  {
+    "id": "react-case-v1:98f1bc07db5285353285",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/dom/calculateHitRegions.test.ts"
+  },
+  {
+    "id": "react-case-v1:39363be1a1220ce0d96f",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/dom/calculateHitRegions.test.ts"
+  },
+  {
+    "id": "react-case-v1:dfd642883d8fc114216b",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/styles/parseSizeAndUnit.test.ts"
+  },
+  {
+    "id": "react-case-v1:891cd4836691fbae374f",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/styles/parseSizeAndUnit.test.ts"
+  },
+  {
+    "id": "react-case-v1:f0be5b0b62d55d7a60a7",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/styles/parseSizeAndUnit.test.ts"
+  },
+  {
+    "id": "react-case-v1:68f4e72e0dff5ba59160",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/styles/parseSizeAndUnit.test.ts"
+  },
+  {
+    "id": "react-case-v1:1782845b2c0a42e6c1e2",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/styles/parseSizeAndUnit.test.ts"
+  },
+  {
+    "id": "react-case-v1:882e7824729ebca919a2",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/styles/parseSizeAndUnit.test.ts"
+  },
+  {
+    "id": "react-case-v1:599f636f6a9103f3a5f6",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/styles/parseSizeAndUnit.test.ts"
+  },
+  {
+    "id": "react-case-v1:b34615ed6a11fdb98cbc",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/styles/parseSizeAndUnit.test.ts"
+  },
+  {
+    "id": "react-case-v1:134987c2a4348ca95533",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/styles/sizeStyleToPixels.test.ts"
+  },
+  {
+    "id": "react-case-v1:96c0d19badf4526d02f4",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/styles/sizeStyleToPixels.test.ts"
+  },
+  {
+    "id": "react-case-v1:15399ea4cdfb2816fbc1",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/styles/sizeStyleToPixels.test.ts"
+  },
+  {
+    "id": "react-case-v1:8449b7b166649317888f",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/styles/sizeStyleToPixels.test.ts"
+  },
+  {
+    "id": "react-case-v1:71e38a7ff6c3cee6d288",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/styles/sizeStyleToPixels.test.ts"
+  },
+  {
+    "id": "react-case-v1:bd6f98bbfd31b0e347aa",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/styles/sizeStyleToPixels.test.ts"
+  },
+  {
+    "id": "react-case-v1:b2c260c1fe582257bdd7",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/styles/sizeStyleToPixels.test.ts"
+  },
+  {
+    "id": "react-case-v1:83e2594b46fc8b75755e",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/styles/sizeStyleToPixels.test.ts"
+  },
+  {
+    "id": "react-case-v1:426a3dcd317a0041edf0",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:048c228b2e1f059e9e6b",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:472f44e7754744670119",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:bedf4aca8f586919a376",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:fe7bd886ad3a39a6e541",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:1c33f535edf78dd14839",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:e704c36e17a3851f74d4",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:0dde20c38b919cd88a6f",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:fde3bdfc7c08d2e8deb7",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:16f868ae0df11f848776",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:519ececc89a71830726c",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:d24db0ab17c2aae9e348",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:7c97821539d188757287",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:1deeb35838e956ad0d72",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:45446dac79bfe204a666",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:5650764172a9d22d4296",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:a310a70ef7a43309813d",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:701ec1ae056736a8c0a6",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:f213fcea61db7528b56a",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:ca4d78baab7f8bf7baab",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:045946e6c10396f51230",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:888d686d04cd65b1d377",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:6d947950d28d03c7c072",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:d8bae21affdd965dae47",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:56d91d68e4ea47f24414",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:ab3621303d3c7e37e78a",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:83472a3d663e1793432f",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:2cefc90d05b6ae98f5a4",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:0beec75d5d2e5fe8ef79",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:29697af20745cbdf3521",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:98aeb526e1438d16b2c1",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:06441472ccee6e7e55cd",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:a5abdced97da318516c7",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:437112852290df2d15bd",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:f107c248c72bdb6c331e",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:168fd57f35ae91495ee2",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:907e1601e35cacdbef4f",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:ac2ea99b0563545fa259",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:ca4bfd0c7e7256d001f9",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:45e4909892c15491a93c",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:a663a3bf409ed156e948",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:bd22cabc4e96f069255d",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:3f3e8c5a715fa2685716",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:e409e9c9afdbb14b7f39",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:405517ee445ca6ea031f",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:2c3f375335019eb6c4f8",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:95a5b6af23fc404f98bc",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:218ecd9a10d7f789d09b",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:e9b8171259a03578ddeb",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:85deb8fffea57227793e",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:1b9aa82d297704ea3c5f",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:b7b6b6930eb11293b0a2",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:d670f00ba0af095f006c",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:b1c0002c3541672be892",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:06007fd7062bee244c74",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:f54813357e4ba1069df6",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:f2852ead4649515853ca",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:96c5970c5c034da60497",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:779bb39a85e90a98d90c",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:e3072117a76d4f994880",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:3628e491f871bd5a10cd",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:bae78dddd5f3a7d75cb3",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:e1a5eb17a10540ec6a60",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:fceda9fb24de9a67811c",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:eed610676ef3e3b8d47f",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:72c2b5911d4d242824f2",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:f9f9bfe9ff6d77c1e0a2",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:8e729fc46113241d00f3",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:718705d49ca7f1d3446b",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:58dc9c18fb796521225c",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:8a96771357856ec445a5",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:6a0a9030095f9987941f",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:da0f632fa1fa6e0d0247",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:2770a143801ce4e9160b",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:cd16cfb7ce4be93bb275",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:c3f53e6e0976854f9fad",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:5b26f3fbc5e383fadf76",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:bedfa9d3a3b8364d416f",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:ebacb1807e9660ab7e75",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:073c32bcd54b8fd625e2",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:140cb1012d6844f50409",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:1df8c8197ee96eaa370e",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:49a15e6b5a377bae2b57",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:262eed77063f49a87e63",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:5105122cc80a27071036",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:308eb0ac24f841ab0eca",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:56ddd7c84de6272eddd4",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:547ac4b47c8e2022a9bd",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:15b17beb7dd0e2dedaa9",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:8f31309887926fda1c25",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:5e9634bf1b5c4c218694",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:a273c754c0dbe5142740",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:156f2c3b76bb647587f8",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:f128dbc03c522307b848",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:02d9a6a3253f4ad9276a",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:c54fa1ca3ee69326efe5",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:23496df7f4ef1ce21176",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:83ed1da145adb46fce55",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:6fb0172cd11de2bdd656",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:ed5b2ce0d6513622d1a3",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:e80bdf1306c6bc41d6d2",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:aee0b74d227b0b5e7d49",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:5d5252a21791fc091b9d",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:887772533c82ef1259bb",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:c52cf9ecf3d26a0d60c8",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:ff156f022b6982375112",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:27a9d9fa50fcb84c1d5f",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-registration-v1:ecacb8a209c90440d95b",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-registration-v1:764f200fbdea76779a4d",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-registration-v1:5d198eac3a7199cbb2d3",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-registration-v1:8de78932912c32407d18",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-registration-v1:e149c0e5334ab6eeec3d",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-registration-v1:5c4fcf2e847f700decec",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-registration-v1:b645e9b8c428ad4696ff",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-registration-v1:51b67eaafc3244c0a2c0",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-registration-v1:cebaace2911e43097707",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-registration-v1:3ca88b1882ca3aa1e2e8",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-registration-v1:81ab12ff934e8d6f184a",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-registration-v1:57397daf651cbe98001d",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-registration-v1:289751b27385edfc7ccc",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-registration-v1:2fbf07a7e0c780086dc9",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-registration-v1:1d6c6541df78f7e9a2e7",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-registration-v1:47bd22d06e93c3b6cbcc",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-registration-v1:f30284865830c17afc8c",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-registration-v1:6d5efd033ff3d0dcaa87",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-registration-v1:60f061f85816c6e1fe32",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-registration-v1:f05f240a447fb4f29d54",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-registration-v1:22acc16d21acd5fd8972",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-registration-v1:938f29f3aae9176ac119",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-registration-v1:6519a4aaec6cf355d38b",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-registration-v1:3ceb1b3a380f4eeed4e5",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-registration-v1:02ca185cbcefb99f2611",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-registration-v1:796c6d427b4cd676b329",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-registration-v1:b46ec4ad6b870e3792ed",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-registration-v1:8f8c751e1b97601cbbaa",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-registration-v1:3f379ab29a5e400cd304",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-registration-v1:7881c68056745c6630ac",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-registration-v1:5f87c7ebbe3b483afbb9",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-registration-v1:a862b01f111e4d8006a5",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:b2fe368a48e774327a75",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:6ae9ede56384893bb72d",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:09f3f1a692f96f3a3fd6",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:d57d0e6117bb7f0a77cb",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:36c34257988677c9c024",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:f6c4fe7634a2a804d82b",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:0e8176690f14b31bd285",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:db40a8e0de90f86b5eee",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:476e33561beeee5ebe42",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/adjustLayoutByDelta.test.ts"
+  },
+  {
+    "id": "react-case-v1:865a579434fdf61f5cf3",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/calculateDefaultLayout.test.ts"
+  },
+  {
+    "id": "react-case-v1:7da859e32ed5de4cda5b",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/calculateDefaultLayout.test.ts"
+  },
+  {
+    "id": "react-case-v1:f6ece1697daac359112e",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/calculateDefaultLayout.test.ts"
+  },
+  {
+    "id": "react-case-v1:7639a96246bc4a03305b",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/calculateSeparatorAriaValues.test.ts"
+  },
+  {
+    "id": "react-case-v1:ebedabf30389d16e8266",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/calculateSeparatorAriaValues.test.ts"
+  },
+  {
+    "id": "react-case-v1:96aa062498d70a5df972",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/calculateSeparatorAriaValues.test.ts"
+  },
+  {
+    "id": "react-case-v1:6a8a8d7b5681bd63c872",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/compareLayoutNumbers.test.ts"
+  },
+  {
+    "id": "react-case-v1:ced63668d0f21b433a0b",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/compareLayoutNumbers.test.ts"
+  },
+  {
+    "id": "react-case-v1:5297fce98aa33f966b10",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/compareLayoutNumbers.test.ts"
+  },
+  {
+    "id": "react-case-v1:284abca9aade36a1862d",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/compareLayoutNumbers.test.ts"
+  },
+  {
+    "id": "react-case-v1:05639a761c8328494082",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/compareLayoutNumbers.test.ts"
+  },
+  {
+    "id": "react-case-v1:3af73f9e15331f462ba2",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/compareLayoutNumbers.test.ts"
+  },
+  {
+    "id": "react-case-v1:c4c47b3c6a6ab15d0282",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/compareLayoutNumbers.test.ts"
+  },
+  {
+    "id": "react-case-v1:3a62987d41fae51d6c7e",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/doRectsIntersect.test.ts"
+  },
+  {
+    "id": "react-case-v1:de871338efe409304826",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/doRectsIntersect.test.ts"
+  },
+  {
+    "id": "react-registration-v1:735479a80c75e0cf28a2",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/doRectsIntersect.test.ts"
+  },
+  {
+    "id": "react-registration-v1:83a833a9c26ad548c81d",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/doRectsIntersect.test.ts"
+  },
+  {
+    "id": "react-registration-v1:71a5588c7da206589829",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/doRectsIntersect.test.ts"
+  },
+  {
+    "id": "react-registration-v1:772d3164e6320a0896fc",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/doRectsIntersect.test.ts"
+  },
+  {
+    "id": "react-registration-v1:791515bc7ed9434c9da3",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/doRectsIntersect.test.ts"
+  },
+  {
+    "id": "react-registration-v1:f5e639b211e9b038c574",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/doRectsIntersect.test.ts"
+  },
+  {
+    "id": "react-registration-v1:9c927a7c89e724d757f2",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/doRectsIntersect.test.ts"
+  },
+  {
+    "id": "react-registration-v1:de5cf2f58b0e86470ce2",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/doRectsIntersect.test.ts"
+  },
+  {
+    "id": "react-registration-v1:f2c97461aa9f3d747a35",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/doRectsIntersect.test.ts"
+  },
+  {
+    "id": "react-registration-v1:4a015acc3554c13e4761",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/doRectsIntersect.test.ts"
+  },
+  {
+    "id": "react-registration-v1:e7a90d5e855689929eb4",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/doRectsIntersect.test.ts"
+  },
+  {
+    "id": "react-registration-v1:4eed2586b89fa45059cc",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/doRectsIntersect.test.ts"
+  },
+  {
+    "id": "react-registration-v1:5db0cf93fcc9fd16c5b4",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/doRectsIntersect.test.ts"
+  },
+  {
+    "id": "react-registration-v1:c0f7daa5068770e6ca5e",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/doRectsIntersect.test.ts"
+  },
+  {
+    "id": "react-case-v1:382b590f32904f866f81",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/doRectsIntersect.test.ts"
+  },
+  {
+    "id": "react-case-v1:ba35ee0978988ae8516b",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/findMatchingHitRegions.test.ts"
+  },
+  {
+    "id": "react-case-v1:654ae0b835285a8cd68d",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/findMatchingHitRegions.test.ts"
+  },
+  {
+    "id": "react-case-v1:47f2992bc07a022a54e4",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/findMatchingHitRegions.test.ts"
+  },
+  {
+    "id": "react-case-v1:499306218e28b7765f7f",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/findMatchingHitRegions.test.ts"
+  },
+  {
+    "id": "react-case-v1:bb062e758dc8a525e063",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/findMatchingHitRegions.test.ts"
+  },
+  {
+    "id": "react-case-v1:50c1290ea1a1208572b4",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/formatLayoutNumber.test.ts"
+  },
+  {
+    "id": "react-case-v1:1639e4e669797afe152b",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/formatLayoutNumber.test.ts"
+  },
+  {
+    "id": "react-case-v1:cc4ca0ea29c0116bf881",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/formatLayoutNumber.test.ts"
+  },
+  {
+    "id": "react-case-v1:636f83e5161ddf24e4e5",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/formatLayoutNumber.test.ts"
+  },
+  {
+    "id": "react-case-v1:98d84e0b78aa9186e229",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/formatLayoutNumber.test.ts"
+  },
+  {
+    "id": "react-case-v1:84931b683b965e0f66aa",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/formatLayoutNumber.test.ts"
+  },
+  {
+    "id": "react-case-v1:e59e6b3a296e9cbdc1c9",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/formatLayoutNumber.test.ts"
+  },
+  {
+    "id": "react-case-v1:5ff93dddb4879f173798",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/formatLayoutNumber.test.ts"
+  },
+  {
+    "id": "react-case-v1:a164ea657724b6ef5b5c",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/formatLayoutNumber.test.ts"
+  },
+  {
+    "id": "react-case-v1:c21be7ddf15fd031286f",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/formatLayoutNumber.test.ts"
+  },
+  {
+    "id": "react-case-v1:4677294538830461484e",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/formatLayoutNumber.test.ts"
+  },
+  {
+    "id": "react-case-v1:80a600e991ffc8be85d6",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/formatLayoutNumber.test.ts"
+  },
+  {
+    "id": "react-case-v1:f327f51eb70241aa2f91",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/formatLayoutNumber.test.ts"
+  },
+  {
+    "id": "react-case-v1:2ead7520abdf56301968",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/formatLayoutNumber.test.ts"
+  },
+  {
+    "id": "react-case-v1:cb5d06c583636d974ecd",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/getDistanceBetweenPointAndRect.test.ts"
+  },
+  {
+    "id": "react-case-v1:5792a9e33d1824e10f79",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/getDistanceBetweenPointAndRect.test.ts"
+  },
+  {
+    "id": "react-case-v1:4bfaf7d2c7b96fa3786c",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/getDistanceBetweenPointAndRect.test.ts"
+  },
+  {
+    "id": "react-case-v1:e028adb1422b2afe242a",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/getImperativeGroupMethods.test.ts"
+  },
+  {
+    "id": "react-case-v1:08c2eea4ed758a85fcea",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/getImperativeGroupMethods.test.ts"
+  },
+  {
+    "id": "react-case-v1:08a4c41a45d802798d2f",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/getImperativeGroupMethods.test.ts"
+  },
+  {
+    "id": "react-case-v1:7c35735d06993a04dea9",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/getImperativeGroupMethods.test.ts"
+  },
+  {
+    "id": "react-case-v1:c59f7668563cf3013fc1",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/getImperativeGroupMethods.test.ts"
+  },
+  {
+    "id": "react-case-v1:e62c29f0800a2f639eb0",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/getImperativeGroupMethods.test.ts"
+  },
+  {
+    "id": "react-case-v1:0326a0b2958c86b0f8ed",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/getImperativeGroupMethods.test.ts"
+  },
+  {
+    "id": "react-case-v1:c6fc4c8d74e833ae014a",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/getImperativePanelMethods.test.ts"
+  },
+  {
+    "id": "react-case-v1:5bed6dffcda33858a869",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/getImperativePanelMethods.test.ts"
+  },
+  {
+    "id": "react-case-v1:2ccd9fa013a09379619a",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/getImperativePanelMethods.test.ts"
+  },
+  {
+    "id": "react-case-v1:03370d678a610770e05d",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/getImperativePanelMethods.test.ts"
+  },
+  {
+    "id": "react-case-v1:976da39964fd9c5c087b",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/getImperativePanelMethods.test.ts"
+  },
+  {
+    "id": "react-case-v1:f10d103052b8e88faa27",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/getImperativePanelMethods.test.ts"
+  },
+  {
+    "id": "react-case-v1:a75f2392093c10ed3783",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/getImperativePanelMethods.test.ts"
+  },
+  {
+    "id": "react-case-v1:d50eb6936d5df56a793d",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/getImperativePanelMethods.test.ts"
+  },
+  {
+    "id": "react-case-v1:affc15ee8eb20b386a8a",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/getImperativePanelMethods.test.ts"
+  },
+  {
+    "id": "react-case-v1:aa9e7a2dfbee088c6e9b",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/getImperativePanelMethods.test.ts"
+  },
+  {
+    "id": "react-case-v1:af688f6e5605e5ec19d2",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/getImperativePanelMethods.test.ts"
+  },
+  {
+    "id": "react-case-v1:4809ee5ff94cc99b84d0",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/getImperativePanelMethods.test.ts"
+  },
+  {
+    "id": "react-case-v1:892e012135f47449aedf",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/getImperativePanelMethods.test.ts"
+  },
+  {
+    "id": "react-case-v1:429b7d21bf79decfc868",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/getImperativePanelMethods.test.ts"
+  },
+  {
+    "id": "react-case-v1:d6e7681492249c8eb4cc",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/getImperativePanelMethods.test.ts"
+  },
+  {
+    "id": "react-case-v1:d3c89d4d9adc352bc50d",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/getImperativePanelMethods.test.ts"
+  },
+  {
+    "id": "react-case-v1:9c12f60947cd2557f55c",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/getImperativePanelMethods.test.ts"
+  },
+  {
+    "id": "react-case-v1:c6ca8d2c9eb739b359b6",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/getImperativePanelMethods.test.ts"
+  },
+  {
+    "id": "react-case-v1:ea102da731f15c1ea688",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/getImperativePanelMethods.test.ts"
+  },
+  {
+    "id": "react-case-v1:66e38174495d99c73b87",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/getImperativePanelMethods.test.ts"
+  },
+  {
+    "id": "react-case-v1:ed026b0343f7d6d841c1",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/getImperativePanelMethods.test.ts"
+  },
+  {
+    "id": "react-case-v1:1435e21b00dd04d72e48",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/getImperativePanelMethods.test.ts"
+  },
+  {
+    "id": "react-case-v1:7a382bba4aac4e40e937",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/getImperativePanelMethods.test.ts"
+  },
+  {
+    "id": "react-case-v1:4687a2bc97f9ff6e0185",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/getImperativePanelMethods.test.ts"
+  },
+  {
+    "id": "react-case-v1:98212bae87b37183b382",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/getImperativePanelMethods.test.ts"
+  },
+  {
+    "id": "react-case-v1:bbc6cf794b448bc57bf5",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/getImperativePanelMethods.test.ts"
+  },
+  {
+    "id": "react-case-v1:9627fe91b3aa50e02876",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/getImperativePanelMethods.test.ts"
+  },
+  {
+    "id": "react-case-v1:9480ce89692e29c02b30",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/getImperativePanelMethods.test.ts"
+  },
+  {
+    "id": "react-case-v1:4e56a3379bfec61a2f23",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/getImperativePanelMethods.test.ts"
+  },
+  {
+    "id": "react-case-v1:9484857c31ac1f398685",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/getImperativePanelMethods.test.ts"
+  },
+  {
+    "id": "react-case-v1:63a8d8b44ad7b94d88c5",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/layoutNumbersEqual.test.ts"
+  },
+  {
+    "id": "react-case-v1:37dc210d70df95109f3a",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/layoutNumbersEqual.test.ts"
+  },
+  {
+    "id": "react-case-v1:16ad7919654db4ac32a3",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/layoutNumbersEqual.test.ts"
+  },
+  {
+    "id": "react-case-v1:b0b5a091c5f5331262ee",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/layoutNumbersEqual.test.ts"
+  },
+  {
+    "id": "react-case-v1:f4a5bc5701b4d6f4de2c",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/layoutNumbersEqual.test.ts"
+  },
+  {
+    "id": "react-case-v1:d5579cbe4b1dace67fff",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/layoutNumbersEqual.test.ts"
+  },
+  {
+    "id": "react-case-v1:615e5ca05e86d6f09dc8",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/layoutNumbersEqual.test.ts"
+  },
+  {
+    "id": "react-registration-v1:533ffb78b432d8e5a134",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/layoutsEqual.test.ts"
+  },
+  {
+    "id": "react-registration-v1:1e73230a0d4d4dfcf7f9",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/layoutsEqual.test.ts"
+  },
+  {
+    "id": "react-registration-v1:e16ac1aac0600f6e2ebf",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/layoutsEqual.test.ts"
+  },
+  {
+    "id": "react-registration-v1:353eeece049918e4df99",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/layoutsEqual.test.ts"
+  },
+  {
+    "id": "react-registration-v1:4c61d1d39ba7367df238",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/layoutsEqual.test.ts"
+  },
+  {
+    "id": "react-registration-v1:a85e66f1f01c93efe189",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/layoutsEqual.test.ts"
+  },
+  {
+    "id": "react-registration-v1:bd88b719a90fbbb284f7",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/layoutsEqual.test.ts"
+  },
+  {
+    "id": "react-registration-v1:e7213d323af440ab71b7",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/layoutsEqual.test.ts"
+  },
+  {
+    "id": "react-registration-v1:7e734830bdb77c927061",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/layoutsEqual.test.ts"
+  },
+  {
+    "id": "react-registration-v1:92a633e2e325b4554bf7",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/objectsEqual.test.ts"
+  },
+  {
+    "id": "react-registration-v1:899e21d760a24915b6a4",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/objectsEqual.test.ts"
+  },
+  {
+    "id": "react-registration-v1:47d91b96ec189f498f3b",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/objectsEqual.test.ts"
+  },
+  {
+    "id": "react-registration-v1:3233895269d42cf1d3e0",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/objectsEqual.test.ts"
+  },
+  {
+    "id": "react-registration-v1:f1d2d872c005df0c1304",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/objectsEqual.test.ts"
+  },
+  {
+    "id": "react-registration-v1:98069ae5ecbd2a8cc804",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/objectsEqual.test.ts"
+  },
+  {
+    "id": "react-registration-v1:7601584d2c6d477dbe00",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/objectsEqual.test.ts"
+  },
+  {
+    "id": "react-registration-v1:978ab96d7f05def9c8f1",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/objectsEqual.test.ts"
+  },
+  {
+    "id": "react-registration-v1:21a8fb2441106841c3ed",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/objectsEqual.test.ts"
+  },
+  {
+    "id": "react-registration-v1:5406a46cf8dd33ca9a3e",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/panelConstraintsEqual.test.ts"
+  },
+  {
+    "id": "react-registration-v1:bb645bea4696b2fea727",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/panelConstraintsEqual.test.ts"
+  },
+  {
+    "id": "react-registration-v1:a18bb376fb19b4bf0f58",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/panelConstraintsEqual.test.ts"
+  },
+  {
+    "id": "react-registration-v1:3453582dc370d4222872",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/panelConstraintsEqual.test.ts"
+  },
+  {
+    "id": "react-registration-v1:aa9684a391378d71717e",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/panelConstraintsEqual.test.ts"
+  },
+  {
+    "id": "react-registration-v1:c55e195dfdc1580552d8",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/panelConstraintsEqual.test.ts"
+  },
+  {
+    "id": "react-registration-v1:ccf626707693cea4fc0d",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/panelConstraintsEqual.test.ts"
+  },
+  {
+    "id": "react-registration-v1:7bd4fd895f8df3d847fd",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/panelConstraintsEqual.test.ts"
+  },
+  {
+    "id": "react-registration-v1:e7e8fcb70baf1e0b5bde",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/panelConstraintsEqual.test.ts"
+  },
+  {
+    "id": "react-case-v1:dfe33bbed3cd3cdd913d",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/validatePanelGroupLayout.test.ts"
+  },
+  {
+    "id": "react-case-v1:7d051e3425ba4bb8a03e",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/validatePanelGroupLayout.test.ts"
+  },
+  {
+    "id": "react-case-v1:1e89d21da0e510c493a5",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/validatePanelGroupLayout.test.ts"
+  },
+  {
+    "id": "react-case-v1:c40c5031d0c80a61b4b1",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/validatePanelGroupLayout.test.ts"
+  },
+  {
+    "id": "react-case-v1:d7b43632f5f4c21a4890",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/validatePanelGroupLayout.test.ts"
+  },
+  {
+    "id": "react-case-v1:97e509ff19e6cc60feb8",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/validatePanelGroupLayout.test.ts"
+  },
+  {
+    "id": "react-case-v1:31d7f45e8ade2ff7ec9c",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/validatePanelGroupLayout.test.ts"
+  },
+  {
+    "id": "react-case-v1:b71d7f3d2e77d2747345",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/validatePanelGroupLayout.test.ts"
+  },
+  {
+    "id": "react-case-v1:ee3089594f329c31efb9",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/global/utils/validatePanelGroupLayout.test.ts"
+  },
+  {
+    "id": "react-case-v1:2dca2f8dd3e43c442f80",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/hooks/useId.test.ts"
+  },
+  {
+    "id": "react-case-v1:85581279ec9aa3d25e4e",
+    "classification": "conformance",
+    "localEvidence": "tests/upstream/hooks/useId.test.ts",
+    "rationale": "Octane owns fallback ids; the explicit React mock expectation is documented in react-parity.json."
+  },
+  {
+    "id": "react-case-v1:7f10ce024eb0f4246c5e",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/hooks/useMergedRefs.test.tsx"
+  },
+  {
+    "id": "react-case-v1:ea9b1d5fd481c728adde",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/hooks/useMergedRefs.test.tsx"
+  },
+  {
+    "id": "react-case-v1:82e5d80203eaa2a08642",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/hooks/useStableCallback.test.tsx"
+  },
+  {
+    "id": "react-case-v1:87db0dae6a4961dbacc0",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/hooks/useStableCallback.test.tsx"
+  },
+  {
+    "id": "react-case-v1:de5cf6ab8ffdc01661fd",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/utils/isArrayEqual.test.ts"
+  },
+  {
+    "id": "react-case-v1:909f702d7d756bc9f33b",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/utils/parseNumericStyleValue.test.ts"
+  },
+  {
+    "id": "react-case-v1:3a82339bbb0ea909716d",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/utils/parseNumericStyleValue.test.ts"
+  },
+  {
+    "id": "react-case-v1:28ff23c62e468a6ae2b8",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/utils/parseNumericStyleValue.test.ts"
+  },
+  {
+    "id": "react-case-v1:d66056f9c33bc93217f9",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/utils/parseNumericStyleValue.test.ts"
+  },
+  {
+    "id": "react-case-v1:7404fa64b38651f6b628",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/utils/parseNumericStyleValue.test.ts"
+  }
+]

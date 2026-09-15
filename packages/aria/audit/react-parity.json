@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "b6e65e48154571accca212b2400e70f0b1dee9499979f0b7ab2febaa4de93c58"
+      "lockfileSha256": "512a0ebbe26d6fe151716392506f43ce6b91c4927b07740bc732c8b49fb44687"
     }
   },
   "lanes": [
@@ -60,8 +60,8 @@
           "cases": [
             {
               "id": "differential:aria-interactions-press",
-              "testName": "usePress: pointer press start \u2192 pressed state \u2192 press sequence, byte-identical",
-              "fullName": "differential: @octanejs/aria vs real react-aria on React usePress: pointer press start \u2192 pressed state \u2192 press sequence, byte-identical"
+              "testName": "usePress: pointer press start → pressed state → press sequence, byte-identical",
+              "fullName": "differential: @octanejs/aria vs real react-aria on React usePress: pointer press start → pressed state → press sequence, byte-identical"
             },
             {
               "id": "differential:aria-usehover-pointer-enter-leave-toggles-hover-state",

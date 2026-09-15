@@ -9,25 +9,41 @@
 import { useState, useEffect, isChildrenBlock } from 'octane';
 import type { OctaneNode } from 'octane';
 import type { BlockerFnArgs, HistoryAction, HistoryLocation } from '@tanstack/history';
+import type { AnyRoute, AnyRouter, ParseRoute, RegisteredRouter } from '@tanstack/router-core';
 import { useRouter } from './context.ts';
 
-// Blocker types, ported from react-router's useBlocker.tsx. Upstream derives the
-// location shapes from the registered route tree's generics; the octane binding's
-// route factories are untyped (`createRoute(options: any)`), so the union of
-// matched-route shapes collapses to the loosely-typed equivalent.
-export interface ShouldBlockFnLocation {
-	routeId: string;
-	fullPath: string;
+export type ShouldBlockFnLocation<
+	TRouteId = string,
+	TFullPath = string,
+	TAllParams = Record<string, string>,
+	TFullSearchSchema = Record<string, any>,
+> = {
+	routeId: TRouteId;
+	fullPath: TFullPath;
 	pathname: string;
-	params: Record<string, string>;
-	search: Record<string, any>;
-}
+	params: TAllParams;
+	search: TFullSearchSchema;
+};
 
-export type BlockerResolver =
+type AnyShouldBlockFnLocation = ShouldBlockFnLocation<any, any, any, any>;
+type MakeShouldBlockFnLocationUnion<
+	TRouter extends AnyRouter = RegisteredRouter,
+	TRoute extends AnyRoute = ParseRoute<TRouter['routeTree']>,
+> =
+	TRoute extends any
+		? ShouldBlockFnLocation<
+				TRoute['id'],
+				TRoute['fullPath'],
+				TRoute['types']['allParams'],
+				TRoute['types']['fullSearchSchema']
+			>
+		: never;
+
+export type BlockerResolver<TRouter extends AnyRouter = RegisteredRouter> =
 	| {
 			status: 'blocked';
-			current: ShouldBlockFnLocation;
-			next: ShouldBlockFnLocation;
+			current: MakeShouldBlockFnLocationUnion<TRouter>;
+			next: MakeShouldBlockFnLocationUnion<TRouter>;
 			action: HistoryAction;
 			proceed: () => void;
 			reset: () => void;
@@ -41,19 +57,22 @@ export type BlockerResolver =
 			reset: undefined;
 	  };
 
-export type ShouldBlockFnArgs = {
-	current: ShouldBlockFnLocation;
-	next: ShouldBlockFnLocation;
+export type ShouldBlockFnArgs<TRouter extends AnyRouter = RegisteredRouter> = {
+	current: MakeShouldBlockFnLocationUnion<TRouter>;
+	next: MakeShouldBlockFnLocationUnion<TRouter>;
 	action: HistoryAction;
 };
 
-export type ShouldBlockFn = (args: ShouldBlockFnArgs) => boolean | Promise<boolean>;
-
-export type UseBlockerOpts = {
-	shouldBlockFn: ShouldBlockFn;
+export type ShouldBlockFn<TRouter extends AnyRouter = RegisteredRouter> =
+	(args: ShouldBlockFnArgs<TRouter>) => boolean | Promise<boolean>;
+export type UseBlockerOpts<
+	TRouter extends AnyRouter = RegisteredRouter,
+	TWithResolver extends boolean = boolean,
+> = {
+	shouldBlockFn: ShouldBlockFn<TRouter>;
 	enableBeforeUnload?: boolean | (() => boolean);
 	disabled?: boolean;
-	withResolver?: boolean;
+	withResolver?: TWithResolver;
 };
 
 type LegacyBlockerFn = () => Promise<any> | any;
@@ -104,6 +123,23 @@ function _resolveBlockerOpts(
 	};
 }
 
+export function useBlocker<
+	TRouter extends AnyRouter = RegisteredRouter,
+	TWithResolver extends boolean = false,
+>(
+	opts: UseBlockerOpts<TRouter, TWithResolver>,
+): TWithResolver extends true ? BlockerResolver<TRouter> : void;
+
+/**
+ * @deprecated Use the shouldBlockFn property instead
+ */
+export function useBlocker(blockerFnOrOpts?: LegacyBlockerOpts): BlockerResolver;
+
+/**
+ * @deprecated Use the UseBlockerOpts object syntax instead
+ */
+export function useBlocker(blockerFn?: LegacyBlockerFn, condition?: boolean | any): BlockerResolver;
+
 export function useBlocker(
 	opts?: UseBlockerOpts | LegacyBlockerOpts | LegacyBlockerFn,
 	condition?: boolean | any,
@@ -118,23 +154,23 @@ export function useBlocker(
 
 	useEffect(() => {
 		const blockerFnComposed = async (blockerFnArgs: BlockerFnArgs) => {
-			function getLocation(location: HistoryLocation): ShouldBlockFnLocation {
+			function getLocation(location: HistoryLocation): AnyShouldBlockFnLocation {
 				const parsedLocation = router.parseLocation(location);
-				const matchedRoutes = router.getMatchedRoutes(parsedLocation.pathname);
-				if (matchedRoutes.foundRoute === undefined) {
+				const [, rawParams, foundRoute] = router.getMatchedRoutes(parsedLocation.pathname);
+				if (foundRoute === undefined) {
 					return {
 						routeId: '__notFound__',
 						fullPath: parsedLocation.pathname,
 						pathname: parsedLocation.pathname,
-						params: matchedRoutes.routeParams,
+						params: rawParams,
 						search: router.options.parseSearch(location.search),
 					};
 				}
 				return {
-					routeId: matchedRoutes.foundRoute.id,
-					fullPath: matchedRoutes.foundRoute.fullPath,
+					routeId: foundRoute.id,
+					fullPath: foundRoute.fullPath,
 					pathname: parsedLocation.pathname,
-					params: matchedRoutes.routeParams,
+					params: rawParams,
 					search: router.options.parseSearch(location.search),
 				};
 			}
@@ -178,22 +214,39 @@ export function useBlocker(
 	return resolver;
 }
 
-// Upstream's PromptProps: the blocker options plus optional children (a render
-// prop receiving the resolver, or plain renderables).
-export type PromptProps =
-	(UseBlockerOpts | LegacyBlockerOpts) & {
-		children?: OctaneNode | ((params: BlockerResolver) => OctaneNode);
+type LegacyPromptProps = {
+	blockerFn?: LegacyBlockerFn;
+	condition?: boolean | any;
+	children?: OctaneNode | ((params: BlockerResolver) => OctaneNode);
+};
+
+export type PromptProps<
+	TRouter extends AnyRouter = RegisteredRouter,
+	TWithResolver extends boolean = boolean,
+	TParams = TWithResolver extends true ? BlockerResolver<TRouter> : void,
+> =
+	UseBlockerOpts<TRouter, TWithResolver> & {
+		children?: OctaneNode | ((params: TParams) => OctaneNode);
 	};
+
+export function Block<
+	TRouter extends AnyRouter = RegisteredRouter,
+	TWithResolver extends boolean = boolean,
+>(opts: PromptProps<TRouter, TWithResolver>): OctaneNode;
+
+/**
+ *  @deprecated Use the UseBlockerOpts property instead
+ */
 
 // Declarative blocker: registers useBlocker and renders children (optionally a
 // render prop receiving the resolver).
-export function Block(props: PromptProps) @{
+export function Block(props: PromptProps | LegacyPromptProps) @{
 	const { children, ...rest } = props;
-	const resolver = useBlocker(rest);
+	const resolver = useBlocker(_resolveBlockerOpts(rest));
 	const out =
 		children
 			? typeof children === 'function' && !isChildrenBlock(children)
-				? children(resolver)
+				? children(resolver as any)
 				: children
 			: null;
 	<>

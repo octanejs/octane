@@ -1,3 +1,5 @@
+declare const process: { env: { NODE_ENV?: string } };
+
 // useLinkProps / createLink / linkOptions — port of react-router's link.tsx
 // (client path; SSR link rendering arrives with the SSR entries). All of Link's
 // behavior lives here so both `<Link>` and custom `createLink` components share
@@ -8,10 +10,21 @@
 // IntersectionObserver, 'render' once on mount), the click handler (navigate
 // with replace/resetScroll/hashScrollIntoView/viewTransition/startTransition/
 // ignoreBlocker forwarded), and data-status/data-transitioning reflection.
-import { useRef, useState, useEffect, useCallback, flushSync, createElement } from 'octane';
-import type { ComponentBody } from 'octane';
+import {
+	useRef,
+	useState,
+	useEffect,
+	useCallback,
+	useMemo,
+	flushSync,
+	createElement,
+} from 'octane';
+import type { OctaneNode } from 'octane';
+import type { Constrain } from '@tanstack/router-core';
+export type { LinkComponentRoute } from './linkTypes';
 import {
 	deepEqual,
+	getUrlScheme,
 	exactPathTest,
 	functionalUpdate,
 	hasKeys,
@@ -20,11 +33,23 @@ import {
 	removeTrailingSlash,
 } from '@tanstack/router-core';
 import { useRouter } from './context';
+import { isServer } from '@tanstack/router-core/isServer';
+import { useHydrated } from './ClientOnly.tsrx';
 import { useStore } from './useStore';
 import { splitSlot, subSlot } from './internal';
 import { Link } from './Link.tsrx';
-import type { AnyRouter, RegisteredRouter } from '@tanstack/router-core';
-import type { LinkComponent, OctaneAnchorProps, UseLinkPropsOptions } from './linkTypes';
+import type {
+	ActiveOptions,
+	AnyRouter,
+	ParsedLocation,
+	RegisteredRouter,
+} from '@tanstack/router-core';
+import type {
+	LinkComponent,
+	CreateLinkProps,
+	OctaneAnchorProps,
+	UseLinkPropsOptions,
+} from './linkTypes';
 import type { ValidateLinkOptions, ValidateLinkOptionsArray } from './typePrimitives';
 
 const STATIC_EMPTY_OBJECT = {};
@@ -33,37 +58,106 @@ const STATIC_DISABLED_PROPS = { role: 'link', 'aria-disabled': true };
 const STATIC_ACTIVE_PROPS = { 'data-status': 'active', 'aria-current': 'page' };
 const STATIC_TRANSITIONING_PROPS = { 'data-transitioning': 'transitioning' };
 
-const timeoutMap = new WeakMap<EventTarget, ReturnType<typeof setTimeout>>();
-
-const composeHandlers = (handlers: Array<undefined | ((e: any) => void)>) => (e: Event) => {
-	for (const handler of handlers) {
-		if (!handler) continue;
-		if (e.defaultPrevented) return;
-		handler(e);
-	}
+const timeoutMap = new WeakMap<object, ReturnType<typeof setTimeout>>();
+const cancelPreload = (target: object) => {
+	clearTimeout(timeoutMap.get(target));
+	timeoutMap.delete(target);
 };
-
-function getHrefOption(
-	publicHref: string,
-	external: boolean,
-	history: any,
-	disabled: boolean | undefined,
-): { href: string; external: boolean } | undefined {
-	if (disabled) return undefined;
-	// Full URL means a rewrite changed the origin — treat as external-like.
-	if (external) return { href: publicHref, external: true };
-	return { href: history.createHref(publicHref) || '/', external: false };
+export const composeHandlers = (
+	first: ((event: any) => void) | undefined,
+	second: (event: any) => void,
+) => {
+	if (!first) return second;
+	return (event: Event) =>
+		event.defaultPrevented || (first(event), event.defaultPrevented || second(event));
+};
+type LinkState = [href: string | undefined, isActive?: boolean];
+function useValueStable<T>(value: T, slot?: symbol): T {
+	const ref = useRef(value, slot);
+	if (!deepEqual(ref.current, value, { ignoreUndefined: false })) ref.current = value;
+	return ref.current;
 }
-
-function isSafeInternal(to: unknown): boolean {
-	if (typeof to !== 'string') return false;
-	const zero = to.charCodeAt(0);
-	if (zero === 47) return to.charCodeAt(1) !== 47; // '/' but not '//'
-	return zero === 46; // '.', '..', './', '../'
-}
-
 function isCtrlEvent(e: MouseEvent): boolean {
 	return !!(e.metaKey || e.altKey || e.ctrlKey || e.shiftKey);
+}
+function compareLinkState(a: LinkState, b: LinkState) {
+	return a[0] === b[0] && a[1] === b[1];
+}
+
+function resolveExternalLink(
+	to: string | undefined,
+	protocolAllowlist: AnyRouter['protocolAllowlist'],
+): string | null | undefined {
+	const scheme = typeof to === 'string' && getUrlScheme(to);
+	if (!scheme) {
+		return undefined;
+	}
+	if (!protocolAllowlist.has(scheme)) {
+		if (process.env.NODE_ENV !== 'production') {
+			console.warn(`Blocked Link with dangerous protocol: ${to}`);
+		}
+		return null;
+	}
+	return to;
+}
+
+function resolveIsActive(
+	location: ParsedLocation,
+	next: ParsedLocation,
+	activeOptions: ActiveOptions | undefined,
+	basepath: string,
+	isHydrated: boolean,
+): boolean {
+	const currentPath = removeTrailingSlash(location.pathname, basepath);
+	const nextPath = removeTrailingSlash(next.pathname, basepath);
+
+	// Both modes compare normalized paths; fuzzy matches need a segment boundary.
+	if (
+		activeOptions?.exact
+			? currentPath !== nextPath
+			: !(
+					currentPath.startsWith(nextPath) &&
+					(currentPath.length === nextPath.length || currentPath[nextPath.length] === '/')
+				)
+	) {
+		return false;
+	}
+
+	if (activeOptions?.includeSearch ?? true) {
+		const searchTest = deepEqual(location.search, next.search, {
+			partial: !activeOptions?.exact,
+			ignoreUndefined: !activeOptions?.explicitUndefined,
+		});
+		if (!searchTest) {
+			return false;
+		}
+	}
+
+	if (activeOptions?.includeHash) {
+		return isHydrated && location.hash === next.hash;
+	}
+	return true;
+}
+
+function getHrefOption(next: ParsedLocation, router: AnyRouter, disabled: boolean | undefined) {
+	if (disabled) {
+		return undefined;
+	}
+	const location = next.maskedLocation ?? next;
+	// A rewritten external URL must bypass history's relative-path formatting.
+	const href = location.external
+		? location.publicHref
+		: router.history.createHref(location.publicHref) || '/';
+	if (
+		(location.external || href !== location.publicHref) &&
+		isDangerousProtocol(href, router.protocolAllowlist)
+	) {
+		if (process.env.NODE_ENV !== 'production') {
+			console.warn(`Blocked Link with dangerous protocol: ${href}`);
+		}
+		return undefined;
+	}
+	return href;
 }
 
 // Merge base/active/inactive styles. Objects merge like upstream; if any is a
@@ -140,77 +234,61 @@ export function useLinkProps(...args: any[]): Record<string, any> {
 		...propsSafeToSpread
 	} = options;
 
-	// Subscribe to the location (by href) — active state re-derives per commit.
-	const currentLocation: any = useStore(
-		router.stores.location,
-		(l: any) => l,
-		(prev: any, next: any) => prev.href === next.href,
-		subSlot(slot, 'lp:loc'),
+	const stableSearch = useValueStable(options.search, subSlot(slot, 'lp:search'));
+	const stableParams = useValueStable(options.params, subSlot(slot, 'lp:params'));
+	const stableActiveOptions = useValueStable(activeOptions, subSlot(slot, 'lp:active'));
+	const isHydrated = useHydrated(subSlot(slot, 'lp:hydrated'));
+	const routingOptions = useMemo(
+		() => options,
+		[
+			router,
+			options.from,
+			options._fromLocation,
+			options.hash,
+			options.to,
+			stableSearch,
+			stableParams,
+			options.state,
+			options.mask,
+			options.unsafeRelative,
+		],
+		subSlot(slot, 'lp:options'),
 	);
-
-	const next = router.buildLocation({ _fromLocation: currentLocation, ...options } as any);
-
-	const hrefOptionPublicHref = next.maskedLocation
-		? next.maskedLocation.publicHref
-		: next.publicHref;
-	const hrefOptionExternal = next.maskedLocation ? next.maskedLocation.external : next.external;
-	const hrefOption = getHrefOption(
-		hrefOptionPublicHref,
-		hrefOptionExternal,
-		router.history,
-		disabled,
+	const selectLinkState = useCallback(
+		(location: ParsedLocation): LinkState => {
+			const directExternal = resolveExternalLink(to, router.protocolAllowlist);
+			if (directExternal !== undefined) return [directExternal ?? undefined];
+			const next = router.buildLocation({ _fromLocation: location, ...routingOptions } as any);
+			const href = getHrefOption(next, router, disabled);
+			return [
+				href,
+				!disabled && (!href || getUrlScheme(href))
+					? undefined
+					: resolveIsActive(location, next, stableActiveOptions, router.basepath, isHydrated),
+			];
+		},
+		[router, routingOptions, to, disabled, stableActiveOptions, isHydrated],
+		subSlot(slot, 'lp:select'),
 	);
-
-	// External URL detection + dangerous-protocol blocking (javascript:, data:…).
-	const externalLink = (() => {
-		if (hrefOption?.external) {
-			if (isDangerousProtocol(hrefOption.href, router.protocolAllowlist)) return undefined;
-			return hrefOption.href;
-		}
-		if (isSafeInternal(to)) return undefined;
-		if (typeof to !== 'string' || to.indexOf(':') === -1) return undefined;
-		try {
-			new URL(to);
-			if (isDangerousProtocol(to, router.protocolAllowlist)) return undefined;
-			return to;
-		} catch {
-			/* not an absolute URL */
-		}
-		return undefined;
-	})();
-
-	const isActive = (() => {
-		if (externalLink) return false;
-		if (activeOptions?.exact) {
-			if (!exactPathTest(currentLocation.pathname, next.pathname, router.basepath)) {
-				return false;
-			}
-		} else {
-			const currentPathSplit = removeTrailingSlash(currentLocation.pathname, router.basepath);
-			const nextPathSplit = removeTrailingSlash(next.pathname, router.basepath);
-			const pathIsFuzzyEqual =
-				currentPathSplit.startsWith(nextPathSplit) &&
-				(currentPathSplit.length === nextPathSplit.length ||
-					currentPathSplit[nextPathSplit.length] === '/');
-			if (!pathIsFuzzyEqual) return false;
-		}
-		if (activeOptions?.includeSearch ?? true) {
-			const searchTest = deepEqual(currentLocation.search, next.search, {
-				partial: !activeOptions?.exact,
-				ignoreUndefined: !activeOptions?.explicitUndefined,
-			});
-			if (!searchTest) return false;
-		}
-		if (activeOptions?.includeHash) return currentLocation.hash === next.hash;
-		return true;
-	})();
+	const [href, isActive] =
+		(isServer ?? router.isServer)
+			? selectLinkState(router.stores.location.get())
+			: useStore(
+					router.stores.location,
+					selectLinkState,
+					compareLinkState,
+					subSlot(slot, 'lp:loc'),
+				);
+	const externalLink = isActive === undefined ? href : undefined;
+	const linkDisabled = disabled || href === undefined;
 
 	const resolvedActiveProps: Record<string, any> = isActive
 		? (functionalUpdate(activeProps, {}) ?? STATIC_ACTIVE_OBJECT)
 		: STATIC_EMPTY_OBJECT;
-	const resolvedInactiveProps: Record<string, any> = isActive
-		? STATIC_EMPTY_OBJECT
-		: (functionalUpdate(inactiveProps, {}) ?? STATIC_EMPTY_OBJECT);
+	const resolvedInactiveProps: Record<string, any> =
+		isActive || externalLink
+			? STATIC_EMPTY_OBJECT
+			: (functionalUpdate(inactiveProps, {}) ?? STATIC_EMPTY_OBJECT);
 
 	// Class composes clsx-style (octane normalizeClass folds arrays + falsy).
 	const resolvedClass = [
@@ -225,38 +303,59 @@ export function useLinkProps(...args: any[]): Record<string, any> {
 	const elRef = useRef<Element | null>(null, subSlot(slot, 'lp:el'));
 
 	const preload =
-		options.reloadDocument || externalLink ? false : (userPreload ?? router.options.defaultPreload);
+		options.reloadDocument || externalLink || linkDisabled
+			? false
+			: (userPreload ?? router.options.defaultPreload);
 	const preloadDelay = userPreloadDelay ?? router.options.defaultPreloadDelay ?? 0;
 
 	const doPreload = useCallback(
 		() => {
-			router.preloadRoute({ ...options, _builtLocation: next } as any).catch((err: unknown) => {
+			router.preloadRoute(routingOptions as any).catch((err: unknown) => {
 				console.warn(err);
 				console.warn(preloadWarning);
 			});
 		},
-		[router, next.href],
+		[router, routingOptions],
 		subSlot(slot, 'lp:dp'),
 	);
 
-	// preload="viewport": preload when the anchor scrolls into view (100px margin).
+	const enqueuePreload = useCallback(
+		(entry?: IntersectionObserverEntry) => {
+			if (!entry || !entry.isIntersecting) {
+				cancelPreload(elRef);
+				return;
+			}
+			if (!preloadDelay) {
+				doPreload();
+				return;
+			}
+			if (!timeoutMap.has(elRef))
+				timeoutMap.set(
+					elRef,
+					setTimeout(() => {
+						timeoutMap.delete(elRef);
+						doPreload();
+					}, preloadDelay),
+				);
+		},
+		[doPreload, preloadDelay],
+		subSlot(slot, 'lp:enqueue'),
+	);
 	useEffect(
 		() => {
-			if (disabled || preload !== 'viewport') return;
-			const el = elRef.current;
-			if (!el || typeof IntersectionObserver === 'undefined') return;
-			const io = new IntersectionObserver(
-				(entries) => {
-					for (const entry of entries) {
-						if (entry.isIntersecting) doPreload();
-					}
-				},
-				{ rootMargin: '100px' },
-			);
-			io.observe(el);
-			return () => io.disconnect();
+			const element = elRef.current;
+			if (!element || preload !== 'viewport' || typeof IntersectionObserver !== 'function')
+				return () => cancelPreload(elRef);
+			const observer = new IntersectionObserver((entries) => enqueuePreload(entries.pop()), {
+				rootMargin: '100px',
+			});
+			observer.observe(element);
+			return () => {
+				observer.disconnect();
+				cancelPreload(elRef);
+			};
 		},
-		[disabled, preload, doPreload],
+		[elRef, preload, enqueuePreload],
 		subSlot(slot, 'lp:io'),
 	);
 
@@ -277,7 +376,7 @@ export function useLinkProps(...args: any[]): Record<string, any> {
 		const elementTarget = (e.currentTarget as Element | null)?.getAttribute?.('target');
 		const effectiveTarget = target !== undefined ? target : elementTarget;
 		if (
-			!disabled &&
+			!linkDisabled &&
 			!isCtrlEvent(e) &&
 			!e.defaultPrevented &&
 			(!effectiveTarget || effectiveTarget === '_self') &&
@@ -294,7 +393,7 @@ export function useLinkProps(...args: any[]): Record<string, any> {
 			});
 
 			router.navigate({
-				...options,
+				...routingOptions,
 				replace,
 				resetScroll,
 				hashScrollIntoView,
@@ -329,12 +428,12 @@ export function useLinkProps(...args: any[]): Record<string, any> {
 	}
 
 	const enqueueIntentPreload = (e: MouseEvent | FocusEvent) => {
-		if (disabled || preload !== 'intent') return;
+		if (linkDisabled || preload !== 'intent') return;
 		if (!preloadDelay) {
 			doPreload();
 			return;
 		}
-		const eventTarget = e.currentTarget as EventTarget;
+		const eventTarget = elRef;
 		if (timeoutMap.has(eventTarget)) return;
 		const id = setTimeout(() => {
 			timeoutMap.delete(eventTarget);
@@ -344,13 +443,13 @@ export function useLinkProps(...args: any[]): Record<string, any> {
 	};
 
 	const handleTouchStart = () => {
-		if (disabled || preload !== 'intent') return;
+		if (linkDisabled || preload !== 'intent') return;
 		doPreload();
 	};
 
 	const handleLeave = (e: MouseEvent | FocusEvent) => {
-		if (disabled || !preload || !preloadDelay) return;
-		const eventTarget = e.currentTarget as EventTarget;
+		if (linkDisabled || preload !== 'intent' || !preloadDelay) return;
+		const eventTarget = elRef;
 		const id = timeoutMap.get(eventTarget);
 		if (id) {
 			clearTimeout(id);
@@ -362,19 +461,19 @@ export function useLinkProps(...args: any[]): Record<string, any> {
 		...propsSafeToSpread,
 		...resolvedActiveProps,
 		...resolvedInactiveProps,
-		href: hrefOption?.href,
+		href,
 		ref: composedRef,
-		onClick: composeHandlers([onClick, handleClick]),
-		onBlur: composeHandlers([onBlur, handleLeave]),
-		onFocus: composeHandlers([onFocus, enqueueIntentPreload]),
-		onMouseEnter: composeHandlers([onMouseEnter, enqueueIntentPreload]),
-		onMouseLeave: composeHandlers([onMouseLeave, handleLeave]),
-		onTouchStart: composeHandlers([onTouchStart, handleTouchStart]),
-		disabled: !!disabled,
+		onClick: composeHandlers(onClick, handleClick),
+		onBlur: composeHandlers(onBlur, handleLeave),
+		onFocus: composeHandlers(onFocus, enqueueIntentPreload),
+		onMouseEnter: composeHandlers(onMouseEnter, enqueueIntentPreload),
+		onMouseLeave: composeHandlers(onMouseLeave, handleLeave),
+		onTouchStart: composeHandlers(onTouchStart, handleTouchStart),
+		disabled: !!linkDisabled,
 		...(target !== undefined && { target }),
 		...(resolvedStyle !== undefined && { style: resolvedStyle }),
 		...(resolvedClass.length > 0 && { class: resolvedClass }),
-		...(disabled && STATIC_DISABLED_PROPS),
+		...(linkDisabled && STATIC_DISABLED_PROPS),
 		...(isActive && STATIC_ACTIVE_PROPS),
 		...(isTransitioning && STATIC_TRANSITIONING_PROPS),
 	};
@@ -382,8 +481,8 @@ export function useLinkProps(...args: any[]): Record<string, any> {
 
 // Wrap a design-system component so it navigates like <Link> — the component
 // receives the fully-built link props (href, handlers, data-status, …).
-export function createLink<const TComp extends ComponentBody<any>>(
-	Comp: TComp,
+export function createLink<const TComp>(
+	Comp: Constrain<TComp, any, (props: CreateLinkProps) => OctaneNode>,
 ): LinkComponent<TComp>;
 export function createLink(Comp: any): any {
 	return function CreatedLink(props: any) {

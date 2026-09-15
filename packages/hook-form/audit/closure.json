@@ -1,0 +1,790 @@
+{
+  "runtimeDependencies": ["octane"],
+  "adaptedSources": [
+    {
+      "packageName": "react-hook-form",
+      "paths": [
+        "package.json",
+        "src/FormProvider.tsrx",
+        "src/constants.ts",
+        "src/controller.tsrx",
+        "src/errorMessage.tsrx",
+        "src/fieldArray.tsrx",
+        "src/form.tsrx",
+        "src/formState.tsrx",
+        "src/index.ts",
+        "src/logic/appendErrors.ts",
+        "src/logic/collectDirtyFieldNames.ts",
+        "src/logic/createFormControl.ts",
+        "src/logic/generateId.ts",
+        "src/logic/generateWatchOutput.ts",
+        "src/logic/getCheckboxValue.ts",
+        "src/logic/getDirtyFields.ts",
+        "src/logic/getEventValue.ts",
+        "src/logic/getFieldArrayItemNames.ts",
+        "src/logic/getFieldValue.ts",
+        "src/logic/getFieldValueAs.ts",
+        "src/logic/getFocusFieldName.ts",
+        "src/logic/getNullAncestorValue.ts",
+        "src/logic/getProxyFormState.ts",
+        "src/logic/getRadioValue.ts",
+        "src/logic/getResolverOptions.ts",
+        "src/logic/getRuleValue.ts",
+        "src/logic/getValidateError.ts",
+        "src/logic/getValidationModes.ts",
+        "src/logic/getValueAndMessage.ts",
+        "src/logic/hasPromiseValidation.ts",
+        "src/logic/hasValidation.ts",
+        "src/logic/index.ts",
+        "src/logic/isNameInFieldArray.ts",
+        "src/logic/isWatched.ts",
+        "src/logic/iterateFieldsByAction.ts",
+        "src/logic/schemaErrorLookup.ts",
+        "src/logic/shouldRenderFormState.ts",
+        "src/logic/shouldSubscribeByName.ts",
+        "src/logic/skipValidation.ts",
+        "src/logic/unsetEmptyArray.ts",
+        "src/logic/updateFieldArrayRootError.ts",
+        "src/logic/validateField.ts",
+        "src/types/controller.ts",
+        "src/types/errors.ts",
+        "src/types/events.ts",
+        "src/types/fieldArray.ts",
+        "src/types/fields.ts",
+        "src/types/form.ts",
+        "src/types/index.ts",
+        "src/types/path/common.ts",
+        "src/types/path/eager.ts",
+        "src/types/path/index.ts",
+        "src/types/resolvers.ts",
+        "src/types/utils.ts",
+        "src/types/validator.ts",
+        "src/types/watch.ts",
+        "src/useController.ts",
+        "src/useFieldArray.ts",
+        "src/useForm.ts",
+        "src/useFormContext.ts",
+        "src/useFormControlContext.ts",
+        "src/useFormState.ts",
+        "src/useIsomorphicLayoutEffect.ts",
+        "src/useResyncOnReconnect.ts",
+        "src/useWatch.ts",
+        "src/utils/append.ts",
+        "src/utils/cloneObject.ts",
+        "src/utils/compact.ts",
+        "src/utils/convertToArrayPayload.ts",
+        "src/utils/createSubject.ts",
+        "src/utils/deepEqual.ts",
+        "src/utils/extractFormValues.ts",
+        "src/utils/fillEmptyArray.ts",
+        "src/utils/flatten.ts",
+        "src/utils/formData.ts",
+        "src/utils/get.ts",
+        "src/utils/has.ts",
+        "src/utils/index.ts",
+        "src/utils/insert.ts",
+        "src/utils/isBoolean.ts",
+        "src/utils/isCheckBoxInput.ts",
+        "src/utils/isDateObject.ts",
+        "src/utils/isEmptyObject.ts",
+        "src/utils/isFileInput.ts",
+        "src/utils/isFunction.ts",
+        "src/utils/isHTMLElement.ts",
+        "src/utils/isKey.ts",
+        "src/utils/isMultipleSelect.ts",
+        "src/utils/isNullOrUndefined.ts",
+        "src/utils/isObject.ts",
+        "src/utils/isPlainObject.ts",
+        "src/utils/isPrimitive.ts",
+        "src/utils/isRadioInput.ts",
+        "src/utils/isRadioOrCheckbox.ts",
+        "src/utils/isRegex.ts",
+        "src/utils/isString.ts",
+        "src/utils/isUndefined.ts",
+        "src/utils/isWeb.ts",
+        "src/utils/json.ts",
+        "src/utils/live.ts",
+        "src/utils/move.ts",
+        "src/utils/noop.ts",
+        "src/utils/objectHasFunction.ts",
+        "src/utils/prepend.ts",
+        "src/utils/remove.ts",
+        "src/utils/set.ts",
+        "src/utils/stringToPath.ts",
+        "src/utils/swap.ts",
+        "src/utils/unset.ts",
+        "src/utils/update.ts",
+        "src/watch.tsrx"
+      ]
+    }
+  ],
+  "sourceLedger": [
+    {
+      "path": "package.json",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "39fca96f26e17736768d42eda92e4e7e72d0c09d5dc2c39cff7e284fd7879b8e"
+    },
+    {
+      "path": "src/FormProvider.tsrx",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "7ba7e602a584f85489275ebbd03a48e40bf85991cbef10401edb0f84c9de27bc"
+    },
+    {
+      "path": "src/constants.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "1a1118aa2a81b4e426e75e3ca7e570ee2cd80b2f9026eac30db82a3daaa636c3"
+    },
+    {
+      "path": "src/controller.tsrx",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "0f3597c62433553c0aa91c1d425a6fc00d8a19aff8e900d964ee6e5a9bd06863"
+    },
+    {
+      "path": "src/errorMessage.tsrx",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "15090395f4bb516c6a2783ab434ede8dfe3ff0195665384846a4c8c626ac25db"
+    },
+    {
+      "path": "src/fieldArray.tsrx",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "0baaccaafa1a9a77d052ed63ca461b6b6f547a576aa89e390cded50c46c539df"
+    },
+    {
+      "path": "src/form.tsrx",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "62913551e025f11bf2b7b0f24ad23131330166aa2c8b9f07b1534c704b44e66c"
+    },
+    {
+      "path": "src/formState.tsrx",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "80bc65c52e290f9d405e1c9f5b9538853e7973c013099d6fd83d8f4e81d486e6"
+    },
+    {
+      "path": "src/index.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "199855e49b0fcbd66bc541b3ba260f7c7ddb44edd1b55568ee1c621246401e79"
+    },
+    {
+      "path": "src/logic/appendErrors.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "26f677a14709e8e75828206de458b6ea296665fb9441c9d26980fe926ec28509"
+    },
+    {
+      "path": "src/logic/collectDirtyFieldNames.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "86b294bf65b22303a01a3d99fa551b0c5464fadfa9c096870064af8d1eb3d27b"
+    },
+    {
+      "path": "src/logic/createFormControl.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "0970cc2fe27d9e66e1c673ef0ce024ea31c8cb163a2d9e7631349c2b5c27521d"
+    },
+    {
+      "path": "src/logic/generateId.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "2dbc65643c91bf9c114acbfcdaeb2b2631cc5c5c96ea6f301f9c79cdda3ead9f"
+    },
+    {
+      "path": "src/logic/generateWatchOutput.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "4ae4edbfbe3dc23628a6aed613d21486efc89d54787f76d795d2c4747c62b9ce"
+    },
+    {
+      "path": "src/logic/getCheckboxValue.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "5e7bf0d8685484f7b3943b64c0234872a505f1f19eb9d52edff4c4b59dbaa960"
+    },
+    {
+      "path": "src/logic/getDirtyFields.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "825dbb2ebd558cbca5bb8444c3f9e38ec9b5be856bf7008f846a963cdac26661"
+    },
+    {
+      "path": "src/logic/getEventValue.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "40d36fa744df99f9a3fb5af1b599420299d2c4b38d2a1913b05c0dcc5f8da250"
+    },
+    {
+      "path": "src/logic/getFieldArrayItemNames.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "a2b8e936e76f5e0a9f802c56e8a9a6b37ffe26eb7057609be43a0f65a924878c"
+    },
+    {
+      "path": "src/logic/getFieldValue.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "1da052d38af6769617921b7571bf3b3b2860566af338826238298ad000aac9e3"
+    },
+    {
+      "path": "src/logic/getFieldValueAs.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "56b3ca5253298e7e97f274c3c06b598e04223cefface5ef8795962a099cf232c"
+    },
+    {
+      "path": "src/logic/getFocusFieldName.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "4c8779ac2256cc0efa865f8d61ab234b1279251f8ddfb8dfb9b469edb92294e6"
+    },
+    {
+      "path": "src/logic/getNullAncestorValue.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "2999e90c0634e1f16f5e693718a27e2c914b63d4a889094cd7e9b1505cbe3800"
+    },
+    {
+      "path": "src/logic/getProxyFormState.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "df1286ef4f8db7315a4c0aec3c0e64eb9a114b38cdd60c7c63c7797d063ee9df"
+    },
+    {
+      "path": "src/logic/getRadioValue.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "d524e5405863a41a8592409723680f8dfc88c4c8e46a6bcc72dc44f76f6cccfc"
+    },
+    {
+      "path": "src/logic/getResolverOptions.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "618c6ce399bc7f7c4c12728e1d5b0f0d936f4069b5751dadc70a3aecbd78b535"
+    },
+    {
+      "path": "src/logic/getRuleValue.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "9b0b5ac6abd5543ca8199eba03765a7222719aaef1e1e33539e204aaa9f2b75b"
+    },
+    {
+      "path": "src/logic/getValidateError.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "685ebe661e85d294350428ce5713bf3addc9077cf5e0865bdad168cfef3d5f5b"
+    },
+    {
+      "path": "src/logic/getValidationModes.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "4193f49f52b23e66e41646bd4145a9b4b2e0d9f65d87d09b8b1d8c694128d533"
+    },
+    {
+      "path": "src/logic/getValueAndMessage.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "1e344fa5348da7ab8a7f429ba3b379c6d5e062f04738c7adc24b4c86cba9c84e"
+    },
+    {
+      "path": "src/logic/hasPromiseValidation.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "c80e7a1fa455ae9031bac95bdda1041c09b3d0da85127fd89a89ad11a8f57452"
+    },
+    {
+      "path": "src/logic/hasValidation.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "63b8decb63410070300641f5fef3af1ca3bcab2e7b55beac291f528d0e7600c2"
+    },
+    {
+      "path": "src/logic/index.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "575fa926f71e40719d9aa7ad87630f1515f733ba070e50776707678a478fedc0"
+    },
+    {
+      "path": "src/logic/isNameInFieldArray.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "82da8d0ae0b86c4b4362e33b6dd5f1ff5cc243e71cab64de50a2360a177fade9"
+    },
+    {
+      "path": "src/logic/isWatched.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "ddbcca0845480da4212739edce8e58a313837de80ef13a96c8993f20d12c011f"
+    },
+    {
+      "path": "src/logic/iterateFieldsByAction.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "dd22719586d5a710159fe1081a7e51110314e89bee50c897ee8d3589f67a8913"
+    },
+    {
+      "path": "src/logic/schemaErrorLookup.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "1f9fc01b944ab9a1e31f0a260506a3428d808c5c5f5a534761fcaff0c52b6152"
+    },
+    {
+      "path": "src/logic/shouldRenderFormState.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "31d06f3fbb9af9f9b2f75e52e1fe3197747aaa0c38d06e005c83f451a3726a8b"
+    },
+    {
+      "path": "src/logic/shouldSubscribeByName.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "24a832d709d0b383abe7cb72c372c36172d5245fa4d31694768a607de60ee89e"
+    },
+    {
+      "path": "src/logic/skipValidation.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "5610eaa0d642d2432f5bb554514f040b1b03c28449b2bfbf74c362c011c64513"
+    },
+    {
+      "path": "src/logic/unsetEmptyArray.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "e949cdbf054b0b69f30edb2f22ed6ade612488ae18388c81f7b2bb7a1823c51e"
+    },
+    {
+      "path": "src/logic/updateFieldArrayRootError.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "f6754b51c4eb0c93ca0ee3a61004ef53b3d70de49985be94a93f40d4cb92ee9f"
+    },
+    {
+      "path": "src/logic/validateField.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "f995c17456322397e128e9202889d22fe39d2cdf44edbff5cc298aa76b7791e4"
+    },
+    {
+      "path": "src/types/controller.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "e43b08b331450f3436ad3c2c77c008e89d75d4e25a12dbba5b9a772fd35f055f"
+    },
+    {
+      "path": "src/types/errors.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "2f4bf8f20c39fc6172615335e8d7c7732ad5fdbe54d4a0f6b93e52277cd172cd"
+    },
+    {
+      "path": "src/types/events.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "133ad670bdec8885de0b8620ab892e9a2fce16f7e04a9fcb1f570310e1b3e9fb"
+    },
+    {
+      "path": "src/types/fieldArray.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "06d3bb21c63412ed2e24c45af32d622302de8f94e0ec6e5e4f3dcdfcb5fa781a"
+    },
+    {
+      "path": "src/types/fields.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "48b5f3049143f2fc96e2c2fbe05bf85a577127a0aee247b9c1a6f49840f2db1e"
+    },
+    {
+      "path": "src/types/form.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "9998a767748335bea6443cf152115edf5227d90042af4c2666267d37a380848b"
+    },
+    {
+      "path": "src/types/index.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "54c2030861e9db822b35acb8f400b80cf10ba6656a00690f1d948fdee94fbdc2"
+    },
+    {
+      "path": "src/types/path/common.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "e6421c1c4abd48199705cc19ba8bc410bc48fb53874a6a205937b78cd71ec1f1"
+    },
+    {
+      "path": "src/types/path/eager.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "e31c9d792f507e80a7110249376169176c85ce8c13abe07c9a983ee26f57b549"
+    },
+    {
+      "path": "src/types/path/index.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "e936b6ac4da48255a56ad27aeb8006f319b17e3669af01ab816840a4e6be7756"
+    },
+    {
+      "path": "src/types/resolvers.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "8638cf01d0d44d24ba332e895e357cd4bc7caee079f7bbf15fa49b70c927b3fd"
+    },
+    {
+      "path": "src/types/utils.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "c2423d66f6305ddbb15caec829eeeae65b363ef9a64052a154739bc970136ecb"
+    },
+    {
+      "path": "src/types/validator.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "68474bb5eb4c3e648cb6c755bd6205bb6ef732ed59102919ddf96aa9b3b5b652"
+    },
+    {
+      "path": "src/types/watch.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "9cd457650329308b9d79419288a59a2be1fa0a7617962dd104d525e944de4167"
+    },
+    {
+      "path": "src/useController.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "71b6bb41723f145179fd382dd78af2ceeb6f4c7d6a50549dba6d435ff429e4e9"
+    },
+    {
+      "path": "src/useFieldArray.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "a198d4cab89f87be22743eb8bef1581562960a903c4821e55c73e1ea8678a118"
+    },
+    {
+      "path": "src/useForm.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "6a623c180d50ebb091cf76ddf23b4c73703f78e81da9ee96a9696008a4ef3152"
+    },
+    {
+      "path": "src/useFormContext.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "d9eaedc588ca4d28848c77a452c7f21c6fb12a5cdbeba005bfc1d00ddae3baed"
+    },
+    {
+      "path": "src/useFormControlContext.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "c8b3b6ff3bddc216041bf5e7ddf6735d0401c00d2f488f16b95c14cac5f90b70"
+    },
+    {
+      "path": "src/useFormState.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "dc0bfbc7407c760f28c66e26560a40a680c7e150f5992c34752890163d0c898a"
+    },
+    {
+      "path": "src/useIsomorphicLayoutEffect.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "31a13eaa8c8082a134c7ae7dec0f166fb27ee53404941b88ddd3a15abd986c67"
+    },
+    {
+      "path": "src/useResyncOnReconnect.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "3d7c5de28516b5108d7d52578f6f062d7b27810a41128e484e9ee2ea2c588e64"
+    },
+    {
+      "path": "src/useWatch.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "8bcfd341ddcfe9b5aa391c7e96949e8a708e846c260ffb03d69e88748387e439"
+    },
+    {
+      "path": "src/utils/append.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "e248272aca0bf5ee3409f70f96116ea4fd766180f2c31ef7aac4e1995e997def"
+    },
+    {
+      "path": "src/utils/cloneObject.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "d556937478247bdd72da7733ac71d55de41e002069cd73491906f3952446b5c6"
+    },
+    {
+      "path": "src/utils/compact.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "fe2751cc513ea7de943dfe231c916f1de6669b5ed1531fae51c0c207343f8272"
+    },
+    {
+      "path": "src/utils/convertToArrayPayload.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "4d55f168b9d390514fe92a94e9d856f2e1e037507ac37e9a97391b06df0ae732"
+    },
+    {
+      "path": "src/utils/createSubject.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "9d746de8762f67023be3c28c4fcd1bd58bffc7c0b2aa0995a2c66b6b17e11202"
+    },
+    {
+      "path": "src/utils/deepEqual.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "6793a4f27c3b6aa8c24b5066afa1ae91def7b3150ca1094842fbfe60557ed06d"
+    },
+    {
+      "path": "src/utils/extractFormValues.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "11abcf662672efe654540860ac41f3302878d940af2b379ec9508f8191ddf71d"
+    },
+    {
+      "path": "src/utils/fillEmptyArray.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "3966bd219f5c5516d659eb8fb30f1b7fc58ed594b62be859b03e0b668b190d7a"
+    },
+    {
+      "path": "src/utils/flatten.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "903470a5e344c7338ff91cebadfc22814a69558ddda6a44b26f4aa8ef29376e0"
+    },
+    {
+      "path": "src/utils/formData.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "f5e02bb02d305afd4ce8dc5987b306e2b3f23398a0a07dd3f44a07abffa2f6e7"
+    },
+    {
+      "path": "src/utils/get.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "92d0ae34fc3024c0a4be56ba738d565fd55057c06e09ec33e4dc4ecea036cc69"
+    },
+    {
+      "path": "src/utils/has.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "e1708f6fc278bb562141f1250218fb2a30998b1ebabfcd7cf033a33f2a863f64"
+    },
+    {
+      "path": "src/utils/index.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "349e8dfda64dcc0a1e880f424bf1ab33b6ead75e925038c20470ac483495d635"
+    },
+    {
+      "path": "src/utils/insert.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "7e75db9ef4b7d51384260ef36ccd7dd5256d713c63bf6e8529281df105b1308c"
+    },
+    {
+      "path": "src/utils/isBoolean.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "e35057e0a758ca8d34ebb3300e3dc43754041c16adb016daeb69416cf2aa66e2"
+    },
+    {
+      "path": "src/utils/isCheckBoxInput.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "fefa675dd774dfacc1b3c97181c132c0e22a95392d742f5a1117fe8e44877301"
+    },
+    {
+      "path": "src/utils/isDateObject.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "bd7e91cf51220fca4e408d0cbe71bc3532b4dedc2161d840f8edcc86ea0f3f08"
+    },
+    {
+      "path": "src/utils/isEmptyObject.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "89ffb7c87740d6c046bae1152178bf33f9eedb94ed2b1ea0b7b45125cf8bd87c"
+    },
+    {
+      "path": "src/utils/isFileInput.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "4319c87113fbb4fb0bfd506f17e2316c17730fd5724749a674db28062f307693"
+    },
+    {
+      "path": "src/utils/isFunction.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "ca58fe3d729a2df46ce2a56aad58816ede24cffc667c2723269b6198b4e85b77"
+    },
+    {
+      "path": "src/utils/isHTMLElement.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "e4fbf97cf0a38d7d76ad2d1d89decdc5a0a1152b2111b9727625964f4623fdb3"
+    },
+    {
+      "path": "src/utils/isKey.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "802f19b08a4b1d552e93261dd4e78430be50b57a2dbe1d15911fca15e677f34f"
+    },
+    {
+      "path": "src/utils/isMultipleSelect.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "5d0f6ab5afbc3b0fe69dba643cce3be9e05b88ff3be978c7b99556181126ff12"
+    },
+    {
+      "path": "src/utils/isNullOrUndefined.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "978e30f4e908e42132b981c0e8d792f6164a1744c66cf042b1a109b1ec3333b4"
+    },
+    {
+      "path": "src/utils/isObject.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "561630e1f9fc7c8db9f16b02e2d221b54b7bac744a57ad01ed8a53bcb29f7464"
+    },
+    {
+      "path": "src/utils/isPlainObject.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "6d31244b4fba6093f6286b8d693cc2423074ddefd66d75312c305cba4b613de8"
+    },
+    {
+      "path": "src/utils/isPrimitive.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "37befa28d65bb43f15e1675d5a3a661f46728d10ab1a84cc1c4f0f3f70a7da99"
+    },
+    {
+      "path": "src/utils/isRadioInput.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "3897b8033231153e5bb6fa182723438b7a6cd063d385f5e6f975b732042e28ad"
+    },
+    {
+      "path": "src/utils/isRadioOrCheckbox.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "9c637be3cc017a8e9f79e877195f802bb7570ff014bd3a365bcf0282e74cc0d2"
+    },
+    {
+      "path": "src/utils/isRegex.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "726875905f648867d43856c929d890e0123692385e34a47894325ab55a85611e"
+    },
+    {
+      "path": "src/utils/isString.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "0efbda37a5700c038ec593973c6f04533953c8098c0f29ef5c364ad6e72bf4b9"
+    },
+    {
+      "path": "src/utils/isUndefined.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "004f62e176043691769c852c0b905c79e71216cb7e918aa29ed6788f27f3dfa9"
+    },
+    {
+      "path": "src/utils/isWeb.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "fd93a868517e39aaacfb9082e95bed8d3523ab5c7e3301f342d4de9227d918d9"
+    },
+    {
+      "path": "src/utils/json.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "af672e6bfd0f8969d66dee2e06184c7c04fd6b413672c30884c7ea8e77d432c5"
+    },
+    {
+      "path": "src/utils/live.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "13a3941aab82594f905a308f416519560ac0badf4460df1f045029e8dd2e637a"
+    },
+    {
+      "path": "src/utils/move.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "afc9be5df48c465a3e846342f923d43c16720dbdc35d76746ef1113077cc2ab0"
+    },
+    {
+      "path": "src/utils/noop.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "c523f80cd7faab8aa0b2eb543a1c77e757c02021cfb82c17aa5cdb5f4813149e"
+    },
+    {
+      "path": "src/utils/objectHasFunction.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "a8ad39bf62c344f8007e9927a2f3ac3bb604d24ad5dad5d3eeed19e1608130a2"
+    },
+    {
+      "path": "src/utils/prepend.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "1378a9f9c40e817c0fa439f5cf7acab44488063dc5b3501480888b5059bba59f"
+    },
+    {
+      "path": "src/utils/remove.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "e87c48c341137403c628f1da4b4af2d7fde38e3695936cc42f58583d8f69ebf8"
+    },
+    {
+      "path": "src/utils/set.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "3070d3ecc7ebc8c1fad61ab0cc69b952f808fae2b682c049fe5c1e8bf863cac4"
+    },
+    {
+      "path": "src/utils/stringToPath.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "21a764fdb79a3e8a2d2511510f2c7c01412074c3a862c20e471209a121a16ba1"
+    },
+    {
+      "path": "src/utils/swap.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "f105a337c2027151160b22bea46a251dd6298bae849a8bc80ac05f2e81bd4517"
+    },
+    {
+      "path": "src/utils/unset.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "1d4e245c2c63f8b1e40e42fc0cbb80616a5c3c94642e679119946e70940b08a6"
+    },
+    {
+      "path": "src/utils/update.ts",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "dbda2a89ac657cd39da4d1a4716fe060d07bb8fe92dc666e6b7b8006af98db5b"
+    },
+    {
+      "path": "src/watch.tsrx",
+      "origin": "adapted",
+      "packageName": "react-hook-form",
+      "sha256": "58334ee63a9ae559cdab74d8544f6ade20f82a0d74d4ba5203576a054d1394b7"
+    }
+  ],
+  "reimplementedDependencies": []
+}

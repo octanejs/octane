@@ -1,10 +1,10 @@
 # Upstream boundary
 
-- Package: `react-is@19.2.7`.
-- Source: https://github.com/facebook/react/tree/6117d7cca4906492c51fe6a03381e35adfd86e7d/packages/react-is
-- Immutable commit: `6117d7cca4906492c51fe6a03381e35adfd86e7d`.
+- Package: `react-is@19.3.0`.
+- Source: https://github.com/facebook/react/tree/1d34f91dfde6bba84d08b683aaba164c7194dacb/packages/react-is
+- Immutable commit: `1d34f91dfde6bba84d08b683aaba164c7194dacb`.
 - License: MIT. `LICENSE.upstream` retains the exact Meta notice and permission.
-- npm integrity: `sha512-kZFnouyVv7eP/Phmrlo9FK+zcAdriZJvzxXHF1Sl1P377WSGe2G/JxVolhTrB/jeV47lKImhNUsijjHAAbcl/A==`.
+- npm integrity: `sha512-UpMYezM4v5/18F28aC66AEsjXIgE02kyEMH6yLdgLXu/UTfa1Ntwck/nNLrbqJsEXW7gPb0coNO9FQse9WTovA==`.
 
 `audit/upstream.lock.json` pins every pristine source and test blob. `src/ReactIs.ts`
 adapts `src/ReactIs.js`; `src/index.ts` mirrors `index.stable.js`. Runtime ownership

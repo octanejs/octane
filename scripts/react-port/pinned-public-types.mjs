@@ -1,4 +1,5 @@
-import { readFileSync, readdirSync, realpathSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { readFileSync, readdirSync, realpathSync, existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { gunzipSync } from 'node:zlib';
 import { parseTarArchive, verifyIntegrity } from './preflight-lib.mjs';
@@ -10,10 +11,89 @@ import {
 import ts from 'typescript';
 import { validateUpstreamLock, verifyPristineTree } from './materialize-lib.mjs';
 
+// Existing Octane-only entrypoints keep their pre-update public contract. The
+// campaign receipt, not a newly supplied hash, authenticates every original file.
+export function readCompatibilityBaseline(packageDirectory, node, baseline) {
+	const descriptorPath = path.join(packageDirectory, 'audit/compatibility-baseline.json');
+	if (!existsSync(descriptorPath)) return new Map();
+	if (!baseline || node.action !== 'extend-binding')
+		throw new Error('Compatibility evidence requires the existing binding preflight baseline');
+	const descriptor = JSON.parse(readFileSync(descriptorPath, 'utf8'));
+	if (
+		descriptor.schemaVersion !== 1 ||
+		descriptor.binding !== node.binding ||
+		descriptor.repository !== 'https://github.com/octanejs/octane.git' ||
+		!/^[a-f0-9]{40}$/.test(descriptor.commit) ||
+		descriptor.sourceRoot !== 'upstream-artifact/previous-binding' ||
+		!Array.isArray(descriptor.files)
+	)
+		throw new Error('Invalid compatibility baseline descriptor');
+	const prefix = node.bindingDirectory + '/';
+	const expected = Object.entries(baseline)
+		.filter(
+			([name, hash]) =>
+				hash !== 'directory' &&
+				(name === prefix + 'package.json' || name.startsWith(prefix + 'src/')),
+		)
+		.map(([name]) => name.slice(prefix.length))
+		.sort();
+	const declared = descriptor.files.map((file) => file.path).sort();
+	if (JSON.stringify(expected) !== JSON.stringify(declared) || expected.length < 2)
+		throw new Error('Compatibility baseline must retain the complete original source inventory');
+	const directory = path.join(realpathSync(packageDirectory), descriptor.sourceRoot);
+	for (const file of descriptor.files) {
+		if (
+			typeof file.path !== 'string' ||
+			file.path.split('/').some((part) => !part || part === '.' || part === '..') ||
+			path.isAbsolute(file.path)
+		)
+			throw new Error('Unsafe compatibility baseline path');
+		if (file.sha256 !== baseline[prefix + file.path])
+			throw new Error(
+				'Compatibility baseline hash differs from the preflight receipt: ' + file.path,
+			);
+		const absolute = path.join(directory, file.path);
+		if (
+			!existsSync(absolute) ||
+			realpathSync(absolute) !== absolute ||
+			createHash('sha256').update(readFileSync(absolute)).digest('hex') !== file.sha256
+		)
+			throw new Error('Compatibility baseline bytes differ from the original source: ' + file.path);
+	}
+	const manifest = JSON.parse(readFileSync(path.join(directory, 'package.json'), 'utf8'));
+	if (manifest.name !== node.binding)
+		throw new Error('Compatibility baseline has a different package');
+	const typeTarget = (value) =>
+		typeof value === 'string'
+			? value
+			: value && (typeTarget(value.types) ?? typeTarget(value.import) ?? typeTarget(value.default));
+	const entries = new Map();
+	for (const [subpath, value] of Object.entries(manifest.exports ?? { '.': manifest.types })) {
+		if (subpath === './package.json') continue;
+		const target = typeTarget(value);
+		if (
+			typeof target !== 'string' ||
+			!target.startsWith('./') ||
+			target.includes('*') ||
+			!expected.includes(target.slice(2))
+		)
+			throw new Error('Compatibility export escapes the original source: ' + subpath);
+		entries.set(
+			subpath === '.' ? node.binding : node.binding + subpath.slice(1),
+			path.join(directory, target),
+		);
+	}
+	return entries;
+}
+
 // An upstream declaration is an authority only after its complete source tree
 // has matched the immutable inventory. No package-local list of allowed `any`
 // paths can manufacture an exception to the public precision check.
-export function pinnedPublicEntries(packageDirectory, node) {
+export function pinnedPublicEntries(
+	packageDirectory,
+	node,
+	{ baseline, publicSpecifiers = [] } = {},
+) {
 	const lock = validateUpstreamLock(
 		JSON.parse(readFileSync(path.join(packageDirectory, 'audit/upstream.lock.json'), 'utf8')),
 	);
@@ -50,7 +130,16 @@ export function pinnedPublicEntries(packageDirectory, node) {
 	if (manifest.name !== node.identity.packageName || manifest.version !== node.identity.version)
 		throw new Error('Public declaration artifact has a different package or version');
 	const require = createRequire(path.join(packageDirectory, 'package.json'));
-	const installedRoot = path.dirname(require.resolve(`${node.identity.packageName}/package.json`));
+	// Package metadata need not be a public export, and an ESM-only package
+	// need not expose a require condition. Follow Node's package lookup paths;
+	// the full metadata and declaration byte comparison below remains mandatory.
+	const installedManifest = require.resolve
+		.paths(node.identity.packageName)
+		?.map((directory) => path.join(directory, node.identity.packageName, 'package.json'))
+		.find((file) => existsSync(file));
+	if (!installedManifest)
+		throw new Error(`Pinned public witness is not installed: ${node.identity.packageName}`);
+	const installedRoot = realpathSync(path.dirname(installedManifest));
 	for (const [file, bytes] of published.files) {
 		const installed = path.resolve(installedRoot, file.slice('package/'.length));
 		if (
@@ -78,9 +167,27 @@ export function pinnedPublicEntries(packageDirectory, node) {
 		};
 		visit(source);
 	}
-	for (const [subpath, target] of Object.entries(manifest.exports)) {
+	const exportKeys = Object.keys(manifest.exports ?? { '.': null });
+	const subpaths = new Set(
+		exportKeys.filter((key) => !key.includes('*') && manifest.exports?.[key] !== null),
+	);
+	// A wildcard is not an import. Resolve concrete consumer entries through
+	// TypeScript so export precedence and null exclusions still apply, then
+	// authenticate each resulting declaration against the registry bytes below.
+	for (const specifier of publicSpecifiers) {
+		if (!specifier.startsWith(node.binding + '/')) continue;
+		const subpath = '.' + specifier.slice(node.binding.length);
+		if (
+			exportKeys.some((key) => {
+				if (!key.includes('*')) return false;
+				const [prefix, suffix] = key.split('*');
+				return subpath.startsWith(prefix) && subpath.endsWith(suffix);
+			})
+		)
+			subpaths.add(subpath);
+	}
+	for (const subpath of subpaths) {
 		if (subpath === './package.json') continue;
-		if (typeof target !== 'object' || target === null) continue;
 		// Let the checking compiler select versioned and nested export conditions,
 		// just as it does for the consumer. A fallback `types` may intentionally
 		// reject older compilers rather than describe the current public surface.
@@ -97,7 +204,9 @@ export function pinnedPublicEntries(packageDirectory, node) {
 		} else {
 			// An export the compiler cannot place on a declaration still needs one:
 			// fall back to its declared types condition rather than dropping the
-			// public entry silently.
+			// public entry silently. Wildcard-expanded subpaths have no literal
+			// export entry, so a missing declaration still surfaces as an error.
+			const target = manifest.exports?.[subpath];
 			const declared = target?.import?.types ?? target?.types ?? target?.default?.types;
 			if (typeof declared !== 'string')
 				throw new Error(`Public export has no pinned declaration: ${subpath}`);
@@ -113,6 +222,16 @@ export function pinnedPublicEntries(packageDirectory, node) {
 			throw new Error(`Compatibility witness is absent from the pinned declarations: ${file}`);
 		entries.set(specifier, path.resolve(installedRoot, file));
 	}
+	// Pristine type programs inspect only the upstream package. Native-only
+	// entrypoints are authenticated separately by the binding's consumer gates.
+	const compatibilityEntries =
+		node.binding === node.identity.packageName
+			? new Map()
+			: readCompatibilityBaseline(packageDirectory, node, baseline);
+	for (const [specifier, file] of compatibilityEntries) {
+		if (entries.has(specifier)) entries.set(specifier + '#prior-binding', file);
+		else entries.set(specifier, file);
+	}
 	return entries;
 }
 
@@ -121,6 +240,37 @@ export function pinnedPublicExport(entries, program, checker, specifier, name) {
 	const target = compatibility?.specifier ?? specifier;
 	const source = program.getSourceFile(entries.get(target));
 	let symbol = source && checker.getSymbolAtLocation(source);
+	if (compatibility?.augmentedModule) {
+		const augmentation = source.statements.find(
+			(statement) =>
+				ts.isModuleDeclaration(statement) &&
+				ts.isStringLiteral(statement.name) &&
+				statement.name.text === compatibility.augmentedModule,
+		);
+		const declaration = augmentation?.body?.statements?.find(
+			(statement) => statement.name?.text === compatibility.path,
+		);
+		return declaration && checker.getSymbolAtLocation(declaration.name);
+	}
+
+	if (
+		!compatibility &&
+		(!symbol || !checker.getExportsOfModule(symbol).some((entry) => entry.name === name))
+	) {
+		const priorPath = entries.get(specifier + '#prior-binding');
+		const prior = priorPath && program.getSourceFile(priorPath);
+		symbol = prior && checker.getSymbolAtLocation(prior);
+	}
+
+	if (compatibility?.localDeclaration) {
+		return checker
+			.getSymbolsInScope(source, ts.SymbolFlags.Type | ts.SymbolFlags.Alias)
+			.find(
+				(entry) =>
+					entry.name === compatibility.path &&
+					entry.declarations?.some((declaration) => declaration.getSourceFile() === source),
+			);
+	}
 	for (const part of (compatibility?.path ?? name).split('.')) {
 		if (!symbol) return undefined;
 		if (symbol.flags & ts.SymbolFlags.Alias) symbol = checker.getAliasedSymbol(symbol);
@@ -191,6 +341,23 @@ function reactRenderable(type, checker, depth = 0) {
 	// Declaration emit can expand ReactNode while preserving its exact union.
 	// Recover the canonical symbol only through a real React element declaration.
 	if (type?.isUnion?.()) {
+		// A nullable element is still a renderer-owned return contract. Keep
+		// unrelated union members precise instead of accepting any union that
+		// merely contains an element somewhere inside it.
+		const rendered = type.types.filter(
+			(part) => !(part.flags & (ts.TypeFlags.Null | ts.TypeFlags.Undefined)),
+		);
+		if (
+			rendered.length > 0 &&
+			rendered.length < type.types.length &&
+			rendered.every(
+				(part) =>
+					!part.isUnion?.() &&
+					['ReactElement', 'Element'].includes(name(part)) &&
+					declarationFiles(part).some((file) => /\/@types\/react\/index\.d\.ts$/.test(file)),
+			)
+		)
+			return true;
 		const parts = [...type.types];
 		const seen = new Set();
 		for (let index = 0; index < parts.length; index++) {
@@ -462,6 +629,10 @@ export function newOpaquePublicType(
 			);
 			if (failure) return failure;
 		}
+		// The constraint and default describe a type parameter's public contract.
+		// Comparing its apparent members again loses union alternatives (such as
+		// an optional React component) and invents missing signature witnesses.
+		return null;
 	}
 	const arguments_ =
 		type.aliasTypeArguments ??
@@ -500,7 +671,15 @@ export function newOpaquePublicType(
 	// generic arguments above, so a binding cannot hide new erasure inside
 	// Promise<any> or Ref<any>, but do not re-audit renderer implementation types.
 	if (
-		nativePlatform ||
+		(nativePlatform &&
+			!checker
+				.getSignaturesOfType(type, ts.SignatureKind.Call)
+				.some(
+					(signature) =>
+						signature.declaration?.parent?.name?.text === 'ComponentBody' &&
+						signature.declaration.getSourceFile().fileName ===
+							path.resolve(import.meta.dirname, '../../packages/octane/src/runtime.ts'),
+				)) ||
 		(sameDeclaration && declarationFiles(type).some((file) => file.includes('/node_modules/')))
 	)
 		return null;
@@ -514,7 +693,26 @@ export function newOpaquePublicType(
 	for (const kind of [ts.SignatureKind.Call, ts.SignatureKind.Construct]) {
 		const signatures = checker.getSignaturesOfType(type, kind);
 
-		const expected = witness ? checker.getSignaturesOfType(witness, kind) : [];
+		let expected = witness ? checker.getSignaturesOfType(witness, kind) : [];
+		if (kind === ts.SignatureKind.Call && !expected.length && witness) {
+			const constructs = checker.getSignaturesOfType(witness, ts.SignatureKind.Construct);
+			const seenClasses = new Set();
+			const isReactClass = (instance) => {
+				if (seenClasses.has(instance)) return false;
+				seenClasses.add(instance);
+				if (
+					name(instance) === 'Component' &&
+					declarationFiles(instance).some((file) => /\/@types\/react\/index\.d\.ts$/.test(file))
+				)
+					return true;
+				return (
+					Boolean(instance.objectFlags & (ts.ObjectFlags.Class | ts.ObjectFlags.Interface)) &&
+					checker.getBaseTypes(instance).some(isReactClass)
+				);
+			};
+			if (constructs.some((signature) => isReactClass(checker.getReturnTypeOfSignature(signature))))
+				expected = constructs;
+		}
 		for (const [index, signature] of signatures.entries()) {
 			const matching = expected.filter(
 				(candidate) =>
@@ -538,6 +736,19 @@ export function newOpaquePublicType(
 			);
 			if (failure) return failure;
 			for (const [i, parameter] of signature.parameters.entries()) {
+				// Compiled ComponentBody's scope and extra arguments are supplied by Octane.
+				// They are not component props; the first argument and result stay checked.
+				const signatureSource = signature.declaration
+					?.getSourceFile()
+					.fileName.replaceAll('\\', '/');
+				if (
+					i > 0 &&
+					signature.declaration?.parent?.name?.text === 'ComponentBody' &&
+					signatureSource ===
+						path.resolve(import.meta.dirname, '../../packages/octane/src/runtime.ts')
+				)
+					continue;
+
 				const declaration = parameter.valueDeclaration ?? parameter.declarations?.[0];
 				if (!declaration) continue;
 				const parameterType = checker.getTypeOfSymbolAtLocation(parameter, declaration);
@@ -581,7 +792,19 @@ export function newOpaquePublicType(
 				(declarations.length ? undefined : property.valueDeclaration);
 			if (!declaration) continue;
 			if (options.internalMembers?.has(memberKey(declaration))) continue;
-			const expected = witness && checker.getPropertyOfType(witness, property.name);
+			// Hook Form exposes its per-edit handler as onInput in Octane. The
+			// pinned onChange declaration remains the complete precision witness;
+			// this is a member rename, never permission for new opaque leaves.
+			const nativeInput =
+				options.binding === '@octanejs/hook-form' &&
+				property.name === 'onInput' &&
+				ts.isTypeLiteralNode(declaration.parent) &&
+				ts.isTypeAliasDeclaration(declaration.parent.parent) &&
+				['ControllerRenderProps', 'UseFormRegisterReturn'].includes(
+					declaration.parent.parent.name.text,
+				);
+			const expected =
+				witness && checker.getPropertyOfType(witness, nativeInput ? 'onChange' : property.name);
 			// memo exposes its original callable as `type` in Octane. React's
 			// NamedExoticComponent omits this platform member; compare the original
 			// callable against the same public call contract instead.
@@ -626,9 +849,8 @@ export function newOpaquePublicSymbol(symbol, witness, checker, options = {}) {
 	if (symbol.flags & ts.SymbolFlags.Alias) symbol = checker.getAliasedSymbol(symbol);
 	if (witness?.flags & ts.SymbolFlags.Alias) witness = checker.getAliasedSymbol(witness);
 	for (const declaration of symbol.declarations ?? []) {
-		// Callable generics are checked per public signature below. Matching every
-		// overload to the first declaration mispairs constraints and includes the
-		// implementation signature, which is not part of the exported contract.
+		// Function generics are checked through their public call signatures below.
+		// This also matches a function implementation to a published callable alias.
 		if (ts.isFunctionDeclaration(declaration)) continue;
 		const candidates =
 			witness?.declarations?.filter(

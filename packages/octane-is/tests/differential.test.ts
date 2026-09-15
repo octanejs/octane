@@ -4,15 +4,18 @@ import { expect, it } from 'vitest';
 import * as Octane from 'octane';
 import * as Is from '../src/index.js';
 
-const oracleRequire = createRequire(resolve(import.meta.dirname, '../../octane/package.json'));
+const oracleRequire = createRequire(resolve(import.meta.dirname, '../package.json'));
 const React = oracleRequire('react');
 const ReactDOM = oracleRequire('react-dom');
-const ReactIs = oracleRequire('../octane-is/upstream-artifact/package/index.js');
+const ReactIs = oracleRequire('./upstream-artifact/package/index.js');
 
 // @parity-case differential:octane-is-supported-surface
 it('matches every predicate for corresponding supported element values', () => {
-	expect(React.version).toBe('19.2.7');
+	expect(React.version).toBe('19.3.0');
 	expect(Object.keys(Is).sort()).toEqual(Object.keys(ReactIs).sort());
+	// React 19.3 enables ViewTransition as a public element type.
+	expect(ReactIs.isValidElementType(React.ViewTransition)).toBe(true);
+	expect(Is.isValidElementType(Octane.ViewTransition)).toBe(true);
 	const target = document.createElement('div');
 	const values = (runtime: typeof Octane, portal: typeof Octane.createPortal) => {
 		const C = () => null;

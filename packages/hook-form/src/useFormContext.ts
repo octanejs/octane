@@ -1,4 +1,4 @@
-// Vendored from react-hook-form@7.81.0 src/useFormContext.tsx (octane port).
+// Vendored from react-hook-form@7.88.0 src/useFormContext.tsx (octane port).
 // Upstream's file holds both useFormContext and the FormProvider component;
 // the component half lives in FormProvider.tsrx here (octane components with
 // JSX are authored in .tsrx), and the shared contexts in useFormControlContext.

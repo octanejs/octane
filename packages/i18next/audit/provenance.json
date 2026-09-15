@@ -1,0 +1,342 @@
+{
+  "schemaVersion": 1,
+  "artifacts": [
+    {
+      "path": "upstream-artifact/dist/amd/react-i18next.js",
+      "sha256": "fca7520dda6170f0331ff3f1f5b84fcb96179fbb0db676e82e174654413949c5"
+    },
+    {
+      "path": "upstream-artifact/dist/amd/react-i18next.min.js",
+      "sha256": "c064d9b0a86fe9246ca87c4e57006849e8b9aff7cfcb295a04500cf64164c0b7"
+    },
+    {
+      "path": "upstream-artifact/dist/commonjs/context.js",
+      "sha256": "bfbff9c0bd397f3a57d707c3a1498f6752af2ccf2fd254111ee317f0d7c35059"
+    },
+    {
+      "path": "upstream-artifact/dist/commonjs/defaults.js",
+      "sha256": "b819b5aa50f9c73996e0013bf5b82f544f4479a2731d96167087cde15a80825d"
+    },
+    {
+      "path": "upstream-artifact/dist/commonjs/I18nextProvider.js",
+      "sha256": "700cd77e1701c0bf55cdaa1b2aab62a73e68f2bff8fc66e89c8c028778db9706"
+    },
+    {
+      "path": "upstream-artifact/dist/commonjs/i18nInstance.js",
+      "sha256": "3efb28ecdf288b87825a3721fe4517c8534585dcb37c84db9b6daba73f8507aa"
+    },
+    {
+      "path": "upstream-artifact/dist/commonjs/IcuTrans.js",
+      "sha256": "d168f3105e5b44020534ad78d4f1042ea5624256f12e2683a0d09524fbe56ad0"
+    },
+    {
+      "path": "upstream-artifact/dist/commonjs/IcuTransUtils/htmlEntityDecoder.js",
+      "sha256": "72dcad7264dcbac3aefb7f1f42f056ad80f8813010770b0e39fb5d036aad7fdb"
+    },
+    {
+      "path": "upstream-artifact/dist/commonjs/IcuTransUtils/index.js",
+      "sha256": "8fef82a2552588f1a9b9004d6c1bd38bec5175fd113eb687b46a8350a11a7761"
+    },
+    {
+      "path": "upstream-artifact/dist/commonjs/IcuTransUtils/renderTranslation.js",
+      "sha256": "0ea76cad4447b6461ee27d5408f7207b6a9a357a88430f4297f4499aff9dc2a4"
+    },
+    {
+      "path": "upstream-artifact/dist/commonjs/IcuTransUtils/tokenizer.js",
+      "sha256": "a7028bc438601de8c2ea81453c83a812bf2dbd6a065c9bad98f07574c17c7533"
+    },
+    {
+      "path": "upstream-artifact/dist/commonjs/IcuTransUtils/TranslationParserError.js",
+      "sha256": "cff4f8acbdceb396629213423b893c9b1606f5e3020cedba6a3018cc3cc29288"
+    },
+    {
+      "path": "upstream-artifact/dist/commonjs/IcuTransWithoutContext.js",
+      "sha256": "827bf909ab13bff7515b83e10cbe93413338eaa2fef4477d6202178db90e9e8a"
+    },
+    {
+      "path": "upstream-artifact/dist/commonjs/index.js",
+      "sha256": "97d2fbdd5b7130af1cc66ffdfce70568ae7dd2bf1c3828ec1f7d028a553c7a69"
+    },
+    {
+      "path": "upstream-artifact/dist/commonjs/initReactI18next.js",
+      "sha256": "b0eb6ec52682e3c95e70ef0e92b37a7b761580fbcf287a1cd3678d773fed672a"
+    },
+    {
+      "path": "upstream-artifact/dist/commonjs/Trans.js",
+      "sha256": "9e789395e8f1036fc7c5ff6a4a19258bb43bacdd8a8bc1131165af2154be8803"
+    },
+    {
+      "path": "upstream-artifact/dist/commonjs/Translation.js",
+      "sha256": "d3968d0742c5f3347320c2d5cb942cb444237b60c478cd6388317df6d7a42764"
+    },
+    {
+      "path": "upstream-artifact/dist/commonjs/TransWithoutContext.js",
+      "sha256": "a2aa361cd6104adea16e735904c01bc70d2784372f91bfa3328c354a26fa03ff"
+    },
+    {
+      "path": "upstream-artifact/dist/commonjs/unescape.js",
+      "sha256": "476eca0c68d00c4b2220e1d60b66e0b395a1377f6a6564b70aa5aad00471c93f"
+    },
+    {
+      "path": "upstream-artifact/dist/commonjs/useSSR.js",
+      "sha256": "b625a122ed10fb8460cbaa6e715b2678295f7bdf6b26eceefd868efd99dfb3be"
+    },
+    {
+      "path": "upstream-artifact/dist/commonjs/useTranslation.js",
+      "sha256": "d61a277bd13c23070788d7a9aa1cec701d919419debd7c85b8044aea46350f19"
+    },
+    {
+      "path": "upstream-artifact/dist/commonjs/utils.js",
+      "sha256": "7f687baf4f79b75ade20c714d07c71112b5d5720b4f847fde99b1bca5b779b62"
+    },
+    {
+      "path": "upstream-artifact/dist/commonjs/withSSR.js",
+      "sha256": "8781776f2876584eea486433119b5efd49bcfff37703d2ea1814aa7c3b05a554"
+    },
+    {
+      "path": "upstream-artifact/dist/commonjs/withTranslation.js",
+      "sha256": "44c649543fff281d6c0c25b0db2d7dc649d6726f496b6d1c174040918fae4446"
+    },
+    {
+      "path": "upstream-artifact/dist/es/context.js",
+      "sha256": "ed36ca43e04319bf9d0955e4d18d01d5499c9ad958ad9d0e069bc597b2f4a6f4"
+    },
+    {
+      "path": "upstream-artifact/dist/es/defaults.js",
+      "sha256": "f96aadbe215bfa24bec3ed6b1bdc1f88037bf1bcd1b5b2d52c5c9f2281b058d3"
+    },
+    {
+      "path": "upstream-artifact/dist/es/I18nextProvider.js",
+      "sha256": "ed13f529bd903e7bea291752bc2f9193eea579978b5b3d7e5149ffc260f31f2e"
+    },
+    {
+      "path": "upstream-artifact/dist/es/i18nInstance.js",
+      "sha256": "6dd7ca20fcad9d87eb2c34775933b3047872e5739fab3f58372c80ee074c1abe"
+    },
+    {
+      "path": "upstream-artifact/dist/es/IcuTrans.js",
+      "sha256": "16a29cd5f1975ee42dc7c6c2fea6afe47175a2f8d30cbfa88e7cc41aa07f95cc"
+    },
+    {
+      "path": "upstream-artifact/dist/es/IcuTransUtils/htmlEntityDecoder.js",
+      "sha256": "6f92f1f02f085aa6703fba93221814f01d4e1444cbf50600e89841d0fa50d357"
+    },
+    {
+      "path": "upstream-artifact/dist/es/IcuTransUtils/index.js",
+      "sha256": "9fad4fb2aea511d5d50af275392aeb0f803b5fef29becbfdf9566bcc0bf63a35"
+    },
+    {
+      "path": "upstream-artifact/dist/es/IcuTransUtils/renderTranslation.js",
+      "sha256": "a7bce1e90c0d12770e73b79273ab4408b1b5afb586c1670760135a0f94ad95c3"
+    },
+    {
+      "path": "upstream-artifact/dist/es/IcuTransUtils/tokenizer.js",
+      "sha256": "c42f95780825b5213aa1c27dc48a73fb747e2a1e001acd7f6ac2250f02c76045"
+    },
+    {
+      "path": "upstream-artifact/dist/es/IcuTransUtils/TranslationParserError.js",
+      "sha256": "0c0e335768aa5566b09515502ba3c041af5d2f9644b6c027fac883173430aa56"
+    },
+    {
+      "path": "upstream-artifact/dist/es/IcuTransWithoutContext.js",
+      "sha256": "64436b1f182c9cf84ca27d866239b9b25b94e0b32f988ca0b10591297ae50332"
+    },
+    {
+      "path": "upstream-artifact/dist/es/index.js",
+      "sha256": "ef60b8fb31d0e27198de71fce359881bb93ae8995f8307aebcd575c092dcf816"
+    },
+    {
+      "path": "upstream-artifact/dist/es/initReactI18next.js",
+      "sha256": "4f0289eec280781d7bd04c837aee19c7bc06e92bd1025e4c2b1f4295b76c4197"
+    },
+    {
+      "path": "upstream-artifact/dist/es/package.json",
+      "sha256": "f384cf77c385fced5322ec50cd11f579ce246115ea212c78a9b27c354baaf632"
+    },
+    {
+      "path": "upstream-artifact/dist/es/Trans.js",
+      "sha256": "05dfa4c236b49ab16d625c75a5739f0862af8a64ccfcf013da82e1d7f4cfabb0"
+    },
+    {
+      "path": "upstream-artifact/dist/es/Translation.js",
+      "sha256": "298e35f719720b590aa8bf874f1fe92a3d643177601d5e5cb5a1f0b82f79d8d2"
+    },
+    {
+      "path": "upstream-artifact/dist/es/TransWithoutContext.js",
+      "sha256": "d76fce9482f2adee4c459a5b11e06dc7b76f7435f57e8c18265d68dc71ed03e9"
+    },
+    {
+      "path": "upstream-artifact/dist/es/unescape.js",
+      "sha256": "bfa5922fda4fa4757e27dd90b65479199b0c141e085c9ea2be280897e05e3bb3"
+    },
+    {
+      "path": "upstream-artifact/dist/es/useSSR.js",
+      "sha256": "862d1c752d97ea6ae0d43441387edf88c4e215ebd388753f027be9bb22dd44c8"
+    },
+    {
+      "path": "upstream-artifact/dist/es/useTranslation.js",
+      "sha256": "83e0686d820d16877ed9825e7826a30648a4e67312e11bf0c72226fecf6801c0"
+    },
+    {
+      "path": "upstream-artifact/dist/es/utils.js",
+      "sha256": "f65a4fd627887673f144ff8151f832324fba29f8d2aac6927374245dc987c818"
+    },
+    {
+      "path": "upstream-artifact/dist/es/withSSR.js",
+      "sha256": "afeafb7b463b06adbc85e6f56a26036639b6c2dc4242b30683879f176b4e8503"
+    },
+    {
+      "path": "upstream-artifact/dist/es/withTranslation.js",
+      "sha256": "ac30a3924d6d50e4d44fdfa43bc6dea89bfb2b3535ca914ba855da5ed2e85b3b"
+    },
+    {
+      "path": "upstream-artifact/dist/umd/react-i18next.js",
+      "sha256": "220f18a96275154a8b31569111ad5cf7d5b7bd4d4736df52b5215d48ab8d3342"
+    },
+    {
+      "path": "upstream-artifact/dist/umd/react-i18next.min.js",
+      "sha256": "aaa92a9cd3818901589d4c8e7dad4bd7839876001d4fea353ff2de1422a60318"
+    },
+    {
+      "path": "upstream-artifact/LICENSE",
+      "sha256": "29b8ae456ef442e53a98df183ad088cf98c2ece73aa84c462330c43e665b8ab2"
+    },
+    {
+      "path": "upstream-artifact/package.json",
+      "sha256": "46b64e9102db382e43c63fccf401d70377f9d08a85183f0a2865281f9439a311"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/package.json",
+      "sha256": "07333e92f65ff42d27acb2bb77417b44f3732d3af258aa1b9505a27524a3b2b9"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/context.js",
+      "sha256": "c5566b6717fe04550dbcbb81227b08fa0559793ec4f2430f16fc9d7e4ecb02b3"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/defaults.js",
+      "sha256": "9a8e0bae5441d116955dfe26376653309bf479a1623d8e81b25ddd66b5a2de0d"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/helpers.d.ts",
+      "sha256": "890bdcec61a6fe8e39e35a1a9e4e0cad8c99b371646077bed13724862c4ab711"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/I18nextProvider.js",
+      "sha256": "f934e847f5e6fc06e9040f00c324e4f3e7e3e8cccc6c71529bf3162b41d90fe4"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/i18nInstance.js",
+      "sha256": "07efd9705ca747f1abd8d6067b36cb314ab646af1d7279e1e50189f1111f6294"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/IcuTrans.js",
+      "sha256": "85f7dedf46e4b77ba9f7045c2bf6c1fa18139f80db81bb415439699ff3ee386f"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/IcuTransUtils/htmlEntityDecoder.js",
+      "sha256": "0288e4d9228ef52f2fc9113afd9d8a2891ccecfa4e2f29b7b43bd8199715bc30"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/IcuTransUtils/index.js",
+      "sha256": "b6c6365126db2dda0351e7140ab927c47849a42c5cb1de4c77f01cd9356b7b0f"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/IcuTransUtils/renderTranslation.js",
+      "sha256": "b1fb6fd20819ad8fc4d88b56a23a46ac159a9581aadb790650e8a74aced46627"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/IcuTransUtils/tokenizer.js",
+      "sha256": "c14740151d527d93b3efb622920a314f1dc35e2e6e289a7377507faa1096c6c6"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/IcuTransUtils/TranslationParserError.js",
+      "sha256": "439718e9329ffb029911f4376e725f7d3ec5012befcaaa9fa83f566555099f1a"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/IcuTransWithoutContext.js",
+      "sha256": "14c8cd93ecfa8a08cca650e3c594715132075e2ca497dc52613b976cabf559a6"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/index.d.ts",
+      "sha256": "5853b345ec0835e1106120c008ef9c2733c18eaa0120c38877e4e2ad7ea823e1"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/index.js",
+      "sha256": "b87c1bd5bfdb167ca6ed7c5509d9bafec3692264df0a5dc08fab6d1140df3f22"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/initReactI18next.d.ts",
+      "sha256": "b3e571e9f098c30db463d30d16d395ad8dd2457ee6e8d1561e2e1527bc2b6ce0"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/initReactI18next.js",
+      "sha256": "09414db1cd5f62beed7595bab37d2d54a09a95c294233c97f8fc0db26c707bea"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/internal.js",
+      "sha256": "56b03e2978fcae23fd3ef2f565a9dd269104dfdf15c3b5f8cb08c69ce5e0abfb"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/Trans.js",
+      "sha256": "8c9db80d752633087fc97c2556dafdc68d4f796d2d8d3d166988238dc60e391f"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/Translation.js",
+      "sha256": "23522853be280e95b04a545c1a37cdf51b03a1a7d006a406c83d57eeca4fa133"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/TransWithoutContext.d.ts",
+      "sha256": "52f8e206e8c8cf1632e555f1cad3d223b2fe3e7bfc91830012a72c974474cb11"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/TransWithoutContext.js",
+      "sha256": "d13dc2c378c427e790dfaf56315912cf6c56ba573992f99eaf50397c3e380b3a"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/unescape.js",
+      "sha256": "00dca9e339b94a4134dc3684de9161388d5008a595da94bb149a30ddeb9b8c52"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/useSSR.js",
+      "sha256": "048c24efc9c08b2a0acf2a6fe7d3b8549ac9bee47246100c0513f6bbe6098d4f"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/useTranslation.js",
+      "sha256": "e616d8d95afcb660c8ff8a16e942a4124790a2bc71eeb24adbbc1c0398e5ae86"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/utils.js",
+      "sha256": "fdd950bed720032e9415b5b1c4e873e4473ad72684aafb294d8a0b8ef3dcaba8"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/withSSR.js",
+      "sha256": "6865ac1bbe8479fc4cda30468a7b49059cf4ac5550587a955a9779f470b1552d"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/withTranslation.js",
+      "sha256": "290a49f03d87aba9fc46e11661d1a4ac27b905cd6024e9fc3319bec7fb665466"
+    },
+    {
+      "path": "upstream-artifact/react-i18next-17.0.14.tgz",
+      "sha256": "ff6684f1e130a688f6d68e67f80bb43279c2daf46f0af8abe96c4793d6d532ec"
+    }
+  ],
+  "packageIdentity": {
+    "path": "upstream-artifact/package.json",
+    "name": "react-i18next",
+    "version": "17.0.14",
+    "license": "MIT"
+  },
+  "unpublishedDirs": ["audit", "tests", "typetests", "upstream", "upstream-artifact"],
+  "filesEqual": [
+    {
+      "path": "LICENSE.upstream",
+      "equalsPath": "upstream/LICENSE"
+    },
+    {
+      "path": "LICENSE.upstream",
+      "equalsPath": "upstream-artifact/LICENSE"
+    }
+  ]
+}

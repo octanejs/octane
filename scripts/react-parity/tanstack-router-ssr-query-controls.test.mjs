@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync } from 'node:fs';
-import { relative, resolve, sep } from 'node:path';
+import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { verifyLaneCollectedTests } from './harness-lib.mjs';
+import { verifyPortTestClassifications } from './binding-classifications-lib.mjs';
 
 const root = fileURLToPath(new URL('../..', import.meta.url));
 const manifest = JSON.parse(
@@ -14,29 +14,7 @@ const manifest = JSON.parse(
 );
 
 test('tanstack-router-ssr-query classifies every port-authored test exactly once', () => {
-	const discovered = readdirSync(resolve(root, 'packages/tanstack-router-ssr-query/tests'), {
-		recursive: true,
-		withFileTypes: true,
-	})
-		.filter((entry) => entry.isFile() && /\.test\.(?:ts|tsx|tsrx)$/.test(entry.name))
-		.map((entry) =>
-			relative(root, resolve(entry.parentPath ?? entry.path, entry.name))
-				.split(sep)
-				.join('/'),
-		)
-		.sort();
-	const declared = JSON.parse(
-		readFileSync(
-			new URL(
-				'../../packages/tanstack-router-ssr-query/audit/test-classifications.json',
-				import.meta.url,
-			),
-			'utf8',
-		),
-	)
-		.tests.map((entry) => entry.path)
-		.sort();
-	assert.deepEqual(discovered, declared);
+	verifyPortTestClassifications(root, 'tanstack-router-ssr-query');
 });
 
 test('tanstack-router-ssr-query differential lane rejects a renamed declared case', () => {

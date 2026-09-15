@@ -1,0 +1,1 @@
+OCTANE DIVERGENCE[icu-macro]: The existing binding does not publish the React/Babel-only icu.macro subpath. All 37 unchanged macro registrations execute in the pristine React lane; the native binding retains the runtime IcuTrans APIs and their independently adapted tests.

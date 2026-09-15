@@ -161,7 +161,33 @@ diff --git a/tests/upstream/useController.test.tsx b/tests/upstream/useControlle
              update-visibility
            </button>
          </>
-@@ -1790,7 +1792,7 @@ describe('useController', () => {
+@@ -1752,6 +1754,7 @@ describe('useController', () => {
+     expect(result.current.field.value).toBe('form1-value');
+   });
+ 
++  // OCTANE DIVERGENCE[hook-form-native-input-handler]: Controller exposes the native input handler; the upstream control replacement assertion is unchanged.
+   it('should write onChange updates to the newly-passed control (#13163)', async () => {
+     type FormValues = {
+       name: string;
+@@ -1784,7 +1787,7 @@ describe('useController', () => {
+       },
+     );
+ 
+-    result.current.field.onChange('form1-typed');
++    result.current.field.onInput('form1-typed');
+ 
+     await waitFor(() => {
+       expect(form1Result.current.getValues('name')).toBe('form1-typed');
+@@ -1796,7 +1799,7 @@ describe('useController', () => {
+       expect(result.current.field.value).toBe('');
+     });
+ 
+-    result.current.field.onChange('form2-typed');
++    result.current.field.onInput('form2-typed');
+ 
+     await waitFor(() => {
+       expect(form2Result.current.getValues('name')).toBe('form2-typed');
+@@ -1843,7 +1846,7 @@ describe('useController', () => {
                  <input
                    type="checkbox"
                    checked={field.value}
@@ -170,3 +196,27 @@ diff --git a/tests/upstream/useController.test.tsx b/tests/upstream/useControlle
                  />
                  {field.value && <InputField control={control} index={0} />}
                </>
+@@ -1945,6 +1948,7 @@ describe('useController', () => {
+     expect(screen.getByText('watch:undefined')).toBeVisible();
+   });
+ 
++  // OCTANE DIVERGENCE[hook-form-native-input-handler]: Dispatch the native input handler while retaining the upstream ownership assertion.
+   it('should not mutate an externally-owned object passed to a parent field.onChange when a nested field later changes', async () => {
+     const preset = { first: 'x' };
+ 
+@@ -1958,13 +1962,13 @@ describe('useController', () => {
+ 
+       return (
+         <div>
+-          <button type="button" onClick={() => parent.field.onChange(preset)}>
++          <button type="button" onClick={() => parent.field.onInput(preset)}>
+             set
+           </button>
+           <input
+             data-testid="leaf"
+             value={leaf.field.value}
+-            onChange={(e) => leaf.field.onChange(e.target.value)}
++            onInput={(e) => leaf.field.onInput(e.target.value)}
+           />
+         </div>
+       );

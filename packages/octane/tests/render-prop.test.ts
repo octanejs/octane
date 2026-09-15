@@ -1,14 +1,88 @@
 import { describe, it, expect } from 'vitest';
-import { type ComponentBody } from '../src/index.js';
+import { flushSync, hydrateRoot, type ComponentBody } from '../src/index.js';
+import { renderToString } from 'octane/server';
 import { mount } from './_helpers';
-import { loadCompiledFixtureSource } from './_server-fixture.js';
-import { App, AppFrag } from './_fixtures/render-prop.tsrx';
+import { loadCompiledFixtureSource, loadServerFixture } from './_server-fixture.js';
+import {
+	App,
+	AppFrag,
+	CallbackEvaluation,
+	FragmentCallbackEvaluation,
+	CallbackFallback,
+} from './_fixtures/render-prop.tsrx';
 
 // React-style render-prop children: `<Comp>{(data) => <jsx/>}</Comp>`. The arrow
 // body is bare JSX — the compiler lowers it to a `createElement(...)` descriptor
 // while keeping the arrow callable, so the consuming component can do
 // `props.children(value)` and have the returned descriptor rendered.
 describe('render-prop children (bare-JSX arrow)', () => {
+	it('keeps an unused JSX fallback in its represented scope inside a callback', () => {
+		const result = mount(CallbackFallback, {
+			fallback: () => {
+				throw new Error('unused fallback evaluated');
+			},
+		});
+		try {
+			expect(result.container.textContent).toBe('ready');
+		} finally {
+			result.unmount();
+		}
+	});
+	it('preserves an unused callback fallback through SSR and hydration', () => {
+		const server = loadServerFixture('packages/octane/tests/_fixtures/render-prop.tsrx');
+		const props = {
+			fallback: () => {
+				throw new Error('unused fallback evaluated');
+			},
+		};
+		const { html } = renderToString(server.CallbackFallback, props);
+		const container = document.createElement('div');
+		container.innerHTML = html;
+		document.body.appendChild(container);
+		const existing = container.querySelector('span');
+		expect(existing?.textContent).toBe('ready');
+		const root = hydrateRoot(container, CallbackFallback, props);
+		try {
+			flushSync(() => {});
+			expect(container.querySelector('span')).toBe(existing);
+			expect(container.textContent).toBe('ready');
+		} finally {
+			root.unmount();
+			container.remove();
+		}
+	});
+	it.each([
+		['CallbackEvaluation', CallbackEvaluation],
+		['FragmentCallbackEvaluation', FragmentCallbackEvaluation],
+	] as const)('preserves callback evaluation through SSR and hydration: %s', (name, Component) => {
+		const server = loadServerFixture('packages/octane/tests/_fixtures/render-prop.tsrx');
+		const { html } = renderToString(server[name]);
+		const container = document.createElement('div');
+		container.innerHTML = html;
+		document.body.appendChild(container);
+		const existing = container.querySelector('span');
+		expect(existing?.textContent).toBe('during callback');
+		const root = hydrateRoot(container, Component);
+		try {
+			flushSync(() => {});
+			expect(container.querySelector('span')).toBe(existing);
+			expect(existing?.textContent).toBe('during callback');
+		} finally {
+			root.unmount();
+			container.remove();
+		}
+	});
+	it.each([CallbackEvaluation, FragmentCallbackEvaluation])(
+		'evaluates the returned JSX while the render callback runs',
+		(Component) => {
+			const result = mount(Component);
+			try {
+				expect(result.find('span').textContent).toBe('during callback');
+			} finally {
+				result.unmount();
+			}
+		},
+	);
 	it('calls the render-prop with data and renders the returned host element', () => {
 		const r = mount(App);
 		expect(r.find('.wrap')).toBeTruthy();

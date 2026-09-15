@@ -1,15 +1,25 @@
 {
+  "extends": "../../tsconfig.json",
   "compilerOptions": {
-    "strict": true,
-    "noEmit": true,
-    "module": "ESNext",
-    "moduleResolution": "Bundler",
-    "target": "ES2022",
-    "jsx": "react-jsx",
     "jsxImportSource": "react",
-    "skipLibCheck": true,
-    "allowImportingTsExtensions": true,
-    "types": ["node"]
+    "types": []
   },
-  "include": ["./types.test-d.ts"]
+  "include": [
+    "./types.test-d.ts",
+    "./published-contract.ts",
+    "./values.test-d.ts",
+    "./upstream-registrations.ts"
+  ],
+  "exclude": [],
+  "reactPortEvidence": {
+    "gate": "upstream-types-pristine",
+    "upstreamRegistrations": [
+      "react-case-v1:1d37b168eaa5af0110d1",
+      "react-case-v1:360bb7641a562fafda9a",
+      "react-case-v1:851a189f86e7bcfe3b45",
+      "react-case-v1:deac27a39daeb110a1cc",
+      "react-case-v1:fc5e11e0c85a5fcb9423"
+    ],
+    "publicMode": "pinned"
+  }
 }

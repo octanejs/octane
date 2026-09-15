@@ -6,7 +6,7 @@
 // Reuses motion's `transformValue` (forms 1, 3, 4) and `mapValue` (form 2). The
 // output MotionValue self-subscribes to its inputs (updates are frame-scheduled); we
 // create it once and `destroy()` it on unmount, which tears those subscriptions down.
-import { transformValue, mapValue } from 'motion';
+import { transformValue, mapValue, type MotionValue, type TransformOptions } from 'motion';
 import { useState, useEffect } from 'octane';
 
 // Memoized — runs per hook call per render; the cache returns the identical
@@ -22,7 +22,22 @@ function sub(slot: symbol | undefined, tag: string): symbol | undefined {
 	return sym;
 }
 
-export function useTransform(...args: any[]): any {
+export function useTransform<I, O>(transformer: () => O): MotionValue<O>;
+export function useTransform<I, O>(
+	input: MotionValue<number>,
+	inputRange: number[],
+	outputRange: O[],
+	options?: TransformOptions<O>,
+): MotionValue<O>;
+export function useTransform<I, O>(
+	input: MotionValue<I>,
+	transformer: (value: I) => O,
+): MotionValue<O>;
+export function useTransform<I, O>(
+	input: MotionValue<I>[],
+	transformer: (values: I[]) => O,
+): MotionValue<O>;
+export function useTransform(...args: any[]): MotionValue {
 	const tail = args[args.length - 1];
 	const slot = typeof tail === 'symbol' ? (tail as symbol) : undefined;
 	// User args = everything except a trailing compiler-injected slot symbol.

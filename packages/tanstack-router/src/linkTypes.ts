@@ -37,7 +37,7 @@ export type ActiveLinkOptions<
 > = LinkOptions<TRouter, TFrom, TTo, TMaskFrom, TMaskTo> & ActiveLinkOptionProps<TComp>;
 
 type ActiveLinkProps<TComp> = Partial<
-	OctaneComponentProps<TComp> & {
+	Omit<OctaneComponentProps<TComp>, keyof CreateLinkProps> & {
 		[key: `data-${string}`]: unknown;
 	}
 >;
@@ -70,7 +70,8 @@ export type LinkComponentProps<
 	TTo extends string | undefined = '.',
 	TMaskFrom extends string = TFrom,
 	TMaskTo extends string = '.',
-> = Omit<OctaneComponentProps<TComp>, keyof CreateLinkProps> &
+> = Octane.JSX.IntrinsicAttributes &
+	Omit<OctaneComponentProps<TComp>, keyof CreateLinkProps> &
 	LinkProps<TComp, TRouter, TFrom, TTo, TMaskFrom, TMaskTo>;
 
 export type LinkComponent<in out TComp, in out TDefaultFrom extends string = string> = <

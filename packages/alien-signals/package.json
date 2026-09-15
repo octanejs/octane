@@ -33,15 +33,17 @@
     "src",
     "README.md",
     "UPSTREAM.md",
-    "LICENSE.upstream"
+    "LICENSE.upstream",
+    "LICENSE"
   ],
   "exports": {
     ".": "./src/index.ts"
   },
   "scripts": {
-    "test": "vitest run",
-    "upstream:verify": "node ../../scripts/react-port/materialize.mjs run --check --package-dir .",
-    "parity:inventory": "node ../../scripts/react-parity/alien-signals-runtime-inventory.mjs"
+    "test": "pnpm upstream:verify && vitest run --root ../.. --project alien-signals --project alien-signals-native --project alien-signals-ssr --maxWorkers=1",
+    "upstream:verify": "node ../../scripts/react-parity/verify-provenance.mjs",
+    "parity:inventory": "node ../../scripts/react-parity/alien-signals-runtime-inventory.mjs",
+    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
     "alien-signals": "catalog:default"
@@ -54,13 +56,15 @@
     "@testing-library/jest-dom": "catalog:default",
     "@testing-library/react": "16.3.2",
     "@types/bun": "1.2.3",
-    "@types/node": "catalog:default",
+    "@types/node": "25.9.5",
     "@types/react": "catalog:default",
     "@types/react-dom": "catalog:default",
     "bun": "1.3.14",
     "octane": "workspace:*",
     "react": "19.2.7",
     "react-dom": "19.2.7",
-    "vitest": "catalog:default"
+    "vitest": "catalog:default",
+    "react-alien-signals": "0.4.0",
+    "pristine-bun-types": "npm:bun-types@1.3.14"
   }
 }

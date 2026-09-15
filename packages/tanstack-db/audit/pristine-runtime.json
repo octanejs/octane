@@ -1,0 +1,826 @@
+{
+  "schemaVersion": 1,
+  "project": "tanstack-db-pristine",
+  "roots": ["packages/tanstack-db/upstream"],
+  "files": [
+    "packages/tanstack-db/upstream/tests/DbProvider.test.tsx",
+    "packages/tanstack-db/upstream/tests/HydrationBoundary.test.tsx",
+    "packages/tanstack-db/upstream/tests/conformance.test.tsx",
+    "packages/tanstack-db/upstream/tests/infinite-query-conformance.test.tsx",
+    "packages/tanstack-db/upstream/tests/useLiveInfiniteQuery.test.tsx",
+    "packages/tanstack-db/upstream/tests/useLiveQuery.eager-onstorechange.test.tsx",
+    "packages/tanstack-db/upstream/tests/useLiveQuery.strictmode.test.tsx",
+    "packages/tanstack-db/upstream/tests/useLiveQuery.test.tsx",
+    "packages/tanstack-db/upstream/tests/useLiveQueryEffect.test.tsx",
+    "packages/tanstack-db/upstream/tests/useLiveSuspenseQuery.test.tsx",
+    "packages/tanstack-db/upstream/tests/usePacedMutations.test.tsx"
+  ],
+  "tests": [
+    {
+      "id": "runtime:35f91cd660dda627",
+      "file": "packages/tanstack-db/upstream/tests/DbProvider.test.tsx",
+      "fullName": "DbProvider provides a DbClient to hooks"
+    },
+    {
+      "id": "runtime:883a150c5372f1e7",
+      "file": "packages/tanstack-db/upstream/tests/DbProvider.test.tsx",
+      "fullName": "DbProvider throws without a provider"
+    },
+    {
+      "id": "runtime:4c7bf974c9156c58",
+      "file": "packages/tanstack-db/upstream/tests/HydrationBoundary.test.tsx",
+      "fullName": "HydrationBoundary hydrates before children render and follows the provider client"
+    },
+    {
+      "id": "runtime:1f5b270253293ba0",
+      "file": "packages/tanstack-db/upstream/tests/conformance.test.tsx",
+      "fullName": "live-query conformance :: react [basic-select] from + where + select returns matching rows"
+    },
+    {
+      "id": "runtime:c7d4dd08b3a5c2e5",
+      "file": "packages/tanstack-db/upstream/tests/conformance.test.tsx",
+      "fullName": "live-query conformance :: react [config-object-input] accepts the { query } config-object input form"
+    },
+    {
+      "id": "runtime:9dadf20346e9c419",
+      "file": "packages/tanstack-db/upstream/tests/conformance.test.tsx",
+      "fullName": "live-query conformance :: react [disabled-explicit] a disabled query reports isEnabled=false with no data"
+    },
+    {
+      "id": "runtime:a0dae8f3ffdf8964",
+      "file": "packages/tanstack-db/upstream/tests/conformance.test.tsx",
+      "fullName": "live-query conformance :: react [disabled-transition] disabled -> enabled -> disabled toggles correctly"
+    },
+    {
+      "id": "runtime:4d70a3cbb34e2c71",
+      "file": "packages/tanstack-db/upstream/tests/conformance.test.tsx",
+      "fullName": "live-query conformance :: react [eager-visible-while-loading] rows emitted before ready are visible while still loading"
+    },
+    {
+      "id": "runtime:7d52ab8324c0d767",
+      "file": "packages/tanstack-db/upstream/tests/conformance.test.tsx",
+      "fullName": "live-query conformance :: react [error-status] a failing source surfaces an error (flag or boundary)"
+    },
+    {
+      "id": "runtime:cfa8f09ac8d1be94",
+      "file": "packages/tanstack-db/upstream/tests/conformance.test.tsx",
+      "fullName": "live-query conformance :: react [findone-cardinality] findOne returns a single row, not an array"
+    },
+    {
+      "id": "runtime:4673c0fcfc586de5",
+      "file": "packages/tanstack-db/upstream/tests/conformance.test.tsx",
+      "fullName": "live-query conformance :: react [findone-reactive] findOne updates in place and becomes undefined on delete"
+    },
+    {
+      "id": "runtime:672cb194a9057074",
+      "file": "packages/tanstack-db/upstream/tests/conformance.test.tsx",
+      "fullName": "live-query conformance :: react [groupby-aggregate] groupBy + count aggregates per group"
+    },
+    {
+      "id": "runtime:5a7635253e069b95",
+      "file": "packages/tanstack-db/upstream/tests/conformance.test.tsx",
+      "fullName": "live-query conformance :: react [includes-subquery] select with a nested subquery produces child collections"
+    },
+    {
+      "id": "runtime:392c6542bb3ad84e",
+      "file": "packages/tanstack-db/upstream/tests/conformance.test.tsx",
+      "fullName": "live-query conformance :: react [isready-no-data] isReady becomes true even when the source readies with no rows"
+    },
+    {
+      "id": "runtime:5c27caccf480c0b3",
+      "file": "packages/tanstack-db/upstream/tests/conformance.test.tsx",
+      "fullName": "live-query conformance :: react [isready-transition] isReady flips from false to true when the source readies"
+    },
+    {
+      "id": "runtime:901ddde0c6d00069",
+      "file": "packages/tanstack-db/upstream/tests/conformance.test.tsx",
+      "fullName": "live-query conformance :: react [join] join across two collections"
+    },
+    {
+      "id": "runtime:e15ba0f999b1e75d",
+      "file": "packages/tanstack-db/upstream/tests/conformance.test.tsx",
+      "fullName": "live-query conformance :: react [live-delete] a sync delete removes from the result"
+    },
+    {
+      "id": "runtime:73b18e9fde3e2661",
+      "file": "packages/tanstack-db/upstream/tests/conformance.test.tsx",
+      "fullName": "live-query conformance :: react [live-insert] a sync insert appears in the result"
+    },
+    {
+      "id": "runtime:36fb497b81d14265",
+      "file": "packages/tanstack-db/upstream/tests/conformance.test.tsx",
+      "fullName": "live-query conformance :: react [live-update] a sync update is reflected in place"
+    },
+    {
+      "id": "runtime:0cb237390f75fc4c",
+      "file": "packages/tanstack-db/upstream/tests/conformance.test.tsx",
+      "fullName": "live-query conformance :: react [nested-aggregates] coalesce(count(...), 0) in a joined subquery"
+    },
+    {
+      "id": "runtime:93f04b954ccc9d5a",
+      "file": "packages/tanstack-db/upstream/tests/conformance.test.tsx",
+      "fullName": "live-query conformance :: react [no-updates-after-unmount] no result mutation after unmount"
+    },
+    {
+      "id": "runtime:e0f9528b244d73ad",
+      "file": "packages/tanstack-db/upstream/tests/conformance.test.tsx",
+      "fullName": "live-query conformance :: react [optimistic-insert] optimistic insert is visible immediately, then reconciles to the server key"
+    },
+    {
+      "id": "runtime:4989170f9195f468",
+      "file": "packages/tanstack-db/upstream/tests/conformance.test.tsx",
+      "fullName": "live-query conformance :: react [order-only-move] an order-only move republishes the ordered result"
+    },
+    {
+      "id": "runtime:46baf2e6bf429d08",
+      "file": "packages/tanstack-db/upstream/tests/conformance.test.tsx",
+      "fullName": "live-query conformance :: react [orderby] orderBy yields rows in sorted order"
+    },
+    {
+      "id": "runtime:2d39e7914be8d71b",
+      "file": "packages/tanstack-db/upstream/tests/conformance.test.tsx",
+      "fullName": "live-query conformance :: react [param-recompile] changing a query parameter recompiles the result"
+    },
+    {
+      "id": "runtime:bc9e5161c6744fe3",
+      "file": "packages/tanstack-db/upstream/tests/conformance.test.tsx",
+      "fullName": "live-query conformance :: react [precreated-collection-ready] accepts a pre-created (syncing) live-query collection"
+    },
+    {
+      "id": "runtime:41c249650378dcb4",
+      "file": "packages/tanstack-db/upstream/tests/conformance.test.tsx",
+      "fullName": "live-query conformance :: react [precreated-not-syncing-isready-false] a pre-created collection over a not-ready source reports isReady=false"
+    },
+    {
+      "id": "runtime:72a06af4c2ba2de2",
+      "file": "packages/tanstack-db/upstream/tests/conformance.test.tsx",
+      "fullName": "live-query conformance :: react [recompile-drops-stale-keys] recompiling to a narrower result drops keys from the previous collection"
+    },
+    {
+      "id": "runtime:afda6f8e54273a85",
+      "file": "packages/tanstack-db/upstream/tests/conformance.test.tsx",
+      "fullName": "live-query conformance :: react every knownGap / universal expected-fail references a real scenario"
+    },
+    {
+      "id": "runtime:f7a0f80849f32e02",
+      "file": "packages/tanstack-db/upstream/tests/infinite-query-conformance.test.tsx",
+      "fullName": "infinite-query conformance :: react [boundary-noop] does not add a page after the end of the result"
+    },
+    {
+      "id": "runtime:a7e123f264c1cc75",
+      "file": "packages/tanstack-db/upstream/tests/infinite-query-conformance.test.tsx",
+      "fullName": "infinite-query conformance :: react [callback-error] surfaces an error thrown while constructing the query"
+    },
+    {
+      "id": "runtime:6d8d9e0b1e67bb62",
+      "file": "packages/tanstack-db/upstream/tests/infinite-query-conformance.test.tsx",
+      "fullName": "infinite-query conformance :: react [callback-once] invokes a zero-arity-compatible query callback once"
+    },
+    {
+      "id": "runtime:512e1334f6117629",
+      "file": "packages/tanstack-db/upstream/tests/infinite-query-conformance.test.tsx",
+      "fullName": "infinite-query conformance :: react [circular-dependency] preserves page depth for a structurally equal circular dependency"
+    },
+    {
+      "id": "runtime:405bb5bb2cef11a6",
+      "file": "packages/tanstack-db/upstream/tests/infinite-query-conformance.test.tsx",
+      "fullName": "infinite-query conformance :: react [collection-immediate-fetch] fetches from a replacement collection before the framework settles"
+    },
+    {
+      "id": "runtime:aa951a6f7f44762c",
+      "file": "packages/tanstack-db/upstream/tests/infinite-query-conformance.test.tsx",
+      "fullName": "infinite-query conformance :: react [collection-live-update] keeps a supplied pre-created collection live"
+    },
+    {
+      "id": "runtime:6af32e5d7f1fd07a",
+      "file": "packages/tanstack-db/upstream/tests/infinite-query-conformance.test.tsx",
+      "fullName": "infinite-query conformance :: react [collection-window-normalization] normalizes a pre-created collection to the first peek-ahead window"
+    },
+    {
+      "id": "runtime:934e7a11cae9ad89",
+      "file": "packages/tanstack-db/upstream/tests/infinite-query-conformance.test.tsx",
+      "fullName": "infinite-query conformance :: react [concurrent-fetch] coalesces concurrent next-page requests"
+    },
+    {
+      "id": "runtime:540a4d7a9e0ff42d",
+      "file": "packages/tanstack-db/upstream/tests/infinite-query-conformance.test.tsx",
+      "fullName": "infinite-query conformance :: react [dependency-immediate-fetch] fetches from the replacement query before the framework settles"
+    },
+    {
+      "id": "runtime:3bab5ba7599417f2",
+      "file": "packages/tanstack-db/upstream/tests/infinite-query-conformance.test.tsx",
+      "fullName": "infinite-query conformance :: react [disabled-callback] rejects a nullable query callback through the shared input policy"
+    },
+    {
+      "id": "runtime:77a6333b57421924",
+      "file": "packages/tanstack-db/upstream/tests/infinite-query-conformance.test.tsx",
+      "fullName": "infinite-query conformance :: react [empty-result] represents an empty result as one empty page"
+    },
+    {
+      "id": "runtime:4fbde75df33470e3",
+      "file": "packages/tanstack-db/upstream/tests/infinite-query-conformance.test.tsx",
+      "fullName": "infinite-query conformance :: react [equal-dependency-depth] preserves loaded pages for a structurally equal dependency"
+    },
+    {
+      "id": "runtime:cbc46c3c735cfb0f",
+      "file": "packages/tanstack-db/upstream/tests/infinite-query-conformance.test.tsx",
+      "fullName": "infinite-query conformance :: react [exact-boundary] detects the end when the result fills the final page exactly"
+    },
+    {
+      "id": "runtime:ee5254649555b8dc",
+      "file": "packages/tanstack-db/upstream/tests/infinite-query-conformance.test.tsx",
+      "fullName": "infinite-query conformance :: react [fetch-settlement] settles the driver operation with the window request"
+    },
+    {
+      "id": "runtime:1c18ddf31b608b50",
+      "file": "packages/tanstack-db/upstream/tests/infinite-query-conformance.test.tsx",
+      "fullName": "infinite-query conformance :: react [findone-collection] rejects a pre-created single-result collection"
+    },
+    {
+      "id": "runtime:886f674f7e08fd4a",
+      "file": "packages/tanstack-db/upstream/tests/infinite-query-conformance.test.tsx",
+      "fullName": "infinite-query conformance :: react [findone-runtime] rejects a single-result query at runtime"
+    },
+    {
+      "id": "runtime:5e3f7c25c09c204d",
+      "file": "packages/tanstack-db/upstream/tests/infinite-query-conformance.test.tsx",
+      "fullName": "infinite-query conformance :: react [input-kind-switch] switches between a supplied collection and a query callback"
+    },
+    {
+      "id": "runtime:d767b12a6368a8e4",
+      "file": "packages/tanstack-db/upstream/tests/infinite-query-conformance.test.tsx",
+      "fullName": "infinite-query conformance :: react [invalid-input] rejects a first argument that is neither a query nor a collection"
+    },
+    {
+      "id": "runtime:a6106236c34b54be",
+      "file": "packages/tanstack-db/upstream/tests/infinite-query-conformance.test.tsx",
+      "fullName": "infinite-query conformance :: react [invalid-page-size] normalizes invalid and unsafe page sizes to the default"
+    },
+    {
+      "id": "runtime:feb26c500ebccf72",
+      "file": "packages/tanstack-db/upstream/tests/infinite-query-conformance.test.tsx",
+      "fullName": "infinite-query conformance :: react [live-deletion] backfills committed pages when rows are deleted"
+    },
+    {
+      "id": "runtime:f8dc7bedd11c7b3c",
+      "file": "packages/tanstack-db/upstream/tests/infinite-query-conformance.test.tsx",
+      "fullName": "infinite-query conformance :: react [live-has-next-page] updates hasNextPage when a row is inserted beyond the visible page"
+    },
+    {
+      "id": "runtime:271064a0948c63fc",
+      "file": "packages/tanstack-db/upstream/tests/infinite-query-conformance.test.tsx",
+      "fullName": "infinite-query conformance :: react [live-window] keeps all committed pages live when a row enters the window"
+    },
+    {
+      "id": "runtime:b2c08c5671a9f57e",
+      "file": "packages/tanstack-db/upstream/tests/infinite-query-conformance.test.tsx",
+      "fullName": "infinite-query conformance :: react [on-demand-async] tracks an asynchronous on-demand page load"
+    },
+    {
+      "id": "runtime:e95eddfdebefc012",
+      "file": "packages/tanstack-db/upstream/tests/infinite-query-conformance.test.tsx",
+      "fullName": "infinite-query conformance :: react [on-demand-paging] uses peek-ahead windows while paging an on-demand source"
+    },
+    {
+      "id": "runtime:4d4188b5f15beb0a",
+      "file": "packages/tanstack-db/upstream/tests/infinite-query-conformance.test.tsx",
+      "fullName": "infinite-query conformance :: react [page-expansion] loads the initial page and expands through the final partial page"
+    },
+    {
+      "id": "runtime:45d70959e109ed0a",
+      "file": "packages/tanstack-db/upstream/tests/infinite-query-conformance.test.tsx",
+      "fullName": "infinite-query conformance :: react [page-shape-change] preserves committed page depth when reactive page options change"
+    },
+    {
+      "id": "runtime:0818d8c39cb8fef4",
+      "file": "packages/tanstack-db/upstream/tests/infinite-query-conformance.test.tsx",
+      "fullName": "infinite-query conformance :: react [partial-page-deletion] removes rows from a partial page in either order direction"
+    },
+    {
+      "id": "runtime:db4444810f45e968",
+      "file": "packages/tanstack-db/upstream/tests/infinite-query-conformance.test.tsx",
+      "fullName": "infinite-query conformance :: react [shared-window-release] releases shared window leases and restores the initial window"
+    },
+    {
+      "id": "runtime:24f2f296ab71b4af",
+      "file": "packages/tanstack-db/upstream/tests/infinite-query-conformance.test.tsx",
+      "fullName": "infinite-query conformance :: react [stale-window] ignores a window promise from a replaced query"
+    },
+    {
+      "id": "runtime:95bec13f3a0368da",
+      "file": "packages/tanstack-db/upstream/tests/infinite-query-conformance.test.tsx",
+      "fullName": "infinite-query conformance :: react [unordered-collection] rejects a pre-created collection without orderBy"
+    },
+    {
+      "id": "runtime:376f70700bf92fe8",
+      "file": "packages/tanstack-db/upstream/tests/infinite-query-conformance.test.tsx",
+      "fullName": "infinite-query conformance :: react [unordered-query] rejects a query callback without orderBy"
+    },
+    {
+      "id": "runtime:35f70da20f85f5aa",
+      "file": "packages/tanstack-db/upstream/tests/infinite-query-conformance.test.tsx",
+      "fullName": "infinite-query conformance :: react [window-failure] surfaces a failed window request in state without rejecting"
+    },
+    {
+      "id": "runtime:8814b2c57d02f587",
+      "file": "packages/tanstack-db/upstream/tests/infinite-query-conformance.test.tsx",
+      "fullName": "infinite-query conformance :: react has no stale known-gap keys"
+    },
+    {
+      "id": "runtime:1b0f23a5d1879378",
+      "file": "packages/tanstack-db/upstream/tests/useLiveInfiniteQuery.test.tsx",
+      "fullName": "useLiveInfiniteQuery binds fetchNextPage to the controller that returned it"
+    },
+    {
+      "id": "runtime:e40b3ee25b402878",
+      "file": "packages/tanstack-db/upstream/tests/useLiveInfiniteQuery.test.tsx",
+      "fullName": "useLiveInfiniteQuery compares dependencies by identity instead of serialization"
+    },
+    {
+      "id": "runtime:4241bb4eb2a2c1aa",
+      "file": "packages/tanstack-db/upstream/tests/useLiveInfiniteQuery.test.tsx",
+      "fullName": "useLiveInfiniteQuery does not activate a query-function collection for an abandoned render"
+    },
+    {
+      "id": "runtime:e7cc1a7c62fdb72b",
+      "file": "packages/tanstack-db/upstream/tests/useLiveInfiniteQuery.test.tsx",
+      "fullName": "useLiveInfiniteQuery does not activate a supplied collection for an abandoned render"
+    },
+    {
+      "id": "runtime:56dfb52f5e196f70",
+      "file": "packages/tanstack-db/upstream/tests/useLiveInfiniteQuery.test.tsx",
+      "fullName": "useLiveInfiniteQuery preserves committed pages across an abandoned dependency update"
+    },
+    {
+      "id": "runtime:646722a675bb7c46",
+      "file": "packages/tanstack-db/upstream/tests/useLiveInfiniteQuery.test.tsx",
+      "fullName": "useLiveInfiniteQuery preserves loaded pages when dependencies are structurally unchanged"
+    },
+    {
+      "id": "runtime:7471e74d2b504164",
+      "file": "packages/tanstack-db/upstream/tests/useLiveInfiniteQuery.test.tsx",
+      "fullName": "useLiveInfiniteQuery recognizes a structurally valid collection from another realm"
+    },
+    {
+      "id": "runtime:8f5c9100aad049b1",
+      "file": "packages/tanstack-db/upstream/tests/useLiveInfiniteQuery.test.tsx",
+      "fullName": "useLiveInfiniteQuery releases a replaced controller through the external-store unsubscribe"
+    },
+    {
+      "id": "runtime:b7fa1dadac94f6c5",
+      "file": "packages/tanstack-db/upstream/tests/useLiveInfiniteQuery.test.tsx",
+      "fullName": "useLiveInfiniteQuery resolves the fetch promise and exposes pagination failures in state"
+    },
+    {
+      "id": "runtime:aaaf0dc9c6e6b0ba",
+      "file": "packages/tanstack-db/upstream/tests/useLiveInfiniteQuery.test.tsx",
+      "fullName": "useLiveInfiniteQuery should derive query identity from structured captured values"
+    },
+    {
+      "id": "runtime:c99cdb0f3434f583",
+      "file": "packages/tanstack-db/upstream/tests/useLiveInfiniteQuery.test.tsx",
+      "fullName": "useLiveInfiniteQuery uses queryKey to make captured values in opaque queries reactive"
+    },
+    {
+      "id": "runtime:3dbcd0c6d874084b",
+      "file": "packages/tanstack-db/upstream/tests/useLiveInfiniteQuery.test.tsx",
+      "fullName": "useLiveInfiniteQuery uses structural queryKey identity without rerunning a stable query"
+    },
+    {
+      "id": "runtime:3a9ac47f1e4f422d",
+      "file": "packages/tanstack-db/upstream/tests/useLiveQuery.eager-onstorechange.test.tsx",
+      "fullName": "useLiveQuery: eager onStoreChange must not fire synchronously during subscribe defers the initial ready-state onStoreChange to a microtask"
+    },
+    {
+      "id": "runtime:dcee6204e3ef7257",
+      "file": "packages/tanstack-db/upstream/tests/useLiveQuery.strictmode.test.tsx",
+      "fullName": "useLiveQuery under StrictMode keeps the subscription alive across StrictMode effect replay"
+    },
+    {
+      "id": "runtime:6c0e6e689b7484ec",
+      "file": "packages/tanstack-db/upstream/tests/useLiveQuery.test.tsx",
+      "fullName": "Query Collections SSR hydration round-trips collection rows into React and applies streamed chunks incrementally"
+    },
+    {
+      "id": "runtime:90fc0e34daf141a8",
+      "file": "packages/tanstack-db/upstream/tests/useLiveQuery.test.tsx",
+      "fullName": "Query Collections aggregates nested inside expressions coalesce(count(...), 0) in groupBy select returns count per group"
+    },
+    {
+      "id": "runtime:d1891ebfc2267f98",
+      "file": "packages/tanstack-db/upstream/tests/useLiveQuery.test.tsx",
+      "fullName": "Query Collections aggregates nested inside expressions coalesce(sum(...), 0) in groupBy select returns sum per group"
+    },
+    {
+      "id": "runtime:6c75225896c90ef2",
+      "file": "packages/tanstack-db/upstream/tests/useLiveQuery.test.tsx",
+      "fullName": "Query Collections aggregates nested inside expressions subquery with coalesce(count(...)) can be left-joined as a source"
+    },
+    {
+      "id": "runtime:c9a053819973da23",
+      "file": "packages/tanstack-db/upstream/tests/useLiveQuery.test.tsx",
+      "fullName": "Query Collections conditional returns disables a config query that returns null"
+    },
+    {
+      "id": "runtime:bf0bcd445892be5c",
+      "file": "packages/tanstack-db/upstream/tests/useLiveQuery.test.tsx",
+      "fullName": "Query Collections conditional returns disables a config query that returns undefined"
+    },
+    {
+      "id": "runtime:f31718ab1ba0caaa",
+      "file": "packages/tanstack-db/upstream/tests/useLiveQuery.test.tsx",
+      "fullName": "Query Collections conditional returns disables a config query with deprecated dependencies"
+    },
+    {
+      "id": "runtime:6cc78bc876f72e57",
+      "file": "packages/tanstack-db/upstream/tests/useLiveQuery.test.tsx",
+      "fullName": "Query Collections conditional returns should handle callback returning Collection"
+    },
+    {
+      "id": "runtime:e86305a01376549e",
+      "file": "packages/tanstack-db/upstream/tests/useLiveQuery.test.tsx",
+      "fullName": "Query Collections conditional returns should handle callback returning LiveQueryCollectionConfig"
+    },
+    {
+      "id": "runtime:d6686b1e9da51bf2",
+      "file": "packages/tanstack-db/upstream/tests/useLiveQuery.test.tsx",
+      "fullName": "Query Collections conditional returns should handle callback returning null without a dependency array"
+    },
+    {
+      "id": "runtime:fd664dcf6c6d43e5",
+      "file": "packages/tanstack-db/upstream/tests/useLiveQuery.test.tsx",
+      "fullName": "Query Collections conditional returns should handle callback returning undefined without a dependency array"
+    },
+    {
+      "id": "runtime:ea1e65cac5f90d02",
+      "file": "packages/tanstack-db/upstream/tests/useLiveQuery.test.tsx",
+      "fullName": "Query Collections conditional returns should handle conditional returns with dependencies"
+    },
+    {
+      "id": "runtime:03790be9119a33c3",
+      "file": "packages/tanstack-db/upstream/tests/useLiveQuery.test.tsx",
+      "fullName": "Query Collections conditional returns stays disabled when the prior query becomes ready"
+    },
+    {
+      "id": "runtime:2f6babb1f846f8ea",
+      "file": "packages/tanstack-db/upstream/tests/useLiveQuery.test.tsx",
+      "fullName": "Query Collections derived query identity does not emit identity warnings in production"
+    },
+    {
+      "id": "runtime:dcaa4ec5625a8d25",
+      "file": "packages/tanstack-db/upstream/tests/useLiveQuery.test.tsx",
+      "fullName": "Query Collections derived query identity evaluates a derived query once per render"
+    },
+    {
+      "id": "runtime:6e93d2f388ab72a2",
+      "file": "packages/tanstack-db/upstream/tests/useLiveQuery.test.tsx",
+      "fullName": "Query Collections derived query identity includes the query in legacy dependency-array SSR identity"
+    },
+    {
+      "id": "runtime:5ae7666c27fe5a9f",
+      "file": "packages/tanstack-db/upstream/tests/useLiveQuery.test.tsx",
+      "fullName": "Query Collections derived query identity keeps an explicit queryKey stable across structurally equal values"
+    },
+    {
+      "id": "runtime:4c8e4e4125a644c6",
+      "file": "packages/tanstack-db/upstream/tests/useLiveQuery.test.tsx",
+      "fullName": "Query Collections derived query identity keeps the same live query collection when derived identity is stable"
+    },
+    {
+      "id": "runtime:7e221e56fc9c4838",
+      "file": "packages/tanstack-db/upstream/tests/useLiveQuery.test.tsx",
+      "fullName": "Query Collections derived query identity preserves reference semantics for deprecated dependency arrays"
+    },
+    {
+      "id": "runtime:803860ace28c9e2b",
+      "file": "packages/tanstack-db/upstream/tests/useLiveQuery.test.tsx",
+      "fullName": "Query Collections derived query identity rebinds descriptors when the DbProvider client changes"
+    },
+    {
+      "id": "runtime:bab590295038c303",
+      "file": "packages/tanstack-db/upstream/tests/useLiveQuery.test.tsx",
+      "fullName": "Query Collections derived query identity recreates the live query collection when derived identity changes"
+    },
+    {
+      "id": "runtime:fc0d7eb56b75f5a6",
+      "file": "packages/tanstack-db/upstream/tests/useLiveQuery.test.tsx",
+      "fullName": "Query Collections derived query identity resolves collection descriptors from DbProvider"
+    },
+    {
+      "id": "runtime:9fccd26908c9438a",
+      "file": "packages/tanstack-db/upstream/tests/useLiveQuery.test.tsx",
+      "fullName": "Query Collections derived query identity reuses dynamically-created collection descriptors by id"
+    },
+    {
+      "id": "runtime:c08be28ea6834b2d",
+      "file": "packages/tanstack-db/upstream/tests/useLiveQuery.test.tsx",
+      "fullName": "Query Collections derived query identity throws when an explicit queryKey cannot be stably hashed"
+    },
+    {
+      "id": "runtime:afbd3b36a4297515",
+      "file": "packages/tanstack-db/upstream/tests/useLiveQuery.test.tsx",
+      "fullName": "Query Collections derived query identity uses explicit queryKey for functional query variants"
+    },
+    {
+      "id": "runtime:bd5eae8c2693eb05",
+      "file": "packages/tanstack-db/upstream/tests/useLiveQuery.test.tsx",
+      "fullName": "Query Collections derived query identity uses runtime identity for opaque values in a structured query without queryKey"
+    },
+    {
+      "id": "runtime:242ad0a60e439575",
+      "file": "packages/tanstack-db/upstream/tests/useLiveQuery.test.tsx",
+      "fullName": "Query Collections derived query identity warns and preserves legacy behavior when a functional query has no queryKey"
+    },
+    {
+      "id": "runtime:1f8e0a3ea5d6f7e3",
+      "file": "packages/tanstack-db/upstream/tests/useLiveQuery.test.tsx",
+      "fullName": "Query Collections derived query identity warns for an explicitly passed empty dependency array"
+    },
+    {
+      "id": "runtime:9a81c7b6ed73814c",
+      "file": "packages/tanstack-db/upstream/tests/useLiveQuery.test.tsx",
+      "fullName": "Query Collections derived query identity warns once for the deprecated dependency-array form"
+    },
+    {
+      "id": "runtime:5659237868d28dfa",
+      "file": "packages/tanstack-db/upstream/tests/useLiveQuery.test.tsx",
+      "fullName": "Query Collections derived query identity warns when derived query identity is slow enough to need queryKey"
+    },
+    {
+      "id": "runtime:fda7afe8c8450e07",
+      "file": "packages/tanstack-db/upstream/tests/useLiveQuery.test.tsx",
+      "fullName": "Query Collections derived query identity warns when repeated derived query identity work accumulates on a hot render path"
+    },
+    {
+      "id": "runtime:61223dfefd94f7bf",
+      "file": "packages/tanstack-db/upstream/tests/useLiveQuery.test.tsx",
+      "fullName": "Query Collections eager execution during sync should show filtered results during sync with isLoading true"
+    },
+    {
+      "id": "runtime:0bac65858c01a71e",
+      "file": "packages/tanstack-db/upstream/tests/useLiveQuery.test.tsx",
+      "fullName": "Query Collections eager execution during sync should show join results during sync with isLoading true"
+    },
+    {
+      "id": "runtime:1af438e4a638afcf",
+      "file": "packages/tanstack-db/upstream/tests/useLiveQuery.test.tsx",
+      "fullName": "Query Collections eager execution during sync should show state while isLoading is true during sync"
+    },
+    {
+      "id": "runtime:bf163748bf1e164b",
+      "file": "packages/tanstack-db/upstream/tests/useLiveQuery.test.tsx",
+      "fullName": "Query Collections eager execution during sync should update isReady when source collection is marked ready with no data"
+    },
+    {
+      "id": "runtime:d44cf8c0f23d6b2d",
+      "file": "packages/tanstack-db/upstream/tests/useLiveQuery.test.tsx",
+      "fullName": "Query Collections includes subqueries renders only the affected child hook once when an include changes"
+    },
+    {
+      "id": "runtime:1564e51ed5b1994b",
+      "file": "packages/tanstack-db/upstream/tests/useLiveQuery.test.tsx",
+      "fullName": "Query Collections isLoaded property should be false for pre-created collections that are already syncing"
+    },
+    {
+      "id": "runtime:c021c9dcbf12cb50",
+      "file": "packages/tanstack-db/upstream/tests/useLiveQuery.test.tsx",
+      "fullName": "Query Collections isLoaded property should be true initially and false after collection is ready"
+    },
+    {
+      "id": "runtime:66917a598c812058",
+      "file": "packages/tanstack-db/upstream/tests/useLiveQuery.test.tsx",
+      "fullName": "Query Collections isLoaded property should handle isLoading with complex queries including joins"
+    },
+    {
+      "id": "runtime:8edb53bcff68413c",
+      "file": "packages/tanstack-db/upstream/tests/useLiveQuery.test.tsx",
+      "fullName": "Query Collections isLoaded property should handle isLoading with parameterized queries"
+    },
+    {
+      "id": "runtime:ca6e75cbba6144b1",
+      "file": "packages/tanstack-db/upstream/tests/useLiveQuery.test.tsx",
+      "fullName": "Query Collections isLoaded property should maintain isReady state during live updates"
+    },
+    {
+      "id": "runtime:1c9b4e8a8baf30f6",
+      "file": "packages/tanstack-db/upstream/tests/useLiveQuery.test.tsx",
+      "fullName": "Query Collections isLoaded property should update isLoading when collection status changes"
+    },
+    {
+      "id": "runtime:a232d70cc8055779",
+      "file": "packages/tanstack-db/upstream/tests/useLiveQuery.test.tsx",
+      "fullName": "Query Collections optimistic state is dropped after commit"
+    },
+    {
+      "id": "runtime:92c04b71ebc28031",
+      "file": "packages/tanstack-db/upstream/tests/useLiveQuery.test.tsx",
+      "fullName": "Query Collections should accept a config object with a pre-built QueryBuilder instance"
+    },
+    {
+      "id": "runtime:33ec8b4f5e3f3aca",
+      "file": "packages/tanstack-db/upstream/tests/useLiveQuery.test.tsx",
+      "fullName": "Query Collections should accept pre-created live query collection"
+    },
+    {
+      "id": "runtime:ff7a4abb32676ef5",
+      "file": "packages/tanstack-db/upstream/tests/useLiveQuery.test.tsx",
+      "fullName": "Query Collections should be able to query a collection with live updates"
+    },
+    {
+      "id": "runtime:5b05b017ad495722",
+      "file": "packages/tanstack-db/upstream/tests/useLiveQuery.test.tsx",
+      "fullName": "Query Collections should be able to query a result collection with live updates"
+    },
+    {
+      "id": "runtime:ae5b781dc18885f7",
+      "file": "packages/tanstack-db/upstream/tests/useLiveQuery.test.tsx",
+      "fullName": "Query Collections should be able to return a single row with collection"
+    },
+    {
+      "id": "runtime:eec0072e2daec957",
+      "file": "packages/tanstack-db/upstream/tests/useLiveQuery.test.tsx",
+      "fullName": "Query Collections should be able to return a single row with config object"
+    },
+    {
+      "id": "runtime:15024d6500d1d4ad",
+      "file": "packages/tanstack-db/upstream/tests/useLiveQuery.test.tsx",
+      "fullName": "Query Collections should be able to return a single row with query builder"
+    },
+    {
+      "id": "runtime:55bb64815ae2ae36",
+      "file": "packages/tanstack-db/upstream/tests/useLiveQuery.test.tsx",
+      "fullName": "Query Collections should join collections and return combined results with live updates"
+    },
+    {
+      "id": "runtime:7b2a698ddcceed63",
+      "file": "packages/tanstack-db/upstream/tests/useLiveQuery.test.tsx",
+      "fullName": "Query Collections should keep stable ref"
+    },
+    {
+      "id": "runtime:2a5f32f7063adc5b",
+      "file": "packages/tanstack-db/upstream/tests/useLiveQuery.test.tsx",
+      "fullName": "Query Collections should recompile query when parameters change and change results"
+    },
+    {
+      "id": "runtime:da3887a7bd224b10",
+      "file": "packages/tanstack-db/upstream/tests/useLiveQuery.test.tsx",
+      "fullName": "Query Collections should stop old query when parameters change"
+    },
+    {
+      "id": "runtime:03481c32ad3a44c1",
+      "file": "packages/tanstack-db/upstream/tests/useLiveQuery.test.tsx",
+      "fullName": "Query Collections should switch to a different pre-created live query collection when changed"
+    },
+    {
+      "id": "runtime:fd338c56291d0213",
+      "file": "packages/tanstack-db/upstream/tests/useLiveQuery.test.tsx",
+      "fullName": "Query Collections should work with basic collection and select"
+    },
+    {
+      "id": "runtime:2e7c54466de229ec",
+      "file": "packages/tanstack-db/upstream/tests/useLiveQueryEffect.test.tsx",
+      "fullName": "useLiveQueryEffect should create effect on mount and dispose on unmount"
+    },
+    {
+      "id": "runtime:309a63adeedb06d5",
+      "file": "packages/tanstack-db/upstream/tests/useLiveQueryEffect.test.tsx",
+      "fullName": "useLiveQueryEffect should receive events from source collection changes"
+    },
+    {
+      "id": "runtime:86ac6de1e028ccdf",
+      "file": "packages/tanstack-db/upstream/tests/useLiveQueryEffect.test.tsx",
+      "fullName": "useLiveQueryEffect should recreate effect when deps change"
+    },
+    {
+      "id": "runtime:a91f90936bafe5bb",
+      "file": "packages/tanstack-db/upstream/tests/useLiveQueryEffect.test.tsx",
+      "fullName": "useLiveQueryEffect should use the latest callback without recreating the effect"
+    },
+    {
+      "id": "runtime:9ca8c7b0bfb02cd4",
+      "file": "packages/tanstack-db/upstream/tests/useLiveSuspenseQuery.test.tsx",
+      "fullName": "useLiveSuspenseQuery renders a streamed query snapshot until browser sync is authoritative"
+    },
+    {
+      "id": "runtime:280f71a196c0676e",
+      "file": "packages/tanstack-db/upstream/tests/useLiveSuspenseQuery.test.tsx",
+      "fullName": "useLiveSuspenseQuery requires queryKey for an opaque query during SSR streaming"
+    },
+    {
+      "id": "runtime:eb05386086455c1c",
+      "file": "packages/tanstack-db/upstream/tests/useLiveSuspenseQuery.test.tsx",
+      "fullName": "useLiveSuspenseQuery should NOT re-suspend on live updates after initial load"
+    },
+    {
+      "id": "runtime:1fad333e42cdb9f3",
+      "file": "packages/tanstack-db/upstream/tests/useLiveSuspenseQuery.test.tsx",
+      "fullName": "useLiveSuspenseQuery should cleanup collection when unmounted"
+    },
+    {
+      "id": "runtime:7f5925b8666cd452",
+      "file": "packages/tanstack-db/upstream/tests/useLiveSuspenseQuery.test.tsx",
+      "fullName": "useLiveSuspenseQuery should handle StrictMode double-invocation correctly"
+    },
+    {
+      "id": "runtime:12b880b2628787af",
+      "file": "packages/tanstack-db/upstream/tests/useLiveSuspenseQuery.test.tsx",
+      "fullName": "useLiveSuspenseQuery should handle multiple queries in same component (serial execution)"
+    },
+    {
+      "id": "runtime:4e64c27e05f6167a",
+      "file": "packages/tanstack-db/upstream/tests/useLiveSuspenseQuery.test.tsx",
+      "fullName": "useLiveSuspenseQuery should keep stable data references when data hasn't changed"
+    },
+    {
+      "id": "runtime:0fb697eb89a8e949",
+      "file": "packages/tanstack-db/upstream/tests/useLiveSuspenseQuery.test.tsx",
+      "fullName": "useLiveSuspenseQuery should not re-suspend after hasBeenReady when isLoadingSubset changes"
+    },
+    {
+      "id": "runtime:104ce1501ad9d141",
+      "file": "packages/tanstack-db/upstream/tests/useLiveSuspenseQuery.test.tsx",
+      "fullName": "useLiveSuspenseQuery should only suspend on deps change, not on every re-render"
+    },
+    {
+      "id": "runtime:333110a5d80ebe87",
+      "file": "packages/tanstack-db/upstream/tests/useLiveSuspenseQuery.test.tsx",
+      "fullName": "useLiveSuspenseQuery should re-suspend when derived query identity changes"
+    },
+    {
+      "id": "runtime:65fc06d178e2df00",
+      "file": "packages/tanstack-db/upstream/tests/useLiveSuspenseQuery.test.tsx",
+      "fullName": "useLiveSuspenseQuery should reactively update data after initial load"
+    },
+    {
+      "id": "runtime:becad2a69388e4dd",
+      "file": "packages/tanstack-db/upstream/tests/useLiveSuspenseQuery.test.tsx",
+      "fullName": "useLiveSuspenseQuery should return data that is always defined (type-safe)"
+    },
+    {
+      "id": "runtime:454c0811d567491e",
+      "file": "packages/tanstack-db/upstream/tests/useLiveSuspenseQuery.test.tsx",
+      "fullName": "useLiveSuspenseQuery should suspend while loading and return data when ready"
+    },
+    {
+      "id": "runtime:7fb85903e5607fdc",
+      "file": "packages/tanstack-db/upstream/tests/useLiveSuspenseQuery.test.tsx",
+      "fullName": "useLiveSuspenseQuery should throw error when query function returns undefined"
+    },
+    {
+      "id": "runtime:6981ad5a7b0e638d",
+      "file": "packages/tanstack-db/upstream/tests/useLiveSuspenseQuery.test.tsx",
+      "fullName": "useLiveSuspenseQuery should work with config object"
+    },
+    {
+      "id": "runtime:ebf64dafe7205b05",
+      "file": "packages/tanstack-db/upstream/tests/useLiveSuspenseQuery.test.tsx",
+      "fullName": "useLiveSuspenseQuery should work with pre-created SingleResult collection"
+    },
+    {
+      "id": "runtime:bae134f36659dc4f",
+      "file": "packages/tanstack-db/upstream/tests/useLiveSuspenseQuery.test.tsx",
+      "fullName": "useLiveSuspenseQuery should work with pre-created live query collection"
+    },
+    {
+      "id": "runtime:213739e4165538e1",
+      "file": "packages/tanstack-db/upstream/tests/useLiveSuspenseQuery.test.tsx",
+      "fullName": "useLiveSuspenseQuery should work with single result queries"
+    },
+    {
+      "id": "runtime:0f00e5fe5fa5b625",
+      "file": "packages/tanstack-db/upstream/tests/useLiveSuspenseQuery.test.tsx",
+      "fullName": "useLiveSuspenseQuery throws the original streamed query error"
+    },
+    {
+      "id": "runtime:d65531f2b0fae881",
+      "file": "packages/tanstack-db/upstream/tests/usePacedMutations.test.tsx",
+      "fullName": "usePacedMutations React hook memoization should not recreate instance when strategy object changes but values are same"
+    },
+    {
+      "id": "runtime:2dd56025d5fa9ba7",
+      "file": "packages/tanstack-db/upstream/tests/usePacedMutations.test.tsx",
+      "fullName": "usePacedMutations React hook memoization should not recreate instance when wrapped in custom hook with inline strategy"
+    },
+    {
+      "id": "runtime:34dd91e7e1ed00e5",
+      "file": "packages/tanstack-db/upstream/tests/usePacedMutations.test.tsx",
+      "fullName": "usePacedMutations React hook memoization should recreate instance when strategy options actually change"
+    },
+    {
+      "id": "runtime:00948019d0e09d77",
+      "file": "packages/tanstack-db/upstream/tests/usePacedMutations.test.tsx",
+      "fullName": "usePacedMutations React hook should work with debounce strategy (smoke test)"
+    },
+    {
+      "id": "runtime:21cedd0261b61a3b",
+      "file": "packages/tanstack-db/upstream/tests/usePacedMutations.test.tsx",
+      "fullName": "usePacedMutations React hook should work with queue strategy (smoke test)"
+    },
+    {
+      "id": "runtime:26bc7f214795590a",
+      "file": "packages/tanstack-db/upstream/tests/usePacedMutations.test.tsx",
+      "fullName": "usePacedMutations React hook should work with throttle strategy (smoke test)"
+    }
+  ],
+  "snapshots": 0
+}

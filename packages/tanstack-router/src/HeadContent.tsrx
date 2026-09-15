@@ -1,3 +1,5 @@
+declare const process: { env: { NODE_ENV?: string } };
+
 import { createElement, useEffect, useId } from 'octane';
 import { DEV_STYLES_ATTR } from '@tanstack/router-core';
 import type { AssetCrossOriginConfig } from '@tanstack/router-core';

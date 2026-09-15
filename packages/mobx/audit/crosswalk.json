@@ -1,0 +1,570 @@
+[
+  {
+    "id": "react-case-v1:2913f1cf66765551bd9c",
+    "source": "packages/mobx-react-lite/__tests__/api.test.tsx:3:1",
+    "title": "correct api should be exposed",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/api.test.tsx"],
+    "rationale": "Materialized one-for-one case with immutable original React evidence. Helper-defined observer cases execute twice; renderer adaptations are documented in UPSTREAM.md and the committed patches."
+  },
+  {
+    "id": "react-case-v1:217187a81f51ba595299",
+    "source": "packages/mobx-react-lite/__tests__/assertEnvironment.test.tsx:6:1",
+    "title": "throws if react is not installed",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/assertEnvironment.test.tsx"],
+    "rationale": "Materialized one-for-one case with immutable original React evidence. Helper-defined observer cases execute twice; renderer adaptations are documented in UPSTREAM.md and the committed patches."
+  },
+  {
+    "id": "react-case-v1:a23d4146b94bdea6653f",
+    "source": "packages/mobx-react-lite/__tests__/assertEnvironment.test.tsx:13:1",
+    "title": "throws if mobx is not installed",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/assertEnvironment.test.tsx"],
+    "rationale": "Materialized one-for-one case with immutable original React evidence. Helper-defined observer cases execute twice; renderer adaptations are documented in UPSTREAM.md and the committed patches."
+  },
+  {
+    "id": "react-case-v1:1d024e6e6fd92f6d5adf",
+    "source": "packages/mobx-react-lite/__tests__/assertEnvironment.test.tsx:21:1",
+    "title": "throws if mobx is older than version 7",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/assertEnvironment.test.tsx"],
+    "rationale": "Materialized one-for-one case with immutable original React evidence. Helper-defined observer cases execute twice; renderer adaptations are documented in UPSTREAM.md and the committed patches."
+  },
+  {
+    "id": "react-case-v1:e2dde61f6b88e8af496a",
+    "source": "packages/mobx-react-lite/__tests__/enforceActions.test.tsx:10:5",
+    "title": "'never' should work",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/enforceActions.test.tsx"],
+    "rationale": "Materialized one-for-one case with immutable original React evidence. Helper-defined observer cases execute twice; renderer adaptations are documented in UPSTREAM.md and the committed patches."
+  },
+  {
+    "id": "react-case-v1:3600e6173fa985a21b5e",
+    "source": "packages/mobx-react-lite/__tests__/enforceActions.test.tsx:29:5",
+    "title": "'observed' should work",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/enforceActions.test.tsx"],
+    "rationale": "Materialized one-for-one case with immutable original React evidence. Helper-defined observer cases execute twice; renderer adaptations are documented in UPSTREAM.md and the committed patches."
+  },
+  {
+    "id": "react-case-v1:43a77689873bd83e9cdf",
+    "source": "packages/mobx-react-lite/__tests__/enforceActions.test.tsx:48:5",
+    "title": "'always' should work",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/enforceActions.test.tsx"],
+    "rationale": "Materialized one-for-one case with immutable original React evidence. Helper-defined observer cases execute twice; renderer adaptations are documented in UPSTREAM.md and the committed patches."
+  },
+  {
+    "id": "react-case-v1:cac0a90a34e211a24b20",
+    "source": "packages/mobx-react-lite/__tests__/observer.test.tsx:68:9",
+    "title": "first rendering",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/observer.test.tsx"],
+    "rationale": "Materialized one-for-one case with immutable original React evidence. Helper-defined observer cases execute twice; renderer adaptations are documented in UPSTREAM.md and the committed patches."
+  },
+  {
+    "id": "react-case-v1:6faaec3f0dbae89789b4",
+    "source": "packages/mobx-react-lite/__tests__/observer.test.tsx:76:9",
+    "title": "inner store changed",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/observer.test.tsx"],
+    "rationale": "Materialized one-for-one case with immutable original React evidence. Helper-defined observer cases execute twice; renderer adaptations are documented in UPSTREAM.md and the committed patches."
+  },
+  {
+    "id": "react-case-v1:42ebee9b075e1f4e097c",
+    "source": "packages/mobx-react-lite/__tests__/observer.test.tsx:89:9",
+    "title": "rerendering with outer store added",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/observer.test.tsx"],
+    "rationale": "Materialized one-for-one case with immutable original React evidence. Helper-defined observer cases execute twice; renderer adaptations are documented in UPSTREAM.md and the committed patches."
+  },
+  {
+    "id": "react-case-v1:ec770f9d9c9684745942",
+    "source": "packages/mobx-react-lite/__tests__/observer.test.tsx:106:9",
+    "title": "rerendering with outer store pop",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/observer.test.tsx"],
+    "rationale": "Materialized one-for-one case with immutable original React evidence. Helper-defined observer cases execute twice; renderer adaptations are documented in UPSTREAM.md and the committed patches."
+  },
+  {
+    "id": "react-case-v1:0437dcf7280ce649dd65",
+    "source": "packages/mobx-react-lite/__tests__/observer.test.tsx:128:9",
+    "title": "does not assume React will update due to NaN prop",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/observer.test.tsx"],
+    "rationale": "Materialized one-for-one case with immutable original React evidence. Helper-defined observer cases execute twice; renderer adaptations are documented in UPSTREAM.md and the committed patches."
+  },
+  {
+    "id": "react-case-v1:611633bab8a613618636",
+    "source": "packages/mobx-react-lite/__tests__/observer.test.tsx:160:9",
+    "title": "init state",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/observer.test.tsx"],
+    "rationale": "Materialized one-for-one case with immutable original React evidence. Helper-defined observer cases execute twice; renderer adaptations are documented in UPSTREAM.md and the committed patches."
+  },
+  {
+    "id": "react-case-v1:354a1fddb37fa434e4fc",
+    "source": "packages/mobx-react-lite/__tests__/observer.test.tsx:166:9",
+    "title": "rerender should not need a recomputation of data.y",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/observer.test.tsx"],
+    "rationale": "Materialized one-for-one case with immutable original React evidence. Helper-defined observer cases execute twice; renderer adaptations are documented in UPSTREAM.md and the committed patches."
+  },
+  {
+    "id": "react-case-v1:93349ed162674b7a67c0",
+    "source": "packages/mobx-react-lite/__tests__/observer.test.tsx:196:9",
+    "title": "init state is correct",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/observer.test.tsx"],
+    "rationale": "Materialized one-for-one case with immutable original React evidence. Helper-defined observer cases execute twice; renderer adaptations are documented in UPSTREAM.md and the committed patches."
+  },
+  {
+    "id": "react-case-v1:84c187d6b1d35755f735",
+    "source": "packages/mobx-react-lite/__tests__/observer.test.tsx:202:9",
+    "title": "no re-rendering on static rendering",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/observer.test.tsx"],
+    "rationale": "Materialized one-for-one case with immutable original React evidence. Helper-defined observer cases execute twice; renderer adaptations are documented in UPSTREAM.md and the committed patches."
+  },
+  {
+    "id": "react-case-v1:93c97c42dd8a627c5ac7",
+    "source": "packages/mobx-react-lite/__tests__/observer.test.tsx:253:9",
+    "title": "init state is correct",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/observer.test.tsx"],
+    "rationale": "Materialized one-for-one case with immutable original React evidence. Helper-defined observer cases execute twice; renderer adaptations are documented in UPSTREAM.md and the committed patches."
+  },
+  {
+    "id": "react-case-v1:62d17dcd17ee6e355ea1",
+    "source": "packages/mobx-react-lite/__tests__/observer.test.tsx:259:9",
+    "title": "run transaction",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/observer.test.tsx"],
+    "rationale": "Materialized one-for-one case with immutable original React evidence. Helper-defined observer cases execute twice; renderer adaptations are documented in UPSTREAM.md and the committed patches."
+  },
+  {
+    "id": "react-case-v1:353d30b99523dce9e800",
+    "source": "packages/mobx-react-lite/__tests__/observer.test.tsx:273:5",
+    "title": "changing state in render should fail",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/observer.test.tsx"],
+    "rationale": "Materialized one-for-one case with immutable original React evidence. Helper-defined observer cases execute twice; renderer adaptations are documented in UPSTREAM.md and the committed patches."
+  },
+  {
+    "id": "react-case-v1:1c2a548f5d73d0e5fa3c",
+    "source": "packages/mobx-react-lite/__tests__/observer.test.tsx:310:9",
+    "title": "renderCount === 1",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/observer.test.tsx"],
+    "rationale": "Materialized one-for-one case with immutable original React evidence. Helper-defined observer cases execute twice; renderer adaptations are documented in UPSTREAM.md and the committed patches."
+  },
+  {
+    "id": "react-case-v1:cf59c897050fdc068d5c",
+    "source": "packages/mobx-react-lite/__tests__/observer.test.tsx:315:9",
+    "title": "after click once renderCount === 2",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/observer.test.tsx"],
+    "rationale": "Materialized one-for-one case with immutable original React evidence. Helper-defined observer cases execute twice; renderer adaptations are documented in UPSTREAM.md and the committed patches."
+  },
+  {
+    "id": "react-case-v1:eb386cfa255346b51a96",
+    "source": "packages/mobx-react-lite/__tests__/observer.test.tsx:321:9",
+    "title": "after click twice renderCount === 3",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/observer.test.tsx"],
+    "rationale": "Materialized one-for-one case with immutable original React evidence. Helper-defined observer cases execute twice; renderer adaptations are documented in UPSTREAM.md and the committed patches."
+  },
+  {
+    "id": "react-case-v1:2012fdd6d2d6f34c2484",
+    "source": "packages/mobx-react-lite/__tests__/observer.test.tsx:361:9",
+    "title": "init renderCount === 1",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/observer.test.tsx"],
+    "rationale": "Materialized one-for-one case with immutable original React evidence. Helper-defined observer cases execute twice; renderer adaptations are documented in UPSTREAM.md and the committed patches."
+  },
+  {
+    "id": "react-case-v1:663e74701b58acb90f91",
+    "source": "packages/mobx-react-lite/__tests__/observer.test.tsx:367:9",
+    "title": "after click renderCount === 2",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/observer.test.tsx"],
+    "rationale": "Materialized one-for-one case with immutable original React evidence. Helper-defined observer cases execute twice; renderer adaptations are documented in UPSTREAM.md and the committed patches."
+  },
+  {
+    "id": "react-case-v1:5c4b12dfd3751c74afe8",
+    "source": "packages/mobx-react-lite/__tests__/observer.test.tsx:374:9",
+    "title": "after click twice renderCount === 3",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/observer.test.tsx"],
+    "rationale": "Materialized one-for-one case with immutable original React evidence. Helper-defined observer cases execute twice; renderer adaptations are documented in UPSTREAM.md and the committed patches."
+  },
+  {
+    "id": "react-case-v1:29c8b952c4a4adb73096",
+    "source": "packages/mobx-react-lite/__tests__/observer.test.tsx:405:9",
+    "title": "init state is correct",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/observer.test.tsx"],
+    "rationale": "Materialized one-for-one case with immutable original React evidence. Helper-defined observer cases execute twice; renderer adaptations are documented in UPSTREAM.md and the committed patches."
+  },
+  {
+    "id": "react-case-v1:7fffa6abe8a0f8a20020",
+    "source": "packages/mobx-react-lite/__tests__/observer.test.tsx:412:9",
+    "title": "after odata change",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/observer.test.tsx"],
+    "rationale": "Materialized one-for-one case with immutable original React evidence. Helper-defined observer cases execute twice; renderer adaptations are documented in UPSTREAM.md and the committed patches."
+  },
+  {
+    "id": "react-case-v1:29d1c92a28efeefbb350",
+    "source": "packages/mobx-react-lite/__tests__/observer.test.tsx:424:9",
+    "title": "errors should propagate",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/observer.test.tsx"],
+    "rationale": "Materialized one-for-one case with immutable original React evidence. Helper-defined observer cases execute twice; renderer adaptations are documented in UPSTREAM.md and the committed patches."
+  },
+  {
+    "id": "react-case-v1:f8e1e6da87a0096b7e74",
+    "source": "packages/mobx-react-lite/__tests__/observer.test.tsx:479:1",
+    "title": "observer(forwardRef(cmp)) + useImperativeHandle",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/observer.test.tsx"],
+    "rationale": "Materialized one-for-one case with immutable original React evidence. Helper-defined observer cases execute twice; renderer adaptations are documented in UPSTREAM.md and the committed patches."
+  },
+  {
+    "id": "react-case-v1:0f0ec8174ec5c37b5ede",
+    "source": "packages/mobx-react-lite/__tests__/observer.test.tsx:511:1",
+    "title": "useImperativeHandle and forwardRef should work with useObserver",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/observer.test.tsx"],
+    "rationale": "Materialized one-for-one case with immutable original React evidence. Helper-defined observer cases execute twice; renderer adaptations are documented in UPSTREAM.md and the committed patches."
+  },
+  {
+    "id": "react-case-v1:4ff0f672045975c61318",
+    "source": "packages/mobx-react-lite/__tests__/observer.test.tsx:547:1",
+    "title": "observer should work with custom HOC and infer correct type",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/observer.test.tsx"],
+    "rationale": "Materialized one-for-one case with immutable original React evidence. Helper-defined observer cases execute twice; renderer adaptations are documented in UPSTREAM.md and the committed patches."
+  },
+  {
+    "id": "react-case-v1:6855b39d0414accdd20a",
+    "source": "packages/mobx-react-lite/__tests__/observer.test.tsx:574:1",
+    "title": "should hoist known statics only",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/observer.test.tsx"],
+    "rationale": "Materialized one-for-one case with immutable original React evidence. Helper-defined observer cases execute twice; renderer adaptations are documented in UPSTREAM.md and the committed patches."
+  },
+  {
+    "id": "react-case-v1:e5e03088b97bcaf45919",
+    "source": "packages/mobx-react-lite/__tests__/observer.test.tsx:598:1",
+    "title": "should inherit original name/displayName #3438",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/observer.test.tsx"],
+    "rationale": "Materialized one-for-one case with immutable original React evidence. Helper-defined observer cases execute twice; renderer adaptations are documented in UPSTREAM.md and the committed patches."
+  },
+  {
+    "id": "react-case-v1:39a1406c65b4d5a58272",
+    "source": "packages/mobx-react-lite/__tests__/observer.test.tsx:609:1",
+    "title": "parent / childs render in the right order",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/observer.test.tsx"],
+    "rationale": "Materialized one-for-one case with immutable original React evidence. Helper-defined observer cases execute twice; renderer adaptations are documented in UPSTREAM.md and the committed patches."
+  },
+  {
+    "id": "react-case-v1:361030309d71e3eb3018",
+    "source": "packages/mobx-react-lite/__tests__/observer.test.tsx:674:1",
+    "title": "should have overload for props with children",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/observer.test.tsx"],
+    "rationale": "Materialized one-for-one case with immutable original React evidence. Helper-defined observer cases execute twice; renderer adaptations are documented in UPSTREAM.md and the committed patches."
+  },
+  {
+    "id": "react-case-v1:8b47a4d1b7d6bc98a032",
+    "source": "packages/mobx-react-lite/__tests__/observer.test.tsx:687:1",
+    "title": "should have overload for props with children when using forwardRef",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/observer.test.tsx"],
+    "rationale": "Materialized one-for-one case with immutable original React evidence. Helper-defined observer cases execute twice; renderer adaptations are documented in UPSTREAM.md and the committed patches."
+  },
+  {
+    "id": "react-case-v1:e109849fa1c0fac63846",
+    "source": "packages/mobx-react-lite/__tests__/observer.test.tsx:706:1",
+    "title": "should preserve generic parameters",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/observer.test.tsx"],
+    "rationale": "Materialized one-for-one case with immutable original React evidence. Helper-defined observer cases execute twice; renderer adaptations are documented in UPSTREAM.md and the committed patches."
+  },
+  {
+    "id": "react-case-v1:6ea3678e3b91198dbcd2",
+    "source": "packages/mobx-react-lite/__tests__/observer.test.tsx:735:1",
+    "title": "should preserve concrete props when using forwardRef",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/observer.test.tsx"],
+    "rationale": "Materialized one-for-one case with immutable original React evidence. Helper-defined observer cases execute twice; renderer adaptations are documented in UPSTREAM.md and the committed patches."
+  },
+  {
+    "id": "react-case-v1:ea7f1fa56373a407a771",
+    "source": "packages/mobx-react-lite/__tests__/observer.test.tsx:759:1",
+    "title": "should keep original props types",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/observer.test.tsx"],
+    "rationale": "Materialized one-for-one case with immutable original React evidence. Helper-defined observer cases execute twice; renderer adaptations are documented in UPSTREAM.md and the committed patches."
+  },
+  {
+    "id": "react-case-v1:ca67412edce0175bfc6f",
+    "source": "packages/mobx-react-lite/__tests__/observer.test.tsx:868:1",
+    "title": "dependencies should not become temporarily unobserved",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/observer.test.tsx"],
+    "rationale": "Materialized one-for-one case with immutable original React evidence. Helper-defined observer cases execute twice; renderer adaptations are documented in UPSTREAM.md and the committed patches."
+  },
+  {
+    "id": "react-case-v1:0ddb87874916c89f4bea",
+    "source": "packages/mobx-react-lite/__tests__/observer.test.tsx:948:1",
+    "title": "Legacy context support",
+    "classification": "inapplicable",
+    "localEvidence": ["tests/upstream/observer.test.tsx"],
+    "rationale": "This registration is already skipped upstream. The native suite preserves that skip; it is not counted as passed."
+  },
+  {
+    "id": "react-case-v1:260d4cfa80a764ca77c0",
+    "source": "packages/mobx-react-lite/__tests__/observer.test.tsx:980:1",
+    "title": "Anonymous component displayName #3192",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/observer.test.tsx"],
+    "rationale": "Materialized one-for-one case with immutable original React evidence. Helper-defined observer cases execute twice; renderer adaptations are documented in UPSTREAM.md and the committed patches."
+  },
+  {
+    "id": "react-case-v1:a9b8427225bb29a69831",
+    "source": "packages/mobx-react-lite/__tests__/observer.test.tsx:1024:1",
+    "title": "StrictMode #3671",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/observer.test.tsx"],
+    "rationale": "Materialized one-for-one case with immutable original React evidence. Helper-defined observer cases execute twice; renderer adaptations are documented in UPSTREAM.md and the committed patches."
+  },
+  {
+    "id": "react-case-v1:4fca329ac33340cfa2e0",
+    "source": "packages/mobx-react-lite/__tests__/observer.test.tsx:1044:1",
+    "title": "`isolateGlobalState` shouldn't break reactivity #3734",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/observer.test.tsx"],
+    "rationale": "Materialized one-for-one case with immutable original React evidence. Helper-defined observer cases execute twice; renderer adaptations are documented in UPSTREAM.md and the committed patches."
+  },
+  {
+    "id": "react-case-v1:1767ecb1ce44934dc96a",
+    "source": "packages/mobx-react-lite/__tests__/ObserverComponent.test.tsx:20:5",
+    "title": "init state is correct",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/ObserverComponent.test.tsx"],
+    "rationale": "Materialized one-for-one case with immutable original React evidence. Helper-defined observer cases execute twice; renderer adaptations are documented in UPSTREAM.md and the committed patches."
+  },
+  {
+    "id": "react-case-v1:7a2402e645dd2f47b98e",
+    "source": "packages/mobx-react-lite/__tests__/ObserverComponent.test.tsx:26:5",
+    "title": "set the data to hello",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/ObserverComponent.test.tsx"],
+    "rationale": "Materialized one-for-one case with immutable original React evidence. Helper-defined observer cases execute twice; renderer adaptations are documented in UPSTREAM.md and the committed patches."
+  },
+  {
+    "id": "react-case-v1:1618e6ddc5b174318ab3",
+    "source": "packages/mobx-react-lite/__tests__/ObserverComponent.test.tsx:36:1",
+    "title": "renders null if no children/render prop is supplied a function",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/ObserverComponent.test.tsx"],
+    "rationale": "Materialized one-for-one case with immutable original React evidence. Helper-defined observer cases execute twice; renderer adaptations are documented in UPSTREAM.md and the committed patches."
+  },
+  {
+    "id": "react-case-v1:685350040d795cd6b7ac",
+    "source": "packages/mobx-react-lite/__tests__/ObserverComponent.test.tsx:44:1",
+    "title": "prop types checks for children/render usage",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/ObserverComponent.test.tsx"],
+    "rationale": "Materialized one-for-one case with immutable original React evidence. Helper-defined observer cases execute twice; renderer adaptations are documented in UPSTREAM.md and the committed patches."
+  },
+  {
+    "id": "react-case-v1:a100bb2cae89d5aecad5",
+    "source": "packages/mobx-react-lite/__tests__/strictAndConcurrentMode.test.tsx:8:1",
+    "title": "uncommitted observing components should not attempt state changes",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/strictAndConcurrentMode.test.tsx"],
+    "rationale": "Materialized one-for-one case with immutable original React evidence. Helper-defined observer cases execute twice; renderer adaptations are documented in UPSTREAM.md and the committed patches."
+  },
+  {
+    "id": "react-case-v1:bc8104d88a78be802a34",
+    "source": "packages/mobx-react-lite/__tests__/strictAndConcurrentMode.test.tsx:41:1",
+    "title": "observable changes before first commit are not lost",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/strictAndConcurrentMode.test.tsx"],
+    "rationale": "Materialized one-for-one case with immutable original React evidence. Helper-defined observer cases execute twice; renderer adaptations are documented in UPSTREAM.md and the committed patches."
+  },
+  {
+    "id": "react-case-v1:18e0a218993412585fb1",
+    "source": "packages/mobx-react-lite/__tests__/strictAndConcurrentModeUsingFinalizationRegistry.test.tsx:24:1",
+    "title": "uncommitted components should not leak observations",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/strictAndConcurrentModeUsingFinalizationRegistry.test.tsx"],
+    "rationale": "Materialized one-for-one case with immutable original React evidence. Helper-defined observer cases execute twice; renderer adaptations are documented in UPSTREAM.md and the committed patches."
+  },
+  {
+    "id": "react-case-v1:ec7bffc43a0e466c64e0",
+    "source": "packages/mobx-react-lite/__tests__/strictAndConcurrentModeUsingTimers.test.tsx:17:1",
+    "title": "uncommitted components should not leak observations",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/strictAndConcurrentModeUsingTimers.test.tsx"],
+    "rationale": "Materialized one-for-one case with immutable original React evidence. Helper-defined observer cases execute twice; renderer adaptations are documented in UPSTREAM.md and the committed patches."
+  },
+  {
+    "id": "react-case-v1:7514b34a74aa3a749180",
+    "source": "packages/mobx-react-lite/__tests__/strictAndConcurrentModeUsingTimers.test.tsx:63:1",
+    "title": "cleanup timer should not clean up recently-pended reactions",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/strictAndConcurrentModeUsingTimers.test.tsx"],
+    "rationale": "Materialized one-for-one case with immutable original React evidence. Helper-defined observer cases execute twice; renderer adaptations are documented in UPSTREAM.md and the committed patches."
+  },
+  {
+    "id": "react-case-v1:aa48d7388f2b8896f3e0",
+    "source": "packages/mobx-react-lite/__tests__/strictAndConcurrentModeUsingTimers.test.tsx:124:1",
+    "title": "component should recreate reaction if necessary",
+    "classification": "inapplicable",
+    "localEvidence": ["tests/upstream/strictAndConcurrentModeUsingTimers.test.tsx"],
+    "rationale": "This registration is already skipped upstream. The native suite preserves that skip; it is not counted as passed."
+  },
+  {
+    "id": "react-case-v1:8868d8149757596abaca",
+    "source": "packages/mobx-react-lite/__tests__/transactions.test.tsx:7:1",
+    "title": "mobx issue 50",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/transactions.test.tsx"],
+    "rationale": "Materialized one-for-one case with immutable original React evidence. Helper-defined observer cases execute twice; renderer adaptations are documented in UPSTREAM.md and the committed patches."
+  },
+  {
+    "id": "react-case-v1:2f239c5b923c47b05e7d",
+    "source": "packages/mobx-react-lite/__tests__/transactions.test.tsx:43:1",
+    "title": "should respect transaction",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/transactions.test.tsx"],
+    "rationale": "Materialized one-for-one case with immutable original React evidence. Helper-defined observer cases execute twice; renderer adaptations are documented in UPSTREAM.md and the committed patches."
+  },
+  {
+    "id": "react-case-v1:d74678021be6bac34e9b",
+    "source": "packages/mobx-react-lite/__tests__/useLocalObservable.test.tsx:12:1",
+    "title": "base useLocalObservable should work",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/useLocalObservable.test.tsx"],
+    "rationale": "Materialized one-for-one case with immutable original React evidence. Helper-defined observer cases execute twice; renderer adaptations are documented in UPSTREAM.md and the committed patches."
+  },
+  {
+    "id": "react-case-v1:96471a584e77589f7632",
+    "source": "packages/mobx-react-lite/__tests__/useLocalObservable.test.tsx:68:5",
+    "title": "value can be changed over renders",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/useLocalObservable.test.tsx"],
+    "rationale": "Materialized one-for-one case with immutable original React evidence. Helper-defined observer cases execute twice; renderer adaptations are documented in UPSTREAM.md and the committed patches."
+  },
+  {
+    "id": "react-case-v1:0a3550f772bf19fcfd86",
+    "source": "packages/mobx-react-lite/__tests__/useLocalObservable.test.tsx:89:5",
+    "title": "works with observer as well",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/useLocalObservable.test.tsx"],
+    "rationale": "Materialized one-for-one case with immutable original React evidence. Helper-defined observer cases execute twice; renderer adaptations are documented in UPSTREAM.md and the committed patches."
+  },
+  {
+    "id": "react-case-v1:6af73b43a7ad04a895f0",
+    "source": "packages/mobx-react-lite/__tests__/useLocalObservable.test.tsx:116:5",
+    "title": "actions can be used",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/useLocalObservable.test.tsx"],
+    "rationale": "Materialized one-for-one case with immutable original React evidence. Helper-defined observer cases execute twice; renderer adaptations are documented in UPSTREAM.md and the committed patches."
+  },
+  {
+    "id": "react-case-v1:f17a42413a9d7addb3fd",
+    "source": "packages/mobx-react-lite/__tests__/useLocalObservable.test.tsx:138:5",
+    "title": "computed properties works as well",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/useLocalObservable.test.tsx"],
+    "rationale": "Materialized one-for-one case with immutable original React evidence. Helper-defined observer cases execute twice; renderer adaptations are documented in UPSTREAM.md and the committed patches."
+  },
+  {
+    "id": "react-case-v1:cc03dbe22ba3f59f42fa",
+    "source": "packages/mobx-react-lite/__tests__/useLocalObservable.test.tsx:156:5",
+    "title": "computed properties can use local functions",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/useLocalObservable.test.tsx"],
+    "rationale": "Materialized one-for-one case with immutable original React evidence. Helper-defined observer cases execute twice; renderer adaptations are documented in UPSTREAM.md and the committed patches."
+  },
+  {
+    "id": "react-case-v1:ca6c3f4589b44b630978",
+    "source": "packages/mobx-react-lite/__tests__/useLocalObservable.test.tsx:177:5",
+    "title": "transactions are respected",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/useLocalObservable.test.tsx"],
+    "rationale": "Materialized one-for-one case with immutable original React evidence. Helper-defined observer cases execute twice; renderer adaptations are documented in UPSTREAM.md and the committed patches."
+  },
+  {
+    "id": "react-case-v1:fb84a3e8dd01aa279f54",
+    "source": "packages/mobx-react-lite/__tests__/useLocalObservable.test.tsx:213:5",
+    "title": "Map can used instead of object",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/useLocalObservable.test.tsx"],
+    "rationale": "Materialized one-for-one case with immutable original React evidence. Helper-defined observer cases execute twice; renderer adaptations are documented in UPSTREAM.md and the committed patches."
+  },
+  {
+    "id": "react-case-v1:6848cf4742800131708e",
+    "source": "packages/mobx-react-lite/__tests__/useLocalObservable.test.tsx:234:9",
+    "title": "and useObserver",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/useLocalObservable.test.tsx"],
+    "rationale": "Materialized one-for-one case with immutable original React evidence. Helper-defined observer cases execute twice; renderer adaptations are documented in UPSTREAM.md and the committed patches."
+  },
+  {
+    "id": "react-case-v1:a430878ff370818d0d60",
+    "source": "packages/mobx-react-lite/__tests__/useLocalObservable.test.tsx:302:9",
+    "title": "with <Observer>",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/useLocalObservable.test.tsx"],
+    "rationale": "Materialized one-for-one case with immutable original React evidence. Helper-defined observer cases execute twice; renderer adaptations are documented in UPSTREAM.md and the committed patches."
+  },
+  {
+    "id": "react-case-v1:96f524be54238174de8c",
+    "source": "packages/mobx-react-lite/__tests__/useLocalObservable.test.tsx:372:9",
+    "title": "with observer()",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/useLocalObservable.test.tsx"],
+    "rationale": "Materialized one-for-one case with immutable original React evidence. Helper-defined observer cases execute twice; renderer adaptations are documented in UPSTREAM.md and the committed patches."
+  },
+  {
+    "id": "react-case-v1:e5d5d729c417669e3dc5",
+    "source": "packages/mobx-react-lite/__tests__/useLocalObservable.test.tsx:433:5",
+    "title": "'never' should work",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/useLocalObservable.test.tsx"],
+    "rationale": "Materialized one-for-one case with immutable original React evidence. Helper-defined observer cases execute twice; renderer adaptations are documented in UPSTREAM.md and the committed patches."
+  },
+  {
+    "id": "react-case-v1:967a4179dad16aee4c3c",
+    "source": "packages/mobx-react-lite/__tests__/useLocalObservable.test.tsx:469:5",
+    "title": "only when 'observed' should work",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/useLocalObservable.test.tsx"],
+    "rationale": "Materialized one-for-one case with immutable original React evidence. Helper-defined observer cases execute twice; renderer adaptations are documented in UPSTREAM.md and the committed patches."
+  },
+  {
+    "id": "react-case-v1:246829489a354a7e78d7",
+    "source": "packages/mobx-react-lite/__tests__/useLocalObservable.test.tsx:505:5",
+    "title": "'always' should work",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/useLocalObservable.test.tsx"],
+    "rationale": "Materialized one-for-one case with immutable original React evidence. Helper-defined observer cases execute twice; renderer adaptations are documented in UPSTREAM.md and the committed patches."
+  },
+  {
+    "id": "react-case-v1:3320c461980d0992af22",
+    "source": "packages/mobx-react-lite/__tests__/useObserverRetention.test.tsx:19:1",
+    "title": "a mounted observer does not retain the element tree it first returned",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/useObserverRetention.test.tsx"],
+    "rationale": "Materialized one-for-one case with immutable original React evidence. Helper-defined observer cases execute twice; renderer adaptations are documented in UPSTREAM.md and the committed patches."
+  }
+]

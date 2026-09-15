@@ -1,6 +1,6 @@
 # @octanejs/resizable-panels
 
-Octane binding for `react-resizable-panels@4.12.2`.
+Octane binding for `react-resizable-panels@4.12.4`.
 
 ## Installation
 

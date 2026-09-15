@@ -1,0 +1,49 @@
+diff --git a/tests/upstream/chat-ui/create-ui-types.test.tsx b/tests/upstream/chat-ui/create-ui-types.test.tsx
+--- a/tests/upstream/chat-ui/create-ui-types.test.tsx
++++ b/tests/upstream/chat-ui/create-ui-types.test.tsx
+@@ -3,6 +3,7 @@ import { expectTypeOf, it } from 'vitest'
+ import { createChatHook } from '../../../src/chat-ui/create-chat-hook.tsrx'
+ import { createChatUI } from '../../../src/chat-ui/create-ui.tsrx'
+ import type {
++  ChatUIFactoryConfig,
+   ChatUIHost,
+   LayoutProps,
+   MessageProps,
+@@ -161,8 +162,6 @@ it('types tool and interrupt component props from chatOptions', () => {
+         return null
+       },
+       purchaseItem: () => null,
+-      // @ts-expect-error This tool is not in chatOptions.
+-      unknownTool: () => null,
+     },
+     interruptsComponents: {
+       generic: {
+@@ -172,13 +171,26 @@ it('types tool and interrupt component props from chatOptions', () => {
+           interrupt.resolveInterrupt(42)
+           return null
+         },
+-        // @ts-expect-error This interrupt is not in chatOptions.
+-        unknownInterrupt: () => null,
+         fallback: () => null,
+       },
+     },
+   })
+ 
++  // Overload diagnostics point at the full call in TS 5.9. Check each
++  // rejected registration independently so neither negative can hide the other.
++  const invalidTools = {
++    getWeather: () => null, purchaseItem: () => null,
++    // @ts-expect-error This tool is not in chatOptions.
++    unknownTool: () => null,
++  } satisfies ChatUIFactoryConfig<typeof chatOptions>['toolsComponents']
++  const invalidInterrupts = {
++    choosePlan: () => null,
++    // @ts-expect-error This interrupt is not in chatOptions.
++    unknownInterrupt: () => null,
++  } satisfies ChatUIFactoryConfig<typeof chatOptions>['interruptsComponents']['generic']
++  void invalidTools
++  void invalidInterrupts
++
+   // This config registers an `input`, so its exact type flows onto the kit.
+   expectTypeOf(UI.Input).toEqualTypeOf<(() => null) | undefined>()
+ 

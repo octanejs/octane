@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "b6e65e48154571accca212b2400e70f0b1dee9499979f0b7ab2febaa4de93c58"
+      "lockfileSha256": "512a0ebbe26d6fe151716392506f43ce6b91c4927b07740bc732c8b49fb44687"
     }
   },
   "lanes": [
@@ -245,7 +245,7 @@
         {
           "path": "packages/tanstack-query/tests/vitest.adapted.config.ts",
           "role": "support",
-          "sha256": "70c7898d6cdb33d4476f09504a93da766a192986b611bf7281af09a9cf9b7545"
+          "sha256": "df3907e441f5a4b732b1aaf1291dd3617d54d284d0b16d8b9bd692e72ec32fc9"
         },
         {
           "path": "packages/tanstack-query/tests/adapted-setup.ts",
@@ -345,7 +345,7 @@
         {
           "path": "packages/tanstack-query/tests/vitest.adapted.config.ts",
           "role": "support",
-          "sha256": "70c7898d6cdb33d4476f09504a93da766a192986b611bf7281af09a9cf9b7545"
+          "sha256": "df3907e441f5a4b732b1aaf1291dd3617d54d284d0b16d8b9bd692e72ec32fc9"
         },
         {
           "path": "packages/tanstack-query/tests/adapted-setup.ts",

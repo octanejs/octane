@@ -1,0 +1,78 @@
+{
+  "package": "@tanstack/react-router",
+  "version": "1.170.35",
+  "commit": "6494e75362ff7ca4988ef41046498dea10cbc462",
+  "review": "The pinned fileRoute suite derives three arrays from Object.keys(getRouteApi()). RouteApi initializes seven use-prefixed instance fields; The pinned BaseRouteApi has id, notFound, and redirect, with no use-prefixed fields. Parse the pinned class fields to expand the arrays without executing the source. The exact test expression, occurrence count, test blob and source blob are required. The link suite derives trailing slash cases from the pinned core constant; parse its three literal values with no upstream execution. Additional navigate/useNavigate and route suites use the same pinned constants. The URI suite excludes exactly slash, question mark, backslash, percent and hash from its thirteen literal rows; the profile pins the complete filter expression and derives all remaining values from the same immutable file.",
+  "helpers": [],
+  "staticArrays": [
+    {
+      "path": "packages/react-router/tests/fileRoute.test.ts",
+      "gitBlob": "9f3fa290d3a724bcb616ef63c3d5c87a46a6f161",
+      "expression": "Object.keys(routeApi).filter((key) => key.startsWith('use'))",
+      "occurrences": 3,
+      "source": {
+        "path": "packages/react-router/src/route.tsx",
+        "gitBlob": "57dca9ef029b6f5ad4d338d61438c7b498d6b0db",
+        "className": "RouteApi",
+        "propertyPrefix": "use"
+      }
+    },
+    {
+      "path": "packages/react-router/tests/link.test.tsx",
+      "gitBlob": "897b6d94144597aec0fe404b9df5ea69bcbac4bc",
+      "expression": "Object.values(trailingSlashOptions)",
+      "occurrences": 1,
+      "source": {
+        "path": "packages/router-core/src/router.ts",
+        "gitBlob": "4ae7554d2cd8e6a281319c2854cee04c5b8af4da",
+        "objectName": "trailingSlashOptions"
+      }
+    },
+    {
+      "path": "packages/react-router/tests/navigate.test.tsx",
+      "gitBlob": "dd7b252c48f08621d9a9e661f7e141821458651e",
+      "expression": "Object.values(trailingSlashOptions)",
+      "occurrences": 1,
+      "source": {
+        "path": "packages/router-core/src/router.ts",
+        "gitBlob": "4ae7554d2cd8e6a281319c2854cee04c5b8af4da",
+        "objectName": "trailingSlashOptions"
+      }
+    },
+    {
+      "path": "packages/react-router/tests/useNavigate.test.tsx",
+      "gitBlob": "1ec1072a26cec414d5aa2c1a10d5150503f198eb",
+      "expression": "Object.values(trailingSlashOptions)",
+      "occurrences": 1,
+      "source": {
+        "path": "packages/router-core/src/router.ts",
+        "gitBlob": "4ae7554d2cd8e6a281319c2854cee04c5b8af4da",
+        "objectName": "trailingSlashOptions"
+      }
+    },
+    {
+      "path": "packages/react-router/tests/route.test.tsx",
+      "gitBlob": "e425dfaaf85a6e6f2ccc05b70a673c933d08854f",
+      "expression": "Object.keys(routeApi).filter((key) => key.startsWith('use'))",
+      "occurrences": 1,
+      "source": {
+        "path": "packages/react-router/src/route.tsx",
+        "gitBlob": "57dca9ef029b6f5ad4d338d61438c7b498d6b0db",
+        "className": "RouteApi",
+        "propertyPrefix": "use"
+      }
+    },
+    {
+      "path": "packages/react-router/tests/router.test.tsx",
+      "gitBlob": "926e2c3b8f6d81639a8f9c86c1de805c87c2cbb6",
+      "expression": "URISyntaxCharacters.filter((c) => {\n        const character = c[0]\n\n        const strictlyNotAllowedCharacters = ['/', '?', '\\\\', '%', '#']\n\n        return !strictlyNotAllowedCharacters.includes(character)\n      })",
+      "occurrences": 1,
+      "source": {
+        "path": "packages/react-router/tests/router.test.tsx",
+        "gitBlob": "926e2c3b8f6d81639a8f9c86c1de805c87c2cbb6",
+        "arrayName": "URISyntaxCharacters",
+        "excludeFirstColumn": ["/", "?", "\\", "%", "#"]
+      }
+    }
+  ]
+}

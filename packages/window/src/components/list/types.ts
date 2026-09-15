@@ -23,7 +23,7 @@ type ExcludeForbiddenKeys<Type> = {
 
 export type ListProps<RowProps extends object, TagName extends TagNames = 'div'> = Omit<
 	HTMLAttributes<HTMLDivElement>,
-	'onResize' | 'style'
+	'onResize' | 'style' | 'className'
 > & {
 	/**
 	 * Additional content to be rendered within the list (above cells).

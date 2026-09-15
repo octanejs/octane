@@ -8,6 +8,23 @@ import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
 
+export async function collectVitestTests(project, root) {
+	const directory = mkdtempSync(resolve(tmpdir(), 'octane-parity-list-'));
+	const reportPath = resolve(directory, 'tests.json');
+	try {
+		// Browser server notices share stdout with `vitest list --json`.
+		// Read a fresh structured report so startup messages cannot corrupt it.
+		await execFileAsync(
+			process.execPath,
+			['node_modules/vitest/vitest.mjs', 'list', '--project', project, '--json', reportPath],
+			{ cwd: root, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 },
+		);
+		return JSON.parse(await readFile(reportPath, 'utf8'));
+	} finally {
+		rmSync(directory, { recursive: true, force: true });
+	}
+}
+
 export async function runVitestCommand(command, args, cwd) {
 	// Vite startup notices share stdout with reporters. A fresh file keeps
 	// structured evidence independent of logs and prevents stale report reuse.
@@ -458,8 +475,8 @@ export function validateManifest(manifest, { surfacePolicy } = {}) {
 			fail(
 				`lane ${lane.id} ${lane.execution.kind} execution is only valid for pristine-upstream lanes`,
 			);
-		if (lane.type === 'pristine-types' && lane.execution.compiler !== 'tsc')
-			fail(`lane ${lane.id} pristine-types execution must use tsc`);
+		if (lane.type === 'pristine-types' && !['tsc', 'tsgo'].includes(lane.execution.compiler))
+			fail(`lane ${lane.id} pristine-types execution must use tsc or tsgo`);
 		if (lane.type === 'adapted-types' && !['tsc', 'tsrx-tsc'].includes(lane.execution.compiler))
 			fail(`lane ${lane.id} adapted-types execution must use tsc or tsrx-tsc`);
 		if (!Array.isArray(lane.files) || lane.files.length === 0)
@@ -1090,14 +1107,16 @@ export async function verifyManifestTestSelections(manifest, root) {
 		const collectionKey = `${lane.project}:${complete}`;
 		let collectedTests = testsByProject.get(collectionKey);
 		if (!collectedTests) {
-			const { stdout } = await execFileAsync(
-				process.execPath,
-				complete
-					? ['scripts/react-parity/collect-vitest-tests.mjs', root, lane.project]
-					: ['node_modules/vitest/vitest.mjs', 'list', '--project', lane.project, '--json'],
-				{ cwd: root, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 },
-			);
-			collectedTests = JSON.parse(stdout);
+			if (complete) {
+				const { stdout } = await execFileAsync(
+					process.execPath,
+					['scripts/react-parity/collect-vitest-tests.mjs', root, lane.project],
+					{ cwd: root, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 },
+				);
+				collectedTests = JSON.parse(stdout);
+			} else {
+				collectedTests = await collectVitestTests(lane.project, root);
+			}
 			testsByProject.set(collectionKey, collectedTests);
 		}
 		if (lane.execution?.kind === 'vitest-full') {

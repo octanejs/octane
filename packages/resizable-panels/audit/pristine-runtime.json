@@ -9,6 +9,7 @@
     "packages/resizable-panels/upstream/lib/components/panel/Panel.test.tsx",
     "packages/resizable-panels/upstream/lib/components/separator/Separator.test.tsx",
     "packages/resizable-panels/upstream/lib/global/cursor/getCursorStyle.test.ts",
+    "packages/resizable-panels/upstream/lib/global/cursor/updateCursorStyle.test.ts",
     "packages/resizable-panels/upstream/lib/global/dom/calculateAvailableGroupSize.test.ts",
     "packages/resizable-panels/upstream/lib/global/dom/calculateHitRegions.test.ts",
     "packages/resizable-panels/upstream/lib/global/styles/parseSizeAndUnit.test.ts",
@@ -26,6 +27,7 @@
     "packages/resizable-panels/upstream/lib/global/utils/layoutNumbersEqual.test.ts",
     "packages/resizable-panels/upstream/lib/global/utils/layoutsEqual.test.ts",
     "packages/resizable-panels/upstream/lib/global/utils/objectsEqual.test.ts",
+    "packages/resizable-panels/upstream/lib/global/utils/panelConstraintsEqual.test.ts",
     "packages/resizable-panels/upstream/lib/global/utils/validatePanelGroupLayout.test.ts",
     "packages/resizable-panels/upstream/lib/hooks/useId.test.ts",
     "packages/resizable-panels/upstream/lib/hooks/useMergedRefs.test.tsx",
@@ -370,6 +372,16 @@
       "fullName": "Panel should throw if rendered outside of a Group"
     },
     {
+      "id": "runtime:939eb0bd3ca4a9d8",
+      "file": "packages/resizable-panels/upstream/lib/components/separator/Separator.test.tsx",
+      "fullName": "Separator HTML attributes ARIA attributes should blah"
+    },
+    {
+      "id": "runtime:6d94e504d17bd06a",
+      "file": "packages/resizable-panels/upstream/lib/components/separator/Separator.test.tsx",
+      "fullName": "Separator HTML attributes ARIA attributes should compute values relative to the Group (not the Separator's own panel pair)"
+    },
+    {
       "id": "runtime:c0bcace489ff389a",
       "file": "packages/resizable-panels/upstream/lib/components/separator/Separator.test.tsx",
       "fullName": "Separator HTML attributes ARIA attributes should identify its primary panel if and only if it has an explicit id"
@@ -573,6 +585,16 @@
       "id": "runtime:1b42234d52b64436",
       "file": "packages/resizable-panels/upstream/lib/global/cursor/getCursorStyle.test.ts",
       "fullName": "getCursorStyle basic cursor style support state: inactive should return null"
+    },
+    {
+      "id": "runtime:1d9c0c2a1de05692",
+      "file": "packages/resizable-panels/upstream/lib/global/cursor/updateCursorStyle.test.ts",
+      "fullName": "updateCursorStyle should apply cursor styles when constructable stylesheets are supported"
+    },
+    {
+      "id": "runtime:1e0069b1fa0f03c3",
+      "file": "packages/resizable-panels/upstream/lib/global/cursor/updateCursorStyle.test.ts",
+      "fullName": "updateCursorStyle should not throw if the environment doesn't support constructable stylesheets"
     },
     {
       "id": "runtime:383525e68f388544",
@@ -2058,6 +2080,51 @@
       "id": "runtime:c0714ccb9060fac8",
       "file": "packages/resizable-panels/upstream/lib/global/utils/objectsEqual.test.ts",
       "fullName": "objectsEqual objectsEqual: {}, {} -> true"
+    },
+    {
+      "id": "runtime:deb77fccfb8f3679",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/panelConstraintsEqual.test.ts",
+      "fullName": "panelConstraintsEqual objectsEqual: [ { collapsedSize: +0, collapsible: false, defaultSize: undefined, disabled: undefined, maxSize: 100, minSize: +0, panelId: 'a' } ], [ { collapsedSize: +0, collapsible: false, defaultSize: undefined, disabled: undefined, maxSize: 100, minSize: +0, panelId: 'a' } ] -> true"
+    },
+    {
+      "id": "runtime:a066e8e546d47c9c",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/panelConstraintsEqual.test.ts",
+      "fullName": "panelConstraintsEqual objectsEqual: [ { collapsedSize: +0, collapsible: false, defaultSize: undefined, disabled: undefined, maxSize: 100, minSize: +0, panelId: 'a' } ], [ { collapsedSize: +0, collapsible: false, defaultSize: undefined, disabled: undefined, maxSize: 100, minSize: +0, panelId: 'a' }, { collapsedSize: +0, collapsible: false, defaultSize: undefined, disabled: undefined, maxSize: 100, minSize: +0, panelId: 'b' } ] -> false"
+    },
+    {
+      "id": "runtime:3a40ca832568370d",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/panelConstraintsEqual.test.ts",
+      "fullName": "panelConstraintsEqual objectsEqual: [ { collapsedSize: +0, collapsible: false, defaultSize: undefined, disabled: undefined, maxSize: 100, minSize: +0, panelId: 'a' } ], [ { collapsedSize: +0, collapsible: true, defaultSize: undefined, disabled: undefined, maxSize: 100, minSize: +0, panelId: 'a' } ] -> false"
+    },
+    {
+      "id": "runtime:61cf8c96b851ad6f",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/panelConstraintsEqual.test.ts",
+      "fullName": "panelConstraintsEqual objectsEqual: [ { collapsedSize: +0, collapsible: false, defaultSize: undefined, disabled: undefined, maxSize: 100, minSize: +0, panelId: 'a' } ], [] -> false"
+    },
+    {
+      "id": "runtime:88b0136456ea8220",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/panelConstraintsEqual.test.ts",
+      "fullName": "panelConstraintsEqual objectsEqual: [ { collapsedSize: +0, collapsible: false, defaultSize: undefined, disabled: undefined, maxSize: 100, minSize: +0, panelId: 'a' }, { collapsedSize: +0, collapsible: false, defaultSize: undefined, disabled: undefined, maxSize: 100, minSize: +0, panelId: 'b' } ], [ { collapsedSize: +0, collapsible: false, defaultSize: undefined, disabled: undefined, maxSize: 100, minSize: +0, panelId: 'a' } ] -> false"
+    },
+    {
+      "id": "runtime:7a6c88ceb773f390",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/panelConstraintsEqual.test.ts",
+      "fullName": "panelConstraintsEqual objectsEqual: [ { collapsedSize: +0, collapsible: false, defaultSize: undefined, disabled: undefined, maxSize: 100, minSize: +0, panelId: 'a' }, { collapsedSize: +0, collapsible: false, defaultSize: undefined, disabled: undefined, maxSize: 100, minSize: +0, panelId: 'b' } ], [ { collapsedSize: +0, collapsible: false, defaultSize: undefined, disabled: undefined, maxSize: 100, minSize: +0, panelId: 'a' }, { collapsedSize: +0, collapsible: false, defaultSize: undefined, disabled: true, maxSize: 100, minSize: +0, panelId: 'b' } ] -> false"
+    },
+    {
+      "id": "runtime:d511936251d76963",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/panelConstraintsEqual.test.ts",
+      "fullName": "panelConstraintsEqual objectsEqual: [ { collapsedSize: +0, collapsible: false, defaultSize: undefined, disabled: undefined, maxSize: 100, minSize: +0, panelId: 'a' }, { collapsedSize: +0, collapsible: false, defaultSize: undefined, disabled: undefined, maxSize: 100, minSize: +0, panelId: 'b' } ], [ { collapsedSize: +0, collapsible: false, defaultSize: undefined, disabled: undefined, maxSize: 100, minSize: +0, panelId: 'a' }, { collapsedSize: +0, collapsible: false, defaultSize: undefined, disabled: undefined, maxSize: 100, minSize: +0, panelId: 'b' } ] -> true"
+    },
+    {
+      "id": "runtime:2bdfdb10fc952600",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/panelConstraintsEqual.test.ts",
+      "fullName": "panelConstraintsEqual objectsEqual: [], [ { collapsedSize: +0, collapsible: false, defaultSize: undefined, disabled: undefined, maxSize: 100, minSize: +0, panelId: 'a' } ] -> false"
+    },
+    {
+      "id": "runtime:e8ddc5b4f4ec4e7f",
+      "file": "packages/resizable-panels/upstream/lib/global/utils/panelConstraintsEqual.test.ts",
+      "fullName": "panelConstraintsEqual objectsEqual: [], [] -> true"
     },
     {
       "id": "runtime:df43e773867f4a4a",

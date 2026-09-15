@@ -1,0 +1,1177 @@
+[
+  {
+    "id": "react-case-v1:f13f1b3e19903a2b3e1e",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/chat-ui/coexistence.test.ts"
+  },
+  {
+    "id": "react-case-v1:95af1bd2fcf6d29d96ef",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/chat-ui/create-ui-stability.test.tsx"
+  },
+  {
+    "id": "react-case-v1:7247ea7de90fe232fb0e",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/chat-ui/create-ui-types.test.tsx"
+  },
+  {
+    "id": "react-case-v1:458ee927cf135eb44a10",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/chat-ui/create-ui-types.test.tsx"
+  },
+  {
+    "id": "react-case-v1:5e5e7c2997aece6d6d95",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/chat-ui/create-ui-types.test.tsx"
+  },
+  {
+    "id": "react-case-v1:8ac9b5bfa43388be7764",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/chat-ui/create-ui.test.tsx"
+  },
+  {
+    "id": "react-case-v1:6dfa067c3c55066605ed",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/chat-ui/create-ui.test.tsx"
+  },
+  {
+    "id": "react-case-v1:eeca2a61ab27d561c0e0",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/chat-ui/create-ui.test.tsx"
+  },
+  {
+    "id": "react-case-v1:a02d671e6b4de8766173",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/chat-ui/create-ui.test.tsx"
+  },
+  {
+    "id": "react-case-v1:6dc2d4e9fd2386082c71",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/chat-ui/create-ui.test.tsx"
+  },
+  {
+    "id": "react-case-v1:03c84cd094c80e9816e9",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/chat-ui/create-ui.test.tsx"
+  },
+  {
+    "id": "react-case-v1:4ee937ab0b59f32cb578",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/chat-ui/create-ui.test.tsx"
+  },
+  {
+    "id": "react-case-v1:16ed05220d428257fa47",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/chat-ui/create-ui.test.tsx"
+  },
+  {
+    "id": "react-case-v1:ec46a12132c554371b28",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/chat-ui/create-ui.test.tsx"
+  },
+  {
+    "id": "react-case-v1:2b365f6e16579cf95553",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/chat-ui/create-ui.test.tsx"
+  },
+  {
+    "id": "react-case-v1:273fc9995a1184ab4ffe",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/chat-ui/create-ui.test.tsx"
+  },
+  {
+    "id": "react-case-v1:f3212c8be5f211928185",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/chat-ui/create-ui.test.tsx"
+  },
+  {
+    "id": "react-case-v1:7edeff3defb2a74d8b8e",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/chat-ui/create-ui.test.tsx"
+  },
+  {
+    "id": "react-case-v1:0719c2d2a02f666a1cc0",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/chat-ui/create-ui.test.tsx"
+  },
+  {
+    "id": "react-case-v1:ace1812cb51042d5882b",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/chat-ui/create-ui.test.tsx"
+  },
+  {
+    "id": "react-case-v1:c09da8b7f36d7ee0f59b",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/chat-ui/create-ui.test.tsx"
+  },
+  {
+    "id": "react-case-v1:c361ee73819d95bdb45e",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/chat-ui/create-ui.test.tsx"
+  },
+  {
+    "id": "react-case-v1:0b3f1def53bfd0faae58",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/chat-ui/markdown-plugins.test.ts"
+  },
+  {
+    "id": "react-case-v1:d095dcd32e9856347c64",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/chat-ui/markdown-plugins.test.ts"
+  },
+  {
+    "id": "react-case-v1:c1db9c5a72fa87d248fc",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/chat-ui/markdown-plugins.test.ts"
+  },
+  {
+    "id": "react-case-v1:6e1279c6f66b407e93dd",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/chat-ui/markdown-plugins.test.ts"
+  },
+  {
+    "id": "react-case-v1:641294a7c02f39bd0237",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/chat-ui/markdown-plugins.test.ts"
+  },
+  {
+    "id": "react-case-v1:e16d9a61a4bd3ded19d4",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/chat-ui/markdown-plugins.test.ts"
+  },
+  {
+    "id": "react-case-v1:264b6dfb05ff89b06c2f",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/chat-ui/markdown-plugins.test.ts"
+  },
+  {
+    "id": "react-case-v1:7ac6b55b9e920de0681b",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/chat-ui/tool-result-content.test.ts"
+  },
+  {
+    "id": "react-case-v1:f5164ce7c617aa6e731c",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/chat-ui/tool-result-content.test.ts"
+  },
+  {
+    "id": "react-case-v1:35d0154b21d275c536ae",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/chat-ui/tool-result-content.test.ts"
+  },
+  {
+    "id": "react-case-v1:1373da12a181726f7dfe",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/chat-ui/tool-result-content.test.ts"
+  },
+  {
+    "id": "react-case-v1:457e3c2e4dcbd4befab5",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/chat-ui/tool-result-content.test.ts"
+  },
+  {
+    "id": "react-case-v1:04e65f5a406a9e422b05",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/chat-ui/tool-result-content.test.ts"
+  },
+  {
+    "id": "react-case-v1:3bc69318f6b75a89bcd7",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/create-chat-hook-types.test.ts"
+  },
+  {
+    "id": "react-case-v1:02ef6c43ad4ab106d025",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/create-chat-hook.test.ts"
+  },
+  {
+    "id": "react-case-v1:d72b74ba9507e4d026be",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/create-chat-hook.test.ts"
+  },
+  {
+    "id": "react-case-v1:9a6f06890b2ac889a84c",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/devtools-name-types.test.ts"
+  },
+  {
+    "id": "react-case-v1:d638f14aa89616e4bcd7",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/mcp-apps.test.tsx"
+  },
+  {
+    "id": "react-case-v1:43ab66058b159543bc10",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/mcp-apps.test.tsx"
+  },
+  {
+    "id": "react-case-v1:c132a54ba8c04b73e086",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/mcp-apps.test.tsx"
+  },
+  {
+    "id": "react-case-v1:f156cd19d90744452aea",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/mcp-apps.test.tsx"
+  },
+  {
+    "id": "react-case-v1:5756fac332ed6b4ce96e",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/mcp-apps.test.tsx"
+  },
+  {
+    "id": "react-case-v1:4405219e02017a88acfa",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/mcp-apps.test.tsx"
+  },
+  {
+    "id": "react-case-v1:410177e1728c1cd89d61",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/mcp-apps.test.tsx"
+  },
+  {
+    "id": "react-case-v1:63f61be186e9cf9b41d5",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/mcp-apps.test.tsx"
+  },
+  {
+    "id": "react-case-v1:029fd5909070d828beae",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/mcp-apps.test.tsx"
+  },
+  {
+    "id": "react-case-v1:fdc59bdd9aeadc94fbe6",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/mcp-apps.test.tsx"
+  },
+  {
+    "id": "react-case-v1:3e39e6d0d2f3ea56e417",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-audio-recorder.test.tsx"
+  },
+  {
+    "id": "react-case-v1:807b6e068ca44af6b645",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-audio-recorder.test.tsx"
+  },
+  {
+    "id": "react-case-v1:8a7a266a9d096a2e42c9",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-audio-recorder.test.tsx"
+  },
+  {
+    "id": "react-case-v1:1d007e1c5ea5c97d7044",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-audio-recorder.test.tsx"
+  },
+  {
+    "id": "react-case-v1:33a0baa31e367f5cb83f",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-audio-recorder.test.tsx"
+  },
+  {
+    "id": "react-case-v1:39bb51d8058e3bb40622",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-audio-recorder.test.tsx"
+  },
+  {
+    "id": "react-case-v1:9399610ea3c1ba5b0aad",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-audio-recorder.test.tsx"
+  },
+  {
+    "id": "react-case-v1:e1ece7dfa82bafb7720f",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-byok.test.ts"
+  },
+  {
+    "id": "react-case-v1:ce50792ccdf4e9951756",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat-byok.test.ts"
+  },
+  {
+    "id": "react-case-v1:104357c14c69cd6328b6",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat-byok.test.ts"
+  },
+  {
+    "id": "react-case-v1:6a15a1da079ff495b271",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat-fetcher.test.ts"
+  },
+  {
+    "id": "react-case-v1:1ea25edb1e6380e0ceb7",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat-fetcher.test.ts"
+  },
+  {
+    "id": "react-case-v1:4baac9d34bd7fb907ab7",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat-fetcher.test.ts"
+  },
+  {
+    "id": "react-case-v1:590f3a1715549af92d85",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat-fetcher.test.ts"
+  },
+  {
+    "id": "react-case-v1:b7b637a8b2b0a25bca3a",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat-options-probe.test.ts"
+  },
+  {
+    "id": "react-case-v1:1d9c253fb48e972092c0",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat-persistence-types.test.ts"
+  },
+  {
+    "id": "react-case-v1:46fa60396957d3ac713a",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat-persistence-types.test.ts"
+  },
+  {
+    "id": "react-case-v1:440c0a5754bac4f9bbbd",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat-persistence-types.test.ts"
+  },
+  {
+    "id": "react-case-v1:5d204538486d505df888",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat-persistence-types.test.ts"
+  },
+  {
+    "id": "react-case-v1:644a19d4c0bce9cf5944",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat-persistence-types.test.ts"
+  },
+  {
+    "id": "react-case-v1:3a54a6dba1fcdd4c00f3",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat-structured-output.test.ts"
+  },
+  {
+    "id": "react-case-v1:a5c1c3bd7d75d3faf997",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat-structured-output.test.ts"
+  },
+  {
+    "id": "react-case-v1:c3c2c18a217283ddb59c",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat-structured-output.test.ts"
+  },
+  {
+    "id": "react-case-v1:665f196b914a8bc6df9f",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat-structured-output.test.ts"
+  },
+  {
+    "id": "react-case-v1:3d18a558e03095e044da",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat-structured-output.test.ts"
+  },
+  {
+    "id": "react-case-v1:6788df9e521fb537ea0e",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat-structured-output.test.ts"
+  },
+  {
+    "id": "react-case-v1:86e4caf9ee061efc19da",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat-structured-output.test.ts"
+  },
+  {
+    "id": "react-case-v1:721d59e2a0e72d7bcc01",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat-structured-output.test.ts"
+  },
+  {
+    "id": "react-case-v1:3309327febe90013c825",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat-structured-output.test.ts"
+  },
+  {
+    "id": "react-case-v1:c1f853fecf342a5565d7",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat-types.test.ts"
+  },
+  {
+    "id": "react-case-v1:9690a9dee93c208d3a60",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat-types.test.ts"
+  },
+  {
+    "id": "react-case-v1:5aad8e5fbc1dbf09e347",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat-types.test.ts"
+  },
+  {
+    "id": "react-case-v1:85066a1f93b9728cd1ff",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat-types.test.ts"
+  },
+  {
+    "id": "react-case-v1:4982be364576a5a7ebfa",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat-types.test.ts"
+  },
+  {
+    "id": "react-case-v1:15978c6da7e57b45e138",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat-types.test.ts"
+  },
+  {
+    "id": "react-case-v1:765afd45104341556d4d",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat-types.test.ts"
+  },
+  {
+    "id": "react-case-v1:6089ef6aa1d5682d846c",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat-types.test.ts"
+  },
+  {
+    "id": "react-case-v1:cc970c6137a1c571caff",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat-types.test.ts"
+  },
+  {
+    "id": "react-case-v1:a0733bfc53a3bf9d1746",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat-types.test.ts"
+  },
+  {
+    "id": "react-case-v1:5d5cbc2c27fdb2071059",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:7e98bbded3fa51ca17fa",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:df65e8319e323e55c10c",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:e0c7a922a09096ef78c9",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:84aa2530a8de165edc9c",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:29b1cd806948497956cd",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:a630db1b9b2050ba8437",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:7a995c75cd4b527a115e",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:9267d103370d45d2e4a3",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:9d6dfdbc8afb57f00071",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:194d5991ed88c4e82bc4",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:597464921526be1bf5e2",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:65a1add3d49c20146f38",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:aee36a38a1c1a08a5271",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:45240c2aab3913202c62",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:9c44f6546121d0dad337",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:807c5fedfd998c657030",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:84cdc40c766fca11d6e2",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:02082e029c09e03f8877",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:0ed6733ba746d8554483",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:0930a56d18ec3ca378a8",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:0fb69b0ca02ad233332c",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:dbe65a2d88ae5301d249",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:155c34c06c1709b83e11",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:61568010bea72644c0db",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:e71df730a7ef9d79a0fa",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:23c0a4190dbc463ae663",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:f5d918ecc94e30df2eb6",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:74dd73867d0de88e13c8",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:ab6b8cda004fd2cecdff",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:db4954ca8fb3b893fe44",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:e1f5fded783a473e3e00",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:d9b397e77ec4828c2747",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:fc008d9d38f38fdadd75",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:20ec237e7fa3cce48d6c",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:143bb0dfb1cb53983b78",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:867687d9ae8aa5e65b73",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:65aeae819a422b2b2e93",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:8d229eedd0b569e7a654",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:9f14663a8e3c94781ea1",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:9b2449660f0e85be9f81",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:3bb53703253e2f6a12ae",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:413c5f77935c8bc345fa",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:8231eecd4eed691bbe4e",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:ae8fa238f2c7b19f5952",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:aab282fdf7cf022e2d15",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:67fdac959541ab94709c",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:28436235a08cfba1a946",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:af4e6b64f700bad717be",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:e3bca05e7a72a2c59d10",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:0a4c245081dd8d34c047",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:b5ef530d6c0d9e601336",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:8af9bf2d08a690d62cba",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:804722d1c438e2b38972",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:1e0d04d83af9d38f86b9",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:0c699506262a972906c9",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:26d8f27361a303ab64d3",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:5357872bde0d62d5fbe0",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:91ec2cf06bdaf312b37e",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:5cdf987c00d4ff7d6c90",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:a70dc435a850374813db",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:fbfcb8cbba555b443d0e",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:d747c70541f2abc74dd2",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:4479fde95ae8e3ec2abe",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:8739bb8f28bda62c38f3",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:6356f540770edd6ba998",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:c369e3c3a21548ce33cc",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:8b748dddf66c12702c66",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:723d87e40536d1c9850a",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:a9a1fa84a01ce1f6f364",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:c49468458062bf1a12d7",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:35fde2526112aadd2d00",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:7d96d933652cc45f6f50",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:fb25cea319596b6d6c2c",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:766826d743b5c3c1f2de",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:0a1ca9244de03874baae",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:9d3aaa0578047c23b27a",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:3119595478307d3587fd",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:7e4da85a454010aa9c17",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:fdceb580c093394488fa",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:150feffe0bcaa30dd705",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:466e66c143029b6eab78",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:3e2ca86321bf8475fdc2",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:1552199e329403e68fa8",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:1f672138e80d68a40c3e",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-chat.test.ts"
+  },
+  {
+    "id": "react-case-v1:f19d2be949638f09ad4e",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-generation-persistence-types.test.ts"
+  },
+  {
+    "id": "react-case-v1:399317afb0be96924b1d",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-generation-persistence-types.test.ts"
+  },
+  {
+    "id": "react-case-v1:4fd492c0f689c60c9b3a",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-generation-persistence-types.test.ts"
+  },
+  {
+    "id": "react-case-v1:13ba8985632382e1f094",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-generation-persistence-types.test.ts"
+  },
+  {
+    "id": "react-case-v1:131690b9d13f4bac6c41",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-generation-persistence-types.test.ts"
+  },
+  {
+    "id": "react-case-v1:68679bd39b71e4693e4a",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-generation.test.ts"
+  },
+  {
+    "id": "react-case-v1:91b63e2b24f2655fffbf",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-generation.test.ts"
+  },
+  {
+    "id": "react-case-v1:a1339b1dbc55a31d22ca",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-generation.test.ts"
+  },
+  {
+    "id": "react-case-v1:453cd3718c3ba350e9fb",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-generation.test.ts"
+  },
+  {
+    "id": "react-case-v1:0d7f3fa308b1b08a8b09",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-generation.test.ts"
+  },
+  {
+    "id": "react-case-v1:2cad3b0d8a2c0674072b",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-generation.test.ts"
+  },
+  {
+    "id": "react-case-v1:8644e9ee62941e958f1e",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-generation.test.ts"
+  },
+  {
+    "id": "react-case-v1:9801f9fbc5f85d8dd0e0",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-generation.test.ts"
+  },
+  {
+    "id": "react-case-v1:2a2ec567cf9cd3cf10d8",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-generation.test.ts"
+  },
+  {
+    "id": "react-case-v1:84e608f47294469fd26a",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-generation.test.ts"
+  },
+  {
+    "id": "react-case-v1:4e1e969f36b69609dbc8",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-generation.test.ts"
+  },
+  {
+    "id": "react-case-v1:e53c1c82127d4ba87bc5",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-generation.test.ts"
+  },
+  {
+    "id": "react-case-v1:91969bbce27ae3a0ac69",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-generation.test.ts"
+  },
+  {
+    "id": "react-case-v1:47c85869a80845546027",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-generation.test.ts"
+  },
+  {
+    "id": "react-case-v1:59b557e4d9481f871f8b",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-generation.test.ts"
+  },
+  {
+    "id": "react-case-v1:284a14402ed79426e023",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-generation.test.ts"
+  },
+  {
+    "id": "react-case-v1:67b68087462651d9be5d",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-generation.test.ts"
+  },
+  {
+    "id": "react-case-v1:1c2c934e6a6e53c7eefa",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-generation.test.ts"
+  },
+  {
+    "id": "react-case-v1:d247ccc3ccf49d089640",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-generation.test.ts"
+  },
+  {
+    "id": "react-case-v1:558e12da7e963abf5e33",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-generation.test.ts"
+  },
+  {
+    "id": "react-case-v1:71c130ea87fb8dc58d35",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-generation.test.ts"
+  },
+  {
+    "id": "react-case-v1:97659262ac2e37374d42",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-generation.test.ts"
+  },
+  {
+    "id": "react-case-v1:4b874a41954a29a19ba6",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-generation.test.ts"
+  },
+  {
+    "id": "react-case-v1:7fda62f50c9f75c8048b",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-generation.test.ts"
+  },
+  {
+    "id": "react-case-v1:9c45ff6f399406f94ed9",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-generation.test.ts"
+  },
+  {
+    "id": "react-case-v1:2f8ca541a92d5f575f9e",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-generation.test.ts"
+  },
+  {
+    "id": "react-case-v1:3f95b6b36923c696fb90",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-generation.test.ts"
+  },
+  {
+    "id": "react-case-v1:b169aaf365ff67453142",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-generation.test.ts"
+  },
+  {
+    "id": "react-case-v1:743d538ea9f57e0de952",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-generation.test.ts"
+  },
+  {
+    "id": "react-case-v1:3a2926cc5a3dd4035fef",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-generation.test.ts"
+  },
+  {
+    "id": "react-case-v1:fd9d9e67dd61fdb387ef",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-generation.test.ts"
+  },
+  {
+    "id": "react-case-v1:b5e11904dc10617151b1",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-generation.test.ts"
+  },
+  {
+    "id": "react-case-v1:52c0840f468895205d8e",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-generation.test.ts"
+  },
+  {
+    "id": "react-case-v1:f5c0e41a855b718ffaac",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-generation.test.ts"
+  },
+  {
+    "id": "react-case-v1:4b1153e8996c9cdcc63c",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-generation.test.ts"
+  },
+  {
+    "id": "react-case-v1:6b84f2bd7f40fd59f99b",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-generation.test.ts"
+  },
+  {
+    "id": "react-case-v1:b416277943295a1c36c5",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-generation.test.ts"
+  },
+  {
+    "id": "react-case-v1:887a2558168c1341eb14",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-generation.test.ts"
+  },
+  {
+    "id": "react-case-v1:5b19462170540ef35f07",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-generation.test.ts"
+  },
+  {
+    "id": "react-case-v1:218e431417701b0b69bd",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-generation.test.ts"
+  },
+  {
+    "id": "react-case-v1:16c357ebe6b610fc6892",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-generation.test.ts"
+  },
+  {
+    "id": "react-case-v1:b0a343ddcf28cdeb76cc",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-generation.test.ts"
+  },
+  {
+    "id": "react-case-v1:1a683401e98c1c4ee0e1",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-generation.test.ts"
+  },
+  {
+    "id": "react-case-v1:5d87edcfc22b3d464838",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-generation.test.ts"
+  },
+  {
+    "id": "react-case-v1:81009b87bdfc4e5b64c3",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-generation.test.ts"
+  },
+  {
+    "id": "react-case-v1:42e18f840fb91b3337dc",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-mcp-app-bridge.test.ts"
+  },
+  {
+    "id": "react-case-v1:7888f288c9206245d33b",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-mcp-app-bridge.test.ts"
+  },
+  {
+    "id": "react-case-v1:c2886c889ed74d919385",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-mcp-app-bridge.test.ts"
+  },
+  {
+    "id": "react-case-v1:731a66d47c1c13265a08",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-mcp-app-bridge.test.ts"
+  },
+  {
+    "id": "react-case-v1:773d7cf2726d1c673754",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-mcp-app-bridge.test.ts"
+  },
+  {
+    "id": "react-case-v1:3b58299566db1a6976d3",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-mcp-app-bridge.test.ts"
+  },
+  {
+    "id": "react-case-v1:9d6a37f0f6cee6b8cacc",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-web-mcp-tools.test.ts"
+  },
+  {
+    "id": "react-case-v1:9f020955209bb6610ec5",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-web-mcp-tools.test.ts"
+  },
+  {
+    "id": "react-case-v1:1d23737287ecdf586130",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-web-mcp-tools.test.ts"
+  },
+  {
+    "id": "react-case-v1:956943f4b2c149765837",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-web-mcp-tools.test.ts"
+  },
+  {
+    "id": "react-case-v1:debc9681bae40b4d15df",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-web-mcp-tools.test.ts"
+  },
+  {
+    "id": "react-case-v1:833469f41593b8b4ef3f",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/use-web-mcp-tools.test.ts"
+  }
+]

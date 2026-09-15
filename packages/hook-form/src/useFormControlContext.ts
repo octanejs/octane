@@ -1,4 +1,4 @@
-// Vendored from react-hook-form@7.81.0 src/useFormControlContext.ts (octane port).
+// Adapted from react-hook-form@7.88.0 src/useFormControlContext.ts for Octane.
 // octane: HookFormContext (module-local in upstream's useFormContext.tsx) also
 // lives here so FormProvider.tsrx can import it — this module is internal (not
 // star-exported from index.ts), so neither context leaks into the public API.

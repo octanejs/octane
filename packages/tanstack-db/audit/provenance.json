@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "artifacts": [
+    {
+      "path": "LICENSE.upstream",
+      "sha256": "dd5fd3a2e8ca256521b80e46d7fb0aa953c842ef1420fb31f4b1f08ae31d82e7"
+    },
+    {
+      "path": "upstream-artifact/tanstack-react-db-0.3.8.tgz",
+      "sha256": "21a9e1d4e9b4f7ccccf0dd9767cb9ea205cdcbf82c15a00e63e72973d3bd910d"
+    }
+  ],
+  "requiredFiles": ["audit/upstream.lock.json", "audit/upstream-helpers.json"],
+  "packageIdentity": {
+    "path": "upstream/package.json",
+    "name": "@tanstack/react-db",
+    "version": "0.3.8",
+    "license": "MIT"
+  },
+  "unpublishedDirs": [
+    "audit",
+    "tests",
+    "typetests",
+    "upstream",
+    "upstream-artifact",
+    "upstream-helpers"
+  ]
+}

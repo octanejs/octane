@@ -3,7 +3,7 @@
 [TanStack AI](https://tanstack.com/ai) bindings for the
 [Octane](https://github.com/octanejs/octane) UI framework.
 
-This package ports `@tanstack/ai-react@0.17.0` onto Octane while reusing
+This package ports `@tanstack/ai-react@0.24.1` onto Octane while reusing
 `@tanstack/ai` and `@tanstack/ai-client` unchanged. The runtime export surface
 matches the React adapter, so migration starts by changing the package import:
 
@@ -15,10 +15,8 @@ import { useChat } from '@tanstack/ai-react'
 import { useChat } from '@octanejs/tanstack-ai'
 ```
 
-The renderer-bearing hook modules are authored as `.tsrx` and compiled by
-Octane. Matching `.tsrx.d.ts` companions are checked declaration emits of
-those implementations, preserving the complete generic surface for
-TypeScript consumers.
+Hooks and components are authored as `.tsrx` and compiled by Octane. Use
+`tsrx-tsc` to check applications that consume these source modules.
 
 ## Install
 
@@ -72,53 +70,55 @@ synthetic `onChange`.
 
 ## API
 
-The adapter includes `useChat`, `useRealtimeChat`, `useMcpAppBridge`,
-`useGeneration`, `useGenerateImage`, `useGenerateAudio`, `useGenerateSpeech`,
-`useGenerateVideo`, `useTranscription`, `useSummarize`, and
-`useAudioRecorder`. It also re-exports all 30 `@tanstack/ai-client`
-convenience helpers and types (`fetchServerSentEvents`, `fetchHttpStream`,
-`xhrServerSentEvents`, `xhrHttpStream`, `stream`, `rpcStream`,
-`createChatClientOptions`, `createMcpAppBridge`, and their associated types)
-unchanged, mirroring the upstream `@tanstack/ai-react` index.
+The root entry includes chat and typed hook factories, realtime, generation,
+media, transcription, summarization, recording, BYOK, WebMCP tools, and the MCP
+bridge. It re-exports the upstream adapter's framework-neutral transport,
+persistence, client configuration, and message types unchanged.
 
-Server rendering through `octane/server` is supported. `useChat` renders its
-initial message snapshot without browser-only setup.
+`@octanejs/tanstack-ai/ui` provides `createChatUI`, context and hook factories,
+`Chat`, `ChatMessages`, `ChatMessage`, `ChatInput`, `ToolApproval`, `TextPart`,
+and `ThinkingPart`. `TextPart` renders Markdown with `@octanejs/markdown`.
 
-## Divergences from `@tanstack/ai-react`
+`@octanejs/tanstack-ai/mcp-apps` provides `MCPAppResource`. Supply the resource
+HTML, a trusted sandbox proxy URL, and an optional MCP bridge, as for the
+upstream component. The host uses the framework-neutral MCP Apps SDK and tears
+down its message transport on unmount.
 
-- The `./mcp-apps` subpath and its `MCPAppResource` component are not ported:
-  they render `AppRenderer` from the React-only `@mcp-ui/client`, which has no
-  Octane equivalent. The framework-agnostic `useMcpAppBridge` hook is ported
-  and available on the main entry.
-- Octane uses native events: text/file/recorder inputs drive updates via
-  `onInput`; there is no synthetic `onChange` layer.
-- Octane has no StrictMode double-invoke and always provides `useId`, so no
-  random-id fallback is needed.
-- Realtime reconnects and token refreshes use the latest `getToken` and adapter
-  supplied to the hook; upstream captures the first render's callbacks.
-- The declared realtime `onStatusChange` callback is invoked alongside the
-  hook's state update; upstream 0.17.0 currently drops the external callback.
-- One upstream `useChat` test case ("auto-resume on mount / when the browser
-  comes back online") is omitted: it targets
-  `ChatClient.prototype.maybeAutoResume`, an API absent from the pinned (and
-  latest published) `@tanstack/ai-client@0.21.0` and never invoked by
-  `useChat`. It is untestable in this binding until that dependency ships the
-  method.
+Server rendering through `octane/server` supports initial chat snapshots and
+chat widgets. Hydration adopts their server-rendered DOM.
+
+## Migration from 0.17
+
+Use `threadId` to identify a conversation. The current client queues concurrent
+messages by default; set `queue: 'drop'` to retain the previous drop behavior.
+The binding now includes persistence and interrupt-resume APIs from the current
+AI client, as well as both UI subpaths.
+
+## Octane behavior
+
+- Octane uses native input events for built-in text controls; the public ChatInput render-prop callback retains its upstream onChange name.
+- Octane has no StrictMode double-invoke and always provides useId.
+- TanStack AI Devtools identifies this binding as framework: octane.
+- Realtime reconnects and token refreshes use the latest getToken and adapter, and onStatusChange calls the latest supplied callback.
+- Changing useChat connection or fetcher preserves the ChatClient and conversation. The replacement transport is applied before the next explicit idle sendMessage, append, or reload, preserving in-flight requests and hydration resumes.
+- MCPAppResource uses an authored Octane host with the framework-neutral MCP Apps SDK. The React-only @mcp-ui/client is used solely as a differential test oracle.
 
 ## Verification
 
-The port runs TanStack AI's React adapter tests against Octane across all
-eleven hooks, with no skipped, todo, or expected-failure cases (except the
-untestable auto-resume case above). A differential test compiles a shared
-chat fixture for Octane and React and compares streamed output after each
-step; output is byte-equal against real `@tanstack/ai-react@0.17.0`. An SSR
-fixture and the upstream compile-time type tests are also included.
+All 235 registrations from the pinned upstream suite run unchanged and as
+Octane adaptations: 218 client and 17 server registrations. Separate strict
+type lanes check all 25 upstream type cases. Published declaration probes cover
+all 123 exports across the three entry points.
 
-Current scope and verification status are tracked in the generated
-[bindings status table](../../docs/bindings-status.md), sourced from this
-package's [`status.json`](./status.json).
+Differential tests compare streamed chat and the actual MCP Apps message
+protocol against `@tanstack/ai-react@0.24.1`. Native integration tests exercise
+input, portals, suspension, errors, hydration, DOM identity, and teardown.
+The exact inventories and source mapping are in `audit/react-parity.json` and
+`audit/crosswalk.json` in the repository. The generated
+[bindings status table](../../docs/bindings-status.md) reads
+[`status.json`](./status.json).
 
 ## License
 
-MIT — contains source derived from
-[TanStack AI](https://github.com/TanStack/ai) (MIT), adapted for Octane.
+MIT. Contains source derived from
+[TanStack AI](https://github.com/TanStack/ai), adapted for Octane.

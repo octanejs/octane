@@ -1,4 +1,4 @@
-// Vendored from react-hook-form@7.81.0 src/useIsomorphicLayoutEffect.ts (octane port).
+// Adapted from react-hook-form@7.88.0 src/useIsomorphicLayoutEffect.ts for Octane.
 import { useEffect, useLayoutEffect } from 'octane';
 
 import isWeb from './utils/isWeb';

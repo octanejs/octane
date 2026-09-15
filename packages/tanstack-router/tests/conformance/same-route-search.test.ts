@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mount, nextPaint } from '../_helpers';
 import { act } from 'octane';
+import { waitFor } from '@octanejs/testing-library';
+import { createRequestHandler } from '@tanstack/router-core/ssr/server';
 import { RouterProvider } from '@octanejs/tanstack-router';
 import {
 	makeSameRouteSearchRouter,
@@ -54,10 +56,13 @@ describe('@octanejs/tanstack-router — same-route search-param navigation', () 
 			const r = mount(RouterProvider as any, { router });
 			await flush();
 
-			// page=1 committed.
-			expect(r.findAll('.stories').length).toBe(1);
-			expect(r.find('.stories').textContent).toBe('content-1');
-			expect(r.findAll('.stories-pending').length).toBe(0);
+			// The first read of an already-fulfilled promise can reveal Suspense.
+			// Observe the committed starting page before measuring navigation policy.
+			await waitFor(() => {
+				expect(r.findAll('.stories').length).toBe(1);
+				expect(r.find('.stories').textContent).toBe('content-1');
+				expect(r.findAll('.stories-pending').length).toBe(0);
+			});
 
 			// Probe the whole pending window; a transient fallback would violate the
 			// deferred route's policy even if it disappears before the last checkpoint.
@@ -99,16 +104,14 @@ describe('@octanejs/tanstack-router — same-route search-param navigation', () 
 		},
 	);
 
-	it('exposes a canonical server redirect after the load settles', async () => {
-		const router = makeSameRouteSearchRouter('/', { isServer: true });
-		await router.load();
-
-		// Server integrations can follow canonical redirects through the public
-		// RouterState snapshot rather than reaching into the reactive store graph.
-		expect(router.state.redirect?.options.href).toBe('/?page=1');
-		// Redirect is a Response in the pinned RouterCore API. The router's
-		// separately exposed status must preserve that same non-success code.
-		expect(router.state.redirect?.status).toBe(307);
-		expect(router.state.statusCode).toBe(router.state.redirect?.status);
+	it('returns the canonical server redirect before rendering', async () => {
+		const response = await createRequestHandler({
+			createRouter: () => makeSameRouteSearchRouter('/', { isServer: true }),
+			request: new Request('http://localhost/'),
+		})(async () => {
+			throw new Error('A canonical redirect must not render route UI');
+		});
+		expect(response.headers.get('Location')).toBe('/?page=1');
+		expect(response.status).toBe(307);
 	});
 });

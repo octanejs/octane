@@ -4,7 +4,7 @@ import type { RegisteredPanel } from '../panel/types';
 import type { RegisteredSeparator } from '../separator/types';
 
 export type Orientation = 'horizontal' | 'vertical';
-export type Layout = Record<string, number>;
+export type Layout = { [id: string]: number };
 export type LayoutStorage = Pick<Storage, 'getItem' | 'setItem'>;
 export type LayoutChangedMeta = { isUserInteraction: boolean };
 export type ResizeTargetMinimumSize = { coarse: number; fine: number };

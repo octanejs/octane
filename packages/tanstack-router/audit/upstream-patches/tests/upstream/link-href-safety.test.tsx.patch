@@ -1,0 +1,32 @@
+diff --git a/tests/upstream/link-href-safety.test.tsx b/tests/upstream/link-href-safety.test.tsx
+--- a/tests/upstream/link-href-safety.test.tsx
++++ b/tests/upstream/link-href-safety.test.tsx
+@@ -1,5 +1,6 @@
+ import * as React from 'octane'
+-import { renderToString } from 'octane/server'
++// OCTANE DIVERGENCE[ssr-compiler]: render the same link through its server graph.
++import { runServerFixture } from '../ssr-fixture'
+ import { cleanup, fireEvent, render } from '@octanejs/testing-library'
+ import { afterEach, expect, test, vi } from 'vitest'
+ import {
+@@ -26,7 +27,7 @@ for (const isServer of [true, false]) {
+     ['https://other.example/', 'https://other.example/', false],
+   ] as const)(
+     `validates final history href %j on ${isServer ? 'server' : 'client'}`,
+-    (href, expectedHref, active) => {
++    async (href, expectedHref, active) => {
+       vi.spyOn(console, 'warn').mockImplementation(() => {})
+       const history = createMemoryHistory({ initialEntries: ['/safe'] })
+       // Browser history normalizes formatter output itself. Use raw history
+@@ -62,7 +63,10 @@ for (const isServer of [true, false]) {
+       let container: HTMLElement
+       if (isServer) {
+         container = document.createElement('div')
+-        container.innerHTML = renderToString(tree)
++        container.innerHTML = await runServerFixture<string>('_fixtures/link-parity.tsrx', 'renderLink', {
++          router, linkProps: { to: '/safe', preload: 'intent', preloadDelay: 0, activeProps, inactiveProps },
++          children: ({ isActive }) => String(isActive),
++        })
+       } else {
+         container = render(tree).container
+       }

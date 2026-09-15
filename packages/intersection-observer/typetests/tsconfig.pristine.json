@@ -1,0 +1,24 @@
+{
+  "extends": "../upstream/tsconfig.json",
+  "compilerOptions": {
+    "strict": true,
+    "skipLibCheck": false,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "noImplicitReturns": true,
+    "types": ["vitest/globals", "vitest/browser", "@testing-library/jest-dom/vitest", "node"],
+    "ignoreDeprecations": "5.0"
+  },
+  "include": [
+    "../upstream/src/**/*.ts",
+    "../upstream/src/**/*.tsx",
+    "./pristine/public-contract.ts",
+    "../audit/type-probes/public-api.test-d.ts"
+  ],
+  "exclude": [],
+  "reactPortEvidence": {
+    "gate": "upstream-types-pristine",
+    "upstreamRegistrations": [],
+    "publicMode": "pinned"
+  }
+}

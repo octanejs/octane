@@ -1,0 +1,29 @@
+diff --git a/tests/upstream/use-throttled-state/use-throttled-state.test.ts b/tests/upstream/use-throttled-state/use-throttled-state.test.ts
+--- a/tests/upstream/use-throttled-state/use-throttled-state.test.ts
++++ b/tests/upstream/use-throttled-state/use-throttled-state.test.ts
+@@ -37,6 +37,7 @@ describe('useThrottledState', () => {
+ 
+   it('should clear timeout on unmount', () => {
+     const clearTimeoutSpy = vi.spyOn(window, 'clearTimeout');
++    const setTimeoutSpy = vi.spyOn(window, 'setTimeout');
+     const hook = renderHook(() => useThrottledState(0, 100));
+ 
+     act(() => {
+@@ -44,10 +45,16 @@ describe('useThrottledState', () => {
+       hook.result.current[1](2);
+     });
+ 
++    const timers = setTimeoutSpy.mock.calls.flatMap(([, delay], index) =>
++      delay === 100 ? [setTimeoutSpy.mock.results[index].value] : []
++    );
++    expect(timers).toHaveLength(1);
++
+     hook.unmount();
+     vi.advanceTimersByTime(100);
+ 
+     expect(hook.result.current[0]).toBe(1);
+-    expect(clearTimeoutSpy).toHaveBeenCalledTimes(1);
++    // OCTANE DIVERGENCE[mantine-timer-boundary][runtime:mantine-hooks-adapted-498]: native scheduling owns additional timers; observe only the hook timer.
++    expect(clearTimeoutSpy.mock.calls.filter(([id]) => id === timers[0])).toHaveLength(1);
+   });
+ });

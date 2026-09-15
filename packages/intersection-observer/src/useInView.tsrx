@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'octane';
-import { observe } from './observe.js';
+import { useCallback, useInsertionEffect, useLayoutEffect, useRef, useState } from 'octane';
+import { useIntersectionObserverRef } from './useIntersectionObserverRef.tsrx';
 import type { InViewHookResponse, IntersectionOptions } from './types.js';
 
 export function useInView(options: IntersectionOptions | symbol = {}): InViewHookResponse {
@@ -17,54 +17,58 @@ export function useInView(options: IntersectionOptions | symbol = {}): InViewHoo
 		onChange,
 		scrollMargin,
 	} = options;
-	const [ref, setRef] = useState<Element | null>(null);
-	const callback = useRef(onChange);
-	callback.current = onChange;
 	const lastInView = useRef(initialInView);
-	const observedTarget = useRef<Element | null>(null);
 	const [state, setState] = useState<{
 		inView: boolean;
 		entry?: IntersectionObserverEntry;
 	}>({ inView: Boolean(initialInView) });
 
-	useEffect(() => {
-		if (observedTarget.current !== ref) {
-			observedTarget.current = ref;
-			lastInView.current = initialInView;
-		} else if (lastInView.current === undefined) {
-			lastInView.current = initialInView;
-		}
-		if (skip || !ref) return;
-		let unobserve: (() => void) | undefined;
-		unobserve = observe(
-			ref,
-			(inView, entry) => {
-				const previousInView = lastInView.current;
-				lastInView.current = inView;
-				if (previousInView === undefined && !inView) return;
-				setState({ inView, entry });
-				callback.current?.(inView, entry);
-				if (inView && triggerOnce && unobserve) {
-					unobserve();
-					unobserve = undefined;
-				}
-			},
-			{ root, rootMargin, threshold, trackVisibility, delay, scrollMargin },
-			fallbackInView,
-		);
-		return () => unobserve?.();
-	}, [Array.isArray(threshold) ? threshold.toString() : threshold, ref, root, rootMargin, triggerOnce, skip, trackVisibility, fallbackInView, delay, scrollMargin]);
+	const observedTarget = useRef<Element | null>(null);
+	const initialVisibility = useRef(initialInView);
+	useInsertionEffect(() => {
+		initialVisibility.current = initialInView;
+	}, [initialInView]);
+	const observerRef = useIntersectionObserverRef<Element>((inView, entry) => {
+		const previousInView = lastInView.current;
+		lastInView.current = inView;
+		if (previousInView === undefined && !inView) return;
+		setState({ inView, entry });
+		onChange?.(inView, entry);
+	}, { threshold, root, rootMargin, scrollMargin, trackVisibility, delay, fallbackInView, skip, triggerOnce });
 
-	const entryTarget = state.entry?.target;
-	const previousTarget = useRef<Element | undefined>(undefined);
-	if (!ref && entryTarget && !triggerOnce && !skip && previousTarget.current !== entryTarget) {
-		previousTarget.current = entryTarget;
-		setState({
-			inView: Boolean(initialInView),
-			entry: undefined,
-		});
+	const refState = useRef<{ node: Element | null; reset: boolean }>({ node: null, reset: false });
+	const setRef = useCallback(function setRef(node?: Element | null) {
+		if (node) {
+			if (observedTarget.current !== node) {
+				observedTarget.current = node;
+				lastInView.current = initialVisibility.current;
+			}
+			refState.current.node = node;
+			refState.current.reset = false;
+		} else if (refState.current.node) {
+			refState.current.node = null;
+			refState.current.reset = true;
+		}
+		const cleanup = observerRef(node);
+		if (!cleanup) return;
+		return () => {
+			cleanup();
+			if (refState.current.node === node) {
+				refState.current.node = null;
+				refState.current.reset = true;
+			}
+		};
+	}, [observerRef]);
+
+	// Octane suppresses layout effects during SSR. An explicit null retains the
+	// upstream every-commit reset instead of compiler-inferred dependencies.
+	useLayoutEffect(() => {
+		if (!refState.current.reset) return;
+		refState.current.reset = false;
+		if (triggerOnce || skip) return;
+		setState({ inView: Boolean(initialInView), entry: undefined });
 		lastInView.current = initialInView;
-	}
+	}, null);
 
 	const result = [setRef, state.inView, state.entry] as InViewHookResponse;
 	result.ref = setRef;

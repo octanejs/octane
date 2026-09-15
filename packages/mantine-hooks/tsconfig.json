@@ -3,15 +3,22 @@
     "module": "esnext",
     "lib": ["esnext", "dom", "dom.iterable"],
     "target": "esnext",
+    "jsx": "react-jsx",
+    "jsxImportSource": "octane",
     "noEmit": true,
     "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
     "noEmitOnError": true,
     "noErrorTruncation": true,
     "allowSyntheticDefaultImports": true,
     "verbatimModuleSyntax": true,
-    "types": ["node"],
-    "strict": true
+    "types": [],
+    "strict": true,
+    "skipLibCheck": false
   },
-  "include": ["./src/"],
-  "exclude": ["node_modules", "dist", "tests", "typetests"]
+  "include": ["src/**/*.ts"],
+  "reactPortEvidence": {
+    "gate": "authored-source-types"
+  }
 }

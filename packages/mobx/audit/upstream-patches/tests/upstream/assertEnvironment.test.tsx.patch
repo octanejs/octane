@@ -1,0 +1,56 @@
+diff --git a/tests/upstream/assertEnvironment.test.tsx b/tests/upstream/assertEnvironment.test.tsx
+--- a/tests/upstream/assertEnvironment.test.tsx
++++ b/tests/upstream/assertEnvironment.test.tsx
+@@ -1,30 +1,38 @@
+ afterEach(() => {
+     vi.resetModules()
+     vi.resetAllMocks()
++    vi.doUnmock("octane")
++    vi.doUnmock("mobx")
+ })
+ 
+-it("throws if react is not installed", () => {
+-    vi.mock("octane", () => ({}))
+-    expect(() => require("../../src/utils/assertEnvironment.ts")).toThrowErrorMatchingInlineSnapshot(
+-        `"mobx-react-lite requires React 18 or later"`
++it("throws if react is not installed", async () => {
++    // OCTANE DIVERGENCE[mobx-environment]: Vitest ESM isolation and native Octane peer diagnostics.
++    vi.resetModules()
++    vi.doMock("octane", () => ({ useState: undefined, useSyncExternalStore: undefined }))
++    await expect(import("../../src/utils/assertEnvironment.ts")).rejects.toThrow(
++        new Error("@octanejs/mobx requires Octane useState and useSyncExternalStore")
+     )
+ })
+ 
+-it("throws if mobx is not installed", () => {
+-    vi.mock("octane", () => ({ useState: true, useSyncExternalStore: true }))
+-    vi.mock("mobx", () => ({}))
+-    expect(() => require("../../src/utils/assertEnvironment.ts")).toThrowErrorMatchingInlineSnapshot(
+-        `"mobx-react-lite requires mobx at least version 7 to be available"`
++it("throws if mobx is not installed", async () => {
++    // OCTANE DIVERGENCE[mobx-environment]: Vitest ESM isolation and native Octane peer diagnostics.
++    vi.resetModules()
++    vi.doMock("octane", () => ({ useState: true, useSyncExternalStore: true }))
++    vi.doMock("mobx", () => ({ _getGlobalState: undefined }))
++    await expect(import("../../src/utils/assertEnvironment.ts")).rejects.toThrow(
++        new Error("@octanejs/mobx requires mobx at least version 7 to be available")
+     )
+ })
+ 
+-it("throws if mobx is older than version 7", () => {
+-    vi.mock("octane", () => ({ useState: true, useSyncExternalStore: true }))
+-    vi.mock("mobx", () => ({
++it("throws if mobx is older than version 7", async () => {
++    // OCTANE DIVERGENCE[mobx-environment]: Vitest ESM isolation and native Octane peer diagnostics.
++    vi.resetModules()
++    vi.doMock("octane", () => ({ useState: true, useSyncExternalStore: true }))
++    vi.doMock("mobx", () => ({
+         _getGlobalState: () => ({ version: 6 })
+     }))
+-    expect(() => require("../../src/utils/assertEnvironment.ts")).toThrowErrorMatchingInlineSnapshot(
+-        `"mobx-react-lite requires mobx at least version 7 to be available"`
++    await expect(import("../../src/utils/assertEnvironment.ts")).rejects.toThrow(
++        new Error("@octanejs/mobx requires mobx at least version 7 to be available")
+     )
+ })
+ 

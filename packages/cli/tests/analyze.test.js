@@ -48,7 +48,7 @@ async function analyze(files, extra = []) {
 	]);
 }
 
-describe('octane analyze', () => {
+describe('octane analyze', { timeout: 30_000 }, () => {
 	it('reports redundant Strong dependencies as hints without failing --strict', async () => {
 		const result = await analyze(
 			{

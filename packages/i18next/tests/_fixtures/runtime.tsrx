@@ -1,15 +1,40 @@
 import { Suspense } from 'octane';
+import type { i18n, Resource, TFunction } from 'i18next';
 import {
 	I18nextProvider,
 	IcuTrans,
+	IcuTransWithoutContext,
 	Trans,
 	Translation,
 	useSSR,
 	useTranslation,
 	withTranslation,
+	type OctaneNode,
 } from '@octanejs/i18next';
 
-export function HookApp(props) @{
+export function LanguageSnapshotApp(props: { i18n: i18n }) @{
+	const { i18n: snapshot } = useTranslation('translation', {
+		i18n: props.i18n,
+		useSuspense: false,
+	});
+	<output
+		data-language={snapshot.language}
+		data-resolved={snapshot.resolvedLanguage}
+	>{snapshot.languages.join(',') as string}</output>
+}
+
+export function KeylessIcuApp(props: { i18n: i18n }) @{
+	<IcuTransWithoutContext
+		i18n={props.i18n}
+		i18nKey="keyless.welcome"
+		defaultTranslation="Welcome <0>friend</0>!"
+		content={[
+			{ type: 'strong', props: {} },
+		]}
+	/>
+}
+
+export function HookApp(props: { i18n: i18n; name: string }) @{
 	const { t, ready } = useTranslation('translation', {
 		i18n: props.i18n,
 		useSuspense: false,
@@ -21,7 +46,7 @@ export function HookApp(props) @{
 	</div>
 }
 
-export function MultipleHooksApp(props) @{
+export function MultipleHooksApp(props: { i18n: i18n }) @{
 	const { t: translateDefault } = useTranslation('translation', {
 		i18n: props.i18n,
 		useSuspense: false,
@@ -41,13 +66,13 @@ function ProviderConsumer() @{
 	<p id="provider-value">{t('welcome', { name: 'Ada' }) as string}</p>
 }
 
-export function ProviderApp(props) @{
+export function ProviderApp(props: { i18n: i18n }) @{
 	<I18nextProvider i18n={props.i18n} defaultNS="translation">
 		<ProviderConsumer />
 	</I18nextProvider>
 }
 
-export function TransApp(props) @{
+export function TransApp(props: { i18n: i18n; name: string }) @{
 	<div>
 		<p id="trans-value">
 			<Trans
@@ -72,20 +97,20 @@ export function TransApp(props) @{
 	</div>
 }
 
-export function BlockChildrenApp(props) @{
+export function BlockChildrenApp(props: { i18n: i18n }) @{
 	<Trans i18n={props.i18n} i18nKey="rich">
 		Fallback{' '}
 		<strong>source</strong>
 	</Trans>
 }
 
-function WrappedView(props) @{
+function WrappedView(props: { t: TFunction; name: string }) @{
 	<p id="hoc-value">{props.t('welcome', { name: props.name }) as string}</p>
 }
 
 const WrappedTranslation = withTranslation('translation')(WrappedView);
 
-export function ComponentApisApp(props) @{
+export function ComponentApisApp(props: { i18n: i18n; name: string }) @{
 	<I18nextProvider i18n={props.i18n}>
 		<div>
 			<Translation
@@ -97,11 +122,11 @@ export function ComponentApisApp(props) @{
 	</I18nextProvider>
 }
 
-function IcuLink(props) @{
+function IcuLink(props: { href: string; children?: OctaneNode }) @{
 	<a class="icu-link" href={props.href}>{props.children}</a>
 }
 
-export function IcuApp(props) @{
+export function IcuApp(props: { i18n: i18n }) @{
 	<div>
 		<p id="icu-value">
 			<IcuTrans
@@ -126,22 +151,25 @@ export function IcuApp(props) @{
 	</div>
 }
 
-function AsyncConsumer(props) @{
+function AsyncConsumer(props: { i18n: i18n }) @{
 	const { t } = useTranslation('lazy', { i18n: props.i18n });
 	<p id="async-value">{t('key1') as string}</p>
 }
 
-export function SuspenseApp(props) @{
+export function SuspenseApp(props: { i18n: i18n }) @{
 	<Suspense fallback={<p id="loading">Loading</p>}>
 		<AsyncConsumer i18n={props.i18n} />
 	</Suspense>
 }
 
-export function SSRSeedApp(props) @{
-	useSSR(props.initialStore, 'fr', { i18n: props.i18n });
-	const { t } = useTranslation('translation', {
-		i18n: props.i18n,
-		useSuspense: false,
-	});
+function SeededView(props: { initialStore: Resource }) @{
+	useSSR(props.initialStore, 'fr');
+	const { t } = useTranslation('translation', { useSuspense: false });
 	<p id="seeded-value">{t('seeded') as string}</p>
+}
+
+export function SSRSeedApp(props: { i18n: i18n; initialStore: Resource }) @{
+	<I18nextProvider i18n={props.i18n}>
+		<SeededView initialStore={props.initialStore} />
+	</I18nextProvider>
 }

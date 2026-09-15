@@ -1,0 +1,204 @@
+diff --git a/tests/upstream/observer.test.tsx b/tests/upstream/observer.test.tsx
+--- a/tests/upstream/observer.test.tsx
++++ b/tests/upstream/observer.test.tsx
+@@ -253,7 +253,8 @@ function runTestSuite(mode: "observer" | "useObserver") {
+         test("init state is correct", () => {
+             const data = createData()
+             const { container } = render(<Table data={data} />)
+-            expect(container).toMatchSnapshot()
++            // OCTANE DIVERGENCE[mobx-renderer-contracts]: assert visible rows independently of renderer comment markers.
++            expect(Array.from(container.querySelectorAll("span"), row => row.textContent)).toEqual(["coffee!", "tea"])
+         })
+ 
+         test("run transaction", () => {
+@@ -266,7 +267,8 @@ function runTestSuite(mode: "observer" | "useObserver") {
+                     data.selected = "tea"
+                 })
+             })
+-            expect(container).toMatchSnapshot()
++            // OCTANE DIVERGENCE[mobx-renderer-contracts]: assert visible rows independently of renderer comment markers.
++            expect(Array.from(container.querySelectorAll("span"), row => row.textContent)).toEqual(["soup"])
+         })
+     })
+ 
+@@ -425,25 +427,12 @@ function runTestSuite(mode: "observer" | "useObserver") {
+             const x = mobx.observable.box(1)
+             const errorsSeen: any[] = []
+ 
+-            class ErrorBoundary extends React.Component<{ children: any }> {
+-                public static getDerivedStateFromError() {
+-                    return { hasError: true }
+-                }
+-
+-                public state = {
+-                    hasError: false
+-                }
+-
+-                public componentDidCatch(error: any, info: any) {
++            // OCTANE DIVERGENCE[mobx-renderer-contracts]: native error boundaries replace React class lifecycles.
++            function ErrorBoundary({ children }: { children: React.OctaneNode }) {
++                return <React.ErrorBoundary fallback={(error: unknown) => {
+                     errorsSeen.push("" + error)
+-                }
+-
+-                public render() {
+-                    if (this.state.hasError) {
+-                        return <span>Saw error!</span>
+-                    }
+-                    return this.props.children
+-                }
++                    return <span>Saw error!</span>
++                }}>{children}</React.ErrorBoundary>
+             }
+ 
+             const C = obsComponent(() => {
+@@ -486,7 +475,8 @@ test("observer(forwardRef(cmp)) + useImperativeHandle", () => {
+     }
+ 
+     const FancyInput = observer(
+-        React.forwardRef((props: IProps, ref: React.Ref<IMethods>) => {
++        // OCTANE DIVERGENCE[mobx-renderer-contracts]: refs are ordinary Octane props.
++        (({ ref, ...props }: IProps & { ref?: React.Ref<IMethods> }) => {
+             const inputRef = React.useRef<HTMLInputElement | null>(null)
+             React.useImperativeHandle(
+                 ref,
+@@ -501,7 +491,8 @@ test("observer(forwardRef(cmp)) + useImperativeHandle", () => {
+         })
+     )
+ 
+-    const cr = React.createRef<IMethods>()
++    // OCTANE DIVERGENCE[mobx-renderer-contracts]: object refs are plain objects.
++    const cr: { current: IMethods | null } = { current: null }
+     render(<FancyInput ref={cr} value="" />)
+     expect(cr).toBeTruthy()
+     expect(cr.current).toBeTruthy()
+@@ -519,7 +510,8 @@ test("useImperativeHandle and forwardRef should work with useObserver", () => {
+     }
+ 
+     const FancyInput = React.memo(
+-        React.forwardRef((props: IProps, ref: React.Ref<IMethods>) => {
++        // OCTANE DIVERGENCE[mobx-renderer-contracts]: refs are ordinary Octane props.
++        (({ ref, ...props }: IProps & { ref?: React.Ref<IMethods> }) => {
+             const inputRef = React.useRef<HTMLInputElement | null>(null)
+             React.useImperativeHandle(
+                 ref,
+@@ -536,12 +528,16 @@ test("useImperativeHandle and forwardRef should work with useObserver", () => {
+         })
+     )
+ 
+-    const cr = React.createRef<IMethods>()
++    // OCTANE DIVERGENCE[mobx-renderer-contracts]: object refs are plain objects.
++    const cr: { current: IMethods | null } = { current: null }
+     render(<FancyInput ref={cr} value="" />)
+     expect(cr).toBeTruthy()
+     expect(cr.current).toBeTruthy()
+     expect(typeof cr.current!.focus).toBe("function")
+-    expect(consoleWarnMock).toMatchSnapshot()
++    // OCTANE DIVERGENCE[mobx-renderer-contracts]: compare warning calls instead of Jest-specific mock formatting.
++    expect(consoleWarnMock).not.toHaveBeenCalled()
++    cr.current!.focus()
++    expect(document.activeElement).toBe(document.querySelector("input"))
+ })
+ 
+ test("observer should work with custom HOC and infer correct type", () => {
+@@ -591,7 +587,8 @@ it("should hoist known statics only", () => {
+     expect(wrapped.defaultProps).toEqual({ x: 3 })
+     expect(wrapped.propTypes).toEqual({ x: isNumber })
+     expect(wrapped.type).toBeInstanceOf(Function) // And not "Nope!"; this is the wrapped component, the property is introduced by memo
+-    expect(wrapped.compare).toBe(null) // another memo field
++    // OCTANE DIVERGENCE[mobx-renderer-contracts]: the function wrapper has no React memo compare field.
++    expect(wrapped.compare).toBeUndefined()
+     expect(wrapped.render).toBe(undefined)
+ })
+ 
+@@ -606,7 +603,8 @@ it("should inherit original name/displayName #3438", () => {
+     expect((TestComponent as any).type.displayName).toBe("DisplayName")
+ })
+ 
+-test("parent / childs render in the right order", done => {
++// OCTANE DIVERGENCE[mobx-renderer-contracts]: this synchronous case needs no Jest completion callback.
++test("parent / childs render in the right order", () => {
+     // See: https://jsfiddle.net/gkaemmer/q1kv7hbL/13/
+     const events: string[] = []
+ 
+@@ -668,7 +666,6 @@ test("parent / childs render in the right order", done => {
+ 
+     tryLogout()
+     expect(events).toEqual(["parent", "child"])
+-    done()
+ })
+ 
+ it("should have overload for props with children", () => {
+@@ -693,7 +690,8 @@ it("should have overload for props with children when using forwardRef", () => {
+         value: string
+     }
+     const TestComponent = observer(
+-        React.forwardRef<IMethods, IProps>(({ value }, ref) => {
++        // OCTANE DIVERGENCE[mobx-renderer-contracts]: refs are ordinary Octane props.
++        (({ value, ref }: IProps & { ref?: React.Ref<IMethods> }) => {
+             return null
+         })
+     )
+@@ -742,7 +740,8 @@ it("should preserve concrete props when using forwardRef", () => {
+         callback: (value: string) => void
+     }
+     const TestComponent = observer(
+-        React.forwardRef<IMethods, ITestComponentProps>((props, ref) => {
++        // OCTANE DIVERGENCE[mobx-renderer-contracts]: refs are ordinary Octane props.
++        (({ ref, ...props }: ITestComponentProps & { ref?: React.Ref<IMethods> }) => {
+             return null
+         })
+     )
+@@ -945,37 +944,8 @@ it("dependencies should not become temporarily unobserved", async () => {
+     expect(doubleDisposed).toHaveBeenCalledTimes(1)
+ })
+ 
+-it.skip("Legacy context support", () => {
+-    const contextKey = "key"
+-    const contextValue = "value"
+-
+-    function ContextConsumer(_, context) {
+-        expect(context[contextKey]).toBe(contextValue)
+-        return null
+-    }
+-
+-    ContextConsumer.contextTypes = {
+-        [contextKey]: () => null
+-    }
+-
+-    const ObserverContextConsumer = observer(ContextConsumer)
+-
+-    class ContextProvider extends React.Component {
+-        getChildContext() {
+-            return { [contextKey]: contextValue }
+-        }
+-
+-        render() {
+-            return <ObserverContextConsumer />
+-        }
+-    }
+-
+-    ;(ContextProvider as any).childContextTypes = {
+-        [contextKey]: () => null
+-    }
+-
+-    render(<ContextProvider />)
+-})
++// OCTANE DIVERGENCE[mobx-renderer-contracts]: this case is skipped upstream and requires unsupported React legacy context.
++it.skip("Legacy context support", () => {})
+ 
+ test("Anonymous component displayName #3192", () => {
+     // React prints errors even if we catch em
+@@ -1012,8 +982,10 @@ test("Anonymous component displayName #3192", () => {
+         observerError = error
+     }
+ 
+-    expect(memoError).toBeInstanceOf(Error)
+-    expect(observerError).toBeInstanceOf(Error)
++    // OCTANE DIVERGENCE[mobx-renderer-contracts]: an explicit guard narrows unknown errors for the strict native program.
++    if (!(memoError instanceof Error) || !(observerError instanceof Error)) {
++        throw new Error("Expected both invalid render results to throw errors")
++    }
+ 
+     expect(memoError.message.includes(MemoCmp.displayName))
+     expect(MemoCmp.displayName).toEqual(ObserverCmp.displayName)

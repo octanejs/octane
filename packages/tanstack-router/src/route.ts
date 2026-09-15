@@ -99,7 +99,7 @@ declare module '@tanstack/router-core' {
 		defaultNotFoundComponent?: NotFoundRouteComponent;
 		Wrap?: ComponentBody<{ children?: unknown }>;
 		InnerWrap?: ComponentBody<{ children?: unknown }>;
-		defaultOnCatch?: (error: Error, errorInfo: ErrorInfo) => void;
+		defaultOnCatch?: (error: unknown, errorInfo: ErrorInfo) => void;
 	}
 }
 
@@ -110,10 +110,7 @@ function attachRouteHooks(self: any, strictLoaderHooks: boolean): void {
 	self.useMatch = (...args: any[]) => {
 		const [user, slot] = splitSlot(args);
 		const opts = user[0] ?? {};
-		return useMatch(
-			{ select: opts.select, structuralSharing: opts.structuralSharing, from: self.id },
-			subSlot(slot, 'r:m'),
-		);
+		return useMatch({ ...opts, from: self.id }, subSlot(slot, 'r:m'));
 	};
 	self.useRouteContext = (...args: any[]) => {
 		const [user, slot] = splitSlot(args);
@@ -123,18 +120,12 @@ function attachRouteHooks(self: any, strictLoaderHooks: boolean): void {
 	self.useSearch = (...args: any[]) => {
 		const [user, slot] = splitSlot(args);
 		const opts = user[0] ?? {};
-		return useSearch(
-			{ select: opts.select, structuralSharing: opts.structuralSharing, from: self.id },
-			subSlot(slot, 'r:s'),
-		);
+		return useSearch({ ...opts, from: self.id }, subSlot(slot, 'r:s'));
 	};
 	self.useParams = (...args: any[]) => {
 		const [user, slot] = splitSlot(args);
 		const opts = user[0] ?? {};
-		return useParams(
-			{ select: opts.select, structuralSharing: opts.structuralSharing, from: self.id },
-			subSlot(slot, 'r:p'),
-		);
+		return useParams({ ...opts, from: self.id }, subSlot(slot, 'r:p'));
 	};
 	self.useLoaderDeps = (...args: any[]) => {
 		const [user, slot] = splitSlot(args);

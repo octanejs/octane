@@ -128,6 +128,13 @@ overrides:
   '@solid-primitives/event-listener>solid-js': '1.9.14'
   '@solid-primitives/keyboard>solid-js': '1.9.14'
   '@solid-primitives/resize-observer>solid-js': '1.9.14'
+  # Pinned framer-motion 13.2.0 evidence includes the dependency set it shipped
+  # with. Its own ^13.2.0/^13.0.0 ranges would otherwise float motion-dom and
+  # motion-utils to 13.3.x, whose MotionValue internals diverged from the
+  # pinned upstream source and contract types the pristine lanes execute.
+  'framer-motion@13.2.0>motion-dom': '13.2.0'
+  'framer-motion@13.2.0>motion-utils': '13.0.0'
+  'motion-dom@13.2.0>motion-utils': '13.0.0'
 
 # Rspeedy exposes Rsbuild/Rspack-backed plugin state but does not declare
 # @rspack/core itself. Make the audited Lynx instance explicit so a newer
@@ -285,7 +292,7 @@ catalogs:
     '@wagmi/core': 3.6.4
     '@tauri-apps/api': 2.11.1
     '@tauri-apps/cli': 2.11.4
-    electron: 43.2.0
+    electron: 44.3.0
     '@testing-library/dom': ^10.4.1
     '@testing-library/jest-dom': ^6.9.1
     '@testing-library/react': ^16.3.2
@@ -359,11 +366,11 @@ catalogs:
     inferno-create-element: 9.1.0
     inferno-hydrate: 9.1.0
     inferno-server: 9.1.0
-    html-parse-stringify: ^3.0.1
-    i18next: 26.3.6
+    html-parse-stringify: 4.0.1
+    i18next: 26.4.0
     jsdom: ^30.0.1
     jotai: ^3.0.0
-    mobx: 6.16.1
+    mobx: 7.0.3
     monaco-editor: 0.55.1
     lexical: 0.46.0
     lighthouse: 13.4.1
@@ -377,8 +384,11 @@ catalogs:
     # package ports, at the pinned release.
     '@vis.gl/react-mapbox': 8.1.2
     '@phosphor-icons/react': 2.1.10
-    motion: ^12.42.2
-    motion-dom: ^12.0.0
+    # Pinned upstream evidence authenticates Motion 13.2.0; the pristine lane's
+    # materialized suite reads motion-dom internals (MotionValue events), so the
+    # catalog must not float past the pinned version.
+    motion: 13.2.0
+    motion-dom: 13.2.0
     miniflare: 4.20260714.0
     nuqs: 2.9.1
     '@standard-schema/spec': 1.1.0
@@ -457,7 +467,7 @@ catalogs:
     react-stately: 3.49.0
     '@react-types/shared': ^3.36.1
     react-dom: 19.2.7
-    react-i18next: 17.0.9
+    react-i18next: 17.0.14
     '@react-email/components': 1.0.12
     '@react-email/render': 2.0.6
     react-error-boundary: 6.1.2
@@ -467,7 +477,7 @@ catalogs:
     rulesync: ^8.32.0
     solid-js: '2.0.0-beta.20'
     sonner: 2.0.7
-    thinking-orbs: 0.2.0
+    thinking-orbs: 0.3.1
     styled-components: 6.4.3
     stylis: ^4.4.0
     '@types/stylis': ^4.2.7
@@ -502,7 +512,7 @@ catalogs:
     "@zag-js/store": 1.42.0
     "@zag-js/types": 1.42.0
     "@zag-js/utils": 1.42.0
-    alien-signals: 1.0.4
+    alien-signals: 3.2.1
     react-transition-group: 4.4.5
     "@date-fns/tz": ^1.4.1
     date-fns: ^4.1.0
@@ -620,6 +630,7 @@ minimumReleaseAgeExclude:
   - cn@0.2.6
   - '@tanstack/react-virtual@3.14.12'
   - '@tanstack/virtual-core@3.17.10'
+  - react-i18next@17.0.14
 
 # Changesets 2.31.1 assumes npm's error shape and crashes on pnpm 11 duplicate
 # publish errors. Remove this backport once the fix ships on Changesets' stable line.

@@ -1,0 +1,65 @@
+import { useRef } from 'octane';
+import { useDidUpdate } from '../use-did-update/use-did-update';
+
+export interface UseFocusReturnInput {
+	opened: boolean;
+	shouldReturnFocus?: boolean;
+}
+
+export type UseFocusReturnReturnValue = () => void;
+
+export function useFocusReturn({
+	opened,
+	shouldReturnFocus = true,
+}: UseFocusReturnInput): UseFocusReturnReturnValue {
+	const lastActiveElement = useRef<HTMLElement | null>(null);
+	const returnFocus = () => {
+		if (
+			lastActiveElement.current &&
+			'focus' in lastActiveElement.current &&
+			typeof lastActiveElement.current.focus === 'function'
+		) {
+			lastActiveElement.current?.focus({ preventScroll: true });
+		}
+	};
+
+	useDidUpdate(() => {
+		let timeout = -1;
+
+		const clearFocusTimeout = (event: KeyboardEvent) => {
+			if (event.key === 'Tab') {
+				window.clearTimeout(timeout);
+			}
+		};
+
+		document.addEventListener('keydown', clearFocusTimeout);
+
+		if (opened) {
+			lastActiveElement.current = document.activeElement as HTMLElement;
+		} else if (shouldReturnFocus) {
+			const activeElementAtClose = document.activeElement;
+			timeout = window.setTimeout(() => {
+				const currentActiveElement = document.activeElement;
+				if (
+					currentActiveElement === null ||
+					currentActiveElement === document.body ||
+					currentActiveElement === activeElementAtClose
+				) {
+					returnFocus();
+				}
+			}, 10);
+		}
+
+		return () => {
+			window.clearTimeout(timeout);
+			document.removeEventListener('keydown', clearFocusTimeout);
+		};
+	}, [opened, shouldReturnFocus]);
+
+	return returnFocus;
+}
+
+export namespace useFocusReturn {
+	export type Input = UseFocusReturnInput;
+	export type ReturnValue = UseFocusReturnReturnValue;
+}

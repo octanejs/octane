@@ -37,10 +37,10 @@ function consumerTypeFixtures() {
 
 	// 8. Rejected assertion: number is not a string.
 	// @ts-expect-error fixture negative control: number is not assignable to string.
-	const rejectedNumberAsString: string = 0;
+	const rejectedNumberAsString: string = x.get();
 	// 9. Rejected assertion: string is not a number.
 	// @ts-expect-error fixture negative control: string is not assignable to number.
-	const rejectedStringAsNumber: number = 'nope';
+	const rejectedStringAsNumber: number = useMotionValue('nope').get();
 
 	void rejectedNumberAsString;
 	void rejectedStringAsNumber;

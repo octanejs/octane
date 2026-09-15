@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 1,
+  "artifacts": [
+    {
+      "path": "upstream-artifact/LICENSE",
+      "sha256": "ee419222e62ec9c36ec40745db5d79ef88e8dc086597d88b808673d52faeab2e"
+    },
+    {
+      "path": "upstream-artifact/dist/index.d.mts",
+      "sha256": "1d0f95539eb31e2fc9539c3c1528e065e752a13bbf670ec479ce48270b5b5b41"
+    },
+    {
+      "path": "upstream-artifact/dist/index.d.ts",
+      "sha256": "1d0f95539eb31e2fc9539c3c1528e065e752a13bbf670ec479ce48270b5b5b41"
+    },
+    {
+      "path": "upstream-artifact/package.json",
+      "sha256": "37d2a8479b7246d5d739faaf2fe11bbd196320669a289e928d410be3184b4ea0"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/package.json",
+      "sha256": "1f866832ac4dafee5f29b58616d0db7d4aa8ffad4a5741b559dfeb5f3b92295b"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/InView.tsrx",
+      "sha256": "3ce4440cb04251c47ad7031d1142af100399b173b7672ced282e81caf6eccbcd"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/index.ts",
+      "sha256": "b151b47922d49c37cd7250374f582ffdf988d7a636fc437ec2fbdc15b4dadcff"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/observe.ts",
+      "sha256": "950e402f2642bc4e1c8baeee002c409db8b1ec760631b9034baaa9efc3f58191"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/test-utils.ts",
+      "sha256": "8e8d784ac4853fa63c058907df435b8322bbb54e18eba850aa8e3d7bc83c3aed"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/types.ts",
+      "sha256": "5ac9853bcae3cbc249cfbf91f82c2790633ffe0f63e5d871b4cad27da7fd3c31"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/useInView.tsrx",
+      "sha256": "281855d4d2f5422fb808eeab80e337d5d8444694be35555e8eb34b345af98f18"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/useOnInView.tsrx",
+      "sha256": "42c7fc793fb8df75081527176b4f2933a18cc43a32142cebc8a6634ad3f36dd9"
+    },
+    {
+      "path": "upstream-artifact/react-intersection-observer-11.0.1.tgz",
+      "sha256": "afeb46b9611e3f167427bd1f355a89edd9f34384e688d77402cefd3dcc1f99d3"
+    },
+    {
+      "path": "upstream-artifact/test-utils/index.d.mts",
+      "sha256": "6aac9e5a9dbb4c4916b76fdd9e64c1f9a3b6d9bcf194eebe67287f5df1b009a8"
+    },
+    {
+      "path": "upstream-artifact/test-utils/index.d.ts",
+      "sha256": "6aac9e5a9dbb4c4916b76fdd9e64c1f9a3b6d9bcf194eebe67287f5df1b009a8"
+    }
+  ],
+  "packageIdentity": {
+    "path": "upstream-artifact/package.json",
+    "name": "react-intersection-observer",
+    "version": "11.0.1",
+    "license": "MIT"
+  },
+  "unpublishedDirs": ["audit", "tests", "typetests", "upstream", "upstream-artifact"],
+  "filesEqual": [
+    {
+      "path": "LICENSE.upstream",
+      "equalsPath": "upstream-artifact/LICENSE"
+    }
+  ]
+}

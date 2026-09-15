@@ -28,6 +28,64 @@ describe('handleSubmit', () => {
     expect(callback).toHaveBeenCalled();
   });
 
+  it('should resolve with the typed return value of onValid', async () => {
+    const { result } = renderHook(() =>
+      useForm({ defaultValues: { test: 'data' } }),
+    );
+
+    let returned: string | undefined;
+
+    await act(async () => {
+      returned = await result.current.handleSubmit(
+        (data) => `hello ${data.test}`,
+      )({
+        preventDefault: noop,
+        persist: noop,
+      } as React.SyntheticEvent);
+    });
+
+    expect(returned).toBe('hello data');
+  });
+
+  it('should resolve with the awaited return value when onValid is async', async () => {
+    const { result } = renderHook(() =>
+      useForm({ defaultValues: { test: 'data' } }),
+    );
+
+    let returned: number | undefined;
+
+    await act(async () => {
+      returned = await result.current.handleSubmit(async (data) => {
+        return data.test.length;
+      })({
+        preventDefault: noop,
+        persist: noop,
+      } as React.SyntheticEvent);
+    });
+
+    expect(returned).toBe(4);
+  });
+
+  it('should resolve with undefined when validation fails', async () => {
+    const { result } = renderHook(() =>
+      useForm({ defaultValues: { test: '' } }),
+    );
+    result.current.register('test', { required: true });
+    const onValid = jest.fn(() => 'should not be returned');
+
+    let returned: string | undefined;
+
+    await act(async () => {
+      returned = await result.current.handleSubmit(onValid)({
+        preventDefault: noop,
+        persist: noop,
+      } as React.SyntheticEvent);
+    });
+
+    expect(onValid).not.toHaveBeenCalled();
+    expect(returned).toBeUndefined();
+  });
+
   it('should pass default value', async () => {
     const { result } = renderHook(() =>
       useForm<{ test: string; deep: { nested: string; values: string } }>({
@@ -600,5 +658,153 @@ describe('handleSubmit', () => {
     fireEvent.click(screen.getByRole('button', { name: 'submit' }));
 
     await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+  });
+
+  it('should not invoke onValid when the resolver reports a root-level error', async () => {
+    const { result } = renderHook(() =>
+      useForm<{ test: string }>({
+        resolver: async () => ({
+          values: {},
+          errors: {
+            root: {
+              type: 'cross-field',
+              message: 'passwords do not match',
+            },
+          },
+        }),
+      }),
+    );
+
+    result.current.register('test');
+
+    const onValid = jest.fn();
+    const onInvalid = jest.fn();
+
+    await act(async () => {
+      await result.current.handleSubmit(
+        onValid,
+        onInvalid,
+      )({
+        preventDefault: noop,
+        persist: noop,
+      } as React.SyntheticEvent);
+    });
+
+    expect(onValid).not.toHaveBeenCalled();
+    expect(onInvalid).toHaveBeenCalledTimes(1);
+    expect(onInvalid.mock.calls[0][0]).toEqual({
+      root: {
+        type: 'cross-field',
+        message: 'passwords do not match',
+      },
+    });
+  });
+
+  it('should still clear a manually set root error on submit without a resolver', async () => {
+    const { result } = renderHook(() => useForm<{ test: string }>());
+
+    result.current.register('test');
+    result.current.setValue('test', 'test');
+
+    await act(async () => {
+      result.current.setError('root.server', {
+        type: 'server',
+        message: 'stale server error',
+      });
+    });
+
+    const onValid = jest.fn();
+
+    await act(async () => {
+      await result.current.handleSubmit(onValid)({
+        preventDefault: noop,
+        persist: noop,
+      } as React.SyntheticEvent);
+    });
+
+    expect(onValid).toHaveBeenCalledTimes(1);
+    expect(result.current.getFieldState('test').error).toBeUndefined();
+  });
+
+  it('should ignore a stale resolver result when reset() runs mid-submit', async () => {
+    let resolveResolver!: (v: { errors: any; values: any }) => void;
+    const resolver = jest.fn(
+      () =>
+        new Promise<{ errors: any; values: any }>((resolve) => {
+          resolveResolver = resolve;
+        }),
+    );
+    const { result } = renderHook(() =>
+      useForm({ defaultValues: { test: 'before' }, resolver }),
+    );
+
+    const onValid = jest.fn();
+    const onInvalid = jest.fn();
+
+    let submitPromise: Promise<unknown>;
+    act(() => {
+      submitPromise = result.current.handleSubmit(
+        onValid,
+        onInvalid,
+      )({
+        preventDefault: noop,
+        persist: noop,
+      } as React.SyntheticEvent);
+    });
+
+    act(() => {
+      result.current.reset({ test: 'after' });
+    });
+
+    await act(async () => {
+      resolveResolver({
+        errors: { test: { type: 'validate', message: 'stale' } },
+        values: { test: 'before' },
+      });
+      await submitPromise;
+    });
+
+    expect(onValid).not.toHaveBeenCalled();
+    expect(onInvalid).not.toHaveBeenCalled();
+    expect(result.current.formState.errors).toEqual({});
+    expect(result.current.formState.submitCount).toBe(0);
+    expect(result.current.formState.isSubmitted).toBe(false);
+    expect(result.current.getValues()).toEqual({ test: 'after' });
+  });
+
+  it('should not invoke onValid with stale values when reset() runs mid-submit', async () => {
+    let resolveResolver!: (v: { errors: any; values: any }) => void;
+    const resolver = jest.fn(
+      () =>
+        new Promise<{ errors: any; values: any }>((resolve) => {
+          resolveResolver = resolve;
+        }),
+    );
+    const { result } = renderHook(() =>
+      useForm({ defaultValues: { test: 'before' }, resolver }),
+    );
+
+    const onValid = jest.fn();
+
+    let submitPromise: Promise<unknown>;
+    act(() => {
+      submitPromise = result.current.handleSubmit(onValid)({
+        preventDefault: noop,
+        persist: noop,
+      } as React.SyntheticEvent);
+    });
+
+    act(() => {
+      result.current.reset({ test: 'after' });
+    });
+
+    await act(async () => {
+      resolveResolver({ errors: {}, values: { test: 'before' } });
+      await submitPromise;
+    });
+
+    expect(onValid).not.toHaveBeenCalled();
+    expect(result.current.formState.submitCount).toBe(0);
+    expect(result.current.formState.isSubmitSuccessful).toBe(false);
   });
 });

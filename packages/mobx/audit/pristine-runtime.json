@@ -1,0 +1,471 @@
+{
+  "schemaVersion": 1,
+  "project": "mobx-pristine-runtime",
+  "roots": ["packages/mobx/upstream/__tests__"],
+  "files": [
+    "packages/mobx/upstream/__tests__/ObserverComponent.test.tsx",
+    "packages/mobx/upstream/__tests__/api.test.tsx",
+    "packages/mobx/upstream/__tests__/assertEnvironment.test.tsx",
+    "packages/mobx/upstream/__tests__/enforceActions.test.tsx",
+    "packages/mobx/upstream/__tests__/observer.test.tsx",
+    "packages/mobx/upstream/__tests__/strictAndConcurrentMode.test.tsx",
+    "packages/mobx/upstream/__tests__/strictAndConcurrentModeUsingFinalizationRegistry.test.tsx",
+    "packages/mobx/upstream/__tests__/strictAndConcurrentModeUsingTimers.test.tsx",
+    "packages/mobx/upstream/__tests__/transactions.test.tsx",
+    "packages/mobx/upstream/__tests__/useLocalObservable.test.tsx",
+    "packages/mobx/upstream/__tests__/useObserverRetention.test.tsx"
+  ],
+  "tests": [
+    {
+      "id": "runtime:01410b28d262b406",
+      "file": "packages/mobx/upstream/__tests__/ObserverComponent.test.tsx",
+      "fullName": "prop types checks for children/render usage"
+    },
+    {
+      "id": "runtime:a965919b1857c069",
+      "file": "packages/mobx/upstream/__tests__/ObserverComponent.test.tsx",
+      "fullName": "regions should rerender component init state is correct"
+    },
+    {
+      "id": "runtime:09779732a4325cee",
+      "file": "packages/mobx/upstream/__tests__/ObserverComponent.test.tsx",
+      "fullName": "regions should rerender component set the data to hello"
+    },
+    {
+      "id": "runtime:d195a98ca8962ee1",
+      "file": "packages/mobx/upstream/__tests__/ObserverComponent.test.tsx",
+      "fullName": "renders null if no children/render prop is supplied a function"
+    },
+    {
+      "id": "runtime:59f917bde174d1ad",
+      "file": "packages/mobx/upstream/__tests__/api.test.tsx",
+      "fullName": "correct api should be exposed"
+    },
+    {
+      "id": "runtime:71bb88f12437a87f",
+      "file": "packages/mobx/upstream/__tests__/assertEnvironment.test.tsx",
+      "fullName": "throws if mobx is not installed"
+    },
+    {
+      "id": "runtime:3c7500b2aa244770",
+      "file": "packages/mobx/upstream/__tests__/assertEnvironment.test.tsx",
+      "fullName": "throws if mobx is older than version 7"
+    },
+    {
+      "id": "runtime:405565701f682687",
+      "file": "packages/mobx/upstream/__tests__/assertEnvironment.test.tsx",
+      "fullName": "throws if react is not installed"
+    },
+    {
+      "id": "runtime:ba332c35184a7a5a",
+      "file": "packages/mobx/upstream/__tests__/enforceActions.test.tsx",
+      "fullName": "enforcing actions 'always' should work"
+    },
+    {
+      "id": "runtime:59794f30cc232b95",
+      "file": "packages/mobx/upstream/__tests__/enforceActions.test.tsx",
+      "fullName": "enforcing actions 'never' should work"
+    },
+    {
+      "id": "runtime:def53b2d6a148dd2",
+      "file": "packages/mobx/upstream/__tests__/enforceActions.test.tsx",
+      "fullName": "enforcing actions 'observed' should work"
+    },
+    {
+      "id": "runtime:5fb199dd7f5efc12",
+      "file": "packages/mobx/upstream/__tests__/observer.test.tsx",
+      "fullName": "Anonymous component displayName #3192"
+    },
+    {
+      "id": "runtime:95de1dba34369509",
+      "file": "packages/mobx/upstream/__tests__/observer.test.tsx",
+      "fullName": "StrictMode #3671"
+    },
+    {
+      "id": "runtime:29fd0ef92e94a970",
+      "file": "packages/mobx/upstream/__tests__/observer.test.tsx",
+      "fullName": "`isolateGlobalState` shouldn't break reactivity #3734"
+    },
+    {
+      "id": "runtime:fc8a776e4487a01e",
+      "file": "packages/mobx/upstream/__tests__/observer.test.tsx",
+      "fullName": "changing state in render should fail"
+    },
+    {
+      "id": "runtime:fc8a776e4487a01e:2",
+      "file": "packages/mobx/upstream/__tests__/observer.test.tsx",
+      "fullName": "changing state in render should fail"
+    },
+    {
+      "id": "runtime:0c630d410a786917",
+      "file": "packages/mobx/upstream/__tests__/observer.test.tsx",
+      "fullName": "dependencies should not become temporarily unobserved"
+    },
+    {
+      "id": "runtime:bfc0a5313cb3c570",
+      "file": "packages/mobx/upstream/__tests__/observer.test.tsx",
+      "fullName": "does not keep views alive when using static rendering init state is correct"
+    },
+    {
+      "id": "runtime:bfc0a5313cb3c570:2",
+      "file": "packages/mobx/upstream/__tests__/observer.test.tsx",
+      "fullName": "does not keep views alive when using static rendering init state is correct"
+    },
+    {
+      "id": "runtime:1a2552b957d80100",
+      "file": "packages/mobx/upstream/__tests__/observer.test.tsx",
+      "fullName": "does not keep views alive when using static rendering no re-rendering on static rendering"
+    },
+    {
+      "id": "runtime:1a2552b957d80100:2",
+      "file": "packages/mobx/upstream/__tests__/observer.test.tsx",
+      "fullName": "does not keep views alive when using static rendering no re-rendering on static rendering"
+    },
+    {
+      "id": "runtime:fce0a6a2a8555c78",
+      "file": "packages/mobx/upstream/__tests__/observer.test.tsx",
+      "fullName": "error handling errors should propagate"
+    },
+    {
+      "id": "runtime:fce0a6a2a8555c78:2",
+      "file": "packages/mobx/upstream/__tests__/observer.test.tsx",
+      "fullName": "error handling errors should propagate"
+    },
+    {
+      "id": "runtime:67b46a8c0c89c09f",
+      "file": "packages/mobx/upstream/__tests__/observer.test.tsx",
+      "fullName": "isObjectShallowModified detects when React will update the component does not assume React will update due to NaN prop"
+    },
+    {
+      "id": "runtime:67b46a8c0c89c09f:2",
+      "file": "packages/mobx/upstream/__tests__/observer.test.tsx",
+      "fullName": "isObjectShallowModified detects when React will update the component does not assume React will update due to NaN prop"
+    },
+    {
+      "id": "runtime:57f0c5bd2bfd1f25",
+      "file": "packages/mobx/upstream/__tests__/observer.test.tsx",
+      "fullName": "issue 12 init state is correct"
+    },
+    {
+      "id": "runtime:57f0c5bd2bfd1f25:2",
+      "file": "packages/mobx/upstream/__tests__/observer.test.tsx",
+      "fullName": "issue 12 init state is correct"
+    },
+    {
+      "id": "runtime:17bd1c864ce6565c",
+      "file": "packages/mobx/upstream/__tests__/observer.test.tsx",
+      "fullName": "issue 12 run transaction"
+    },
+    {
+      "id": "runtime:17bd1c864ce6565c:2",
+      "file": "packages/mobx/upstream/__tests__/observer.test.tsx",
+      "fullName": "issue 12 run transaction"
+    },
+    {
+      "id": "runtime:2e90237429c2bbbc",
+      "file": "packages/mobx/upstream/__tests__/observer.test.tsx",
+      "fullName": "it rerenders correctly when useMemo is wrapping observable after click renderCount === 2"
+    },
+    {
+      "id": "runtime:2e90237429c2bbbc:2",
+      "file": "packages/mobx/upstream/__tests__/observer.test.tsx",
+      "fullName": "it rerenders correctly when useMemo is wrapping observable after click renderCount === 2"
+    },
+    {
+      "id": "runtime:d7c9567441271bb7",
+      "file": "packages/mobx/upstream/__tests__/observer.test.tsx",
+      "fullName": "it rerenders correctly when useMemo is wrapping observable after click twice renderCount === 3"
+    },
+    {
+      "id": "runtime:d7c9567441271bb7:2",
+      "file": "packages/mobx/upstream/__tests__/observer.test.tsx",
+      "fullName": "it rerenders correctly when useMemo is wrapping observable after click twice renderCount === 3"
+    },
+    {
+      "id": "runtime:2a84778365056905",
+      "file": "packages/mobx/upstream/__tests__/observer.test.tsx",
+      "fullName": "it rerenders correctly when useMemo is wrapping observable init renderCount === 1"
+    },
+    {
+      "id": "runtime:2a84778365056905:2",
+      "file": "packages/mobx/upstream/__tests__/observer.test.tsx",
+      "fullName": "it rerenders correctly when useMemo is wrapping observable init renderCount === 1"
+    },
+    {
+      "id": "runtime:d997ffb5cca856e9",
+      "file": "packages/mobx/upstream/__tests__/observer.test.tsx",
+      "fullName": "keep views alive init state"
+    },
+    {
+      "id": "runtime:d997ffb5cca856e9:2",
+      "file": "packages/mobx/upstream/__tests__/observer.test.tsx",
+      "fullName": "keep views alive init state"
+    },
+    {
+      "id": "runtime:edac2bc803f680a0",
+      "file": "packages/mobx/upstream/__tests__/observer.test.tsx",
+      "fullName": "keep views alive rerender should not need a recomputation of data.y"
+    },
+    {
+      "id": "runtime:edac2bc803f680a0:2",
+      "file": "packages/mobx/upstream/__tests__/observer.test.tsx",
+      "fullName": "keep views alive rerender should not need a recomputation of data.y"
+    },
+    {
+      "id": "runtime:d5998334e70d23c6",
+      "file": "packages/mobx/upstream/__tests__/observer.test.tsx",
+      "fullName": "nestedRendering - observer first rendering"
+    },
+    {
+      "id": "runtime:d9c5a1418c04e65a",
+      "file": "packages/mobx/upstream/__tests__/observer.test.tsx",
+      "fullName": "nestedRendering - observer inner store changed"
+    },
+    {
+      "id": "runtime:dc81b210292cde51",
+      "file": "packages/mobx/upstream/__tests__/observer.test.tsx",
+      "fullName": "nestedRendering - observer rerendering with outer store added"
+    },
+    {
+      "id": "runtime:1d1aba4b5bbcc312",
+      "file": "packages/mobx/upstream/__tests__/observer.test.tsx",
+      "fullName": "nestedRendering - observer rerendering with outer store pop"
+    },
+    {
+      "id": "runtime:35ef5fe4e0fa79c2",
+      "file": "packages/mobx/upstream/__tests__/observer.test.tsx",
+      "fullName": "nestedRendering - useObserver first rendering"
+    },
+    {
+      "id": "runtime:83041ad61e6c13f1",
+      "file": "packages/mobx/upstream/__tests__/observer.test.tsx",
+      "fullName": "nestedRendering - useObserver inner store changed"
+    },
+    {
+      "id": "runtime:fa23aa6ee6592094",
+      "file": "packages/mobx/upstream/__tests__/observer.test.tsx",
+      "fullName": "nestedRendering - useObserver rerendering with outer store added"
+    },
+    {
+      "id": "runtime:ff23fd71a854f837",
+      "file": "packages/mobx/upstream/__tests__/observer.test.tsx",
+      "fullName": "nestedRendering - useObserver rerendering with outer store pop"
+    },
+    {
+      "id": "runtime:231a79e1b3d466a0",
+      "file": "packages/mobx/upstream/__tests__/observer.test.tsx",
+      "fullName": "observer should work with custom HOC and infer correct type"
+    },
+    {
+      "id": "runtime:9aa99e9bddc12da2",
+      "file": "packages/mobx/upstream/__tests__/observer.test.tsx",
+      "fullName": "observer(forwardRef(cmp)) + useImperativeHandle"
+    },
+    {
+      "id": "runtime:28c742cda2d2edf8",
+      "file": "packages/mobx/upstream/__tests__/observer.test.tsx",
+      "fullName": "parent / childs render in the right order"
+    },
+    {
+      "id": "runtime:17782a4135219582",
+      "file": "packages/mobx/upstream/__tests__/observer.test.tsx",
+      "fullName": "should have overload for props with children"
+    },
+    {
+      "id": "runtime:0016ee7f61b02e7d",
+      "file": "packages/mobx/upstream/__tests__/observer.test.tsx",
+      "fullName": "should have overload for props with children when using forwardRef"
+    },
+    {
+      "id": "runtime:a5b676c4f5daef48",
+      "file": "packages/mobx/upstream/__tests__/observer.test.tsx",
+      "fullName": "should hoist known statics only"
+    },
+    {
+      "id": "runtime:5f033dedf807846b",
+      "file": "packages/mobx/upstream/__tests__/observer.test.tsx",
+      "fullName": "should inherit original name/displayName #3438"
+    },
+    {
+      "id": "runtime:c575ca4e0b47e243",
+      "file": "packages/mobx/upstream/__tests__/observer.test.tsx",
+      "fullName": "should keep original props types"
+    },
+    {
+      "id": "runtime:dc4baed6eb9158ae",
+      "file": "packages/mobx/upstream/__tests__/observer.test.tsx",
+      "fullName": "should not re-render on shallow equal new props after odata change"
+    },
+    {
+      "id": "runtime:dc4baed6eb9158ae:2",
+      "file": "packages/mobx/upstream/__tests__/observer.test.tsx",
+      "fullName": "should not re-render on shallow equal new props after odata change"
+    },
+    {
+      "id": "runtime:28637461727a9ce0",
+      "file": "packages/mobx/upstream/__tests__/observer.test.tsx",
+      "fullName": "should not re-render on shallow equal new props init state is correct"
+    },
+    {
+      "id": "runtime:28637461727a9ce0:2",
+      "file": "packages/mobx/upstream/__tests__/observer.test.tsx",
+      "fullName": "should not re-render on shallow equal new props init state is correct"
+    },
+    {
+      "id": "runtime:762993eb4fcf8720",
+      "file": "packages/mobx/upstream/__tests__/observer.test.tsx",
+      "fullName": "should preserve concrete props when using forwardRef"
+    },
+    {
+      "id": "runtime:9614177087c914a7",
+      "file": "packages/mobx/upstream/__tests__/observer.test.tsx",
+      "fullName": "should preserve generic parameters"
+    },
+    {
+      "id": "runtime:86414c6fd1d8e4b2",
+      "file": "packages/mobx/upstream/__tests__/observer.test.tsx",
+      "fullName": "should render component even if setState called with exactly the same props after click once renderCount === 2"
+    },
+    {
+      "id": "runtime:86414c6fd1d8e4b2:2",
+      "file": "packages/mobx/upstream/__tests__/observer.test.tsx",
+      "fullName": "should render component even if setState called with exactly the same props after click once renderCount === 2"
+    },
+    {
+      "id": "runtime:449daa6c24a07236",
+      "file": "packages/mobx/upstream/__tests__/observer.test.tsx",
+      "fullName": "should render component even if setState called with exactly the same props after click twice renderCount === 3"
+    },
+    {
+      "id": "runtime:449daa6c24a07236:2",
+      "file": "packages/mobx/upstream/__tests__/observer.test.tsx",
+      "fullName": "should render component even if setState called with exactly the same props after click twice renderCount === 3"
+    },
+    {
+      "id": "runtime:11e0ef0a00104a9c",
+      "file": "packages/mobx/upstream/__tests__/observer.test.tsx",
+      "fullName": "should render component even if setState called with exactly the same props renderCount === 1"
+    },
+    {
+      "id": "runtime:11e0ef0a00104a9c:2",
+      "file": "packages/mobx/upstream/__tests__/observer.test.tsx",
+      "fullName": "should render component even if setState called with exactly the same props renderCount === 1"
+    },
+    {
+      "id": "runtime:883eaf7f311a6870",
+      "file": "packages/mobx/upstream/__tests__/observer.test.tsx",
+      "fullName": "useImperativeHandle and forwardRef should work with useObserver"
+    },
+    {
+      "id": "runtime:2f4ba5e2758348f0",
+      "file": "packages/mobx/upstream/__tests__/strictAndConcurrentMode.test.tsx",
+      "fullName": "observable changes before first commit are not lost"
+    },
+    {
+      "id": "runtime:25b11dc8b881b805",
+      "file": "packages/mobx/upstream/__tests__/strictAndConcurrentMode.test.tsx",
+      "fullName": "uncommitted observing components should not attempt state changes"
+    },
+    {
+      "id": "runtime:6cfc565762318436",
+      "file": "packages/mobx/upstream/__tests__/strictAndConcurrentModeUsingFinalizationRegistry.test.tsx",
+      "fullName": "uncommitted components should not leak observations"
+    },
+    {
+      "id": "runtime:062d9188a5c152c3",
+      "file": "packages/mobx/upstream/__tests__/strictAndConcurrentModeUsingTimers.test.tsx",
+      "fullName": "cleanup timer should not clean up recently-pended reactions"
+    },
+    {
+      "id": "runtime:b2c53f62b9535ad8",
+      "file": "packages/mobx/upstream/__tests__/strictAndConcurrentModeUsingTimers.test.tsx",
+      "fullName": "uncommitted components should not leak observations"
+    },
+    {
+      "id": "runtime:2b3a4e8e80514c48",
+      "file": "packages/mobx/upstream/__tests__/transactions.test.tsx",
+      "fullName": "mobx issue 50"
+    },
+    {
+      "id": "runtime:e554b7d491a86f7e",
+      "file": "packages/mobx/upstream/__tests__/transactions.test.tsx",
+      "fullName": "should respect transaction"
+    },
+    {
+      "id": "runtime:5679017d604709e1",
+      "file": "packages/mobx/upstream/__tests__/useLocalObservable.test.tsx",
+      "fullName": "base useLocalObservable should work"
+    },
+    {
+      "id": "runtime:36f6b56d264b7623",
+      "file": "packages/mobx/upstream/__tests__/useLocalObservable.test.tsx",
+      "fullName": "enforcing actions 'always' should work"
+    },
+    {
+      "id": "runtime:7dbe99cdbda4842c",
+      "file": "packages/mobx/upstream/__tests__/useLocalObservable.test.tsx",
+      "fullName": "enforcing actions 'never' should work"
+    },
+    {
+      "id": "runtime:8451135bc240da26",
+      "file": "packages/mobx/upstream/__tests__/useLocalObservable.test.tsx",
+      "fullName": "enforcing actions only when 'observed' should work"
+    },
+    {
+      "id": "runtime:3b1667c597596610",
+      "file": "packages/mobx/upstream/__tests__/useLocalObservable.test.tsx",
+      "fullName": "is used to keep observable within component body Map can used instead of object"
+    },
+    {
+      "id": "runtime:c74dea09af61400c",
+      "file": "packages/mobx/upstream/__tests__/useLocalObservable.test.tsx",
+      "fullName": "is used to keep observable within component body actions can be used"
+    },
+    {
+      "id": "runtime:f235e5ee2fa8ab54",
+      "file": "packages/mobx/upstream/__tests__/useLocalObservable.test.tsx",
+      "fullName": "is used to keep observable within component body computed properties can use local functions"
+    },
+    {
+      "id": "runtime:0b2a34e2b8523e2a",
+      "file": "packages/mobx/upstream/__tests__/useLocalObservable.test.tsx",
+      "fullName": "is used to keep observable within component body computed properties works as well"
+    },
+    {
+      "id": "runtime:22b54da2e022aeae",
+      "file": "packages/mobx/upstream/__tests__/useLocalObservable.test.tsx",
+      "fullName": "is used to keep observable within component body transactions are respected"
+    },
+    {
+      "id": "runtime:6b7303caf5f6f6d4",
+      "file": "packages/mobx/upstream/__tests__/useLocalObservable.test.tsx",
+      "fullName": "is used to keep observable within component body value can be changed over renders"
+    },
+    {
+      "id": "runtime:a845bcb6581fd298",
+      "file": "packages/mobx/upstream/__tests__/useLocalObservable.test.tsx",
+      "fullName": "is used to keep observable within component body with props and useObserver"
+    },
+    {
+      "id": "runtime:e7a9a4515139c8de",
+      "file": "packages/mobx/upstream/__tests__/useLocalObservable.test.tsx",
+      "fullName": "is used to keep observable within component body with props with <Observer>"
+    },
+    {
+      "id": "runtime:1b635baca0a0971f",
+      "file": "packages/mobx/upstream/__tests__/useLocalObservable.test.tsx",
+      "fullName": "is used to keep observable within component body with props with observer()"
+    },
+    {
+      "id": "runtime:cce263aed9928120",
+      "file": "packages/mobx/upstream/__tests__/useLocalObservable.test.tsx",
+      "fullName": "is used to keep observable within component body works with observer as well"
+    },
+    {
+      "id": "runtime:56c9b4d097d5c6f5",
+      "file": "packages/mobx/upstream/__tests__/useObserverRetention.test.tsx",
+      "fullName": "a mounted observer does not retain the element tree it first returned"
+    }
+  ],
+  "snapshots": 11
+}

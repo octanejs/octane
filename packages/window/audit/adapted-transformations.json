@@ -3,14 +3,14 @@
   "source": "packages/window/upstream/lib/**/*.test.{ts,tsx}",
   "destination": "packages/window/tests/upstream/**/*.test.{ts,tsx}",
   "caseInventory": {
-    "registrations": 117,
-    "sha256": "d9a7db848a6d2cdeac1268f8757e9563b06890958a04279b478b69bd7f1c570c"
+    "registrations": 119,
+    "sha256": "c3604d3b1b2a1f6ae4b52b416a686ed3dfb8f9e6686e8c1da8c5e13a90d55f1a"
   },
   "transformations": [
     {
       "id": "testing-library-adapter",
       "classification": "framework-import",
-      "scope": "8 test files",
+      "scope": "9 test files",
       "reason": "Run the same DOM assertions through Octane's testing-library adapter."
     },
     {

@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "project": "window-browser",
+  "roots": ["packages/window/tests/browser"],
+  "files": ["packages/window/tests/browser/window.browser.test.ts"],
+  "tests": [
+    {
+      "id": "browser:react-window:list:client-startup",
+      "file": "packages/window/tests/browser/window.browser.test.ts",
+      "fullName": "React Window browser conformance list client startup preserves initial layout and bounded item count"
+    },
+    {
+      "id": "browser:react-window:list:SSR-hydration",
+      "file": "packages/window/tests/browser/window.browser.test.ts",
+      "fullName": "React Window browser conformance list SSR hydration preserves initial layout and bounded item count"
+    },
+    {
+      "id": "browser:react-window:grid:client-startup",
+      "file": "packages/window/tests/browser/window.browser.test.ts",
+      "fullName": "React Window browser conformance grid client startup preserves initial layout and bounded item count"
+    },
+    {
+      "id": "browser:react-window:grid:SSR-hydration",
+      "file": "packages/window/tests/browser/window.browser.test.ts",
+      "fullName": "React Window browser conformance grid SSR hydration preserves initial layout and bounded item count"
+    },
+    {
+      "id": "browser:react-window:direction",
+      "file": "packages/window/tests/browser/window.browser.test.ts",
+      "fullName": "React Window browser conformance Grid changes scroll direction on the same mounted element"
+    }
+  ]
+}

@@ -1,0 +1,86 @@
+{
+  "runtimeDependencies": ["mobx", "octane"],
+  "adaptedSources": [
+    {
+      "packageName": "mobx-react-lite",
+      "paths": [
+        "src/ObserverComponent.ts",
+        "src/index.ts",
+        "src/observer.ts",
+        "src/staticRendering.ts",
+        "src/useLocalObservable.ts",
+        "src/useObserver.ts",
+        "src/utils/UniversalFinalizationRegistry.ts",
+        "src/utils/assertEnvironment.ts",
+        "src/utils/observerFinalizationRegistry.ts"
+      ]
+    }
+  ],
+  "sourceLedger": [
+    {
+      "path": "src/ObserverComponent.ts",
+      "origin": "adapted",
+      "packageName": "mobx-react-lite",
+      "sha256": "d1925f845f9303c0a0186524692d4eb94fcb62fc15f953627a065a67aab3e1b1"
+    },
+    {
+      "path": "src/index.ts",
+      "origin": "adapted",
+      "packageName": "mobx-react-lite",
+      "sha256": "29850c32a506c5805941c7d4098a24cacc51d6cc7dd3a58e6642a39f8b3ad69d"
+    },
+    {
+      "path": "src/internal.ts",
+      "origin": "authored",
+      "sha256": "98ec22e8b98999f6a745a0d3d94b1fed438cb09fe29c12a4b740c350fe53b909"
+    },
+    {
+      "path": "src/observer.ts",
+      "origin": "adapted",
+      "packageName": "mobx-react-lite",
+      "sha256": "caefb231c3daf5fcd598f4196f315a26846bf2c503f467467c36e74e83db1b26"
+    },
+    {
+      "path": "src/staticRendering.ts",
+      "origin": "adapted",
+      "packageName": "mobx-react-lite",
+      "sha256": "5d834be7df9436afa2dcb717c2ee2d70ea78c927b08ab75d97be342dd43f04e7"
+    },
+    {
+      "path": "src/useLocalObservable.ts",
+      "origin": "adapted",
+      "packageName": "mobx-react-lite",
+      "sha256": "4777e037793a77c291b953fa1d4ca38528d3ca7caa9c701bd878e61ee75cfa93"
+    },
+    {
+      "path": "src/useObserver.ts",
+      "origin": "adapted",
+      "packageName": "mobx-react-lite",
+      "sha256": "ab89ee729bb57431e23c86a889820ed31ef169d08353cbf3451de8e8b0008322"
+    },
+    {
+      "path": "src/utils/UniversalFinalizationRegistry.ts",
+      "origin": "adapted",
+      "packageName": "mobx-react-lite",
+      "sha256": "9797c32b5909f5b0add940ad2b59cbe95aa7112d0091d603dce02ae71c8b983b"
+    },
+    {
+      "path": "src/utils/assertEnvironment.ts",
+      "origin": "adapted",
+      "packageName": "mobx-react-lite",
+      "sha256": "f4e4cdc0a2718c0752ad5a153fde168ad42c9b8b223aa40e708ad1c909b959b1"
+    },
+    {
+      "path": "src/utils/observerFinalizationRegistry.ts",
+      "origin": "adapted",
+      "packageName": "mobx-react-lite",
+      "sha256": "66ed931fdf158c1f8d5ecd14f577a06ecb64fee0d9ae25d5e4ddf55635da5843"
+    },
+    {
+      "path": "package.json",
+      "origin": "authored",
+      "sha256": "9dbc0397b867f524e440963d54e413b84b2b4227a0c17037296353771e21e0c3"
+    }
+  ],
+  "reimplementedDependencies": []
+}

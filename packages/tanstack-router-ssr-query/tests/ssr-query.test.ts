@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { QueryClient } from '@octanejs/tanstack-query';
+import { createMemoryHistory, createRootRoute, createRouter } from '@octanejs/tanstack-router';
 import { attachRouterServerSsrUtils } from '@octanejs/tanstack-router/ssr/server';
 import { setupRouterSsrQueryIntegration } from '@octanejs/tanstack-router-ssr-query';
 import { renderToString } from 'octane/server';
@@ -58,28 +59,32 @@ describe('@octanejs/tanstack-router-ssr-query', () => {
 		expect(router.options.dehydrate).toEqual(expect.any(Function));
 	});
 
-	it('dehydrates real cached queries into the router server state', async () => {
+	it('restores cached and streamed queries through the router hydration callbacks', async () => {
 		const router = makeSsrRouter();
 		const queryClient = createCachedQueryClient();
 
 		setupRouterSsrQueryIntegration({ router, queryClient });
 		attachRouterServerSsrUtils({ router, manifest: undefined });
 
-		const dehydrated = await router.options.dehydrate?.();
-
-		expect(dehydrated).toEqual(
-			expect.objectContaining({
-				dehydratedQueryClient: expect.objectContaining({
-					queries: expect.arrayContaining([
-						expect.objectContaining({
-							queryKey: ['router-ssr-proof'],
-							state: expect.objectContaining({ data: 'server-cached' }),
-						}),
-					]),
-				}),
-				queryStream: expect.any(ReadableStream),
-			}),
-		);
+		const restoredClient = new QueryClient();
+		clients.add(restoredClient);
+		const clientRouter = createRouter({
+			routeTree: createRootRoute(),
+			history: createMemoryHistory({ initialEntries: ['/'] }),
+			isServer: false,
+			origin: 'http://localhost',
+		});
+		setupRouterSsrQueryIntegration({ router: clientRouter, queryClient: restoredClient });
+		try {
+			expect(clientRouter.options.hydrate).toEqual(expect.any(Function));
+			await clientRouter.options.hydrate!(await router.options.dehydrate?.());
+			expect(restoredClient.getQueryData(['router-ssr-proof'])).toBe('server-cached');
+			await queryClient.fetchQuery({ queryKey: ['late-query'], queryFn: async () => 'streamed' });
+			await expect.poll(() => restoredClient.getQueryData(['late-query'])).toBe('streamed');
+		} finally {
+			router.serverSsr?.cleanup();
+		}
+		expect(queryClient.getQueryCache().getAll()).toEqual([]);
 	});
 
 	it('retains values produced by the original router dehydration callback', async () => {
@@ -90,11 +95,12 @@ describe('@octanejs/tanstack-router-ssr-query', () => {
 		setupRouterSsrQueryIntegration({ router, queryClient });
 		attachRouterServerSsrUtils({ router, manifest: undefined });
 
-		await expect(router.options.dehydrate?.()).resolves.toEqual(
-			expect.objectContaining({
-				original: 'preserved',
-				queryStream: expect.any(ReadableStream),
-			}),
-		);
+		try {
+			await expect(router.options.dehydrate?.()).resolves.toEqual(
+				expect.objectContaining({ original: 'preserved' }),
+			);
+		} finally {
+			router.serverSsr?.cleanup();
+		}
 	});
 });

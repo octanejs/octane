@@ -1,0 +1,12 @@
+diff --git a/tests/upstream/_app/autoUnregister.tsx b/tests/upstream/_app/autoUnregister.tsx
+--- a/tests/upstream/_app/autoUnregister.tsx
++++ b/tests/upstream/_app/autoUnregister.tsx
+@@ -33,7 +33,7 @@ export default function AutoUnregister() {
+           <section id="input-ReactSelect">
+             <Controller
+               render={({ field }) => (
+-                <ReactSelect isClearable options={options} {...field} />
++                <ReactSelect isClearable options={options} {...field} onChange={field.onInput} />
+               )}
+               name="ReactSelect"
+               control={control}

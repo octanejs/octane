@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "project": "tanstack-db-pristine",
+  "roots": ["packages/tanstack-db/tests"],
+  "files": ["packages/tanstack-db/tests/upstream-original.test.ts"],
+  "tests": [
+    {
+      "id": "pristine:tanstack-db-original-suite",
+      "file": "packages/tanstack-db/tests/upstream-original.test.ts",
+      "fullName": "runs all 161 pinned DB runtime registrations unchanged"
+    }
+  ],
+  "snapshots": 0
+}

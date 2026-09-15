@@ -1,0 +1,15 @@
+diff --git a/tests/upstream/_e2e/isValid.spec.ts b/tests/upstream/_e2e/isValid.spec.ts
+--- a/tests/upstream/_e2e/isValid.spec.ts
++++ b/tests/upstream/_e2e/isValid.spec.ts
+@@ -48,7 +48,10 @@ test.describe('isValid', () => {
+     await page.locator('#toggle').click();
+     await type(page.locator('input[name="firstName"]'), 'test');
+     await expect(page.locator('#isValid')).toContainText('true');
+-    await expect(page.locator('#renderCount')).toContainText('7');
++    // OCTANE DIVERGENCE[hook-form-duplicate-resolver-notification]: the
++    // unregister effect commits separately from the visibility update.
++    // Keep every validity assertion and require the exact native render count.
++    await expect(page.locator('#renderCount')).toContainText('8');
+   });
+ 
+   test('should showing valid correctly with schema validation and default value supplied', async ({

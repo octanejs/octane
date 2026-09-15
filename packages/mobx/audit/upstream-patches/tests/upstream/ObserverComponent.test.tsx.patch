@@ -1,0 +1,13 @@
+diff --git a/tests/upstream/ObserverComponent.test.tsx b/tests/upstream/ObserverComponent.test.tsx
+--- a/tests/upstream/ObserverComponent.test.tsx
++++ b/tests/upstream/ObserverComponent.test.tsx
+@@ -37,7 +37,8 @@ it("renders null if no children/render prop is supplied a function", () => {
+     const restoreConsole = mockConsole()
+     const Comp = () => <Observer />
+     const { container } = render(<Comp />)
+-    expect(container).toMatchInlineSnapshot(`<div />`)
++    // OCTANE DIVERGENCE[mobx-dom-markers]: internal DOM comment markers are not rendered content.
++    expect(container).toBeEmptyDOMElement()
+     restoreConsole()
+ })
+ 

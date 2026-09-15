@@ -31,7 +31,7 @@ export interface UseAudioRecorderReturn<TOutput> {
 }
 
 /**
- * Octane hook for recording an audio message. The resolved
+ * React hook for recording an audio message. The resolved
  * {@link AudioRecording} carries `.part` (an audio content part for
  * `useChat.sendMessage`) and `.base64` (for the generation hooks).
  *
@@ -48,16 +48,25 @@ export interface UseAudioRecorderReturn<TOutput> {
  * sendMessage({ content: [rec.part] })
  * ```
  */
+// The transforming overload requires `onComplete`. Without that constraint an
+// options object carrying only unrelated keys (`useAudioRecorder({ onError })`)
+// still matches it, `TOnComplete` infers as `unknown`, and `recording`/`stop()`
+// collapse to `unknown` — so passing any option would silently cost you the
+// `AudioRecording` type. Requiring it here sends those calls to the second
+// overload instead (issue #1001).
 export function useAudioRecorder<
-  TOnComplete extends (recording: AudioRecording) => unknown = (
-    recording: AudioRecording,
-  ) => AudioRecording,
+  TOnComplete extends (recording: AudioRecording) => unknown,
 >(
-  options: UseAudioRecorderOptions<TOnComplete> = {},
-): UseAudioRecorderReturn<InferAudioRecordingOutput<TOnComplete>> {
-  type Output = InferAudioRecordingOutput<TOnComplete>
+  options: UseAudioRecorderOptions<TOnComplete> & { onComplete: TOnComplete },
+): UseAudioRecorderReturn<InferAudioRecordingOutput<TOnComplete>>
+export function useAudioRecorder(
+  options?: UseAudioRecorderOptions<undefined>,
+): UseAudioRecorderReturn<AudioRecording>
+export function useAudioRecorder(
+  options: UseAudioRecorderOptions<(recording: AudioRecording) => unknown> = {},
+): UseAudioRecorderReturn<unknown> {
   const [isRecording, setIsRecording] = useState(false)
-  const [recording, setRecording] = useState<Output | null>(null)
+  const [recording, setRecording] = useState<unknown>(null)
   // Read the freshest callbacks at fire time without recreating the recorder.
   const optionsRef = useRef(options)
   optionsRef.current = options
@@ -91,7 +100,7 @@ export function useAudioRecorder<
     // Only `undefined` (returning nothing) falls back to the raw recording, so
     // a transform that returns null is preserved — matching the inferred type,
     // which excludes only undefined/void/null from the transform's return.
-    const output = (transformed === undefined ? recording : transformed) as Output
+    const output = transformed === undefined ? recording : transformed
     setRecording(() => output)
     return output
   }, [recorder])

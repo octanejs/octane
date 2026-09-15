@@ -11,14 +11,21 @@
     "integrity": "sha256:8dc9e1f04cda91beab7818cc11fd5cee8c5f316b84934686c892c8cfb9b808ac",
     "verification": "recorded-unverified"
   },
-  "upstreamSuites": { "runtime": "present", "types": "absent" },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "absent"
+  },
   "adaptedRoots": {
     "source": {
       "roots": ["packages/streamdown/src"],
       "include": ["\\.(?:ts|tsrx)$"],
       "exclude": ["\\.d\\.ts$"]
     },
-    "tests": { "roots": ["packages/streamdown/tests"], "include": ["\\.test\\.ts$"], "exclude": [] }
+    "tests": {
+      "roots": ["packages/streamdown/tests"],
+      "include": ["\\.test\\.ts$"],
+      "exclude": []
+    }
   },
   "adaptedRuntimeSummary": {
     "inventoryEntries": 0,
@@ -33,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "b6e65e48154571accca212b2400e70f0b1dee9499979f0b7ab2febaa4de93c58"
+      "lockfileSha256": "512a0ebbe26d6fe151716392506f43ce6b91c4927b07740bc732c8b49fb44687"
     }
   },
   "lanes": [

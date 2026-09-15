@@ -8,13 +8,28 @@ const upstreamRoot = process.env.INTERSECTION_OBSERVER_PRISTINE_ROOT
 export default defineConfig({
 	cacheDir: resolve(upstreamRoot, '.vite-cache'),
 	test: {
-		name: 'intersection-observer-pristine',
 		root: upstreamRoot,
-		include: ['src/__tests__/**/*.{test,spec}.{ts,tsx}'],
-		exclude: ['src/__tests__/browser.test.tsx'],
-		environment: 'jsdom',
 		globals: true,
-		setupFiles: [resolve(import.meta.dirname, '_harness/pristine-setup.ts')],
+		projects: [
+			{
+				extends: true,
+				test: {
+					name: 'intersection-observer-pristine',
+					include: ['src/__tests__/**/*.{test,spec}.{ts,tsx}'],
+					exclude: ['src/__tests__/browser.test.tsx', 'src/__tests__/useInView.ssr.test.ts'],
+					environment: 'jsdom',
+					setupFiles: [resolve(import.meta.dirname, '_harness/pristine-setup.ts')],
+				},
+			},
+			{
+				extends: true,
+				test: {
+					name: 'intersection-observer-pristine-ssr',
+					include: ['src/__tests__/useInView.ssr.test.ts'],
+					environment: 'node',
+				},
+			},
+		],
 	},
 	esbuild: {
 		target: 'es2020',

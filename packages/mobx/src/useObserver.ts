@@ -2,6 +2,7 @@ import { Reaction } from 'mobx';
 import { useRef, useSyncExternalStore } from 'octane';
 import { subSlot } from './internal';
 import { isUsingStaticRendering } from './staticRendering';
+import { observerFinalizationRegistry } from './utils/observerFinalizationRegistry';
 
 type ObserverAdministration = {
 	reaction: Reaction | null;
@@ -12,17 +13,39 @@ type ObserverAdministration = {
 	getSnapshot: () => symbol;
 };
 
-const observerFinalizationRegistry = new FinalizationRegistry<ObserverAdministration>((adm) => {
-	adm.reaction?.dispose();
-	adm.reaction = null;
-	adm.onStoreChange = null;
-});
-
 function createReaction(adm: ObserverAdministration): void {
 	adm.reaction = new Reaction(`observer${adm.name}`, () => {
 		adm.stateVersion = Symbol();
 		adm.onStoreChange?.();
 	});
+}
+
+// Subscription callbacks must not share the render scope: a mounted store
+// subscription would otherwise retain its first render result and hook ref.
+function createObserverAdministration(baseComponentName: string): ObserverAdministration {
+	const adm: ObserverAdministration = {
+		reaction: null,
+		onStoreChange: null,
+		stateVersion: Symbol(),
+		name: baseComponentName,
+		subscribe(onStoreChange) {
+			observerFinalizationRegistry.unregister(adm);
+			adm.onStoreChange = onStoreChange;
+			if (adm.reaction === null) {
+				createReaction(adm);
+				adm.stateVersion = Symbol();
+			}
+			return () => {
+				adm.onStoreChange = null;
+				adm.reaction?.dispose();
+				adm.reaction = null;
+			};
+		},
+		getSnapshot() {
+			return adm.stateVersion;
+		},
+	};
+	return adm;
 }
 
 function runObserver<T>(render: () => T, baseComponentName: string, slot: symbol | undefined): T {
@@ -31,29 +54,7 @@ function runObserver<T>(render: () => T, baseComponentName: string, slot: symbol
 	const admRef = useRef<ObserverAdministration | null>(null, subSlot(slot, 'administration'));
 
 	if (admRef.current === null) {
-		const adm: ObserverAdministration = {
-			reaction: null,
-			onStoreChange: null,
-			stateVersion: Symbol(),
-			name: baseComponentName,
-			subscribe(onStoreChange) {
-				observerFinalizationRegistry.unregister(adm);
-				adm.onStoreChange = onStoreChange;
-				if (adm.reaction === null) {
-					createReaction(adm);
-					adm.stateVersion = Symbol();
-				}
-				return () => {
-					adm.onStoreChange = null;
-					adm.reaction?.dispose();
-					adm.reaction = null;
-				};
-			},
-			getSnapshot() {
-				return adm.stateVersion;
-			},
-		};
-		admRef.current = adm;
+		admRef.current = createObserverAdministration(baseComponentName);
 	}
 
 	const adm = admRef.current;

@@ -1,0 +1,154 @@
+diff --git a/tests/upstream/hydration-capped-boundary-pending.test.tsx b/tests/upstream/hydration-capped-boundary-pending.test.tsx
+--- a/tests/upstream/hydration-capped-boundary-pending.test.tsx
++++ b/tests/upstream/hydration-capped-boundary-pending.test.tsx
+@@ -1,3 +1,7 @@
++import { runServerFixture } from '../ssr-fixture'
++import { makeMissingRouteTree, makeCappedRouteTree } from '../_fixtures/capped-hydration-parity'
++import type { AnyRouteMatch } from '../../src'
++type ServerSnapshot = { serverHtml: string; serverMatches: AnyRouteMatch[] }
+ import * as React from 'octane'
+ import { act } from '@octanejs/testing-library'
+ import { hydrateRoot } from 'octane'
+@@ -35,35 +39,13 @@ afterEach(async () => {
+ 
+ describe('hydrating a server-capped boundary lane', () => {
+   test('recovers a /404 payload against a missing browser URL', async () => {
+-    function MissingPage() {
+-      return <div data-testid="missing-page">Missing page</div>
+-    }
+ 
+-    const makeRouteTree = () => {
+-      const rootRoute = createRootRoute({
+-        component: Outlet,
+-        notFoundComponent: MissingPage,
+-      })
+-      const notFoundRoute = createRoute({
+-        getParentRoute: () => rootRoute,
+-        path: '/404',
+-        component: MissingPage,
+-      })
+-      return rootRoute.addChildren([notFoundRoute])
+-    }
++    const { serverMatches, serverHtml } = await runServerFixture<ServerSnapshot>('_fixtures/capped-hydration-parity.tsx', 'renderMissingPage')
+ 
+-    const serverRouter = createRouter({
+-      routeTree: makeRouteTree(),
+-      history: createMemoryHistory({ initialEntries: ['/404'] }),
+-    })
+-    serverRouter.isServer = true
+-    await serverRouter.load()
+-    const serverMatches = serverRouter.stores.matches.get()
+-    const serverHtml = renderToString(<RouterProvider router={serverRouter} />)
+     expect(serverHtml).toContain('Missing page')
+ 
+     const clientRouter = createRouter({
+-      routeTree: makeRouteTree(),
++      routeTree: makeMissingRouteTree(),
+       history: createMemoryHistory({ initialEntries: ['/missing'] }),
+     })
+     window.$_TSR = {
+@@ -95,7 +77,7 @@ describe('hydrating a server-capped boundary lane', () => {
+     document.body.appendChild(container)
+     let root!: ReturnType<typeof hydrateRoot>
+     await act(async () => {
+-      root = hydrateRoot(container, <RouterProvider router={clientRouter} />, {
++      root = hydrateRoot(container, RouterProvider, { router: clientRouter }, {
+         onRecoverableError: () => {},
+       })
+       testCleanups.push(async () => {
+@@ -121,66 +103,8 @@ describe('hydrating a server-capped boundary lane', () => {
+       const childLoader = vi.fn(() => 'child data')
+       const boundaryCommits = vi.fn()
+ 
+-      function BoundaryError() {
+-        React.useEffect(() => {
+-          boundaryCommits()
+-        }, [])
+-        return <div data-testid="boundary-error">Boundary error</div>
+-      }
+-
+-      function BoundaryNotFound() {
+-        React.useEffect(() => {
+-          boundaryCommits()
+-        }, [])
+-        return <div data-testid="boundary-not-found">Boundary not found</div>
+-      }
+-
+-      const makeRouteTree = () => {
+-        const boundaryOptions = {
+-          beforeLoad: () => {
+-            throw outcome === 'notFound'
+-              ? notFound()
+-              : new Error('server route failure')
+-          },
+-          pendingComponent: () => (
+-            <div data-testid="boundary-pending">Boundary pending</div>
+-          ),
+-          errorComponent: BoundaryError,
+-          notFoundComponent: BoundaryNotFound,
+-        }
+-        const rootRoute = createRootRoute({
+-          component: Outlet,
+-          ...(boundary === 'root' ? boundaryOptions : {}),
+-        })
+-        const parentRoute = createRoute({
+-          getParentRoute: () => rootRoute,
+-          path: '/parent',
+-          component: Outlet,
+-          ...(boundary === 'parent' ? boundaryOptions : {}),
+-        })
+-        const childRoute = createRoute({
+-          getParentRoute: () => parentRoute,
+-          path: '/child',
+-          loader: childLoader,
+-          component: () => <div>Child</div>,
+-        })
+-        return {
+-          routeTree: rootRoute.addChildren([
+-            parentRoute.addChildren([childRoute]),
+-          ]),
+-        }
+-      }
+-
+-      const serverRouter = createRouter({
+-        ...makeRouteTree(),
+-        history: createMemoryHistory({
+-          initialEntries: ['/parent/child'],
+-        }),
+-      })
+-      serverRouter.isServer = true
+-      await serverRouter.load()
+ 
+-      const serverMatches = serverRouter.stores.matches.get()
++      const { serverMatches, serverHtml } = await runServerFixture<ServerSnapshot>('_fixtures/capped-hydration-parity.tsx', 'renderCappedPage', outcome, boundary, childLoader, boundaryCommits)
+       expect(serverMatches).toHaveLength(3)
+       const serverBoundary = serverMatches[boundary === 'root' ? 0 : 1]!
+       if (outcome === 'notFound' && boundary === 'root') {
+@@ -191,16 +115,14 @@ describe('hydrating a server-capped boundary lane', () => {
+       } else {
+         expect(serverBoundary.status).toBe(outcome)
+       }
+-      const serverHtml = renderToString(
+-        <RouterProvider router={serverRouter} />,
+-      )
++
+       expect(serverHtml).toContain(
+         outcome === 'notFound' ? 'Boundary not found' : 'Boundary error',
+       )
+       expect(boundaryCommits).not.toHaveBeenCalled()
+ 
+       const clientRouter = createRouter({
+-        ...makeRouteTree(),
++        ...makeCappedRouteTree(outcome, boundary, childLoader, boundaryCommits),
+         history: createMemoryHistory({
+           initialEntries: ['/parent/child'],
+         }),
+@@ -240,7 +162,7 @@ describe('hydrating a server-capped boundary lane', () => {
+         .mockImplementation(() => {})
+       let root!: ReturnType<typeof hydrateRoot>
+       await act(async () => {
+-        root = hydrateRoot(container, <RouterProvider router={clientRouter} />)
++        root = hydrateRoot(container, RouterProvider, { router: clientRouter })
+         testCleanups.push(async () => {
+           await act(() => root.unmount())
+         })

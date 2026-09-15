@@ -23,7 +23,7 @@ function NotFoundFallback(props: {
 
 export function CatchNotFound(props: {
 	fallback?: (error: NotFoundError) => OctaneNode;
-	onCatch?: (error: Error, errorInfo: ErrorInfo) => void;
+	onCatch?: (error: NotFoundError, errorInfo: ErrorInfo) => void;
 	children: OctaneNode;
 }) @{
 	const router = useRouter();
@@ -33,7 +33,7 @@ export function CatchNotFound(props: {
 
 	<CatchBoundary
 		getResetKey={() => resetKey}
-		onCatch={(error: Error, errorInfo: ErrorInfo) => {
+		onCatch={(error: unknown, errorInfo: ErrorInfo) => {
 			if (isNotFound(error)) {
 				if (props.onCatch) props.onCatch(error, errorInfo);
 			} else {

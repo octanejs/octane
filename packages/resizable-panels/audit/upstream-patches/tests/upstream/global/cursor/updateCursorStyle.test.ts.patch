@@ -1,0 +1,12 @@
+diff --git a/tests/upstream/global/cursor/updateCursorStyle.test.ts b/tests/upstream/global/cursor/updateCursorStyle.test.ts
+--- a/tests/upstream/global/cursor/updateCursorStyle.test.ts
++++ b/tests/upstream/global/cursor/updateCursorStyle.test.ts
+@@ -1,6 +1,6 @@
+ import { afterEach, describe, expect, test } from "vitest";
+-import { updateInteractionState } from "../mutable-state/interactions";
+-import { updateCursorStyle } from "./updateCursorStyle";
++import { updateInteractionState } from "../../../../src/global/mutable-state/interactions";
++import { updateCursorStyle } from "../../../../src/global/cursor/updateCursorStyle";
+ 
+ describe("updateCursorStyle", () => {
+   const originalCSSStyleSheet = window.CSSStyleSheet;

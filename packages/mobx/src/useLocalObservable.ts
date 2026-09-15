@@ -3,11 +3,11 @@ import type { AnnotationsMap } from 'mobx';
 import { useState } from 'octane';
 import { subSlot } from './internal';
 
-export function useLocalObservable<TStore extends Record<string, unknown>>(
+export function useLocalObservable<TStore extends object>(
 	initializer: () => TStore,
 	annotations?: AnnotationsMap<TStore, never>,
 ): TStore;
-export function useLocalObservable<TStore extends Record<string, unknown>>(
+export function useLocalObservable<TStore extends object>(
 	initializer: () => TStore,
 	annotations?: AnnotationsMap<TStore, never> | symbol,
 	...rest: [slot?: symbol]

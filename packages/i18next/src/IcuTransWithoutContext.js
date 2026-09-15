@@ -1,4 +1,4 @@
-// Ported from react-i18next@17.0.9 (8b4a9ea): dynamic nodes are octane descriptors.
+// Ported from react-i18next@17.0.14 (5f8c5f9): dynamic nodes are octane descriptors.
 import { warn, warnOnce, isString } from './utils.js';
 import { getI18n } from './i18nInstance.js';
 import { renderTranslation } from './IcuTransUtils/index.js';
@@ -117,8 +117,8 @@ export function IcuTransWithoutContext({
 				: { ...i18n.options.interpolation.defaultVariables };
 	}
 
-	// Get the translation, falling back to defaultTranslation
-	const translation = t(i18nKey, {
+	// Use the default string as the key when no explicit key is supplied.
+	const translation = t(i18nKey || defaultTranslation, {
 		defaultValue: defaultTranslation,
 		...mergedValues,
 		ns: namespaces,

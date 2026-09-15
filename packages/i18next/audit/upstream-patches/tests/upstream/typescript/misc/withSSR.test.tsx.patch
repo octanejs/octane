@@ -1,0 +1,81 @@
+diff --git a/tests/upstream/typescript/misc/withSSR.test.tsx b/tests/upstream/typescript/misc/withSSR.test.tsx
+--- a/tests/upstream/typescript/misc/withSSR.test.tsx
++++ b/tests/upstream/typescript/misc/withSSR.test.tsx
+@@ -5,24 +5,32 @@ import { withSSR } from '@octanejs/i18next';
+ describe('withSSR', () => {
+   describe('class component', () => {
+     it('without props', () => {
+-      class ClassComponent extends React.Component {
++      class ClassComponent {
+         render = () => null;
+       }
+ 
++      // OCTANE DIVERGENCE[class-components]: Octane has no class components; a
++      // class constructor is not a valid OctaneComponentType and is rejected.
++      // @ts-expect-error
+       const ExtendedClass = withSSR()(ClassComponent);
+ 
+       // <ExtendedClass initialLanguage={'en'} initialI18nStore={{ en: { namespace: { key: 'value' } } }} />;
+-      expectTypeOf(ExtendedClass).toBeCallableWith({
++      // OCTANE DIVERGENCE[component-signature]: component bodies are
++      // (props, scope, extra); the wrapped props parameter still carries the SSR props.
++      expectTypeOf({
+         initialLanguage: 'en',
+         initialI18nStore: { en: { namespace: { key: 'value' } } },
+-      });
++      }).toExtend<Parameters<typeof ExtendedClass>[0]>();
+     });
+ 
+     it('with props', () => {
+-      class ClassComponentWithProps extends React.Component<{ foo: number }> {
++      class ClassComponentWithProps {
+         render = () => null;
+       }
+ 
++      // OCTANE DIVERGENCE[class-components]: Octane has no class components; a
++      // class constructor is not a valid OctaneComponentType and is rejected.
++      // @ts-expect-error
+       const ExtendedClassWithProps = withSSR()(ClassComponentWithProps);
+ 
+       // <ExtendedClassWithProps
+@@ -30,11 +38,11 @@ describe('withSSR', () => {
+       //   initialI18nStore={{ en: { namespace: { key: 'value' } } }}
+       //   foo={1}
+       // />;
+-      expectTypeOf(ExtendedClassWithProps).toBeCallableWith({
++      expectTypeOf({
+         initialLanguage: 'en',
+         initialI18nStore: { en: { namespace: { key: 'value' } } },
+         foo: 1,
+-      });
++      }).toExtend<Parameters<typeof ExtendedClassWithProps>[0]>();
+     });
+   });
+ 
+@@ -45,10 +53,10 @@ describe('withSSR', () => {
+       const ExtendedFn = withSSR()(FunctionComponent);
+ 
+       // <ExtendedFn initialLanguage={'en'} initialI18nStore={{ en: { namespace: { key: 'value' } } }} />;
+-      expectTypeOf(ExtendedFn).toBeCallableWith({
++      expectTypeOf({
+         initialLanguage: 'en',
+         initialI18nStore: { en: { namespace: { key: 'value' } } },
+-      });
++      }).toExtend<Parameters<typeof ExtendedFn>[0]>();
+     });
+ 
+     it('with props', () => {
+@@ -61,11 +69,11 @@ describe('withSSR', () => {
+       //   initialI18nStore={{ en: { namespace: { key: 'value' } } }}
+       //   foo="bar"
+       // />;
+-      expectTypeOf(ExtendedFnWithProp).toBeCallableWith({
++      expectTypeOf({
+         initialLanguage: 'en',
+         initialI18nStore: { en: { namespace: { key: 'value' } } },
+         foo: 'bar',
+-      });
++      }).toExtend<Parameters<typeof ExtendedFnWithProp>[0]>();
+     });
+   });
+ });

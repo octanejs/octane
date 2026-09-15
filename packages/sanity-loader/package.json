@@ -38,7 +38,7 @@
   },
   "scripts": {
     "test": "vitest run --root ../.. --project sanity-loader --project sanity-loader-ssr",
-    "typecheck": "tsgo --noEmit -p tsconfig.json"
+    "typecheck": "tsgo --noEmit -p tsconfig.json && tsgo --noEmit -p tsconfig.public-types.json"
   },
   "dependencies": {
     "@sanity/client": "catalog:default",

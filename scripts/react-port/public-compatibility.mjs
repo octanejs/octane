@@ -31,6 +31,20 @@ baseUIAliases.set('useMediaQuery', {
 // not re-export it. The witness must pass the same npm-byte authentication.
 const jotaiHydrationWitness = '@octanejs/jotai#hydration-types';
 export function publicCompatibilityDeclarations(binding) {
+	// motion's root re-exports framer-motion/dom. Keep the React hook declarations
+	// as separate witnesses for the functions implemented by the native binding.
+	if (binding === '@octanejs/motion')
+		return new Map([
+			['@octanejs/motion', 'dist/dom.d.ts'],
+			['@octanejs/motion#react-types', 'dist/index.d.ts'],
+		]);
+
+	if (binding === '@octanejs/tanstack-router')
+		return new Map([
+			['@octanejs/tanstack-router#blocker-types', 'dist/esm/useBlocker.d.ts'],
+			['@octanejs/tanstack-router#serializer-types', 'dist/esm/ssr/serializer.d.ts'],
+		]);
+
 	if (binding === '@octanejs/jotai')
 		return new Map([[jotaiHydrationWitness, 'dist/react/utils/useHydrateAtoms.d.ts']]);
 	if (binding === '@octanejs/tanstack-query')
@@ -41,6 +55,105 @@ export function publicCompatibilityDeclarations(binding) {
 }
 
 export function publicCompatibilityExport(specifier, name) {
+	// Upstream test-utils declares the ambient vi.fn symbol. The native
+	// binding keeps its existing standalone mock-factory contract, without
+	// publishing a dependency on Vitest ambient globals.
+	if (
+		specifier === '@octanejs/intersection-observer/test-utils' &&
+		name === 'setupIntersectionMocking'
+	)
+		return { specifier: specifier + '#prior-binding', path: name };
+
+	// InView was already a native function component. Preserve its Octane
+	// children/ref/host-prop contract against the complete pre-update receipt;
+	// a React class instance is not the native function's render result.
+	if (specifier === '@octanejs/intersection-observer' && name === 'InView')
+		return { specifier: specifier + '#prior-binding', path: name };
+
+	// The existing binding names React's dependency-list shape. The exact npm
+	// declaration imports that type for its hook parameters without re-exporting it.
+	if (specifier === '@octanejs/alien-signals' && name === 'DependencyList')
+		return { specifier, path: name, localDeclaration: true };
+
+	if (
+		specifier === '@octanejs/motion' &&
+		[
+			'MotionConfigProps',
+			'useAnimate',
+			'useMotionValue',
+			'useMotionValueEvent',
+			'useReducedMotion',
+			'useScroll',
+			'useSpring',
+			'useTransform',
+		].includes(name)
+	)
+		return { specifier: specifier + '#react-types', path: name };
+
+	// Motion's existing native host factories, compiled components, feature
+	// bundles and contexts use Octane's calling convention. Authenticate their
+	// retained contracts against the complete pre-update source receipt.
+	if (
+		specifier === '@octanejs/motion' &&
+		[
+			'motion',
+			'm',
+			'AnimatePresence',
+			'LayoutGroup',
+			'MotionConfig',
+			'LazyMotion',
+			'domAnimation',
+			'domMax',
+			'LayoutGroupProps',
+			'LazyMotionProps',
+			'LayoutGroupContext',
+			'LazyMotionContext',
+			'MotionConfigContext',
+			'VariantContext',
+			'StaggerContext',
+		].includes(name)
+	)
+		return { specifier: specifier + '#prior-binding', path: name };
+
+	// Native SSR compiles an App component with router props in a separate graph.
+	if (
+		specifier === '@octanejs/tanstack-router/ssr/server' &&
+		['renderRouterToString', 'renderRouterToStream'].includes(name)
+	)
+		return { specifier: specifier + '#prior-binding', path: name };
+	if (specifier === '@octanejs/tanstack-router' && name === 'SerializerExtensions')
+		return {
+			specifier: specifier + '#serializer-types',
+			path: name,
+			augmentedModule: '@tanstack/router-core',
+		};
+
+	// These named native exports are public return/parameter shapes upstream.
+	// Their declarations are local to the authenticated useBlocker module.
+	if (
+		specifier === '@octanejs/tanstack-router' &&
+		['BlockerResolver', 'ShouldBlockFnArgs'].includes(name)
+	)
+		return { specifier: specifier + '#blocker-types', path: name, localDeclaration: true };
+
+	// Retained native contracts: createRoute/NotFoundRoute keep the file-route,
+	// SSR and handlers slots separate; useRouter accepts an explicit router;
+	// component aliases carry Octane's compiled component calling convention.
+	// Every prior declaration is authenticated against the campaign baseline.
+	if (
+		specifier === '@octanejs/tanstack-router' &&
+		[
+			'createRoute',
+			'NotFoundRoute',
+			'AnyRootRoute',
+			'useRouter',
+			'AsyncRouteComponent',
+			'RouteComponent',
+			'ErrorRouteComponent',
+		].includes(name)
+	)
+		return { specifier: specifier + '#prior-binding', path: name };
+
 	if (specifier === '@octanejs/tanstack-table') {
 		const aliases = {
 			OctaneTable: 'ReactTable',
@@ -66,6 +179,34 @@ export function publicCompatibilityExport(specifier, name) {
 		['@octanejs/jotai/react/utils', '@octanejs/jotai/utils'].includes(specifier)
 	)
 		return { specifier: jotaiHydrationWitness, path: name };
+
+	// i18next's Trans family keeps the Octane children contract: TransChild is
+	// `unknown` because Octane renderables are not React nodes, and
+	// withTranslation keeps the plain `ref` prop Octane passes through. The
+	// complete pre-update receipt authenticates every retained declaration.
+	if (
+		specifier === '@octanejs/i18next' &&
+		[
+			'Trans',
+			'TransWithoutContext',
+			'TransProps',
+			'TransSelectorProps',
+			'withTranslation',
+		].includes(name)
+	)
+		return { specifier: specifier + '#prior-binding', path: name };
+	if (
+		specifier === '@octanejs/i18next/TransWithoutContext' &&
+		[
+			'Trans',
+			'TransChild',
+			'TransProps',
+			'TransLegacy',
+			'TransSelector',
+			'TransSelectorProps',
+		].includes(name)
+	)
+		return { specifier: specifier + '#prior-binding', path: name };
 
 	const alias = baseUIAliases.get(name);
 	if (!alias) return undefined;

@@ -1,0 +1,143 @@
+diff --git a/tests/upstream/link.test.tsx b/tests/upstream/link.test.tsx
+--- a/tests/upstream/link.test.tsx
++++ b/tests/upstream/link.test.tsx
+@@ -1,5 +1,7 @@
+ import * as React from 'octane'
+-import { renderToString } from 'octane/server'
++// OCTANE DIVERGENCE[ssr-compiler]: execute SSR in the matching server graph.
++import { runServerFixture } from '../ssr-fixture'
++import { createDirectLinksRouter } from '../_fixtures/direct-links-parity.tsrx'
+ import { afterEach, beforeEach, describe, expect, it, test, vi } from 'vitest'
+ import {
+   act,
+@@ -5176,10 +5178,9 @@ describe('Link', () => {
+     expect(indexLink).toBeInTheDocument()
+ 
+     expect(ioObserveMock).toBeCalled()
+-    expect(ioObserveMock).toBeCalledTimes(2) // since React.StrictMode is enabled it double renders
+-
+-    expect(ioDisconnectMock).toBeCalled()
+-    expect(ioDisconnectMock).toBeCalledTimes(1) // since React.StrictMode is enabled it should have disconnected
++    // OCTANE DIVERGENCE[strict-mode]: Octane mounts once; observation stays live.
++    expect(ioObserveMock).toBeCalledTimes(1)
++    expect(ioDisconnectMock).not.toBeCalled()
+ 
+     const output = screen.getByRole('status')
+     expect(output).toHaveTextContent('0')
+@@ -5189,8 +5190,10 @@ describe('Link', () => {
+     await waitFor(() => {
+       expect(output).toHaveTextContent('1')
+     })
+-    expect(ioObserveMock).toBeCalledTimes(2) // it should not observe again
+-    expect(ioDisconnectMock).toBeCalledTimes(1) // it should not disconnect again
++    expect(ioObserveMock).toBeCalledTimes(1) // it should not observe again
++    expect(ioDisconnectMock).not.toBeCalled() // it should not disconnect again
++    cleanup()
++    expect(ioDisconnectMock).toBeCalledTimes(1)
+   })
+ 
+   test('Link.preload="viewport" should respect preloadDelay', async () => {
+@@ -5906,12 +5909,10 @@ describe('createLink', () => {
+   })
+ 
+   it('should respect target attribute set by custom component', async () => {
+-    const CustomLinkWithTarget = React.forwardRef<
+-      HTMLAnchorElement,
+-      { href?: string; children?: React.OctaneNode }
+-    >((props, ref) => (
+-      <a ref={ref} {...props} target="_blank" rel="noopener noreferrer" />
+-    ))
++    // OCTANE DIVERGENCE[ref-prop]: refs are ordinary component props.
++    const CustomLinkWithTarget = (props: React.ComponentProps<'a'>) => (
++      <a {...props} target="_blank" rel="noopener noreferrer" />
++    )
+ 
+     const CreatedCustomLink = createLink(CustomLinkWithTarget)
+ 
+@@ -5965,10 +5966,10 @@ describe('createLink', () => {
+   })
+ 
+   it('should allow override of target prop even when custom component sets it', async () => {
+-    const CustomLinkWithDefaultTarget = React.forwardRef<
+-      HTMLAnchorElement,
+-      { href?: string; children?: React.OctaneNode; target?: string }
+-    >((props, ref) => <a ref={ref} target="_blank" {...props} />)
++    // OCTANE DIVERGENCE[ref-prop]: refs are ordinary component props.
++    const CustomLinkWithDefaultTarget = (props: React.ComponentProps<'a'>) => (
++      <a target="_blank" {...props} />
++    )
+ 
+     const CreatedCustomLink = createLink(CustomLinkWithDefaultTarget)
+ 
+@@ -8035,7 +8036,10 @@ describe('masked and custom history hrefs', () => {
+           let container: HTMLElement
+           if (isServer) {
+             container = document.createElement('div')
+-            container.innerHTML = renderToString(element)
++            container.innerHTML = await runServerFixture<string>('_fixtures/link-parity.tsrx', 'renderLink', {
++              router, linkProps: { to: '/target', mask: { to: '/mask' }, preload: 'intent', preloadDelay: 0 },
++              children: ({ isActive }) => String(isActive),
++            })
+           } else {
+             container = render(element).container
+           }
+@@ -8073,33 +8077,13 @@ describe('masked and custom history hrefs', () => {
+   )
+ 
+   test('keeps direct-scheme links safe and inactive across SSR and client', async () => {
+-    const rootRoute = createRootRoute()
+-    const indexRoute = createRoute({
+-      getParentRoute: () => rootRoute,
+-      path: '/',
+-      component: () => (
+-        <>
+-          <Link data-testid="allowed-link" to="https://example.com">
+-            {({ isActive }) => String(isActive)}
+-          </Link>
+-          <Link data-testid="dangerous-link" to="javascript:alert(1)">
+-            {({ isActive }) => String(isActive)}
+-          </Link>
+-        </>
+-      ),
+-    })
+-    const router = createRouter({
+-      routeTree: rootRoute.addChildren([indexRoute]),
+-      history: createMemoryHistory({ initialEntries: ['/'] }),
+-    })
++    const router = createDirectLinksRouter()
+     vi.spyOn(console, 'warn').mockImplementation(() => {})
+     await router.load()
+ 
+     router.isServer = true
+     const serverContainer = document.createElement('div')
+-    serverContainer.innerHTML = renderToString(
+-      <RouterProvider router={router} />,
+-    )
++    serverContainer.innerHTML = await runServerFixture<string>('_fixtures/direct-links-parity.tsrx', 'renderDirectLinks')
+ 
+     router.isServer = false
+     const { container: clientContainer } = render(
+@@ -8208,7 +8192,7 @@ describe('masked and custom history hrefs', () => {
+     expect(fireEvent.click(link)).toBe(true)
+   })
+ 
+-  test('normalizes protocol-relative paths from output rewrites during SSR', () => {
++  test('normalizes protocol-relative paths from output rewrites during SSR', async () => {
+     const origin = 'https://victim.example'
+     const router = createRouter({
+       routeTree: createRootRoute(),
+@@ -8223,11 +8207,9 @@ describe('masked and custom history hrefs', () => {
+       },
+     })
+ 
+-    const html = renderToString(
+-      <RouterContextProvider router={router}>
+-        <Link to="/safe">Safe</Link>
+-      </RouterContextProvider>,
+-    )
++    const html = await runServerFixture<string>('_fixtures/link-parity.tsrx', 'renderLink', {
++      router, linkProps: { to: '/safe' }, children: 'Safe',
++    })
+ 
+     expect(html).toContain('href="/evil.example/path"')
+     expect(html).not.toContain('href="//evil.example/path"')

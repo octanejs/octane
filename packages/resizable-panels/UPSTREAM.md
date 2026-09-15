@@ -1,19 +1,19 @@
 # react-resizable-panels upstream contract
 
-## Pin and source boundary
+## Source boundary
 
 | Field | Value |
 |---|---|
 | Package | `react-resizable-panels` |
-| Version | `4.12.2` |
+| Version | `4.12.4` |
 | Canonical repository | `https://github.com/bvaughn/react-resizable-panels.git` |
-| Canonical tag commit | `a1eeb7aefdb024bb5879a323218e0ac05f77f28e` |
-| Supported upstream range | exactly `4.12.2` |
-| npm tarball SHA-256 | `099742808fafbe3a0288d758271aaf1c35dc9b66ec85077e60f0861e58e89e61` |
+| Canonical tag commit | `152b1a8f856438c432b360a77a5afbdeb78782fb` |
+| Supported upstream range | exactly `4.12.4` |
+| npm tarball SHA-256 | `d6374b89cbce9a0f224f0f776642362de515a308df75bd23eb33e6fef23d2ab7` |
 | License | MIT, copyright Brian Vaughn |
 
 `upstream/` contains the byte-exact canonical `lib/` source and tests plus
-the package, TypeScript, and Vitest metadata needed to execute them.
+the pinned browser driver/runtime fixtures and the package, TypeScript, and Vitest metadata needed to execute them.
 `upstream-artifact/` contains the complete unpacked npm publication artifact. Both
 boundaries are development evidence and excluded from the published `files`.
 `audit/upstream.lock.json` pins every committed Git-sourced byte to the canonical
@@ -55,10 +55,24 @@ hand-written or `any`-based map.
 
 ## Upstream test disposition
 
-The canonical `lib/` tree contains the exact 29 test artifacts and 329 literal
-registrations enumerated in `audit/test-inventory.json`. Every artifact is
-adapted and executable; parameter matrices expand the adapted lane beyond the
-literal registration count. Port-authored differential, persistence, SSR,
-hydration, type, and real-browser evidence is inventoried separately. Negative
-controls reject missing or renamed tests, stale classifications, and API or
-provenance drift.
+The pinned source contains **505 registrations across 41 test artifacts**:
+439 unit cases in 31 files and 66 browser scenarios in 10 files. All 439 unit
+cases execute against both React and Octane. The 63 decoder browser scenarios
+run unchanged assertions in both ordinary and popup Chromium windows, yielding
+126 checks per runtime. `audit/registrations.json` preserves every immutable
+registration and `audit/crosswalk.json` accounts for each one.
+
+Two upstream default-layout scenarios depend on separate demo application
+servers. Octane conformance tests cover the same persistence and layout-stability
+contracts for client startup and SSR hydration, including actual layout-shift
+measurements and server DOM adoption. The remaining demo scenario requires React
+Server Components, which Octane does not support; it is explicitly inapplicable.
+These three dispositions are recorded in `audit/browser-dispositions.json`.
+
+The public type checks cover all 22 exports. Custom hooks retain Octane's optional
+compiler-assigned trailing symbol parameter. `Layout` preserves the upstream
+string index signature, including numeric property access. Negative controls
+reject missing assertions, altered helper bodies, changed pinned bytes, and
+undeclared browser fixture adaptations.
+
+Browser drivers and serialization helpers execute with their pristine React toolchain. Only the browser runtime components and decoder are adapted to Octane; their renderable and class-name types are checked by `tsconfig.fixtures.json`.

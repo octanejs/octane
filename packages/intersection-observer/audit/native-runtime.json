@@ -1,0 +1,117 @@
+{
+  "schemaVersion": 1,
+  "project": "intersection-observer",
+  "roots": ["packages/intersection-observer/tests"],
+  "files": [
+    "packages/intersection-observer/tests/hydration.test.ts",
+    "packages/intersection-observer/tests/intersection-observer.test.ts"
+  ],
+  "tests": [
+    {
+      "id": "runtime:a704a2a161371951",
+      "file": "packages/intersection-observer/tests/hydration.test.ts",
+      "fullName": "adopts server visibility, starts observation on the client, and disconnects on unmount"
+    },
+    {
+      "id": "runtime:f5670b1006f936ca",
+      "file": "packages/intersection-observer/tests/intersection-observer.test.ts",
+      "fullName": "Octane binding does not re-arm useOnInView initial-false skip on same-target reattach"
+    },
+    {
+      "id": "runtime:0f4e45e9874488a6",
+      "file": "packages/intersection-observer/tests/intersection-observer.test.ts",
+      "fullName": "Octane binding keeps a stable composed host ref across InView visibility updates"
+    },
+    {
+      "id": "runtime:2eafecc66abae46b",
+      "file": "packages/intersection-observer/tests/intersection-observer.test.ts",
+      "fullName": "Octane binding keeps triggerOnce observing until the threshold-aware inView state is true"
+    },
+    {
+      "id": "runtime:7d131c3e9d87a235",
+      "file": "packages/intersection-observer/tests/intersection-observer.test.ts",
+      "fullName": "Octane binding keeps useOnInView observation when a stale cleanup runs after re-attach"
+    },
+    {
+      "id": "runtime:bb2d002f3b3b8ef4",
+      "file": "packages/intersection-observer/tests/intersection-observer.test.ts",
+      "fullName": "Octane binding notifies each pooled observer subscriber once in mockAllIsIntersecting"
+    },
+    {
+      "id": "runtime:0027d6befae6c84e",
+      "file": "packages/intersection-observer/tests/intersection-observer.test.ts",
+      "fullName": "Octane binding only suppresses the first false useOnInView notification"
+    },
+    {
+      "id": "runtime:d549f7215092adea",
+      "file": "packages/intersection-observer/tests/intersection-observer.test.ts",
+      "fullName": "Octane binding pools useOnInView observers regardless of library-only flags"
+    },
+    {
+      "id": "runtime:4b0d77c9a8929204",
+      "file": "packages/intersection-observer/tests/intersection-observer.test.ts",
+      "fullName": "Octane binding resets useInView initial-false suppression when the target changes"
+    },
+    {
+      "id": "runtime:ea0bcf3767df6429",
+      "file": "packages/intersection-observer/tests/intersection-observer.test.ts",
+      "fullName": "Octane binding resets useOnInView initial-false suppression when the target changes"
+    },
+    {
+      "id": "runtime:8e9c6670b4130fda",
+      "file": "packages/intersection-observer/tests/intersection-observer.test.ts",
+      "fullName": "Octane binding runs useOnInView without a visibility rerender contract"
+    },
+    {
+      "id": "runtime:dffcb2977309594e",
+      "file": "packages/intersection-observer/tests/intersection-observer.test.ts",
+      "fullName": "Octane binding stops observing after triggerOnce enters"
+    },
+    {
+      "id": "runtime:4b911b8ffb46d9b3",
+      "file": "packages/intersection-observer/tests/intersection-observer.test.ts",
+      "fullName": "Octane binding supports the InView render-prop form and ref"
+    },
+    {
+      "id": "runtime:93e9d5a6c2e9ebd9",
+      "file": "packages/intersection-observer/tests/intersection-observer.test.ts",
+      "fullName": "Octane binding survives sync defaultFallbackInView with triggerOnce without TDZ"
+    },
+    {
+      "id": "runtime:1f5842ba92cdef56",
+      "file": "packages/intersection-observer/tests/intersection-observer.test.ts",
+      "fullName": "Octane binding updates useInView and skips the initial false notification"
+    },
+    {
+      "id": "runtime:7ffb1b57f63b2364",
+      "file": "packages/intersection-observer/tests/intersection-observer.test.ts",
+      "fullName": "Octane binding uses the latest initial visibility when a stable hook ref changes target"
+    },
+    {
+      "id": "runtime:af9ab520ae210f47",
+      "file": "packages/intersection-observer/tests/intersection-observer.test.ts",
+      "fullName": "Octane binding uses the latest useOnInView callback immediately after a render"
+    },
+    {
+      "id": "runtime:bebf55a0b14b972a",
+      "file": "packages/intersection-observer/tests/intersection-observer.test.ts",
+      "fullName": "observe derives mock intersection state from each observer threshold"
+    },
+    {
+      "id": "runtime:88a5915263434347",
+      "file": "packages/intersection-observer/tests/intersection-observer.test.ts",
+      "fullName": "observe keeps a duplicate callback registration active after another is cleaned twice"
+    },
+    {
+      "id": "runtime:fb42008d34c608f5",
+      "file": "packages/intersection-observer/tests/intersection-observer.test.ts",
+      "fullName": "observe keeps distinct observers registered for the same element"
+    },
+    {
+      "id": "runtime:42100452be34a961",
+      "file": "packages/intersection-observer/tests/intersection-observer.test.ts",
+      "fullName": "observe pools matching options and disconnects after the final subscriber"
+    }
+  ],
+  "snapshots": 0
+}

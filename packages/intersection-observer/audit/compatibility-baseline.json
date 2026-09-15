@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "binding": "@octanejs/intersection-observer",
+  "repository": "https://github.com/octanejs/octane.git",
+  "commit": "7600f6bb5238e549bc1412ff84a60ff192f9bdf6",
+  "sourceRoot": "upstream-artifact/previous-binding",
+  "files": [
+    {
+      "path": "package.json",
+      "sha256": "1f866832ac4dafee5f29b58616d0db7d4aa8ffad4a5741b559dfeb5f3b92295b"
+    },
+    {
+      "path": "src/InView.tsrx",
+      "sha256": "3ce4440cb04251c47ad7031d1142af100399b173b7672ced282e81caf6eccbcd"
+    },
+    {
+      "path": "src/index.ts",
+      "sha256": "b151b47922d49c37cd7250374f582ffdf988d7a636fc437ec2fbdc15b4dadcff"
+    },
+    {
+      "path": "src/observe.ts",
+      "sha256": "950e402f2642bc4e1c8baeee002c409db8b1ec760631b9034baaa9efc3f58191"
+    },
+    {
+      "path": "src/test-utils.ts",
+      "sha256": "8e8d784ac4853fa63c058907df435b8322bbb54e18eba850aa8e3d7bc83c3aed"
+    },
+    {
+      "path": "src/types.ts",
+      "sha256": "5ac9853bcae3cbc249cfbf91f82c2790633ffe0f63e5d871b4cad27da7fd3c31"
+    },
+    {
+      "path": "src/useInView.tsrx",
+      "sha256": "281855d4d2f5422fb808eeab80e337d5d8444694be35555e8eb34b345af98f18"
+    },
+    {
+      "path": "src/useOnInView.tsrx",
+      "sha256": "42c7fc793fb8df75081527176b4f2933a18cc43a32142cebc8a6634ad3f36dd9"
+    }
+  ]
+}

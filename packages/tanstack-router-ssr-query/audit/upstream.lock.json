@@ -2,14 +2,14 @@
   "schemaVersion": 1,
   "identity": {
     "packageName": "@tanstack/react-router-ssr-query",
-    "version": "1.167.1",
+    "version": "1.167.2",
     "repository": {
       "owner": "TanStack",
       "repo": "router",
       "subdirectory": "packages/react-router-ssr-query"
     },
-    "commit": "8b3659143f634542c455a9d7915a8c7e8fabb65d",
-    "integrity": "sha512-W9j5JPnBikyafvuUfykFfHIWod58OAbAAa5leNkXBcoDoocghMmu6w9uZOmUZvAWT7CSvgj5tBUtF7CM2OoHXQ=="
+    "commit": "0dbb77f7260b4919786c2c3d594b8c262de43a9e",
+    "integrity": "sha512-yRvy0VJ00R8huPuquk+qyYQGMpYRc/G33mc6/yZ4f7LaBZz9h/VbACjmLzhm/+6u5WSmUt6ouJJZnI1/5Npfag=="
   },
   "license": {
     "spdx": "MIT",
@@ -27,8 +27,8 @@
   "files": [
     {
       "path": "CHANGELOG.md",
-      "gitBlob": "8e4f3df45d86548a532c72fb162e8696313c03db",
-      "size": 1738
+      "gitBlob": "082433df3d512bf031fde2d3924f2ec6dc5d6e89",
+      "size": 1936
     },
     {
       "path": "eslint.config.js",
@@ -37,13 +37,13 @@
     },
     {
       "path": "package.json",
-      "gitBlob": "82d9917747880fb795173333bbe059f091e87b85",
-      "size": 2423
+      "gitBlob": "dba26ffbdfcd98441d8fb2d25c85a312d14d2a73",
+      "size": 2737
     },
     {
       "path": "README.md",
-      "gitBlob": "0a19fd3b814fd3547b7694281b82208bbd878e91",
-      "size": 2520
+      "gitBlob": "c3a60d1008ffe9300b98979278a22ceb53ccbb98",
+      "size": 2832
     },
     {
       "path": "src/index.tsx",
@@ -66,5 +66,5 @@
       "size": 560
     }
   ],
-  "fingerprint": "97ac15f153a06a1eee5f00cc6c76358b911d2a7c047fa04ee10fa78e8ffc8f63"
+  "fingerprint": "679ef3bfa7fd3416fdb91bec10d034362775ed5ff275d861a5615e7dbd6e1757"
 }

@@ -28,6 +28,7 @@ import {
 	pinnedPublicEntries,
 	pinnedPublicExport,
 	newOpaquePublicSymbol,
+	publicSymbolType,
 } from './pinned-public-types.mjs';
 import {
 	auditShippedClosure,
@@ -222,6 +223,19 @@ function hasTypeProjectMarker(relativeProject, marker) {
 	return new RegExp(`(?:^|[./_-])${marker}(?:[./_-]|$)`, 'i').test(relativeProject);
 }
 
+// An upstream type project may mirror the pinned compiler contract when the
+// vendored upstream tsconfig already disables lib checking (for example when
+// upstream's own augmentations are intentionally non-extends-safe). The
+// relaxation is bound to the hash-pinned file, never to a free choice.
+function upstreamCompilerDisablesLibCheck(packageDirectory) {
+	const upstreamConfig = path.join(packageDirectory, 'upstream', 'tsconfig.json');
+	if (!existsSync(upstreamConfig)) return false;
+	const loaded = ts.readConfigFile(upstreamConfig, ts.sys.readFile);
+	if (loaded.error) return false;
+	const parsed = ts.parseJsonConfigFileContent(loaded.config, ts.sys, path.dirname(upstreamConfig));
+	return parsed.options.skipLibCheck === true;
+}
+
 function isTypeProjectCommand(commandArguments, bindingDirectory, gateId, compiler) {
 	const prefix = commandArguments.slice(0, -1);
 	if (
@@ -278,7 +292,9 @@ function packageTestInvocations(manifest, scriptName = 'test', visiting = new Se
 		.map((segment) => segment.trim().replace(/^(?:[A-Za-z_][A-Za-z0-9_]*=[^\s]+\s+)+/, ''));
 	const invocations = [];
 	for (const segment of segments) {
-		const direct = segment.match(/^(?:(?:pnpm\s+(?:exec\s+)?)?)(vitest|jest)(?:\s+(.*))?$/);
+		const direct = segment.match(
+			/^(?:(?:pnpm\s+(?:exec\s+)?)?)(?:(?:\.\.?\/)*node_modules\/\.bin\/)?(vitest|jest)(?:\s+(.*))?$/,
+		);
 		if (direct) {
 			const [, runner, rawArguments = ''] = direct;
 			if (
@@ -357,12 +373,19 @@ function packageTestExecutionPlan(node, workspaceRoot) {
 			'Package test script must run Vitest, Jest, node --test, or the repository parity command',
 		);
 	}
-	const testFiles = discoverPackageTests(packageDirectory).map((filePath) =>
-		realpathSync(filePath),
-	);
-	const reportEligibleTestFiles = discoverReportEligiblePackageTests(packageDirectory).map(
-		(filePath) => realpathSync(filePath),
-	);
+	// Materialized upstream test trees are regenerated in place, so a discovered
+	// file can be removed before it is resolved; treat a vanished file as absent.
+	const resolveIfPresent = (filePath) => {
+		try {
+			return [realpathSync(filePath)];
+		} catch (error) {
+			if (error?.code === 'ENOENT') return [];
+			throw error;
+		}
+	};
+	const testFiles = discoverPackageTests(packageDirectory).flatMap(resolveIfPresent);
+	const reportEligibleTestFiles =
+		discoverReportEligiblePackageTests(packageDirectory).flatMap(resolveIfPresent);
 	if (testFiles.length === 0) {
 		throw new Error('Package test gate has no package-local test file candidates');
 	}
@@ -1230,12 +1253,14 @@ function analyzeTypeEvidence(
 			if (pinnedExports) {
 				const witness = publicCompatibilityExport(specifier, symbol.name)
 					? pinnedPublicExport(pinnedEntries, program, checker, specifier, symbol.name)
-					: pinnedExports.get(symbol.name);
+					: (pinnedExports.get(symbol.name) ??
+						pinnedPublicExport(pinnedEntries, program, checker, specifier, symbol.name));
 				if (!witness)
 					throw new Error(
 						`Export ${specifier}.${symbol.name} is absent from the pinned public API`,
 					);
 				const failure = newOpaquePublicSymbol(symbol, witness, checker, {
+					binding: specifier,
 					internalMembers: pinnedEntries.internalMembers,
 				});
 				if (failure)
@@ -1253,7 +1278,9 @@ function analyzeTypeEvidence(
 		}
 	}
 	for (const imported of importedBindings) {
-		if (checker.getTypeAtLocation(imported).flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown)) {
+		const symbol = checker.getSymbolAtLocation(imported);
+		const type = symbol ? publicSymbolType(symbol, checker) : checker.getTypeAtLocation(imported);
+		if (type.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown)) {
 			throw new Error(`Imported public type ${imported.text} resolves to any or unknown`);
 		}
 	}
@@ -1375,7 +1402,7 @@ function structurallyMappedRegistrations(programFiles, analysis) {
 	return registrations;
 }
 
-function assertTypeProjectSemantics(gateId, commandArguments, node, workspaceRoot) {
+function assertTypeProjectSemantics(gateId, commandArguments, node, workspaceRoot, baseline) {
 	const packageDirectory = bindingPackageDirectory(node, workspaceRoot);
 	const projectPath = path.resolve(workspaceRoot, commandArguments.at(-1));
 	const relativeProject = path.relative(packageDirectory, projectPath);
@@ -1392,7 +1419,15 @@ function assertTypeProjectSemantics(gateId, commandArguments, node, workspaceRoo
 	}
 	if (parsed.options.noCheck)
 		throw new Error(`Type project for ${gateId} must not disable checking with noCheck`);
-	if (parsed.options.strict !== true || parsed.options.skipLibCheck !== false) {
+	const mirrorsUpstreamCompiler =
+		gateId.startsWith('upstream-types-') &&
+		loaded.config.reactPortEvidence?.mirrorsUpstreamCompilerOptions === true &&
+		upstreamCompilerDisablesLibCheck(packageDirectory);
+	if (
+		parsed.options.strict !== true ||
+		(parsed.options.skipLibCheck !== false &&
+			!(mirrorsUpstreamCompiler && parsed.options.skipLibCheck === true))
+	) {
 		throw new Error(`Type project for ${gateId} must enable strict and disable skipLibCheck`);
 	}
 	if (loaded.config.reactPortEvidence?.gate !== gateId) {
@@ -1440,7 +1475,12 @@ function assertTypeProjectSemantics(gateId, commandArguments, node, workspaceRoo
 				concretePublicSpecifiers(packageDirectory, node.binding, { excludePackageMetadata: true }),
 				trustedTypeAssertionModulePath,
 				loaded.config.reactPortEvidence?.publicMode === 'pinned'
-					? pinnedPublicEntries(packageDirectory, node)
+					? pinnedPublicEntries(packageDirectory, node, {
+							baseline,
+							publicSpecifiers: concretePublicSpecifiers(packageDirectory, node.binding, {
+								excludePackageMetadata: true,
+							}),
+						})
 					: undefined,
 			);
 			if (!semantics.hasPositiveAssertion) {
@@ -1468,17 +1508,42 @@ function assertTypeProjectSemantics(gateId, commandArguments, node, workspaceRoo
 			.flatMap(({ registrations }) => registrations.map(({ id }) => id))
 			.sort();
 		const declaredRegistrations = loaded.config.reactPortEvidence?.upstreamRegistrations;
-		if (
-			!Array.isArray(declaredRegistrations) ||
-			JSON.stringify([...declaredRegistrations].sort()) !== JSON.stringify(expectedRegistrations)
-		) {
+		// Upstream type suites can be pinned multi-program workspaces (per-directory
+		// module augmentations conflict inside a single program). A project may cover
+		// a named, non-empty subset of the pinned inventory; run coverage accumulates
+		// per `upstreamProgram` until the union equals the immutable inventory.
+		const upstreamProgram = loaded.config.reactPortEvidence?.upstreamProgram;
+		const expectedSet = new Set(expectedRegistrations);
+		const fullCoverage =
+			Array.isArray(declaredRegistrations) &&
+			JSON.stringify([...declaredRegistrations].sort()) === JSON.stringify(expectedRegistrations);
+		const programCoverage =
+			typeof upstreamProgram === 'string' &&
+			upstreamProgram.length > 0 &&
+			Array.isArray(declaredRegistrations) &&
+			declaredRegistrations.length > 0 &&
+			new Set(declaredRegistrations).size === declaredRegistrations.length &&
+			declaredRegistrations.every((id) => expectedSet.has(id));
+		if (!fullCoverage && !programCoverage) {
 			throw new Error(
 				`Type project for ${gateId} is not bound to the pinned immutable type inventory`,
 			);
 		}
+		const coveredRegistrations = fullCoverage ? expectedRegistrations : declaredRegistrations;
+		const projectInfo = {
+			project: relativeProject,
+			upstreamProgram: fullCoverage ? null : upstreamProgram,
+			registrations: coveredRegistrations,
+		};
 		if (materialized) {
-			assertMaterializedTypeEvidence({ gateId, node, packageDirectory, programFiles });
-			return;
+			assertMaterializedTypeEvidence({
+				gateId,
+				node,
+				packageDirectory,
+				programFiles,
+				declaredRegistrations: coveredRegistrations,
+			});
+			return projectInfo;
 		}
 		const expectedImport = gateId === 'upstream-types-pristine' ? node.packageName : node.binding;
 		if (!expectedImport) {
@@ -1490,7 +1555,7 @@ function assertTypeProjectSemantics(gateId, commandArguments, node, workspaceRoo
 			[expectedImport],
 			canonicalPath(path.join(workspaceRoot, 'scripts/react-port/type-assertions.d.ts')),
 			loaded.config.reactPortEvidence?.publicMode === 'pinned'
-				? pinnedPublicEntries(packageDirectory, { ...node, binding: expectedImport })
+				? pinnedPublicEntries(packageDirectory, { ...node, binding: expectedImport }, { baseline })
 				: undefined,
 		);
 		if (!analysis.hasPositiveAssertion || !analysis.hasNegativeControl) {
@@ -1504,13 +1569,14 @@ function assertTypeProjectSemantics(gateId, commandArguments, node, workspaceRoo
 			);
 		}
 		const mappedRegistrations = structurallyMappedRegistrations(programFiles, analysis);
-		for (const registrationId of expectedRegistrations) {
+		for (const registrationId of coveredRegistrations) {
 			if (!mappedRegistrations.has(registrationId)) {
 				throw new Error(
 					`Type project for ${gateId} does not structurally map pinned registration ${registrationId} to a real assertion group`,
 				);
 			}
 		}
+		return projectInfo;
 	}
 }
 
@@ -1518,11 +1584,12 @@ export function assertApprovedGateCommand(
 	gateIds,
 	commandArguments,
 	node,
-	{ workspaceRoot = null, manifestPath = null, nodeId = null } = {},
+	{ workspaceRoot = null, manifestPath = null, nodeId = null, baseline } = {},
 ) {
 	const bindingDirectory = node.bindingDirectory?.replaceAll('\\', '/');
 	if (!bindingDirectory) throw new Error('Evidence node has no graph-planned binding directory');
 	let packageTestPlan = null;
+	let typeEvidence = null;
 	const absenceCommand = Boolean(
 		workspaceRoot &&
 		manifestPath &&
@@ -1560,7 +1627,9 @@ export function assertApprovedGateCommand(
 				`${bindingDirectory}/audit/react-parity.json`,
 			]);
 		} else if (gateId === 'upstream-types-pristine') {
-			approved = isTypeProjectCommand(commandArguments, bindingDirectory, gateId, 'tsc');
+			approved = ['tsc', 'tsgo'].some((compiler) =>
+				isTypeProjectCommand(commandArguments, bindingDirectory, gateId, compiler),
+			);
 		} else if (
 			['upstream-types-adapted', 'authored-source-types', 'public-types'].includes(gateId)
 		) {
@@ -1593,10 +1662,19 @@ export function assertApprovedGateCommand(
 				'public-types',
 			].includes(gateId)
 		) {
-			assertTypeProjectSemantics(gateId, commandArguments, node, workspaceRoot);
+			const typeProject = assertTypeProjectSemantics(
+				gateId,
+				commandArguments,
+				node,
+				workspaceRoot,
+				baseline,
+			);
+			if (typeProject?.upstreamProgram) {
+				(typeEvidence ??= []).push({ gateId, ...typeProject });
+			}
 		}
 	}
-	return { packageTestPlan };
+	return { packageTestPlan, typeEvidence };
 }
 
 async function operate(
@@ -1766,6 +1844,7 @@ async function operate(
 			workspaceRoot: manifest.workspaceRoot ?? process.cwd(),
 			manifestPath: path.join(batchDirectory, 'manifest.json'),
 			nodeId: options.node,
+			baseline: manifest.baseline,
 		});
 		const packageTestPlan = gateIds.includes('package-tests')
 			? (commandValidation?.packageTestPlan ??
@@ -1840,7 +1919,52 @@ async function operate(
 			if (nodeProxyDirectory) rmSync(nodeProxyDirectory, { force: true, recursive: true });
 		}
 		for (const gateId of gateIds) {
-			recordEvidence(node.evidenceMatrix, gateId, evidence);
+			const typeProgram = commandValidation?.typeEvidence?.find((entry) => entry.gateId === gateId);
+			let gateEvidence = evidence;
+			if (typeProgram) {
+				const gate = node.evidenceMatrix.gates[gateId];
+				const programs = { ...(gate.programs ?? {}) };
+				programs[typeProgram.upstreamProgram] = {
+					project: typeProgram.project,
+					registrations: typeProgram.registrations,
+					status: evidence.status === 'passed' ? 'passed' : 'failed',
+					command: commandDisplay,
+					observed: evidence.observed,
+				};
+				const packageDirectory = bindingPackageDirectory(
+					node,
+					manifest.workspaceRoot ?? process.cwd(),
+				);
+				const expectedIds = scopedUpstreamTestInventory({ node, packageDirectory })
+					.filter(({ kind }) => kind === 'type')
+					.flatMap(({ registrations }) => registrations.map(({ id }) => id));
+				const covered = new Set();
+				for (const program of Object.values(programs)) {
+					if (program.status === 'passed') {
+						for (const id of program.registrations) covered.add(id);
+					}
+				}
+				const complete = expectedIds.every((id) => covered.has(id));
+				const anyFailed = Object.values(programs).some((program) => program.status === 'failed');
+				let status = 'blocked';
+				if (anyFailed) status = 'failed';
+				else if (complete) status = 'passed';
+				gateEvidence = {
+					status,
+					command: commandDisplay,
+					observed: complete
+						? evidence.observed
+						: `Type program ${typeProgram.upstreamProgram} ${evidence.status}; covered ${covered.size}/${expectedIds.length} pinned registrations.`,
+					programs,
+					...(status === 'blocked'
+						? {
+								reason: `Upstream type programs cover ${covered.size}/${expectedIds.length} registrations`,
+								repair: 'Run the remaining per-configuration type projects.',
+							}
+						: {}),
+				};
+			}
+			recordEvidence(node.evidenceMatrix, gateId, gateEvidence);
 		}
 		const gates = gateIds.map((gateId) => node.evidenceMatrix.gates[gateId]);
 		return {

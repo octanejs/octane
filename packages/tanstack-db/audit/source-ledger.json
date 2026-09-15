@@ -1,0 +1,61 @@
+[
+  {
+    "path": "src/DbProvider.tsrx",
+    "origin": "adapted",
+    "packageName": "@tanstack/react-db",
+    "sha256": "9d2b96c8118b6a4092f64dea220d551369b96aa85c717684f2bb035bc0b3282b"
+  },
+  {
+    "path": "src/HydrationBoundary.tsrx",
+    "origin": "adapted",
+    "packageName": "@tanstack/react-db",
+    "sha256": "0ddd60f98d13753eba5dd9790be89e0d066b30d0096e009a4ea9313b72b42b56"
+  },
+  {
+    "path": "src/index.ts",
+    "origin": "adapted",
+    "packageName": "@tanstack/react-db",
+    "sha256": "371421a432aa43b000f64244538689ffa8f74de08c9dd2c8a0c9c9bc95dabf35"
+  },
+  {
+    "path": "src/live-query-internals.ts",
+    "origin": "adapted",
+    "packageName": "@tanstack/react-db",
+    "sha256": "0705fb883a9a4b7334a4e78a311e97521dde43dfc5452d8ae4a4dab9a342f1f4"
+  },
+  {
+    "path": "src/slot.ts",
+    "origin": "authored",
+    "sha256": "de1f6578feb3bd46cc783a6234d6268bf026427cbc7d2d7b93c2df3c86a335a9"
+  },
+  {
+    "path": "src/useLiveInfiniteQuery.ts",
+    "origin": "adapted",
+    "packageName": "@tanstack/react-db",
+    "sha256": "0af4c6ee53e761431f0d658c524cc72d5b05cb9bfba31149752926a3fe6d1cfe"
+  },
+  {
+    "path": "src/useLiveQuery.ts",
+    "origin": "adapted",
+    "packageName": "@tanstack/react-db",
+    "sha256": "f482717c25cfbdf6c136d2c538e210f1e5440c92eefaa147507b5f2a2eb01f57"
+  },
+  {
+    "path": "src/useLiveQueryEffect.ts",
+    "origin": "adapted",
+    "packageName": "@tanstack/react-db",
+    "sha256": "6d8a3bdfa0b56a940591a9fb77018b1c2fc18ef0c3bd822456df45f7388e9c25"
+  },
+  {
+    "path": "src/useLiveSuspenseQuery.ts",
+    "origin": "adapted",
+    "packageName": "@tanstack/react-db",
+    "sha256": "40605bd5b0308dcba469ad1ad266c80ab9022423e4af70a919f74beeae550472"
+  },
+  {
+    "path": "src/usePacedMutations.ts",
+    "origin": "adapted",
+    "packageName": "@tanstack/react-db",
+    "sha256": "8c062015c8673c70896c8727ee6b9f983372a064fa3f6b02426443de336e02da"
+  }
+]

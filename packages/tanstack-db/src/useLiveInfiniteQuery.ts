@@ -1,16 +1,31 @@
-import { useRef, useSyncExternalStore } from 'octane';
+import { splitTrailingSlot, subSlot } from './slot';
+
+import { useCallback, useRef, useSyncExternalStore } from 'octane';
 import {
-	CollectionImpl,
+	assertLiveQueryWindowManyResult,
+	compareLiveQueryWindowDependencies,
 	createLiveQueryCollection,
 	createLiveQueryWindowController,
-	deepEquals,
+	fetchNextLiveQueryWindowPage,
+	getLiveQueryWindowCollectionWarning,
+	getLiveQueryWindowInputKind,
+	normalizeLiveQueryWindowPageSize,
+	resolveLiveQueryWindowInput,
+	shouldPreserveLiveQueryWindowPageCount,
 } from '@tanstack/db';
-import { splitTrailingSlot, subSlot } from './slot';
-// Type-only: used in `ReturnType<typeof useLiveQuery>` in UseLiveInfiniteQueryReturn.
-import type { useLiveQuery } from './useLiveQuery';
+import { useOptionalDbClient } from './DbProvider.tsrx';
+import {
+	prepareDerivedQuery,
+	prepareQueryValue,
+	warnDeprecatedDepsArray,
+	warnUnhashableDerivedIdentity,
+} from './useLiveQuery';
+import type { DerivedIdentityProfiler, LiveQueryKey, useLiveQuery } from './useLiveQuery';
 import type {
 	Collection,
+	CollectionImpl as CollectionImplType,
 	Context,
+	DbClient,
 	InferResultType,
 	InitialQueryBuilder,
 	LiveQueryWindowController,
@@ -20,34 +35,17 @@ import type {
 
 // Live queries created here are cleaned up immediately (0 disables GC).
 const DEFAULT_GC_TIME_MS = 1;
-
-type WindowedCollection = Collection<any, any, any> & {
-	utils: {
-		setWindow: (options: { offset: number; limit: number }) => true | Promise<void>;
-		getWindow: () => { offset: number; limit: number | null } | undefined;
-	};
-};
-
-/**
- * Does this pre-created collection support windowing (i.e. has an ORDER BY)?
- *
- * In TanStack DB 0.7.0 every live-query collection exposes `setWindow`/`getWindow`
- * on `utils`, so a bare `typeof setWindow === 'function'` check is always true and
- * cannot detect a missing ORDER BY — calling `setWindow` without one throws
- * `SetWindowRequiresOrderByError` later, inside the controller's subscribe (a
- * passive effect Octane swallows), never reaching the caller. `getWindow()`
- * instead returns the current window only for an ordered query and `undefined`
- * otherwise, independent of preload/sync state, so it is the reliable render-time
- * signal that lets the hook reject a non-orderBy collection synchronously.
- */
-function supportsWindowing(
-	collection: Collection<any, any, any>,
-): collection is WindowedCollection {
-	const utils = collection.utils as WindowedCollection[`utils`] | undefined;
-	return typeof utils?.setWindow === `function` && utils.getWindow?.() !== undefined;
-}
+const unpreparedQueryValue = Symbol(`unpreparedQueryValue`);
 
 export type UseLiveInfiniteQueryConfig<TContext extends Context> = {
+	/**
+	 * Explicit identity for queries that contain opaque functional variants or
+	 * are hot enough that deriving identity from structured IR is too expensive.
+	 * Structured queries should omit this so DB can derive identity directly.
+	 */
+	queryKey?: LiveQueryKey;
+	/** Override the nearest DbProvider for this query. */
+	client?: DbClient;
 	pageSize?: number;
 	initialPageParam?: number;
 	/**
@@ -70,77 +68,40 @@ export type UseLiveInfiniteQueryReturn<TContext extends Context> = Omit<
 	data: InferResultType<TContext>;
 	pages: Array<Array<InferResultType<TContext>[number]>>;
 	pageParams: Array<number>;
-	fetchNextPage: () => void;
+	fetchNextPage: () => Promise<void>;
 	hasNextPage: boolean;
 	isFetchingNextPage: boolean;
-	/** The last pagination failure, cleared when a retry begins. */
 	error: unknown;
 };
 
+type EnabledLiveQueryReturn<TContext extends Context> = ReturnType<typeof useLiveQuery<TContext>>;
+
+type InfiniteQueryRenderState = {
+	inputKind: `collection` | `query`;
+	inputCollection: Collection<any, any, any> | null;
+	inputQuery: unknown;
+	client: DbClient | undefined;
+	identityMode: `collection` | `queryKey` | `legacyDeps` | `derived`;
+	dependencies: Array<unknown> | null;
+	pageSize: number;
+	initialPageParam: number;
+	collection: Collection<any, any, any>;
+	controller: LiveQueryWindowController<any, any>;
+	warning: string | null;
+	warned: boolean;
+	deferredCollections: Set<CollectionImplType<any, string | number, any, any, any>>;
+};
+
 /**
- * Create an infinite query using a query function with live updates
+ * Create an infinite query using a query function with live updates.
  *
  * Uses `utils.setWindow()` to dynamically adjust the limit/offset window
  * without recreating the live query collection on each page change.
  *
  * @param queryFn - Query function that defines what data to fetch. Must include `.orderBy()` for setWindow to work.
  * @param config - Configuration including pageSize and getNextPageParam
- * @param deps - Array of dependencies that trigger query re-execution when changed
+ * @param deps - Deprecated array of dependencies that trigger query re-execution when changed
  * @returns Object with pages, data, and pagination controls
- *
- * @example
- * // Basic infinite query
- * const { data, pages, fetchNextPage, hasNextPage } = useLiveInfiniteQuery(
- *   (q) => q
- *     .from({ posts: postsCollection })
- *     .orderBy(({ posts }) => posts.createdAt, 'desc')
- *     .select(({ posts }) => ({
- *       id: posts.id,
- *       title: posts.title
- *     })),
- *   {
- *     pageSize: 20,
- *     getNextPageParam: (lastPage, allPages) =>
- *       lastPage.length === 20 ? allPages.length : undefined
- *   }
- * )
- *
- * @example
- * // With dependencies
- * const { pages, fetchNextPage } = useLiveInfiniteQuery(
- *   (q) => q
- *     .from({ posts: postsCollection })
- *     .where(({ posts }) => eq(posts.category, category))
- *     .orderBy(({ posts }) => posts.createdAt, 'desc'),
- *   {
- *     pageSize: 10,
- *     getNextPageParam: (lastPage) =>
- *       lastPage.length === 10 ? lastPage.length : undefined
- *   },
- *   [category]
- * )
- *
- * @example
- * // Router loader pattern with pre-created collection
- * // In loader:
- * const postsQuery = createLiveQueryCollection({
- *   query: (q) => q
- *     .from({ posts: postsCollection })
- *     .orderBy(({ posts }) => posts.createdAt, 'desc')
- *     .limit(20)
- * })
- * await postsQuery.preload()
- * return { postsQuery }
- *
- * // In component:
- * const { postsQuery } = useLoaderData()
- * const { data, fetchNextPage, hasNextPage } = useLiveInfiniteQuery(
- *   postsQuery,
- *   {
- *     pageSize: 20,
- *     getNextPageParam: (lastPage) => lastPage.length === 20 ? lastPage.length : undefined
- *   }
- * )
  */
 
 // Overload for pre-created collection (non-single result)
@@ -167,192 +128,223 @@ export function useLiveInfiniteQuery<TContext extends Context>(
 	...rest: Array<unknown>
 ): UseLiveInfiniteQueryReturn<TContext> {
 	const [args, slot] = splitTrailingSlot(rest);
-	const deps = (args[0] as Array<unknown> | undefined) ?? [];
+	const deps = args[0] as Array<unknown> | undefined;
 
-	const pageSize = config.pageSize ?? 20;
-	if (pageSize <= 0) {
-		throw new Error(
-			`useLiveInfiniteQuery: pageSize must be a positive integer. Received: ${pageSize}`,
-		);
-	}
+	const pageSize = normalizeLiveQueryWindowPageSize(config.pageSize);
 	const initialPageParam = config.initialPageParam ?? 0;
+	const contextDbClient = useOptionalDbClient();
+	const dbClient = config.client ?? contextDbClient;
 
-	// Detect if input is a collection or query function
-	const isCollection = queryFnOrCollection instanceof CollectionImpl;
+	const inputIsCollection = getLiveQueryWindowInputKind(queryFnOrCollection) === `collection`;
 
-	// Validate input type
-	if (!isCollection && typeof queryFnOrCollection !== `function`) {
-		throw new Error(
-			`useLiveInfiniteQuery: First argument must be either a pre-created live query collection (CollectionImpl) ` +
-				`or a query function. Received: ${typeof queryFnOrCollection}`,
-		);
-	}
-
-	// The shared window controller (TanStack DB #1675) owns the physical window,
-	// committed pages, pagination error, and the fetch/reset lifecycle. It
-	// coordinates a per-consumer window lease over the underlying collection, so
-	// two hooks pointed at one pre-created collection no longer truncate each
-	// other's window and an unmount restores the surviving consumer's window.
-	// It also rolls back a failed page load and exposes it on `snapshot.error`
-	// with a clean retry, replacing the old fire-and-forget `setWindow` that
-	// merely logged and permanently consumed the page.
-	const collectionRef = useRef<Collection<any, any, any> | null>(null, subSlot(slot, `coll-ref`));
-	const controllerRef = useRef<LiveQueryWindowController<any, any> | null>(
-		null,
-		subSlot(slot, `ctrl-ref`),
+	const committedRef = useRef<InfiniteQueryRenderState | null>(null, subSlot(slot, 'committedRef'));
+	const committed = committedRef.current;
+	const inputKind = inputIsCollection ? `collection` : `query`;
+	const derivedIdentityProfilerRef = useRef<DerivedIdentityProfiler>(
+		{
+			renderCount: 0,
+			totalMs: 0,
+			maxMs: 0,
+			warned: false,
+		},
+		subSlot(slot, 'derivedIdentityProfilerRef'),
 	);
-	const configRef = useRef<unknown>(null, subSlot(slot, `cfg-ref`));
-	const depsRef = useRef<Array<unknown> | null>(null, subSlot(slot, `deps-ref`));
-	const pageSizeRef = useRef(pageSize, subSlot(slot, `page-size-ref`));
-	const initialPageParamRef = useRef(initialPageParam, subSlot(slot, `page-param-ref`));
-	const validatedCollectionRef = useRef<unknown>(null, subSlot(slot, `validated-ref`));
-	const inputKind = isCollection ? `collection` : `query`;
-	const inputKindRef = useRef<`collection` | `query` | null>(null, subSlot(slot, `kind-ref`));
-	const previousInputKind = inputKindRef.current;
+	const legacyUnhashableIdentityRef = useRef<Array<unknown>>(
+		[`legacy-unhashable`],
+		subSlot(slot, 'legacyUnhashableIdentityRef'),
+	);
+	const deferredCollections = new Set<CollectionImplType<any, string | number, any, any, any>>();
 
-	const dependenciesChanged =
-		!isCollection &&
-		(depsRef.current === null ||
-			depsRef.current.length !== deps.length ||
-			depsRef.current.some((dep, index) => dep !== deps[index]));
-	const dependenciesStructurallyEqual =
-		!isCollection && depsRef.current !== null && deepEquals(depsRef.current, deps);
-	const needsNewCollection =
-		!collectionRef.current ||
-		inputKindRef.current !== inputKind ||
-		(isCollection && configRef.current !== queryFnOrCollection) ||
-		dependenciesChanged;
-	const pageShapeChanged =
-		pageSizeRef.current !== pageSize || initialPageParamRef.current !== initialPageParam;
-	const needsNewController = !controllerRef.current || needsNewCollection || pageShapeChanged;
+	let preparedQueryValue: unknown | typeof unpreparedQueryValue = unpreparedQueryValue;
+	let identityDeps: ReadonlyArray<unknown> = [];
+	let identityMode: InfiniteQueryRenderState[`identityMode`] = `collection`;
 
-	if (needsNewCollection) {
-		inputKindRef.current = inputKind;
-		if (isCollection) {
-			const collection = queryFnOrCollection as Collection<any, any, any>;
-			if (!supportsWindowing(collection)) {
-				// Surfaced synchronously during render (not from a passive effect), so
-				// a caller — and a test's expect().toThrow — observes it directly.
-				throw new Error(
-					`useLiveInfiniteQuery: Pre-created live query collection must have an orderBy clause for infinite pagination to work (setWindow() is unavailable without one). ` +
-						`Please add .orderBy() to your createLiveQueryCollection query.`,
-				);
-			}
-			// Warn once per collection instance if its current window doesn't match
-			// the first page the hook is about to enforce.
-			if (validatedCollectionRef.current !== collection) {
-				validatedCollectionRef.current = collection;
-				const currentWindow = collection.utils.getWindow?.();
-				if (currentWindow && (currentWindow.offset !== 0 || currentWindow.limit !== pageSize + 1)) {
-					console.warn(
-						`useLiveInfiniteQuery: Pre-created collection has window {offset: ${currentWindow.offset}, limit: ${currentWindow.limit}} ` +
-							`but the hook expects {offset: 0, limit: ${pageSize + 1}}. Adjusting window now.`,
-					);
-				}
-			}
-			collectionRef.current = collection;
-			configRef.current = queryFnOrCollection;
+	if (!inputIsCollection) {
+		if (config.queryKey !== undefined) {
+			identityMode = `queryKey`;
+			identityDeps = config.queryKey;
+		} else if (deps !== undefined) {
+			identityMode = `legacyDeps`;
+			identityDeps = deps;
+			warnDeprecatedDepsArray(`useLiveInfiniteQuery`);
+		} else if (
+			committed?.identityMode === `derived` &&
+			committed.inputQuery === queryFnOrCollection &&
+			committed.client === dbClient
+		) {
+			identityMode = `derived`;
+			identityDeps = committed.dependencies ?? [];
 		} else {
-			// Wrap the query with the first page's peek-ahead window; the controller
-			// grows the limit from here. Construction happens during render, so keep
-			// synchronization idle until the committed controller subscription first
-			// acquires the matching window lease.
-			collectionRef.current = createLiveQueryCollection({
-				query: (q: InitialQueryBuilder) =>
-					queryFnOrCollection(q)
-						.limit(pageSize + 1)
-						.offset(0),
-				startSync: false,
-				gcTime: DEFAULT_GC_TIME_MS,
-			});
-			depsRef.current = [...deps];
+			identityMode = `derived`;
+			const preparation = prepareDerivedQuery(
+				queryFnOrCollection,
+				dbClient,
+				derivedIdentityProfilerRef.current,
+				deferredCollections,
+			);
+			preparedQueryValue = preparation.value;
+			if (preparation.status === `hashable`) {
+				identityDeps = preparation.identityDeps;
+			} else {
+				warnUnhashableDerivedIdentity(preparation.error);
+				identityDeps = legacyUnhashableIdentityRef.current;
+			}
 		}
 	}
 
+	const usesLegacyDeps = !inputIsCollection && config.queryKey === undefined && deps !== undefined;
+	const dependencyComparison = compareLiveQueryWindowDependencies(
+		committed?.dependencies,
+		identityDeps,
+	);
+	const sameClient = committed?.client === dbClient;
+	const dependenciesChanged =
+		!inputIsCollection &&
+		(!sameClient ||
+			(usesLegacyDeps ? dependencyComparison.changed : !dependencyComparison.structurallyEqual));
+	const dependenciesStructurallyEqual =
+		usesLegacyDeps && sameClient && dependencyComparison.structurallyEqual;
+	const needsNewCollection =
+		committed === null ||
+		committed.inputKind !== inputKind ||
+		(inputIsCollection && committed.inputCollection !== queryFnOrCollection) ||
+		dependenciesChanged;
+	const pageShapeChanged =
+		committed === null ||
+		committed.pageSize !== pageSize ||
+		committed.initialPageParam !== initialPageParam;
+	const needsNewController = committed === null || needsNewCollection || pageShapeChanged;
+
+	let renderState = committed;
 	if (needsNewController) {
-		const previousController = controllerRef.current;
-		// Preserve the committed page count across a controller swap when the
-		// underlying data window is unchanged (same collection, or same query with
-		// structurally-equal deps). A genuine deps change resets to the first page.
-		const canPreservePageCount =
-			previousController !== null &&
-			(!needsNewCollection || (previousInputKind === `query` && dependenciesStructurallyEqual));
-		const initialPageCount = canPreservePageCount
-			? Math.max(1, previousController.getSnapshot().pages.length)
+		let collection = committed?.collection;
+		let warning: string | null = null;
+
+		if (needsNewCollection) {
+			let inputValue = queryFnOrCollection;
+			if (!inputIsCollection) {
+				if (preparedQueryValue === unpreparedQueryValue) {
+					preparedQueryValue = prepareQueryValue(
+						queryFnOrCollection,
+						dbClient,
+						deferredCollections,
+					);
+				}
+				inputValue = () => preparedQueryValue;
+			}
+			const input = resolveLiveQueryWindowInput<TContext>(inputValue);
+			if (input.kind === `collection`) {
+				collection = input.collection;
+			} else {
+				// Wrap the query with the first page's peek-ahead window; the controller
+				// grows the limit from here via setWindow.
+				collection = createLiveQueryCollection({
+					query: input.query.limit(pageSize + 1).offset(0),
+					// Construction happens during render. Synchronization starts only when
+					// useSyncExternalStore commits the controller subscription.
+					startSync: false,
+					gcTime: DEFAULT_GC_TIME_MS,
+				});
+			}
+		}
+
+		if (!collection) {
+			throw new Error(`useLiveInfiniteQuery: Failed to create a collection.`);
+		}
+
+		if (inputIsCollection) {
+			warning = getLiveQueryWindowCollectionWarning(collection, pageSize + 1) ?? null;
+		} else {
+			assertLiveQueryWindowManyResult(collection);
+		}
+
+		const canPreservePageCount = shouldPreserveLiveQueryWindowPageCount({
+			hasPreviousController: committed !== null,
+			previousInputKind: committed?.inputKind,
+			inputKind,
+			sameCollection: inputIsCollection && committed?.inputCollection === collection,
+			dependenciesChanged,
+			dependenciesStructurallyEqual,
+			pageShapeChanged,
+		});
+		const previousPageCount = committed
+			? Math.max(1, committed.controller.getSnapshot().pages.length)
 			: 1;
-		pageSizeRef.current = pageSize;
-		initialPageParamRef.current = initialPageParam;
-		controllerRef.current = createLiveQueryWindowController(collectionRef.current, {
+		const initialPageCount = canPreservePageCount ? previousPageCount : 1;
+		renderState = {
+			inputKind,
+			inputCollection: inputIsCollection ? collection : null,
+			inputQuery: inputIsCollection ? null : queryFnOrCollection,
+			client: dbClient,
+			identityMode,
+			dependencies: inputIsCollection ? null : [...identityDeps],
 			pageSize,
 			initialPageParam,
-			initialPageCount,
-		});
-	}
-	const controller = controllerRef.current!;
-
-	// Stable subscribe / getSnapshot / fetchNextPage bound to the current
-	// controller; recreated only when the controller is swapped.
-	const subscribeRef = useRef<((onStoreChange: () => void) => () => void) | null>(
-		null,
-		subSlot(slot, `sub-ref`),
-	);
-	const getSnapshotRef = useRef<(() => ReturnType<typeof controller.getSnapshot>) | null>(
-		null,
-		subSlot(slot, `gs-ref`),
-	);
-	const fetchNextPageRef = useRef<(() => void) | null>(null, subSlot(slot, `fetch-ref`));
-	if (needsNewController || !subscribeRef.current) {
-		subscribeRef.current = (onStoreChange: () => void) => {
-			let unsubscribed = false;
-			const unsub = controller.subscribe(() => {
-				if (!unsubscribed) onStoreChange();
-			});
-			// The controller starts sync and, for a pre-created collection whose
-			// window differs from the hook's page shape, grows the window via
-			// setWindow synchronously during subscribe. That growth publishes no
-			// change the observer can forward, and Octane's useSyncExternalStore
-			// tear-check already ran before this passive subscribe effect. Nudge
-			// Octane to re-read the freshly-grown snapshot on the next microtask.
-			// See useLiveQuery's matching note and the eager-onstorechange test.
-			queueMicrotask(() => {
-				if (!unsubscribed) onStoreChange();
-			});
-			return () => {
-				unsubscribed = true;
-				unsub();
-			};
-		};
-		getSnapshotRef.current = () => controller.getSnapshot();
-		fetchNextPageRef.current = () => {
-			// Pagination errors surface on the controller snapshot's `error`; the void
-			// callback has no promise channel, so consume the rejection here.
-			void controller.fetchNextPage().catch(() => {});
+			collection,
+			controller: createLiveQueryWindowController(collection, {
+				pageSize,
+				initialPageParam,
+				initialPageCount,
+			}),
+			warning,
+			warned: false,
+			deferredCollections,
 		};
 	}
+	const currentRenderState = renderState!;
+	const controller = currentRenderState.controller;
 
+	const subscribe = useCallback(
+		(onStoreChange: () => void) => {
+			const unsubscribe = controller.subscribe(onStoreChange);
+			committedRef.current = currentRenderState;
+			if (currentRenderState.warning && !currentRenderState.warned) {
+				currentRenderState.warned = true;
+				console.warn(currentRenderState.warning);
+			}
+			for (const collection of currentRenderState.deferredCollections) {
+				collection._resumeSyncStart();
+			}
+			currentRenderState.deferredCollections.clear();
+			return unsubscribe;
+		},
+		[controller, currentRenderState],
+		subSlot(slot, 'subscribe'),
+	);
+	const getSnapshot = useCallback(
+		() => controller.getSnapshot(),
+		[controller],
+		subSlot(slot, 'getSnapshot'),
+	);
 	const snapshot = useSyncExternalStore(
-		subscribeRef.current,
-		getSnapshotRef.current!,
-		getSnapshotRef.current!,
-		subSlot(slot, `uses`),
+		subscribe,
+		getSnapshot,
+		getSnapshot,
+		subSlot(slot, 'snapshot'),
+	);
+
+	const fetchNextPage = useCallback(
+		() => fetchNextLiveQueryWindowPage(controller),
+		[controller],
+		subSlot(slot, 'fetchNextPage'),
 	);
 
 	return {
-		data: snapshot.data,
-		state: snapshot.state,
-		status: snapshot.status,
+		data: snapshot.data as InferResultType<TContext>,
+		state: snapshot.state as EnabledLiveQueryReturn<TContext>[`state`],
+		status: snapshot.status as EnabledLiveQueryReturn<TContext>[`status`],
 		isLoading: snapshot.isLoading,
 		isReady: snapshot.isReady,
 		isIdle: snapshot.isIdle,
 		isError: snapshot.isError,
 		isCleanedUp: snapshot.isCleanedUp,
-		collection: snapshot.collection,
+		collection: snapshot.collection as EnabledLiveQueryReturn<TContext>[`collection`],
 		isEnabled: snapshot.isEnabled,
-		pages: snapshot.pages,
-		pageParams: snapshot.pageParams,
-		fetchNextPage: fetchNextPageRef.current!,
+		pages: snapshot.pages as Array<Array<InferResultType<TContext>[number]>>,
+		pageParams: snapshot.pageParams as Array<number>,
+		fetchNextPage,
 		hasNextPage: snapshot.hasNextPage,
 		isFetchingNextPage: snapshot.isFetchingNextPage,
 		error: snapshot.error,
-	} as unknown as UseLiveInfiniteQueryReturn<TContext>;
+	};
 }

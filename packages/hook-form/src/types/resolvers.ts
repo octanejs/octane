@@ -1,4 +1,4 @@
-// Vendored from react-hook-form@7.81.0 src/types/resolvers.ts (octane port).
+// Adapted from react-hook-form@7.88.0 src/types/resolvers.ts for Octane.
 import type { FieldErrors } from './errors';
 import type { Field, FieldName, FieldValues, InternalFieldName } from './fields';
 import type { CriteriaMode } from './form';

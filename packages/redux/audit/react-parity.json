@@ -11,14 +11,21 @@
     "integrity": "sha256:947436d0e52a8f4fa348aaf5708eafc8ae8395b986229f0fce5c91c81011c805",
     "verification": "recorded-unverified"
   },
-  "upstreamSuites": { "runtime": "present", "types": "present" },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "present"
+  },
   "adaptedRoots": {
     "source": {
       "roots": ["packages/redux/src"],
       "include": ["\\.(?:ts|tsrx)$"],
       "exclude": ["\\.d\\.ts$"]
     },
-    "tests": { "roots": ["packages/redux/tests"], "include": ["\\.test\\.ts$"], "exclude": [] }
+    "tests": {
+      "roots": ["packages/redux/tests"],
+      "include": ["\\.test\\.ts$"],
+      "exclude": []
+    }
   },
   "adaptedRuntimeSummary": {
     "inventoryEntries": 0,
@@ -33,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "b6e65e48154571accca212b2400e70f0b1dee9499979f0b7ab2febaa4de93c58"
+      "lockfileSha256": "512a0ebbe26d6fe151716392506f43ce6b91c4927b07740bc732c8b49fb44687"
     }
   },
   "lanes": [

@@ -4,6 +4,7 @@
   "roots": ["packages/hook-form/tests/upstream"],
   "files": [
     "packages/hook-form/tests/upstream/controller.test.tsx",
+    "packages/hook-form/tests/upstream/errorMessage.test.tsx",
     "packages/hook-form/tests/upstream/form.test.tsx",
     "packages/hook-form/tests/upstream/formStateSubscribe.test.tsx",
     "packages/hook-form/tests/upstream/isPlainObject.test.ts",
@@ -16,7 +17,6 @@
     "packages/hook-form/tests/upstream/logic/getFieldValue.test.ts",
     "packages/hook-form/tests/upstream/logic/getFieldValueAs.test.ts",
     "packages/hook-form/tests/upstream/logic/getFocusFieldName.test.ts",
-    "packages/hook-form/tests/upstream/logic/getNodeParentName.test.ts",
     "packages/hook-form/tests/upstream/logic/getRadioValue.test.ts",
     "packages/hook-form/tests/upstream/logic/getResolverOptions.test.ts",
     "packages/hook-form/tests/upstream/logic/getRuleValue.test.ts",
@@ -51,7 +51,9 @@
     "packages/hook-form/tests/upstream/useFieldArray/update.test.tsx",
     "packages/hook-form/tests/upstream/useForm.test.tsx",
     "packages/hook-form/tests/upstream/useForm/clearErrors.test.tsx",
+    "packages/hook-form/tests/upstream/useForm/criteriaMode.test.tsx",
     "packages/hook-form/tests/upstream/useForm/formState.test.tsx",
+    "packages/hook-form/tests/upstream/useForm/getErrors.test.tsx",
     "packages/hook-form/tests/upstream/useForm/getFieldState.test.tsx",
     "packages/hook-form/tests/upstream/useForm/getValues.test.tsx",
     "packages/hook-form/tests/upstream/useForm/handleSubmit.test.tsx",
@@ -78,11 +80,12 @@
     "packages/hook-form/tests/upstream/utils/convertToArrayPayload.test.ts",
     "packages/hook-form/tests/upstream/utils/createSubject.test.ts",
     "packages/hook-form/tests/upstream/utils/deepEqual.test.ts",
-    "packages/hook-form/tests/upstream/utils/deepMerge.test.ts",
     "packages/hook-form/tests/upstream/utils/extractFormValues.test.ts",
     "packages/hook-form/tests/upstream/utils/fillEmptyArray.test.ts",
     "packages/hook-form/tests/upstream/utils/flatten.test.ts",
+    "packages/hook-form/tests/upstream/utils/formData.test.ts",
     "packages/hook-form/tests/upstream/utils/get.test.ts",
+    "packages/hook-form/tests/upstream/utils/has.test.ts",
     "packages/hook-form/tests/upstream/utils/insert.test.ts",
     "packages/hook-form/tests/upstream/utils/isBoolean.test.ts",
     "packages/hook-form/tests/upstream/utils/isCheckBoxInput.test.ts",
@@ -366,6 +369,146 @@
       "fullName": "Controller should validate input when input is touched and with onTouched mode"
     },
     {
+      "id": "runtime:2ac0c2c1a693443d",
+      "file": "packages/hook-form/tests/upstream/errorMessage.test.tsx",
+      "fullName": "ErrorMessage root errors renders root-level errors set via setError"
+    },
+    {
+      "id": "runtime:74ce7e1737cf0c89",
+      "file": "packages/hook-form/tests/upstream/errorMessage.test.tsx",
+      "fullName": "ErrorMessage snapshot: prop matrix should render correctly with flat errors"
+    },
+    {
+      "id": "runtime:ce48852a1a64da6b",
+      "file": "packages/hook-form/tests/upstream/errorMessage.test.tsx",
+      "fullName": "ErrorMessage snapshot: prop matrix should render correctly with flat errors and as with component"
+    },
+    {
+      "id": "runtime:4a51bb77aebdc4a0",
+      "file": "packages/hook-form/tests/upstream/errorMessage.test.tsx",
+      "fullName": "ErrorMessage snapshot: prop matrix should render correctly with flat errors and as with component and render"
+    },
+    {
+      "id": "runtime:577e33271720b599",
+      "file": "packages/hook-form/tests/upstream/errorMessage.test.tsx",
+      "fullName": "ErrorMessage snapshot: prop matrix should render correctly with flat errors and as with element and render"
+    },
+    {
+      "id": "runtime:703224de24ed5447",
+      "file": "packages/hook-form/tests/upstream/errorMessage.test.tsx",
+      "fullName": "ErrorMessage snapshot: prop matrix should render correctly with flat errors and as with string"
+    },
+    {
+      "id": "runtime:71b43755a48929df",
+      "file": "packages/hook-form/tests/upstream/errorMessage.test.tsx",
+      "fullName": "ErrorMessage snapshot: prop matrix should render correctly with flat multiple errors and as with element and render"
+    },
+    {
+      "id": "runtime:3f5337493953482a",
+      "file": "packages/hook-form/tests/upstream/errorMessage.test.tsx",
+      "fullName": "ErrorMessage snapshot: prop matrix should render correctly with flat multiple errors and render"
+    },
+    {
+      "id": "runtime:af8e99272956bac6",
+      "file": "packages/hook-form/tests/upstream/errorMessage.test.tsx",
+      "fullName": "ErrorMessage snapshot: prop matrix should render correctly with nested errors and as with element and render"
+    },
+    {
+      "id": "runtime:d8f0b453b9f1196e",
+      "file": "packages/hook-form/tests/upstream/errorMessage.test.tsx",
+      "fullName": "ErrorMessage snapshot: prop matrix should render correctly with nested errors array"
+    },
+    {
+      "id": "runtime:516d8cf0bbf3bf96",
+      "file": "packages/hook-form/tests/upstream/errorMessage.test.tsx",
+      "fullName": "ErrorMessage snapshot: prop matrix should render correctly with nested errors array and as with element and render"
+    },
+    {
+      "id": "runtime:ff111747111e9614",
+      "file": "packages/hook-form/tests/upstream/errorMessage.test.tsx",
+      "fullName": "ErrorMessage snapshot: prop matrix should render correctly with nested errors array and as with string"
+    },
+    {
+      "id": "runtime:d0f272fda49e4111",
+      "file": "packages/hook-form/tests/upstream/errorMessage.test.tsx",
+      "fullName": "ErrorMessage snapshot: prop matrix should render correctly with nested errors object"
+    },
+    {
+      "id": "runtime:d69752f7ba2a36f0",
+      "file": "packages/hook-form/tests/upstream/errorMessage.test.tsx",
+      "fullName": "ErrorMessage snapshot: prop matrix should render correctly with nested errors object and as with string"
+    },
+    {
+      "id": "runtime:75ba554d7b1570ab",
+      "file": "packages/hook-form/tests/upstream/errorMessage.test.tsx",
+      "fullName": "ErrorMessage snapshot: prop matrix should render correctly with nested multiple errors and as with element and render"
+    },
+    {
+      "id": "runtime:c833177a1cf517a4",
+      "file": "packages/hook-form/tests/upstream/errorMessage.test.tsx",
+      "fullName": "ErrorMessage snapshot: prop matrix should render correctly with nested multiple errors and render"
+    },
+    {
+      "id": "runtime:ffe7b212cab81a82",
+      "file": "packages/hook-form/tests/upstream/errorMessage.test.tsx",
+      "fullName": "ErrorMessage snapshot: prop matrix should render correctly with nested multiple errors array and as with element and render"
+    },
+    {
+      "id": "runtime:65ba743a7099d4fc",
+      "file": "packages/hook-form/tests/upstream/errorMessage.test.tsx",
+      "fullName": "ErrorMessage snapshot: prop matrix should render correctly with nested multiple errors array and render"
+    },
+    {
+      "id": "runtime:7a085ebf6483e6d0",
+      "file": "packages/hook-form/tests/upstream/errorMessage.test.tsx",
+      "fullName": "ErrorMessage snapshot: prop matrix should render correctly with no errors"
+    },
+    {
+      "id": "runtime:1316d493247b4f61",
+      "file": "packages/hook-form/tests/upstream/errorMessage.test.tsx",
+      "fullName": "ErrorMessage with FormProvider context reads errors from context without control prop"
+    },
+    {
+      "id": "runtime:57691aeb2b3d2f0a",
+      "file": "packages/hook-form/tests/upstream/errorMessage.test.tsx",
+      "fullName": "ErrorMessage with control prop clears error message when field becomes valid"
+    },
+    {
+      "id": "runtime:b63d0337940c3531",
+      "file": "packages/hook-form/tests/upstream/errorMessage.test.tsx",
+      "fullName": "ErrorMessage with control prop does not re-render parent when only errors change"
+    },
+    {
+      "id": "runtime:02f3b12aeb739e91",
+      "file": "packages/hook-form/tests/upstream/errorMessage.test.tsx",
+      "fullName": "ErrorMessage with control prop handles nested field names"
+    },
+    {
+      "id": "runtime:836d2ead0efdb5ab",
+      "file": "packages/hook-form/tests/upstream/errorMessage.test.tsx",
+      "fullName": "ErrorMessage with control prop renders error message after submit with required rule"
+    },
+    {
+      "id": "runtime:a4566e3450b0bfb2",
+      "file": "packages/hook-form/tests/upstream/errorMessage.test.tsx",
+      "fullName": "ErrorMessage with control prop renders nothing when field has no error"
+    },
+    {
+      "id": "runtime:4f6c2cf27a2355d9",
+      "file": "packages/hook-form/tests/upstream/errorMessage.test.tsx",
+      "fullName": "ErrorMessage with control prop renders via render prop"
+    },
+    {
+      "id": "runtime:b58e1d92a852d7dd",
+      "file": "packages/hook-form/tests/upstream/errorMessage.test.tsx",
+      "fullName": "ErrorMessage with control prop renders with `as` string element"
+    },
+    {
+      "id": "runtime:d5cace52c7626e8a",
+      "file": "packages/hook-form/tests/upstream/form.test.tsx",
+      "fullName": "Form should call a function action with FormData instead of fetching"
+    },
+    {
       "id": "runtime:283239605c4b7913",
       "file": "packages/hook-form/tests/upstream/form.test.tsx",
       "fullName": "Form should handle error request callback"
@@ -379,6 +522,26 @@
       "id": "runtime:97ab34afb4312db3",
       "file": "packages/hook-form/tests/upstream/form.test.tsx",
       "fullName": "Form should include application/json header with encType supplied"
+    },
+    {
+      "id": "runtime:707dd5d82f9c7577",
+      "file": "packages/hook-form/tests/upstream/form.test.tsx",
+      "fullName": "Form should include file values in the submitted FormData"
+    },
+    {
+      "id": "runtime:16ea1fbc3a935423",
+      "file": "packages/hook-form/tests/upstream/form.test.tsx",
+      "fullName": "Form should invoke onError when a function action throws"
+    },
+    {
+      "id": "runtime:5ac6d7c3d0ab8f96",
+      "file": "packages/hook-form/tests/upstream/form.test.tsx",
+      "fullName": "Form should not render method/encType on the form element when action is a function"
+    },
+    {
+      "id": "runtime:494416c444d80822",
+      "file": "packages/hook-form/tests/upstream/form.test.tsx",
+      "fullName": "Form should still render method/encType on the form element when action is a URL string"
     },
     {
       "id": "runtime:101fb6a908e39bb6",
@@ -526,6 +689,16 @@
       "fullName": "createFormControl should call executeBuiltInValidation the correct number of times in case the field is an array"
     },
     {
+      "id": "runtime:0258086512fda52d",
+      "file": "packages/hook-form/tests/upstream/logic/createFormControl.test.ts",
+      "fullName": "createFormControl should clear the entire internal errors state when `clearErrors()` is called without arguments"
+    },
+    {
+      "id": "runtime:b33fcc1104948649",
+      "file": "packages/hook-form/tests/upstream/logic/createFormControl.test.ts",
+      "fullName": "createFormControl should keep dirtyFields reference stable when dirty fields do not change"
+    },
+    {
       "id": "runtime:dd3816b27c8770d2",
       "file": "packages/hook-form/tests/upstream/logic/generateId.test.ts",
       "fullName": "generateId should fallback to current date if performance is undefined"
@@ -611,6 +784,16 @@
       "fullName": "getDirtyFields should mark null values as dirty when comparing with defaultValues"
     },
     {
+      "id": "runtime:13afd2e8614ddc95",
+      "file": "packages/hook-form/tests/upstream/logic/getDirtyFields.test.ts",
+      "fullName": "getDirtyFields should not leave a stray empty array for a field array with no default value once all items are removed (#13600)"
+    },
+    {
+      "id": "runtime:b31416d0739e2b69",
+      "file": "packages/hook-form/tests/upstream/logic/getDirtyFields.test.ts",
+      "fullName": "getDirtyFields should not leave a stray empty array for a nested field array with no default value once all items are removed (#13600)"
+    },
+    {
       "id": "runtime:99c7b5c586b59092",
       "file": "packages/hook-form/tests/upstream/logic/getDirtyFields.test.ts",
       "fullName": "getDirtyFields should not set dirtyFields fields for nested input data which are deep equal"
@@ -676,6 +859,11 @@
       "fullName": "getEventValue should return correct value"
     },
     {
+      "id": "runtime:3cf84147f0c64b94",
+      "file": "packages/hook-form/tests/upstream/logic/getEventValue.test.ts",
+      "fullName": "getEventValue should return files for a file input target"
+    },
+    {
       "id": "runtime:422015bb6489b697",
       "file": "packages/hook-form/tests/upstream/logic/getFieldValue.test.ts",
       "fullName": "getFieldValue should return correct value when type is radio"
@@ -714,16 +902,6 @@
       "id": "runtime:dec2d7c581962e05",
       "file": "packages/hook-form/tests/upstream/logic/getFocusFieldName.test.ts",
       "fullName": "getFocusFieldName should return expected focus name"
-    },
-    {
-      "id": "runtime:f99c1cc383e6885a",
-      "file": "packages/hook-form/tests/upstream/logic/getNodeParentName.test.ts",
-      "fullName": "getNodeParentName should return empty string when name is not field array"
-    },
-    {
-      "id": "runtime:b0d6dca579ae63fb",
-      "file": "packages/hook-form/tests/upstream/logic/getNodeParentName.test.ts",
-      "fullName": "getNodeParentName should return parent name when name is field array"
     },
     {
       "id": "runtime:00d97b7a86d7dc98",
@@ -806,11 +984,6 @@
       "fullName": "hasPromiseValidation validate option does not exist"
     },
     {
-      "id": "runtime:26138cd2f5b27b06",
-      "file": "packages/hook-form/tests/upstream/logic/hasValidation.test.ts",
-      "fullName": "hasValidation should return false for falsy but valid numeric values like min: 0, max: 0, minLength: 0 or maxLength: 0"
-    },
-    {
       "id": "runtime:3495a8401c83dc8a",
       "file": "packages/hook-form/tests/upstream/logic/hasValidation.test.ts",
       "fullName": "hasValidation should return false if mount is not defined"
@@ -841,6 +1014,11 @@
       "fullName": "hasValidation should return pattern even when valueAsDate and valueAsNumber are not provided"
     },
     {
+      "id": "runtime:9442fbc0979dd358",
+      "file": "packages/hook-form/tests/upstream/logic/hasValidation.test.ts",
+      "fullName": "hasValidation should return true for falsy but valid numeric values like min: 0, max: 0, minLength: 0 or maxLength: 0"
+    },
+    {
       "id": "runtime:73fbd4899d19df9f",
       "file": "packages/hook-form/tests/upstream/logic/hasValidation.test.ts",
       "fullName": "hasValidation should return true when any validation rule is provided"
@@ -854,6 +1032,11 @@
       "id": "runtime:76dd6c242eeb4035",
       "file": "packages/hook-form/tests/upstream/logic/hasValidation.test.ts",
       "fullName": "hasValidation should return true when required is a string message"
+    },
+    {
+      "id": "runtime:11fab929198c6c48",
+      "file": "packages/hook-form/tests/upstream/logic/hasValidation.test.ts",
+      "fullName": "hasValidation should return true when required is an empty message string"
     },
     {
       "id": "runtime:560da94d9740aee7",
@@ -896,6 +1079,11 @@
       "fullName": "isWatched should return watched fields"
     },
     {
+      "id": "runtime:4ccf23f120d3519c",
+      "file": "packages/hook-form/tests/upstream/logic/iterateFieldsByAction.test.ts",
+      "fullName": "iterateFieldsByAction should break out of all loops when the match is nested below a sibling top-level group"
+    },
+    {
       "id": "runtime:649f80663f47b4b1",
       "file": "packages/hook-form/tests/upstream/logic/iterateFieldsByAction.test.ts",
       "fullName": "iterateFieldsByAction should focus on first option when options input error encounters"
@@ -936,9 +1124,19 @@
       "fullName": "errorsLookup should find the nearest root error"
     },
     {
+      "id": "runtime:736e892e52a70d4e",
+      "file": "packages/hook-form/tests/upstream/logic/schemaErrorLookup.test.ts",
+      "fullName": "errorsLookup should not report a nested error container as the exact-name field error"
+    },
+    {
       "id": "runtime:cfe3b9ed8e1899c8",
       "file": "packages/hook-form/tests/upstream/logic/schemaErrorLookup.test.ts",
       "fullName": "errorsLookup should prevent error from reported when field is identified"
+    },
+    {
+      "id": "runtime:798c820514e34403",
+      "file": "packages/hook-form/tests/upstream/logic/schemaErrorLookup.test.ts",
+      "fullName": "errorsLookup should resolve an exact-name root error to the .root path"
     },
     {
       "id": "runtime:d7081dda86f53c45",
@@ -1106,6 +1304,11 @@
       "fullName": "validateField should return min error"
     },
     {
+      "id": "runtime:f0c9afccb8ab086a",
+      "file": "packages/hook-form/tests/upstream/logic/validateField.test.tsx",
+      "fullName": "validateField should return min error when the field value is already a Date object (valueAsDate)"
+    },
+    {
       "id": "runtime:46a04936bb94e2d2",
       "file": "packages/hook-form/tests/upstream/logic/validateField.test.tsx",
       "fullName": "validateField should return min length error "
@@ -1161,9 +1364,29 @@
       "fullName": "validateField with Browser native validation should invoke setCustomValidity on all refs for a required radio group"
     },
     {
+      "id": "runtime:541753f3ff9850b3",
+      "file": "packages/hook-form/tests/upstream/logic/validateField.test.tsx",
+      "fullName": "validateField with Browser native validation should invoke setCustomValidity with an empty string for a valid input when all criteria are collected"
+    },
+    {
       "id": "runtime:91b10fcd4eb5f729",
       "file": "packages/hook-form/tests/upstream/logic/validateField.test.tsx",
       "fullName": "validateField with Browser native validation should invoke setCustomValidity with empty string for a valid input"
+    },
+    {
+      "id": "runtime:4f31cb1f8025ae03",
+      "file": "packages/hook-form/tests/upstream/logic/validateField.test.tsx",
+      "fullName": "validateField with Browser native validation should invoke setCustomValidity with the required message when all criteria are collected"
+    },
+    {
+      "id": "runtime:2d4163dc38e627f5",
+      "file": "packages/hook-form/tests/upstream/logic/validateField.test.tsx",
+      "fullName": "validateField with Browser native validation should invoke setCustomValidity with the validate message when all criteria are collected"
+    },
+    {
+      "id": "runtime:19e15ed72ce43452",
+      "file": "packages/hook-form/tests/upstream/logic/validateField.test.tsx",
+      "fullName": "validateField with Browser native validation should not invoke setCustomValidity per key when collecting all criteria from a validate object"
     },
     {
       "id": "runtime:663a970442ed5fbd",
@@ -1279,6 +1502,31 @@
       "id": "runtime:7f179801e98baf4d",
       "file": "packages/hook-form/tests/upstream/performance.test.tsx",
       "fullName": "setValues emission batching emits exactly one state notification regardless of how many fields change"
+    },
+    {
+      "id": "runtime:1b8578ce532bcea9",
+      "file": "packages/hook-form/tests/upstream/performance.test.tsx",
+      "fullName": "unregister _valuesSubscriberCount guard a returning subscriber sees values that changed while it was away"
+    },
+    {
+      "id": "runtime:7fbe093f40a30fee",
+      "file": "packages/hook-form/tests/upstream/performance.test.tsx",
+      "fullName": "unregister _valuesSubscriberCount guard omits the values broadcast when no value subscriber is active"
+    },
+    {
+      "id": "runtime:54f5d8d0ba791db3",
+      "file": "packages/hook-form/tests/upstream/performance.test.tsx",
+      "fullName": "unregister _valuesSubscriberCount guard omits values broadcasts while _removeUnmounted drains many fields"
+    },
+    {
+      "id": "runtime:627ca194beacca61",
+      "file": "packages/hook-form/tests/upstream/performance.test.tsx",
+      "fullName": "unregister _valuesSubscriberCount guard still delivers unregistered values to a watch(fn) subscriber"
+    },
+    {
+      "id": "runtime:a38afbe48792797a",
+      "file": "packages/hook-form/tests/upstream/performance.test.tsx",
+      "fullName": "unregister _valuesSubscriberCount guard tracks a public values subscriber through unsubscribe"
     },
     {
       "id": "runtime:1149dd93c3624565",
@@ -1461,6 +1709,11 @@
       "fullName": "useController should not disable form input field with disabled=false"
     },
     {
+      "id": "runtime:6ab6675f7c68f4f5",
+      "file": "packages/hook-form/tests/upstream/useController.test.tsx",
+      "fullName": "useController should not mutate an externally-owned object passed to a parent field.onChange when a nested field later changes"
+    },
+    {
       "id": "runtime:0ff3847639bf94b0",
       "file": "packages/hook-form/tests/upstream/useController.test.tsx",
       "fullName": "useController should not omit form value when disabled is not been presented"
@@ -1531,6 +1784,11 @@
       "fullName": "useController should return defaultValues when component is not yet mounted"
     },
     {
+      "id": "runtime:a3d68e8b6bc9427f",
+      "file": "packages/hook-form/tests/upstream/useController.test.tsx",
+      "fullName": "useController should submit null instead of undefined for a nested Controller field under a null parent default value (#13674)"
+    },
+    {
       "id": "runtime:e62f5fd4d8315148",
       "file": "packages/hook-form/tests/upstream/useController.test.tsx",
       "fullName": "useController should subscribe to exact form state update"
@@ -1564,6 +1822,11 @@
       "id": "runtime:df683423708c6ee9",
       "file": "packages/hook-form/tests/upstream/useController.test.tsx",
       "fullName": "useController should update with inline defaultValue"
+    },
+    {
+      "id": "runtime:da3069f48573566a",
+      "file": "packages/hook-form/tests/upstream/useController.test.tsx",
+      "fullName": "useController should write onChange updates to the newly-passed control (#13163)"
     },
     {
       "id": "runtime:82de7bef2c786075",
@@ -1751,6 +2014,16 @@
       "fullName": "useFieldArray when component unMount should unset field array values correctly on DOM removing"
     },
     {
+      "id": "runtime:cbcae6af83074de1",
+      "file": "packages/hook-form/tests/upstream/useFieldArray.test.tsx",
+      "fullName": "useFieldArray with Activity should synchronize field array values after Activity restoration"
+    },
+    {
+      "id": "runtime:54d6669f48c952f9",
+      "file": "packages/hook-form/tests/upstream/useFieldArray.test.tsx",
+      "fullName": "useFieldArray with Activity should synchronize field array values when an Activity subtree becomes visible for the first time"
+    },
+    {
       "id": "runtime:84b3faae25a1fa77",
       "file": "packages/hook-form/tests/upstream/useFieldArray.test.tsx",
       "fullName": "useFieldArray with checkbox should correctly duplicate checkbox items with their values"
@@ -1856,6 +2129,16 @@
       "fullName": "useFieldArray with resolver should update error when user action corrects it"
     },
     {
+      "id": "runtime:307b427daab1f3d3",
+      "file": "packages/hook-form/tests/upstream/useFieldArray.test.tsx",
+      "fullName": "useFieldArray with rules should keep the root error after append/prepend/insert/remove when triggered before submit"
+    },
+    {
+      "id": "runtime:9952035f58d14593",
+      "file": "packages/hook-form/tests/upstream/useFieldArray.test.tsx",
+      "fullName": "useFieldArray with rules should keep the root error after swap/move when triggered before submit"
+    },
+    {
       "id": "runtime:b29af9584cb6a4a2",
       "file": "packages/hook-form/tests/upstream/useFieldArray.test.tsx",
       "fullName": "useFieldArray with rules should no longer validate when unmounted"
@@ -1909,6 +2192,11 @@
       "id": "runtime:4042b03ace7b300c",
       "file": "packages/hook-form/tests/upstream/useFieldArray.test.tsx",
       "fullName": "useFieldArray with setValue should not remount field-array rows on consecutive descendant setValue calls (key thrashing regression, #13420)"
+    },
+    {
+      "id": "runtime:ee4e535bd5169e7a",
+      "file": "packages/hook-form/tests/upstream/useFieldArray.test.tsx",
+      "fullName": "useFieldArray with setValue should resize a nested field array when setValue targets an ancestor object path (#13621)"
     },
     {
       "id": "runtime:22b6508202f96dd9",
@@ -1984,6 +2272,16 @@
       "id": "runtime:2764d0366a9efa12",
       "file": "packages/hook-form/tests/upstream/useFieldArray/append.test.tsx",
       "fullName": "append should focus if shouldFocus is true"
+    },
+    {
+      "id": "runtime:042e42bad5e76e2e",
+      "file": "packages/hook-form/tests/upstream/useFieldArray/append.test.tsx",
+      "fullName": "append should keep the value of a controlled field mounted in the same commit as an append to another field array"
+    },
+    {
+      "id": "runtime:6d1d112fa2854ae2",
+      "file": "packages/hook-form/tests/upstream/useFieldArray/append.test.tsx",
+      "fullName": "append should materialize a controlled field staged at the end of the array appended to in the same commit"
     },
     {
       "id": "runtime:3f676a3f6ef3d2d0",
@@ -2109,6 +2407,11 @@
       "id": "runtime:eeb2ba2242abb4fd",
       "file": "packages/hook-form/tests/upstream/useFieldArray/focus.test.tsx",
       "fullName": "useFieldArray focus should focus correct field array by focus name"
+    },
+    {
+      "id": "runtime:f77fcb0c03a0b5be",
+      "file": "packages/hook-form/tests/upstream/useFieldArray/focus.test.tsx",
+      "fullName": "useFieldArray focus should focus on a checkbox input of the appended field"
     },
     {
       "id": "runtime:2a2c133dc2c263a0",
@@ -2271,6 +2574,21 @@
       "fullName": "move should trigger reRender when user is watching the all field array"
     },
     {
+      "id": "runtime:76361ee9f1ac9aed",
+      "file": "packages/hook-form/tests/upstream/useFieldArray/move.test.tsx",
+      "fullName": "move when a render still holds the pre-move arrangement should keep guarding the moved array when another array acts in the same handler"
+    },
+    {
+      "id": "runtime:de028ec3ff78e89e",
+      "file": "packages/hook-form/tests/upstream/useFieldArray/move.test.tsx",
+      "fullName": "move when a render still holds the pre-move arrangement should not materialize a vacated path when a leaf re-renders before the move commits"
+    },
+    {
+      "id": "runtime:a7f88ace982a46de",
+      "file": "packages/hook-form/tests/upstream/useFieldArray/move.test.tsx",
+      "fullName": "move when a render still holds the pre-move arrangement should not resize nested arrays when index-keyed children render the pre-move arrangement"
+    },
+    {
       "id": "runtime:2be99b55f47991ba",
       "file": "packages/hook-form/tests/upstream/useFieldArray/move.test.tsx",
       "fullName": "move with resolver should invoke resolver when formState.isValid true"
@@ -2366,6 +2684,11 @@
       "fullName": "remove should be dirtyFields when value is remove with isDirty"
     },
     {
+      "id": "runtime:6242785234787dd8",
+      "file": "packages/hook-form/tests/upstream/useFieldArray/remove.test.tsx",
+      "fullName": "remove should not copy deleted fields onto a surviving row rendered from useWatch"
+    },
+    {
       "id": "runtime:05b2b0b77a71a0ac",
       "file": "packages/hook-form/tests/upstream/useFieldArray/remove.test.tsx",
       "fullName": "remove should not leave empty objects in watched values when removing from field array with values prop"
@@ -2394,6 +2717,16 @@
       "id": "runtime:d06c48ade5011d95",
       "file": "packages/hook-form/tests/upstream/useFieldArray/remove.test.tsx",
       "fullName": "remove should not reset Controller's value during remove when Field Array name is already registered"
+    },
+    {
+      "id": "runtime:feccca5b4aeca62e",
+      "file": "packages/hook-form/tests/upstream/useFieldArray/remove.test.tsx",
+      "fullName": "remove should not resize nested arrays when index-keyed children render the pre-remove arrangement"
+    },
+    {
+      "id": "runtime:7b0938b45c907497",
+      "file": "packages/hook-form/tests/upstream/useFieldArray/remove.test.tsx",
+      "fullName": "remove should not resurrect removed items when the list itself renders from useWatch"
     },
     {
       "id": "runtime:a8b24a93cb3a0266",
@@ -2456,6 +2789,11 @@
       "fullName": "remove should return watched value with watch API"
     },
     {
+      "id": "runtime:56c7d46aa6647bd3",
+      "file": "packages/hook-form/tests/upstream/useFieldArray/remove.test.tsx",
+      "fullName": "remove should treat a controlled field staged at a vacated index as the stale arrangement"
+    },
+    {
       "id": "runtime:3622f17c507d9068",
       "file": "packages/hook-form/tests/upstream/useFieldArray/remove.test.tsx",
       "fullName": "remove should trigger reRender when user is watching the all field array"
@@ -2489,6 +2827,16 @@
       "id": "runtime:c81290fc5ac58aab",
       "file": "packages/hook-form/tests/upstream/useFieldArray/remove.test.tsx",
       "fullName": "remove with resolver should remove the first index correctly"
+    },
+    {
+      "id": "runtime:b99048467b3b0fff",
+      "file": "packages/hook-form/tests/upstream/useFieldArray/replace.test.tsx",
+      "fullName": "replace should drop errors for rows removed by replace"
+    },
+    {
+      "id": "runtime:8c071ecec5e2b716",
+      "file": "packages/hook-form/tests/upstream/useFieldArray/replace.test.tsx",
+      "fullName": "replace should drop touched state for rows removed by replace"
     },
     {
       "id": "runtime:6d5be10f9734413b",
@@ -2581,6 +2929,16 @@
       "fullName": "swap with resolver should not invoke resolver when formState.isValid false"
     },
     {
+      "id": "runtime:839ec45ad73b77ea",
+      "file": "packages/hook-form/tests/upstream/useFieldArray/update.test.tsx",
+      "fullName": "update should clear touched state for the updated field"
+    },
+    {
+      "id": "runtime:425d0a2ea6ca2f65",
+      "file": "packages/hook-form/tests/upstream/useFieldArray/update.test.tsx",
+      "fullName": "update should keep errors of other fields when updating an index"
+    },
+    {
       "id": "runtime:c7249c502d5ad202",
       "file": "packages/hook-form/tests/upstream/useFieldArray/update.test.tsx",
       "fullName": "update should not omit keyName when provided"
@@ -2591,9 +2949,9 @@
       "fullName": "update should not omit keyName when provided and defaultValue is empty"
     },
     {
-      "id": "runtime:671f3c48231323e8",
+      "id": "runtime:73a53e5b80d30720",
       "file": "packages/hook-form/tests/upstream/useFieldArray/update.test.tsx",
-      "fullName": "update should not update errors state"
+      "fullName": "update should remove stale errors for the updated field"
     },
     {
       "id": "runtime:9fb7f30f6460782b",
@@ -2976,6 +3334,11 @@
       "fullName": "useForm when given formControl should reset useController value on remount with defaultValues"
     },
     {
+      "id": "runtime:baae4167ff310045",
+      "file": "packages/hook-form/tests/upstream/useForm.test.tsx",
+      "fullName": "useForm when given formControl should synchronize form state when an Activity subtree becomes visible for the first time"
+    },
+    {
       "id": "runtime:21855607a066c214",
       "file": "packages/hook-form/tests/upstream/useForm.test.tsx",
       "fullName": "useForm when input is not registered trigger should not throw warn"
@@ -3031,6 +3394,21 @@
       "fullName": "clearErrors should be able to clear root error"
     },
     {
+      "id": "runtime:3126a426805aa20c",
+      "file": "packages/hook-form/tests/upstream/useForm/clearErrors.test.tsx",
+      "fullName": "clearErrors should cancel a pending delayError timer so the cleared error does not come back"
+    },
+    {
+      "id": "runtime:939d5d06162cd5d7",
+      "file": "packages/hook-form/tests/upstream/useForm/clearErrors.test.tsx",
+      "fullName": "clearErrors should cancel pending delayError timers for nested fields when their parent is cleared"
+    },
+    {
+      "id": "runtime:e2aee7a82107a3fa",
+      "file": "packages/hook-form/tests/upstream/useForm/clearErrors.test.tsx",
+      "fullName": "clearErrors should not cancel a pending delayError timer for a field that only shares a name prefix"
+    },
+    {
       "id": "runtime:8a85f91c8c688dde",
       "file": "packages/hook-form/tests/upstream/useForm/clearErrors.test.tsx",
       "fullName": "clearErrors should only notify subscribers for the cleared field when using exact: true"
@@ -3069,6 +3447,26 @@
       "id": "runtime:c74a7d63e532bb54",
       "file": "packages/hook-form/tests/upstream/useForm/clearErrors.test.tsx",
       "fullName": "clearErrors should update isValid to true with setError"
+    },
+    {
+      "id": "runtime:bf7537339c548a44",
+      "file": "packages/hook-form/tests/upstream/useForm/criteriaMode.test.tsx",
+      "fullName": "criteriaMode should narrow back to the first error after switching criteriaMode to firstError at runtime"
+    },
+    {
+      "id": "runtime:e722552f8ab1760e",
+      "file": "packages/hook-form/tests/upstream/useForm/criteriaMode.test.tsx",
+      "fullName": "criteriaMode should report every error after switching criteriaMode to all at runtime"
+    },
+    {
+      "id": "runtime:828e9570eb30e93c",
+      "file": "packages/hook-form/tests/upstream/useForm/formState.test.tsx",
+      "fullName": "formState isValid should not let a stale resolver pass report isValidating as false while a newer one is pending"
+    },
+    {
+      "id": "runtime:518969986589fc7e",
+      "file": "packages/hook-form/tests/upstream/useForm/formState.test.tsx",
+      "fullName": "formState isValid should not let a stale whole-form validity check overwrite a newer one"
     },
     {
       "id": "runtime:7de77bda73e0eb7b",
@@ -3126,9 +3524,19 @@
       "fullName": "formState should be a proxy object that returns undefined for unknown properties"
     },
     {
+      "id": "runtime:84db960822ba30d7",
+      "file": "packages/hook-form/tests/upstream/useForm/formState.test.tsx",
+      "fullName": "formState should clear dirty state when setValue restores the default value on a disabled form"
+    },
+    {
       "id": "runtime:d8489a035ac204a9",
       "file": "packages/hook-form/tests/upstream/useForm/formState.test.tsx",
       "fullName": "formState should mark an array-valued registered field dirty as a boolean rather than diffing its elements (#13584)"
+    },
+    {
+      "id": "runtime:f3978528b0ee3924",
+      "file": "packages/hook-form/tests/upstream/useForm/formState.test.tsx",
+      "fullName": "formState should mark field and form as dirty with setValue shouldDirty when the form is disabled"
     },
     {
       "id": "runtime:23e9aeabfbc25b6e",
@@ -3221,9 +3629,24 @@
       "fullName": "formState when delay config is set should prevent error from showing once input is validated"
     },
     {
+      "id": "runtime:649a09314f5e15dc",
+      "file": "packages/hook-form/tests/upstream/useForm/formState.test.tsx",
+      "fullName": "formState when delay config is set when delayError is provided should delay, show immediately, or cancel error via setValue depending on delayError option"
+    },
+    {
       "id": "runtime:06ad8fcc16f311c8",
       "file": "packages/hook-form/tests/upstream/useForm/formState.test.tsx",
       "fullName": "formState when delay config is set when delayError is provided should only show error after 500ms with register and render formState instantly"
+    },
+    {
+      "id": "runtime:5ced0b5eb761bfa0",
+      "file": "packages/hook-form/tests/upstream/useForm/formState.test.tsx",
+      "fullName": "formState when delay config is set when delayError is provided should show error immediately when form-level delayError is not configured"
+    },
+    {
+      "id": "runtime:b05e1e6c7e8f59de",
+      "file": "packages/hook-form/tests/upstream/useForm/formState.test.tsx",
+      "fullName": "formState when using with reset API should end with isValid: true after reset() (matches e2e test baseline expectation)"
     },
     {
       "id": "runtime:db17dee1c3b44573",
@@ -3234,6 +3657,86 @@
       "id": "runtime:2d5f4410a6d07bf2",
       "file": "packages/hook-form/tests/upstream/useForm/formState.test.tsx",
       "fullName": "formState when using with reset API should render isValid as true with reset at useEffect with valid data"
+    },
+    {
+      "id": "runtime:af95f83203ffd550",
+      "file": "packages/hook-form/tests/upstream/useForm/formState.test.tsx",
+      "fullName": "formState with Activity should resync isSubmitting after Activity restoration when a submit resolves while hidden"
+    },
+    {
+      "id": "runtime:ecbebb2267da79b5",
+      "file": "packages/hook-form/tests/upstream/useForm/getErrors.test.tsx",
+      "fullName": "getErrors global errors should include root and form global errors"
+    },
+    {
+      "id": "runtime:f062014b52b1e9a1",
+      "file": "packages/hook-form/tests/upstream/useForm/getErrors.test.tsx",
+      "fullName": "getErrors global errors should read a nested form error via its full path"
+    },
+    {
+      "id": "runtime:0927c93208554ad9",
+      "file": "packages/hook-form/tests/upstream/useForm/getErrors.test.tsx",
+      "fullName": "getErrors nested and array field paths should return the nested error tree for a parent object path"
+    },
+    {
+      "id": "runtime:8c08d56700338047",
+      "file": "packages/hook-form/tests/upstream/useForm/getErrors.test.tsx",
+      "fullName": "getErrors nested and array field paths should return the nested error tree for an array parent path"
+    },
+    {
+      "id": "runtime:045496303de8f4a9",
+      "file": "packages/hook-form/tests/upstream/useForm/getErrors.test.tsx",
+      "fullName": "getErrors should expose getErrors on createFormControl and its formControl"
+    },
+    {
+      "id": "runtime:3beca68b9aec9faa",
+      "file": "packages/hook-form/tests/upstream/useForm/getErrors.test.tsx",
+      "fullName": "getErrors should expose getErrors through FormProvider and useFormContext at runtime"
+    },
+    {
+      "id": "runtime:3b1cf693149c1ba4",
+      "file": "packages/hook-form/tests/upstream/useForm/getErrors.test.tsx",
+      "fullName": "getErrors should not re-render a component that only calls getErrors when setError fires"
+    },
+    {
+      "id": "runtime:f80ae1edec990b0b",
+      "file": "packages/hook-form/tests/upstream/useForm/getErrors.test.tsx",
+      "fullName": "getErrors should protect internal errors from top-level mutations"
+    },
+    {
+      "id": "runtime:bf6e2029bf7df797",
+      "file": "packages/hook-form/tests/upstream/useForm/getErrors.test.tsx",
+      "fullName": "getErrors should read a field-array root error"
+    },
+    {
+      "id": "runtime:0401601407cb03cd",
+      "file": "packages/hook-form/tests/upstream/useForm/getErrors.test.tsx",
+      "fullName": "getErrors should reflect the setError -> getErrors -> clearErrors -> getErrors transition"
+    },
+    {
+      "id": "runtime:e70ac46415913f18",
+      "file": "packages/hook-form/tests/upstream/useForm/getErrors.test.tsx",
+      "fullName": "getErrors should return a single field error"
+    },
+    {
+      "id": "runtime:177e73602524381c",
+      "file": "packages/hook-form/tests/upstream/useForm/getErrors.test.tsx",
+      "fullName": "getErrors should return errors in the requested order, including missing entries"
+    },
+    {
+      "id": "runtime:a0637168214f7270",
+      "file": "packages/hook-form/tests/upstream/useForm/getErrors.test.tsx",
+      "fullName": "getErrors should return stored errors without running validation"
+    },
+    {
+      "id": "runtime:8e5e2591ab20b985",
+      "file": "packages/hook-form/tests/upstream/useForm/getErrors.test.tsx",
+      "fullName": "getErrors should return the entire errors object without an argument"
+    },
+    {
+      "id": "runtime:789fbcbae7305cfa",
+      "file": "packages/hook-form/tests/upstream/useForm/getErrors.test.tsx",
+      "fullName": "getErrors should return undefined when no error is stored for a path"
     },
     {
       "id": "runtime:494b5b9532f02874",
@@ -3336,6 +3839,11 @@
       "fullName": "getFieldState with form state and field name supplied when input is primitive data type should display isValid state"
     },
     {
+      "id": "runtime:39ee7eb15bf87d15",
+      "file": "packages/hook-form/tests/upstream/useForm/getFieldState.test.tsx",
+      "fullName": "getFieldState with form state and field name supplied when input is primitive data type should display isValidating state"
+    },
+    {
       "id": "runtime:578aed8e958f156c",
       "file": "packages/hook-form/tests/upstream/useForm/getFieldState.test.tsx",
       "fullName": "getFieldState with form state and field name supplied when input is primitive data type should not have error"
@@ -3431,6 +3939,11 @@
       "fullName": "handleSubmit should bubble the error up when an error occurs in the provided handleSubmit function by leaving formState flags in a consistent state"
     },
     {
+      "id": "runtime:1b06918e1c4b1194",
+      "file": "packages/hook-form/tests/upstream/useForm/handleSubmit.test.tsx",
+      "fullName": "handleSubmit should ignore a stale resolver result when reset() runs mid-submit"
+    },
+    {
       "id": "runtime:40f62166fbc22aff",
       "file": "packages/hook-form/tests/upstream/useForm/handleSubmit.test.tsx",
       "fullName": "handleSubmit should invoke onSubmit callback and reset nested errors when submit with valid form values"
@@ -3456,6 +3969,16 @@
       "fullName": "handleSubmit should not invoke callback when there are errors"
     },
     {
+      "id": "runtime:ff579a2b695c77b0",
+      "file": "packages/hook-form/tests/upstream/useForm/handleSubmit.test.tsx",
+      "fullName": "handleSubmit should not invoke onValid when the resolver reports a root-level error"
+    },
+    {
+      "id": "runtime:93a93c3806e8c4c2",
+      "file": "packages/hook-form/tests/upstream/useForm/handleSubmit.test.tsx",
+      "fullName": "handleSubmit should not invoke onValid with stale values when reset() runs mid-submit"
+    },
+    {
       "id": "runtime:2513b9c90e031876",
       "file": "packages/hook-form/tests/upstream/useForm/handleSubmit.test.tsx",
       "fullName": "handleSubmit should not pass default value when field is not registered"
@@ -3474,6 +3997,26 @@
       "id": "runtime:5661c66d19085417",
       "file": "packages/hook-form/tests/upstream/useForm/handleSubmit.test.tsx",
       "fullName": "handleSubmit should pass default value"
+    },
+    {
+      "id": "runtime:910da1cfe5ec44e8",
+      "file": "packages/hook-form/tests/upstream/useForm/handleSubmit.test.tsx",
+      "fullName": "handleSubmit should resolve with the awaited return value when onValid is async"
+    },
+    {
+      "id": "runtime:6954d5ccca866651",
+      "file": "packages/hook-form/tests/upstream/useForm/handleSubmit.test.tsx",
+      "fullName": "handleSubmit should resolve with the typed return value of onValid"
+    },
+    {
+      "id": "runtime:d8bcf100b6b21159",
+      "file": "packages/hook-form/tests/upstream/useForm/handleSubmit.test.tsx",
+      "fullName": "handleSubmit should resolve with undefined when validation fails"
+    },
+    {
+      "id": "runtime:7273bb08c9aa6d16",
+      "file": "packages/hook-form/tests/upstream/useForm/handleSubmit.test.tsx",
+      "fullName": "handleSubmit should still clear a manually set root error on submit without a resolver"
     },
     {
       "id": "runtime:4fc728547d549e8f",
@@ -3751,9 +4294,29 @@
       "fullName": "reset should allow resetting unmounted field array"
     },
     {
+      "id": "runtime:2eb491edda29a785",
+      "file": "packages/hook-form/tests/upstream/useForm/reset.test.tsx",
+      "fullName": "reset should apply a delayed resolver error normally when reset() is not called"
+    },
+    {
+      "id": "runtime:9391af8c5433f437",
+      "file": "packages/hook-form/tests/upstream/useForm/reset.test.tsx",
+      "fullName": "reset should cancel a pending delayError timer so the reset error does not come back"
+    },
+    {
+      "id": "runtime:2c691873d6c11986",
+      "file": "packages/hook-form/tests/upstream/useForm/reset.test.tsx",
+      "fullName": "reset should clear isValidating when reset is called while a validation is pending"
+    },
+    {
       "id": "runtime:b8069607fcb6d1e6",
       "file": "packages/hook-form/tests/upstream/useForm/reset.test.tsx",
       "fullName": "reset should clear validation errors after reset to prevent false errors on subsequent submissions (Next.js 16 Server Actions fix)"
+    },
+    {
+      "id": "runtime:95995a021bdb1415",
+      "file": "packages/hook-form/tests/upstream/useForm/reset.test.tsx",
+      "fullName": "reset should keep a newer trigger validation marked as validating when a stale resolver from before reset settles"
     },
     {
       "id": "runtime:9410faa3f23050ca",
@@ -3769,6 +4332,11 @@
       "id": "runtime:5cd5251bf2bdfc6e",
       "file": "packages/hook-form/tests/upstream/useForm/reset.test.tsx",
       "fullName": "reset should keep dirty fields for dynamic controller name when keepDirty and keepDirtyValues are true"
+    },
+    {
+      "id": "runtime:667e203c7a3ccdbe",
+      "file": "packages/hook-form/tests/upstream/useForm/reset.test.tsx",
+      "fullName": "reset should keep dirtyFields in sync with isDirty when reset with keepValues"
     },
     {
       "id": "runtime:9c643f3d82e12236",
@@ -3791,6 +4359,16 @@
       "fullName": "reset should keep isValid value when reset is called with keepIsValid option"
     },
     {
+      "id": "runtime:82241b423cdf558e",
+      "file": "packages/hook-form/tests/upstream/useForm/reset.test.tsx",
+      "fullName": "reset should keep isValidating true after keepIsValidating reset even once the stale resolver settles"
+    },
+    {
+      "id": "runtime:1c1efef7f7691547",
+      "file": "packages/hook-form/tests/upstream/useForm/reset.test.tsx",
+      "fullName": "reset should keep isValidating when reset is called with keepIsValidating option"
+    },
+    {
       "id": "runtime:5310ea3e06f3a195",
       "file": "packages/hook-form/tests/upstream/useForm/reset.test.tsx",
       "fullName": "reset should keep mounted value after reset with keep dirty values"
@@ -3806,9 +4384,19 @@
       "fullName": "reset should keep track on updated defaultValues"
     },
     {
+      "id": "runtime:35407987a2d2e404",
+      "file": "packages/hook-form/tests/upstream/useForm/reset.test.tsx",
+      "fullName": "reset should not delay a current error when a pre-reset trigger settles"
+    },
+    {
       "id": "runtime:fa7fef78409bf2a7",
       "file": "packages/hook-form/tests/upstream/useForm/reset.test.tsx",
       "fullName": "reset should not mutate data outside of library"
+    },
+    {
+      "id": "runtime:545ca554538ff91b",
+      "file": "packages/hook-form/tests/upstream/useForm/reset.test.tsx",
+      "fullName": "reset should not overwrite a keepIsValid-preserved isValid when a stale resolver settles after reset"
     },
     {
       "id": "runtime:049d54a31f734803",
@@ -3834,6 +4422,11 @@
       "id": "runtime:0d13b6c47b6f2e15",
       "file": "packages/hook-form/tests/upstream/useForm/reset.test.tsx",
       "fullName": "reset should not reset value to undefined with onSubmit data"
+    },
+    {
+      "id": "runtime:67990f084c01b95b",
+      "file": "packages/hook-form/tests/upstream/useForm/reset.test.tsx",
+      "fullName": "reset should not resurrect a resolver error that settles after reset() clears the field"
     },
     {
       "id": "runtime:28348e12ddf7d248",
@@ -3901,6 +4494,11 @@
       "fullName": "reset should return reset nested value"
     },
     {
+      "id": "runtime:a4ccdf012d7f49c1",
+      "file": "packages/hook-form/tests/upstream/useForm/reset.test.tsx",
+      "fullName": "reset should return the discarded validation result without touching or focusing reset fields"
+    },
+    {
       "id": "runtime:2c28b17aa09dd83a",
       "file": "packages/hook-form/tests/upstream/useForm/reset.test.tsx",
       "fullName": "reset should set _formValues to empty object after reset({})"
@@ -3934,6 +4532,11 @@
       "id": "runtime:a8f1270540c896fe",
       "file": "packages/hook-form/tests/upstream/useForm/reset.test.tsx",
       "fullName": "reset should use values passed to reset({}) as new defaultValues on submit"
+    },
+    {
+      "id": "runtime:c6a6324dda17cdc3",
+      "file": "packages/hook-form/tests/upstream/useForm/reset.test.tsx",
+      "fullName": "reset when reset optional props set to keepDirtyValues should merge nested object at leaf granularity, keeping only the dirty leaf and updating a clean sibling that is not bound to an input (#13627)"
     },
     {
       "id": "runtime:59cb5947161ebf41",
@@ -3981,6 +4584,16 @@
       "fullName": "resetDefaultValues should work with nested objects"
     },
     {
+      "id": "runtime:88f55ec7d3fcf92d",
+      "file": "packages/hook-form/tests/upstream/useForm/resetField.test.tsx",
+      "fullName": "resetField should clear stale validating state when reset does not revalidate"
+    },
+    {
+      "id": "runtime:d578fa78ae1900ad",
+      "file": "packages/hook-form/tests/upstream/useForm/resetField.test.tsx",
+      "fullName": "resetField should notify a memoized field-scoped subscriber after an unrelated field validated via onChange"
+    },
+    {
       "id": "runtime:9975732d565153de",
       "file": "packages/hook-form/tests/upstream/useForm/resetField.test.tsx",
       "fullName": "resetField should reset input dirty field and dirty state"
@@ -4004,6 +4617,11 @@
       "id": "runtime:242b6e52c09ae901",
       "file": "packages/hook-form/tests/upstream/useForm/resetField.test.tsx",
       "fullName": "resetField should reset input value"
+    },
+    {
+      "id": "runtime:c3591a7c76fb5956",
+      "file": "packages/hook-form/tests/upstream/useForm/resetField.test.tsx",
+      "fullName": "resetField should update isValid state for a subscribe only consumer"
     },
     {
       "id": "runtime:659aa28d06ef7d36",
@@ -4111,6 +4729,11 @@
       "fullName": "setError should only set an error when it is not existed"
     },
     {
+      "id": "runtime:d14ea130681decba",
+      "file": "packages/hook-form/tests/upstream/useForm/setError.test.tsx",
+      "fullName": "setError should replace types from a previous validation when overwriting an error"
+    },
+    {
       "id": "runtime:3777bab5e0df836f",
       "file": "packages/hook-form/tests/upstream/useForm/setError.test.tsx",
       "fullName": "setError should set error message"
@@ -4151,6 +4774,11 @@
       "fullName": "setFocus should work with field arrays"
     },
     {
+      "id": "runtime:5820e1b52889067d",
+      "file": "packages/hook-form/tests/upstream/useForm/setValue.test.tsx",
+      "fullName": "setValue should apply every own property and skip only an inherited one"
+    },
+    {
       "id": "runtime:a68d577d25f55b16",
       "file": "packages/hook-form/tests/upstream/useForm/setValue.test.tsx",
       "fullName": "setValue should empty string when value is null or undefined when registered field is HTMLElement"
@@ -4174,6 +4802,11 @@
       "id": "runtime:e5c6866008a73bfc",
       "file": "packages/hook-form/tests/upstream/useForm/setValue.test.tsx",
       "fullName": "setValue should not setValue for unmounted state with shouldUnregister"
+    },
+    {
+      "id": "runtime:f6625b8a708e8889",
+      "file": "packages/hook-form/tests/upstream/useForm/setValue.test.tsx",
+      "fullName": "setValue should notify a Controller registered on a field array item root when setValue targets a nested leaf"
     },
     {
       "id": "runtime:34f027c013e89dd5",
@@ -4416,6 +5049,21 @@
       "fullName": "setValue with validation should validate input correctly with existing error"
     },
     {
+      "id": "runtime:115ddc791ccd3b3f",
+      "file": "packages/hook-form/tests/upstream/useForm/setValue.test.tsx",
+      "fullName": "setValue with value transforms should mark field dirty when setValueAs output differs from the default value"
+    },
+    {
+      "id": "runtime:ed4d3a416c839619",
+      "file": "packages/hook-form/tests/upstream/useForm/setValue.test.tsx",
+      "fullName": "setValue with value transforms should not mark field dirty when setValueAs output equals the default value"
+    },
+    {
+      "id": "runtime:2fda584bf4dc835b",
+      "file": "packages/hook-form/tests/upstream/useForm/setValue.test.tsx",
+      "fullName": "setValue with value transforms should not mark field dirty when valueAsNumber output equals the default value"
+    },
+    {
       "id": "runtime:2375aa17543b17d4",
       "file": "packages/hook-form/tests/upstream/useForm/setValue.test.tsx",
       "fullName": "setValue with watch should get watched value"
@@ -4429,6 +5077,11 @@
       "id": "runtime:acde0aaa6ccde1cd",
       "file": "packages/hook-form/tests/upstream/useForm/setValues.test.tsx",
       "fullName": "setValues should batch update multiple values"
+    },
+    {
+      "id": "runtime:28a4759510ea2098",
+      "file": "packages/hook-form/tests/upstream/useForm/setValues.test.tsx",
+      "fullName": "setValues should clear a multiple select when an empty array is provided"
     },
     {
       "id": "runtime:a6ffca0a1a4e482d",
@@ -4496,6 +5149,16 @@
       "fullName": "setValues should support function updater"
     },
     {
+      "id": "runtime:0401e068d104abe7",
+      "file": "packages/hook-form/tests/upstream/useForm/setValues.test.tsx",
+      "fullName": "setValues should update a checkbox group registered under an array value"
+    },
+    {
+      "id": "runtime:d5cef456eecb1214",
+      "file": "packages/hook-form/tests/upstream/useForm/setValues.test.tsx",
+      "fullName": "setValues should update a multiple select registered under an array value"
+    },
+    {
       "id": "runtime:d17c2486034ecef3",
       "file": "packages/hook-form/tests/upstream/useForm/setValues.test.tsx",
       "fullName": "setValues should update controlled input value when setValues is called"
@@ -4529,6 +5192,11 @@
       "id": "runtime:de769e3d2a98fd72:2",
       "file": "packages/hook-form/tests/upstream/useForm/subscribe.test.tsx",
       "fullName": "call setValue within subscribe does not infinitely recurse when setValue call is conditional"
+    },
+    {
+      "id": "runtime:37a82bf7b847ac40",
+      "file": "packages/hook-form/tests/upstream/useForm/subscribe.test.tsx",
+      "fullName": "call setValue within subscribe should invoke the values callback only once per setValue call"
     },
     {
       "id": "runtime:b60f99f955724a95",
@@ -4604,6 +5272,61 @@
       "id": "runtime:de635c9c7bae3088",
       "file": "packages/hook-form/tests/upstream/useForm/trigger.test.tsx",
       "fullName": "trigger should focus on first errored input"
+    },
+    {
+      "id": "runtime:a8c656ead9b9e51e",
+      "file": "packages/hook-form/tests/upstream/useForm/trigger.test.tsx",
+      "fullName": "trigger should keep registered nested resolver errors when trigger targets their parent"
+    },
+    {
+      "id": "runtime:0ca8178fd83fcc8d",
+      "file": "packages/hook-form/tests/upstream/useForm/trigger.test.tsx",
+      "fullName": "trigger should mark all triggered fields as touched when shouldTouch is true with an array of names"
+    },
+    {
+      "id": "runtime:2ad64a0899d0943e",
+      "file": "packages/hook-form/tests/upstream/useForm/trigger.test.tsx",
+      "fullName": "trigger should mark each field array item as touched when shouldTouch is true and no name is given"
+    },
+    {
+      "id": "runtime:cfae4a734ef76394",
+      "file": "packages/hook-form/tests/upstream/useForm/trigger.test.tsx",
+      "fullName": "trigger should mark every mounted field as touched when shouldTouch is true and no name is provided"
+    },
+    {
+      "id": "runtime:aa2a72b517e87aae",
+      "file": "packages/hook-form/tests/upstream/useForm/trigger.test.tsx",
+      "fullName": "trigger should mark the field as touched when shouldTouch is true with schema validation"
+    },
+    {
+      "id": "runtime:f50d25d7a4fdd1ea",
+      "file": "packages/hook-form/tests/upstream/useForm/trigger.test.tsx",
+      "fullName": "trigger should mark the targeted field as touched when shouldTouch is true"
+    },
+    {
+      "id": "runtime:43f3d39eba16f270",
+      "file": "packages/hook-form/tests/upstream/useForm/trigger.test.tsx",
+      "fullName": "trigger should not mark the field as touched when shouldTouch is not supplied"
+    },
+    {
+      "id": "runtime:36239ab06258e2df",
+      "file": "packages/hook-form/tests/upstream/useForm/trigger.test.tsx",
+      "fullName": "trigger should not overwrite a field array touchedFields entry with true when shouldTouch is true and no name is given"
+    },
+    {
+      "id": "runtime:fc302b379bc90770",
+      "file": "packages/hook-form/tests/upstream/useForm/trigger.test.tsx",
+      "fullName": "trigger should not overwrite a field array touchedFields entry with true when shouldTouch is true and the array name is passed directly"
+    },
+    {
+      "id": "runtime:4ada0c7b2c160ee3",
+      "file": "packages/hook-form/tests/upstream/useForm/trigger.test.tsx",
+      "fullName": "trigger should not set a parent error when only nested resolver errors exist"
+    },
+    {
+      "id": "runtime:7f1b758c786858e1",
+      "file": "packages/hook-form/tests/upstream/useForm/trigger.test.tsx",
+      "fullName": "trigger should not set a parent error when trigger targets a field with only nested resolver errors"
     },
     {
       "id": "runtime:c0045a43bcf85e91",
@@ -4716,14 +5439,49 @@
       "fullName": "trigger with schema should validate all fields when pass with undefined"
     },
     {
+      "id": "runtime:0c03bcbadeea0fd0",
+      "file": "packages/hook-form/tests/upstream/useForm/unregister.test.tsx",
+      "fullName": "unregister should cancel a pending delayError timer when the field is unregistered"
+    },
+    {
+      "id": "runtime:a167ebee3699bdaf",
+      "file": "packages/hook-form/tests/upstream/useForm/unregister.test.tsx",
+      "fullName": "unregister should cancel pending delayError timers for nested fields when their parent is unregistered"
+    },
+    {
+      "id": "runtime:89983dc5bec8e0b5",
+      "file": "packages/hook-form/tests/upstream/useForm/unregister.test.tsx",
+      "fullName": "unregister should keep isValidating when unregister is called with keepIsValidating option"
+    },
+    {
+      "id": "runtime:32e2a3546afb62bf",
+      "file": "packages/hook-form/tests/upstream/useForm/unregister.test.tsx",
+      "fullName": "unregister should keep submitting a value retained by keepValue after a disabled field is unregistered"
+    },
+    {
       "id": "runtime:cc41f81afa8d6f3f",
       "file": "packages/hook-form/tests/upstream/useForm/unregister.test.tsx",
       "fullName": "unregister should not flip isDirty to true when a field with no defaultValue is registered from useEffect"
     },
     {
+      "id": "runtime:626d7add3a92aa84",
+      "file": "packages/hook-form/tests/upstream/useForm/unregister.test.tsx",
+      "fullName": "unregister should preserve isDirty when a dirty field is unregistered with keepDirty"
+    },
+    {
       "id": "runtime:6d0247c7809bbe89",
       "file": "packages/hook-form/tests/upstream/useForm/unregister.test.tsx",
       "fullName": "unregister should recompute isDirty after a field is unregistered and re-registered back to its default value (#13397)"
+    },
+    {
+      "id": "runtime:20d74cba26f17d76",
+      "file": "packages/hook-form/tests/upstream/useForm/unregister.test.tsx",
+      "fullName": "unregister should recompute isDirty when a dirty field is unregistered"
+    },
+    {
+      "id": "runtime:9b4ef13c2a9757d8",
+      "file": "packages/hook-form/tests/upstream/useForm/unregister.test.tsx",
+      "fullName": "unregister should recompute isValidating after unregistering a field with a pending validation"
     },
     {
       "id": "runtime:ec6059ea00b36d18",
@@ -4881,6 +5639,11 @@
       "fullName": "FormProvider should be able to access defaultValues within formState"
     },
     {
+      "id": "runtime:c51a39a00608c169",
+      "file": "packages/hook-form/tests/upstream/useFormContext.test.tsx",
+      "fullName": "FormProvider should expose resetDefaultValues from useFormContext"
+    },
+    {
       "id": "runtime:9e025184c8531e42",
       "file": "packages/hook-form/tests/upstream/useFormContext.test.tsx",
       "fullName": "FormProvider should expose setValues from useFormContext"
@@ -4971,6 +5734,11 @@
       "fullName": "useFormState should only re-render when subscribed field names updated"
     },
     {
+      "id": "runtime:8dfab994262e632f",
+      "file": "packages/hook-form/tests/upstream/useFormState.test.tsx",
+      "fullName": "useFormState should re-subscribe when the control prop changes identity"
+    },
+    {
       "id": "runtime:05ab0375e990c861",
       "file": "packages/hook-form/tests/upstream/useFormState.test.tsx",
       "fullName": "useFormState should render correct form state with isDirty, dirty, touched"
@@ -5016,9 +5784,29 @@
       "fullName": "useFormState should update isValidating correctly"
     },
     {
+      "id": "runtime:f4f3562a9453d7ed",
+      "file": "packages/hook-form/tests/upstream/useFormState.test.tsx",
+      "fullName": "useFormState with Activity should resync isSubmitting after Activity restoration when a submit resolves while hidden"
+    },
+    {
+      "id": "runtime:2d77916981aa9316",
+      "file": "packages/hook-form/tests/upstream/useFormState.test.tsx",
+      "fullName": "useFormState with Activity should synchronize Controller field state when an Activity subtree becomes visible for the first time"
+    },
+    {
+      "id": "runtime:66ca5cd497c67758",
+      "file": "packages/hook-form/tests/upstream/useFormState.test.tsx",
+      "fullName": "useFormState with Activity should synchronize form state when an Activity subtree becomes visible for the first time"
+    },
+    {
       "id": "runtime:c01c86279535b2d5",
       "file": "packages/hook-form/tests/upstream/useWatch.test.tsx",
       "fullName": "useWatch compute  should only update when value changed within compute"
+    },
+    {
+      "id": "runtime:f26c3b3670fabfb9",
+      "file": "packages/hook-form/tests/upstream/useWatch.test.tsx",
+      "fullName": "useWatch compute  should update to undefined on the first computed value change"
     },
     {
       "id": "runtime:0006729f289e5ab2",
@@ -5064,6 +5852,16 @@
       "id": "runtime:5189ac8d97dceeaf",
       "file": "packages/hook-form/tests/upstream/useWatch.test.tsx",
       "fullName": "useWatch reset should return updated default value with watched field after reset"
+    },
+    {
+      "id": "runtime:fad9d72d2c6ab41e",
+      "file": "packages/hook-form/tests/upstream/useWatch.test.tsx",
+      "fullName": "useWatch reset should synchronize watched and controlled values after Activity restoration"
+    },
+    {
+      "id": "runtime:f1bd2b9e7fe350c4",
+      "file": "packages/hook-form/tests/upstream/useWatch.test.tsx",
+      "fullName": "useWatch reset should synchronize watched values when an Activity subtree becomes visible for the first time"
     },
     {
       "id": "runtime:903ec6008a4db185",
@@ -5119,6 +5917,16 @@
       "id": "runtime:4120adb948ad439f",
       "file": "packages/hook-form/tests/upstream/useWatch.test.tsx",
       "fullName": "useWatch should avoid triggering extra callbacks"
+    },
+    {
+      "id": "runtime:db06069c8eb0df48",
+      "file": "packages/hook-form/tests/upstream/useWatch.test.tsx",
+      "fullName": "useWatch should keep its own default value for array of inputs after a value change"
+    },
+    {
+      "id": "runtime:34dde4f99bb720fa",
+      "file": "packages/hook-form/tests/upstream/useWatch.test.tsx",
+      "fullName": "useWatch should prefer the form default value over its own default value for single input"
     },
     {
       "id": "runtime:5a8063dbb80d631c",
@@ -5236,6 +6044,11 @@
       "fullName": "useWatch update should react to changing field name"
     },
     {
+      "id": "runtime:9037825c609c69e0",
+      "file": "packages/hook-form/tests/upstream/useWatch.test.tsx",
+      "fullName": "useWatch update should return the new field value synchronously on the same render even when that value is null"
+    },
+    {
       "id": "runtime:b7cf2c2853b1859c",
       "file": "packages/hook-form/tests/upstream/useWatch.test.tsx",
       "fullName": "useWatch update should return undefined when input get unregistered"
@@ -5304,6 +6117,16 @@
       "id": "runtime:54dedec6581441cd",
       "file": "packages/hook-form/tests/upstream/utils/append.test.ts",
       "fullName": "append should work with string arrays when appending multiple strings"
+    },
+    {
+      "id": "runtime:0a48c3edb038ec62",
+      "file": "packages/hook-form/tests/upstream/utils/cloneObject.test.ts",
+      "fullName": "clone Blob not a constructor should skip clone if Blob is not defined"
+    },
+    {
+      "id": "runtime:a590ac69e6c6d7d2",
+      "file": "packages/hook-form/tests/upstream/utils/cloneObject.test.ts",
+      "fullName": "clone Blob not a constructor should skip clone if Blob is undefined"
     },
     {
       "id": "runtime:d978052e27ee271b",
@@ -5431,36 +6254,6 @@
       "fullName": "deepEqual should return true when two sets matches"
     },
     {
-      "id": "runtime:68bb523d9b3b2774",
-      "file": "packages/hook-form/tests/upstream/utils/deepMerge.test.ts",
-      "fullName": "deepMerge should deep merge array values  "
-    },
-    {
-      "id": "runtime:434e639331978ff4",
-      "file": "packages/hook-form/tests/upstream/utils/deepMerge.test.ts",
-      "fullName": "deepMerge should deep merge object correctly"
-    },
-    {
-      "id": "runtime:998b8b53b42811c3",
-      "file": "packages/hook-form/tests/upstream/utils/deepMerge.test.ts",
-      "fullName": "deepMerge should never merge non-objects, and always return the 'source' object"
-    },
-    {
-      "id": "runtime:65842ad5712b8699",
-      "file": "packages/hook-form/tests/upstream/utils/deepMerge.test.ts",
-      "fullName": "deepMerge should not merge object with date type"
-    },
-    {
-      "id": "runtime:5da14eb2e6ff0075",
-      "file": "packages/hook-form/tests/upstream/utils/deepMerge.test.ts",
-      "fullName": "deepMerge should overwrite array value "
-    },
-    {
-      "id": "runtime:0cc0866dd10af607",
-      "file": "packages/hook-form/tests/upstream/utils/deepMerge.test.ts",
-      "fullName": "deepMerge should overwrite different data type"
-    },
-    {
       "id": "runtime:93ee3b6328e03d9c",
       "file": "packages/hook-form/tests/upstream/utils/extractFormValues.test.ts",
       "fullName": "extractFormValues should return extracted form values based on form state"
@@ -5486,9 +6279,34 @@
       "fullName": "flatten should preserve Date values as leaf nodes and not drop them"
     },
     {
+      "id": "runtime:f05a48a96c06d833",
+      "file": "packages/hook-form/tests/upstream/utils/flatten.test.ts",
+      "fullName": "flatten should preserve File and Blob values as leaf nodes and not drop them"
+    },
+    {
+      "id": "runtime:5002ebe529d7cd5e",
+      "file": "packages/hook-form/tests/upstream/utils/flatten.test.ts",
+      "fullName": "flatten should preserve FileList values as leaf nodes and not split them"
+    },
+    {
       "id": "runtime:8b19dc22cdc88d31",
       "file": "packages/hook-form/tests/upstream/utils/flatten.test.ts",
       "fullName": "flatten should preserve nested Date values as leaf nodes"
+    },
+    {
+      "id": "runtime:f510b91f925c96a4",
+      "file": "packages/hook-form/tests/upstream/utils/flatten.test.ts",
+      "fullName": "flatten should preserve nested and indexed File values as leaf nodes"
+    },
+    {
+      "id": "runtime:2d4950d26539ba75",
+      "file": "packages/hook-form/tests/upstream/utils/formData.test.ts",
+      "fullName": "jsonToFormData should skip undefined values instead of stringifying them"
+    },
+    {
+      "id": "runtime:eb1f3defc5e00b89",
+      "file": "packages/hook-form/tests/upstream/utils/formData.test.ts",
+      "fullName": "jsonToFormData should submit FileList values under their field name"
     },
     {
       "id": "runtime:6b977f5a38fdeb28",
@@ -5534,6 +6352,31 @@
       "id": "runtime:95555672232596fb",
       "file": "packages/hook-form/tests/upstream/utils/get.test.ts",
       "fullName": "get should return undefined when provided with empty path"
+    },
+    {
+      "id": "runtime:b9759f0b76751ce1",
+      "file": "packages/hook-form/tests/upstream/utils/has.test.ts",
+      "fullName": "has should detect a path that is present but holds an empty or nullish value"
+    },
+    {
+      "id": "runtime:a199f1e0f82fc684",
+      "file": "packages/hook-form/tests/upstream/utils/has.test.ts",
+      "fullName": "has should detect paths that are absent"
+    },
+    {
+      "id": "runtime:915a32c6495393d1",
+      "file": "packages/hook-form/tests/upstream/utils/has.test.ts",
+      "fullName": "has should detect paths that resolve to a value"
+    },
+    {
+      "id": "runtime:fc2d4a92156d91f0",
+      "file": "packages/hook-form/tests/upstream/utils/has.test.ts",
+      "fullName": "has should not report inherited properties"
+    },
+    {
+      "id": "runtime:086965e3e9bcc548",
+      "file": "packages/hook-form/tests/upstream/utils/has.test.ts",
+      "fullName": "has should return false for an empty path or a non-traversable object"
     },
     {
       "id": "runtime:6cfac695409a84b6",

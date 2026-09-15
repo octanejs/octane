@@ -1,7 +1,6 @@
 {
   "schemaVersion": 1,
   "root": "packages/colorful/upstream",
-  "snapshots": 5,
   "tests": [
     {
       "file": "tests/components.test.js",
@@ -56,6 +55,21 @@
     {
       "file": "tests/components.test.js",
       "fullName": "Doesn't call `onChange` when user changes a hue of a grayscale color",
+      "status": "passed"
+    },
+    {
+      "file": "tests/components.test.js",
+      "fullName": "Doesn't change HEX color channels when only alpha is changed",
+      "status": "passed"
+    },
+    {
+      "file": "tests/components.test.js",
+      "fullName": "Doesn't change RGB channels when only alpha is changed",
+      "status": "passed"
+    },
+    {
+      "file": "tests/components.test.js",
+      "fullName": "Doesn't change RGB string channels when only alpha is changed",
       "status": "passed"
     },
     {
@@ -133,11 +147,7 @@
       "fullName": "Supports any event that a regular div does",
       "status": "passed"
     },
-    {
-      "file": "tests/components.test.js",
-      "fullName": "Supports multitouch",
-      "status": "passed"
-    },
+    { "file": "tests/components.test.js", "fullName": "Supports multitouch", "status": "passed" },
     {
       "file": "tests/components.test.js",
       "fullName": "Triggers `onChangeEnd` after a keyboard interaction",
@@ -173,11 +183,7 @@
       "fullName": "Uses #rrggbbaa format if alpha channel value is less than 1",
       "status": "passed"
     },
-    {
-      "file": "tests/components.test.js",
-      "fullName": "Works with no props",
-      "status": "passed"
-    },
+    { "file": "tests/components.test.js", "fullName": "Works with no props", "status": "passed" },
     {
       "file": "tests/csp.test.js",
       "fullName": "Signs the `style` element with a nonce",
@@ -193,26 +199,10 @@
       "fullName": "Clamps a number between bounds",
       "status": "passed"
     },
-    {
-      "file": "tests/utils.test.js",
-      "fullName": "Compares two HEX colors",
-      "status": "passed"
-    },
-    {
-      "file": "tests/utils.test.js",
-      "fullName": "Compares two object colors",
-      "status": "passed"
-    },
-    {
-      "file": "tests/utils.test.js",
-      "fullName": "Compares two string colors",
-      "status": "passed"
-    },
-    {
-      "file": "tests/utils.test.js",
-      "fullName": "Converts HEX to HSVA",
-      "status": "passed"
-    },
+    { "file": "tests/utils.test.js", "fullName": "Compares two HEX colors", "status": "passed" },
+    { "file": "tests/utils.test.js", "fullName": "Compares two object colors", "status": "passed" },
+    { "file": "tests/utils.test.js", "fullName": "Compares two string colors", "status": "passed" },
+    { "file": "tests/utils.test.js", "fullName": "Converts HEX to HSVA", "status": "passed" },
     {
       "file": "tests/utils.test.js",
       "fullName": "Converts HSL string to HSVA",
@@ -223,11 +213,7 @@
       "fullName": "Converts HSLA string to HSVA",
       "status": "passed"
     },
-    {
-      "file": "tests/utils.test.js",
-      "fullName": "Converts HSLA to HSVA",
-      "status": "passed"
-    },
+    { "file": "tests/utils.test.js", "fullName": "Converts HSLA to HSVA", "status": "passed" },
     {
       "file": "tests/utils.test.js",
       "fullName": "Converts HSV string to HSVA",
@@ -238,21 +224,13 @@
       "fullName": "Converts HSVA string to HSVA",
       "status": "passed"
     },
-    {
-      "file": "tests/utils.test.js",
-      "fullName": "Converts HSVA to HEX",
-      "status": "passed"
-    },
+    { "file": "tests/utils.test.js", "fullName": "Converts HSVA to HEX", "status": "passed" },
     {
       "file": "tests/utils.test.js",
       "fullName": "Converts HSVA to HSL string",
       "status": "passed"
     },
-    {
-      "file": "tests/utils.test.js",
-      "fullName": "Converts HSVA to HSLA",
-      "status": "passed"
-    },
+    { "file": "tests/utils.test.js", "fullName": "Converts HSVA to HSLA", "status": "passed" },
     {
       "file": "tests/utils.test.js",
       "fullName": "Converts HSVA to HSV string",
@@ -268,11 +246,7 @@
       "fullName": "Converts HSVA to RGB string",
       "status": "passed"
     },
-    {
-      "file": "tests/utils.test.js",
-      "fullName": "Converts HSVA to RGBA",
-      "status": "passed"
-    },
+    { "file": "tests/utils.test.js", "fullName": "Converts HSVA to RGBA", "status": "passed" },
     {
       "file": "tests/utils.test.js",
       "fullName": "Converts HSVA to RGBA string",
@@ -288,9 +262,10 @@
       "fullName": "Converts RGBA string to HSVA",
       "status": "passed"
     },
+    { "file": "tests/utils.test.js", "fullName": "Converts RGBA to HSVA", "status": "passed" },
     {
       "file": "tests/utils.test.js",
-      "fullName": "Converts RGBA to HSVA",
+      "fullName": "Converts RGBA to HSVA and back without losing precision",
       "status": "passed"
     },
     {
@@ -298,30 +273,11 @@
       "fullName": "Converts shorthand HEX to HSVA",
       "status": "passed"
     },
-    {
-      "file": "tests/utils.test.js",
-      "fullName": "Formats a class name",
-      "status": "passed"
-    },
-    {
-      "file": "tests/utils.test.js",
-      "fullName": "Rounds HSVA",
-      "status": "passed"
-    },
-    {
-      "file": "tests/utils.test.js",
-      "fullName": "Rounds a number",
-      "status": "passed"
-    },
-    {
-      "file": "tests/utils.test.js",
-      "fullName": "Trims alpha-channel",
-      "status": "passed"
-    },
-    {
-      "file": "tests/utils.test.js",
-      "fullName": "Validates HEX colors",
-      "status": "passed"
-    }
-  ]
+    { "file": "tests/utils.test.js", "fullName": "Formats a class name", "status": "passed" },
+    { "file": "tests/utils.test.js", "fullName": "Rounds HSVA", "status": "passed" },
+    { "file": "tests/utils.test.js", "fullName": "Rounds a number", "status": "passed" },
+    { "file": "tests/utils.test.js", "fullName": "Trims alpha-channel", "status": "passed" },
+    { "file": "tests/utils.test.js", "fullName": "Validates HEX colors", "status": "passed" }
+  ],
+  "snapshots": 5
 }

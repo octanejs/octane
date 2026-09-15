@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "project": "react-error-boundary-browser",
+  "roots": ["packages/react-error-boundary/tests/browser"],
+  "files": ["packages/react-error-boundary/tests/browser/error-boundary.browser.test.ts"],
+  "tests": [
+    {
+      "id": "browser:error-boundary:0",
+      "file": "packages/react-error-boundary/tests/browser/error-boundary.browser.test.ts",
+      "fullName": "Error Boundary browser compatibility client startup preserves ref resets, callbacks, and unmount cleanup"
+    },
+    {
+      "id": "browser:error-boundary:1",
+      "file": "packages/react-error-boundary/tests/browser/error-boundary.browser.test.ts",
+      "fullName": "Error Boundary browser compatibility SSR hydration preserves ref resets, callbacks, and unmount cleanup"
+    }
+  ]
+}

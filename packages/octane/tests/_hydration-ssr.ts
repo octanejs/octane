@@ -11,22 +11,61 @@ type HydrationBinding =
 	| 'base-ui'
 	| 'docusaurus'
 	| 'formisch'
+	| 'hook-form'
+	| 'intersection-observer'
+	| 'mantine-hooks'
 	| 'monaco-editor'
+	| 'motion'
+	| 'mobx'
 	| 'pdf'
 	| 'rainbowkit'
+	| 'react-error-boundary'
 	| 'react-map-gl'
+	| 'react-window'
 	| 'select'
 	| 'solana-kit'
 	| 'testing-library'
+	| 'thinking-orbs'
+	| 'window'
 	| 'tanstack-pacer'
 	| 'tanstack-query'
 	| 'tanstack-virtual'
-	| 'tanstack-table';
+	| 'tanstack-table'
+	| 'tanstack-ai'
+	| 'tanstack-db';
 
 const repositoryRoot = resolve(import.meta.dirname, '../../..');
 
 function bindingAliases(binding: HydrationBinding) {
+	if (binding === 'window' || binding === 'react-window') {
+		return [
+			{
+				find: /^@octanejs\/window$/,
+				replacement: resolve(repositoryRoot, 'packages/window/src/index.ts'),
+			},
+		];
+	}
 	const source = resolve(repositoryRoot, 'packages', binding, 'src');
+	if (binding === 'thinking-orbs')
+		return [{ find: /^@octanejs\/thinking-orbs$/, replacement: resolve(source, 'index.ts') }];
+	if (binding === 'react-error-boundary') {
+		return [
+			{ find: /^@octanejs\/react-error-boundary$/, replacement: resolve(source, 'server.tsrx') },
+		];
+	}
+
+	if (
+		binding === 'mantine-hooks' ||
+		binding === 'mobx' ||
+		binding === 'motion' ||
+		binding === 'intersection-observer' ||
+		binding === 'hook-form'
+	) {
+		return [
+			{ find: new RegExp(`^@octanejs/${binding}$`), replacement: resolve(source, 'index.ts') },
+		];
+	}
+
 	if (binding === 'alien-signals') {
 		return [{ find: /^@octanejs\/alien-signals$/, replacement: resolve(source, 'index.ts') }];
 	}
@@ -120,6 +159,14 @@ function bindingAliases(binding: HydrationBinding) {
 	if (binding === 'react-map-gl') {
 		return [{ find: /^@octanejs\/react-map-gl$/, replacement: resolve(source, 'index.ts') }];
 	}
+
+	if (binding === 'tanstack-db')
+		return [{ find: /^@octanejs\/tanstack-db$/, replacement: resolve(source, 'index.ts') }];
+	if (binding === 'tanstack-ai')
+		return [
+			{ find: /^@octanejs\/tanstack-ai$/, replacement: resolve(source, 'index.ts') },
+			{ find: /^@octanejs\/tanstack-ai\/ui$/, replacement: resolve(source, 'ui.ts') },
+		];
 
 	if (binding === 'tanstack-table')
 		return [{ find: /^@octanejs\/tanstack-table$/, replacement: resolve(source, 'index.ts') }];

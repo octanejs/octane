@@ -2,18 +2,17 @@
   "schemaVersion": 1,
   "identity": {
     "packageName": "react-alien-signals",
-    "version": "0.3.0",
+    "version": "0.4.0",
     "repository": {
       "owner": "Rajaniraiyn",
       "repo": "react-alien-signals",
       "subdirectory": null
     },
-    "commit": "6d883959ddf25a3f486451ff8abff60eb989671c",
-    "integrity": "sha512-UJdsSl9bLUL0wb/TmJ0YR++CCx0q+8PJYw/c3WUVdl1C61HNudUMRX6Qe5fJHsyRWuD0vb9yUjFtgnnB0Im5ag=="
+    "commit": "2d85d8d063d79332ec7c7e99c07bda3a722f491a",
+    "integrity": "sha512-eYCneiYRa+9blKWkwrKCJ+NX9bUTmEOAaGmgF0u8UxzZgQOGfjO5TS2gg+fI5IvYiuKPM1p9hv2PwUTR22gviA=="
   },
   "license": {
     "spdx": "MIT",
-    "declaration": "file-only",
     "evidence": [
       {
         "path": "LICENSE",
@@ -22,36 +21,35 @@
     ],
     "notices": []
   },
-  "scopes": [
-    "package.json",
-    "src/index.test.ts",
-    "src/index.ts",
-    "tsconfig.json",
-    "tsconfig.tsbuildinfo"
-  ],
+  "scopes": ["LICENSE", "package.json", "src", "tsconfig.json"],
   "adaptedMappings": [],
   "adaptedRewrites": [],
   "files": [
     {
+      "path": "LICENSE",
+      "gitBlob": "1d95a17bb62aada36c544e16f6d71f45817d59fa",
+      "size": 1070
+    },
+    {
       "path": "package.json",
-      "gitBlob": "0ae528d4378027c4635671a32240814cf0ba7e54",
-      "size": 1166
+      "gitBlob": "9a6c9f90592f3b291385469ea8d143a7c9f284cd",
+      "size": 1955
     },
     {
       "path": "src/index.test.ts",
-      "gitBlob": "1ff8387b52b572b5ec2d2b0240fcf92649aedf56",
-      "size": 13483
+      "gitBlob": "522ae4280213dc03003f8ff899c9f3932abb647d",
+      "size": 18817
     },
     {
       "path": "src/index.ts",
-      "gitBlob": "e0977e033f0dfa6ffab2e773bf8d84dfe43ffe28",
-      "size": 8084
+      "gitBlob": "5acbe842a7ebe4093441dc066fe6ee33e193246e",
+      "size": 13595
     },
     {
       "path": "tsconfig.json",
-      "gitBlob": "67212c2c50c7de69d978a4f09e2ea27d01c4f349",
-      "size": 689
+      "gitBlob": "c171fbdb39c2a1f94cf218758f619fffe73cfe15",
+      "size": 771
     }
   ],
-  "fingerprint": "37292208bd61b096f854e6018b22bb4fe238e8522f9d719babcee9c8a1f1001e"
+  "fingerprint": "39ac688ede5d743c0f5c91a3df8e9e0ebb09197039a7f30514b56512a3482113"
 }

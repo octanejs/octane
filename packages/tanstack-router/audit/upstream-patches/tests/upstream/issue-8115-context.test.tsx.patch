@@ -1,0 +1,91 @@
+diff --git a/tests/upstream/issue-8115-context.test.tsx b/tests/upstream/issue-8115-context.test.tsx
+--- a/tests/upstream/issue-8115-context.test.tsx
++++ b/tests/upstream/issue-8115-context.test.tsx
+@@ -1,3 +1,5 @@
++import { runServerFixture } from '../ssr-fixture'
++import { createContextRouteTree } from '../_fixtures/context-hydration-parity'
+ import {
+   act,
+   cleanup,
+@@ -375,64 +377,16 @@ test('#8115: hydration does not render a successful route with missing context w
+   let clientContextAttempts = 0
+   let serverPhase = true
+ 
+-  const createRouteTree = () => {
+-    const rootRoute = createRootRoute({
+-      component: () => (
+-        <>
+-          <Outlet />
+-          <Scripts />
+-        </>
+-      ),
+-    })
+-    const indexRoute = createRoute({
+-      getParentRoute: () => rootRoute,
+-      path: '/',
+-      context: (): { locale: string } => {
+-        if (serverPhase) {
+-          return { locale: 'en' }
+-        }
+-        clientContextAttempts++
+-        throw contextError
+-      },
+-      component: () => {
+-        const context: { locale?: string } = indexRoute.useRouteContext()
+-        if (!serverPhase) {
+-          clientSuccessRenderValues.push(context.locale)
+-        }
+-        return (
+-          <div data-testid="route-success">
+-            Locale: {context.locale ?? 'missing'}
+-          </div>
+-        )
+-      },
+-      errorComponent: ({ error }) => (
+-        <div data-testid="route-error">
+-          {error instanceof Error ? error.message : String(error)}
+-        </div>
+-      ),
+-    })
++  const createRouteTree = () => createContextRouteTree(() => {
++    if (serverPhase) return { locale: 'en' }
++    clientContextAttempts++
++    throw contextError
++  }, (locale) => {
++    if (!serverPhase) clientSuccessRenderValues.push(locale)
++  })
+ 
+-    return rootRoute.addChildren([indexRoute])
+-  }
++  const response = await runServerFixture<Response>('_fixtures/context-hydration-parity.tsx', 'renderContextPage')
+ 
+-  const response = await createRequestHandler({
+-    request: new Request('http://localhost/'),
+-    createRouter: () =>
+-      createRouter({ routeTree: createRouteTree(), isServer: true }),
+-  })(({ router, responseHeaders }) =>
+-    renderRouterToString({
+-      router,
+-      responseHeaders,
+-      children: (
+-        <html>
+-          <head />
+-          <body>
+-            <RouterServer router={router} />
+-          </body>
+-        </html>
+-      ),
+-    }),
+-  )
+   const html = await response.text()
+   const serverDocument = new DOMParser().parseFromString(html, 'text/html')
+ 
+@@ -464,7 +418,7 @@ test('#8115: hydration does not render a successful route with missing context w
+   try {
+     await hydrate(clientRouter)
+     await act(async () => {
+-      root = hydrateRoot(container, <RouterProvider router={clientRouter} />, {
++      root = hydrateRoot(container, RouterProvider, { router: clientRouter }, {
+         onRecoverableError: (error) => {
+           const messages = [
+             error instanceof Error ? error.message : String(error),

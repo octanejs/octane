@@ -1,0 +1,1448 @@
+# @tanstack/react-db
+
+## 0.3.8
+
+### Patch Changes
+
+- Updated dependencies [[`cfb01ce`](https://github.com/TanStack/db/commit/cfb01cee34de7d0378e008dc8c01c1df5253c1e2)]:
+  - @tanstack/db@0.9.0
+
+## 0.3.7
+
+### Patch Changes
+
+- Updated dependencies [[`bbc9edf`](https://github.com/TanStack/db/commit/bbc9edf28ef707c8fb3c451fe2c4724039a0037a)]:
+  - @tanstack/db@0.8.7
+
+## 0.3.6
+
+### Patch Changes
+
+- Updated dependencies [[`ae2fe74`](https://github.com/TanStack/db/commit/ae2fe74e4cb4e74500a90034e6db7987bbd90bd8)]:
+  - @tanstack/db@0.8.6
+
+## 0.3.5
+
+### Patch Changes
+
+- Updated dependencies [[`d8defd2`](https://github.com/TanStack/db/commit/d8defd2a8eb96162cbd4e24970d519eac217bb95), [`9ad882f`](https://github.com/TanStack/db/commit/9ad882f71872aa2210b93ea93d084bd08bedb6a4), [`8c5838d`](https://github.com/TanStack/db/commit/8c5838ddd5f08b3c298d4458cae1ce599af80624)]:
+  - @tanstack/db@0.8.5
+
+## 0.3.4
+
+### Patch Changes
+
+- Updated dependencies [[`3131de1`](https://github.com/TanStack/db/commit/3131de14507006f72631947a61e040b1523d417f), [`8f432ba`](https://github.com/TanStack/db/commit/8f432ba226df2a27d67498ddd1df8468f93ff776)]:
+  - @tanstack/db@0.8.4
+
+## 0.3.3
+
+### Patch Changes
+
+- Support disabling live queries declared with the `{ query }` config syntax by returning `undefined` or `null` from the query callback. ([#1757](https://github.com/TanStack/db/pull/1757))
+
+- Updated dependencies [[`99ba511`](https://github.com/TanStack/db/commit/99ba5113b21fd850a8f3e517e5d44ea42ac9f984), [`43cc741`](https://github.com/TanStack/db/commit/43cc741842ae3689128c308be19069b062642f12)]:
+  - @tanstack/db@0.8.3
+
+## 0.3.2
+
+### Patch Changes
+
+- Updated dependencies [[`c521b5d`](https://github.com/TanStack/db/commit/c521b5d6503d8fdf03574b9f9791143e59d34204)]:
+  - @tanstack/db@0.8.2
+
+## 0.3.1
+
+### Patch Changes
+
+- Updated dependencies [[`5d9335d`](https://github.com/TanStack/db/commit/5d9335d0d42c1cc1ec2b92be8ce40ae8abe42827), [`a20352a`](https://github.com/TanStack/db/commit/a20352a9a7b64c9708bef9a1dfb90c96426b6730)]:
+  - @tanstack/db@0.8.1
+
+## 0.3.0
+
+### Minor Changes
+
+- Add SSR through request-scoped `DbClient` instances, collection descriptors, ([#1564](https://github.com/TanStack/db/pull/1564))
+  explicit collection-row hydration, live-query result snapshots, adapter sync
+  metadata, and React and Svelte descriptor resolution.
+
+  React live queries now derive identity from structured query IR. Opaque queries
+  can provide `queryKey`; legacy dependency arrays and unkeyed opaque queries keep
+  working with development warnings until 1.0.
+
+  Add TanStack Router integration that streams live queries discovered during a
+  Suspense render as pending promises which resolve to ordered result snapshots.
+  The browser starts normal source sync and atomically replaces the snapshot when
+  its live result is ready.
+
+### Patch Changes
+
+- Updated dependencies [[`4b9e8cd`](https://github.com/TanStack/db/commit/4b9e8cdf79551734cf526e6fa4bbdba42ec94575)]:
+  - @tanstack/db@0.8.0
+
+## 0.2.1
+
+### Patch Changes
+
+- Update agent skills to match current APIs and behavior. ([#1696](https://github.com/TanStack/db/pull/1696))
+
+- Updated dependencies [[`5f63996`](https://github.com/TanStack/db/commit/5f63996b0febd4775fb641f50975f8f0d442dc00)]:
+  - @tanstack/db@0.7.2
+
+## 0.2.0
+
+### Minor Changes
+
+- Add `useLiveInfiniteQuery` as a Vue binding over the shared live-query window controller. Align infinite-query behavior across React, Vue, and Svelte, including awaitable page fetches, safe page sizes, reactive page-depth preservation, ordered collection validation, shared input resolution, and shared-window cleanup. ([#1724](https://github.com/TanStack/db/pull/1724))
+
+### Patch Changes
+
+- Updated dependencies [[`424382b`](https://github.com/TanStack/db/commit/424382b3a80c6b3556701b433c26c8a60fc8d1af)]:
+  - @tanstack/db@0.7.1
+
+## 0.1.96
+
+### Patch Changes
+
+- Add an internal shared live-query observer and migrate all five framework adapters to it ([#1642](https://github.com/TanStack/db/pull/1642))
+
+  Introduces `createLiveQueryObserver` in `@tanstack/db`: given a resolved live-query collection (or `null` for a disabled query) it owns the subscription lifecycle every adapter used to re-implement — change and status subscriptions, a snapshot with stable identity per state revision for wholesale consumers, and delivery of the raw `ChangeMessage[]` for granular consumers. React, Vue, Svelte, Solid, and Angular's live-query hooks now materialize from the observer instead of their own hand-rolled subscription/status/snapshot machinery, keeping each adapter's native reactivity and each adapter's data-loading policy (wholesale adapters subscribe without initial state; granular adapters seed from it).
+
+  The observer is an **internal, unstable contract** for TanStack DB's official adapters — it is exported so the adapter packages can consume it, but it is not a public extension point yet and its API may change in any release.
+
+  The migration also fixes several live-query lifecycle defects: status-only transitions (`error`, `cleaned-up`) now reach mounted consumers; snapshot identity is stable across unsubscribe/resubscribe and stays fresh while detached; dispatch is FIFO and non-reentrant with subscriptions identified by record rather than callback; disposing during the synchronous initial replay no longer leaks the collection subscription; subscribing after dispose throws instead of registering a dead listener; Solid guards its async resource continuations against superseded collections; and constructing an observer no longer activates sync. Observers activate on their first committed subscription unless an adapter has already started a pre-created collection supplied directly or returned from a callback.
+
+- Add the unstable, internal `createLiveQueryWindowController` primitive for ([#1675](https://github.com/TanStack/db/pull/1675))
+  forward pagination. It coordinates collection-scoped window leases, commits
+  pages only after subset loads succeed, restores windows after failures and
+  cleanup, and lets React's `useLiveInfiniteQuery` become a thin binding without
+  changing its public API or resetting pages for structurally equal dependencies.
+- Updated dependencies [[`ad88d07`](https://github.com/TanStack/db/commit/ad88d0751db9723dfb9f164ebfcef88d52b6efa3), [`7e7abda`](https://github.com/TanStack/db/commit/7e7abda73a7ab313f9ec6a413fad00f300e79fb3), [`dc53f0e`](https://github.com/TanStack/db/commit/dc53f0ecbc38e173af68d829ff2de97531494722)]:
+  - @tanstack/db@0.7.0
+
+## 0.1.95
+
+### Patch Changes
+
+- Updated dependencies [[`8ee783d`](https://github.com/TanStack/db/commit/8ee783d7aed9bd5585c182607581305374b8904f)]:
+  - @tanstack/db@0.6.17
+
+## 0.1.94
+
+### Patch Changes
+
+- Updated dependencies [[`8258d09`](https://github.com/TanStack/db/commit/8258d0955ab47c8510bd49ea59bcdbefd2ae054d), [`286964d`](https://github.com/TanStack/db/commit/286964d72612b59e3e427baabd9870f5a71a4281)]:
+  - @tanstack/db@0.6.16
+
+## 0.1.93
+
+### Patch Changes
+
+- Extract shared live-query adapter helpers into `@tanstack/db` ([#1641](https://github.com/TanStack/db/pull/1641))
+
+  Adds `isCollection`, `isSingleResultCollection`, and `getLiveQueryStatusFlags` to `@tanstack/db` and migrates all five framework adapters to use them. `isCollection` replaces the per-adapter duck-typing and Solid's `instanceof CollectionImpl` with one structural, multi-realm-safe guard (the `instanceof` form gave false negatives across dual-package boundaries). No behavior change; internal deduplication only.
+
+- Updated dependencies [[`eabcea7`](https://github.com/TanStack/db/commit/eabcea743fdfa045a2db01e12bef87403613102a), [`6d4c096`](https://github.com/TanStack/db/commit/6d4c096395b7ff3f428122ea8842bbead551a8c9)]:
+  - @tanstack/db@0.6.15
+
+## 0.1.92
+
+### Patch Changes
+
+- Updated dependencies [[`397e12a`](https://github.com/TanStack/db/commit/397e12a1224ad563e20a331eebcbe904cd4af948)]:
+  - @tanstack/db@0.6.14
+
+## 0.1.91
+
+### Patch Changes
+
+- Updated dependencies [[`99e9afe`](https://github.com/TanStack/db/commit/99e9afed46ab4083d66609a3e37ee44103c2177f), [`816b667`](https://github.com/TanStack/db/commit/816b6671c2cc9806715f6e6ed4410b3f4efb5afb)]:
+  - @tanstack/db@0.6.13
+
+## 0.1.90
+
+### Patch Changes
+
+- Updated dependencies [[`2b27dd1`](https://github.com/TanStack/db/commit/2b27dd1448da71c78a48e2390cb71b0ada1b1488)]:
+  - @tanstack/db@0.6.12
+
+## 0.1.89
+
+### Patch Changes
+
+- Updated dependencies [[`d79b0cd`](https://github.com/TanStack/db/commit/d79b0cd3fd20c1f7e2525e90121752fb6bee314c), [`36fb29a`](https://github.com/TanStack/db/commit/36fb29ad7e906d39b6afdba2fd31e369c601bbb0), [`d79b0cd`](https://github.com/TanStack/db/commit/d79b0cd3fd20c1f7e2525e90121752fb6bee314c), [`ac09b11`](https://github.com/TanStack/db/commit/ac09b1177a100eafa85cba3cd09dd1f53f933ded)]:
+  - @tanstack/db@0.6.11
+
+## 0.1.88
+
+### Patch Changes
+
+- Updated dependencies [[`307fdf8`](https://github.com/TanStack/db/commit/307fdf80f522a39a50e316316b3b75ba27fd5e84)]:
+  - @tanstack/db@0.6.10
+
+## 0.1.87
+
+### Patch Changes
+
+- Updated dependencies [[`2147345`](https://github.com/TanStack/db/commit/2147345236ceee6e73d9fc6c0cdc2385833199fc), [`00389a4`](https://github.com/TanStack/db/commit/00389a47b258ad58fc3a03c5cc6f66957b9bd2d1)]:
+  - @tanstack/db@0.6.9
+
+## 0.1.86
+
+### Patch Changes
+
+- Updated dependencies [[`3827b62`](https://github.com/TanStack/db/commit/3827b62604bbfc970d80b57479c8da063d78e69d)]:
+  - @tanstack/db@0.6.8
+
+## 0.1.85
+
+### Patch Changes
+
+- Updated dependencies [[`ec59984`](https://github.com/TanStack/db/commit/ec59984dcd8610ad9651c2d32e1361143d44d3c9), [`6238a2d`](https://github.com/TanStack/db/commit/6238a2d80caf4d1cdecaf889fb66bd6ebcc7386a)]:
+  - @tanstack/db@0.6.7
+
+## 0.1.84
+
+### Patch Changes
+
+- Updated dependencies [[`4e9ab39`](https://github.com/TanStack/db/commit/4e9ab39241aae3ba17c8bddf744d566de411f9aa)]:
+  - @tanstack/db@0.6.6
+
+## 0.1.83
+
+### Patch Changes
+
+- Updated dependencies [[`232f228`](https://github.com/TanStack/db/commit/232f22845ddfe179a803a241f95a3375ae63a1fb), [`232f228`](https://github.com/TanStack/db/commit/232f22845ddfe179a803a241f95a3375ae63a1fb)]:
+  - @tanstack/db@0.6.5
+
+## 0.1.82
+
+### Patch Changes
+
+- Add includes (hierarchical data) documentation to all framework SKILL.md files and fix inaccurate toArray scalar select constraint in db-core/live-queries skill. ([#1361](https://github.com/TanStack/db/pull/1361))
+
+- Updated dependencies [[`1e69dd6`](https://github.com/TanStack/db/commit/1e69dd6fac7c9d8d7314af5ce18c33f2006c96b4)]:
+  - @tanstack/db@0.6.4
+
+## 0.1.81
+
+### Patch Changes
+
+- Updated dependencies [[`e29aab3`](https://github.com/TanStack/db/commit/e29aab3ece4420c6959202294777daa606c4b9e4), [`f4a9bd2`](https://github.com/TanStack/db/commit/f4a9bd28c613dc4757f279f292c9276f6a8e012e)]:
+  - @tanstack/db@0.6.3
+
+## 0.1.80
+
+### Patch Changes
+
+- Fix stale status mismatch in useLiveSuspenseQuery causing infinite suspense fallback. ([#1427](https://github.com/TanStack/db/pull/1427))
+
+- Updated dependencies [[`3fe689a`](https://github.com/TanStack/db/commit/3fe689a4444d53a075a0dbe6e2649f8852137fc8), [`c314c36`](https://github.com/TanStack/db/commit/c314c36b8bd02f8be86865c13f31f817ce21dc66)]:
+  - @tanstack/db@0.6.2
+
+## 0.1.79
+
+### Patch Changes
+
+- Update all SKILL.md files to v0.6.0 with new documentation for persistence, virtual properties, queryOnce, createEffect, includes, indexing, and sync metadata. Add tanstack-intent keyword to all packages with skills. ([#1421](https://github.com/TanStack/db/pull/1421))
+
+- Updated dependencies [[`8b7fb1a`](https://github.com/TanStack/db/commit/8b7fb1a18522b8d1c2adb46f5917305c7d99fc4a)]:
+  - @tanstack/db@0.6.1
+
+## 0.1.78
+
+### Patch Changes
+
+- Update dependencies across workspace to resolve version mismatches: `@electric-sql/client` ^1.5.13, `@tanstack/store` ^0.9.2, `pg` ^8.20.0. Adapt subscription cleanup to `@tanstack/store` 0.9.x API which returns `Subscription` objects instead of unsubscribe functions. ([#1381](https://github.com/TanStack/db/pull/1381))
+
+- Updated dependencies [[`f60384b`](https://github.com/TanStack/db/commit/f60384b0fbde019865cbac5a7af341ff8a46d483), [`b8abc02`](https://github.com/TanStack/db/commit/b8abc0230096900746f92c51496489460b4d75e1), [`09c7afc`](https://github.com/TanStack/db/commit/09c7afc47a5ef3f3415ae601b6b00155ab64650b), [`bb09eb1`](https://github.com/TanStack/db/commit/bb09eb1eecbf680bb95a0bb08639f337e9982043), [`179d666`](https://github.com/TanStack/db/commit/179d66685449bcdf9f785c8765bc57cc19c2f7bd), [`43ecbfa`](https://github.com/TanStack/db/commit/43ecbfae5be5e59ffdce6c545d90ca5a810159e6), [`055fd94`](https://github.com/TanStack/db/commit/055fd94bd4654d27d5366af12a90da4c0e670fc0), [`055fd94`](https://github.com/TanStack/db/commit/055fd94bd4654d27d5366af12a90da4c0e670fc0), [`055fd94`](https://github.com/TanStack/db/commit/055fd94bd4654d27d5366af12a90da4c0e670fc0), [`055fd94`](https://github.com/TanStack/db/commit/055fd94bd4654d27d5366af12a90da4c0e670fc0), [`85f5435`](https://github.com/TanStack/db/commit/85f54355a426baefc88ccc55179e0cfcb4dac168), [`b65d8f7`](https://github.com/TanStack/db/commit/b65d8f767dafb1aeede26766c644f9ef0694f20c), [`e0df07e`](https://github.com/TanStack/db/commit/e0df07e1eb2eefbc829407f337cee1d443a7e9b6), [`9952921`](https://github.com/TanStack/db/commit/9952921e02ed8bca5653f0afa64862fc22ffbf9d), [`d351c67`](https://github.com/TanStack/db/commit/d351c677d687e667450138f66ab3bd0e11e7e347)]:
+  - @tanstack/db@0.6.0
+
+## 0.1.77
+
+### Patch Changes
+
+- Add `createEffect` API for reactive delta-driven effects and `useLiveQueryEffect` React hook. ([#1221](https://github.com/TanStack/db/pull/1221))
+
+  `createEffect` attaches callbacks to a live query's delta stream — firing `onEnter`, `onExit`, and `onUpdate` for row-level query-result transitions and `onBatch` for the full delta batch from each graph run — without materialising the full result set. Supports `skipInitial`, `orderBy` + `limit` (top-K window), joins, lazy loading, transaction coalescing, async disposal with `AbortSignal`, and `onSourceError` / `onError` callbacks.
+
+  `useLiveQueryEffect` is the React hook wrapper that manages the effect lifecycle (create on mount, dispose on unmount, recreate on dependency change).
+
+- Updated dependencies [[`c3e6a96`](https://github.com/TanStack/db/commit/c3e6a9654004ce53d429e0ec995738078ab93870)]:
+  - @tanstack/db@0.5.33
+
+## 0.1.76
+
+### Patch Changes
+
+- Updated dependencies [[`eeb5321`](https://github.com/TanStack/db/commit/eeb5321c578ffa2fbdfb7b0b3d64f579d1933522), [`495abc2`](https://github.com/TanStack/db/commit/495abc29fe8c088783b43402c7eeed35566d8524), [`a55e2bf`](https://github.com/TanStack/db/commit/a55e2bf54dbe78128adf5ce26d524a13dedf8145), [`41c0ea2`](https://github.com/TanStack/db/commit/41c0ea2d956f9de37d0216af371f58a461be6f1f)]:
+  - @tanstack/db@0.5.32
+
+## 0.1.75
+
+### Patch Changes
+
+- Add Intent agent skills (SKILL.md files) to guide AI coding agents. Include skills for core DB concepts, all 5 framework bindings, meta-framework integration, and offline transactions. Also add `export * from '@tanstack/db'` to angular-db for consistency with other framework packages. ([#1330](https://github.com/TanStack/db/pull/1330))
+
+- fix(react-db): make getNextPageParam optional in useLiveInfiniteQuery ([#1268](https://github.com/TanStack/db/pull/1268))
+
+- fix(react-db): handle rejected/stale setWindow promises in useLiveInfiniteQuery ([#1269](https://github.com/TanStack/db/pull/1269))
+
+- Updated dependencies [[`bf1d078`](https://github.com/TanStack/db/commit/bf1d078627de150bfca02e2ae2ad8b0289c19b37)]:
+  - @tanstack/db@0.5.31
+
+## 0.1.74
+
+### Patch Changes
+
+- Updated dependencies [[`e9d0fd8`](https://github.com/TanStack/db/commit/e9d0fd8f0db18a7dc8a0f2b3eacd50a94f6258f7)]:
+  - @tanstack/db@0.5.30
+
+## 0.1.73
+
+### Patch Changes
+
+- Updated dependencies [[`77b815e`](https://github.com/TanStack/db/commit/77b815ee52e91ca8d03110a551a4cb8bab4f2daa), [`ac4ce67`](https://github.com/TanStack/db/commit/ac4ce6790e906f5cfb086b063c8d7daa7681ceb9)]:
+  - @tanstack/db@0.5.29
+
+## 0.1.72
+
+### Patch Changes
+
+- Updated dependencies [[`46450e7`](https://github.com/TanStack/db/commit/46450e73bf78dbdcbef1fb46cb90c6a86b10f6c8)]:
+  - @tanstack/db@0.5.28
+
+## 0.1.71
+
+### Patch Changes
+
+- Updated dependencies [[`802550f`](https://github.com/TanStack/db/commit/802550f3c517b8decac273edf9a4a6074fb3526b), [`dc41d7d`](https://github.com/TanStack/db/commit/dc41d7dacc4a70cb62462633a375de823f01b280), [`4ff3da5`](https://github.com/TanStack/db/commit/4ff3da57e095dc17d8585585d7678b9538cf7602), [`2223cd6`](https://github.com/TanStack/db/commit/2223cd6b51ce37f21983302804a75af28b47f2fe)]:
+  - @tanstack/db@0.5.27
+
+## 0.1.70
+
+### Patch Changes
+
+- Fix `useLiveInfiniteQuery` peek-ahead detection for `hasNextPage`. The initial query now correctly requests `pageSize + 1` items to detect whether additional pages exist, matching the behavior of subsequent page loads. ([#1209](https://github.com/TanStack/db/pull/1209))
+
+  Fix async on-demand pagination by ensuring the graph callback fires at least once even when there is no pending graph work, so that `loadMoreIfNeeded` is triggered after `setWindow()` increases the limit.
+
+- Updated dependencies [[`85c373e`](https://github.com/TanStack/db/commit/85c373ef892e4080fe86b26e2fcb762181545e3c), [`9184dcc`](https://github.com/TanStack/db/commit/9184dcce62019ea870f968f4a4a5c2428291214d), [`83d5ac8`](https://github.com/TanStack/db/commit/83d5ac82983fb6c244c53d349c83845969473a9b)]:
+  - @tanstack/db@0.5.26
+
+## 0.1.69
+
+### Patch Changes
+
+- Updated dependencies [[`43c7c9d`](https://github.com/TanStack/db/commit/43c7c9d5f2b47366a58f87470ac5dca95020ac57), [`284ebcc`](https://github.com/TanStack/db/commit/284ebcc8346bd237c3381de766995b8bda35009a)]:
+  - @tanstack/db@0.5.25
+
+## 0.1.68
+
+### Patch Changes
+
+- Updated dependencies [[`7099459`](https://github.com/TanStack/db/commit/7099459291810b237a9fb24bbfe6e543852a2ab2)]:
+  - @tanstack/db@0.5.24
+
+## 0.1.67
+
+### Patch Changes
+
+- Updated dependencies [[`05130f2`](https://github.com/TanStack/db/commit/05130f2420eb682f11f099310a0af87afa3f35fe)]:
+  - @tanstack/db@0.5.23
+
+## 0.1.66
+
+### Patch Changes
+
+- Updated dependencies [[`f9b741e`](https://github.com/TanStack/db/commit/f9b741e9fb636be1c9f1502b7e28fe691bae2480)]:
+  - @tanstack/db@0.5.22
+
+## 0.1.65
+
+### Patch Changes
+
+- Updated dependencies [[`6745ed0`](https://github.com/TanStack/db/commit/6745ed003dc25cfd6fa0f7e60f708205a6069ff2), [`1b22e40`](https://github.com/TanStack/db/commit/1b22e40c56323cfa5e7f759272fed53320aa32f7), [`7a2cacd`](https://github.com/TanStack/db/commit/7a2cacd7a426530cb77844a8c2680f6b06e9ce2f), [`bdf9405`](https://github.com/TanStack/db/commit/bdf94059e7ab98b5181e0df7d8d25cd1dbb5ae58)]:
+  - @tanstack/db@0.5.21
+
+## 0.1.64
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @tanstack/db@0.5.20
+
+## 0.1.63
+
+### Patch Changes
+
+- Updated dependencies [[`29033b8`](https://github.com/TanStack/db/commit/29033b8f55b0ba5721371ad761037ec813440aa7), [`888ad6a`](https://github.com/TanStack/db/commit/888ad6afe5932b0467320c04fbd4583469cb9c47)]:
+  - @tanstack/db@0.5.19
+
+## 0.1.62
+
+### Patch Changes
+
+- Updated dependencies [[`c1247e8`](https://github.com/TanStack/db/commit/c1247e816950314da6d201613481577834c1d97a)]:
+  - @tanstack/db@0.5.18
+
+## 0.1.61
+
+### Patch Changes
+
+- Improve runtime error message and documentation when `useLiveSuspenseQuery` receives `undefined` from query callback. ([#860](https://github.com/TanStack/db/pull/860))
+
+  Following TanStack Query's `useSuspenseQuery` design, `useLiveSuspenseQuery` intentionally does not support disabled queries (when callback returns `undefined` or `null`). This maintains the type guarantee that `data` is always `T` (not `T | undefined`), which is a core benefit of using Suspense.
+
+  **What changed:**
+  1. **Improved runtime error message** with clear guidance:
+
+  ```
+  useLiveSuspenseQuery does not support disabled queries (callback returned undefined/null).
+  The Suspense pattern requires data to always be defined (T, not T | undefined).
+  Solutions:
+  1) Use conditional rendering - don't render the component until the condition is met.
+  2) Use useLiveQuery instead, which supports disabled queries with the 'isEnabled' flag.
+  ```
+
+  2. **Enhanced JSDoc documentation** with detailed `@remarks` section explaining the design decision, showing both incorrect (❌) and correct (✅) patterns
+
+  **Why this matters:**
+
+  ```typescript
+  // ❌ This pattern doesn't work with Suspense queries:
+  const { data } = useLiveSuspenseQuery(
+    (q) => userId
+      ? q.from({ users }).where(({ users }) => eq(users.id, userId)).findOne()
+      : undefined,
+    [userId]
+  )
+
+  // ✅ Instead, use conditional rendering:
+  function UserProfile({ userId }: { userId: string }) {
+    const { data } = useLiveSuspenseQuery(
+      (q) => q.from({ users }).where(({ users }) => eq(users.id, userId)).findOne(),
+      [userId]
+    )
+    return <div>{data.name}</div> // data is guaranteed non-undefined
+  }
+
+  function App({ userId }: { userId?: string }) {
+    if (!userId) return <div>No user selected</div>
+    return <UserProfile userId={userId} />
+  }
+
+  // ✅ Or use useLiveQuery for conditional queries:
+  const { data, isEnabled } = useLiveQuery(
+    (q) => userId
+      ? q.from({ users }).where(({ users }) => eq(users.id, userId)).findOne()
+      : undefined,
+    [userId]
+  )
+  ```
+
+  This aligns with TanStack Query's philosophy where Suspense queries prioritize type safety and proper component composition over flexibility.
+
+- Updated dependencies [[`f795a67`](https://github.com/TanStack/db/commit/f795a674f21659ef46ff370d4f3b9903a596bcaf), [`d542667`](https://github.com/TanStack/db/commit/d542667a3440415d8e6cbb449b20abd3cbd6855c), [`6503c09`](https://github.com/TanStack/db/commit/6503c091a259208331f471dca29abf086e881147), [`b1cc4a7`](https://github.com/TanStack/db/commit/b1cc4a7e018ffb6804ae7f1c99e9c6eb4bb22812)]:
+  - @tanstack/db@0.5.17
+
+## 0.1.60
+
+### Patch Changes
+
+- Updated dependencies [[`41308b8`](https://github.com/TanStack/db/commit/41308b8ee914aa467e22842cd454f06d1a60032e)]:
+  - @tanstack/db@0.5.16
+
+## 0.1.59
+
+### Patch Changes
+
+- Updated dependencies [[`32ec4d8`](https://github.com/TanStack/db/commit/32ec4d8478cca96f76f3a49efc259c95b85baa40)]:
+  - @tanstack/db@0.5.15
+
+## 0.1.58
+
+### Patch Changes
+
+- Updated dependencies [[`26ed0aa`](https://github.com/TanStack/db/commit/26ed0aad2def60e652508a99b2e980e73f70148e)]:
+  - @tanstack/db@0.5.14
+
+## 0.1.57
+
+### Patch Changes
+
+- Updated dependencies [[`8ed7725`](https://github.com/TanStack/db/commit/8ed7725514a6a501482a391162f7792aa8b371e5), [`01452bf`](https://github.com/TanStack/db/commit/01452bfd0d00da8bd52941a4954af73749473651)]:
+  - @tanstack/db@0.5.13
+
+## 0.1.56
+
+### Patch Changes
+
+- Updated dependencies [[`b3b1940`](https://github.com/TanStack/db/commit/b3b194000d8efcc2c6cc45a663029dadc26f13f0), [`09da081`](https://github.com/TanStack/db/commit/09da081b420fc915d7f0dc566c6cdbbc78582435), [`86ad40c`](https://github.com/TanStack/db/commit/86ad40c6bc37b2f5d4ad24d06f72168ca4b96161)]:
+  - @tanstack/db@0.5.12
+
+## 0.1.55
+
+### Patch Changes
+
+- Fixed `isReady` to return `true` for disabled queries in `useLiveQuery`/`injectLiveQuery` across all framework packages. When a query function returns `null` or `undefined` (disabling the query), there's no async operation to wait for, so the hook should be considered "ready" immediately. ([#886](https://github.com/TanStack/db/pull/886))
+
+  Additionally, all frameworks now have proper TypeScript overloads that explicitly support returning `undefined | null` from query functions, making the disabled query pattern type-safe.
+
+  This fixes the common pattern where users conditionally enable queries and don't want to show loading states when the query is disabled.
+
+- Updated dependencies [[`c4b9399`](https://github.com/TanStack/db/commit/c4b93997432743d974749683059bf68a082d3e5b), [`a1a484e`](https://github.com/TanStack/db/commit/a1a484ec4d2331d702ab9c4b7e5b02622c76b3dd)]:
+  - @tanstack/db@0.5.11
+
+## 0.1.54
+
+### Patch Changes
+
+- Updated dependencies [[`1d19d22`](https://github.com/TanStack/db/commit/1d19d2219cbbaef6483845df1c3b078077e4e3bd), [`b3e4e80`](https://github.com/TanStack/db/commit/b3e4e80c4b73d96c15391ac25efb518c7ae7ccbb)]:
+  - @tanstack/db@0.5.10
+
+## 0.1.53
+
+### Patch Changes
+
+- Updated dependencies [[`5f474f1`](https://github.com/TanStack/db/commit/5f474f1eabd57e144ba05b0f33d848f7efc8fb07)]:
+  - @tanstack/db@0.5.9
+
+## 0.1.52
+
+### Patch Changes
+
+- Updated dependencies [[`954c8fe`](https://github.com/TanStack/db/commit/954c8fed5ed92a348ac8b6d8333bc69c955f4f60), [`51c73aa`](https://github.com/TanStack/db/commit/51c73aaa2b27b27966edb98fb6664beb44eac1ac)]:
+  - @tanstack/db@0.5.8
+
+## 0.1.51
+
+### Patch Changes
+
+- Updated dependencies [[`295cb45`](https://github.com/TanStack/db/commit/295cb45797572b232650eddd3d62ffa937fa2fd7)]:
+  - @tanstack/db@0.5.7
+
+## 0.1.50
+
+### Patch Changes
+
+- Updated dependencies [[`c8a2c16`](https://github.com/TanStack/db/commit/c8a2c16aa528427d5ddd55cda4ee59a5cb369b5f)]:
+  - @tanstack/db@0.5.6
+
+## 0.1.49
+
+### Patch Changes
+
+- Updated dependencies [[`077fc1a`](https://github.com/TanStack/db/commit/077fc1a418ca090d7533115888c09f3f609e36b2)]:
+  - @tanstack/db@0.5.5
+
+## 0.1.48
+
+### Patch Changes
+
+- Updated dependencies [[`acb3e4f`](https://github.com/TanStack/db/commit/acb3e4f1441e6872ca577e74d92ae2d77deb5938), [`464805d`](https://github.com/TanStack/db/commit/464805d96bad6d0fd741e48fbfc98e90dc58bebe), [`2c2e4db`](https://github.com/TanStack/db/commit/2c2e4dbd781d278347d73373f66d3c51c6388116), [`15c772f`](https://github.com/TanStack/db/commit/15c772f5e42e49000a2d775fd8e4cfda3418243f)]:
+  - @tanstack/db@0.5.4
+
+## 0.1.47
+
+### Patch Changes
+
+- Updated dependencies [[`846a830`](https://github.com/TanStack/db/commit/846a8309a243197245f4400a5d53cef5cec6d5d9), [`8e26dcf`](https://github.com/TanStack/db/commit/8e26dcfde600e4a18cd51fbe524560d60ab98d70)]:
+  - @tanstack/db@0.5.3
+
+## 0.1.46
+
+### Patch Changes
+
+- Updated dependencies [[`99a3716`](https://github.com/TanStack/db/commit/99a371630b9f4632db86c43357c64701ecb53b0e)]:
+  - @tanstack/db@0.5.2
+
+## 0.1.45
+
+### Patch Changes
+
+- Updated dependencies [[`a83a818`](https://github.com/TanStack/db/commit/a83a8189514d22ca2fcdf34b9cb97206d3c03c38)]:
+  - @tanstack/db@0.5.1
+
+## 0.1.44
+
+### Patch Changes
+
+- Updated dependencies [[`243a35a`](https://github.com/TanStack/db/commit/243a35a632ee0aca20c3ee12ee2ac2929d8be11d), [`f9d11fc`](https://github.com/TanStack/db/commit/f9d11fc3d7297c61feb3c6876cb2f436edbb5b34), [`7aedf12`](https://github.com/TanStack/db/commit/7aedf12996a67ef64010bca0d78d51c919dd384f), [`28f81b5`](https://github.com/TanStack/db/commit/28f81b5165d0a9566f99c2b6cf0ad09533e1a2cb), [`28f81b5`](https://github.com/TanStack/db/commit/28f81b5165d0a9566f99c2b6cf0ad09533e1a2cb), [`f6ac7ea`](https://github.com/TanStack/db/commit/f6ac7eac50ae1334ddb173786a68c9fc732848f9), [`01093a7`](https://github.com/TanStack/db/commit/01093a762cf2f5f308edec7f466d1c3dabb5ea9f)]:
+  - @tanstack/db@0.5.0
+
+## 0.1.43
+
+### Patch Changes
+
+- Updated dependencies [[`6c55e16`](https://github.com/TanStack/db/commit/6c55e16a2545b479b1d47f548b6846d362573d45), [`7805afb`](https://github.com/TanStack/db/commit/7805afb7286b680168b336e77dd4de7dd1b6f06a), [`1367756`](https://github.com/TanStack/db/commit/1367756d0a68447405c5f5c1a3cca30ab0558d74)]:
+  - @tanstack/db@0.4.20
+
+## 0.1.42
+
+### Patch Changes
+
+- Updated dependencies [[`75470a8`](https://github.com/TanStack/db/commit/75470a8297f316b4817601b2ea92cb9b21cc7829)]:
+  - @tanstack/db@0.4.19
+
+## 0.1.41
+
+### Patch Changes
+
+- Add `useLiveSuspenseQuery` hook for React Suspense support ([#697](https://github.com/TanStack/db/pull/697))
+
+  Introduces a new `useLiveSuspenseQuery` hook that integrates with React Suspense and Error Boundaries, following TanStack Query's `useSuspenseQuery` pattern.
+
+  **Key features:**
+  - React 18+ compatible using the throw promise pattern
+  - Type-safe API with guaranteed data (never undefined)
+  - Automatic error handling via Error Boundaries
+  - Reactive updates after initial load via useSyncExternalStore
+  - Support for dependency-based re-suspension
+  - Works with query functions, config objects, and pre-created collections
+
+  **Example usage:**
+
+  ```tsx
+  import { Suspense } from 'react'
+  import { useLiveSuspenseQuery } from '@tanstack/react-db'
+
+  function TodoList() {
+    // Data is guaranteed to be defined - no isLoading needed
+    const { data } = useLiveSuspenseQuery((q) =>
+      q
+        .from({ todos: todosCollection })
+        .where(({ todos }) => eq(todos.completed, false)),
+    )
+
+    return (
+      <ul>
+        {data.map((todo) => (
+          <li key={todo.id}>{todo.text}</li>
+        ))}
+      </ul>
+    )
+  }
+
+  function App() {
+    return (
+      <Suspense fallback={<div>Loading...</div>}>
+        <TodoList />
+      </Suspense>
+    )
+  }
+  ```
+
+  **Implementation details:**
+  - Throws promises when collection is loading (caught by Suspense)
+  - Throws errors when collection fails (caught by Error Boundary)
+  - Reuses promise across re-renders to prevent infinite loops
+  - Detects dependency changes and creates new collection/promise
+  - Same TypeScript overloads as useLiveQuery for consistency
+
+  **Documentation:**
+  - Comprehensive guide in live-queries.md covering usage patterns and when to use each hook
+  - Comparison with useLiveQuery showing different approaches to loading/error states
+  - Router loader pattern recommendation for React Router/TanStack Router users
+  - Error handling examples with Suspense and Error Boundaries
+
+  Resolves #692
+
+## 0.1.40
+
+### Patch Changes
+
+- Updated dependencies [[`f416231`](https://github.com/TanStack/db/commit/f41623180c862b58b4fa6415383dfdb034f84ee9), [`b1b8299`](https://github.com/TanStack/db/commit/b1b82994cb9765225129b5a19be06e9369e3158d)]:
+  - @tanstack/db@0.4.18
+
+## 0.1.39
+
+### Patch Changes
+
+- Updated dependencies [[`49bcaa5`](https://github.com/TanStack/db/commit/49bcaa5557ba8d647c947811ed6e0c2450159d84)]:
+  - @tanstack/db@0.4.17
+
+## 0.1.38
+
+### Patch Changes
+
+- Add paced mutations with pluggable timing strategies ([#704](https://github.com/TanStack/db/pull/704))
+
+  Introduces a new paced mutations system that enables optimistic mutations with pluggable timing strategies. This provides fine-grained control over when and how mutations are persisted to the backend. Powered by [TanStack Pacer](https://github.com/TanStack/pacer).
+
+  **Key Design:**
+  - **Debounce/Throttle**: Only one pending transaction (collecting mutations) and one persisting transaction (writing to backend) at a time. Multiple rapid mutations automatically merge together.
+  - **Queue**: Each mutation creates a separate transaction, guaranteed to run in the order they're made (FIFO by default, configurable to LIFO).
+
+  **Core Features:**
+  - **Pluggable Strategy System**: Choose from debounce, queue, or throttle strategies to control mutation timing
+  - **Auto-merging Mutations**: Multiple rapid mutations on the same item automatically merge for efficiency (debounce/throttle only)
+  - **Transaction Management**: Full transaction lifecycle tracking (pending → persisting → completed/failed)
+  - **React Hook**: `usePacedMutations` for easy integration in React applications
+
+  **Available Strategies:**
+  - `debounceStrategy`: Wait for inactivity before persisting. Only final state is saved. (ideal for auto-save, search-as-you-type)
+  - `queueStrategy`: Each mutation becomes a separate transaction, processed sequentially in order (defaults to FIFO, configurable to LIFO). All mutations are guaranteed to persist. (ideal for sequential workflows, rate-limited APIs)
+  - `throttleStrategy`: Ensure minimum spacing between executions. Mutations between executions are merged. (ideal for analytics, progress updates)
+
+  **Example Usage:**
+
+  ```ts
+  import { usePacedMutations, debounceStrategy } from '@tanstack/react-db'
+
+  const mutate = usePacedMutations({
+    mutationFn: async ({ transaction }) => {
+      await api.save(transaction.mutations)
+    },
+    strategy: debounceStrategy({ wait: 500 }),
+  })
+
+  // Trigger a mutation
+  const tx = mutate(() => {
+    collection.update(id, (draft) => {
+      draft.value = newValue
+    })
+  })
+
+  // Optionally await persistence
+  await tx.isPersisted.promise
+  ```
+
+- Updated dependencies [[`979a66f`](https://github.com/TanStack/db/commit/979a66f2f6eff0ffe44dfde7c67feea933ee6110), [`f8a979b`](https://github.com/TanStack/db/commit/f8a979ba3aa90ac7e85f7a065fc050bda6589b4b), [`cb25623`](https://github.com/TanStack/db/commit/cb256234c9cd8df7771808b147e5afc2be56f51f)]:
+  - @tanstack/db@0.4.16
+
+## 0.1.37
+
+### Patch Changes
+
+- Updated dependencies [[`6738247`](https://github.com/TanStack/db/commit/673824791bcfae04acf42fc35e5d6d8755adceb2)]:
+  - @tanstack/db@0.4.15
+
+## 0.1.36
+
+### Patch Changes
+
+- Updated dependencies [[`970616b`](https://github.com/TanStack/db/commit/970616b6db723d1716eecd5076417de5d6e9a884)]:
+  - @tanstack/db@0.4.14
+
+## 0.1.35
+
+### Patch Changes
+
+- Updated dependencies [[`3c9526c`](https://github.com/TanStack/db/commit/3c9526cd1fd80032ddddff32cf4a23dfa8376888)]:
+  - @tanstack/db@0.4.13
+
+## 0.1.34
+
+### Patch Changes
+
+- Updated dependencies [[`8b29841`](https://github.com/TanStack/db/commit/8b298417964340bbac5ad08a831766f8f1497477), [`8187c6d`](https://github.com/TanStack/db/commit/8187c6d69c4b498e306ac2eb5fc7115e4f8193a5)]:
+  - @tanstack/db@0.4.12
+
+## 0.1.33
+
+### Patch Changes
+
+- Add support for pre-created live query collections in useLiveInfiniteQuery, enabling router loader patterns where live queries can be created, preloaded, and passed to components. ([#684](https://github.com/TanStack/db/pull/684))
+
+- Updated dependencies [[`5566b26`](https://github.com/TanStack/db/commit/5566b26100abdae9b4a041f048aeda1dd726e904)]:
+  - @tanstack/db@0.4.11
+
+## 0.1.32
+
+### Patch Changes
+
+- Add `useLiveInfiniteQuery` hook for infinite scrolling with live updates. ([#669](https://github.com/TanStack/db/pull/669))
+
+  The new `useLiveInfiniteQuery` hook provides an infinite query pattern similar to TanStack Query's `useInfiniteQuery`, but with live updates from your local collection. It uses `liveQueryCollection.utils.setWindow()` internally to efficiently paginate through ordered data without recreating the query on each page fetch.
+
+  **Key features:**
+  - Automatic live updates as data changes in the collection
+  - Efficient pagination using dynamic window adjustment
+  - Peek-ahead mechanism to detect when more pages are available
+  - Compatible with TanStack Query's infinite query API patterns
+
+  **Example usage:**
+
+  ```tsx
+  import { useLiveInfiniteQuery } from '@tanstack/react-db'
+
+  function PostList() {
+    const { data, pages, fetchNextPage, hasNextPage, isLoading } =
+      useLiveInfiniteQuery(
+        (q) =>
+          q
+            .from({ posts: postsCollection })
+            .orderBy(({ posts }) => posts.createdAt, 'desc'),
+        {
+          pageSize: 20,
+          getNextPageParam: (lastPage, allPages) =>
+            lastPage.length === 20 ? allPages.length : undefined,
+        },
+      )
+
+    if (isLoading) return <div>Loading...</div>
+
+    return (
+      <div>
+        {pages.map((page, i) => (
+          <div key={i}>
+            {page.map((post) => (
+              <PostCard key={post.id} post={post} />
+            ))}
+          </div>
+        ))}
+        {hasNextPage && (
+          <button onClick={() => fetchNextPage()}>Load More</button>
+        )}
+      </div>
+    )
+  }
+  ```
+
+  **Requirements:**
+  - Query must include `.orderBy()` for the window mechanism to work
+  - Returns flattened `data` array and `pages` array for flexible rendering
+  - Automatically detects new pages when data is synced to the collection
+
+- Updated dependencies [[`63aa8ef`](https://github.com/TanStack/db/commit/63aa8ef8b09960ce0f93e068d41b37fb0503a21a), [`b0687ab`](https://github.com/TanStack/db/commit/b0687ab4c1476362d7a25e3c1704ab0fb0385455)]:
+  - @tanstack/db@0.4.10
+
+## 0.1.31
+
+### Patch Changes
+
+- Updated dependencies [[`e52be92`](https://github.com/TanStack/db/commit/e52be92ce16b09a095b4b9baf7ac2cf708146f47), [`4a7c44a`](https://github.com/TanStack/db/commit/4a7c44a723223ade4e226745eadffead671fff13), [`ee61bb6`](https://github.com/TanStack/db/commit/ee61bb61f76ca510f113e96baa090940719aac40)]:
+  - @tanstack/db@0.4.9
+
+## 0.1.30
+
+### Patch Changes
+
+- Refactored live queries to execute eagerly during sync. Live queries now materialize their results immediately as data arrives from source collections, even while those collections are still in a "loading" state, rather than waiting for all sources to be "ready" before executing. ([#658](https://github.com/TanStack/db/pull/658))
+
+- Updated dependencies [[`d9ae7b7`](https://github.com/TanStack/db/commit/d9ae7b76b8ab30fd55fe835531974eee333dd450), [`44555b7`](https://github.com/TanStack/db/commit/44555b733a1a4d38d8126bf8da51d4b44f898298)]:
+  - @tanstack/db@0.4.8
+
+## 0.1.29
+
+### Patch Changes
+
+- Updated dependencies [[`6692aad`](https://github.com/TanStack/db/commit/6692aad4267e127b71ce595529080d6fc0aa2066)]:
+  - @tanstack/db@0.4.7
+
+## 0.1.28
+
+### Patch Changes
+
+- Updated dependencies [[`dd6cdf7`](https://github.com/TanStack/db/commit/dd6cdf7ea62d91bfb12ea8d25bdd25549259c113), [`c30a20b`](https://github.com/TanStack/db/commit/c30a20b1df39b34f18d0aa7c7b901a27fb963f36)]:
+  - @tanstack/db@0.4.6
+
+## 0.1.27
+
+### Patch Changes
+
+- Updated dependencies [[`7556fb6`](https://github.com/TanStack/db/commit/7556fb6f888b5bdc830fe6448eb3368efeb61988)]:
+  - @tanstack/db@0.4.5
+
+## 0.1.26
+
+### Patch Changes
+
+- Updated dependencies [[`56b870b`](https://github.com/TanStack/db/commit/56b870b3e63f8010b6eeebea87893b10c75a5888), [`f623990`](https://github.com/TanStack/db/commit/f62399062e4db61426ddfbbbe324c48cab2513dd), [`5f43d5f`](https://github.com/TanStack/db/commit/5f43d5f7f47614be8e71856ceb0f91733d9be627), [`05776f5`](https://github.com/TanStack/db/commit/05776f52a8ce4fe41b34fc8cace2046afc42835c), [`d27d32a`](https://github.com/TanStack/db/commit/d27d32aceb7f8fcabc07dcf1b55a84a605d2f23f)]:
+  - @tanstack/db@0.4.4
+
+## 0.1.25
+
+### Patch Changes
+
+- Updated dependencies [[`32f2212`](https://github.com/TanStack/db/commit/32f221278e2a684f3f4e1e2ace1ca98f5ecc858a)]:
+  - @tanstack/db@0.4.3
+
+## 0.1.24
+
+### Patch Changes
+
+- Updated dependencies [[`51c6bc5`](https://github.com/TanStack/db/commit/51c6bc58244ed6a3ac853e7e6af7775b33d6b65a), [`248e2c6`](https://github.com/TanStack/db/commit/248e2c6db8e9df8cf2cb225100e4ba9cb67cd534), [`ce7e2b2`](https://github.com/TanStack/db/commit/ce7e2b209ed882baa29ec86f89f1b527d6580e0b), [`1b832ff`](https://github.com/TanStack/db/commit/1b832ff9ec236e7dbe9256803e2ba12b4c9b9a30)]:
+  - @tanstack/db@0.4.2
+
+## 0.1.23
+
+### Patch Changes
+
+- Updated dependencies [[`8cd0876`](https://github.com/TanStack/db/commit/8cd0876b50bc7c1a614365318d5e74c2f32a0f80)]:
+  - @tanstack/db@0.4.1
+
+## 0.1.22
+
+### Patch Changes
+
+- Let collection.subscribeChanges return a subscription object. Move all data loading code related to optimizations into that subscription object. ([#564](https://github.com/TanStack/db/pull/564))
+
+- Updated dependencies [[`2f87216`](https://github.com/TanStack/db/commit/2f8721630e06331ca8bb2f962fbb283341103a58), [`ac6250a`](https://github.com/TanStack/db/commit/ac6250a879e95718e8d911732c10fb3388569f0f), [`2f87216`](https://github.com/TanStack/db/commit/2f8721630e06331ca8bb2f962fbb283341103a58)]:
+  - @tanstack/db@0.4.0
+
+## 0.1.21
+
+### Patch Changes
+
+- Expand `useLiveQuery` callback to support conditional queries and additional return types, enabling the ability to temporarily disable the query. ([#535](https://github.com/TanStack/db/pull/535))
+
+  **New Features:**
+  - Callback can now return `undefined` or `null` to temporarily disable the query
+  - Callback can return a pre-created `Collection` instance to use it directly
+  - Callback can return a `LiveQueryCollectionConfig` object for advanced configuration
+  - When disabled (returning `undefined`/`null`), the hook returns a specific idle state
+
+  **Usage Examples:**
+
+  ```ts
+  // Conditional queries - disable when not ready
+  const enabled = useState(false)
+  const { data, state, isIdle } = useLiveQuery((q) => {
+    if (!enabled) return undefined  // Disables the query
+    return q.from({ users }).where(...)
+  }, [enabled])
+
+  /**
+   * When disabled, returns:
+   * {
+   *   state: undefined,
+   *   data: undefined,
+   *   isIdle: true,
+   *   ...
+   * }
+   */
+
+  // Return pre-created Collection
+  const { data } = useLiveQuery((q) => {
+    if (usePrebuilt) return myCollection  // Use existing collection
+    return q.from({ items }).select(...)
+  }, [usePrebuilt])
+
+  // Return LiveQueryCollectionConfig
+  const { data } = useLiveQuery((q) => {
+    return {
+      query: q.from({ items }).select(...),
+      id: `my-collection`,
+    }
+  })
+  ```
+
+- Updated dependencies [[`cacfca2`](https://github.com/TanStack/db/commit/cacfca2d1b430c34a05202128fd3affa4bff54d6)]:
+  - @tanstack/db@0.3.2
+
+## 0.1.20
+
+### Patch Changes
+
+- Updated dependencies [[`5f51f35`](https://github.com/TanStack/db/commit/5f51f35d2c9543766a00cc5eea1374c62798b34e)]:
+  - @tanstack/db@0.3.1
+
+## 0.1.19
+
+### Patch Changes
+
+- Updated dependencies [[`c557a14`](https://github.com/TanStack/db/commit/c557a1488650ea9081b671a4ac278d55c59ac9cc), [`b5c87f7`](https://github.com/TanStack/db/commit/b5c87f71dbb534e4f1c660cf010e2cb6c0446ec5)]:
+  - @tanstack/db@0.3.0
+
+## 0.1.18
+
+### Patch Changes
+
+- Updated dependencies [[`b03894d`](https://github.com/TanStack/db/commit/b03894db05e063629a3660e03b31a80a48558dd5), [`3968087`](https://github.com/TanStack/db/commit/39680877fdc1993733933d2def13217bd18fa254)]:
+  - @tanstack/db@0.2.5
+
+## 0.1.17
+
+### Patch Changes
+
+- Updated dependencies [[`92febbf`](https://github.com/TanStack/db/commit/92febbf1feaa1d46f8cc4d7a4ea0d44cd5f85256), [`b487430`](https://github.com/TanStack/db/commit/b4874308813f95232f3361de539cec104ed55170)]:
+  - @tanstack/db@0.2.4
+
+## 0.1.16
+
+### Patch Changes
+
+- Updated dependencies [[`b162556`](https://github.com/TanStack/db/commit/b1625565df44b0824501297f7ef14ae1cd450b49)]:
+  - @tanstack/db@0.2.3
+
+## 0.1.15
+
+### Patch Changes
+
+- Updated dependencies [[`33515c6`](https://github.com/TanStack/db/commit/33515c69befc557add2cf828354ee378100f3977)]:
+  - @tanstack/db@0.2.2
+
+## 0.1.14
+
+### Patch Changes
+
+- Updated dependencies [[`620ebea`](https://github.com/TanStack/db/commit/620ebea96eb3fbeec66701b949de9920c4084c17)]:
+  - @tanstack/db@0.2.1
+
+## 0.1.13
+
+### Patch Changes
+
+- Updated dependencies [[`08303e6`](https://github.com/TanStack/db/commit/08303e645974db97e10b2aca0031abcbce027dd6), [`bafeaa1`](https://github.com/TanStack/db/commit/bafeaa1e9f161ac2200ce86537e442b2aa8e2a5b), [`1814f8c`](https://github.com/TanStack/db/commit/1814f8cc3c0e831c82f8053b86fbbbd737e4f34b), [`31acdf2`](https://github.com/TanStack/db/commit/31acdf2a96411da327f93f0d30fa78d884422969), [`e41ed7e`](https://github.com/TanStack/db/commit/e41ed7e1ff1d94dd3ce0c48b6321f66b8ea044fd), [`51954d8`](https://github.com/TanStack/db/commit/51954d8c5d64291d136159bce293e0ad00a19f88)]:
+  - @tanstack/db@0.2.0
+
+## 0.1.12
+
+### Patch Changes
+
+- Updated dependencies [[`cc4c34a`](https://github.com/TanStack/db/commit/cc4c34a6b40c81c83aa10c8d00dfc0a3d33c56db)]:
+  - @tanstack/db@0.1.12
+
+## 0.1.11
+
+### Patch Changes
+
+- Fixed a bug where a race condition could cause initial results not to be rendered when using `useLiveQuery`. ([#485](https://github.com/TanStack/db/pull/485))
+
+- Updated dependencies [[`b869f68`](https://github.com/TanStack/db/commit/b869f68f0109b3126509f202a38855cee38b4276)]:
+  - @tanstack/db@0.1.11
+
+## 0.1.10
+
+### Patch Changes
+
+- Updated dependencies [[`eb8fd18`](https://github.com/TanStack/db/commit/eb8fd18c50ee03b72cb06e4d7ef25f214367950b), [`e59a355`](https://github.com/TanStack/db/commit/e59a3551e75bac9dd166e14c911d9491e3a67b9a), [`074aab0`](https://github.com/TanStack/db/commit/074aab0477a7c55e9e0f19a705b96ed2619e2afb), [`d469c39`](https://github.com/TanStack/db/commit/d469c39a7bdc034fa4fbc533010573b3515f239f)]:
+  - @tanstack/db@0.1.10
+
+## 0.1.9
+
+### Patch Changes
+
+- Updated dependencies [[`d64b4a8`](https://github.com/TanStack/db/commit/d64b4a8b692a213c7ad58faaf66f5f5fd50bef66)]:
+  - @tanstack/db@0.1.9
+
+## 0.1.8
+
+### Patch Changes
+
+- Updated dependencies [[`1c5e206`](https://github.com/TanStack/db/commit/1c5e206d00d0a99f8419f0d00429b5a3c6cdc76e), [`4d20004`](https://github.com/TanStack/db/commit/4d2000488b9b5abf85c05801633297528af0eff6), [`968602e`](https://github.com/TanStack/db/commit/968602e4ffc597eaa559219daf22d6ef6321162a)]:
+  - @tanstack/db@0.1.8
+
+## 0.1.7
+
+### Patch Changes
+
+- Updated dependencies [[`48d0889`](https://github.com/TanStack/db/commit/48d088996a3f18df026aa7d2d1e7f27d1151345b), [`aecbcc3`](https://github.com/TanStack/db/commit/aecbcc32012561f1645df0bdf89a6c259058d888), [`a937f4c`](https://github.com/TanStack/db/commit/a937f4c7a5f4fc20c255e86692c5e2e80d5ebbec), [`3d60fad`](https://github.com/TanStack/db/commit/3d60fadbb9e8a1b62a9bcde947e282d653a2a270), [`79c95a3`](https://github.com/TanStack/db/commit/79c95a36f60087ffc3f9a02b76975c8bdf40acc7)]:
+  - @tanstack/db@0.1.7
+
+## 0.1.6
+
+### Patch Changes
+
+- Updated dependencies [[`ad33e9e`](https://github.com/TanStack/db/commit/ad33e9e535ca6197c2e00e2dbb59bf8e8f9bb51e)]:
+  - @tanstack/db@0.1.6
+
+## 0.1.5
+
+### Patch Changes
+
+- ensure that useLiveQuery returns a stable ref when there are no changes ([#388](https://github.com/TanStack/db/pull/388))
+
+- Updated dependencies [[`9a5a20c`](https://github.com/TanStack/db/commit/9a5a20c21fbf8286ab90e1db6d6f3315f8344a4e)]:
+  - @tanstack/db@0.1.5
+
+## 0.1.4
+
+### Patch Changes
+
+- Ensure that the ready status is correctly returned from a live query ([#390](https://github.com/TanStack/db/pull/390))
+
+- Updated dependencies [[`c90b4d8`](https://github.com/TanStack/db/commit/c90b4d85822f94f7fe72286d5c7ee07b087d0e20), [`6c1c19c`](https://github.com/TanStack/db/commit/6c1c19cedbc1d9d98396948e8e43fa0515bb8919), [`69a6d2d`](https://github.com/TanStack/db/commit/69a6d2d94c7a5510568c8b652356c62bd2b3cc76), [`6250a92`](https://github.com/TanStack/db/commit/6250a92c8045ef2fd69c107a94e05179471681d7), [`68538b4`](https://github.com/TanStack/db/commit/68538b4c446abeb992e24964f811c8900749f141)]:
+  - @tanstack/db@0.1.4
+
+## 0.1.3
+
+### Patch Changes
+
+- Updated dependencies [[`0cb7699`](https://github.com/TanStack/db/commit/0cb76999e5d6df5916694a5afeb31b928eab68e4)]:
+  - @tanstack/db@0.1.3
+
+## 0.1.2
+
+### Patch Changes
+
+- Updated dependencies [[`bb5d50e`](https://github.com/TanStack/db/commit/bb5d50e255d9114ef32b8f52eef6b15399255327), [`97b595e`](https://github.com/TanStack/db/commit/97b595e9617b1abb05c14489e3d608b314da08e8)]:
+  - @tanstack/db@0.1.2
+
+## 0.1.1
+
+### Patch Changes
+
+- Updated dependencies [[`bc2f204`](https://github.com/TanStack/db/commit/bc2f204b8cb8a4870ade00757d10f846524e2090), [`bda3f24`](https://github.com/TanStack/db/commit/bda3f24cc41504f60be0c5e071698b7735f75e28)]:
+  - @tanstack/db@0.1.1
+
+## 0.1.0
+
+### Minor Changes
+
+- 0.1 release - first beta 🎉 ([#332](https://github.com/TanStack/db/pull/332))
+
+### Patch Changes
+
+- We have moved development of the differential dataflow implementation from @electric-sql/d2mini to a new @tanstack/db-ivm package inside the tanstack db monorepo to make development simpler. ([#330](https://github.com/TanStack/db/pull/330))
+
+- Updated dependencies [[`7d2f4be`](https://github.com/TanStack/db/commit/7d2f4be95c43aad29fb61e80e5a04c58c859322b), [`f0eda36`](https://github.com/TanStack/db/commit/f0eda36cb36350399bc8835686a6c4b6ad297e45)]:
+  - @tanstack/db@0.1.0
+
+## 0.0.33
+
+### Patch Changes
+
+- Updated dependencies [[`6e8d7f6`](https://github.com/TanStack/db/commit/6e8d7f660050118e050d575913733e469e3daa8c)]:
+  - @tanstack/db@0.0.33
+
+## 0.0.32
+
+### Patch Changes
+
+- Updated dependencies [[`e04bd12`](https://github.com/TanStack/db/commit/e04bd1252f612d4638104368d17cb644cc85295b)]:
+  - @tanstack/db@0.0.32
+
+## 0.0.31
+
+### Patch Changes
+
+- Updated dependencies [[`3e9a36d`](https://github.com/TanStack/db/commit/3e9a36d2600c4f700ca7bc4f720c189a5a29387a)]:
+  - @tanstack/db@0.0.31
+
+## 0.0.30
+
+### Patch Changes
+
+- Updated dependencies [[`6bdde55`](https://github.com/TanStack/db/commit/6bdde554f36f54c0c4f4dacb74bef5da45811855)]:
+  - @tanstack/db@0.0.30
+
+## 0.0.29
+
+### Patch Changes
+
+- Updated dependencies [[`ced0657`](https://github.com/TanStack/db/commit/ced0657e72646e35343dfea8389d96e213710cdf), [`dcfef51`](https://github.com/TanStack/db/commit/dcfef51d4d94c756bf77e40e7015e47b7982c09a), [`360b0df`](https://github.com/TanStack/db/commit/360b0dfa411ba9f8a93f6b737aa1df8fb37dd036), [`608be0c`](https://github.com/TanStack/db/commit/608be0c14dc5ae9577deebf436557a1eace46733), [`5260ee3`](https://github.com/TanStack/db/commit/5260ee3098d12eccc58a5cf903ea479908681402)]:
+  - @tanstack/db@0.0.29
+
+## 0.0.28
+
+### Patch Changes
+
+- Updated dependencies [[`bb85522`](https://github.com/TanStack/db/commit/bb8552210a97dd05d3ca6fdd080a3fd25c1023a6), [`e9e8e5e`](https://github.com/TanStack/db/commit/e9e8e5e20c23fb7f98865d6b8aab05ad5322e5f7)]:
+  - @tanstack/db@0.0.28
+
+## 0.0.27
+
+### Patch Changes
+
+- Updated dependencies [[`bec8620`](https://github.com/TanStack/db/commit/bec862004deef5fdd560f70107ebd59f7c27656e)]:
+  - @tanstack/db@0.0.27
+
+## 0.0.26
+
+### Patch Changes
+
+- Add initial release of TrailBase collection for TanStack DB. TrailBase is a blazingly fast, open-source alternative to Firebase built on Rust, SQLite, and V8. It provides type-safe REST and realtime APIs with sub-millisecond latencies, integrated authentication, and flexible access control - all in a single executable. This collection type enables seamless integration with TrailBase backends for high-performance real-time applications. ([#228](https://github.com/TanStack/db/pull/228))
+
+- Updated dependencies [[`09c6995`](https://github.com/TanStack/db/commit/09c6995ea9c8e6979d077ca63cbdd6215054ae78)]:
+  - @tanstack/db@0.0.26
+
+## 0.0.25
+
+### Patch Changes
+
+- Updated dependencies [[`1758eda`](https://github.com/TanStack/db/commit/1758edab9608383d9d1470156021ee632f043e51), [`20f810e`](https://github.com/TanStack/db/commit/20f810e13a7d802bf56da6f0df89b34312ebb2fd)]:
+  - @tanstack/db@0.0.25
+
+## 0.0.24
+
+### Patch Changes
+
+- Updated dependencies [[`11215d9`](https://github.com/TanStack/db/commit/11215d9544d02e9dc6258c661ba4b5e439e479ed), [`fe42591`](https://github.com/TanStack/db/commit/fe42591bd7ea9955d67ecec4471b44cb7808e74b), [`665efe6`](https://github.com/TanStack/db/commit/665efe660c1aed68139326a2a33904968622a882)]:
+  - @tanstack/db@0.0.24
+
+## 0.0.23
+
+### Patch Changes
+
+- Updated dependencies [[`056609e`](https://github.com/TanStack/db/commit/056609ed2926e12df5ee08be5fad0a6333e787f3)]:
+  - @tanstack/db@0.0.23
+
+## 0.0.22
+
+### Patch Changes
+
+- Updated dependencies [[`aeee9a1`](https://github.com/TanStack/db/commit/aeee9a13411527bd0ebfc0a0c06989bdb904b650)]:
+  - @tanstack/db@0.0.22
+
+## 0.0.21
+
+### Patch Changes
+
+- Updated dependencies [[`8e23322`](https://github.com/TanStack/db/commit/8e233229b25eabed07cdaf12948ba913786bf4f9)]:
+  - @tanstack/db@0.0.21
+
+## 0.0.20
+
+### Patch Changes
+
+- Updated dependencies [[`f13c11e`](https://github.com/TanStack/db/commit/f13c11ed0ab27cd88b03d789b0cd953e86bd1333)]:
+  - @tanstack/db@0.0.20
+
+## 0.0.19
+
+### Patch Changes
+
+- Updated dependencies [[`9f0b0c2`](https://github.com/TanStack/db/commit/9f0b0c28ede99273eb5914be28aff55b91c50778)]:
+  - @tanstack/db@0.0.19
+
+## 0.0.18
+
+### Patch Changes
+
+- Improve jsdocs ([#243](https://github.com/TanStack/db/pull/243))
+
+- Updated dependencies [[`266bd29`](https://github.com/TanStack/db/commit/266bd29514c6c0fa9e903986ca11c5e22f4d2361)]:
+  - @tanstack/db@0.0.18
+
+## 0.0.17
+
+### Patch Changes
+
+- Updated dependencies [[`7e63d76`](https://github.com/TanStack/db/commit/7e63d7671f9df9f9fc81240c3818789d4ed0d464)]:
+  - @tanstack/db@0.0.17
+
+## 0.0.16
+
+### Patch Changes
+
+- add support for composable queries ([#232](https://github.com/TanStack/db/pull/232))
+
+- Updated dependencies [[`e478d53`](https://github.com/TanStack/db/commit/e478d5353cc8fc64e3a29dda1f86fba863cf6ce8)]:
+  - @tanstack/db@0.0.16
+
+## 0.0.15
+
+### Patch Changes
+
+- Updated dependencies [[`f5cf44b`](https://github.com/TanStack/db/commit/f5cf44b1b181afef89a80cf7b8678337a3d4a065), [`f5cf44b`](https://github.com/TanStack/db/commit/f5cf44b1b181afef89a80cf7b8678337a3d4a065)]:
+  - @tanstack/db@0.0.15
+
+## 0.0.14
+
+### Patch Changes
+
+- Updated dependencies [[`74c140d`](https://github.com/TanStack/db/commit/74c140d8744f1f7bd3f9cb940c75719574afc78f)]:
+  - @tanstack/db@0.0.14
+
+## 0.0.13
+
+### Patch Changes
+
+- feat: implement Collection Lifecycle Management ([#198](https://github.com/TanStack/db/pull/198))
+
+  Adds automatic lifecycle management for collections to optimize resource usage.
+
+  **New Features:**
+  - Added `startSync` option (defaults to `false`, set to `true` to start syncing immediately)
+  - Automatic garbage collection after `gcTime` (default 5 minutes) of inactivity
+  - Collection status tracking: "idle" | "loading" | "ready" | "error" | "cleaned-up"
+  - Manual `preload()` and `cleanup()` methods for lifecycle control
+
+  **Usage:**
+
+  ```typescript
+  const collection = createCollection({
+    startSync: false, // Enable lazy loading
+    gcTime: 300000, // Cleanup timeout (default: 5 minutes)
+  })
+
+  console.log(collection.status) // Current state
+  await collection.preload() // Ensure ready
+  await collection.cleanup() // Manual cleanup
+  ```
+
+- Add createOptimisticAction helper that replaces useOptimisticMutation ([#210](https://github.com/TanStack/db/pull/210))
+
+  An example of converting a `useOptimisticMutation` hook to `createOptimisticAction`. Now all optimistic & server mutation logic are consolidated.
+
+  ```diff
+  -import { useOptimisticMutation } from '@tanstack/react-db'
+  +import { createOptimisticAction } from '@tanstack/react-db'
+  +
+  +// Create the `addTodo` action, passing in your `mutationFn` and `onMutate`.
+  +const addTodo = createOptimisticAction<string>({
+  +  onMutate: (text) => {
+  +    // Instantly applies the local optimistic state.
+  +    todoCollection.insert({
+  +      id: uuid(),
+  +      text,
+  +      completed: false
+  +    })
+  +  },
+  +  mutationFn: async (text) => {
+  +    // Persist the todo to your backend
+  +    const response = await fetch('/api/todos', {
+  +      method: 'POST',
+  +      body: JSON.stringify({ text, completed: false }),
+  +    })
+  +    return response.json()
+  +  }
+  +})
+
+   const Todo = () => {
+  -  // Create the `addTodo` mutator, passing in your `mutationFn`.
+  -  const addTodo = useOptimisticMutation({ mutationFn })
+  -
+     const handleClick = () => {
+  -    // Triggers the mutationFn
+  -    addTodo.mutate(() =>
+  -      // Instantly applies the local optimistic state.
+  -      todoCollection.insert({
+  -        id: uuid(),
+  -        text: '🔥 Make app faster',
+  -        completed: false
+  -      })
+  -    )
+  +    // Triggers the onMutate and then the mutationFn
+  +    addTodo('🔥 Make app faster')
+     }
+
+     return <Button onClick={ handleClick } />
+   }
+  ```
+
+- Updated dependencies [[`945868e`](https://github.com/TanStack/db/commit/945868e95944543ccf5d778409548679a952e249), [`0f8a008`](https://github.com/TanStack/db/commit/0f8a008be8b368f231c8518ad1adfcac08132da2), [`57b5f5d`](https://github.com/TanStack/db/commit/57b5f5de6297326a57ef205a400428af0697b48b)]:
+  - @tanstack/db@0.0.13
+
+## 0.0.12
+
+### Patch Changes
+
+- Updated dependencies [[`f6abe9b`](https://github.com/TanStack/db/commit/f6abe9b94b890487fe960bd72a89e4a75de89d46)]:
+  - @tanstack/db@0.0.12
+
+## 0.0.11
+
+### Patch Changes
+
+- Export `ElectricCollectionUtils` & allow passing generic to `createTransaction` ([#179](https://github.com/TanStack/db/pull/179))
+
+- Updated dependencies [[`66ed58b`](https://github.com/TanStack/db/commit/66ed58b66553683ff0a5241de8cde83954d18847), [`c5489ff`](https://github.com/TanStack/db/commit/c5489ff276db07a0a4b65876790ccd7f11a6f99d)]:
+  - @tanstack/db@0.0.11
+
+## 0.0.10
+
+### Patch Changes
+
+- Updated dependencies [[`38d4505`](https://github.com/TanStack/db/commit/38d45051b065b619b95849f78422e9ace8750361)]:
+  - @tanstack/db@0.0.10
+
+## 0.0.9
+
+### Patch Changes
+
+- Updated dependencies [[`2ae0b09`](https://github.com/TanStack/db/commit/2ae0b09cc52152b0044818b538e11e8ca10d0f80)]:
+  - @tanstack/db@0.0.9
+
+## 0.0.8
+
+### Patch Changes
+
+- A large refactor of the core `Collection` with: ([#155](https://github.com/TanStack/db/pull/155))
+  - a change to not use Store internally and emit fine grade changes with `subscribeChanges` and `subscribeKeyChanges` methods.
+  - changes to the `Collection` api to be more `Map` like for reads, with `get`, `has`, `size`, `entries`, `keys`, and `values`.
+  - renames `config.getId` to `config.getKey` for consistency with the `Map` like api.
+
+- Updated dependencies [[`5c538cf`](https://github.com/TanStack/db/commit/5c538cf03573512a8d1bbde96962a9f7ca014708), [`9553366`](https://github.com/TanStack/db/commit/955336604a286d7992f9506cb1c76ecf150d0432), [`b4602a0`](https://github.com/TanStack/db/commit/b4602a071cb6866bb1338e30d5802220b0d1fc49), [`02adc81`](https://github.com/TanStack/db/commit/02adc813177cbb44ab6245cc9821142e9cf97876), [`06d8ecc`](https://github.com/TanStack/db/commit/06d8eccc5aaabc194c31ea89c9b4191e2aa68180), [`c50cd51`](https://github.com/TanStack/db/commit/c50cd51ac8030b391cd9d84e8cd8b8fb57cb8ca5)]:
+  - @tanstack/db@0.0.8
+
+## 0.0.7
+
+### Patch Changes
+
+- Expose utilities on collection instances ([#161](https://github.com/TanStack/db/pull/161))
+
+  Implemented a utility exposure pattern for TanStack DB collections that allows utility functions to be passed as part of collection options and exposes them under a `.utils` namespace, with full TypeScript typing.
+  - Refactored `createCollection` in packages/db/src/collection.ts to accept options with utilities directly
+  - Added `utils` property to CollectionImpl
+  - Added TypeScript types for utility functions and utility records
+  - Changed Collection from a class to a type, updating all usages to use createCollection() instead
+  - Updated Electric/Query implementations
+  - Utilities are now ergonomically accessible under `.utils`
+  - Full TypeScript typing is preserved for both collection data and utilities
+  - API is clean and straightforward - users can call `createCollection(optionsCreator(config))` directly
+  - Zero-boilerplate TypeScript pattern that infers utility types automatically
+
+- Updated dependencies [[`8b43ad3`](https://github.com/TanStack/db/commit/8b43ad305b277560aed660c31cf1409d22ed1e47)]:
+  - @tanstack/db@0.0.7
+
+## 0.0.6
+
+### Patch Changes
+
+- Updated dependencies [[`856be72`](https://github.com/TanStack/db/commit/856be725a6299374a3a97c88b50bd5d7bb94b783), [`0455e27`](https://github.com/TanStack/db/commit/0455e27f50d69b1e1887b841dc2f262f4de4c55d), [`80fdac7`](https://github.com/TanStack/db/commit/80fdac76389ea741f5743bc788df375f63fb767b)]:
+  - @tanstack/db@0.0.6
+
+## 0.0.5
+
+### Patch Changes
+
+- Collections must have a getId function & use an id for update/delete operators ([#134](https://github.com/TanStack/db/pull/134))
+
+- the `keyBy` query operator has been removed, keying withing the query pipeline is now automatic ([#144](https://github.com/TanStack/db/pull/144))
+
+- Updated dependencies [[`1fbb844`](https://github.com/TanStack/db/commit/1fbb8447d8425d37cb9ab4f078ffab999b28b06c), [`338efc2`](https://github.com/TanStack/db/commit/338efc229c3794da5ac373b8b26143e379433407), [`ee5d026`](https://github.com/TanStack/db/commit/ee5d026715962dd0232fcaca513a8fac9189dce2), [`e7b036c`](https://github.com/TanStack/db/commit/e7b036ce6ebd17c94cc944d6d96ca2c645921c3e), [`e4feb0c`](https://github.com/TanStack/db/commit/e4feb0c214835675b47f0aa18a72d004a423df03)]:
+  - @tanstack/db@0.0.5
+
+## 0.0.4
+
+### Patch Changes
+
+- Updated dependencies [[`8ce449e`](https://github.com/TanStack/db/commit/8ce449ed6d070e9e591d1b74b0db5fed7a3fc92f)]:
+  - @tanstack/db@0.0.4
+
+## 0.0.3
+
+### Patch Changes
+
+- Updated dependencies [[`b29420b`](https://github.com/TanStack/db/commit/b29420bcdae30dfeffeef63a8753b83306a54e5a)]:
+  - @tanstack/db@0.0.3
+
+## 0.0.2
+
+### Patch Changes
+
+- Fixed an issue with injecting the optimistic state removal into the reactive live query. ([#78](https://github.com/TanStack/db/pull/78))
+
+- Updated dependencies [[`4c82edb`](https://github.com/TanStack/db/commit/4c82edb9547f26c9de44f5bf43d4385c38920672)]:
+  - @tanstack/db@0.0.2
+
+## 0.0.3
+
+### Patch Changes
+
+- Make transactions first class & move ownership of mutationFn from collections to transactions ([#53](https://github.com/TanStack/db/pull/53))
+
+- Updated dependencies [[`b42479c`](https://github.com/TanStack/db/commit/b42479cf95f9a820b36e01684b13a9179973f3d8)]:
+  - @tanstack/db@0.0.3
+
+## 0.0.2
+
+### Patch Changes
+
+- make mutationFn optional for read-only collections ([#12](https://github.com/TanStack/db/pull/12))
+
+- Updated dependencies [[`9bb6e89`](https://github.com/TanStack/db/commit/9bb6e8909cebdcd7c03091bfc12dd37f5ab2e1ea), [`8eb7e9b`](https://github.com/TanStack/db/commit/8eb7e9b1d1f569c5c064e0f440257589486b73cf)]:
+  - @tanstack/db@0.0.2
+
+## 0.0.1
+
+### Patch Changes
+
+- feat: Initial release ([#2](https://github.com/TanStack/db/pull/2))
+
+- Updated dependencies [[`2d2dd77`](https://github.com/TanStack/db/commit/2d2dd7743f715ffefaeee8e8d11173b751c7043b)]:
+  - @tanstack/db@0.0.1

@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "skipLibCheck": false,
+    "noEmit": true,
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
+    "jsxImportSource": "react",
+    "lib": ["esnext", "dom", "dom.iterable"],
+    "types": []
+  },
+  "include": ["pristine.test-d.ts"],
+  "reactPortEvidence": {
+    "gate": "upstream-types-pristine",
+    "publicMode": "pinned",
+    "upstreamRegistrations": []
+  }
+}

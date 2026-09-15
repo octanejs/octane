@@ -1,0 +1,199 @@
+[
+  {
+    "path": "src/chat-ui/chat-input.tsrx",
+    "origin": "adapted",
+    "packageName": "@tanstack/ai-react",
+    "sha256": "5b55ce06d6677b46ca810f3ab4ae800d24c36c6c5e16e78aa864ced3bb5be808"
+  },
+  {
+    "path": "src/chat-ui/chat-message.tsrx",
+    "origin": "adapted",
+    "packageName": "@tanstack/ai-react",
+    "sha256": "7a14e18ef9f87f2f8261442332757e1c3b1084fb9275f6474eb11baeaf7b6959"
+  },
+  {
+    "path": "src/chat-ui/chat-messages.tsrx",
+    "origin": "adapted",
+    "packageName": "@tanstack/ai-react",
+    "sha256": "730411bfdccc7fb980b74bbc4094d9320fea361776cf86fc9c3416eafcfe350b"
+  },
+  {
+    "path": "src/chat-ui/chat.tsrx",
+    "origin": "adapted",
+    "packageName": "@tanstack/ai-react",
+    "sha256": "cbd4f726cd3e51605f462a4a126603785b121d1d3728b6cc8f78401c5714a586"
+  },
+  {
+    "path": "src/chat-ui/create-chat-hook.tsrx",
+    "origin": "adapted",
+    "packageName": "@tanstack/ai-react",
+    "sha256": "0b5ad275431b6ca05c752042dc8dd8f808eef3fbc76ab28da94c893091e41dcf"
+  },
+  {
+    "path": "src/chat-ui/create-ui-contexts.tsrx",
+    "origin": "adapted",
+    "packageName": "@tanstack/ai-react",
+    "sha256": "a19036aa0bba92df238738e3f31028a8030c7653a5b2775acbe5d0a0580b7f61"
+  },
+  {
+    "path": "src/chat-ui/create-ui.tsrx",
+    "origin": "adapted",
+    "packageName": "@tanstack/ai-react",
+    "sha256": "f846c9b781ae653ad01a0a628541dd4771b46788135f70b4a2427f33e18cf435"
+  },
+  {
+    "path": "src/chat-ui/markdown-plugins.ts",
+    "origin": "adapted",
+    "packageName": "@tanstack/ai-react",
+    "sha256": "c7f459c38658320f13f0d32d6d87383ce8085cbb71bd38b671345000e62bbbd6"
+  },
+  {
+    "path": "src/chat-ui/text-part.tsrx",
+    "origin": "adapted",
+    "packageName": "@tanstack/ai-react",
+    "sha256": "5ff2c28c86095ddf55d7b618e62f3dcf7c5a99ede0a350362b8f9db9be0b3c67"
+  },
+  {
+    "path": "src/chat-ui/thinking-part.tsrx",
+    "origin": "adapted",
+    "packageName": "@tanstack/ai-react",
+    "sha256": "a60c0a215d90ff80a74834eec7245279bbe8f17c06868628a97ba279b8c2cd7e"
+  },
+  {
+    "path": "src/chat-ui/tool-approval.tsrx",
+    "origin": "adapted",
+    "packageName": "@tanstack/ai-react",
+    "sha256": "8427d319c5663fc63bfcda3e539c6da3bcba62840f7bf1c6ec93c14e28f88716"
+  },
+  {
+    "path": "src/chat-ui/tool-result-content.ts",
+    "origin": "adapted",
+    "packageName": "@tanstack/ai-react",
+    "sha256": "7a65d1c0af3cda50ec65839561b63af2670f8045d9d1bc9222ef132bbed06fc7"
+  },
+  {
+    "path": "src/create-chat-hook.tsrx",
+    "origin": "adapted",
+    "packageName": "@tanstack/ai-react",
+    "sha256": "c2f805de4ae9ddde529cdc11b5c26641b2d3e6912da3d624904a82131e57af4d"
+  },
+  {
+    "path": "src/index.ts",
+    "origin": "adapted",
+    "packageName": "@tanstack/ai-react",
+    "sha256": "c378a4cd4d20a41df0f7b7f57daafbe34f7ec9e56edb406e8eadf21b732366b3"
+  },
+  {
+    "path": "src/mcp-app-renderer.tsrx",
+    "origin": "authored",
+    "sha256": "0f7d8e32eb05f760a7cdbe02d144eb4729dfb11b10443dc16a8ac447064ce012"
+  },
+  {
+    "path": "src/mcp-app-resource.tsrx",
+    "origin": "adapted",
+    "packageName": "@tanstack/ai-react",
+    "sha256": "58697aa8d4f9c411f5facc0137a8d1cd0028cf6942b19aa5bffb00a4cd431334"
+  },
+  {
+    "path": "src/mcp-apps.ts",
+    "origin": "adapted",
+    "packageName": "@tanstack/ai-react",
+    "sha256": "c97ed80527b77dd7fad3e496aba5ce1a074c4ab799f06001711c81e399edac7d"
+  },
+  {
+    "path": "src/realtime-types.ts",
+    "origin": "adapted",
+    "packageName": "@tanstack/ai-react",
+    "sha256": "21a9c3ca7e4e128aeba1809052ffa71eaad052bf29c5fbab06af845eb27456dd"
+  },
+  {
+    "path": "src/types.ts",
+    "origin": "adapted",
+    "packageName": "@tanstack/ai-react",
+    "sha256": "d36ab1d04262fb078b8fba5c37cb9bb7eec791a23b551167b06449576df21480"
+  },
+  {
+    "path": "src/ui.ts",
+    "origin": "adapted",
+    "packageName": "@tanstack/ai-react",
+    "sha256": "14a912af7ddf8fb612a3817e698ea54e89cd32dfa59f28b114ae12d5380146d1"
+  },
+  {
+    "path": "src/use-audio-recorder.tsrx",
+    "origin": "adapted",
+    "packageName": "@tanstack/ai-react",
+    "sha256": "fa2cf96539c2fd514b6ff9a29f851b7e517898bbc89a0a4bff1e11dbc2ae14a7"
+  },
+  {
+    "path": "src/use-byok.tsrx",
+    "origin": "adapted",
+    "packageName": "@tanstack/ai-react",
+    "sha256": "208bcf8af729cc14813287d52fba78c9ef21241a154c5b4eeb44ea8e9db6d98b"
+  },
+  {
+    "path": "src/use-chat.tsrx",
+    "origin": "adapted",
+    "packageName": "@tanstack/ai-react",
+    "sha256": "ef6f8d2004e5600c3face8bdcfbf0db817b842379ec2a0c85ed0bc8e79471f8e"
+  },
+  {
+    "path": "src/use-generate-audio.tsrx",
+    "origin": "adapted",
+    "packageName": "@tanstack/ai-react",
+    "sha256": "0f266c543a1ee34430f63a7aba2e78bcf67614fdefff7887230d17742c10d622"
+  },
+  {
+    "path": "src/use-generate-image.tsrx",
+    "origin": "adapted",
+    "packageName": "@tanstack/ai-react",
+    "sha256": "ef87a45e45b90ee0fc1295d38a574b7ac4e98fae171f079a56eb1695509fca12"
+  },
+  {
+    "path": "src/use-generate-speech.tsrx",
+    "origin": "adapted",
+    "packageName": "@tanstack/ai-react",
+    "sha256": "86a5d4bf12014a4b457587d4245a9bcfc309a32f45e6902b8de803ffe4a16981"
+  },
+  {
+    "path": "src/use-generate-video.tsrx",
+    "origin": "adapted",
+    "packageName": "@tanstack/ai-react",
+    "sha256": "b73ac1e4b007af1d0294e22df27b30a28ca1b15dbe9a8d9cf90389889515298f"
+  },
+  {
+    "path": "src/use-generation.tsrx",
+    "origin": "adapted",
+    "packageName": "@tanstack/ai-react",
+    "sha256": "a6289a5aea1b5bf7dd76de7e71e64e8d4ce4fdaca4dbfe854de84bc3d7e77f8e"
+  },
+  {
+    "path": "src/use-mcp-app-bridge.tsrx",
+    "origin": "adapted",
+    "packageName": "@tanstack/ai-react",
+    "sha256": "f646331a7be4d6ce42681923efc5fafc0aacd187b38edf02ce9ecbe3758d6dde"
+  },
+  {
+    "path": "src/use-realtime-chat.tsrx",
+    "origin": "adapted",
+    "packageName": "@tanstack/ai-react",
+    "sha256": "9a008c187b6e768c672a5e115ff8220c4c92deec296ee73f20649401ff1ef229"
+  },
+  {
+    "path": "src/use-summarize.tsrx",
+    "origin": "adapted",
+    "packageName": "@tanstack/ai-react",
+    "sha256": "aa5645539a5105618ff7ab545e789d547124cb2fe76621399e2828517dc0a041"
+  },
+  {
+    "path": "src/use-transcription.tsrx",
+    "origin": "adapted",
+    "packageName": "@tanstack/ai-react",
+    "sha256": "1576844d4913db1696638d34bded3026da3166f72b72a34c5412e107d6f09061"
+  },
+  {
+    "path": "src/use-web-mcp-tools.tsrx",
+    "origin": "adapted",
+    "packageName": "@tanstack/ai-react",
+    "sha256": "c5581b9daa93b701689200dfac09af9994c9a5afa9075923a7aac41fcd4fdd7c"
+  }
+]

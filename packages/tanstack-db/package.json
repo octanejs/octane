@@ -13,7 +13,7 @@
       ]
     }
   },
-  "description": "TanStack DB bindings for Octane — reuses @tanstack/db's framework-agnostic core with Octane live-query hooks.",
+  "description": "TanStack DB bindings for Octane \u2014 reuses @tanstack/db's framework-agnostic core with Octane live-query hooks.",
   "author": "Kyle Mathews",
   "publishConfig": {
     "access": "public"
@@ -37,17 +37,20 @@
     "src",
     "skills",
     "README.md",
-    "LICENSE.upstream"
+    "LICENSE.upstream",
+    "LICENSE",
+    "UPSTREAM.md"
   ],
   "exports": {
     ".": "./src/index.ts"
   },
   "sideEffects": false,
   "scripts": {
-    "test": "vitest run"
+    "test": "vitest run --root ../.. --project tanstack-db --project tanstack-db-differential --project tanstack-db-hydration --project tanstack-db-portal",
+    "upstream:check": "node ../../scripts/react-parity/verify-provenance.mjs --package-dir ."
   },
   "dependencies": {
-    "@tanstack/db": "^0.7.0"
+    "@tanstack/db": "0.9.0"
   },
   "peerDependencies": {
     "octane": "workspace:^0.1.51 || ^0.2.0"
@@ -55,6 +58,15 @@
   "devDependencies": {
     "@octanejs/testing-library": "workspace:*",
     "octane": "workspace:*",
-    "vitest": "catalog:default"
+    "vitest": "catalog:default",
+    "@tanstack/react-db": "0.3.8",
+    "@testing-library/jest-dom": "catalog:default",
+    "@testing-library/react": "catalog:default",
+    "@types/react": "catalog:default",
+    "react": "catalog:default",
+    "react-dom": "catalog:default",
+    "@tsrx/react": "catalog:default",
+    "esbuild": "catalog:default",
+    "@types/react-dom": "catalog:default"
   }
 }

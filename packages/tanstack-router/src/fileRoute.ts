@@ -204,9 +204,8 @@ export class LazyRoute<TRoute extends AnyRoute> {
 			const options = user[0] ?? {};
 			return useMatch(
 				{
-					select: options.select,
+					...options,
 					from: id,
-					structuralSharing: options.structuralSharing,
 				},
 				subSlot(slot, 'lr:m'),
 			);
@@ -220,9 +219,8 @@ export class LazyRoute<TRoute extends AnyRoute> {
 			const options = user[0] ?? {};
 			return useSearch(
 				{
-					select: options.select,
+					...options,
 					from: id,
-					structuralSharing: options.structuralSharing,
 				},
 				subSlot(slot, 'lr:s'),
 			);
@@ -232,9 +230,8 @@ export class LazyRoute<TRoute extends AnyRoute> {
 			const options = user[0] ?? {};
 			return useParams(
 				{
-					select: options.select,
+					...options,
 					from: id,
-					structuralSharing: options.structuralSharing,
 				},
 				subSlot(slot, 'lr:p'),
 			);

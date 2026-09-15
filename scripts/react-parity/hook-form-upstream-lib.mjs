@@ -23,22 +23,6 @@ const TITLE_REPLACEMENTS = new Map([
 	],
 ]);
 
-const PORT_ONLY_CASES = new Map([
-	[
-		'logic/getDirtyFields.test.ts',
-		new Set([
-			'should mark an array-valued registered field as dirty with a boolean rather than diffing elements (#13584)',
-			'should still diff a field array element-by-element when the array path itself is not a registered leaf',
-		]),
-	],
-	[
-		'useForm/formState.test.tsx',
-		new Set([
-			'should mark an array-valued registered field dirty as a boolean rather than diffing its elements (#13584)',
-		]),
-	],
-]);
-
 function filesBelow(root) {
 	return readdirSync(root, { recursive: true, withFileTypes: true })
 		.filter((entry) => entry.isFile())
@@ -102,7 +86,10 @@ export function verifyHookFormUpstream(repoRoot, { lock = true } = {}) {
 	const upstreamRoot = resolve(repoRoot, UPSTREAM_TEST_ROOT);
 	const portedRoot = resolve(repoRoot, PORTED_TEST_ROOT);
 	const upstreamArtifacts = testArtifacts(upstreamRoot);
-	const portedArtifacts = testArtifacts(portedRoot);
+	// Type and browser suites have independent immutable inventories and runners.
+	const portedArtifacts = testArtifacts(portedRoot).filter(
+		(file) => !['_types/', '_app/', '_e2e/'].some((prefix) => file.startsWith(prefix)),
+	);
 	if (JSON.stringify(upstreamArtifacts) !== JSON.stringify(portedArtifacts)) {
 		throw new Error('react-hook-form adapted suite must account for every upstream test artifact');
 	}
@@ -124,16 +111,8 @@ export function verifyHookFormUpstream(repoRoot, { lock = true } = {}) {
 			);
 		}
 		const ported = extractTestCases(portedSource, { file }).map(({ title }) => title);
-		const allowedExtras = PORT_ONLY_CASES.get(file) ?? new Set();
-		const portedUpstreamCases = ported.filter((title) => !allowedExtras.has(title));
-		const observedExtras = ported.filter((title) => allowedExtras.has(title));
-		if (JSON.stringify(portedUpstreamCases) !== JSON.stringify(upstream)) {
+		if (JSON.stringify(ported) !== JSON.stringify(upstream)) {
 			throw new Error(`${file}: adapted test registrations drifted from the pinned upstream suite`);
-		}
-		for (const title of allowedExtras) {
-			if (observedExtras.filter((observed) => observed === title).length !== 1) {
-				throw new Error(`${file}: expected every recorded Octane regression case to execute once`);
-			}
 		}
 		upstreamCases += upstream.length;
 		portedCases += ported.length;

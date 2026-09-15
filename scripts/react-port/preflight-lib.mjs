@@ -13,6 +13,11 @@ import {
 import { decodePathPart, parseGitHubUrl, parseInput } from './input-lib.mjs';
 import { fingerprint, sanitizeForReport, stableStringify } from './report-lib.mjs';
 import { selectHighestSatisfyingVersion } from './version-lib.mjs';
+import {
+	configuredTestSelectors,
+	resolveConfigurationImport,
+	selectedByTestConfiguration,
+} from './test-discovery.mjs';
 
 const SUPPORTED_INTEGRITY_ALGORITHMS = ['sha512', 'sha384', 'sha256'];
 
@@ -48,7 +53,7 @@ const MAX_SOURCE_FILES = 4_000;
 const MAX_SOURCE_BYTES = 64 * 1024 * 1024;
 const TEST_SOURCE_PATTERN = /\.(?:[cm]?[jt]sx?|coffee)$/i;
 const TEST_CONFIG_PATTERN =
-	/^(?:(?:vitest|vite|jest|karma|mocha|ava|webpack)\.config|test(?:s)?\.config)\.[cm]?[jt]s$/i;
+	/^(?:(?:vitest|vite|jest|playwright|karma|mocha|ava|webpack)\.config|test(?:s)?\.config)\.[cm]?[jt]s$/i;
 const MAX_UPSTREAM_TEST_FILES = 500;
 const MAX_UPSTREAM_TEST_BYTES = 16 * 1024 * 1024;
 
@@ -319,7 +324,10 @@ export function assessResolvedEvidence({ input, registry, source }) {
 	const identity = {
 		packageName: registry.name,
 		version: registry.version,
-		repository: registry.repository,
+		repository: {
+			...registry.repository,
+			subdirectory: registry.repository?.subdirectory ?? source.repository?.subdirectory ?? null,
+		},
 		commit: source.commit,
 		integrity: registry.integrity,
 	};
@@ -754,13 +762,14 @@ function isScannableSourcePath(entryPath) {
 export function conventionalTestPath(relativePath, { runner } = {}) {
 	const segments = relativePath.toLowerCase().split('/');
 	const baseName = segments.at(-1);
+	if (/\.d\.[cm]?ts$/.test(baseName)) return false;
 	if (
 		segments.some((segment) => ['fixture', 'fixtures', '__fixtures__'].includes(segment)) ||
 		/(?:^|[.-])fixture\.[cm]?[jt]sx?$/.test(baseName)
 	) {
 		return false;
 	}
-	if (runner === 'vitest' || runner === 'jest') {
+	if (runner === 'vitest' || runner === 'jest' || runner === 'playwright') {
 		return (
 			/(?:^|[.-])(?:test|spec|test-d|d-test)\.[cm]?[jt]sx?$/.test(baseName) ||
 			segments.some((segment) => ['typetests', 'type-tests', 'test-d'].includes(segment)) ||
@@ -775,7 +784,7 @@ export function conventionalTestPath(relativePath, { runner } = {}) {
 }
 
 export function isUpstreamTypeTestPath(relativePath) {
-	return /(?:^|\/)(?:typetests|type-tests|test-d)(?:\/|$)|(?:^|[.-])(?:test-d|d-test)\.[cm]?[jt]sx?$|(?:^|\/)types?\.test\.[cm]?tsx?$/i.test(
+	return /(?:^|\/)(?:typetests|type-tests|test-d)(?:\/|$)|(?:^|\/)(?:test|tests)\/typescript\/|(?:^|[.-])(?:test-d|d-test)\.[cm]?[jt]sx?$|(?:^|[\/.-])types?\.test\.[cm]?tsx?$|(?:^|\/)types\/(?:[^/]+\.)?(?:test|spec)\.[cm]?tsx?$/i.test(
 		relativePath,
 	);
 }
@@ -922,11 +931,7 @@ function containsInlineTestMarker(source, fileName) {
 }
 
 function extractTypeAssertionGroups(source, file) {
-	if (
-		!/(?:^|\/)(?:typetests|type-tests|test-d)(?:\/|$)|\.(?:spec|test-d|d-test)\.[cm]?tsx?$/i.test(
-			file,
-		)
-	) {
+	if (!isUpstreamTypeTestPath(file) && !/\.spec\.[cm]?tsx?$/i.test(file)) {
 		return [];
 	}
 	const sourceFile = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
@@ -959,6 +964,212 @@ function extractTypeAssertionGroups(source, file) {
 		});
 }
 
+// Derive bounded arrays from reviewed, content-addressed class fields. This is
+// inventory-only parsing: no upstream module or test body is evaluated.
+export function pinnedClassFieldNames(source, { className, propertyPrefix }) {
+	const file = ts.createSourceFile(
+		'pinned.tsx',
+		source,
+		ts.ScriptTarget.Latest,
+		true,
+		ts.ScriptKind.TSX,
+	);
+	const declarations = file.statements.filter(
+		(node) => ts.isClassDeclaration(node) && node.name?.text === className,
+	);
+	if (declarations.length !== 1 || !propertyPrefix)
+		throw new Error('Ambiguous pinned class fields');
+	const names = declarations[0].members.flatMap((member) => {
+		if (
+			!ts.isPropertyDeclaration(member) ||
+			!ts.isIdentifier(member.name) ||
+			!member.name.text.startsWith(propertyPrefix)
+		)
+			return [];
+		if (
+			!member.initializer ||
+			member.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.StaticKeyword)
+		)
+			throw new Error('Pinned inventory requires initialized instance fields');
+		return [member.name.text];
+	});
+	if (names.length === 0 || new Set(names).size !== names.length)
+		throw new Error('Empty or duplicate pinned class fields');
+	return names;
+}
+
+export function pinnedObjectValues(source, { objectName }) {
+	const file = ts.createSourceFile('pinned.ts', source, ts.ScriptTarget.Latest, true);
+	const declarations = file.statements.flatMap((node) =>
+		ts.isVariableStatement(node) && node.declarationList.flags & ts.NodeFlags.Const
+			? node.declarationList.declarations.filter(
+					(declaration) =>
+						ts.isIdentifier(declaration.name) && declaration.name.text === objectName,
+				)
+			: [],
+	);
+	if (declarations.length !== 1) throw new Error('Ambiguous pinned object');
+	let object = declarations[0].initializer;
+	while (object && (ts.isAsExpression(object) || ts.isSatisfiesExpression(object)))
+		object = object.expression;
+	if (!object || !ts.isObjectLiteralExpression(object) || object.properties.length === 0)
+		throw new Error('Pinned inventory requires a nonempty literal object');
+	const keys = new Set();
+	return object.properties.map((property) => {
+		if (
+			!ts.isPropertyAssignment(property) ||
+			!(ts.isIdentifier(property.name) || ts.isStringLiteral(property.name)) ||
+			!ts.isStringLiteral(property.initializer) ||
+			keys.has(property.name.text)
+		)
+			throw new Error('Pinned inventory requires unique literal string properties');
+		keys.add(property.name.text);
+		return property.initializer.text;
+	});
+}
+
+export function expandPinnedStaticArray(source, entry, expansion, sourceEntry, sourceBytes) {
+	if (
+		entry.path !== expansion.path ||
+		entry.sha !== expansion.gitBlob ||
+		sourceEntry.path !== expansion.source.path ||
+		sourceEntry.sha !== expansion.source.gitBlob
+	)
+		throw new Error('Static array profile source mismatch');
+	if (
+		!expansion.expression ||
+		!Number.isSafeInteger(expansion.occurrences) ||
+		expansion.occurrences < 1
+	)
+		throw new Error('Invalid static array profile');
+	const fragments = source.split(expansion.expression);
+	if (fragments.length - 1 !== expansion.occurrences)
+		throw new Error('Static array profile expression count mismatch');
+	const names = expansion.source.arrayName
+		? pinnedLiteralRows(sourceBytes.toString('utf8'), expansion.source)
+		: expansion.source.objectName
+			? pinnedObjectValues(sourceBytes.toString('utf8'), expansion.source)
+			: pinnedClassFieldNames(sourceBytes.toString('utf8'), expansion.source);
+	return fragments.join(JSON.stringify(names));
+}
+
+export function pinnedLiteralRows(source, { arrayName, excludeFirstColumn = [] }) {
+	const file = ts.createSourceFile(
+		'pinned.tsx',
+		source,
+		ts.ScriptTarget.Latest,
+		true,
+		ts.ScriptKind.TSX,
+	);
+	const declarations = file.statements.flatMap((node) =>
+		ts.isVariableStatement(node) && node.declarationList.flags & ts.NodeFlags.Const
+			? node.declarationList.declarations.filter(
+					(declaration) => ts.isIdentifier(declaration.name) && declaration.name.text === arrayName,
+				)
+			: [],
+	);
+	if (declarations.length !== 1) throw new Error('Ambiguous pinned array');
+	let array = declarations[0].initializer;
+	while (array && (ts.isAsExpression(array) || ts.isSatisfiesExpression(array)))
+		array = array.expression;
+	if (!array || !ts.isArrayLiteralExpression(array))
+		throw new Error('Pinned array must be literal');
+	const rows = array.elements.map((row) => {
+		if (
+			!ts.isArrayLiteralExpression(row) ||
+			row.elements.length === 0 ||
+			!row.elements.every(ts.isStringLiteral)
+		)
+			throw new Error('Pinned array rows must contain literal strings');
+		return row.elements.map((value) => value.text);
+	});
+	return rows.filter((row) => !excludeFirstColumn.includes(row[0]));
+}
+
+// Some upstream type-only workspaces enumerate directories at configuration
+// time. A reviewed immutable profile maps that exact expression to discovery
+// selectors derived from the same Git tree, without executing filesystem code.
+export function expandPinnedDirectoryProjects(source, entry, expansion, tree) {
+	if (entry.path !== expansion.path || entry.sha !== expansion.gitBlob)
+		throw new Error(`Directory project profile source mismatch: ${entry.path}`);
+	const { directory, expression, testPattern } = expansion;
+	if (
+		typeof expression !== 'string' ||
+		!expression.trim() ||
+		typeof directory !== 'string' ||
+		!directory ||
+		directory !== path.posix.normalize(directory) ||
+		directory.split('/').some((part) => !part || part === '..') ||
+		typeof testPattern !== 'string' ||
+		!testPattern ||
+		testPattern.includes('/') ||
+		testPattern.includes('..') ||
+		!Array.isArray(expansion.excludedDirectories) ||
+		expansion.excludedDirectories.some((name) => typeof name !== 'string') ||
+		['configPrefix', 'configSuffix', 'excludedConfigSubstring'].some(
+			(key) => typeof expansion[key] !== 'string' || !expansion[key],
+		)
+	)
+		throw new Error('Invalid directory project profile');
+	if (source.split(expression).length !== 2)
+		throw new Error(`Directory project expression count mismatch: ${entry.path}`);
+	const projects = [];
+	for (const file of tree) {
+		if (!isGitHubRegularBlob(file) || !file.path.startsWith(`${directory}/`)) continue;
+		const parts = file.path.slice(directory.length + 1).split('/');
+		if (parts.length !== 2) continue;
+		const [name, config] = parts;
+		if (
+			expansion.excludedDirectories.includes(name) ||
+			!config.startsWith(expansion.configPrefix) ||
+			!config.endsWith(expansion.configSuffix) ||
+			config.includes(expansion.excludedConfigSubstring)
+		)
+			continue;
+		projects.push({ test: { include: [`${directory}/${name}/${testPattern}`] } });
+	}
+	if (projects.length === 0 || projects.length > MAX_UPSTREAM_TEST_FILES)
+		throw new Error(`Directory project expansion has an invalid project count: ${entry.path}`);
+	return source.replace(expression, JSON.stringify(projects));
+}
+
+export function verifyNonTestArtifact(source, entry, disposition) {
+	if (
+		disposition.path !== entry.path ||
+		disposition.gitBlob !== entry.sha ||
+		createHash('sha1')
+			.update(`blob ${Buffer.byteLength(source)}\0`)
+			.update(source)
+			.digest('hex') !== entry.sha
+	)
+		throw new Error(`Non-test artifact profile source mismatch: ${entry.path}`);
+	if (typeof disposition.reason !== 'string' || disposition.reason.trim().length < 20)
+		throw new Error(`Non-test artifact disposition requires a precise reason: ${entry.path}`);
+	const file = ts.createSourceFile(entry.path, source, ts.ScriptTarget.Latest, true);
+	function containsAssertion(node) {
+		if (ts.isCallExpression(node)) {
+			let callee = node.expression;
+			while (ts.isPropertyAccessExpression(callee) || ts.isCallExpression(callee))
+				callee = callee.expression;
+			if (
+				ts.isIdentifier(callee) &&
+				/^(?:expect(?:Type|TypeOf)?|assert(?:Type)?)$/.test(callee.text)
+			)
+				return true;
+		}
+		return ts.forEachChild(node, containsAssertion) ?? false;
+	}
+	if (
+		containsAssertion(file) ||
+		findPossibleUnexpandedRegistrars(source).length ||
+		extractTestCases(source, { file: entry.path }).length ||
+		extractTypeAssertionGroups(source, entry.path).length
+	)
+		throw new Error(
+			`Non-test artifact contains a test registration or type assertion: ${entry.path}`,
+		);
+}
+
 export async function immutableTestInventory(tree, subdirectory, manifest, options) {
 	const profilePath = new URL(
 		`./profiles/${manifest.name?.replace(/^@/, '').replaceAll('/', '-')}-${manifest.version}.json`,
@@ -973,7 +1184,7 @@ export async function immutableTestInventory(tree, subdirectory, manifest, optio
 			profile.commit !== options.sourceCommit
 		)
 			throw new Error('Test helper profile does not match the immutable package identity');
-		for (const helper of profile.helpers) {
+		for (const helper of profile.helpers ?? []) {
 			const sourceCases = [];
 			for (const module of helper.modules) {
 				const entry = tree.find(
@@ -983,7 +1194,10 @@ export async function immutableTestInventory(tree, subdirectory, manifest, optio
 					throw new Error(`Test helper profile source mismatch: ${module.path}`);
 				const bytes = await fetchGitHubBlob(entry, options);
 				if (!module.registrations) continue;
-				for (const testCase of extractTestCases(bytes.toString('utf8'), { file: entry.path })) {
+				for (const testCase of extractTestCases(bytes.toString('utf8'), {
+					file: entry.path,
+					registrarWrappers: module.registrarWrappers ?? [],
+				})) {
 					if (
 						!Number.isSafeInteger(testCase.estimatedRegistrations) ||
 						testCase.estimatedRegistrations < 1
@@ -1021,11 +1235,28 @@ export async function immutableTestInventory(tree, subdirectory, manifest, optio
 		...manifestRunnerConfiguration,
 	});
 	const explicitConfigurationPaths = [
-		...initialConfigurationSource.matchAll(/--config(?:=|\s+)([^\s"']+)/g),
+		...initialConfigurationSource.matchAll(/(?:--config|-c)(?:=|\s+)([^\s"']+)/g),
 	].map((match) => match[1].replace(/^\.\//, ''));
+	const usesPackageJestConfig =
+		subdirectory &&
+		explicitConfigurationPaths.length === 0 &&
+		tree.some(
+			(entry) =>
+				isGitHubRegularBlob(entry) &&
+				path.posix.dirname(entry.path) === subdirectory &&
+				/^jest\.config\.[cm]?[jt]s$/i.test(path.posix.basename(entry.path)),
+		);
 	const configurationEntries = tree.filter((entry) => {
 		if (!isGitHubRegularBlob(entry)) return false;
 		const directory = path.posix.dirname(entry.path);
+		// Jest resolves the package's own config before searching its ancestors.
+		// A workspace project aggregator is not an additional package test lane.
+		if (
+			usesPackageJestConfig &&
+			directory === '.' &&
+			/^jest\.config\.[cm]?[jt]s$/i.test(entry.path)
+		)
+			return false;
 		const conventionalConfiguration =
 			(directory === '.' || directory === (subdirectory ?? '.')) &&
 			TEST_CONFIG_PATTERN.test(path.posix.basename(entry.path));
@@ -1037,6 +1268,12 @@ export async function immutableTestInventory(tree, subdirectory, manifest, optio
 			(relativePath !== null && explicitConfigurationPaths.includes(relativePath))
 		);
 	});
+	const runner = ['vitest', 'jest', 'playwright'].find(
+		(name) =>
+			Object.values(testScripts).some((command) => new RegExp(`\\b${name}\\b`).test(command)) ||
+			configurationEntries.some((entry) => path.posix.basename(entry.path).startsWith(`${name}.`)),
+	);
+	const selectors = [];
 	const manifestSelections = configurationPathSelections(
 		JSON.stringify(manifestRunnerConfiguration),
 		'package-runner-config.json',
@@ -1046,8 +1283,62 @@ export async function immutableTestInventory(tree, subdirectory, manifest, optio
 		...manifestSelections.testFiles,
 	]);
 	const inlineSourcePatterns = new Set(manifestSelections.inlineSources);
+	let vitestVersion = manifest.devDependencies?.vitest ?? manifest.dependencies?.vitest;
+	if (
+		!vitestVersion &&
+		subdirectory &&
+		configurationEntries.some((entry) => path.posix.basename(entry.path).startsWith('vitest.'))
+	) {
+		const rootManifest = tree.find(
+			(entry) => entry.path === 'package.json' && isGitHubRegularBlob(entry),
+		);
+		if (rootManifest) {
+			const root = parseJsonFile(
+				await fetchGitHubBlob(rootManifest, options),
+				'Repository package.json',
+			);
+			vitestVersion = root.devDependencies?.vitest ?? root.dependencies?.vitest;
+		}
+	}
+	const configurationSources = new Map();
+	const sourceEntriesByPath = new Map(
+		tree.filter(isGitHubRegularBlob).map((entry) => [entry.path, entry]),
+	);
+	let configurationBytes = 0;
+	async function readConfiguration(entry) {
+		if (configurationSources.has(entry.path)) return;
+		if (configurationSources.size >= 64)
+			throw new Error('Immutable upstream configuration exceeds the file limit');
+		const bytes = await fetchGitHubBlob(entry, options);
+		configurationBytes += bytes.length;
+		if (configurationBytes > 4 * 1024 * 1024)
+			throw new Error('Immutable upstream configuration exceeds the byte limit');
+		const source = bytes.toString('utf8');
+		configurationSources.set(entry.path, source);
+		for (const specifier of collectModuleSpecifiers([[entry.path, bytes]])) {
+			const imported = resolveConfigurationImport(entry.path, specifier, sourceEntriesByPath);
+			if (imported) await readConfiguration(sourceEntriesByPath.get(imported));
+		}
+	}
+	for (const entry of configurationEntries) await readConfiguration(entry);
 	for (const entry of configurationEntries) {
-		const source = (await fetchGitHubBlob(entry, options)).toString('utf8');
+		let source = configurationSources.get(entry.path);
+		for (const expansion of profile?.configurationProjects ?? []) {
+			if (expansion.path === entry.path)
+				source = expandPinnedDirectoryProjects(source, entry, expansion, tree);
+		}
+		const configurationRunner =
+			['vitest', 'jest', 'playwright'].find((name) =>
+				path.posix.basename(entry.path).startsWith(`${name}.`),
+			) ?? runner;
+		selectors.push(
+			...configuredTestSelectors(source, entry.path, {
+				runner: configurationRunner,
+				modules: configurationSources,
+				vitestVersion,
+				scope: subdirectory ?? '',
+			}),
+		);
 		const selections = configurationPathSelections(source, entry.path);
 		for (const pattern of selections.testFiles) {
 			configurationPatterns.add(pattern);
@@ -1055,13 +1346,10 @@ export async function immutableTestInventory(tree, subdirectory, manifest, optio
 		for (const pattern of selections.inlineSources) inlineSourcePatterns.add(pattern);
 	}
 	const configuredTestPatterns = [...configurationPatterns];
+	if (runner === 'playwright' && selectors.length === 0)
+		selectors.push({ runner, scope: subdirectory ?? '', root: '', fileName: 'package.json' });
 	const configuredInlineSourcePatterns = [...inlineSourcePatterns];
 	const configurationEntryPaths = new Set(configurationEntries.map((entry) => entry.path));
-	const runner = ['vitest', 'jest'].find(
-		(name) =>
-			Object.values(testScripts).some((command) => new RegExp(`\\b${name}\\b`).test(command)) ||
-			configurationEntries.some((entry) => path.posix.basename(entry.path).startsWith(`${name}.`)),
-	);
 	const candidateEntries = tree.flatMap((entry) => {
 		if (!isGitHubRegularBlob(entry) || !entry.path.startsWith(scopePrefix)) return [];
 		if (configurationEntryPaths.has(entry.path)) return [];
@@ -1073,13 +1361,23 @@ export async function immutableTestInventory(tree, subdirectory, manifest, optio
 		// module beneath a test/ support directory. Explicit include patterns
 		// still admit nonstandard names, and compile-only specs remain inventoried.
 		const conventional = conventionalTestPath(relativePath, { runner });
+		const typeSuite = isUpstreamTypeTestPath(relativePath);
 		const directTest =
-			conventional || referencedByTestConfiguration(relativePath, configuredTestPatterns);
+			selectors.length > 0
+				? selectors.some((selector) =>
+						selectedByTestConfiguration(relativePath, selector, conventionalTestPath),
+					)
+				: conventional || referencedByTestConfiguration(relativePath, configuredTestPatterns);
 		const inlineSource = referencedByTestConfiguration(
 			relativePath,
 			configuredInlineSourcePatterns,
 		);
-		return directTest || inlineSource ? [{ directTest, entry, inlineSource, relativePath }] : [];
+		// Compile-only conformance specs can live outside the runtime runner's roots.
+		// Inspect excluded conventional candidates for actual type assertions only.
+		const typeCandidate = !directTest && !inlineSource && conventional;
+		return directTest || inlineSource || typeCandidate
+			? [{ directTest, entry, inlineSource, typeCandidate, typeSuite, relativePath }]
+			: [];
 	});
 	if (candidateEntries.length > MAX_UPSTREAM_TEST_FILES) {
 		throw new Error('Immutable upstream test inventory exceeds the file limit');
@@ -1093,7 +1391,17 @@ export async function immutableTestInventory(tree, subdirectory, manifest, optio
 	const candidateSources = new Map();
 	const candidates = [];
 	for (const candidate of candidateEntries) {
-		if (!candidate.directTest && candidate.inlineSource) {
+		if (candidate.typeCandidate) {
+			const source = (await fetchGitHubBlob(candidate.entry, options)).toString('utf8');
+			const runtimeCases = extractTestCases(source, { file: candidate.entry.path });
+			if (
+				runtimeCases.length > 0
+					? !candidate.typeSuite
+					: extractTypeAssertionGroups(source, candidate.entry.path).length === 0
+			)
+				continue;
+			candidateSources.set(candidate.entry.path, source);
+		} else if (!candidate.directTest && candidate.inlineSource) {
 			const source = (await fetchGitHubBlob(candidate.entry, options)).toString('utf8');
 			if (!containsInlineTestMarker(source, candidate.entry.path)) continue;
 			candidateSources.set(candidate.entry.path, source);
@@ -1106,6 +1414,11 @@ export async function immutableTestInventory(tree, subdirectory, manifest, optio
 	)) {
 		const source =
 			candidateSources.get(entry.path) ?? (await fetchGitHubBlob(entry, options)).toString('utf8');
+		const nonTest = profile?.nonTestFiles?.find((file) => file.path === entry.path);
+		if (nonTest) {
+			verifyNonTestArtifact(source, entry, nonTest);
+			continue;
+		}
 		const possibleRegistrars = findPossibleUnexpandedRegistrars(source);
 		if (possibleRegistrars.length > 0) {
 			throw new Error(
@@ -1114,7 +1427,23 @@ export async function immutableTestInventory(tree, subdirectory, manifest, optio
 					.join(', ')}`,
 			);
 		}
-		const runtimeCases = extractTestCases(source, {
+		let inventorySource = source;
+		for (const expansion of profile?.staticArrays ?? []) {
+			if (expansion.path !== entry.path) continue;
+			const sourceEntry = tree.find(
+				(candidate) => candidate.path === expansion.source.path && isGitHubRegularBlob(candidate),
+			);
+			if (!sourceEntry || sourceEntry.sha !== expansion.source.gitBlob)
+				throw new Error(`Static array profile source mismatch: ${expansion.source.path}`);
+			inventorySource = expandPinnedStaticArray(
+				inventorySource,
+				entry,
+				expansion,
+				sourceEntry,
+				await fetchGitHubBlob(sourceEntry, options),
+			);
+		}
+		const runtimeCases = extractTestCases(inventorySource, {
 			file: entry.path,
 			...(profile ? { helperExpansions } : {}),
 		});
@@ -1510,17 +1839,50 @@ async function resolveGitHubSource(repository, ref, options) {
 			type: entry.type === 'tree' ? 'directory' : 'file',
 			size: entry.size ?? 0,
 		}));
-	validateArchiveEntries(sourceEntries, { maxFiles: 50_000 });
+	// A recursive Git tree is bounded metadata, not a downloaded archive. Large
+	// unrelated assets are never fetched; fetchGitHubBlob and the test inventory
+	// enforce the byte limits on the evidence we actually read.
+	validateArchiveEntries(sourceEntries, {
+		maxFiles: 50_000,
+		maxFileBytes: Number.MAX_SAFE_INTEGER,
+		maxTotalBytes: Number.MAX_SAFE_INTEGER,
+	});
 
-	const manifestPath = repository.subdirectory
+	let manifestPath = repository.subdirectory
 		? `${repository.subdirectory}/package.json`
 		: 'package.json';
-	const manifestEntry = treeResponse.tree.find(
+	let manifestEntry = treeResponse.tree.find(
 		(entry) => entry.path === manifestPath && isGitHubRegularBlob(entry),
 	);
+	let manifestBytes = manifestEntry ? await fetchGitHubBlob(manifestEntry, options) : null;
+	let manifest = manifestBytes ? parseJsonFile(manifestBytes, 'Immutable source manifest') : null;
+	// npm metadata sometimes omits a monorepo directory. Resolve its exact
+	// published name from authenticated manifests; an explicit directory is
+	// authoritative, and ambiguous sibling packages remain an intake failure.
+	if (
+		options.expectedPackage &&
+		!repository.subdirectory &&
+		manifest?.name !== options.expectedPackage
+	) {
+		const matches = [];
+		for (const entry of treeResponse.tree) {
+			if (!isGitHubRegularBlob(entry) || !entry.path.endsWith('/package.json')) continue;
+			const bytes = await fetchGitHubBlob(entry, options);
+			const candidate = parseJsonFile(bytes, `Immutable source manifest ${entry.path}`);
+			if (candidate.name === options.expectedPackage && candidate.private !== true) {
+				matches.push({ entry, bytes, manifest: candidate });
+			}
+		}
+		if (matches.length !== 1) {
+			throw new Error(
+				`Immutable source must contain one package named ${options.expectedPackage}; found ${matches.length}`,
+			);
+		}
+		({ entry: manifestEntry, bytes: manifestBytes, manifest } = matches[0]);
+		manifestPath = manifestEntry.path;
+		repository = { ...repository, subdirectory: path.posix.dirname(manifestPath) };
+	}
 	if (!manifestEntry) throw new Error(`Immutable source has no ${manifestPath}`);
-	const manifestBytes = await fetchGitHubBlob(manifestEntry, options);
-	const manifest = parseJsonFile(manifestBytes, 'Immutable source manifest');
 	if (manifest.repository) {
 		const sourceManifestRepository = normalizeRepository(manifest.repository);
 		if (!repositoryMatchesLocation(sourceManifestRepository, repository)) {
@@ -1596,7 +1958,7 @@ export async function resolveRemoteInput(parsedInput, rawInput, options = {}) {
 		source = await resolveGitHubSource(
 			registry.repository,
 			registry.gitHead ?? registry.sourceProvenance?.commit,
-			resolvedOptions,
+			{ ...resolvedOptions, expectedPackage: registry.name },
 		);
 	} else {
 		const repository = {

@@ -1,4 +1,5 @@
 import {
+	_getAssetMatches,
 	appendUniqueUserTags,
 	deepEqual,
 	escapeHtml,
@@ -23,6 +24,7 @@ function buildTagsFromMatches(
 	matches: Array<AnyRouteMatch>,
 	assetCrossOrigin?: AssetCrossOriginConfig,
 ): Array<RouterManagedTag> {
+	matches = _getAssetMatches(matches);
 	const routeMeta = matches.map((match) => match.meta).filter((meta) => meta !== undefined);
 
 	const resultMeta: Array<RouterManagedTag> = [];
@@ -152,6 +154,7 @@ function buildTagsFromMatches(
 	return tags;
 }
 
+export function useTags(assetCrossOrigin?: AssetCrossOriginConfig): Array<RouterManagedTag>;
 export function useTags(...args: Array<unknown>): Array<RouterManagedTag> {
 	const [userArgs, slot] = splitSlot(args);
 	const assetCrossOrigin = userArgs[0] as AssetCrossOriginConfig | undefined;

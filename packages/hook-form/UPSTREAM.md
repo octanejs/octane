@@ -1,16 +1,20 @@
 # react-hook-form upstream contract
 
-## Pin and source boundary
+## Pin
 
 | Field | Value |
 |---|---|
 | Package | `react-hook-form` |
-| Version | `7.81.0` |
-| Canonical tag commit | `46b217e034dd92f7aa3cb3a478815556b416b299` |
-| Supported upstream range | exactly `7.81.0` |
-| React oracle | `19.2.7` |
-| Canonical archive SHA-256 | `2d49ffe1a26427eb579201d574fa6a76903f8a15bae5b0bab20c434273ebc8bd` |
+| Version | `7.88.0` |
+| Canonical tag commit | `28334faa6105b0475060592c6bf27dca87e3941e` |
+| Supported upstream range | exactly `7.88.0` |
+| Unit-test React oracle | `19.2.7` |
+| Browser React oracle | `19.0.0`, matching `upstream/app/pnpm-lock.yaml` |
+| Browser toolchain | Vite `6.4.3`, React plugin `4.3.4`, React Router `6.28.1` |
+| npm tarball integrity | `sha512-QRaLOWhX93YCnMiRfnOFRSwWXZNt8qhm2JTZwypoDvKpSffTJHmpzMXt8U6PV5UThvL3IiiLDUWe2nHMtz6Mmw==` |
 | License | MIT, © Beier (Bill) Luo |
+
+## Source boundary
 
 The npm artifact publishes compiled `dist/` output and declarations only. The
 byte-exact source, original tests, snapshots, Jest configuration, package
@@ -26,19 +30,22 @@ and the one-for-one adapted-suite inventory. The adapted suite under
 `adaptedRewrites` retarget every import at Octane (react → octane,
 `@testing-library/react` → `@octanejs/testing-library`, upstream source paths →
 the binding's `src/`), and the committed patches under `audit/upstream-patches/`
-carry only the genuine divergences (44 of 119 files; the other 75 need no
-patch). Run
-`pnpm --dir packages/hook-form test:upstream` to execute the original React/Jest
-suite unchanged.
+carry the intentional divergences. Run `pnpm --dir packages/hook-form
+test:upstream` to execute the original React/Jest suite unchanged. The separate
+`upstream-artifact/` directory retains the authenticated npm archive and its
+published declaration bytes, verified by `audit/provenance.json`.
 
 ## Runtime export crosswalk
 
 | Upstream export | Octane disposition | Evidence |
 |---|---|---|
 | `Controller` | Ported to `src/controller.tsrx` | `tests/upstream/controller.test.tsx`, `tests/upstream/useController.test.tsx` |
+| `ErrorMessage` | Ported to `src/errorMessage.tsrx` | `tests/upstream/errorMessage.test.tsx`, `tests/browser/browser.test.ts` |
+| `FieldArray` | Ported to `src/fieldArray.tsrx` | `tests/hydration.test.ts`, strict upstream field-array type tests |
+| `FormState` | Ported to `src/formState.tsrx` | `tests/upstream/formStateSubscribe.test.tsx`, `tests/hydration.test.ts` |
 | `Form` | Ported to `src/form.tsrx` | `tests/upstream/form.test.tsx` |
 | `FormProvider` | Ported to `src/FormProvider.tsrx` | `tests/upstream/useFormContext.test.tsx` |
-| `FormStateSubscribe` | Ported to `src/formStateSubscribe.tsrx` | `tests/upstream/formStateSubscribe.test.tsx` |
+| `FormStateSubscribe` | Deprecated compatibility alias for `FormState` | `tests/upstream/formStateSubscribe.test.tsx` |
 | `Watch` | Ported to `src/watch.tsrx` | `tests/upstream/watch.test.tsx` |
 | `appendErrors` | Reused framework-neutral logic | `tests/upstream/logic/appendErrors.test.ts` |
 | `createFormControl` | Reused framework-neutral logic | `tests/upstream/logic/createFormControl.test.ts` |
@@ -70,42 +77,54 @@ covered by every adapted `*.server.test.tsx` counterpart.
 
 ## Test-suite disposition
 
-The tagged repository contains 119 test artifacts: 115 test files plus four
-snapshots. Every relative path under upstream `src/__tests__/` has an adapted
-counterpart under `tests/upstream/`. The verifier extracts registrations from
-both trees and currently accounts for 1,183 upstream registrations and 1,186
-adapted registrations.
+The immutable lock contains 355 source, test, application, configuration, and
+license files. Runtime tests map from `src/__tests__` to `tests/upstream`; strict
+type tests map from `src/__typetest__` to `tests/upstream/_types`; browser fixtures
+and Playwright cases map into `_app` and `_e2e`. Generated adaptations are ignored
+by Git and reproduced offline from pristine bytes, mechanical rewrites, and
+committed patches. The pristine tree and npm artifacts never contain local edits.
 
-The unfiltered execution inventories are a separate collection-time
-measurement. They contain 1,187 entries representing 1,178 unique
-file/full-name identities. All nine duplicate entries are repeated titles
-within the DOM inventory; the server inventory shares no file or test identity
-with it. The manifest records these measurements structurally, and validation
-recomputes them from the committed inventories.
+The original Jest suite contains 1,364 executed entries and 26 snapshots. Its
+DOM and Node projects each execute the nine server cases. Octane executes those
+nine server cases once and 1,346 DOM cases, giving 1,355 adapted entries and 1,346
+unique file/title identities. Nine repeated titles are preserved with distinct
+occurrence identities. The dirty-array regressions previously added only to
+Octane are now present upstream and need no local additions.
 
-Three upstream titles are deliberately mapped to their Octane equivalents:
+All strict type files and their assertion groups remain in separate pristine
+`tsc` and adapted `tsrx-tsc` programs with `skipLibCheck: false`. This includes the
+runtime-located `type.test.tsx` as well as the dedicated upstream type directory.
+Published API probes also verify precise field paths, errors, submit return
+values, renderer properties, and negative controls.
 
-- `field.onChange` → `field.onInput` in the controller promise case;
-- the same native-event rename in the resolver subscriber case; and
-- React's batched trigger notification case → Octane's documented commit-order
-  notification case.
+The browser wrapper checks the exact file/title multiset and execution status of
+all 90 pinned Playwright registrations. The pristine lane builds the immutable TypeScript source and uses the real React
+application with its locked React, Vite, React plugin, and router versions. The adapted lane substitutes a route-parameter fixture for the React
+Router shell and executes the original native form fixtures and assertions.
+Three cases in `controller.spec.ts` mount React MUI 5 components and assert MUI
+portal DOM. They remain visible as inapplicable external integrations in
+`audit/crosswalk.json`, with a durable materialization skip rationale; this
+existing-binding campaign does not introduce a MUI port. All 87 supported browser
+cases execute in Chromium, including the existing Octane Select integration.
 
-The adapted suite adds three Octane regression cases for registered array-valued
-dirty fields. These are explicit additions, not substitutes for upstream cases.
-There are no skipped, todo, or expected-failure cases. Any removed/renamed test
-artifact, unrecorded title change, missing extra, or vendored-byte drift fails
-`upstream:verify`.
+Both browser lanes use one worker and a 10 ms browser-command delay. The pinned
+fixtures observe intermediate renders between inputs and closely spaced timers;
+consistent command pacing avoids coalescing those observations during burst
+input. The runners retain all original assertions and use zero retries.
 
-In the root Vitest project, `testExecution.group: react-parity` owns the adapted
-upstream and differential test patterns. The ordinary sharded config derives
-their complement, so the package-authored conformance cases still run without
-repeating manifest-owned parity work. This follows the repository-wide
-[React parity test-execution contract](../../docs/react-parity-testing.md); the
-workflow does not enumerate this package.
+Native text fields expose `onInput`; selects, checkboxes, radios, and component
+callbacks retain their respective contracts. The StrictMode fixture uses a
+Fragment because Octane has no React development double-invoke mode. A resolver
+visibility update commits separately from its unregister effect in Octane, so
+that browser case preserves all validity assertions and expects eight renders
+instead of React's seven. The existing structured divergence ledger documents
+these native-event and scheduling boundaries. No supported case uses an expected
+failure, weakened behavior assertion, or silent omission.
 
-The pristine lane runs all 1,193 tests and eight snapshots in the original Jest
-suite against React. Its local Jest wrapper removes only the optional
-`jest-preview` dashboard transforms/setup; test source, SWC transformation,
-environments, assertions, and snapshots remain upstream-exact. The adapted and
-differential lanes then verify the Octane port, including the native input-event
-divergence.
+Additional conformance evidence checks native events, focus, keyed field-array
+survivors, SSR/hydration node adoption, server-effect exclusion, actual File bytes
+in FormData, function action success/rejection, and subscription cleanup.
+Differential cases run the same consumer actions through React and Octane.
+
+The root Vitest projects and required parity lanes follow the shared
+[React parity test-execution contract](../../docs/react-parity-testing.md).

@@ -1,0 +1,23 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "skipLibCheck": false,
+    "types": ["node"],
+    "paths": {
+      "@octanejs/tanstack-router": ["../../src/index.ts"],
+      "@octanejs/tanstack-router/history": ["../../src/history.ts"],
+      "@octanejs/tanstack-router/ssr/server": ["../../src/ssr/server.ts"],
+      "@octanejs/tanstack-router/ssr/client": ["../../src/ssr/client.ts"],
+      "@octanejs/tanstack-router/generator-plugin": ["../../src/generator-plugin.d.ts"]
+    }
+  },
+  "include": ["./*.test-d.ts", "../../src/**/*"],
+  "exclude": ["node_modules"],
+  "reactPortEvidence": {
+    "gate": "public-types",
+    "publicMode": "pinned"
+  },
+  "tsrx": {
+    "compiler": "octane/compiler/volar"
+  }
+}

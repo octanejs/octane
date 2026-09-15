@@ -1,0 +1,22 @@
+{
+  "extends": "../upstream/tsconfig.json",
+  "compilerOptions": {
+    "strict": true,
+    "skipLibCheck": false,
+    "typeRoots": ["../node_modules/@types"],
+    "paths": {
+      "react": ["../node_modules/@types/react/index.d.ts"],
+      "react/*": ["../node_modules/@types/react/*"],
+      "bun": ["../node_modules/pristine-bun-types/index.d.ts"]
+    },
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "types": []
+  },
+  "include": ["../upstream/src/**/*.ts", "./pristine/public-contract.ts"],
+  "reactPortEvidence": {
+    "gate": "upstream-types-pristine",
+    "upstreamRegistrations": [],
+    "publicMode": "pinned"
+  }
+}

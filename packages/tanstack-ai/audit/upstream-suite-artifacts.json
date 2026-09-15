@@ -1,86 +1,170 @@
 {
   "schemaVersion": 1,
-  "commit": "9ca3706513b94764d11ea63c7541b2cf4f3daa20",
+  "commit": "0ddaa6cb3c2e948a47dbd19d31c0ad874d176a86",
   "repo": "https://github.com/TanStack/ai.git",
-  "notes": "Complete inventory of executable and support artifacts under packages/ai-react/tests at the pinned commit. npm tarballs omit these files; repository presence is authoritative. Closing this disposition requires vendoring the suite and registering pristine / adapted lanes.",
   "summary": {
-    "artifacts": 12,
-    "runtimeTests": 10,
-    "support": 2,
-    "excluded": 12
+    "artifacts": 26,
+    "testFiles": 23,
+    "runtimeRegistrations": 210,
+    "typeRegistrations": 25,
+    "excluded": 0
   },
   "artifacts": [
     {
+      "path": "packages/ai-react/tests/chat-ui/coexistence.test.ts",
+      "kind": "test",
+      "disposition": "included",
+      "sha256": "cd6ea8ec99b681175e743ba67395b6e695fc3caca04680818ae52fa5dd3c5dd1"
+    },
+    {
+      "path": "packages/ai-react/tests/chat-ui/create-ui-stability.test.tsx",
+      "kind": "test",
+      "disposition": "included",
+      "sha256": "3ea4c43a2e3f5b9386c0f53c32e1f082a2e718d858cc82818eaf8aed41bb05cc"
+    },
+    {
+      "path": "packages/ai-react/tests/chat-ui/create-ui-types.test.tsx",
+      "kind": "test",
+      "disposition": "included",
+      "sha256": "602582027d054fb1bfb5074eb4dbef8602c5deba141c51c3c87941a4ae013cad"
+    },
+    {
+      "path": "packages/ai-react/tests/chat-ui/create-ui.test.tsx",
+      "kind": "test",
+      "disposition": "included",
+      "sha256": "80946e74a7602651db3f2c667446f7cfb6f40386d105255ffab2950c5742e936"
+    },
+    {
+      "path": "packages/ai-react/tests/chat-ui/markdown-plugins.test.ts",
+      "kind": "test",
+      "disposition": "included",
+      "sha256": "8ba8cf58da2c2e42bb15753af1f93c420d53f00eeac6766f5492c9e4ade0b293"
+    },
+    {
+      "path": "packages/ai-react/tests/chat-ui/react-dom-server.d.ts",
+      "kind": "support",
+      "disposition": "included",
+      "sha256": "6596dfa1852782de01ad04941cb1f964183386513e1ab2ef463d3c6a6535f859"
+    },
+    {
+      "path": "packages/ai-react/tests/chat-ui/tool-result-content.test.ts",
+      "kind": "test",
+      "disposition": "included",
+      "sha256": "af26c6645dbfcf87ddd4386b3e028a044a6a996abac23220107ecccf8a43edd8"
+    },
+    {
+      "path": "packages/ai-react/tests/create-chat-hook-types.test.ts",
+      "kind": "test",
+      "disposition": "included",
+      "sha256": "305a488595169de200cf1b40c1666883a9d0ce813cfb522a96f2d06d44e220a6"
+    },
+    {
+      "path": "packages/ai-react/tests/create-chat-hook.test.ts",
+      "kind": "test",
+      "disposition": "included",
+      "sha256": "dd4c102ec1130e00fdf9c1fd7c7cd85d0ade2929a43a68dc6b86101a4b25856e"
+    },
+    {
       "path": "packages/ai-react/tests/devtools-name-types.test.ts",
-      "kind": "runtime-test",
-      "disposition": "excluded",
-      "reason": "Present at the pinned repository commit and omitted from the published npm tarball. This bounded harness does not yet vendor or execute a pristine / one-for-one adapted lane for the upstream suite; register those lanes before promoting provenance to verified."
+      "kind": "test",
+      "disposition": "included",
+      "sha256": "3b21c76c17994255c440cdb70c8c4194753f285106b98526b7f07a95cf0e7840"
     },
     {
       "path": "packages/ai-react/tests/mcp-apps.test.tsx",
-      "kind": "runtime-test",
-      "disposition": "excluded",
-      "reason": "Present at the pinned repository commit and omitted from the published npm tarball. This bounded harness does not yet vendor or execute a pristine / one-for-one adapted lane for the upstream suite; register those lanes before promoting provenance to verified."
+      "kind": "test",
+      "disposition": "included",
+      "sha256": "a3ff50ef962b14115fa759cee37b74c9be6d7d0434eb2e2a17ffdcd76dd2e90a"
     },
     {
       "path": "packages/ai-react/tests/setup.ts",
       "kind": "support",
-      "disposition": "excluded",
-      "reason": "Present at the pinned repository commit and omitted from the published npm tarball. This bounded harness does not yet vendor or execute a pristine / one-for-one adapted lane for the upstream suite; register those lanes before promoting provenance to verified."
+      "disposition": "included",
+      "sha256": "27b143893720d787f91478ee0a3c62169d65e3ce138b98f4469a22e39aa19d9a"
     },
     {
       "path": "packages/ai-react/tests/test-utils.ts",
       "kind": "support",
-      "disposition": "excluded",
-      "reason": "Present at the pinned repository commit and omitted from the published npm tarball. This bounded harness does not yet vendor or execute a pristine / one-for-one adapted lane for the upstream suite; register those lanes before promoting provenance to verified."
+      "disposition": "included",
+      "sha256": "fb79f4f584d27ded4d44ef867ae5de7f46c5f59d32ffd69e0a7e49598e063be4"
     },
     {
       "path": "packages/ai-react/tests/use-audio-recorder.test.tsx",
-      "kind": "runtime-test",
-      "disposition": "excluded",
-      "reason": "Present at the pinned repository commit and omitted from the published npm tarball. This bounded harness does not yet vendor or execute a pristine / one-for-one adapted lane for the upstream suite; register those lanes before promoting provenance to verified."
+      "kind": "test",
+      "disposition": "included",
+      "sha256": "4eb5a1399b41ca3e704ec9fafaa5e3e5b927a29e48d40d343af540a2277b7a68"
+    },
+    {
+      "path": "packages/ai-react/tests/use-byok.test.ts",
+      "kind": "test",
+      "disposition": "included",
+      "sha256": "decaa6f56945c598491b64a8760ba7ac7050c9efd568eebddd424fb27e74b774"
+    },
+    {
+      "path": "packages/ai-react/tests/use-chat-byok.test.ts",
+      "kind": "test",
+      "disposition": "included",
+      "sha256": "3e6591b7555115a54523480cba5ee98532ba63aed13132046a32859f610c1b1b"
     },
     {
       "path": "packages/ai-react/tests/use-chat-fetcher.test.ts",
-      "kind": "runtime-test",
-      "disposition": "excluded",
-      "reason": "Present at the pinned repository commit and omitted from the published npm tarball. This bounded harness does not yet vendor or execute a pristine / one-for-one adapted lane for the upstream suite; register those lanes before promoting provenance to verified."
+      "kind": "test",
+      "disposition": "included",
+      "sha256": "6b56291c9c730b6ce708aeab2696e7f11b74d4dc3276b907ca37879ae8d6bd88"
     },
     {
       "path": "packages/ai-react/tests/use-chat-options-probe.test.ts",
-      "kind": "runtime-test",
-      "disposition": "excluded",
-      "reason": "Present at the pinned repository commit and omitted from the published npm tarball. This bounded harness does not yet vendor or execute a pristine / one-for-one adapted lane for the upstream suite; register those lanes before promoting provenance to verified."
+      "kind": "test",
+      "disposition": "included",
+      "sha256": "b8bb90c1798de82d0f7a1eeae2d20f2f5ed69630abe863291ebfd58fe8035b1d"
+    },
+    {
+      "path": "packages/ai-react/tests/use-chat-persistence-types.test.ts",
+      "kind": "test",
+      "disposition": "included",
+      "sha256": "7044c7e29a2d021af45be2b203338a3b7c6f48f4b9c6e45ca0079acfcbd91762"
     },
     {
       "path": "packages/ai-react/tests/use-chat-structured-output.test.ts",
-      "kind": "runtime-test",
-      "disposition": "excluded",
-      "reason": "Present at the pinned repository commit and omitted from the published npm tarball. This bounded harness does not yet vendor or execute a pristine / one-for-one adapted lane for the upstream suite; register those lanes before promoting provenance to verified."
+      "kind": "test",
+      "disposition": "included",
+      "sha256": "b0ed6d9e7b1458a375ff66c81d7d8a04ae0c346d3f909079cf10c25f342b7cf9"
     },
     {
       "path": "packages/ai-react/tests/use-chat-types.test.ts",
-      "kind": "runtime-test",
-      "disposition": "excluded",
-      "reason": "Present at the pinned repository commit and omitted from the published npm tarball. This bounded harness does not yet vendor or execute a pristine / one-for-one adapted lane for the upstream suite; register those lanes before promoting provenance to verified."
+      "kind": "test",
+      "disposition": "included",
+      "sha256": "0561b6431c5162046141293fda6b297676ef89a92b55905351b07f4a413813a7"
     },
     {
       "path": "packages/ai-react/tests/use-chat.test.ts",
-      "kind": "runtime-test",
-      "disposition": "excluded",
-      "reason": "Present at the pinned repository commit and omitted from the published npm tarball. This bounded harness does not yet vendor or execute a pristine / one-for-one adapted lane for the upstream suite; register those lanes before promoting provenance to verified."
+      "kind": "test",
+      "disposition": "included",
+      "sha256": "e2e072ea776ae6a051908edcfdf981c818f63c31b8d1017e6079dffc04d71592"
+    },
+    {
+      "path": "packages/ai-react/tests/use-generation-persistence-types.test.ts",
+      "kind": "test",
+      "disposition": "included",
+      "sha256": "89f6dd49aa0806509f6935033765e5cc4f59b66fa2140a77200d5b14bc955d3c"
     },
     {
       "path": "packages/ai-react/tests/use-generation.test.ts",
-      "kind": "runtime-test",
-      "disposition": "excluded",
-      "reason": "Present at the pinned repository commit and omitted from the published npm tarball. This bounded harness does not yet vendor or execute a pristine / one-for-one adapted lane for the upstream suite; register those lanes before promoting provenance to verified."
+      "kind": "test",
+      "disposition": "included",
+      "sha256": "28d43141d7b149dbb93a5993966d2a0584f891ac7471fb480b579a5ded880ce3"
     },
     {
       "path": "packages/ai-react/tests/use-mcp-app-bridge.test.ts",
-      "kind": "runtime-test",
-      "disposition": "excluded",
-      "reason": "Present at the pinned repository commit and omitted from the published npm tarball. This bounded harness does not yet vendor or execute a pristine / one-for-one adapted lane for the upstream suite; register those lanes before promoting provenance to verified."
+      "kind": "test",
+      "disposition": "included",
+      "sha256": "c8c7571e22ab58f12b737a651952b3e939f36b104d793477e5b728e276b9e2d5"
+    },
+    {
+      "path": "packages/ai-react/tests/use-web-mcp-tools.test.ts",
+      "kind": "test",
+      "disposition": "included",
+      "sha256": "744d48c142a42c7706d4d1bffa26f6e87d13938585ec7b02ea6af44ba021f7a5"
     }
   ]
 }

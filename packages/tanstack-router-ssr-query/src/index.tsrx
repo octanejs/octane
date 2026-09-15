@@ -1,4 +1,4 @@
-// Octane port of @tanstack/react-router-ssr-query@1.167.1 (src/index.tsx,
+// Octane port of @tanstack/react-router-ssr-query@1.167.2 (src/index.tsx,
 // 29 lines): delegates to the framework-agnostic
 // @tanstack/router-ssr-query-core and wraps the router's Wrap option in a
 // QueryClientProvider. Fragment comes from octane; everything else is
@@ -15,7 +15,7 @@ export type Options<TRouter extends AnyRouter> =
 	};
 
 export function setupRouterSsrQueryIntegration<TRouter extends AnyRouter>(opts: Options<TRouter>) {
-	setupCoreRouterSsrQueryIntegration(opts as any);
+	setupCoreRouterSsrQueryIntegration(opts);
 
 	if (opts.wrapQueryClient === false) {
 		return;

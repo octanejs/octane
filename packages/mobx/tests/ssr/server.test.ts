@@ -8,6 +8,7 @@ describe('MobX static rendering', () => {
 		enableStaticRendering(false);
 	});
 
+	// @parity-case native:mobx-253a0c1cb521
 	it('renders deterministic markup without retaining an observer', () => {
 		const store = observable({
 			count: 4,

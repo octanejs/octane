@@ -1,16 +1,8 @@
-import * as React from "react";
 import type {
   IntersectionChangeEffect,
   IntersectionEffectOptions,
 } from "./index";
-import { observe } from "./observe";
-
-const useSyncEffect = (("useInsertionEffect" in React
-  ? (React as typeof React & { useInsertionEffect: typeof React.useEffect })
-      .useInsertionEffect
-  : undefined) ??
-  React.useLayoutEffect ??
-  React.useEffect) as typeof React.useEffect;
+import { useIntersectionObserverRef } from "./useIntersectionObserverRef";
 
 /**
  * React Hooks make it easy to monitor when elements come into and leave view. Call
@@ -55,91 +47,18 @@ export const useOnInView = <TElement extends Element>(
     triggerOnce,
     skip,
   }: IntersectionEffectOptions = {},
-) => {
-  const onIntersectionChangeRef = React.useRef(onIntersectionChange);
-  const observedElementRef = React.useRef<TElement | null>(null);
-  const observerCleanupRef = React.useRef<(() => void) | undefined>(undefined);
-  const lastInViewRef = React.useRef<boolean | undefined>(undefined);
-
-  useSyncEffect(() => {
-    onIntersectionChangeRef.current = onIntersectionChange;
-  }, [onIntersectionChange]);
-
-  // biome-ignore lint/correctness/useExhaustiveDependencies: Threshold arrays are normalized inside the callback
-  return React.useCallback(
-    (element: TElement | undefined | null) => {
-      // React <19 never calls ref callbacks with `null` during unmount, so we
-      // eagerly tear down existing observers manually whenever the target changes.
-      const cleanupExisting = () => {
-        if (observerCleanupRef.current) {
-          const cleanup = observerCleanupRef.current;
-          observerCleanupRef.current = undefined;
-          cleanup();
-        }
-      };
-
-      if (element === observedElementRef.current) {
-        return observerCleanupRef.current;
-      }
-
-      if (!element || skip) {
-        cleanupExisting();
-        observedElementRef.current = null;
-        lastInViewRef.current = undefined;
+): ((element: TElement | undefined | null) => (() => void) | undefined) => {
+  return useIntersectionObserverRef<TElement>(
+    (inView, entry, previousInView) => {
+      // Ignore the very first `false` notification so consumers only hear about actual state changes.
+      if (previousInView === undefined && !inView) {
         return;
       }
 
-      cleanupExisting();
-
-      observedElementRef.current = element;
-      let destroyed = false;
-
-      const destroyObserver = observe(
-        element,
-        (inView, entry) => {
-          const previousInView = lastInViewRef.current;
-          lastInViewRef.current = inView;
-
-          // Ignore the very first `false` notification so consumers only hear about actual state changes.
-          if (previousInView === undefined && !inView) {
-            return;
-          }
-
-          onIntersectionChangeRef.current(
-            inView,
-            entry as IntersectionObserverEntry & { target: TElement },
-          );
-          if (triggerOnce && inView) {
-            stopObserving();
-          }
-        },
-        {
-          threshold,
-          root,
-          rootMargin,
-          scrollMargin,
-          trackVisibility,
-          delay,
-        } as IntersectionObserverInit,
-      );
-
-      function stopObserving() {
-        // Centralized teardown so both manual destroys and React ref updates share
-        // the same cleanup path (needed for React versions that never call the ref with `null`).
-        if (destroyed) return;
-        destroyed = true;
-        destroyObserver();
-        observedElementRef.current = null;
-        observerCleanupRef.current = undefined;
-        lastInViewRef.current = undefined;
-      }
-
-      observerCleanupRef.current = stopObserving;
-
-      return observerCleanupRef.current;
+      onIntersectionChange(inView, entry);
     },
-    [
-      Array.isArray(threshold) ? threshold.toString() : threshold,
+    {
+      threshold,
       root,
       rootMargin,
       scrollMargin,
@@ -147,6 +66,6 @@ export const useOnInView = <TElement extends Element>(
       delay,
       triggerOnce,
       skip,
-    ],
+    },
   );
 };

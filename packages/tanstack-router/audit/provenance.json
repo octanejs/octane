@@ -1,0 +1,353 @@
+{
+  "schemaVersion": 1,
+  "artifacts": [
+    {
+      "path": "LICENSE.upstream",
+      "sha256": "a405ee70c632bb938acb7ac5f210e814409b3760ea9d2329d8ed8ffcfd11a0e7"
+    },
+    {
+      "path": "upstream-artifact/react-router-1.170.35.tgz",
+      "sha256": "47a10f3e21473036f2e5c1f526b0c96bb948e0cd90d63db4e5cf41ac574f9450"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/package.json",
+      "sha256": "ccb2660ed867661a706569b4cad752976a47a4f380fef147cc2136ad74c68d9b"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/Asset.tsrx",
+      "sha256": "c6d2abeda9e83a10896ecacc743e903c80687d473ead4107e66abdaa9e48bf3a"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/Asset.tsrx.d.ts",
+      "sha256": "eb81a6b04aa1cf37b268be1081f0475d202a565a2ea847e853d805534bc9f444"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/Await.tsrx",
+      "sha256": "0a8ad3b89555638f0161111c9a8d96b127de17e82305554e259195891d2a14d5"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/Await.tsrx.d.ts",
+      "sha256": "3e7f4339fddc73a51902b3f803604b2bddf28fcf978fe8f53efaf1c7fb8a2d31"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/Body.ts",
+      "sha256": "da3aef07fc95171c9c2b34d123b2dd0834a86a043372fb27244f0e69c7c912e6"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/CatchBoundary.tsrx",
+      "sha256": "fead46d287f3f45b32b4def5cadb8e0668c869d5e6a9629749b7db85aa7691a5"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/CatchBoundary.tsrx.d.ts",
+      "sha256": "966772db74e09390adefee2694b4876f402e08af7794afc35533966c3bf6a06a"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/ClientOnly.tsrx",
+      "sha256": "eaa9e01d5d121e58b7ba4f843b981cc3777910fe0678a90177d80ac11614ea94"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/ClientOnly.tsrx.d.ts",
+      "sha256": "7493e8a3ee96dd855786718a648b867e6b8e3c8ca61427e20e0547af9600e332"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/Head.ts",
+      "sha256": "aa4085556013974b1a4453833f51cd0fad06d434cd321a44d9a438e29c4d963e"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/HeadContent.tsrx",
+      "sha256": "916d6b0cf9104f328ee06d2fb5b48980fa441a1e39276940604cacd9788ebea9"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/HeadContent.tsrx.d.ts",
+      "sha256": "3e33092d0b8f12399482bca30a978db1a0cee26ef65ecc92cabb04a81fd6fb6a"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/Html.ts",
+      "sha256": "61e874d7dab8f318d428aa8ebab0a1985af9edf7d60ead617e3617f82b5d5474"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/Link.tsrx",
+      "sha256": "26b0950af883192b6a058dd58bf832dad559964cd3711f26e4423d8ac3bcf37f"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/Link.tsrx.d.ts",
+      "sha256": "62cc00ce0203fa8555b3e6971c4cfdc1821b3b1fe32a81335214365328a61e6c"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/Match.tsrx",
+      "sha256": "b118bbadbdb971334425cb9fb4ad6be8bb04c1e0ffc6f984e464a569adf15446"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/Match.tsrx.d.ts",
+      "sha256": "82b15d8b9f09082263b9b239af853f585d34f824810f9d01a08cbd91557858fc"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/MatchRoute.tsrx",
+      "sha256": "f1fb0b616e4aa6e98736e37b78c20d9139e752bfdae9d5a49b43b63e63397a2e"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/MatchRoute.tsrx.d.ts",
+      "sha256": "d0bcea45fa2b3952c697275e404a7e2998433ffeed4668b450ee93af26b58be2"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/Matches.tsrx",
+      "sha256": "71a82b2a629ce287a3ba72a2d8da227782d3c5888945e4c4421e26b6dadbc4c0"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/Matches.tsrx.d.ts",
+      "sha256": "14ded8bd846a46e16ed79c88d205e9e5552023d2ada5cbae536d4b8e5ac1b59c"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/Navigate.tsrx",
+      "sha256": "7d49033b107f8ca096d67835cd3e9fbb34b3cec4f42846764e5cb06fff91aef9"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/Navigate.tsrx.d.ts",
+      "sha256": "fc47f26d12f13964c60b9ee77f146ffd360278ed72d7c7f4765d0c3bc02537be"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/Outlet.tsrx",
+      "sha256": "78838bc5fa906360c8c06be9f9eaaa6331dfbde379ccd6a8e45e350647a440c7"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/Outlet.tsrx.d.ts",
+      "sha256": "118bce6cbd1f1e963980585f6ea61cc3bb1de522f8bd24249c0985610cf4a7b4"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/RouteNotFound.tsrx",
+      "sha256": "01f9b204c9347b847cf93f1e1df85ef3f6def72e665312c3c60e606164d1385a"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/RouterProvider.tsrx",
+      "sha256": "42212afe0d4f59c113690c6b6f24dfd92b083ed810659cf72c89d5c4690d7368"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/RouterProvider.tsrx.d.ts",
+      "sha256": "2d4086c3345b24743bbf7b9eaff1249bd9be963e22252dc6fa963fe556fe0319"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/SafeFragment.tsrx",
+      "sha256": "7f38da53d7ad2c0118c6e0af86a22aee394c13f931ef3fb0c5939b3761ce45d5"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/SafeFragment.tsrx.d.ts",
+      "sha256": "91dcdc5e819a0d7bfd8a2063852cbf5e7916f2d239c241d84f9854d88a2b260e"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/ScriptOnce.tsrx",
+      "sha256": "f0531fcb83dc772a2f155d37d8a6f961ef0b091b6f98c55f0c5772944baa38c6"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/ScriptOnce.tsrx.d.ts",
+      "sha256": "c0177baf7f117d54a5c45087489674450f535561105138086ff054d431686f0a"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/Scripts.tsrx",
+      "sha256": "137e21da6454746473ad9d92b1963f3f26e53bed58ac30cc6cbdf1d7cf36cd8e"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/Scripts.tsrx.d.ts",
+      "sha256": "eee2155472e6b3b8e34f7f848c751ade68e74559686e99f6a5f964207ec708bc"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/ScrollRestoration.tsrx",
+      "sha256": "84ad92a0289ffb3e82d6e5bb68d89753a9de63f7ad310314d8bf99a5c0d5cb89"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/ScrollRestoration.tsrx.d.ts",
+      "sha256": "7bcaa54464117014b9de0bc245ce7ed5d07f0c9896f41db9c50ec8179401926b"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/Transitioner.tsrx",
+      "sha256": "fb99b5a4f8249f6fae38e73dce2953180bb7b95715fdaeb64ff7a644909219a5"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/assetKeys.ts",
+      "sha256": "714071c6a622d9b6c0577d08e7733044b36454abb685e4b97363b71aa86fe52c"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/context.ts",
+      "sha256": "0055056292d3b4924084df8fae259e59e11f283e7472b12cb184caf1f00745d7"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/externalHydration.ts",
+      "sha256": "a8e75929263d46d5419338723ba08f533d67fadf0f987588fb9b709a41228171"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/fileRoute.ts",
+      "sha256": "0076f440452a432b07727634bbd8398c41e8d5cffc40e5e936c0a89f332ff5d3"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/frameworkTypes.ts",
+      "sha256": "3615fd38d73a2a85079580a7bc3ae283d1e5f0893d21c4a53a8709ed0b007321"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/generator-plugin.d.ts",
+      "sha256": "b4fadef78a05d11b7789227826fc81e04b75bc74250502b90edc597346eaa863"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/generator-plugin.js",
+      "sha256": "b2b40d58aad9aa68b6338eb6c5aabd9870494bb9f911e44d49e8bb2a023f7002"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/headContentUtils.ts",
+      "sha256": "7a562829929259908efd9ca479db4ae3ebccf9cd7e47619c548d9d1be351a95a"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/history.ts",
+      "sha256": "024c3c70ff71401f323eac5f1b2fffc60e289c8c97cbf305548928c0fea5e32b"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/hooks.ts",
+      "sha256": "ad9f958355a1e329af22e171dc43dd03318f7408e35d173445e8f8f6f1b6175e"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/index.ts",
+      "sha256": "24755f131cce3e9dfc3b44aff2ebe5847ffdbaa8c67d021afabfa08ae2e94f78"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/internal.ts",
+      "sha256": "208d06911e38acb3421299c7155d8112c31f89e3b04c448ba37d70922b2ce510"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/lazyRouteComponent.ts",
+      "sha256": "18246e3293373768e2703bc8e192824e53ef5a121ffbdb59bb31bebce427c3c2"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/link.ts",
+      "sha256": "146908a513b2becf1608e622945cc7e036313150c98ae66b4aee3e5a58ec9373"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/linkTypes.ts",
+      "sha256": "34ce10d436168a4fea38972114dfc517f472d18f7e66fdad84973e412ad30d42"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/not-found.tsrx",
+      "sha256": "0d7c0b649aeb3e3d1d5ebb9f7d67c6afda4d2900cd8f5eb237fb3a3bd634dba0"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/not-found.tsrx.d.ts",
+      "sha256": "09a8ea82b8d8f1386ba72cb6c301186639ec9d8ca7dae800c9b7c5112d7d3d95"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/octane-compiler.d.ts",
+      "sha256": "c3482665010d996f882c90366742b543ab645e149603dbc42042bab98285e3b5"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/route.ts",
+      "sha256": "767bd017481950ad6c8b4de0f7798396fb558ebeddb879caa028d00ff954165a"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/routeHookTypes.ts",
+      "sha256": "0134037f2b5419070519258979313b86ba2810102aa18afc6c3ba43251dfa6f5"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/router.ts",
+      "sha256": "d2cea2804fb16afe746b10acae6c2b0d4029888a8cc805c109aad516e15de388"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/scriptContentUtils.ts",
+      "sha256": "7b09994248398659757c7fb94e215a28ae475462ff0dca2f75b5db20a9d24831"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/scroll-restoration.tsrx",
+      "sha256": "dddf02899fd04034999eb458f8c4dc93b9b88f92d0976ba893a9438d1241d15b"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/scroll-restoration.tsrx.d.ts",
+      "sha256": "e4cbea63d607aa66fecad155ee89aac0389c2e7761021410e5cb87960ecbac86"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/ssr/RouterClient.tsrx",
+      "sha256": "d837bbb705c942f00fa9709492e26f51f35cc396b79b70e3f5b3cb89b059ef24"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/ssr/RouterClient.tsrx.d.ts",
+      "sha256": "65281bd1962f51dad45f804973a0bb0aee488da992be011e4fc1d94bc50ee738"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/ssr/RouterServer.tsrx",
+      "sha256": "3163254249601b965bb99ab7d225f23d7f17bb53c4001c9777a1a801eb96835d"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/ssr/RouterServer.tsrx.d.ts",
+      "sha256": "42e73f408bece3dddde1ae407a01f86d882213b611de45ff20f60634c951a4a5"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/ssr/client.ts",
+      "sha256": "152aae21ba7ab6eda7f80228ce183245e052c7d2762a838d7c3d63c71edd5c03"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/ssr/defaultRenderHandler.ts",
+      "sha256": "eb24dfb7e0b333403b34d272bcd46ad9d295c602a8eebe000eedfc9d9044a2c9"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/ssr/defaultStreamHandler.ts",
+      "sha256": "89a351a900c2f54c86af502c003e285051bbf15227b75d398ed1be3570d83adf"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/ssr/renderRouterToStream.ts",
+      "sha256": "cf179d2f14704e95cce9292c8f39293a174370105ec3398977b8f1ac0571731a"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/ssr/renderRouterToString.ts",
+      "sha256": "5b40bb3976d56d1635ac58fe8561d732e0f170c1f37daaa968e47a2a9f75c3fb"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/ssr/server.ts",
+      "sha256": "53f96b0b246d3667223c57c80a8cb16325cf6b6132a92be152324812bdf9e8c1"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/structuralSharing.ts",
+      "sha256": "b09c3974e79b14cdb3e2014f099b1f289ddc9e984dcefdb085cf82491ed665a0"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/typePrimitives.ts",
+      "sha256": "cfb0984cfeb2c10abb93a749b1efde1607cecd0a49a8c275015bd6b6cdf707bf"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/useAwaited.ts",
+      "sha256": "5e20653e0d52dff578ea586c3d31af5097eb6e985df2d1b45b4db3f379b4f37d"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/useBlocker.tsrx",
+      "sha256": "9639a754cc387da04fc157f02171213a2b2261fbe63b81b8ea46f3027227f896"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/useBlocker.tsrx.d.ts",
+      "sha256": "7c7610a5e09af431a3f1d6444489810e302904c47f0d666c72dc8845e5a98071"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/useElementScrollRestoration.ts",
+      "sha256": "ed00800687f1d857402ad0f5e2d59c638eabb28bc9ffd6b4b642e6c8b3aa5423"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/useRouterState.ts",
+      "sha256": "0eebf0432147cb47491513008cceccabb76af8ddec1a0f042412a4c6901ec8a4"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/useStore.ts",
+      "sha256": "0fb8a808f4f1a1b926c3242e159c5cd7aee3ed58b5e032f0b3cd083a929a1b83"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/src/utils.ts",
+      "sha256": "6b49d5c6d95e2b305f92ddc8b70be180c1a1ffeb167811e6ebbdd251cfacba37"
+    },
+    {
+      "path": "upstream-artifact/previous-binding/LICENSE",
+      "sha256": "4b83c082bc5305628aceda4130f495f30a6b992389b8d19229d508d38bc09a36"
+    },
+    {
+      "path": "LICENSE.node-types",
+      "sha256": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383"
+    }
+  ],
+  "requiredFiles": ["audit/upstream.lock.json", "audit/compatibility-baseline.json"],
+  "packageIdentity": {
+    "path": "upstream/package.json",
+    "name": "@tanstack/react-router",
+    "version": "1.170.35",
+    "license": "MIT"
+  },
+  "unpublishedDirs": ["audit", "tests", "typetests", "upstream", "upstream-artifact"]
+}

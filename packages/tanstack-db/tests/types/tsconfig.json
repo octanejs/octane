@@ -1,0 +1,20 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "skipLibCheck": false,
+    "allowImportingTsExtensions": true,
+    "types": ["node"],
+    "paths": {
+      "@octanejs/tanstack-db": ["../../src/index.ts"]
+    }
+  },
+  "include": ["./*.test-d.ts", "./*.test-d.tsx", "../../src/**/*"],
+  "exclude": ["node_modules"],
+  "reactPortEvidence": {
+    "gate": "public-types",
+    "publicMode": "pinned"
+  },
+  "tsrx": {
+    "compiler": "octane/compiler/volar"
+  }
+}

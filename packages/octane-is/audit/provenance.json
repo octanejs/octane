@@ -11,11 +11,11 @@
     },
     {
       "path": "upstream-artifact/package/cjs/react-is.development.js",
-      "sha256": "44314886ebca6d96bdb050470894181ee4d27ab04484153a6918700fdc4f97e3"
+      "sha256": "0bd0ece0db7d059a422b2e3553a30f99e04f7b26cc9ee1b7536387e49261a212"
     },
     {
       "path": "upstream-artifact/package/cjs/react-is.production.js",
-      "sha256": "7e1b24d0e2a3d9ede538feae7a480620f25e3ff0314a9fe1104a01c9373e56f7"
+      "sha256": "9a073bb4a71d6180250b70db22e9120993071cfddd473b1b8d2727182253c79e"
     },
     {
       "path": "upstream-artifact/package/index.js",
@@ -23,11 +23,11 @@
     },
     {
       "path": "upstream-artifact/package/package.json",
-      "sha256": "06b53d3182d60f170c7ada7cc51f3027ec0aee58316d62ef4cec3ba970af0e85"
+      "sha256": "9f8dca775e46a0517608558be0c1b8754c2d808c8d2225caa2f72520b9d55571"
     },
     {
-      "path": "upstream-artifact/react-is-19.2.7.tgz",
-      "sha256": "70e0dac61c6782a508e77c70e0c459f8fbbbed82d5ab341921f2f85f8014f0e0"
+      "path": "upstream-artifact/react-is-19.3.0.tgz",
+      "sha256": "3adffb233a18be2b79c3521cf1b2e26902c0cafc2a1de2d7e9f086afd3a2f7a5"
     },
     {
       "path": "LICENSE.upstream",
@@ -37,7 +37,7 @@
   "packageIdentity": {
     "path": "upstream-artifact/package/package.json",
     "name": "react-is",
-    "version": "19.2.7",
+    "version": "19.3.0",
     "license": "MIT"
   },
   "unpublishedDirs": ["audit", "scripts", "tests", "upstream", "upstream-artifact"],

@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "project": "hook-form-adapted-browser",
+  "roots": ["packages/hook-form/tests"],
+  "files": ["packages/hook-form/tests/upstream-browser-adapted.test.ts"],
+  "tests": [
+    {
+      "id": "runtime:3213a923cc5cfc06",
+      "file": "packages/hook-form/tests/upstream-browser-adapted.test.ts",
+      "fullName": "runs every supported upstream browser registration against Octane"
+    }
+  ]
+}

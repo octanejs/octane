@@ -1,0 +1,605 @@
+{
+  "schemaVersion": 1,
+  "identity": {
+    "packageName": "@tanstack/ai-react",
+    "version": "0.24.1",
+    "repository": {
+      "owner": "TanStack",
+      "repo": "ai",
+      "subdirectory": "packages/ai-react"
+    },
+    "commit": "0ddaa6cb3c2e948a47dbd19d31c0ad874d176a86",
+    "integrity": "sha512-kxxkyunUiacR79HlRpBxOLT/fGKqNP16W/UBOcgM+lqmqaM7TiwqOpHHhwg800opGAEETIFFedUDMyP8ls1Glw=="
+  },
+  "license": {
+    "spdx": "MIT",
+    "evidence": [
+      {
+        "path": "LICENSE",
+        "sha256": "9fe9970f409e5b1d2067c0107ac0201761d5fddc53e9b20b66619fb0d2b4122f"
+      },
+      {
+        "path": "packages/ai-react/LICENSE",
+        "sha256": "9fe9970f409e5b1d2067c0107ac0201761d5fddc53e9b20b66619fb0d2b4122f"
+      }
+    ],
+    "notices": []
+  },
+  "scopes": [],
+  "adaptedMappings": [
+    {
+      "fromRoot": "tests",
+      "toRoot": "tests/upstream"
+    }
+  ],
+  "adaptedRewrites": [
+    {
+      "find": "import { renderToStaticMarkup } from 'react-dom/server'",
+      "replace": "import { renderToStaticMarkup } from '../../server-markup'"
+    },
+    {
+      "find": "@testing-library/react",
+      "replace": "@octanejs/testing-library"
+    },
+    {
+      "find": "react-dom/client",
+      "replace": "octane"
+    },
+    {
+      "find": "react-dom/server",
+      "replace": "octane/server"
+    },
+    {
+      "find": "'react'",
+      "replace": "'octane'"
+    },
+    {
+      "find": "\"react\"",
+      "replace": "\"octane\""
+    },
+    {
+      "find": "../src/",
+      "replace": "../../src/"
+    },
+    {
+      "find": "from '../src'",
+      "replace": "from '../../src'"
+    },
+    {
+      "find": "'@mcp-ui/client'",
+      "replace": "'../../src/mcp-app-renderer.tsrx'"
+    },
+    {
+      "find": "ReactNode",
+      "replace": "OctaneNode"
+    },
+    {
+      "find": "/chat-input'",
+      "replace": "/chat-input.tsrx'"
+    },
+    {
+      "find": "/chat-input\"",
+      "replace": "/chat-input.tsrx\""
+    },
+    {
+      "find": "/chat-message'",
+      "replace": "/chat-message.tsrx'"
+    },
+    {
+      "find": "/chat-message\"",
+      "replace": "/chat-message.tsrx\""
+    },
+    {
+      "find": "/chat-messages'",
+      "replace": "/chat-messages.tsrx'"
+    },
+    {
+      "find": "/chat-messages\"",
+      "replace": "/chat-messages.tsrx\""
+    },
+    {
+      "find": "/chat'",
+      "replace": "/chat.tsrx'"
+    },
+    {
+      "find": "/chat\"",
+      "replace": "/chat.tsrx\""
+    },
+    {
+      "find": "/create-chat-hook'",
+      "replace": "/create-chat-hook.tsrx'"
+    },
+    {
+      "find": "/create-chat-hook\"",
+      "replace": "/create-chat-hook.tsrx\""
+    },
+    {
+      "find": "/create-ui-contexts'",
+      "replace": "/create-ui-contexts.tsrx'"
+    },
+    {
+      "find": "/create-ui-contexts\"",
+      "replace": "/create-ui-contexts.tsrx\""
+    },
+    {
+      "find": "/create-ui'",
+      "replace": "/create-ui.tsrx'"
+    },
+    {
+      "find": "/create-ui\"",
+      "replace": "/create-ui.tsrx\""
+    },
+    {
+      "find": "/text-part'",
+      "replace": "/text-part.tsrx'"
+    },
+    {
+      "find": "/text-part\"",
+      "replace": "/text-part.tsrx\""
+    },
+    {
+      "find": "/thinking-part'",
+      "replace": "/thinking-part.tsrx'"
+    },
+    {
+      "find": "/thinking-part\"",
+      "replace": "/thinking-part.tsrx\""
+    },
+    {
+      "find": "/tool-approval'",
+      "replace": "/tool-approval.tsrx'"
+    },
+    {
+      "find": "/tool-approval\"",
+      "replace": "/tool-approval.tsrx\""
+    },
+    {
+      "find": "/create-chat-hook'",
+      "replace": "/create-chat-hook.tsrx'"
+    },
+    {
+      "find": "/create-chat-hook\"",
+      "replace": "/create-chat-hook.tsrx\""
+    },
+    {
+      "find": "/mcp-app-resource'",
+      "replace": "/mcp-app-resource.tsrx'"
+    },
+    {
+      "find": "/mcp-app-resource\"",
+      "replace": "/mcp-app-resource.tsrx\""
+    },
+    {
+      "find": "/use-audio-recorder'",
+      "replace": "/use-audio-recorder.tsrx'"
+    },
+    {
+      "find": "/use-audio-recorder\"",
+      "replace": "/use-audio-recorder.tsrx\""
+    },
+    {
+      "find": "/use-byok'",
+      "replace": "/use-byok.tsrx'"
+    },
+    {
+      "find": "/use-byok\"",
+      "replace": "/use-byok.tsrx\""
+    },
+    {
+      "find": "/use-chat'",
+      "replace": "/use-chat.tsrx'"
+    },
+    {
+      "find": "/use-chat\"",
+      "replace": "/use-chat.tsrx\""
+    },
+    {
+      "find": "/use-generate-audio'",
+      "replace": "/use-generate-audio.tsrx'"
+    },
+    {
+      "find": "/use-generate-audio\"",
+      "replace": "/use-generate-audio.tsrx\""
+    },
+    {
+      "find": "/use-generate-image'",
+      "replace": "/use-generate-image.tsrx'"
+    },
+    {
+      "find": "/use-generate-image\"",
+      "replace": "/use-generate-image.tsrx\""
+    },
+    {
+      "find": "/use-generate-speech'",
+      "replace": "/use-generate-speech.tsrx'"
+    },
+    {
+      "find": "/use-generate-speech\"",
+      "replace": "/use-generate-speech.tsrx\""
+    },
+    {
+      "find": "/use-generate-video'",
+      "replace": "/use-generate-video.tsrx'"
+    },
+    {
+      "find": "/use-generate-video\"",
+      "replace": "/use-generate-video.tsrx\""
+    },
+    {
+      "find": "/use-generation'",
+      "replace": "/use-generation.tsrx'"
+    },
+    {
+      "find": "/use-generation\"",
+      "replace": "/use-generation.tsrx\""
+    },
+    {
+      "find": "/use-mcp-app-bridge'",
+      "replace": "/use-mcp-app-bridge.tsrx'"
+    },
+    {
+      "find": "/use-mcp-app-bridge\"",
+      "replace": "/use-mcp-app-bridge.tsrx\""
+    },
+    {
+      "find": "/use-realtime-chat'",
+      "replace": "/use-realtime-chat.tsrx'"
+    },
+    {
+      "find": "/use-realtime-chat\"",
+      "replace": "/use-realtime-chat.tsrx\""
+    },
+    {
+      "find": "/use-summarize'",
+      "replace": "/use-summarize.tsrx'"
+    },
+    {
+      "find": "/use-summarize\"",
+      "replace": "/use-summarize.tsrx\""
+    },
+    {
+      "find": "/use-transcription'",
+      "replace": "/use-transcription.tsrx'"
+    },
+    {
+      "find": "/use-transcription\"",
+      "replace": "/use-transcription.tsrx\""
+    },
+    {
+      "find": "/use-web-mcp-tools'",
+      "replace": "/use-web-mcp-tools.tsrx'"
+    },
+    {
+      "find": "/use-web-mcp-tools\"",
+      "replace": "/use-web-mcp-tools.tsrx\""
+    }
+  ],
+  "files": [
+    {
+      "path": "CHANGELOG.md",
+      "gitBlob": "83d0a2bda33eb704e7f51ab1e34e5f04d4e5a4f8",
+      "size": 217848
+    },
+    {
+      "path": "LICENSE",
+      "gitBlob": "308cb68dc0f95fe0ee166458cd1ff54956aa03cd",
+      "size": 1071
+    },
+    {
+      "path": "package.json",
+      "gitBlob": "84cb36f513bb0ce1d6fe86b65a0b1353f8fa17da",
+      "size": 2429
+    },
+    {
+      "path": "README.md",
+      "gitBlob": "ffde43b164f6c9f617f2ab592ed6a3ec42ebdd60",
+      "size": 15984
+    },
+    {
+      "path": "src/chat-ui/chat-input.tsx",
+      "gitBlob": "3811f92de90c0b9e67f20a1e2c032b50825fd401",
+      "size": 4822
+    },
+    {
+      "path": "src/chat-ui/chat-message.tsx",
+      "gitBlob": "41dd1831616dd8ef072acf87f6ba107793f3201c",
+      "size": 7449
+    },
+    {
+      "path": "src/chat-ui/chat-messages.tsx",
+      "gitBlob": "f87ea034dad7216b12ac5a636d532b1acaa8cf81",
+      "size": 2412
+    },
+    {
+      "path": "src/chat-ui/chat.tsx",
+      "gitBlob": "fae617218d80448edb76d71e4e5809ce6fd4e36a",
+      "size": 3001
+    },
+    {
+      "path": "src/chat-ui/create-chat-hook.tsx",
+      "gitBlob": "34027f7f1c63295b761967b950e1d322bcd1fdaf",
+      "size": 3124
+    },
+    {
+      "path": "src/chat-ui/create-ui-contexts.tsx",
+      "gitBlob": "f0fbf8db4d53ddac03c4329f7ea3b9c2b413712a",
+      "size": 1987
+    },
+    {
+      "path": "src/chat-ui/create-ui.tsx",
+      "gitBlob": "bbdc865845a4012d2043f1da0a2941f3fcb75186",
+      "size": 21223
+    },
+    {
+      "path": "src/chat-ui/markdown-plugins.ts",
+      "gitBlob": "1f34f7a9f33ab71e9ce840fb4edbed0429348bb5",
+      "size": 1386
+    },
+    {
+      "path": "src/chat-ui/text-part.tsx",
+      "gitBlob": "6764894d1769ca21be2d061ee3514cd07872d46c",
+      "size": 2854
+    },
+    {
+      "path": "src/chat-ui/thinking-part.tsx",
+      "gitBlob": "4a3caca2c97d0608735c180f258cfd0aff0a7087",
+      "size": 2245
+    },
+    {
+      "path": "src/chat-ui/tool-approval.tsx",
+      "gitBlob": "9ca83921eacf9b56042c2f200fbf38cd3332c2fd",
+      "size": 2934
+    },
+    {
+      "path": "src/chat-ui/tool-result-content.ts",
+      "gitBlob": "8825b51ad9965b9d4a91e2f17bb6de74905f7ce7",
+      "size": 1166
+    },
+    {
+      "path": "src/create-chat-hook.ts",
+      "gitBlob": "f143af1ef11ba806da32ce84795ddab37b65d7b7",
+      "size": 2025
+    },
+    {
+      "path": "src/index.ts",
+      "gitBlob": "a9c1b554760656e4145c327393a2f402e9c50fb2",
+      "size": 3167
+    },
+    {
+      "path": "src/mcp-app-resource.tsx",
+      "gitBlob": "f32f62b3d181dd8e7117155ae2a8b85add2f9091",
+      "size": 3074
+    },
+    {
+      "path": "src/mcp-apps.ts",
+      "gitBlob": "9cf23ca90bbf5a93ecea38b7fc4d6f34a67b3f4b",
+      "size": 443
+    },
+    {
+      "path": "src/realtime-types.ts",
+      "gitBlob": "e581502370d33145c410ac3866cdecb362170578",
+      "size": 3798
+    },
+    {
+      "path": "src/types.ts",
+      "gitBlob": "ffbe704c448fbcc6e87968eb6a67ef4f3bd75b7f",
+      "size": 9516
+    },
+    {
+      "path": "src/ui.ts",
+      "gitBlob": "04b69d23c0ef58e63865208234f4af280a4064f6",
+      "size": 1372
+    },
+    {
+      "path": "src/use-audio-recorder.ts",
+      "gitBlob": "ec6295c65ff1e88820b27383fd7f5941db0ccb18",
+      "size": 4563
+    },
+    {
+      "path": "src/use-byok.ts",
+      "gitBlob": "d5bcf587613554da873a451a1636ccb791d55bf0",
+      "size": 356
+    },
+    {
+      "path": "src/use-chat.ts",
+      "gitBlob": "e5edb97d5066fe103ebf60c53b550a2e39a7a8c5",
+      "size": 21321
+    },
+    {
+      "path": "src/use-generate-audio.ts",
+      "gitBlob": "bf18f7c82aa6f2ba0376b78f5a79b254d18d884a",
+      "size": 6712
+    },
+    {
+      "path": "src/use-generate-image.ts",
+      "gitBlob": "93602c7487a88acd798a4de9c1e6ffc2a4a5273f",
+      "size": 6741
+    },
+    {
+      "path": "src/use-generate-speech.ts",
+      "gitBlob": "799d75e40b8b6eb2da7c779786c71d5b51472b49",
+      "size": 6381
+    },
+    {
+      "path": "src/use-generate-video.ts",
+      "gitBlob": "708281fee2ee647bf2ca1bb096c1d24ad11c8203",
+      "size": 12449
+    },
+    {
+      "path": "src/use-generation.ts",
+      "gitBlob": "8106f4cf905e0eb77adeed001e8e741142b98688",
+      "size": 11954
+    },
+    {
+      "path": "src/use-mcp-app-bridge.ts",
+      "gitBlob": "4d8c2869c561b18c5801edf773072f785c361a02",
+      "size": 2207
+    },
+    {
+      "path": "src/use-realtime-chat.ts",
+      "gitBlob": "bddef502c6e3c851237fbe03975aa9aa0bdcf60f",
+      "size": 8021
+    },
+    {
+      "path": "src/use-summarize.ts",
+      "gitBlob": "c2f57170f161e7fb9e6c80d3c652062bb47a5cb7",
+      "size": 6439
+    },
+    {
+      "path": "src/use-transcription.ts",
+      "gitBlob": "65a527a507e950ec3f6dcc0ed428a277e3fceee5",
+      "size": 6709
+    },
+    {
+      "path": "src/use-web-mcp-tools.ts",
+      "gitBlob": "2c394783a11286bae7c83d1da5291e445b8e6086",
+      "size": 1957
+    },
+    {
+      "path": "tests/chat-ui/coexistence.test.ts",
+      "gitBlob": "bf8d4a50f4bf642de3aca69520de8fc75c41b293",
+      "size": 664
+    },
+    {
+      "path": "tests/chat-ui/create-ui-stability.test.tsx",
+      "gitBlob": "b131460f6bb6c0a4a5ac1b4ee600ab8c25a6348a",
+      "size": 1875
+    },
+    {
+      "path": "tests/chat-ui/create-ui-types.test.tsx",
+      "gitBlob": "d5f127553b02a55e06a99c8e4e22abf295941fc1",
+      "size": 9171
+    },
+    {
+      "path": "tests/chat-ui/create-ui.test.tsx",
+      "gitBlob": "1d0af4422266b20d962161e7ab994a86ea0a45e1",
+      "size": 15316
+    },
+    {
+      "path": "tests/chat-ui/markdown-plugins.test.ts",
+      "gitBlob": "c783a39d68a125042c15d165a3b98e1a1cf21d98",
+      "size": 2541
+    },
+    {
+      "path": "tests/chat-ui/react-dom-server.d.ts",
+      "gitBlob": "df9bff243df4b27caaf617f328185e3f18a64939",
+      "size": 143
+    },
+    {
+      "path": "tests/chat-ui/tool-result-content.test.ts",
+      "gitBlob": "3a142833e03e41f26c6d9886a6b4d0dc49210fdb",
+      "size": 1482
+    },
+    {
+      "path": "tests/create-chat-hook-types.test.ts",
+      "gitBlob": "def6d30c2d39e04a064c34108f474d52b9a687df",
+      "size": 1187
+    },
+    {
+      "path": "tests/create-chat-hook.test.ts",
+      "gitBlob": "6a8462d26872b665f7b3d44ce7ff2d24c0f237df",
+      "size": 1527
+    },
+    {
+      "path": "tests/devtools-name-types.test.ts",
+      "gitBlob": "cb04e7e8cc6c4cce754f4eadd39b536f5e608ff4",
+      "size": 2001
+    },
+    {
+      "path": "tests/mcp-apps.test.tsx",
+      "gitBlob": "0948fca18357fb0e003ed868bb65920cd7a53b1a",
+      "size": 6919
+    },
+    {
+      "path": "tests/setup.ts",
+      "gitBlob": "f763a2ac22aab854f50525f5fd4e12787526da51",
+      "size": 195
+    },
+    {
+      "path": "tests/test-utils.ts",
+      "gitBlob": "eba9ac1ed4ee017d60402de66159866c5ac77c3e",
+      "size": 1652
+    },
+    {
+      "path": "tests/use-audio-recorder.test.tsx",
+      "gitBlob": "d78e9fdef86fbb401bbfe4f535f7195eb2f0957f",
+      "size": 5815
+    },
+    {
+      "path": "tests/use-byok.test.ts",
+      "gitBlob": "53b3d075a86bfb6b146ccda750aeb8f06937083c",
+      "size": 947
+    },
+    {
+      "path": "tests/use-chat-byok.test.ts",
+      "gitBlob": "3aca16f3a0e139fcc130aea4b0dc0c48e6bed5ee",
+      "size": 2869
+    },
+    {
+      "path": "tests/use-chat-fetcher.test.ts",
+      "gitBlob": "f06cb620b9148c5de5bdb21338e57d43d1e13887",
+      "size": 3372
+    },
+    {
+      "path": "tests/use-chat-options-probe.test.ts",
+      "gitBlob": "1f483a4e18ff8c02f28be037d3ede57952846974",
+      "size": 928
+    },
+    {
+      "path": "tests/use-chat-persistence-types.test.ts",
+      "gitBlob": "4f984cbf1de0a031df8281d489a890695c8c5466",
+      "size": 1815
+    },
+    {
+      "path": "tests/use-chat-structured-output.test.ts",
+      "gitBlob": "a503dbb48dcf002d95ac739ef3e06cc812c12273",
+      "size": 19164
+    },
+    {
+      "path": "tests/use-chat-types.test.ts",
+      "gitBlob": "5f603973cc5add272959778276ce8f462a43dc96",
+      "size": 14246
+    },
+    {
+      "path": "tests/use-chat.test.ts",
+      "gitBlob": "3f6d6593f8bafb00377b329e7503d868802d2bc7",
+      "size": 80207
+    },
+    {
+      "path": "tests/use-generation-persistence-types.test.ts",
+      "gitBlob": "43fb17af99c75363ff85ae8d77b3c0ae869d0384",
+      "size": 7196
+    },
+    {
+      "path": "tests/use-generation.test.ts",
+      "gitBlob": "0f4ee075a323d38436846258bd4ec20bed7658a9",
+      "size": 35107
+    },
+    {
+      "path": "tests/use-mcp-app-bridge.test.ts",
+      "gitBlob": "f356418f57afcd04786e78432a623dc03862b9f0",
+      "size": 3411
+    },
+    {
+      "path": "tests/use-web-mcp-tools.test.ts",
+      "gitBlob": "2f121570746e889e19ba96bfd31de90c4fd90af6",
+      "size": 6320
+    },
+    {
+      "path": "tsconfig.json",
+      "gitBlob": "6a1fa110633268e323e412a375ae742ba2acb1ff",
+      "size": 714
+    },
+    {
+      "path": "vite.config.ts",
+      "gitBlob": "0ccd51800efa3d0dd1226db4a38267fcd08ccb21",
+      "size": 838
+    },
+    {
+      "path": "vitest.config.ts",
+      "gitBlob": "0a3174d8fff9e5364a1590089ac0362397c6fc12",
+      "size": 832
+    }
+  ],
+  "fingerprint": "f76208396b51b30fcd15440e6ba330422982ecfe0851a47b8ce772b9623423a3"
+}

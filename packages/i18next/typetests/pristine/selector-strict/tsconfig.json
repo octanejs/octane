@@ -1,0 +1,50 @@
+{
+  "compilerOptions": {
+    "module": "ESNext",
+    "target": "ES2020",
+    "lib": ["ES2020", "dom"],
+    "jsx": "react",
+    "moduleResolution": "bundler",
+    "forceConsistentCasingInFileNames": true,
+    "strict": true,
+    "noEmit": true,
+    "baseUrl": ".",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "paths": {
+      "react-i18next": ["../../../upstream"],
+      "react-i18next/*": ["../../../upstream/*"]
+    }
+  },
+  "include": ["../../../upstream/test/typescript/selector-strict/**/*"],
+  "exclude": [],
+  "reactPortEvidence": {
+    "gate": "upstream-types-pristine",
+    "upstreamMode": "materialized",
+    "upstreamProgram": "selector-strict",
+    "upstreamRegistrations": [
+      "react-case-v1:004a11a3e6876cc64343",
+      "react-case-v1:1434bb92671f8812e22c",
+      "react-case-v1:197b3853abfab1084040",
+      "react-case-v1:255d226b139d821f3d54",
+      "react-case-v1:25bd79e7f75e46e4ccc0",
+      "react-case-v1:5aab2565dd6a9e4827ab",
+      "react-case-v1:718762bad3fcde3db0db",
+      "react-case-v1:7614142f8ec64476337f",
+      "react-case-v1:8954fd91884db99d117d",
+      "react-case-v1:98b9596410c5cf5f7571",
+      "react-case-v1:9aadce9566ed614daa55",
+      "react-case-v1:a8f02a61652ab1e4bb7d",
+      "react-case-v1:baf30b75b6567fb8adec",
+      "react-case-v1:bbf7672981211bc698ee",
+      "react-case-v1:f46dc2bc963d0a04533d",
+      "react-case-v1:f7228a6307a0fcd202ea",
+      "react-case-v1:f8fc31c49e9ab1815930",
+      "react-case-v1:f9b20e5692b7759dc88e",
+      "react-case-v1:fb79d35a544160d240c4",
+      "react-case-v1:fe644a0a6187d89b3a4a",
+      "react-case-v1:ff0439619f61ca7e5fe7"
+    ],
+    "mirrorsUpstreamCompilerOptions": true
+  }
+}

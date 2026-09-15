@@ -1,0 +1,2797 @@
+{
+  "schemaVersion": 1,
+  "project": "mantine-hooks-adapted",
+  "roots": ["packages/mantine-hooks/tests/upstream"],
+  "files": [
+    "packages/mantine-hooks/tests/upstream/use-click-outside/use-click-outside.test.tsx",
+    "packages/mantine-hooks/tests/upstream/use-collapse/use-collapse.test.tsx",
+    "packages/mantine-hooks/tests/upstream/use-color-scheme/use-color-scheme.test.tsx",
+    "packages/mantine-hooks/tests/upstream/use-counter/use-counter.test.ts",
+    "packages/mantine-hooks/tests/upstream/use-debounced-callback/use-debounced-callback.test.ts",
+    "packages/mantine-hooks/tests/upstream/use-debounced-state/use-debounced-state.test.ts",
+    "packages/mantine-hooks/tests/upstream/use-debounced-value/use-debounced-value.test.ts",
+    "packages/mantine-hooks/tests/upstream/use-did-update/use-did-update.test.tsx",
+    "packages/mantine-hooks/tests/upstream/use-disclosure/use-disclosure.test.ts",
+    "packages/mantine-hooks/tests/upstream/use-document-title/use-document-title.test.ts",
+    "packages/mantine-hooks/tests/upstream/use-document-visibility/use-document-visibility.test.ts",
+    "packages/mantine-hooks/tests/upstream/use-drag/use-drag.test.tsx",
+    "packages/mantine-hooks/tests/upstream/use-event-listener/use-event-listener.test.tsx",
+    "packages/mantine-hooks/tests/upstream/use-focus-within/use-focus-within.test.tsx",
+    "packages/mantine-hooks/tests/upstream/use-hash/use-hash.test.ts",
+    "packages/mantine-hooks/tests/upstream/use-headroom/use-headroom.test.ts",
+    "packages/mantine-hooks/tests/upstream/use-hotkeys/parse-hotkey.test.ts",
+    "packages/mantine-hooks/tests/upstream/use-hotkeys/use-hotkeys.test.tsx",
+    "packages/mantine-hooks/tests/upstream/use-hover/use-hover.test.tsx",
+    "packages/mantine-hooks/tests/upstream/use-id/use-id.test.tsx",
+    "packages/mantine-hooks/tests/upstream/use-idle/use-idle.test.tsx",
+    "packages/mantine-hooks/tests/upstream/use-input-state/use-input-state.test.ts",
+    "packages/mantine-hooks/tests/upstream/use-interval/use-interval.test.ts",
+    "packages/mantine-hooks/tests/upstream/use-is-first-render/use-is-first-render.test.ts",
+    "packages/mantine-hooks/tests/upstream/use-list-state/use-list-state.test.ts",
+    "packages/mantine-hooks/tests/upstream/use-local-storage/use-local-storage.test.ts",
+    "packages/mantine-hooks/tests/upstream/use-logger/use-logger.test.ts",
+    "packages/mantine-hooks/tests/upstream/use-long-press/use-long-press.test.tsx",
+    "packages/mantine-hooks/tests/upstream/use-map/use-map.test.ts",
+    "packages/mantine-hooks/tests/upstream/use-mask/use-mask.test.ts",
+    "packages/mantine-hooks/tests/upstream/use-merged-ref/use-merged-ref.test.tsx",
+    "packages/mantine-hooks/tests/upstream/use-mounted/use-mounted.test.ts",
+    "packages/mantine-hooks/tests/upstream/use-mouse/use-mouse.test.tsx",
+    "packages/mantine-hooks/tests/upstream/use-page-leave/use-page-leave.test.ts",
+    "packages/mantine-hooks/tests/upstream/use-pagination/use-pagination.test.ts",
+    "packages/mantine-hooks/tests/upstream/use-previous/use-previous.test.ts",
+    "packages/mantine-hooks/tests/upstream/use-queue/use-queue.test.ts",
+    "packages/mantine-hooks/tests/upstream/use-roving-index/use-roving-index.test.ts",
+    "packages/mantine-hooks/tests/upstream/use-scroll-direction/use-scroll-direction.test.ts",
+    "packages/mantine-hooks/tests/upstream/use-scroll-spy/use-scroll-spy.test.tsx",
+    "packages/mantine-hooks/tests/upstream/use-selection/use-selection.test.ts",
+    "packages/mantine-hooks/tests/upstream/use-session-storage/use-session-storage.test.ts",
+    "packages/mantine-hooks/tests/upstream/use-set-state/use-set-state.test.ts",
+    "packages/mantine-hooks/tests/upstream/use-set/use-set.test.ts",
+    "packages/mantine-hooks/tests/upstream/use-shallow-effect/use-shallow-effect.test.ts",
+    "packages/mantine-hooks/tests/upstream/use-splitter/use-splitter.test.tsx",
+    "packages/mantine-hooks/tests/upstream/use-state-history/use-state-history.test.ts",
+    "packages/mantine-hooks/tests/upstream/use-text-selection/use-text-selection.test.ts",
+    "packages/mantine-hooks/tests/upstream/use-throttled-callback/use-throttled-callback.test.ts",
+    "packages/mantine-hooks/tests/upstream/use-throttled-state/use-throttled-state.test.ts",
+    "packages/mantine-hooks/tests/upstream/use-throttled-value/use-throttled-value.test.ts",
+    "packages/mantine-hooks/tests/upstream/use-timeout/use-timeout.test.ts",
+    "packages/mantine-hooks/tests/upstream/use-toggle/use-toggle.test.ts",
+    "packages/mantine-hooks/tests/upstream/use-uncontrolled/use-uncontrolled.test.ts",
+    "packages/mantine-hooks/tests/upstream/use-validated-state/use-validated-state.test.ts",
+    "packages/mantine-hooks/tests/upstream/use-viewport-size/use-viewport-size.test.ts",
+    "packages/mantine-hooks/tests/upstream/use-window-event/use-window-event.test.ts",
+    "packages/mantine-hooks/tests/upstream/utils/clamp/clamp.test.ts",
+    "packages/mantine-hooks/tests/upstream/utils/lower-first/lower-first.test.ts",
+    "packages/mantine-hooks/tests/upstream/utils/random-id/random-id.test.ts",
+    "packages/mantine-hooks/tests/upstream/utils/range/range.test.ts",
+    "packages/mantine-hooks/tests/upstream/utils/shallow-equal/shallow-equal.test.ts",
+    "packages/mantine-hooks/tests/upstream/utils/upper-first/upper-first.test.ts"
+  ],
+  "tests": [
+    {
+      "id": "runtime:mantine-hooks-adapted-000",
+      "file": "packages/mantine-hooks/tests/upstream/use-click-outside/use-click-outside.test.tsx",
+      "fullName": "@mantine/hooks/use-click-outside calls `handler` function when clicked outside target (no `events` given)"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-001",
+      "file": "packages/mantine-hooks/tests/upstream/use-click-outside/use-click-outside.test.tsx",
+      "fullName": "@mantine/hooks/use-click-outside calls `handler` only on given `events`"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-002",
+      "file": "packages/mantine-hooks/tests/upstream/use-click-outside/use-click-outside.test.tsx",
+      "fullName": "@mantine/hooks/use-click-outside ignores clicks outside the given `nodes`"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-003",
+      "file": "packages/mantine-hooks/tests/upstream/use-click-outside/use-click-outside.test.tsx",
+      "fullName": "@mantine/hooks/use-click-outside calls the latest handler after rerender (no stale closure)"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-004",
+      "file": "packages/mantine-hooks/tests/upstream/use-click-outside/use-click-outside.test.tsx",
+      "fullName": "@mantine/hooks/use-click-outside does not re-register listeners when handler identity changes"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-005",
+      "file": "packages/mantine-hooks/tests/upstream/use-click-outside/use-click-outside.test.tsx",
+      "fullName": "@mantine/hooks/use-click-outside does not call handler when enabled is false"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-006",
+      "file": "packages/mantine-hooks/tests/upstream/use-click-outside/use-click-outside.test.tsx",
+      "fullName": "@mantine/hooks/use-click-outside starts calling handler when enabled changes from false to true"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-007",
+      "file": "packages/mantine-hooks/tests/upstream/use-click-outside/use-click-outside.test.tsx",
+      "fullName": "@mantine/hooks/use-click-outside stops calling handler when enabled changes from true to false"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-008",
+      "file": "packages/mantine-hooks/tests/upstream/use-click-outside/use-click-outside.test.tsx",
+      "fullName": "@mantine/hooks/use-click-outside propagates event to handler"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-009",
+      "file": "packages/mantine-hooks/tests/upstream/use-collapse/use-collapse.test.tsx",
+      "fullName": "@mantine/hooks/use-collapse starts in entered state when expanded=true"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-010",
+      "file": "packages/mantine-hooks/tests/upstream/use-collapse/use-collapse.test.tsx",
+      "fullName": "@mantine/hooks/use-collapse starts in exited state when expanded=false"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-011",
+      "file": "packages/mantine-hooks/tests/upstream/use-collapse/use-collapse.test.tsx",
+      "fullName": "@mantine/hooks/use-collapse calls onTransitionStart when expanded changes"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-012",
+      "file": "packages/mantine-hooks/tests/upstream/use-collapse/use-collapse.test.tsx",
+      "fullName": "@mantine/hooks/use-collapse does not call onTransitionStart when only its identity changes (no stale re-run)"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-013",
+      "file": "packages/mantine-hooks/tests/upstream/use-collapse/use-collapse.test.tsx",
+      "fullName": "@mantine/hooks/use-collapse calls the latest onTransitionStart after callback identity changes"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-014",
+      "file": "packages/mantine-hooks/tests/upstream/use-collapse/use-collapse.test.tsx",
+      "fullName": "@mantine/hooks/use-collapse settles in `entered` state when expanding an element that cannot be measured"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-015",
+      "file": "packages/mantine-hooks/tests/upstream/use-collapse/use-collapse.test.tsx",
+      "fullName": "@mantine/hooks/use-collapse settles in `exited` state when collapsing an element that cannot be measured"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-016",
+      "file": "packages/mantine-hooks/tests/upstream/use-collapse/use-collapse.test.tsx",
+      "fullName": "@mantine/hooks/use-collapse ignores frames from a transition that was superseded before it settled"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-017",
+      "file": "packages/mantine-hooks/tests/upstream/use-collapse/use-collapse.test.tsx",
+      "fullName": "@mantine/hooks/use-collapse does not call onTransitionEnd for a transition aborted by unmount"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-018",
+      "file": "packages/mantine-hooks/tests/upstream/use-color-scheme/use-color-scheme.test.tsx",
+      "fullName": "@mantine/hooks/use-color-scheme correctly returns initial dark state without useEffect"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-019",
+      "file": "packages/mantine-hooks/tests/upstream/use-color-scheme/use-color-scheme.test.tsx",
+      "fullName": "@mantine/hooks/use-color-scheme correctly returns initial light state with useEffect"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-020",
+      "file": "packages/mantine-hooks/tests/upstream/use-color-scheme/use-color-scheme.test.tsx",
+      "fullName": "@mantine/hooks/use-color-scheme correctly returns initial dark state with useEffect"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-021",
+      "file": "packages/mantine-hooks/tests/upstream/use-color-scheme/use-color-scheme.test.tsx",
+      "fullName": "@mantine/hooks/use-color-scheme correctly returns initial light state with default props"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-022",
+      "file": "packages/mantine-hooks/tests/upstream/use-color-scheme/use-color-scheme.test.tsx",
+      "fullName": "@mantine/hooks/use-color-scheme correctly returns initial dark state with default props"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-023",
+      "file": "packages/mantine-hooks/tests/upstream/use-counter/use-counter.test.ts",
+      "fullName": "@mantine/hooks/use-counter correctly returns initial state"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-024",
+      "file": "packages/mantine-hooks/tests/upstream/use-counter/use-counter.test.ts",
+      "fullName": "@mantine/hooks/use-counter correctly performs operations without initialValue or options"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-025",
+      "file": "packages/mantine-hooks/tests/upstream/use-counter/use-counter.test.ts",
+      "fullName": "@mantine/hooks/use-counter correctly increments and decrements by custom step"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-026",
+      "file": "packages/mantine-hooks/tests/upstream/use-counter/use-counter.test.ts",
+      "fullName": "@mantine/hooks/use-counter clamps step increment/decrement to min/max"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-027",
+      "file": "packages/mantine-hooks/tests/upstream/use-counter/use-counter.test.ts",
+      "fullName": "@mantine/hooks/use-counter correctly performs operations with initialValue and options"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-028",
+      "file": "packages/mantine-hooks/tests/upstream/use-debounced-callback/use-debounced-callback.test.ts",
+      "fullName": "@mantine/hooks/use-debounced-callback debounces callback with given delay"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-029",
+      "file": "packages/mantine-hooks/tests/upstream/use-debounced-callback/use-debounced-callback.test.ts",
+      "fullName": "@mantine/hooks/use-debounced-callback calls callback with correct arguments"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-030",
+      "file": "packages/mantine-hooks/tests/upstream/use-debounced-callback/use-debounced-callback.test.ts",
+      "fullName": "@mantine/hooks/use-debounced-callback can be flushed immediately"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-031",
+      "file": "packages/mantine-hooks/tests/upstream/use-debounced-callback/use-debounced-callback.test.ts",
+      "fullName": "@mantine/hooks/use-debounced-callback can be flushed immediately after rerender"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-032",
+      "file": "packages/mantine-hooks/tests/upstream/use-debounced-callback/use-debounced-callback.test.ts",
+      "fullName": "@mantine/hooks/use-debounced-callback does not flush twice"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-033",
+      "file": "packages/mantine-hooks/tests/upstream/use-debounced-callback/use-debounced-callback.test.ts",
+      "fullName": "@mantine/hooks/use-debounced-callback does not flush after being called if not called since"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-034",
+      "file": "packages/mantine-hooks/tests/upstream/use-debounced-callback/use-debounced-callback.test.ts",
+      "fullName": "@mantine/hooks/use-debounced-callback does not still call after flush if not called since"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-035",
+      "file": "packages/mantine-hooks/tests/upstream/use-debounced-callback/use-debounced-callback.test.ts",
+      "fullName": "@mantine/hooks/use-debounced-callback can flush on unmount"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-036",
+      "file": "packages/mantine-hooks/tests/upstream/use-debounced-callback/use-debounced-callback.test.ts",
+      "fullName": "@mantine/hooks/use-debounced-callback flushes on option changes"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-037",
+      "file": "packages/mantine-hooks/tests/upstream/use-debounced-callback/use-debounced-callback.test.ts",
+      "fullName": "@mantine/hooks/use-debounced-callback cancels on option changes"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-038",
+      "file": "packages/mantine-hooks/tests/upstream/use-debounced-callback/use-debounced-callback.test.ts",
+      "fullName": "@mantine/hooks/use-debounced-callback can flush on unmount after rerender"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-039",
+      "file": "packages/mantine-hooks/tests/upstream/use-debounced-callback/use-debounced-callback.test.ts",
+      "fullName": "@mantine/hooks/use-debounced-callback does not call after unmount if timer lapsed"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-040",
+      "file": "packages/mantine-hooks/tests/upstream/use-debounced-callback/use-debounced-callback.test.ts",
+      "fullName": "@mantine/hooks/use-debounced-callback does not call on unmount if never called"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-041",
+      "file": "packages/mantine-hooks/tests/upstream/use-debounced-callback/use-debounced-callback.test.ts",
+      "fullName": "@mantine/hooks/use-debounced-callback does not call on unmount if already called and not called since"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-042",
+      "file": "packages/mantine-hooks/tests/upstream/use-debounced-callback/use-debounced-callback.test.ts",
+      "fullName": "@mantine/hooks/use-debounced-callback debounces callback with leading=true"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-043",
+      "file": "packages/mantine-hooks/tests/upstream/use-debounced-callback/use-debounced-callback.test.ts",
+      "fullName": "@mantine/hooks/use-debounced-callback resets leading after delay with leading=true"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-044",
+      "file": "packages/mantine-hooks/tests/upstream/use-debounced-callback/use-debounced-callback.test.ts",
+      "fullName": "@mantine/hooks/use-debounced-callback does not call on leading edge if leading changes from true to false"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-045",
+      "file": "packages/mantine-hooks/tests/upstream/use-debounced-callback/use-debounced-callback.test.ts",
+      "fullName": "@mantine/hooks/use-debounced-callback does call again on leading edge if options change and it was already called before the change"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-046",
+      "file": "packages/mantine-hooks/tests/upstream/use-debounced-callback/use-debounced-callback.test.ts",
+      "fullName": "@mantine/hooks/use-debounced-callback can cancel debounced callback"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-047",
+      "file": "packages/mantine-hooks/tests/upstream/use-debounced-callback/use-debounced-callback.test.ts",
+      "fullName": "@mantine/hooks/use-debounced-callback can cancel after second render"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-048",
+      "file": "packages/mantine-hooks/tests/upstream/use-debounced-callback/use-debounced-callback.test.ts",
+      "fullName": "@mantine/hooks/use-debounced-callback can cancel multiple times without error"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-049",
+      "file": "packages/mantine-hooks/tests/upstream/use-debounced-callback/use-debounced-callback.test.ts",
+      "fullName": "@mantine/hooks/use-debounced-callback can cancel and then call again"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-050",
+      "file": "packages/mantine-hooks/tests/upstream/use-debounced-callback/use-debounced-callback.test.ts",
+      "fullName": "@mantine/hooks/use-debounced-callback cancel does not affect already executed callback"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-051",
+      "file": "packages/mantine-hooks/tests/upstream/use-debounced-callback/use-debounced-callback.test.ts",
+      "fullName": "@mantine/hooks/use-debounced-callback cancel resets leading flag for leading=true"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-052",
+      "file": "packages/mantine-hooks/tests/upstream/use-debounced-callback/use-debounced-callback.test.ts",
+      "fullName": "@mantine/hooks/use-debounced-callback cancel prevents flush from working after cancel"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-053",
+      "file": "packages/mantine-hooks/tests/upstream/use-debounced-callback/use-debounced-callback.test.ts",
+      "fullName": "@mantine/hooks/use-debounced-callback flush works after cancel if new call is made"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-054",
+      "file": "packages/mantine-hooks/tests/upstream/use-debounced-callback/use-debounced-callback.test.ts",
+      "fullName": "@mantine/hooks/use-debounced-callback isPending returns true when a call is pending"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-055",
+      "file": "packages/mantine-hooks/tests/upstream/use-debounced-callback/use-debounced-callback.test.ts",
+      "fullName": "@mantine/hooks/use-debounced-callback isPending returns false after cancel"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-056",
+      "file": "packages/mantine-hooks/tests/upstream/use-debounced-callback/use-debounced-callback.test.ts",
+      "fullName": "@mantine/hooks/use-debounced-callback isPending returns false after leading-edge call"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-057",
+      "file": "packages/mantine-hooks/tests/upstream/use-debounced-callback/use-debounced-callback.test.ts",
+      "fullName": "@mantine/hooks/use-debounced-callback isPending returns true for subsequent calls in leading mode"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-058",
+      "file": "packages/mantine-hooks/tests/upstream/use-debounced-callback/use-debounced-callback.test.ts",
+      "fullName": "@mantine/hooks/use-debounced-callback isPending returns false after flush"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-059",
+      "file": "packages/mantine-hooks/tests/upstream/use-debounced-callback/use-debounced-callback.test.ts",
+      "fullName": "@mantine/hooks/use-debounced-callback maxWait fires callback after max wait time during continuous calls"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-060",
+      "file": "packages/mantine-hooks/tests/upstream/use-debounced-callback/use-debounced-callback.test.ts",
+      "fullName": "@mantine/hooks/use-debounced-callback maxWait does not fire if delay fires first"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-061",
+      "file": "packages/mantine-hooks/tests/upstream/use-debounced-callback/use-debounced-callback.test.ts",
+      "fullName": "@mantine/hooks/use-debounced-callback maxWait is cleared by cancel"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-062",
+      "file": "packages/mantine-hooks/tests/upstream/use-debounced-callback/use-debounced-callback.test.ts",
+      "fullName": "@mantine/hooks/use-debounced-callback maxWait with leading fires trailing after maxWait during continuous calls"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-063",
+      "file": "packages/mantine-hooks/tests/upstream/use-debounced-callback/use-debounced-callback.test.ts",
+      "fullName": "@mantine/hooks/use-debounced-callback leading=true should suppress trailing execution"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-064",
+      "file": "packages/mantine-hooks/tests/upstream/use-debounced-state/use-debounced-state.test.ts",
+      "fullName": "use-debounced-state should run without errors"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-065",
+      "file": "packages/mantine-hooks/tests/upstream/use-debounced-state/use-debounced-state.test.ts",
+      "fullName": "use-debounced-state should debounce value with leading=false"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-066",
+      "file": "packages/mantine-hooks/tests/upstream/use-debounced-state/use-debounced-state.test.ts",
+      "fullName": "use-debounced-state should debounce value with leading=true"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-067",
+      "file": "packages/mantine-hooks/tests/upstream/use-debounced-value/use-debounced-value.test.ts",
+      "fullName": "useDebouncedValue returns initial value immediately"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-068",
+      "file": "packages/mantine-hooks/tests/upstream/use-debounced-value/use-debounced-value.test.ts",
+      "fullName": "useDebouncedValue debounces value updates by wait MS"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-069",
+      "file": "packages/mantine-hooks/tests/upstream/use-debounced-value/use-debounced-value.test.ts",
+      "fullName": "useDebouncedValue only applies the last value when updated rapidly"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-070",
+      "file": "packages/mantine-hooks/tests/upstream/use-debounced-value/use-debounced-value.test.ts",
+      "fullName": "useDebouncedValue cancel prevents the pending update"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-071",
+      "file": "packages/mantine-hooks/tests/upstream/use-debounced-value/use-debounced-value.test.ts",
+      "fullName": "useDebouncedValue with the `leading` option the first rerender updates the value immediately"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-072",
+      "file": "packages/mantine-hooks/tests/upstream/use-debounced-value/use-debounced-value.test.ts",
+      "fullName": "useDebouncedValue with the `leading` option subsequent rapid updates are suppressed until the cooldown has elapsed"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-073",
+      "file": "packages/mantine-hooks/tests/upstream/use-debounced-value/use-debounced-value.test.ts",
+      "fullName": "useDebouncedValue with the `leading` option a burst of updates emits only the leading and the final value"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-074",
+      "file": "packages/mantine-hooks/tests/upstream/use-debounced-value/use-debounced-value.test.ts",
+      "fullName": "useDebouncedValue with the `leading` option does not emit a stale value after the burst has settled"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-075",
+      "file": "packages/mantine-hooks/tests/upstream/use-debounced-value/use-debounced-value.test.ts",
+      "fullName": "useDebouncedValue with the `leading` option the cooldown is reset after `wait` milliseconds"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-076",
+      "file": "packages/mantine-hooks/tests/upstream/use-did-update/use-did-update.test.tsx",
+      "fullName": "@mantine/hooks/use-did-update calls `fn` on `dependencies` change"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-077",
+      "file": "packages/mantine-hooks/tests/upstream/use-did-update/use-did-update.test.tsx",
+      "fullName": "@mantine/hooks/use-did-update does not call `fn` on the initial mount"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-078",
+      "file": "packages/mantine-hooks/tests/upstream/use-did-update/use-did-update.test.tsx",
+      "fullName": "@mantine/hooks/use-did-update calls cleanup returned by `fn` before the next run"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-079",
+      "file": "packages/mantine-hooks/tests/upstream/use-did-update/use-did-update.test.tsx",
+      "fullName": "@mantine/hooks/use-did-update fires on every rerender when no dependency array is provided"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-080",
+      "file": "packages/mantine-hooks/tests/upstream/use-did-update/use-did-update.test.tsx",
+      "fullName": "@mantine/hooks/use-did-update calls `fn` for a `dependencies` change that happened while hidden by `Activity`"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-081",
+      "file": "packages/mantine-hooks/tests/upstream/use-did-update/use-did-update.test.tsx",
+      "fullName": "@mantine/hooks/use-did-update does not call `fn` when `Activity` is revealed without a `dependencies` change"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-082",
+      "file": "packages/mantine-hooks/tests/upstream/use-did-update/use-did-update.test.tsx",
+      "fullName": "@mantine/hooks/use-did-update does not call `fn` without a dependency array when the effect is recreated without a rerender"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-083",
+      "file": "packages/mantine-hooks/tests/upstream/use-disclosure/use-disclosure.test.ts",
+      "fullName": "@mantine/hooks/use-disclosure handles close correctly"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-084",
+      "file": "packages/mantine-hooks/tests/upstream/use-disclosure/use-disclosure.test.ts",
+      "fullName": "@mantine/hooks/use-disclosure handles open correctly"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-085",
+      "file": "packages/mantine-hooks/tests/upstream/use-disclosure/use-disclosure.test.ts",
+      "fullName": "@mantine/hooks/use-disclosure handles toggle correctly"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-086",
+      "file": "packages/mantine-hooks/tests/upstream/use-disclosure/use-disclosure.test.ts",
+      "fullName": "@mantine/hooks/use-disclosure calls onClose when close is called"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-087",
+      "file": "packages/mantine-hooks/tests/upstream/use-disclosure/use-disclosure.test.ts",
+      "fullName": "@mantine/hooks/use-disclosure calls onOpen when open is called"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-088",
+      "file": "packages/mantine-hooks/tests/upstream/use-disclosure/use-disclosure.test.ts",
+      "fullName": "@mantine/hooks/use-disclosure calls onOpen and onClose correctly when toggle is called"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-089",
+      "file": "packages/mantine-hooks/tests/upstream/use-document-title/use-document-title.test.ts",
+      "fullName": "@mantine/hooks/use-document-title sets given value as document.title"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-090",
+      "file": "packages/mantine-hooks/tests/upstream/use-document-title/use-document-title.test.ts",
+      "fullName": "@mantine/hooks/use-document-title does not change document.title if called with empty string"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-091",
+      "file": "packages/mantine-hooks/tests/upstream/use-document-title/use-document-title.test.ts",
+      "fullName": "@mantine/hooks/use-document-title trims value before setting to document.title"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-092",
+      "file": "packages/mantine-hooks/tests/upstream/use-document-visibility/use-document-visibility.test.ts",
+      "fullName": "@mantine/hooks/use-document-visibility returns visible as the initial state"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-093",
+      "file": "packages/mantine-hooks/tests/upstream/use-document-visibility/use-document-visibility.test.ts",
+      "fullName": "@mantine/hooks/use-document-visibility updates to hidden when visibilitychange fires"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-094",
+      "file": "packages/mantine-hooks/tests/upstream/use-document-visibility/use-document-visibility.test.ts",
+      "fullName": "@mantine/hooks/use-document-visibility updates back to visible on subsequent visibilitychange"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-095",
+      "file": "packages/mantine-hooks/tests/upstream/use-document-visibility/use-document-visibility.test.ts",
+      "fullName": "@mantine/hooks/use-document-visibility removes the listener on unmount"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-096",
+      "file": "packages/mantine-hooks/tests/upstream/use-drag/use-drag.test.tsx",
+      "fullName": "useDrag basic lifecycle fires handler with first: true on pointerdown when threshold is 0"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-097",
+      "file": "packages/mantine-hooks/tests/upstream/use-drag/use-drag.test.tsx",
+      "fullName": "useDrag basic lifecycle fires handler on pointermove with correct movement and delta"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-098",
+      "file": "packages/mantine-hooks/tests/upstream/use-drag/use-drag.test.tsx",
+      "fullName": "useDrag basic lifecycle fires handler with last: true on pointerup"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-099",
+      "file": "packages/mantine-hooks/tests/upstream/use-drag/use-drag.test.tsx",
+      "fullName": "useDrag basic lifecycle sets active state during drag and resets on release"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-100",
+      "file": "packages/mantine-hooks/tests/upstream/use-drag/use-drag.test.tsx",
+      "fullName": "useDrag basic lifecycle sets user-select: none on body during drag"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-101",
+      "file": "packages/mantine-hooks/tests/upstream/use-drag/use-drag.test.tsx",
+      "fullName": "useDrag multiple sequential drags handles two separate drag gestures correctly"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-102",
+      "file": "packages/mantine-hooks/tests/upstream/use-drag/use-drag.test.tsx",
+      "fullName": "useDrag delta accumulation across moves computes delta relative to previous move, not start"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-103",
+      "file": "packages/mantine-hooks/tests/upstream/use-drag/use-drag.test.tsx",
+      "fullName": "useDrag direction reports negative direction for leftward movement"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-104",
+      "file": "packages/mantine-hooks/tests/upstream/use-drag/use-drag.test.tsx",
+      "fullName": "useDrag threshold does not fire handler until threshold is exceeded"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-105",
+      "file": "packages/mantine-hooks/tests/upstream/use-drag/use-drag.test.tsx",
+      "fullName": "useDrag threshold does not set active state before threshold is met"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-106",
+      "file": "packages/mantine-hooks/tests/upstream/use-drag/use-drag.test.tsx",
+      "fullName": "useDrag threshold accepts [x, y] tuple threshold"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-107",
+      "file": "packages/mantine-hooks/tests/upstream/use-drag/use-drag.test.tsx",
+      "fullName": "useDrag filterTaps reports tap: true when released with no movement and filterTaps is enabled"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-108",
+      "file": "packages/mantine-hooks/tests/upstream/use-drag/use-drag.test.tsx",
+      "fullName": "useDrag filterTaps reports tap: false when pre-threshold movement exceeds tapThreshold"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-109",
+      "file": "packages/mantine-hooks/tests/upstream/use-drag/use-drag.test.tsx",
+      "fullName": "useDrag filterTaps does not fire handler on pre-threshold release when filterTaps is disabled"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-110",
+      "file": "packages/mantine-hooks/tests/upstream/use-drag/use-drag.test.tsx",
+      "fullName": "useDrag axis constraint constrains movement to x axis"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-111",
+      "file": "packages/mantine-hooks/tests/upstream/use-drag/use-drag.test.tsx",
+      "fullName": "useDrag axis constraint constrains movement to y axis"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-112",
+      "file": "packages/mantine-hooks/tests/upstream/use-drag/use-drag.test.tsx",
+      "fullName": "useDrag axis constraint locks to dominant axis after axisThreshold"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-113",
+      "file": "packages/mantine-hooks/tests/upstream/use-drag/use-drag.test.tsx",
+      "fullName": "useDrag axis constraint locks to y when vertical movement dominates"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-114",
+      "file": "packages/mantine-hooks/tests/upstream/use-drag/use-drag.test.tsx",
+      "fullName": "useDrag pointer filtering ignores non-primary button"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-115",
+      "file": "packages/mantine-hooks/tests/upstream/use-drag/use-drag.test.tsx",
+      "fullName": "useDrag pointer filtering ignores pointermove from a different pointerId"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-116",
+      "file": "packages/mantine-hooks/tests/upstream/use-drag/use-drag.test.tsx",
+      "fullName": "useDrag pointer filtering ignores second pointerdown while drag is active"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-117",
+      "file": "packages/mantine-hooks/tests/upstream/use-drag/use-drag.test.tsx",
+      "fullName": "useDrag pointercancel fires handler with canceled: true and last: true"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-118",
+      "file": "packages/mantine-hooks/tests/upstream/use-drag/use-drag.test.tsx",
+      "fullName": "useDrag pointercancel resets active state after cancel"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-119",
+      "file": "packages/mantine-hooks/tests/upstream/use-drag/use-drag.test.tsx",
+      "fullName": "useDrag enabled option does not start drag when enabled is false"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-120",
+      "file": "packages/mantine-hooks/tests/upstream/use-drag/use-drag.test.tsx",
+      "fullName": "useDrag velocity computes velocity as absolute delta / time"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-121",
+      "file": "packages/mantine-hooks/tests/upstream/use-drag/use-drag.test.tsx",
+      "fullName": "useDrag cleanup on unmount does not fire handler after unmount"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-122",
+      "file": "packages/mantine-hooks/tests/upstream/use-drag/use-drag.test.tsx",
+      "fullName": "useDrag cleanup on unmount restores body user-select on unmount during active drag"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-123",
+      "file": "packages/mantine-hooks/tests/upstream/use-drag/use-drag.test.tsx",
+      "fullName": "useDrag cancel function cancel() in handler stops the gesture and resets state"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-124",
+      "file": "packages/mantine-hooks/tests/upstream/use-event-listener/use-event-listener.test.tsx",
+      "fullName": "@mantine/hooks/use-event-listener calls given function when event is fired"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-125",
+      "file": "packages/mantine-hooks/tests/upstream/use-event-listener/use-event-listener.test.tsx",
+      "fullName": "@mantine/hooks/use-event-listener removes the listener on unmount"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-126",
+      "file": "packages/mantine-hooks/tests/upstream/use-event-listener/use-event-listener.test.tsx",
+      "fullName": "@mantine/hooks/use-event-listener removes listener from the previous node when ref moves to a new node"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-127",
+      "file": "packages/mantine-hooks/tests/upstream/use-focus-within/use-focus-within.test.tsx",
+      "fullName": "@mantine/hooks/use-focus-within changes `focused` on focusin/focusout correctly"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-128",
+      "file": "packages/mantine-hooks/tests/upstream/use-focus-within/use-focus-within.test.tsx",
+      "fullName": "@mantine/hooks/use-focus-within calls onFocus and onBlur callbacks with latest state (issue #8507)"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-129",
+      "file": "packages/mantine-hooks/tests/upstream/use-hash/use-hash.test.ts",
+      "fullName": "@mantine/hooks/use-hash returns empty string initially when hash is not set (getInitialValueInEffect: true)"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-130",
+      "file": "packages/mantine-hooks/tests/upstream/use-hash/use-hash.test.ts",
+      "fullName": "@mantine/hooks/use-hash reads window.location.hash synchronously when getInitialValueInEffect is false"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-131",
+      "file": "packages/mantine-hooks/tests/upstream/use-hash/use-hash.test.ts",
+      "fullName": "@mantine/hooks/use-hash setter updates state and writes to window.location.hash"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-132",
+      "file": "packages/mantine-hooks/tests/upstream/use-hash/use-hash.test.ts",
+      "fullName": "@mantine/hooks/use-hash setter prepends # when not already present"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-133",
+      "file": "packages/mantine-hooks/tests/upstream/use-hash/use-hash.test.ts",
+      "fullName": "@mantine/hooks/use-hash setter does not double-prepend # when already present"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-134",
+      "file": "packages/mantine-hooks/tests/upstream/use-hash/use-hash.test.ts",
+      "fullName": "@mantine/hooks/use-hash reacts to external hashchange events"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-135",
+      "file": "packages/mantine-hooks/tests/upstream/use-headroom/use-headroom.test.ts",
+      "fullName": "@mantine/hooks/use-headroom isFixed returns true when position is within the fixed zone"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-136",
+      "file": "packages/mantine-hooks/tests/upstream/use-headroom/use-headroom.test.ts",
+      "fullName": "@mantine/hooks/use-headroom isFixed returns false when position exceeds fixedAt"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-137",
+      "file": "packages/mantine-hooks/tests/upstream/use-headroom/use-headroom.test.ts",
+      "fullName": "@mantine/hooks/use-headroom isPinned returns true when current position is at or above previous"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-138",
+      "file": "packages/mantine-hooks/tests/upstream/use-headroom/use-headroom.test.ts",
+      "fullName": "@mantine/hooks/use-headroom isPinned returns false when current position is below previous"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-139",
+      "file": "packages/mantine-hooks/tests/upstream/use-headroom/use-headroom.test.ts",
+      "fullName": "@mantine/hooks/use-headroom isReleased returns true when scrolled down and not in fixed position"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-140",
+      "file": "packages/mantine-hooks/tests/upstream/use-headroom/use-headroom.test.ts",
+      "fullName": "@mantine/hooks/use-headroom isReleased returns false when scrolled up (pinned)"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-141",
+      "file": "packages/mantine-hooks/tests/upstream/use-headroom/use-headroom.test.ts",
+      "fullName": "@mantine/hooks/use-headroom isReleased returns false when in the fixed zone"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-142",
+      "file": "packages/mantine-hooks/tests/upstream/use-headroom/use-headroom.test.ts",
+      "fullName": "@mantine/hooks/use-headroom isPinnedOrReleased calls onPin when entering the fixed zone and not already pinned"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-143",
+      "file": "packages/mantine-hooks/tests/upstream/use-headroom/use-headroom.test.ts",
+      "fullName": "@mantine/hooks/use-headroom isPinnedOrReleased calls onPin when scrolling up outside the fixed zone and not already pinned"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-144",
+      "file": "packages/mantine-hooks/tests/upstream/use-headroom/use-headroom.test.ts",
+      "fullName": "@mantine/hooks/use-headroom isPinnedOrReleased calls onRelease when scrolling down and was previously pinned"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-145",
+      "file": "packages/mantine-hooks/tests/upstream/use-headroom/use-headroom.test.ts",
+      "fullName": "@mantine/hooks/use-headroom isPinnedOrReleased does not call onPin when already pinned"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-146",
+      "file": "packages/mantine-hooks/tests/upstream/use-headroom/use-headroom.test.ts",
+      "fullName": "@mantine/hooks/use-headroom isPinnedOrReleased does not call onRelease when not pinned"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-147",
+      "file": "packages/mantine-hooks/tests/upstream/use-headroom/use-headroom.test.ts",
+      "fullName": "@mantine/hooks/use-headroom isPinnedOrReleased does not call onRelease when scrolling up and pinned (rapid-toggle regression)"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-148",
+      "file": "packages/mantine-hooks/tests/upstream/use-headroom/use-headroom.test.ts",
+      "fullName": "@mantine/hooks/use-headroom useHeadroom / scrollProgress starts fully visible at the top of the page"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-149",
+      "file": "packages/mantine-hooks/tests/upstream/use-headroom/use-headroom.test.ts",
+      "fullName": "@mantine/hooks/use-headroom useHeadroom / scrollProgress stays fully visible while inside the fixed zone"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-150",
+      "file": "packages/mantine-hooks/tests/upstream/use-headroom/use-headroom.test.ts",
+      "fullName": "@mantine/hooks/use-headroom useHeadroom / scrollProgress gradually hides as the page scrolls past fixedAt"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-151",
+      "file": "packages/mantine-hooks/tests/upstream/use-headroom/use-headroom.test.ts",
+      "fullName": "@mantine/hooks/use-headroom useHeadroom / scrollProgress reaches fully hidden after scrollDistance pixels past fixedAt"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-152",
+      "file": "packages/mantine-hooks/tests/upstream/use-headroom/use-headroom.test.ts",
+      "fullName": "@mantine/hooks/use-headroom useHeadroom / scrollProgress gradually reveals as the page scrolls back up"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-153",
+      "file": "packages/mantine-hooks/tests/upstream/use-headroom/use-headroom.test.ts",
+      "fullName": "@mantine/hooks/use-headroom useHeadroom / scrollProgress returns to fully visible when scrolling back into the fixed zone"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-154",
+      "file": "packages/mantine-hooks/tests/upstream/use-headroom/use-headroom.test.ts",
+      "fullName": "@mantine/hooks/use-headroom useHeadroom / scrollProgress continues from the saved progress when reversing direction mid-scroll"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-155",
+      "file": "packages/mantine-hooks/tests/upstream/use-headroom/use-headroom.test.ts",
+      "fullName": "@mantine/hooks/use-headroom useHeadroom / scrollProgress clamps scrollProgress to 0 when scrolled far past fixedAt"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-156",
+      "file": "packages/mantine-hooks/tests/upstream/use-headroom/use-headroom.test.ts",
+      "fullName": "@mantine/hooks/use-headroom useHeadroom / scrollProgress clamps scrollProgress to 1 when scrolled far up"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-157",
+      "file": "packages/mantine-hooks/tests/upstream/use-headroom/use-headroom.test.ts",
+      "fullName": "@mantine/hooks/use-headroom useHeadroom / scrollProgress starts hidden when the page loads already scrolled past fixedAt"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-158",
+      "file": "packages/mantine-hooks/tests/upstream/use-headroom/use-headroom.test.ts",
+      "fullName": "@mantine/hooks/use-headroom useHeadroom / callbacks calls onFix on mount when starting within the fixed zone"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-159",
+      "file": "packages/mantine-hooks/tests/upstream/use-headroom/use-headroom.test.ts",
+      "fullName": "@mantine/hooks/use-headroom useHeadroom / callbacks calls onPin when scroll direction changes to up outside the fixed zone"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-160",
+      "file": "packages/mantine-hooks/tests/upstream/use-headroom/use-headroom.test.ts",
+      "fullName": "@mantine/hooks/use-headroom useHeadroom / callbacks calls onRelease when scroll direction changes to down after being pinned"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-161",
+      "file": "packages/mantine-hooks/tests/upstream/use-headroom/use-headroom.test.ts",
+      "fullName": "@mantine/hooks/use-headroom useHeadroom / callbacks does not call onPin more than once while continuously scrolling up"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-162",
+      "file": "packages/mantine-hooks/tests/upstream/use-headroom/use-headroom.test.ts",
+      "fullName": "@mantine/hooks/use-headroom useHeadroom / callbacks does not call onRelease more than once while continuously scrolling down"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-163",
+      "file": "packages/mantine-hooks/tests/upstream/use-headroom/use-headroom.test.ts",
+      "fullName": "@mantine/hooks/use-headroom useHeadroom / callbacks always calls the latest callback version with no stale closure"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-164",
+      "file": "packages/mantine-hooks/tests/upstream/use-hotkeys/parse-hotkey.test.ts",
+      "fullName": "@mantine/hooks/use-hot-key/parse-hotkey should parse hotkey correctly"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-165",
+      "file": "packages/mantine-hooks/tests/upstream/use-hotkeys/parse-hotkey.test.ts",
+      "fullName": "@mantine/hooks/use-hot-key/parse-hotkey should detect exact hotkey"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-166",
+      "file": "packages/mantine-hooks/tests/upstream/use-hotkeys/parse-hotkey.test.ts",
+      "fullName": "@mantine/hooks/use-hot-key/parse-hotkey parses [plus] key correctly"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-167",
+      "file": "packages/mantine-hooks/tests/upstream/use-hotkeys/parse-hotkey.test.ts",
+      "fullName": "@mantine/hooks/use-hot-key/parse-hotkey handles Escape key correctly"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-168",
+      "file": "packages/mantine-hooks/tests/upstream/use-hotkeys/parse-hotkey.test.ts",
+      "fullName": "@mantine/hooks/use-hot-key/parse-hotkey ensures compatibility with existing escape key usage"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-169",
+      "file": "packages/mantine-hooks/tests/upstream/use-hotkeys/use-hotkeys.test.tsx",
+      "fullName": "@mantine/hooks/use-hotkey should listen to document events"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-170",
+      "file": "packages/mantine-hooks/tests/upstream/use-hotkeys/use-hotkeys.test.tsx",
+      "fullName": "@mantine/hooks/use-hotkey should not fire when keys mismatch"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-171",
+      "file": "packages/mantine-hooks/tests/upstream/use-hotkeys/use-hotkeys.test.tsx",
+      "fullName": "@mantine/hooks/use-hotkey should not fire when event is no exact match"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-172",
+      "file": "packages/mantine-hooks/tests/upstream/use-hotkeys/use-hotkeys.test.tsx",
+      "fullName": "@mantine/hooks/use-hotkey correctly handles space key"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-173",
+      "file": "packages/mantine-hooks/tests/upstream/use-hotkeys/use-hotkeys.test.tsx",
+      "fullName": "@mantine/hooks/use-hotkey correctly handles [plus] key"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-174",
+      "file": "packages/mantine-hooks/tests/upstream/use-hotkeys/use-hotkeys.test.tsx",
+      "fullName": "@mantine/hooks/use-hotkey correctly handles physical key assignments like Digit1"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-175",
+      "file": "packages/mantine-hooks/tests/upstream/use-hotkeys/use-hotkeys.test.tsx",
+      "fullName": "@mantine/hooks/use-hotkey correctly ignores unclear numerical assignments when usePhyiscalKeys is true"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-176",
+      "file": "packages/mantine-hooks/tests/upstream/use-hotkeys/use-hotkeys.test.tsx",
+      "fullName": "@mantine/hooks/use-hotkey correctly assumes physical keys when usePhysicalKeys is true"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-177",
+      "file": "packages/mantine-hooks/tests/upstream/use-hotkeys/use-hotkeys.test.tsx",
+      "fullName": "@mantine/hooks/use-hotkey does not re-register the listener when an inline array changes identity on rerender"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-178",
+      "file": "packages/mantine-hooks/tests/upstream/use-hotkeys/use-hotkeys.test.tsx",
+      "fullName": "@mantine/hooks/use-hotkey calls the latest handler after rerender (no stale closure)"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-179",
+      "file": "packages/mantine-hooks/tests/upstream/use-hotkeys/use-hotkeys.test.tsx",
+      "fullName": "@mantine/hooks/use-hotkey removes the listener on unmount"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-180",
+      "file": "packages/mantine-hooks/tests/upstream/use-hover/use-hover.test.tsx",
+      "fullName": "@mantine/hooks/use-hover stops tracking hover when the ref is detached (ref called with null)"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-181",
+      "file": "packages/mantine-hooks/tests/upstream/use-hover/use-hover.test.tsx",
+      "fullName": "@mantine/hooks/use-hover removes old listeners and attaches new ones when ref moves to a different node"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-182",
+      "file": "packages/mantine-hooks/tests/upstream/use-hover/use-hover.test.tsx",
+      "fullName": "@mantine/hooks/use-hover changes `hovered` on mouseenter/mouseleave correctly"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-183",
+      "file": "packages/mantine-hooks/tests/upstream/use-id/use-id.test.tsx",
+      "fullName": "use-id returns static id"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-184",
+      "file": "packages/mantine-hooks/tests/upstream/use-id/use-id.test.tsx",
+      "fullName": "use-id returns random id if static id is not provided"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-185",
+      "file": "packages/mantine-hooks/tests/upstream/use-id/use-id.test.tsx",
+      "fullName": "use-id keeps the same id across Activity hide/reveal cycles"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-186",
+      "file": "packages/mantine-hooks/tests/upstream/use-idle/use-idle.test.tsx",
+      "fullName": "@mantine/hooks/use-idle Correct initial return value"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-187",
+      "file": "packages/mantine-hooks/tests/upstream/use-idle/use-idle.test.tsx",
+      "fullName": "@mantine/hooks/use-idle Starts the timer immediately instead of waiting for the first event to happen"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-188",
+      "file": "packages/mantine-hooks/tests/upstream/use-idle/use-idle.test.tsx",
+      "fullName": "@mantine/hooks/use-idle Returns correct value on firing keydown event"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-189",
+      "file": "packages/mantine-hooks/tests/upstream/use-idle/use-idle.test.tsx",
+      "fullName": "@mantine/hooks/use-idle Correct return value on mouse events"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-190",
+      "file": "packages/mantine-hooks/tests/upstream/use-idle/use-idle.test.tsx",
+      "fullName": "@mantine/hooks/use-idle Correct return value on touch events"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-191",
+      "file": "packages/mantine-hooks/tests/upstream/use-idle/use-idle.test.tsx",
+      "fullName": "@mantine/hooks/use-idle Correct return value on multiple consecutive events"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-192",
+      "file": "packages/mantine-hooks/tests/upstream/use-input-state/use-input-state.test.ts",
+      "fullName": "@mantine/hooks/use-input-state sets correct initial state"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-193",
+      "file": "packages/mantine-hooks/tests/upstream/use-input-state/use-input-state.test.ts",
+      "fullName": "@mantine/hooks/use-input-state sets value with change event on text input"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-194",
+      "file": "packages/mantine-hooks/tests/upstream/use-input-state/use-input-state.test.ts",
+      "fullName": "@mantine/hooks/use-input-state sets value with change event on boolean input"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-195",
+      "file": "packages/mantine-hooks/tests/upstream/use-input-state/use-input-state.test.ts",
+      "fullName": "@mantine/hooks/use-input-state sets value when onChange is called with actual value"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-196",
+      "file": "packages/mantine-hooks/tests/upstream/use-input-state/use-input-state.test.ts",
+      "fullName": "@mantine/hooks/use-input-state sets value with a callback function"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-197",
+      "file": "packages/mantine-hooks/tests/upstream/use-interval/use-interval.test.ts",
+      "fullName": "@mantine/hooks/use-interval initialize"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-198",
+      "file": "packages/mantine-hooks/tests/upstream/use-interval/use-interval.test.ts",
+      "fullName": "@mantine/hooks/use-interval should run after timeout exceeded"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-199",
+      "file": "packages/mantine-hooks/tests/upstream/use-interval/use-interval.test.ts",
+      "fullName": "@mantine/hooks/use-interval should stop after stop fn call"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-200",
+      "file": "packages/mantine-hooks/tests/upstream/use-interval/use-interval.test.ts",
+      "fullName": "@mantine/hooks/use-interval should not restart the interval when fn identity changes between renders"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-201",
+      "file": "packages/mantine-hooks/tests/upstream/use-interval/use-interval.test.ts",
+      "fullName": "@mantine/hooks/use-interval should keep ticking with autoInvoke when the component re-renders faster than the interval"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-202",
+      "file": "packages/mantine-hooks/tests/upstream/use-interval/use-interval.test.ts",
+      "fullName": "@mantine/hooks/use-interval should call the latest fn after a re-render"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-203",
+      "file": "packages/mantine-hooks/tests/upstream/use-interval/use-interval.test.ts",
+      "fullName": "@mantine/hooks/use-interval should toggle between active states"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-204",
+      "file": "packages/mantine-hooks/tests/upstream/use-is-first-render/use-is-first-render.test.ts",
+      "fullName": "@mantine/hooks/use-is-first-render returns true on the first render"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-205",
+      "file": "packages/mantine-hooks/tests/upstream/use-is-first-render/use-is-first-render.test.ts",
+      "fullName": "@mantine/hooks/use-is-first-render returns false on every subsequent rerender"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-206",
+      "file": "packages/mantine-hooks/tests/upstream/use-list-state/use-list-state.test.ts",
+      "fullName": "@mantine/hooks/use-list-state returns initial state of no modifications were applied"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-207",
+      "file": "packages/mantine-hooks/tests/upstream/use-list-state/use-list-state.test.ts",
+      "fullName": "@mantine/hooks/use-list-state sets state with given value or callback"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-208",
+      "file": "packages/mantine-hooks/tests/upstream/use-list-state/use-list-state.test.ts",
+      "fullName": "@mantine/hooks/use-list-state adds item to the end of the list with handlers.append"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-209",
+      "file": "packages/mantine-hooks/tests/upstream/use-list-state/use-list-state.test.ts",
+      "fullName": "@mantine/hooks/use-list-state adds item to the start of the list with handlers.prepend"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-210",
+      "file": "packages/mantine-hooks/tests/upstream/use-list-state/use-list-state.test.ts",
+      "fullName": "@mantine/hooks/use-list-state inserts item at given position with handlers.insert"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-211",
+      "file": "packages/mantine-hooks/tests/upstream/use-list-state/use-list-state.test.ts",
+      "fullName": "@mantine/hooks/use-list-state removes items with given indices with handlers.remove"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-212",
+      "file": "packages/mantine-hooks/tests/upstream/use-list-state/use-list-state.test.ts",
+      "fullName": "@mantine/hooks/use-list-state applies given function to all items with handlers.apply"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-213",
+      "file": "packages/mantine-hooks/tests/upstream/use-list-state/use-list-state.test.ts",
+      "fullName": "@mantine/hooks/use-list-state applies given function to respective item with handlers.applyWhere"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-214",
+      "file": "packages/mantine-hooks/tests/upstream/use-list-state/use-list-state.test.ts",
+      "fullName": "@mantine/hooks/use-list-state reorders item at given position with handlers.reorder"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-215",
+      "file": "packages/mantine-hooks/tests/upstream/use-list-state/use-list-state.test.ts",
+      "fullName": "@mantine/hooks/use-list-state swap items positions with handlers.swap"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-216",
+      "file": "packages/mantine-hooks/tests/upstream/use-list-state/use-list-state.test.ts",
+      "fullName": "@mantine/hooks/use-list-state sets item at given position with handlers.setItem"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-217",
+      "file": "packages/mantine-hooks/tests/upstream/use-list-state/use-list-state.test.ts",
+      "fullName": "@mantine/hooks/use-list-state sets given item property at given position with handlers.setItemProp"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-218",
+      "file": "packages/mantine-hooks/tests/upstream/use-list-state/use-list-state.test.ts",
+      "fullName": "@mantine/hooks/use-list-state works with primitive values"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-219",
+      "file": "packages/mantine-hooks/tests/upstream/use-list-state/use-list-state.test.ts",
+      "fullName": "@mantine/hooks/use-list-state removes last item with pop handler"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-220",
+      "file": "packages/mantine-hooks/tests/upstream/use-list-state/use-list-state.test.ts",
+      "fullName": "@mantine/hooks/use-list-state removes first item with shift handler"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-221",
+      "file": "packages/mantine-hooks/tests/upstream/use-list-state/use-list-state.test.ts",
+      "fullName": "@mantine/hooks/use-list-state filter items with handlers.filter"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-222",
+      "file": "packages/mantine-hooks/tests/upstream/use-local-storage/use-local-storage.test.ts",
+      "fullName": "@mantine/hooks/use-local-storage returns defaultValue when storage is empty"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-223",
+      "file": "packages/mantine-hooks/tests/upstream/use-local-storage/use-local-storage.test.ts",
+      "fullName": "@mantine/hooks/use-local-storage reads an existing value from localStorage on mount"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-224",
+      "file": "packages/mantine-hooks/tests/upstream/use-local-storage/use-local-storage.test.ts",
+      "fullName": "@mantine/hooks/use-local-storage writes value to localStorage on set"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-225",
+      "file": "packages/mantine-hooks/tests/upstream/use-local-storage/use-local-storage.test.ts",
+      "fullName": "@mantine/hooks/use-local-storage supports functional updater"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-226",
+      "file": "packages/mantine-hooks/tests/upstream/use-local-storage/use-local-storage.test.ts",
+      "fullName": "@mantine/hooks/use-local-storage removes value from localStorage and resets to defaultValue"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-227",
+      "file": "packages/mantine-hooks/tests/upstream/use-local-storage/use-local-storage.test.ts",
+      "fullName": "@mantine/hooks/use-local-storage serializes and deserializes objects"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-228",
+      "file": "packages/mantine-hooks/tests/upstream/use-local-storage/use-local-storage.test.ts",
+      "fullName": "@mantine/hooks/use-local-storage reacts to a storage event (cross-tab update)"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-229",
+      "file": "packages/mantine-hooks/tests/upstream/use-local-storage/use-local-storage.test.ts",
+      "fullName": "@mantine/hooks/use-local-storage ignores storage events for different keys"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-230",
+      "file": "packages/mantine-hooks/tests/upstream/use-logger/use-logger.test.ts",
+      "fullName": "@mantine/hooks/use-logger logs mount and unmount events"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-231",
+      "file": "packages/mantine-hooks/tests/upstream/use-logger/use-logger.test.ts",
+      "fullName": "@mantine/hooks/use-logger logs mount, unmount and update events"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-232",
+      "file": "packages/mantine-hooks/tests/upstream/use-logger/use-logger.test.ts",
+      "fullName": "@mantine/hooks/use-logger logs mount, unmount and rerenders without update events"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-233",
+      "file": "packages/mantine-hooks/tests/upstream/use-long-press/use-long-press.test.tsx",
+      "fullName": "useLongPress should call onLongPress after default threshold"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-234",
+      "file": "packages/mantine-hooks/tests/upstream/use-long-press/use-long-press.test.tsx",
+      "fullName": "useLongPress should call onLongPress after custom threshold"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-235",
+      "file": "packages/mantine-hooks/tests/upstream/use-long-press/use-long-press.test.tsx",
+      "fullName": "useLongPress should not call onLongPress if released before threshold"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-236",
+      "file": "packages/mantine-hooks/tests/upstream/use-long-press/use-long-press.test.tsx",
+      "fullName": "useLongPress should call onStart callback on press start"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-237",
+      "file": "packages/mantine-hooks/tests/upstream/use-long-press/use-long-press.test.tsx",
+      "fullName": "useLongPress should call onFinish callback after long press is completed"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-238",
+      "file": "packages/mantine-hooks/tests/upstream/use-long-press/use-long-press.test.tsx",
+      "fullName": "useLongPress should call onCancel callback if press is canceled before threshold"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-239",
+      "file": "packages/mantine-hooks/tests/upstream/use-long-press/use-long-press.test.tsx",
+      "fullName": "useLongPress should cancel long press when mouse leaves element"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-240",
+      "file": "packages/mantine-hooks/tests/upstream/use-long-press/use-long-press.test.tsx",
+      "fullName": "useLongPress should handle touch events"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-241",
+      "file": "packages/mantine-hooks/tests/upstream/use-long-press/use-long-press.test.tsx",
+      "fullName": "useLongPress should handle touch events being canceled"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-242",
+      "file": "packages/mantine-hooks/tests/upstream/use-long-press/use-long-press.test.tsx",
+      "fullName": "useLongPress should return empty object if onLongPress is not a function"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-243",
+      "file": "packages/mantine-hooks/tests/upstream/use-long-press/use-long-press.test.tsx",
+      "fullName": "useLongPress should clean up timeout on unmount"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-244",
+      "file": "packages/mantine-hooks/tests/upstream/use-long-press/use-long-press.test.tsx",
+      "fullName": "useLongPress should handle multiple presses correctly"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-245",
+      "file": "packages/mantine-hooks/tests/upstream/use-long-press/use-long-press.test.tsx",
+      "fullName": "useLongPress only triggers on touch when events is [\"touch\"]"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-246",
+      "file": "packages/mantine-hooks/tests/upstream/use-long-press/use-long-press.test.tsx",
+      "fullName": "useLongPress only triggers on mouse when events is [\"mouse\"]"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-247",
+      "file": "packages/mantine-hooks/tests/upstream/use-long-press/use-long-press.test.tsx",
+      "fullName": "useLongPress cancels long press when touch moves beyond threshold with cancelOnMove"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-248",
+      "file": "packages/mantine-hooks/tests/upstream/use-long-press/use-long-press.test.tsx",
+      "fullName": "useLongPress does not cancel long press when touch moves within threshold with cancelOnMove"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-249",
+      "file": "packages/mantine-hooks/tests/upstream/use-long-press/use-long-press.test.tsx",
+      "fullName": "useLongPress respects a custom numeric cancelOnMove threshold"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-250",
+      "file": "packages/mantine-hooks/tests/upstream/use-long-press/use-long-press.test.tsx",
+      "fullName": "useLongPress cancels on any movement when cancelOnMove is 0"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-251",
+      "file": "packages/mantine-hooks/tests/upstream/use-long-press/use-long-press.test.tsx",
+      "fullName": "useLongPress still fires with cancelOnMove 0 when there is no movement"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-252",
+      "file": "packages/mantine-hooks/tests/upstream/use-long-press/use-long-press.test.tsx",
+      "fullName": "useLongPress does not cancel on move when cancelOnMove is not set"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-253",
+      "file": "packages/mantine-hooks/tests/upstream/use-map/use-map.test.ts",
+      "fullName": "@mantine/hooks/use-map has correct initial state"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-254",
+      "file": "packages/mantine-hooks/tests/upstream/use-map/use-map.test.ts",
+      "fullName": "@mantine/hooks/use-map sets values"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-255",
+      "file": "packages/mantine-hooks/tests/upstream/use-map/use-map.test.ts",
+      "fullName": "@mantine/hooks/use-map deletes values"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-256",
+      "file": "packages/mantine-hooks/tests/upstream/use-map/use-map.test.ts",
+      "fullName": "@mantine/hooks/use-map clears map"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-257",
+      "file": "packages/mantine-hooks/tests/upstream/use-map/use-map.test.ts",
+      "fullName": "@mantine/hooks/use-map returns a new instance identity after each mutation"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-258",
+      "file": "packages/mantine-hooks/tests/upstream/use-map/use-map.test.ts",
+      "fullName": "@mantine/hooks/use-map accumulates multiple synchronous mutations"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-259",
+      "file": "packages/mantine-hooks/tests/upstream/use-map/use-map.test.ts",
+      "fullName": "@mantine/hooks/use-map applies a retained mutator to the latest instance"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-260",
+      "file": "packages/mantine-hooks/tests/upstream/use-mask/use-mask.test.ts",
+      "fullName": "@mantine/hooks/use-mask useMask hook returns initial empty state"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-261",
+      "file": "packages/mantine-hooks/tests/upstream/use-mask/use-mask.test.ts",
+      "fullName": "@mantine/hooks/use-mask useMask hook returns a ref callback function"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-262",
+      "file": "packages/mantine-hooks/tests/upstream/use-mask/use-mask.test.ts",
+      "fullName": "@mantine/hooks/use-mask useMask hook reset clears state and calls onChangeRaw"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-263",
+      "file": "packages/mantine-hooks/tests/upstream/use-mask/use-mask.test.ts",
+      "fullName": "@mantine/hooks/use-mask useMask hook shows mask when alwaysShowMask is true and input is mounted"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-264",
+      "file": "packages/mantine-hooks/tests/upstream/use-mask/use-mask.test.ts",
+      "fullName": "@mantine/hooks/use-mask useMask hook shows multi-character slotChar correctly with alwaysShowMask"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-265",
+      "file": "packages/mantine-hooks/tests/upstream/use-mask/use-mask.test.ts",
+      "fullName": "@mantine/hooks/use-mask useMask hook does not show mask when alwaysShowMask is false"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-266",
+      "file": "packages/mantine-hooks/tests/upstream/use-mask/use-mask.test.ts",
+      "fullName": "@mantine/hooks/use-mask useMask hook sets aria-invalid when invalid option is true"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-267",
+      "file": "packages/mantine-hooks/tests/upstream/use-mask/use-mask.test.ts",
+      "fullName": "@mantine/hooks/use-mask useMask hook clears display on blur when input was focused but nothing was typed"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-268",
+      "file": "packages/mantine-hooks/tests/upstream/use-mask/use-mask.test.ts",
+      "fullName": "@mantine/hooks/use-mask useMask hook clears display on blur when typed value was fully deleted"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-269",
+      "file": "packages/mantine-hooks/tests/upstream/use-mask/use-mask.test.ts",
+      "fullName": "@mantine/hooks/use-mask useMask hook moves cursor to end of typed value when cursor lands before the first editable slot"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-270",
+      "file": "packages/mantine-hooks/tests/upstream/use-mask/use-mask.test.ts",
+      "fullName": "@mantine/hooks/use-mask useMask hook preserves active selection on mouseup (does not collapse drag selection)"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-271",
+      "file": "packages/mantine-hooks/tests/upstream/use-mask/use-mask.test.ts",
+      "fullName": "@mantine/hooks/use-mask useMask hook clamps cursor to end of typed value on mousedown when click lands past typed content"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-272",
+      "file": "packages/mantine-hooks/tests/upstream/use-mask/use-mask.test.ts",
+      "fullName": "@mantine/hooks/use-mask useMask hook positions cursor at the cut location when content is removed via cut"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-273",
+      "file": "packages/mantine-hooks/tests/upstream/use-mask/use-mask.test.ts",
+      "fullName": "@mantine/hooks/use-mask useMask hook positions cursor at the cut location for partially filled mask with placeholders"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-274",
+      "file": "packages/mantine-hooks/tests/upstream/use-mask/use-mask.test.ts",
+      "fullName": "@mantine/hooks/use-mask useMask hook positions cursor after pasted content rather than at the end"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-275",
+      "file": "packages/mantine-hooks/tests/upstream/use-mask/use-mask.test.ts",
+      "fullName": "@mantine/hooks/use-mask useMask hook undoes a single character insertion via Ctrl+Z"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-276",
+      "file": "packages/mantine-hooks/tests/upstream/use-mask/use-mask.test.ts",
+      "fullName": "@mantine/hooks/use-mask useMask hook undoes a backspace deletion and restores cursor position"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-277",
+      "file": "packages/mantine-hooks/tests/upstream/use-mask/use-mask.test.ts",
+      "fullName": "@mantine/hooks/use-mask useMask hook supports redo via Ctrl+Shift+Z"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-278",
+      "file": "packages/mantine-hooks/tests/upstream/use-mask/use-mask.test.ts",
+      "fullName": "@mantine/hooks/use-mask useMask hook supports redo via Ctrl+Y"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-279",
+      "file": "packages/mantine-hooks/tests/upstream/use-mask/use-mask.test.ts",
+      "fullName": "@mantine/hooks/use-mask useMask hook supports Cmd+Z (Mac) for undo"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-280",
+      "file": "packages/mantine-hooks/tests/upstream/use-mask/use-mask.test.ts",
+      "fullName": "@mantine/hooks/use-mask useMask hook clears redo stack on new edit"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-281",
+      "file": "packages/mantine-hooks/tests/upstream/use-mask/use-mask.test.ts",
+      "fullName": "@mantine/hooks/use-mask useMask hook clears undo/redo stacks on reset"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-282",
+      "file": "packages/mantine-hooks/tests/upstream/use-mask/use-mask.test.ts",
+      "fullName": "@mantine/hooks/use-mask useMask hook removes event listeners on cleanup"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-283",
+      "file": "packages/mantine-hooks/tests/upstream/use-mask/use-mask.test.ts",
+      "fullName": "@mantine/hooks/use-mask formatMask utility formats raw digits into phone mask"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-284",
+      "file": "packages/mantine-hooks/tests/upstream/use-mask/use-mask.test.ts",
+      "fullName": "@mantine/hooks/use-mask formatMask utility formats partial input"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-285",
+      "file": "packages/mantine-hooks/tests/upstream/use-mask/use-mask.test.ts",
+      "fullName": "@mantine/hooks/use-mask formatMask utility handles empty input"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-286",
+      "file": "packages/mantine-hooks/tests/upstream/use-mask/use-mask.test.ts",
+      "fullName": "@mantine/hooks/use-mask formatMask utility filters non-matching characters"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-287",
+      "file": "packages/mantine-hooks/tests/upstream/use-mask/use-mask.test.ts",
+      "fullName": "@mantine/hooks/use-mask formatMask utility applies transform before validation"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-288",
+      "file": "packages/mantine-hooks/tests/upstream/use-mask/use-mask.test.ts",
+      "fullName": "@mantine/hooks/use-mask formatMask utility transform does not affect non-matching characters"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-289",
+      "file": "packages/mantine-hooks/tests/upstream/use-mask/use-mask.test.ts",
+      "fullName": "@mantine/hooks/use-mask formatMask utility works with letter tokens"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-290",
+      "file": "packages/mantine-hooks/tests/upstream/use-mask/use-mask.test.ts",
+      "fullName": "@mantine/hooks/use-mask formatMask utility works with custom tokens"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-291",
+      "file": "packages/mantine-hooks/tests/upstream/use-mask/use-mask.test.ts",
+      "fullName": "@mantine/hooks/use-mask formatMask utility works with regex array format"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-292",
+      "file": "packages/mantine-hooks/tests/upstream/use-mask/use-mask.test.ts",
+      "fullName": "@mantine/hooks/use-mask formatMask utility truncates values longer than mask"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-293",
+      "file": "packages/mantine-hooks/tests/upstream/use-mask/use-mask.test.ts",
+      "fullName": "@mantine/hooks/use-mask formatMask utility handles date mask"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-294",
+      "file": "packages/mantine-hooks/tests/upstream/use-mask/use-mask.test.ts",
+      "fullName": "@mantine/hooks/use-mask formatMask utility handles SSN mask"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-295",
+      "file": "packages/mantine-hooks/tests/upstream/use-mask/use-mask.test.ts",
+      "fullName": "@mantine/hooks/use-mask unformatMask utility extracts raw value from phone number"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-296",
+      "file": "packages/mantine-hooks/tests/upstream/use-mask/use-mask.test.ts",
+      "fullName": "@mantine/hooks/use-mask unformatMask utility extracts raw value from date"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-297",
+      "file": "packages/mantine-hooks/tests/upstream/use-mask/use-mask.test.ts",
+      "fullName": "@mantine/hooks/use-mask unformatMask utility returns empty for empty input"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-298",
+      "file": "packages/mantine-hooks/tests/upstream/use-mask/use-mask.test.ts",
+      "fullName": "@mantine/hooks/use-mask unformatMask utility extracts raw from partial value"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-299",
+      "file": "packages/mantine-hooks/tests/upstream/use-mask/use-mask.test.ts",
+      "fullName": "@mantine/hooks/use-mask isMaskComplete utility returns true for complete phone number"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-300",
+      "file": "packages/mantine-hooks/tests/upstream/use-mask/use-mask.test.ts",
+      "fullName": "@mantine/hooks/use-mask isMaskComplete utility returns false for incomplete phone number"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-301",
+      "file": "packages/mantine-hooks/tests/upstream/use-mask/use-mask.test.ts",
+      "fullName": "@mantine/hooks/use-mask isMaskComplete utility returns false for empty input"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-302",
+      "file": "packages/mantine-hooks/tests/upstream/use-mask/use-mask.test.ts",
+      "fullName": "@mantine/hooks/use-mask isMaskComplete utility returns true for complete date"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-303",
+      "file": "packages/mantine-hooks/tests/upstream/use-mask/use-mask.test.ts",
+      "fullName": "@mantine/hooks/use-mask isMaskComplete utility handles optional segments"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-304",
+      "file": "packages/mantine-hooks/tests/upstream/use-mask/use-mask.test.ts",
+      "fullName": "@mantine/hooks/use-mask generatePattern utility generates pattern for digit mask"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-305",
+      "file": "packages/mantine-hooks/tests/upstream/use-mask/use-mask.test.ts",
+      "fullName": "@mantine/hooks/use-mask generatePattern utility generates pattern with literal escaping"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-306",
+      "file": "packages/mantine-hooks/tests/upstream/use-mask/use-mask.test.ts",
+      "fullName": "@mantine/hooks/use-mask generatePattern utility generates full-inexact pattern without groups"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-307",
+      "file": "packages/mantine-hooks/tests/upstream/use-mask/use-mask.test.ts",
+      "fullName": "@mantine/hooks/use-mask mask parsing handles escaped characters"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-308",
+      "file": "packages/mantine-hooks/tests/upstream/use-mask/use-mask.test.ts",
+      "fullName": "@mantine/hooks/use-mask mask parsing handles uppercase letter token"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-309",
+      "file": "packages/mantine-hooks/tests/upstream/use-mask/use-mask.test.ts",
+      "fullName": "@mantine/hooks/use-mask mask parsing uppercase token rejects lowercase"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-310",
+      "file": "packages/mantine-hooks/tests/upstream/use-mask/use-mask.test.ts",
+      "fullName": "@mantine/hooks/use-mask mask parsing alphanumeric token accepts mixed"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-311",
+      "file": "packages/mantine-hooks/tests/upstream/use-mask/use-mask.test.ts",
+      "fullName": "@mantine/hooks/use-mask mask parsing sign token accepts signs and digits"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-312",
+      "file": "packages/mantine-hooks/tests/upstream/use-merged-ref/use-merged-ref.test.tsx",
+      "fullName": "@mantine/hook/use-merged-ref assigns refs to all given arguments"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-313",
+      "file": "packages/mantine-hooks/tests/upstream/use-merged-ref/use-merged-ref.test.tsx",
+      "fullName": "@mantine/hook/use-merged-ref when ref callback does not return a function, ref callback is called with null on unmount"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-314",
+      "file": "packages/mantine-hooks/tests/upstream/use-merged-ref/use-merged-ref.test.tsx",
+      "fullName": "@mantine/hook/use-merged-ref when ref callback returns a non-function value, that value is not called during cleanup"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-315",
+      "file": "packages/mantine-hooks/tests/upstream/use-mounted/use-mounted.test.ts",
+      "fullName": "@mantine/hooks/use-mounted returns false before the effect runs"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-316",
+      "file": "packages/mantine-hooks/tests/upstream/use-mounted/use-mounted.test.ts",
+      "fullName": "@mantine/hooks/use-mounted returns true after mount and stays true across rerenders"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-317",
+      "file": "packages/mantine-hooks/tests/upstream/use-mouse/use-mouse.test.tsx",
+      "fullName": "@mantine/hook/use-mouse returns correct initial position (0, 0)"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-318",
+      "file": "packages/mantine-hooks/tests/upstream/use-mouse/use-mouse.test.tsx",
+      "fullName": "@mantine/hook/use-mouse updates the position without a ref"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-319",
+      "file": "packages/mantine-hooks/tests/upstream/use-mouse/use-mouse.test.tsx",
+      "fullName": "@mantine/hook/use-mouse updates the position"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-320",
+      "file": "packages/mantine-hooks/tests/upstream/use-page-leave/use-page-leave.test.ts",
+      "fullName": "@mantine/hooks/use-page-leave calls onPageLeave when mouseleave fires on documentElement"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-321",
+      "file": "packages/mantine-hooks/tests/upstream/use-page-leave/use-page-leave.test.ts",
+      "fullName": "@mantine/hooks/use-page-leave calls the latest onPageLeave after rerender (no stale closure)"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-322",
+      "file": "packages/mantine-hooks/tests/upstream/use-page-leave/use-page-leave.test.ts",
+      "fullName": "@mantine/hooks/use-page-leave removes the listener on unmount"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-323",
+      "file": "packages/mantine-hooks/tests/upstream/use-pagination/use-pagination.test.ts",
+      "fullName": "@mantine/hooks/use-pagination setPage function sets active page"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-324",
+      "file": "packages/mantine-hooks/tests/upstream/use-pagination/use-pagination.test.ts",
+      "fullName": "@mantine/hooks/use-pagination returns correct initial state"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-325",
+      "file": "packages/mantine-hooks/tests/upstream/use-pagination/use-pagination.test.ts",
+      "fullName": "@mantine/hooks/use-pagination does not change range length between page changes"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-326",
+      "file": "packages/mantine-hooks/tests/upstream/use-pagination/use-pagination.test.ts",
+      "fullName": "@mantine/hooks/use-pagination returns correct initial state with custom parameters"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-327",
+      "file": "packages/mantine-hooks/tests/upstream/use-pagination/use-pagination.test.ts",
+      "fullName": "@mantine/hooks/use-pagination calls onChange correctly with active page"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-328",
+      "file": "packages/mantine-hooks/tests/upstream/use-pagination/use-pagination.test.ts",
+      "fullName": "@mantine/hooks/use-pagination does not change range length between page changes with custom parameters"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-329",
+      "file": "packages/mantine-hooks/tests/upstream/use-pagination/use-pagination.test.ts",
+      "fullName": "@mantine/hooks/use-pagination truncates total value"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-330",
+      "file": "packages/mantine-hooks/tests/upstream/use-pagination/use-pagination.test.ts",
+      "fullName": "@mantine/hooks/use-pagination handles negative total value correctly"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-331",
+      "file": "packages/mantine-hooks/tests/upstream/use-pagination/use-pagination.test.ts",
+      "fullName": "@mantine/hooks/use-pagination handles startValue correctly"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-332",
+      "file": "packages/mantine-hooks/tests/upstream/use-previous/use-previous.test.ts",
+      "fullName": "@mantine/hooks/use-previous returns undefined on initial render"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-333",
+      "file": "packages/mantine-hooks/tests/upstream/use-previous/use-previous.test.ts",
+      "fullName": "@mantine/hooks/use-previous returns the previous value after update"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-334",
+      "file": "packages/mantine-hooks/tests/upstream/use-queue/use-queue.test.ts",
+      "fullName": "@mantine/hooks/use-queue correctly distributes initial values when limit is not reached"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-335",
+      "file": "packages/mantine-hooks/tests/upstream/use-queue/use-queue.test.ts",
+      "fullName": "@mantine/hooks/use-queue correctly distributes initial values when limit is reached"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-336",
+      "file": "packages/mantine-hooks/tests/upstream/use-queue/use-queue.test.ts",
+      "fullName": "@mantine/hooks/use-queue adds items to the state when limit is not reached"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-337",
+      "file": "packages/mantine-hooks/tests/upstream/use-queue/use-queue.test.ts",
+      "fullName": "@mantine/hooks/use-queue adds items to the queue when limit is reached"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-338",
+      "file": "packages/mantine-hooks/tests/upstream/use-queue/use-queue.test.ts",
+      "fullName": "@mantine/hooks/use-queue correctly applies given update to state without queue"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-339",
+      "file": "packages/mantine-hooks/tests/upstream/use-queue/use-queue.test.ts",
+      "fullName": "@mantine/hooks/use-queue correctly applies given update to state with queue"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-340",
+      "file": "packages/mantine-hooks/tests/upstream/use-queue/use-queue.test.ts",
+      "fullName": "@mantine/hooks/use-queue puts extra items to the queue if state has extra items after update"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-341",
+      "file": "packages/mantine-hooks/tests/upstream/use-queue/use-queue.test.ts",
+      "fullName": "@mantine/hooks/use-queue cleans queue with cleanQueue handlers"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-342",
+      "file": "packages/mantine-hooks/tests/upstream/use-roving-index/use-roving-index.test.ts",
+      "fullName": "@mantine/hooks/use-roving-index assigns tabIndex={0} to first item and tabIndex={-1} to others by default"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-343",
+      "file": "packages/mantine-hooks/tests/upstream/use-roving-index/use-roving-index.test.ts",
+      "fullName": "@mantine/hooks/use-roving-index uses initialIndex to set the starting focused item"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-344",
+      "file": "packages/mantine-hooks/tests/upstream/use-roving-index/use-roving-index.test.ts",
+      "fullName": "@mantine/hooks/use-roving-index skips disabled items for initial focus"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-345",
+      "file": "packages/mantine-hooks/tests/upstream/use-roving-index/use-roving-index.test.ts",
+      "fullName": "@mantine/hooks/use-roving-index updates focusedIndex on click"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-346",
+      "file": "packages/mantine-hooks/tests/upstream/use-roving-index/use-roving-index.test.ts",
+      "fullName": "@mantine/hooks/use-roving-index composes user onClick handler"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-347",
+      "file": "packages/mantine-hooks/tests/upstream/use-roving-index/use-roving-index.test.ts",
+      "fullName": "@mantine/hooks/use-roving-index supports controlled focusedIndex"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-348",
+      "file": "packages/mantine-hooks/tests/upstream/use-roving-index/use-roving-index.test.ts",
+      "fullName": "@mantine/hooks/use-roving-index programmatically sets focused index via setFocusedIndex"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-349",
+      "file": "packages/mantine-hooks/tests/upstream/use-roving-index/use-roving-index.test.ts",
+      "fullName": "@mantine/hooks/use-roving-index adjusts focused index when total decreases below current index"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-350",
+      "file": "packages/mantine-hooks/tests/upstream/use-roving-index/use-roving-index.test.ts",
+      "fullName": "@mantine/hooks/use-roving-index falls back when current focused item becomes disabled"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-351",
+      "file": "packages/mantine-hooks/tests/upstream/use-roving-index/use-roving-index.test.ts",
+      "fullName": "@mantine/hooks/use-roving-index horizontal list navigation navigates forward with ArrowRight"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-352",
+      "file": "packages/mantine-hooks/tests/upstream/use-roving-index/use-roving-index.test.ts",
+      "fullName": "@mantine/hooks/use-roving-index horizontal list navigation navigates backward with ArrowLeft"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-353",
+      "file": "packages/mantine-hooks/tests/upstream/use-roving-index/use-roving-index.test.ts",
+      "fullName": "@mantine/hooks/use-roving-index horizontal list navigation does not respond to ArrowUp/ArrowDown in horizontal mode"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-354",
+      "file": "packages/mantine-hooks/tests/upstream/use-roving-index/use-roving-index.test.ts",
+      "fullName": "@mantine/hooks/use-roving-index horizontal list navigation wraps from last to first when loop is true"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-355",
+      "file": "packages/mantine-hooks/tests/upstream/use-roving-index/use-roving-index.test.ts",
+      "fullName": "@mantine/hooks/use-roving-index horizontal list navigation does not wrap when loop is false"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-356",
+      "file": "packages/mantine-hooks/tests/upstream/use-roving-index/use-roving-index.test.ts",
+      "fullName": "@mantine/hooks/use-roving-index horizontal list navigation skips disabled items during navigation"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-357",
+      "file": "packages/mantine-hooks/tests/upstream/use-roving-index/use-roving-index.test.ts",
+      "fullName": "@mantine/hooks/use-roving-index vertical list navigation navigates with ArrowDown/ArrowUp"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-358",
+      "file": "packages/mantine-hooks/tests/upstream/use-roving-index/use-roving-index.test.ts",
+      "fullName": "@mantine/hooks/use-roving-index vertical list navigation does not respond to ArrowLeft/ArrowRight in vertical mode"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-359",
+      "file": "packages/mantine-hooks/tests/upstream/use-roving-index/use-roving-index.test.ts",
+      "fullName": "@mantine/hooks/use-roving-index both orientation responds to all arrow keys"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-360",
+      "file": "packages/mantine-hooks/tests/upstream/use-roving-index/use-roving-index.test.ts",
+      "fullName": "@mantine/hooks/use-roving-index RTL support swaps ArrowRight/ArrowLeft behavior in RTL"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-361",
+      "file": "packages/mantine-hooks/tests/upstream/use-roving-index/use-roving-index.test.ts",
+      "fullName": "@mantine/hooks/use-roving-index Home/End keys Home focuses first non-disabled item"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-362",
+      "file": "packages/mantine-hooks/tests/upstream/use-roving-index/use-roving-index.test.ts",
+      "fullName": "@mantine/hooks/use-roving-index Home/End keys End focuses last non-disabled item"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-363",
+      "file": "packages/mantine-hooks/tests/upstream/use-roving-index/use-roving-index.test.ts",
+      "fullName": "@mantine/hooks/use-roving-index grid navigation navigates horizontally within a row"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-364",
+      "file": "packages/mantine-hooks/tests/upstream/use-roving-index/use-roving-index.test.ts",
+      "fullName": "@mantine/hooks/use-roving-index grid navigation stops at row boundaries horizontally"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-365",
+      "file": "packages/mantine-hooks/tests/upstream/use-roving-index/use-roving-index.test.ts",
+      "fullName": "@mantine/hooks/use-roving-index grid navigation navigates vertically across rows preserving column"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-366",
+      "file": "packages/mantine-hooks/tests/upstream/use-roving-index/use-roving-index.test.ts",
+      "fullName": "@mantine/hooks/use-roving-index grid navigation stops at grid boundary when navigating up from first row"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-367",
+      "file": "packages/mantine-hooks/tests/upstream/use-roving-index/use-roving-index.test.ts",
+      "fullName": "@mantine/hooks/use-roving-index grid navigation stops at grid boundary when navigating down from last row"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-368",
+      "file": "packages/mantine-hooks/tests/upstream/use-roving-index/use-roving-index.test.ts",
+      "fullName": "@mantine/hooks/use-roving-index grid navigation skips disabled items in vertical grid navigation"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-369",
+      "file": "packages/mantine-hooks/tests/upstream/use-roving-index/use-roving-index.test.ts",
+      "fullName": "@mantine/hooks/use-roving-index grid navigation Home navigates to first item in current row"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-370",
+      "file": "packages/mantine-hooks/tests/upstream/use-roving-index/use-roving-index.test.ts",
+      "fullName": "@mantine/hooks/use-roving-index grid navigation End navigates to last item in current row"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-371",
+      "file": "packages/mantine-hooks/tests/upstream/use-roving-index/use-roving-index.test.ts",
+      "fullName": "@mantine/hooks/use-roving-index grid navigation Ctrl+Home navigates to first item in grid"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-372",
+      "file": "packages/mantine-hooks/tests/upstream/use-roving-index/use-roving-index.test.ts",
+      "fullName": "@mantine/hooks/use-roving-index grid navigation Ctrl+End navigates to last item in grid"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-373",
+      "file": "packages/mantine-hooks/tests/upstream/use-roving-index/use-roving-index.test.ts",
+      "fullName": "@mantine/hooks/use-roving-index grid navigation handles RTL in grid navigation"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-374",
+      "file": "packages/mantine-hooks/tests/upstream/use-roving-index/use-roving-index.test.ts",
+      "fullName": "@mantine/hooks/use-roving-index onKeyDown composition calls user onKeyDown handler before navigation"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-375",
+      "file": "packages/mantine-hooks/tests/upstream/use-roving-index/use-roving-index.test.ts",
+      "fullName": "@mantine/hooks/use-roving-index onKeyDown composition does not navigate when event.defaultPrevented is true"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-376",
+      "file": "packages/mantine-hooks/tests/upstream/use-roving-index/use-roving-index.test.ts",
+      "fullName": "@mantine/hooks/use-roving-index ref management registers and unregisters element refs"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-377",
+      "file": "packages/mantine-hooks/tests/upstream/use-scroll-direction/use-scroll-direction.test.ts",
+      "fullName": "@mantine/hooks/use-scroll-direction returns \"unknown\" initially"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-378",
+      "file": "packages/mantine-hooks/tests/upstream/use-scroll-direction/use-scroll-direction.test.ts",
+      "fullName": "@mantine/hooks/use-scroll-direction returns \"down\" after the first scroll down event"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-379",
+      "file": "packages/mantine-hooks/tests/upstream/use-scroll-direction/use-scroll-direction.test.ts",
+      "fullName": "@mantine/hooks/use-scroll-direction returns \"up\" after scrolling up"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-380",
+      "file": "packages/mantine-hooks/tests/upstream/use-scroll-direction/use-scroll-direction.test.ts",
+      "fullName": "@mantine/hooks/use-scroll-direction returns \"down\" again after reversing back down"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-381",
+      "file": "packages/mantine-hooks/tests/upstream/use-scroll-spy/use-scroll-spy.test.tsx",
+      "fullName": "@mantine/hooks/use-scroll-spy attaches the scroll listener to window by default"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-382",
+      "file": "packages/mantine-hooks/tests/upstream/use-scroll-spy/use-scroll-spy.test.tsx",
+      "fullName": "@mantine/hooks/use-scroll-spy attaches the scroll listener to a resolved HTMLElement scrollHost"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-383",
+      "file": "packages/mantine-hooks/tests/upstream/use-scroll-spy/use-scroll-spy.test.tsx",
+      "fullName": "@mantine/hooks/use-scroll-spy resolves a RefObject scrollHost and attaches the listener to its current element"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-384",
+      "file": "packages/mantine-hooks/tests/upstream/use-scroll-spy/use-scroll-spy.test.tsx",
+      "fullName": "@mantine/hooks/use-scroll-spy falls back to window when a RefObject scrollHost has a null current"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-385",
+      "file": "packages/mantine-hooks/tests/upstream/use-scroll-spy/use-scroll-spy.test.tsx",
+      "fullName": "@mantine/hooks/use-scroll-spy reattaches the listener when scrollHost changes to a different element"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-386",
+      "file": "packages/mantine-hooks/tests/upstream/use-scroll-spy/use-scroll-spy.test.tsx",
+      "fullName": "@mantine/hooks/use-scroll-spy resolves a React ref that is attached to an element rendered in the same pass"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-387",
+      "file": "packages/mantine-hooks/tests/upstream/use-selection/use-selection.test.ts",
+      "fullName": "@mantine/hooks/use-selection correctly returns initial state for an empty data array"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-388",
+      "file": "packages/mantine-hooks/tests/upstream/use-selection/use-selection.test.ts",
+      "fullName": "@mantine/hooks/use-selection correctly returns initial state for a non-empty data array"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-389",
+      "file": "packages/mantine-hooks/tests/upstream/use-selection/use-selection.test.ts",
+      "fullName": "@mantine/hooks/use-selection correctly initializes with defaultSelection"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-390",
+      "file": "packages/mantine-hooks/tests/upstream/use-selection/use-selection.test.ts",
+      "fullName": "@mantine/hooks/use-selection correctly selects an item"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-391",
+      "file": "packages/mantine-hooks/tests/upstream/use-selection/use-selection.test.ts",
+      "fullName": "@mantine/hooks/use-selection correctly deselects an item"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-392",
+      "file": "packages/mantine-hooks/tests/upstream/use-selection/use-selection.test.ts",
+      "fullName": "@mantine/hooks/use-selection correctly toggles an item"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-393",
+      "file": "packages/mantine-hooks/tests/upstream/use-selection/use-selection.test.ts",
+      "fullName": "@mantine/hooks/use-selection correctly resets the selection"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-394",
+      "file": "packages/mantine-hooks/tests/upstream/use-selection/use-selection.test.ts",
+      "fullName": "@mantine/hooks/use-selection isAllSelected is true when all items are selected"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-395",
+      "file": "packages/mantine-hooks/tests/upstream/use-selection/use-selection.test.ts",
+      "fullName": "@mantine/hooks/use-selection allows direct setting of selection via setSelection"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-396",
+      "file": "packages/mantine-hooks/tests/upstream/use-selection/use-selection.test.ts",
+      "fullName": "@mantine/hooks/use-selection does not reset selection when data changes and resetSelectionOnDataChange is false"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-397",
+      "file": "packages/mantine-hooks/tests/upstream/use-selection/use-selection.test.ts",
+      "fullName": "@mantine/hooks/use-selection resets selection when data changes and resetSelectionOnDataChange is true"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-398",
+      "file": "packages/mantine-hooks/tests/upstream/use-selection/use-selection.test.ts",
+      "fullName": "@mantine/hooks/use-selection resets to empty selection when data changes and resetSelectionOnDataChange is true"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-399",
+      "file": "packages/mantine-hooks/tests/upstream/use-selection/use-selection.test.ts",
+      "fullName": "@mantine/hooks/use-selection correctly calculates isAllSelected based on data and selection lengths"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-400",
+      "file": "packages/mantine-hooks/tests/upstream/use-selection/use-selection.test.ts",
+      "fullName": "@mantine/hooks/use-selection handles duplicates in defaultSelection correctly"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-401",
+      "file": "packages/mantine-hooks/tests/upstream/use-session-storage/use-session-storage.test.ts",
+      "fullName": "@mantine/hooks/use-session-storage returns defaultValue when storage is empty"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-402",
+      "file": "packages/mantine-hooks/tests/upstream/use-session-storage/use-session-storage.test.ts",
+      "fullName": "@mantine/hooks/use-session-storage reads an existing value from sessionStorage on mount"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-403",
+      "file": "packages/mantine-hooks/tests/upstream/use-session-storage/use-session-storage.test.ts",
+      "fullName": "@mantine/hooks/use-session-storage writes value to sessionStorage on set"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-404",
+      "file": "packages/mantine-hooks/tests/upstream/use-session-storage/use-session-storage.test.ts",
+      "fullName": "@mantine/hooks/use-session-storage removes value from sessionStorage and resets to defaultValue"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-405",
+      "file": "packages/mantine-hooks/tests/upstream/use-set-state/use-set-state.test.ts",
+      "fullName": "@mantine/hooks/use-set-state returns correct initial state"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-406",
+      "file": "packages/mantine-hooks/tests/upstream/use-set-state/use-set-state.test.ts",
+      "fullName": "@mantine/hooks/use-set-state sets state with given state partial"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-407",
+      "file": "packages/mantine-hooks/tests/upstream/use-set-state/use-set-state.test.ts",
+      "fullName": "@mantine/hooks/use-set-state sets state with state function"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-408",
+      "file": "packages/mantine-hooks/tests/upstream/use-set/use-set.test.ts",
+      "fullName": "@mantine/hooks/use-set has correct initial state"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-409",
+      "file": "packages/mantine-hooks/tests/upstream/use-set/use-set.test.ts",
+      "fullName": "@mantine/hooks/use-set adds values"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-410",
+      "file": "packages/mantine-hooks/tests/upstream/use-set/use-set.test.ts",
+      "fullName": "@mantine/hooks/use-set deletes values"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-411",
+      "file": "packages/mantine-hooks/tests/upstream/use-set/use-set.test.ts",
+      "fullName": "@mantine/hooks/use-set clears set"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-412",
+      "file": "packages/mantine-hooks/tests/upstream/use-set/use-set.test.ts",
+      "fullName": "@mantine/hooks/use-set unions with another set and does not mutate the original set"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-413",
+      "file": "packages/mantine-hooks/tests/upstream/use-set/use-set.test.ts",
+      "fullName": "@mantine/hooks/use-set intersects with another set and does not mutate the original set"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-414",
+      "file": "packages/mantine-hooks/tests/upstream/use-set/use-set.test.ts",
+      "fullName": "@mantine/hooks/use-set finds difference with another set"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-415",
+      "file": "packages/mantine-hooks/tests/upstream/use-set/use-set.test.ts",
+      "fullName": "@mantine/hooks/use-set finds symmetric difference with another set"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-416",
+      "file": "packages/mantine-hooks/tests/upstream/use-set/use-set.test.ts",
+      "fullName": "@mantine/hooks/use-set returns a new instance identity after each mutation"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-417",
+      "file": "packages/mantine-hooks/tests/upstream/use-set/use-set.test.ts",
+      "fullName": "@mantine/hooks/use-set accumulates multiple synchronous mutations"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-418",
+      "file": "packages/mantine-hooks/tests/upstream/use-set/use-set.test.ts",
+      "fullName": "@mantine/hooks/use-set applies a retained mutator to the latest instance"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-419",
+      "file": "packages/mantine-hooks/tests/upstream/use-shallow-effect/use-shallow-effect.test.ts",
+      "fullName": "@mantine/hooks/use-shallow-effect is called on initial render"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-420",
+      "file": "packages/mantine-hooks/tests/upstream/use-shallow-effect/use-shallow-effect.test.ts",
+      "fullName": "@mantine/hooks/use-shallow-effect is called without dependencies"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-421",
+      "file": "packages/mantine-hooks/tests/upstream/use-shallow-effect/use-shallow-effect.test.ts",
+      "fullName": "@mantine/hooks/use-shallow-effect is called with an empty dependency array"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-422",
+      "file": "packages/mantine-hooks/tests/upstream/use-shallow-effect/use-shallow-effect.test.ts",
+      "fullName": "@mantine/hooks/use-shallow-effect is called with a non-empty dependency array on rerenders"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-423",
+      "file": "packages/mantine-hooks/tests/upstream/use-shallow-effect/use-shallow-effect.test.ts",
+      "fullName": "@mantine/hooks/use-shallow-effect is called with the same object on rerenders"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-424",
+      "file": "packages/mantine-hooks/tests/upstream/use-splitter/use-splitter.test.tsx",
+      "fullName": "useSplitter returns correct initial state"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-425",
+      "file": "packages/mantine-hooks/tests/upstream/use-splitter/use-splitter.test.tsx",
+      "fullName": "useSplitter returns handle props with correct ARIA attributes"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-426",
+      "file": "packages/mantine-hooks/tests/upstream/use-splitter/use-splitter.test.tsx",
+      "fullName": "useSplitter returns vertical aria-orientation when orientation is vertical"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-427",
+      "file": "packages/mantine-hooks/tests/upstream/use-splitter/use-splitter.test.tsx",
+      "fullName": "useSplitter programmatically sets sizes"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-428",
+      "file": "packages/mantine-hooks/tests/upstream/use-splitter/use-splitter.test.tsx",
+      "fullName": "useSplitter collapses a collapsible panel"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-429",
+      "file": "packages/mantine-hooks/tests/upstream/use-splitter/use-splitter.test.tsx",
+      "fullName": "useSplitter does not collapse a non-collapsible panel"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-430",
+      "file": "packages/mantine-hooks/tests/upstream/use-splitter/use-splitter.test.tsx",
+      "fullName": "useSplitter expands a collapsed panel"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-431",
+      "file": "packages/mantine-hooks/tests/upstream/use-splitter/use-splitter.test.tsx",
+      "fullName": "useSplitter toggleCollapse toggles panel state"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-432",
+      "file": "packages/mantine-hooks/tests/upstream/use-splitter/use-splitter.test.tsx",
+      "fullName": "useSplitter handles keyboard ArrowRight to increase before panel"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-433",
+      "file": "packages/mantine-hooks/tests/upstream/use-splitter/use-splitter.test.tsx",
+      "fullName": "useSplitter handles keyboard ArrowLeft to decrease before panel"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-434",
+      "file": "packages/mantine-hooks/tests/upstream/use-splitter/use-splitter.test.tsx",
+      "fullName": "useSplitter handles Shift+Arrow for larger step"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-435",
+      "file": "packages/mantine-hooks/tests/upstream/use-splitter/use-splitter.test.tsx",
+      "fullName": "useSplitter handles Home key to shrink before panel to min"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-436",
+      "file": "packages/mantine-hooks/tests/upstream/use-splitter/use-splitter.test.tsx",
+      "fullName": "useSplitter handles End key to grow before panel to max"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-437",
+      "file": "packages/mantine-hooks/tests/upstream/use-splitter/use-splitter.test.tsx",
+      "fullName": "useSplitter respects min/max constraints during keyboard navigation"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-438",
+      "file": "packages/mantine-hooks/tests/upstream/use-splitter/use-splitter.test.tsx",
+      "fullName": "useSplitter handles RTL keyboard direction"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-439",
+      "file": "packages/mantine-hooks/tests/upstream/use-splitter/use-splitter.test.tsx",
+      "fullName": "useSplitter handles vertical orientation with ArrowUp/ArrowDown"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-440",
+      "file": "packages/mantine-hooks/tests/upstream/use-splitter/use-splitter.test.tsx",
+      "fullName": "useSplitter ignores wrong-axis arrow keys without preventing default (allows page scroll)"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-441",
+      "file": "packages/mantine-hooks/tests/upstream/use-splitter/use-splitter.test.tsx",
+      "fullName": "useSplitter Enter toggles collapse on collapsible panel"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-442",
+      "file": "packages/mantine-hooks/tests/upstream/use-splitter/use-splitter.test.tsx",
+      "fullName": "useSplitter does not respond to keyboard when disabled"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-443",
+      "file": "packages/mantine-hooks/tests/upstream/use-splitter/use-splitter.test.tsx",
+      "fullName": "useSplitter handles 3 panels correctly"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-444",
+      "file": "packages/mantine-hooks/tests/upstream/use-splitter/use-splitter.test.tsx",
+      "fullName": "useSplitter calls onSizeChange in controlled mode"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-445",
+      "file": "packages/mantine-hooks/tests/upstream/use-splitter/use-splitter.test.tsx",
+      "fullName": "useSplitter data-active is set on active handle only"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-446",
+      "file": "packages/mantine-hooks/tests/upstream/use-splitter/use-splitter.test.tsx",
+      "fullName": "useSplitter custom step size works"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-447",
+      "file": "packages/mantine-hooks/tests/upstream/use-splitter/use-splitter.test.tsx",
+      "fullName": "useSplitter custom shiftStep size works"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-448",
+      "file": "packages/mantine-hooks/tests/upstream/use-splitter/use-splitter.test.tsx",
+      "fullName": "useSplitter sizes always sum to 100 when constrained by min"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-449",
+      "file": "packages/mantine-hooks/tests/upstream/use-splitter/use-splitter.test.tsx",
+      "fullName": "useSplitter keyboard collapse fires onCollapseChange"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-450",
+      "file": "packages/mantine-hooks/tests/upstream/use-splitter/use-splitter.test.tsx",
+      "fullName": "useSplitter redistribute: nearest borrows from further panels when neighbor is at min"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-451",
+      "file": "packages/mantine-hooks/tests/upstream/use-splitter/use-splitter.test.tsx",
+      "fullName": "useSplitter redistribute: nearest borrows from nearest panel first (positive delta)"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-452",
+      "file": "packages/mantine-hooks/tests/upstream/use-splitter/use-splitter.test.tsx",
+      "fullName": "useSplitter redistribute: nearest borrows from panels to the left on negative delta"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-453",
+      "file": "packages/mantine-hooks/tests/upstream/use-splitter/use-splitter.test.tsx",
+      "fullName": "useSplitter redistribute: nearest respects growing panel max constraint"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-454",
+      "file": "packages/mantine-hooks/tests/upstream/use-splitter/use-splitter.test.tsx",
+      "fullName": "useSplitter redistribute: equal distributes shrinkage equally among donor panels"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-455",
+      "file": "packages/mantine-hooks/tests/upstream/use-splitter/use-splitter.test.tsx",
+      "fullName": "useSplitter redistribute: equal skips donors at min and redistributes to remaining"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-456",
+      "file": "packages/mantine-hooks/tests/upstream/use-splitter/use-splitter.test.tsx",
+      "fullName": "useSplitter redistribute: custom function calls custom function with correct input"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-457",
+      "file": "packages/mantine-hooks/tests/upstream/use-splitter/use-splitter.test.tsx",
+      "fullName": "useSplitter redistribute: custom function uses sizes returned by custom function"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-458",
+      "file": "packages/mantine-hooks/tests/upstream/use-splitter/use-splitter.test.tsx",
+      "fullName": "useSplitter expand does not fire onCollapseChange or set negative sizes when neighbor has no space to give"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-459",
+      "file": "packages/mantine-hooks/tests/upstream/use-splitter/use-splitter.test.tsx",
+      "fullName": "useSplitter cleans up body styles on unmount during an active drag"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-460",
+      "file": "packages/mantine-hooks/tests/upstream/use-splitter/use-splitter.test.tsx",
+      "fullName": "useSplitter does not change sizes when the container has zero measured size"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-461",
+      "file": "packages/mantine-hooks/tests/upstream/use-splitter/use-splitter.test.tsx",
+      "fullName": "useSplitter CSS units preserves declared units in returned sizes"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-462",
+      "file": "packages/mantine-hooks/tests/upstream/use-splitter/use-splitter.test.tsx",
+      "fullName": "useSplitter CSS units reports fixed pixel pane size via aria-valuenow"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-463",
+      "file": "packages/mantine-hooks/tests/upstream/use-splitter/use-splitter.test.tsx",
+      "fullName": "useSplitter CSS units resolves rem sizes to pixels using root font-size"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-464",
+      "file": "packages/mantine-hooks/tests/upstream/use-splitter/use-splitter.test.tsx",
+      "fullName": "useSplitter CSS units applies a pixel keyboard step to a fixed pane"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-465",
+      "file": "packages/mantine-hooks/tests/upstream/use-splitter/use-splitter.test.tsx",
+      "fullName": "useSplitter CSS units treats a bare-number step as a percentage of the container in pixel mode"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-466",
+      "file": "packages/mantine-hooks/tests/upstream/use-splitter/use-splitter.test.tsx",
+      "fullName": "useSplitter CSS units clamps a fixed pane to its pixel max"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-467",
+      "file": "packages/mantine-hooks/tests/upstream/use-splitter/use-splitter.test.tsx",
+      "fullName": "useSplitter CSS units updates the fixed pane in pixels and the flexible neighbor in percent on drag"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-468",
+      "file": "packages/mantine-hooks/tests/upstream/use-splitter/use-splitter.test.tsx",
+      "fullName": "useSplitter CSS units collapses and expands a fixed pane preserving its unit"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-469",
+      "file": "packages/mantine-hooks/tests/upstream/use-splitter/use-splitter.test.tsx",
+      "fullName": "useSplitter CSS units restores a fixed pane to its original px after it collapses mid-drag (not as a percentage)"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-470",
+      "file": "packages/mantine-hooks/tests/upstream/use-splitter/use-splitter.test.tsx",
+      "fullName": "useSplitter CSS units respects RTL when dragging a fixed pane"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-471",
+      "file": "packages/mantine-hooks/tests/upstream/use-splitter/use-splitter.test.tsx",
+      "fullName": "useSplitter CSS units moves the handle by the pointer delta between two flexible panes next to a fixed pane"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-472",
+      "file": "packages/mantine-hooks/tests/upstream/use-splitter/use-splitter.test.tsx",
+      "fullName": "useSplitter CSS units enables pixel mode when only collapseThreshold uses a fixed unit"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-473",
+      "file": "packages/mantine-hooks/tests/upstream/use-splitter/use-splitter.test.tsx",
+      "fullName": "useSplitter CSS units does not rewrite fixed sizes on a no-op drag when panes overflow the container"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-474",
+      "file": "packages/mantine-hooks/tests/upstream/use-splitter/use-splitter.test.tsx",
+      "fullName": "useSplitter CSS units does not shrink overflowing fixed panes on a real drag (keeps the unscaled total)"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-475",
+      "file": "packages/mantine-hooks/tests/upstream/use-splitter/use-splitter.test.tsx",
+      "fullName": "useSplitter CSS units does not shrink overflowing fixed panes on keyboard resize (keeps the unscaled total)"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-476",
+      "file": "packages/mantine-hooks/tests/upstream/use-splitter/use-splitter.test.tsx",
+      "fullName": "useSplitter CSS units encodes the absolute fixed size when a drag hands space to a flexible pane"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-477",
+      "file": "packages/mantine-hooks/tests/upstream/use-splitter/use-splitter.test.tsx",
+      "fullName": "useSplitter CSS units re-encodes unchanged fixed panes when a drag clears the overflow"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-478",
+      "file": "packages/mantine-hooks/tests/upstream/use-splitter/use-splitter.test.tsx",
+      "fullName": "useSplitter CSS units re-encodes untouched flex panes when a drag clears the overflow"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-479",
+      "file": "packages/mantine-hooks/tests/upstream/use-splitter/use-splitter.test.tsx",
+      "fullName": "useSplitter redistribute preserves sum nearest: sizes sum to 100 after multiple operations"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-480",
+      "file": "packages/mantine-hooks/tests/upstream/use-splitter/use-splitter.test.tsx",
+      "fullName": "useSplitter redistribute preserves sum equal: sizes sum to 100 after multiple operations"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-481",
+      "file": "packages/mantine-hooks/tests/upstream/use-splitter/use-splitter.test.tsx",
+      "fullName": "useSplitter reset reset(handleIndex) restores adjacent panels to their default ratio and leaves other panels untouched"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-482",
+      "file": "packages/mantine-hooks/tests/upstream/use-splitter/use-splitter.test.tsx",
+      "fullName": "useSplitter reset reset clamps adjacent panels to their min constraints"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-483",
+      "file": "packages/mantine-hooks/tests/upstream/use-splitter/use-splitter.test.tsx",
+      "fullName": "useSplitter reset double-clicking a handle resets its adjacent panels to the default ratio"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-484",
+      "file": "packages/mantine-hooks/tests/upstream/use-splitter/use-splitter.test.tsx",
+      "fullName": "useSplitter reset does not reset on double click when resetOnDoubleClick is false"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-485",
+      "file": "packages/mantine-hooks/tests/upstream/use-state-history/use-state-history.test.ts",
+      "fullName": "@mantine/hooks/use-state-history initializes with the given value"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-486",
+      "file": "packages/mantine-hooks/tests/upstream/use-state-history/use-state-history.test.ts",
+      "fullName": "@mantine/hooks/use-state-history remembers previous state in history"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-487",
+      "file": "packages/mantine-hooks/tests/upstream/use-state-history/use-state-history.test.ts",
+      "fullName": "@mantine/hooks/use-state-history allows going back and forward in history"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-488",
+      "file": "packages/mantine-hooks/tests/upstream/use-state-history/use-state-history.test.ts",
+      "fullName": "@mantine/hooks/use-state-history does not allow to go back/forward beyond history"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-489",
+      "file": "packages/mantine-hooks/tests/upstream/use-state-history/use-state-history.test.ts",
+      "fullName": "@mantine/hooks/use-state-history erase forward history when new value is set"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-490",
+      "file": "packages/mantine-hooks/tests/upstream/use-state-history/use-state-history.test.ts",
+      "fullName": "@mantine/hooks/use-state-history resets history"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-491",
+      "file": "packages/mantine-hooks/tests/upstream/use-text-selection/use-text-selection.test.ts",
+      "fullName": "@mantine/hooks/use-text-selection registers a selectionchange listener on mount"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-492",
+      "file": "packages/mantine-hooks/tests/upstream/use-text-selection/use-text-selection.test.ts",
+      "fullName": "@mantine/hooks/use-text-selection removes the selectionchange listener on unmount"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-493",
+      "file": "packages/mantine-hooks/tests/upstream/use-text-selection/use-text-selection.test.ts",
+      "fullName": "@mantine/hooks/use-text-selection re-renders when selectionchange fires"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-494",
+      "file": "packages/mantine-hooks/tests/upstream/use-throttled-callback/use-throttled-callback.test.ts",
+      "fullName": "useThrottledCallback should throttle the callback"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-495",
+      "file": "packages/mantine-hooks/tests/upstream/use-throttled-callback/use-throttled-callback.test.ts",
+      "fullName": "useThrottledCallback should allow callback after throttle period"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-496",
+      "file": "packages/mantine-hooks/tests/upstream/use-throttled-callback/use-throttled-callback.test.ts",
+      "fullName": "useThrottledCallback should call the callback with correct arguments"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-497",
+      "file": "packages/mantine-hooks/tests/upstream/use-throttled-state/use-throttled-state.test.ts",
+      "fullName": "useThrottledState should update value with throttling"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-498",
+      "file": "packages/mantine-hooks/tests/upstream/use-throttled-state/use-throttled-state.test.ts",
+      "fullName": "useThrottledState should clear timeout on unmount"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-499",
+      "file": "packages/mantine-hooks/tests/upstream/use-throttled-value/use-throttled-value.test.ts",
+      "fullName": "useThrottledValue should return the initial value"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-500",
+      "file": "packages/mantine-hooks/tests/upstream/use-throttled-value/use-throttled-value.test.ts",
+      "fullName": "useThrottledValue should throttle the value update"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-501",
+      "file": "packages/mantine-hooks/tests/upstream/use-throttled-value/use-throttled-value.test.ts",
+      "fullName": "useThrottledValue should clear timeout on unmount"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-502",
+      "file": "packages/mantine-hooks/tests/upstream/use-timeout/use-timeout.test.ts",
+      "fullName": "@mantine/hooks/use-timeout initialize"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-503",
+      "file": "packages/mantine-hooks/tests/upstream/use-timeout/use-timeout.test.ts",
+      "fullName": "@mantine/hooks/use-timeout callback should NOT fire before calling start function, if autoInvoke is false"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-504",
+      "file": "packages/mantine-hooks/tests/upstream/use-timeout/use-timeout.test.ts",
+      "fullName": "@mantine/hooks/use-timeout callback should fire after calling start function, if autoInvoke is false"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-505",
+      "file": "packages/mantine-hooks/tests/upstream/use-timeout/use-timeout.test.ts",
+      "fullName": "@mantine/hooks/use-timeout callback should fire without calling start when autoInvoke is true"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-506",
+      "file": "packages/mantine-hooks/tests/upstream/use-timeout/use-timeout.test.ts",
+      "fullName": "@mantine/hooks/use-timeout callback should be called when rerender is triggered before timeout"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-507",
+      "file": "packages/mantine-hooks/tests/upstream/use-timeout/use-timeout.test.ts",
+      "fullName": "@mantine/hooks/use-timeout timeout is cleared on calling clear"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-508",
+      "file": "packages/mantine-hooks/tests/upstream/use-timeout/use-timeout.test.ts",
+      "fullName": "@mantine/hooks/use-timeout start function passes parameters to callback"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-509",
+      "file": "packages/mantine-hooks/tests/upstream/use-toggle/use-toggle.test.ts",
+      "fullName": "@mantine/hooks/use-toggle returns correct initial state"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-510",
+      "file": "packages/mantine-hooks/tests/upstream/use-toggle/use-toggle.test.ts",
+      "fullName": "@mantine/hooks/use-toggle correctly toggles value"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-511",
+      "file": "packages/mantine-hooks/tests/upstream/use-toggle/use-toggle.test.ts",
+      "fullName": "@mantine/hooks/use-toggle correctly toggles more than two values"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-512",
+      "file": "packages/mantine-hooks/tests/upstream/use-toggle/use-toggle.test.ts",
+      "fullName": "@mantine/hooks/use-toggle allows to set value"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-513",
+      "file": "packages/mantine-hooks/tests/upstream/use-toggle/use-toggle.test.ts",
+      "fullName": "@mantine/hooks/use-toggle allows to set value with callback function"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-514",
+      "file": "packages/mantine-hooks/tests/upstream/use-toggle/use-toggle.test.ts",
+      "fullName": "@mantine/hooks/use-toggle allows to use hook without options"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-515",
+      "file": "packages/mantine-hooks/tests/upstream/use-uncontrolled/use-uncontrolled.test.ts",
+      "fullName": "use-uncontrolled returns default value for initial uncontrolled state"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-516",
+      "file": "packages/mantine-hooks/tests/upstream/use-uncontrolled/use-uncontrolled.test.ts",
+      "fullName": "use-uncontrolled returns final value for initial uncontrolled state if default value was not provided"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-517",
+      "file": "packages/mantine-hooks/tests/upstream/use-uncontrolled/use-uncontrolled.test.ts",
+      "fullName": "use-uncontrolled supports uncontrolled state"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-518",
+      "file": "packages/mantine-hooks/tests/upstream/use-uncontrolled/use-uncontrolled.test.ts",
+      "fullName": "use-uncontrolled calls onChange with uncontrolled state"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-519",
+      "file": "packages/mantine-hooks/tests/upstream/use-uncontrolled/use-uncontrolled.test.ts",
+      "fullName": "use-uncontrolled supports controlled state"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-520",
+      "file": "packages/mantine-hooks/tests/upstream/use-validated-state/use-validated-state.test.ts",
+      "fullName": "@mantine/hooks/use-validated-state returns initial value"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-521",
+      "file": "packages/mantine-hooks/tests/upstream/use-validated-state/use-validated-state.test.ts",
+      "fullName": "@mantine/hooks/use-validated-state respects initialValidationState to override validator result on initial render"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-522",
+      "file": "packages/mantine-hooks/tests/upstream/use-validated-state/use-validated-state.test.ts",
+      "fullName": "@mantine/hooks/use-validated-state updates lastValidValue when a valid value is set after invalid ones"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-523",
+      "file": "packages/mantine-hooks/tests/upstream/use-validated-state/use-validated-state.test.ts",
+      "fullName": "@mantine/hooks/use-validated-state keeps lastValidValue from before a streak of invalid values"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-524",
+      "file": "packages/mantine-hooks/tests/upstream/use-validated-state/use-validated-state.test.ts",
+      "fullName": "@mantine/hooks/use-validated-state returns correct value based on the rule"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-525",
+      "file": "packages/mantine-hooks/tests/upstream/use-viewport-size/use-viewport-size.test.ts",
+      "fullName": "@mantine/hooks/use-viewport-size returns width and height reflecting window dimensions"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-526",
+      "file": "packages/mantine-hooks/tests/upstream/use-viewport-size/use-viewport-size.test.ts",
+      "fullName": "@mantine/hooks/use-viewport-size updates after a resize event"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-527",
+      "file": "packages/mantine-hooks/tests/upstream/use-viewport-size/use-viewport-size.test.ts",
+      "fullName": "@mantine/hooks/use-viewport-size updates after an orientationchange event"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-528",
+      "file": "packages/mantine-hooks/tests/upstream/use-window-event/use-window-event.test.ts",
+      "fullName": "@mantine/hooks/use-window-event calls listener when the event fires"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-529",
+      "file": "packages/mantine-hooks/tests/upstream/use-window-event/use-window-event.test.ts",
+      "fullName": "@mantine/hooks/use-window-event calls the latest listener after rerender (no stale closure)"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-530",
+      "file": "packages/mantine-hooks/tests/upstream/use-window-event/use-window-event.test.ts",
+      "fullName": "@mantine/hooks/use-window-event does not re-register the listener when an inline callback changes identity"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-531",
+      "file": "packages/mantine-hooks/tests/upstream/use-window-event/use-window-event.test.ts",
+      "fullName": "@mantine/hooks/use-window-event re-registers when event type changes"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-532",
+      "file": "packages/mantine-hooks/tests/upstream/use-window-event/use-window-event.test.ts",
+      "fullName": "@mantine/hooks/use-window-event removes the listener on unmount"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-533",
+      "file": "packages/mantine-hooks/tests/upstream/utils/clamp/clamp.test.ts",
+      "fullName": "@mantine/hooks/clamp clamps given value"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-534",
+      "file": "packages/mantine-hooks/tests/upstream/utils/clamp/clamp.test.ts",
+      "fullName": "@mantine/hooks/clamp correctly works with undefined min and max"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-535",
+      "file": "packages/mantine-hooks/tests/upstream/utils/lower-first/lower-first.test.ts",
+      "fullName": "@mantine/hooks/lower-first converts first letter to lower case"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-536",
+      "file": "packages/mantine-hooks/tests/upstream/utils/lower-first/lower-first.test.ts",
+      "fullName": "@mantine/hooks/lower-first returns empty string if value cannot be capitalized"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-537",
+      "file": "packages/mantine-hooks/tests/upstream/utils/random-id/random-id.test.ts",
+      "fullName": "@mantine/hooks/random-id returns random id with mantine- prefix"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-538",
+      "file": "packages/mantine-hooks/tests/upstream/utils/random-id/random-id.test.ts",
+      "fullName": "@mantine/hooks/random-id supports custom prefix"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-539",
+      "file": "packages/mantine-hooks/tests/upstream/utils/range/range.test.ts",
+      "fullName": "@mantine/hooks/range returns range between given numbers"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-540",
+      "file": "packages/mantine-hooks/tests/upstream/utils/range/range.test.ts",
+      "fullName": "@mantine/hooks/range allows generating reversed range"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-541",
+      "file": "packages/mantine-hooks/tests/upstream/utils/shallow-equal/shallow-equal.test.ts",
+      "fullName": "@mantine/hooks/shallow-equal correctly compares primitive types"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-542",
+      "file": "packages/mantine-hooks/tests/upstream/utils/shallow-equal/shallow-equal.test.ts",
+      "fullName": "@mantine/hooks/shallow-equal correctly compares object and array type"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-543",
+      "file": "packages/mantine-hooks/tests/upstream/utils/upper-first/upper-first.test.ts",
+      "fullName": "@mantine/hooks/upper-first capitalizes first letter"
+    },
+    {
+      "id": "runtime:mantine-hooks-adapted-544",
+      "file": "packages/mantine-hooks/tests/upstream/utils/upper-first/upper-first.test.ts",
+      "fullName": "@mantine/hooks/upper-first returns empty string if value cannot be capitalized"
+    }
+  ]
+}

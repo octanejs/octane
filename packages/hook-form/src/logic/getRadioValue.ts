@@ -1,4 +1,4 @@
-// Vendored from react-hook-form@7.81.0 src/logic/getRadioValue.ts (octane port).
+// Adapted from react-hook-form@7.88.0 src/logic/getRadioValue.ts for Octane.
 type RadioFieldResult = {
 	isValid: boolean;
 	value: number | string | null;

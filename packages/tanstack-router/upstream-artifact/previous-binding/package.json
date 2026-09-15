@@ -1,0 +1,75 @@
+{
+  "name": "@octanejs/tanstack-router",
+  "version": "0.1.53",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "octane": {
+    "hookSlots": {
+      "manual": [
+        "src"
+      ]
+    }
+  },
+  "description": "TanStack Router bindings for the octane renderer — reuses @tanstack/router-core and swaps the React binding for octane's hooks.",
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/tanstack-router"
+  },
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "sideEffects": false,
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "exports": {
+    ".": "./src/index.ts",
+    "./history": "./src/history.ts",
+    "./ssr/server": {
+      "types": "./src/ssr/server.ts",
+      "default": "./src/ssr/server.ts"
+    },
+    "./ssr/client": {
+      "types": "./src/ssr/client.ts",
+      "default": "./src/ssr/client.ts"
+    },
+    "./generator-plugin": {
+      "types": "./src/generator-plugin.d.ts",
+      "default": "./src/generator-plugin.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@tanstack/history": "catalog:default",
+    "@tanstack/router-core": "catalog:default",
+    "@tanstack/store": "catalog:default",
+    "isbot": "^5.1.22"
+  },
+  "peerDependencies": {
+    "octane": "workspace:^0.1.51 || ^0.2.0"
+  },
+  "devDependencies": {
+    "@tanstack/react-router": "catalog:default",
+    "@tsrx/react": "catalog:default",
+    "esbuild": "catalog:default",
+    "octane": "workspace:*",
+    "react": "catalog:default",
+    "react-dom": "catalog:default",
+    "vitest": "catalog:default"
+  }
+}

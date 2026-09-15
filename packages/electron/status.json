@@ -1,7 +1,7 @@
 {
   "upstream": {
     "package": "electron",
-    "version": "43.2.0"
+    "version": "44.3.0"
   },
   "surface": "Process-split Electron bindings: ./main registers ipcMain handlers, ./main/native re-exports main-only Electron APIs (Menu, Tray, session, protocol, BrowserWindow, …), ./preload exposes Electron IPC and desktop helpers via contextBridge, and the renderer entry provides Octane hooks (useInvoke, useInvokeState, useIpcEvent, useNativeTheme, useWindowState) plus promise helpers for app/window/dialog/shell/clipboard/screen. Menu/Tray/session/protocol stay intentional main-only under contextIsolation.",
   "divergences": [
@@ -14,5 +14,5 @@
     "Built-in desktop helpers use octane:* IPC channels; apps may allowlist additional channels in preload."
   ],
   "ssr": "Server rendering performs no IPC. useInvokeState renders pending and issues the command on the client after hydration; useIpcEvent and reactive desktop hooks subscribe only on the client. useInvoke without a host rejects with ElectronUnavailableError.",
-  "verified": "2026-08-02"
+  "verified": "2026-09-13"
 }

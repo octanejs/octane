@@ -1,9 +1,10 @@
 import { createElement, useEffect, useId, useState } from 'octane';
 import { isServer } from '@tanstack/router-core/isServer';
-import type { RouterManagedTag } from '@tanstack/router-core';
 import { getAssetKey, getManagedAssetKey } from './assetKeys.ts';
 import { useRouter } from './context.ts';
 import { useScripts } from './scriptContentUtils.ts';
+import type { ScriptRenderAsset } from './scriptContentUtils.ts';
+import { Asset } from './Asset.tsrx';
 
 export function Scripts() @{
 	const owner = useId();
@@ -13,7 +14,7 @@ export function Scripts() @{
 	useEffect(() => {
 		setHydrating(false);
 	}, []);
-	const renderScripts: Array<RouterManagedTag> =
+	const renderScripts: Array<ScriptRenderAsset> =
 		!(isServer ?? router.isServer) && hydrating
 			? [
 					{
@@ -32,11 +33,22 @@ export function Scripts() @{
 	<>
 		{renderScripts.map((script, index) => {
 			const assetKey = getAssetKey('body', script, index);
-			return createElement('script', {
-				...script.attrs,
+			// The streamed bootstrap stays in the native tree until hydration has
+			// adopted its barrier. Ordinary assets use the shared script lifecycle.
+			if (script.attrs?.id === '$tsr-stream-barrier') {
+				return createElement('script', {
+					...script.attrs,
+					key: assetKey,
+					dangerouslySetInnerHTML: { __html: script.children ?? '' },
+				});
+			}
+			return createElement(Asset, {
+				...script,
+				attrs: {
+					...script.attrs,
+					'data-tsr-managed-key': getManagedAssetKey('body', owner, index),
+				},
 				key: assetKey,
-				'data-tsr-managed-key': getManagedAssetKey('body', owner, index),
-				dangerouslySetInnerHTML: { __html: script.children ?? '' },
 			});
 		})}
 	</>

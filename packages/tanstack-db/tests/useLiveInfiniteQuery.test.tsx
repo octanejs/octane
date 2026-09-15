@@ -1027,12 +1027,12 @@ describe(`useLiveInfiniteQuery`, () => {
 		expect(result.current.pages).toHaveLength(1);
 		expect(result.current.isFetchingNextPage).toBe(false);
 
-		// Fetch next page - should remain false because data is immediately available
-		act(() => {
-			result.current.fetchNextPage();
+		// Core 0.9 publishes the page through the controller's fetch promise,
+		// even when its source rows are already available.
+		await act(async () => {
+			await result.current.fetchNextPage();
 		});
 
-		// Since data is *synchronously* available, isFetchingNextPage should be false
 		expect(result.current.pages).toHaveLength(2);
 		expect(result.current.isFetchingNextPage).toBe(false);
 	});

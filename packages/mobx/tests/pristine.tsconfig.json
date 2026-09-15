@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "target": "ES2015",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "lib": ["ESNext", "DOM"],
+    "jsx": "react",
+    "esModuleInterop": true,
+    "useDefineForClassFields": true,
+    "strict": true,
+    "noImplicitAny": false,
+    "noImplicitThis": false,
+    "skipLibCheck": true,
+    "allowJs": true
+  },
+  "include": ["../upstream/src", "../upstream/__tests__", "../upstream/jest.setup.ts"]
+}

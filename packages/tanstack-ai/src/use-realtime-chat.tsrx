@@ -16,7 +16,7 @@ const emptyFrequencyData = new Uint8Array(128)
 const emptyTimeDomainData = new Uint8Array(128).fill(128)
 
 /**
- * Octane hook for realtime voice conversations.
+ * React hook for realtime voice conversations.
  *
  * Provides a simple interface for voice-to-voice AI interactions
  * with support for multiple providers (OpenAI, ElevenLabs, etc.).
@@ -26,7 +26,7 @@ const emptyTimeDomainData = new Uint8Array(128).fill(128)
  *
  * @example
  * ```typescript
- * import { useRealtimeChat } from '@octanejs/tanstack-ai'
+ * import { useRealtimeChat } from '@tanstack/ai-react'
  * import { openaiRealtime } from '@tanstack/ai-openai'
  *
  * function VoiceChat() {
@@ -87,17 +87,11 @@ export function useRealtimeChat(
     // `undefined` for absent values.
     const initial = optionsRef.current
     clientRef.current = new RealtimeClient({
-      // Octane divergence note: Upstream captures the first transport callbacks.
-      // Ref-backed delegates keep the client stable while reconnects and token
-      // refreshes observe the latest render's authentication and adapter.
+      // Preserve the existing native binding's latest-callback contract.
       getToken: () => optionsRef.current.getToken(),
       adapter: {
-        get provider() {
-          return optionsRef.current.adapter.provider
-        },
-        connect(token, tools) {
-          return optionsRef.current.adapter.connect(token, tools)
-        },
+        get provider() { return optionsRef.current.adapter.provider },
+        connect: (...args) => optionsRef.current.adapter.connect(...args),
       },
       ...(initial.tools !== undefined && { tools: initial.tools }),
       ...(initial.instructions !== undefined && {
@@ -125,8 +119,6 @@ export function useRealtimeChat(
       }),
       onStatusChange: (newStatus) => {
         setStatus(newStatus)
-        // Octane divergence note: Upstream declares this callback but does not
-        // forward status changes beyond its own hook state.
         optionsRef.current.onStatusChange?.(newStatus)
       },
       onModeChange: (newMode) => {
@@ -137,10 +129,10 @@ export function useRealtimeChat(
         setMessages((prev) => [...prev, message])
         optionsRef.current.onMessage?.(message)
       },
-      onUsage: (usage) => {
+      onUsage(usage) {
         optionsRef.current.onUsage?.(usage)
       },
-      onGoAway: (timeLeft) => {
+      onGoAway(timeLeft) {
         optionsRef.current.onGoAway?.(timeLeft)
       },
       onError: (err) => {

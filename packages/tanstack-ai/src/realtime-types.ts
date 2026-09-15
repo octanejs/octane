@@ -141,6 +141,5 @@ export interface UseRealtimeChatReturn {
 	getOutputTimeDomainData: () => Uint8Array;
 
 	// Session control
-	/** Update the active session and persist the configuration for reconnects. */
 	updateSession: (config: RealtimeSessionConfig) => void;
 }

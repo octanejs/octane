@@ -1,4 +1,4 @@
-// Vendored from react-hook-form@7.81.0 src/types/fields.ts (octane port).
+// Adapted from react-hook-form@7.88.0 src/types/fields.ts for Octane.
 import type { IsFlatObject, Noop } from './utils';
 import type { RegisterOptions } from './validator';
 

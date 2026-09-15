@@ -1,4 +1,4 @@
-// Vendored from react-hook-form@7.81.0 src/types/validator.ts (octane port).
+// Adapted from react-hook-form@7.88.0 src/types/validator.ts for Octane.
 import type { EVENTS, INPUT_VALIDATION_RULES } from '../constants';
 
 import type { Message } from './errors';
@@ -12,7 +12,7 @@ export type ValidationRule<TValidationValue extends ValidationValue = Validation
 	TValidationValue | ValidationValueMessage<TValidationValue>;
 
 export type ValidationValueMessage<TValidationValue extends ValidationValue = ValidationValue> = {
-	value: TValidationValue;
+	value: TValidationValue | undefined;
 	message: Message;
 };
 

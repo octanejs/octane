@@ -1,18 +1,21 @@
-import { deepEqual } from '@tanstack/router-core';
+import { _getAssetMatches, deepEqual } from '@tanstack/router-core';
 import { isServer } from '@tanstack/router-core/isServer';
 import { useRouter } from './context';
 import { splitSlot, subSlot } from './internal';
 import { useStore } from './useStore';
 import type { AnyRouteMatch, AnyRouter, RouterManagedTag } from '@tanstack/router-core';
 
+export type ScriptRenderAsset = RouterManagedTag & { preventScriptHoist?: boolean };
+
 function getScripts(router: AnyRouter, matches: Array<AnyRouteMatch>) {
+	matches = _getAssetMatches(matches);
 	const nonce = router.options.ssr?.nonce;
-	const scripts: Array<RouterManagedTag> = matches
+	const scripts: Array<ScriptRenderAsset> = matches
 		.flatMap((match) => match.scripts ?? [])
 		.filter((script) => script !== undefined)
 		.map(({ children, ...attrs }) => ({
 			tag: 'script',
-			attrs: { ...attrs, nonce },
+			attrs: { ...attrs, nonce, suppressHydrationWarning: true },
 			children,
 		}));
 
@@ -24,6 +27,7 @@ function getScripts(router: AnyRouter, matches: Array<AnyRouteMatch>) {
 					tag: 'script',
 					attrs: { ...asset.attrs, nonce },
 					children: asset.children,
+					...(typeof asset.attrs?.src === 'string' ? { preventScriptHoist: true } : {}),
 				});
 			}
 		}
@@ -32,7 +36,7 @@ function getScripts(router: AnyRouter, matches: Array<AnyRouteMatch>) {
 	return scripts;
 }
 
-export function useScripts(...args: Array<unknown>): Array<RouterManagedTag> {
+export function useScripts(...args: Array<unknown>): Array<ScriptRenderAsset> {
 	const [, slot] = splitSlot(args);
 	const router = useRouter();
 

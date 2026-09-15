@@ -1,7 +1,7 @@
 {
   "name": "@octanejs/octane-is",
   "version": "0.0.1",
-  "description": "Element-kind predicates for Octane, matching react-is 19.2.7's public surface.",
+  "description": "Element-kind predicates for Octane, matching react-is 19.3.0's public surface.",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
@@ -43,8 +43,8 @@
   },
   "devDependencies": {
     "octane": "workspace:*",
-    "react": "19.2.7",
-    "react-dom": "19.2.7",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
     "vitest": "catalog:default"
   }
 }

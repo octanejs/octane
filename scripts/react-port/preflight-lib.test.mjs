@@ -11,15 +11,95 @@ import {
 	assessResolvedEvidence,
 	collectArchiveEvidence,
 	conventionalTestPath,
+	isUpstreamTypeTestPath,
 	evaluateApprovedLicense,
 	parseTarArchive,
 	parseInput,
+	pinnedClassFieldNames,
+	pinnedObjectValues,
+	pinnedLiteralRows,
+	expandPinnedStaticArray,
+	expandPinnedDirectoryProjects,
 	resolveRemoteInput,
 	runPreflight,
 	sanitizeForReport,
 	validateArchiveEntries,
 	verifyIntegrity,
+	verifyNonTestArtifact,
 } from './preflight-lib.mjs';
+import { configuredTestSelectors, selectedByTestConfiguration } from './test-discovery.mjs';
+
+test('separates explicit TypeScript test directories from runtime TypeScript suites', () => {
+	assert.equal(
+		isUpstreamTypeTestPath('test/typescript/selector-strict/useTranslation.test.ts'),
+		true,
+	);
+	assert.equal(isUpstreamTypeTestPath('tests/typescript/custom/Trans.test.tsx'), true);
+	assert.equal(isUpstreamTypeTestPath('test/useTranslation.spec.tsx'), false);
+	assert.equal(isUpstreamTypeTestPath('src/typescript/parser.test.ts'), false);
+});
+
+test('pinned directory projects select the complete type suites without running upstream code', () => {
+	const expression = 'readProjectsFromDisk()';
+	const entry = { path: 'vitest.workspace.typescript.mts', sha: 'a'.repeat(40) };
+	const expansion = {
+		path: entry.path,
+		gitBlob: entry.sha,
+		expression,
+		directory: 'test/typescript',
+		excludedDirectories: ['issue-1899'],
+		configPrefix: 'tsconfig.',
+		configSuffix: '.json',
+		excludedConfigSubstring: 'vitest-temp',
+		testPattern: '*.test.{ts,tsx}',
+	};
+	const tree = [
+		'test/typescript/custom/tsconfig.json',
+		'test/typescript/misc/tsconfig.json',
+		'test/typescript/misc/tsconfig.nonEsModuleInterop.json',
+		'test/typescript/issue-1899/tsconfig.json',
+		'test/typescript/temporary/tsconfig.vitest-temp.json',
+		'test/typescript/helper/nested/tsconfig.json',
+		'other/tsconfig.json',
+	].map((path) => ({ path, type: 'blob', mode: '100644' }));
+	const source = `export default {test:{projects:${expression}}};`;
+	const result = expandPinnedDirectoryProjects(source, entry, expansion, tree);
+	const selectors = configuredTestSelectors(result, entry.path, {
+		runner: 'vitest',
+		vitestVersion: '^4.1.11',
+	});
+	assert.equal(selectors.length, 3);
+	const files = [
+		'test/typescript/custom/translation.test.ts',
+		'test/typescript/misc/translation.test.tsx',
+		'test/typescript/custom/helper.ts',
+		'test/typescript/issue-1899/translation.test.tsx',
+		'test/typescript/temporary/translation.test.ts',
+		'test/runtime.test.js',
+	];
+	assert.deepEqual(
+		files.filter((file) =>
+			selectors.some((selector) =>
+				selectedByTestConfiguration(file, selector, conventionalTestPath),
+			),
+		),
+		files.slice(0, 2),
+	);
+	assert.throws(
+		() => expandPinnedDirectoryProjects(source, { ...entry, sha: 'b'.repeat(40) }, expansion, tree),
+		/source mismatch/,
+	);
+	assert.throws(
+		() => expandPinnedDirectoryProjects(`${source}\n${expression}`, entry, expansion, tree),
+		/expression count mismatch/,
+	);
+	assert.throws(() => expandPinnedDirectoryProjects(source, entry, expansion, []), /project count/);
+	assert.throws(
+		() =>
+			expandPinnedDirectoryProjects(source, entry, { ...expansion, directory: '../test' }, tree),
+		/Invalid directory project/,
+	);
+});
 
 test('conventional test discovery excludes fixture modules beside runnable suites', () => {
 	assert.equal(conventionalTestPath('tests/image.test.tsx'), true);
@@ -315,6 +395,178 @@ function makeTarEntries(entries) {
 function makeTar(files) {
 	return makeTarEntries(Object.entries(files).map(([name, value]) => ({ name, value })));
 }
+
+function packageRootResolverFixture(files, repositoryDirectory, manifestOverrides = {}) {
+	const commit = '1'.repeat(40);
+	const tree = '2'.repeat(40);
+	const manifest = {
+		name: 'react-root-discovery',
+		version: '1.0.0',
+		license: 'MIT',
+		gitHead: commit,
+		repository: {
+			type: 'git',
+			url: 'git+https://github.com/example/root-discovery.git',
+			...(repositoryDirectory ? { directory: repositoryDirectory } : {}),
+		},
+		scripts: { test: 'vitest run' },
+		...manifestOverrides,
+	};
+	const tarball = gzipSync(
+		makeTar({ 'package/package.json': JSON.stringify(manifest), 'package/LICENSE': MIT_TEXT }),
+	);
+	const dist = {
+		tarball: 'https://registry.npmjs.org/react-root-discovery/-/react-root-discovery-1.0.0.tgz',
+		integrity: `sha512-${createHash('sha512').update(tarball).digest('base64')}`,
+	};
+	const metadata = { ...manifest, dist };
+	const content = new Map(
+		Object.entries(files(manifest)).map(([name, value]) => [
+			name,
+			Buffer.from(typeof value === 'string' ? value : JSON.stringify(value)),
+		]),
+	);
+	const api = 'https://api.github.com/repos/example/root-discovery';
+	const entries = [...content].map(([name, bytes]) => ({
+		path: name,
+		mode: '100644',
+		type: 'blob',
+		size: bytes.length,
+		sha: gitBlobSha(bytes),
+		url: `${api}/git/blobs/${gitBlobSha(bytes)}`,
+	}));
+	return async (url) => {
+		url = String(url);
+		if (url === dist.tarball) return new Response(tarball);
+		if (url === 'https://registry.npmjs.org/react-root-discovery')
+			return Response.json({
+				name: manifest.name,
+				'dist-tags': { latest: manifest.version },
+				versions: { [manifest.version]: metadata },
+			});
+		if (url === 'https://registry.npmjs.org/react-root-discovery/1.0.0')
+			return Response.json(metadata);
+		if (url === `${api}/commits/${commit}`)
+			return Response.json({ sha: commit, commit: { tree: { sha: tree } } });
+		if (url === `${api}/git/trees/${tree}?recursive=1`)
+			return Response.json({ sha: tree, tree: entries, truncated: false });
+		const entry = entries.find((entry) => entry.url === url);
+		if (entry)
+			return Response.json({
+				encoding: 'base64',
+				content: content.get(entry.path).toString('base64'),
+				size: entry.size,
+			});
+		throw new Error(`Unexpected fixture request ${url}`);
+	};
+}
+
+test('discovers a root Playwright configuration even when npm invokes a wrapper script', async () => {
+	const input = 'react-root-discovery@1.0.0';
+	const fetchImpl = packageRootResolverFixture(
+		(manifest) => ({
+			'package.json': manifest,
+			LICENSE: MIT_TEXT,
+			'playwright.config.ts': "export default { testDir: './browser' };",
+			'browser/widget.spec.ts': "test('renders', () => {});",
+			'browser/helpers.ts': 'export const fixture = true;',
+			'outside/unrelated.spec.ts': "test('not selected', () => {});",
+		}),
+		null,
+		{ scripts: { test: './run-tests.sh' } },
+	);
+	const result = await resolveRemoteInput(parseInput(input), input, { fetchImpl });
+	assert.deepEqual(
+		result.upstreamTestInventory.map(({ path }) => path),
+		['browser/widget.spec.ts'],
+	);
+});
+
+test('large unrelated Git blobs do not consume the downloaded artifact byte budget', async () => {
+	const input = 'react-root-discovery@1.0.0';
+	const fetchFixture = packageRootResolverFixture((manifest) => ({
+		'package.json': manifest,
+		LICENSE: MIT_TEXT,
+		'tests/widget.test.ts': "test('renders', () => {});",
+	}));
+	const fetchImpl = async (url, options) => {
+		const response = await fetchFixture(url, options);
+		if (!String(url).includes('/git/trees/')) return response;
+		const tree = await response.json();
+		tree.tree.push({
+			path: 'docs/demo-video.mp4',
+			type: 'blob',
+			mode: '100644',
+			size: 512 * 1024 * 1024,
+			sha: '3'.repeat(40),
+			url: 'https://api.github.com/never-download-this-blob',
+		});
+		return Response.json(tree);
+	};
+	const result = await resolveRemoteInput(parseInput(input), input, { fetchImpl });
+	assert.equal(result.status, 'licensed');
+	assert.equal(result.upstreamTestInventory.length, 1);
+});
+
+test('resolves an omitted npm directory from the immutable package name and scopes its tests', async () => {
+	const input = 'react-root-discovery@1.0.0';
+	const fetchImpl = packageRootResolverFixture((manifest) => ({
+		'package.json': { name: 'private-workspace', private: true },
+		LICENSE: MIT_TEXT,
+		'packages/adapter/package.json': manifest,
+		'packages/adapter/tests/adapter.test.ts': "test('preserves behavior', () => {});",
+		'packages/unrelated/tests/support.test.ts': 'export const support = true;',
+	}));
+	const result = await resolveRemoteInput(parseInput(input), input, { fetchImpl });
+	assert.equal(result.status, 'licensed');
+	assert.equal(result.identity.repository.subdirectory, 'packages/adapter');
+	assert.deepEqual(
+		result.upstreamTestInventory.map(({ path }) => path),
+		['packages/adapter/tests/adapter.test.ts'],
+	);
+});
+
+test('keeps a matching public root canonical and rejects ambiguous or contradictory locations', async () => {
+	const input = 'react-root-discovery@1.0.0';
+	const resolve = (files, directory) =>
+		resolveRemoteInput(parseInput(input), input, {
+			fetchImpl: packageRootResolverFixture(files, directory),
+		});
+	const canonical = await resolve((manifest) => ({
+		'package.json': manifest,
+		LICENSE: MIT_TEXT,
+		'example/package.json': manifest,
+	}));
+	assert.equal(canonical.status, 'licensed');
+	assert.equal(canonical.identity.repository.subdirectory, null);
+	const stagedRoot = await resolve((manifest) => ({
+		'package.json': { ...manifest, private: true },
+		LICENSE: MIT_TEXT,
+		'example/package.json': manifest,
+	}));
+	assert.equal(stagedRoot.status, 'licensed');
+	assert.equal(stagedRoot.identity.repository.subdirectory, null);
+	await assert.rejects(
+		resolve((manifest) => ({
+			'package.json': { private: true },
+			'one/package.json': manifest,
+			'two/package.json': manifest,
+			LICENSE: MIT_TEXT,
+		})),
+		/found 2/,
+	);
+	await assert.rejects(
+		resolve(
+			(manifest) => ({
+				'package.json': { private: true },
+				'actual/package.json': manifest,
+				LICENSE: MIT_TEXT,
+			}),
+			'declared',
+		),
+		/no declared\/package.json/,
+	);
+});
 
 describe('resolved evidence', () => {
 	test('accepts an explicit package location when published metadata omits its directory', () => {
@@ -914,6 +1166,79 @@ export function Wrapper(props: Widget.Props<string>) { return <Widget {...props}
 		assert.ok(typeInventory.registrations.every(({ kind }) => kind === 'type-assertion'));
 		assert.match(typeInventory.registrations[1].title, /invalid/);
 
+		// Some libraries compile exported assertion functions from types/test.tsx
+		// instead of naming individual files *.test-d.ts.
+		responses.set(
+			`https://api.github.com/repos/example/widgets/git/trees/${tree}?recursive=1`,
+			githubTreeResponse(
+				sourceTree.map((entry) =>
+					entry.path === 'packages/react-widget/quality/widget.behavior.ts'
+						? {
+								...entry,
+								path: 'packages/react-widget/types/test.tsx',
+								size: typeTestBytes.length,
+								sha: gitBlobSha(typeTestBytes),
+							}
+						: entry,
+				),
+			),
+		);
+		const directoryTypeResult = await resolveRemoteInput(parseInput(githubInput), githubInput, {
+			fetchImpl,
+		});
+		const directoryTypeInventory = directoryTypeResult.upstreamTestInventory.find((entry) =>
+			entry.path.endsWith('types/test.tsx'),
+		);
+		assert.equal(directoryTypeInventory.kind, 'type');
+		assert.equal(directoryTypeInventory.gitBlob, gitBlobSha(typeTestBytes));
+		assert.equal(directoryTypeInventory.registrations.length, 3);
+
+		const namedTypeTestBytes = Buffer.from(`import { describe, expectTypeOf, it } from 'vitest';
+import { Widget } from 'react-widget';
+describe('Widget types', () => {
+  it('preserves the required value type', () => { expectTypeOf<Parameters<typeof Widget>[0]['value']>().toEqualTypeOf<string>(); });
+  it('rejects invalid values', () => {
+    // @ts-expect-error Invalid public input.
+    const invalid: Parameters<typeof Widget>[0]['value'] = 123;
+  });
+});
+`);
+		responses.set(
+			`https://api.github.com/repos/example/widgets/git/trees/${tree}?recursive=1`,
+			githubTreeResponse(
+				sourceTree.map((entry) =>
+					entry.path === 'packages/react-widget/quality/widget.behavior.ts'
+						? {
+								...entry,
+								path: 'packages/react-widget/tests/use-widget-types.test.ts',
+								size: namedTypeTestBytes.length,
+								sha: gitBlobSha(namedTypeTestBytes),
+							}
+						: entry,
+				),
+			),
+		);
+		responses.set(
+			'https://api.github.com/repos/example/widgets/git/blobs/test',
+			Response.json({
+				encoding: 'base64',
+				content: namedTypeTestBytes.toString('base64'),
+				size: namedTypeTestBytes.length,
+			}),
+		);
+		const namedTypeResult = await resolveRemoteInput(parseInput(githubInput), githubInput, {
+			fetchImpl,
+		});
+		const namedTypeInventory = namedTypeResult.upstreamTestInventory.find((entry) =>
+			entry.path.endsWith('use-widget-types.test.ts'),
+		);
+		assert.equal(namedTypeInventory.kind, 'type');
+		assert.deepEqual(
+			namedTypeInventory.registrations.map(({ title }) => title),
+			['preserves the required value type', 'rejects invalid values'],
+		);
+		assert.ok(namedTypeInventory.registrations.every(({ kind }) => kind === 'it'));
+
 		const dynamicTestBytes = Buffer.from("test.each(rows)('renders %s', value => value);\n");
 		responses.set(
 			`https://api.github.com/repos/example/widgets/git/trees/${tree}?recursive=1`,
@@ -1200,6 +1525,31 @@ describe('preflight CLI', () => {
 		assert.equal(report.graph.nodes['pkg:fixture-prerequisite'].requested, false);
 	});
 
+	test('passes authored dependency edges through the CLI without inventing upstream facts', () => {
+		const result = spawnSync(
+			process.execPath,
+			[
+				FIXTURE_PREFLIGHT_CLI,
+				'--no-state',
+				'--fixture-evidence',
+				path.join(SCRIPT_DIRECTORY, '__fixtures__/resolved/mit-widget.json'),
+				'--classify',
+				'fixture-core=framework-neutral',
+				'--runtime-dependency',
+				'fixture-widget=@scope/protocol@1.2.3',
+				'--classify',
+				'@scope/protocol=framework-neutral',
+				'fixture-widget@1.0.0',
+			],
+			{ encoding: 'utf8' },
+		);
+		assert.equal(result.status, 0, result.stderr);
+		const report = JSON.parse(result.stdout);
+		assert.ok(report.graph.nodes['pkg:fixture-widget'].dependsOn.includes('pkg:@scope/protocol'));
+		assert.equal(report.graph.nodes['pkg:@scope/protocol'].action, 'reuse-package');
+		assert.equal(report.targets[0].runtimeDependencies['@scope/protocol'], undefined);
+	});
+
 	test('does not let a failed duplicate prerequisite poison licensed requested evidence', () => {
 		const result = spawnSync(
 			process.execPath,
@@ -1264,4 +1614,244 @@ describe('preflight CLI', () => {
 		assert.equal(result.status, 2);
 		assert.match(result.stderr, /unknown option: --fixture-evidence/i);
 	});
+});
+
+test('pinned array inventory derives initialized instance fields and rejects ambiguous shapes', () => {
+	const source = 'export class Api { useMatch = () => {}; useSearch = () => {}; other = 1 }';
+	assert.deepEqual(pinnedClassFieldNames(source, { className: 'Api', propertyPrefix: 'use' }), [
+		'useMatch',
+		'useSearch',
+	]);
+	for (const invalid of [
+		'class Other { useMatch = 1 }',
+		'class Api { useMatch: unknown }',
+		'class Api { static useMatch = 1 }',
+		'class Api { other = 1 }',
+		'class Api { useMatch = 1 } class Api { useSearch = 1 }',
+	])
+		assert.throws(() =>
+			pinnedClassFieldNames(invalid, { className: 'Api', propertyPrefix: 'use' }),
+		);
+});
+
+test('pinned array expansion requires both immutable blobs and the exact expression count', () => {
+	const entry = { path: 'tests/api.test.ts', sha: 'a'.repeat(40) };
+	const sourceEntry = { path: 'src/api.ts', sha: 'b'.repeat(40) };
+	const expansion = {
+		path: entry.path,
+		gitBlob: entry.sha,
+		expression: 'Object.keys(api).filter(key => key.startsWith("use"))',
+		occurrences: 1,
+		source: {
+			path: sourceEntry.path,
+			gitBlob: sourceEntry.sha,
+			className: 'Api',
+			propertyPrefix: 'use',
+		},
+	};
+	const source = `const names = ${expansion.expression};\nit.each(names.map(name => [name]))('%s', () => {});`;
+	const bytes = Buffer.from('class Api { useMatch = () => {}; useSearch = () => {} }');
+	const result = expandPinnedStaticArray(source, entry, expansion, sourceEntry, bytes);
+	assert.equal(
+		result,
+		`const names = ["useMatch","useSearch"];\nit.each(names.map(name => [name]))('%s', () => {});`,
+	);
+	assert.throws(
+		() =>
+			expandPinnedStaticArray(
+				source,
+				{ ...entry, sha: 'c'.repeat(40) },
+				expansion,
+				sourceEntry,
+				bytes,
+			),
+		/source mismatch/,
+	);
+	assert.throws(
+		() =>
+			expandPinnedStaticArray(
+				source,
+				entry,
+				expansion,
+				{ ...sourceEntry, sha: 'c'.repeat(40) },
+				bytes,
+			),
+		/source mismatch/,
+	);
+	assert.throws(
+		() =>
+			expandPinnedStaticArray(source, entry, { ...expansion, occurrences: 2 }, sourceEntry, bytes),
+		/expression count mismatch/,
+	);
+	assert.throws(
+		() =>
+			expandPinnedStaticArray(source, entry, { ...expansion, expression: '' }, sourceEntry, bytes),
+		/Invalid static array/,
+	);
+});
+
+test('pinned object values retain literals and reject dynamic or duplicate properties', () => {
+	assert.deepEqual(
+		pinnedObjectValues("export const options = { a: 'always', b: 'never' } as const", {
+			objectName: 'options',
+		}),
+		['always', 'never'],
+	);
+	for (const source of [
+		'const options = { ...other }',
+		'const options = { a: value }',
+		"const options = { a: 'one', a: 'two' }",
+		"let options = { a: 'one' }",
+		"const options = { [key]: 'one' }",
+	])
+		assert.throws(() => pinnedObjectValues(source, { objectName: 'options' }));
+});
+
+test('pinned literal rows derive a reviewed filter without evaluating source', () => {
+	assert.deepEqual(
+		pinnedLiteralRows("const chars = [['/', '%2F'], [';', '%3B']] as const", {
+			arrayName: 'chars',
+			excludeFirstColumn: ['/'],
+		}),
+		[[';', '%3B']],
+	);
+	assert.throws(
+		() => pinnedLiteralRows('const chars = [[value]]', { arrayName: 'chars' }),
+		/literal strings/,
+	);
+	assert.throws(
+		() => pinnedLiteralRows('const chars = getRows()', { arrayName: 'chars' }),
+		/must be literal/,
+	);
+});
+
+test('immutable test discovery follows bounded shared config imports outside the package directory', async () => {
+	const input = 'react-root-discovery@1.0.0';
+	const fetchImpl = packageRootResolverFixture(
+		(manifest) => ({
+			'package.json': { private: true },
+			'packages/widget/package.json': manifest,
+			LICENSE: MIT_TEXT,
+			'jest.config.js': `module.exports = { projects: ['<rootDir>/packages/*/jest.config.js'] };`,
+			'packages/widget/jest.config.js': `const base = require('../../shared/jest'); module.exports = { ...base };`,
+			'shared/jest.js': `throw new Error('must not run'); module.exports = { testMatch: ['tests/**/*-test.ts'], testPathIgnorePatterns: ['helper'] };`,
+			'packages/widget/tests/widget-test.ts': "test('renders', () => {});",
+			'packages/widget/tests/helper-test.ts': 'export const helper = true;',
+			'packages/widget/tests/unrelated.test.ts': "test('excluded', () => {});",
+		}),
+		'packages/widget',
+		{ scripts: { test: 'jest' } },
+	);
+	const result = await resolveRemoteInput(parseInput(input), input, { fetchImpl });
+	assert.deepEqual(
+		result.upstreamTestInventory.map(({ path }) => path),
+		['packages/widget/tests/widget-test.ts'],
+	);
+});
+
+test('an explicit ancestor Jest config is not hidden by a package config', async () => {
+	const input = 'react-root-discovery@1.0.0';
+	const fetchImpl = packageRootResolverFixture(
+		(manifest) => ({
+			'package.json': { private: true },
+			'packages/widget/package.json': manifest,
+			LICENSE: MIT_TEXT,
+			'jest.config.js': 'module.exports = unknownConfiguration;',
+			'packages/widget/jest.config.js': `module.exports = {testMatch:['tests/*.test.ts']};`,
+			'packages/widget/tests/widget.test.ts': "test('renders', () => {});",
+		}),
+		'packages/widget',
+		{ scripts: { test: 'jest --config ../../jest.config.js' } },
+	);
+	await assert.rejects(
+		() => resolveRemoteInput(parseInput(input), input, { fetchImpl }),
+		/Cannot resolve upstream test configuration/,
+	);
+});
+
+test('uses immutable repository Vitest defaults for a workspace package', async () => {
+	const input = 'react-root-discovery@1.0.0';
+	const fetchImpl = packageRootResolverFixture(
+		(manifest) => ({
+			'package.json': { private: true, devDependencies: { vitest: '^5.0.0' } },
+			'packages/widget/package.json': manifest,
+			LICENSE: MIT_TEXT,
+			'packages/widget/vitest.config.ts': `import { configDefaults } from 'vitest/config'; export default { test: { exclude: [...configDefaults.exclude, 'src/index.test.ts'] } };`,
+			'packages/widget/src/index.test.ts': 'export const helper = true;',
+			'packages/widget/src/widget.test.ts': "test('renders', () => {});",
+		}),
+		'packages/widget',
+	);
+	const result = await resolveRemoteInput(parseInput(input), input, { fetchImpl });
+	assert.deepEqual(
+		result.upstreamTestInventory.map(({ path }) => path),
+		['packages/widget/src/widget.test.ts'],
+	);
+});
+
+test('shared configuration traversal rejects graphs exceeding the bounded file budget', async () => {
+	const input = 'react-root-discovery@1.0.0';
+	const fetchImpl = packageRootResolverFixture((manifest) => ({
+		'package.json': manifest,
+		LICENSE: MIT_TEXT,
+		'vitest.config.ts': `import base from './shared/config0'; export default base;`,
+		...Object.fromEntries(
+			Array.from({ length: 65 }, (_, index) => [
+				`shared/config${index}.ts`,
+				index < 64
+					? `import base from './config${index + 1}'; export default base;`
+					: `export default { test: { include: [] } };`,
+			]),
+		),
+	}));
+	await assert.rejects(
+		() => resolveRemoteInput(parseInput(input), input, { fetchImpl }),
+		/configuration exceeds the file limit/,
+	);
+});
+
+test('a configuration import does not hide an independently selected runtime suite', async () => {
+	const input = 'react-root-discovery@1.0.0';
+	const fetchImpl = packageRootResolverFixture((manifest) => ({
+		'package.json': manifest,
+		LICENSE: MIT_TEXT,
+		'vitest.config.ts': `import './tests/widget.test'; export default { test: { include: ['tests/*.test.ts'] } };`,
+		'tests/widget.test.ts': "test('renders', () => {});",
+	}));
+	const result = await resolveRemoteInput(parseInput(input), input, { fetchImpl });
+	assert.deepEqual(
+		result.upstreamTestInventory.map(({ path }) => path),
+		['tests/widget.test.ts'],
+	);
+});
+
+test('non-test dispositions require an exact reviewed blob and cannot suppress registrations', () => {
+	const source =
+		"import {writeFileSync} from 'node:fs'; writeFileSync('golden.json', JSON.stringify({samples:[0,1]}));";
+	const entry = { path: 'scripts/extract-spec.ts', sha: gitBlobSha(Buffer.from(source)) };
+	const disposition = {
+		path: entry.path,
+		gitBlob: entry.sha,
+		reason: 'Generates geometry vectors; it contains no runtime or type assertions.',
+	};
+	assert.doesNotThrow(() => verifyNonTestArtifact(source, entry, disposition));
+	assert.throws(
+		() => verifyNonTestArtifact(source, entry, { ...disposition, gitBlob: '0'.repeat(40) }),
+		/mismatch/,
+	);
+	assert.throws(
+		() => verifyNonTestArtifact(source, entry, { ...disposition, reason: '' }),
+		/reason/,
+	);
+	for (const source of [
+		"test('real test', () => {});",
+		"it.each(values)('dynamic', () => {});",
+		'expectTypeOf<string>().toEqualTypeOf<string>();',
+	]) {
+		const entry = { path: disposition.path, sha: gitBlobSha(Buffer.from(source)) };
+		assert.throws(
+			() => verifyNonTestArtifact(source, entry, { ...disposition, gitBlob: entry.sha }),
+			/contains.*(registration|assertion)/,
+		);
+	}
 });

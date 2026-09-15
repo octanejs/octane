@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "project": "tanstack-ai-adapted-ssr",
+  "roots": ["packages/tanstack-ai/tests/upstream"],
+  "files": ["packages/tanstack-ai/tests/upstream/chat-ui/create-ui.test.tsx"],
+  "tests": [
+    {
+      "id": "runtime:d79db74743501d17",
+      "file": "packages/tanstack-ai/tests/upstream/chat-ui/create-ui.test.tsx",
+      "fullName": "createChatHook mixes AppChat onto the instance from options and chatComponents"
+    },
+    {
+      "id": "runtime:9b3660826b41f88a",
+      "file": "packages/tanstack-ai/tests/upstream/chat-ui/create-ui.test.tsx",
+      "fullName": "createChatUI isolates nested chats when createChatHookContexts is passed in"
+    },
+    {
+      "id": "runtime:d4415b820009531e",
+      "file": "packages/tanstack-ai/tests/upstream/chat-ui/create-ui.test.tsx",
+      "fullName": "createChatUI keeps unmatched tool results and suppresses matched ones"
+    },
+    {
+      "id": "runtime:4d883607e80f18ac",
+      "file": "packages/tanstack-ai/tests/upstream/chat-ui/create-ui.test.tsx",
+      "fullName": "createChatUI lets Interrupt children pick a mixed interrupt widget"
+    },
+    {
+      "id": "runtime:564a77795a482978",
+      "file": "packages/tanstack-ai/tests/upstream/chat-ui/create-ui.test.tsx",
+      "fullName": "createChatUI lets Message children pick a mixed part or tool widget"
+    },
+    {
+      "id": "runtime:88994c82e203a7b1",
+      "file": "packages/tanstack-ai/tests/upstream/chat-ui/create-ui.test.tsx",
+      "fullName": "createChatUI lets a tool render its approval from interrupt without a registered interrupt component"
+    },
+    {
+      "id": "runtime:93b5fb82612d1c90",
+      "file": "packages/tanstack-ai/tests/upstream/chat-ui/create-ui.test.tsx",
+      "fullName": "createChatUI mixes Input onto the UI kit when one is registered"
+    },
+    {
+      "id": "runtime:c775aa1b7f6dfa9a",
+      "file": "packages/tanstack-ai/tests/upstream/chat-ui/create-ui.test.tsx",
+      "fullName": "createChatUI passes Input to layout when an input component is registered"
+    },
+    {
+      "id": "runtime:cf36adcd2611eb4e",
+      "file": "packages/tanstack-ai/tests/upstream/chat-ui/create-ui.test.tsx",
+      "fullName": "createChatUI puts list approvals in Interrupts when interrupts.tools has the tool"
+    },
+    {
+      "id": "runtime:fd3c80b8f0831038",
+      "file": "packages/tanstack-ai/tests/upstream/chat-ui/create-ui.test.tsx",
+      "fullName": "createChatUI reads chat from nested provider context and throws outside a provider"
+    },
+    {
+      "id": "runtime:c34b7445a5c22d2f",
+      "file": "packages/tanstack-ai/tests/upstream/chat-ui/create-ui.test.tsx",
+      "fullName": "createChatUI renders a tool component for every ToolCallState"
+    },
+    {
+      "id": "runtime:91dbc6a9457dcb7e",
+      "file": "packages/tanstack-ai/tests/upstream/chat-ui/create-ui.test.tsx",
+      "fullName": "createChatUI renders automatic and manual trees"
+    },
+    {
+      "id": "runtime:6e3ebc07e27d922a",
+      "file": "packages/tanstack-ai/tests/upstream/chat-ui/create-ui.test.tsx",
+      "fullName": "createChatUI renders each queued item and binds cancelQueued"
+    },
+    {
+      "id": "runtime:0db6440dbdbe95ae",
+      "file": "packages/tanstack-ai/tests/upstream/chat-ui/create-ui.test.tsx",
+      "fullName": "createChatUI renders nothing from Queue when no queue component exists"
+    },
+    {
+      "id": "runtime:a5c4b865b0e31cc2",
+      "file": "packages/tanstack-ai/tests/upstream/chat-ui/create-ui.test.tsx",
+      "fullName": "createChatUI renders registered generic interrupts and sends the rest to fallback"
+    },
+    {
+      "id": "runtime:cf6613fd76479dd3",
+      "file": "packages/tanstack-ai/tests/upstream/chat-ui/create-ui.test.tsx",
+      "fullName": "createChatUI warns once for a missing runtime key"
+    },
+    {
+      "id": "runtime:9270bebd0161a9ce",
+      "file": "packages/tanstack-ai/tests/upstream/chat-ui/create-ui.test.tsx",
+      "fullName": "createChatUI warns once when layout renders an Input that was never registered"
+    }
+  ],
+  "snapshots": 0
+}

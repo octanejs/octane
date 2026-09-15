@@ -1,4 +1,4 @@
-// Vendored from react-hook-form@7.81.0 src/utils/set.ts (octane port).
+// Adapted from react-hook-form@7.88.0 src/utils/set.ts for Octane.
 import { PROTOTYPE_KEYWORDS } from '../constants';
 import type { FieldPath, FieldValues } from '../types';
 

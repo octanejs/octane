@@ -1,0 +1,18 @@
+diff --git a/tests/upstream/Outlet.test.tsx b/tests/upstream/Outlet.test.tsx
+--- a/tests/upstream/Outlet.test.tsx
++++ b/tests/upstream/Outlet.test.tsx
+@@ -1,3 +1,4 @@
++import { act } from '@octanejs/testing-library'
+ import { afterEach, expect, test, vi } from 'vitest'
+ import { cleanup, render, screen } from '@octanejs/testing-library'
+ import { createMemoryHistory } from '@tanstack/history'
+@@ -139,7 +140,8 @@ test('warns when Outlet is rendered inside a notFoundComponent', async () => {
+ 
+   render(<RouterProvider router={router} />)
+   await screen.findByText('Index route')
+-  await router.navigate({ to: '/not-found' })
++  // OCTANE DIVERGENCE[native-lifecycle]: settle the native error-boundary reset before retaining the queried fallback node.
++  await act(async () => { await router.navigate({ to: '/not-found' }) })
+ 
+   expect(await screen.findByText('Not found route')).toBeInTheDocument()
+   expect(warn).toHaveBeenCalledWith(outletWarning('notFoundComponent'))

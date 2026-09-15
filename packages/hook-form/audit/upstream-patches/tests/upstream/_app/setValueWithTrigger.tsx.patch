@@ -1,0 +1,21 @@
+diff --git a/tests/upstream/_app/setValueWithTrigger.tsx b/tests/upstream/_app/setValueWithTrigger.tsx
+--- a/tests/upstream/_app/setValueWithTrigger.tsx
++++ b/tests/upstream/_app/setValueWithTrigger.tsx
+@@ -45,7 +45,7 @@ const SetValueWithTrigger: React.FC = () => {
+       <input
+         name="firstName"
+         placeholder="firstName"
+-        onChange={(e) =>
++        onInput={(e) =>
+           setValue('firstName', e.target.value, {
+             shouldValidate: true,
+             shouldDirty: true,
+@@ -57,7 +57,7 @@ const SetValueWithTrigger: React.FC = () => {
+       <input
+         name="lastName"
+         placeholder="lastName"
+-        onChange={(e) =>
++        onInput={(e) =>
+           setValue('lastName', e.target.value, {
+             shouldValidate: true,
+             shouldDirty: true,

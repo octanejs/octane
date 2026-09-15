@@ -14,14 +14,18 @@ async function fixture() {
 		upstreamRoot,
 		{ recursive: true },
 	);
-	await cp(new URL('../../packages/hook-form/typetests', import.meta.url), adaptedRoot, {
-		recursive: true,
-	});
+	await cp(
+		new URL('../../packages/hook-form/tests/upstream/_types', import.meta.url),
+		adaptedRoot,
+		{
+			recursive: true,
+		},
+	);
 	return {
 		root,
 		upstreamRoot,
 		adaptedRoot,
-		config: { upstreamRoot: 'upstream', adaptedRoot: 'adapted' },
+		config: { upstreamRoot: 'upstream', adaptedRoot: 'adapted', adaptedSourceRoot: '../../src' },
 	};
 }
 
@@ -63,7 +67,27 @@ test('rejects retargeting an adapted relative import', async (t) => {
 	t.after(() => rm(value.root, { recursive: true, force: true }));
 	const file = join(value.adaptedRoot, 'errors.test-d.ts');
 	const source = await readFile(file, 'utf8');
-	await writeFile(file, source.replace("from '../src/types'", "from '../src/useForm'"));
+	await writeFile(file, source.replace("from '../../../src/types'", "from '../../../src/useForm'"));
+	assert.throws(
+		() => buildTypeInventory(value.root, value.config),
+		/change outside the permitted transformations/,
+	);
+});
+
+test('maps opaque-type module augmentation to the same adapted module and rejects retargeting it', async (t) => {
+	const value = await fixture();
+	t.after(() => rm(value.root, { recursive: true, force: true }));
+	assert.doesNotThrow(() => buildTypeInventory(value.root, value.config));
+	const file = join(value.adaptedRoot, 'opaqueTypes.test-d.ts');
+	const source = await readFile(file, 'utf8');
+	assert.match(source, /declare module '\.\.\/\.\.\/\.\.\/src\/types\/utils'/);
+	await writeFile(
+		file,
+		source.replace(
+			"declare module '../../../src/types/utils'",
+			"declare module '../../../src/types/form'",
+		),
+	);
 	assert.throws(
 		() => buildTypeInventory(value.root, value.config),
 		/change outside the permitted transformations/,

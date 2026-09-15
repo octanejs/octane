@@ -1,0 +1,22 @@
+diff --git a/tests/upstream/api.test.tsx b/tests/upstream/api.test.tsx
+--- a/tests/upstream/api.test.tsx
++++ b/tests/upstream/api.test.tsx
+@@ -1,12 +1,17 @@
++import * as core from "mobx"
+ const api = await import("../../src/index")
+ 
+ test("correct api should be exposed", function () {
+     expect(
+         Object.keys(api)
+-            .filter(key => api[key] !== undefined)
++            .filter(key => api[key as keyof typeof api] !== undefined)
+             .sort()
+     ).toEqual(
+         [
++            // OCTANE DIVERGENCE[mobx-exports]: retain the MobX core re-exports and existing hook aliases.
++            ...Object.keys(core).filter(key => core[key as keyof typeof core] !== undefined),
++            "useObserver",
++            "useStaticRendering",
+             "isUsingStaticRendering",
+             "enableStaticRendering",
+             "observer",

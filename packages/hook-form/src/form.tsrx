@@ -1,56 +1,63 @@
-// Vendored from react-hook-form@7.81.0 src/form.tsx (octane port).
-// Form component to manage submission — renders a real <form> (or the headless
-// render prop) and posts via fetch. Same submission/error semantics as
-// upstream; the submit handler receives the NATIVE submit event.
-import { useState, useCallback, useEffect } from 'octane';
-import { flatten } from './utils/flatten.ts';
-import { useFormContext } from './useFormContext.ts';
+// Adapted from react-hook-form@7.88.0 src/form.tsx for Octane.
+import { useState, useMemo, useCallback, useEffect } from 'octane';
+import type { OctaneNode } from 'octane';
+
+import { jsonToFormData } from './utils/formData';
+import isFunction from './utils/isFunction';
+import isString from './utils/isString';
+import { safeJSONStringify } from './utils/json';
+import noop from './utils/noop';
 import type { FieldValues, FormProps } from './types';
+import { useFormContext } from './useFormContext';
 
 const POST_REQUEST = 'post';
 
+function defaultValidateStatus(status: number) {
+	return status >= 200 && status < 300;
+}
+
+/**
+ * Form component that handles submission, including optional `action` fetch and server error wiring.
+ *
+ * @see [API](https://react-hook-form.com/docs/useform/form)
+ *
+ * @example
+ * ```tsx
+ * <Form action="/api" control={control}>
+ *   <input {...register("name")} />
+ *   <p>{errors?.root?.server && 'Server error'}</p>
+ *   <button>Submit</button>
+ * </Form>
+ * ```
+ */
 export function Form<TFieldValues extends FieldValues, TTransformedValues = TFieldValues>(
 	props: FormProps<TFieldValues, TTransformedValues>,
-) {
-	const methods = useFormContext<TFieldValues, any, TTransformedValues>();
+): OctaneNode {
+	const methods = useFormContext<TFieldValues, unknown, TTransformedValues>();
 	const [mounted, setMounted] = useState(false);
 	const {
 		control = methods.control,
-		onSubmit,
+		onSubmit = noop,
 		children,
 		action,
 		method = POST_REQUEST,
 		headers,
 		encType,
-		onError,
+		onError = noop,
 		render,
-		onSuccess,
-		validateStatus,
+		onSuccess = noop,
+		validateStatus = defaultValidateStatus,
 		...rest
 	} = props;
 
-	const submit = useCallback(async (event) => {
-		let hasError = false;
-		let type = '';
-
-		await control.handleSubmit(async (data) => {
-			const formData = new FormData();
-			let formDataJson = '';
-
-			try {
-				formDataJson = JSON.stringify(data);
-			} catch {
-			}
-
-			const flattenFormValues = flatten(data as FieldValues);
-
-			for (const key in flattenFormValues) {
-				formData.append(key, flattenFormValues[key]);
-			}
+	const handleSubmit = useMemo(() => {
+		return control.handleSubmit(async (data, event) => {
+			const formData = jsonToFormData(data);
+			const formDataJson = safeJSONStringify(data);
 
 			if (onSubmit) {
 				await onSubmit({
-					data: data as TTransformedValues,
+					data,
 					event,
 					method,
 					formData,
@@ -58,50 +65,68 @@ export function Form<TFieldValues extends FieldValues, TTransformedValues = TFie
 				});
 			}
 
-			if (action) {
+			if (isString(action)) {
 				try {
-					const shouldStringifySubmissionData = [
-						headers && headers['Content-Type'],
-						encType,
-					].some((value) => value && value.includes('json'));
+					const shouldStringifySubmissionData =
+						headers && headers['Content-Type'] && headers['Content-Type'].includes('json') ||
+							encType && encType.includes('json');
 
-					const response = await fetch(String(action), {
+					const response = await fetch(action, {
 						method,
 						headers: {
 							...headers,
-							...(encType && encType !== 'multipart/form-data' ? { 'Content-Type': encType } : {}),
+							...encType && encType !== 'multipart/form-data' &&
+								{
+									'Content-Type': encType,
+								},
 						},
 						body: shouldStringifySubmissionData ? formDataJson : formData,
 					});
 
-					if (
-						response &&
-							(validateStatus
-								? !validateStatus(response.status)
-								: response.status < 200 || response.status >= 300)
-					) {
-						hasError = true;
-						onError && onError({ response });
-						type = String(response.status);
+					if (response && !validateStatus(response.status)) {
+						onError({ response });
+						return { type: String(response.status) };
 					} else {
-						onSuccess && onSuccess({ response });
+						onSuccess({ response });
 					}
-				} catch (error) {
-					hasError = true;
-					onError && onError({ error });
+				} catch (error: unknown) {
+					onError({ error });
+					return { type: '' };
 				}
 			}
-		})(event);
 
-		if (hasError && control) {
-			control._subjects.state.next({
-				isSubmitSuccessful: false,
-			});
-			control.setError('root.server', {
-				type,
-			});
+			if (isFunction(action)) {
+				try {
+					await action(formData);
+				} catch (error: unknown) {
+					onError({ error });
+					return { type: '' };
+				}
+			}
+
+			// Return nothing when successful.
+			return;
+		});
+	}, [
+		control,
+		onSubmit,
+		method,
+		action,
+		headers,
+		encType,
+		validateStatus,
+		onError,
+		onSuccess,
+	]);
+
+	const submit = useCallback(async (event?: Event) => {
+		const err = await handleSubmit(event);
+
+		if (err && control) {
+			control._subjects.state.next({ isSubmitSuccessful: false });
+			control.setError('root.server', err);
 		}
-	}, [control, onSubmit, method, action, headers, encType, validateStatus, onError, onSuccess]);
+	}, [handleSubmit, control]);
 
 	useEffect(() => {
 		setMounted(true);
@@ -111,11 +136,13 @@ export function Form<TFieldValues extends FieldValues, TTransformedValues = TFie
 		return render({ submit });
 	}
 
+	// React forbids passing `method`/`encType` alongside a function `action`
+	// (a Server-Action-style submission) -- it manages those itself and warns
+	// if they're present, so they're only rendered for string/URL actions.
 	return <form
 		noValidate={mounted}
-		action={action as string | undefined}
-		method={method}
-		encType={encType}
+		action={action}
+		{...!isFunction(action) && { method, encType }}
 		onSubmit={submit}
 		{...rest}
 	>{children}</form>;

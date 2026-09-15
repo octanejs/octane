@@ -3,6 +3,3801 @@
   "project": "motion-pristine",
   "tests": [
     {
+      "file": "src/animation/__tests__/animate-waapi.test.ts",
+      "fullName": "animate() with WAAPI Accepts ease array for multiple keyframes",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/__tests__/animate-waapi.test.ts",
+      "fullName": "animate() with WAAPI Applies stagger",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/__tests__/animate-waapi.test.ts",
+      "fullName": "animate() with WAAPI Can accept timeline sequences",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/__tests__/animate-waapi.test.ts",
+      "fullName": "animate() with WAAPI Can override transition options per-value",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/__tests__/get-value-transition.test.ts",
+      "fullName": "getValueTransition does not merge when inherit is on the base transition itself (fallback case)",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/__tests__/get-value-transition.test.ts",
+      "fullName": "getValueTransition falls back to default key",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/__tests__/get-value-transition.test.ts",
+      "fullName": "getValueTransition inner keys win when merging with inherit",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/__tests__/get-value-transition.test.ts",
+      "fullName": "getValueTransition merges value-specific with base transition when inherit is true",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/__tests__/get-value-transition.test.ts",
+      "fullName": "getValueTransition returns base transition when no value-specific key exists",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/__tests__/get-value-transition.test.ts",
+      "fullName": "getValueTransition returns value-specific transition as-is without inherit",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/__tests__/get-value-transition.test.ts",
+      "fullName": "getValueTransition strips inherit key from merged result",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/__tests__/index.test.tsx",
+      "fullName": "useAnimation .set accepts state depending on custom attribute",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/__tests__/index.test.tsx",
+      "fullName": "useAnimation .set sets values of bound components",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/__tests__/index.test.tsx",
+      "fullName": "useAnimation .set updates variants throughout a tree",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/__tests__/index.test.tsx",
+      "fullName": "useAnimation .start accepts state depending on custom attribute",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/__tests__/index.test.tsx",
+      "fullName": "useAnimation accepts array of variants",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/__tests__/index.test.tsx",
+      "fullName": "useAnimation animates on mount",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/__tests__/index.test.tsx",
+      "fullName": "useAnimation animates to named variants",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/__tests__/index.test.tsx",
+      "fullName": "useAnimation animates to named variants via variants prop",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/__tests__/index.test.tsx",
+      "fullName": "useAnimation fire's a component's onAnimationComplete",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/__tests__/index.test.tsx",
+      "fullName": "useAnimation fires a component's onAnimationComplete with the animation definition",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/__tests__/index.test.tsx",
+      "fullName": "useAnimation pathOffset types are inferred correctly",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/__tests__/index.test.tsx",
+      "fullName": "useAnimation propagates variants to children",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/__tests__/index.test.tsx",
+      "fullName": "useAnimation propagates variants to children even if not variants set on controlling component",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/__tests__/index.test.tsx",
+      "fullName": "useAnimation respects initial even if passed controls",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/__tests__/index.test.tsx",
+      "fullName": "useAnimation variants fire a child's onAnimationComplete",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/animate/__tests__/animate.test.tsx",
+      "fullName": "Sequence callbacks Progress callback receives interpolated values",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/animate/__tests__/animate.test.tsx",
+      "fullName": "Sequence callbacks Progress callback with custom keyframes",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/animate/__tests__/animate.test.tsx",
+      "fullName": "Sequence callbacks Toggle helper for do/undo pattern",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/animate/__tests__/animate.test.tsx",
+      "fullName": "Sequence callbacks onComplete fires once when sequence finishes",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/animate/__tests__/animate.test.tsx",
+      "fullName": "Sequence callbacks onComplete fires when sequence finishes",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/animate/__tests__/animate.test.tsx",
+      "fullName": "animate .time can be set to duration",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/animate/__tests__/animate.test.tsx",
+      "fullName": "animate Accepts all overloads",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/animate/__tests__/animate.test.tsx",
+      "fullName": "animate Applies final target keyframe when animation has finished",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/animate/__tests__/animate.test.tsx",
+      "fullName": "animate Applies final target keyframe when animation has finished, repeat: mirror",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/animate/__tests__/animate.test.tsx",
+      "fullName": "animate Applies final target keyframe when animation has finished, repeat: mirror even",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/animate/__tests__/animate.test.tsx",
+      "fullName": "animate Applies final target keyframe when animation has finished, repeat: reverse",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/animate/__tests__/animate.test.tsx",
+      "fullName": "animate Applies final target keyframe when animation has finished, repeat: reverse even",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/animate/__tests__/animate.test.tsx",
+      "fullName": "animate Applies target keyframe when animation has finished",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/animate/__tests__/animate.test.tsx",
+      "fullName": "animate Doesn't throw keyframe error",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/animate/__tests__/animate.test.tsx",
+      "fullName": "animate Is typed correctly",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/animate/__tests__/animate.test.tsx",
+      "fullName": "animate Skips animations",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/animate/__tests__/animate.test.tsx",
+      "fullName": "animate Works with multiple elements",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/animate/__tests__/animate.test.tsx",
+      "fullName": "animate animates a motion value in sequence",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/animate/__tests__/animate.test.tsx",
+      "fullName": "animate animates motion values in sequence",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/animate/__tests__/animate.test.tsx",
+      "fullName": "animate correctly animates MotionValues",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/animate/__tests__/animate.test.tsx",
+      "fullName": "animate correctly animates normal values",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/animate/__tests__/animate.test.tsx",
+      "fullName": "animate correctly hydrates keyframes null with current MotionValue",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/animate/__tests__/animate.test.tsx",
+      "fullName": "animate time sets and gets time",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/animate/__tests__/animate.test.tsx",
+      "fullName": "animate top-level onComplete fires once when some props are equal and others animate",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/animate/__tests__/animate.test.tsx",
+      "fullName": "animate will animate spring with existing target and velocity",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/animate/__tests__/animate.test.tsx",
+      "fullName": "animate: Objects Object animates",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/animate/__tests__/animate.test.tsx",
+      "fullName": "animate: Objects Object animates in sequence",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/animate/__tests__/animate.test.tsx",
+      "fullName": "animate: Objects Three.js Object3D animates",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/animate/__tests__/animate.test.tsx",
+      "fullName": "animate: Objects Three.js Object3D animates in sequence",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/animate/__tests__/animate.test.tsx",
+      "fullName": "animate: Objects Types: Object in sequence",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/animate/__tests__/animate.test.tsx",
+      "fullName": "animate: Objects Types: Object in sequence with transition",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/animate/__tests__/animate.test.tsx",
+      "fullName": "animate: Objects Types: Object in sequence with value-specific transition",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/animate/__tests__/animate.test.tsx",
+      "fullName": "animate: Objects Types: Object to object",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/animate/__tests__/animate.test.tsx",
+      "fullName": "animate: Objects Types: Object to object with onUpdate",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/animate/__tests__/animate.test.tsx",
+      "fullName": "animate: Objects Types: Object to object with transition",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/animate/__tests__/animate.test.tsx",
+      "fullName": "animate: Objects Types: Object to object with value-specific transitions",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/animate/__tests__/animate.test.tsx",
+      "fullName": "animate: Objects Types: Three.js Object3D",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/animate/__tests__/animate.test.tsx",
+      "fullName": "animate: Objects Types: Three.js Object3D in sequence",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/animate/__tests__/animate.test.tsx",
+      "fullName": "animate: Objects Types: Three.js Object3D in sequence with transition",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/animate/__tests__/animate.test.tsx",
+      "fullName": "animate: Objects Types: Three.js Object3D keyframes",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/animate/__tests__/animate.test.tsx",
+      "fullName": "animate: Objects does not fire console warning when animating non-animatable color with type: false",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/animate/__tests__/animate.test.tsx",
+      "fullName": "animate: Objects sets motion value to target when animating non-animatable color with type: false",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/animate/__tests__/effects.test.ts",
+      "fullName": "animate.addEffect animates DOM elements even when an effect claims everything",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/animate/__tests__/effects.test.ts",
+      "fullName": "animate.addEffect animates arrays of effect subjects with stagger",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/animate/__tests__/effects.test.ts",
+      "fullName": "animate.addEffect animates mixed DOM and effect subjects in a sequence",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/animate/__tests__/effects.test.ts",
+      "fullName": "animate.addEffect animates subjects claimed by a registered effect",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/animate/__tests__/effects.test.ts",
+      "fullName": "animate.addEffect falls back to plain objects when no effect claims the subject",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/animate/__tests__/effects.test.ts",
+      "fullName": "animate.addEffect reuses motion values bound via the effect",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/animators/waapi/__tests__/animate-style.test.ts",
+      "fullName": "animateMini Interrupt polyfilled transforms",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/animators/waapi/__tests__/animate-style.test.ts",
+      "fullName": "animateMini No type errors",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/animators/waapi/__tests__/animate-style.test.ts",
+      "fullName": "animateMini time sets and gets time",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/animators/waapi/__tests__/css-variables.test.tsx",
+      "fullName": "css variables css variable detects fallback values with decimal",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/animators/waapi/__tests__/css-variables.test.tsx",
+      "fullName": "css variables css variable parsing",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/animators/waapi/__tests__/css-variables.test.tsx",
+      "fullName": "css variables css variable parsing fallback",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/animators/waapi/__tests__/css-variables.test.tsx",
+      "fullName": "css variables css variable parsing ignores metadata",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/animators/waapi/__tests__/css-variables.test.tsx",
+      "fullName": "css variables css variable parsing nested fallback",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/animators/waapi/__tests__/css-variables.test.tsx",
+      "fullName": "css variables motion component still accetps React.CSSProperties",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/animators/waapi/__tests__/css-variables.test.tsx",
+      "fullName": "css variables should animate css color variables",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/animators/waapi/__tests__/css-variables.test.tsx",
+      "fullName": "css variables should correctly animate previously unencountered variables",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/animators/waapi/__tests__/css-variables.test.tsx",
+      "fullName": "css variables types work",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/hooks/__tests__/use-animate.test.tsx",
+      "fullName": "useAnimate Animates provided animation",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/hooks/__tests__/use-animate.test.tsx",
+      "fullName": "useAnimate Animations removed from scope when finished",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/hooks/__tests__/use-animate.test.tsx",
+      "fullName": "useAnimate Applies final value instantly when MotionConfig skipAnimations is true",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/hooks/__tests__/use-animate.test.tsx",
+      "fullName": "useAnimate Stops animations when unmounted",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/hooks/__tests__/use-animate.test.tsx",
+      "fullName": "useAnimate Types work as expected",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/hooks/__tests__/use-animated-state.test.tsx",
+      "fullName": "useAnimatedState animates values",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/sequence/__tests__/index.test.ts",
+      "fullName": "Sequence callbacks Function segments appear as MotionValue entries in animation definitions",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/sequence/__tests__/index.test.ts",
+      "fullName": "Sequence callbacks Function segments as MotionValues don't affect element animation timing",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/sequence/__tests__/index.test.ts",
+      "fullName": "createAnimationsFromSequence Adds spring as duration-based easing when only one keyframe defined",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/sequence/__tests__/index.test.ts",
+      "fullName": "createAnimationsFromSequence Adds spring as duration-based easing when only one keyframe defined",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/sequence/__tests__/index.test.ts",
+      "fullName": "createAnimationsFromSequence Adds springs as duration-based simulation when two keyframes defined",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/sequence/__tests__/index.test.ts",
+      "fullName": "createAnimationsFromSequence Can set label as first item in sequence",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/sequence/__tests__/index.test.ts",
+      "fullName": "createAnimationsFromSequence Does not include type: spring in transition when spring is converted to easing via defaultTransition",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/sequence/__tests__/index.test.ts",
+      "fullName": "createAnimationsFromSequence It accepts motion values",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/sequence/__tests__/index.test.ts",
+      "fullName": "createAnimationsFromSequence It accepts motion values keyframes",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/sequence/__tests__/index.test.ts",
+      "fullName": "createAnimationsFromSequence It adds moves the playhead back to the previous animation",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/sequence/__tests__/index.test.ts",
+      "fullName": "createAnimationsFromSequence It adds relative time to another animation",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/sequence/__tests__/index.test.ts",
+      "fullName": "createAnimationsFromSequence It adds subtracts time to another animation",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/sequence/__tests__/index.test.ts",
+      "fullName": "createAnimationsFromSequence It advances time by the maximum defined in individual value options",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/sequence/__tests__/index.test.ts",
+      "fullName": "createAnimationsFromSequence It assigns the correct easing to the correct keyframes",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/sequence/__tests__/index.test.ts",
+      "fullName": "createAnimationsFromSequence It correctly adds repeatDelay between repeated keyframes",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/sequence/__tests__/index.test.ts",
+      "fullName": "createAnimationsFromSequence It correctly adds type: spring to timeline with simulated spring",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/sequence/__tests__/index.test.ts",
+      "fullName": "createAnimationsFromSequence It correctly mirrors repeated keyframes",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/sequence/__tests__/index.test.ts",
+      "fullName": "createAnimationsFromSequence It correctly passes easing cubic bezier array to children",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/sequence/__tests__/index.test.ts",
+      "fullName": "createAnimationsFromSequence It correctly repeats easing",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/sequence/__tests__/index.test.ts",
+      "fullName": "createAnimationsFromSequence It correctly repeats keyframes once",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/sequence/__tests__/index.test.ts",
+      "fullName": "createAnimationsFromSequence It correctly reverses repeated keyframes",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/sequence/__tests__/index.test.ts",
+      "fullName": "createAnimationsFromSequence It creates a single animation",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/sequence/__tests__/index.test.ts",
+      "fullName": "createAnimationsFromSequence It creates a single animation with defaults",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/sequence/__tests__/index.test.ts",
+      "fullName": "createAnimationsFromSequence It creates a single animation with defaults - 2",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/sequence/__tests__/index.test.ts",
+      "fullName": "createAnimationsFromSequence It creates multiple animations for multiple targets",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/sequence/__tests__/index.test.ts",
+      "fullName": "createAnimationsFromSequence It creates multiple animations, staggered",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/sequence/__tests__/index.test.ts",
+      "fullName": "createAnimationsFromSequence It filters null elements from array of targets",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/sequence/__tests__/index.test.ts",
+      "fullName": "createAnimationsFromSequence It handles sequence with only null element gracefully",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/sequence/__tests__/index.test.ts",
+      "fullName": "createAnimationsFromSequence It orders grouped keyframes correctly",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/sequence/__tests__/index.test.ts",
+      "fullName": "createAnimationsFromSequence It passes default options to children",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/sequence/__tests__/index.test.ts",
+      "fullName": "createAnimationsFromSequence It passes timeline options to children",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/sequence/__tests__/index.test.ts",
+      "fullName": "createAnimationsFromSequence It scales the whole animation based on the provided duration",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/sequence/__tests__/index.test.ts",
+      "fullName": "createAnimationsFromSequence It sequences one animation after another",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/sequence/__tests__/index.test.ts",
+      "fullName": "createAnimationsFromSequence It sets annotated labels with absolute at times",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/sequence/__tests__/index.test.ts",
+      "fullName": "createAnimationsFromSequence It sets annotated labels with relative at times",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/sequence/__tests__/index.test.ts",
+      "fullName": "createAnimationsFromSequence It sets another animation at a specific time",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/sequence/__tests__/index.test.ts",
+      "fullName": "createAnimationsFromSequence It sets labels from strings",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/sequence/__tests__/index.test.ts",
+      "fullName": "createAnimationsFromSequence It skips null elements in sequence",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/sequence/__tests__/index.test.ts",
+      "fullName": "createAnimationsFromSequence Mirror keeps original easings on flipped iterations (matches JSAnimation runtime)",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/sequence/__tests__/index.test.ts",
+      "fullName": "createAnimationsFromSequence Repeating a segment correctly places the next segment at the end",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/sequence/__tests__/index.test.ts",
+      "fullName": "createAnimationsFromSequence Reverse applies reverseEasing to function easings on flipped iterations",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/sequence/__tests__/index.test.ts",
+      "fullName": "createAnimationsFromSequence Spring defaultTransition does not leak type into multi-element sequence (#3158)",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/sequence/__tests__/index.test.ts",
+      "fullName": "createAnimationsFromSequence unsupported repeat options on segments (#2915) ignores repeat=50 on a segment with a warning",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/sequence/__tests__/index.test.ts",
+      "fullName": "createAnimationsFromSequence unsupported repeat options on segments (#2915) ignores repeat=Infinity on a segment with a warning",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/sequence/utils/__tests__/calc-repeat-duration.test.ts",
+      "fullName": "calculateRepeatDuration It correctly calculates the duration",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/sequence/utils/__tests__/calc-repeat-duration.test.ts",
+      "fullName": "calculateRepeatDuration It includes repeatDelay between iterations",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/sequence/utils/__tests__/calc-time.test.ts",
+      "fullName": "calcNextTime Correctly returns a new time based on the past arguments",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/sequence/utils/__tests__/edit.test.ts",
+      "fullName": "addKeyframes Adds keyframes to sequence",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/sequence/utils/__tests__/edit.test.ts",
+      "fullName": "eraseKeyframes Erase keyframes between the specified time range",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/sequence/utils/__tests__/normalize-times.test.ts",
+      "fullName": "normalizeTimes It accounts for repeatDelay between iterations",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/sequence/utils/__tests__/normalize-times.test.ts",
+      "fullName": "normalizeTimes It correctly scales times",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/sequence/utils/__tests__/sort.test.ts",
+      "fullName": "compareByTime Can be used to sort values by at time",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/sequence/utils/__tests__/sort.test.ts",
+      "fullName": "compareByTime Will correctly swap values so null comes second if at time the same",
+      "status": "passed"
+    },
+    {
+      "file": "src/animation/sequence/utils/__tests__/sort.test.ts",
+      "fullName": "compareByTime Will prefer to keep original order when at is the same",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/AnimatePresence/__tests__/AnimatePresence.test.tsx",
+      "fullName": "AnimatePresence Allows initial animation if no `initial` prop defined",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/AnimatePresence/__tests__/AnimatePresence.test.tsx",
+      "fullName": "AnimatePresence Allows nested exit animations",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/AnimatePresence/__tests__/AnimatePresence.test.tsx",
+      "fullName": "AnimatePresence Animates a component back in if it's re-added before animating out",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/AnimatePresence/__tests__/AnimatePresence.test.tsx",
+      "fullName": "AnimatePresence Animates a component out after having an animation cancelled",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/AnimatePresence/__tests__/AnimatePresence.test.tsx",
+      "fullName": "AnimatePresence Animates out a component when its removed",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/AnimatePresence/__tests__/AnimatePresence.test.tsx",
+      "fullName": "AnimatePresence Can cycle through multiple components",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/AnimatePresence/__tests__/AnimatePresence.test.tsx",
+      "fullName": "AnimatePresence Elements exit in sequence during fast renders",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/AnimatePresence/__tests__/AnimatePresence.test.tsx",
+      "fullName": "AnimatePresence Exit propagates through variants",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/AnimatePresence/__tests__/AnimatePresence.test.tsx",
+      "fullName": "AnimatePresence Exit variants are triggered with `AnimatePresence.custom`, not that of the element.",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/AnimatePresence/__tests__/AnimatePresence.test.tsx",
+      "fullName": "AnimatePresence Exiting children don't reorder present children (#3746)",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/AnimatePresence/__tests__/AnimatePresence.test.tsx",
+      "fullName": "AnimatePresence Fast animations with wait render the child content correctly",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/AnimatePresence/__tests__/AnimatePresence.test.tsx",
+      "fullName": "AnimatePresence Fast animations with wait render the child content correctly (strict mode disabled)",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/AnimatePresence/__tests__/AnimatePresence.test.tsx",
+      "fullName": "AnimatePresence Handles external refs on a single child",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/AnimatePresence/__tests__/AnimatePresence.test.tsx",
+      "fullName": "AnimatePresence Immediately remove child if no exit animations defined",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/AnimatePresence/__tests__/AnimatePresence.test.tsx",
+      "fullName": "AnimatePresence Normal rerenders work as expected",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/AnimatePresence/__tests__/AnimatePresence.test.tsx",
+      "fullName": "AnimatePresence Only renders one child at a time if mode === 'wait'",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/AnimatePresence/__tests__/AnimatePresence.test.tsx",
+      "fullName": "AnimatePresence Removes a child with no animations",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/AnimatePresence/__tests__/AnimatePresence.test.tsx",
+      "fullName": "AnimatePresence Suppresses initial animation if `initial={false}`",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/AnimatePresence/__tests__/AnimatePresence.test.tsx",
+      "fullName": "AnimatePresence Switching mode from popLayout to wait doesn't break animations",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/AnimatePresence/__tests__/AnimatePresence.test.tsx",
+      "fullName": "AnimatePresence Switching mode from wait to popLayout doesn't break animations",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/AnimatePresence/__tests__/AnimatePresence.test.tsx",
+      "fullName": "AnimatePresence popLayout mode with anchorY='bottom' preserves bottom positioning",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/AnimatePresence/__tests__/AnimatePresence.test.tsx",
+      "fullName": "AnimatePresence when: afterChildren fires correctly",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/AnimatePresence/__tests__/AnimatePresence.test.tsx",
+      "fullName": "AnimatePresence with custom components AnimatePresence - nested AnimatePresence should animate exit when propagate is true",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/AnimatePresence/__tests__/AnimatePresence.test.tsx",
+      "fullName": "AnimatePresence with custom components AnimatePresence - nested AnimatePresence should not animate exit",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/AnimatePresence/__tests__/AnimatePresence.test.tsx",
+      "fullName": "AnimatePresence with custom components Animates out a component when its removed",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/AnimatePresence/__tests__/AnimatePresence.test.tsx",
+      "fullName": "AnimatePresence with custom components Animation controls children of initial={false} don't throw`",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/AnimatePresence/__tests__/AnimatePresence.test.tsx",
+      "fullName": "AnimatePresence with custom components Can cycle through multiple components",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/AnimatePresence/__tests__/AnimatePresence.test.tsx",
+      "fullName": "AnimatePresence with custom components Does not get stuck when state changes cause rapid key alternation in mode='wait'",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/AnimatePresence/__tests__/AnimatePresence.test.tsx",
+      "fullName": "AnimatePresence with custom components Does nothing on initial render by default",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/AnimatePresence/__tests__/AnimatePresence.test.tsx",
+      "fullName": "AnimatePresence with custom components Exit propagates through variants",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/AnimatePresence/__tests__/AnimatePresence.test.tsx",
+      "fullName": "AnimatePresence with custom components Exit variants are triggered with `AnimatePresence.custom` throughout the tree",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/AnimatePresence/__tests__/AnimatePresence.test.tsx",
+      "fullName": "AnimatePresence with custom components Exit variants are triggered with `AnimatePresence.custom`, not that of the element.",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/AnimatePresence/__tests__/AnimatePresence.test.tsx",
+      "fullName": "AnimatePresence with custom components Fires onExitComplete during rapid key switches with dynamic custom variants",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/AnimatePresence/__tests__/AnimatePresence.test.tsx",
+      "fullName": "AnimatePresence with custom components Re-entering child replays enter animation when exit was complete",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/AnimatePresence/__tests__/AnimatePresence.test.tsx",
+      "fullName": "AnimatePresence with custom components Re-entering child with object-form initial resets to initial values when exit was complete",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/AnimatePresence/__tests__/AnimatePresence.test.tsx",
+      "fullName": "AnimatePresence with custom components Removes child when motion components inside unmount during exit (#3243)",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/AnimatePresence/__tests__/AnimatePresence.test.tsx",
+      "fullName": "AnimatePresence with custom components Removes child when nested variant children have exit matching current values",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/AnimatePresence/__tests__/AnimatePresence.test.tsx",
+      "fullName": "AnimatePresence with custom components Removes exiting children during rapid key switches with dynamic custom variants",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/AnimatePresence/__tests__/AnimatePresence.test.tsx",
+      "fullName": "AnimatePresence with custom components Shows latest child after rapid key switches in mode='wait'",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/AnimatePresence/__tests__/AnimatePresence.test.tsx",
+      "fullName": "AnimatePresence with custom components Sibling AnimatePresence wrapped in LayoutGroup remove exiting elements",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/AnimatePresence/__tests__/AnimatePresence.test.tsx",
+      "fullName": "AnimatePresence with custom components Suppresses initial animation if `initial={false}`",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/AnimatePresence/__tests__/pop-child-ref.test.tsx",
+      "fullName": "AnimatePresence PopChild ref access does not read children.props.ref in non-popLayout mode",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/AnimatePresence/__tests__/use-presence-data.test.tsx",
+      "fullName": "usePresenceCustomData returns custom data passed to AnimatePresence",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/AnimatePresence/__tests__/use-presence-data.test.tsx",
+      "fullName": "usePresenceCustomData returns undefined when not within AnimatePresence",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/AnimatePresence/__tests__/use-presence.test.tsx",
+      "fullName": "usePresence Calling safeToRemove multiple times only triggers exit once",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/AnimatePresence/__tests__/use-presence.test.tsx",
+      "fullName": "usePresence Can defer unmounting",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/AnimatePresence/__tests__/use-presence.test.tsx",
+      "fullName": "usePresence Component can exit again after re-entering",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/AnimatePresence/__tests__/use-presence.test.tsx",
+      "fullName": "usePresence Multiple children can exit",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/AnimatePresence/__tests__/use-presence.test.tsx",
+      "fullName": "usePresence Multiple children can exit over multiple rerenders",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/AnimatePresence/__tests__/use-presence.test.tsx",
+      "fullName": "usePresence Rapid rerenders during exit only triggers exit once",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/LayoutGroup/__tests__/LayoutGroup.test.tsx",
+      "fullName": "if it's a nested LayoutGroup it appends to the group id",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/LayoutGroup/__tests__/LayoutGroup.test.tsx",
+      "fullName": "if it's the first LayoutGroup it sets the group id",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/LayoutGroup/__tests__/LayoutGroup.test.tsx",
+      "fullName": "if the parent group id is undefined, child LayoutGroups still append the group id",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/LayoutGroup/__tests__/LayoutGroup.test.tsx",
+      "fullName": "if the value of id is undefined, it doesn't change the group id",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/MotionConfig/__tests__/MotionConfig.test.tsx",
+      "fullName": "Nested MotionConfig with inherit shallow-merges with parent transition",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/MotionConfig/__tests__/MotionConfig.test.tsx",
+      "fullName": "Nested MotionConfig without inherit fully replaces parent transition",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/MotionConfig/__tests__/MotionConfig.test.tsx",
+      "fullName": "Passes down transition",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/MotionConfig/__tests__/MotionConfig.test.tsx",
+      "fullName": "Passes down transition changes",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/MotionConfig/__tests__/MotionConfig.test.tsx",
+      "fullName": "inherit cascades through deeply nested MotionConfigs",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/MotionConfig/__tests__/MotionConfig.test.tsx",
+      "fullName": "inherit inner keys win over parent keys",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/MotionConfig/__tests__/MotionConfig.test.tsx",
+      "fullName": "inherit key is stripped from resulting transition",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/MotionConfig/__tests__/index.test.tsx",
+      "fullName": "custom properties isValidProp is scoped to children",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/MotionConfig/__tests__/index.test.tsx",
+      "fullName": "custom properties nested isValidProp overrides restore the parent validator",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/MotionConfig/__tests__/index.test.tsx",
+      "fullName": "reducedMotion reducedMotion makes transforms animate instantly",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/MotionConfig/__tests__/index.test.tsx",
+      "fullName": "reducedMotion reducedMotion warning fires in development mode",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/MotionConfig/__tests__/index.test.tsx",
+      "fullName": "skipAnimations skipAnimations is scoped to component tree",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/MotionConfig/__tests__/index.test.tsx",
+      "fullName": "skipAnimations skipAnimations makes all animations complete instantly",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/MotionConfig/__tests__/index.test.tsx",
+      "fullName": "skipAnimations skipAnimations=false does not skip animations",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/Reorder/__tests__/index.test.tsx",
+      "fullName": "Reorder Accepts union array types for values prop",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/Reorder/__tests__/index.test.tsx",
+      "fullName": "Reorder Correctly hydrates ref",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/Reorder/__tests__/index.test.tsx",
+      "fullName": "Reorder Preserves unmeasured items during reorder (virtualized list support)",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/Reorder/__tests__/index.test.tsx",
+      "fullName": "Reorder Reorders a grid across both axes with axis=undefined",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/Reorder/__tests__/index.test.tsx",
+      "fullName": "Reorder Reorders a grid across both axes with axis=xy",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/Reorder/__tests__/server.ssr.test.tsx",
+      "fullName": "Reorder Correctly renders HTML",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/Reorder/__tests__/server.ssr.test.tsx",
+      "fullName": "Reorder HTML props have incorrect types - these should fail TypeScript checking",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/Reorder/__tests__/server.ssr.test.tsx",
+      "fullName": "Reorder onReorder is typed correctly",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/Reorder/utils/__tests__/check-reorder.test.ts",
+      "fullName": "Reorder layout utils detects horizontal, vertical, and wrapped layouts",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/Reorder/utils/__tests__/check-reorder.test.ts",
+      "fullName": "Reorder layout utils inserts into the empty end of a wrapped ltr row",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/Reorder/utils/__tests__/check-reorder.test.ts",
+      "fullName": "Reorder layout utils inserts into the empty end of a wrapped rtl row",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/Reorder/utils/__tests__/check-reorder.test.ts",
+      "fullName": "Reorder layout utils moves into a wrapped row",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/Reorder/utils/__tests__/check-reorder.test.ts",
+      "fullName": "Reorder layout utils preserves single-axis reorder thresholds",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/Reorder/utils/__tests__/check-reorder.test.ts",
+      "fullName": "Reorder layout utils waits until the dragged center crosses a large gap",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/utils/__tests__/tag-proxy.test.tsx",
+      "fullName": "tagProxy Cache works correctly",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/utils/__tests__/tag-proxy.test.tsx",
+      "fullName": "tagProxy Correctly renders the defined tag",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/utils/__tests__/tag-proxy.test.tsx",
+      "fullName": "tagProxy Creates a component that accepts underlying element props and custom props",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/utils/__tests__/tag-proxy.test.tsx",
+      "fullName": "tagProxy Creates a component that correctly excludes overlapping props",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/utils/__tests__/tag-proxy.test.tsx",
+      "fullName": "tagProxy Creates a component with the defined tags",
+      "status": "passed"
+    },
+    {
+      "file": "src/components/utils/__tests__/tag-proxy.test.tsx",
+      "fullName": "tagProxy Creates custom component when used as a function",
+      "status": "passed"
+    },
+    {
+      "file": "src/context/MotionContext/__tests__/utils.test.ts",
+      "fullName": "getCurrentTreeVariants It returns the correct variant to render currently",
+      "status": "passed"
+    },
+    {
+      "file": "src/events/__tests__/types.test.tsx",
+      "fullName": "relativeTo should return nothing if there is no element available",
+      "status": "passed"
+    },
+    {
+      "file": "src/events/__tests__/types.test.tsx",
+      "fullName": "relativeTo should use element from document if id was provided",
+      "status": "passed"
+    },
+    {
+      "file": "src/events/__tests__/types.test.tsx",
+      "fullName": "relativeTo should use provided element",
+      "status": "passed"
+    },
+    {
+      "file": "src/events/__tests__/use-event.test.tsx",
+      "fullName": "useDomEvent should call the handler when the event is fired",
+      "status": "passed"
+    },
+    {
+      "file": "src/events/__tests__/use-event.test.tsx",
+      "fullName": "useDomEvent should fire an event on another element in the ref",
+      "status": "passed"
+    },
+    {
+      "file": "src/events/__tests__/use-event.test.tsx",
+      "fullName": "useDomEvent should handle the ref not being set correctly",
+      "status": "passed"
+    },
+    {
+      "file": "src/events/__tests__/use-event.test.tsx",
+      "fullName": "useDomEvent should not fire an event if the component has been unmounted",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/__tests__/focus.test.tsx",
+      "fullName": "focus whileFocus applied",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/__tests__/focus.test.tsx",
+      "fullName": "focus whileFocus applied as variant",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/__tests__/focus.test.tsx",
+      "fullName": "focus whileFocus applied if focus-visible selector throws unsupported",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/__tests__/focus.test.tsx",
+      "fullName": "focus whileFocus is unapplied when blur",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/__tests__/focus.test.tsx",
+      "fullName": "focus whileFocus not applied when :focus-visible is false",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/__tests__/hover.test.tsx",
+      "fullName": "hover Correctly uses transition applied to initial",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/__tests__/hover.test.tsx",
+      "fullName": "hover filters touch events",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/__tests__/hover.test.tsx",
+      "fullName": "hover hover event listeners fire",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/__tests__/hover.test.tsx",
+      "fullName": "hover whileHover applied",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/__tests__/hover.test.tsx",
+      "fullName": "hover whileHover applied as variant",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/__tests__/hover.test.tsx",
+      "fullName": "hover whileHover is unapplied after drag ends when pointer left element during drag",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/__tests__/hover.test.tsx",
+      "fullName": "hover whileHover is unapplied when hover ends",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/__tests__/hover.test.tsx",
+      "fullName": "hover whileHover only animates values that aren't being controlled by a higher-priority gesture ",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/__tests__/hover.test.tsx",
+      "fullName": "hover whileHover propagates to children",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/__tests__/hover.test.tsx",
+      "fullName": "hover whileHover remains active when pointer is over element after drag ends",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/__tests__/hover.test.tsx",
+      "fullName": "hover whileHover stays active during press and deactivates on release outside element",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/__tests__/hover.test.tsx",
+      "fullName": "hover whileHover stays active during press when pointer leaves before drag starts",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/__tests__/is-node-or-child.test.tsx",
+      "fullName": "isNodeOrChild tap event listeners fire",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/__tests__/pan.test.tsx",
+      "fullName": "pan onPanEnd doesn't fire unless onPanStart has",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/__tests__/pan.test.tsx",
+      "fullName": "pan onPanStart fires before onPan",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/__tests__/pan.test.tsx",
+      "fullName": "pan pan handlers aren't frozen at pan session start",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/__tests__/press.test.tsx",
+      "fullName": "press global press event listeners fire",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/__tests__/press.test.tsx",
+      "fullName": "press ignore press event when button is disabled",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/__tests__/press.test.tsx",
+      "fullName": "press onTapCancel is correctly removed from a component",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/__tests__/press.test.tsx",
+      "fullName": "press press cancel event listeners fire via keyboard",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/__tests__/press.test.tsx",
+      "fullName": "press press cancel event listeners not fired via keyboard after keyUp",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/__tests__/press.test.tsx",
+      "fullName": "press press cancel fires if press released outside element",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/__tests__/press.test.tsx",
+      "fullName": "press press event listeners are cleaned up",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/__tests__/press.test.tsx",
+      "fullName": "press press event listeners do fire after drag gesture on parent element",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/__tests__/press.test.tsx",
+      "fullName": "press press event listeners do fire if parent is being dragged only a little bit",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/__tests__/press.test.tsx",
+      "fullName": "press press event listeners doesn't fire if parent is being dragged",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/__tests__/press.test.tsx",
+      "fullName": "press press event listeners don't fire if element is disabled",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/__tests__/press.test.tsx",
+      "fullName": "press press event listeners fire",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/__tests__/press.test.tsx",
+      "fullName": "press press event listeners fire if triggered by bound element and released on child",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/__tests__/press.test.tsx",
+      "fullName": "press press event listeners fire if triggered by child",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/__tests__/press.test.tsx",
+      "fullName": "press press event listeners fire if triggered by child and released on bound element",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/__tests__/press.test.tsx",
+      "fullName": "press press event listeners fire via keyboard",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/__tests__/press.test.tsx",
+      "fullName": "press press event listeners unset",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/__tests__/press.test.tsx",
+      "fullName": "press press gesture on children returns to parent-defined variant",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/__tests__/press.test.tsx",
+      "fullName": "press press gesture variant applies and unapplies",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/__tests__/press.test.tsx",
+      "fullName": "press press gesture variant applies and unapplies as state changes",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/__tests__/press.test.tsx",
+      "fullName": "press press gesture variant applies and unapplies via blur cancel",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/__tests__/press.test.tsx",
+      "fullName": "press press gesture variant applies and unapplies via keyboard",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/__tests__/press.test.tsx",
+      "fullName": "press press gesture variant applies and unapplies with whileHover",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/__tests__/press.test.tsx",
+      "fullName": "press press gesture variant unapplies children",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/__tests__/press.test.tsx",
+      "fullName": "press press gesture works with animation state",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/__tests__/press.test.tsx",
+      "fullName": "press propagate={{ tap: false }} isolates whileTap to child only",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/__tests__/press.test.tsx",
+      "fullName": "press propagate={{ tap: false }} prevents all ancestor onTap handlers (three levels)",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/__tests__/press.test.tsx",
+      "fullName": "press propagate={{ tap: false }} prevents parent onTap from firing",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/__tests__/press.test.tsx",
+      "fullName": "press without propagate both parent and child onTap fire",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/drag/__tests__/index.test.tsx",
+      "fullName": "drag onDragStart fires",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/drag/__tests__/index.test.tsx",
+      "fullName": "drag with AnimatePresence initial={false} drag starts from animate value, not initial value",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/drag/__tests__/index.test.tsx",
+      "fullName": "dragging allow drag propagation on opposing axis",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/drag/__tests__/index.test.tsx",
+      "fullName": "dragging applies drag transition",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/drag/__tests__/index.test.tsx",
+      "fullName": "dragging block drag propagation",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/drag/__tests__/index.test.tsx",
+      "fullName": "dragging block drag propagation even after parent has been dragged",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/drag/__tests__/index.test.tsx",
+      "fullName": "dragging block drag propagation release velocity",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/drag/__tests__/index.test.tsx",
+      "fullName": "dragging cleans up pan session event listeners when unmounting during active gesture",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/drag/__tests__/index.test.tsx",
+      "fullName": "dragging drag constraints can be updated",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/drag/__tests__/index.test.tsx",
+      "fullName": "dragging drag handlers aren't frozen at drag session start",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/drag/__tests__/index.test.tsx",
+      "fullName": "dragging drag momentum is applied",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/drag/__tests__/index.test.tsx",
+      "fullName": "dragging dragEnd does fire even if the MotionValues were physically reset",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/drag/__tests__/index.test.tsx",
+      "fullName": "dragging dragEnd doesn't fire if dragging never initiated",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/drag/__tests__/index.test.tsx",
+      "fullName": "dragging dragEnd fires",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/drag/__tests__/index.test.tsx",
+      "fullName": "dragging dragEnd fires when a child stops pointerup propagation (#2794)",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/drag/__tests__/index.test.tsx",
+      "fullName": "dragging dragEnd returns transformed pointer",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/drag/__tests__/index.test.tsx",
+      "fullName": "dragging dragStart doesn't fire if dragListener === false",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/drag/__tests__/index.test.tsx",
+      "fullName": "dragging dragTransitionEnd fires",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/drag/__tests__/index.test.tsx",
+      "fullName": "dragging enable drag propagation",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/drag/__tests__/index.test.tsx",
+      "fullName": "dragging impose bottom drag constraint",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/drag/__tests__/index.test.tsx",
+      "fullName": "dragging impose left drag constraint",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/drag/__tests__/index.test.tsx",
+      "fullName": "dragging impose right drag constraint",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/drag/__tests__/index.test.tsx",
+      "fullName": "dragging impose top drag constraint",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/drag/__tests__/index.test.tsx",
+      "fullName": "dragging limit to initial direction: x",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/drag/__tests__/index.test.tsx",
+      "fullName": "dragging limit to initial direction: y",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/drag/__tests__/index.test.tsx",
+      "fullName": "dragging panSessionStart fires",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/drag/__tests__/index.test.tsx",
+      "fullName": "dragging pointer down kills momentum",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/drag/__tests__/index.test.tsx",
+      "fullName": "dragging whileDrag applies animation state",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/drag/__tests__/index.test.tsx",
+      "fullName": "dragging willChange is applied correctly",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/drag/__tests__/index.test.tsx",
+      "fullName": "dragging willChange is applied correctly when other values are animating",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/drag/__tests__/index.test.tsx",
+      "fullName": "keyboard accessible elements drag gesture does not start when clicking a child input",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/drag/__tests__/index.test.tsx",
+      "fullName": "keyboard accessible elements drag gesture does not start when clicking a child select",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/drag/__tests__/index.test.tsx",
+      "fullName": "keyboard accessible elements drag gesture does not start when clicking a child textarea",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/drag/__tests__/index.test.tsx",
+      "fullName": "keyboard accessible elements drag gesture starts on a motion.a with drag prop",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/drag/__tests__/index.test.tsx",
+      "fullName": "keyboard accessible elements drag gesture starts on a motion.button with drag prop",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/drag/__tests__/index.test.tsx",
+      "fullName": "keyboard accessible elements drag gesture starts on a motion.input with drag prop",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/drag/__tests__/index.test.tsx",
+      "fullName": "keyboard accessible elements drag gesture starts when clicking a child button",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/drag/__tests__/index.test.tsx",
+      "fullName": "keyboard accessible elements drag gesture starts when clicking a child link",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/drag/__tests__/use-drag-controls.test.tsx",
+      "fullName": "useDragControls .start triggers dragging on a different component",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/drag/__tests__/use-drag-controls.test.tsx",
+      "fullName": "useDragControls .start triggers dragging on its parent",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/drag/__tests__/use-drag-controls.test.tsx",
+      "fullName": "useDragControls dragControls can be updated",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/drag/__tests__/use-drag-controls.test.tsx",
+      "fullName": "useDragControls snapToCursor works correctly with initial coordinates",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/drag/utils/__tests__/constraints.test.ts",
+      "fullName": "applyConstraints Applies elastic factor",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/drag/utils/__tests__/constraints.test.ts",
+      "fullName": "applyConstraints Returns points within the defined constraints",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/drag/utils/__tests__/constraints.test.ts",
+      "fullName": "calcConstraintedMinPoint Correctly applies constraints",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/drag/utils/__tests__/constraints.test.ts",
+      "fullName": "calcConstraintedMinPoint Correctly calculates a minimum point when no constraints are provided",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/drag/utils/__tests__/constraints.test.ts",
+      "fullName": "calcPositionFromProgress Correctly calculates an axis within constraints based on a progress value",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/drag/utils/__tests__/constraints.test.ts",
+      "fullName": "calcRelativeAxisConstraints Correctly calculates viewport constraints given a relative bounding box",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/drag/utils/__tests__/constraints.test.ts",
+      "fullName": "calcViewportAxisConstraints Correctly calculates constraints relative to the viewport when axis is larger than constraints",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/drag/utils/__tests__/constraints.test.ts",
+      "fullName": "calcViewportAxisConstraints Correctly calculates constraints relative to the viewport when axis is smaller than and overlaps constraints",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/drag/utils/__tests__/constraints.test.ts",
+      "fullName": "calcViewportAxisConstraints Correctly calculates constraints relative to the viewport when axis is smaller than and within constraints",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/drag/utils/__tests__/constraints.test.ts",
+      "fullName": "rebaseAxisConstraints Converts viewport-relative constraints to element-relative",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/drag/utils/__tests__/constraints.test.ts",
+      "fullName": "resolveDragElastic Resolves false as 0",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/drag/utils/__tests__/constraints.test.ts",
+      "fullName": "resolveDragElastic Resolves number as object filled with number",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/drag/utils/__tests__/constraints.test.ts",
+      "fullName": "resolveDragElastic Resolves object as object, with default values for missing values",
+      "status": "passed"
+    },
+    {
+      "file": "src/gestures/drag/utils/__tests__/constraints.test.ts",
+      "fullName": "resolveDragElastic Resolves true as default",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/animate-no-browser.test.tsx",
+      "fullName": "animations with isBrowser=false (Next.js build cache regression) animates initial to animate when isBrowser is false",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/animate-no-browser.test.tsx",
+      "fullName": "animations with isBrowser=false (Next.js build cache regression) animates y transform when isBrowser is false",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/animate-prop.test.tsx",
+      "fullName": "animate prop as object Correctly animates complex value types on first rerender",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/animate-prop.test.tsx",
+      "fullName": "animate prop as object Correctly animates from HEX to HSLA",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/animate-prop.test.tsx",
+      "fullName": "animate prop as object Correctly animates from HSLA to Hex",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/animate-prop.test.tsx",
+      "fullName": "animate prop as object Correctly animates from HSLA to RGB",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/animate-prop.test.tsx",
+      "fullName": "animate prop as object Correctly animates from RGB to HSLA",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/animate-prop.test.tsx",
+      "fullName": "animate prop as object Correctly applies final keyframe with repeatType loop and even numbered repeat",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/animate-prop.test.tsx",
+      "fullName": "animate prop as object Correctly applies final keyframe with repeatType loop and odd numbered repeat",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/animate-prop.test.tsx",
+      "fullName": "animate prop as object Correctly applies final keyframe with repeatType mirror and even numbered repeat",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/animate-prop.test.tsx",
+      "fullName": "animate prop as object Correctly applies final keyframe with repeatType mirror and odd numbered repeat",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/animate-prop.test.tsx",
+      "fullName": "animate prop as object Correctly applies final keyframe with repeatType reverse and even numbered repeat",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/animate-prop.test.tsx",
+      "fullName": "animate prop as object Correctly applies final keyframe with repeatType reverse and odd numbered repeat",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/animate-prop.test.tsx",
+      "fullName": "animate prop as object Doesn't double-add listeners to externally-provided motion values",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/animate-prop.test.tsx",
+      "fullName": "animate prop as object Positional values without specific handlers are not measured",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/animate-prop.test.tsx",
+      "fullName": "animate prop as object Resets motion values to initial after Suspense remount",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/animate-prop.test.tsx",
+      "fullName": "animate prop as object accepts base transition settings",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/animate-prop.test.tsx",
+      "fullName": "animate prop as object accepts custom transition prop",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/animate-prop.test.tsx",
+      "fullName": "animate prop as object accepts default transition prop",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/animate-prop.test.tsx",
+      "fullName": "animate prop as object animate display block => none switches to none on animation end",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/animate-prop.test.tsx",
+      "fullName": "animate prop as object animate display none => block immediately switches to block",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/animate-prop.test.tsx",
+      "fullName": "animate prop as object animate prop accepts pathOffset",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/animate-prop.test.tsx",
+      "fullName": "animate prop as object animate visibility hidden => visible immediately switches to visible",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/animate-prop.test.tsx",
+      "fullName": "animate prop as object animate visibility visible => hidden switches to hidden on animation end",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/animate-prop.test.tsx",
+      "fullName": "animate prop as object animates previously unseen CSS variables",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/animate-prop.test.tsx",
+      "fullName": "animate prop as object animates previously unseen properties",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/animate-prop.test.tsx",
+      "fullName": "animate prop as object animates previously unseen properties, instant animation",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/animate-prop.test.tsx",
+      "fullName": "animate prop as object animates to set prop",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/animate-prop.test.tsx",
+      "fullName": "animate prop as object animates to set prop and preserves existing initial transform props",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/animate-prop.test.tsx",
+      "fullName": "animate prop as object animating between none/block fires onAnimationComplete",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/animate-prop.test.tsx",
+      "fullName": "animate prop as object animationStart event fires as expected",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/animate-prop.test.tsx",
+      "fullName": "animate prop as object applies custom transform",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/animate-prop.test.tsx",
+      "fullName": "animate prop as object converts unseen zero unit types to number",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/animate-prop.test.tsx",
+      "fullName": "animate prop as object correctly implements custom mix function",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/animate-prop.test.tsx",
+      "fullName": "animate prop as object does animate different keyframes",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/animate-prop.test.tsx",
+      "fullName": "animate prop as object does animate no-op values if velocity is non-zero and animation type is spring",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/animate-prop.test.tsx",
+      "fullName": "animate prop as object doesn't animate no-op keyframes",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/animate-prop.test.tsx",
+      "fullName": "animate prop as object doesn't animate no-op values",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/animate-prop.test.tsx",
+      "fullName": "animate prop as object doesn't animate zIndex",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/animate-prop.test.tsx",
+      "fullName": "animate prop as object doesn't error when provided unknown animation type",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/animate-prop.test.tsx",
+      "fullName": "animate prop as object fires onAnimationStart when animation begins",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/animate-prop.test.tsx",
+      "fullName": "animate prop as object forces an animation to fallback if has been set to `null`",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/animate-prop.test.tsx",
+      "fullName": "animate prop as object keyframes - accepts ease as an array",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/animate-prop.test.tsx",
+      "fullName": "animate prop as object mount animation doesn't run if `initial={false}`",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/animate-prop.test.tsx",
+      "fullName": "animate prop as object respects repeatDelay prop",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/animate-prop.test.tsx",
+      "fullName": "animate prop as object style doesnt overwrite in subsequent renders",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/animate-prop.test.tsx",
+      "fullName": "animate prop as object transition accepts manual from value",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/animate-prop.test.tsx",
+      "fullName": "animate prop as object unmount cancels active animations",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/animate-prop.test.tsx",
+      "fullName": "animate prop as object uses transition on subsequent renders",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/animate-prop.test.tsx",
+      "fullName": "animate prop as object uses transitionEnd on subsequent renders",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/animate-prop.test.tsx",
+      "fullName": "animate prop as object when value is removed from animate, animate back to value read from DOM",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/animate-prop.test.tsx",
+      "fullName": "animate prop as object when value is removed from animate, animates back to value currently defined in initial prop",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/animate-prop.test.tsx",
+      "fullName": "animate prop as object when value is removed from animate, animates back to value originally defined in initial prop",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/animate-prop.test.tsx",
+      "fullName": "animate prop as object when value is removed from both animate and initial, perform no animation",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/animate-prop.test.tsx",
+      "fullName": "animate prop as object will switch from non-animatable value to animatable value",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/animated-values.test.tsx",
+      "fullName": "values prop Doesn't render custom values",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/animated-values.test.tsx",
+      "fullName": "values prop Is defensive against undefined motion values",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/animated-values.test.tsx",
+      "fullName": "values prop Performs animations only on motion values provided via values",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/animated-values.test.tsx",
+      "fullName": "values prop Prioritises transform over independent transforms",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/animated-values.test.tsx",
+      "fullName": "values prop Still correctly renders values provided via style",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/child-motion-value.test.tsx",
+      "fullName": "child as motion value accepts motion values as children",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/child-motion-value.test.tsx",
+      "fullName": "child as motion value accepts motion values as children for motion.text inside an svg",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/child-motion-value.test.tsx",
+      "fullName": "child as motion value updates svg text when motion value changes",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/child-motion-value.test.tsx",
+      "fullName": "child as motion value updates textContent when motion value changes",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/component-svg.test.tsx",
+      "fullName": "SVG MotionValue can be used for transform attribute on g element",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/component-svg.test.tsx",
+      "fullName": "SVG accepts attrX/attrY/attrScale in types",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/component-svg.test.tsx",
+      "fullName": "SVG animates viewBox",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/component-svg.test.tsx",
+      "fullName": "SVG doesn't add translateZ",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/component-svg.test.tsx",
+      "fullName": "SVG doesn't calculate transformOrigin for <svg /> elements",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/component-svg.test.tsx",
+      "fullName": "SVG doesn't read viewBox as '0 0 0 0'",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/component-svg.test.tsx",
+      "fullName": "SVG doesn't throw if animating unencounterd value",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/component-svg.test.tsx",
+      "fullName": "SVG motion svg elements should be able to set correct type of ref",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/component-svg.test.tsx",
+      "fullName": "SVG recognises MotionValues in attributes",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/component.test.tsx",
+      "fullName": "motion component rendering and styles accepts createref",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/component.test.tsx",
+      "fullName": "motion component rendering and styles doesnt propagate style for children if passed initial as object",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/component.test.tsx",
+      "fullName": "motion component rendering and styles filters MotionProps from the DOM",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/component.test.tsx",
+      "fullName": "motion component rendering and styles generates style attribute for children if passed initial as variant label",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/component.test.tsx",
+      "fullName": "motion component rendering and styles generates style attribute for nested children if passed initial as variant label",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/component.test.tsx",
+      "fullName": "motion component rendering and styles generates style attribute if passed a special transform style attr",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/component.test.tsx",
+      "fullName": "motion component rendering and styles generates style attribute if passed initial",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/component.test.tsx",
+      "fullName": "motion component rendering and styles generates style attribute if passed initial as false",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/component.test.tsx",
+      "fullName": "motion component rendering and styles generates style attribute if passed initial as variant label",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/component.test.tsx",
+      "fullName": "motion component rendering and styles generates style attribute if passed initial as variant label is function",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/component.test.tsx",
+      "fullName": "motion component rendering and styles hydrates a provided ref by the time useLayoutEffect has fired",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/component.test.tsx",
+      "fullName": "motion component rendering and styles it can render inside <StrictMode />",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/component.test.tsx",
+      "fullName": "motion component rendering and styles it can render nested components inside <StrictMode />",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/component.test.tsx",
+      "fullName": "motion component rendering and styles layout animations interrupt jump",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/component.test.tsx",
+      "fullName": "motion component rendering and styles renders",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/component.test.tsx",
+      "fullName": "motion component rendering and styles renders HTML and SVG attributes without type errors",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/component.test.tsx",
+      "fullName": "motion component rendering and styles renders child",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/component.test.tsx",
+      "fullName": "motion component rendering and styles renders custom component",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/component.test.tsx",
+      "fullName": "motion component rendering and styles renders motion div component (using motion.create) without type errors ",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/component.test.tsx",
+      "fullName": "motion component rendering and styles renders normal event listeners",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/component.test.tsx",
+      "fullName": "motion component rendering and styles renders styled component and overwrites style",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/component.test.tsx",
+      "fullName": "motion component rendering and styles renders transform",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/create-component.test.tsx",
+      "fullName": "Create DOM Motion component Animates",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/custom-non-dom-ref.test.tsx",
+      "fullName": "motion.create() wrapping a custom component with a non-DOM ref mounts without error when the ref resolves to an element",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/custom-non-dom-ref.test.tsx",
+      "fullName": "motion.create() wrapping a custom component with a non-DOM ref throws an actionable invariant when the ref isn't an element",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/custom.test.tsx",
+      "fullName": "motion.create() Accepts children as a function if original component accepts children as a function",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/custom.test.tsx",
+      "fullName": "motion.create() accepts custom types",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/custom.test.tsx",
+      "fullName": "motion.create() accepts normal component",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/custom.test.tsx",
+      "fullName": "motion.create() doesn't forward motion props but does forward custom props",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/custom.test.tsx",
+      "fullName": "motion.create() forwards MotionProps if forwardMotionProps is defined",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/custom.test.tsx",
+      "fullName": "motion.create() forwards MotionValue children as raw values",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/custom.test.tsx",
+      "fullName": "motion.create() with type: 'svg' animates SVG-specific attributes like viewBox when type is 'svg'",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/delay.test.tsx",
+      "fullName": "delay attr in animate.transition",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/delay.test.tsx",
+      "fullName": "delay attr in transition prop",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/delay.test.tsx",
+      "fullName": "delay attr in variant",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/delay.test.tsx",
+      "fullName": "delay attr in variant children via delayChildren",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/delay.test.tsx",
+      "fullName": "delay attr in variant children via delayChildren: stagger(interval)",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/delay.test.tsx",
+      "fullName": "delay attr in variant children via staggerChildren",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/delay.test.tsx",
+      "fullName": "delay attr value-specific delay on animation",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/delay.test.tsx",
+      "fullName": "delay attr value-specific delay on instant transition",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/lazy.test.tsx",
+      "fullName": "Lazy feature loading Animates after async loading",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/lazy.test.tsx",
+      "fullName": "Lazy feature loading Does animate with synchronously-loaded domAnimation",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/lazy.test.tsx",
+      "fullName": "Lazy feature loading Does animate with synchronously-loaded domMax",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/lazy.test.tsx",
+      "fullName": "Lazy feature loading Doesn't animate without loaded features",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/lazy.test.tsx",
+      "fullName": "Lazy feature loading Doesn't throw without strict mode",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/lazy.test.tsx",
+      "fullName": "Lazy feature loading Supports nested feature sets",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/lazy.test.tsx",
+      "fullName": "Lazy feature loading Throws in strict mode",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/motion-component.test.tsx",
+      "fullName": "isMotionComponent returns false for other components",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/motion-component.test.tsx",
+      "fullName": "isMotionComponent returns true for motion components",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/motion-component.test.tsx",
+      "fullName": "unwrapMotionComponent returns the wrapped component for motion components",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/motion-component.test.tsx",
+      "fullName": "unwrapMotionComponent returns undefined for other components",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/motion-context.test.tsx",
+      "fullName": "MotionConfig.transition Can define a default transition for an entire tree",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/motion-context.test.tsx",
+      "fullName": "MotionConfig.transition transition is overridden by component prop",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/ssr.test.tsx",
+      "fullName": "render Reorder: Doesn't render touch-scroll disabling styles if dragListener === false",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/ssr.test.tsx",
+      "fullName": "render Reorder: Renders correct element",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/ssr.test.tsx",
+      "fullName": "render Reorder: Renders provided element",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/ssr.test.tsx",
+      "fullName": "render correctly renders HTML",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/ssr.test.tsx",
+      "fullName": "render correctly renders SVG",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/ssr.test.tsx",
+      "fullName": "render correctly renders custom HTML tag",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/ssr.test.tsx",
+      "fullName": "render doesn't override tabindex",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/ssr.test.tsx",
+      "fullName": "render doesn't throw type or runtime errors",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/ssr.test.tsx",
+      "fullName": "render doesn't throw when rendering Fragment",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/ssr.test.tsx",
+      "fullName": "render initial correctly overrides style",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/ssr.test.tsx",
+      "fullName": "render initial correctly overrides style with keyframes and initial={false}",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/ssr.test.tsx",
+      "fullName": "render renders motion value child",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/ssr.test.tsx",
+      "fullName": "render sets tabindex='0' if onTap is set",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/ssr.test.tsx",
+      "fullName": "render sets tabindex='0' if onTapStart is set",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/ssr.test.tsx",
+      "fullName": "render sets tabindex='0' if whileTap is set",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/ssr.test.tsx",
+      "fullName": "renderToStaticMarkup Reorder: Doesn't render touch-scroll disabling styles if dragListener === false",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/ssr.test.tsx",
+      "fullName": "renderToStaticMarkup Reorder: Renders correct element",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/ssr.test.tsx",
+      "fullName": "renderToStaticMarkup Reorder: Renders provided element",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/ssr.test.tsx",
+      "fullName": "renderToStaticMarkup correctly renders HTML",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/ssr.test.tsx",
+      "fullName": "renderToStaticMarkup correctly renders SVG",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/ssr.test.tsx",
+      "fullName": "renderToStaticMarkup correctly renders custom HTML tag",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/ssr.test.tsx",
+      "fullName": "renderToStaticMarkup doesn't override tabindex",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/ssr.test.tsx",
+      "fullName": "renderToStaticMarkup doesn't throw type or runtime errors",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/ssr.test.tsx",
+      "fullName": "renderToStaticMarkup doesn't throw when rendering Fragment",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/ssr.test.tsx",
+      "fullName": "renderToStaticMarkup initial correctly overrides style",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/ssr.test.tsx",
+      "fullName": "renderToStaticMarkup initial correctly overrides style with keyframes and initial={false}",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/ssr.test.tsx",
+      "fullName": "renderToStaticMarkup renders motion value child",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/ssr.test.tsx",
+      "fullName": "renderToStaticMarkup sets tabindex='0' if onTap is set",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/ssr.test.tsx",
+      "fullName": "renderToStaticMarkup sets tabindex='0' if onTapStart is set",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/ssr.test.tsx",
+      "fullName": "renderToStaticMarkup sets tabindex='0' if whileTap is set",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/static-prop.test.tsx",
+      "fullName": "isStatic prop accepts externally-defined transition",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/static-prop.test.tsx",
+      "fullName": "isStatic prop it does not assign projection id to the node",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/static-prop.test.tsx",
+      "fullName": "isStatic prop it doesn't override defined styles if values are removed",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/static-prop.test.tsx",
+      "fullName": "isStatic prop it doesn't respond to updates in `initial`",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/static-prop.test.tsx",
+      "fullName": "isStatic prop it permits updating transform values via style",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/static-prop.test.tsx",
+      "fullName": "isStatic prop it prevents rendering of animated values",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/static-prop.test.tsx",
+      "fullName": "isStatic prop it prevents rendering of children via context",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/static-prop.test.tsx",
+      "fullName": "isStatic prop it propagates changes in `initial` if isStatic",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/static-prop.test.tsx",
+      "fullName": "isStatic prop it reflects changes in attached motion values",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/static-prop.test.tsx",
+      "fullName": "isStatic prop it removes unused styles",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/static-prop.test.tsx",
+      "fullName": "isStatic prop it responds to updates in `initial` if isStatic",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/style-prop.test.tsx",
+      "fullName": "style prop doesn't update transforms that are handled by animation props",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/style-prop.test.tsx",
+      "fullName": "style prop should remove non-set styles",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/style-prop.test.tsx",
+      "fullName": "style prop should update transforms when passed a new value",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/style-prop.test.tsx",
+      "fullName": "style prop should update when passed new MotionValue",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/style-prop.test.tsx",
+      "fullName": "style prop should update when swapping between motion value and static value",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/svg-path.test.tsx",
+      "fullName": "SVG path accepts custom transition prop",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/transformTemplate.test.tsx",
+      "fullName": "transformTemplate applies transformTemplate on initial render",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/transformTemplate.test.tsx",
+      "fullName": "transformTemplate applies updated transformTemplate",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/transformTemplate.test.tsx",
+      "fullName": "transformTemplate removes transformTemplate if prop is removed",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/transformTemplate.test.tsx",
+      "fullName": "transformTemplate removes transformTemplate if prop is removed and transform is changed",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/transformTemplate.test.tsx",
+      "fullName": "transformTemplate removes transformTemplate if prop is removed and transform is not changed",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/transformTemplate.test.tsx",
+      "fullName": "transformTemplate renders transform with transformTemplate",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/transformTemplate.test.tsx",
+      "fullName": "transformTemplate renders transformTemplate without any transform",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/transition-keyframes.test.tsx",
+      "fullName": "keyframes transition hasUpdated detects only changed keyframe arrays",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/transition-keyframes.test.tsx",
+      "fullName": "keyframes transition if initial={false}, take state of final keyframe",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/transition-keyframes.test.tsx",
+      "fullName": "keyframes transition issue #2855: keyframes with shared values across variants rerun on each change",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/transition-keyframes.test.tsx",
+      "fullName": "keyframes transition keyframes animation reruns when variants change and keyframes are the same",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/transition-keyframes.test.tsx",
+      "fullName": "keyframes transition keyframes as target",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/transition-keyframes.test.tsx",
+      "fullName": "keyframes transition keyframes with non-pixel values",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/transition-keyframes.test.tsx",
+      "fullName": "keyframes transition times works as expected",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/types.test.tsx",
+      "fullName": "accepts motion values into both motion components from both entry points accepts expected values",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/types.test.tsx",
+      "fullName": "accepts motion values into both motion components from both entry points renders",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/unit-type-shadow.test.tsx",
+      "fullName": "box-shadow support box-shadow should animate correctly, even when read from browser in weird format",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/unit-type-shadow.test.tsx",
+      "fullName": "box-shadow support box-shadow should animate correctly, even with no initial set",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/unmount-motion-value.test.tsx",
+      "fullName": "motion value lifecycle on unmount (#3315) animation can survive an unmount-then-resubscribe within a single frame",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/unmount-motion-value.test.tsx",
+      "fullName": "motion value lifecycle on unmount (#3315) deferred auto-stop fires on next frame when nothing resubscribes",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/unmount-motion-value.test.tsx",
+      "fullName": "motion value lifecycle on unmount (#3315) does not synchronously stop animations on VE-owned motion values",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/variant.test.tsx",
+      "fullName": "Variant propagation to asynchronously mounted children child inside Suspense boundary should animate from initial variant when parent is already animating",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/variant.test.tsx",
+      "fullName": "Variant propagation to asynchronously mounted children child inside Suspense boundary should not skip directly to animate variant values",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/variant.test.tsx",
+      "fullName": "Variant propagation to asynchronously mounted children child inside Suspense boundary should re-animate after animationState reset (StrictMode remount)",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/variant.test.tsx",
+      "fullName": "animate prop as variant Child variants correctly calculate delay based on delayChildren: stagger()",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/variant.test.tsx",
+      "fullName": "animate prop as variant Child variants correctly calculate delay based on staggerChildren (deprecated)",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/variant.test.tsx",
+      "fullName": "animate prop as variant Child variants with value-specific transitions correctly calculate delay based on delayChildren: stagger()",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/variant.test.tsx",
+      "fullName": "animate prop as variant Child variants with value-specific transitions correctly calculate delay based on staggerChildren (deprecated)",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/variant.test.tsx",
+      "fullName": "animate prop as variant Children correctly animate to removed values even when not rendering along with parents",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/variant.test.tsx",
+      "fullName": "animate prop as variant FRAMER BUG: When a value is removed from an element as the result of a parent variant, fallback to style",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/variant.test.tsx",
+      "fullName": "animate prop as variant Protected keys don't persist after setActive fires",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/variant.test.tsx",
+      "fullName": "animate prop as variant accepts custom transition",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/variant.test.tsx",
+      "fullName": "animate prop as variant animates to set variant",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/variant.test.tsx",
+      "fullName": "animate prop as variant applies applyOnEnd and end of animation",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/variant.test.tsx",
+      "fullName": "animate prop as variant applies applyOnEnd if set on initial",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/variant.test.tsx",
+      "fullName": "animate prop as variant changing values within an inherited variant triggers an animation",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/variant.test.tsx",
+      "fullName": "animate prop as variant child animates to set variant",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/variant.test.tsx",
+      "fullName": "animate prop as variant child animates to set variant even if variants are not found on parent",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/variant.test.tsx",
+      "fullName": "animate prop as variant child onAnimationComplete triggers from parent animations",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/variant.test.tsx",
+      "fullName": "animate prop as variant child onAnimationComplete triggers from parent animations",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/variant.test.tsx",
+      "fullName": "animate prop as variant components without variants are transparent to stagger order",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/variant.test.tsx",
+      "fullName": "animate prop as variant delay propagates throughout children",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/variant.test.tsx",
+      "fullName": "animate prop as variant doesn't propagate to a component with its own `animate` prop",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/variant.test.tsx",
+      "fullName": "animate prop as variant fires onAnimationStart when animation begins",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/variant.test.tsx",
+      "fullName": "animate prop as variant fires onAnimationStart with the animation definition",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/variant.test.tsx",
+      "fullName": "animate prop as variant initial: false correctly propagates",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/variant.test.tsx",
+      "fullName": "animate prop as variant initial=false doesn't propagate to props",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/variant.test.tsx",
+      "fullName": "animate prop as variant nested controlled variants switch correctly",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/variant.test.tsx",
+      "fullName": "animate prop as variant new child items animate from initial to animate",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/variant.test.tsx",
+      "fullName": "animate prop as variant onUpdate",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/variant.test.tsx",
+      "fullName": "animate prop as variant onUpdate doesnt fire if no values have changed",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/variant.test.tsx",
+      "fullName": "animate prop as variant propagates through components with no `animate` prop",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/variant.test.tsx",
+      "fullName": "animate prop as variant respects orchestration props in transition prop",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/variant.test.tsx",
+      "fullName": "animate prop as variant staggerChildren is calculated correctly for new children",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/variant.test.tsx",
+      "fullName": "animate prop as variant style is active once value has been removed from animate",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/variant.test.tsx",
+      "fullName": "animate prop as variant style is used as fallback when a variant changes to not contain that style",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/variant.test.tsx",
+      "fullName": "animate prop as variant style is used as fallback when a variant is removed from animate",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/variant.test.tsx",
+      "fullName": "animate prop as variant transitionEnd from instant animation does not override subsequent variant",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/variant.test.tsx",
+      "fullName": "animate prop as variant variants work the same whether defined inline or not",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/variant.test.tsx",
+      "fullName": "animate prop as variant when: afterChildren works correctly",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/variant.test.tsx",
+      "fullName": "animate prop as variant when: beforeChildren works correctly",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/waapi.test.tsx",
+      "fullName": "WAAPI animations Animates with WAAPI if repeat is Infinity and we need to generate keyframes",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/waapi.test.tsx",
+      "fullName": "WAAPI animations Animates with WAAPI if repeat is defined and we need to generate keyframes",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/waapi.test.tsx",
+      "fullName": "WAAPI animations Does animate non-transform values with WAAPI even if transformTemplate is defined",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/waapi.test.tsx",
+      "fullName": "WAAPI animations Doesn't animate transform values with WAAPI if transformTemplate is defined",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/waapi.test.tsx",
+      "fullName": "WAAPI animations Doesn't animate with WAAPI if external motion value is defined",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/waapi.test.tsx",
+      "fullName": "WAAPI animations Doesn't animate with WAAPI if onUpdate is defined",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/waapi.test.tsx",
+      "fullName": "WAAPI animations Doesn't animate with WAAPI if repeatDelay is defined",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/waapi.test.tsx",
+      "fullName": "WAAPI animations Doesn't animate with WAAPI if repeatType is defined as mirror",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/waapi.test.tsx",
+      "fullName": "WAAPI animations Generates linear() easing if ease is anticipate",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/waapi.test.tsx",
+      "fullName": "WAAPI animations Generates linear() if ease is backInOut",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/waapi.test.tsx",
+      "fullName": "WAAPI animations Generates linear() if ease is circInOut",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/waapi.test.tsx",
+      "fullName": "WAAPI animations Maps 'backIn' to 'cubic-bezier(0.31, 0.01, 0.66, -0.59)'",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/waapi.test.tsx",
+      "fullName": "WAAPI animations Maps 'backOut' to 'cubic-bezier(0.33, 1.53, 0.69, 0.99)'",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/waapi.test.tsx",
+      "fullName": "WAAPI animations Maps 'circIn' to 'cubic-bezier(0, 0.65, 0.55, 1)'",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/waapi.test.tsx",
+      "fullName": "WAAPI animations Maps 'circOut' to 'cubic-bezier(0.55, 0, 1, 0.45)'",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/waapi.test.tsx",
+      "fullName": "WAAPI animations Maps 'easeIn' to 'ease-in'",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/waapi.test.tsx",
+      "fullName": "WAAPI animations Maps 'easeInOut' to 'ease-in-out'",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/waapi.test.tsx",
+      "fullName": "WAAPI animations Maps 'easeOut' to 'ease-out'",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/waapi.test.tsx",
+      "fullName": "WAAPI animations Spring generates easeOut easing if linear() not supported",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/waapi.test.tsx",
+      "fullName": "WAAPI animations Spring generates linear() easing",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/waapi.test.tsx",
+      "fullName": "WAAPI animations WAAPI is called with easeOut easing if linear() not supported",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/waapi.test.tsx",
+      "fullName": "WAAPI animations WAAPI is called with expected arguments",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/waapi.test.tsx",
+      "fullName": "WAAPI animations WAAPI is called with generated linear() easing function when supported",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/waapi.test.tsx",
+      "fullName": "WAAPI animations WAAPI is called with linear() easing if ease is spring",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/waapi.test.tsx",
+      "fullName": "WAAPI animations clipPath animates with WAAPI at default settings",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/waapi.test.tsx",
+      "fullName": "WAAPI animations filter animates with WAAPI at default settings",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/waapi.test.tsx",
+      "fullName": "WAAPI animations opacity animates with WAAPI at default settings",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/waapi.test.tsx",
+      "fullName": "WAAPI animations opacity animates with WAAPI at default settings when layout is enabled",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/waapi.test.tsx",
+      "fullName": "WAAPI animations opacity animates with WAAPI at default settings with no initial value set",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/waapi.test.tsx",
+      "fullName": "WAAPI animations opacity animates with WAAPI when no value is originally provided via initial",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/__tests__/waapi.test.tsx",
+      "fullName": "WAAPI animations transform animates with WAAPI at default settings",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/utils/__tests__/should-inherit-variants.test.ts",
+      "fullName": "checkShouldInheritVariant Detects when a component should inherit variants",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/utils/__tests__/use-motion-ref.test.tsx",
+      "fullName": "useMotionRef should call cleanup function on unmount when ref returns one (React 19)",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/utils/__tests__/use-motion-ref.test.tsx",
+      "fullName": "useMotionRef should call external ref callback with element on mount",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/utils/__tests__/use-motion-ref.test.tsx",
+      "fullName": "useMotionRef should call external ref callback with null on unmount",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/utils/__tests__/use-motion-ref.test.tsx",
+      "fullName": "useMotionRef should handle RefObject refs correctly",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/utils/__tests__/use-motion-ref.test.tsx",
+      "fullName": "useMotionRef should handle mixed ref types in motion components",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/utils/__tests__/use-motion-ref.test.tsx",
+      "fullName": "useMotionRef should register VisualElement in visualElementStore before external ref callback runs",
+      "status": "passed"
+    },
+    {
+      "file": "src/motion/utils/__tests__/use-motion-ref.test.tsx",
+      "fullName": "useMotionRef should work with forwardRef components",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/dom/scroll/__tests__/index.test.ts",
+      "fullName": "scroll Fires onScroll on creation.",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/dom/scroll/__tests__/index.test.ts",
+      "fullName": "scroll Fires onScroll on element resize.",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/dom/scroll/__tests__/index.test.ts",
+      "fullName": "scroll Fires onScroll on resize.",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/dom/scroll/__tests__/index.test.ts",
+      "fullName": "scroll Fires onScroll on scroll with different container with child target.",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/dom/scroll/__tests__/index.test.ts",
+      "fullName": "scroll Fires onScroll on scroll with different container.",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/dom/scroll/__tests__/index.test.ts",
+      "fullName": "scroll Fires onScroll on scroll.",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/dom/scroll/__tests__/index.test.ts",
+      "fullName": "scroll Fires onScroll on window scroll with child target.",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/dom/scroll/__tests__/index.test.ts",
+      "fullName": "scroll Respects offset when callback has no info parameter (#3668).",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/dom/scroll/__tests__/index.test.ts",
+      "fullName": "scrollInfo Fires onScroll on creation.",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/dom/scroll/__tests__/index.test.ts",
+      "fullName": "scrollInfo Fires onScroll on element resize.",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/dom/scroll/__tests__/index.test.ts",
+      "fullName": "scrollInfo Fires onScroll on resize.",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/dom/scroll/__tests__/index.test.ts",
+      "fullName": "scrollInfo Fires onScroll on scroll with different container with child target.",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/dom/scroll/__tests__/index.test.ts",
+      "fullName": "scrollInfo Fires onScroll on scroll with different container.",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/dom/scroll/__tests__/index.test.ts",
+      "fullName": "scrollInfo Fires onScroll on scroll.",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/dom/scroll/__tests__/index.test.ts",
+      "fullName": "scrollInfo Fires onScroll on window scroll with child target.",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/dom/scroll/__tests__/index.test.ts",
+      "fullName": "scrollInfo Reports non-negative progress for negative scroll values (reverse directions).",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/dom/scroll/__tests__/index.test.ts",
+      "fullName": "scrollInfo Reports non-negative progress for negative scrollLeft (x axis, reverse directions).",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/dom/scroll/__tests__/on-scroll-handler.test.ts",
+      "fullName": "on-scroll-handler static-position warning does not warn when container is document.documentElement",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/dom/scroll/__tests__/on-scroll-handler.test.ts",
+      "fullName": "on-scroll-handler static-position warning warns when a custom container has static position",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/dom/scroll/offsets/__tests__/edge.test.ts",
+      "fullName": "resolveEdge It handles named presets",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/dom/scroll/offsets/__tests__/edge.test.ts",
+      "fullName": "resolveEdge It handles percent",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/dom/scroll/offsets/__tests__/edge.test.ts",
+      "fullName": "resolveEdge It handles pixels",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/dom/scroll/offsets/__tests__/edge.test.ts",
+      "fullName": "resolveEdge It handles progress numbers",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/dom/scroll/offsets/__tests__/edge.test.ts",
+      "fullName": "resolveEdge It handles progress numbers as string",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/dom/scroll/offsets/__tests__/edge.test.ts",
+      "fullName": "resolveEdge It handles vh",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/dom/scroll/offsets/__tests__/edge.test.ts",
+      "fullName": "resolveEdge It handles vw",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/dom/scroll/offsets/__tests__/offset.test.ts",
+      "fullName": "resolveOffset Can resolve numerical intersection",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/dom/scroll/offsets/__tests__/offset.test.ts",
+      "fullName": "resolveOffset Can resolve single-value labelled edge",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/dom/scroll/offsets/__tests__/offset.test.ts",
+      "fullName": "resolveOffset Can resolve single-value numerical edge",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/dom/scroll/offsets/__tests__/offset.test.ts",
+      "fullName": "resolveOffset Can resolve single-value px",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/dom/scroll/offsets/__tests__/offset.test.ts",
+      "fullName": "resolveOffset Can resolve string intersection",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/dom/scroll/utils/__tests__/offset-to-range.test.ts",
+      "fullName": "offsetToViewTimelineRange maps All preset to contain range",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/dom/scroll/utils/__tests__/offset-to-range.test.ts",
+      "fullName": "offsetToViewTimelineRange maps Any preset to cover range",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/dom/scroll/utils/__tests__/offset-to-range.test.ts",
+      "fullName": "offsetToViewTimelineRange maps Enter preset to entry range",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/dom/scroll/utils/__tests__/offset-to-range.test.ts",
+      "fullName": "offsetToViewTimelineRange maps Exit preset to exit range",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/dom/scroll/utils/__tests__/offset-to-range.test.ts",
+      "fullName": "offsetToViewTimelineRange maps undefined (default) to contain",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/dom/scroll/utils/__tests__/offset-to-range.test.ts",
+      "fullName": "offsetToViewTimelineRange returns All preset for string offsets",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/dom/scroll/utils/__tests__/offset-to-range.test.ts",
+      "fullName": "offsetToViewTimelineRange returns All preset for string offsets",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/dom/scroll/utils/__tests__/offset-to-range.test.ts",
+      "fullName": "offsetToViewTimelineRange returns Any preset for string offsets",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/dom/scroll/utils/__tests__/offset-to-range.test.ts",
+      "fullName": "offsetToViewTimelineRange returns Enter preset for string offsets",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/dom/scroll/utils/__tests__/offset-to-range.test.ts",
+      "fullName": "offsetToViewTimelineRange returns Exit preset for string offsets",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/dom/scroll/utils/__tests__/offset-to-range.test.ts",
+      "fullName": "offsetToViewTimelineRange returns undefined for non-preset ProgressIntersection arrays",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/dom/scroll/utils/__tests__/offset-to-range.test.ts",
+      "fullName": "offsetToViewTimelineRange returns undefined for other string offsets",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/dom/scroll/utils/__tests__/offset-to-range.test.ts",
+      "fullName": "offsetToViewTimelineRange returns undefined for single-item offset",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/dom/utils/__tests__/camel-to-dash.test.ts",
+      "fullName": "camelToDash Converts camel case to dash case",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/dom/utils/__tests__/filter-props.test.ts",
+      "fullName": "filter-props does not declare @emotion/is-prop-valid as an optional peer",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/dom/utils/__tests__/filter-props.test.ts",
+      "fullName": "filter-props does not load @emotion/is-prop-valid at runtime",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/dom/utils/__tests__/filter-props.test.ts",
+      "fullName": "filter-props forwards arbitrary non-Motion props by default",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/dom/utils/__tests__/filter-props.test.ts",
+      "fullName": "filter-props uses an injected validator for DOM props",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/dom/utils/__tests__/is-svg-component.test.ts",
+      "fullName": "isSVGComponent Correctly identifies SVG components",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/html/__tests__/use-props.test.ts",
+      "fullName": "HTML useProps should disable hardware acceleration in isStatic mode",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/html/__tests__/use-props.test.ts",
+      "fullName": "HTML useProps should generate new styles when a new visualState object is passed",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/html/__tests__/use-props.test.ts",
+      "fullName": "HTML useProps should generate the correct props when drag is enabled",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/html/__tests__/use-props.test.ts",
+      "fullName": "HTML useProps should return correct styles for element",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/html/utils/__tests__/build-styles.test.ts",
+      "fullName": "buildHTMLStyles Applies transformTemplate if provided",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/html/utils/__tests__/build-styles.test.ts",
+      "fullName": "buildHTMLStyles Applies transformTemplate if provided",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/html/utils/__tests__/build-styles.test.ts",
+      "fullName": "buildHTMLStyles Builds basic styles",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/html/utils/__tests__/build-styles.test.ts",
+      "fullName": "buildHTMLStyles Builds fontSize with px unit",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/html/utils/__tests__/build-styles.test.ts",
+      "fullName": "buildHTMLStyles Builds perspective into the CSS perspective style",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/html/utils/__tests__/build-styles.test.ts",
+      "fullName": "buildHTMLStyles Builds transform none if all transforms are default",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/html/utils/__tests__/build-styles.test.ts",
+      "fullName": "buildHTMLStyles Builds transform with default value types",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/html/utils/__tests__/build-styles.test.ts",
+      "fullName": "buildHTMLStyles Builds transform with defined value types",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/html/utils/__tests__/build-styles.test.ts",
+      "fullName": "buildHTMLStyles Builds transformOrigin with correct default value types",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/html/utils/__tests__/build-styles.test.ts",
+      "fullName": "buildHTMLStyles Builds vars",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/html/utils/__tests__/build-transform.test.ts",
+      "fullName": "buildTransform Correctly handles string scale values of zero",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/html/utils/__tests__/build-transform.test.ts",
+      "fullName": "buildTransform Correctly handles transformPerspective",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/html/utils/__tests__/build-transform.test.ts",
+      "fullName": "buildTransform Correctly handles transformTemplate if provided",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/html/utils/__tests__/build-transform.test.ts",
+      "fullName": "buildTransform Outputs 'none' when all values are default",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/html/utils/__tests__/build-transform.test.ts",
+      "fullName": "buildTransform Outputs transform values in the correct order",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/html/utils/__tests__/build-transform.test.ts",
+      "fullName": "buildTransform Still outputs translateZ if z is explicitly assigned",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/html/utils/__tests__/build-transform.test.ts",
+      "fullName": "transformProps.has Correctly identifies only transformPerspective as a transform prop",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/html/utils/__tests__/build-transform.test.ts",
+      "fullName": "transformProps.has Correctly identifies translate and alias to be true",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/svg/__tests__/use-props.test.ts",
+      "fullName": "SVG useProps should correctly remove props as motionvalues",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/svg/__tests__/use-props.test.ts",
+      "fullName": "SVG useProps should keep all CSS motion path properties as styles",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/svg/__tests__/use-props.test.ts",
+      "fullName": "SVG useProps should keep offsetDistance as CSS style, not SVG attribute",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/svg/__tests__/use-props.test.ts",
+      "fullName": "SVG useProps should return correct styles for element",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/svg/__tests__/use-props.test.ts",
+      "fullName": "SVG useProps should return correct styles for element with pathLength",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/svg/utils/__tests__/path.test.ts",
+      "fullName": "buildSVGPath correctly generates SVG path props",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/utils/__tests__/animation-state.test.ts",
+      "fullName": "Animation state - Initiating props Initial animation",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/utils/__tests__/animation-state.test.ts",
+      "fullName": "Animation state - Initiating props Initial animation with initial=false",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/utils/__tests__/animation-state.test.ts",
+      "fullName": "Animation state - Initiating props Initial animation with prop as inherited variant",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/utils/__tests__/animation-state.test.ts",
+      "fullName": "Animation state - Initiating props Initial animation with prop as variant",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/utils/__tests__/animation-state.test.ts",
+      "fullName": "Animation state - Initiating props Initial animation with prop as variant list",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/utils/__tests__/animation-state.test.ts",
+      "fullName": "Animation state - Initiating props Initial animation with prop as variant list with initial=false",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/utils/__tests__/animation-state.test.ts",
+      "fullName": "Animation state - Initiating props Initial animation with prop as variant when initial === animate",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/utils/__tests__/animation-state.test.ts",
+      "fullName": "Animation state - Initiating props Initial animation with prop as variant with initial=false",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/utils/__tests__/animation-state.test.ts",
+      "fullName": "Animation state - Set active Change active state while props are the same",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/utils/__tests__/animation-state.test.ts",
+      "fullName": "Animation state - Set active Change active variant where no variants are defined",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/utils/__tests__/animation-state.test.ts",
+      "fullName": "Animation state - Setting props Change single value, keyframes",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/utils/__tests__/animation-state.test.ts",
+      "fullName": "Animation state - Setting props Change single value, target",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/utils/__tests__/animation-state.test.ts",
+      "fullName": "Animation state - Setting props Change single value, target, with unchanging values",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/utils/__tests__/animation-state.test.ts",
+      "fullName": "Animation state - Setting props Change single value, variant",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/utils/__tests__/animation-state.test.ts",
+      "fullName": "Animation state - Setting props Change single value, variant list",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/utils/__tests__/animation-state.test.ts",
+      "fullName": "Animation state - Setting props No change, target",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/utils/__tests__/animation-state.test.ts",
+      "fullName": "Animation state - Setting props No change, target keyframes",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/utils/__tests__/animation-state.test.ts",
+      "fullName": "Animation state - Setting props No change, variant",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/utils/__tests__/animation-state.test.ts",
+      "fullName": "Animation state - Setting props No change, variant list",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/utils/__tests__/animation-state.test.ts",
+      "fullName": "Animation state - Setting props Removing values, inherited variant changed",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/utils/__tests__/animation-state.test.ts",
+      "fullName": "Animation state - Setting props Removing values, inherited variant changed from starting at empty variant",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/utils/__tests__/animation-state.test.ts",
+      "fullName": "Animation state - Setting props Removing values, target changed",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/utils/__tests__/animation-state.test.ts",
+      "fullName": "Animation state - Setting props Removing values, target undefined",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/utils/__tests__/animation-state.test.ts",
+      "fullName": "Animation state - Setting props Removing values, variant changed",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/utils/__tests__/animation-state.test.ts",
+      "fullName": "Animation state - Setting props Swap between value in target and transitionEnd, target",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/utils/__tests__/flat-tree.test.ts",
+      "fullName": "FlatTree Correctly sorts by depth on iteration",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/utils/__tests__/flat-tree.test.ts",
+      "fullName": "FlatTree Doesn't crash when removing child mid-loop",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/utils/__tests__/variants.test.ts",
+      "fullName": "resolveVariantFromProps Resolves function that returns object",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/utils/__tests__/variants.test.ts",
+      "fullName": "resolveVariantFromProps Resolves function that returns string",
+      "status": "passed"
+    },
+    {
+      "file": "src/render/utils/__tests__/variants.test.ts",
+      "fullName": "resolveVariantFromProps Resolves string",
+      "status": "passed"
+    },
+    {
+      "file": "src/utils/__tests__/delay.test.ts",
+      "fullName": "delay callback doesn't fire if cancelled",
+      "status": "passed"
+    },
+    {
+      "file": "src/utils/__tests__/delay.test.ts",
+      "fullName": "delay provides overshoot duration",
+      "status": "passed"
+    },
+    {
+      "file": "src/utils/__tests__/delay.test.ts",
+      "fullName": "delay resolves after provided duration",
+      "status": "passed"
+    },
+    {
+      "file": "src/utils/__tests__/distance.test.ts",
+      "fullName": "distance",
+      "status": "passed"
+    },
+    {
+      "file": "src/utils/__tests__/distance.test.ts",
+      "fullName": "should return the correct distance between two 2D points",
+      "status": "passed"
+    },
+    {
+      "file": "src/utils/__tests__/each-axis.test.ts",
+      "fullName": "eachAxis Fires the callback once for each axis and returns an array with the results",
+      "status": "passed"
+    },
+    {
+      "file": "src/utils/__tests__/shallow-compare.test.ts",
+      "fullName": "shallowCompare returns false if args are different",
+      "status": "passed"
+    },
+    {
+      "file": "src/utils/__tests__/shallow-compare.test.ts",
+      "fullName": "shallowCompare returns true if args are same",
+      "status": "passed"
+    },
+    {
+      "file": "src/utils/__tests__/use-animation-frame.test.tsx",
+      "fullName": "useAnimationFrame Fires every animation frame",
+      "status": "passed"
+    },
+    {
+      "file": "src/utils/__tests__/use-animation-frame.test.tsx",
+      "fullName": "useAnimationFrame Updates callback",
+      "status": "passed"
+    },
+    {
+      "file": "src/utils/__tests__/use-cycle.test.tsx",
+      "fullName": "useCycle cycles through given states",
+      "status": "passed"
+    },
+    {
+      "file": "src/utils/__tests__/use-cycle.test.tsx",
+      "fullName": "useCycle is not functionally bound by the render cycle",
+      "status": "passed"
+    },
+    {
+      "file": "src/utils/__tests__/use-cycle.test.tsx",
+      "fullName": "useCycle jumps to a given index",
+      "status": "passed"
+    },
+    {
+      "file": "src/utils/__tests__/use-in-view.test.tsx",
+      "fullName": "useInView Can change initial value",
+      "status": "passed"
+    },
+    {
+      "file": "src/utils/__tests__/use-in-view.test.tsx",
+      "fullName": "useInView Only triggers true once, if once is set",
+      "status": "passed"
+    },
+    {
+      "file": "src/utils/__tests__/use-in-view.test.tsx",
+      "fullName": "useInView Returns false on mount",
+      "status": "passed"
+    },
+    {
+      "file": "src/utils/__tests__/use-in-view.test.tsx",
+      "fullName": "useInView Returns false when element leaves the viewport",
+      "status": "passed"
+    },
+    {
+      "file": "src/utils/__tests__/use-in-view.test.tsx",
+      "fullName": "useInView Returns true when element enters the viewport",
+      "status": "passed"
+    },
+    {
+      "file": "src/utils/__tests__/use-instant-transition.test.tsx",
+      "fullName": "useInstantTransition Disables animations for a single render",
+      "status": "passed"
+    },
+    {
+      "file": "src/utils/__tests__/use-instant-transition.test.tsx",
+      "fullName": "useInstantTransition Reenable animations on subsequent renders",
+      "status": "passed"
+    },
+    {
+      "file": "src/utils/__tests__/use-instant-transition.test.tsx",
+      "fullName": "useInstantTransition transitions stay blocked when called on multiple frames back-to-back",
+      "status": "passed"
+    },
+    {
+      "file": "src/utils/__tests__/use-motion-value-event.test.tsx",
+      "fullName": "useMotionValueEvent useMotionValueEvent infers type for change callback",
+      "status": "passed"
+    },
+    {
+      "file": "src/utils/reduced-motion/__tests__/index.test.tsx",
+      "fullName": "reduced motion listener initialization 'user' config triggers listener, explicit 'never'/'always' do not",
+      "status": "passed"
+    },
+    {
+      "file": "src/utils/reduced-motion/__tests__/index.test.tsx",
+      "fullName": "reduced motion listener initialization mixed configurations - 'never' and 'always' do not trigger listener",
+      "status": "passed"
+    },
+    {
+      "file": "src/utils/reduced-motion/__tests__/index.test.tsx",
+      "fullName": "reduced motion listener initialization should initialize listener only once across multiple components with 'user' config",
+      "status": "passed"
+    },
+    {
+      "file": "src/utils/reduced-motion/__tests__/index.test.tsx",
+      "fullName": "reduced motion listener initialization should initialize listener when reducedMotionConfig is 'user'",
+      "status": "passed"
+    },
+    {
+      "file": "src/utils/reduced-motion/__tests__/index.test.tsx",
+      "fullName": "reduced motion listener initialization should not initialize listener when reducedMotionConfig is 'always'",
+      "status": "passed"
+    },
+    {
+      "file": "src/utils/reduced-motion/__tests__/index.test.tsx",
+      "fullName": "reduced motion listener initialization should not initialize listener when reducedMotionConfig is 'never'",
+      "status": "passed"
+    },
+    {
+      "file": "src/utils/reduced-motion/__tests__/index.test.tsx",
+      "fullName": "reduced motion listener initialization should not initialize listener with default config (defaults to 'never')",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/motion-value.test.ts",
+      "fullName": "motionValue x animate When all change listeners removed, stop animation",
+      "status": "passed"
+    },
+    {
       "file": "src/value/__tests__/motion-value.test.ts",
       "fullName": "motionValue x animate animationCancel event fires",
       "status": "passed"
@@ -15,11 +3810,6 @@
     {
       "file": "src/value/__tests__/motion-value.test.ts",
       "fullName": "motionValue x animate animationStart event fires",
-      "status": "passed"
-    },
-    {
-      "file": "src/value/__tests__/motion-value.test.ts",
-      "fullName": "motionValue x animate When all change listeners removed, stop animation",
       "status": "passed"
     },
     {
@@ -64,12 +3854,12 @@
     },
     {
       "file": "src/value/__tests__/use-follow-value.test.tsx",
-      "fullName": "useFollowValue with % can create a motion value from a number (default spring)",
+      "fullName": "useFollowValue with % can create a MotionValue that responds to changes from another MotionValue",
       "status": "passed"
     },
     {
       "file": "src/value/__tests__/use-follow-value.test.tsx",
-      "fullName": "useFollowValue with % can create a MotionValue that responds to changes from another MotionValue",
+      "fullName": "useFollowValue with % can create a motion value from a number (default spring)",
       "status": "passed"
     },
     {
@@ -109,12 +3899,12 @@
     },
     {
       "file": "src/value/__tests__/use-follow-value.test.tsx",
-      "fullName": "useFollowValue with numbers can create a motion value from a number (default spring)",
+      "fullName": "useFollowValue with numbers can create a MotionValue that responds to changes from another MotionValue",
       "status": "passed"
     },
     {
       "file": "src/value/__tests__/use-follow-value.test.tsx",
-      "fullName": "useFollowValue with numbers can create a MotionValue that responds to changes from another MotionValue",
+      "fullName": "useFollowValue with numbers can create a motion value from a number (default spring)",
       "status": "passed"
     },
     {
@@ -244,12 +4034,12 @@
     },
     {
       "file": "src/value/__tests__/use-spring.test.tsx",
-      "fullName": "useSpring with % can create a motion value from a number",
+      "fullName": "useSpring with % can create a MotionValue that responds to changes from another MotionValue",
       "status": "passed"
     },
     {
       "file": "src/value/__tests__/use-spring.test.tsx",
-      "fullName": "useSpring with % can create a MotionValue that responds to changes from another MotionValue",
+      "fullName": "useSpring with % can create a motion value from a number",
       "status": "passed"
     },
     {
@@ -269,12 +4059,12 @@
     },
     {
       "file": "src/value/__tests__/use-spring.test.tsx",
-      "fullName": "useSpring with numbers can create a motion value from a number",
+      "fullName": "useSpring with numbers can create a MotionValue that responds to changes from another MotionValue",
       "status": "passed"
     },
     {
       "file": "src/value/__tests__/use-spring.test.tsx",
-      "fullName": "useSpring with numbers can create a MotionValue that responds to changes from another MotionValue",
+      "fullName": "useSpring with numbers can create a motion value from a number",
       "status": "passed"
     },
     {
@@ -290,6 +4080,36 @@
     {
       "file": "src/value/__tests__/use-spring.test.tsx",
       "fullName": "useSpring with numbers will not animate if immediate=true",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-transform.test.tsx",
+      "fullName": "CSS logical properties support numeric values with useTransform",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-transform.test.tsx",
+      "fullName": "CSS logical properties supports inset shorthand with numeric values",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-transform.test.tsx",
+      "fullName": "CSS logical properties supports other CSS logical properties",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-transform.test.tsx",
+      "fullName": "CSS logical properties supports other inset logical properties",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-transform.test.tsx",
+      "fullName": "CSS logical properties updates inset when MotionValue changes",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/__tests__/use-transform.test.tsx",
+      "fullName": "CSS logical properties updates paddingBlock when MotionValue changes",
       "status": "passed"
     },
     {
@@ -369,36 +4189,6 @@
     },
     {
       "file": "src/value/__tests__/use-transform.test.tsx",
-      "fullName": "CSS logical properties support numeric values with useTransform",
-      "status": "passed"
-    },
-    {
-      "file": "src/value/__tests__/use-transform.test.tsx",
-      "fullName": "CSS logical properties supports inset shorthand with numeric values",
-      "status": "passed"
-    },
-    {
-      "file": "src/value/__tests__/use-transform.test.tsx",
-      "fullName": "CSS logical properties supports other CSS logical properties",
-      "status": "passed"
-    },
-    {
-      "file": "src/value/__tests__/use-transform.test.tsx",
-      "fullName": "CSS logical properties supports other inset logical properties",
-      "status": "passed"
-    },
-    {
-      "file": "src/value/__tests__/use-transform.test.tsx",
-      "fullName": "CSS logical properties updates inset when MotionValue changes",
-      "status": "passed"
-    },
-    {
-      "file": "src/value/__tests__/use-transform.test.tsx",
-      "fullName": "CSS logical properties updates paddingBlock when MotionValue changes",
-      "status": "passed"
-    },
-    {
-      "file": "src/value/__tests__/use-transform.test.tsx",
       "fullName": "frame scheduling",
       "status": "passed"
     },
@@ -411,6 +4201,193 @@
       "file": "src/value/__tests__/use-velocity.test.tsx",
       "fullName": "useVelocity creates a motion value that updates with the velocity of the provided motion value",
       "status": "passed"
+    },
+    {
+      "file": "src/value/use-will-change/__tests__/is.test.ts",
+      "fullName": "isWillChangeMotionValue Correctly detects WillChangeMotionValue",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/use-will-change/__tests__/will-change.ssr.test.tsx",
+      "fullName": "render Externally defined MotionValues not automatically added to will-change",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/use-will-change/__tests__/will-change.ssr.test.tsx",
+      "fullName": "render will-change correctly not applied when isStatic",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/use-will-change/__tests__/will-change.ssr.test.tsx",
+      "fullName": "render will-change manually set",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/use-will-change/__tests__/will-change.ssr.test.tsx",
+      "fullName": "render will-change manually set by MotionValue",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/use-will-change/__tests__/will-change.ssr.test.tsx",
+      "fullName": "render will-change manually set without animated values",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/use-will-change/__tests__/will-change.ssr.test.tsx",
+      "fullName": "render will-change not applied",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/use-will-change/__tests__/will-change.ssr.test.tsx",
+      "fullName": "render will-change not set in static mode",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/use-will-change/__tests__/will-change.ssr.test.tsx",
+      "fullName": "render will-change not set without animated values",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/use-will-change/__tests__/will-change.ssr.test.tsx",
+      "fullName": "renderToStaticMarkup Externally defined MotionValues not automatically added to will-change",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/use-will-change/__tests__/will-change.ssr.test.tsx",
+      "fullName": "renderToStaticMarkup will-change correctly not applied when isStatic",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/use-will-change/__tests__/will-change.ssr.test.tsx",
+      "fullName": "renderToStaticMarkup will-change manually set",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/use-will-change/__tests__/will-change.ssr.test.tsx",
+      "fullName": "renderToStaticMarkup will-change manually set by MotionValue",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/use-will-change/__tests__/will-change.ssr.test.tsx",
+      "fullName": "renderToStaticMarkup will-change manually set without animated values",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/use-will-change/__tests__/will-change.ssr.test.tsx",
+      "fullName": "renderToStaticMarkup will-change not applied",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/use-will-change/__tests__/will-change.ssr.test.tsx",
+      "fullName": "renderToStaticMarkup will-change not set in static mode",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/use-will-change/__tests__/will-change.ssr.test.tsx",
+      "fullName": "renderToStaticMarkup will-change not set without animated values",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/use-will-change/__tests__/will-change.test.tsx",
+      "fullName": "WillChangeMotionValue Can manage transform alongside independent transforms",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/use-will-change/__tests__/will-change.test.tsx",
+      "fullName": "willChange Add values when they start animating",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/use-will-change/__tests__/will-change.test.tsx",
+      "fullName": "willChange Doesn't remove values when animation interrupted",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/use-will-change/__tests__/will-change.test.tsx",
+      "fullName": "willChange Doesn't render CSS variables or non-hardware accelerated values",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/use-will-change/__tests__/will-change.test.tsx",
+      "fullName": "willChange Don't remove values when they finish animating",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/use-will-change/__tests__/will-change.test.tsx",
+      "fullName": "willChange Externally-provided motion values are not added to will-change",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/use-will-change/__tests__/will-change.test.tsx",
+      "fullName": "willChange Renders values defined in animate on initial render",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/use-will-change/__tests__/will-change.test.tsx",
+      "fullName": "willChange injection Add values when they start animating",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/use-will-change/__tests__/will-change.test.tsx",
+      "fullName": "willChange injection Doesn't remove values when animation interrupted",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/use-will-change/__tests__/will-change.test.tsx",
+      "fullName": "willChange injection Doesn't render CSS variables or non-hardware accelerated values",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/use-will-change/__tests__/will-change.test.tsx",
+      "fullName": "willChange injection Don't remove values when they finish animating",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/use-will-change/__tests__/will-change.test.tsx",
+      "fullName": "willChange injection Externally-provided motion values are not added to will-change",
+      "status": "passed"
+    },
+    {
+      "file": "src/value/use-will-change/__tests__/will-change.test.tsx",
+      "fullName": "willChange injection Renders values defined in animate on initial render",
+      "status": "passed"
+    }
+  ],
+  "upstreamSkipped": [
+    {
+      "file": "src/animation/animators/waapi/__tests__/css-variables.test.tsx",
+      "fullName": "css variables should have the original target css variable on animation end",
+      "status": "pending"
+    },
+    {
+      "file": "src/gestures/drag/__tests__/index.test.tsx",
+      "fullName": "dragging accepts new motion values",
+      "status": "pending"
+    },
+    {
+      "file": "src/gestures/drag/__tests__/index.test.tsx",
+      "fullName": "dragging drag momentum is applied to external values",
+      "status": "pending"
+    },
+    {
+      "file": "src/gestures/drag/__tests__/index.test.tsx",
+      "fullName": "dragging outputs to external values if provided",
+      "status": "pending"
+    },
+    {
+      "file": "src/gestures/drag/__tests__/index.test.tsx",
+      "fullName": "dragging updates position when updating drag constraints",
+      "status": "pending"
+    },
+    {
+      "file": "src/motion/__tests__/waapi.test.tsx",
+      "fullName": "WAAPI animations WAAPI only receives expected number of calls in Framer configuration with hover gestures enabled",
+      "status": "pending"
+    },
+    {
+      "file": "src/motion/__tests__/waapi.test.tsx",
+      "fullName": "WAAPI animations WAAPI only receives expected number of calls in Framer configuration with tap gestures enabled",
+      "status": "pending"
     }
   ]
 }

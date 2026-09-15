@@ -23,6 +23,10 @@ type _AppendKeyPrefix<Key, KPrefix> = KPrefix extends string
 	? `${KPrefix}${_KeySeparator}${Key & string}`
 	: Key;
 
+// OCTANE DIVERGENCE[children-typing][types:i18next-adapted-misc/trans-children]
+// Trans children are typed as the opaque TransChild renderable union; Octane
+// block children compile to render bodies inspected through props, defaults,
+// and components rather than React's element tree.
 type TransChild = unknown;
 type $NoInfer<T> = [T][T extends T ? 0 : never];
 
@@ -128,6 +132,7 @@ export type ErrorCode =
 	| 'TRANS_INVALID_VAR'
 	| 'TRANS_INVALID_COMPONENTS'
 	| 'USE_T_BEFORE_READY'
+	| 'SUSPENDED_WHILE_LOADING'
 	| 'OCTANE_TRANS_BLOCK_CHILDREN'
 	| 'ICU_TRANS_RENDER_ERROR';
 

@@ -111,6 +111,66 @@ test('rejects a removed adapted inventory identity', async function rejectsRemov
 	}, /unit pristine\/adapted inventories must match/);
 });
 
+test('retains the complete React-version oracle while comparing applicable native cases', async () => {
+	const { audit, root } = await fixture();
+	const versions = [
+		'19.0.0',
+		'19.0.0-rc.1',
+		'19.0.0-experimental-abcdef',
+		'20.1.0',
+		'18.3.1',
+		'17.0.2',
+		'undefined',
+		'unknown',
+		'19unknown',
+		'19',
+		'v19.0.0',
+	];
+	const versionCases = versions.map((version) => ({
+		file: 'packages/intersection-observer/upstream/src/__tests__/useOnInView.test.tsx',
+		fullName: `detects ref cleanup support for React version ${version}`,
+	}));
+	const shared = { file: 'example.test.ts', fullName: 'same behavior' };
+	await writeFile(
+		join(audit, 'pristine-runtime.json'),
+		JSON.stringify({ tests: [shared, ...versionCases] }),
+	);
+	assert.equal(verifyIntersectionObserverRuntimeCrosswalk(root).unitCases, 1);
+	await writeFile(
+		join(audit, 'pristine-runtime.json'),
+		JSON.stringify({ tests: [shared, ...versionCases.slice(1)] }),
+	);
+	assert.throws(
+		() => verifyIntersectionObserverRuntimeCrosswalk(root),
+		/retain every original parameterized case/,
+	);
+	await writeFile(
+		join(audit, 'pristine-runtime.json'),
+		JSON.stringify({ tests: [shared, ...versionCases, versionCases[0]] }),
+	);
+	assert.throws(
+		() => verifyIntersectionObserverRuntimeCrosswalk(root),
+		/retain every original parameterized case/,
+	);
+	await writeFile(
+		join(audit, 'pristine-runtime.json'),
+		JSON.stringify({
+			tests: [shared, ...versionCases.map((test) => ({ ...test, file: 'unrelated.test.ts' }))],
+		}),
+	);
+	assert.throws(() => verifyIntersectionObserverRuntimeCrosswalk(root), /inventories must match/);
+});
+
+test('requires native SSR evidence when the original suite contains an SSR case', async () => {
+	const { audit, root } = await fixture();
+	const shared = { file: 'example.test.ts', fullName: 'same behavior' };
+	const ssr = { file: 'useInView.ssr.test.ts', fullName: 'server rendering' };
+	await writeFile(join(audit, 'pristine-runtime.json'), JSON.stringify({ tests: [shared, ssr] }));
+	assert.throws(() => verifyIntersectionObserverRuntimeCrosswalk(root), /inventories must match/);
+	await writeFile(join(audit, 'adapted-ssr-runtime.json'), JSON.stringify({ tests: [ssr] }));
+	assert.equal(verifyIntersectionObserverRuntimeCrosswalk(root).unitCases, 2);
+});
+
 test('rejects a renamed adapted inventory identity', async function rejectsRenamedIdentity() {
 	const { audit, root } = await fixture();
 	await writeFile(

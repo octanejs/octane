@@ -309,7 +309,7 @@ This is the explicit artifact sample reviewed at the pinned snapshot; broad sour
 
 **Octane references**
 
-- [packages/octane/tests/sync-external-store.test.ts](../packages/octane/tests/sync-external-store.test.ts) — “subscribes outside render and converges when subscribe notifies synchronously” — Proves subscription timing at the public callback boundary and commits the synchronously published snapshot without resubscribing.
+- [packages/octane/tests/sync-external-store.test.ts](../packages/octane/tests/sync-external-store.test.ts) — “converges when subscribe changes the snapshot (notifies: true)” — Proves subscription timing at the public callback boundary and commits the synchronously published snapshot without resubscribing.
 - [packages/octane/tests/sync-external-store.test.ts](../packages/octane/tests/sync-external-store.test.ts) — “unsubscribes on unmount (store drops its listener)”
 - [packages/octane/tests/sync-external-store.test.ts](../packages/octane/tests/sync-external-store.test.ts) — “unsubscribes when its conditional owner removes it”
 - [packages/octane/tests/sync-external-store.test.ts](../packages/octane/tests/sync-external-store.test.ts) — “ignores a retained stale callback after conditional removal” — Invokes the exact callback retained by the store and proves the removed reader stays absent while unrelated host and sibling objects survive.
@@ -317,7 +317,7 @@ This is the explicit artifact sample reviewed at the pinned snapshot; broad sour
 
 **Executable evidence**
 
-- [subscribes outside render and converges when subscribe notifies synchronously](../packages/octane/tests/sync-external-store.test.ts) — modes: `client`, `production-compile`; observables: `markup`, `effects`
+- [converges when subscribe changes the snapshot (notifies: true)](../packages/octane/tests/sync-external-store.test.ts) — modes: `client`, `production-compile`; observables: `markup`, `effects`
 - [unsubscribes on unmount (store drops its listener)](../packages/octane/tests/sync-external-store.test.ts) — modes: `client`, `production-compile`; observables: `effects`
 - [unsubscribes when its conditional owner removes it](../packages/octane/tests/sync-external-store.test.ts) — modes: `client`, `production-compile`; observables: `markup`, `effects`
 - [ignores a retained stale callback after conditional removal](../packages/octane/tests/sync-external-store.test.ts) — modes: `client`, `production-compile`; observables: `markup`, `node-identity`, `effects`

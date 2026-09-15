@@ -6,6 +6,7 @@
     "packages/intersection-observer/upstream/src/__tests__/InView.test.tsx",
     "packages/intersection-observer/upstream/src/__tests__/observe.test.ts",
     "packages/intersection-observer/upstream/src/__tests__/setup.test.ts",
+    "packages/intersection-observer/upstream/src/__tests__/useInView.ssr.test.ts",
     "packages/intersection-observer/upstream/src/__tests__/useInView.test.tsx",
     "packages/intersection-observer/upstream/src/__tests__/useOnInView.test.tsx"
   ],
@@ -49,6 +50,16 @@
       "id": "runtime:7f505c2163815bc9",
       "file": "packages/intersection-observer/upstream/src/__tests__/InView.test.tsx",
       "fullName": "Should respect skip"
+    },
+    {
+      "id": "runtime:31dc38ae0c9a9831",
+      "file": "packages/intersection-observer/upstream/src/__tests__/InView.test.tsx",
+      "fullName": "Should resume observing when triggerOnce is disabled while in view"
+    },
+    {
+      "id": "runtime:a837d75854a3c0a9",
+      "file": "packages/intersection-observer/upstream/src/__tests__/InView.test.tsx",
+      "fullName": "Should stop observing when triggerOnce is enabled while in view"
     },
     {
       "id": "runtime:2944b6f45c01b611",
@@ -106,6 +117,11 @@
       "fullName": "should convert options to id"
     },
     {
+      "id": "runtime:2eac2b4a3b1b2564",
+      "file": "packages/intersection-observer/upstream/src/__tests__/observe.test.ts",
+      "fullName": "should only clean up each observer callback once"
+    },
+    {
       "id": "runtime:5305cb4400f01aca",
       "file": "packages/intersection-observer/upstream/src/__tests__/setup.test.ts",
       "fullName": "should not warn if running in test env with global \"vi\""
@@ -116,9 +132,19 @@
       "fullName": "should warn if not running in test env"
     },
     {
+      "id": "runtime:845c5ba51911adba",
+      "file": "packages/intersection-observer/upstream/src/__tests__/useInView.ssr.test.ts",
+      "fullName": "useInView renders on the server without diagnostics"
+    },
+    {
       "id": "runtime:822398a7b12b1339",
       "file": "packages/intersection-observer/upstream/src/__tests__/useInView.test.tsx",
       "fullName": "inView should be false when component is unmounted"
+    },
+    {
+      "id": "runtime:1f5c09f119cf84aa",
+      "file": "packages/intersection-observer/upstream/src/__tests__/useInView.test.tsx",
+      "fullName": "mounting useInView does not cause an attachment rerender"
     },
     {
       "id": "runtime:9b4de8426cda0b00",
@@ -201,6 +227,11 @@
       "fullName": "should mock thresholds"
     },
     {
+      "id": "runtime:6de520f2280fa6fe",
+      "file": "packages/intersection-observer/upstream/src/__tests__/useInView.test.tsx",
+      "fullName": "should not react to initialInView changes before the first notification"
+    },
+    {
       "id": "runtime:06cea4174bbac2b6",
       "file": "packages/intersection-observer/upstream/src/__tests__/useInView.test.tsx",
       "fullName": "should not reset current state if changing skip"
@@ -209,6 +240,11 @@
       "id": "runtime:a484a56d66bb5af2",
       "file": "packages/intersection-observer/upstream/src/__tests__/useInView.test.tsx",
       "fullName": "should respect skip"
+    },
+    {
+      "id": "runtime:9f1175b8dcd9fd97",
+      "file": "packages/intersection-observer/upstream/src/__tests__/useInView.test.tsx",
+      "fullName": "should respect the threshold before triggering once"
     },
     {
       "id": "runtime:04a482b3bf4a3a31",
@@ -246,6 +282,101 @@
       "fullName": "should unmount the hook"
     },
     {
+      "id": "runtime:7ba623f972416a09",
+      "file": "packages/intersection-observer/upstream/src/__tests__/useInView.test.tsx",
+      "fullName": "should use the latest onChange when fallback reattaches synchronously"
+    },
+    {
+      "id": "runtime:ba61619ad595af4c",
+      "file": "packages/intersection-observer/upstream/src/__tests__/useInView.test.tsx",
+      "fullName": "useInView Strict Mode leaves no observer or React diagnostic"
+    },
+    {
+      "id": "runtime:688e8ecb5aea12dd",
+      "file": "packages/intersection-observer/upstream/src/__tests__/useInView.test.tsx",
+      "fullName": "useInView does not churn for equal threshold arrays"
+    },
+    {
+      "id": "runtime:1f788ce1c16cf815",
+      "file": "packages/intersection-observer/upstream/src/__tests__/useInView.test.tsx",
+      "fullName": "useInView replaces the observer exactly once when options change"
+    },
+    {
+      "id": "runtime:51fb70d1307b95e4",
+      "file": "packages/intersection-observer/upstream/src/__tests__/useInView.test.tsx",
+      "fullName": "useInView resets only while detached across A to B to detached to A"
+    },
+    {
+      "id": "runtime:4dc2b0db8748d3cc",
+      "file": "packages/intersection-observer/upstream/src/__tests__/useInView.test.tsx",
+      "fullName": "useInView skip toggles retain visibility and attach exactly once"
+    },
+    {
+      "id": "runtime:b21d83e6c52ad5e0",
+      "file": "packages/intersection-observer/upstream/src/__tests__/useInView.test.tsx",
+      "fullName": "useInView uses the latest onChange without recreating its observer"
+    },
+    {
+      "id": "runtime:77f20ec86caf5e1d",
+      "file": "packages/intersection-observer/upstream/src/__tests__/useOnInView.test.tsx",
+      "fullName": "detects ref cleanup support for React version 17.0.2"
+    },
+    {
+      "id": "runtime:b1ce4292c8005be6",
+      "file": "packages/intersection-observer/upstream/src/__tests__/useOnInView.test.tsx",
+      "fullName": "detects ref cleanup support for React version 18.3.1"
+    },
+    {
+      "id": "runtime:fb954dbef4783279",
+      "file": "packages/intersection-observer/upstream/src/__tests__/useOnInView.test.tsx",
+      "fullName": "detects ref cleanup support for React version 19"
+    },
+    {
+      "id": "runtime:fe2ef36fe66e34e0",
+      "file": "packages/intersection-observer/upstream/src/__tests__/useOnInView.test.tsx",
+      "fullName": "detects ref cleanup support for React version 19.0.0"
+    },
+    {
+      "id": "runtime:80413974bf18c3ef",
+      "file": "packages/intersection-observer/upstream/src/__tests__/useOnInView.test.tsx",
+      "fullName": "detects ref cleanup support for React version 19.0.0-experimental-abcdef"
+    },
+    {
+      "id": "runtime:732ec7b8324d2213",
+      "file": "packages/intersection-observer/upstream/src/__tests__/useOnInView.test.tsx",
+      "fullName": "detects ref cleanup support for React version 19.0.0-rc.1"
+    },
+    {
+      "id": "runtime:00c31d8dd1d20987",
+      "file": "packages/intersection-observer/upstream/src/__tests__/useOnInView.test.tsx",
+      "fullName": "detects ref cleanup support for React version 19unknown"
+    },
+    {
+      "id": "runtime:1b1352f3672a0d26",
+      "file": "packages/intersection-observer/upstream/src/__tests__/useOnInView.test.tsx",
+      "fullName": "detects ref cleanup support for React version 20.1.0"
+    },
+    {
+      "id": "runtime:d8ca346528a41cb2",
+      "file": "packages/intersection-observer/upstream/src/__tests__/useOnInView.test.tsx",
+      "fullName": "detects ref cleanup support for React version undefined"
+    },
+    {
+      "id": "runtime:515ece78d371a352",
+      "file": "packages/intersection-observer/upstream/src/__tests__/useOnInView.test.tsx",
+      "fullName": "detects ref cleanup support for React version unknown"
+    },
+    {
+      "id": "runtime:6d7f2cad77be976b",
+      "file": "packages/intersection-observer/upstream/src/__tests__/useOnInView.test.tsx",
+      "fullName": "detects ref cleanup support for React version v19.0.0"
+    },
+    {
+      "id": "runtime:74ea7f1c5934a8f7",
+      "file": "packages/intersection-observer/upstream/src/__tests__/useOnInView.test.tsx",
+      "fullName": "mounting useOnInView does not cause a hook-owned rerender"
+    },
+    {
       "id": "runtime:d825b6a9d3343794",
       "file": "packages/intersection-observer/upstream/src/__tests__/useOnInView.test.tsx",
       "fullName": "should call cleanup when element leaves view"
@@ -254,6 +385,11 @@
       "id": "runtime:a21c44527c651a95",
       "file": "packages/intersection-observer/upstream/src/__tests__/useOnInView.test.tsx",
       "fullName": "should call the callback when element comes into view"
+    },
+    {
+      "id": "runtime:323767ab17eafadb",
+      "file": "packages/intersection-observer/upstream/src/__tests__/useOnInView.test.tsx",
+      "fullName": "should clean up each ref attachment without React diagnostics"
     },
     {
       "id": "runtime:ce228b2ace945b1f",
@@ -324,6 +460,36 @@
       "id": "runtime:e3831f51f69352a7",
       "file": "packages/intersection-observer/upstream/src/__tests__/useOnInView.test.tsx",
       "fullName": "should track which threshold triggered the visibility change"
+    },
+    {
+      "id": "runtime:689704e421a05901",
+      "file": "packages/intersection-observer/upstream/src/__tests__/useOnInView.test.tsx",
+      "fullName": "useOnInView Strict Mode leaves no observer or React diagnostic"
+    },
+    {
+      "id": "runtime:1d68d4bd35e210a8",
+      "file": "packages/intersection-observer/upstream/src/__tests__/useOnInView.test.tsx",
+      "fullName": "useOnInView only replaces its observer when options change"
+    },
+    {
+      "id": "runtime:3a877253673326f3",
+      "file": "packages/intersection-observer/upstream/src/__tests__/useOnInView.test.tsx",
+      "fullName": "useOnInView skip cleanup stays idempotent"
+    },
+    {
+      "id": "runtime:f1b267503278915d",
+      "file": "packages/intersection-observer/upstream/src/__tests__/useOnInView.test.tsx",
+      "fullName": "useOnInView target replacement cleans each attachment exactly once"
+    },
+    {
+      "id": "runtime:35b7d3a704a7b15c",
+      "file": "packages/intersection-observer/upstream/src/__tests__/useOnInView.test.tsx",
+      "fullName": "useOnInView triggerOnce cleanup stays idempotent"
+    },
+    {
+      "id": "runtime:fb59ae949a00ff60",
+      "file": "packages/intersection-observer/upstream/src/__tests__/useOnInView.test.tsx",
+      "fullName": "useOnInView uses the latest callback without re-observing"
     }
   ],
   "snapshots": 0

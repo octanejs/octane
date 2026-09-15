@@ -1,0 +1,49 @@
+diff --git a/tests/upstream/disableGlobalCatchBoundary.test.tsx b/tests/upstream/disableGlobalCatchBoundary.test.tsx
+--- a/tests/upstream/disableGlobalCatchBoundary.test.tsx
++++ b/tests/upstream/disableGlobalCatchBoundary.test.tsx
+@@ -1,6 +1,6 @@
+ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+ import { cleanup, render, screen } from '@octanejs/testing-library'
+-import { Component } from 'octane'
++import { ErrorBoundary } from 'octane'
+ import {
+   RouterProvider,
+   createBrowserHistory,
+@@ -17,28 +17,15 @@ function ThrowingComponent() {
+ }
+ 
+ // Custom error boundary to catch errors that bubble up
+-class TestErrorBoundary extends Component<
+-  { children: OctaneNode },
+-  { hasError: boolean; error?: Error }
+-> {
+-  constructor(props: { children: OctaneNode }) {
+-    super(props)
+-    this.state = { hasError: false }
+-  }
+-
+-  static getDerivedStateFromError(error: Error) {
+-    return { hasError: true, error }
+-  }
+-
+-  render() {
+-    if (this.state.hasError) {
+-      return (
+-        <div>External Error Boundary Caught: {this.state.error?.message}</div>
+-      )
+-    }
+-
+-    return this.props.children
+-  }
++// OCTANE DIVERGENCE[error-boundary]: native function boundary replaces the class.
++function TestErrorBoundary(props: { children: OctaneNode }) {
++  return (
++    <ErrorBoundary fallback={(error) => (
++      <div>External Error Boundary Caught: {(error as Error).message}</div>
++    )}>
++      {props.children}
++    </ErrorBoundary>
++  )
+ }
+ 
+ let history: RouterHistory

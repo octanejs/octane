@@ -1,4 +1,4 @@
-// Vendored from react-hook-form@7.81.0 src/logic/iterateFieldsByAction.ts (octane port).
+// Adapted from react-hook-form@7.88.0 src/logic/iterateFieldsByAction.ts for Octane.
 import type { FieldRefs, InternalFieldName, Ref } from '../types';
 import { get } from '../utils';
 import isObject from '../utils/isObject';
@@ -7,27 +7,30 @@ const iterateFieldsByAction = (
 	fields: FieldRefs,
 	action: (ref: Ref, name: string) => 1 | undefined | void,
 	fieldsNames?: Set<InternalFieldName> | InternalFieldName[] | 0,
-	abortEarly?: boolean,
 ) => {
 	for (const key of fieldsNames || Object.keys(fields)) {
-		const field = get(fields, key);
+		if (key === '_f') {
+			continue;
+		}
+
+		const field = fieldsNames ? get(fields, key) : fields[key];
 
 		if (field) {
-			const { _f, ...currentField } = field;
+			const { _f } = field;
 
 			if (_f) {
-				if (_f.refs && _f.refs[0] && action(_f.refs[0], key) && !abortEarly) {
+				if (_f.refs && _f.refs[0] && action(_f.refs[0], _f.name)) {
 					return true;
-				} else if (_f.ref && action(_f.ref, _f.name) && !abortEarly) {
+				} else if (_f.ref && action(_f.ref, _f.name)) {
 					return true;
 				} else {
-					if (iterateFieldsByAction(currentField, action)) {
-						break;
+					if (iterateFieldsByAction(field, action)) {
+						return true;
 					}
 				}
-			} else if (isObject(currentField)) {
-				if (iterateFieldsByAction(currentField as FieldRefs, action)) {
-					break;
+			} else if (isObject(field) || Array.isArray(field)) {
+				if (iterateFieldsByAction(field as FieldRefs, action)) {
+					return true;
 				}
 			}
 		}

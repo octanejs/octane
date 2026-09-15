@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "project": "tanstack-router-pristine",
+  "roots": ["packages/tanstack-router/tests"],
+  "files": ["packages/tanstack-router/tests/upstream-original.test.ts"],
+  "tests": [
+    {
+      "id": "pristine:tanstack-router-original-suite",
+      "file": "packages/tanstack-router/tests/upstream-original.test.ts",
+      "fullName": "runs all pinned Router runtime cases unchanged, including the upstream skip"
+    }
+  ],
+  "snapshots": 0
+}

@@ -93,6 +93,9 @@ import type { PacedMutationsConfig, Transaction } from '@tanstack/db';
  */
 export function usePacedMutations<TVariables = unknown, T extends object = Record<string, unknown>>(
 	config: PacedMutationsConfig<TVariables, T>,
+): (variables: TVariables) => Transaction<T>;
+export function usePacedMutations<TVariables = unknown, T extends object = Record<string, unknown>>(
+	config: PacedMutationsConfig<TVariables, T>,
 	...rest: Array<unknown>
 ): (variables: TVariables) => Transaction<T> {
 	const [, slot] = splitTrailingSlot(rest);

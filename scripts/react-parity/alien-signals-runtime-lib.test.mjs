@@ -155,7 +155,7 @@ test('rejects a missing Per citation', function rejectsMissingCitation() {
 		'utf8',
 	);
 	const stripped = adaptedSource.replace(
-		"\t// Per src/index.test.ts:31\n\tit('should create a writable signal'",
+		"\t// Per src/index.test.ts:40\n\tit('should create a writable signal'",
 		"\tit('should create a writable signal'",
 	);
 	assert.notEqual(stripped, adaptedSource);
@@ -894,4 +894,36 @@ test('rejects post-return setter padding in authenticated handlers', function re
 			expectedFixtureSha256: fixtureFileFingerprint(padded),
 		});
 	}, /bypasses .* hook-surface transition/);
+});
+
+test('maps nested renderHook snapshots to native DOM observations without accepting literals', () => {
+	const pristineSource = `it('selected snapshot', () => { expect(hook.result.current.selected).toBe(2); });`;
+	const adaptedSource = `// Per src/index.test.ts:1\nit('selected snapshot', () => { const result = mount(Selected); expect(result.find('#selected').textContent).toBe('2'); });`;
+	const fixtureSource = `export function Selected() @{ <output id="selected">2</output> }`;
+	assertRuntimeStructureCrosswalk({ pristineSource, adaptedSource, fixtureSource });
+	assert.throws(
+		() =>
+			assertRuntimeStructureCrosswalk({
+				pristineSource,
+				adaptedSource: adaptedSource.replace("result.find('#selected').textContent", '2'),
+				fixtureSource,
+			}),
+		/assertion drift/,
+	);
+});
+
+test('preserves undefined assertions when the native fixture serializes the snapshot', () => {
+	const pristineSource = `it('undefined snapshot', () => { expect(result.current).toBeUndefined(); });`;
+	const adaptedSource = `// Per src/index.test.ts:1\nit('undefined snapshot', () => { const result = mount(Snapshot); expect(result.find('#value').textContent).toBe('undefined'); });`;
+	const fixtureSource = `export function Snapshot() @{ <output id="value">undefined</output> }`;
+	assertRuntimeStructureCrosswalk({ pristineSource, adaptedSource, fixtureSource });
+	assert.throws(
+		() =>
+			assertRuntimeStructureCrosswalk({
+				pristineSource,
+				adaptedSource: adaptedSource.replace("toBe('undefined')", "toBe('null')"),
+				fixtureSource,
+			}),
+		/assertion drift/,
+	);
 });

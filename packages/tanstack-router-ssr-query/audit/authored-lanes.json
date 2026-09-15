@@ -1,0 +1,53 @@
+[
+  {
+    "id": "tanstack-router-ssr-query-differential",
+    "type": "differential",
+    "oracle": "required",
+    "environment": "workspace-node",
+    "project": "tanstack-router-ssr-query-differential",
+    "evidenceOrigin": "repo-authored",
+    "notes": "Runs equivalent provider-backed SSR and setup controls against the Octane adapter and pinned React adapter; upstream provides no adapter runtime suite.",
+    "files": [
+      {
+        "path": "packages/tanstack-router-ssr-query/tests/differential/parity.test.ts",
+        "role": "test",
+        "cases": [
+          {
+            "id": "differential:tanstack-router-ssr-query-provider-ssr",
+            "testName": "matches provider-backed SSR and preserves the existing wrapper",
+            "fullName": "differential: @octanejs/tanstack-router-ssr-query vs @tanstack/react-router-ssr-query matches provider-backed SSR and preserves the existing wrapper"
+          },
+          {
+            "id": "differential:tanstack-router-ssr-query-wrap-control",
+            "testName": "matches the disabled query-client wrapper control",
+            "fullName": "differential: @octanejs/tanstack-router-ssr-query vs @tanstack/react-router-ssr-query matches the disabled query-client wrapper control"
+          }
+        ]
+      },
+      {
+        "path": "packages/tanstack-router-ssr-query/tests/differential/_setup.ts",
+        "role": "support"
+      },
+      {
+        "path": "packages/tanstack-router-ssr-query/tests/_fixtures/ssr-query-diff.tsrx",
+        "role": "support"
+      },
+      {
+        "path": "packages/tanstack-router-ssr-query/audit/upstream-crosswalk.json",
+        "role": "support"
+      },
+      {
+        "path": "packages/tanstack-router-ssr-query/audit/test-classifications.json",
+        "role": "support"
+      },
+      {
+        "path": "scripts/react-parity/tanstack-router-ssr-query-controls.test.mjs",
+        "role": "support"
+      },
+      {
+        "path": "packages/tanstack-router-ssr-query/audit/upstream.lock.json",
+        "role": "support"
+      }
+    ]
+  }
+]

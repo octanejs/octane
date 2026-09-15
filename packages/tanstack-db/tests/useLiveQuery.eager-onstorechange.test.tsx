@@ -30,7 +30,7 @@ const initialPersons: Array<Person> = [
 ];
 
 describe(`useLiveQuery: eager onStoreChange must not fire synchronously during subscribe`, () => {
-	it(`defers the initial ready-state onStoreChange to a microtask`, async () => {
+	it(`notifies for real deltas without a redundant initial wake-up`, async () => {
 		const base = createCollection(
 			mockSyncCollectionOptions<Person>({
 				id: `eager-onstorechange-persons`,
@@ -53,12 +53,20 @@ describe(`useLiveQuery: eager onStoreChange must not fire synchronously during s
 		const onStoreChange = vi.fn();
 		const unsub = capturedSubscribe!(onStoreChange);
 
-		// onStoreChange must not be invoked synchronously inside subscribe;
-		// it should be deferred to a microtask so it lands after the commit.
+		// The external-store hook re-reads after subscribing. An unchanged ready
+		// collection does not need a redundant synchronous or deferred wake-up.
+		expect(onStoreChange).not.toHaveBeenCalled();
+		await Promise.resolve();
 		expect(onStoreChange).not.toHaveBeenCalled();
 
+		base.utils.begin();
+		base.utils.write({
+			type: `insert`,
+			value: { id: `3`, name: `C`, age: 30 },
+		});
+		base.utils.commit();
 		await Promise.resolve();
-		expect(onStoreChange).toHaveBeenCalledTimes(1);
+		expect(onStoreChange).toHaveBeenCalled();
 
 		unsub();
 	});

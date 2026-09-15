@@ -1,0 +1,50 @@
+diff --git a/tests/upstream/trans.render.dynamic.spec.jsx b/tests/upstream/trans.render.dynamic.spec.jsx
+--- a/tests/upstream/trans.render.dynamic.spec.jsx
++++ b/tests/upstream/trans.render.dynamic.spec.jsx
+@@ -1,3 +1,4 @@
++// OCTANE DIVERGENCE[inspectable-children]: Trans inspects explicit descriptor children; Translation receives its callback as a prop.
+ import { describe, it, expect, afterEach, vi } from 'vitest';
+ import * as React from 'octane';
+ import { render, cleanup } from '@octanejs/testing-library';
+@@ -53,14 +54,14 @@ describe('Trans should render nested components', () => {
+ 
+     function TestComponent() {
+       return (
+-        <Trans i18nKey="testTrans5KeyWithNestedComponent">
++        <Trans i18nKey="testTrans5KeyWithNestedComponent" children={<>
+           My list:
+           <ul i18nIsDynamicList>
+             {list.map((item) => (
+               <li key={item}>{item}</li>
+             ))}
+           </ul>
+-        </Trans>
++        </>} />
+       );
+     }
+     const { container } = render(<TestComponent />);
+@@ -84,10 +85,10 @@ describe('Trans should render nested components', () => {
+ 
+     function TestComponent() {
+       return (
+-        <Trans>
++        <Trans children={<>
+           My dynamic content:
+           <React.Fragment i18nIsDynamicList>{dynamicContent}</React.Fragment>
+-        </Trans>
++        </>} />
+       );
+     }
+     const { container } = render(<TestComponent />);
+@@ -106,9 +107,9 @@ describe('Trans should render nested components', () => {
+ 
+     function TestComponent() {
+       return (
+-        <Trans>
++        <Trans children={<>
+           My dynamic content: <React.Fragment i18nIsDynamicList>{dynamicContent}</React.Fragment>
+-        </Trans>
++        </>} />
+       );
+     }
+     const { container } = render(<TestComponent />);

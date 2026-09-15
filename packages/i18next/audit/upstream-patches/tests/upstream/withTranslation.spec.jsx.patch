@@ -1,0 +1,38 @@
+diff --git a/tests/upstream/withTranslation.spec.jsx b/tests/upstream/withTranslation.spec.jsx
+--- a/tests/upstream/withTranslation.spec.jsx
++++ b/tests/upstream/withTranslation.spec.jsx
+@@ -11,20 +11,19 @@ describe('withTranslation', () => {
+     cleanup();
+   });
+ 
+-  class TestComponent extends React.Component {
+-    render() {
+-      const { t, i18n: instance } = this.props;
++  // OCTANE DIVERGENCE[function-components]: Preserve the HOC contract with a function component and a native element ref.
++  function TestComponent(props) {
++      const { t, i18n: instance } = props;
+       expect(typeof t).toBe('function');
+       // expect(instance).toBe(i18n);
+       expect(instance.__original).toBe(i18n);
+ 
+       return (
+-        <div>
++        <div ref={props.ref}>
+           {t('key1')}
+           {t('deepPath.deepKey1')}
+         </div>
+       );
+-    }
+   }
+ 
+   it('should export wrapped component', () => {
+@@ -45,7 +44,8 @@ describe('withTranslation', () => {
+ 
+   it('should has ref', () => {
+     const HocElement = withTranslation('translation', { withRef: true })(TestComponent);
+-    const hocRef = React.createRef();
++    // OCTANE DIVERGENCE[function-components]: octane has no createRef; refs are plain objects.
++    const hocRef = { current: null };
+     render(<HocElement ref={hocRef} />);
+     expect(hocRef.current).not.toBeNull();
+   });

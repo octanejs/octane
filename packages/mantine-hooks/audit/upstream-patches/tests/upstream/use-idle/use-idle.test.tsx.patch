@@ -1,0 +1,19 @@
+diff --git a/tests/upstream/use-idle/use-idle.test.tsx b/tests/upstream/use-idle/use-idle.test.tsx
+--- a/tests/upstream/use-idle/use-idle.test.tsx
++++ b/tests/upstream/use-idle/use-idle.test.tsx
+@@ -21,11 +21,10 @@ describe('@mantine/hooks/use-idle', () => {
+     );
+ 
+     expect(hook.result.current).toBe(false);
+-    expect(spy).toHaveBeenCalledTimes(1);
+-    setTimeout(() => {
+-      expect(hook.result.current).toBe(true);
+-      expect(spy).toHaveBeenCalledTimes(2);
+-    }, 1001);
++    // OCTANE DIVERGENCE[mantine-timer-boundary][runtime:mantine-hooks-adapted-187]: native scheduling owns additional timers; observe only the hook timer.
++    expect(spy.mock.calls.filter(([, delay]) => delay === 1000)).toHaveLength(1);
++    act(() => vi.advanceTimersByTime(1000));
++    expect(hook.result.current).toBe(true);
+   });
+ 
+   it('Returns correct value on firing keydown event', () => {

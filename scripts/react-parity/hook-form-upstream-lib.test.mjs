@@ -52,7 +52,7 @@ test('rejects an unrecorded adapted title change', async () => {
 	assert.throws(() => verifyHookFormUpstream(root, { lock: false }), /test registrations drifted/);
 });
 
-test('rejects duplicating one port-only case while dropping another', async () => {
+test('rejects duplicating an upstream regression while dropping another', async () => {
 	const { portedTests, root, upstreamTests } = await fixture();
 	const relativeFile = 'logic/getDirtyFields.test.ts';
 	const upstreamFile = join(upstreamTests, relativeFile);
@@ -63,7 +63,10 @@ test('rejects duplicating one port-only case while dropping another', async () =
 		'should still diff a field array element-by-element when the array path itself is not a registered leaf';
 	await mkdir(join(upstreamTests, 'logic'), { recursive: true });
 	await mkdir(join(portedTests, 'logic'), { recursive: true });
-	await writeFile(upstreamFile, "it('same dirty behavior', () => {});\n");
+	await writeFile(
+		upstreamFile,
+		`it('same dirty behavior', () => {});\nit('${firstExtra}', () => {});\nit('${secondExtra}', () => {});\n`,
+	);
 	await writeFile(
 		portedFile,
 		`it('same dirty behavior', () => {});\nit('${firstExtra}', () => {});\nit('${secondExtra}', () => {});\n`,
@@ -74,10 +77,7 @@ test('rejects duplicating one port-only case while dropping another', async () =
 		portedFile,
 		`it('same dirty behavior', () => {});\nit('${firstExtra}', () => {});\nit('${firstExtra}', () => {});\n`,
 	);
-	assert.throws(
-		() => verifyHookFormUpstream(root, { lock: false }),
-		/expected every recorded Octane regression case to execute once/,
-	);
+	assert.throws(() => verifyHookFormUpstream(root, { lock: false }), /test registrations drifted/);
 });
 
 test('rejects disabled, focused, or expected-failing adapted tests', async () => {

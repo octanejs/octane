@@ -1,0 +1,121 @@
+{
+  "schemaVersion": 1,
+  "binding": "@octanejs/i18next",
+  "repository": "https://github.com/octanejs/octane.git",
+  "commit": "8e5ca22a6e17582b4293232406a2c0420509f4a4",
+  "sourceRoot": "upstream-artifact/previous-binding",
+  "files": [
+    {
+      "path": "package.json",
+      "sha256": "07333e92f65ff42d27acb2bb77417b44f3732d3af258aa1b9505a27524a3b2b9"
+    },
+    {
+      "path": "src/I18nextProvider.js",
+      "sha256": "f934e847f5e6fc06e9040f00c324e4f3e7e3e8cccc6c71529bf3162b41d90fe4"
+    },
+    {
+      "path": "src/IcuTrans.js",
+      "sha256": "85f7dedf46e4b77ba9f7045c2bf6c1fa18139f80db81bb415439699ff3ee386f"
+    },
+    {
+      "path": "src/IcuTransUtils/TranslationParserError.js",
+      "sha256": "439718e9329ffb029911f4376e725f7d3ec5012befcaaa9fa83f566555099f1a"
+    },
+    {
+      "path": "src/IcuTransUtils/htmlEntityDecoder.js",
+      "sha256": "0288e4d9228ef52f2fc9113afd9d8a2891ccecfa4e2f29b7b43bd8199715bc30"
+    },
+    {
+      "path": "src/IcuTransUtils/index.js",
+      "sha256": "b6c6365126db2dda0351e7140ab927c47849a42c5cb1de4c77f01cd9356b7b0f"
+    },
+    {
+      "path": "src/IcuTransUtils/renderTranslation.js",
+      "sha256": "b1fb6fd20819ad8fc4d88b56a23a46ac159a9581aadb790650e8a74aced46627"
+    },
+    {
+      "path": "src/IcuTransUtils/tokenizer.js",
+      "sha256": "c14740151d527d93b3efb622920a314f1dc35e2e6e289a7377507faa1096c6c6"
+    },
+    {
+      "path": "src/IcuTransWithoutContext.js",
+      "sha256": "14c8cd93ecfa8a08cca650e3c594715132075e2ca497dc52613b976cabf559a6"
+    },
+    {
+      "path": "src/Trans.js",
+      "sha256": "8c9db80d752633087fc97c2556dafdc68d4f796d2d8d3d166988238dc60e391f"
+    },
+    {
+      "path": "src/TransWithoutContext.d.ts",
+      "sha256": "52f8e206e8c8cf1632e555f1cad3d223b2fe3e7bfc91830012a72c974474cb11"
+    },
+    {
+      "path": "src/TransWithoutContext.js",
+      "sha256": "d13dc2c378c427e790dfaf56315912cf6c56ba573992f99eaf50397c3e380b3a"
+    },
+    {
+      "path": "src/Translation.js",
+      "sha256": "23522853be280e95b04a545c1a37cdf51b03a1a7d006a406c83d57eeca4fa133"
+    },
+    {
+      "path": "src/context.js",
+      "sha256": "c5566b6717fe04550dbcbb81227b08fa0559793ec4f2430f16fc9d7e4ecb02b3"
+    },
+    {
+      "path": "src/defaults.js",
+      "sha256": "9a8e0bae5441d116955dfe26376653309bf479a1623d8e81b25ddd66b5a2de0d"
+    },
+    {
+      "path": "src/helpers.d.ts",
+      "sha256": "890bdcec61a6fe8e39e35a1a9e4e0cad8c99b371646077bed13724862c4ab711"
+    },
+    {
+      "path": "src/i18nInstance.js",
+      "sha256": "07efd9705ca747f1abd8d6067b36cb314ab646af1d7279e1e50189f1111f6294"
+    },
+    {
+      "path": "src/index.d.ts",
+      "sha256": "5853b345ec0835e1106120c008ef9c2733c18eaa0120c38877e4e2ad7ea823e1"
+    },
+    {
+      "path": "src/index.js",
+      "sha256": "b87c1bd5bfdb167ca6ed7c5509d9bafec3692264df0a5dc08fab6d1140df3f22"
+    },
+    {
+      "path": "src/initReactI18next.d.ts",
+      "sha256": "b3e571e9f098c30db463d30d16d395ad8dd2457ee6e8d1561e2e1527bc2b6ce0"
+    },
+    {
+      "path": "src/initReactI18next.js",
+      "sha256": "09414db1cd5f62beed7595bab37d2d54a09a95c294233c97f8fc0db26c707bea"
+    },
+    {
+      "path": "src/internal.js",
+      "sha256": "56b03e2978fcae23fd3ef2f565a9dd269104dfdf15c3b5f8cb08c69ce5e0abfb"
+    },
+    {
+      "path": "src/unescape.js",
+      "sha256": "00dca9e339b94a4134dc3684de9161388d5008a595da94bb149a30ddeb9b8c52"
+    },
+    {
+      "path": "src/useSSR.js",
+      "sha256": "048c24efc9c08b2a0acf2a6fe7d3b8549ac9bee47246100c0513f6bbe6098d4f"
+    },
+    {
+      "path": "src/useTranslation.js",
+      "sha256": "e616d8d95afcb660c8ff8a16e942a4124790a2bc71eeb24adbbc1c0398e5ae86"
+    },
+    {
+      "path": "src/utils.js",
+      "sha256": "fdd950bed720032e9415b5b1c4e873e4473ad72684aafb294d8a0b8ef3dcaba8"
+    },
+    {
+      "path": "src/withSSR.js",
+      "sha256": "6865ac1bbe8479fc4cda30468a7b49059cf4ac5550587a955a9779f470b1552d"
+    },
+    {
+      "path": "src/withTranslation.js",
+      "sha256": "290a49f03d87aba9fc46e11661d1a4ac27b905cd6024e9fc3319bec7fb665466"
+    }
+  ]
+}

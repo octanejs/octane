@@ -1,4 +1,4 @@
-// Vendored from react-hook-form@7.81.0 src/logic/getFieldValueAs.ts (octane port).
+// Adapted from react-hook-form@7.88.0 src/logic/getFieldValueAs.ts for Octane.
 import type { Field, NativeFieldValue } from '../types';
 import isString from '../utils/isString';
 import isUndefined from '../utils/isUndefined';

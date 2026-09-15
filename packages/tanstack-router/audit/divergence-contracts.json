@@ -1,0 +1,68 @@
+[
+  {
+    "id": "ssr-compiler",
+    "upstreamResult": "React route factories run through React server and client APIs.",
+    "octaneResult": "The same route factories run through separate Octane server/client compiler graphs and native readable streams.",
+    "rationale": "Octane compilation selects server and client runtime ownership.",
+    "classification": "framework-contract",
+    "consumerImpact": "SSR fixtures must be compiled for their execution environment.",
+    "migrationGuidance": "Use octane/server and native readable streams.",
+    "owner": "@octanejs/tanstack-router",
+    "reviewCondition": "Recheck when the pinned upstream case or Octane renderer contract changes."
+  },
+  {
+    "id": "ref-prop",
+    "upstreamResult": "React forwardRef and legacy ref injection type the wrapped component.",
+    "octaneResult": "A component declares its native ref prop; arbitrary custom components receive ref/key only when their public props declare them.",
+    "rationale": "Octane refs are ordinary typed props.",
+    "classification": "framework-contract",
+    "consumerImpact": "Declare the ref accepted by a custom Link component.",
+    "migrationGuidance": "Replace forwardRef wrappers with a typed ref prop.",
+    "owner": "@octanejs/tanstack-router",
+    "reviewCondition": "Recheck when the pinned upstream case or Octane renderer contract changes."
+  },
+  {
+    "id": "store-hooks",
+    "upstreamResult": "The React test mocks useSyncExternalStore for its server snapshot.",
+    "octaneResult": "The native hydration snapshot runs through the actual Octane hook.",
+    "rationale": "Mocks of React hooks cannot observe the Octane runtime.",
+    "classification": "framework-contract",
+    "consumerImpact": "Hydration uses the native server snapshot and follows the live client value.",
+    "migrationGuidance": "Keep store server/client snapshots consistent.",
+    "owner": "@octanejs/tanstack-router",
+    "reviewCondition": "Recheck when the pinned upstream case or Octane renderer contract changes."
+  },
+  {
+    "id": "error-boundary",
+    "upstreamResult": "A React class boundary catches the rendered failure.",
+    "octaneResult": "The native function ErrorBoundary catches that same failure.",
+    "rationale": "Octane supports function boundaries without class components.",
+    "classification": "framework-contract",
+    "consumerImpact": "The fallback and cleanup remain observable.",
+    "migrationGuidance": "Use Octane ErrorBoundary.",
+    "owner": "@octanejs/tanstack-router",
+    "reviewCondition": "Recheck when the pinned upstream case or Octane renderer contract changes."
+  },
+  {
+    "id": "strict-mode",
+    "upstreamResult": "The React observer may be initialized again by development StrictMode.",
+    "octaneResult": "Octane mounts once and the same observer remains live.",
+    "rationale": "Octane does not replay mounts under StrictMode.",
+    "classification": "framework-contract",
+    "consumerImpact": "The retained observer must continue receiving intersection events.",
+    "migrationGuidance": "Retain native observer identity and release it on teardown.",
+    "owner": "@octanejs/tanstack-router",
+    "reviewCondition": "Recheck when the pinned upstream case or Octane renderer contract changes."
+  },
+  {
+    "id": "native-lifecycle",
+    "upstreamResult": "The React navigation helper finishes before the test retains a fallback node.",
+    "octaneResult": "Native act settles the pending-to-idle boundary reset before the test retains that node.",
+    "rationale": "Native commits preserve the same final fallback while resetting ownership during navigation.",
+    "classification": "framework-contract",
+    "consumerImpact": "DOM assertions must inspect the committed live node.",
+    "migrationGuidance": "Wrap asynchronous navigation interactions in the native act helper.",
+    "owner": "@octanejs/tanstack-router",
+    "reviewCondition": "Recheck when the pinned upstream case or Octane renderer contract changes."
+  }
+]

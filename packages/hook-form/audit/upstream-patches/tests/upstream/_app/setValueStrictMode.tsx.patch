@@ -1,0 +1,21 @@
+diff --git a/tests/upstream/_app/setValueStrictMode.tsx b/tests/upstream/_app/setValueStrictMode.tsx
+--- a/tests/upstream/_app/setValueStrictMode.tsx
++++ b/tests/upstream/_app/setValueStrictMode.tsx
+@@ -28,7 +28,7 @@ const SetValueAsyncStrictMode = () => {
+   }, [register, setValue]);
+ 
+   return (
+-    <React.StrictMode>
++    <React.Fragment>
+       <form>
+         <Controller
+           defaultValue={'test'}
+@@ -46,7 +46,7 @@ const SetValueAsyncStrictMode = () => {
+ 
+         <p id="result">{JSON.stringify([...state.current])}</p>
+       </form>
+-    </React.StrictMode>
++    </React.Fragment>
+   );
+ };
+ 

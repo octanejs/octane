@@ -1,0 +1,3480 @@
+{
+  "schemaVersion": 1,
+  "identity": {
+    "package": "framer-motion",
+    "version": "13.2.0"
+  },
+  "upstream": [
+    {
+      "name": "AbsoluteKeyframe",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "AccelerateConfig",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "AcceptedAnimations",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "ActiveStatsBuffer",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "AddEffectValue",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "AnimateEffect",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "AnimatePresence",
+      "disposition": "native-compatibility-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "AnimatePresenceProps",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "AnimateSharedLayout",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "AnimationDefinition",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "AnimationGeneratorName",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "AnimationGeneratorType",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "AnimationList",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "AnimationOptions",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "AnimationOrchestrationOptions",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "AnimationPlaybackControls",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "AnimationPlaybackControlsWithThen",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "AnimationPlaybackLifecycles",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "AnimationPlaybackOptions",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "AnimationScope",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "AnimationSequence",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "AnimationState",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "AnimationType",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "AnimationTypeState",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "AnyResolvedKeyframe",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "ArcOptions",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "AsyncMotionValueAnimation",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "At",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "Axis",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "AxisDelta",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "Batcher",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "BezierDefinition",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "BoundingBox",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "Box",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "CSSStyleDeclarationWithTransform",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "CSSVariableName",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "CSSVariableToken",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "CancelProcess",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "Color",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "ComplexValueInfo",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "ComplexValues",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "CreateVisualElement",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "Cycle",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "CycleState",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "DOMKeyframesDefinition",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "DOMKeyframesResolver",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "DOMMotionComponents",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "DOMSegment",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "DOMSegmentWithTransition",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "DOMValueAnimationOptions",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "DOMVisualElement",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "DOMVisualElementOptions",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "DecayOptions",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "DelayedFunction",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "Delta",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "DeprecatedLayoutGroupContext",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "DevMessage",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "Direction",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "DocumentProjectionNode",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "DragControls",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "DragElastic",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "DragHandler",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "DraggableProps",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "DurationSpringOptions",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "DynamicOption",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "Easing",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "EasingDefinition",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "EasingFunction",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "EasingModifier",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "Effect",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "EffectKeyframes",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "EffectOptions",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "EffectRead",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "EffectTest",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "EffectTransition",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "ElementOrSelector",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "EventInfo",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "EventOptions",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "Feature",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "FeatureBundle",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "FeatureClass",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "FeatureDefinition",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "FeatureDefinitions",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "FeaturePackage",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "FeaturePackages",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "FlatTree",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "FollowValueOptions",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "ForwardRefComponent",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "FrameData",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "FunctionSegment",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "GeneratorFactory",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "GeneratorFactoryFunction",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "GroupAnimation",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "GroupAnimationWithThen",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "GroupedAnimations",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "HSLA",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "HTMLElements",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "HTMLMotionProps",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "HTMLProjectionNode",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "HTMLRenderState",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "HTMLVisualElement",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "HandoffFunction",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "HydratedFeatureDefinition",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "HydratedFeatureDefinitions",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "IProjectionNode",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "InactiveStatsBuffer",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "InertiaOptions",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "InitialPromotionConfig",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "InterpolateOptions",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "JSAnimation",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "KeyframeGenerator",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "KeyframeOptions",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "KeyframeResolver",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "LayoutAnimationBuilder",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "LayoutEvents",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "LayoutGroup",
+      "disposition": "native-compatibility-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "LayoutGroupContext",
+      "disposition": "native-compatibility-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "LayoutLifecycles",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "LayoutProjectionMetrics",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "LayoutProjectionStats",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "LayoutUpdateData",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "LayoutUpdateHandler",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "LazyFeatureBundle",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "LazyMotion",
+      "disposition": "native-compatibility-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "LazyProps",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "LegacyAnimationControls",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "MapInputRange",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "Measurements",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "Mixer",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "MixerFactory",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "MotionConfig",
+      "disposition": "native-compatibility-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "MotionConfigContext",
+      "disposition": "native-compatibility-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "MotionConfigContextProps",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "MotionConfigProps",
+      "disposition": "native-compatibility-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "MotionContext",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "MotionGlobalConfig",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "MotionNodeAdvancedOptions",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "MotionNodeAnimationOptions",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "MotionNodeDragHandlers",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "MotionNodeDraggableOptions",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "MotionNodeEventOptions",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "MotionNodeFocusHandlers",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "MotionNodeHoverHandlers",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "MotionNodeLayoutOptions",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "MotionNodeOptions",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "MotionNodePanHandlers",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "MotionNodeTapHandlers",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "MotionNodeViewportOptions",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "MotionPath",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "MotionProps",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "MotionStyle",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "MotionTransform",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "MotionValue",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "MotionValueEventCallbacks",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "MotionValueOptions",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "MotionValueSegment",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "MotionValueSegmentWithTransition",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "MotionValueState",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "MultiTransformer",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "NativeAnimation",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "NativeAnimationExtended",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "NativeAnimationOptions",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "NativeAnimationOptionsExtended",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "NativeAnimationWrapper",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "NodeGroup",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "NodeStack",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "NumberMap",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "ObjectSegment",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "ObjectSegmentWithTransition",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "ObjectTarget",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "ObjectVisualElement",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "OnHoverEndEvent",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "OnHoverStartEvent",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "OnKeyframesResolved",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "OnPressEndEvent",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "OnPressStartEvent",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "Owner",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "PanHandler",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "PanInfo",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "PassiveEffect",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "PathInterpolator",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "PathState",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "Phase",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "Point",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "Point2D",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "PointerEventOptions",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "PopChild",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "PresenceChild",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "PresenceContext",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "PresenceContextProps",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "PressGestureInfo",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "Process",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "ProgressTimeline",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "ProjectionEventName",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "ProjectionNodeConfig",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "ProjectionNodeOptions",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "PropagateOptions",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "RGBA",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "ReducedMotionConfig",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "Reorder",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "RepeatType",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "ResolveKeyframes",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "ResolvedAnimationDefinition",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "ResolvedAnimationDefinitions",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "ResolvedConstraints",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "ResolvedElastic",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "ResolvedKeyframes",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "ResolvedValueKeyframe",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "ResolvedValues",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "SVGAttributes",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "SVGAttributesAsMotionValues",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "SVGForcedAttrKeyframesDefinition",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "SVGForcedAttrProperties",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "SVGForcedAttrTransitions",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "SVGKeyframesDefinition",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "SVGMotionProps",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "SVGPathKeyframesDefinition",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "SVGPathProperties",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "SVGPathTransitions",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "SVGRenderState",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "SVGTransitions",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "SVGVisualElement",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "ScaleCorrectionNode",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "ScaleCorrector",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "ScaleCorrectorDefinition",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "ScaleCorrectorMap",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "Schedule",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "ScrapeMotionValuesFromProps",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "ScrollMeasurements",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "ScrollMotionValues",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "Segment",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "SegmentTransitionOptions",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "SegmentValueTransitionOptions",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "SelectorCache",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "SequenceLabel",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "SequenceLabelWithTime",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "SequenceMap",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "SequenceOptions",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "SequenceProgressCallback",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "SequenceTime",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "SingleTransformer",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "Spring",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "SpringOptions",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "StaggerOptions",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "StaggerOrigin",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "StartAnimation",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "StatsRecording",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "Step",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "StepId",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "Steps",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "StyleKeyframesDefinition",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "StyleTransitions",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "Subscriber",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "SubscriptionManager",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "SwitchLayoutGroupContext",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "TapHandlers",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "TapInfo",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "Target",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "TargetAndTransition",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "TargetResolver",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "TimelineWithFallback",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "TransformInputRange",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "TransformOptions",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "TransformOrigin",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "TransformPoint",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "TransformProperties",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "TransformTemplate",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "Transformer",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "Transition",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "TransitionWithValueOverrides",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "Tween",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "UnresolvedKeyframes",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "UnresolvedValueKeyframe",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "UseInViewOptions",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "UseRenderState",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "UseScrollOptions",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "ValueAnimationOptions",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "ValueAnimationOptionsWithRenderContext",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "ValueAnimationTransition",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "ValueAnimationWithDynamicDelay",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "ValueIndexes",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "ValueKeyframe",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "ValueKeyframesDefinition",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "ValueSequence",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "ValueTransformer",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "ValueTransition",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "ValueType",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "ValueTypeMap",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "VariableKeyframesDefinition",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "VariableTransitions",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "Variant",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "VariantLabels",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "Variants",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "VelocityOptions",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "ViewTransitionAnimationDefinition",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "ViewTransitionBuilder",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "ViewTransitionOptions",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "ViewTransitionTarget",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "ViewTransitionTargetDefinition",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "ViewportEventHandler",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "ViewportOptions",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "VisualElement",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "VisualElementAnimationOptions",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "VisualElementEventCallbacks",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "VisualElementOptions",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "VisualState",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "WillChange",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "WillChangeMotionValue",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "WithAppearProps",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "WithDepth",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "WithQuerySelectorAll",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "acceleratedValues",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "addAttrValue",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "addDomEvent",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "addEffect",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "addPointerEvent",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "addPointerInfo",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "addScaleCorrector",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "addStyleValue",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "addUniqueItem",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "addValueToWillChange",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "alpha",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "analyseComplexValue",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "animate",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "animateEffectSubject",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "animateMini",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "animateMotionValue",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "animateSingleValue",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "animateTarget",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "animateValue",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "animateVariant",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "animateView",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "animateVisualElement",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "animationControls",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "animationMapKey",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "animations",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "anticipate",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "applyAxisDelta",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "applyBoxDelta",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "applyGeneratorOptions",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "applyPointDelta",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "applyPxDefaults",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "applyTreeDeltas",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "arc",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "aspectRatio",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "attachFollow",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "attachSpring",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "attrEffect",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "axisDeltaEquals",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "axisEquals",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "axisEqualsRounded",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "backIn",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "backInOut",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "backOut",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "boxEquals",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "boxEqualsRounded",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "buildHTMLStyles",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "buildProjectionTransform",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "buildSVGAttrs",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "buildSVGPath",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "buildTransform",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "calcAxisDelta",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "calcBoxDelta",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "calcChildStagger",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "calcGeneratorDuration",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "calcLength",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "calcRelativeAxis",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "calcRelativeAxisPosition",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "calcRelativeBox",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "calcRelativePosition",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "camelCaseAttributes",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "camelToDash",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "cancelFrame",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "cancelMicrotask",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "cancelSync",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "checkVariantsDidChange",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "circIn",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "circInOut",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "circOut",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "clamp",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "cleanDirtyNodes",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "collectMotionValues",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "color",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "compareByDepth",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "complex",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "containsCSSVariable",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "convertBoundingBoxToBox",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "convertBoxToBoundingBox",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "convertOffsetToTimes",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "copyAxisDeltaInto",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "copyAxisInto",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "copyBoxInto",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "correctBorderRadius",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "correctBoxShadow",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "correctParentTransform",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "createAnimationState",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "createAxis",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "createAxisDelta",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "createBox",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "createDelta",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "createEffect",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "createGeneratorEasing",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "createProjectionNode",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "createRenderBatcher",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "createScopedAnimate",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "cubicBezier",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "cubicBezierAsString",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "defaultEasing",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "defaultOffset",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "defaultTransformValue",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "defaultValueTypes",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "degrees",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "delay",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "delayInSeconds",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "dimensionValueTypes",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "disableInstantTransitions",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "distance",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "distance2D",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "domAnimation",
+      "disposition": "native-compatibility-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "domMax",
+      "disposition": "native-compatibility-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "domMin",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "eachAxis",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "easeIn",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "easeInOut",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "easeOut",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "easingDefinitionToFunction",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "fillOffset",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "fillWildcards",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "filterProps",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "findDimensionValueType",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "findEffect",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "findValueType",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "flushKeyframeResolvers",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "followValue",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "frame",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "frameData",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "frameSteps",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "generateLinearEasing",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "getAnimatableNone",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "getAnimationMap",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "getComputedStyle",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "getDefaultTransition",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "getDefaultValueType",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "getEasingForSegment",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "getFeatureDefinitions",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "getFinalKeyframe",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "getMixer",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "getOptimisedAppearId",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "getOriginIndex",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "getValueAsType",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "getValueTransition",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "getVariableValue",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "getVariantContext",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "getViewAnimationLayerInfo",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "getViewAnimations",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "globalProjectionState",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "has2DTranslate",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "hasReducedMotionListener",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "hasScale",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "hasTransform",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "hasWarned",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "hex",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "hover",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "hsla",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "hslaToRgba",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "inView",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "inertia",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "initPrefersReducedMotion",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "interpolate",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "invariant",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "invisibleValues",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "isAnimationControls",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "isBezierDefinition",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "isBrowser",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "isCSSVariableName",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "isCSSVariableToken",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "isControllingVariants",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "isDeltaZero",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "isDragActive",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "isDragging",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "isEasingArray",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "isElementKeyboardAccessible",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "isElementTextInput",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "isForcedMotionValue",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "isGenerator",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "isHTMLElement",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "isKeyframesTarget",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "isMotionComponent",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "isMotionValue",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "isNear",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "isNodeOrChild",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "isNumericalString",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "isObject",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "isPrimaryPointer",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "isSVGElement",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "isSVGSVGElement",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "isSVGTag",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "isTransitionDefined",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "isValidMotionProp",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "isVariantLabel",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "isVariantNode",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "isWaapiSupportedEasing",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "isWillChangeMotionValue",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "isZeroValueString",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "keyframes",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "m",
+      "disposition": "native-compatibility-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "makeAnimationInstant",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "makeUseVisualState",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "mapEasingToNativeEasing",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "mapValue",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "maxGeneratorDuration",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "measurePageBox",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "measureViewportBox",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "memo",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "microtask",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "millisecondsToSeconds",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "mirrorEasing",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "mix",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "mixArray",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "mixColor",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "mixComplex",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "mixImmediate",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "mixLinearColor",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "mixNumber",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "mixObject",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "mixValues",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "mixVisibility",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "motion",
+      "disposition": "native-compatibility-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "motionValue",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "moveItem",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "nodeGroup",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "noop",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "number",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "numberValueTypes",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "observeTimeline",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "optimizedAppearDataAttribute",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "optimizedAppearDataId",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "parseAnimateLayoutArgs",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "parseCSSVariable",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "parseValueFromTransform",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "percent",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "pipe",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "pixelsToPercent",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "positionalKeys",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "prefersReducedMotion",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "press",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "progress",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "progressPercentage",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "propEffect",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "propagateDirtyNodes",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "px",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "readTransformValue",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "recordStats",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "removeAxisDelta",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "removeAxisTransforms",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "removeBoxTransforms",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "removeEffect",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "removeItem",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "removePointDelta",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "renderHTML",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "renderSVG",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "resize",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "resolveElements",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "resolveMotionValue",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "resolveTransition",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "resolveVariant",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "resolveVariantFromProps",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "reverseEasing",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "rgbUnit",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "rgba",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "rootProjectionNode",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "scale",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "scaleCorrectors",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "scalePoint",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "scrapeHTMLMotionValuesFromProps",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "scrapeSVGMotionValuesFromProps",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "scroll",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "scrollInfo",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "secondsToMilliseconds",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "setDragLock",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "setFeatureDefinitions",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "setStyle",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "setTarget",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "spring",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "springValue",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "stagger",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "startOptimizedAppearAnimation",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "startWaapiAnimation",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "statsBuffer",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "steps",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "styleEffect",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "supportedWaapiEasing",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "supportsBrowserAnimation",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "supportsFlags",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "supportsLinearEasing",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "supportsPartialKeyframes",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "supportsScrollTimeline",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "supportsViewTimeline",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "svgEffect",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "sync",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "testValueType",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "time",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "transform",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "transformAxis",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "transformBox",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "transformBoxPoints",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "transformPropOrder",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "transformProps",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "transformValue",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "transformValueTypes",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "transformViewBoxPoint",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "translateAxis",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "unwrapMotionComponent",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "updateMotionValuesFromProps",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "useAnimate",
+      "disposition": "native-compatibility-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "useAnimateMini",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "useAnimation",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "useAnimationControls",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "useAnimationFrame",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "useComposedRefs",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "useCycle",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "useDeprecatedAnimatedState",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "useDeprecatedInvertedScale",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "useDomEvent",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "useDragControls",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "useElementScroll",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "useFollowValue",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "useForceUpdate",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "useInView",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "useInstantLayoutTransition",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "useInstantTransition",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "useIsPresent",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "useIsomorphicLayoutEffect",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "useMotionTemplate",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "useMotionValue",
+      "disposition": "native-compatibility-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "useMotionValueEvent",
+      "disposition": "native-compatibility-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "usePageInView",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "usePresence",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "usePresenceData",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "useReducedMotion",
+      "disposition": "native-compatibility-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "useReducedMotionConfig",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "useResetProjection",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "useScroll",
+      "disposition": "native-compatibility-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "useSpring",
+      "disposition": "native-compatibility-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "useTime",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "useTransform",
+      "disposition": "native-compatibility-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "useUnmountEffect",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "useVelocity",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "useViewportScroll",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "useWillChange",
+      "disposition": "not-exported",
+      "evidence": "status.json"
+    },
+    {
+      "name": "variantPriorityOrder",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "variantProps",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "velocityPerSecond",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "vh",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "visualElementStore",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "vw",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "warnOnce",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "warning",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    },
+    {
+      "name": "wrap",
+      "disposition": "imported-engine-contract",
+      "evidence": "tests/types/published-contract.ts"
+    }
+  ],
+  "nativeOnly": [
+    "LayoutGroupProps",
+    "LazyMotionContext",
+    "LazyMotionFeatures",
+    "LazyMotionProps",
+    "MotionComponent",
+    "MotionProxy",
+    "StaggerContext",
+    "VariantContext"
+  ],
+  "namedHosts": [
+    "a",
+    "abbr",
+    "address",
+    "animate",
+    "area",
+    "article",
+    "aside",
+    "audio",
+    "b",
+    "base",
+    "bdi",
+    "bdo",
+    "big",
+    "blockquote",
+    "body",
+    "button",
+    "canvas",
+    "caption",
+    "circle",
+    "cite",
+    "clipPath",
+    "code",
+    "col",
+    "colgroup",
+    "data",
+    "datalist",
+    "dd",
+    "defs",
+    "del",
+    "desc",
+    "details",
+    "dfn",
+    "dialog",
+    "div",
+    "dl",
+    "dt",
+    "ellipse",
+    "em",
+    "embed",
+    "feBlend",
+    "feColorMatrix",
+    "feComponentTransfer",
+    "feComposite",
+    "feConvolveMatrix",
+    "feDiffuseLighting",
+    "feDisplacementMap",
+    "feDistantLight",
+    "feDropShadow",
+    "feFlood",
+    "feFuncA",
+    "feFuncB",
+    "feFuncG",
+    "feFuncR",
+    "feGaussianBlur",
+    "feImage",
+    "feMerge",
+    "feMergeNode",
+    "feMorphology",
+    "feOffset",
+    "fePointLight",
+    "feSpecularLighting",
+    "feSpotLight",
+    "feTile",
+    "feTurbulence",
+    "fieldset",
+    "figcaption",
+    "figure",
+    "filter",
+    "footer",
+    "foreignObject",
+    "form",
+    "g",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    "head",
+    "header",
+    "hgroup",
+    "hr",
+    "html",
+    "i",
+    "iframe",
+    "image",
+    "img",
+    "input",
+    "ins",
+    "kbd",
+    "keygen",
+    "label",
+    "legend",
+    "li",
+    "line",
+    "linearGradient",
+    "link",
+    "main",
+    "map",
+    "mark",
+    "marker",
+    "mask",
+    "menu",
+    "menuitem",
+    "metadata",
+    "meter",
+    "nav",
+    "object",
+    "ol",
+    "optgroup",
+    "option",
+    "output",
+    "p",
+    "param",
+    "path",
+    "pattern",
+    "picture",
+    "polygon",
+    "polyline",
+    "pre",
+    "progress",
+    "q",
+    "radialGradient",
+    "rect",
+    "rp",
+    "rt",
+    "ruby",
+    "s",
+    "samp",
+    "script",
+    "section",
+    "select",
+    "small",
+    "source",
+    "span",
+    "stop",
+    "strong",
+    "style",
+    "sub",
+    "summary",
+    "sup",
+    "svg",
+    "symbol",
+    "table",
+    "tbody",
+    "td",
+    "text",
+    "textPath",
+    "textarea",
+    "tfoot",
+    "th",
+    "thead",
+    "time",
+    "title",
+    "tr",
+    "track",
+    "tspan",
+    "u",
+    "ul",
+    "use",
+    "video",
+    "view",
+    "wbr",
+    "webview"
+  ]
+}

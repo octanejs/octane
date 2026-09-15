@@ -2,6 +2,11 @@
   "schemaVersion": 1,
   "tests": [
     {
+      "path": "packages/motion/tests/browser/motion.browser.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Real Chromium verifies client behavior and SSR hook hydration adoption."
+    },
+    {
       "path": "packages/motion/tests/conformance/config.test.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Checks Octane MotionConfig context behavior."
@@ -17,6 +22,11 @@
       "reason": "Checks animation and gesture effect lifecycle with controlled engine observations."
     },
     {
+      "path": "packages/motion/tests/conformance/engine.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks that the binding preserves every runtime identity from the directly imported framework-neutral engine."
+    },
+    {
       "path": "packages/motion/tests/conformance/exit.test.ts",
       "disposition": "octane-only-divergence",
       "reason": "Documents cleanup-before-detach exit animations versus React deferred deletion.",
@@ -26,6 +36,11 @@
       "path": "packages/motion/tests/conformance/fixture-compiler.test.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Checks fail-closed React fixture compilation."
+    },
+    {
+      "path": "packages/motion/tests/conformance/host-contracts.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks native host refs, DOM styles, events, SVG and derived logical CSS values."
     },
     {
       "path": "packages/motion/tests/conformance/inView.test.ts",
@@ -91,6 +106,11 @@
       "reason": "Checks Octane child reconciliation."
     },
     {
+      "path": "packages/motion/tests/conformance/scoped-animation.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks the public scoped animation hook with the real engine, final DOM styles, released controls, and unmount cleanup."
+    },
+    {
       "path": "packages/motion/tests/conformance/scroll.test.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Checks scroll-linked MotionValues."
@@ -146,6 +166,11 @@
       "reason": "Checks production-bundle reachability for the public motion entry."
     },
     {
+      "path": "packages/motion/tests/ssr.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Node-mode deterministic hook initialization without DOM effects."
+    },
+    {
       "path": "packages/motion/tests/upstream-original.test.ts",
       "disposition": "unmodified-upstream-suite-wrapper",
       "oracle": "Runs the curated Motion useMotionValue Jest suite byte-exact against motion/react@12.42.2."
@@ -159,6 +184,11 @@
       "path": "packages/motion/typetests/pristine/types.test-d.ts",
       "disposition": "unmodified-upstream-suite-wrapper",
       "oracle": "Repo-authored pristine public-surface type probes against motion/react@12.42.2, paired one-for-one with the adapted type lane via packages/motion/typetests/assertions.md."
+    },
+    {
+      "path": "packages/motion/typetests/pristine/values.test-d.ts",
+      "disposition": "octane-only-type-conformance",
+      "reason": "Repository-authored positive and negative consumer probes against the authenticated upstream Motion declarations."
     },
     {
       "path": "packages/motion/typetests/public-api.test-d.ts",

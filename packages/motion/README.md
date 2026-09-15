@@ -49,7 +49,7 @@ function List(props) @{
   `onDrag*`), `layout`, `layoutId`, `variants`, plus any DOM props (className, style,
   events, …) and `style` MotionValues spread/bound onto the element.
 - `AnimatePresence` — exit animations on removal.
-- `MotionConfig` — global `transition` / `reducedMotion` defaults via context.
+- `MotionConfig` — global `transition` / `reducedMotion` defaults and scoped `isValidProp` filtering via context.
 - `useReducedMotion()` — a live `prefers-reduced-motion` subscription; operating-system
   setting changes update mounted consumers.
 - `LayoutGroup` — namespaces `layoutId` values so independent shared-layout surfaces
@@ -107,3 +107,11 @@ keyed reorder does not re-stagger).
 Current scope, known divergences, and verification status are tracked in the
 generated [bindings status table](../../docs/bindings-status.md), sourced from
 this package's [`status.json`](./status.json).
+
+## Release and compatibility scope
+
+This binding targets Motion 13.2.0. `MotionConfig` inherits `isValidProp` from its nearest provider; a nested predicate overrides it, and an explicit `undefined` resets filtering. Styles, refs and native event callbacks retain their host behavior.
+
+`useSpring` now detaches its previous source when a replacement MotionValue is supplied. Ordinary numeric and unit-string springs are covered; Motion 13.2.0's engine currently mishandles unit strings with `skipInitialAnimation: true`, as detailed in the upstream notes.
+
+The integration preserves a bounded native surface. See [UPSTREAM.md](./UPSTREAM.md) for the tested contracts, immutable release evidence, and remaining gaps. Server initialization and hydration are supported for the tested motion-value hooks; motion host components remain client-only.

@@ -11,8 +11,16 @@
     "allowSyntheticDefaultImports": true,
     "strict": true,
     "jsx": "react-jsx",
-    "jsxImportSource": "octane"
+    "jsxImportSource": "octane",
+    "allowImportingTsExtensions": true,
+    "skipLibCheck": false
   },
   "include": ["./src/"],
-  "exclude": ["node_modules", "dist", "tests"]
+  "exclude": ["node_modules", "dist", "tests"],
+  "tsrx": {
+    "compiler": "octane/compiler/volar"
+  },
+  "reactPortEvidence": {
+    "gate": "authored-source-types"
+  }
 }

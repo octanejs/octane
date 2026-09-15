@@ -4,7 +4,7 @@ import type { ErrorInfo } from './route';
 
 export declare const CatchNotFound: (props: {
 	fallback?: (error: NotFoundError) => unknown;
-	onCatch?: (error: Error, errorInfo: ErrorInfo) => void;
+	onCatch?: (error: unknown, errorInfo: ErrorInfo) => void;
 	children?: unknown;
 }) => unknown;
 export declare const DefaultGlobalNotFound: () => unknown;

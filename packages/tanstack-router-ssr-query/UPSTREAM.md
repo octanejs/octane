@@ -1,47 +1,45 @@
-# TanStack React Router SSR Query upstream ledger
+# TanStack Router SSR Query upstream ledger
 
 `@octanejs/tanstack-router-ssr-query` targets
-`@tanstack/react-router-ssr-query@1.167.1` from `https://github.com/TanStack/router.git`.
+`@tanstack/react-router-ssr-query@1.167.2` from https://github.com/TanStack/router.
 
-## Immutable pin
+- Commit: `0dbb77f7260b4919786c2c3d594b8c262de43a9e`
+- npm archive SHA-256: `1301a0f79fab7aca720fc2289cf6c9e6157e2e76d4442241fd6a9420f646a7c5`
+- npm integrity: `sha512-yRvy0VJ00R8huPuquk+qyYQGMpYRc/G33mc6/yZ4f7LaBZz9h/VbACjmLzhm/+6u5WSmUt6ouJJZnI1/5Npfag==`
+- License: MIT, retained verbatim in `LICENSE.upstream`
+- Framework-neutral dependency: `@tanstack/router-ssr-query-core@1.169.2`, as published by the adapter
 
-- Tag: `@tanstack/react-router-ssr-query@1.167.1`
-- Resolved commit: `8b3659143f634542c455a9d7915a8c7e8fabb65d`
-- npm archive SHA-256: `14b0cc524faad53c9e0d68fb2277bdd66147f0589048762fde82dda6aa7fa743`
-- npm lock integrity: `sha512-W9j5JPnBikyafvuUfykFfHIWod58OAbAAa5leNkXBcoDoocghMmu6w9uZOmUZvAWT7CSvgj5tBUtF7CM2OoHXQ==`
-- Supported range: exactly `1.167.1`
-- License: MIT
-- React oracle: workspace-pinned React and React DOM
-- Framework-neutral core: `@tanstack/router-ssr-query-core@1.169.1`, the version published by the pinned adapter
+## Source boundary
 
-## Source, exports, and suites
+The complete eight-file upstream package is retained byte-exact in `upstream/`.
+`audit/upstream.lock.json` authenticates each Git blob offline, and
+`audit/provenance.json` authenticates the npm archive and license. The published
+package includes only authored source and documentation, not the snapshots.
 
-The byte-exact tagged adapter directory is vendored under `upstream/` and pinned by
-`audit/upstream.lock.json`: each committed file verifies offline against its upstream git blob
-sha at the pinned commit (`pnpm react-port:materialize run --check --package-dir
-packages/tanstack-router-ssr-query`). The upstream MIT license is retained byte-exact as
-`LICENSE.upstream`, hash-matched to the lock. The tagged
-package contains no runtime test, fixture, or snapshot artifacts. Its `test:types` scripts compile
-package source across TypeScript 5.5–6.0 (accept/reject compile results, no dedicated `expectType`
-artifacts). The pristine type lane invokes the vendored `upstream/package/tsconfig.build.json`
-under `typescript55`–`typescript60` (matching upstream's matrix) and inventories each compiler
-result. The adapted lane mirrors that compile once with `tsrx-tsc` (TypeScript 5.9-equivalent);
-TypeScript 5.5, 5.6, 5.7, 5.8, and 6.0 are recorded as adapted-lane incompatibilities because
-Octane's typecheck toolchain is a single `tsrx-tsc` version.
+The owned implementation is the 29-line React wrapper adapted to Octane's
+Fragment and QueryClientProvider. Router dehydration, streaming, redirects, and
+cache hydration are imported from the neutral core. The adapter preserves an
+existing router wrapper inside the query provider and honors
+`wrapQueryClient: false`. The crosswalk accounts for both public exports,
+`Options` and `setupRouterSsrQueryIntegration`. The metadata-only upstream
+`./package.json` subpath is intentionally omitted, as recorded in `status.json`.
 
-The package publishes one runtime entrypoint plus a metadata-only `./package.json` entrypoint. The
-export crosswalk maps `Options` and `setupRouterSsrQueryIntegration` individually. The Octane
-package deliberately omits the metadata subpath; that gap, its consumer impact, and agreement with
-`status.json` are recorded in `audit/upstream-crosswalk.json`. The published `1.167.1` adapter
-depends on core `1.169.1`; the Octane dependency is therefore faithful rather than a version drift.
+Upstream has no runtime or dedicated type-test registrations. Its source compile
+matrix is retained across TypeScript 5.6, 5.7, 5.8, 5.9, 6.0, and 7.0. Native source
+is checked with `tsrx-tsc`; the other compilers do not accept `.tsrx`. Separate
+strict pristine, adapted, authored-source, and public-entry programs exercise both
+exports and reject invalid options without `skipLibCheck`.
 
-## Executable evidence
+Two React/Octane differential cases compare provider-backed server output,
+preservation of an existing wrapper, and disabled query wrapping. Native SSR
+checks additionally exercise real router dehydration, cached queries, the query
+stream, and preservation of the original dehydration callback. A production
+Chromium test hydrates the provider, retains server DOM and pre-hydration input
+edits/focus, updates page and portal consumers, isolates sibling query clients,
+and verifies observer cleanup on unmount. This browser test covers the owned
+provider lifecycle, not end-to-end transport of the neutral core's stream.
 
-A repo-authored server differential executes equivalent setup calls against the Octane and pinned
-React adapters. It compares provider-backed SSR output, preservation of an existing wrapper, core
-dehydrate/lifecycle mutations, and the `wrapQueryClient: false` control. Existing local tests remain
-Octane framework contracts and are not counted as React parity.
-
-Because upstream supplies no adapter runtime suite and the differential is representative rather
-than exhaustive over core streaming, redirects, and hydration, the binding remains
-`recorded-unverified`.
+Regenerate the required lanes and source closure with
+`node packages/tanstack-router-ssr-query/scripts/generate-parity.mjs`.
+The machine evidence gate records final verification separately from this
+description of the executable coverage.

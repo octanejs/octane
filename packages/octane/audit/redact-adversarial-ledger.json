@@ -2200,7 +2200,7 @@
         {
           "kind": "test",
           "file": "packages/octane/tests/sync-external-store.test.ts",
-          "testName": "subscribes outside render and converges when subscribe notifies synchronously",
+          "testName": "converges when subscribe changes the snapshot (notifies: true)",
           "note": "Proves subscription timing at the public callback boundary and commits the synchronously published snapshot without resubscribing."
         },
         {
@@ -2228,7 +2228,7 @@
       "evidence": [
         {
           "file": "packages/octane/tests/sync-external-store.test.ts",
-          "testName": "subscribes outside render and converges when subscribe notifies synchronously",
+          "testName": "converges when subscribe changes the snapshot (notifies: true)",
           "modes": ["client", "production-compile"],
           "observables": ["markup", "effects"]
         },

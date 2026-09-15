@@ -2,18 +2,17 @@
   "schemaVersion": 1,
   "identity": {
     "packageName": "react-resizable-panels",
-    "version": "4.12.2",
+    "version": "4.12.4",
     "repository": {
       "owner": "bvaughn",
       "repo": "react-resizable-panels",
       "subdirectory": null
     },
-    "commit": "a1eeb7aefdb024bb5879a323218e0ac05f77f28e",
-    "integrity": "sha512-NwY5LCo4WrxVvDh0xoMML6EMLPONP/8ckKcIdpnojxexoatZdjLiRqLJQjQK5CPkd4SYiB/2M5BVrjZBQtOO7Q=="
+    "commit": "152b1a8f856438c432b360a77a5afbdeb78782fb",
+    "integrity": "sha512-SOsSj4e9U7vxL15MbgTfl35IO4vxSW4Xb0b1gtJVbRPWv7FOezcgOA00Mi0jP8XqC3y7jOQxpsGs/9zLKHPitA=="
   },
   "license": {
     "spdx": "MIT",
-    "declaration": "manifest",
     "evidence": [
       {
         "path": "LICENSE.md",
@@ -24,6 +23,7 @@
   },
   "scopes": [
     "LICENSE.md",
+    "integrations/tests",
     "lib",
     "package.json",
     "tsconfig.json",
@@ -36,6 +36,11 @@
       "fromRoot": "lib",
       "toRoot": "tests/upstream",
       "include": "(?:\\.test\\.tsx?$|(?:global/test|test|utils/test)/.*\\.ts$)"
+    },
+    {
+      "fromRoot": "integrations/tests/src",
+      "toRoot": "tests/upstream/browser/src",
+      "include": "^(?:components/.*\\.tsx|utils/serializer/(?:decode|types)\\.ts)$"
     }
   ],
   "adaptedRewrites": [
@@ -50,9 +55,295 @@
     {
       "find": "from \"@testing-library/react\"",
       "replace": "from \"@octanejs/testing-library\""
+    },
+    {
+      "find": "from \"react-dom\"",
+      "replace": "from \"octane\""
+    },
+    {
+      "find": "from \"react-resizable-panels\"",
+      "replace": "from \"@octanejs/resizable-panels\""
+    },
+    {
+      "find": "import type { PropsWithChildren } from \"octane\";",
+      "replace": "import type { PropsWithChildren } from \"react-lib-tools\";"
+    },
+    {
+      "find": "import { type PropsWithChildren } from \"octane\";",
+      "replace": "import type { PropsWithChildren } from \"react-lib-tools\";"
+    },
+    {
+      "find": ", type PropsWithChildren } from \"octane\";",
+      "replace": " } from \"octane\";\nimport type { PropsWithChildren } from \"react-lib-tools\";"
+    },
+    {
+      "find": "import {\n  Activity,\n  useState,\n  type PropsWithChildren,\n  type ReactNode\n} from \"octane\";",
+      "replace": "import { Activity, useState, type OctaneNode } from \"octane\";"
+    },
+    {
+      "find": "type PropsWithChildren, ",
+      "replace": ""
+    },
+    {
+      "find": "ReactNode",
+      "replace": "OctaneNode"
+    },
+    {
+      "find": "ReactElement",
+      "replace": "ElementDescriptor"
+    },
+    {
+      "prepend": "import type { PropsWithChildren } from \"react-lib-tools\";\n",
+      "include": "^tests/upstream/browser/src/(?:components/DisplayModeToggle\\.tsx|utils/serializer/encode\\.ts)$"
+    },
+    {
+      "find": "import { createElement, type ElementDescriptor } from \"octane\";",
+      "replace": "import { createElement, type OctaneNode } from \"octane\";"
+    },
+    {
+      "find": ": ElementDescriptor<unknown>",
+      "replace": ": OctaneNode"
+    },
+    {
+      "find": ": ElementDescriptor<PanelProps>",
+      "replace": ": OctaneNode"
+    },
+    {
+      "find": ": ElementDescriptor<SeparatorProps>",
+      "replace": ": OctaneNode"
+    },
+    {
+      "find": ": ElementDescriptor<TextProps>",
+      "replace": ": OctaneNode"
+    },
+    {
+      "find": ": ElementDescriptor<ClickableProps>",
+      "replace": ": OctaneNode"
+    },
+    {
+      "find": "GroupProps & {\n    className?: string | undefined;\n  }",
+      "replace": "GroupProps"
+    },
+    {
+      "find": "SeparatorProps & {\n    className?: string | undefined;\n  }",
+      "replace": "SeparatorProps"
+    },
+    {
+      "prepend": "/** @jsxImportSource octane */\n",
+      "include": "^tests/upstream/browser/.*\\.tsx$"
     }
   ],
   "files": [
+    {
+      "path": "integrations/tests/package.json",
+      "gitBlob": "48bed6a6850cb984e6dd4ad48e40768bb7bf1a0c",
+      "size": 726
+    },
+    {
+      "path": "integrations/tests/playwright.config.ts",
+      "gitBlob": "ea7f0e10c30b8f5190e06cf5e6bdd900ccccc8a5",
+      "size": 692
+    },
+    {
+      "path": "integrations/tests/src/components/Clickable.tsx",
+      "gitBlob": "7a2a2499f174f7c7216baf37d475b61c69e64ef0",
+      "size": 1455
+    },
+    {
+      "path": "integrations/tests/src/components/Container.tsx",
+      "gitBlob": "9d0059b2f83ae91f1b3cb5d4352db127a78ad0d3",
+      "size": 262
+    },
+    {
+      "path": "integrations/tests/src/components/DebugData.tsx",
+      "gitBlob": "37bf11da46c3b8397bb8c6bd8a9cab0667a01250",
+      "size": 522
+    },
+    {
+      "path": "integrations/tests/src/components/Decoder.tsx",
+      "gitBlob": "770d95dd6878c934f080ce8b6fd3d91f6484ff87",
+      "size": 5389
+    },
+    {
+      "path": "integrations/tests/src/components/DisplayModeToggle.tsx",
+      "gitBlob": "918c20c2ad64ae63eb3043ebf909a228ad4b6c10",
+      "size": 1210
+    },
+    {
+      "path": "integrations/tests/src/components/Group.tsx",
+      "gitBlob": "e53917f750490baa6a6bbf719946b8de207d78dd",
+      "size": 435
+    },
+    {
+      "path": "integrations/tests/src/components/IFrame.tsx",
+      "gitBlob": "4aa4f97445b14f04f44560d2164ab8b641ddb1d8",
+      "size": 232
+    },
+    {
+      "path": "integrations/tests/src/components/LayoutShiftDetecter.tsx",
+      "gitBlob": "112ee559e9d8c010e310849426f75fa6f5d6e62f",
+      "size": 1228
+    },
+    {
+      "path": "integrations/tests/src/components/Panel.tsx",
+      "gitBlob": "280e98ba3bde22def5f61f26d638447bbc031b76",
+      "size": 1327
+    },
+    {
+      "path": "integrations/tests/src/components/PanelText.tsx",
+      "gitBlob": "78b7f70ce7a3aebe0bc877979e7e539dedc47514",
+      "size": 242
+    },
+    {
+      "path": "integrations/tests/src/components/PopupWindow.tsx",
+      "gitBlob": "a3d1f213ed1b0fee851e1dd00962ddecf56c8f6f",
+      "size": 1980
+    },
+    {
+      "path": "integrations/tests/src/components/Separator.tsx",
+      "gitBlob": "e4831f8f0f219c14e4dd1eb057e883b081f9f94c",
+      "size": 821
+    },
+    {
+      "path": "integrations/tests/src/index.ts",
+      "gitBlob": "0d26ca3d8749edb4dd53d9ce6b62094c3adf559f",
+      "size": 120
+    },
+    {
+      "path": "integrations/tests/src/utils/assertLayoutChangeCounts.ts",
+      "gitBlob": "e9c3e7a7d880097afd7bf1838633c8fb5f1c1aee",
+      "size": 417
+    },
+    {
+      "path": "integrations/tests/src/utils/calculateBoxBetween.ts",
+      "gitBlob": "5260aa0d9dec31af70d4e9e651842158b0695bdb",
+      "size": 423
+    },
+    {
+      "path": "integrations/tests/src/utils/calculateHitArea.ts",
+      "gitBlob": "7fb44044fa8fa529f30f8d70d507ee871f0f07c8",
+      "size": 457
+    },
+    {
+      "path": "integrations/tests/src/utils/debugging/logDebugState.ts",
+      "gitBlob": "20a3171c3df69c725ff167bc1a964ae4a3d13393",
+      "size": 337
+    },
+    {
+      "path": "integrations/tests/src/utils/debugging/logGroup.ts",
+      "gitBlob": "a6bba12dc3a9b1bb19ad0e19bdbc48b475b84d04",
+      "size": 195
+    },
+    {
+      "path": "integrations/tests/src/utils/expectLayout.ts",
+      "gitBlob": "187cd2bdc7afd10ab2d33b352b0ca25602f0144d",
+      "size": 526
+    },
+    {
+      "path": "integrations/tests/src/utils/expectPanelSize.ts",
+      "gitBlob": "16884e143b7fc037582a76d60e8c4534e6975e0c",
+      "size": 616
+    },
+    {
+      "path": "integrations/tests/src/utils/getCenterCoordinates.ts",
+      "gitBlob": "4fb1d34de2a981bc37eeb70576572898906d7633",
+      "size": 190
+    },
+    {
+      "path": "integrations/tests/src/utils/getSeparatorAriaAttributes.ts",
+      "gitBlob": "067a4d99c7c4ebb16537f3995044b71f1c054af2",
+      "size": 585
+    },
+    {
+      "path": "integrations/tests/src/utils/goToUrl.ts",
+      "gitBlob": "fde97d88f8290780ef443d20b4928817b2a0874a",
+      "size": 1780
+    },
+    {
+      "path": "integrations/tests/src/utils/goToUrlWithIframe.ts",
+      "gitBlob": "12e6fd2cf122177a8b45f7bb7f8edf90882c792c",
+      "size": 660
+    },
+    {
+      "path": "integrations/tests/src/utils/pointer-interactions/resizeHelper.ts",
+      "gitBlob": "2312c78ddefa972dcec00dccf23f08e6c82470b9",
+      "size": 750
+    },
+    {
+      "path": "integrations/tests/src/utils/serializer/decode.ts",
+      "gitBlob": "7b24de032157369dbf2fe0303f669bb10e336518",
+      "size": 4667
+    },
+    {
+      "path": "integrations/tests/src/utils/serializer/encode.ts",
+      "gitBlob": "ca4fb2533d6b2d35f7bbf64b1c8bbd075c65bb20",
+      "size": 5570
+    },
+    {
+      "path": "integrations/tests/src/utils/serializer/types.ts",
+      "gitBlob": "4d3c32bfbc3bd41b40b37fef03a821bba0fe503a",
+      "size": 1946
+    },
+    {
+      "path": "integrations/tests/src/utils/types.ts",
+      "gitBlob": "695e2eb83fd4fb77cb42355e399d5648db1a2416",
+      "size": 142
+    },
+    {
+      "path": "integrations/tests/src/utils/updateUrl.ts",
+      "gitBlob": "2b9eb1c3e515301f1f2fb31adaaedd437a182034",
+      "size": 715
+    },
+    {
+      "path": "integrations/tests/tests/cursor.spec.tsx",
+      "gitBlob": "102a1da9f6f60665fa53755252121fb59b902715",
+      "size": 15499
+    },
+    {
+      "path": "integrations/tests/tests/default-layout.spec.tsx",
+      "gitBlob": "44503907d0c09e897caedea7f51546bd13c65df1",
+      "size": 1672
+    },
+    {
+      "path": "integrations/tests/tests/default-sizes.spec.tsx",
+      "gitBlob": "eebfa618d7e16bab4fc069f70b73dd161d1da1d3",
+      "size": 2793
+    },
+    {
+      "path": "integrations/tests/tests/fixed-size-elements.spec.tsx",
+      "gitBlob": "6a8b03b6741cf76f4c1488858ac85c48525d9927",
+      "size": 4288
+    },
+    {
+      "path": "integrations/tests/tests/imperative-api-hooks.spec.tsx",
+      "gitBlob": "21f4d11ee1297e185f6bce0ed137b3fc047ea0c6",
+      "size": 1699
+    },
+    {
+      "path": "integrations/tests/tests/keyboard-interactions.spec.tsx",
+      "gitBlob": "f13e40173da949a86fc682c80803b1f79e204a90",
+      "size": 10566
+    },
+    {
+      "path": "integrations/tests/tests/pointer-interactions.spec.tsx",
+      "gitBlob": "12c8c3b0dd0b5e5691c750f57392a3217d384f2f",
+      "size": 25400
+    },
+    {
+      "path": "integrations/tests/tests/resize-events.spec.tsx",
+      "gitBlob": "ae84dee557fae4214ba23f32a539676d1e1d0676",
+      "size": 6268
+    },
+    {
+      "path": "integrations/tests/tests/stacking-order.spec.tsx",
+      "gitBlob": "22ffcb6ac0435a59615d6f9321eb2f75b35b7c0a",
+      "size": 4688
+    },
+    {
+      "path": "integrations/tests/tests/visibility.spec.tsx",
+      "gitBlob": "fa56efd8f93bcd40608f7cede9ce2c2aa442498d",
+      "size": 2905
+    },
     {
       "path": "lib/components/group/auto-save/getStorageKey.ts",
       "gitBlob": "10d635ae4388b63f80a48201d329bcaaf9d57f44",
@@ -160,13 +451,13 @@
     },
     {
       "path": "lib/components/separator/Separator.test.tsx",
-      "gitBlob": "fc81d806a16d339097985b84f1f7e2776256a6fd",
-      "size": 4626
+      "gitBlob": "d59ff8214814e43f82e6157e5c7924f09f57e26d",
+      "size": 6157
     },
     {
       "path": "lib/components/separator/Separator.tsx",
-      "gitBlob": "a63ff1aee43fef67e933e1f592fa1b2d0fb71d20",
-      "size": 6047
+      "gitBlob": "518b1125b01f5946dd5edceda2da5f58a71c2854",
+      "size": 6446
     },
     {
       "path": "lib/components/separator/types.ts",
@@ -194,9 +485,14 @@
       "size": 577
     },
     {
+      "path": "lib/global/cursor/updateCursorStyle.test.ts",
+      "gitBlob": "0fb0924d956ef61c92e49aef847325ad31fb98d1",
+      "size": 1958
+    },
+    {
       "path": "lib/global/cursor/updateCursorStyle.ts",
-      "gitBlob": "db10403dccfca3be9185ef554a7df92e5b571366",
-      "size": 2239
+      "gitBlob": "b5894668058f4f4486ed64c15e18f5c9fd813d98",
+      "size": 2182
     },
     {
       "path": "lib/global/dom/calculateAvailableGroupSize.test.ts",
@@ -250,8 +546,8 @@
     },
     {
       "path": "lib/global/event-handlers/onDocumentPointerMove.ts",
-      "gitBlob": "71cb257bd39d08cec16a68e92a04844310c89c82",
-      "size": 2900
+      "gitBlob": "41d9b12e95eb6d60627483f32bc6321e9113bb5d",
+      "size": 3210
     },
     {
       "path": "lib/global/event-handlers/onDocumentPointerOut.ts",
@@ -265,8 +561,8 @@
     },
     {
       "path": "lib/global/mountGroup.ts",
-      "gitBlob": "cf7c53e4b028b8f6f81648a916743e39a415a79f",
-      "size": 8373
+      "gitBlob": "c895df23362170ed9be01b7e5d2ef8eb3f2001f0",
+      "size": 8402
     },
     {
       "path": "lib/global/mutable-state/groups.ts",
@@ -385,8 +681,8 @@
     },
     {
       "path": "lib/global/utils/completeActivePointerResize.ts",
-      "gitBlob": "937a3312ebaa105836c0d9019ebf3196d24acdc9",
-      "size": 1237
+      "gitBlob": "38bde1e06cdf86856b1e45cd23878d7e4cd419d4",
+      "size": 1552
     },
     {
       "path": "lib/global/utils/doRectsIntersect.test.ts",
@@ -500,13 +796,23 @@
     },
     {
       "path": "lib/global/utils/objectsEqual.test.ts",
-      "gitBlob": "d5cfcd819314232951e2b602705ea20d7568a1ba",
-      "size": 537
+      "gitBlob": "d9795d8f40d063a4bf721bae5fc19aa313979cbd",
+      "size": 625
     },
     {
       "path": "lib/global/utils/objectsEqual.ts",
       "gitBlob": "6f6b771d02814c3746bef707dbe88879ba075433",
       "size": 292
+    },
+    {
+      "path": "lib/global/utils/panelConstraintsEqual.test.ts",
+      "gitBlob": "2d05b260f004ce7c9b012f1913792313d98c78f6",
+      "size": 1956
+    },
+    {
+      "path": "lib/global/utils/panelConstraintsEqual.ts",
+      "gitBlob": "bce2284dbdfcb0076585c0f7ff5fae2d3b2a2e46",
+      "size": 337
     },
     {
       "path": "lib/global/utils/preserveFixedPanelSizes.ts",
@@ -665,7 +971,7 @@
     },
     {
       "path": "package.json",
-      "gitBlob": "ccbddff4921ab71c193cbc66cb5acdedc7e7a955",
+      "gitBlob": "136fef7265430f1065d2467b892fb0147ac9b1c3",
       "size": 4411
     },
     {
@@ -689,5 +995,5 @@
       "size": 2170
     }
   ],
-  "fingerprint": "1fa5790f19b5bfdfe68debf6ef2e2f8bd5a76b90ee5e61e40c078b70aece25e4"
+  "fingerprint": "a40ab9d4f47c0d4d3029be22498fe02d25b258f4095136d67478b18fb160bddc"
 }

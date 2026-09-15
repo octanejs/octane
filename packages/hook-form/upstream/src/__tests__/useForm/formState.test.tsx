@@ -14,7 +14,17 @@ import type { Control, FormState, UseFormGetFieldState } from '../../types';
 import { useController } from '../../useController';
 import { useFieldArray } from '../../useFieldArray';
 import { useForm } from '../../useForm';
+import { useFormState } from '../../useFormState';
 import noop from '../../utils/noop';
+
+// Activity is a React 19.2+ API. Only run Activity-dependent tests when the
+// installed React actually provides it.
+const Activity = (React as unknown as { Activity?: unknown })
+  .Activity as React.ComponentType<{
+  mode: 'hidden' | 'visible';
+  children?: React.ReactNode;
+}>;
+const itWithActivity = Activity ? it : it.skip;
 
 describe('formState', () => {
   describe('isValid', () => {
@@ -268,6 +278,124 @@ describe('formState', () => {
       await waitFor(() => expect(screen.getByText('valid')).toBeVisible());
       jest.useRealTimers();
     });
+
+    it('should not let a stale whole-form validity check overwrite a newer one', async () => {
+      type FormValues = {
+        username: string;
+        bio: string;
+      };
+
+      const pending: Array<(valid: boolean) => void> = [];
+
+      const App = () => {
+        const {
+          register,
+          formState: { isValid },
+        } = useForm<FormValues>({
+          mode: 'onChange',
+        });
+
+        return (
+          <form>
+            <input
+              data-testid="username"
+              {...register('username', {
+                validate: () =>
+                  new Promise<boolean>((resolve) => {
+                    pending.push(resolve);
+                  }),
+              })}
+            />
+            <input data-testid="bio" {...register('bio')} />
+            <p>{isValid ? 'valid' : 'invalid'}</p>
+          </form>
+        );
+      };
+
+      render(<App />);
+
+      // mount starts the first (soon-to-be-stale) whole-form validity check,
+      // which is waiting on username's validate() to resolve
+      await waitFor(() => expect(pending.length).toBe(1));
+
+      // bio has no validation rules of its own, so this re-triggers another
+      // whole-form validity check while the mount-time one is still pending
+      fireEvent.change(screen.getByTestId('bio'), {
+        target: { value: 'hello' },
+      });
+
+      await waitFor(() => expect(pending.length).toBe(2));
+
+      // the newer check resolves first, correctly reporting the form valid
+      await act(async () => {
+        pending[1](true);
+      });
+      await waitFor(() => expect(screen.getByText('valid')).toBeVisible());
+
+      // the mount-time check was superseded, but its own validate() call
+      // was never told to stop; it resolves after and reports invalid.
+      // Flush with a real macrotask (not just act's microtask draining) so
+      // a stale commit has every chance to land before the final assertion.
+      await act(async () => {
+        pending[0](false);
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+
+      expect(screen.getByText('valid')).toBeVisible();
+    });
+
+    it('should not let a stale resolver pass report isValidating as false while a newer one is pending', async () => {
+      type FormValues = {
+        username: string;
+      };
+
+      const pending: Array<() => void> = [];
+
+      const App = () => {
+        const {
+          register,
+          resetField,
+          formState: { isValid, isValidating },
+        } = useForm<FormValues>({
+          mode: 'onChange',
+          resolver: async () =>
+            new Promise((resolve) => {
+              pending.push(() => resolve({ values: {}, errors: {} }));
+            }),
+        });
+        void isValid;
+
+        return (
+          <div>
+            <input data-testid="username" {...register('username')} />
+            <button type="button" onClick={() => resetField('username')}>
+              reset
+            </button>
+            <p>{isValidating ? 'validating' : 'idle'}</p>
+          </div>
+        );
+      };
+
+      render(<App />);
+
+      // mount fires the first (soon-to-be-superseded) resolver pass, via
+      // _setValid's own resolver branch
+      await waitFor(() => expect(pending.length).toBe(1));
+      await waitFor(() => expect(screen.getByText('validating')).toBeVisible());
+
+      // resetField also calls _setValid directly (not onChange's separate
+      // resolver path), firing a second, overlapping pass
+      fireEvent.click(screen.getByText('reset'));
+      await waitFor(() => expect(pending.length).toBe(2));
+
+      // only the FIRST (now-superseded) pass resolves; the second, current
+      // pass is still in flight
+      await act(async () => {
+        pending[0]();
+      });
+
+      expect(screen.getByText('validating')).toBeVisible();
+    });
   });
 
   it('should be a proxy object that returns undefined for unknown properties', () => {
@@ -365,6 +493,262 @@ describe('formState', () => {
       render(<Component />);
 
       expect(await screen.findByText('nope')).toBeVisible();
+    });
+
+    // Mirrors e2e/useFormState.spec.ts › "should subscribed to the form
+    // state without re-render the root". reset() must not let a validity
+    // recompute triggered by the root's own re-render (queued when
+    // _state.mount is reset) clobber isValid with a value computed against
+    // the just-reset, now-empty fields.
+    it('should end with isValid: true after reset() (matches e2e test baseline expectation)', async () => {
+      let renderCounter = 0;
+
+      type FormInputs = {
+        firstName: string;
+        lastName: string;
+        min: string;
+        max: string;
+        minDate: string;
+        maxDate: string;
+        minLength: string;
+        minRequiredLength: string;
+        selectNumber: string;
+        pattern: string;
+        nestItem: {
+          nest1: string;
+        };
+        arrayItem: {
+          test1: string;
+        }[];
+      };
+
+      const SubForm = ({ control }: { control: Control<FormInputs> }) => {
+        const {
+          isDirty,
+          dirtyFields,
+          touchedFields,
+          isSubmitted,
+          isSubmitSuccessful,
+          submitCount,
+          isValid,
+        } = useFormState({
+          control,
+        });
+
+        return (
+          <p id="state">
+            {JSON.stringify({
+              isDirty,
+              touched: Object.keys(touchedFields),
+              dirty: Object.keys(dirtyFields),
+              isSubmitted,
+              isSubmitSuccessful,
+              submitCount,
+              isValid,
+            })}
+          </p>
+        );
+      };
+
+      const App: React.FC = () => {
+        const {
+          register,
+          handleSubmit,
+          control,
+          reset: resetForm,
+        } = useForm<FormInputs>({
+          mode: 'onChange',
+        });
+        const onValid = () => {};
+
+        renderCounter++;
+
+        return (
+          <form onSubmit={handleSubmit(onValid)}>
+            <input
+              placeholder="nest.nest1"
+              {...register('nestItem.nest1', { required: true })}
+            />
+            <input
+              placeholder="arrayItem.0.test1"
+              {...register('arrayItem.0.test1', { required: true })}
+            />
+            <input
+              {...register('firstName', { required: true })}
+              placeholder="firstName"
+            />
+            <input
+              {...register('lastName', { required: true, maxLength: 5 })}
+              placeholder="lastName"
+            />
+            <input
+              type="number"
+              {...register('min', { min: 10 })}
+              placeholder="min"
+            />
+            <input
+              type="number"
+              {...register('max', { max: 20 })}
+              placeholder="max"
+            />
+            <input
+              type="date"
+              {...register('minDate', { min: '2019-08-01' })}
+              placeholder="minDate"
+            />
+            <input
+              type="date"
+              {...register('maxDate', { max: '2019-08-01' })}
+              placeholder="maxDate"
+            />
+            <input
+              {...register('minLength', { minLength: 2 })}
+              placeholder="minLength"
+            />
+            <input
+              {...register('minRequiredLength', {
+                minLength: 2,
+                required: true,
+              })}
+              placeholder="minRequiredLength"
+            />
+            <select {...register('selectNumber', { required: true })}>
+              <option value="">Select</option>
+              <option value={1}>1</option>
+              <option value={2}>1</option>
+            </select>
+            <input
+              {...register('pattern', { pattern: /\d+/ })}
+              placeholder="pattern"
+            />
+            <button id="submit">Submit</button>
+            <button type="button" id="resetForm" onClick={() => resetForm()}>
+              Reset
+            </button>
+            <div id="renderCount">{renderCounter}</div>
+            <SubForm control={control} />
+          </form>
+        );
+      };
+
+      const type = async (el: HTMLElement, text: string) => {
+        for (const char of text) {
+          fireEvent.focus(el);
+          fireEvent.input(el, {
+            target: { value: (el as HTMLInputElement).value + char },
+          });
+
+          await act(async () => {});
+        }
+      };
+
+      const getState = () =>
+        JSON.parse(screen.getByText(/isValid/).textContent!);
+
+      render(<App />);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Submit' }));
+      await act(async () => {});
+
+      await type(screen.getByPlaceholderText('firstName'), 'bill');
+      await type(screen.getByPlaceholderText('firstName'), 'a');
+      await type(screen.getByPlaceholderText('arrayItem.0.test1'), 'ab');
+      await type(screen.getByPlaceholderText('nest.nest1'), 'ab');
+      await type(screen.getByPlaceholderText('lastName'), 'luo123456');
+
+      fireEvent.focus(screen.getByRole('combobox'));
+      fireEvent.change(screen.getByRole('combobox'), {
+        target: { value: '1' },
+      });
+      fireEvent.blur(screen.getByRole('combobox'));
+      await act(async () => {});
+
+      await type(screen.getByPlaceholderText('pattern'), 'luo');
+      await type(screen.getByPlaceholderText('min'), '1');
+      await type(screen.getByPlaceholderText('max'), '21');
+      fireEvent.input(screen.getByPlaceholderText('minDate'), {
+        target: { value: '2019-07-30' },
+      });
+      await act(async () => {});
+      fireEvent.input(screen.getByPlaceholderText('maxDate'), {
+        target: { value: '2019-08-02' },
+      });
+      await act(async () => {});
+
+      fireEvent.input(screen.getByPlaceholderText('lastName'), {
+        target: { value: '' },
+      });
+      await act(async () => {});
+      await type(screen.getByPlaceholderText('lastName'), 'luo');
+      await type(screen.getByPlaceholderText('minLength'), 'b');
+      fireEvent.blur(screen.getByPlaceholderText('minLength'));
+      await act(async () => {});
+
+      await waitFor(() => {
+        expect(getState()).toEqual(
+          expect.objectContaining({
+            isSubmitted: true,
+            isSubmitSuccessful: false,
+            submitCount: 1,
+          }),
+        );
+      });
+
+      await type(screen.getByPlaceholderText('pattern'), '23');
+      await type(screen.getByPlaceholderText('minLength'), 'bi');
+      await type(screen.getByPlaceholderText('minRequiredLength'), 'bi');
+      fireEvent.input(screen.getByPlaceholderText('min'), {
+        target: { value: '' },
+      });
+      await act(async () => {});
+      await type(screen.getByPlaceholderText('min'), '11');
+      fireEvent.input(screen.getByPlaceholderText('max'), {
+        target: { value: '' },
+      });
+      await act(async () => {});
+      await type(screen.getByPlaceholderText('max'), '19');
+      fireEvent.input(screen.getByPlaceholderText('minDate'), {
+        target: { value: '2019-08-01' },
+      });
+      await act(async () => {});
+      fireEvent.input(screen.getByPlaceholderText('maxDate'), {
+        target: { value: '2019-08-01' },
+      });
+      await act(async () => {});
+
+      await waitFor(() => {
+        expect(getState()).toEqual(expect.objectContaining({ isValid: true }));
+      });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Submit' }));
+      await act(async () => {});
+
+      await waitFor(() => {
+        expect(getState()).toEqual(
+          expect.objectContaining({
+            isSubmitSuccessful: true,
+            submitCount: 2,
+            isValid: true,
+          }),
+        );
+      });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Reset' }));
+      await act(async () => {});
+
+      await waitFor(() => {
+        expect(getState()).toEqual(
+          expect.objectContaining({
+            isDirty: false,
+            touched: [],
+            dirty: [],
+            isSubmitted: false,
+            isSubmitSuccessful: false,
+            submitCount: 0,
+            isValid: true,
+          }),
+        );
+      });
     });
   });
 
@@ -712,6 +1096,40 @@ describe('formState', () => {
     expect(dirtyFieldsState).toEqual({});
   });
 
+  it('should mark an array-valued registered field dirty as a boolean rather than diffing its elements (#13584)', async () => {
+    function App() {
+      const {
+        register,
+        formState: { isDirty, dirtyFields },
+      } = useForm({
+        defaultValues: { fruits: [] as string[] },
+      });
+
+      return (
+        <div>
+          <select multiple {...register('fruits')}>
+            <option value="apple">apple</option>
+            <option value="banana">banana</option>
+          </select>
+          <p>{isDirty ? 'dirty' : 'notDirty'}</p>
+          <p>{JSON.stringify(dirtyFields)}</p>
+        </div>
+      );
+    }
+
+    render(<App />);
+
+    const select = screen.getAllByRole('listbox')[0] as HTMLSelectElement;
+
+    await act(async () => {
+      select.options[0].selected = true;
+      fireEvent.change(select);
+    });
+
+    expect(await screen.findByText('dirty')).toBeVisible();
+    expect(screen.getByText(JSON.stringify({ fruits: true }))).toBeVisible();
+  });
+
   it('should update isDirty with getFieldState at child component', () => {
     type FormValues = {
       test?: string;
@@ -844,6 +1262,57 @@ describe('formState', () => {
 
     await screen.getByText('notDirty');
     await screen.getByText('0');
+  });
+
+  it('should mark field and form as dirty with setValue shouldDirty when the form is disabled', () => {
+    const { result } = renderHook(() =>
+      useForm({
+        disabled: true,
+        defaultValues: {
+          test: 'a',
+        },
+      }),
+    );
+
+    result.current.formState.isDirty;
+    result.current.formState.dirtyFields;
+
+    act(() => {
+      result.current.register('test');
+      result.current.setValue('test', 'b', { shouldDirty: true });
+    });
+
+    expect(result.current.getFieldState('test').isDirty).toBe(true);
+    expect(result.current.formState.isDirty).toBe(true);
+    expect(result.current.formState.dirtyFields).toEqual({ test: true });
+  });
+
+  it('should clear dirty state when setValue restores the default value on a disabled form', () => {
+    const { result } = renderHook(() =>
+      useForm({
+        disabled: true,
+        defaultValues: {
+          test: 'a',
+        },
+      }),
+    );
+
+    result.current.formState.isDirty;
+    result.current.formState.dirtyFields;
+
+    act(() => {
+      result.current.register('test');
+      result.current.setValue('test', 'b', { shouldDirty: true });
+    });
+
+    expect(result.current.formState.isDirty).toBe(true);
+
+    act(() => {
+      result.current.setValue('test', 'a', { shouldDirty: true });
+    });
+
+    expect(result.current.getFieldState('test').isDirty).toBe(false);
+    expect(result.current.formState.isDirty).toBe(false);
   });
 
   describe('when delay config is set', () => {
@@ -1052,6 +1521,124 @@ describe('formState', () => {
 
         expect(await screen.findByText(message)).toBeVisible();
       });
+
+      it('should delay, show immediately, or cancel error via setValue depending on delayError option', async () => {
+        jest.useFakeTimers();
+
+        const message = 'required.';
+
+        const App = () => {
+          const {
+            register,
+            setValue,
+            formState: { errors },
+          } = useForm<{ test: string }>({
+            delayError: 500,
+          });
+
+          return (
+            <div>
+              <input {...register('test', { maxLength: 4 })} />
+              {errors.test && <p>{message}</p>}
+              <button
+                data-testid="delayed"
+                onClick={() =>
+                  setValue('test', '123456', {
+                    shouldValidate: true,
+                    delayError: true,
+                  })
+                }
+              />
+              <button
+                data-testid="immediate"
+                onClick={() =>
+                  setValue('test', '123456', { shouldValidate: true })
+                }
+              />
+              <button
+                data-testid="valid"
+                onClick={() =>
+                  setValue('test', '12', {
+                    shouldValidate: true,
+                    delayError: true,
+                  })
+                }
+              />
+            </div>
+          );
+        };
+
+        render(<App />);
+
+        await act(async () => {
+          fireEvent.click(screen.getByTestId('delayed'));
+        });
+        expect(screen.queryByText(message)).not.toBeInTheDocument();
+
+        await act(async () => {
+          jest.advanceTimersByTime(500);
+        });
+        expect(await screen.findByText(message)).toBeVisible();
+
+        await act(async () => {
+          fireEvent.click(screen.getByTestId('delayed'));
+        });
+        expect(screen.queryByText(message)).not.toBeInTheDocument();
+
+        await act(async () => {
+          fireEvent.click(screen.getByTestId('valid'));
+        });
+        await act(async () => {
+          jest.advanceTimersByTime(500);
+        });
+        expect(screen.queryByText(message)).not.toBeInTheDocument();
+
+        await act(async () => {
+          fireEvent.click(screen.getByTestId('immediate'));
+        });
+        expect(await screen.findByText(message)).toBeVisible();
+
+        jest.useRealTimers();
+      });
+
+      it('should show error immediately when form-level delayError is not configured', async () => {
+        jest.useFakeTimers();
+
+        const message = 'required.';
+
+        const App = () => {
+          const {
+            register,
+            setValue,
+            formState: { errors },
+          } = useForm<{ test: string }>();
+
+          return (
+            <div>
+              <input {...register('test', { maxLength: 4 })} />
+              {errors.test && <p>{message}</p>}
+              <button
+                data-testid="trigger"
+                onClick={() =>
+                  setValue('test', '123456', {
+                    shouldValidate: true,
+                    delayError: true,
+                  })
+                }
+              />
+            </div>
+          );
+        };
+
+        render(<App />);
+
+        await act(async () => {
+          fireEvent.click(screen.getByTestId('trigger'));
+        });
+        expect(await screen.findByText(message)).toBeVisible();
+
+        jest.useRealTimers();
+      });
     });
   });
 
@@ -1254,5 +1841,84 @@ describe('formState', () => {
 
     expect(refAfterFirstError).not.toBe(refAfterCleared);
     expect(refAfterCleared).not.toBe(refAfterSecondError);
+  });
+
+  describe('with Activity', () => {
+    itWithActivity(
+      'should resync isSubmitting after Activity restoration when a submit resolves while hidden',
+      async () => {
+        type FormValues = { amount: string };
+
+        let resolveSubmit: () => void = () => {
+          throw new Error('Submit was not started.');
+        };
+
+        const ActivityContent = () => {
+          const { register, handleSubmit, formState } = useForm<FormValues>();
+
+          return (
+            <form
+              onSubmit={handleSubmit(
+                () =>
+                  new Promise<void>((resolve) => {
+                    resolveSubmit = resolve;
+                  }),
+              )}
+            >
+              <input {...register('amount')} />
+              <button
+                type="submit"
+                disabled={formState.isSubmitting}
+                data-testid="submit"
+              >
+                Review
+              </button>
+            </form>
+          );
+        };
+
+        const Component = () => {
+          const [mode, setMode] = React.useState<'hidden' | 'visible'>(
+            'visible',
+          );
+
+          return (
+            <>
+              <button type="button" onClick={() => setMode('hidden')}>
+                Hide
+              </button>
+              <button type="button" onClick={() => setMode('visible')}>
+                Show
+              </button>
+              <Activity mode={mode}>
+                <ActivityContent />
+              </Activity>
+            </>
+          );
+        };
+
+        render(<Component />);
+
+        await act(async () => {
+          fireEvent.submit(screen.getByTestId('submit').closest('form')!);
+          await Promise.resolve();
+        });
+
+        expect(screen.getByTestId('submit')).toBeDisabled();
+
+        // The parent hides the subtree while the submit is still in flight,
+        // matching the reported race in #13563.
+        fireEvent.click(screen.getByRole('button', { name: 'Hide' }));
+
+        await act(async () => {
+          resolveSubmit();
+          await Promise.resolve();
+        });
+
+        fireEvent.click(screen.getByRole('button', { name: 'Show' }));
+
+        expect(screen.getByTestId('submit')).not.toBeDisabled();
+      },
+    );
   });
 });

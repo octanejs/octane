@@ -10,12 +10,16 @@
     "noEmitOnError": true,
     "noErrorTruncation": true,
     "allowSyntheticDefaultImports": true,
-    "skipLibCheck": true,
+    "skipLibCheck": false,
     "verbatimModuleSyntax": true,
     "types": ["node"],
     "strict": true,
-    "jsxImportSource": "octane"
+    "jsxImportSource": "octane",
+    "allowImportingTsExtensions": true
   },
   "include": ["./src/"],
-  "exclude": ["node_modules", "dist", "tests"]
+  "exclude": ["node_modules", "dist", "tests"],
+  "reactPortEvidence": {
+    "gate": "authored-source-types"
+  }
 }

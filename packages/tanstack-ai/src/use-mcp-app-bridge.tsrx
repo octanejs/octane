@@ -8,7 +8,7 @@ import type {
 export type UseMcpAppBridgeOptions = CreateMcpAppBridgeOptions
 
 /**
- * Octane wrapper around `createMcpAppBridge` that returns a **stable** bridge for
+ * React wrapper around `createMcpAppBridge` that returns a **stable** bridge for
  * the given `threadId`/`callEndpoint`, while always invoking the latest
  * `chat.sendMessage` and `onLink` (kept in refs). This avoids both recreating
  * the bridge on every render and the stale-closure / `exhaustive-deps` dance
@@ -19,7 +19,7 @@ export type UseMcpAppBridgeOptions = CreateMcpAppBridgeOptions
  * const bridge = useMcpAppBridge({
  *   threadId,
  *   callEndpoint: '/api/mcp-apps-call',
- *   chat: { sendMessage: async (content) => void sendMessage(content) },
+ *   chat: { sendMessage: (content, body) => sendMessage(content, { body }) },
  *   onLink: (url) => window.open(url, '_blank', 'noopener,noreferrer'),
  * })
  * // pass `bridge` to <MCPAppResource bridge={bridge} … />

@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'octane/server';
-import { attachRouterServerSsrUtils } from '@tanstack/router-core/ssr/server';
+import { attachRouterServerSsrUtils, normalizeSsrResponse } from '@tanstack/router-core/ssr/server';
 import { getScrollRestorationScriptForRouter } from '@tanstack/router-core/scroll-restoration-script';
 import { RouterServer, renderRouterToStream, renderRouterToString } from '../../src/ssr/server';
+import { makeRouter } from '../_fixtures/basic.tsrx';
 import { makeSsrRouter } from '../_fixtures/ssr.tsrx';
 
 describe('@octanejs/tanstack-router SSR', () => {
@@ -154,14 +155,19 @@ describe('@octanejs/tanstack-router SSR', () => {
 		await router.load();
 		await router.serverSsr.dehydrate();
 
-		const response = await renderRouterToStream({
-			request: new Request('http://localhost/', {
-				headers: { 'user-agent': 'Mozilla/5.0' },
+		const { response } = normalizeSsrResponse(
+			await renderRouterToStream({
+				request: new Request('http://localhost/', {
+					headers: {
+						'user-agent':
+							'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+					},
+				}),
+				router,
+				responseHeaders: new Headers({ 'content-type': 'text/html' }),
+				App: RouterServer,
 			}),
-			router,
-			responseHeaders: new Headers({ 'content-type': 'text/html' }),
-			App: RouterServer,
-		});
+		);
 		const html = await response.text();
 		const doctype = html.indexOf('<!DOCTYPE html>');
 		const document = html.indexOf('<html');
@@ -178,4 +184,39 @@ describe('@octanejs/tanstack-router SSR', () => {
 		expect(html.slice(style, headClose)).toContain('nonce="octane-csp"');
 		expect(html.slice(style, headClose)).toContain('rgb(12, 34, 56)');
 	});
+});
+
+// Router core 1.171.29 exposes HTTP status on the response, not client RouterState.
+describe('finalized router HTTP statuses', () => {
+	for (const mode of ['buffered', 'streaming'] as const) {
+		it.each([
+			['/', 200],
+			['/load-failure', 500],
+			['/load-not-found', 404],
+		] as const)(`${mode} returns %s with status %s`, async (path, status) => {
+			const router = makeRouter(path);
+			router.isServer = true;
+			attachRouterServerSsrUtils({ router, manifest: undefined });
+			await router.load();
+			await router.serverSsr!.dehydrate();
+			const options = {
+				router,
+				responseHeaders: new Headers({ 'content-type': 'text/html' }),
+				App: RouterServer,
+			};
+			const result =
+				mode === 'buffered'
+					? await renderRouterToString(options)
+					: await renderRouterToStream({
+							...options,
+							request: new Request('http://localhost' + path),
+						});
+			const { response } = normalizeSsrResponse(result);
+			expect(response.status).toBe(status);
+			const html = await response.text();
+			expect(html).toContain(
+				status === 500 ? 'load failed' : status === 404 ? 'Not Found' : 'Index',
+			);
+		});
+	}
 });

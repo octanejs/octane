@@ -12,6 +12,7 @@ export function ScriptOnce(props: { children: string }) @{
 	@if ((isServer ?? router.isServer) || hydrating) {
 		<script
 			nonce={router.options.ssr?.nonce}
+			suppressHydrationWarning
 			dangerouslySetInnerHTML={{
 				__html: props.children,
 			}}

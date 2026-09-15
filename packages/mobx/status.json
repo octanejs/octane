@@ -1,22 +1,26 @@
 {
   "upstream": {
     "package": "mobx-react-lite",
-    "version": "4.1.1",
-    "core": "mobx@6.16.1"
+    "version": "5.0.3",
+    "core": "mobx@7.0.3"
   },
-  "surface": "The framework-independent MobX core is re-exported verbatim. The function-component binding includes observer, Observer, useObserver, useLocalObservable, enableStaticRendering, isUsingStaticRendering, and the deprecated useStaticRendering alias.",
+  "surface": "MobX 7 core re-exports plus observer, Observer, useLocalObservable, static-rendering controls, finalization utilities, and the retained useObserver/useStaticRendering aliases. Generic props, typed Maps, component statics, and native refs are preserved.",
   "divergences": [
     "React class components and the legacy mobx-react Provider/inject APIs are not included.",
     "forwardRef compatibility options are omitted because Octane uses refs as props.",
     "React-specific batching, prop-types validation, React DevTools integration, and useDebugValue output are omitted."
   ],
   "ssr": "enableStaticRendering(true) renders observed components without creating a Reaction or retaining observable subscriptions.",
-  "verified": "2026-08-02",
+  "verified": "2026-09-14",
   "provenance": {
     "source": "https://github.com/mobxjs/mobx",
     "license": "MIT",
-    "commit": "989de2d198e7a15c1fc1b981e1a96e50083ff2a0",
-    "verification": "recorded-unverified"
+    "commit": "5dbb04a15f7eb0ef6b844904c43955357a9bbdfc",
+    "verification": "verified"
   },
-  "notes": []
+  "notes": [
+    "Complete immutable and adapted runtime suites: 90 active cases and two pre-existing upstream skips.",
+    "Strict original/adapted source tests and public declarations, native callback/retention regressions, Chromium events and focus, SSR/hydration, and unmount cleanup.",
+    "The dependency now uses MobX 7. Applications importing mobx directly should use a compatible MobX 7 version."
+  ]
 }

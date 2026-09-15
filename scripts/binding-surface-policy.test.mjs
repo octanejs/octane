@@ -60,6 +60,37 @@ test('observed dependency and hook exports keep focused evidence without engine 
 	assert.deepEqual(scopeUpstreamInventory(policy, [{ path: 'tests/engine.test.ts' }]), []);
 });
 
+test('copied ownership accounts for every exported destructuring binding', (t) => {
+	const { root, write } = fixture(t);
+	const source = 'export const { button, other: named } = { button: 1, other: 2 };\n';
+	write('src/index.ts', source);
+	const surface = {
+		entrypoint: '.',
+		exports: ['button', 'named'],
+		ownership: 'copied',
+		files: ['src/index.ts'],
+		dependency: { package: 'engine', version: '1.0.0' },
+		upstreamPaths: ['src/'],
+		evidence: ['tests/consumer.test.ts'],
+	};
+	const sourceLedger = [
+		{
+			path: 'src/index.ts',
+			sha256: createHash('sha256').update(source).digest('hex'),
+			origin: 'adapted',
+			packageName: 'engine',
+		},
+	];
+	write('status.json', { surfaces: [surface] });
+	const policy = readBindingSurfacePolicy(root, { sourceLedger });
+	assert.equal(policy.valid, true, policy.issues.join('\n'));
+	assert.equal(policy.requiresCopiedEvidence, true);
+	write('status.json', { surfaces: [{ ...surface, exports: ['button'] }] });
+	const incomplete = readBindingSurfacePolicy(root, { sourceLedger });
+	assert.equal(incomplete.valid, false);
+	assert.ok(incomplete.issues.some((issue) => issue.includes('named: uncovered')));
+});
+
 test('default expression adapters are observed through named re-exports', (t) => {
 	const { root, write } = fixture(t);
 	write('src/index.ts', "export * from 'engine'; export { default as useEngine } from './hook';");

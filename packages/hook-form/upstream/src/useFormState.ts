@@ -9,35 +9,17 @@ import type {
 } from './types';
 import { useFormControlContext } from './useFormControlContext';
 import { useIsomorphicLayoutEffect } from './useIsomorphicLayoutEffect';
+import { useResyncOnReconnect } from './useResyncOnReconnect';
 
 /**
- * This custom hook allows you to subscribe to each form state, and isolate the re-render at the custom hook level. It has its scope in terms of form state subscription, so it would not affect other useFormState and useForm. Using this hook can reduce the re-render impact on large and complex form application.
+ * Subscribes to form state with re-renders isolated to this hook.
+ * Optionally scope to specific field names to minimize re-render surface.
  *
- * @remarks
- * [API](https://react-hook-form.com/docs/useformstate) • [Demo](https://codesandbox.io/s/useformstate-75xly)
- *
- * @param props - include options on specify fields to subscribe. {@link UseFormStateReturn}
+ * @see [API](https://react-hook-form.com/docs/useformstate)
  *
  * @example
  * ```tsx
- * function App() {
- *   const { register, handleSubmit, control } = useForm({
- *     defaultValues: {
- *     firstName: "firstName"
- *   }});
- *   const { dirtyFields } = useFormState({
- *     control
- *   });
- *   const onSubmit = (data) => console.log(data);
- *
- *   return (
- *     <form onSubmit={handleSubmit(onSubmit)}>
- *       <input {...register("firstName")} placeholder="First Name" />
- *       {dirtyFields.firstName && <p>Field is dirty.</p>}
- *       <input type="submit" />
- *     </form>
- *   );
- * }
+ * const { errors, isDirty } = useFormState({ control, name: "email" });
  * ```
  */
 export function useFormState<
@@ -48,17 +30,19 @@ export function useFormState<
 ): UseFormStateReturn<TFieldValues> {
   const formControl = useFormControlContext<
     TFieldValues,
-    any,
+    unknown,
     TTransformedValues
   >();
   const { control = formControl, disabled, name, exact } = props || {};
-  const [formState, updateFormState] = React.useState<FormState<TFieldValues>>(
-    () => ({
-      ...control._formState,
-      defaultValues:
-        control._defaultValues as FormState<TFieldValues>['defaultValues'],
-    }),
-  );
+
+  const getCurrentFormState = () => ({
+    ...control._formState,
+    defaultValues:
+      control._defaultValues as FormState<TFieldValues>['defaultValues'],
+  });
+
+  const [formState, updateFormState] =
+    React.useState<FormState<TFieldValues>>(getCurrentFormState);
   const _localProxyFormState = React.useRef({
     isDirty: false,
     isLoading: false,
@@ -70,24 +54,32 @@ export function useFormState<
     errors: false,
   });
 
-  useIsomorphicLayoutEffect(
-    () =>
-      control._subscribe({
-        name,
-        formState: _localProxyFormState.current,
-        exact,
-        callback: (formState) => {
-          !disabled &&
-            updateFormState({
-              ...control._formState,
-              ...formState,
-              defaultValues:
-                control._defaultValues as FormState<TFieldValues>['defaultValues'],
-            });
-        },
-      }),
-    [name, disabled, exact],
-  );
+  const { resyncIfNeeded, snapshot } =
+    useResyncOnReconnect<FormState<TFieldValues>>(getCurrentFormState);
+
+  useIsomorphicLayoutEffect(() => {
+    resyncIfNeeded(!disabled, getCurrentFormState, updateFormState);
+
+    const unsubscribe = control._subscribe({
+      name,
+      formState: _localProxyFormState.current,
+      exact,
+      callback: (formState) => {
+        !disabled &&
+          updateFormState({
+            ...control._formState,
+            ...formState,
+            defaultValues:
+              control._defaultValues as FormState<TFieldValues>['defaultValues'],
+          });
+      },
+    });
+
+    return () => {
+      unsubscribe();
+      snapshot(!disabled, getCurrentFormState);
+    };
+  }, [control, name, disabled, exact, resyncIfNeeded, snapshot]);
 
   React.useEffect(() => {
     _localProxyFormState.current.isValid && control._setValid(true);

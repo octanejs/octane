@@ -23,7 +23,7 @@ diff --git a/tests/upstream/logic/validateField.test.tsx b/tests/upstream/logic/
        value: 'test',
        isValid: true,
      }));
-@@ -1593,7 +1593,7 @@ describe('validateField', () => {
+@@ -1667,7 +1667,7 @@ describe('validateField', () => {
        },
      });
  
@@ -32,7 +32,7 @@ diff --git a/tests/upstream/logic/validateField.test.tsx b/tests/upstream/logic/
        return {
          isValid: false,
          value: 'test',
-@@ -1884,7 +1884,7 @@ describe('validateField', () => {
+@@ -1958,7 +1958,7 @@ describe('validateField', () => {
    });
  
    it('should return all validation errors', async () => {
@@ -41,7 +41,7 @@ diff --git a/tests/upstream/logic/validateField.test.tsx b/tests/upstream/logic/
        value: '',
      }));
  
-@@ -1963,7 +1963,7 @@ describe('validateField', () => {
+@@ -2037,7 +2037,7 @@ describe('validateField', () => {
    it('should handle pattern with g flag', async () => {
      const reusedRe = /a/g;
  
@@ -50,7 +50,7 @@ diff --git a/tests/upstream/logic/validateField.test.tsx b/tests/upstream/logic/
        value: '',
      }));
      expect(
-@@ -2038,7 +2038,7 @@ describe('validateField', () => {
+@@ -2112,7 +2112,7 @@ describe('validateField', () => {
    });
  
    it('should return all validation error messages', async () => {
@@ -59,7 +59,7 @@ diff --git a/tests/upstream/logic/validateField.test.tsx b/tests/upstream/logic/
        value: '',
      }));
      expect(
-@@ -2280,7 +2280,7 @@ describe('validateField', () => {
+@@ -2354,7 +2354,7 @@ describe('validateField', () => {
      });
  
      it('should invoke setCustomValidity on all refs for a required radio group', async () => {
@@ -68,7 +68,7 @@ diff --git a/tests/upstream/logic/validateField.test.tsx b/tests/upstream/logic/
          isValid: false,
          value: undefined,
        });
-@@ -2325,7 +2325,7 @@ describe('validateField', () => {
+@@ -2399,7 +2399,7 @@ describe('validateField', () => {
      });
  
      it('should clear setCustomValidity on all refs for a valid radio group', async () => {

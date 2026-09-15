@@ -13,7 +13,7 @@
       ]
     }
   },
-  "description": "Exact react-window 2.3.0 binding for Octane: virtualized List and Grid components, dynamic row measurement, imperative scrolling, SSR, and hydration.",
+  "description": "Exact react-window 2.3.1 binding for Octane: virtualized List and Grid components, dynamic row measurement, imperative scrolling, SSR, and hydration.",
   "author": {
     "name": "Dominic Gannaway",
     "email": "dg@domgan.com"
@@ -41,7 +41,7 @@
   },
   "scripts": {
     "adapted:generate": "node ../../scripts/react-port/materialize.mjs run --package-dir .",
-    "test": "pnpm upstream:verify && pnpm test:audit && node ../../scripts/react-parity/harness.mjs run-required --manifest packages/window/audit/react-parity.json",
+    "test": "pnpm upstream:verify && pnpm test:audit && vitest run --root ../.. --project window --project window-ssr --project window-feasibility && node ../../scripts/react-parity/harness.mjs run-required --manifest packages/window/audit/react-parity.json",
     "upstream:verify": "node tests/audit/verify-upstream.mjs",
     "test:audit": "node --test tests/audit/*.test.mjs",
     "test:types:pristine": "tsc --noEmit -p typetests/tsconfig.pristine.json",
@@ -63,7 +63,7 @@
     "octane": "workspace:*",
     "react": "catalog:default",
     "react-dom": "catalog:default",
-    "react-window": "2.3.0",
+    "react-window": "2.3.1",
     "vitest": "catalog:default"
   }
 }

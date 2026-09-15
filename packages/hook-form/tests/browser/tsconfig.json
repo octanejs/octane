@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "strict": true,
+    "skipLibCheck": false,
+    "types": []
+  },
+  "include": ["./main.ts", "../_fixtures/release-contracts.tsrx"],
+  "exclude": []
+}

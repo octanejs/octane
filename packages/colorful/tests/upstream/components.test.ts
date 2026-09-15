@@ -11,6 +11,7 @@ import {
 	InputHarness,
 	RgbHarness,
 	RgbaHarness,
+	RgbaStringHarness,
 } from './_fixtures/RuntimeHarness.tsrx';
 import {
 	interactive,
@@ -247,6 +248,35 @@ it('Changes alpha channel value after an interaction', async function changesAlp
 	mouse(alpha, 'mousedown', 105, 0);
 	settle();
 	expect(onChange).toHaveBeenCalledWith({ h: 100, s: 0, l: 0, a: 1 });
+});
+
+it("Doesn't change RGB channels when only alpha is changed", () => {
+	mockPickerGeometry();
+	const onChange = vi.fn();
+	const root = mountTracked(RgbaHarness, { color: { r: 200, g: 120, b: 35, a: 0.5 }, onChange });
+	const alpha = interactive(root, 'Alpha');
+	mouse(alpha, 'mousedown', 0, 0);
+	mouse(window, 'mousemove', 105, 0);
+	settle();
+	expect(onChange).toHaveBeenLastCalledWith({ r: 200, g: 120, b: 35, a: 1 });
+});
+
+it("Doesn't change RGB string channels when only alpha is changed", () => {
+	mockPickerGeometry();
+	const onChange = vi.fn();
+	const root = mountTracked(RgbaStringHarness, { color: 'rgba(200, 120, 35, 1)', onChange });
+	mouse(interactive(root, 'Alpha'), 'mousedown', 55, 0);
+	settle();
+	expect(onChange).toHaveBeenLastCalledWith('rgba(200, 120, 35, 0.5)');
+});
+
+it("Doesn't change HEX color channels when only alpha is changed", () => {
+	mockPickerGeometry();
+	const onChange = vi.fn();
+	const root = mountTracked(AlphaHarness, { color: '#c87823', onChange });
+	mouse(interactive(root, 'Alpha'), 'mousedown', 55, 0);
+	settle();
+	expect(onChange).toHaveBeenLastCalledWith('#c8782380');
 });
 
 it('Uses #rrggbbaa format if alpha channel value is less than 1', async function usesRrggbbaa() {

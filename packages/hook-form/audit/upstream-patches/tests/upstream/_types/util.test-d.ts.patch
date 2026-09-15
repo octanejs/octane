@@ -1,0 +1,9 @@
+diff --git a/tests/upstream/_types/util.test-d.ts b/tests/upstream/_types/util.test-d.ts
+--- a/tests/upstream/_types/util.test-d.ts
++++ b/tests/upstream/_types/util.test-d.ts
+@@ -1,4 +1,4 @@
+-import type { DeepPartial, ExtractObjects, IsAny, IsNever } from '../../src/types';
++import type { DeepPartial, ExtractObjects, IsAny, IsNever } from '../../../src/types';
+ 
+ import type { Equal, Expect } from './__fixtures__';
+ import { _ } from './__fixtures__';

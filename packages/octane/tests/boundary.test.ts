@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { flushSync } from 'octane';
+import { flushSync, startTransition } from 'octane';
 import { act, flushEffects, mount, nextPaint } from './_helpers';
 import {
 	SuspenseHost,
@@ -9,6 +9,8 @@ import {
 	ResetErrorHost,
 	RetainedResetErrorHost,
 	RetainedResetSuspenseHost,
+	ResetThenSuspendHost,
+	LiteralResetThenSuspendHost,
 	EffectErrorHost,
 	LifecycleErrorHost,
 	RefDetachErrorHost,
@@ -45,6 +47,95 @@ describe('<Suspense> component', () => {
 });
 
 describe('<ErrorBoundary> component', () => {
+	describe.each([
+		['dynamic', ResetThenSuspendHost],
+		['imported', LiteralResetThenSuspendHost],
+	] as const)('%s reset', (_name, Host) => {
+		it.each(['urgent', 'transition'] as const)(
+			'retains the committed fallback while a %s retry suspends',
+			async (priority) => {
+				let resolve!: (value: string) => void;
+				const promise = new Promise<string>((done) => (resolve = done));
+				const state = { failed: true };
+				const log: string[] = [];
+				const resetRef = { current: null };
+				const r = mount(Host, { state, promise, resetRef, log });
+				try {
+					const error = r.find('#retry-error') as HTMLButtonElement;
+					await act(() => {
+						state.failed = false;
+						if (priority === 'transition') startTransition(() => error.click());
+						else error.click();
+					});
+					expect(error.isConnected).toBe(true);
+					if (priority === 'urgent') {
+						expect(r.find('#retry-pending').textContent).toBe('pending');
+						expect(error.style.display).toBe('none');
+					} else {
+						expect(r.container.querySelector('#retry-pending')).toBeNull();
+						expect(error.style.display).not.toBe('none');
+					}
+					expect(log).toEqual([]);
+					await act(async () => {
+						resolve('ready');
+						await promise;
+					});
+					expect(r.find('#retry-ready').textContent).toBe('ready');
+					expect(error.isConnected).toBe(false);
+					expect(log).toEqual(['setup']);
+				} finally {
+					resolve('ready');
+					r.unmount();
+				}
+				expect(log).toEqual(['setup', 'cleanup']);
+			},
+		);
+
+		it('replaces the retained fallback when the retry rejects', async () => {
+			let reject!: (error: Error) => void;
+			const promise = new Promise<string>((_resolve, fail) => (reject = fail));
+			const state = { failed: true };
+			const log: string[] = [];
+			const r = mount(Host, { state, promise, resetRef: { current: null }, log });
+			try {
+				const previous = r.find('#retry-error') as HTMLButtonElement;
+				await act(() => {
+					state.failed = false;
+					previous.click();
+				});
+				await act(async () => {
+					reject(new Error('retry rejected'));
+					await promise.catch(() => {});
+				});
+				expect(r.find('#retry-error').textContent).toContain('retry rejected');
+				expect(previous.isConnected).toBe(false);
+				expect(r.container.querySelector('#retry-pending')).toBeNull();
+				expect(log).toEqual([]);
+			} finally {
+				r.unmount();
+			}
+		});
+
+		it('does not commit a suspended retry after its root unmounts', async () => {
+			let resolve!: (value: string) => void;
+			const promise = new Promise<string>((done) => (resolve = done));
+			const state = { failed: true };
+			const log: string[] = [];
+			const r = mount(Host, { state, promise, resetRef: { current: null }, log });
+			await act(() => {
+				state.failed = false;
+				(r.find('#retry-error') as HTMLButtonElement).click();
+			});
+			r.unmount();
+			await act(async () => {
+				resolve('ready');
+				await promise;
+			});
+			expect(r.container.childNodes).toHaveLength(0);
+			expect(log).toEqual([]);
+		});
+	});
+
 	it('renders children when no error', () => {
 		const r = mount(ErrorHost, { bang: false });
 		expect(r.find('#ok').textContent).toBe('ok');

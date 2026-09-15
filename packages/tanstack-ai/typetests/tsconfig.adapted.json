@@ -1,0 +1,57 @@
+{
+  "compilerOptions": {
+    "module": "esnext",
+    "target": "esnext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "skipLibCheck": false,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "allowImportingTsExtensions": true,
+    "types": ["node"],
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "jsx": "react-jsx",
+    "rootDirs": ["..", "../tests", "../upstream-helpers", "../node_modules/@tanstack"],
+    "jsxImportSource": "octane"
+  },
+  "files": [
+    "../tests/upstream/chat-ui/create-ui-types.test.tsx",
+    "../tests/upstream/create-chat-hook-types.test.ts",
+    "../tests/upstream/devtools-name-types.test.ts",
+    "../tests/upstream/use-chat-persistence-types.test.ts",
+    "../tests/upstream/use-chat-types.test.ts",
+    "../tests/upstream/use-generation-persistence-types.test.ts"
+  ],
+  "exclude": ["node_modules"],
+  "reactPortEvidence": {
+    "gate": "upstream-types-adapted",
+    "upstreamMode": "materialized",
+    "upstreamRegistrations": [
+      "react-case-v1:131690b9d13f4bac6c41",
+      "react-case-v1:13ba8985632382e1f094",
+      "react-case-v1:15978c6da7e57b45e138",
+      "react-case-v1:1d9c253fb48e972092c0",
+      "react-case-v1:399317afb0be96924b1d",
+      "react-case-v1:3bc69318f6b75a89bcd7",
+      "react-case-v1:440c0a5754bac4f9bbbd",
+      "react-case-v1:458ee927cf135eb44a10",
+      "react-case-v1:46fa60396957d3ac713a",
+      "react-case-v1:4982be364576a5a7ebfa",
+      "react-case-v1:4fd492c0f689c60c9b3a",
+      "react-case-v1:5aad8e5fbc1dbf09e347",
+      "react-case-v1:5d204538486d505df888",
+      "react-case-v1:5e5e7c2997aece6d6d95",
+      "react-case-v1:6089ef6aa1d5682d846c",
+      "react-case-v1:644a19d4c0bce9cf5944",
+      "react-case-v1:7247ea7de90fe232fb0e",
+      "react-case-v1:765afd45104341556d4d",
+      "react-case-v1:85066a1f93b9728cd1ff",
+      "react-case-v1:9690a9dee93c208d3a60",
+      "react-case-v1:9a6f06890b2ac889a84c",
+      "react-case-v1:a0733bfc53a3bf9d1746",
+      "react-case-v1:c1f853fecf342a5565d7",
+      "react-case-v1:cc970c6137a1c571caff",
+      "react-case-v1:f19d2be949638f09ad4e"
+    ]
+  }
+}

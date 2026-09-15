@@ -1,0 +1,9 @@
+diff --git a/tests/upstream/_types/path/eager.test-d.ts b/tests/upstream/_types/path/eager.test-d.ts
+--- a/tests/upstream/_types/path/eager.test-d.ts
++++ b/tests/upstream/_types/path/eager.test-d.ts
+@@ -1,4 +1,4 @@
+-import type { ArrayPath, FieldPathValues, Path, PathValue } from '../../../src/types';
++import type { ArrayPath, FieldPathValues, Path, PathValue } from '../../../../src/types';
+ import type { Depth3Type } from '../__fixtures__';
+ import type { Equal, Expect } from '../__fixtures__';
+ import { _ } from '../__fixtures__';

@@ -1,0 +1,19 @@
+{
+  "package": "react-i18next",
+  "version": "17.0.14",
+  "commit": "5f8c5f9e6c7cdabdc476111d0748c91e33bbaa30",
+  "review": "The pinned type-only Vitest workspace enumerates immediate test/typescript directories, excluding issue-1899, and creates a project for every non-temporary tsconfig JSON. Expand its exact expression from the authenticated tree without executing source. Each generated discovery selector matches exactly the original typecheck.include; issue-1899 remains separately inventoried as compile-only evidence.",
+  "configurationProjects": [
+    {
+      "path": "vitest.workspace.typescript.mts",
+      "gitBlob": "76d22eaa9a0c691d9cd8fa564b518890ad7ae0e9",
+      "expression": "readdirSync('./test/typescript', { withFileTypes: true })\n      .filter((dir) => dir.isDirectory())\n      // Exclude issue-1899 - it runs separately via test:typescript:issue-1899\n      // because it requires skipLibCheck: false which exposes @types/node errors\n      .filter((dir) => dir.name !== 'issue-1899')\n      .reduce<ReturnType<typeof defineProject>[]>((workspaces, dir) => {\n        const dirPath = `test/typescript/${dir.name}` as const;\n\n        const tsConfigFiles = readdirSync(dirPath).filter(\n          // Do not include temporary vitest tsconfig files\n          (it) => it.startsWith('tsconfig.') && it.endsWith('.json') && !it.includes('vitest-temp'),\n        );\n\n        tsConfigFiles.forEach((tsConfigFileName) => {\n          const workspaceName =\n            tsConfigFileName === 'tsconfig.json'\n              ? `typescript-${dir.name}`\n              : `${dir.name}-${tsConfigFileName.split('.')[1]}`;\n\n          workspaces.push(\n            defineProject({\n              test: {\n                name: workspaceName,\n                alias: {\n                  /**\n                   * Imports are resolved even if we are running only typecheck tests.\n                   * This will result in:\n                   * ```text\n                   * Error: Failed to resolve entry for package \"react-i18next\". The package may have incorrect main/module/exports specified in its package.json.\n                   * ```\n                   * To avoid a useless build process before running these tests a stub alias to `react-i18next` is added.\n                   */\n                  'react-i18next': './test/typescript/_stub.js',\n                },\n                typecheck: {\n                  enabled: true,\n                  only: true,\n                  include: [`./${dirPath}/*.test.{ts,tsx}`],\n                  tsconfig: `./${dirPath}/${tsConfigFileName}`,\n                },\n              },\n            }),\n          );\n        });\n\n        return workspaces;\n      }, [])",
+      "directory": "test/typescript",
+      "excludedDirectories": ["issue-1899"],
+      "configPrefix": "tsconfig.",
+      "configSuffix": ".json",
+      "excludedConfigSubstring": "vitest-temp",
+      "testPattern": "*.test.{ts,tsx}"
+    }
+  ]
+}

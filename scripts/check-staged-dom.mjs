@@ -44,6 +44,9 @@ const NATIVE_OPERATIONS = new Map(
 		vtFinalizeGroup: ['read:animate', 'call:animate'],
 		vtWaitForResources: ['read:complete', 'read:loading', 'read:onload', 'read:sheet'],
 		vtOwnerAffected: ['call:contains'],
+		// Namespace classification reads the committed destination parent; a staged
+		// view has no projected `encoding` to consult.
+		deoptChildNamespace: ['call:getAttribute'],
 		vtFlush: [
 			'read:isConnected',
 			'call:getAttribute',

@@ -1,0 +1,897 @@
+[
+  {
+    "id": "react-registration-v1:55755ecc2390c32d403c",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/conformance.test.tsx"
+  },
+  {
+    "id": "react-registration-v1:de87df5de4248ac7137f",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/conformance.test.tsx"
+  },
+  {
+    "id": "react-registration-v1:bfb5a72c78886a681c99",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/conformance.test.tsx"
+  },
+  {
+    "id": "react-registration-v1:992d2d4c33597be14b63",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/conformance.test.tsx"
+  },
+  {
+    "id": "react-registration-v1:44425efcccc6fbfb614b",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/conformance.test.tsx"
+  },
+  {
+    "id": "react-registration-v1:487479988a7da453bc95",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/conformance.test.tsx"
+  },
+  {
+    "id": "react-registration-v1:591baf5cd52f7708126e",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/conformance.test.tsx"
+  },
+  {
+    "id": "react-registration-v1:059ead677eb20c30cf9b",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/conformance.test.tsx"
+  },
+  {
+    "id": "react-registration-v1:6f1d13ba981206d429c8",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/conformance.test.tsx"
+  },
+  {
+    "id": "react-registration-v1:252c922ab16abca73801",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/conformance.test.tsx"
+  },
+  {
+    "id": "react-registration-v1:003e677ccdbbcd567e80",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/conformance.test.tsx"
+  },
+  {
+    "id": "react-registration-v1:8c1ae6afb936ebe55487",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/conformance.test.tsx"
+  },
+  {
+    "id": "react-registration-v1:89b0aa6cc6eb9e4a0cfe",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/conformance.test.tsx"
+  },
+  {
+    "id": "react-registration-v1:4b10e6902d7075ef9758",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/conformance.test.tsx"
+  },
+  {
+    "id": "react-registration-v1:625fa1d07e67ddbe0ecc",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/conformance.test.tsx"
+  },
+  {
+    "id": "react-registration-v1:027cf38d2ef5467950e1",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/conformance.test.tsx"
+  },
+  {
+    "id": "react-registration-v1:26b3e4bdf29e03fdeda9",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/conformance.test.tsx"
+  },
+  {
+    "id": "react-registration-v1:7aa541717ce98cfdaac3",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/conformance.test.tsx"
+  },
+  {
+    "id": "react-registration-v1:618aa4a7845f89017a92",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/conformance.test.tsx"
+  },
+  {
+    "id": "react-registration-v1:aec753569f7ebef117a6",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/conformance.test.tsx"
+  },
+  {
+    "id": "react-registration-v1:fad07d402080d46928a4",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/conformance.test.tsx"
+  },
+  {
+    "id": "react-registration-v1:c5e1f8fb20f52f931982",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/conformance.test.tsx"
+  },
+  {
+    "id": "react-registration-v1:759cf45d86cfa228f39f",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/conformance.test.tsx"
+  },
+  {
+    "id": "react-registration-v1:f14816a5d75b96af542c",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/conformance.test.tsx"
+  },
+  {
+    "id": "react-registration-v1:921604719fe801923261",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/conformance.test.tsx"
+  },
+  {
+    "id": "react-registration-v1:90f52ff81afc846aa9c2",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/conformance.test.tsx"
+  },
+  {
+    "id": "react-case-v1:8aa6fa39750f14c45480",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/DbProvider.test.tsx"
+  },
+  {
+    "id": "react-case-v1:e87b3e55012ab4f04cc3",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/DbProvider.test.tsx"
+  },
+  {
+    "id": "react-case-v1:abe1c315ccf5ab6e1060",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/HydrationBoundary.test.tsx"
+  },
+  {
+    "id": "react-registration-v1:c0935a97bde05476c9d7",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/infinite-query-conformance.test.tsx"
+  },
+  {
+    "id": "react-registration-v1:e7bda1a511c2ecb7e90e",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/infinite-query-conformance.test.tsx"
+  },
+  {
+    "id": "react-registration-v1:a3407cd75303a2a2fc82",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/infinite-query-conformance.test.tsx"
+  },
+  {
+    "id": "react-registration-v1:32633cb914d50468562a",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/infinite-query-conformance.test.tsx"
+  },
+  {
+    "id": "react-registration-v1:d0435b63646698a4c269",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/infinite-query-conformance.test.tsx"
+  },
+  {
+    "id": "react-registration-v1:7e7a4e4ad8f2cd2419c7",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/infinite-query-conformance.test.tsx"
+  },
+  {
+    "id": "react-registration-v1:1612a9135efbb4c37ddc",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/infinite-query-conformance.test.tsx"
+  },
+  {
+    "id": "react-registration-v1:feae39fad4a69aa18c18",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/infinite-query-conformance.test.tsx"
+  },
+  {
+    "id": "react-registration-v1:dfafbb9f60dc3e87bbd3",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/infinite-query-conformance.test.tsx"
+  },
+  {
+    "id": "react-registration-v1:33e06188e4211706927b",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/infinite-query-conformance.test.tsx"
+  },
+  {
+    "id": "react-registration-v1:936957636dbc5879d503",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/infinite-query-conformance.test.tsx"
+  },
+  {
+    "id": "react-registration-v1:5f013d15e8e850ad6259",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/infinite-query-conformance.test.tsx"
+  },
+  {
+    "id": "react-registration-v1:55f1a5f684f3130319d4",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/infinite-query-conformance.test.tsx"
+  },
+  {
+    "id": "react-registration-v1:bdfdf1adcc7b0967a8ff",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/infinite-query-conformance.test.tsx"
+  },
+  {
+    "id": "react-registration-v1:48f2ea43935b215caeeb",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/infinite-query-conformance.test.tsx"
+  },
+  {
+    "id": "react-registration-v1:9590825a8f506125a6a3",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/infinite-query-conformance.test.tsx"
+  },
+  {
+    "id": "react-registration-v1:b50c2864051ff1e40e87",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/infinite-query-conformance.test.tsx"
+  },
+  {
+    "id": "react-registration-v1:c7aaf5564ca468000876",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/infinite-query-conformance.test.tsx"
+  },
+  {
+    "id": "react-registration-v1:c8ad7fa5d47016fe5181",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/infinite-query-conformance.test.tsx"
+  },
+  {
+    "id": "react-registration-v1:771a69f7c7f1c8979d63",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/infinite-query-conformance.test.tsx"
+  },
+  {
+    "id": "react-registration-v1:911b8d362dc557307410",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/infinite-query-conformance.test.tsx"
+  },
+  {
+    "id": "react-registration-v1:e7fc5acc3090d6841410",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/infinite-query-conformance.test.tsx"
+  },
+  {
+    "id": "react-registration-v1:87beaefa63543b587377",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/infinite-query-conformance.test.tsx"
+  },
+  {
+    "id": "react-registration-v1:4cf7ba3019149b5f3b30",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/infinite-query-conformance.test.tsx"
+  },
+  {
+    "id": "react-registration-v1:0fbda2f1054f26704603",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/infinite-query-conformance.test.tsx"
+  },
+  {
+    "id": "react-registration-v1:634956ef56417e65de15",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/infinite-query-conformance.test.tsx"
+  },
+  {
+    "id": "react-registration-v1:8b0cd56fc7cd9a96897b",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/infinite-query-conformance.test.tsx"
+  },
+  {
+    "id": "react-registration-v1:b9bad6cedfee4db2b298",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/infinite-query-conformance.test.tsx"
+  },
+  {
+    "id": "react-registration-v1:ecd3d1c6340af8b5cfe1",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/infinite-query-conformance.test.tsx"
+  },
+  {
+    "id": "react-registration-v1:1d8446ae46bde4237abd",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/infinite-query-conformance.test.tsx"
+  },
+  {
+    "id": "react-registration-v1:b814ab854bdf9eaf50d8",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/infinite-query-conformance.test.tsx"
+  },
+  {
+    "id": "react-registration-v1:8c43d12602a23597eb50",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/infinite-query-conformance.test.tsx"
+  },
+  {
+    "id": "react-registration-v1:949b764c4185e0da4cdc",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/infinite-query-conformance.test.tsx"
+  },
+  {
+    "id": "react-case-v1:199afc572fa01f9ef76c",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveInfiniteQuery.test-d.tsx"
+  },
+  {
+    "id": "react-case-v1:50fcb6a09f380c1e06a5",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveInfiniteQuery.test-d.tsx"
+  },
+  {
+    "id": "react-case-v1:5f18a3896a26540f5076",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveInfiniteQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:6f00689a02d0d5c5ab05",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveInfiniteQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:0a9d9c25db54cd4f7f7f",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveInfiniteQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:356e84e680bd68b0b18d",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveInfiniteQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:806e5dafa492498e8c90",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveInfiniteQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:f4aa6083881c4b31a939",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveInfiniteQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:dc76a1e97acd4e4fe03e",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveInfiniteQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:250771cd7aa2b5b5fdef",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveInfiniteQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:954a10fa0cad52e1930d",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveInfiniteQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:470e564bcc8b5f506f97",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveInfiniteQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:48683a2e143ecbda9d6c",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveInfiniteQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:dfea406d494b6fa4efdd",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveInfiniteQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:bc998c0295419f2d9b17",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.eager-onstorechange.test.tsx"
+  },
+  {
+    "id": "react-case-v1:27c9788114edd5ca1243",
+    "classification": "inapplicable",
+    "rationale": "React StrictMode double-invokes effects in development. Octane has no StrictMode replay; all ordinary setup, readiness, cleanup and lifecycle contracts run in the adapted suite."
+  },
+  {
+    "id": "react-case-v1:01ae2af03fa7d22ddae0",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.test-d.tsx"
+  },
+  {
+    "id": "react-case-v1:fa04b4cec68ddc86645a",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.test-d.tsx"
+  },
+  {
+    "id": "react-case-v1:d0bbe457de8ffd0c29fc",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.test-d.tsx"
+  },
+  {
+    "id": "react-case-v1:5ff320591840ff0a64ce",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.test-d.tsx"
+  },
+  {
+    "id": "react-case-v1:b8d8b4d5aed9cdfd9b0b",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.test-d.tsx"
+  },
+  {
+    "id": "react-case-v1:74951b788886f1b29255",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.test-d.tsx"
+  },
+  {
+    "id": "react-case-v1:893e7695dcf2701bd8b3",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.test-d.tsx"
+  },
+  {
+    "id": "react-case-v1:b8200e0b6f931c884231",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.test-d.tsx"
+  },
+  {
+    "id": "react-case-v1:4fe5aab615413f5971f9",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.test-d.tsx"
+  },
+  {
+    "id": "react-case-v1:7d3869036f72f02d4c9a",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.test-d.tsx"
+  },
+  {
+    "id": "react-case-v1:5e59dce6e40ee4a9efff",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.test-d.tsx"
+  },
+  {
+    "id": "react-case-v1:77eeea727f23b7cd632d",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.test-d.tsx"
+  },
+  {
+    "id": "react-case-v1:5b5062fb3ac1c6bee807",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.test-d.tsx"
+  },
+  {
+    "id": "react-case-v1:02ef7e43ba71bd96f695",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.test-d.tsx"
+  },
+  {
+    "id": "react-case-v1:420961af9ab39e6683a4",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.test-d.tsx"
+  },
+  {
+    "id": "react-case-v1:fdff32cc8f399e6942c5",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.test-d.tsx"
+  },
+  {
+    "id": "react-case-v1:4b4f40d5dd3cd30b03e8",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:770e46cf23f94d8d249b",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:f4926ac381fb12618b13",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:558b4f724e4a9c7bebbd",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:043e7149aa61ddd02151",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:8333ba1c087856b2610c",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:54e6aeed9db48d3ee9df",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:04126c2c85060d03963a",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:4e834795e1197fa13c4c",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:710c069834948179106e",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:0df73fce02077c795084",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:5365260573a50bbd5fff",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:3d9bef59351fb36b8d38",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:cc3c9577629ca65dac2e",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:bf2d36ea98dd10912b5f",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:12bb773350a5d13cb7f9",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:a24f2947ac6a7bf3cc19",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:9101182e8140612e90f4",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:59a56749586b239f8060",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:c573263322159a5d3344",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:078ff1da51e2d288a062",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:5ae97dd00071858ebc20",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:97d388ec5fb91cbb7df3",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:1d0f6d42e0ab0e98c1cd",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:f5dd53f56ccf1ba76f7b",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:9b8e404846d9307f933f",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:1fa496c25873d643b08d",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:072c806d289c9e16ccd1",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:290fb01c37e7519a2ff4",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:4acdc8bb40514f2b5e26",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:30f91042c4525951c51d",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:34c43a1589d4398b92a4",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:6289da0ef3ccc1c66647",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:472322b7bebb6a0331ff",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:31c13fed0dce9399902d",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:d670d71ffcaa49e8c5a4",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:796400841b74773beeee",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:f2176eea31bee8239b09",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:3d648554fad1d7d0f1dd",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:8bbe5bd37ac16aecdc7b",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:05de8be60977fd575162",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:f6d5dd26ae505bc11820",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:a5a46dbdb1c42ef1adcd",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:9ace5a0905c572d5167c",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:92f18ed23638d691d63c",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:eccfac2c766bf7ab7d3f",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:39936591106f7be8fa60",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:90ef94df06c82d746dba",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:a292e312ce04baabcb4b",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:06843028f13c265bbf0a",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:6c68a6787bb5cb2460fc",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:55bb8c378637b8000771",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:6e8848c40041ecd4e46f",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:1a08be1ba64615865a14",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:f226e3d273f2e2cc8f23",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:f3d5ac7fae6a918af16a",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:019d9da36f2415025871",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQueryEffect.test.tsx"
+  },
+  {
+    "id": "react-case-v1:a9a9b3e4ab7b0712a00c",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQueryEffect.test.tsx"
+  },
+  {
+    "id": "react-case-v1:50ecc1ac5431725b54d8",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQueryEffect.test.tsx"
+  },
+  {
+    "id": "react-case-v1:b9f1ad2bbc198d0dd60b",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveQueryEffect.test.tsx"
+  },
+  {
+    "id": "react-case-v1:a2354af17cfeb4730cb7",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveSuspenseQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:3559dcbbf4e1ccd63963",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveSuspenseQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:4174fbd3f445985ea8d0",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveSuspenseQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:fba916a32aa33bf29991",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveSuspenseQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:bcaccd1e306c6c1b1eb5",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveSuspenseQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:01bfc64eab2f67f58010",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveSuspenseQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:429eed55f4db3423ff4c",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveSuspenseQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:382e571c2b6a88cc76f0",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveSuspenseQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:1bff5e5a0dbb872ce7dc",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveSuspenseQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:219834b209b469011fd2",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveSuspenseQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:c5ae409063ebf5eac5b6",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveSuspenseQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:456e813a6f2fa9dd4dcb",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveSuspenseQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:1b1b77cbdabe6141e591",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveSuspenseQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:a8a7b68ee623a0bfd7b1",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveSuspenseQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:4f3796ff5d3f1368f000",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveSuspenseQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:8f3e6a0445862e94d828",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveSuspenseQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:c543623867161dd402ec",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveSuspenseQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:a1cf3130828ec8240095",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveSuspenseQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:57f1def0755a9fc9a0ff",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLiveSuspenseQuery.test.tsx"
+  },
+  {
+    "id": "react-case-v1:7bfa09526164a84296cd",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/usePacedMutations.test.tsx"
+  },
+  {
+    "id": "react-case-v1:9cbe2b0848f8a20f33fc",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/usePacedMutations.test.tsx"
+  },
+  {
+    "id": "react-case-v1:800098127e46c48ff3f8",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/usePacedMutations.test.tsx"
+  },
+  {
+    "id": "react-case-v1:e154fd7f4ff6d1208ddd",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/usePacedMutations.test.tsx"
+  },
+  {
+    "id": "react-case-v1:a1eecc829deec537aa1b",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/usePacedMutations.test.tsx"
+  },
+  {
+    "id": "react-case-v1:1aba05a997b5c36e6075",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/usePacedMutations.test.tsx"
+  }
+]

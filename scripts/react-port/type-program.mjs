@@ -42,9 +42,12 @@ export function createTypeEvidenceProgram(rootNames, options) {
 			},
 		},
 	]);
+	// Authenticated native witnesses may themselves be TSRX entrypoint roots.
+	// TypeScript otherwise drops those roots before Volar can transform them.
+	const compilerOptions = { ...options, allowNonTsExtensions: true };
 	return createProgram({
 		rootNames,
-		options: { ...options },
-		host: ts.createCompilerHost(options, true),
+		options: compilerOptions,
+		host: ts.createCompilerHost(compilerOptions, true),
 	});
 }

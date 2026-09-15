@@ -1,0 +1,12 @@
+diff --git a/tests/upstream/global/utils/panelConstraintsEqual.test.ts b/tests/upstream/global/utils/panelConstraintsEqual.test.ts
+--- a/tests/upstream/global/utils/panelConstraintsEqual.test.ts
++++ b/tests/upstream/global/utils/panelConstraintsEqual.test.ts
+@@ -1,6 +1,6 @@
+ import { describe, expect, test } from "vitest";
+-import { panelConstraintsEqual } from "./panelConstraintsEqual";
+-import type { PanelConstraints } from "../../components/panel/types";
++import { panelConstraintsEqual } from "../../../../src/global/utils/panelConstraintsEqual";
++import type { PanelConstraints } from "../../../../src/components/panel/types";
+ 
+ function createPanelConstraints(
+   partial: { panelId: string } & Partial<PanelConstraints>

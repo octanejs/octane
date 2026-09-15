@@ -1,4 +1,4 @@
-// Vendored from react-hook-form@7.81.0 src/utils/unset.ts (octane port).
+// Adapted from react-hook-form@7.88.0 src/utils/unset.ts for Octane.
 import { PROTOTYPE_KEYWORDS } from '../constants';
 
 import isEmptyObject from './isEmptyObject';
@@ -10,7 +10,7 @@ import isUndefined from './isUndefined';
 import stringToPath from './stringToPath';
 
 function baseGet(object: any, updatePath: (string | number)[]) {
-	const length = updatePath.slice(0, -1).length;
+	const length = updatePath.length - 1;
 	let index = 0;
 
 	while (index < length) {

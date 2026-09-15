@@ -158,12 +158,17 @@ process.stdout.write(JSON.stringify(['default', 'DraggableCore'].filter((key) =>
 }
 
 export const PACKED_STRICT_BROWSER_SOURCE_PACKAGES = [
+	'@octanejs/mobx',
+	'@octanejs/intersection-observer',
+	'@octanejs/alien-signals',
 	'@octanejs/octane-is',
 	'@octanejs/jotai',
 	'@octanejs/redux',
 	'@octanejs/remix-router',
 	'@octanejs/visx',
 	'@octanejs/recharts',
+	'@octanejs/tanstack-router',
+	'@octanejs/tanstack-router-ssr-query',
 ];
 
 const strictBrowserSourcePackages = new Set(PACKED_STRICT_BROWSER_SOURCE_PACKAGES);
@@ -219,7 +224,12 @@ function collectExportTargets(value, output = []) {
 	return output;
 }
 
-export function findPackedTsrxSourceConsumerSpecifiers(packageName, manifest, files) {
+export function findPackedTsrxSourceConsumerSpecifiers(
+	packageName,
+	manifest,
+	files,
+	{ nodeTypes = true } = {},
+) {
 	if (!hasPackedSourceConsumer(packageName, files)) return [];
 
 	const exports = manifest.exports;
@@ -233,6 +243,12 @@ export function findPackedTsrxSourceConsumerSpecifiers(packageName, manifest, fi
 
 	const specifiers = [];
 	for (const [subpath, target] of Object.entries(exports)) {
+		// This server entry exposes the upstream Node HTTP header type. Keep it
+		// in the Node program while compiling the client and history entries,
+		// and all shipped TSRX implementations, without Node ambient types.
+		if (!nodeTypes && packageName === '@octanejs/tanstack-router' && subpath === './ssr/server') {
+			continue;
+		}
 		if (subpath === '.') {
 			specifiers.push(packageName);
 			continue;
@@ -481,11 +497,153 @@ void packedIsWrong;
 `;
 }
 
+function renderPackedIntersectionObserverTypeProbe() {
+	return `import * as PackedIntersectionO from '@octanejs/intersection-observer';
+import * as PackedIntersectionM from '@octanejs/intersection-observer/test-utils';
+import type { OctaneNode as PackedIntersectionOctaneNode } from 'octane';
+type PackedIntersectionEqual<A, B> = (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? true : false;
+type PackedIntersectionAssert<T extends true> = T;
+
+type PackedIntersectionChange = (inView: boolean, entry: IntersectionObserverEntry) => void;
+type PackedIntersectionCleanupRef = (node?: Element | null) => (() => void) | undefined;
+type PackedIntersectionExpectedHook = [PackedIntersectionCleanupRef, boolean, IntersectionObserverEntry | undefined] & {
+    ref: PackedIntersectionCleanupRef;
+    inView: boolean;
+    entry?: IntersectionObserverEntry;
+};
+type PackedIntersectionExpectedRenderProps = {
+    inView: boolean;
+    entry: IntersectionObserverEntry | undefined;
+    ref: PackedIntersectionCleanupRef;
+};
+
+type PackedIntersectionInViewChildren = PackedIntersectionAssert<PackedIntersectionEqual<Parameters<typeof PackedIntersectionO.InView>[0]['children'], PackedIntersectionOctaneNode | ((props: PackedIntersectionExpectedRenderProps) => PackedIntersectionOctaneNode)>>;
+type PackedIntersectionHook = PackedIntersectionAssert<PackedIntersectionEqual<ReturnType<typeof PackedIntersectionO.useInView>, PackedIntersectionExpectedHook>>;
+type PackedIntersectionEffectHook = PackedIntersectionAssert<PackedIntersectionEqual<ReturnType<typeof PackedIntersectionO.useOnInView<HTMLButtonElement>>, (node: HTMLButtonElement | null | undefined) => (() => void) | undefined>>;
+type PackedIntersectionObserve = PackedIntersectionAssert<PackedIntersectionEqual<ReturnType<typeof PackedIntersectionO.observe>, () => void>>;
+type PackedIntersectionFallback = PackedIntersectionAssert<PackedIntersectionEqual<Parameters<typeof PackedIntersectionO.defaultFallbackInView>, [boolean | undefined]>>;
+type PackedIntersectionHookResponse = PackedIntersectionAssert<PackedIntersectionEqual<PackedIntersectionO.InViewHookResponse, PackedIntersectionExpectedHook>>;
+type PackedIntersectionCallback = PackedIntersectionAssert<PackedIntersectionEqual<PackedIntersectionO.ObserverInstanceCallback, PackedIntersectionChange>>;
+type PackedIntersectionEffect = PackedIntersectionAssert<PackedIntersectionEqual<PackedIntersectionO.IntersectionChangeEffect<HTMLButtonElement>, (inView: boolean, entry: IntersectionObserverEntry & {target: HTMLButtonElement}) => void>>;
+type PackedIntersectionOptions = PackedIntersectionAssert<PackedIntersectionEqual<PackedIntersectionO.IntersectionOptions['onChange'], PackedIntersectionChange | undefined>>;
+type PackedIntersectionEffectOptions = PackedIntersectionAssert<PackedIntersectionEqual<PackedIntersectionO.IntersectionEffectOptions['threshold'], number | number[] | undefined>>;
+type PackedIntersectionInitOptions = PackedIntersectionAssert<PackedIntersectionEqual<PackedIntersectionO.IntersectionObserverInitWithOptions['root'], Element | Document | null | undefined>>;
+type PackedIntersectionRenderProps = PackedIntersectionAssert<PackedIntersectionEqual<PackedIntersectionO.InViewRenderProps, PackedIntersectionExpectedRenderProps>>;
+type PackedIntersectionCompatProps = PackedIntersectionAssert<PackedIntersectionEqual<PackedIntersectionO.InViewProps['children'], PackedIntersectionOctaneNode | ((props: PackedIntersectionExpectedRenderProps) => PackedIntersectionOctaneNode)>>;
+type PackedIntersectionComponentProps = PackedIntersectionAssert<PackedIntersectionEqual<PackedIntersectionO.IntersectionObserverProps['children'], (props: PackedIntersectionExpectedRenderProps) => PackedIntersectionOctaneNode>>;
+type PackedIntersectionPlainProps = PackedIntersectionAssert<PackedIntersectionEqual<PackedIntersectionO.PlainChildrenProps['children'], PackedIntersectionOctaneNode>>;
+type PackedIntersectionSetup = PackedIntersectionAssert<PackedIntersectionEqual<ReturnType<typeof PackedIntersectionM.setupIntersectionMocking>, void>>;
+type PackedIntersectionReset = PackedIntersectionAssert<PackedIntersectionEqual<typeof PackedIntersectionM.resetIntersectionMocking, () => void>>;
+type PackedIntersectionDestroy = PackedIntersectionAssert<PackedIntersectionEqual<typeof PackedIntersectionM.destroyIntersectionMocking, () => void>>;
+type PackedIntersectionAll = PackedIntersectionAssert<PackedIntersectionEqual<typeof PackedIntersectionM.mockAllIsIntersecting, (visible: boolean | number) => void>>;
+type PackedIntersectionOne = PackedIntersectionAssert<PackedIntersectionEqual<typeof PackedIntersectionM.mockIsIntersecting, (element: Element, visible: boolean | number) => void>>;
+type PackedIntersectionInstance = PackedIntersectionAssert<PackedIntersectionEqual<typeof PackedIntersectionM.intersectionMockInstance, (element: Element) => IntersectionObserver>>;
+
+declare const PackedIntersectiontarget: HTMLButtonElement;
+const PackedIntersectionresult = PackedIntersectionO.useInView({threshold: [0.25, 0.75], triggerOnce: true, scrollMargin: '8px'});
+const PackedIntersectionstop = PackedIntersectionresult.ref(PackedIntersectiontarget);
+PackedIntersectionstop?.();
+PackedIntersectionO.useOnInView<HTMLButtonElement>((visible, entry) => {
+    const button: HTMLButtonElement = entry.target;
+    button.disabled = !visible;
+})(PackedIntersectiontarget)?.();
+PackedIntersectionO.observe(PackedIntersectiontarget, (visible, entry) => { PackedIntersectiontarget.hidden = !visible && entry.target === PackedIntersectiontarget; })();
+PackedIntersectionO.defaultFallbackInView(false);
+PackedIntersectionM.mockAllIsIntersecting(0.5);
+PackedIntersectionM.mockIsIntersecting(PackedIntersectiontarget, true);
+PackedIntersectionM.intersectionMockInstance(PackedIntersectiontarget).unobserve(PackedIntersectiontarget);
+// @ts-expect-error targets must be elements
+PackedIntersectionO.observe('invalid', () => {});
+// @ts-expect-error effect-only hooks do not own initial visibility
+PackedIntersectionO.useOnInView(() => {}, {initialInView: true});
+// @ts-expect-error the generic target stays a button
+PackedIntersectionO.useOnInView<HTMLButtonElement>(() => {})(document.createElement('div'));
+// @ts-expect-error mock visibility accepts a boolean or number
+PackedIntersectionM.mockAllIsIntersecting('visible');
+`;
+}
+
+function renderPackedAlienSignalsTypeProbe() {
+	return `import * as PackedAlien from '@octanejs/alien-signals';
+type PackedAlienEqual<A, B> = (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? true : false;
+type PackedAlienAssert<T extends true> = T;
+type PackedAlienExports = PackedAlienAssert<PackedAlienEqual<keyof typeof PackedAlien, 'createSignal' | 'createComputed' | 'createEffect' | 'createSignalScope' | 'batch' | 'trigger' | 'useSignal' | 'useSignalValue' | 'useDeferredSignalValue' | 'useSignalSelector' | 'useSetSignal' | 'useSignalEffect' | 'useSignalPassiveEffect' | 'useSignalLayoutEffect' | 'useSignalInsertionEffect' | 'useSignalScope' | 'useComputed'>>;
+type PackedAlienReadable = PackedAlienAssert<PackedAlienEqual<PackedAlien.ReadableSignal<number>, () => number>>;
+type PackedAlienWritable = PackedAlienAssert<PackedAlienEqual<PackedAlien.WritableSignal<number>, { (value: number | ((previous: number) => number)): void; (): number }>>;
+type PackedAlienDependencies = PackedAlienAssert<PackedAlienEqual<PackedAlien.DependencyList, readonly unknown[]>>;
+type PackedAlienSetter = PackedAlienAssert<PackedAlienEqual<PackedAlien.SignalSetter<number>, (value: number | ((previous: number) => number)) => void>>;
+type PackedAlienEffect = PackedAlienAssert<PackedAlienEqual<PackedAlien.SignalEffectCallback, () => void | (() => void)>>;
+type PackedAlienEffectDependencies = PackedAlienAssert<PackedAlienEqual<PackedAlien.SignalEffectDependencies, readonly (() => unknown)[]>>;
+const packedAlienCount = PackedAlien.createSignal(1);
+const packedAlienComputed = PackedAlien.createComputed<number>((previous = 0) => packedAlienCount() + previous);
+const packedAlienSelected = PackedAlien.useSignalSelector(packedAlienComputed, value => String(value));
+type PackedAlienSelection = PackedAlienAssert<PackedAlienEqual<typeof packedAlienSelected, string>>;
+const packedAlienDeferred: number = PackedAlien.useDeferredSignalValue(packedAlienComputed);
+const packedAlienValue: number = PackedAlien.useSignalValue(packedAlienComputed);
+const packedAlienTuple: [number, PackedAlien.SignalSetter<number>] = PackedAlien.useSignal(packedAlienCount);
+const packedAlienMemo: number = PackedAlien.useComputed(() => packedAlienCount() * 2, []);
+const packedAlienBatch: string = PackedAlien.batch(() => { packedAlienCount(2); return 'updated'; });
+const packedAlienStop: () => void = PackedAlien.createEffect(() => { packedAlienCount(); return () => {}; });
+const packedAlienScope: () => void = PackedAlien.createSignalScope(() => {});
+PackedAlien.trigger(packedAlienCount);
+PackedAlien.useSignalEffect(() => {}, []);
+PackedAlien.useSignalPassiveEffect([packedAlienCount], () => {}, []);
+PackedAlien.useSignalLayoutEffect([packedAlienCount], () => {}, []);
+PackedAlien.useSignalInsertionEffect([packedAlienCount], () => {}, []);
+const packedAlienScopeStop: () => void = PackedAlien.useSignalScope(() => {}, []);
+PackedAlien.useSetSignal(packedAlienCount)(value => value + 1);
+// @ts-expect-error numeric signals reject string writes
+PackedAlien.useSetSignal(packedAlienCount)('wrong');
+// @ts-expect-error computed snapshots remain read-only
+packedAlienComputed(1);
+// @ts-expect-error the selector receives a number
+PackedAlien.useSignalSelector(packedAlienCount, (value: string) => value);
+`;
+}
+
+function renderPackedMobxTypeProbe() {
+	return `import * as PackedMobx from '@octanejs/mobx';
+import type { Ref as PackedMobxRef } from 'octane';
+type PackedMobxEqual<A, B> = (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? true : false;
+type PackedMobxAssert<T extends true> = T;
+const PackedMobxInput = PackedMobx.observer((props: {value: string; ref?: PackedMobxRef<HTMLInputElement>}) => null);
+const packedMobxGeneric = PackedMobx.observer(<T>(props: {value: T; onValue: (value: T) => void}) => null);
+packedMobxGeneric({value: 1, onValue: value => value.toFixed()});
+// @ts-expect-error observer retains the relationship between generic props
+packedMobxGeneric({value: 1, onValue: (value: string) => value.toUpperCase()});
+// @ts-expect-error element refs retain their input type
+PackedMobxInput({value: 'value', ref: {current: document.createElement('button')}});
+const packedMobxLocal = PackedMobx.useLocalObservable(() => new Map<string, number>());
+packedMobxLocal.set('count', 1);
+// @ts-expect-error Map values remain numeric
+packedMobxLocal.set('count', 'invalid');
+const packedMobxCount = PackedMobx.useObserver(() => packedMobxLocal.get('count'));
+type PackedMobxCount = PackedMobxAssert<PackedMobxEqual<typeof packedMobxCount, number | undefined>>;
+type PackedMobxMap = PackedMobxAssert<PackedMobxEqual<typeof packedMobxLocal, Map<string, number>>>;
+type PackedMobxName = PackedMobxAssert<PackedMobxEqual<typeof PackedMobx.Observer.displayName, string>>;
+const packedMobxCore = PackedMobx.observable({count: 0});
+PackedMobx.runInAction(() => { packedMobxCore.count++; });
+PackedMobx.enableStaticRendering(true);
+PackedMobx.useStaticRendering(false);
+PackedMobx.clearTimers();
+const packedMobxRegion: PackedMobx.ObserverProps = {children: () => null};
+// @ts-expect-error Observer callbacks remain mutually exclusive
+const packedMobxInvalidRegion: PackedMobx.ObserverProps = {children: () => null, render: () => null};
+`;
+}
+
 export function renderPackedStrictBrowserConsumerTypeProbe() {
 	return `${renderPackedOctaneIsTypeProbe()}
+${renderPackedAlienSignalsTypeProbe()}
+${renderPackedMobxTypeProbe()}
+${renderPackedIntersectionObserverTypeProbe()}
 import { sumTypedPair } from './App.tsrx';
 import { compileToVolarMappings, compileTypesInspection } from 'octane/compiler/volar';
 import { atom, useAtom } from '@octanejs/jotai';
+import { createRootRoute, createRoute, createRouter, useMatchRoute } from '@octanejs/tanstack-router';
+import { setupRouterSsrQueryIntegration } from '@octanejs/tanstack-router-ssr-query';
+import { hydrate, json, mergeHeaders } from '@octanejs/tanstack-router/ssr/client';
+import { QueryClient } from '@tanstack/query-core';
 import { useSelector } from '@octanejs/redux';
 import { Form, Link, NavLink } from '@octanejs/remix-router';
 import { Group } from '@octanejs/visx/group';
@@ -515,6 +673,41 @@ import { Brush } from '@octanejs/recharts';
 import { Treemap } from '@octanejs/recharts';
 
 type AssertNotAny<T> = 0 extends 1 & T ? never : true;
+const packedRouteRoot = createRootRoute();
+const packedPostRoute = createRoute({
+	getParentRoute: () => packedRouteRoot,
+	path: 'posts/$postId',
+	ssr: false,
+});
+const packedRouter = createRouter({ routeTree: packedRouteRoot.addChildren([packedPostRoute]) });
+export function verifyPackedRouterTypes() {
+	const matchRoute = useMatchRoute<typeof packedRouter>();
+	const params = matchRoute({ to: '/posts/$postId' });
+	if (params !== false) {
+		const postId: string = params.postId;
+		// @ts-expect-error Matched path parameters retain their string type.
+		const invalidPostId: number = params.postId;
+		void [postId, invalidPostId];
+	}
+	// @ts-expect-error The chosen router rejects unknown destinations.
+	matchRoute({ to: '/missing' });
+	const hydrated: Promise<void> = hydrate(packedRouter);
+	const merged: Headers = mergeHeaders({ 'content-length': 12, 'set-cookie': ['a=1', 'b=2'] });
+	const payload: Promise<{ value: number }> = json({ value: 1 }).json();
+	// @ts-expect-error Header values cannot contain arbitrary objects.
+	mergeHeaders({ invalid: { nested: true } });
+	// @ts-expect-error JSON payload types survive the client entry.
+	const invalidPayload: Promise<string> = json({ value: 1 }).json();
+	void [hydrated, merged, payload, invalidPayload];
+	const clientOnly: false = packedPostRoute.types.ssr;
+	const options = { router: packedRouter, queryClient: new QueryClient(), wrapQueryClient: true };
+	const integrated: void = setupRouterSsrQueryIntegration(options);
+	// @ts-expect-error Integration options preserve the boolean wrapper contract.
+	setupRouterSsrQueryIntegration({ ...options, wrapQueryClient: 'yes' });
+	// @ts-expect-error Integration requires a real QueryClient.
+	setupRouterSsrQueryIntegration({ ...options, queryClient: {} });
+	void [clientOnly, integrated];
+}
 export function verifyPackedCompilerTypes() {
 	const mappings = compileToVolarMappings('export const value = 1;', 'Probe.tsrx');
 	const inspection = compileTypesInspection('export const value = 1;', 'Probe.tsrx');
@@ -812,6 +1005,9 @@ export function PublishedSourceConsumer() @{
 
 export function renderPackedTsrxConsumerTypeProbe() {
 	return `${renderPackedOctaneIsTypeProbe()}
+${renderPackedAlienSignalsTypeProbe()}
+${renderPackedMobxTypeProbe()}
+${renderPackedIntersectionObserverTypeProbe()}
 import { Command, type CommandProps } from '@octanejs/cmdk';
 import {
 	Bar,

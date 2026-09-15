@@ -1,0 +1,38 @@
+diff --git a/tests/upstream/router-client-stream-cleanup.test.tsx b/tests/upstream/router-client-stream-cleanup.test.tsx
+--- a/tests/upstream/router-client-stream-cleanup.test.tsx
++++ b/tests/upstream/router-client-stream-cleanup.test.tsx
+@@ -1,6 +1,6 @@
+ import { act, cleanup, render, screen, waitFor } from '@octanejs/testing-library'
+ import { afterEach, expect, test, vi } from 'vitest'
+-import { Component } from 'octane'
++import { ErrorBoundary as NativeErrorBoundary } from 'octane'
+ import { createMemoryHistory } from '@tanstack/history'
+ import { RouterClient } from '../../src/ssr/RouterClient'
+ import { createRootRoute, createRouter } from '../../src'
+@@ -10,19 +10,13 @@ const hydrate = vi.hoisted(() => vi.fn())
+ 
+ vi.mock('@tanstack/router-core/ssr/client', () => ({ hydrate }))
+ 
+-class ErrorBoundary extends Component<
+-  { children: OctaneNode },
+-  { error?: Error }
+-> {
+-  state: { error?: Error } = {}
+-
+-  static getDerivedStateFromError(error: Error) {
+-    return { error }
+-  }
+-
+-  render() {
+-    return this.state.error ? this.state.error.message : this.props.children
+-  }
++// OCTANE DIVERGENCE[error-boundary]: native function boundary replaces the class.
++function ErrorBoundary(props: { children: OctaneNode }) {
++  return (
++    <NativeErrorBoundary fallback={(error) => (error as Error).message}>
++      {props.children}
++    </NativeErrorBoundary>
++  )
+ }
+ 
+ afterEach(() => {

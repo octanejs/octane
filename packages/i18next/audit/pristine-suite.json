@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "project": "i18next-pristine",
+  "vitestConfig": "tests/upstream-vitest.config.ts",
+  "rootEnvVar": "I18NEXT_PRISTINE_ROOT",
+  "copy": ["src", "test", "icu.macro.js", ".babelrc", "package.json", ".prettierrc.json"],
+  "inlineFiles": {
+    "tsconfig.json": {
+      "compilerOptions": {
+        "target": "ES2022",
+        "module": "ESNext",
+        "moduleResolution": "Bundler",
+        "jsx": "react-jsx",
+        "jsxImportSource": "react",
+        "esModuleInterop": true
+      }
+    }
+  }
+}

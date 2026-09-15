@@ -1,3 +1,9 @@
+import tanstackRouterAdapted from './packages/tanstack-router/tests/vitest.adapted.config.ts';
+import mobxAdapted from './packages/mobx/tests/vitest.adapted.config.ts';
+import i18nextAdapted from './packages/i18next/tests/vitest.adapted.config.ts';
+import tanstackAiAdapted from './packages/tanstack-ai/tests/vitest.adapted.config.ts';
+import tanstackAiAdaptedSSR from './packages/tanstack-ai/tests/vitest.adapted-ssr.config.ts';
+import tanstackDbAdapted from './packages/tanstack-db/tests/vitest.adapted.config.ts';
 import tanstackTableAdapted from './packages/tanstack-table/tests/vitest.adapted.config.ts';
 import tanstackTableAdaptedSSR from './packages/tanstack-table/tests/vitest.adapted-ssr.config.ts';
 import { realpathSync } from 'node:fs';
@@ -604,11 +610,116 @@ function octaneSourceTestProject({ aliases, ssr = false, test }) {
 export default defineConfig({
 	test: {
 		...configDefaults,
+		// Many lanes boot per-test infrastructure (Vite SSR servers, browser
+		// fixtures, CLI subprocesses) whose cold start can exceed the 5s default
+		// under full-shard CI contention. 30s covers the slowest observed cold
+		// start; projects that need more already override it.
+		testTimeout: 30_000,
 		// This root-only option applies to every project below. For local
 		// diagnostics, a CLI value such as `--silent=false` or
 		// `--silent=passed-only` overrides this default.
 		silent: true,
 		projects: [
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'tanstack-router-browser',
+					include: ['packages/tanstack-router/tests/browser/**/*.test.ts'],
+					environment: 'node',
+					testTimeout: 60_000,
+					hookTimeout: 60_000,
+				},
+			},
+			{ ...tanstackRouterAdapted, testExecution: { group: 'react-parity' } },
+			{ ...mobxAdapted, testExecution: { group: 'react-parity' } },
+			{ ...i18nextAdapted, testExecution: { group: 'react-parity' } },
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'mobx-pristine-runtime',
+					include: ['packages/mobx/tests/upstream-original.test.ts'],
+					environment: 'node',
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'i18next-pristine-runtime',
+					include: ['packages/i18next/tests/upstream-original.test.ts'],
+					environment: 'node',
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'mobx-browser',
+					include: ['packages/mobx/tests/browser/**/*.test.ts'],
+					testTimeout: 60_000,
+					hookTimeout: 60_000,
+					browser: {
+						enabled: true,
+						headless: true,
+						provider: playwright(),
+						instances: [{ browser: 'chromium' }],
+					},
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/mobx$/,
+							replacement: resolve(import.meta.dirname, 'packages/mobx/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'tanstack-router-pristine',
+					include: ['packages/tanstack-router/tests/upstream-original.test.ts'],
+					environment: 'node',
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'tanstack-ai-browser',
+					include: ['packages/tanstack-ai/tests/browser/**/*.test.ts'],
+					environment: 'node',
+					testTimeout: 60_000,
+					hookTimeout: 60_000,
+				},
+			},
+			{ ...tanstackAiAdapted, testExecution: { group: 'react-parity' } },
+			{ ...tanstackAiAdaptedSSR, testExecution: { group: 'react-parity' } },
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'tanstack-ai-pristine',
+					include: ['packages/tanstack-ai/tests/upstream-original.test.ts'],
+					environment: 'node',
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
+				},
+			},
+			{ ...tanstackDbAdapted, testExecution: { group: 'react-parity' } },
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'tanstack-db-pristine',
+					include: ['packages/tanstack-db/tests/upstream-original.test.ts'],
+					environment: 'node',
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
+				},
+			},
 			{ ...tanstackVirtualAdapted, testExecution: { group: 'react-parity' } },
 			{ ...tanstackTableAdapted, testExecution: { group: 'react-parity' } },
 			{ ...tanstackTableAdaptedSSR, testExecution: { group: 'react-parity' } },
@@ -618,6 +729,8 @@ export default defineConfig({
 					name: 'tanstack-table-pristine',
 					include: ['packages/tanstack-table/tests/upstream-original.test.ts'],
 					environment: 'node',
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
 				},
 			},
 			{ ...tanstackQueryAdapted, testExecution: { group: 'react-parity' } },
@@ -628,6 +741,8 @@ export default defineConfig({
 					name: 'tanstack-query-pristine',
 					include: ['packages/tanstack-query/tests/upstream-original.test.ts'],
 					environment: 'node',
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
 				},
 			},
 			{
@@ -636,6 +751,8 @@ export default defineConfig({
 					name: 'tanstack-virtual-pristine',
 					include: ['packages/tanstack-virtual/tests/upstream-original.test.ts'],
 					environment: 'node',
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
 				},
 			},
 			{
@@ -1190,12 +1307,30 @@ export default defineConfig({
 					],
 				},
 			},
-			{
+			...[
+				['tanstack-db', []],
+				['tanstack-db-differential', ['packages/tanstack-db/tests/differential/parity.test.ts']],
+				['tanstack-db-hydration', ['packages/tanstack-db/tests/ssr-hydration.test.ts']],
+				['tanstack-db-portal', ['packages/tanstack-db/tests/provider-portal.test.ts']],
+			].map(([name, files]) => ({
+				...(files.length ? { testExecution: { group: 'react-parity' } } : {}),
 				test: {
-					name: 'tanstack-db',
-					include: ['packages/tanstack-db/tests/**/*.test.tsx'],
+					name,
+					include: files.length ? files : ['packages/tanstack-db/tests/**/*.test.{ts,tsx}'],
+					exclude: files.length
+						? []
+						: [
+								'packages/tanstack-db/tests/differential/parity.test.ts',
+								'packages/tanstack-db/tests/ssr-hydration.test.ts',
+								'packages/tanstack-db/tests/provider-portal.test.ts',
+								'packages/tanstack-db/tests/upstream/**',
+								'packages/tanstack-db/tests/upstream-original.test.ts',
+							],
 					environment: 'jsdom',
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
 					setupFiles: ['packages/tanstack-db/tests/test-setup.ts'],
+					globalSetup: ['packages/tanstack-db/tests/differential/_setup.ts'],
 					globals: false,
 				},
 				plugins: [octane()],
@@ -1209,7 +1344,7 @@ export default defineConfig({
 						},
 					],
 				},
-			},
+			})),
 			{
 				testExecution: { group: 'react-parity' },
 				test: {
@@ -1264,6 +1399,8 @@ export default defineConfig({
 					name: 'jotai-hydration',
 					include: ['packages/jotai/tests/conformance/hydration.test.ts'],
 					environment: 'jsdom',
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
 					globals: false,
 				},
 				plugins: [octaneServerFixtures(import.meta.dirname), octane()],
@@ -1456,6 +1593,8 @@ export default defineConfig({
 						...configDefaults.exclude,
 						'packages/i18next/tests/differential/**/*.test.ts',
 						'packages/i18next/tests/ssr/**/*.test.ts',
+						'packages/i18next/tests/upstream/**',
+						'packages/i18next/tests/upstream-original.test.ts',
 					],
 					environment: 'jsdom',
 					setupFiles: ['packages/i18next/tests/_setup.ts'],
@@ -1507,10 +1646,13 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'i18next-ssr',
 					include: ['packages/i18next/tests/ssr/**/*.test.ts'],
 					environment: 'node',
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
 					globals: false,
 				},
 				plugins: [octane({ ssr: true })],
@@ -1746,6 +1888,7 @@ export default defineConfig({
 					],
 					environment: 'jsdom',
 					globals: false,
+					testTimeout: 30_000,
 				},
 				plugins: [octane()],
 				resolve: {
@@ -1841,6 +1984,8 @@ export default defineConfig({
 						'packages/waypoint/tests/ssr/**/*.test.ts',
 					],
 					environment: 'jsdom',
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
 					globals: false,
 				},
 				plugins: [octane()],
@@ -1878,6 +2023,8 @@ export default defineConfig({
 					name: 'waypoint-ssr',
 					include: ['packages/waypoint/tests/ssr/**/*.test.ts'],
 					environment: 'node',
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
 					globals: false,
 				},
 				plugins: [octane({ ssr: true })],
@@ -2043,6 +2190,8 @@ export default defineConfig({
 						'packages/livestore/tests/upstream-original.test.ts',
 					],
 					environment: 'jsdom',
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
 					globals: false,
 				},
 				plugins: [octane()],
@@ -2278,16 +2427,38 @@ export default defineConfig({
 					],
 				},
 			},
-			{
-				// Package-authored TanStack AI contracts stay ordinary. Parity owns
-				// only the dedicated differential project below.
+			...[
+				['tanstack-ai', []],
+				[
+					'tanstack-ai-mcp-differential',
+					['packages/tanstack-ai/tests/conformance/mcp-resource.test.tsx'],
+				],
+				['tanstack-ai-hydration', ['packages/tanstack-ai/tests/conformance/ui-hydration.test.ts']],
+				['tanstack-ai-portal', ['packages/tanstack-ai/tests/conformance/ui-lifecycle.test.ts']],
+				['tanstack-ai-input', ['packages/tanstack-ai/tests/conformance/ui-components.test.tsx']],
+			].map(([name, files]) => ({
+				...(files.length ? { testExecution: { group: 'react-parity' } } : {}),
+				// Give each required parity lane its own project and leave the
+				// remaining package contracts in the ordinary project.
 				test: {
-					name: 'tanstack-ai',
-					include: [
-						'packages/tanstack-ai/tests/conformance/**/*.test.ts',
-						'packages/tanstack-ai/tests/conformance/**/*.test.tsx',
-					],
+					name,
+					include: files.length
+						? files
+						: [
+								'packages/tanstack-ai/tests/conformance/**/*.test.ts',
+								'packages/tanstack-ai/tests/conformance/**/*.test.tsx',
+							],
+					exclude: files.length
+						? []
+						: [
+								'packages/tanstack-ai/tests/conformance/mcp-resource.test.tsx',
+								'packages/tanstack-ai/tests/conformance/ui-hydration.test.ts',
+								'packages/tanstack-ai/tests/conformance/ui-lifecycle.test.ts',
+								'packages/tanstack-ai/tests/conformance/ui-components.test.tsx',
+							],
 					environment: 'jsdom',
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
 					setupFiles: ['packages/tanstack-ai/tests/conformance/test-setup.ts'],
 					globals: false,
 				},
@@ -2308,7 +2479,7 @@ export default defineConfig({
 						},
 					],
 				},
-			},
+			})),
 			{
 				test: {
 					name: 'tanstack-ai-ssr',
@@ -2421,6 +2592,8 @@ export default defineConfig({
 					name: 'tanstack-table',
 					include: ['packages/tanstack-table/tests/**/*.test.ts'],
 					environment: 'jsdom',
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
 					exclude: [
 						'packages/tanstack-table/tests/differential/**/*.test.ts',
 						'packages/tanstack-table/tests/upstream-original.test.ts',
@@ -2489,6 +2662,8 @@ export default defineConfig({
 					name: 'remix-router-ssr',
 					include: ['packages/remix-router/tests/ssr/**/*.test.ts'],
 					environment: 'node',
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
 					globalSetup: ['packages/remix-router/tests/differential/_setup-ssr.ts'],
 					globals: false,
 				},
@@ -2539,6 +2714,8 @@ export default defineConfig({
 					name: 'tanstack-virtual',
 					include: ['packages/tanstack-virtual/tests/**/*.test.ts'],
 					environment: 'jsdom',
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
 					exclude: [
 						'packages/tanstack-virtual/tests/differential/**/*.test.ts',
 						'packages/tanstack-virtual/tests/upstream-original.test.ts',
@@ -3200,7 +3377,7 @@ export default defineConfig({
 				},
 			},
 			{
-				testExecution: { group: 'heavy-browser' },
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'resizable-panels-browser',
 					include: ['packages/resizable-panels/tests/browser/**/*.browser.test.ts'],
@@ -3352,6 +3529,8 @@ export default defineConfig({
 					],
 					exclude: [...configDefaults.exclude, 'packages/formisch/tests/differential/**/*.test.ts'],
 					environment: 'jsdom',
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
 					setupFiles: ['packages/formisch/tests/conformance/test-setup.ts'],
 					globals: false,
 				},
@@ -3434,6 +3613,36 @@ export default defineConfig({
 			{
 				testExecution: { group: 'react-parity' },
 				test: {
+					name: 'hook-form-pristine-browser',
+					include: ['packages/hook-form/tests/upstream-browser-original.test.ts'],
+					environment: 'node',
+					testTimeout: 60_000,
+					hookTimeout: 60_000,
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'hook-form-adapted-browser',
+					include: ['packages/hook-form/tests/upstream-browser-adapted.test.ts'],
+					environment: 'node',
+					testTimeout: 60_000,
+					hookTimeout: 60_000,
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'hook-form-browser',
+					include: ['packages/hook-form/tests/browser/**/*.test.ts'],
+					environment: 'node',
+					testTimeout: 60_000,
+					hookTimeout: 60_000,
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
 					name: 'hook-form-pristine',
 					include: ['packages/hook-form/tests/upstream-original.test.ts'],
 					environment: 'node',
@@ -3441,28 +3650,24 @@ export default defineConfig({
 					globals: false,
 				},
 			},
-			{
-				testExecution: {
-					group: 'react-parity',
-					include: [
-						'packages/hook-form/tests/upstream/**/*.test.ts',
-						'packages/hook-form/tests/upstream/**/*.test.tsx',
-					],
-				},
+			...['upstream', 'native'].map((suite) => ({
+				testExecution: { group: 'react-parity' },
 				test: {
-					name: 'hook-form',
-					include: [
-						'packages/hook-form/tests/**/*.test.ts',
-						'packages/hook-form/tests/**/*.test.tsx',
-					],
-					exclude: [
-						...configDefaults.exclude,
-						'packages/hook-form/tests/**/*.server.test.tsx',
-						'packages/hook-form/tests/upstream-original.test.ts',
-						'packages/hook-form/tests/differential/**/*.test.ts',
-						'packages/hook-form/tests/differential/**/*.test.tsx',
-					],
+					name: suite === 'upstream' ? 'hook-form' : 'hook-form-native',
+					include:
+						suite === 'upstream'
+							? [
+									'packages/hook-form/tests/upstream/**/*.test.ts',
+									'packages/hook-form/tests/upstream/**/*.test.tsx',
+								]
+							: [
+									'packages/hook-form/tests/conformance/**/*.test.*',
+									'packages/hook-form/tests/hydration.test.ts',
+								],
+					exclude: [...configDefaults.exclude, 'packages/hook-form/tests/**/*.server.test.tsx'],
 					environment: 'jsdom',
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
 					// The ported upstream suite uses @testing-library/jest-dom matchers
 					// (toBeVisible, toBeInTheDocument, …) — same as react-hook-form's own
 					// jest setup. clear/reset/restore mirror upstream's jest config so
@@ -3498,7 +3703,7 @@ export default defineConfig({
 						},
 					],
 				},
-			},
+			})),
 			{
 				testExecution: { group: 'react-parity' },
 				test: {
@@ -3928,7 +4133,12 @@ export default defineConfig({
 					name: 'tanstack-router',
 					include: ['packages/tanstack-router/tests/**/*.test.ts'],
 					environment: 'jsdom',
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
 					exclude: [
+						'packages/tanstack-router/tests/browser/**',
+						'packages/tanstack-router/tests/upstream/**',
+						'packages/tanstack-router/tests/upstream-original.test.ts',
 						'packages/tanstack-router/tests/differential/**/*.test.ts',
 						'packages/tanstack-router/tests/ssr/**/*.test.ts',
 					],
@@ -3955,10 +4165,46 @@ export default defineConfig({
 						'packages/tanstack-router-ssr-query/tests/**/*.test.ts',
 						'!packages/tanstack-router-ssr-query/tests/differential/**/*.test.ts',
 						'!packages/tanstack-router-ssr-query/tests/parity/**/*.test.ts',
+						'!packages/tanstack-router-ssr-query/tests/*.browser.test.ts',
 					],
 					environment: 'node',
 					globals: false,
 				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/tanstack-router-ssr-query$/,
+							replacement: resolve(
+								import.meta.dirname,
+								'packages/tanstack-router-ssr-query/src/index.tsrx',
+							),
+						},
+						{
+							find: /^@octanejs\/tanstack-query$/,
+							replacement: resolve(import.meta.dirname, 'packages/tanstack-query/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/tanstack-router$/,
+							replacement: resolve(import.meta.dirname, 'packages/tanstack-router/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'tanstack-router-ssr-query-browser',
+					include: ['packages/tanstack-router-ssr-query/tests/*.browser.test.ts'],
+					environment: 'node',
+					testTimeout: 60_000,
+					hookTimeout: 60_000,
+					globals: false,
+				},
+				testExecution: { group: 'react-parity' },
 				plugins: [octane({ ssr: true })],
 				resolve: {
 					alias: [
@@ -4032,6 +4278,8 @@ export default defineConfig({
 					include: ['packages/tanstack-start/tests/**/*.test.ts'],
 					exclude: ['packages/tanstack-start/tests/rsbuild-plugin.test.ts'],
 					environment: 'jsdom',
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
 					globals: false,
 				},
 				plugins: [octane()],
@@ -4080,10 +4328,19 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: {
+					group: 'react-parity',
+					include: [
+						'packages/motion/tests/browser/motion.browser.test.ts',
+						'packages/motion/tests/production-bundle.test.ts',
+					],
+				},
 				test: {
 					name: 'motion',
 					include: ['packages/motion/tests/**/*.test.ts'],
 					environment: 'jsdom',
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
 					exclude: [
 						'packages/motion/tests/differential/**/*.test.ts',
 						'packages/motion/tests/upstream/**/*.test.ts',
@@ -5151,6 +5408,8 @@ export default defineConfig({
 					name: 'cmdk-ssr',
 					include: ['packages/cmdk/tests/ssr/**/*.test.ts'],
 					environment: 'node',
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
 					setupFiles: ['packages/cmdk/tests/_setup.ts'],
 					globals: false,
 				},
@@ -5694,6 +5953,49 @@ export default defineConfig({
 				plugins: [octane()],
 			},
 			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'react-error-boundary-browser',
+					include: ['packages/react-error-boundary/tests/browser/**/*.test.ts'],
+					environment: 'node',
+					testTimeout: 30000,
+					hookTimeout: 60000,
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'react-error-boundary-pristine',
+					include: ['packages/react-error-boundary/upstream/lib/**/*.test.tsx'],
+					environment: 'jsdom',
+					setupFiles: ['packages/react-error-boundary/upstream/vitest.setup.ts'],
+					globals: false,
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'react-error-boundary-adapted',
+					include: ['packages/react-error-boundary/tests/upstream/**/*.test.tsx'],
+					environment: 'jsdom',
+					setupFiles: ['packages/react-error-boundary/upstream/vitest.setup.ts'],
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/index.ts'),
+						},
+						{
+							find: /^@testing-library\/react$/,
+							replacement: resolve(import.meta.dirname, 'packages/testing-library/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
 				test: {
 					name: 'react-error-boundary',
 					include: [
@@ -5701,7 +6003,10 @@ export default defineConfig({
 						'!packages/react-error-boundary/tests/ssr/**/*.test.ts',
 					],
 					environment: 'jsdom',
-					exclude: ['packages/react-error-boundary/tests/differential/**/*.test.ts'],
+					exclude: [
+						'packages/react-error-boundary/tests/differential/**/*.test.ts',
+						'packages/react-error-boundary/tests/browser/**/*.test.ts',
+					],
 					globals: false,
 				},
 				plugins: [octane()],
@@ -5778,6 +6083,52 @@ export default defineConfig({
 						{
 							find: /^@octanejs\/gsap$/,
 							replacement: resolve(import.meta.dirname, 'packages/gsap/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'mantine-hooks-browser',
+					include: ['packages/mantine-hooks/tests/browser/**/*.test.ts'],
+					environment: 'node',
+					testTimeout: 30000,
+					hookTimeout: 60000,
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'mantine-hooks-pristine',
+					include: ['packages/mantine-hooks/upstream/src/**/*.test.{ts,tsx}'],
+					environment: 'jsdom',
+					globals: true,
+					setupFiles: [
+						'packages/mantine-hooks/tests/upstream-environment.ts',
+						'packages/mantine-hooks/tests/pristine-environment.ts',
+					],
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'mantine-hooks-adapted',
+					include: ['packages/mantine-hooks/tests/upstream/**/*.test.{ts,tsx}'],
+					environment: 'jsdom',
+					globals: true,
+					setupFiles: ['packages/mantine-hooks/tests/upstream-environment.ts'],
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/testing-library$/,
+							replacement: resolve(import.meta.dirname, 'packages/testing-library/src/index.ts'),
 						},
 					],
 				},
@@ -5866,10 +6217,19 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: {
+					group: 'react-parity',
+					include: [
+						'packages/mobx/tests/conformance/binding.test.ts',
+						'packages/mobx/tests/conformance/hydration.test.ts',
+					],
+				},
 				test: {
 					name: 'mobx',
 					include: ['packages/mobx/tests/conformance/**/*.test.ts'],
 					environment: 'jsdom',
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
 					globals: false,
 				},
 				plugins: [octane()],
@@ -5889,6 +6249,8 @@ export default defineConfig({
 					include: ['packages/mobx/tests/differential/**/*.test.ts'],
 					globalSetup: ['packages/mobx/tests/differential/_setup.ts'],
 					environment: 'jsdom',
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
 					globals: false,
 				},
 				plugins: [octane()],
@@ -5902,10 +6264,13 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'mobx-ssr',
 					include: ['packages/mobx/tests/ssr/**/*.test.ts'],
 					environment: 'node',
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
 					globals: false,
 				},
 				plugins: [octane({ ssr: true })],
@@ -6155,6 +6520,8 @@ export default defineConfig({
 						'playground/octane/src/demos/AlienSignals.test.ts',
 						'!packages/alien-signals/tests/ssr/**/*.test.ts',
 						'!packages/alien-signals/tests/upstream-original.test.ts',
+						'!packages/alien-signals/tests/octane-contracts.test.ts',
+						'!packages/alien-signals/tests/hydration.test.ts',
 					],
 					environment: 'jsdom',
 					globals: false,
@@ -6174,10 +6541,36 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'alien-signals-native',
+					include: [
+						'packages/alien-signals/tests/octane-contracts.test.ts',
+						'packages/alien-signals/tests/hydration.test.ts',
+					],
+					environment: 'jsdom',
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/alien-signals$/,
+							replacement: resolve(import.meta.dirname, 'packages/alien-signals/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'alien-signals-ssr',
 					include: ['packages/alien-signals/tests/ssr/**/*.test.ts'],
 					environment: 'node',
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
 					globals: false,
 				},
 				plugins: [octane({ ssr: true })],
@@ -6190,6 +6583,26 @@ export default defineConfig({
 						{
 							find: /^@octanejs\/alien-signals$/,
 							replacement: resolve(import.meta.dirname, 'packages/alien-signals/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'intersection-observer-adapted-ssr',
+					include: ['packages/intersection-observer/tests/upstream/useInView.ssr.test.ts'],
+					environment: 'node',
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
+					globals: true,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
 						},
 					],
 				},
@@ -6217,6 +6630,7 @@ export default defineConfig({
 				},
 			},
 			{
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'intersection-observer',
 					include: [
@@ -6230,6 +6644,8 @@ export default defineConfig({
 						'packages/intersection-observer/tests/upstream-browser-original.test.ts',
 					],
 					environment: 'jsdom',
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
 					globals: false,
 				},
 				plugins: [octane()],
@@ -6260,8 +6676,13 @@ export default defineConfig({
 						'packages/intersection-observer/tests/upstream/**/*.test.ts',
 						'packages/intersection-observer/tests/upstream/**/*.test.tsx',
 					],
-					exclude: ['packages/intersection-observer/tests/upstream/browser.test.tsx'],
+					exclude: [
+						'packages/intersection-observer/tests/upstream/browser.test.tsx',
+						'packages/intersection-observer/tests/upstream/useInView.ssr.test.ts',
+					],
 					environment: 'jsdom',
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
 					globals: true,
 					setupFiles: ['packages/intersection-observer/tests/upstream-adapted.setup.ts'],
 				},
@@ -6508,6 +6929,8 @@ export default defineConfig({
 					name: 'transition-group-ssr',
 					include: ['packages/transition-group/tests/ssr/**/*.test.ts'],
 					environment: 'node',
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
 					globals: false,
 				},
 				plugins: [octane({ ssr: true })],
@@ -6545,6 +6968,8 @@ export default defineConfig({
 						'!packages/select/tests/state-manager.test.ts',
 					],
 					environment: 'node',
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
 					globals: false,
 					fileParallelism: false,
 				},
@@ -6595,6 +7020,8 @@ export default defineConfig({
 						'packages/select/tests/state-manager.test.ts',
 					],
 					environment: 'node',
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
 					globals: false,
 					fileParallelism: false,
 				},
@@ -7015,6 +7442,8 @@ export default defineConfig({
 					name: 'input-otp-server',
 					include: ['packages/input-otp/tests/ssr/**/*.server.test.ts'],
 					environment: 'node',
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
 					globals: false,
 				},
 				testExecution: { group: 'react-parity' },
@@ -7113,6 +7542,8 @@ export default defineConfig({
 					name: 'tanstack-query-ssr',
 					include: ['packages/tanstack-query/tests/ssr/**/*.test.ts'],
 					environment: 'node',
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
 					globals: false,
 				},
 				plugins: [octane({ ssr: true })],
@@ -7327,6 +7758,8 @@ export default defineConfig({
 					name: 'tanstack-virtual-ssr',
 					include: ['packages/tanstack-virtual/tests/ssr/**/*.test.ts'],
 					environment: 'node',
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
 					globals: false,
 				},
 				plugins: [octane({ ssr: true })],
@@ -7574,7 +8007,7 @@ export default defineConfig({
 				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'motion-upstream',
-					include: ['packages/motion/tests/upstream/**/*.test.ts'],
+					include: ['packages/motion/tests/upstream/**/*.test.{ts,tsx}'],
 					environment: 'jsdom',
 					globals: false,
 				},
@@ -7810,6 +8243,8 @@ export default defineConfig({
 						'packages/dropzone/tests/probes/server.test.ts',
 					],
 					environment: 'jsdom',
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
 					globals: false,
 					fileParallelism: false,
 				},
@@ -8170,6 +8605,8 @@ export default defineConfig({
 						'packages/textarea-autosize/tests/differential/**/*.test.ts',
 					],
 					environment: 'jsdom',
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
 					globals: false,
 					server: {
 						deps: {
@@ -8247,6 +8684,8 @@ export default defineConfig({
 					name: 'textarea-autosize-ssr',
 					include: ['packages/textarea-autosize/tests/ssr/**/*.test.ts'],
 					environment: 'node',
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
 					globals: false,
 					server: {
 						deps: {
@@ -8305,6 +8744,8 @@ export default defineConfig({
 						'!packages/syntax-highlighter/tests/differential/**/*.test.ts',
 					],
 					environment: 'jsdom',
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
 					globals: false,
 				},
 				plugins: [octane()],
@@ -8359,6 +8800,17 @@ export default defineConfig({
 					],
 					environment: 'node',
 					globals: false,
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'window-browser',
+					include: ['packages/window/tests/browser/**/*.browser.test.ts'],
+					environment: 'node',
+					globals: false,
+					testTimeout: 60_000,
+					hookTimeout: 60_000,
 				},
 			},
 			{
@@ -8596,17 +9048,23 @@ export default defineConfig({
 				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'colorful-upstream',
-					include: ['packages/colorful/tests/upstream/**/*.test.ts'],
+					include: ['packages/colorful/tests/upstream/**/*.test.{js,ts}'],
 					environment: 'jsdom',
 					globals: false,
 				},
 				plugins: [octane()],
 			},
 			{
+				testExecution: {
+					group: 'react-parity',
+					include: ['packages/colorful/tests/runtime/lifecycle.test.ts'],
+				},
 				test: {
 					name: 'colorful',
 					include: ['packages/colorful/tests/runtime/**/*.test.ts'],
 					environment: 'jsdom',
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
 					globals: false,
 				},
 				plugins: [octane()],
@@ -8623,19 +9081,25 @@ export default defineConfig({
 				plugins: [octane()],
 			},
 			{
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'colorful-hydration',
 					include: ['packages/colorful/tests/hydration/**/*.test.ts'],
 					environment: 'jsdom',
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
 					globals: false,
 				},
 				plugins: [octane()],
 			},
 			{
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'colorful-ssr',
 					include: ['packages/colorful/tests/ssr/**/*.test.ts'],
 					environment: 'node',
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
 					globals: false,
 				},
 				plugins: [octane({ ssr: true })],
@@ -8649,7 +9113,7 @@ export default defineConfig({
 				},
 			},
 			{
-				testExecution: { group: 'heavy-browser' },
+				testExecution: { group: 'react-parity' },
 				test: {
 					name: 'colorful-browser',
 					include: ['packages/colorful/tests/browser/**/*.test.ts'],
@@ -9304,29 +9768,49 @@ export default defineConfig({
 				aliases: SANITY_LOADER_SOURCE_ALIASES,
 				ssr: true,
 			}),
-			octaneSourceTestProject({
-				test: {
-					name: 'thinking-orbs',
-					include: ['packages/thinking-orbs/tests/**/*.test.ts'],
-					exclude: [
-						...configDefaults.exclude,
-						'packages/thinking-orbs/tests/differential/**/*.test.ts',
-					],
-					environment: 'jsdom',
-					globals: false,
+			{
+				testExecution: {
+					group: 'react-parity',
+					include: ['packages/thinking-orbs/tests/conformance/render.test.ts'],
 				},
-				aliases: THINKING_ORBS_SOURCE_ALIASES,
-			}),
-			octaneSourceTestProject({
+				...octaneSourceTestProject({
+					test: {
+						name: 'thinking-orbs',
+						include: ['packages/thinking-orbs/tests/**/*.test.ts'],
+						exclude: [
+							...configDefaults.exclude,
+							'packages/thinking-orbs/tests/differential/**/*.test.ts',
+							'packages/thinking-orbs/tests/browser/**/*.test.ts',
+						],
+						environment: 'jsdom',
+						globals: false,
+					},
+					aliases: THINKING_ORBS_SOURCE_ALIASES,
+				}),
+			},
+			{
+				testExecution: { group: 'react-parity' },
 				test: {
-					name: 'thinking-orbs-differential',
-					include: ['packages/thinking-orbs/tests/differential/**/*.test.ts'],
-					environment: 'jsdom',
-					globalSetup: ['packages/thinking-orbs/tests/differential/_setup.ts'],
-					globals: false,
+					name: 'thinking-orbs-browser',
+					include: ['packages/thinking-orbs/tests/browser/**/*.test.ts'],
+					environment: 'node',
+					testTimeout: 30_000,
+					hookTimeout: 60_000,
 				},
-				aliases: THINKING_ORBS_SOURCE_ALIASES,
-			}),
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				...octaneSourceTestProject({
+					test: {
+						name: 'thinking-orbs-differential',
+						include: ['packages/thinking-orbs/tests/differential/**/*.test.ts'],
+						environment: 'jsdom',
+						globalSetup: ['packages/thinking-orbs/tests/differential/_setup.ts'],
+						globals: false,
+					},
+					aliases: THINKING_ORBS_SOURCE_ALIASES,
+				}),
+			},
 			octaneSourceTestProject({
 				test: {
 					name: 'puck',

@@ -1,0 +1,19 @@
+diff --git a/tests/upstream/store-updates-during-navigation.test.tsx b/tests/upstream/store-updates-during-navigation.test.tsx
+--- a/tests/upstream/store-updates-during-navigation.test.tsx
++++ b/tests/upstream/store-updates-during-navigation.test.tsx
+@@ -154,7 +154,14 @@ describe("Store doesn't update *too many* times during navigation", () => {
+     // This number should be as small as possible to minimize the amount of work
+     // that needs to be done during a navigation.
+     // Any change that increases this number should be investigated.
+-    expect(updates).toBe(2)
++    // DIVERGENCE: the native selector observes one initial-load publication;
++    // preloading itself keeps the current page intact and redirects on navigation.
++    expect(updates).toBe(1)
++    expect(router.state.location.pathname).toBe('/')
++    expect(await screen.findByRole('heading', { name: 'Index' })).toBeInTheDocument()
++    fireEvent.click(screen.getByRole('link', { name: 'Posts' }))
++    expect(await screen.findByRole('heading', { name: 'Other Title' })).toBeInTheDocument()
++    expect(router.state.location.pathname).toBe('/other')
+   })
+ 
+   test('sync beforeLoad', async () => {

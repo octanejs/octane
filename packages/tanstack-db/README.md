@@ -5,8 +5,8 @@ Octane live-query hooks for [TanStack DB](https://github.com/TanStack/db).
 ## Installation
 
 ```sh
-npm install @octanejs/tanstack-db
-pnpm add @octanejs/tanstack-db
+npm install @octanejs/tanstack-db octane
+pnpm add @octanejs/tanstack-db octane
 ```
 
 Re-exports [`@tanstack/db`](https://tanstack.com/db) unchanged and implements its
@@ -17,25 +17,24 @@ live-query binding surface on Octane hooks:
 - `useLiveSuspenseQuery`
 - `useLiveQueryEffect`
 - `usePacedMutations`
+- `DbProvider`, `useDbClient`, `useOptionalDbClient`
+- `HydrationBoundary`
 
 Install `octane` alongside this package and configure the Octane compiler in your
 build tool (see [octanejs.dev](https://octanejs.dev/docs/build-tools)).
 
 ## Compatibility
 
-Ports the React live-query hooks of `@tanstack/react-db@0.1.96` onto Octane and
-re-exports the framework-neutral `@tanstack/db@0.7.0` core unchanged.
-`useLiveQuery`/`useLiveSuspenseQuery` run on db's shared `createLiveQueryObserver`
-and `useLiveInfiniteQuery` on the coordinated `createLiveQueryWindowController`.
+Ports `@tanstack/react-db@0.3.8` and re-exports `@tanstack/db@0.9.0` unchanged.
+The adapter includes `DbProvider`, `useDbClient`, `useOptionalDbClient` and
+`HydrationBoundary`, alongside all five live-query and mutation hooks.
 
-Intentional differences from React:
+Use `DbProvider` to share a `DbClient`; `HydrationBoundary` applies dehydrated
+collection state before its children render. Query identity is derived from
+structured query IR. Use an explicit `queryKey` for opaque functional queries;
+the legacy dependency-array form remains supported with a development warning.
+`fetchNextPage()` returns a promise that resolves when the page is available.
 
-- **Suspense** integrates via Octane's `use(thenable)` rather than throwing a raw
-  promise (observable behavior — fallback then data — matches).
-- **`useLiveInfiniteQuery`** rejects a pre-created collection that lacks an
-  `orderBy` synchronously during render, so the error reaches the caller.
-- **StrictMode double-invocation** is not applicable (Octane has no development
-  double-invoke).
-
-See `UPSTREAM.md` for the pin and export crosswalk and `status.json` for the
-tracked binding status.
+Octane uses compiler-assigned hook slots and has no React StrictMode double
+invocation. Suspense uses the same promise/error behavior as the pinned adapter.
+See `UPSTREAM.md` for provenance, ownership and verification evidence.

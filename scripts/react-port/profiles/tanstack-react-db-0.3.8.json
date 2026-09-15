@@ -1,0 +1,50 @@
+{
+  "package": "@tanstack/react-db",
+  "version": "0.3.8",
+  "commit": "667d53307e5b4d281352af642da7364aff04e8b1",
+  "review": "Both pinned React drivers declare empty knownGaps. The shared scenario wrappers always register exactly one test; expected-fail branches retain a registration. All counts and case titles are parsed from immutable source without executing upstream code.",
+  "helpers": [
+    {
+      "name": "runSuite",
+      "modules": [
+        {
+          "path": "packages/react-db/tests/conformance.test.tsx",
+          "gitBlob": "3916d67b79474c1bc22e88e0272a551cf251cf41",
+          "registrations": false
+        },
+        {
+          "path": "packages/db/tests/conformance/suite.ts",
+          "gitBlob": "39759017bcb9f3171e638996d889f41280c6b053",
+          "registrations": true,
+          "registrarWrappers": [
+            {
+              "name": "scenario",
+              "titleArgument": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "runInfiniteQuerySuite",
+      "modules": [
+        {
+          "path": "packages/react-db/tests/infinite-query-conformance.test.tsx",
+          "gitBlob": "bf7bd198eb6d3bf7b85efb3515e698869e19a34a",
+          "registrations": false
+        },
+        {
+          "path": "packages/db/tests/conformance/infinite-suite.ts",
+          "gitBlob": "829fa6bf44028980422bd0e2016f0c3913d76376",
+          "registrations": true,
+          "registrarWrappers": [
+            {
+              "name": "scenario",
+              "titleArgument": 1
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

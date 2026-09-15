@@ -1,13 +1,44 @@
 {
   "upstream": {
     "package": "thinking-orbs",
-    "version": "0.2.0"
+    "version": "0.3.1"
   },
   "surface": "ThinkingOrb component, resolvePreset, MODE_DRAWS, and public types — nine animation states, two tuned size presets, auto/dark/light theme, reduced-motion static frame.",
   "divergences": [],
   "ssr": "Canvas is client-only; server render emits the canvas element without animation.",
-  "verified": "2026-08-07",
+  "verified": "2026-09-13",
   "notes": [
     "Below the standard 10M npm downloads admission cutoff; explicit portfolio approval required."
+  ],
+  "surfaces": [
+    {
+      "entrypoint": ".",
+      "exports": ["resolvePreset", "STATE_TO_MODE", "ModeKey", "Resolved", "MODE_DRAWS"],
+      "ownership": "imported",
+      "files": ["src/index.ts"],
+      "dependency": {
+        "package": "thinking-orbs",
+        "version": "catalog:default",
+        "specifier": "thinking-orbs/engine"
+      },
+      "evidence": ["tests/conformance/exports.test.ts"]
+    },
+    {
+      "entrypoint": ".",
+      "exports": ["ThinkingOrb", "ThinkingOrbProps", "OrbState", "OrbSize", "OrbTheme"],
+      "ownership": "copied",
+      "files": ["src/ThinkingOrb.tsrx", "src/theme.ts", "src/types.ts"],
+      "dependency": {
+        "package": "thinking-orbs",
+        "version": "0.3.1"
+      },
+      "upstreamPaths": ["src/ThinkingOrb.tsx", "src/theme.ts", "src/types.ts"],
+      "evidence": [
+        "tests/conformance/render.test.ts",
+        "tests/differential/parity.test.ts",
+        "tests/browser/parity.browser.test.ts",
+        "tests/types/public.test-d.ts"
+      ]
+    }
   ]
 }

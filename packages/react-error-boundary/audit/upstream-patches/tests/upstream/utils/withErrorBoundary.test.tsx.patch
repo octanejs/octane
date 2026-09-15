@@ -1,0 +1,46 @@
+diff --git a/tests/upstream/utils/withErrorBoundary.test.tsx b/tests/upstream/utils/withErrorBoundary.test.tsx
+--- a/tests/upstream/utils/withErrorBoundary.test.tsx
++++ b/tests/upstream/utils/withErrorBoundary.test.tsx
+@@ -63,13 +63,12 @@ describe("withErrorBoundary", () => {
+   it("should forward refs", () => {
+     type Props = { foo: string };
+ 
+-    class TestClassComponent extends Component<Props> {
+-      getFoo() {
+-        return this.props.foo;
+-      }
+-      render() {
+-        return null;
+-      }
++    // OCTANE DIVERGENCE[react-error-boundary-class-ref][runtime:error-boundary-adapted-022]: Octane components are
++    // functions; expose the same public handle through a ref prop.
++    type TestClassComponent = { getFoo: () => string };
++    function TestClassComponent({ foo, ref }: Props & { ref?: Ref<TestClassComponent> }) {
++      useImperativeHandle(ref, () => ({ getFoo: () => foo }));
++      return null;
+     }
+ 
+     const Wrapped = withErrorBoundary(TestClassComponent, {
+@@ -119,14 +118,14 @@ describe("withErrorBoundary", () => {
+   it("should forward refs to a function using forwardRef", () => {
+     type Handle = { getFoo: () => string };
+ 
+-    const TestForwardRefComponent = forwardRef(
+-      ({ foo }: { foo: string }, ref: Ref<Handle>) => {
+-        useImperativeHandle(ref, () => ({
+-          getFoo: () => foo,
+-        }));
+-        return null;
+-      },
+-    );
++    // OCTANE DIVERGENCE[react-error-boundary-forward-ref][runtime:error-boundary-adapted-024]: Refs are ordinary
++    // props in Octane; the wrapper must retain the same imperative handle.
++    const TestForwardRefComponent = ({ foo, ref }: { foo: string; ref?: Ref<Handle> }) => {
++      useImperativeHandle(ref, () => ({
++        getFoo: () => foo,
++      }));
++      return null;
++    };
+ 
+     const Wrapped = withErrorBoundary(TestForwardRefComponent, {
+       fallback: <div>Error</div>,

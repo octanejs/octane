@@ -1,0 +1,396 @@
+{
+  "runtimeDependencies": [
+    "@tanstack/history",
+    "@tanstack/router-core",
+    "@tanstack/store",
+    "isbot",
+    "octane"
+  ],
+  "adaptedSources": [
+    {
+      "packageName": "@tanstack/react-router",
+      "paths": [
+        "src/Asset.tsrx",
+        "src/Await.tsrx",
+        "src/Body.ts",
+        "src/CatchBoundary.tsrx",
+        "src/ClientOnly.tsrx",
+        "src/Head.ts",
+        "src/HeadContent.tsrx",
+        "src/Html.ts",
+        "src/Link.tsrx",
+        "src/Match.tsrx",
+        "src/MatchRoute.tsrx",
+        "src/Matches.tsrx",
+        "src/Navigate.tsrx",
+        "src/Outlet.tsrx",
+        "src/RouteNotFound.tsrx",
+        "src/RouterProvider.tsrx",
+        "src/SafeFragment.tsrx",
+        "src/ScriptOnce.tsrx",
+        "src/Scripts.tsrx",
+        "src/ScrollRestoration.tsrx",
+        "src/Transitioner.tsrx",
+        "src/assetKeys.ts",
+        "src/context.ts",
+        "src/externalHydration.ts",
+        "src/fileRoute.ts",
+        "src/headContentUtils.ts",
+        "src/history.ts",
+        "src/hooks.ts",
+        "src/index.ts",
+        "src/internal.ts",
+        "src/lazyRouteComponent.ts",
+        "src/link.ts",
+        "src/not-found.tsrx",
+        "src/route.ts",
+        "src/router.ts",
+        "src/scriptContentUtils.ts",
+        "src/scroll-restoration.tsrx",
+        "src/ssr/RouterClient.tsrx",
+        "src/ssr/RouterServer.tsrx",
+        "src/ssr/client.ts",
+        "src/ssr/core-client.js",
+        "src/ssr/defaultRenderHandler.ts",
+        "src/ssr/defaultStreamHandler.ts",
+        "src/ssr/renderRouterToStream.ts",
+        "src/ssr/renderRouterToString.ts",
+        "src/ssr/server.ts",
+        "src/useAwaited.ts",
+        "src/useBlocker.tsrx",
+        "src/useElementScrollRestoration.ts",
+        "src/useRouterState.ts",
+        "src/useStore.ts"
+      ]
+    }
+  ],
+  "sourceLedger": [
+    {
+      "path": "package.json",
+      "origin": "authored",
+      "sha256": "683afb05a5f054bc32409a0dd404652a32a55c9d1a71eb296058fba87506ecf1"
+    },
+    {
+      "path": "src/Asset.tsrx",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-router",
+      "sha256": "2ff2b515c78c030a6ec2c51ed28056db43648ae39059d040e661b0c173d9ed37"
+    },
+    {
+      "path": "src/Await.tsrx",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-router",
+      "sha256": "e4bd8dc7fc12f2708361a42d1b57e51c4fb95f0ab45ba1a615d9cf5c44e9bc7a"
+    },
+    {
+      "path": "src/Body.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-router",
+      "sha256": "da3aef07fc95171c9c2b34d123b2dd0834a86a043372fb27244f0e69c7c912e6"
+    },
+    {
+      "path": "src/CatchBoundary.tsrx",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-router",
+      "sha256": "fce6a6f69e4988c305885a01fc80880b22eabef8a453f062b7d043c042ee8681"
+    },
+    {
+      "path": "src/ClientOnly.tsrx",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-router",
+      "sha256": "eab1da362f3427e54cf90adac9ebcbc391c306d00ee657dfccab72faba72d332"
+    },
+    {
+      "path": "src/Head.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-router",
+      "sha256": "aa4085556013974b1a4453833f51cd0fad06d434cd321a44d9a438e29c4d963e"
+    },
+    {
+      "path": "src/HeadContent.tsrx",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-router",
+      "sha256": "66977b4ba42eb99f6b673a4964b65de2f8437962937cc2e0596e2e141c8091df"
+    },
+    {
+      "path": "src/Html.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-router",
+      "sha256": "61e874d7dab8f318d428aa8ebab0a1985af9edf7d60ead617e3617f82b5d5474"
+    },
+    {
+      "path": "src/Link.tsrx",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-router",
+      "sha256": "26b0950af883192b6a058dd58bf832dad559964cd3711f26e4423d8ac3bcf37f"
+    },
+    {
+      "path": "src/Match.tsrx",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-router",
+      "sha256": "c5481227c57b431fd42057f0f73afe2f28b1a65dbc62b0288d6c02490b0e2f7c"
+    },
+    {
+      "path": "src/MatchRoute.tsrx",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-router",
+      "sha256": "d1dbffd1065f2bcb04e097b48dc1af79feadb2ad4c291303a138ff304154c83a"
+    },
+    {
+      "path": "src/Matches.tsrx",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-router",
+      "sha256": "7883a8cc05ca5f37e7d4337ed6dba2bdebc1b293c3786f56656b6334d31a360f"
+    },
+    {
+      "path": "src/Navigate.tsrx",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-router",
+      "sha256": "7d49033b107f8ca096d67835cd3e9fbb34b3cec4f42846764e5cb06fff91aef9"
+    },
+    {
+      "path": "src/Outlet.tsrx",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-router",
+      "sha256": "8fa817789661ad5f4e5aa84bc9ac0f3926cecbc097b3b05ecf1f77dbcca8d718"
+    },
+    {
+      "path": "src/RouteNotFound.tsrx",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-router",
+      "sha256": "6c1c945e0a87075c88ba2e9dc519b2ce6ba3cb93a765ff6de93b9159aa1b5aa1"
+    },
+    {
+      "path": "src/RouterProvider.tsrx",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-router",
+      "sha256": "672742cf5b7281bad610715e61a8d17924f507c199d7051aa34672f765eebef4"
+    },
+    {
+      "path": "src/SafeFragment.tsrx",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-router",
+      "sha256": "7f38da53d7ad2c0118c6e0af86a22aee394c13f931ef3fb0c5939b3761ce45d5"
+    },
+    {
+      "path": "src/ScriptOnce.tsrx",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-router",
+      "sha256": "d2922bab9552fe52ea4fb3b1f3c4d47fb77cc655b9b04dd831a393a9b5cc2539"
+    },
+    {
+      "path": "src/Scripts.tsrx",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-router",
+      "sha256": "03d1b09ba794a9455878c3ef5c1a4dd408e3b3f02856f72a11f9d93d130eeabc"
+    },
+    {
+      "path": "src/ScrollRestoration.tsrx",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-router",
+      "sha256": "84ad92a0289ffb3e82d6e5bb68d89753a9de63f7ad310314d8bf99a5c0d5cb89"
+    },
+    {
+      "path": "src/Transitioner.tsrx",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-router",
+      "sha256": "89d1606301277222c7403eb5364491f086f418530d7e47598105bbbfa022132d"
+    },
+    {
+      "path": "src/assetKeys.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-router",
+      "sha256": "714071c6a622d9b6c0577d08e7733044b36454abb685e4b97363b71aa86fe52c"
+    },
+    {
+      "path": "src/context.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-router",
+      "sha256": "0055056292d3b4924084df8fae259e59e11f283e7472b12cb184caf1f00745d7"
+    },
+    {
+      "path": "src/externalHydration.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-router",
+      "sha256": "a8e75929263d46d5419338723ba08f533d67fadf0f987588fb9b709a41228171"
+    },
+    {
+      "path": "src/fileRoute.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-router",
+      "sha256": "b180d550771bd23b2bdae0af1b1f6673783f7a01fb20734f8a7bac88db6b6e8a"
+    },
+    {
+      "path": "src/frameworkTypes.ts",
+      "origin": "authored",
+      "sha256": "3615fd38d73a2a85079580a7bc3ae283d1e5f0893d21c4a53a8709ed0b007321"
+    },
+    {
+      "path": "src/generator-plugin.js",
+      "origin": "authored",
+      "sha256": "b2b40d58aad9aa68b6338eb6c5aabd9870494bb9f911e44d49e8bb2a023f7002"
+    },
+    {
+      "path": "src/headContentUtils.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-router",
+      "sha256": "4009efcbc382114fcdb2701941c472694a5fdf326f0364e3e0a34e61d8bb3f7e"
+    },
+    {
+      "path": "src/history.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-router",
+      "sha256": "f887012ce0b5ece33454932cd9c011c22406cafef061ed42897ac220f924acf6"
+    },
+    {
+      "path": "src/hooks.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-router",
+      "sha256": "b0d9dde6edf2266f62d29a2386e3e6a8e3cc9153a8a0724b4f8c04185ec67766"
+    },
+    {
+      "path": "src/index.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-router",
+      "sha256": "1f5667aee9788eae4a19b989884bb6c96b918ab20d3d56e56ba8154e4a661b18"
+    },
+    {
+      "path": "src/internal.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-router",
+      "sha256": "208d06911e38acb3421299c7155d8112c31f89e3b04c448ba37d70922b2ce510"
+    },
+    {
+      "path": "src/lazyRouteComponent.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-router",
+      "sha256": "df3cf04ef4848c5913c1377d298475d00f143fab3785291d28721b5e2be9779f"
+    },
+    {
+      "path": "src/link.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-router",
+      "sha256": "583c2455bb5ef5e3ebe1999bc98f2a2cbc5b9f9909b33ff10582d4fba4ba0108"
+    },
+    {
+      "path": "src/nonRouteComponentContext.ts",
+      "origin": "authored",
+      "sha256": "1acd57dbd7fc0f018dd31b203f50931c6a6cde7de4986ed1e46854a7bd6d4fee"
+    },
+    {
+      "path": "src/not-found.tsrx",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-router",
+      "sha256": "49949631bfc26829cd3a914b56e414d96ed61972c617cb86605370dba7bf42a9"
+    },
+    {
+      "path": "src/route.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-router",
+      "sha256": "06c4ceb7ce056af45d272328ae8d58035d62bfcd87a12f6f873d33ace2db6efb"
+    },
+    {
+      "path": "src/router.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-router",
+      "sha256": "29267dda31a0810091790e39d4163d5bef016888970e85d83470cbe49478a359"
+    },
+    {
+      "path": "src/scriptContentUtils.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-router",
+      "sha256": "577e676d2dd67cbdfd7637cd05a445d4844826a11cea21b3633e354a86eed3e4"
+    },
+    {
+      "path": "src/scroll-restoration.tsrx",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-router",
+      "sha256": "fd1646a4ccffd5003fe35b79ace2dffafd8b5b79bfd616f259b5bafd8e4003e1"
+    },
+    {
+      "path": "src/ssr/RouterClient.tsrx",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-router",
+      "sha256": "363441d40f95934d731db57d369410462dce6c46ccad8ae21be2d7e15dc2fd92"
+    },
+    {
+      "path": "src/ssr/RouterServer.tsrx",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-router",
+      "sha256": "3163254249601b965bb99ab7d225f23d7f17bb53c4001c9777a1a801eb96835d"
+    },
+    {
+      "path": "src/ssr/client.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-router",
+      "sha256": "24af78bbf9ec26d836bc7b31423be6f70bab4332a8e170681274ef7c37bbae70"
+    },
+    {
+      "path": "src/ssr/core-client.js",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-router",
+      "sha256": "cbacde9dfb087ec647f13cb38381e75af954fdab7ed7e322f9fcca8658bca412"
+    },
+    {
+      "path": "src/ssr/defaultRenderHandler.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-router",
+      "sha256": "eb24dfb7e0b333403b34d272bcd46ad9d295c602a8eebe000eedfc9d9044a2c9"
+    },
+    {
+      "path": "src/ssr/defaultStreamHandler.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-router",
+      "sha256": "89a351a900c2f54c86af502c003e285051bbf15227b75d398ed1be3570d83adf"
+    },
+    {
+      "path": "src/ssr/renderRouterToStream.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-router",
+      "sha256": "f35b403a64fb463e66a1d115695d3d1d56e3516db04a6fb5fd1e318c4d67329c"
+    },
+    {
+      "path": "src/ssr/renderRouterToString.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-router",
+      "sha256": "2da0dce9407a7e0204442e1d8b70f6f2b5f8173a02eab78a1f7e8fd242e1409d"
+    },
+    {
+      "path": "src/ssr/server.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-router",
+      "sha256": "53f96b0b246d3667223c57c80a8cb16325cf6b6132a92be152324812bdf9e8c1"
+    },
+    {
+      "path": "src/useAwaited.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-router",
+      "sha256": "5e20653e0d52dff578ea586c3d31af5097eb6e985df2d1b45b4db3f379b4f37d"
+    },
+    {
+      "path": "src/useBlocker.tsrx",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-router",
+      "sha256": "dbd3fae3a270fea74cb2cdd77568d27336d764ab8b5cfa70ebf7ce4f1f4160b2"
+    },
+    {
+      "path": "src/useElementScrollRestoration.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-router",
+      "sha256": "e625b173c26247ab50e554778317aa5986e6fb2e3143a4610de57a5182a1832a"
+    },
+    {
+      "path": "src/useRouterState.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-router",
+      "sha256": "72ec89e833dd34006926492874f7cc10f5930e06e006a3fc1d1a1593e95266fd"
+    },
+    {
+      "path": "src/useStore.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-router",
+      "sha256": "0fb8a808f4f1a1b926c3242e159c5cd7aee3ed58b5e032f0b3cd083a929a1b83"
+    }
+  ],
+  "reimplementedDependencies": []
+}

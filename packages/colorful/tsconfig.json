@@ -13,8 +13,12 @@
     "allowSyntheticDefaultImports": true,
     "allowImportingTsExtensions": true,
     "strict": true,
-    "types": ["node"]
+    "types": ["node"],
+    "skipLibCheck": false
   },
   "include": ["src/**/*.ts", "src/**/*.tsrx"],
-  "exclude": ["node_modules", "dist", "tests"]
+  "exclude": ["node_modules", "dist", "tests"],
+  "reactPortEvidence": {
+    "gate": "authored-source-types"
+  }
 }
