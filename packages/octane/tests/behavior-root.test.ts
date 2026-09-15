@@ -3040,6 +3040,78 @@ describe('behavior-only roots', () => {
 			expect(sampledCheck.checked).toBe(true);
 			expect(sampledRoot.querySelector('textarea')!.value).toBe('refreshed plain');
 			sampledHandle.dispose();
+			for (const adopt of [false, true]) {
+				const amount = controlScope.signal$<number | null | undefined>(
+					`amount-${adopt}`,
+					undefined,
+				);
+				const numeric = authoredPresentation(
+					'NumericPresentation',
+					{
+						amount,
+						plain: undefined as number | null | undefined,
+						picked: undefined as readonly (number | string)[] | null | undefined,
+						enabled: undefined as boolean | null | undefined,
+					},
+					dev,
+					`import 'octane/signals';
+export function NumericPresentation(props) @{ 'use dom bindings';
+  <section><input type="number" value={props.amount.get()} />
+    <input value={props.plain} /><textarea value={props.plain} />
+    <input type="checkbox" checked={props.enabled} />
+    <select multiple value={props.picked}><option value="42">Answer</option></select></section>
+}`,
+				);
+				const numericHost = document.createElement('div');
+				container.append(numericHost);
+				if (adopt) {
+					numericHost.innerHTML = numeric.html;
+					numericHost.querySelector('input')!.value = '1.5';
+					numericHost.querySelector('textarea')!.value = 'early edit';
+				}
+				const numericHandle = adopt
+					? numeric.attach(numericHost.firstElementChild!, numeric.state)
+					: numeric.mount({ parent: numericHost }, numeric.state);
+				const numberInput = numericHost.querySelector('input')!;
+				const plainInput = numericHost.querySelectorAll('input')[1]!;
+				const textarea = numericHost.querySelector('textarea')!;
+				const optionalCheck = numericHost.querySelector<HTMLInputElement>('[type="checkbox"]')!;
+				const optionalSelect = numericHost.querySelector('select')!;
+				expect(numberInput.value).toBe(adopt ? '1.5' : '');
+				expect(textarea.value).toBe(adopt ? 'early edit' : '');
+				amount.set(1);
+				expect(numberInput.value).toBe(adopt ? '1.5' : '');
+				numeric.publish({ plain: 42, picked: [42], enabled: true });
+				expect([numberInput.value, plainInput.value, textarea.value]).toEqual(['1', '42', '42']);
+				expect(optionalCheck.checked).toBe(true);
+				expect([...optionalSelect.selectedOptions].map((option) => option.value)).toEqual(['42']);
+				numberInput.value = '1.0';
+				numberInput.dispatchEvent(new InputEvent('input', { bubbles: true }));
+				expect(amount.get()).toBe(1);
+				numeric.publish({});
+				expect(numberInput.value).toBe('1.0');
+				amount.set(0);
+				numberInput.value = '';
+				numeric.publish({ plain: 0 });
+				expect([numberInput.value, plainInput.value, textarea.value]).toEqual(['0', '0', '0']);
+				for (const empty of [undefined, null]) {
+					amount.set(empty);
+					numberInput.value = '2';
+					textarea.value = 'keep native edit';
+					numeric.publish({ plain: empty, picked: empty, enabled: empty });
+					expect([numberInput.value, plainInput.value, textarea.value]).toEqual([
+						'2',
+						'0',
+						'keep native edit',
+					]);
+					expect(optionalCheck.checked).toBe(true);
+					expect(optionalSelect.value).toBe('42');
+				}
+				numericHandle.dispose();
+				amount.set(5);
+				numeric.publish({ plain: 5 });
+				expect(numberInput.value).toBe('2');
+			}
 			const firstRadio = controlScope.signal$('radio-first', true);
 			const secondRadio = controlScope.signal$('radio-second', false);
 			const radio = authoredPresentation(

@@ -4,11 +4,12 @@ This guide explains how the [accepted RFC](./async-signals-streaming-ssr.md)
 maps to Octane's implementation. It separates supported behavior, implementation
 choices, measured results, and unfinished acceptance work.
 
-The last published validation checkpoint documented here is `ac8f008e9` in
+The earlier published validation checkpoint `ac8f008e9` is recorded in
 [PR #1069](https://github.com/octanejs/octane/pull/1069).
 Its [26-job CI run](https://github.com/octanejs/octane/actions/runs/34922143270)
 and automated review passed. Those results do not establish every browser,
 performance, or deployment requirement in the RFC.
+The renderer-free follow-up and integration with upstream `777cef385` are documented below; consult the PR for the current head's CI state rather than applying the earlier checkpoint to later changes.
 
 ## What authors get
 
@@ -211,24 +212,29 @@ all Safari loading problems. See the [Safari investigation](./safari-esm-investi
 
 ### Renderer-free controls and styles follow-up
 
-The candidate now builds with the normally installed, frozen dependency lockfile: TSRX core/runtime 0.2.0 and OXC 0.13.0, without a dependency override. Compiler-selected controls and whole/spread styles use the same native adapters as their explicit APIs. A binding-only activation no longer imports the renderer's collection driver. The exact chained-string extraction example is exercised alongside rejection cases for opaque or mutating calls.
+The candidate now builds with the normally installed, frozen dependency lockfile: TSRX core/runtime 0.2.0 and OXC 0.13.0, without a dependency override. Compiler-selected controls and whole/spread styles use the same native adapters as their explicit APIs. A binding-only activation no longer imports the renderer's collection driver. The exact chained-string extraction example is exercised alongside rejection cases for opaque or mutating calls. Sampled numeric values retain native coercion and number-input equality; nullish values leave the control uncontrolled. These ordinary values do not acquire a signal writer or relax writable-handle validation.
+
+The upstream ViewTransition integration preserves committed control sources and listeners until native publication, stages authored text and structural changes, and runs deferred cleanup under the exact retiring signal owner. Regression faults reproduce early text publication and cleanup reading the wrong owner. An already-committed signal update drains only its own development diagnostic so that diagnostic cannot accidentally interrupt an unrelated held transition. Ordinary asynchronous server components can still compose cached markup after `await` when no render pass is active; that path does not invent a request owner.
 
 All five signal test modes pass 635 cases. Renderer-free behavior passes 49 cases in each of development and production; public control handoff passes six; native-read compiler/collection/plain-module coverage passes 75 in each mode. Public types, selected runtime types, distribution build/import checks, and 26 streaming-workload/bundle-boundary/fragmentation cases pass. These overlapping lanes are not added together. Full-core validation and current-head CI are separate gates.
 
 Production-compiled controls pass in Chromium and Playwright WebKit 26.5 using actual server control receipts and the inline bootstrap. Early typing, original node identity, focus and selection survive adoption; writable and sampled controls, nested styles, and the chained-string example behave as declared. Composition events exercise the guard but do not establish operating-system IME behavior. The matched rich streaming workload passes six measured WebKit cases plus two warmups per mode, including A → B → A navigation and retained map selection. The authored mode imports no renderer.
 
-Matched minified esbuild closures against parent `083d0c179` isolate the optional capabilities:
+Matched minified esbuild closures against parent `083d0c179` isolate the optional capabilities. The last three rows are complete capability closures, not increments or independently additive costs:
 
 | Entry | Parent gzip bytes | Candidate gzip bytes | Increment |
 | --- | ---: | ---: | ---: |
 | Scalar authored bindings | 3,363 | 3,653 | 290 |
 | Structural authored bindings | 7,942 | 8,286 | 344 |
-| Scalar bindings with whole styles | — | 5,253 | 1,600 beyond candidate scalar |
-| Scalar bindings with controls | — | 6,388 | 2,735 beyond candidate scalar |
+| Optional control leaf | — | 3,216 | No matching parent entry |
+| Optional whole-style leaf | — | 2,216 | No matching parent entry |
+| Scalar bindings with controls and whole styles | — | 7,936 | Combined closure |
 
-The scalar and structural entries exclude both optional leaves. These closure sizes are not an application's home-route increment. In the matched rich Vite fixture, the renderer-free entry is 34,940 gzip bytes versus 96,197 for the renderer-backed entry; both share an 811 raw / 457 gzip byte inline capture script and a 92 gzip byte lazy interaction chunk. The fixture includes its signal/query engine, transport, authored view, and benchmark driver; it is not an isolated binding-runtime measurement or proof of the application startup budget.
+The scalar and structural entries exclude both optional leaves. These closure sizes are not an application's home-route increment. In the matched rich Vite fixture, the renderer-free entry is 35,053 gzip bytes versus 98,229 for the renderer-backed entry; both share an 811 raw / 457 gzip byte inline capture script and a 92 gzip byte lazy interaction chunk. The fixture includes its signal/query engine, transport, authored view, and benchmark driver; it is not an isolated binding-runtime measurement or proof of the application startup budget.
 
-The native-presentation benchmark uses the actual StyleX compiler and canonical native reader. For 5,000 progress updates, targeted subscriptions remove 5,000 whole-source snapshots, 25,000 projected reads, and 5,000 StyleX merges while retaining the same terminal DOM. Seven-sample median synchronous update time was 12.72 ms versus 23.71 ms for whole-source projection; unrelated updates were 4.78 ms versus 14.30 ms. These happy-dom measurements establish work avoided, not browser paint, input latency, or production speedup. An actual style variant change still performs its required merge.
+Against the same upstream `777cef385` source and toolchain, the ordinary `createRoot` closure is 56,499 versus 53,285 gzip bytes (+3,214), and the ordinary `renderToString` closure is 17,360 versus 14,886 (+2,474). These compare the entire RFC branch to upstream, not just this follow-up. Neither retains the optional signal graph or control/style adapters. Comparing instead to the older RFC parent would also charge upstream ViewTransition work to this follow-up, so those baselines must not be conflated.
+
+At the pre-integration follow-up checkpoint, the native-presentation benchmark used the actual StyleX compiler and canonical native reader. For 5,000 progress updates, targeted subscriptions removed 5,000 whole-source snapshots, 25,000 projected reads, and 5,000 StyleX merges while retaining the same terminal DOM. Seven-sample median synchronous update time was 12.72 ms versus 23.71 ms for whole-source projection; unrelated updates were 4.78 ms versus 14.30 ms. These happy-dom measurements establish work avoided, not browser paint, input latency, a final merged-head timing, or production speedup. An actual style variant change still performs its required merge.
 
 ### Earlier core-feedback checkpoint
 

@@ -1,257 +1,129 @@
-# View Transitions — React-parity plan
+# View Transitions compatibility record
 
-Status: COMPLETE — all phases (0-5) LANDED 2026-07-11/12. Every in-scope test
-from ReactDOMViewTransition-test.js (25) AND ReactDOMFizzViewTransition-test.js
-(4) is ported and passing. Phase 5: SSR `vt-*` annotations (server
-ViewTransition + ssrTry claim hooks in runtime.server.ts — arm-top detection
-is POSITIONAL via vt-enter-x/vt-exit-x candidate attributes claimed by each
-@try arm's first element and stripped at emission, exact where flag-based
-tracking couldn't be; auto names `_O<frame-path>_` are stable across
-streaming passes so fallback/content captures pair; streamed segment chunks
-inherit the wrapping boundary's name/share/update), the user doc
-(docs/view-transitions.md), and the website demo route (/view-transitions —
-enter/exit, shared-element morph, addTransitionType tabs; driven by the
-real-browser e2e; needed BOTH the app-router entry and the plugin-level
-octane.config.ts RenderRoute — the catch-all otherwise serves it with a 404
-status). Follow-up polish on 2026-07-14 moved that live demo into the Core APIs
-guide at `/docs/core-apis` and removed the standalone route and nav item. Phase
-4: parent enter/exit relays SHIPPED (React's
-`enableViewTransitionParentEnterExit` is ON in the experimental channel, so
-this is live behavior, not a pin): `parentEnter`/`parentExit` class props +
-`onParentEnter`/`onParentExit` callbacks; a nested boundary in a unit that
-entered/exited as a whole relays when every STRICT intermediate boundary
-participates (relay prop or handler, not resolving 'none' — a prop-less
-intermediate breaks the chain, plain DOM never does) and the unit's outermost
-genuinely activates (not 'none', not share-consumed; share also wins over the
-nested boundary's own relay). Exit-side relays reuse the pre-drain recs
-(pre-named); enter-side relays mint recs post-drain. vtPreClass gained
-parentExit in its chain and vtAllNone counts parentExit participation.
-Phase 3: Suspense reveal commits
-(standalone `commitResume` + the entangled `flushStagedReveals` batch, which
-animates as ONE transition) route through the controller via `vtFlush(work)`;
-nested-unit suppression (only the OUTERMOST of boundaries inserted/removed
-together fires — nearest-boundary-ancestor walks against the entered set /
-the disposed flag; share pairing gets first claim on named nested exits);
-`render()` inside a transition schedules at transition priority instead of
-committing synchronously (closing the Phase-1 root-mount gap — boundaries
-mounting with initial content enter-animate, which is what makes the
-Suspense-reveal conformance test's fallback-enter arm hold); passive effects
-scheduled mid-animation defer to `finished` (scheduled path only — direct
-test-harness drains stay ungated); update detection compares element
-IDENTITY (a fallback→content swap of same-count elements activates). A
-reveal that mounts the app's first-ever boundary is a documented miss
-(vtWouldWrapResume gates on VT_REGISTRY.size > 0). Phase 2: shared-element
-pairing
-(same-named exit+enter in one commit → ONE `share` activation fired on the
-EXITING side, suppressing its exit and the enter side's enter; viewport decay
-via pre-drain exit rect + post-drain enter rect), `addTransitionType` (+
-`unstable_` alias; types captured per batch by vtFlush, cleared by unwrapped
-transition drains too), class resolution (`string | 'auto' | 'none' |
-per-type map` against batch types; applied as `view-transition-class`
-alongside the name; `'none'` suppresses activation — fully-inert boundaries
-skip pre-naming, which is the only capture-correct suppression), and the full
-callback contract (`(instance, types)`, instance = name + `.animate()`-capable
-`old`/`new`/`group`/`imagePair` `ViewTransitionPseudoElement` handles; a
-returned cleanup runs before the boundary's next activation). Phase-2 note:
-pre-drain class application resolves kind-agnostically (share→exit→update→
-default chain) because a live boundary's fate is unknown until the drain runs
-— per-kind exactness for exits/updates in the OLD capture is a render-first
-luxury; documented, revisit only if a test pins it. Phase 0: conformance
-skeletons
-(`tests/conformance/view-transition.test.ts` + `view-transition-ssr.test.ts`)
-+ the jsdom mock helper. Phase 1: the core runtime — `ViewTransition` builtin
-(tier-1 export + `unstable_ViewTransition` alias), boundary registry +
-enter/exit/update activation, setText dirty tracking + rect diffing, the
-`vtFlush` controller wrapping transition drains in
-`document.startViewTransition` (sync fallback, `flushSync` skip, one-at-a-time
-batching), auto name assignment/revert, `onEnter`/`onExit`/`onUpdate`
-callbacks, the compiler's `_$vtSeen()` module-load hint + boundary-name M3
-exclusion, and the transparent SSR twin with both-sides inherit-decline. Five
-conformance ports flipped from todo. Phases 2-5 pending. Phase-1 notes:
-`act()`'s sync drain loop routes through `flush()` when a wrap is due
-(flushSync is the urgent path and skips); the root's FIRST `render()` is
-synchronous (never queued), so an initial-transition root mount doesn't
-enter-animate — the ported tests don't assert it (React's do via mockClear
-patterns); revisit if a real test pins it. Owner doc for `<ViewTransition>` /
-`addTransitionType` support; read with `docs/react-parity-migration-plan.md`
-(its ViewTransitions row now points here).
+## Reference versions
 
-## 1. What React ships (the parity target)
+The September 2026 audit compares Octane with React 19.3.0
+(`1d34f91dfde6bba84d08b683aaba164c7194dacb`) and React main
+(`9b9385327857d1211fb4dc022122d897fb38bc5a`) for experimental parent relays.
+The original July implementation used callback-only mocks; native browser
+regressions now cover captures, CSS, interaction, readiness, and cleanup too.
 
-React's View Transitions are **experimental-channel** (`unstable_ViewTransition`,
-`unstable_addTransitionType`, gated by `enableViewTransition`). The API drives
-the browser's same-document View Transitions
-(`document.startViewTransition`) from the declarative tree:
+## Implemented contracts and evidence
 
-- `<ViewTransition>` marks a boundary. Props: `name` (manual, for shared
-  transitions; auto-generated otherwise), `enter` / `exit` / `update` /
-  `share` / `default` — each `"auto" | "none" | "<class>"` or a
-  per-transition-type object `{ 'nav-back': 'slide-right', default: 'auto' }`
-  — plus callbacks `onEnter` / `onExit` / `onUpdate` / `onShare`
-  (`(instance, types) => cleanup`).
-- **Activation** (only inside transitions: `startTransition`,
-  `useDeferredValue`, Suspense reveals):
-  - `enter` — the boundary's subtree is newly inserted.
-  - `exit` — the subtree is deleted.
-  - `share` — a `name` appears on BOTH a deleted and an inserted boundary in
-    the same commit (shared-element pair; wins over enter+exit; both sides
-    must be in-viewport or it decays to separate enter/exit).
-  - `update` — DOM mutations inside the boundary, or the boundary's own
-    size/position changed (React measures rects), including reorders.
-    Mutations activate the INNERMOST enclosing boundary only.
-- **Mechanics**: before snapshotting, React assigns `view-transition-name`
-  (unique auto names; suffixes when a boundary has several top-level DOM
-  children) + the resolved class to activated boundaries, calls
-  `document.startViewTransition({ update })`, applies ALL DOM mutations inside
-  `update`, then after the transition's `ready` promise reverts the names and
-  fires the callbacks; passive effects wait for `finished`.
-- **Ordering contract** (react.dev): snapshot → mutations + insertion effects
-  → fonts wait → layout effects + refs → measure → `ready` → revert names +
-  fire on\* callbacks → `finished` → passive effects.
-- **Batching/interrupt**: one view transition at a time — work arriving while
-  one is animating batches and runs AFTER it (A→B then B→D, never A→D);
-  `flushSync` mid-transition skips it (`skipTransition()`); no
-  `document.startViewTransition` (Firefox pre-139, jsdom) → apply
-  synchronously with no animation. No automatic `prefers-reduced-motion`
-  handling (userland CSS).
-- Out of experimental even in React: gesture transitions
-  (`unstable_startGestureTransition`, `useSwipeTransition`) — **explicitly out
-  of scope here** until React stabilizes them.
+| Contract | Primary regression coverage |
+| --- | --- |
+| All matching type classes, `none` precedence, default fallback, actual activation classes | `tests/view-transition-matching.test.ts`, native browser suite |
+| Stable automatic names, instance refs, pseudo-element methods, cleanup at native finish | `tests/view-transition-lifecycle.test.ts`, native browser suite |
+| Authored style restoration, descriptor and compiled DOM mutations, all-host geometry | Matching, lifecycle, and native browser suites |
+| Nested shared elements, viewport suppression, clipping ancestors, handler-only parent relays | Matching and existing conformance suites |
+| Native transition types, outside-region interaction, urgent interruption | `tests/browser/view-transition-parity/` |
+| Prepared DOM stays private until native update; keyed survivors retain identity | Native staged-commit controls |
+| Suspended plans discard writes; reentrant renders preserve accepted work and retired cleanup | `tests/view-transition-staging.test.ts` |
+| Deferred hydration resources survive preparation and abort | `tests/hydration/deferred-hydration-contract.test.ts` |
+| Mutation/insertion → resource wait → layout refs/effects → navigation wait → new capture | Layout-readiness feature and native browser suites |
+| Streaming annotations, native reveal driver, client coordination, hydration adoption | `tests/view-transition-ssr.test.ts`, native streaming coverage |
+| Error recovery and unsupported-browser fallback | Lifecycle and streaming suites |
+| Element scopes, native local pseudo targets, independent sibling/nested animations and shared capture barriers | `tests/browser/view-transition-scopes/`, native streaming coverage |
+| Scope scheduling, per-batch passive lifetime, local Suspense, invalid hosts and outside portals | `tests/view-transition-scoped-effects.test.ts` |
+| Optional-feature bundle boundaries and active-transition DOM reads | `benchmarks/view-transitions/` |
 
-## 2. Conformance anchors (the user-facing spec is React's tests)
+## Why the eager-rendering decision changed
 
-Port via `scripts/scaffold-react-port.mjs` and cite source lines. Fix real gaps
-before landing their tests; encode intentional divergences as ordinary passing
-assertions with `// OCTANE DIVERGENCE:` rationale:
+The plan at main `277c10c3fa80f56ef162959832dba35c1b43b32e` explicitly rejected a
+staged-mutation reconciler mode: keeping eager host writes was preferred to
+React’s snapshot timing. That decision made a boundary’s next `update` prop unavailable when choosing
+its old snapshot. A nested boundary
+switching its own `update` to `none` in the animated render must remain in the
+parent’s old snapshot; giving it a separate old name leaves stale pixels animating
+beside the parent. The new `update` prop is the requirement that makes preparing
+the next tree necessary. A changed `name` keeps the previous name for the old
+capture and the next name for the new capture, matching React’s
+[`commitBeforeUpdateViewTransition`](https://github.com/facebook/react/blob/1d34f91dfde6bba84d08b683aaba164c7194dacb/packages/react-reconciler/src/ReactFiberCommitViewTransitions.js#L670).
 
-| React test file | size | scope |
-| --- | --- | --- |
-| `react-dom/src/__tests__/ReactDOMViewTransition-test.js` | 26 its | THE suite: callbacks (onEnter/onExit/onUpdate/onShare), Suspense reveal enter, nested-boundary unit-removal, shared pairs, and 15 its behind `enableViewTransitionParentEnterExit` (onParentEnter/onParentExit relays) |
-| `react-dom/src/__tests__/ReactDOMFizzViewTransition-test.js` | 4 its | SSR annotations for boundaries that animate on stream-in/hydration reveal |
-| `react-dom/src/__tests__/ReactDOMHostComponentTransitions-test.js` | small | triaged OUT in Phase 0: both its cases are Float/hoistable-resource error tests, nothing VT-specific survives |
-| `react-reconciler/.../ViewTransitionReactServer-test.js` | — | RSC restrictions — OUT (no Server Components) |
+After this conflict was demonstrated in the task conversation, the requester
+selected **“Expand into staged DOM commits”** and then requested element scopes.
+That instruction expanded this task beyond the earlier eager-rendering plan.
+Preparation now evaluates the next tree and
+boundary props before native capture, with connected host mutations withheld
+until the native update callback. The own-prop regressions in the native parity
+suite exercise both cases. This is a deliberate performance trade-off: active
+transition preparation allocates a host projection and a commit plan. Once a ViewTransition-facing API installs its driver, all-transition flushes may still
+need preparation to discover newly entering boundaries even if no boundary is
+currently mounted. Ordinary rendering remains eager. Byte, browser-work and
+large-list measurements are recorded in `benchmarks/view-transitions/RESULTS.md`;
+those measurements do not establish that preparation is free.
 
-React's own jsdom mock recipe (ReactDOMViewTransition-test.js:188-249) ports
-verbatim to our vitest env and is the whole test-infra story:
-`document.startViewTransition = ({update}) => { update(); return { ready:
-Promise.resolve(), finished: Promise.resolve(), skipTransition() {} } }`,
-`Element.prototype.getBoundingClientRect` returning content-length-derived
-rects (so update-detection has signal), stub `animate`/`getAnimations`,
-`document.fonts`, `CSS.escape`. Land as a shared helper in
-`tests/conformance/_helpers/`.
+## Architecture
 
-## 3. The architectural decision (octane's commit model vs React's)
+ViewTransition prepares its next tree before the native old capture. An optional
+DOM plan projects structural reads and host writes without changing existing
+native nodes. The finished boundary props select old-capture participation and classes, so a
+nested `update="none"` remains inside its parent's snapshot. Each snapshot
+retains its own name.
+The native update callback publishes the ordered plan once, preserving survivor
+identity and connected deletion cleanup. Ordinary rendering keeps its eager
+native DOM path; host views and mutation plans are allocated only while a
+ViewTransition prepares.
 
-React renders concurrently FIRST, then wraps only its mutation commit phase in
-`startViewTransition`. Octane has no separate mutation phase: `flush()` →
-`drainQueue()` renders AND mutates the DOM in one eager walk
-(`runtime.ts:861-887`); only effects are deferred (`effectQueues`,
-`runtime.ts:549-559`).
+The structural read seam is `getFirstChild` / `getNextSibling`; these use cached
+native getters normally and the staged view during preparation. Other host
+operations use typed `domNode` views. `pnpm staged-dom:check` resolves DOM members
+through TypeScript (including traceable aliases and casts) and rejects raw host
+operations outside a small, operation-specific native allowlist. The guard and
+mutation tests run in the existing CI workflow tests. Committed geometry,
+resource readiness, imperative public handles, and eager event registration are
+explicit native exceptions. This is static enforcement for typed or traceable
+host receivers, not a proof about arbitrary untyped application code.
+Unchecked `any`, reflective writes such as `Reflect.set`, and destructured
+members can escape that analysis and still require manual review.
 
-**Decision: v1 wraps the whole transition drain inside the `update`
-callback.** When a flush contains transition-lane work touching ≥1 mounted
-`ViewTransition` boundary (and `document.startViewTransition` exists), the
-scheduler routes that drain through the VT controller instead of draining
-synchronously. Consequence: octane's render work runs while the browser holds
-the old-state snapshot (React's runs before the snapshot). This is observable
-only as snapshot-hold time; octane's render pass is typically far cheaper than
-the animation budget. Documented as an **intentional divergence** (do not
-"fix" toward React by inventing a staged-mutation reconciler mode — that
-trades away the eager-mutation performance model for a timing nicety).
+`initDomOperations` previously initialized only the two traversal getters. It
+was not a complete read/write operations table. Replacing projected form,
+selector, property and CSSOM semantics with a new table would require a broader
+host API migration. This change consolidates structural access and adds the
+missing enforcement while retaining the tested projection adapter. A future
+operations-table migration must preserve projected form ownership, result
+identity, native scroll geometry, controlled state and rollback contracts.
 
-There is a SECOND commit path to route through the same wrapper:
-`flushStagedReveals` (`runtime.ts:10498`) — the atomic held-transition reveal
-for Suspense — is exactly the "content resolves → enter activates" moment.
+DOM observation and controlled-property snapshots during native commits detect
+updates from compiled templates and returned descriptors. A layout capture
+defers new refs and layout bodies until resource readiness. Every
+boundary's visible top-level hosts contribute geometry; layout changes can
+activate clipping ancestors. Temporary capture styles are restored before
+mutation publication and again after the new capture.
 
-## 4. Design
+Owner lookups are intentionally recomputed across preparation, publication and
+layout callbacks: portal destinations, scope hosts and CSS participation can
+change at each phase. A cache would need to track those invalidations. The
+committed-DOM observer still watches document/shadow roots so newly introduced
+hosts and stylesheet resources are observed. It therefore also allocates
+records for unrelated writes during the commit; the current measurements do
+not establish an allocation or whole-page latency improvement there. Old
+geometry measurements omit unused clip-style reads; post-layout measurements
+retain them for clipping activation.
 
-- **Boundary**: `export const ViewTransition` — a runtime builtin carrying the
-  same boundary capability bit as `Suspense`/`ErrorBoundary` for the M3
-  inherit-decline check, so its component slot always owns an exact DOM range
-  (needed to enumerate top-level children for name assignment and to scope
-  dirty-tracking) without rooting it from the generic component path. Tier-1
-  export in `index.ts` (React parity); also alias `unstable_ViewTransition` /
-  `unstable_addTransitionType` so React-experimental imports port unchanged.
-- **Optional runtime capability**: generic scheduling, mutation, passive-effect,
-  teardown, and Suspense-reveal paths call a nullable driver table. Compiler-emitted
-  `__vtSeen` installs the concrete driver at module evaluation for a compiled
-  ViewTransition import; `addTransitionType` and the first direct boundary render
-  install it on their paths. The PURE component initializer keeps this feature
-  edge removable, so the registry, browser adapter, class resolver, and callback
-  machinery disappear from applications that retain none of the ViewTransition
-  APIs.
-- **Dirty tracking**: the reconciler's DOM-op helpers (insert / remove /
-  setText / attr / move) mark the nearest enclosing VT boundary via a
-  render-walk stack. Fast path: a module-level `VT_MOUNTED_COUNT === 0` guard
-  keeps the non-VT world at literally zero added work.
-- **Activation resolution at flush end**: inserted-subtree boundaries → enter;
-  deleted → exit; name-matched exit+enter → share (in-viewport check, decay
-  rule); dirty or rect-changed survivors → update (innermost only). Rects of
-  candidates measured once before `startViewTransition`, re-measured inside
-  `update` after mutations.
-- **Class/type resolution**: `addTransitionType(type)` accumulates on the
-  current transition batch; class props resolve `string | auto | none |
-  {type: class, default}` against the batch's types; `none` deactivates.
-- **Names**: auto `⟨vt-N⟩` unique names per activated boundary, one per
-  top-level DOM child (suffix `-1, -2…` for multiple), `view-transition-name`
-  + `view-transition-class` applied pre-snapshot, reverted after `ready`.
-- **Controller/queueing**: singleton in-flight transition; later transition
-  flushes queue and run after `finished` (B→D batching). `flushSync` (and any
-  discrete/urgent flush) while in-flight → `skipTransition()` + drain
-  synchronously. No `startViewTransition` → straight sync drain (today's
-  behavior, also the jsdom default without the mock).
-- **Effect phasing on VT flushes**: mutations + insertion effects + layout
-  effects/refs inside `update` (existing `commitEffects` order); the passive
-  drain gates on `finished` (new); callbacks fire after `ready` with
-  `(instance, types)` where instance = `{ name, old, new, group, imagePair }`
-  pseudo-element handles (same shape as React: element + pseudoElement
-  string, `.animate()`-capable) and returned cleanups run on next transition
-  or unmount.
+The client and optional streaming driver share the actual native document handle
+and a lazily allocated map of element handles. A batch prepares and publishes once.
+Element native callbacks enter before a document capture starts, preventing a
+document callback from blocking an element callback needed by the same batch.
+The preparation lock lasts through every participant's `ready` settlement. After
+that, independent scopes can animate concurrently. A queued ancestor waits for
+active scopes it could replace; local work can proceed in another scope.
 
-## 5. Phases (each independently landable)
+Callback cleanup and explicit animation cancellation belong to each native
+handle and survive boundary unmount. Passive work belongs to the shared commit
+and is released when its animations finish or that commit is interrupted.
+Identity checks prevent an old completion from clearing a newer handle.
 
-- **Phase 0 — pin the spec.** Scaffold-triage the three DOM test files into
-  `tests/conformance/`; land the mock helper; no runtime changes. Output: the
-  triaged `it.todo` skeleton IS the refined scope.
-- **Phase 1 — core.** Boundary builtin + capability/inherit-decline + dirty
-  tracking + enter/exit/update activation on `startTransition` flushes + auto
-  names + controller with sync fallback and `flushSync` skip. Flip the Phase-0
-  todos covering mount/unmount/content-change callbacks (onEnter/onExit/
-  onUpdate minimal) and the "no VT boundary → no `startViewTransition` call"
-  negatives.
-- **Phase 2 — share + types + full callbacks.** Named pairs (+viewport decay),
-  `addTransitionType`, per-type class maps, `(instance, types)` callback
-  contract with cleanups, class application/revert.
-- **Phase 3 — Suspense + scheduling depth.** Route `flushStagedReveals`
-  through the controller (reveal → enter; fallback swap semantics),
-  `useDeferredValue` activation, B→D batching, passive-gating on `finished`,
-  nested-boundary unit-removal semantics.
-- **Phase 4 — parent enter/exit relays.** The 15 `enableViewTransitionParentEnterExit`
-  its (onParentEnter/onParentExit chains, `none` breaking relays). React still
-  flag-gates this — decide ship vs `it.todo`-pin when we get here based on
-  where React's flag stands.
-- **Phase 5 — SSR + polish.** Fizz-parity SSR annotations + hydration-reveal
-  transitions (port the 4 Fizz its; `runtime.server.ts` pass-through today,
-  annotations after), volar/type surface for the new props, user doc
-  (`docs/view-transitions.md`), website demo route (real-browser validation —
-  note the `/benchmarks` comment-ceiling re-base convention if the page adds
-  weight), `pnpm parity:gaps` regeneration.
+## Deliberate scope limits
 
-## 6. Expected divergences (candidate GAP pins, decided at port time)
+- Gesture transitions remain deferred until React stabilizes their API.
+- React Server Components, class components, and React Native are outside
+  Octane's supported rendering model.
+- Reduced-motion behavior remains application CSS, as in React.
+- `scope="element"` is an Octane extension, with document behavior remaining the
+  default. Unsupported or invalid element scopes commit without animation.
+- Keyed reconciliation retains Octane's LIS algorithm. Only ViewTransition
+  preparation uses staged DOM publication.
 
-- **Render-inside-update-callback timing** (§3) — intentional; snapshot-hold
-  includes octane's render pass.
-- **Reorder `update` activation set**: octane's LIS reconciler physically
-  moves fewer nodes than React's `lastPlacedIndex` (documented divergence).
-  Rect-based activation should converge the OBSERVABLE set (a survivor whose
-  rect changed activates regardless of whether it was the node that moved),
-  but any residual difference is pinned, not "fixed" toward React.
-- **Discrete-event flushes** (octane's per-keystroke `onInput` commits) are
-  urgent lanes — they never animate, matching React's sync-update rule.
-
-## 7. Out of scope
-
-Gesture transitions (`startGestureTransition` / `useSwipeTransition`), RSC
-semantics, React Native, automatic reduced-motion handling (parity: userland),
-and any octane-invented animation surface (tier-1 stays React-shaped;
-`@octanejs/motion` remains the JS-driven alternative and is unaffected).
+See [the public guide](view-transitions.md) for usage and observable behavior.

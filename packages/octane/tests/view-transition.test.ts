@@ -4,7 +4,7 @@ import { loadCompiledFixtureSource } from './_server-fixture.js';
  * ports in conformance/view-transition.test.ts): addTransitionType types
  * reaching callbacks + per-type class maps, 'none' deactivation, name/class
  * style application inside the transition window, the callback instance's
- * pseudo-element handles, cleanup-before-next-fire, and share viewport decay.
+ * pseudo-element handles, cleanup-on-finish, and share viewport decay.
  * jsdom environment via the shared conformance mock helper.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
@@ -26,6 +26,7 @@ import {
 	FirstBoundaryRevealApp,
 	ClickUpdateApp,
 	PlainClickApp,
+	RenderErrorApp,
 } from './_fixtures/view-transition-features.tsrx';
 
 function evalServer(source: string, filename: string): Record<string, any> {
@@ -240,7 +241,7 @@ describe('ViewTransition server output', () => {
 			expect(content.textContent).toBe('ready');
 			expect(content.getAttribute('vt-name')).toBe('outer-name');
 			expect(content.getAttribute('vt-update')).toBe('fade');
-			expect(content.getAttribute('vt-share')).toBe('pair');
+			expect(content.getAttribute('vt-share')).toBe('fade');
 		} finally {
 			container.remove();
 			resetStreamRuntimeGlobals();
@@ -354,7 +355,7 @@ describe('ViewTransition features', () => {
 		expect(updates).toBe(1);
 	});
 
-	it('share decays to exit/enter when the exiting side is out of the viewport', async () => {
+	it('does not activate an offscreen shared pair', async () => {
 		let shares = 0,
 			exits = 0,
 			enters = 0;
@@ -377,8 +378,8 @@ describe('ViewTransition features', () => {
 		});
 		shares = exits = enters = 0;
 
-		// Move the exiting element far off-screen: the pre-drain rect capture
-		// sees it out of the viewport, so the named pair decays (React's rule).
+		// Both captures are outside the viewport. The named pair is ineligible
+		// for sharing and neither side has a visible enter or exit animation.
 		Element.prototype.getBoundingClientRect = function () {
 			return new DOMRect(0, -5000, 100, 20);
 		};
@@ -390,8 +391,8 @@ describe('ViewTransition features', () => {
 		});
 
 		expect(shares).toBe(0);
-		expect(exits).toBe(1);
-		expect(enters).toBe(1);
+		expect(exits).toBe(0);
+		expect(enters).toBe(0);
 	});
 
 	it('routes a standalone Suspense reveal through startViewTransition (boundary updates)', async () => {
@@ -507,9 +508,10 @@ describe('ViewTransition features', () => {
 		let calls = 0;
 		let skips = 0;
 		(document as never as Record<string, unknown>)['startViewTransition'] = (
-			update: () => void,
+			input: (() => void) | { update: () => void },
 		) => {
 			calls++;
+			const update = typeof input === 'function' ? input : input.update;
 			const updated = Promise.resolve().then(update);
 			return {
 				ready: updated,
@@ -531,7 +533,7 @@ describe('ViewTransition features', () => {
 		expect(container.querySelector('div')?.textContent).toBe('Count: 1');
 	});
 
-	it('runs the previous callback cleanup before the next activation fires', async () => {
+	it('runs each callback cleanup when its native animation finishes', async () => {
 		const log: string[] = [];
 		const props = {
 			text: 'One',
@@ -554,13 +556,47 @@ describe('ViewTransition features', () => {
 				root.render(CleanupApp, { ...props, text: 'Two much longer' });
 			});
 		});
-		expect(log).toEqual(['fire']);
+		expect(log).toEqual(['fire', 'cleanup']);
 
 		await act(() => {
 			startTransition(() => {
 				root.render(CleanupApp, { ...props, text: 'Three even longer still' });
 			});
 		});
-		expect(log).toEqual(['fire', 'cleanup', 'fire']);
+		expect(log).toEqual(['fire', 'cleanup', 'fire', 'cleanup']);
+	});
+
+	it('surfaces a render error thrown inside an animated transition to the caller', async () => {
+		const recoverable: unknown[] = [];
+		const errorContainer = document.createElement('div');
+		document.body.appendChild(errorContainer);
+		const errorRoot = createRoot(errorContainer, {
+			onRecoverableError: (error) => {
+				recoverable.push(error);
+			},
+		});
+		try {
+			await act(() => {
+				startTransition(() => {
+					errorRoot.render(RenderErrorApp, { error: null });
+				});
+			});
+			expect(errorContainer.textContent).toBe('ok');
+
+			// The same uncaught render error an unwrapped commit reports: act()
+			// rejects with it, and the recoverable channel stays reserved for native
+			// transition failures.
+			await expect(
+				act(() => {
+					startTransition(() => {
+						errorRoot.render(RenderErrorApp, { error: new Error('boom') });
+					});
+				}),
+			).rejects.toThrow('boom');
+			expect(recoverable).toEqual([]);
+		} finally {
+			errorRoot.unmount();
+			errorContainer.remove();
+		}
 	});
 });

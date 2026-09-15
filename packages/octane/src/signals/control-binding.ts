@@ -16,6 +16,16 @@ type ControlChannel = 'value' | 'checked';
 const CONTROL_BINDINGS = /* @__PURE__ */ new WeakMap<Element, Set<ControlChannel>>();
 const RADIO_WRITERS = /* @__PURE__ */ new WeakMap<Element, (value: unknown) => void>();
 
+// Sampled JSX values use the native renderer's scalar coercion, not the stricter
+// writable-handle contract. Keep this optional leaf independent of the renderer.
+function controlString(value: unknown): string {
+	return typeof value === 'string'
+		? value
+		: typeof value === 'function' || typeof value === 'symbol'
+			? ''
+			: String(value);
+}
+
 /** Publish the platform's native radio-group edit, never arbitrate a checked write. */
 function publishRadioInput(input: HTMLInputElement): void {
 	const root = input.getRootNode();
@@ -215,11 +225,12 @@ export function __createBindingControls() {
 				if (disposed) return { publish() {}, commit() {} };
 				const multiple = control.localName === 'select' && (control as HTMLSelectElement).multiple;
 				if (
-					channel === 'checked'
+					candidate &&
+					(channel === 'checked'
 						? typeof value !== 'boolean'
 						: multiple
 							? !Array.isArray(value)
-							: typeof value !== 'string'
+							: typeof value !== 'string')
 				)
 					throw new TypeError(
 						channel === 'checked'
@@ -228,7 +239,13 @@ export function __createBindingControls() {
 								? 'A multiple select signal must contain an array.'
 								: 'A value signal must contain a string.',
 					);
-				const selected = multiple ? new Set(value as readonly string[]) : undefined;
+				let selected: Set<string> | undefined;
+				if (multiple && Array.isArray(value)) {
+					selected = new Set();
+					for (const item of value) selected.add(candidate ? item : controlString(item));
+				}
+				const normalized =
+					channel === 'checked' ? !!value : value == null || multiple ? '' : controlString(value);
 				const ticket = generation;
 				const version = revision;
 				return {
@@ -269,6 +286,8 @@ export function __createBindingControls() {
 					commit(): void {
 						if (
 							disposed ||
+							value == null ||
+							(multiple && selected === undefined) ||
 							ticket !== generation ||
 							version !== revision ||
 							active !== candidate ||
@@ -277,15 +296,21 @@ export function __createBindingControls() {
 						)
 							return;
 						if (channel === 'checked') {
-							if ((control as HTMLInputElement).checked !== value)
-								(control as HTMLInputElement).checked = value as boolean;
+							if ((control as HTMLInputElement).checked !== normalized)
+								(control as HTMLInputElement).checked = normalized as boolean;
 						} else if (selected) {
 							for (const option of (control as HTMLSelectElement).options) {
 								if (disposed) return;
 								const next = selected.has(option.value);
 								if (option.selected !== next) option.selected = next;
 							}
-						} else if (control.value !== value) control.value = value as string;
+						} else if (
+							!candidate && control.localName === 'input' && control.type === 'number'
+								? // Preserve a user's "1.0" for sampled numeric 1, but show zero over an empty edit.
+									(value === 0 && control.value === '') || control.value != (value as any)
+								: control.value !== normalized
+						)
+							control.value = normalized as string;
 					},
 				};
 			};

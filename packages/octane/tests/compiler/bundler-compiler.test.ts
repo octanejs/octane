@@ -1,4 +1,5 @@
 import { parseModule } from '@tsrx/core';
+import { compile } from 'octane/compiler';
 import { parseModule as parseCompilerModule } from '@tsrx/oxc/tsrx-core-compat';
 import { describe, expect, it } from 'vitest';
 import { spawnSync } from 'node:child_process';
@@ -48,6 +49,19 @@ function emittedHeadKey(code: string | undefined): string | undefined {
 
 describe('bundler-neutral compiler integration', () => {
 	it('preserves compiler signal capability through client and server runtime-request transforms', () => {
+		const cleanupSource = `import { useLayoutEffect } from 'octane';
+export function Lifecycle(props) @{
+ useLayoutEffect(() => () => props.cleanups.push('cleanup'), []);
+ <span>ordinary</span>
+}
+export function View(props) @{ 'use dom bindings'; <p>{props.label as string}</p> }`;
+		for (const mode of ['client', 'server'] as const) {
+			for (const dev of [false, true]) {
+				const result = compile(cleanupSource, '/project/src/View.tsrx', { mode, dev, hmr: false });
+				expect(result.code).not.toBe('');
+				expect(() => parseModule(result.code, 'View.js')).not.toThrow();
+			}
+		}
 		const compiler = createOctaneCompiler({
 			root: '/project',
 			knownAttributeSpreads: [

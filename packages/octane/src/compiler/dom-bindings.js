@@ -217,7 +217,7 @@ function unwrap(node) {
 }
 
 function statements(fn) {
-	return fn.body?.body ?? [];
+	return Array.isArray(fn.body?.body) ? fn.body.body : [];
 }
 
 function isDirective(node) {

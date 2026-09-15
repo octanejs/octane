@@ -1,0 +1,1658 @@
+{
+  "suite": "view-transition-main-merge-equivalence",
+  "mainRevision": "fe1b2b7e6774c0bb00170ceecd5a5432fbef81c0",
+  "mergedRevision": "b891b99f61f8a662b3f72a7ca91099804ce0ae65",
+  "measuredSourceSha256": "45aa6f0df1f3e2c79a38a9044132f49ad2be85296596a9572026ad5899ef4ba2",
+  "mergedSourceSha256": "9176bbd8eea698ae3dc7ef6dc3e433a17dac5dee8ecb18cf98dc95a69e26272b",
+  "claims": {
+    "allFourCanonicalAssetsIdentical": true,
+    "compiledCanonicalInputsIdentical": true,
+    "nativeBundleAssetsAndObservationsIdentical": true,
+    "scopeAssetAndObservationsIdentical": true
+  },
+  "note": "Original timing report retains measured hashes. One-sample postmerge guard ran concurrently with correctness/build work; do not interpret its timing. No code changes follow this source hash; subsequent commits update only evidence/docs.",
+  "canonicalBuilds": {
+    "node": "v24.20.0",
+    "platform": "darwin",
+    "arch": "arm64",
+    "vite": "8.1.5",
+    "lockfile": "51648462c4e126c7b945cb99c5390b8a77243538c3bc86fbf784021d16e0cace",
+    "builds": [
+      {
+        "label": "main",
+        "dialect": "tsrx",
+        "revision": "fe1b2b7e6774c0bb00170ceecd5a5432fbef81c0",
+        "sourceHash": "dcd5ac5dc75e4017f9fe3f0283cdf00826c0ee5b8101a9e1c87306d142fc4194",
+        "fixtureHashes": {
+          "KeyCallbackRows.tsrx": "f8b7a702863a466b5ac6934d8766144a9ccb990ba396a4f53d665900d4aa72bd",
+          "Main.tsrx": "26002c3f20e81d04e31ed57cf656357b52e9eaa852817f52f31c83032829fb87",
+          "NestedWorkRows.tsrx": "98d588a4320395478fe37e817eb8684e68b000c7bb6f77c15d6d6f034544b721",
+          "UnkeyedRows.tsrx": "27ebda1c09bad11edf52ee5d4fcabf100c9cd71747771cbe049302c623398f4f",
+          "key-callback-work-main.js": "30a9ea37c5faff12db5b9aa9475628196e16d159b3caedbdd22cc6d298bf0716",
+          "key-callback-work.ts": "17fe64db5a4f236c4ab50d103327b581ac9c52db4c1744bb27ed2bac81b39d4e",
+          "main.js": "60448dcf6e09c0bd652ad55af145e22dbef2f8201c84d60f86b0c89105de27d0",
+          "nested-work-main.js": "5697d6053833936ffd0467e5f97280064ef118043cec19cb2e26899c480c85ed",
+          "nested-work.ts": "799d7dde016a1c50e08d3f1e5bbb9cbda760497918a5b897b6106dde5237069d",
+          "unkeyed-work-main.js": "7698883b6e0cf88bac03b662c2570daf19071c5a52f3c178894a8b662d35e5e9",
+          "unkeyed-work.ts": "df2b5cd8d1a5d7941a8e36e11ba14d9cd766b3c7c44610f1f6a60229d7315402"
+        },
+        "compiledHashes": {
+          "src/Main.tsrx": "64aecb083870c18239b959fae47772eccfe4a4279d25096dfbf6b493ac565d61",
+          "src/main.js": "2edb98ef75cfadd0f28589e9b08f89db9c671ead7267319dba3c3831e367e14f"
+        },
+        "bytes": {
+          "raw": 96612,
+          "gzip": 32273,
+          "brotli": 28723
+        },
+        "assetHash": "4718973365c0342940b22e29d6231d60310ad420f03c6900852cf63c6b74dcc2",
+        "driverReachable": false,
+        "stagingReachable": false
+      },
+      {
+        "label": "main",
+        "dialect": "jsx",
+        "revision": "fe1b2b7e6774c0bb00170ceecd5a5432fbef81c0",
+        "sourceHash": "dcd5ac5dc75e4017f9fe3f0283cdf00826c0ee5b8101a9e1c87306d142fc4194",
+        "fixtureHashes": {
+          "Main.tsx": "cc49ca342aac06041c979cadd71eea96146b156f43a242086ce8455729f43f06",
+          "main.js": "bcaa89c8009320acf813cde03508ad5a38c4d7a08f5a2868c7bf031fba2a5d2b"
+        },
+        "compiledHashes": {
+          "src/Main.tsx": "aac1c3c1e1bcd45a15b00b8f595307c777165304109295f0c955f83f19a8873f",
+          "src/main.js": "bcaa89c8009320acf813cde03508ad5a38c4d7a08f5a2868c7bf031fba2a5d2b"
+        },
+        "bytes": {
+          "raw": 187384,
+          "gzip": 60228,
+          "brotli": 52560
+        },
+        "assetHash": "3eaed05c2e0c21ce26bf142f84ed9c38f0ab4db2c1feb5bb4d92f3f3ea17eb55",
+        "driverReachable": false,
+        "stagingReachable": false
+      },
+      {
+        "label": "pr",
+        "dialect": "tsrx",
+        "revision": "b891b99f61f8a662b3f72a7ca91099804ce0ae65",
+        "sourceHash": "9176bbd8eea698ae3dc7ef6dc3e433a17dac5dee8ecb18cf98dc95a69e26272b",
+        "fixtureHashes": {
+          "KeyCallbackRows.tsrx": "f8b7a702863a466b5ac6934d8766144a9ccb990ba396a4f53d665900d4aa72bd",
+          "Main.tsrx": "26002c3f20e81d04e31ed57cf656357b52e9eaa852817f52f31c83032829fb87",
+          "NestedWorkRows.tsrx": "98d588a4320395478fe37e817eb8684e68b000c7bb6f77c15d6d6f034544b721",
+          "UnkeyedRows.tsrx": "27ebda1c09bad11edf52ee5d4fcabf100c9cd71747771cbe049302c623398f4f",
+          "key-callback-work-main.js": "30a9ea37c5faff12db5b9aa9475628196e16d159b3caedbdd22cc6d298bf0716",
+          "key-callback-work.ts": "17fe64db5a4f236c4ab50d103327b581ac9c52db4c1744bb27ed2bac81b39d4e",
+          "main.js": "60448dcf6e09c0bd652ad55af145e22dbef2f8201c84d60f86b0c89105de27d0",
+          "nested-work-main.js": "5697d6053833936ffd0467e5f97280064ef118043cec19cb2e26899c480c85ed",
+          "nested-work.ts": "799d7dde016a1c50e08d3f1e5bbb9cbda760497918a5b897b6106dde5237069d",
+          "unkeyed-work-main.js": "7698883b6e0cf88bac03b662c2570daf19071c5a52f3c178894a8b662d35e5e9",
+          "unkeyed-work.ts": "df2b5cd8d1a5d7941a8e36e11ba14d9cd766b3c7c44610f1f6a60229d7315402"
+        },
+        "compiledHashes": {
+          "src/Main.tsrx": "64aecb083870c18239b959fae47772eccfe4a4279d25096dfbf6b493ac565d61",
+          "src/main.js": "2edb98ef75cfadd0f28589e9b08f89db9c671ead7267319dba3c3831e367e14f"
+        },
+        "bytes": {
+          "raw": 99795,
+          "gzip": 33040,
+          "brotli": 29331
+        },
+        "assetHash": "2e4c2571cd1cc99524983f755f4a0ab82b6c17796036cbcbc08f0d3c0297aa06",
+        "driverReachable": false,
+        "stagingReachable": false
+      },
+      {
+        "label": "pr",
+        "dialect": "jsx",
+        "revision": "b891b99f61f8a662b3f72a7ca91099804ce0ae65",
+        "sourceHash": "9176bbd8eea698ae3dc7ef6dc3e433a17dac5dee8ecb18cf98dc95a69e26272b",
+        "fixtureHashes": {
+          "Main.tsx": "cc49ca342aac06041c979cadd71eea96146b156f43a242086ce8455729f43f06",
+          "main.js": "bcaa89c8009320acf813cde03508ad5a38c4d7a08f5a2868c7bf031fba2a5d2b"
+        },
+        "compiledHashes": {
+          "src/Main.tsx": "aac1c3c1e1bcd45a15b00b8f595307c777165304109295f0c955f83f19a8873f",
+          "src/main.js": "bcaa89c8009320acf813cde03508ad5a38c4d7a08f5a2868c7bf031fba2a5d2b"
+        },
+        "bytes": {
+          "raw": 194694,
+          "gzip": 61653,
+          "brotli": 53550
+        },
+        "assetHash": "a53bc87266544cd17759609aa6d786465de9ec6b9874260690fda780f7da5e0c",
+        "driverReachable": false,
+        "stagingReachable": false
+      }
+    ]
+  },
+  "postMergeGuard": {
+    "suite": "view-transitions-js-framework",
+    "iterations": 1,
+    "metadata": {
+      "revision": "b891b99f61f8a662b3f72a7ca91099804ce0ae65",
+      "workingTree": true,
+      "sourceSha256": "9176bbd8eea698ae3dc7ef6dc3e433a17dac5dee8ecb18cf98dc95a69e26272b",
+      "compilerSourceSha256": "653236f83b565c844df63c54156ece40bf02cfb4ba40fa6dd66a561b915455be",
+      "lockfileSha256": "51648462c4e126c7b945cb99c5390b8a77243538c3bc86fbf784021d16e0cace",
+      "harnessSha256": "c3c7297b6aa8028d7134671c892b18165d31d3018c1625096afae7fcb4099782",
+      "node": "v24.20.0",
+      "platform": "darwin",
+      "arch": "arm64",
+      "osRelease": "25.6.0",
+      "cpu": "Apple M5 Max",
+      "toolchain": {
+        "vite": "8.1.5",
+        "esbuild": "0.28.1",
+        "tsrxCore": "0.2.0",
+        "tsrxOxc": "0.13.0",
+        "playwright": "1.61.1"
+      },
+      "build": {
+        "target": "esnext",
+        "minify": "esbuild",
+        "hmr": false,
+        "profile": false
+      },
+      "cpuThrottle": 1,
+      "chromium": "149.0.7827.55"
+    },
+    "targets": [
+      {
+        "name": "octane-tsrx",
+        "meta": {
+          "fixtureSourceSha256": "f4cc0ff24b1d419cdf4a1390295ff2d8825ad1b7bcddcc14023c7db23fea843b",
+          "compiledInputSha256": {
+            "src/Main.tsrx": "64aecb083870c18239b959fae47772eccfe4a4279d25096dfbf6b493ac565d61",
+            "src/main.js": "2edb98ef75cfadd0f28589e9b08f89db9c671ead7267319dba3c3831e367e14f"
+          },
+          "assets": [
+            {
+              "file": "assets/index-BnySTXcz.js",
+              "sha256": "2e4c2571cd1cc99524983f755f4a0ab82b6c17796036cbcbc08f0d3c0297aa06",
+              "rawBytes": 99795,
+              "gzipBytes": 33040
+            },
+            {
+              "file": "index.html",
+              "sha256": "407b2ea02d3e441eb189b45d6079aa281041f373796a96ab026183431dcf3914",
+              "rawBytes": 542,
+              "gzipBytes": 319
+            }
+          ],
+          "javascriptBytes": 99795,
+          "javascriptGzipBytes": 33040
+        },
+        "harness": {
+          "stdout": "\nOp       | octane-tsrx               \n---------+---------------------------\nrun     | 2.40 (min 2.40)           \nreplace | 5.60 (min 5.60)           \nadd     | 2.70 (min 2.70)           \nupdate  | 0.60 (min 0.60)           \nselect  | 0.20 (min 0.20)           \nswap    | 1.20 (min 1.20)           \nremove  | 0.70 (min 0.70)           \nrunlots | 24.70 (min 24.70)         \nselect_lots| 0.20 (min 0.20)           \nclear   | 19.40 (min 19.40)         \n#ins1k  | 1000                      \n#frag1k | 0                         \n#ins10k | 10000                     \n#frag10k| 0                         \n#calls1k| 34088                     \n#insadd | 1000                      \n#inspre | 100                       \n#insapp | 100                       \n#insmid | 100                       \n",
+          "stderr": "Running octane-tsrx (http://127.0.0.1:63613/) \u00d7 1\u2026\nBENCH_JSON written to /var/folders/zr/_4f6yytj45z6l0cfjlchy5gc0000gn/T/octane-vt-js-framework-EcmWL8/octane-tsrx.json\n",
+          "exitCode": 0,
+          "signal": null,
+          "result": {
+            "suite": "js-framework",
+            "iterations": 1,
+            "targets": [
+              {
+                "name": "octane-tsrx",
+                "ops": {
+                  "run": {
+                    "score": 2.4000000953674316,
+                    "median": 2.4000000953674316,
+                    "min": 2.4000000953674316,
+                    "mean": 2.4000000953674316,
+                    "p95": 2.4000000953674316,
+                    "sd": 0,
+                    "rme": 0,
+                    "scoreRme": 0,
+                    "warmupRatio": 1,
+                    "samples": 1
+                  },
+                  "replace": {
+                    "score": 5.599999904632568,
+                    "median": 5.599999904632568,
+                    "min": 5.599999904632568,
+                    "mean": 5.599999904632568,
+                    "p95": 5.599999904632568,
+                    "sd": 0,
+                    "rme": 0,
+                    "scoreRme": 0,
+                    "warmupRatio": 1,
+                    "samples": 1
+                  },
+                  "add": {
+                    "score": 2.700000047683716,
+                    "median": 2.700000047683716,
+                    "min": 2.700000047683716,
+                    "mean": 2.700000047683716,
+                    "p95": 2.700000047683716,
+                    "sd": 0,
+                    "rme": 0,
+                    "scoreRme": 0,
+                    "warmupRatio": 1,
+                    "samples": 1
+                  },
+                  "update": {
+                    "score": 0.5999999046325684,
+                    "median": 0.5999999046325684,
+                    "min": 0.5999999046325684,
+                    "mean": 0.5999999046325684,
+                    "p95": 0.5999999046325684,
+                    "sd": 0,
+                    "rme": 0,
+                    "scoreRme": 0,
+                    "warmupRatio": 1,
+                    "samples": 1
+                  },
+                  "select": {
+                    "score": 0.20000004768371582,
+                    "median": 0.20000004768371582,
+                    "min": 0.20000004768371582,
+                    "mean": 0.20000004768371582,
+                    "p95": 0.20000004768371582,
+                    "sd": 0,
+                    "rme": 0,
+                    "scoreRme": 0,
+                    "warmupRatio": 1,
+                    "samples": 1
+                  },
+                  "swap": {
+                    "score": 1.2000000476837158,
+                    "median": 1.2000000476837158,
+                    "min": 1.2000000476837158,
+                    "mean": 1.2000000476837158,
+                    "p95": 1.2000000476837158,
+                    "sd": 0,
+                    "rme": 0,
+                    "scoreRme": 0,
+                    "warmupRatio": 1,
+                    "samples": 1
+                  },
+                  "remove": {
+                    "score": 0.7000000476837158,
+                    "median": 0.7000000476837158,
+                    "min": 0.7000000476837158,
+                    "mean": 0.7000000476837158,
+                    "p95": 0.7000000476837158,
+                    "sd": 0,
+                    "rme": 0,
+                    "scoreRme": 0,
+                    "warmupRatio": 1,
+                    "samples": 1
+                  },
+                  "runlots": {
+                    "score": 24.699999809265137,
+                    "median": 24.699999809265137,
+                    "min": 24.699999809265137,
+                    "mean": 24.699999809265137,
+                    "p95": 24.699999809265137,
+                    "sd": 0,
+                    "rme": 0,
+                    "scoreRme": 0,
+                    "warmupRatio": 1,
+                    "samples": 1
+                  },
+                  "select_lots": {
+                    "score": 0.20000004768371582,
+                    "median": 0.20000004768371582,
+                    "min": 0.20000004768371582,
+                    "mean": 0.20000004768371582,
+                    "p95": 0.20000004768371582,
+                    "sd": 0,
+                    "rme": 0,
+                    "scoreRme": 0,
+                    "warmupRatio": 1,
+                    "samples": 1
+                  },
+                  "clear": {
+                    "score": 19.40000009536743,
+                    "median": 19.40000009536743,
+                    "min": 19.40000009536743,
+                    "mean": 19.40000009536743,
+                    "p95": 19.40000009536743,
+                    "sd": 0,
+                    "rme": 0,
+                    "scoreRme": 0,
+                    "warmupRatio": 1,
+                    "samples": 1
+                  },
+                  "live_inserts_1k": {
+                    "median": 1000,
+                    "min": 1000,
+                    "samples": 1
+                  },
+                  "fragment_commits_1k": {
+                    "median": 0,
+                    "min": 0,
+                    "samples": 1
+                  },
+                  "live_inserts_10k": {
+                    "median": 10000,
+                    "min": 10000,
+                    "samples": 1
+                  },
+                  "fragment_commits_10k": {
+                    "median": 0,
+                    "min": 0,
+                    "samples": 1
+                  },
+                  "live_inserts_append_1k": {
+                    "median": 1000,
+                    "min": 1000,
+                    "samples": 1
+                  },
+                  "fragment_commits_append_1k": {
+                    "median": 0,
+                    "min": 0,
+                    "samples": 1
+                  },
+                  "live_inserts_prepend_100": {
+                    "median": 100,
+                    "min": 100,
+                    "samples": 1
+                  },
+                  "fragment_commits_prepend_100": {
+                    "median": 0,
+                    "min": 0,
+                    "samples": 1
+                  },
+                  "live_inserts_append_100": {
+                    "median": 100,
+                    "min": 100,
+                    "samples": 1
+                  },
+                  "fragment_commits_append_100": {
+                    "median": 0,
+                    "min": 0,
+                    "samples": 1
+                  },
+                  "live_inserts_middle_100": {
+                    "median": 100,
+                    "min": 100,
+                    "samples": 1
+                  },
+                  "fragment_commits_middle_100": {
+                    "median": 0,
+                    "min": 0,
+                    "samples": 1
+                  },
+                  "production_calls_1k": {
+                    "median": 34088,
+                    "min": 34088,
+                    "samples": 1
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "ops": {
+          "run": {
+            "score": 2.4000000953674316,
+            "median": 2.4000000953674316,
+            "min": 2.4000000953674316,
+            "mean": 2.4000000953674316,
+            "p95": 2.4000000953674316,
+            "sd": 0,
+            "rme": 0,
+            "scoreRme": 0,
+            "warmupRatio": 1,
+            "samples": 1
+          },
+          "replace": {
+            "score": 5.599999904632568,
+            "median": 5.599999904632568,
+            "min": 5.599999904632568,
+            "mean": 5.599999904632568,
+            "p95": 5.599999904632568,
+            "sd": 0,
+            "rme": 0,
+            "scoreRme": 0,
+            "warmupRatio": 1,
+            "samples": 1
+          },
+          "add": {
+            "score": 2.700000047683716,
+            "median": 2.700000047683716,
+            "min": 2.700000047683716,
+            "mean": 2.700000047683716,
+            "p95": 2.700000047683716,
+            "sd": 0,
+            "rme": 0,
+            "scoreRme": 0,
+            "warmupRatio": 1,
+            "samples": 1
+          },
+          "update": {
+            "score": 0.5999999046325684,
+            "median": 0.5999999046325684,
+            "min": 0.5999999046325684,
+            "mean": 0.5999999046325684,
+            "p95": 0.5999999046325684,
+            "sd": 0,
+            "rme": 0,
+            "scoreRme": 0,
+            "warmupRatio": 1,
+            "samples": 1
+          },
+          "select": {
+            "score": 0.20000004768371582,
+            "median": 0.20000004768371582,
+            "min": 0.20000004768371582,
+            "mean": 0.20000004768371582,
+            "p95": 0.20000004768371582,
+            "sd": 0,
+            "rme": 0,
+            "scoreRme": 0,
+            "warmupRatio": 1,
+            "samples": 1
+          },
+          "swap": {
+            "score": 1.2000000476837158,
+            "median": 1.2000000476837158,
+            "min": 1.2000000476837158,
+            "mean": 1.2000000476837158,
+            "p95": 1.2000000476837158,
+            "sd": 0,
+            "rme": 0,
+            "scoreRme": 0,
+            "warmupRatio": 1,
+            "samples": 1
+          },
+          "remove": {
+            "score": 0.7000000476837158,
+            "median": 0.7000000476837158,
+            "min": 0.7000000476837158,
+            "mean": 0.7000000476837158,
+            "p95": 0.7000000476837158,
+            "sd": 0,
+            "rme": 0,
+            "scoreRme": 0,
+            "warmupRatio": 1,
+            "samples": 1
+          },
+          "runlots": {
+            "score": 24.699999809265137,
+            "median": 24.699999809265137,
+            "min": 24.699999809265137,
+            "mean": 24.699999809265137,
+            "p95": 24.699999809265137,
+            "sd": 0,
+            "rme": 0,
+            "scoreRme": 0,
+            "warmupRatio": 1,
+            "samples": 1
+          },
+          "select_lots": {
+            "score": 0.20000004768371582,
+            "median": 0.20000004768371582,
+            "min": 0.20000004768371582,
+            "mean": 0.20000004768371582,
+            "p95": 0.20000004768371582,
+            "sd": 0,
+            "rme": 0,
+            "scoreRme": 0,
+            "warmupRatio": 1,
+            "samples": 1
+          },
+          "clear": {
+            "score": 19.40000009536743,
+            "median": 19.40000009536743,
+            "min": 19.40000009536743,
+            "mean": 19.40000009536743,
+            "p95": 19.40000009536743,
+            "sd": 0,
+            "rme": 0,
+            "scoreRme": 0,
+            "warmupRatio": 1,
+            "samples": 1
+          },
+          "live_inserts_1k": {
+            "median": 1000,
+            "min": 1000,
+            "samples": 1
+          },
+          "fragment_commits_1k": {
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "live_inserts_10k": {
+            "median": 10000,
+            "min": 10000,
+            "samples": 1
+          },
+          "fragment_commits_10k": {
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "live_inserts_append_1k": {
+            "median": 1000,
+            "min": 1000,
+            "samples": 1
+          },
+          "fragment_commits_append_1k": {
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "live_inserts_prepend_100": {
+            "median": 100,
+            "min": 100,
+            "samples": 1
+          },
+          "fragment_commits_prepend_100": {
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "live_inserts_append_100": {
+            "median": 100,
+            "min": 100,
+            "samples": 1
+          },
+          "fragment_commits_append_100": {
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "live_inserts_middle_100": {
+            "median": 100,
+            "min": 100,
+            "samples": 1
+          },
+          "fragment_commits_middle_100": {
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "production_calls_1k": {
+            "median": 34088,
+            "min": 34088,
+            "samples": 1
+          }
+        }
+      },
+      {
+        "name": "octane-jsx",
+        "meta": {
+          "fixtureSourceSha256": "39ef2f4a39ad81a08a7cccf122792134bf06c29c314268f64cb8ae0f54894258",
+          "compiledInputSha256": {
+            "src/Main.tsx": "aac1c3c1e1bcd45a15b00b8f595307c777165304109295f0c955f83f19a8873f",
+            "src/main.js": "bcaa89c8009320acf813cde03508ad5a38c4d7a08f5a2868c7bf031fba2a5d2b"
+          },
+          "assets": [
+            {
+              "file": "assets/index-DvT3RrHK.js",
+              "sha256": "a53bc87266544cd17759609aa6d786465de9ec6b9874260690fda780f7da5e0c",
+              "rawBytes": 194694,
+              "gzipBytes": 61653
+            },
+            {
+              "file": "index.html",
+              "sha256": "f6d5d9c9d4266309c05e3d062841d37daf7ddb629b7a0d29d68733f3b52546ae",
+              "rawBytes": 541,
+              "gzipBytes": 318
+            }
+          ],
+          "javascriptBytes": 194694,
+          "javascriptGzipBytes": 61653
+        },
+        "harness": {
+          "stdout": "\nOp       | octane-jsx                \n---------+---------------------------\nrun     | 3.10 (min 3.10)           \nreplace | 5.70 (min 5.70)           \nadd     | 3.60 (min 3.60)           \nupdate  | 0.90 (min 0.90)           \nselect  | 0.50 (min 0.50)           \nswap    | 1.00 (min 1.00)           \nremove  | 1.00 (min 1.00)           \nrunlots | 24.90 (min 24.90)         \nselect_lots| 2.40 (min 2.40)           \nclear   | 16.90 (min 16.90)         \n#ins1k  | 1000                      \n#frag1k | 0                         \n#ins10k | 10000                     \n#frag10k| 0                         \n#calls1k| 46167                     \n#insadd | 1000                      \n#inspre | 100                       \n#insapp | 100                       \n#insmid | 100                       \n",
+          "stderr": "Running octane-jsx (http://127.0.0.1:63637/) \u00d7 1\u2026\nBENCH_JSON written to /var/folders/zr/_4f6yytj45z6l0cfjlchy5gc0000gn/T/octane-vt-js-framework-EcmWL8/octane-jsx.json\n",
+          "exitCode": 0,
+          "signal": null,
+          "result": {
+            "suite": "js-framework",
+            "iterations": 1,
+            "targets": [
+              {
+                "name": "octane-jsx",
+                "ops": {
+                  "run": {
+                    "score": 3.1000001430511475,
+                    "median": 3.1000001430511475,
+                    "min": 3.1000001430511475,
+                    "mean": 3.1000001430511475,
+                    "p95": 3.1000001430511475,
+                    "sd": 0,
+                    "rme": 0,
+                    "scoreRme": 0,
+                    "warmupRatio": 1,
+                    "samples": 1
+                  },
+                  "replace": {
+                    "score": 5.700000047683716,
+                    "median": 5.700000047683716,
+                    "min": 5.700000047683716,
+                    "mean": 5.700000047683716,
+                    "p95": 5.700000047683716,
+                    "sd": 0,
+                    "rme": 0,
+                    "scoreRme": 0,
+                    "warmupRatio": 1,
+                    "samples": 1
+                  },
+                  "add": {
+                    "score": 3.6000001430511475,
+                    "median": 3.6000001430511475,
+                    "min": 3.6000001430511475,
+                    "mean": 3.6000001430511475,
+                    "p95": 3.6000001430511475,
+                    "sd": 0,
+                    "rme": 0,
+                    "scoreRme": 0,
+                    "warmupRatio": 1,
+                    "samples": 1
+                  },
+                  "update": {
+                    "score": 0.8999998569488525,
+                    "median": 0.8999998569488525,
+                    "min": 0.8999998569488525,
+                    "mean": 0.8999998569488525,
+                    "p95": 0.8999998569488525,
+                    "sd": 0,
+                    "rme": 0,
+                    "scoreRme": 0,
+                    "warmupRatio": 1,
+                    "samples": 1
+                  },
+                  "select": {
+                    "score": 0.5,
+                    "median": 0.5,
+                    "min": 0.5,
+                    "mean": 0.5,
+                    "p95": 0.5,
+                    "sd": 0,
+                    "rme": 0,
+                    "scoreRme": 0,
+                    "warmupRatio": 1,
+                    "samples": 1
+                  },
+                  "swap": {
+                    "score": 1,
+                    "median": 1,
+                    "min": 1,
+                    "mean": 1,
+                    "p95": 1,
+                    "sd": 0,
+                    "rme": 0,
+                    "scoreRme": 0,
+                    "warmupRatio": 1,
+                    "samples": 1
+                  },
+                  "remove": {
+                    "score": 1,
+                    "median": 1,
+                    "min": 1,
+                    "mean": 1,
+                    "p95": 1,
+                    "sd": 0,
+                    "rme": 0,
+                    "scoreRme": 0,
+                    "warmupRatio": 1,
+                    "samples": 1
+                  },
+                  "runlots": {
+                    "score": 24.899999856948853,
+                    "median": 24.899999856948853,
+                    "min": 24.899999856948853,
+                    "mean": 24.899999856948853,
+                    "p95": 24.899999856948853,
+                    "sd": 0,
+                    "rme": 0,
+                    "scoreRme": 0,
+                    "warmupRatio": 1,
+                    "samples": 1
+                  },
+                  "select_lots": {
+                    "score": 2.3999998569488525,
+                    "median": 2.3999998569488525,
+                    "min": 2.3999998569488525,
+                    "mean": 2.3999998569488525,
+                    "p95": 2.3999998569488525,
+                    "sd": 0,
+                    "rme": 0,
+                    "scoreRme": 0,
+                    "warmupRatio": 1,
+                    "samples": 1
+                  },
+                  "clear": {
+                    "score": 16.90000009536743,
+                    "median": 16.90000009536743,
+                    "min": 16.90000009536743,
+                    "mean": 16.90000009536743,
+                    "p95": 16.90000009536743,
+                    "sd": 0,
+                    "rme": 0,
+                    "scoreRme": 0,
+                    "warmupRatio": 1,
+                    "samples": 1
+                  },
+                  "live_inserts_1k": {
+                    "median": 1000,
+                    "min": 1000,
+                    "samples": 1
+                  },
+                  "fragment_commits_1k": {
+                    "median": 0,
+                    "min": 0,
+                    "samples": 1
+                  },
+                  "live_inserts_10k": {
+                    "median": 10000,
+                    "min": 10000,
+                    "samples": 1
+                  },
+                  "fragment_commits_10k": {
+                    "median": 0,
+                    "min": 0,
+                    "samples": 1
+                  },
+                  "live_inserts_append_1k": {
+                    "median": 1000,
+                    "min": 1000,
+                    "samples": 1
+                  },
+                  "fragment_commits_append_1k": {
+                    "median": 0,
+                    "min": 0,
+                    "samples": 1
+                  },
+                  "live_inserts_prepend_100": {
+                    "median": 100,
+                    "min": 100,
+                    "samples": 1
+                  },
+                  "fragment_commits_prepend_100": {
+                    "median": 0,
+                    "min": 0,
+                    "samples": 1
+                  },
+                  "live_inserts_append_100": {
+                    "median": 100,
+                    "min": 100,
+                    "samples": 1
+                  },
+                  "fragment_commits_append_100": {
+                    "median": 0,
+                    "min": 0,
+                    "samples": 1
+                  },
+                  "live_inserts_middle_100": {
+                    "median": 100,
+                    "min": 100,
+                    "samples": 1
+                  },
+                  "fragment_commits_middle_100": {
+                    "median": 0,
+                    "min": 0,
+                    "samples": 1
+                  },
+                  "production_calls_1k": {
+                    "median": 46167,
+                    "min": 46167,
+                    "samples": 1
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "ops": {
+          "run": {
+            "score": 3.1000001430511475,
+            "median": 3.1000001430511475,
+            "min": 3.1000001430511475,
+            "mean": 3.1000001430511475,
+            "p95": 3.1000001430511475,
+            "sd": 0,
+            "rme": 0,
+            "scoreRme": 0,
+            "warmupRatio": 1,
+            "samples": 1
+          },
+          "replace": {
+            "score": 5.700000047683716,
+            "median": 5.700000047683716,
+            "min": 5.700000047683716,
+            "mean": 5.700000047683716,
+            "p95": 5.700000047683716,
+            "sd": 0,
+            "rme": 0,
+            "scoreRme": 0,
+            "warmupRatio": 1,
+            "samples": 1
+          },
+          "add": {
+            "score": 3.6000001430511475,
+            "median": 3.6000001430511475,
+            "min": 3.6000001430511475,
+            "mean": 3.6000001430511475,
+            "p95": 3.6000001430511475,
+            "sd": 0,
+            "rme": 0,
+            "scoreRme": 0,
+            "warmupRatio": 1,
+            "samples": 1
+          },
+          "update": {
+            "score": 0.8999998569488525,
+            "median": 0.8999998569488525,
+            "min": 0.8999998569488525,
+            "mean": 0.8999998569488525,
+            "p95": 0.8999998569488525,
+            "sd": 0,
+            "rme": 0,
+            "scoreRme": 0,
+            "warmupRatio": 1,
+            "samples": 1
+          },
+          "select": {
+            "score": 0.5,
+            "median": 0.5,
+            "min": 0.5,
+            "mean": 0.5,
+            "p95": 0.5,
+            "sd": 0,
+            "rme": 0,
+            "scoreRme": 0,
+            "warmupRatio": 1,
+            "samples": 1
+          },
+          "swap": {
+            "score": 1,
+            "median": 1,
+            "min": 1,
+            "mean": 1,
+            "p95": 1,
+            "sd": 0,
+            "rme": 0,
+            "scoreRme": 0,
+            "warmupRatio": 1,
+            "samples": 1
+          },
+          "remove": {
+            "score": 1,
+            "median": 1,
+            "min": 1,
+            "mean": 1,
+            "p95": 1,
+            "sd": 0,
+            "rme": 0,
+            "scoreRme": 0,
+            "warmupRatio": 1,
+            "samples": 1
+          },
+          "runlots": {
+            "score": 24.899999856948853,
+            "median": 24.899999856948853,
+            "min": 24.899999856948853,
+            "mean": 24.899999856948853,
+            "p95": 24.899999856948853,
+            "sd": 0,
+            "rme": 0,
+            "scoreRme": 0,
+            "warmupRatio": 1,
+            "samples": 1
+          },
+          "select_lots": {
+            "score": 2.3999998569488525,
+            "median": 2.3999998569488525,
+            "min": 2.3999998569488525,
+            "mean": 2.3999998569488525,
+            "p95": 2.3999998569488525,
+            "sd": 0,
+            "rme": 0,
+            "scoreRme": 0,
+            "warmupRatio": 1,
+            "samples": 1
+          },
+          "clear": {
+            "score": 16.90000009536743,
+            "median": 16.90000009536743,
+            "min": 16.90000009536743,
+            "mean": 16.90000009536743,
+            "p95": 16.90000009536743,
+            "sd": 0,
+            "rme": 0,
+            "scoreRme": 0,
+            "warmupRatio": 1,
+            "samples": 1
+          },
+          "live_inserts_1k": {
+            "median": 1000,
+            "min": 1000,
+            "samples": 1
+          },
+          "fragment_commits_1k": {
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "live_inserts_10k": {
+            "median": 10000,
+            "min": 10000,
+            "samples": 1
+          },
+          "fragment_commits_10k": {
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "live_inserts_append_1k": {
+            "median": 1000,
+            "min": 1000,
+            "samples": 1
+          },
+          "fragment_commits_append_1k": {
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "live_inserts_prepend_100": {
+            "median": 100,
+            "min": 100,
+            "samples": 1
+          },
+          "fragment_commits_prepend_100": {
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "live_inserts_append_100": {
+            "median": 100,
+            "min": 100,
+            "samples": 1
+          },
+          "fragment_commits_append_100": {
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "live_inserts_middle_100": {
+            "median": 100,
+            "min": 100,
+            "samples": 1
+          },
+          "fragment_commits_middle_100": {
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "production_calls_1k": {
+            "median": 46167,
+            "min": 46167,
+            "samples": 1
+          }
+        }
+      }
+    ]
+  },
+  "nativeBundle": {
+    "suite": "view-transitions",
+    "targets": [
+      {
+        "name": "vt-bundle-root-static",
+        "ops": {
+          "raw": {
+            "score": 171732,
+            "median": 171732,
+            "min": 171732,
+            "samples": 1
+          },
+          "gzip": {
+            "score": 54126,
+            "median": 54126,
+            "min": 54126,
+            "samples": 1
+          },
+          "driver_reachable": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "staging_reachable": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          }
+        },
+        "meta": {
+          "revision": "b891b99f61f8a662b3f72a7ca91099804ce0ae65",
+          "sourceSha256": "9176bbd8eea698ae3dc7ef6dc3e433a17dac5dee8ecb18cf98dc95a69e26272b",
+          "fixtureSourceSha256": "bbb786f2c180fe8dba7e276ce1d3ef52731a0e172c8bb0b3fde349a06a3ec851",
+          "node": "v24.20.0",
+          "platform": "darwin",
+          "arch": "arm64",
+          "lockfileSha256": "51648462c4e126c7b945cb99c5390b8a77243538c3bc86fbf784021d16e0cace",
+          "toolchain": {
+            "vite": "8.1.5",
+            "esbuild": "0.28.1",
+            "tsrxCore": "0.2.0",
+            "playwright": "1.61.1"
+          },
+          "snapshot": {
+            "text": "Octane",
+            "cleaned": true
+          },
+          "bundleSha256": "61fd86261a9b9b5fbdc89c92e4b9f202ccf4d48f2e45ccfe19a1f2b21bcc30b3"
+        }
+      },
+      {
+        "name": "vt-bundle-hooks-state",
+        "ops": {
+          "raw": {
+            "score": 180012,
+            "median": 180012,
+            "min": 180012,
+            "samples": 1
+          },
+          "gzip": {
+            "score": 57070,
+            "median": 57070,
+            "min": 57070,
+            "samples": 1
+          },
+          "driver_reachable": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "staging_reachable": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          }
+        },
+        "meta": {
+          "revision": "b891b99f61f8a662b3f72a7ca91099804ce0ae65",
+          "sourceSha256": "9176bbd8eea698ae3dc7ef6dc3e433a17dac5dee8ecb18cf98dc95a69e26272b",
+          "fixtureSourceSha256": "bbb786f2c180fe8dba7e276ce1d3ef52731a0e172c8bb0b3fde349a06a3ec851",
+          "node": "v24.20.0",
+          "platform": "darwin",
+          "arch": "arm64",
+          "lockfileSha256": "51648462c4e126c7b945cb99c5390b8a77243538c3bc86fbf784021d16e0cace",
+          "toolchain": {
+            "vite": "8.1.5",
+            "esbuild": "0.28.1",
+            "tsrxCore": "0.2.0",
+            "playwright": "1.61.1"
+          },
+          "snapshot": {
+            "before": "0",
+            "after": "1",
+            "clicks": 1,
+            "effects": 1,
+            "cleanups": 1,
+            "cleaned": true
+          },
+          "bundleSha256": "9b272ab6d2c9c7480a19df68c0505e188c11e55998c206cb08c0e628acc1aeb6"
+        }
+      },
+      {
+        "name": "vt-work-root-static",
+        "ops": {
+          "rect_reads": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "computed_style_reads": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "native_transitions": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          }
+        },
+        "meta": {
+          "revision": "b891b99f61f8a662b3f72a7ca91099804ce0ae65",
+          "sourceSha256": "9176bbd8eea698ae3dc7ef6dc3e433a17dac5dee8ecb18cf98dc95a69e26272b",
+          "fixtureSourceSha256": "bbb786f2c180fe8dba7e276ce1d3ef52731a0e172c8bb0b3fde349a06a3ec851",
+          "node": "v24.20.0",
+          "platform": "darwin",
+          "arch": "arm64",
+          "lockfileSha256": "51648462c4e126c7b945cb99c5390b8a77243538c3bc86fbf784021d16e0cace",
+          "toolchain": {
+            "vite": "8.1.5",
+            "esbuild": "0.28.1",
+            "tsrxCore": "0.2.0",
+            "playwright": "1.61.1"
+          },
+          "browser": "149.0.7827.55",
+          "snapshot": {
+            "text": "Octane",
+            "cleaned": true
+          }
+        }
+      },
+      {
+        "name": "vt-work-hooks-state",
+        "ops": {
+          "rect_reads": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "computed_style_reads": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          },
+          "native_transitions": {
+            "score": 0,
+            "median": 0,
+            "min": 0,
+            "samples": 1
+          }
+        },
+        "meta": {
+          "revision": "b891b99f61f8a662b3f72a7ca91099804ce0ae65",
+          "sourceSha256": "9176bbd8eea698ae3dc7ef6dc3e433a17dac5dee8ecb18cf98dc95a69e26272b",
+          "fixtureSourceSha256": "bbb786f2c180fe8dba7e276ce1d3ef52731a0e172c8bb0b3fde349a06a3ec851",
+          "node": "v24.20.0",
+          "platform": "darwin",
+          "arch": "arm64",
+          "lockfileSha256": "51648462c4e126c7b945cb99c5390b8a77243538c3bc86fbf784021d16e0cace",
+          "toolchain": {
+            "vite": "8.1.5",
+            "esbuild": "0.28.1",
+            "tsrxCore": "0.2.0",
+            "playwright": "1.61.1"
+          },
+          "browser": "149.0.7827.55",
+          "snapshot": {
+            "before": "0",
+            "after": "1",
+            "clicks": 1,
+            "effects": 1,
+            "cleanups": 1,
+            "cleaned": true
+          }
+        }
+      },
+      {
+        "name": "vt-bundle-active",
+        "ops": {
+          "raw": {
+            "score": 331713,
+            "median": 331713,
+            "min": 331713,
+            "samples": 1
+          },
+          "gzip": {
+            "score": 91196,
+            "median": 91196,
+            "min": 91196,
+            "samples": 1
+          },
+          "driver_reachable": {
+            "score": 1,
+            "median": 1,
+            "min": 1,
+            "samples": 1
+          },
+          "staging_reachable": {
+            "score": 1,
+            "median": 1,
+            "min": 1,
+            "samples": 1
+          }
+        },
+        "meta": {
+          "revision": "b891b99f61f8a662b3f72a7ca91099804ce0ae65",
+          "sourceSha256": "9176bbd8eea698ae3dc7ef6dc3e433a17dac5dee8ecb18cf98dc95a69e26272b",
+          "fixtureSourceSha256": "bbb786f2c180fe8dba7e276ce1d3ef52731a0e172c8bb0b3fde349a06a3ec851",
+          "node": "v24.20.0",
+          "platform": "darwin",
+          "arch": "arm64",
+          "lockfileSha256": "51648462c4e126c7b945cb99c5390b8a77243538c3bc86fbf784021d16e0cace",
+          "toolchain": {
+            "vite": "8.1.5",
+            "esbuild": "0.28.1",
+            "tsrxCore": "0.2.0",
+            "playwright": "1.61.1"
+          },
+          "browser": "149.0.7827.55",
+          "snapshot": [
+            {
+              "text": "generation 1",
+              "inputIdentity": true,
+              "inputValue": "retained draft",
+              "kinds": ["update"],
+              "animated": true
+            },
+            {
+              "text": "generation 2",
+              "inputIdentity": true,
+              "inputValue": "retained draft",
+              "kinds": ["update"],
+              "animated": true
+            },
+            {
+              "text": "generation 3",
+              "inputIdentity": true,
+              "inputValue": "retained draft",
+              "kinds": ["update"],
+              "animated": true
+            },
+            {
+              "text": "generation 4",
+              "inputIdentity": true,
+              "inputValue": "retained draft",
+              "kinds": ["update"],
+              "animated": true
+            }
+          ],
+          "bundleSha256": "652ce0dd717f16cb4f2de5cdf7b8f2047d887760d07b3c20d55cab5aa2f3921e"
+        }
+      },
+      {
+        "name": "vt-work-four-updates",
+        "ops": {
+          "rect_reads": {
+            "score": 8,
+            "median": 8,
+            "min": 8,
+            "samples": 1
+          },
+          "computed_style_reads": {
+            "score": 24,
+            "median": 24,
+            "min": 24,
+            "samples": 1
+          },
+          "native_transitions": {
+            "score": 4,
+            "median": 4,
+            "min": 4,
+            "samples": 1
+          }
+        },
+        "meta": {
+          "revision": "b891b99f61f8a662b3f72a7ca91099804ce0ae65",
+          "sourceSha256": "9176bbd8eea698ae3dc7ef6dc3e433a17dac5dee8ecb18cf98dc95a69e26272b",
+          "fixtureSourceSha256": "bbb786f2c180fe8dba7e276ce1d3ef52731a0e172c8bb0b3fde349a06a3ec851",
+          "node": "v24.20.0",
+          "platform": "darwin",
+          "arch": "arm64",
+          "lockfileSha256": "51648462c4e126c7b945cb99c5390b8a77243538c3bc86fbf784021d16e0cace",
+          "toolchain": {
+            "vite": "8.1.5",
+            "esbuild": "0.28.1",
+            "tsrxCore": "0.2.0",
+            "playwright": "1.61.1"
+          },
+          "browser": "149.0.7827.55",
+          "snapshot": [
+            {
+              "text": "generation 1",
+              "inputIdentity": true,
+              "inputValue": "retained draft",
+              "kinds": ["update"],
+              "animated": true
+            },
+            {
+              "text": "generation 2",
+              "inputIdentity": true,
+              "inputValue": "retained draft",
+              "kinds": ["update"],
+              "animated": true
+            },
+            {
+              "text": "generation 3",
+              "inputIdentity": true,
+              "inputValue": "retained draft",
+              "kinds": ["update"],
+              "animated": true
+            },
+            {
+              "text": "generation 4",
+              "inputIdentity": true,
+              "inputValue": "retained draft",
+              "kinds": ["update"],
+              "animated": true
+            }
+          ]
+        }
+      },
+      {
+        "name": "vt-work-model",
+        "ops": {
+          "updates": {
+            "score": 4,
+            "median": 4,
+            "min": 4,
+            "samples": 1
+          },
+          "rect_reads": {
+            "score": 4,
+            "median": 4,
+            "min": 4,
+            "samples": 1
+          },
+          "computed_style_reads": {
+            "score": 4,
+            "median": 4,
+            "min": 4,
+            "samples": 1
+          },
+          "native_transitions": {
+            "score": 4,
+            "median": 4,
+            "min": 4,
+            "samples": 1
+          },
+          "driver_reachable": {
+            "score": 1,
+            "median": 1,
+            "min": 1,
+            "samples": 1
+          },
+          "staging_reachable": {
+            "score": 1,
+            "median": 1,
+            "min": 1,
+            "samples": 1
+          }
+        },
+        "meta": {
+          "revision": "b891b99f61f8a662b3f72a7ca91099804ce0ae65",
+          "sourceSha256": "9176bbd8eea698ae3dc7ef6dc3e433a17dac5dee8ecb18cf98dc95a69e26272b",
+          "fixtureSourceSha256": "bbb786f2c180fe8dba7e276ce1d3ef52731a0e172c8bb0b3fde349a06a3ec851",
+          "node": "v24.20.0",
+          "platform": "darwin",
+          "arch": "arm64",
+          "lockfileSha256": "51648462c4e126c7b945cb99c5390b8a77243538c3bc86fbf784021d16e0cace",
+          "toolchain": {
+            "vite": "8.1.5",
+            "esbuild": "0.28.1",
+            "tsrxCore": "0.2.0",
+            "playwright": "1.61.1"
+          },
+          "semanticControl": "four completed native animations preserve the input and final text"
+        }
+      }
+    ]
+  },
+  "nativeScopes": {
+    "suite": "view-transition-scopes",
+    "bytesOnly": false,
+    "metadata": {
+      "revision": "b891b99f61f8a662b3f72a7ca91099804ce0ae65",
+      "sourceSha256": "9176bbd8eea698ae3dc7ef6dc3e433a17dac5dee8ecb18cf98dc95a69e26272b",
+      "fixtureSha256": "504d1c57ae9686322f5b95b1822db49b41993f869a739acfa08236d3286847f6",
+      "lockfileSha256": "51648462c4e126c7b945cb99c5390b8a77243538c3bc86fbf784021d16e0cace",
+      "node": "v24.20.0",
+      "platform": "darwin",
+      "arch": "arm64",
+      "toolchain": {
+        "vite": "8.1.5",
+        "esbuild": "0.28.1",
+        "tsrxCore": "0.2.0",
+        "playwright": "1.61.1"
+      },
+      "chromium": "149.0.7827.55"
+    },
+    "bundle": {
+      "rawBytes": 328267,
+      "gzipBytes": 90001,
+      "sha256": "d5280ed1f45f64ad72f4b2b9de78192f0d60f0f2aa5cda8e60b8eda2b4995125",
+      "driverReachable": 1,
+      "stagingReachable": 1
+    },
+    "cases": {
+      "single": {
+        "counts": {
+          "rectReads": 4,
+          "styleReads": 20,
+          "elementCaptures": 1,
+          "documentCaptures": 0
+        },
+        "semantic": {
+          "owners": ["left"],
+          "ready": [["fulfilled", "fulfilled", null]],
+          "finished": ["fulfilled"],
+          "hostsRetained": true,
+          "roots": [
+            {
+              "id": "left",
+              "scope": "all"
+            }
+          ],
+          "text": [["left", "left-after"]],
+          "events": [
+            {
+              "id": "left-root",
+              "targets": ["left", "left"],
+              "animatedTarget": "left",
+              "styleOwner": "left"
+            },
+            {
+              "id": "left",
+              "targets": ["left", "left"],
+              "animatedTarget": "left",
+              "styleOwner": "left"
+            }
+          ]
+        }
+      },
+      "siblings": {
+        "counts": {
+          "rectReads": 8,
+          "styleReads": 40,
+          "elementCaptures": 2,
+          "documentCaptures": 0
+        },
+        "semantic": {
+          "owners": ["left", "right"],
+          "ready": [
+            ["fulfilled", "fulfilled", null],
+            ["fulfilled", "fulfilled", null]
+          ],
+          "finished": ["fulfilled", "fulfilled"],
+          "hostsRetained": true,
+          "roots": [
+            {
+              "id": "left",
+              "scope": "all"
+            },
+            {
+              "id": "right",
+              "scope": "all"
+            }
+          ],
+          "text": [
+            ["left", "left-after"],
+            ["right", "right-after"]
+          ],
+          "events": [
+            {
+              "id": "left-root",
+              "targets": ["left", "left"],
+              "animatedTarget": "left",
+              "styleOwner": "left"
+            },
+            {
+              "id": "left",
+              "targets": ["left", "left"],
+              "animatedTarget": "left",
+              "styleOwner": "left"
+            },
+            {
+              "id": "right-root",
+              "targets": ["right", "right"],
+              "animatedTarget": "right",
+              "styleOwner": "right"
+            },
+            {
+              "id": "right",
+              "targets": ["right", "right"],
+              "animatedTarget": "right",
+              "styleOwner": "right"
+            }
+          ]
+        }
+      },
+      "nested": {
+        "counts": {
+          "rectReads": 8,
+          "styleReads": 40,
+          "elementCaptures": 2,
+          "documentCaptures": 0
+        },
+        "semantic": {
+          "owners": ["inner", "left"],
+          "ready": [
+            ["fulfilled", "fulfilled", null],
+            ["fulfilled", "fulfilled", null]
+          ],
+          "finished": ["fulfilled", "fulfilled"],
+          "hostsRetained": true,
+          "roots": [
+            {
+              "id": "left",
+              "scope": "all"
+            },
+            {
+              "id": "inner",
+              "scope": "all"
+            }
+          ],
+          "text": [
+            ["left", "left-after"],
+            ["inner", "inner-after"]
+          ],
+          "events": [
+            {
+              "id": "left-root",
+              "targets": ["left", "left"],
+              "animatedTarget": "left",
+              "styleOwner": "left"
+            },
+            {
+              "id": "left",
+              "targets": ["left", "left"],
+              "animatedTarget": "left",
+              "styleOwner": "left"
+            },
+            {
+              "id": "inner-root",
+              "targets": ["inner", "inner"],
+              "animatedTarget": "inner",
+              "styleOwner": "inner"
+            },
+            {
+              "id": "inner",
+              "targets": ["inner", "inner"],
+              "animatedTarget": "inner",
+              "styleOwner": "inner"
+            }
+          ]
+        }
+      },
+      "mixed": {
+        "counts": {
+          "rectReads": 14,
+          "styleReads": 64,
+          "elementCaptures": 3,
+          "documentCaptures": 1
+        },
+        "semantic": {
+          "owners": ["document", "inner", "left", "right"],
+          "ready": [
+            ["fulfilled", "fulfilled", null],
+            ["fulfilled", "fulfilled", null],
+            ["fulfilled", "fulfilled", null],
+            ["fulfilled", "fulfilled", null]
+          ],
+          "finished": ["fulfilled", "fulfilled", "fulfilled", "fulfilled"],
+          "hostsRetained": true,
+          "roots": [
+            {
+              "id": "left",
+              "scope": "all"
+            },
+            {
+              "id": "inner",
+              "scope": "all"
+            },
+            {
+              "id": "right",
+              "scope": "all"
+            }
+          ],
+          "text": [
+            ["page", "page-after"],
+            ["left", "left-after"],
+            ["inner", "inner-after"],
+            ["right", "right-after"]
+          ],
+          "events": [
+            {
+              "id": "left-root",
+              "targets": ["left", "left"],
+              "animatedTarget": "left",
+              "styleOwner": "left"
+            },
+            {
+              "id": "left",
+              "targets": ["left", "left"],
+              "animatedTarget": "left",
+              "styleOwner": "left"
+            },
+            {
+              "id": "inner-root",
+              "targets": ["inner", "inner"],
+              "animatedTarget": "inner",
+              "styleOwner": "inner"
+            },
+            {
+              "id": "inner",
+              "targets": ["inner", "inner"],
+              "animatedTarget": "inner",
+              "styleOwner": "inner"
+            },
+            {
+              "id": "right-root",
+              "targets": ["right", "right"],
+              "animatedTarget": "right",
+              "styleOwner": "right"
+            },
+            {
+              "id": "right",
+              "targets": ["right", "right"],
+              "animatedTarget": "right",
+              "styleOwner": "right"
+            },
+            {
+              "id": "page",
+              "targets": ["document", "document"],
+              "animatedTarget": "document",
+              "styleOwner": "document"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "validationLogs": {
+    "vt-jsbench-current-main-types.log": "",
+    "vt-jsbench-current-main-style.log": "\n RUN  v4.1.10 /Users/domgan/.codex/worktrees/octane-react-view-transition-parity\n\n\n Test Files  2 passed (2)\n      Tests  112 passed (112)\n   Start at  13:40:21\n   Duration  7.11s (transform 10.27s, setup 6.69s, import 5.40s, tests 721ms, environment 1.20s)\n\n",
+    "vt-jsbench-current-main-native.log": "\n RUN  v4.1.10 /Users/domgan/.codex/worktrees/octane-react-view-transition-parity\n\n\n Test Files  4 passed (4)\n      Tests  85 passed (85)\n   Start at  13:40:23\n   Duration  57.97s (transform 1.83s, setup 0ms, import 4.04s, tests 53.34s, environment 0ms)\n\n"
+  }
+}

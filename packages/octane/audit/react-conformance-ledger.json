@@ -13801,7 +13801,7 @@
       "rationale": "Executable SSR and hydration evidence verifies emitted ViewTransition annotations and clean client adoption, matching the upstream public outcome.",
       "evidence": [
         {
-          "file": "packages/octane/tests/conformance/view-transition-ssr.test.ts",
+          "file": "packages/octane/tests/view-transition-ssr.test.ts",
           "testName": "emits annotations for view transitions",
           "modes": ["server-string", "hydrate-match", "production-compile"]
         }
@@ -19167,7 +19167,7 @@
       "rationale": "Executable streaming and hydration evidence verifies stable ViewTransition annotations outside Suspense and clean client adoption, matching the upstream public outcome.",
       "evidence": [
         {
-          "file": "packages/octane/tests/conformance/view-transition-ssr.test.ts",
+          "file": "packages/octane/tests/view-transition-ssr.test.ts",
           "testName": "emits annotations for view transitions outside Suspense",
           "modes": ["server-stream", "hydrate-match", "production-compile"]
         }
@@ -35631,7 +35631,7 @@
       "rationale": "Executable streaming and hydration evidence verifies that one node can carry both ViewTransition enter and exit annotations, matching the upstream public outcome.",
       "evidence": [
         {
-          "file": "packages/octane/tests/conformance/view-transition-ssr.test.ts",
+          "file": "packages/octane/tests/view-transition-ssr.test.ts",
           "testName": "can emit both enter and exit on the same node",
           "modes": ["server-stream", "hydrate-match", "production-compile"]
         }
@@ -69575,7 +69575,7 @@
       "rationale": "Executable streaming and hydration evidence verifies ViewTransition enter/exit annotations inside Suspense and clean client adoption, matching the upstream public outcome.",
       "evidence": [
         {
-          "file": "packages/octane/tests/conformance/view-transition-ssr.test.ts",
+          "file": "packages/octane/tests/view-transition-ssr.test.ts",
           "testName": "emits enter/exit annotations for view transitions inside Suspense",
           "modes": ["server-stream", "hydrate-match", "production-compile"]
         }

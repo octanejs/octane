@@ -1894,9 +1894,31 @@ class ServerHtml {
 	}
 }
 
+// Async component results and memoized output can outlive their rendering pass.
+// Restore raw provenance through the existing branded read, keeping ordinary
+// ServerHtml values and their consumption path unchanged.
+class RawServerHtml {
+	constructor(html: string) {
+		this.html = html;
+	}
+	private readonly html: string;
+	get [SERVER_HTML](): string {
+		VT_SSR_HAS_RAW_HTML = true;
+		return this.html;
+	}
+	toString(): string {
+		return this[SERVER_HTML];
+	}
+}
+
 /** @internal Brand the final serialized output of a compiled server body. */
 export function ssrHtml(html: string): string {
-	return typeof html === 'string' ? (new ServerHtml(html) as unknown as string) : html;
+	if (typeof html !== 'string') return html;
+	if (!VT_SSR_HAS_RAW_HTML) return new ServerHtml(html) as unknown as string;
+	// An async continuation runs outside a synchronous pass. Its wrapper now
+	// owns this provenance; do not leave it behind for an unrelated continuation.
+	if (CURRENT_SCOPE === null) VT_SSR_HAS_RAW_HTML = false;
+	return new RawServerHtml(html) as unknown as string;
 }
 
 const BINDING_HTML_ROOT = /* @__PURE__ */ Symbol.for('octane.binding.html');
@@ -2274,6 +2296,7 @@ function ssrHostElement(
 		}
 		let inner = '';
 		if (hasDangerHTML) {
+			VT_SSR_HAS_RAW_HTML = true;
 			const html = (innerHTMLValue as { __html?: unknown }).__html;
 			const raw = html == null ? '' : String(html);
 			// HTML tag names are ASCII case-insensitive on the public descriptor path
@@ -3522,6 +3545,7 @@ export function ssrInnerHtml(
 			}
 		}
 		const html = (value as { __html?: unknown }).__html;
+		VT_SSR_HAS_RAW_HTML = true;
 		return html == null ? '' : String(html);
 	}
 	return undefined;
@@ -3613,6 +3637,7 @@ export function ssrSpreadContent(
 		}
 		if (child != null) throw new Error(formatServerError(5));
 		const value = (html as { __html?: unknown }).__html;
+		VT_SSR_HAS_RAW_HTML = true;
 		return value == null ? '' : String(value);
 	}
 	return child === undefined ? '' : ssrChildText(child, scope);
@@ -4373,6 +4398,8 @@ function rewindComponentReplayState(
 	if (snapshot.jobs !== null) snapshot.jobs.length = snapshot.jobsLength;
 	VT_SSR_TRY_SEQ = snapshot.vtTrySeq;
 	VT_SSR_HAS_CANDIDATES = snapshot.vtHasCandidates;
+	// Memoized HTML can survive a render-phase retry. Retain the conservative
+	// raw-HTML requirement for this pass even when other output is discarded.
 	VT_SSR_STACK.length = 0;
 	for (const entry of snapshot.vtStack) {
 		entry.candidate.consumed = entry.consumed;
@@ -4463,8 +4490,15 @@ function serverStructuralSignalInstanceKey(
 }
 
 function serverSignalOwner(_frame: Frame | null): SignalRendererOwnerIdentity | undefined {
-	const resolved = RESOLVED!;
-	if (resolved.signalOwner === undefined || resolved.signalInstances === undefined) return;
+	// An async continuation can compose cached compiled HTML outside a render pass.
+	// Only an active pass may assign a request-owned signal instance.
+	const resolved = RESOLVED;
+	if (
+		resolved === null ||
+		resolved.signalOwner === undefined ||
+		resolved.signalInstances === undefined
+	)
+		return;
 	const instanceKey =
 		SIGNAL_COMPONENT_INSTANCE_KEY || JSON.stringify([SIGNAL_INSTANCE_PREFIX, 'root']);
 	let owner = resolved.signalInstances.get(instanceKey);
@@ -5205,9 +5239,10 @@ export const Suspense = /* @__PURE__ */ markComponentFlags(
 //                Suspense content).
 // Arm-top detection is POSITIONAL, not flag-based (compiled static elements
 // emit as string concatenation — no runtime call to consult): every boundary
-// stamps CANDIDATE attributes (vt-enter-x / vt-exit-x) on its first element;
-// each @try arm then CLAIMS the matching candidate on the arm's first element
-// (renaming -x → real). Ordering makes this exact — an OUTER boundary's
+// stamps CANDIDATE attributes (vt-enter-x / vt-exit-x) on each direct host;
+// each @try arm then CLAIMS matching direct hosts (renaming -x → real) and
+// relays through nested boundaries that opt in with parentEnter/parentExit.
+// Ordering makes this exact — an OUTER boundary's
 // surgery runs after the arm's claim, so its candidates are never claimed by
 // an arm it merely contains. Residual candidates are stripped at the final
 // emission points (buffered html / stream shell / stream segments).
@@ -5215,15 +5250,21 @@ export const Suspense = /* @__PURE__ */ markComponentFlags(
 type VtSsrClassValue = string | Record<string, string>;
 interface VtSsrProps {
 	name?: string;
+	scope?: 'element';
 	enter?: VtSsrClassValue;
 	exit?: VtSsrClassValue;
 	update?: VtSsrClassValue;
 	share?: VtSsrClassValue;
 	default?: VtSsrClassValue;
+	parentEnter?: VtSsrClassValue;
+	parentExit?: VtSsrClassValue;
+	onParentEnter?: unknown;
+	onParentExit?: unknown;
 	children?: unknown;
 }
 interface VtSsrCandidate {
 	name: string;
+	elementScope: boolean;
 	share: string;
 	update: string;
 	consumed: boolean;
@@ -5234,48 +5275,22 @@ let VT_SSR_TRY_SEQ = 0;
 // contain residual vt-enter-x / vt-exit-x attributes. Threaded into the pass
 // result so ordinary SSR can skip scanning the entire emitted HTML string.
 let VT_SSR_HAS_CANDIDATES = false;
+// Compiler-emitted attributes escape quotes, so their candidates can be stripped
+// by a native regex. Trusted raw HTML needs the quote-aware tag/attribute walk.
+// Keep this alongside candidate state through render retries and reentrancy.
+let VT_SSR_HAS_RAW_HTML = false;
 const VT_SSR_STACK: VtSsrCandidate[] = [];
 
 /** Resolve a class-prop value server-side (no types → maps use `default`). */
-function vtSsrResolve(props: VtSsrProps, kind: 'enter' | 'exit' | 'update' | 'share'): string {
-	let v: VtSsrClassValue | undefined = props[kind];
-	if (v == null) v = props.default;
-	if (v == null) return 'auto';
-	if (typeof v === 'string') return v;
-	return v.default != null ? v.default : 'auto';
-}
-
-/** Skip comment markers and streaming placeholders to locate the visible root. */
-function vtSsrFirstVisibleOpenTag(html: string): number {
-	const n = html.length;
-	let i = 0;
-	while (i < n) {
-		const lt = html.indexOf('<', i);
-		if (lt === -1) return -1;
-		if (html.startsWith('<!--', lt)) {
-			const close = html.indexOf('-->', lt + 4);
-			if (close === -1) return -1;
-			i = close + 3;
-			continue;
-		}
-		const c = html.charCodeAt(lt + 1);
-		if (!((c >= 65 && c <= 90) || (c >= 97 && c <= 122))) {
-			// Not an element open (a closing tag or stray '<' text) — move on.
-			i = lt + 1;
-			continue;
-		}
-		let e = lt + 1;
-		while (e < n && /[a-zA-Z0-9-]/.test(html[e])) e++;
-		if (e - lt === 9 && html.slice(lt + 1, e).toLowerCase() === 'template') {
-			const j = vtSsrOpenTagEnd(html, e);
-			if (j === -1) return -1;
-			const close = html.indexOf('</template>', j);
-			i = close === -1 ? j + 1 : close + 11;
-			continue;
-		}
-		return lt;
-	}
-	return -1;
+function vtSsrResolve(
+	props: VtSsrProps,
+	kind: 'enter' | 'exit' | 'update' | 'share' | 'parentEnter' | 'parentExit',
+): string {
+	const value = props[kind];
+	const resolved = typeof value === 'string' ? value : value?.default;
+	if (resolved != null) return resolved;
+	const fallback = props.default;
+	return (typeof fallback === 'string' ? fallback : fallback?.default) ?? 'auto';
 }
 
 /** Find an opening tag's actual terminator without allocating scan state. */
@@ -5294,52 +5309,366 @@ function vtSsrOpenTagEnd(html: string, from: number): number {
 	return -1;
 }
 
-/**
- * Inject `vt-*` attributes into the first visible element's opening tag.
- * An inner boundary owns attributes it has already placed on the same root.
- */
-function vtSsrAnnotate(html: string, attrs: Array<[string, string]>): string {
-	const start = vtSsrFirstVisibleOpenTag(html);
-	if (start === -1) return html;
-	const end = vtSsrOpenTagEnd(html, start + 1);
-	if (end === -1) return html;
-	const open = html.slice(start, end);
-	let inject = '';
-	for (let index = 0; index < attrs.length; index++) {
-		if (open.indexOf(attrs[index][0] + '="') === -1) {
-			inject += ' ' + attrs[index][0] + '="' + escapeAttr(attrs[index][1]) + '"';
+/** Walk rendered opening tags without interpreting quoted attributes or raw text as markup. */
+function vtSsrMapTags(
+	html: string,
+	visit: (open: string, depth: number, tag: string) => string,
+	visitText?: (text: string, depth: number) => void,
+	visitAllElements = false,
+	rootOnly = false,
+): string {
+	let depth = 0;
+	let from = 0;
+	let copied = 0;
+	let out = '';
+	while (from < html.length) {
+		const start = html.indexOf('<', from);
+		if (visitText && (!rootOnly || depth === 0))
+			visitText(html.slice(from, start < 0 ? html.length : start), depth);
+		if (start < 0) break;
+		if (html.startsWith('<!--', start)) {
+			const end = html.indexOf('-->', start + 4);
+			if (end < 0) break;
+			from = end + 3;
+			continue;
 		}
+		const closing = html[start + 1] === '/';
+		const nameStart = start + (closing ? 2 : 1);
+		const initial = html.charCodeAt(nameStart);
+		if (!((initial >= 65 && initial <= 90) || (initial >= 97 && initial <= 122))) {
+			from = start + 1;
+			continue;
+		}
+		let nameEnd = nameStart + 1;
+		while (nameEnd < html.length) {
+			const code = html.charCodeAt(nameEnd);
+			if (!(
+				(code >= 65 && code <= 90) ||
+				(code >= 97 && code <= 122) ||
+				(code >= 48 && code <= 57) ||
+				code === 58 ||
+				code === 45
+			))
+				break;
+			nameEnd++;
+		}
+		const tag = html.slice(nameStart, nameEnd).toLowerCase();
+		const end = vtSsrOpenTagEnd(html, nameStart + tag.length);
+		if (end < 0) break;
+		from = end + 1;
+		if (closing) {
+			depth = Math.max(0, depth - 1);
+			continue;
+		}
+		const inert = tag === 'template' || tag === 'script' || tag === 'style' || tag === 'title';
+		const isVoid = VOID_ELEMENTS.has(tag) || html[end - 1] === '/';
+		if (
+			(!rootOnly || depth === 0) &&
+			(visitAllElements ||
+				(!inert && tag !== 'link' && tag !== 'meta' && tag !== 'base' && tag !== 'option'))
+		) {
+			const open = html.slice(start, end + 1);
+			const next = visit(open, depth, tag);
+			if (next !== open) {
+				out += html.slice(copied, start) + next;
+				copied = end + 1;
+			}
+		}
+		// Resource tags are not visual hosts. Templates hold inert transport markup;
+		// scope validation alone visits every direct element, including stream sentinels.
+		if (inert) {
+			const close = new RegExp('</' + tag + '[\\t\\n\\f\\r ]*>', 'gi');
+			close.lastIndex = from;
+			from = close.exec(html) === null ? html.length : close.lastIndex;
+			continue;
+		}
+		if (!isVoid) depth++;
 	}
-	if (inject === '') return html;
-	const insertion = html[end - 1] === '/' ? end - 1 : end;
-	return html.slice(0, insertion) + inject + html.slice(insertion);
+	return copied === 0 ? html : out + html.slice(copied);
 }
 
-/**
- * Claim an arm-top candidate: rename `vt-enter-x`/`vt-exit-x` → `vt-enter`/
- * `vt-exit` on the FIRST element of an arm's HTML (same template/comment
- * skipping as vtSsrAnnotate). A first element without the candidate (e.g. a
- * static wrapper above the boundary, or an outer boundary's annotation target)
- * claims nothing — that is exactly React's "top of the arm only" rule.
- */
+function vtSsrInject(open: string, attrs: Array<[string, string]>): string {
+	// Every injected marker starts with vt-. Most authored hosts have none;
+	// only parse once when a marker might already belong to an inner boundary.
+	let existing: Set<string> | undefined;
+	if (/vt-/i.test(open)) {
+		existing = new Set();
+		vtSsrAttributes(open, (name) => {
+			existing!.add(name);
+		});
+	}
+	let inject = '';
+	for (const [name, value] of attrs) {
+		if (!existing?.has(name)) inject += ' ' + name + '="' + escapeAttr(value) + '"';
+	}
+	if (inject === '') return open;
+	const insertion = open[open.length - 2] === '/' ? open.length - 2 : open.length - 1;
+	return open.slice(0, insertion) + inject + open.slice(insertion);
+}
+
+/** Every direct host participates; inner boundaries retain their own classes. */
+function vtSsrAnnotate(html: string, attrs: Array<[string, string]>): string {
+	let index = 0;
+	return vtSsrMapTags(
+		html,
+		(open, depth) => {
+			if (depth !== 0) return open;
+			const suffix = index++;
+			return vtSsrInject(
+				open,
+				suffix === 0
+					? attrs
+					: attrs.map(([name, value]) => [name, name === 'vt-name' ? value + '-' + suffix : value]),
+			);
+		},
+		undefined,
+		false,
+		true,
+	);
+}
+
+/** HTML attribute whitespace (not arbitrary whitespace inside an attribute name). */
+function vtSsrSpace(code: number): boolean {
+	return code === 32 || code === 9 || code === 10 || code === 12 || code === 13;
+}
+
+/** Scan actual attributes once, skipping quoted text in other attribute values. */
+function vtSsrAttributes(
+	open: string,
+	visit: (
+		name: string,
+		start: number,
+		end: number,
+		quote: string,
+		nameStart: number,
+		nameEnd: number,
+	) => boolean | void,
+): void {
+	let i = 1;
+	while (i < open.length && !vtSsrSpace(open.charCodeAt(i)) && open[i] !== '/' && open[i] !== '>')
+		i++;
+	while (i < open.length) {
+		while (vtSsrSpace(open.charCodeAt(i))) i++;
+		if (i >= open.length || open[i] === '>' || open[i] === '/') break;
+		const start = i;
+		while (
+			i < open.length &&
+			!vtSsrSpace(open.charCodeAt(i)) &&
+			open[i] !== '=' &&
+			open[i] !== '/' &&
+			open[i] !== '>'
+		)
+			i++;
+		const nameEnd = i;
+		const name = open.slice(start, i).toLowerCase();
+		while (vtSsrSpace(open.charCodeAt(i))) i++;
+		if (open[i] !== '=') {
+			if (visit(name, nameEnd, nameEnd, '', start, nameEnd)) return;
+			continue;
+		}
+		i++;
+		while (vtSsrSpace(open.charCodeAt(i))) i++;
+		const quote = open[i] === '"' || open[i] === "'" ? open[i++] : '';
+		const valueStart = i;
+		if (quote) {
+			const closing = open.indexOf(quote, i);
+			i = closing < 0 ? open.length : closing;
+		} else {
+			while (i < open.length && !vtSsrSpace(open.charCodeAt(i)) && open[i] !== '>') i++;
+		}
+		const valueEnd = i;
+		if (quote) i++;
+		if (visit(name, valueStart, valueEnd, quote, start, nameEnd)) return;
+	}
+}
+
+/** Read one actual attribute using the shared quote-aware scanner. */
+function vtSsrAttribute(
+	open: string,
+	wanted: string,
+): { start: number; end: number; quote: string; nameStart: number; nameEnd: number } | null {
+	let result: ReturnType<typeof vtSsrAttribute> = null;
+	vtSsrAttributes(open, (name, start, end, quote, nameStart, nameEnd) => {
+		if (name !== wanted) return;
+		result = { start, end, quote, nameStart, nameEnd };
+		return true;
+	});
+	return result;
+}
+
+/** A scope owns one host that contains, rather than replaces, streamed boundaries. */
+function vtSsrAnnotateScope(html: string): string {
+	let roots = 0;
+	let sentinel = false;
+	let text = false;
+	vtSsrMapTags(
+		html,
+		(open, depth, tag) => {
+			if (depth === 0) {
+				if (tag === 'template' && vtSsrAttribute(open, STREAM_BOUNDARY_ATTR) !== null)
+					sentinel = true;
+				else roots++;
+			}
+			return open;
+		},
+		(value, depth) => {
+			if (depth === 0 && /\S/.test(value)) text = true;
+		},
+		true,
+		true,
+	);
+	const valid = roots === 1 && !sentinel && !text;
+	if (valid)
+		injectStyle(
+			'octane-view-transition-scope',
+			'[vt-scope="element"]{view-transition-scope:all!important}',
+		);
+	return vtSsrMapTags(
+		html,
+		(open) => vtSsrInject(open, [['vt-scope', valid ? 'element' : 'none']]),
+		undefined,
+		true,
+		true,
+	);
+}
+
+/** Resolve arm entry/exit and opt-in relays after the actual host hierarchy is known. */
 function vtSsrClaimArm(html: string, kind: 'enter' | 'exit'): string {
 	if (!VT_SSR_HAS_CANDIDATES) return html;
-	const start = vtSsrFirstVisibleOpenTag(html);
-	if (start === -1) return html;
-	const end = vtSsrOpenTagEnd(html, start + 1);
-	if (end === -1) return html;
-	const marker = ' vt-' + kind + '-x="';
-	const offset = html.slice(start, end).indexOf(marker);
-	if (offset === -1) return html;
-	const insertion = start + offset;
-	return html.slice(0, insertion) + ' vt-' + kind + '="' + html.slice(insertion + marker.length);
+	const active: boolean[] = [];
+	const eventName = 'vt-' + kind;
+	const candidateName = eventName + '-x';
+	const relayName = 'vt-parent-' + kind + '-x';
+	return vtSsrMapTags(html, (open, depth) => {
+		let candidate: string | undefined;
+		let candidateEnd = -1;
+		let event: string | undefined;
+		let eventStart = Infinity;
+		let relay: string | undefined;
+		let relayEnd = -1;
+		if (/vt-/i.test(open))
+			vtSsrAttributes(open, (name, start, end, _quote, nameStart, nameEnd) => {
+				if (name === candidateName && candidate === undefined) {
+					candidate = open.slice(start, end);
+					candidateEnd = nameEnd;
+				} else if (name === eventName && event === undefined) {
+					event = open.slice(start, end);
+					eventStart = nameStart;
+				} else if (name === relayName && relay === undefined) {
+					relay = open.slice(start, end);
+					relayEnd = nameEnd;
+				}
+			});
+		let claimEnd = -1;
+		if (depth === 0 && candidate !== undefined && candidate !== 'none') {
+			claimEnd = candidateEnd;
+			// Browser duplicate-attribute semantics choose the first occurrence,
+			// including an authored event preceding the newly claimed candidate.
+			if (candidateEnd < eventStart) event = candidate;
+		}
+		const parentActive = depth > 0 && active[depth - 1];
+		if (parentActive && relay !== undefined && relay !== 'none' && relay !== 'auto') {
+			claimEnd = relayEnd;
+		}
+		active[depth] =
+			(event !== undefined && event !== 'none') ||
+			(parentActive && (relay === undefined || relay !== 'none'));
+		// Root hosts claim their event; descendants claim only a parent relay.
+		// Values are already escaped and are never serialized a second time.
+		return claimEnd < 0 ? open : open.slice(0, claimEnd - 2) + open.slice(claimEnd);
+	});
 }
 
-/** Strip residual (unclaimed) arm candidates before emission. */
-function vtSsrStrip(html: string): string {
-	// Cheap fast path — apps without ViewTransition never pay the regex.
-	if (html.indexOf(' vt-e') === -1) return html;
-	return html.replace(/ vt-(?:enter|exit)-x="[^"]*"/g, '');
+// Keep the candidate prefix separate from opaque markup. A mixed alternation
+// makes the native matcher inspect every ordinary tag in a large document.
+const VT_SSR_STRIP = / vt-(?:parent-)?(?:enter|exit)-x="[^"]*"(?=[^<>"]*(?:"[^"]*"[^<>"]*)*>)/gi;
+const VT_SSR_OPAQUE = /<!--|<(script|style|title|template)(?=[\t\n\f\r />])/gi;
+const VT_SSR_CANDIDATE = /vt-(?:parent-)?(?:enter|exit)-x/i;
+
+/** Strip staging attributes, including blocked and unclaimed relay candidates. */
+function vtSsrStrip(html: string, rawHtml: boolean): string {
+	if (!rawHtml) {
+		let lower = html.indexOf('-x="');
+		let upper = html.indexOf('-X="');
+		if (lower < 0 && upper < 0) return html;
+		// Cache each spelling's next match, including its absent state, so many
+		// candidates never repeatedly search the suffix for the other spelling.
+		const advance = (from: number): number => {
+			if (lower >= 0 && lower < from) lower = html.indexOf('-x="', from);
+			if (upper >= 0 && upper < from) upper = html.indexOf('-X="', from);
+			return lower < 0 ? upper : upper < 0 ? lower : Math.min(lower, upper);
+		};
+		let candidate = advance(0);
+		let from = 0;
+		let copied = 0;
+		let out = '';
+		VT_SSR_OPAQUE.lastIndex = 0;
+		let opaque: RegExpExecArray | null;
+		while ((opaque = VT_SSR_OPAQUE.exec(html)) !== null) {
+			const start = opaque.index;
+			// Compiler attributes escape quotes but may contain literal '<'. Check
+			// only opaque openers and bound the search to fresh input, so adjacent
+			// component markers never repeatedly scan an attribute-free prefix.
+			const attr = html.slice(from, start).lastIndexOf('="');
+			if (attr >= 0 && html.indexOf('"', from + attr + 2) > start) {
+				rawHtml = true;
+				break;
+			}
+			if (candidate < start) {
+				const part = html.slice(from, start);
+				const next = part.replace(VT_SSR_STRIP, '');
+				if (next !== part) {
+					out += html.slice(copied, from) + next;
+					copied = start;
+				}
+				candidate = advance(start);
+				if (candidate < 0) return copied === 0 ? html : out + html.slice(copied);
+			}
+			const tag = opaque[1];
+			let end: number;
+			if (tag === undefined) {
+				const close = html.indexOf('-->', start + 4);
+				end = close < 0 ? html.length : close + 3;
+			} else {
+				const openingEnd = vtSsrOpenTagEnd(html, start + tag.length + 1) + 1;
+				const close = html.indexOf('</' + tag + '>', openingEnd);
+				if (close >= 0) end = close + tag.length + 3;
+				else {
+					const closing = new RegExp('</' + tag + '[\\t\\n\\f\\r ]*>', 'gi');
+					closing.lastIndex = openingEnd;
+					end = closing.exec(html) === null ? html.length : closing.lastIndex;
+				}
+			}
+			if (candidate < end) {
+				candidate = advance(end);
+				if (candidate < 0) return copied === 0 ? html : out + html.slice(copied);
+			}
+			from = VT_SSR_OPAQUE.lastIndex = end;
+		}
+		if (!rawHtml)
+			return out + html.slice(copied, from) + html.slice(from).replace(VT_SSR_STRIP, '');
+	}
+	if (!VT_SSR_CANDIDATE.test(html)) return html;
+	return vtSsrMapTags(html, (open) => {
+		if (!VT_SSR_CANDIDATE.test(open)) return open;
+		let out = '';
+		let copied = 0;
+		vtSsrAttributes(open, (name, _start, end, quote, nameStart) => {
+			if (
+				name === 'vt-enter-x' ||
+				name === 'vt-exit-x' ||
+				name === 'vt-parent-enter-x' ||
+				name === 'vt-parent-exit-x'
+			) {
+				// HTML accepts an attribute immediately after a quoted value. Only
+				// consume the preceding byte when it actually separates attributes.
+				const start = vtSsrSpace(open.charCodeAt(nameStart - 1)) ? nameStart - 1 : nameStart;
+				out += open.slice(copied, start);
+				copied = end + (quote ? 1 : 0);
+			}
+		});
+		return copied === 0 ? open : out + open.slice(copied);
+	});
 }
 
 /**
@@ -5353,12 +5682,17 @@ function vtSsrStrip(html: string): string {
 export const ViewTransition = /* @__PURE__ */ markComponentFlags(
 	function ViewTransition(props: VtSsrProps, scope: SSRScope): string {
 		VT_SSR_HAS_CANDIDATES = true;
-		const explicit = typeof props.name === 'string';
+		const explicit = typeof props.name === 'string' && props.name !== 'auto';
 		const frame = FRAME;
 		const cand: VtSsrCandidate = {
+			elementScope: props.scope === 'element',
 			name: explicit
 				? (props.name as string)
-				: '_O' + (frame !== null ? framePath(frame).replace(/\//g, '-') : '') + '_',
+				: '_O' +
+					ID_PREFIX +
+					(STREAM !== null ? STREAM.token + '-' : '') +
+					(frame !== null ? framePath(frame).replace(/\//g, '-') : '') +
+					'_',
 			share: vtSsrResolve(props, 'share'),
 			update: vtSsrResolve(props, 'update'),
 			consumed: false,
@@ -5371,7 +5705,7 @@ export const ViewTransition = /* @__PURE__ */ markComponentFlags(
 		} finally {
 			VT_SSR_STACK.pop();
 		}
-		const named = explicit || VT_SSR_TRY_SEQ !== seqBefore;
+		const named = explicit || (props.scope !== 'element' && VT_SSR_TRY_SEQ !== seqBefore);
 		const attrs: Array<[string, string]> = [];
 		if (named) attrs.push(['vt-name', cand.name]);
 		attrs.push(['vt-update', cand.update]);
@@ -5379,8 +5713,18 @@ export const ViewTransition = /* @__PURE__ */ markComponentFlags(
 		// this boundary tops, stripped at emission when unclaimed.
 		attrs.push(['vt-enter-x', vtSsrResolve(props, 'enter')]);
 		attrs.push(['vt-exit-x', vtSsrResolve(props, 'exit')]);
-		if (named) attrs.push(['vt-share', cand.share]);
-		return ssrHtml(ssrBlock(vtSsrAnnotate(inner, attrs)));
+		if (named) attrs.push(['vt-share', VT_SSR_TRY_SEQ !== seqBefore ? cand.update : cand.share]);
+		for (const kind of ['Enter', 'Exit'] as const) {
+			const prop = props[('parent' + kind) as 'parentEnter' | 'parentExit'];
+			const value =
+				prop === undefined
+					? undefined
+					: vtSsrResolve(props, ('parent' + kind) as 'parentEnter' | 'parentExit');
+			const handler = props[('onParent' + kind) as 'onParentEnter' | 'onParentExit'];
+			attrs.push(['vt-parent-' + kind.toLowerCase() + '-x', value ?? (handler ? 'auto' : 'none')]);
+		}
+		const annotated = vtSsrAnnotate(inner, attrs);
+		return ssrHtml(ssrBlock(props.scope === 'element' ? vtSsrAnnotateScope(annotated) : annotated));
 	},
 	COMPONENT_FLAG_BOUNDARY,
 	'ViewTransition',
@@ -7679,6 +8023,8 @@ interface FullPassResult {
 	/** Whether this pass rendered ViewTransition candidate attributes that need
 	 *  the final residual-candidate cleanup scan. */
 	vtCandidates: boolean;
+	/** Whether emitted HTML may contain unescaped trusted attribute syntax. */
+	rawHtml: boolean;
 	/** Per-hash scoped stylesheets from this pass — the streaming renderer diffs
 	 *  these against what it already flushed to emit late boundaries' styles. */
 	cssEntries: Map<string, InjectedStyle>;
@@ -7726,6 +8072,7 @@ interface Ambient {
 	nestingWarnings: Set<string> | null | undefined;
 	vtTrySeq: number;
 	vtHasCandidates: boolean;
+	vtHasRawHtml: boolean;
 	vtStack: Array<{ candidate: VtSsrCandidate; consumed: boolean }>;
 }
 function saveAmbient(): Ambient {
@@ -7762,6 +8109,7 @@ function saveAmbient(): Ambient {
 		nestingWarnings: SSR_NESTING_WARNINGS,
 		vtTrySeq: VT_SSR_TRY_SEQ,
 		vtHasCandidates: VT_SSR_HAS_CANDIDATES,
+		vtHasRawHtml: VT_SSR_HAS_RAW_HTML,
 		vtStack: snapshotVtStack(),
 	};
 }
@@ -7818,6 +8166,7 @@ function restoreAmbient(a: Ambient): void {
 	SSR_NESTING_WARNINGS = a.nestingWarnings;
 	VT_SSR_TRY_SEQ = a.vtTrySeq;
 	VT_SSR_HAS_CANDIDATES = a.vtHasCandidates;
+	VT_SSR_HAS_RAW_HTML = a.vtHasRawHtml;
 	VT_SSR_STACK.length = 0;
 	for (const snapshot of a.vtStack) {
 		snapshot.candidate.consumed = snapshot.consumed;
@@ -7862,6 +8211,7 @@ function runFullFramedPass(
 	PERMANENT_STATIC_HYDRATE_DEPTH = 0;
 	VT_SSR_TRY_SEQ = 0;
 	VT_SSR_HAS_CANDIDATES = false;
+	VT_SSR_HAS_RAW_HTML = false;
 	VT_SSR_STACK.length = 0;
 	const cssMap = (CSS = newStyleCollector());
 	const headBuf = (HEAD = {
@@ -7902,6 +8252,7 @@ function runFullFramedPass(
 	CURRENT_PARENT_SCOPE = null;
 	let body = '';
 	let vtCandidates = false;
+	let rawHtml = false;
 	let rootSuspended = false;
 	let signals: NativeSignalManifest | undefined;
 	let nativePassCompleted = false;
@@ -7927,6 +8278,7 @@ function runFullFramedPass(
 		rootSuspended = true;
 	} finally {
 		vtCandidates = VT_SSR_HAS_CANDIDATES;
+		rawHtml = VT_SSR_HAS_RAW_HTML;
 		try {
 			if (nativeToken >= 0) NATIVE_READ_COLLECTOR!.endScope(nativeToken, nativePassCompleted);
 			if (markers && nativePassCompleted)
@@ -7970,6 +8322,7 @@ function runFullFramedPass(
 		deferred,
 		rootSuspended,
 		vtCandidates,
+		rawHtml,
 		cssEntries: cssMap,
 		sheets: headBuf.sheets,
 		hasSignalControls: resolved.hasSignalControls === true,
@@ -8008,6 +8361,7 @@ function runDiscoveryRound(
 	PERMANENT_STATIC_HYDRATE_DEPTH = 0;
 	VT_SSR_TRY_SEQ = 0;
 	VT_SSR_HAS_CANDIDATES = false;
+	VT_SSR_HAS_RAW_HTML = false;
 	VT_SSR_STACK.length = 0;
 	CSS = newStyleCollector();
 	HEAD = {
@@ -8488,13 +8842,13 @@ function passToResult(
 	let result: RenderResult;
 	if (separateHead) {
 		result = {
-			html: pass.vtCandidates ? vtSsrStrip(body) : body,
+			html: pass.vtCandidates ? vtSsrStrip(body, pass.rawHtml) : body,
 			css: pass.css,
-			head: pass.vtCandidates ? vtSsrStrip(pass.head) : pass.head,
+			head: pass.vtCandidates ? vtSsrStrip(pass.head, pass.rawHtml) : pass.head,
 		};
 	} else {
 		const html = spliceHead(body, pass.head);
-		result = { html: pass.vtCandidates ? vtSsrStrip(html) : html, css: pass.css };
+		result = { html: pass.vtCandidates ? vtSsrStrip(html, pass.rawHtml) : html, css: pass.css };
 	}
 	if (pass.signals !== undefined) result.signals = pass.signals;
 	return result;
@@ -8817,7 +9171,7 @@ export function renderHostedAttempt(
 	let body = pass.body;
 	if (pass.serial.length > 0) body += serializeSuspenseSeeds(pass.serial, nonceAttr);
 	if (pass.signals !== undefined) body += serializeNativeSignalSeeds(pass.signals, nonceAttr);
-	if (pass.vtCandidates) body = vtSsrStrip(body);
+	if (pass.vtCandidates) body = vtSsrStrip(body, pass.rawHtml);
 	return { status: 'complete', html: body, head: pass.head, cssEntries: pass.cssEntries };
 }
 
@@ -8905,13 +9259,13 @@ export function renderToStaticMarkup(
 	// handed over on its own under `headChannel: 'separate'`.
 	if (options?.headChannel === 'separate') {
 		return {
-			html: pass.vtCandidates ? vtSsrStrip(pass.body) : pass.body,
+			html: pass.vtCandidates ? vtSsrStrip(pass.body, pass.rawHtml) : pass.body,
 			css: pass.css,
-			head: pass.vtCandidates ? vtSsrStrip(pass.head) : pass.head,
+			head: pass.vtCandidates ? vtSsrStrip(pass.head, pass.rawHtml) : pass.head,
 		};
 	}
 	const html = spliceHead(pass.body, pass.head);
-	return { html: pass.vtCandidates ? vtSsrStrip(html) : html, css: pass.css };
+	return { html: pass.vtCandidates ? vtSsrStrip(html, pass.rawHtml) : html, css: pass.css };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -8983,6 +9337,8 @@ interface StreamBoundary {
 	serverOwnedStatic: boolean;
 	/** Inner branch-range html (`<!--[-->…<!--]-->`) from the resolving pass. */
 	html: string;
+	/** Whether the accepted segment requires quote-aware candidate stripping. */
+	rawHtml: boolean;
 	/** This boundary's `use()` seed slice from the resolving pass. */
 	seeds: unknown[];
 	/** Ready native values captured with this exact accepted segment. */
@@ -9184,7 +9540,7 @@ export function ssrTry(
 	let vtOuter: VtSsrCandidate | null = null;
 	if (VT_SSR_STACK.length > 0) {
 		const top = VT_SSR_STACK[VT_SSR_STACK.length - 1];
-		if (!top.consumed) {
+		if (!top.consumed && !top.elementScope) {
 			top.consumed = true;
 			vtOuter = top;
 		}
@@ -9401,6 +9757,8 @@ export function ssrTry(
 				}
 				VT_SSR_TRY_SEQ = vtTrySeq;
 				VT_SSR_HAS_CANDIDATES = vtHasCandidates;
+				// The fallback HTML still supplies the transport placeholder, so its
+				// raw-HTML requirement survives even though its side effects do not.
 				VT_SSR_STACK.length = 0;
 				for (const snapshot of vtStack) {
 					snapshot.candidate.consumed = snapshot.consumed;
@@ -9439,12 +9797,13 @@ export function ssrTry(
 					if (!entry.serverOwnedStatic)
 						entry.signals = NATIVE_READ_COLLECTOR?.serialize(nativeReads);
 					entry.state = 'done';
+					entry.rawHtml = VT_SSR_HAS_RAW_HTML;
 					entry.html =
 						vtOuter !== null
 							? vtSsrAnnotate(inner, [
 									['vt-name', vtOuter.name],
 									['vt-update', vtOuter.update],
-									['vt-share', vtOuter.share],
+									['vt-share', vtOuter.update],
 								])
 							: inner;
 					if (SERIAL !== null) {
@@ -9500,6 +9859,7 @@ export function ssrTry(
 							state: 'pending',
 							serverOwnedStatic: PERMANENT_STATIC_HYDRATE_DEPTH !== 0,
 							html: '',
+							rawHtml: false,
 							seeds: [],
 							pendingIdOffset,
 							namespace,
@@ -9549,6 +9909,7 @@ export function ssrTry(
 						}
 						entry.state = 'done';
 						entry.html = inner;
+						entry.rawHtml = VT_SSR_HAS_RAW_HTML;
 						entry.seeds = nativeFresh ? [] : caughtSeeds;
 						pruneUnrepresentedStreamDescendants(stream!, key, entry.html);
 					} else if (SERIAL !== null) {
@@ -9577,6 +9938,7 @@ export function ssrTry(
 						serverOwnedStatic: false,
 						error: e,
 						html: '',
+						rawHtml: false,
 						seeds: [],
 						pendingIdOffset,
 						namespace,
@@ -9625,17 +9987,26 @@ export function ssrTry(
 // `<!--oct-seed:id-->` scoping comment. `id` is the full render-scoped opaque
 // key, so both document queries and the seed stash remain disjoint when output
 // from multiple streams is composed into one page. $OCTRX(id) marks the
-// boundary errored (hydration client-renders it via mismatch recovery). A
+// boundary errored (hydration client-renders it via mismatch recovery). Error
+// instructions that arrive before a queued parent reveal are retained until
+// insertion exposes their sentinel; transport order alone does not imply DOM
+// availability when an optional animation driver delays the parent swap. A
 // truthy second argument removes only a server-owned permanent-static sentinel,
 // retaining its already-flushed fallback because no client graph can recover it.
 let STREAM_RUNTIME_JS: string | undefined;
 function streamRuntimeJs(): string {
 	return (STREAM_RUNTIME_JS ??=
-		'(function(){var d=document;var S=window.$OCTS=window.$OCTS||{};' +
+		'(function(){if(window.$OCTRC)return;var d=document;var S=window.$OCTS=window.$OCTS||{},E;' +
 		// Legacy `[` / `]` means one physical range; `[N` / `]N` is canonical only
 		// for safe integer N >= 2. Keep this in sync with hydrationMarkerMultiplicity.
 		'var M=function(v,c){if(v===c)return 1;if(!v||v.charAt(0)!==c)return 0;' +
 		'var s=v.slice(1),n=+s;return n>=2&&Number.isSafeInteger(n)&&String(n)===s;};' +
+		// Share parser/range rules with the optional driver; the base swap owns
+		// transport even when animation prepares its carrier before insertion.
+		'var P=function(s){var q=s.firstElementChild;if(q&&q.localName==="script"&&q.hasAttribute("' +
+		STREAM_SCRIPT_ATTR +
+		'")){var z=d.createElement("template");try{z.innerHTML=JSON.parse(q.textContent);return z.content;}catch(e){return null;}}return s;};' +
+		'var C=function(c,nc){if(!nc)return c;var n=c.firstElementChild;while(n&&n.localName==="script")n=n.nextElementSibling;return n;};' +
 		'window.$OCTRC=function(id,nc){' +
 		"var t=d.querySelector('template[" +
 		STREAM_BOUNDARY_ATTR +
@@ -9644,8 +10015,7 @@ function streamRuntimeJs(): string {
 		STREAM_SEGMENT_ATTR +
 		"=\"'+id+'\"]');" +
 		'if(!s)return;if(!t){s.remove();return;}' +
-		'var q=s.firstElementChild,z=d.createElement("template"),c=s;' +
-		'if(q&&q.localName==="script"){try{z.innerHTML=JSON.parse(q.textContent);c=z.content;}catch(e){return;}}' +
+		'var c=P(s);if(!c)return;' +
 		'var sd=c.querySelector("script[' +
 		STREAM_SEED_ATTR +
 		']");' +
@@ -9654,7 +10024,7 @@ function streamRuntimeJs(): string {
 		NATIVE_SIGNAL_SEED_ATTR +
 		'")))ns=ns.nextElementSibling;' +
 		'if(ns){S[id+"$signals"]=ns.textContent;ns.parentNode.removeChild(ns);}' +
-		'if(nc)c=c.firstElementChild;' +
+		'c=C(c,nc);if(!c)return;' +
 		'var n=t.nextSibling,depth=1;' +
 		'while(n){var x=n.nextSibling,v=n.nodeType===8?n.data:null;' +
 		'if(M(v,"["))depth++;else if(M(v,"]")){depth--;if(depth===0)break;}' +
@@ -9664,12 +10034,13 @@ function streamRuntimeJs(): string {
 		'p.replaceChild(d.createComment("' +
 		STREAM_SEED_COMMENT +
 		'"+id),t);' +
-		's.parentNode.removeChild(s);};' +
-		'window.$OCTRX=function(id,so){' +
+		's.parentNode.removeChild(s);if(E){var errors=E;E=undefined;for(var i=0;i<errors.length;i++)X(errors[i][0],errors[i][1]);}};' +
+		'window.$OCTRC.marker=M;window.$OCTRC.parse=P;window.$OCTRC.content=C;' +
+		'var X=window.$OCTRX=function(id,so){' +
 		"var t=d.querySelector('template[" +
 		STREAM_BOUNDARY_ATTR +
 		"=\"'+id+'\"]');" +
-		'if(t){if(so)t.remove();else t.setAttribute("data-oct-err","");}};' +
+		'if(t){if(so)t.remove();else t.setAttribute("data-oct-err","");}else(E||(E=[])).push([id,so]);};' +
 		// $OCTRH(id): hoist a wave carrier's Float sheet tags into document.head.
 		// With a live client runtime (window.$OCTFR, installed once client Float
 		// resource state exists) each tag is handed over so ONE authority keeps
@@ -9690,6 +10061,226 @@ function streamRuntimeJs(): string {
 		'if(x)x.after(n);else if(t)t.after(n);else d.head.appendChild(n);}' +
 		'c.remove();};' +
 		'})();');
+}
+
+/**
+ * Optional streaming animation driver. The ordinary swap remains the transport
+ * authority: animation only schedules that same swap after the old snapshot.
+ * Native handles are shared with hydration per document or persistent element
+ * owner. Siblings can overlap, while a containing capture waits for its active
+ * children. A new child waits only for its ancestor's old snapshot to complete.
+ * A batch enters every element callback before starting a document capture;
+ * otherwise the document's rendering freeze can prevent those callbacks from
+ * entering. All participating callbacks then publish the same swap plan once.
+ */
+let STREAM_VIEW_TRANSITION_RUNTIME_JS: string | undefined;
+function streamViewTransitionRuntimeJs(): string {
+	return (STREAM_VIEW_TRANSITION_RUNTIME_JS ??= `(function(){
+var w=window,d=document;
+if(w.$OCTVT)return;
+w.$OCTVT=true;
+var reveal=w.$OCTRC,queue=[],scheduled=false,callbackOnly=new WeakSet(),ready=new WeakSet(),waitReady=new WeakSet(),waitFinish=new WeakSet();
+w.$OCTRC=function(id,nc){
+ if(typeof d.startViewTransition!=="function"&&typeof Element.prototype.startViewTransition!=="function"){reveal(id,nc);return;}
+ queue.push([id,nc]);later();
+};
+function later(){if(queue.length&&!scheduled){scheduled=true;queueMicrotask(function(){scheduled=false;drain();});}}
+function watch(handle,untilReady){
+ var watched=untilReady?waitReady:waitFinish;
+ if(watched.has(handle))return;
+ watched.add(handle);
+ if(untilReady)handle.ready.then(function(){ready.add(handle);later();},function(){watch(handle,false);});
+ else handle.finished.then(later,later);
+}
+function ownerOf(t){
+ var scope=t.closest("[vt-scope]");
+ return scope?(scope.getAttribute("vt-scope")==="element"?scope:null):d;
+}
+function blocked(owner){
+ var handle=d.__octaneViewTransition,blocked=false;
+ if(handle&&!(owner&&owner!==d&&ready.has(handle))){watch(handle,!!owner&&owner!==d);blocked=true;}
+ var scopes=d.__octaneViewTransitionScopes;
+ if(scopes)scopes.forEach(function(active,element){
+  if(!owner||owner===d||owner===element||owner.contains(element)){watch(active,false);blocked=true;}
+  else if(element.contains(owner)&&!ready.has(active)){watch(active,true);blocked=true;}
+ });
+ return blocked;
+}
+function drain(){
+ if(!queue.length)return;
+ var selected=[],pending=[],groups=[],owners=new Map();
+ for(var i=0;i<queue.length;i++){
+  var item=queue[i],t=d.querySelector('template[${STREAM_BOUNDARY_ATTR}="'+item[0]+'"]'),owner=t?ownerOf(t):null;
+  if(blocked(owner)){pending.push(item);continue;}
+  selected.push(item);
+  var group=owners.get(owner);
+  if(!group){group={owner:owner,items:[],restore:[],changed:new Set(),prepared:[],arrived:false};owners.set(owner,group);groups.push(group);}
+  group.items.push(item);
+ }
+ queue=pending;
+ if(!selected.length)return;
+ var committed=false,animated=false,images=[],resourceWait;
+ function commit(){
+  if(committed)return resourceWait;
+  committed=true;for(var i=0;i<selected.length;i++)reveal(selected[i][0],selected[i][1]);
+  if(!animated)return;
+  var blockers=[],cleanups=[];
+  d.documentElement.clientHeight;
+  if(d.fonts&&d.fonts.status!=="loaded")blockers.push(d.fonts.ready);
+  for(var i=0;i<images.length;i++){
+   var img=images[i],bounds=img.getBoundingClientRect();
+   if(!img.complete&&bounds.bottom>0&&bounds.right>0&&bounds.top<w.innerHeight&&bounds.left<w.innerWidth){
+    blockers.push(new Promise(function(resolve){
+     var image=img;image.addEventListener("load",resolve);image.addEventListener("error",resolve);
+     cleanups.push(function(){image.removeEventListener("load",resolve);image.removeEventListener("error",resolve);});
+    }));
+   }
+  }
+  images.length=0;
+  if(blockers.length)resourceWait=new Promise(function(resolve){
+   var timer=setTimeout(done,500),settled=false;
+   function done(){if(settled)return;settled=true;clearTimeout(timer);for(var i=0;i<cleanups.length;i++)cleanups[i]();cleanups.length=0;resolve();}
+   Promise.all(blockers).then(done,done);
+  });
+  return resourceWait;
+ }
+ function reset(group){
+  var restore=group.restore;
+  for(var i=restore.length-1;i>=0;i--){
+   var entry=restore[i],el=entry[0],style=el.style;
+   if(style.getPropertyValue("view-transition-name")===entry[5]&&style.getPropertyPriority("view-transition-name")===entry[8]){
+    if(entry[1])style.setProperty("view-transition-name",entry[1],entry[2]);
+    else style.removeProperty("view-transition-name");
+   }
+   if(style.getPropertyValue("view-transition-class")===entry[6]&&style.getPropertyPriority("view-transition-class")===entry[9]){
+    if(entry[3])style.setProperty("view-transition-class",entry[3],entry[4]);
+    else style.removeProperty("view-transition-class");
+   }
+   if(!style.length&&!entry[7])el.removeAttribute("style");
+  }
+  restore.length=0;group.changed.clear();
+ }
+ function prepare(group){
+  var owner=group.owner,restore=group.restore,changed=group.changed,appearing=new Map();
+  if(!owner||typeof owner.startViewTransition!=="function")return;
+  function owns(el,content){
+   for(var node=el;node&&node.nodeType===1;node=node.parentElement){
+    if(node===owner)return true;
+    if(node.getAttribute("vt-scope")==="element")return false;
+    if(node===content)return true;
+   }
+   return owner===d;
+  }
+  function apply(el,attr,content){
+   var cls=el.getAttribute(attr);
+   if(!cls||cls==="none"||changed.has(el)||!owns(el,content))return;
+   var style=el.style;
+   if(!style)return;
+   var explicit=el.getAttribute("vt-name"),name=explicit||("_OT_"+restore.length+"_");
+   var entry=[el,style.getPropertyValue("view-transition-name"),style.getPropertyPriority("view-transition-name"),style.getPropertyValue("view-transition-class"),style.getPropertyPriority("view-transition-class"),"","",el.hasAttribute("style")];
+   if(el!==owner||explicit)style.setProperty("view-transition-name",w.CSS.escape(name));
+   if(cls!=="auto")style.setProperty("view-transition-class",cls);
+   entry[5]=style.getPropertyValue("view-transition-name");entry[6]=style.getPropertyValue("view-transition-class");
+   entry[8]=style.getPropertyPriority("view-transition-name");entry[9]=style.getPropertyPriority("view-transition-class");
+   restore.push(entry);changed.add(el);
+  }
+  function descendants(el,attr,content){
+   var nodes=el.querySelectorAll("["+attr+"]");
+   for(var i=0;i<nodes.length;i++)apply(nodes[i],attr,content);
+  }
+  for(var k=0;k<group.items.length;k++){
+   var id=group.items[k][0],nc=group.items[k][1];
+   var t=d.querySelector('template[${STREAM_BOUNDARY_ATTR}="'+id+'"]');
+   var s=d.querySelector('[${STREAM_SEGMENT_ATTR}="'+id+'"]');
+   if(!t||!s)continue;
+   var parent=t.parentNode,rect=parent.getBoundingClientRect();
+   if(!rect.width&&!rect.height&&!rect.left&&!rect.top)continue;
+   var parsed=reveal.parse(s);
+   if(!parsed)continue;
+   if(parsed!==s)s.replaceChildren(parsed);
+   var content=reveal.content(s,nc);
+   if(!content)continue;
+   group.prepared.push([t,content,parent]);
+   var matches=content.querySelectorAll("[vt-share]");
+   for(var i=0;i<matches.length;i++)if(matches[i].getAttribute("vt-share")!=="none"&&owns(matches[i],content))appearing.set(matches[i].getAttribute("vt-name"),matches[i]);
+   var pendingImages=content.querySelectorAll('img[src]:not([loading="lazy"])');
+   for(var i=0;i<pendingImages.length;i++)if(owns(pendingImages[i],content))images.push(pendingImages[i]);
+  }
+  function pair(el){
+   if(!owns(el))return false;
+   var other=appearing.get(el.getAttribute("vt-name"));
+   if(other&&el.getAttribute("vt-share")&&el.getAttribute("vt-share")!=="none"){
+    apply(el,"vt-share");apply(other,"vt-share",other.closest('[${STREAM_SEGMENT_ATTR}]'));appearing.delete(el.getAttribute("vt-name"));return true;
+   }
+   return false;
+  }
+  for(var k=0;k<group.prepared.length;k++){
+   var t=group.prepared[k][0],content=group.prepared[k][1],parent=group.prepared[k][2];
+   var node=t.nextSibling,depth=1;
+   while(node){
+    if(node.nodeType===8){
+     var v=node.data;
+     if(reveal.marker(v,"["))depth++;else if(reveal.marker(v,"]")&&!--depth)break;
+    }else if(node.nodeType===1){
+     if(!pair(node))apply(node,"vt-exit");
+     matches=node.querySelectorAll("[vt-share]");for(var j=0;j<matches.length;j++)pair(matches[j]);
+     descendants(node,"vt-parent-exit");
+    }
+    node=node.nextSibling;
+   }
+   for(var el=content.firstElementChild;el;el=el.nextElementSibling){apply(el,"vt-enter",content);descendants(el,"vt-parent-enter",content);}
+   do{
+    for(var sibling=parent.firstElementChild;sibling;sibling=sibling.nextElementSibling)apply(sibling,"vt-update");
+    if(parent===owner)break;
+    parent=parent.parentNode;
+   }while(parent&&parent.nodeType===1&&parent.getAttribute("vt-update")!=="none");
+  }
+  if(owner!==d&&group.prepared.length)apply(owner,"vt-update");
+ }
+ var captures=[],documentGroup=null,elementsToEnter=0,remaining=0,resolveGate,rejectGate;
+ var gate=new Promise(function(resolve,reject){resolveGate=resolve;rejectGate=reject;});
+ gate.catch(function(){});
+ for(var i=0;i<groups.length;i++){
+  try{prepare(groups[i]);}catch(error){reset(groups[i]);}
+  if(groups[i].restore.length){captures.push(groups[i]);if(groups[i].owner===d)documentGroup=groups[i];else elementsToEnter++;}
+ }
+ remaining=captures.length;animated=remaining>0;
+ if(!remaining){images.length=0;commit();later();return;}
+ function arrive(group){
+  if(group.arrived)return gate;
+  group.arrived=true;remaining--;
+  if(group.owner!==d&&!--elementsToEnter&&documentGroup)start(documentGroup);
+  if(!remaining){try{Promise.resolve(commit()).then(resolveGate,rejectGate);}catch(error){rejectGate(error);}}
+  return gate;
+ }
+ function start(group){
+  if(group.started)return;group.started=true;
+  var owner=group.owner,transition,startNative=owner.startViewTransition,update=function(){return arrive(group);};
+  try{
+   if(callbackOnly.has(startNative))transition=startNative.call(owner,update);
+   else{
+    try{transition=startNative.call(owner,{update:update,types:[]});}
+    catch(error){
+     if(!(error instanceof TypeError))throw error;
+     transition=startNative.call(owner,update);callbackOnly.add(startNative);
+    }
+   }
+   if(owner===d)d.__octaneViewTransition=transition;
+   else (d.__octaneViewTransitionScopes||(d.__octaneViewTransitionScopes=new Map())).set(owner,transition);
+   transition.ready.then(function(){ready.add(transition);reset(group);later();},function(){reset(group);});
+   function complete(){
+    reset(group);
+    if(owner===d){if(d.__octaneViewTransition===transition)d.__octaneViewTransition=null;}
+    else{var scopes=d.__octaneViewTransitionScopes;if(scopes&&scopes.get(owner)===transition)scopes.delete(owner);}
+    drain();
+   }
+   transition.finished.then(complete,complete);
+  }catch(error){reset(group);arrive(group);if(!error||(error.name!=="AbortError"&&error.name!=="InvalidStateError"))console.error(error);}
+ }
+ for(var i=0;i<captures.length;i++)if(captures[i].owner!==d)start(captures[i]);
+ if(!elementsToEnter&&documentGroup&&!documentGroup.arrived)start(documentGroup);
+}
+})();`);
 }
 
 interface StreamSink {
@@ -9955,7 +10546,7 @@ function segmentChunk(b: StreamBoundary, nonceAttr: string): string {
 	// them while this is still markup: once the parsing-safe carrier below turns
 	// the segment into a JSON string, vtSsrStrip can no longer recognize quoted
 	// HTML attributes inside it.
-	const html = vtSsrStrip(b.html);
+	const html = vtSsrStrip(b.html, b.rawHtml);
 	const content =
 		b.namespace === 'svg'
 			? seedScript + '<svg>' + html + '</svg>'
@@ -10372,7 +10963,7 @@ async function runStream(
 	const separateHead = options?.headChannel === 'separate';
 	if (separateHead) {
 		try {
-			options?.onHeadReady?.(pass.vtCandidates ? vtSsrStrip(pass.head) : pass.head);
+			options?.onHeadReady?.(pass.vtCandidates ? vtSsrStrip(pass.head, pass.rawHtml) : pass.head);
 		} catch (err) {
 			try {
 				completeInjection();
@@ -10425,8 +11016,16 @@ async function runStream(
 	}
 	if (injection?.takeInitialSelections !== undefined) shell += injection.takeInitialSelections();
 	const anyPending = stream.boundaries.size > 0;
+	let sentViewTransitions = pass.vtCandidates;
 	if (anyPending)
-		shell += '<script ' + STREAM_SCRIPT_ATTR + nonceAttr + '>' + streamRuntimeJs() + '</script>';
+		shell +=
+			'<script ' +
+			STREAM_SCRIPT_ATTR +
+			nonceAttr +
+			'>' +
+			streamRuntimeJs() +
+			(sentViewTransitions ? streamViewTransitionRuntimeJs() : '') +
+			'</script>';
 	try {
 		if (
 			injection?.streamedRenderer === true ||
@@ -10435,7 +11034,7 @@ async function runStream(
 		) {
 			options?.onEarlyHydrationReady?.();
 		}
-		const shellWrite = write(pass.vtCandidates ? vtSsrStrip(shell) : shell);
+		const shellWrite = write(pass.vtCandidates ? vtSsrStrip(shell, pass.rawHtml) : shell);
 		if (shellWrite !== undefined) await shellWrite;
 	} catch (err) {
 		try {
@@ -10487,7 +11086,7 @@ async function runStream(
 		if (initiallyDone.length > 0) {
 			let chunk = '';
 			for (const boundary of initiallyDone) chunk += segmentChunk(boundary, nonceAttr);
-			const segmentWrite = write(pass.vtCandidates ? vtSsrStrip(chunk) : chunk);
+			const segmentWrite = write(pass.vtCandidates ? vtSsrStrip(chunk, pass.rawHtml) : chunk);
 			if (segmentWrite !== undefined) await segmentWrite;
 			for (const boundary of initiallyDone) {
 				flushedSegments.add(boundary.id);
@@ -10561,9 +11160,19 @@ async function runStream(
 			// ancestor is already flushed or earlier in this same chunk. Browser script
 			// execution then introduces each child template before its `$OCTRC` call.
 			const done = reachableDoneSegments();
+			if (!sentViewTransitions && pass.vtCandidates && done.length > 0) {
+				sentViewTransitions = true;
+				chunk +=
+					'<script ' +
+					STREAM_SCRIPT_ATTR +
+					nonceAttr +
+					'>' +
+					streamViewTransitionRuntimeJs() +
+					'</script>';
+			}
 			for (const b of done) chunk += segmentChunk(b, nonceAttr);
 			if (chunk !== '') {
-				const segmentWrite = write(pass.vtCandidates ? vtSsrStrip(chunk) : chunk);
+				const segmentWrite = write(pass.vtCandidates ? vtSsrStrip(chunk, pass.rawHtml) : chunk);
 				if (segmentWrite !== undefined) await segmentWrite;
 				// A boundary isn't considered flushed until the transport accepted its
 				// chunk through any active backpressure gate.

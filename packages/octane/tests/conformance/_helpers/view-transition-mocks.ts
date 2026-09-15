@@ -20,7 +20,7 @@
 
 export interface ViewTransitionCall {
 	/** The normalized update callback passed to document.startViewTransition. */
-	options: { update: () => void };
+	options: { update: () => void | Promise<void> };
 }
 
 export interface ViewTransitionMocks {
@@ -31,9 +31,10 @@ export interface ViewTransitionMocks {
 }
 
 export function installViewTransitionMocks(): ViewTransitionMocks {
-	const proto = Element.prototype as Element & {
-		getAnimations?: unknown;
-		animate?: unknown;
+	const proto = Element.prototype as unknown as {
+		getBoundingClientRect: Element['getBoundingClientRect'];
+		getAnimations?: Element['getAnimations'];
+		animate?: Element['animate'];
 	};
 	const originalGetBoundingClientRect = proto.getBoundingClientRect;
 	const originalGetAnimations = proto.getAnimations;
@@ -61,7 +62,7 @@ export function installViewTransitionMocks(): ViewTransitionMocks {
 		return [];
 	};
 	proto.animate = function () {
-		return { cancel() {}, finished: Promise.resolve() };
+		return { cancel() {}, finished: Promise.resolve() } as unknown as Animation;
 	};
 	proto.getBoundingClientRect = function (this: Element) {
 		// Content-length-derived rect (React's hasInstanceChanged signal).
@@ -71,14 +72,14 @@ export function installViewTransitionMocks(): ViewTransitionMocks {
 
 	const calls: ViewTransitionCall[] = [];
 	(document as never as Record<string, unknown>)['startViewTransition'] = function (
-		input: (() => void) | { update: () => void },
+		input: (() => void | Promise<void>) | { update: () => void | Promise<void> },
 	) {
 		const options = typeof input === 'function' ? { update: input } : input;
 		calls.push({ options });
-		options.update();
+		const updated = Promise.resolve(options.update());
 		return {
-			ready: Promise.resolve(),
-			finished: Promise.resolve(),
+			ready: updated,
+			finished: updated,
 			skipTransition() {},
 		};
 	};

@@ -126,6 +126,7 @@ require a fixed checkbox or radio input type. Radio synchronization covers nativ
 input on bound group members; entirely unbound members and programmatic writes
 do not acquire implicit sibling-signal authority. Source-faithful consumer
 deletion, application budgets, and current-head CI remain integration gates.
+Sampled numeric values use native control coercion; nullish samples leave the control uncontrolled. This does not broaden the string/boolean contracts of writable control handles.
 
 The required contract uses one authored view for SSR and live presentation. It must adopt
 real native elements and explicitly owned attribute, class-token, and style

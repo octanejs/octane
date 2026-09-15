@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, flushSync, hydrateRoot } from 'octane';
+import { act, flushSync, hydrateRoot, startTransition } from 'octane';
 import {
 	condition,
 	idle,
@@ -10,9 +10,11 @@ import {
 	never,
 	visible,
 	type HydrationPrefetchContext,
+	type HydrationStrategy,
 } from 'octane/hydration';
 import { renderToString } from 'octane/server';
 import { flushEffects } from '../_helpers.js';
+import { installViewTransitionMocks } from '../conformance/_helpers/view-transition-mocks.js';
 import { loadServerFixture } from '../_server-fixture.js';
 import {
 	createHydrationInteractionEvent,
@@ -89,7 +91,7 @@ describe('deferred hydration contract edges', () => {
 		document.body.appendChild(iframe);
 		try {
 			const foreignDocument = iframe.contentDocument!;
-			const foreignWindow = iframe.contentWindow!;
+			const foreignWindow = iframe.contentWindow! as Window & typeof globalThis;
 			expect(foreignWindow.Element).not.toBe(Element);
 			foreignDocument.body.innerHTML =
 				'<div data-octane-hydrate-id="foreign" data-octane-hydrate-when="interaction"><button id="foreign-intent">Activate</button></div>';
@@ -234,7 +236,7 @@ describe('deferred hydration contract edges', () => {
 		let observation: ReturnType<typeof observeHydrationReplays> | undefined;
 		try {
 			const foreignDocument = iframe.contentDocument!;
-			const foreignWindow = iframe.contentWindow!;
+			const foreignWindow = iframe.contentWindow! as Window & typeof globalThis;
 			const foreignContainer = foreignDocument.createElement('div');
 			foreignDocument.body.appendChild(foreignContainer);
 			const replayCases = HYDRATION_INTERACTION_EVENT_CASES.filter(
@@ -287,7 +289,7 @@ describe('deferred hydration contract edges', () => {
 		let observation: ReturnType<typeof observeHydrationReplays> | undefined;
 		try {
 			const foreignDocument = iframe.contentDocument!;
-			const foreignWindow = iframe.contentWindow!;
+			const foreignWindow = iframe.contentWindow! as Window & typeof globalThis;
 			const foreignContainer = foreignDocument.createElement('div');
 			foreignDocument.body.appendChild(foreignContainer);
 			const replayCases = HYDRATION_INTERACTION_CROSS_REALM_CASES;
@@ -375,7 +377,7 @@ describe('deferred hydration contract edges', () => {
 		document.body.appendChild(iframe);
 		let observation: ReturnType<typeof observeHydrationReplays> | undefined;
 		try {
-			const foreignWindow = iframe.contentWindow!;
+			const foreignWindow = iframe.contentWindow! as Window & typeof globalThis;
 			expect(foreignWindow.MouseEvent).not.toBe(MouseEvent);
 			const replayCases = HYDRATION_INTERACTION_CROSS_REALM_CASES;
 			const when = interaction({ events: replayCases.map((testCase) => testCase.type) });
@@ -493,7 +495,17 @@ describe('deferred hydration contract edges', () => {
 
 		await act(() =>
 			intersect(
-				[{ isIntersecting: true, target: wrapper } as IntersectionObserverEntry],
+				[
+					{
+						isIntersecting: true,
+						target: wrapper,
+						boundingClientRect: wrapper.getBoundingClientRect(),
+						intersectionRect: wrapper.getBoundingClientRect(),
+						intersectionRatio: 1,
+						rootBounds: null,
+						time: 0,
+					},
+				],
 				{} as IntersectionObserver,
 			),
 		);
@@ -814,7 +826,10 @@ describe('deferred hydration contract edges', () => {
 	it('hydrates from idle, visibility, and media-query strategies', async () => {
 		vi.useFakeTimers();
 		const onIdleHydrated = vi.fn();
-		let props = { when: idle({ timeout: 25 }), onHydrated: onIdleHydrated };
+		let props: { when: HydrationStrategy; onHydrated: () => void } = {
+			when: idle({ timeout: 25 }),
+			onHydrated: onIdleHydrated,
+		};
 		container.innerHTML = renderToString(server.ProceduralPrefetchHydration, props).html;
 		root = hydrateRoot(container, client.ProceduralPrefetchHydration, props);
 		flushSync(() => {});
@@ -849,7 +864,17 @@ describe('deferred hydration contract edges', () => {
 		expect(observe).toHaveBeenCalledWith(visibleWrapper);
 		await act(() =>
 			intersect(
-				[{ isIntersecting: true, target: visibleWrapper } as IntersectionObserverEntry],
+				[
+					{
+						isIntersecting: true,
+						target: visibleWrapper,
+						boundingClientRect: visibleWrapper.getBoundingClientRect(),
+						intersectionRect: visibleWrapper.getBoundingClientRect(),
+						intersectionRatio: 1,
+						rootBounds: null,
+						time: 0,
+					},
+				],
 				{} as IntersectionObserver,
 			),
 		);
@@ -1299,4 +1324,97 @@ describe('deferred hydration contract edges', () => {
 		expect(container.querySelector('#activation-content')?.textContent).toBe('Server reviews');
 		expect(onHydrated).toHaveBeenCalledOnce();
 	});
+	it.each(['remove', 'cancel'] as const)(
+		'keeps hydration resources alive until a %s transition commits',
+		async (mode) => {
+			const mocks = installViewTransitionMocks();
+			const handles: Array<{
+				update(): void | Promise<void>;
+				ready: ReturnType<typeof deferred<void>>;
+				finished: ReturnType<typeof deferred<void>>;
+			}> = [];
+			(document as any).startViewTransition = (options: { update(): void | Promise<void> }) => {
+				const ready = deferred<void>();
+				const finished = deferred<void>();
+				handles.push({ update: options.update, ready, finished });
+				return { ready: ready.promise, finished: finished.promise, skipTransition() {} };
+			};
+			const events: string[] = [];
+			let signal: AbortSignal | undefined;
+			const when: HydrationStrategy<'interaction'> = {
+				_t: 'interaction',
+				_s:
+					({ element }) =>
+					() => {
+						events.push('strategy:' + element!.isConnected);
+					},
+			};
+			const prefetch = ({ element, signal: nextSignal }: HydrationPrefetchContext) => {
+				signal = nextSignal;
+				signal.addEventListener('abort', () => events.push('abort:' + element!.isConnected));
+			};
+			const pending = deferred<void>();
+			const props = {
+				show: true,
+				when,
+				prefetch,
+				suspend: false,
+				promise: pending.promise,
+				label: 'before',
+			};
+			try {
+				container.innerHTML = renderToString(server.TransitionHydration, props).html;
+				const child = container.querySelector('#transition-hydration-child');
+				root = hydrateRoot(container, client.TransitionHydration, props);
+				flushSync(() => {});
+				flushEffects();
+				expect(signal?.aborted).toBe(false);
+				startTransition(() =>
+					root!.render(client.TransitionHydration, {
+						...props,
+						show: mode === 'cancel',
+						when: mode === 'cancel' ? never() : when,
+						suspend: mode === 'cancel',
+						label: 'after',
+					}),
+				);
+				await vi.waitFor(() => expect(handles).toHaveLength(1));
+				expect(container.querySelector('#transition-hydration-child')).toBe(child);
+				expect(container.querySelector('#transition-hydration-suffix')?.textContent).toBe('before');
+				expect(events).toEqual([]);
+				expect(signal?.aborted).toBe(false);
+				await handles[0].update();
+				handles[0].ready.resolve();
+				handles[0].finished.resolve();
+				await Promise.resolve();
+				if (mode === 'remove') {
+					expect(container.querySelector('#transition-hydration-child')).toBeNull();
+					expect(container.querySelector('#transition-hydration-suffix')?.textContent).toBe(
+						'after',
+					);
+					expect(events).toEqual(['strategy:true', 'abort:true']);
+					expect(signal?.aborted).toBe(true);
+				} else {
+					expect(container.querySelector('#transition-hydration-child')).toBe(child);
+					expect(container.querySelector('#transition-hydration-suffix')?.textContent).toBe(
+						'before',
+					);
+					expect(events).toEqual([]);
+					expect(signal?.aborted).toBe(false);
+					flushSync(() => root!.unmount());
+					root = undefined;
+					expect(events).toEqual(['strategy:true', 'abort:true']);
+				}
+			} finally {
+				flushSync(() => root?.unmount());
+				root = undefined;
+				for (const handle of handles) {
+					handle.ready.resolve();
+					handle.finished.resolve();
+				}
+				await Promise.resolve();
+				mocks.restore();
+			}
+		},
+	);
 });
