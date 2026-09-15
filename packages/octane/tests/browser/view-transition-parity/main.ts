@@ -316,6 +316,7 @@ interface Update {
 		ViewTransitionProps,
 		'name' | 'default' | 'enter' | 'exit' | 'update' | 'share' | 'parentEnter' | 'parentExit'
 	>;
+	nestedTransition?: Update['transition'];
 }
 function render(update: Update, types: string[] = [], urgent = false) {
 	const mark = {

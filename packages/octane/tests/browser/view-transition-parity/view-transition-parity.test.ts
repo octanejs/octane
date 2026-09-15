@@ -308,6 +308,25 @@ describe.sequential.each(['dev', 'prod'] as const)('native View Transition parit
 			}
 			expect([...active]).toEqual([urgent.generation]);
 			expect(result.layouts.some((layout) => layout.generation === urgent.generation)).toBe(true);
+			await page.evaluate(() => window.__viewTransitionParity.unmount());
+			await page.waitForFunction(
+				(generation) =>
+					window.__viewTransitionParity
+						.snapshot()
+						.passives.some(
+							(effect) => effect.generation === generation && effect.kind === 'cleanup',
+						),
+				urgent.generation,
+				{ polling: 10 },
+			);
+			const retired = (await page.evaluate(() => window.__viewTransitionParity.snapshot()))
+				.passives;
+			for (const generation of new Set(retired.map((effect) => effect.generation))) {
+				expect(retired.filter((effect) => effect.generation === generation)).toEqual([
+					{ generation, kind: 'mount' },
+					{ generation, kind: 'cleanup' },
+				]);
+			}
 			expect(errors).toEqual([]);
 		} finally {
 			await fixture.close();

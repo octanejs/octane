@@ -1,5 +1,82 @@
 # View Transition parity performance evidence
 
+## Effect cleanup after a completed transition
+
+The cleanup comparison starts from `ead781345500f7245d9efbb076cdfc2313b474eb`,
+which includes main `1198cdc6c14e44ef7c63e6f2e77948f13048b2a3`. It isolates this
+follow-up from the earlier changes below. Exact source, compiler, fixture,
+dependency, harness and asset hashes are in
+[effect-cleanup.json](measurements/effect-cleanup.json). The final package hash is
+`0b260f33…`; the baseline package hash is `3e715763…`.
+
+The optional driver remains installed after a ViewTransition finishes. Ordinary
+deletions were still entering `stageTeardown`, which immediately returned because
+no staged capture existed. Cleanup and deactivation now check the active capture
+before calling the driver. Capture creation initializes the driver before
+publishing the capture. During preparation, teardown and deactivation keep their
+existing ordering, journaling and rollback behavior, including effect slots that
+have no cleanup callback. There is no new cache, allocation or retained state.
+
+The benchmark uses the original effectful-list TSRX and JSX fixtures and their
+exact lifecycle oracle. Each operation runs in a fresh browser context, either
+after ordinary root setup or after a real native transition has completed and
+its root has been removed. Both modes load identical feature-containing assets.
+The benchmark verifies the browser's executed script bytes and counts outermost
+function entries with Chromium precise coverage and JIT disabled.
+
+| Operation after a completed transition | TSRX before → after | JSX before → after | Calls removed in each |
+| --- | ---: | ---: | ---: |
+| Clear 1,000 rows | 51,101 → 49,101 | 62,127 → 60,127 | 2,000 |
+| Remount 1,000 rows | 159,097 → 157,097 | 203,123 → 201,123 | 2,000 |
+| Remove 100 scattered rows | 43,192 → 42,992 | 65,018 → 64,818 | 200 |
+
+All removed calls are inactive `stageTeardown` entries. The six cold-control
+counts are unchanged: TSRX 47,089 / 155,085 / 42,780 and JSX
+57,115 / 198,111 / 64,506, in table order. This is a reduction in measured
+function calls, not a CPU or application-latency claim. Remaining idle-minus-cold
+work is 2,012 / 2,012 / 212 calls for TSRX and 3,012 / 3,012 / 312 for JSX;
+the installed driver still has other lifecycle work. These controls do not
+measure a bundle that excludes ViewTransition.
+
+The three guards add 23 raw JavaScript bytes to each combined fixture build:
+TSRX 248,244 → 248,267 bytes, JSX 248,122 → 248,145. Sum-of-asset gzip sizes
+are 79,319 → 79,322 bytes and 79,340 → 79,345 respectively (+3 / +5 bytes).
+Compiler and compiled fixture hashes match between baseline and candidate.
+No server or compiler implementation changes are part of this follow-up.
+
+The new Chromium CI check requires zero inactive `stageTeardown` calls, bounds all asset
+function calls and bounds the difference between idle and cold controls. Its
+18 total/delta guards allow 32 calls above the measured result, less than one
+extra helper call for each of the smallest 100 removed rows. Baseline semantics
+pass, but all six idle cases fail the new work budgets; the final candidate
+passes all 30 guards, including 12 zero-call checks. The registered suite passes
+all 43 guards. Shared lifecycle assertions remain in the canonical effectful-list
+timing runner, whose original six operations also pass in both dialects with
+one sample per operation; that smoke run is not a timing comparison.
+
+Correctness validation passes 534 focused development/production tests and 89
+native browser cases, plus strict runtime/TSRX fixture types and 72 staged-DOM
+checker/workflow tests. New observations cover cleanup exactly once, connected
+DOM during synchronous deletion cleanup, Activity disconnect/reconnect and
+native urgent-abort cleanup. Deliberately bypassing staged teardown makes the
+held-update tests fail; incorrectly suppressing ordinary cleanup makes the
+ordinary deletion and Activity tests fail in both modes. The Activity case
+publishes deactivation after preparation; it does not independently establish
+coverage of deactivation during a still-suspended retry.
+
+Environment: Node 24.20.0, Chromium 149.0.7827.55, Playwright 1.61.1, Vite 8.1.5,
+esbuild 0.28.1, @tsrx/core 0.2.0, @tsrx/oxc 0.13.0, macOS arm64. Both variants
+use the same dependency installation and final harness. These deterministic
+counts do not establish changes to CPU time, allocation/GC, active transition
+latency or native DOM work. Reproduce with:
+
+```sh
+# Expected to fail the new work budgets while retaining passing lifecycle checks.
+BENCH_JSON=/tmp/vt-cleanup-before.json node benchmarks/view-transitions/effect-cleanup.mjs --octane-revision=ead781345500f7245d9efbb076cdfc2313b474eb
+BENCH_JSON=/tmp/vt-cleanup-after.json node benchmarks/view-transitions/effect-cleanup.mjs
+node benchmarks/bench.mjs --quick --ratios view-transitions
+```
+
 ## Ordinary client regression and fix
 
 The ordinary table workloads exposed a regression that the smaller root controls

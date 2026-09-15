@@ -725,7 +725,10 @@ const SUITES = [
 		cwd: 'view-transitions',
 		servers: [],
 		iter: { normal: 1, quick: 1 },
-		runs: [{ script: 'bundle.mjs', args: () => [] }],
+		runs: [
+			{ script: 'bundle.mjs', args: () => [] },
+			{ label: 'effect-cleanup', script: 'effect-cleanup.mjs', args: () => [] },
+		],
 	},
 	{
 		// Raw streaming API over REAL HTTP, cold and warm: fresh-process import

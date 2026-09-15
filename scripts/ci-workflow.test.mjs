@@ -751,8 +751,12 @@ describe('CI workflow aggregation', () => {
 		const guard = steps.find((step) =>
 			step.startsWith('Check ordinary js-framework benchmark work\n'),
 		);
+		const cleanup = steps.find((step) =>
+			step.startsWith('Check ordinary effect cleanup work after ViewTransition\n'),
+		);
 		const upload = steps.find((step) => step.startsWith('Upload js-framework work results\n'));
 		assert.ok(guard, 'missing ordinary client benchmark guard');
+		assert.ok(cleanup, 'missing ordinary effect cleanup guard');
 		assert.ok(upload, 'missing ordinary client benchmark result upload');
 		assert.match(
 			guard,
@@ -764,13 +768,22 @@ describe('CI workflow aggregation', () => {
 			/^          BENCH_JSON: benchmarks\/results\/view-transitions-js-framework\.json$/m,
 		);
 		assert.match(
+			cleanup,
+			/if: \$\{\{ matrix\.lane == 'browser' && matrix\.playwright_browser == 'chromium' \}\}/,
+		);
+		assert.match(cleanup, /^        run: node benchmarks\/view-transitions\/effect-cleanup\.mjs$/m);
+		assert.match(
+			cleanup,
+			/^          BENCH_JSON: benchmarks\/results\/view-transitions-effect-cleanup\.json$/m,
+		);
+		assert.match(
 			upload,
 			/if: \$\{\{ always\(\) && matrix\.lane == 'browser' && matrix\.playwright_browser == 'chromium' \}\}/,
 		);
 		assert.match(upload, /uses: actions\/upload-artifact@[a-f0-9]{40}/);
 		assert.match(
 			upload,
-			/^          path: benchmarks\/results\/view-transitions-js-framework\.json$/m,
+			/^          path: \|\n            benchmarks\/results\/view-transitions-js-framework\.json\n            benchmarks\/results\/view-transitions-effect-cleanup\.json$/m,
 		);
 		assert.match(upload, /^          retention-days: 1$/m);
 	});

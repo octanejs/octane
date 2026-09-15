@@ -10310,7 +10310,13 @@ function unmountScope(scope: Scope, detachDom: boolean = true): void {
 				// commitEffects anyway, deduped by the flag.
 				if (!passiveScheduled) schedulePassiveFlush();
 			} else {
-				if (DEFERRED_LAYOUT_DRIVER?.stageTeardown(cleanup, slot.phase) === true) continue;
+				// The driver stays installed after a transition. Ordinary teardown
+				// needs no staging call; only an active capture can defer this cleanup.
+				if (
+					STAGED_COMMIT_CAPTURE !== null &&
+					DEFERRED_LAYOUT_DRIVER!.stageTeardown(cleanup, slot.phase) === true
+				)
+					continue;
 				try {
 					runEffectCleanupCallback(cleanup, slot.phase);
 				} catch (err) {
@@ -10347,7 +10353,11 @@ function runScopeCleanups(scope: Scope): void {
 	const c = scope.cleanups;
 	if (c !== null)
 		for (let i = c.length - 1; i >= 0; i--) {
-			if (DEFERRED_LAYOUT_DRIVER?.stageTeardown(c[i], -1) === true) continue;
+			if (
+				STAGED_COMMIT_CAPTURE !== null &&
+				DEFERRED_LAYOUT_DRIVER!.stageTeardown(c[i], -1) === true
+			)
+				continue;
 			try {
 				runEffectLifecycleCallback(c[i]);
 			} catch (err) {
@@ -36015,7 +36025,9 @@ function deactivateScope(scope: Scope, disconnectPassive: boolean = true): void 
 			) {
 				continue;
 			}
-			const staged = DEFERRED_LAYOUT_DRIVER?.stageDeactivation(e, scope) === true;
+			const staged =
+				STAGED_COMMIT_CAPTURE !== null &&
+				DEFERRED_LAYOUT_DRIVER!.stageDeactivation(e, scope) === true;
 			if (typeof e.cleanup === 'function') {
 				const cleanup = e.cleanup;
 				// Clear it BEFORE firing so unmountScope's effect-slot walk sees

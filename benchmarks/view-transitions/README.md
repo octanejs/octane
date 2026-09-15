@@ -225,3 +225,51 @@ among 2,049 ordinary elements uses zero JavaScript child collections instead of
 3,084. These are operation counts, not elapsed-time or allocation measurements.
 The candidate's adapter hash identifies the measured working tree exactly;
 `workingTree` distinguishes it from a selected commit snapshot.
+
+## Ordinary effect cleanup after a transition
+
+`effect-cleanup.mjs` reuses the authored JSX and TSRX effectful-list applications
+and their shared, exact lifecycle contract. Each dialect clears 1,000 rows,
+replaces all 1,000 keys, and removes 100 scattered rows in fresh cold and
+installed-driver contexts. The original preparation, counter reset, and 50ms
+settling boundaries remain intact; effect cleanup, callback-ref cleanup, layout
+reads, and final row counts must all match the canonical benchmark.
+
+```sh
+BENCH_JSON=/tmp/vt-cleanup-before.json node benchmarks/view-transitions/effect-cleanup.mjs --octane-revision=ead781345500f7245d9efbb076cdfc2313b474eb
+BENCH_JSON=/tmp/vt-cleanup-after.json node benchmarks/view-transitions/effect-cleanup.mjs
+node benchmarks/bench.mjs --quick --ratios view-transitions
+```
+
+Both modes execute identical minified assets. The idle primer uses public Octane
+APIs to complete a real native transition: `ready`, `updateCallbackDone`, and
+`finished` must fulfill, `onUpdate` must run once, and the primer must fully
+unmount with no remaining transition animation. The cold primer makes the same
+plain-root updates. The fixture loads only after the primer has finished.
+
+A jitless Chromium context captures precise function coverage around one
+original operation. The runner verifies each executed script against its emitted
+SHA-256 hash and records every outermost function count, complete coverage
+ranges, total calls, and the idle-minus-cold total-call delta. Initial and setup
+counts are excluded. Nested basic-block ranges are retained as evidence but not
+summed as extra function calls. The installed driver must expose exactly one
+`stageTeardown` coverage range, and ordinary cleanup must enter it zero times.
+The standalone runner and 12 ratio guards enforce this limit; the Chromium CI
+lane runs the standalone guard and uploads its JSON even on failure.
+
+Results include source, compiler, fixture, compiled-input, lockfile, harness,
+emitted-asset, and tool/browser provenance. Edits during a run fail it. Temporary
+servers and assets are removed afterward. The selected revision helper retains
+ignored package snapshots. These are work counts, not timing, instruction,
+allocation, or native DOM measurements; the total-call delta does not need to be
+zero. An additional 18 ratio guards limit each operation's total calls and each idle case's nonnegative excess over
+its cold control to the measured candidate plus 32 calls. This allowance is
+smaller than one extra call for each of the smallest 100 removed rows.
+`effect-cleanup-budget.json` records the calibration source and toolchain;
+updates require fresh semantic and work evidence. The standalone CI runner
+enforces these same ceilings.
+
+The exact before/after comparison is recorded in
+[`measurements/effect-cleanup.json`](measurements/effect-cleanup.json). Cold work
+is unchanged; each dialect removes 2,000 function entries for clear/remount and
+200 for scattered removal, with the original lifecycle snapshots preserved.

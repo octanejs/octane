@@ -1,0 +1,68 @@
+{
+  "description": "Measured production function entries plus 32 calls per operation. The allowance is below one extra call for each of the smallest 100 removed rows. Update only with semantic and work evidence.",
+  "allowance": 32,
+  "calibration": {
+    "revision": "ead781345500f7245d9efbb076cdfc2313b474eb",
+    "workingTree": true,
+    "sourceSha256": "0b260f33c6959b912ad8ada620d50b86058707e0c47a028bcbf24dc0f3becf76",
+    "compilerSourceSha256": "653236f83b565c844df63c54156ece40bf02cfb4ba40fa6dd66a561b915455be",
+    "lockfileSha256": "51648462c4e126c7b945cb99c5390b8a77243538c3bc86fbf784021d16e0cace",
+    "node": "v24.20.0",
+    "toolchain": {
+      "vite": "8.1.5",
+      "esbuild": "0.28.1",
+      "tsrxCore": "0.2.0",
+      "tsrxOxc": "0.13.0",
+      "playwright": "1.61.1"
+    },
+    "chromium": "149.0.7827.55"
+  },
+  "fixtures": {
+    "octane-tsrx": "abcc85aa1624c461bb2bb7de59f2dc22ba6e14bcb1177fdb6f14ba9e59daa8f8",
+    "octane-jsx": "f5eea1589e3412909ac966270fc3486b31788636b87b3437492c0b3820315df9"
+  },
+  "observed": {
+    "tsrx-cold-clear": {
+      "total_calls": 47089
+    },
+    "tsrx-cold-remount": {
+      "total_calls": 155085
+    },
+    "tsrx-cold-remove_100_scattered": {
+      "total_calls": 42780
+    },
+    "tsrx-idle-clear": {
+      "total_calls": 49101,
+      "idle_extra_calls": 2012
+    },
+    "tsrx-idle-remount": {
+      "total_calls": 157097,
+      "idle_extra_calls": 2012
+    },
+    "tsrx-idle-remove_100_scattered": {
+      "total_calls": 42992,
+      "idle_extra_calls": 212
+    },
+    "jsx-cold-clear": {
+      "total_calls": 57115
+    },
+    "jsx-cold-remount": {
+      "total_calls": 198111
+    },
+    "jsx-cold-remove_100_scattered": {
+      "total_calls": 64506
+    },
+    "jsx-idle-clear": {
+      "total_calls": 60127,
+      "idle_extra_calls": 3012
+    },
+    "jsx-idle-remount": {
+      "total_calls": 201123,
+      "idle_extra_calls": 3012
+    },
+    "jsx-idle-remove_100_scattered": {
+      "total_calls": 64818,
+      "idle_extra_calls": 312
+    }
+  }
+}

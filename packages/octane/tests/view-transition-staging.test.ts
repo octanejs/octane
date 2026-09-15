@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
 	act,
+	Activity,
 	createElement,
 	createRoot,
 	flushSync,
@@ -164,8 +165,141 @@ describe('ViewTransition staged commits', () => {
 		handles[0].ready.resolve();
 		handles[0].finished.resolve();
 		await vi.waitFor(() => expect(events).toContain('unsubscribe:second'));
-		expect(events.filter((event) => event === 'unsubscribe:first')).toHaveLength(1);
-		expect(events.filter((event) => event === 'unsubscribe:second')).toHaveLength(1);
+		await act(() => root.unmount());
+		for (const name of ['first', 'second']) {
+			expect(events.filter((event) => event.startsWith('remove-insertion:' + name + ':'))).toEqual([
+				'remove-insertion:' + name + ':true',
+			]);
+			expect(events.filter((event) => event.startsWith('remove-layout:' + name + ':'))).toEqual([
+				'remove-layout:' + name + ':true',
+			]);
+			expect(events.filter((event) => event === 'unsubscribe:' + name)).toHaveLength(1);
+		}
+		for (const value of ['before', 'after']) {
+			expect(events.filter((event) => event === 'destroy-insertion:' + value)).toHaveLength(1);
+			expect(events.filter((event) => event === 'destroy-layout:' + value)).toHaveLength(1);
+		}
+	});
+
+	it('cleans up ordinary deletions and a later unmount after a completed transition', async () => {
+		const events: string[] = [];
+		const clicks: string[] = [];
+		await act(() =>
+			root.render(StagingLifecycleApp, { value: 'before', events, clicks, children: true }),
+		);
+		startTransition(() =>
+			root.render(StagingLifecycleApp, { value: 'after', events, clicks, children: true }),
+		);
+		await vi.waitFor(() => expect(handles).toHaveLength(1));
+		await handles[0].update();
+		handles[0].ready.resolve();
+		handles[0].finished.resolve();
+		await act(() => {});
+		expect(container.textContent).toBe('afterfirstsecond');
+		expect(
+			events.some((event) => event.startsWith('remove-') || event.startsWith('unsubscribe:')),
+		).toBe(false);
+
+		events.length = 0;
+		await act(() =>
+			root.render(StagingLifecycleApp, { value: 'after', events, clicks, children: false }),
+		);
+		expect(container.textContent).toBe('after');
+		for (const name of ['first', 'second']) {
+			expect(events.filter((event) => event.startsWith('remove-insertion:' + name + ':'))).toEqual([
+				'remove-insertion:' + name + ':true',
+			]);
+			expect(events.filter((event) => event.startsWith('remove-layout:' + name + ':'))).toEqual([
+				'remove-layout:' + name + ':true',
+			]);
+			expect(events.filter((event) => event === 'unsubscribe:' + name)).toHaveLength(1);
+		}
+		await act(() =>
+			root.render(StagingLifecycleApp, { value: 'final', events, clicks, children: true }),
+		);
+		await act(() => root.unmount());
+		expect(container.childNodes).toHaveLength(0);
+		for (const name of ['first', 'second']) {
+			expect(events.filter((event) => event.startsWith('remove-insertion:' + name + ':'))).toEqual([
+				'remove-insertion:' + name + ':true',
+				'remove-insertion:' + name + ':true',
+			]);
+			expect(events.filter((event) => event.startsWith('remove-layout:' + name + ':'))).toEqual([
+				'remove-layout:' + name + ':true',
+				'remove-layout:' + name + ':true',
+			]);
+			expect(events.filter((event) => event === 'unsubscribe:' + name)).toHaveLength(2);
+		}
+		for (const value of ['after', 'final']) {
+			expect(events.filter((event) => event === 'destroy-insertion:' + value)).toHaveLength(1);
+			expect(events.filter((event) => event === 'destroy-layout:' + value)).toHaveLength(1);
+		}
+		expect(events.some((event) => event.endsWith(':before'))).toBe(false);
+		expect(recoverable).toEqual([]);
+	});
+
+	it('disconnects Activity effects at the native update and reconnects them for later ordinary work', async () => {
+		const events: string[] = [];
+		const clicks: string[] = [];
+		const render = (mode: 'visible' | 'hidden') =>
+			root.render(
+				createElement(
+					Activity,
+					{ mode },
+					createElement(StagingLifecycleApp, { value: 'current', events, clicks, children: true }),
+				),
+			);
+		await act(() => render('visible'));
+		const section = container.querySelector('section')!;
+		const first = container.querySelector('[data-child="first"]')!;
+		events.length = 0;
+		startTransition(() => render('hidden'));
+		await vi.waitFor(() => expect(handles).toHaveLength(1));
+		expect(events).toEqual([]);
+		expect(section.style.display).toBe('');
+		await handles[0].update();
+		expect(section.style.display).toBe('none');
+		expect(first.isConnected).toBe(true);
+		for (const name of ['first', 'second']) {
+			expect(events.filter((event) => event.startsWith('remove-layout:' + name + ':'))).toEqual([
+				'remove-layout:' + name + ':true',
+			]);
+			expect(events.filter((event) => event === 'unsubscribe:' + name)).toHaveLength(1);
+		}
+		expect(events.some((event) => event.startsWith('remove-insertion:'))).toBe(false);
+		expect(events).not.toContain('destroy-insertion:current');
+		const hiddenEvents = events.slice();
+		handles[0].ready.resolve();
+		handles[0].finished.resolve();
+		await act(() => {});
+		expect(events).toEqual(hiddenEvents);
+		events.length = 0;
+		await act(() => render('visible'));
+		expect(container.querySelector('[data-child="first"]')).toBe(first);
+		expect(section.style.display).toBe('');
+		for (const name of ['first', 'second']) {
+			expect(events.filter((event) => event === 'layout:' + name)).toHaveLength(1);
+			expect(events.filter((event) => event === 'subscribe:' + name)).toHaveLength(1);
+			expect(events).not.toContain('insert:' + name);
+		}
+
+		events.length = 0;
+		await act(() => render('hidden'));
+		expect(section.style.display).toBe('none');
+		await act(() => root.unmount());
+		expect(container.childNodes).toHaveLength(0);
+		for (const name of ['first', 'second']) {
+			expect(events.filter((event) => event.startsWith('remove-layout:' + name + ':'))).toEqual([
+				'remove-layout:' + name + ':true',
+			]);
+			expect(events.filter((event) => event === 'unsubscribe:' + name)).toHaveLength(1);
+			expect(
+				events.filter((event) => event.startsWith('remove-insertion:' + name + ':')),
+			).toHaveLength(1);
+		}
+		expect(events.filter((event) => event === 'destroy-insertion:current')).toHaveLength(1);
+		expect(events.filter((event) => event === 'destroy-layout:current')).toHaveLength(1);
+		expect(recoverable).toEqual([]);
 	});
 
 	it('keeps newly registered input events working after a suspended attempt is retried', async () => {
