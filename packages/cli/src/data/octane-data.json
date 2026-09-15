@@ -2144,6 +2144,11 @@
       "message": "Multiple errors were thrown during act.",
       "runtime": ["client"],
       "status": "active"
+    },
+    "65": {
+      "message": "Internal SSR invariant violated: ASYNC_SCOPE is not an extension of the active frame's async scope. Please file an Octane issue.",
+      "runtime": ["server"],
+      "status": "active"
     }
   }
 }
