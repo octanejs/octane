@@ -6,7 +6,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { format } from 'prettier';
 
-const expectedVersion = '5.2.1';
+const expectedVersion = '5.2.2';
 const check = process.argv.includes('--check');
 const packageDirectory = dirname(dirname(fileURLToPath(import.meta.url)));
 const sourceDirectory = join(packageDirectory, 'src');

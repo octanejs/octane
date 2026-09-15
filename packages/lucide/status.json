@@ -1,6 +1,9 @@
 {
-  "upstream": { "package": "lucide-react", "version": "1.24.0" },
-  "surface": "Complete against the published `lucide-react@1.24.0` runtime surface: every canonical icon and alias, the `icons` namespace, `Icon`, `createLucideIcon`, `LucideProvider`, `useLucideContext`, `DynamicIcon`, `iconNames`, `dynamicIconImports`, and per-icon subpath imports.",
+  "upstream": {
+    "package": "lucide-react",
+    "version": "1.45.0"
+  },
+  "surface": "Complete against the published `lucide-react@1.45.0` runtime surface: every canonical icon and alias, the `icons` namespace, `Icon`, `createLucideIcon`, `LucideProvider`, `useLucideContext`, `DynamicIcon`, `iconNames`, `dynamicIconImports`, and per-icon subpath imports.",
   "divergences": [
     "Icon refs are normal Octane `ref` props rather than React `forwardRef` components.",
     "Event callbacks receive native DOM events rather than React synthetic events."
@@ -14,10 +17,11 @@
   },
   "verified": "2026-08-02",
   "notes": [
-    "Generated wrappers consume official framework-neutral `@lucide/icons@1.24.0` data, so SVG geometry is not copied or maintained by the port.",
+    "Generated wrappers consume official framework-neutral @lucide/icons@1.45.0 data and its public build export. The Octane bridge supports icon data, nested nodes, custom view boxes, and non-scaling strokes without copying new React implementation.",
     "Generation checks pin the React export, alias, and dynamic-name surfaces and reject stale generated files.",
-    "The manifest registers two bounded runtime differential cases; the pinned upstream runtime suite remains unvendored and unadapted one-for-one, and the React package has no separate executable type-test suite.",
-    "Every pinned upstream test artifact and public entry-point family is dispositioned in UPSTREAM.md."
+    "Two shared runtime differential scenarios plus complete canonical SVG comparisons, direct public type probes, hydration, native refs/events and dynamic-import lifecycle tests cover the current dependency. The historical upstream runtime suite remains unvendored and unadapted one-for-one.",
+    "Every pinned upstream test artifact and public entry-point family is dispositioned in UPSTREAM.md.",
+    "Release identities are recorded in audit/release-compatibility.json. Historical ISC source attribution remains recorded-unverified; the current dependency update does not claim full upstream-suite parity."
   ],
   "docs": ["docs/lucide-port-plan.md"]
 }

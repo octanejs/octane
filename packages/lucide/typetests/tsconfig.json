@@ -1,0 +1,6 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": { "skipLibCheck": false },
+  "include": ["../src", "./public-api.test-d.ts"],
+  "exclude": []
+}

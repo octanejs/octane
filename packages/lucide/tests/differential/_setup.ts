@@ -77,7 +77,7 @@ export async function setup(): Promise<void> {
 	// the equivalent facade; the root export inventories are tested separately.
 	writeFileSync(
 		ICONS_RUNTIME,
-		"export { Camera, CircleAlert, Icon, LucideProvider, Search } from 'lucide-react';\n",
+		"export { Camera, CircleAlert, createLucideIcon, Icon, LucideProvider, Search } from 'lucide-react';\n",
 	);
 	if (!existsSync(FIXTURE_DIR)) return;
 	for (const sourcePath of walk(FIXTURE_DIR)) compileOne(sourcePath);

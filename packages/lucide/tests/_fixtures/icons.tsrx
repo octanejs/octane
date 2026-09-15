@@ -1,10 +1,25 @@
-import { Camera, CircleAlert, Icon, LucideProvider, Search } from './icons-runtime.js';
+import {
+	Camera,
+	CircleAlert,
+	createLucideIcon,
+	Icon,
+	LucideProvider,
+	Search,
+} from './icons-runtime.js';
 import type { IconNode } from '../../src/types.js';
 
 const customNode: IconNode = [
 	['circle', { cx: '12', cy: '12', r: '9', key: 'outer' }],
 	['path', { d: 'm9 12 2 2 4-4', key: 'check' }],
 ];
+
+const WideIcon = createLucideIcon({
+	name: 'wide-badge',
+	aliases: ['badge-wide'],
+	width: 48,
+	height: 16,
+	node: [['rect', { width: 48, height: 16, key: 'body' }]],
+});
 
 export function IconGallery(
 	props: {
@@ -30,5 +45,9 @@ export function IconGallery(
 			<title id="alert-title">Warning</title>
 		</CircleAlert>
 		<Icon id="custom" iconNode={customNode} role="img" />
+		<LucideProvider nonScalingStroke className="badge-provider">
+			<WideIcon id="wide" width={96} height={32} className="badge" />
+			<WideIcon id="wide-override" nonScalingStroke={false} />
+		</LucideProvider>
 	</section>;
 }

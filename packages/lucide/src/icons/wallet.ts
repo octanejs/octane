@@ -1,12 +1,12 @@
-// Generated from lucide-react@1.24.0 and @lucide/icons@1.24.0.
+// Generated from lucide-react@1.45.0 and @lucide/icons@1.45.0.
 // Run `pnpm lucide:generate`; do not edit by hand.
 
 import iconData from '@lucide/icons/icons/wallet';
 import createLucideIcon from '../createLucideIcon';
-import type { IconNode } from '../types';
 
-const __iconNode = iconData.node as IconNode;
-const Wallet = createLucideIcon(iconData.name, __iconNode);
+const Wallet = createLucideIcon(iconData);
 
-export { __iconNode };
+export { default as __iconData } from '@lucide/icons/icons/wallet';
+/** @deprecated Use __iconData.node. */
+export const __iconNode = iconData.node;
 export default Wallet;

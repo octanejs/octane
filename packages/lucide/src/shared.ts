@@ -23,6 +23,3 @@ export const toPascalCase = (string: string): string => {
 	const camelCase = toCamelCase(string);
 	return camelCase.charAt(0).toUpperCase() + camelCase.slice(1);
 };
-
-export const toKebabCase = (string: string): string =>
-	string.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase();
