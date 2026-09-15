@@ -1017,6 +1017,22 @@
     "note": "intra-octane de-opt cliff: plain-.ts createElement vs compiled .tsrx SSR (known ~2.1x). Bounds the cliff so a broken fast path (ratio\u21921) or a runaway deopt (ratio>4) both surface."
   },
   {
+    "suite": "ssr-scope-keys",
+    "op": "render",
+    "target": "nested-components",
+    "reference": "host-tree",
+    "maxRatio": 8,
+    "note": "Same-process SSR of a depth-6 component tree vs a component-free host tree of the same element shape. Suffix-keyed scoped counters measured ~5.5x; full-scope keying (which re-scans the shared ASYNC_SCOPE prefix per child) measured ~11.2x. The 8 ceiling leaves ~45% headroom while catching restoration of per-child prefix scans."
+  },
+  {
+    "suite": "ssr-scope-keys",
+    "op": "render",
+    "target": "nested-arms",
+    "reference": "host-tree",
+    "maxRatio": 4,
+    "note": "Component tree whose items enter through compiler-emitted @for arm membranes (arm-position occurrence keys plus children scoped under each arm) vs the same component-free host reference. Covers the frame.occ/enterAsyncArm path nested-components does not reach. Suffix-keyed measured ~2.5x; full-scope keys with the re-embedded position base measured ~5.7x."
+  },
+  {
     "suite": "bundle-size",
     "op": "app_raw",
     "target": "octane-jsx",
