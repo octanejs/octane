@@ -1,5 +1,5 @@
 /** Shared, pure workload specification: both runners verify every row. */
-export const scenarios = ['body-first', 'history-first', 'large-waves', 'denied'];
+export const scenarios = ['body-first', 'history-first', 'large-waves', 'rich-waves', 'denied'];
 
 /** @param {unknown} input */
 export function scenarioConfig(input = {}) {
@@ -26,11 +26,13 @@ export function scenarioConfig(input = {}) {
 		holdAuth,
 		bodyCount: boundedCount(value.bodyCount, scenario === 'large-waves' ? 200 : 20, 2_000),
 		historyCount: boundedCount(value.historyCount, scenario === 'large-waves' ? 60 : 10, 500),
-		waves: scenario === 'large-waves' ? 4 : 1,
+		waves: scenario === 'large-waves' || scenario === 'rich-waves' ? 4 : 1,
 		authDelay: latency === 'none' ? 0 : 30,
 		bodyDelay: latency === 'none' ? 0 : scenario === 'history-first' ? 25 : 8,
 		historyDelay: latency === 'none' ? 0 : scenario === 'history-first' ? 8 : 25,
-		waveDelay: latency === 'none' ? 0 : 8,
+		// The rich interaction fixture keeps later waves pending while native input
+		// selects/zooms a map. Driver wait is excluded from projection CPU metrics.
+		waveDelay: latency === 'none' ? 0 : scenario === 'rich-waves' ? 400 : 8,
 	};
 }
 

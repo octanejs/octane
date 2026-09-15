@@ -740,14 +740,36 @@ export function App(props: { label: Label }) @{ <p>{props.label}</p> }`;
 		).rejects.toThrow(/Invalid descriptor-children metadata.*\.\/Slot\.tsrx/);
 	});
 
-	it('enforces the public Strong option for both client and server transforms', async () => {
+	it('enforces public static compiler options for both client and server transforms', async () => {
 		for (const ssr of [false, true]) {
-			const plugin = octane({ hmr: false, strong: true });
+			const plugin = octane({
+				hmr: false,
+				strong: true,
+				knownAttributeSpreads: [
+					{ source: '@stylexjs/stylex', imported: 'attrs', fields: ['class', 'style'] },
+				],
+			});
 			configure(plugin, 'build', { ssr });
 
 			await expect(
 				Promise.resolve(transform(plugin, RENDER_STATE_UPDATE, `${ROOT}/src/App.tsrx`, { ssr })),
 			).rejects.toThrow(/OCTANE_STRONG_RENDER_STATE_UPDATE|useLinkedState/);
+			const source = `import { attrs as nativeAttrs } from '@stylexjs/stylex';
+export function Styled(props) @{ 'use dom bindings'; <div {...nativeAttrs(props.styles)} /> }`;
+			expect(await transform(plugin, source, `${ROOT}/src/Styled.tsrx`, { ssr })).not.toBeNull();
+			if (!ssr)
+				expect(
+					await transform(plugin, source, `${ROOT}/src/Styled.tsrx?octane-bindings=Styled`, {
+						ssr,
+					}),
+				).not.toBeNull();
+			await (plugin.closeBundle as any)?.();
+			if (!ssr)
+				expect(
+					await transform(plugin, source, `${ROOT}/src/Styled.tsrx?octane-bindings=Styled`, {
+						ssr,
+					}),
+				).not.toBeNull();
 		}
 	});
 

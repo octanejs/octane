@@ -1,5 +1,6 @@
-export { adoptBindings, unbound } from './dom-bindings.js';
+export { adoptBindings, mountBindings, unbound } from './dom-bindings.js';
 export type { BindingSource, BindingOptions, BindingHandle } from './dom-bindings.js';
+export type { BindingRange, BindingMountTarget } from './dom-binding-program.js';
 
 /** A behavior-only root observes existing DOM without taking reconciliation ownership. */
 export interface BehaviorRootOptions {

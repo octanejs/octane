@@ -1,7 +1,8 @@
 import { createElement, createRoot, flushSync, type Root } from '../../../src/index.js';
 import { NestedConditionalList } from '../../_fixtures/for.tsrx';
+import { mountPresentationRows } from './presentation.tsrx';
 
-type ListKind = 'compiled' | 'descriptor';
+type ListKind = 'compiled' | 'descriptor' | 'presentation';
 type TouchName = 'touchmove' | 'touchstart';
 
 const rows = [
@@ -12,6 +13,7 @@ const rows = [
 ];
 
 let root: Root | undefined;
+let presentation: ReturnType<typeof mountPresentationRows> | undefined;
 let input: HTMLInputElement;
 let queryRoot: Document | ShadowRoot = document;
 let focusedId = 0;
@@ -41,6 +43,8 @@ function renderRows(): void {
 			prefix: 'row',
 			onSelect() {},
 		});
+	} else if (kind === 'presentation') {
+		presentation!.update(currentRows);
 	} else {
 		root!.render(DescriptorRows, { items: currentRows });
 	}
@@ -48,6 +52,9 @@ function renderRows(): void {
 
 function mount(nextKind: ListKind, nextFocusedId: number, shadow = false): void {
 	root?.unmount();
+	root = undefined;
+	presentation?.dispose();
+	presentation = undefined;
 	kind = nextKind;
 	focusedId = nextFocusedId;
 	currentRows = rows;
@@ -64,13 +71,16 @@ function mount(nextKind: ListKind, nextFocusedId: number, shadow = false): void 
 		container = document.createElement('section');
 		queryRoot.appendChild(container);
 	}
-	root = createRoot(container);
+	if (kind === 'presentation') presentation = mountPresentationRows(container, currentRows);
+	else root = createRoot(container);
 	renderRows();
 	flushSync(() => {});
 	input =
 		kind === 'compiled'
 			? queryRoot.querySelector<HTMLInputElement>('.nested-conditional-editor')!
-			: queryRoot.querySelector<HTMLInputElement>(`[data-row="${focusedId}"]`)!;
+			: kind === 'presentation'
+				? queryRoot.querySelector<HTMLInputElement>(`input[name="${focusedId}"]`)!
+				: queryRoot.querySelector<HTMLInputElement>(`[data-row="${focusedId}"]`)!;
 	for (const name of ['blur', 'focusout']) {
 		input.addEventListener(name, () => interruptions.push(name));
 	}
@@ -88,9 +98,14 @@ function snapshot() {
 					queryRoot.querySelectorAll('.nested-conditional-label'),
 					(node) => rows.find((row) => row.label === node.textContent)!.id,
 				)
-			: Array.from(queryRoot.querySelectorAll<HTMLInputElement>('#descriptor-rows input'), (node) =>
-					Number(node.dataset.row),
-				);
+			: kind === 'presentation'
+				? Array.from(queryRoot.querySelectorAll('figure'), (node) =>
+						Number(node.getAttribute('data-file')),
+					)
+				: Array.from(
+						queryRoot.querySelectorAll<HTMLInputElement>('#descriptor-rows input'),
+						(node) => Number(node.dataset.row),
+					);
 	return {
 		order,
 		focused: (input.getRootNode() as Document | ShadowRoot).activeElement === input,
@@ -98,7 +113,9 @@ function snapshot() {
 		same:
 			kind === 'compiled'
 				? queryRoot.querySelector('.nested-conditional-editor') === input
-				: queryRoot.querySelector(`[data-row="${focusedId}"]`) === input,
+				: kind === 'presentation'
+					? queryRoot.querySelector(`input[name="${focusedId}"]`) === input
+					: queryRoot.querySelector(`[data-row="${focusedId}"]`) === input,
 		value: input.value,
 		selection: [input.selectionStart, input.selectionEnd],
 		interruptions: interruptions.slice(),

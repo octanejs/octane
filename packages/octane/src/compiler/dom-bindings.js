@@ -1,4 +1,4 @@
-/** Explicit static views share authored SSR markup with a renderer-free projector. */
+/** Explicit presentation views share authored SSR markup with a renderer-free program. */
 import { builders as b, strongHash } from '@tsrx/core';
 import { createLexicalAnalysis } from './compile-universal.js';
 import { inheritHookMemoOrigin } from './inline-hook-memo.js';
@@ -16,10 +16,15 @@ import {
 	invalidHtmlNestingWithAncestor,
 	invalidHtmlNestingWithParent,
 } from '../html-tree-validation.js';
+import { shouldSanitizeURLAttribute } from '../sanitize-url.js';
+import { needsBindingProgram, planBindingProgram } from './dom-binding-program.js';
 
 export const DOM_BINDINGS_QUERY = 'octane-bindings';
+export const DOM_BINDINGS_MOUNT_QUERY = 'octane-mount';
+export const DOM_BINDING_COMPILER_ABI_VERSION = 1;
 const DIRECTIVE = 'use dom bindings';
 const MARKER = 'data-octane-bindings';
+const NODE_MARKER = 'data-octane-binding-node';
 const SKIP = new Set([
 	'loc',
 	'start',
@@ -51,14 +56,7 @@ const FORBIDDEN_TAGS = new Set([
 	'meta',
 	'link',
 	'base',
-	'html',
 	'head',
-	'body',
-	'input',
-	'textarea',
-	'select',
-	'option',
-	'optgroup',
 	'math',
 	'foreignObject',
 	'iframe',
@@ -75,25 +73,66 @@ const FORBIDDEN_ATTRS = new Set([
 	'innerhtml',
 	'innertext',
 	'textcontent',
-	'value',
-	'checked',
-	'defaultvalue',
-	'defaultchecked',
-	'autofocus',
 	'suppresshydrationwarning',
 	'suppressnativechangewarning',
 	'is',
 	'slot',
-	'action',
-	'formaction',
 	'download',
 	'capture',
 	'rowspan',
 	'start',
 	MARKER,
+	NODE_MARKER,
 ]);
-// These retain the normal SSR sanitizer when static or externally owned, but
-// the small adoption writer deliberately has no URL/namespace semantics.
+// Initial form state and submission identity stay with normal SSR/native owners.
+// A presentation binding must not reset a user's edit or change its form owner.
+const EXTERNAL_ATTRS = new Set([
+	'autofocus',
+	'value',
+	'checked',
+	'defaultvalue',
+	'defaultchecked',
+	'selected',
+	'action',
+	'formaction',
+	'formmethod',
+	'formenctype',
+	'formtarget',
+]);
+const FORM_HOSTS = new Set(['input', 'textarea', 'select', 'button', 'option', 'optgroup', 'form']);
+
+function externalAttribute(tag, name) {
+	return (
+		(EXTERNAL_ATTRS.has(name) && !(tag === 'button' && name === 'value')) ||
+		(MUST_USE_PROPERTY_PROPS.has(name) && !(tag === 'button' && name === 'value')) ||
+		POSITIVE_NUMERIC_ATTR_PROPS.has(name) ||
+		(FORM_HOSTS.has(tag) &&
+			(name === 'name' ||
+				name === 'id' ||
+				name === 'form' ||
+				name === 'multiple' ||
+				(tag === 'input' && (name === 'type' || name === 'list')) ||
+				(tag === 'form' && ['id', 'method', 'enctype', 'target', 'accept-charset'].includes(name))))
+	);
+}
+
+function bindingKind(tag, name) {
+	return name === 'class'
+		? 'class'
+		: name === 'style'
+			? 'styleAttribute'
+			: shouldSanitizeURLAttribute(tag, name)
+				? 'url'
+				: name.startsWith('aria-') ||
+					  name.startsWith('data-') ||
+					  isEnumeratedBooleanAttr(name.toLowerCase())
+					? 'aria'
+					: BOOLEAN_ATTR_PROPS.has(name.toLowerCase())
+						? 'boolean'
+						: 'attr';
+}
+// URL sinks with an existing native sanitizer can be projected. Other URL
+// shapes remain static or externally owned rather than inventing a policy.
 const URL_ATTRS = new Set([
 	'src',
 	'href',
@@ -120,9 +159,14 @@ function error(filename, node, message) {
 export function domBindingExportFromId(id) {
 	const question = id.indexOf('?');
 	if (question === -1) return null;
-	const values = new URLSearchParams(id.slice(question + 1).split('#')[0]).getAll(
-		DOM_BINDINGS_QUERY,
-	);
+	const query = new URLSearchParams(id.slice(question + 1).split('#')[0]);
+	const values = query.getAll(DOM_BINDINGS_QUERY);
+	const mounting = query.getAll(DOM_BINDINGS_MOUNT_QUERY);
+	if (
+		mounting.length > 1 ||
+		(mounting.length === 1 && (mounting[0] !== '1' || values.length !== 1))
+	)
+		error(id, null, 'octane-mount=1 requires one selected binding export');
 	if (values.length === 0) return null;
 	if (values.length !== 1 || !/^[A-Za-z_$][\w$]*$/.test(values[0])) {
 		error(id, null, `invalid ${DOM_BINDINGS_QUERY} export query`);
@@ -136,6 +180,7 @@ function walk(node, visit, parent = null, key = null) {
 		for (const child of node) walk(child, visit, parent, key);
 		return;
 	}
+	if (typeof node.type !== 'string') return;
 	if (visit(node, parent, key) === false) return;
 	for (const [childKey, child] of Object.entries(node)) {
 		if (!SKIP.has(childKey)) walk(child, visit, node, childKey);
@@ -186,6 +231,12 @@ function attrName(attr) {
 		: (name?.name ?? name);
 }
 
+function attrValueForBinding(attr) {
+	return attr.value === null
+		? b.literal(true)
+		: unwrap(attr.value?.type === 'JSXExpressionContainer' ? attr.value.expression : attr.value);
+}
+
 function importedBindings(ast) {
 	const imports = new Map();
 	for (const declaration of ast.body) {
@@ -205,7 +256,38 @@ function importedBindings(ast) {
 
 // The directive asserts imported projections are pure. Obvious writes, ambient
 // reads, hooks and arbitrary calls remain diagnostics instead of silent one-shot work.
-function assertProjection(expression, filename, imports, lexical, parameterScope) {
+function assertProjection(
+	expression,
+	filename,
+	imports,
+	lexical,
+	parameterScope,
+	constants = new Set(),
+) {
+	const readMethod = (node) => {
+		const callee = unwrap(node?.callee);
+		const sampled =
+			(node?.type === 'CallExpression' || node?.type === 'OptionalCallExpression') &&
+			node.arguments.length === 0 &&
+			(callee?.computed ? callee.property?.value === 'get' : callee?.property?.name === 'get');
+		if (
+			!['MemberExpression', 'OptionalMemberExpression'].includes(callee?.type) ||
+			(!sampled && (callee.computed || !['includes', 'find'].includes(callee.property.name)))
+		)
+			return false;
+		let receiver = unwrap(callee.object);
+		while (['MemberExpression', 'OptionalMemberExpression'].includes(receiver?.type))
+			receiver = unwrap(receiver.object);
+		if (receiver?.type !== 'Identifier') return false;
+		const binding = lexical.resolveBinding(
+			lexical.nodeScopes.get(receiver) ?? parameterScope,
+			receiver.name,
+		);
+		return (
+			binding != null &&
+			(binding.scope !== lexical.rootScope || (sampled && imports.has(receiver.name)))
+		);
+	};
 	walk(expression, (node, parent, key) => {
 		if (node.type.startsWith('TS') && !UNWRAP.has(node.type)) return false;
 		if (
@@ -216,9 +298,15 @@ function assertProjection(expression, filename, imports, lexical, parameterScope
 				'YieldExpression',
 				'NewExpression',
 				'TaggedTemplateExpression',
-				'FunctionExpression',
-				'ArrowFunctionExpression',
 			].includes(node.type) ||
+			(['FunctionExpression', 'ArrowFunctionExpression'].includes(node.type) &&
+				!(
+					key === 'arguments' &&
+					readMethod(parent) &&
+					node.body.type !== 'BlockStatement' &&
+					!node.async &&
+					node.params.every((param) => param.type === 'Identifier')
+				)) ||
 			(node.type === 'UnaryExpression' && node.operator === 'delete') ||
 			/^JSX/.test(node.type)
 		)
@@ -236,19 +324,46 @@ function assertProjection(expression, filename, imports, lexical, parameterScope
 				);
 			}
 			if (binding?.scope === lexical.rootScope && !imports.has(node.name)) {
-				error(filename, node, 'move module-local values into props or an imported pure projection');
+				const declaration = lexical.domBindingConstants?.get(node.name);
+				if (!declaration)
+					error(
+						filename,
+						node,
+						'move module-local values into props or an imported pure projection',
+					);
+				if (constants.has(node.name))
+					error(filename, node, 'cyclic binding constants are not supported');
+				assertProjection(
+					declaration.init,
+					filename,
+					imports,
+					lexical,
+					parameterScope,
+					new Set([...constants, node.name]),
+				);
 			}
 		}
 		if (node.type === 'CallExpression' || node.type === 'OptionalCallExpression') {
 			const callee = unwrap(node.callee);
-			const imported = callee?.type === 'Identifier' ? imports.get(callee.name) : null;
+			if (readMethod(node)) return;
+			let importedRoot = callee;
+			while (importedRoot?.type === 'MemberExpression' && !importedRoot.computed)
+				importedRoot = importedRoot.object;
+			const namespace =
+				importedRoot !== callee &&
+				importedRoot?.type === 'Identifier' &&
+				imports.get(importedRoot.name)?.specifier.type === 'ImportNamespaceSpecifier'
+					? importedRoot
+					: null;
+			const reference = namespace ?? callee;
+			const imported = reference?.type === 'Identifier' ? imports.get(reference.name) : null;
 			const binding =
 				callee &&
-				lexical.resolveBinding(lexical.nodeScopes.get(callee) ?? parameterScope, callee.name);
+				lexical.resolveBinding(lexical.nodeScopes.get(reference) ?? parameterScope, reference.name);
 			if (
 				!imported ||
 				binding?.scope !== lexical.rootScope ||
-				/^use(?:[A-Z]|$)/.test(imported.imported ?? '') ||
+				/^use(?:[A-Z]|$)/.test(namespace ? callee.property.name : (imported.imported ?? '')) ||
 				imported.source === 'octane' ||
 				imported.source.startsWith('octane/')
 			) {
@@ -262,42 +377,213 @@ function assertProjection(expression, filename, imports, lexical, parameterScope
 	});
 }
 
-function planView(fn, filename, source, imports, lexical) {
+function bindingRender(fn, filename, required = true) {
 	const body = statements(fn);
-	if (!isDirective(body[0])) error(filename, fn, `place '${DIRECTIVE}' first in the view body`);
+	const offset = isDirective(body[0]) ? 1 : 0;
+	if (required && offset === 0) error(filename, fn, `place '${DIRECTIVE}' first in the view body`);
 	const render =
 		fn.body.type === 'JSXCodeBlock'
-			? body.length === 1
-				? fn.body.render
-				: null
-			: body.length === 2 && body[1].type === 'ReturnStatement'
-				? unwrap(body[1].argument)
+			? fn.body.render
+			: body.at(-1)?.type === 'ReturnStatement'
+				? unwrap(body.at(-1).argument)
 				: null;
+	const setup = body.slice(offset, fn.body.type === 'JSXCodeBlock' ? undefined : -1);
+	if (
+		!setup.every(
+			(statement) =>
+				statement.type === 'VariableDeclaration' &&
+				statement.kind === 'const' &&
+				statement.declarations.every((decl) => decl.id.type === 'Identifier' && decl.init),
+		)
+	)
+		error(filename, fn, 'binding setup supports only pure const aliases before its output');
 	if (
 		!render ||
 		fn.async ||
 		fn.generator ||
-		fn.params.length !== 1 ||
-		fn.params[0].type !== 'Identifier'
+		fn.params.length > 1 ||
+		(required && fn.params.length !== 1) ||
+		(fn.params.length === 1 && fn.params[0].type !== 'Identifier')
 	) {
 		error(
 			filename,
 			fn,
-			'a binding view needs one props parameter and one static native root, without setup or early returns',
+			'a binding view needs an ordinary props parameter and one template output, without early returns',
 		);
 	}
+	return render;
+}
+
+function planView(fn, filename, source, imports, lexical, native = null) {
+	const render = native?.element ?? bindingRender(fn, filename);
 	const nodes = [];
+	const elements = [];
 	const bindings = [];
 	const values = [];
+	const projections = [];
+	const signalIndices = [];
+	const classAttributes = new Map();
+	const id = `d:${strongHash(`octane:dom-bindings:2\0${filename}\0${fn.id.name}\0${source}`)}`;
 	const parameterScope = lexical.nodeScopes.get(fn.body) ?? lexical.rootScope;
 	const unbound = new Map();
+	let addressed = false;
+	const markUnbound = (expression, opaque = false) => {
+		const value = unwrap(expression);
+		const external =
+			value?.type === 'CallExpression' && value.callee.type === 'Identifier'
+				? imports.get(value.callee.name)
+				: null;
+		if (
+			external?.source !== 'octane/behavior' ||
+			external.imported !== 'unbound' ||
+			lexical.resolveBinding(lexical.nodeScopes.get(value.callee), value.callee.name)?.scope !==
+				lexical.rootScope
+		)
+			return false;
+		if (
+			value.arguments.length !== 1 ||
+			value.arguments[0].type === 'SpreadElement' ||
+			value.optional
+		)
+			error(filename, value, 'unbound requires one externally owned value');
+		// Opaque descendants remain ordinary authored output. Their expressions
+		// never execute in the selected artifact, so they need no projection proof.
+		if (!opaque) assertProjection(value.arguments[0], filename, imports, lexical, parameterScope);
+		unbound.set(value, value.arguments[0]);
+		return true;
+	};
 	const add = (node, kind, name, value, origin, unitless) => {
 		assertProjection(value, filename, imports, lexical, parameterScope);
 		// Static authored markup is not a behavior-owned channel. In particular,
 		// SVG paths remain in SSR rather than shipping again in every projector.
 		if (unwrap(value)?.type === 'Literal') return;
+		if (kind !== 'classToken' && lexical.domBindingCanCarrySignal(value))
+			signalIndices.push(bindings.length);
 		bindings.push([node, kind, name, ...(unitless === undefined ? [] : [unitless])]);
 		values.push(value);
+	};
+	const addClassTokens = (index, expression) => {
+		const tokens = new Set();
+		const reserved = new Set();
+		const externalTokens = new Set();
+		const collectStaticTokens = (input) => {
+			const value = unwrap(input);
+			if (value?.type === 'Literal') {
+				if (typeof value.value === 'string' || typeof value.value === 'number') {
+					for (const token of String(value.value || '').split(/[\t\n\f\r ]+/))
+						externalTokens.add(token);
+				}
+			} else if (value?.type === 'ArrayExpression') {
+				for (const child of value.elements) collectStaticTokens(child);
+			} else if (value?.type === 'ObjectExpression') {
+				for (const property of value.properties) {
+					if (
+						property.type !== 'Property' ||
+						property.kind !== 'init' ||
+						property.computed ||
+						property.method
+					)
+						continue;
+					const key = property.key.name ?? property.key.value;
+					const condition = unwrap(property.value);
+					if (typeof key === 'string' && condition?.type === 'Literal' && condition.value) {
+						for (const token of key.split(/[\t\n\f\r ]+/)) externalTokens.add(token);
+					}
+				}
+			}
+		};
+		const visitClass = (input) => {
+			const value = unwrap(input);
+			if (markUnbound(value)) {
+				collectStaticTokens(value.arguments[0]);
+				return;
+			}
+			if (value?.type === 'ArrayExpression') {
+				for (const child of value.elements) {
+					if (child !== null) visitClass(child);
+				}
+				return;
+			}
+			if (value?.type === 'Literal') {
+				collectStaticTokens(value);
+				return;
+			}
+			if (value?.type !== 'ObjectExpression')
+				error(
+					filename,
+					value,
+					'partial classes need fixed token objects and explicitly unbound values',
+				);
+			for (const property of value.properties) {
+				if (
+					property.type !== 'Property' ||
+					property.kind !== 'init' ||
+					property.computed ||
+					property.method
+				)
+					error(filename, property, 'partial classes need fixed ordinary token properties');
+				const token = property.key.name ?? property.key.value;
+				if (
+					typeof token !== 'string' ||
+					token === '' ||
+					/[\t\n\f\r ]/.test(token) ||
+					token === '__proto__'
+				)
+					error(filename, property, 'a class binding key must be one fixed nonempty class token');
+				if (tokens.has(token))
+					error(filename, property, `duplicate class token ${JSON.stringify(token)}`);
+				tokens.add(token);
+				if (unwrap(property.value)?.type !== 'Literal') reserved.add(token);
+				add(index, 'classToken', token, property.value, property);
+			}
+		};
+		visitClass(expression);
+		for (const token of reserved) {
+			if (externalTokens.has(token))
+				error(
+					filename,
+					expression,
+					`unbound classes must not contribute owned token ${JSON.stringify(token)}`,
+				);
+		}
+	};
+	const hasPartialClass = (input) => {
+		const value = unwrap(input);
+		return (
+			value?.type === 'ObjectExpression' ||
+			markUnbound(value) ||
+			(value?.type === 'ArrayExpression' && value.elements.some(hasPartialClass))
+		);
+	};
+	const addClassGroups = (index, attr, input) => {
+		const baseline = [];
+		const groups = [];
+		let needsGroup = false;
+		const collect = (expression) => {
+			const value = unwrap(expression);
+			if (markUnbound(value)) baseline.push(value.arguments[0]);
+			else if (value?.type === 'Literal') baseline.push(value);
+			else if (value?.type === 'ArrayExpression') {
+				for (const child of value.elements) if (child !== null) collect(child);
+			} else {
+				groups.push(value);
+				needsGroup ||=
+					value?.type !== 'ObjectExpression' ||
+					value.properties.some((property) => property.type !== 'Property' || property.computed);
+			}
+		};
+		collect(input);
+		if (!needsGroup) return false;
+		const receipt = `data-octane-class-${id}-${index}`;
+		const value = b.array(groups);
+		assertProjection(value, filename, imports, lexical, parameterScope);
+		bindings.push([index, 'classGroup', receipt, 0]);
+		values.push(value);
+		classAttributes.set(attr, {
+			...attr,
+			_octaneBindingClassGroups: { receipt, baseline, groups: [value] },
+		});
+		return true;
 	};
 	const visit = (element, parent, namespace, ancestors) => {
 		if (element?.type !== 'JSXElement' && element?.type !== 'Element') {
@@ -328,65 +614,168 @@ function planView(fn, filename, source, imports, lexical) {
 				if (invalid) error(filename, element, invalid);
 			}
 		}
-		const children = (element.children ?? []).filter(
+		const authoredChildren = (native === null ? (element.children ?? []) : []).filter(
 			(child) =>
-				child.type !== 'JSXText' || child.value.trim() !== '' || !/[\r\n]/.test(child.value),
+				(child.type !== 'JSXText' || child.value.trim() !== '' || !/[\r\n]/.test(child.value)) &&
+				(child.type !== 'JSXExpressionContainer' ||
+					child.expression?.type !== 'JSXEmptyExpression'),
 		);
+		const children = authoredChildren.filter((child) => {
+			const expression = child.type === 'JSXExpressionContainer' ? child.expression : null;
+			return expression === null || !markUnbound(expression, true);
+		});
+		const opaqueChildren = authoredChildren.length !== children.length;
+		const openChildren = tag !== 'textarea' && opaqueChildren && children.length > 0;
+		if (tag === 'textarea' && children.some((child) => child.type !== 'JSXText'))
+			error(filename, element, 'textarea content must be static text or explicitly unbound');
+		if (openChildren) addressed = true;
 		const index = nodes.length;
-		nodes.push([parent, tag, ns, children.length]);
+		// Textarea's initial value is serialized as text by the normal SSR path.
+		// Its children belong to the native control, even without an authored hole.
+		nodes.push([
+			parent,
+			tag,
+			ns,
+			(opaqueChildren && !openChildren) || tag === 'textarea' ? null : children.length,
+			...(openChildren ? [true] : []),
+		]);
+		elements.push(element);
 		const owned = new Set();
+		const externalNames = new Set();
+		const knownFields = new Set();
 		for (const attr of element.openingElement?.attributes ?? element.attributes ?? []) {
+			if (attr.type === 'JSXSpreadAttribute' || attr.type === 'SpreadAttribute') {
+				if (attr._octaneKnownAttributeSpread) {
+					assertProjection(attr.argument, filename, imports, lexical, parameterScope);
+					const temporary = b.id(lexical.domBindingAllocateName('_bindingAttrs'));
+					projections.push(inheritHookMemoOrigin(b.const(temporary, attr.argument), attr));
+					for (const raw of attr._octaneKnownAttributeSpread.fields) {
+						let name = raw === 'className' ? 'class' : (ATTRIBUTE_ALIASES.get(raw) ?? raw);
+						if (ns === 0) name = name.toLowerCase();
+						const lower = name.toLowerCase();
+						if (
+							FORBIDDEN_ATTRS.has(lower) ||
+							lower.startsWith('on') ||
+							lower.startsWith('data-octane-class-') ||
+							externalAttribute(tag, lower) ||
+							((URL_ATTRS.has(lower) || name.includes(':')) &&
+								!shouldSanitizeURLAttribute(tag, name))
+						)
+							error(
+								filename,
+								attr,
+								`known spread field ${JSON.stringify(raw)} is not a presentation channel`,
+							);
+						if (owned.has(name) || externalNames.has(lower))
+							error(filename, attr, `known spread conflicts with attribute ${JSON.stringify(raw)}`);
+						owned.add(name);
+						knownFields.add(lower);
+						signalIndices.push(bindings.length);
+						bindings.push([index, bindingKind(tag, name), name]);
+						values.push(
+							inheritHookMemoOrigin(
+								b.conditional(
+									b.binary('==', temporary, b.literal(null)),
+									b.unary('void', b.literal(0)),
+									b.member(temporary, b.literal(raw), true),
+								),
+								attr,
+							),
+						);
+					}
+					continue;
+				}
+				if (!markUnbound(attr.argument))
+					error(filename, attr, 'binding attribute spreads must be explicitly unbound');
+				if (bindings.some((binding) => binding[0] === index))
+					error(filename, attr, 'unbound attribute spreads must precede owned binding attributes');
+				const external = unwrap(unwrap(attr.argument).arguments[0]);
+				if (external?.type === 'ObjectExpression') {
+					for (const property of external.properties) {
+						if (property.type !== 'Property' || property.computed) continue;
+						const raw = property.key.name ?? property.key.value;
+						if (typeof raw !== 'string') continue;
+						const name = (
+							raw === 'className' ? 'class' : (ATTRIBUTE_ALIASES.get(raw) ?? raw)
+						).toLowerCase();
+						if (
+							FORBIDDEN_ATTRS.has(name) ||
+							name.startsWith('on') ||
+							name.startsWith('data-octane-class-')
+						)
+							error(
+								filename,
+								property,
+								`unbound spreads cannot supply reserved or structural attribute ${JSON.stringify(raw)}`,
+							);
+						externalNames.add(name);
+					}
+				}
+				continue;
+			}
 			if (attr.type !== 'JSXAttribute' && attr.type !== 'Attribute')
 				error(filename, attr, 'spread attributes are not supported in binding views');
 			const raw = attrName(attr);
 			let name = raw === 'className' ? 'class' : (ATTRIBUTE_ALIASES.get(raw) ?? raw);
 			if (ns === 0) name = name.toLowerCase();
 			const lower = name.toLowerCase();
+			if (owned.has(name))
+				error(
+					filename,
+					attr,
+					`${knownFields.has(lower) ? 'known spread conflicts with' : 'duplicate binding'} attribute ${JSON.stringify(name)}`,
+				);
+			owned.add(name);
+			if (lower === 'dangerouslysetinnerhtml' && markUnbound(attrValueForBinding(attr), true)) {
+				if (authoredChildren.length > 0)
+					error(filename, attr, 'an opaque HTML host cannot also declare binding children');
+				nodes[index][3] = null;
+				continue;
+			}
 			if (
 				!/^[A-Za-z_][A-Za-z0-9_.:-]*$/.test(name) ||
 				lower.startsWith('on') ||
 				FORBIDDEN_ATTRS.has(lower) ||
-				MUST_USE_PROPERTY_PROPS.has(lower) ||
-				POSITIVE_NUMERIC_ATTR_PROPS.has(lower)
+				lower.startsWith('data-octane-class-')
 			) {
 				error(filename, attr, `attribute ${JSON.stringify(raw)} is not supported in binding views`);
 			}
-			if (owned.has(name))
-				error(filename, attr, `duplicate binding attribute ${JSON.stringify(name)}`);
-			owned.add(name);
 			const value =
 				attr.value === null
 					? b.literal(true)
 					: unwrap(
 							attr.value?.type === 'JSXExpressionContainer' ? attr.value.expression : attr.value,
 						);
-			const external =
-				value?.type === 'CallExpression' && value.callee.type === 'Identifier'
-					? imports.get(value.callee.name)
-					: null;
-			if (
-				external?.source === 'octane/behavior' &&
-				external.imported === 'unbound' &&
-				lexical.resolveBinding(lexical.nodeScopes.get(value.callee), value.callee.name)?.scope ===
-					lexical.rootScope
-			) {
-				if (
-					value.arguments.length !== 1 ||
-					value.arguments[0].type === 'SpreadElement' ||
-					value.optional
-				)
-					error(filename, value, 'unbound requires one external-owned attribute value');
-				assertProjection(value.arguments[0], filename, imports, lexical, parameterScope);
-				unbound.set(value, value.arguments[0]);
-				continue;
-			}
-			if (URL_ATTRS.has(lower) || name.includes(':')) {
+			if (markUnbound(value)) continue;
+			if (value?.type !== 'Literal' && externalNames.has(lower))
+				error(
+					filename,
+					attr,
+					`unbound spreads must not contribute owned attribute ${JSON.stringify(raw)}`,
+				);
+			if (externalAttribute(tag, lower)) {
 				if (value?.type === 'Literal') continue;
-				error(filename, attr, 'URL and namespaced attributes must be static or explicitly unbound');
+				error(
+					filename,
+					attr,
+					`native state and identity attribute ${JSON.stringify(raw)} must be static or explicitly unbound`,
+				);
 			}
-			if (name === 'style') {
-				if (value?.type !== 'ObjectExpression')
-					error(filename, attr, 'binding styles need an object with fixed property keys');
+			if ((URL_ATTRS.has(lower) || name.includes(':')) && !shouldSanitizeURLAttribute(tag, name)) {
+				if (value?.type === 'Literal') continue;
+				error(
+					filename,
+					attr,
+					'unsupported URL and namespaced attributes must be static or explicitly unbound',
+				);
+			}
+			if (name === 'class' && hasPartialClass(value)) {
+				if (!addClassGroups(index, attr, value)) addClassTokens(index, value);
+			} else if (name === 'style') {
+				if (value?.type !== 'ObjectExpression') {
+					add(index, 'styleAttribute', 'style', value, attr);
+					continue;
+				}
 				const properties = new Set();
 				for (const property of value.properties) {
 					if (
@@ -418,25 +807,36 @@ function planView(fn, filename, source, imports, lexical) {
 				const kind =
 					name === 'class'
 						? 'class'
-						: name.startsWith('aria-') || name.startsWith('data-') || isEnumeratedBooleanAttr(lower)
-							? 'aria'
-							: BOOLEAN_ATTR_PROPS.has(lower)
-								? 'boolean'
-								: 'attr';
+						: shouldSanitizeURLAttribute(tag, name)
+							? 'url'
+							: name.startsWith('aria-') ||
+								  name.startsWith('data-') ||
+								  isEnumeratedBooleanAttr(lower)
+								? 'aria'
+								: BOOLEAN_ATTR_PROPS.has(lower)
+									? 'boolean'
+									: 'attr';
 				add(index, kind, name, value, attr);
 			}
 		}
-		for (const child of children) visit(child, index, ns, [...ancestors, tag]);
+		if (tag !== 'textarea') {
+			for (const child of children) visit(child, index, ns, [...ancestors, tag]);
+		}
 	};
-	visit(render, -1, 0, []);
+	visit(render, -1, native?.namespace ?? 0, native?.ancestors ?? []);
 	return {
 		fn,
 		render,
 		nodes,
+		elements,
+		addressed,
 		bindings,
 		values,
+		projections,
+		signalIndices,
 		unbound,
-		id: `d:${strongHash(`octane:dom-bindings:1\0${filename}\0${fn.id.name}\0${source}`)}`,
+		classAttributes,
+		id,
 	};
 }
 
@@ -444,7 +844,25 @@ function literalData(value) {
 	return Array.isArray(value) ? b.array(value.map(literalData)) : b.literal(value);
 }
 
+function scalarProperties(plan, project, classFactory, signalFactory = null) {
+	return [
+		b.prop('init', b.id('id'), b.literal(plan.id)),
+		...(plan.addressed ? [b.prop('init', b.id('addressed'), b.literal(true))] : []),
+		b.prop('init', b.id('nodes'), literalData(plan.nodes)),
+		b.prop('init', b.id('bindings'), literalData(plan.bindings)),
+		b.prop('init', b.id('project'), project),
+		...(plan.signalIndices.length
+			? [
+					b.prop('init', b.id('signalIndices'), literalData(plan.signalIndices)),
+					b.prop('init', b.id('connectSignal'), signalFactory),
+				]
+			: []),
+		...(classFactory ? [b.prop('init', b.id('createClassGroup'), classFactory)] : []),
+	];
+}
+
 function projectProgram(ast, plan, filename, lexical) {
+	const imports = importedBindings(ast);
 	for (const statement of ast.body) {
 		const declaration = statement.declaration ?? statement;
 		if (
@@ -458,25 +876,51 @@ function projectProgram(ast, plan, filename, lexical) {
 			continue;
 		if (statement.type === 'ExpressionStatement' && typeof statement.directive === 'string')
 			continue;
+		if (
+			declaration.type === 'VariableDeclaration' &&
+			declaration.kind === 'const' &&
+			declaration.declarations.every((item) => item.id.type === 'Identifier' && item.init)
+		) {
+			for (const item of declaration.declarations)
+				assertProjection(
+					item.init,
+					filename,
+					imports,
+					lexical,
+					lexical.rootScope,
+					new Set([item.id.name]),
+				);
+			continue;
+		}
 		error(
 			filename,
 			statement,
 			'binding view modules cannot contain eager module initialization; pass state as props',
 		);
 	}
-	const project = inheritHookMemoOrigin(b.arrow(plan.fn.params, b.array(plan.values)), plan.fn);
 	const needed = new Set();
-	walk(plan.values, (node, parent, key) => {
-		if (node.type.startsWith('TS') && !UNWRAP.has(node.type)) return false;
-		if (
-			isRuntimeReference(node, lexical, parent, key) &&
-			lexical.resolveBinding(lexical.nodeScopes.get(node) ?? lexical.rootScope, node.name)
-				?.importSource != null
-		) {
-			needed.add(node.name);
-		}
-	});
+	const collect = (expression) =>
+		walk(expression, (node, parent, key) => {
+			if (node.type.startsWith('TS') && !UNWRAP.has(node.type)) return false;
+			if (
+				isRuntimeReference(node, lexical, parent, key) &&
+				lexical.resolveBinding(lexical.nodeScopes.get(node) ?? lexical.rootScope, node.name)
+					?.scope === lexical.rootScope
+			) {
+				if (needed.has(node.name)) return;
+				needed.add(node.name);
+				const declaration = lexical.domBindingConstants.get(node.name);
+				if (declaration) collect(declaration.init);
+			}
+		});
+	collect(plan.expressions ?? plan.values);
+	collect(plan.projections?.map((declaration) => declaration.declarations[0].init));
 	const importNodes = ast.body.flatMap((node) => {
+		const declaration = node.declaration ?? node;
+		if (declaration.type === 'VariableDeclaration' && declaration.kind === 'const') {
+			const declarations = declaration.declarations.filter((item) => needed.has(item.id.name));
+			return declarations.length ? [{ ...declaration, declarations }] : [];
+		}
 		if (node.type !== 'ImportDeclaration' || node.importKind === 'type') return [];
 		if (node.specifiers.length === 0) return [node];
 		const specifiers = node.specifiers.filter(
@@ -484,18 +928,136 @@ function projectProgram(ast, plan, filename, lexical) {
 		);
 		return specifiers.length === 0 ? [] : [{ ...node, specifiers }];
 	});
+	if (plan.root) {
+		const names = new Set([
+			...needed,
+			...plan.dependencies.flatMap((node) =>
+				node.specifiers.map((specifier) => specifier.local.name),
+			),
+			...plan.hoists.flatMap((node) => node.declarations.map((item) => item.id.name)),
+		]);
+		const allocate = (prefix) => {
+			let name = prefix;
+			for (let index = 1; names.has(name); index++) name = `${prefix}${index}`;
+			names.add(name);
+			return name;
+		};
+		const adopt = allocate('_$adoptBindingProgram');
+		const mount = allocate('_$mountBindingProgram');
+		const adoptScalar = plan.scalar ? allocate('_$adoptScalarBindings') : null;
+		const signalFactory = plan.signals ? allocate('_bindingSignals') : null;
+		const root = plan.scalar ? b.id(allocate('_bindingRoot')) : null;
+		const scalar =
+			plan.scalar &&
+			b.object(
+				scalarProperties(
+					plan.scalar,
+					b.arrow(plan.fn.params, b.call(b.member(root, 'project'), b.array(plan.fn.params))),
+					plan.scalar.bindings.some((binding) => binding[1] === 'classGroup')
+						? b.member(root, 'createClassGroup')
+						: null,
+					signalFactory ? b.id(signalFactory) : null,
+				),
+			);
+		return {
+			...ast,
+			body: [
+				...importNodes,
+				...plan.dependencies,
+				...(signalFactory
+					? [
+							inheritHookMemoOrigin(
+								b.imports(
+									[['__createBindingSignals', signalFactory]],
+									'octane/dom-binding-signals',
+								),
+								plan.fn,
+							),
+						]
+					: []),
+				inheritHookMemoOrigin(
+					b.imports(
+						[
+							['__adoptBindingProgram', adopt],
+							['__mountBindingProgram', mount],
+						],
+						'octane/dom-binding-program',
+					),
+					plan.fn,
+				),
+				...(adoptScalar
+					? [
+							inheritHookMemoOrigin(
+								b.imports([['__adoptBindings', adoptScalar]], 'octane/dom-bindings'),
+								plan.fn,
+							),
+						]
+					: []),
+				...plan.hoists,
+				...(root ? [inheritHookMemoOrigin(b.const(root, plan.root), plan.fn)] : []),
+				inheritHookMemoOrigin(
+					b.export_default(
+						b.object([
+							b.prop('init', b.id('id'), b.literal(plan.id)),
+							b.prop('init', b.id('root'), root ?? plan.root),
+							b.prop('init', b.id('adopt'), b.id(adopt)),
+							b.prop('init', b.id('mount'), b.id(mount)),
+							...(scalar ? [b.prop('init', b.id('scalar'), scalar)] : []),
+							...(adoptScalar ? [b.prop('init', b.id('adoptScalar'), b.id(adoptScalar))] : []),
+							...(signalFactory
+								? [b.prop('init', b.id('connectSignal'), b.id(signalFactory))]
+								: []),
+						]),
+					),
+					plan.fn,
+				),
+			],
+		};
+	}
+	const project = inheritHookMemoOrigin(
+		b.arrow(
+			plan.fn.params,
+			plan.projections.length > 0
+				? b.block([...plan.projections, b.return(b.array(plan.values))])
+				: b.array(plan.values),
+		),
+		plan.fn,
+	);
+	let classFactory = null;
+	let signalFactory = null;
+	if (plan.signalIndices.length > 0) {
+		signalFactory = lexical.domBindingAllocateName('_bindingSignals');
+		importNodes.push(
+			inheritHookMemoOrigin(
+				b.imports([['__createBindingSignals', signalFactory]], 'octane/dom-binding-signals'),
+				plan.fn,
+			),
+		);
+	}
+	if (plan.bindings.some((binding) => binding[1] === 'classGroup')) {
+		classFactory = '_$createBindingClassGroup';
+		while (needed.has(classFactory)) classFactory += '$';
+		importNodes.push(
+			inheritHookMemoOrigin(
+				b.imports([['createBindingClassGroup', classFactory]], 'octane/dom-binding-classes'),
+				plan.fn,
+			),
+		);
+	}
 	return {
 		...ast,
 		body: [
 			...importNodes,
 			inheritHookMemoOrigin(
 				b.export_default(
-					b.object([
-						b.prop('init', b.id('id'), b.literal(plan.id)),
-						b.prop('init', b.id('nodes'), literalData(plan.nodes)),
-						b.prop('init', b.id('bindings'), literalData(plan.bindings)),
-						b.prop('init', b.id('project'), project),
-					]),
+					b.object(
+						scalarProperties(
+							plan,
+							project,
+							classFactory ? b.id(classFactory) : null,
+							signalFactory ? b.id(signalFactory) : null,
+						),
+					),
 				),
 				plan.fn,
 			),
@@ -533,7 +1095,9 @@ function lowerAdoptions(ast, filename) {
 	const intrinsics = new Set(
 		[...imports]
 			.filter(
-				([, value]) => value.source === 'octane/behavior' && value.imported === 'adoptBindings',
+				([, value]) =>
+					value.source === 'octane/behavior' &&
+					['adoptBindings', 'mountBindings'].includes(value.imported),
 			)
 			.map(([name]) => name),
 	);
@@ -543,8 +1107,27 @@ function lowerAdoptions(ast, filename) {
 	const consumed = new Set();
 	const added = [];
 	const names = new Set();
+	const constructionRequests = new Set();
 	walk(ast, (node) => {
 		if (node.type === 'Identifier') names.add(node.name);
+		if (
+			node.type !== 'CallExpression' ||
+			node.callee?.type !== 'Identifier' ||
+			!intrinsics.has(node.callee.name) ||
+			imports.get(node.callee.name).imported !== 'mountBindings' ||
+			lexical.resolveBinding(lexical.nodeScopes.get(node.callee), node.callee.name)?.scope !==
+				lexical.rootScope
+		)
+			return;
+		const view = unwrap(node.arguments[1]);
+		const imported = view?.type === 'Identifier' ? imports.get(view.name) : null;
+		if (
+			imported?.specifier.type === 'ImportSpecifier' &&
+			lexical.resolveBinding(lexical.nodeScopes.get(view), view.name)?.scope === lexical.rootScope
+		)
+			constructionRequests.add(
+				`${imported.source}?${DOM_BINDINGS_QUERY}=${encodeURIComponent(imported.imported)}`,
+			);
 	});
 	const allocate = (prefix) => {
 		let name = prefix;
@@ -552,7 +1135,7 @@ function lowerAdoptions(ast, filename) {
 		names.add(name);
 		return name;
 	};
-	let helper = null;
+	const helpers = new Map();
 	const queryLocals = new Map();
 	walk(ast, (node) => {
 		if (
@@ -567,6 +1150,7 @@ function lowerAdoptions(ast, filename) {
 		)
 			return;
 		const view = unwrap(node.arguments[1]);
+		const intrinsic = imports.get(node.callee.name).imported;
 		const imported = view?.type === 'Identifier' ? imports.get(view.name) : null;
 		if (
 			node.optional ||
@@ -585,16 +1169,16 @@ function lowerAdoptions(ast, filename) {
 				'adoptBindings requires a directly imported named view and explicit root, source and options arguments',
 			);
 		}
-		if (helper === null) {
-			helper = allocate('_$adoptBindings');
+		let helper = helpers.get(intrinsic);
+		if (helper === undefined) {
+			helper = allocate(`_$${intrinsic}`);
+			helpers.set(intrinsic, helper);
 			added.push(
-				inheritHookMemoOrigin(
-					b.imports([['__adoptBindings', helper]], 'octane/dom-bindings'),
-					node,
-				),
+				inheritHookMemoOrigin(b.imports([[`__${intrinsic}`, helper]], 'octane/dom-bindings'), node),
 			);
 		}
-		const request = `${imported.source}?${DOM_BINDINGS_QUERY}=${encodeURIComponent(imported.imported)}`;
+		const adoptionRequest = `${imported.source}?${DOM_BINDINGS_QUERY}=${encodeURIComponent(imported.imported)}`;
+		const request = `${adoptionRequest}${constructionRequests.has(adoptionRequest) ? `&${DOM_BINDINGS_MOUNT_QUERY}=1` : ''}`;
 		let local = queryLocals.get(request);
 		if (local === undefined) {
 			local = allocate('_$bindingView');
@@ -639,11 +1223,191 @@ function lowerAdoptions(ast, filename) {
 }
 
 /** Annotate normal SSR/client output, or select a pure adoption descriptor Program. */
-export function prepareDomBindings(ast, source, filename, selectedExport) {
+export function prepareDomBindings(ast, source, filename, selectedExport, helpers) {
 	const imports = importedBindings(ast);
 	const lexical = createLexicalAnalysis(ast);
+	lexical.domBindingConstants = new Map(
+		ast.body.flatMap((statement) => {
+			const declaration = statement.declaration ?? statement;
+			return declaration.type === 'VariableDeclaration' && declaration.kind === 'const'
+				? declaration.declarations
+						.filter((item) => item.id.type === 'Identifier' && item.init)
+						.map((item) => [item.id.name, item])
+				: [];
+		}),
+	);
 	const plans = new Map();
 	const replacements = new Map();
+	const localFunctions = new Map(
+		ast.body.flatMap((statement) => {
+			const fn = statement.declaration ?? statement;
+			return fn.type === 'FunctionDeclaration' && fn.id ? [[fn.id.name, fn]] : [];
+		}),
+	);
+	const inProgress = new Set();
+	const programPlans = new Map();
+	const programNames = new Set(imports.keys());
+	walk(ast, (node) => {
+		if (node.type === 'Identifier') programNames.add(node.name);
+	});
+	const allocateProgramName = (prefix) => {
+		let name = prefix;
+		for (let i = 1; programNames.has(name); i++) name = `${prefix}${i}`;
+		programNames.add(name);
+		return name;
+	};
+	lexical.domBindingAllocateName = allocateProgramName;
+	lexical.domBindingCanCarrySignal = helpers.canCarryDirectSignalHandle;
+	const refCallbacks = [];
+	walk(ast, (node) => {
+		if ((node.type === 'JSXAttribute' || node.type === 'Attribute') && attrName(node) === 'ref') {
+			const value = attrValueForBinding(node);
+			if (['ArrowFunctionExpression', 'FunctionExpression'].includes(value?.type))
+				refCallbacks.push(value);
+		}
+	});
+	const refDependencies = refCallbacks.length
+		? helpers.analyzeCallbackDependencies(ast, refCallbacks)
+		: new Map();
+	const isUnbound = (expression) => {
+		const value = unwrap(expression);
+		if (value?.type !== 'CallExpression' || value.callee.type !== 'Identifier') return false;
+		const imported = imports.get(value.callee.name);
+		return (
+			imported?.source === 'octane/behavior' &&
+			imported.imported === 'unbound' &&
+			lexical.resolveBinding(lexical.nodeScopes.get(value.callee), value.callee.name)?.scope ===
+				lexical.rootScope
+		);
+	};
+	const programFor = (fn, render) => {
+		if (programPlans.has(fn)) return programPlans.get(fn);
+		if (inProgress.has(fn))
+			error(filename, fn, 'recursive binding child programs are not supported');
+		inProgress.add(fn);
+		const setup = statements(fn)
+			.filter((statement) => statement.type === 'VariableDeclaration')
+			.flatMap((statement) => statement.declarations);
+		for (const declaration of setup)
+			assertProjection(
+				declaration.init,
+				filename,
+				imports,
+				lexical,
+				lexical.nodeScopes.get(fn.body) ?? lexical.rootScope,
+			);
+		const setupBindings = new Map(
+			setup.map((declaration) => [
+				declaration.id.name,
+				{
+					scope: lexical.resolveBinding(
+						lexical.nodeScopes.get(declaration.id) ?? lexical.nodeScopes.get(fn.body),
+						declaration.id.name,
+					)?.scope,
+					declaration,
+				},
+			]),
+		);
+		const projectionBody = (value, expressions, temporaries = []) => {
+			const required = new Set();
+			const visit = (expression) =>
+				walk(expression, (node, parent, key) => {
+					if (!isRuntimeReference(node, lexical, parent, key)) return;
+					const binding = setupBindings.get(node.name);
+					const declaration =
+						binding?.scope ===
+						lexical.resolveBinding(lexical.nodeScopes.get(node) ?? lexical.rootScope, node.name)
+							?.scope
+							? binding?.declaration
+							: undefined;
+					if (!declaration || required.has(declaration)) return;
+					required.add(declaration);
+					visit(declaration.init);
+				});
+			visit(value);
+			for (const temporary of temporaries) {
+				const expression = temporary.declarations[0].init;
+				visit(expression);
+				expressions.push(expression);
+			}
+			if (required.size === 0 && temporaries.length === 0) return value;
+			const declarations = setup.filter((declaration) => required.has(declaration));
+			expressions.push(...declarations.map((declaration) => declaration.init));
+			return b.block([
+				...declarations.map((declaration) =>
+					inheritHookMemoOrigin(b.const(declaration.id, declaration.init), declaration),
+				),
+				...temporaries,
+				b.return(value),
+			]);
+		};
+		const plan = planBindingProgram(fn, render, {
+			source,
+			filename,
+			helpers,
+			isUnbound,
+			mapCow,
+			imports,
+			lexical,
+			allocateProgramName,
+			projectionBody,
+			refDependencies: (expression) => refDependencies.get(unwrap(expression)) ?? null,
+			isChildSlot: (expression) => {
+				const value = unwrap(expression);
+				const parameter = fn.params[0];
+				return (
+					value?.type === 'MemberExpression' &&
+					!value.optional &&
+					(value.computed ? value.property.value : value.property.name) === 'children' &&
+					value.object.type === 'Identifier' &&
+					value.object.name === parameter?.name &&
+					lexical.resolveBinding(lexical.nodeScopes.get(value.object), value.object.name)?.scope ===
+						lexical.resolveBinding(lexical.nodeScopes.get(parameter), parameter.name)?.scope
+				);
+			},
+			canCarryValue: (expression) => {
+				if (!helpers.canCarryDirectSignalHandle(expression)) return false;
+				let renderable = false;
+				walk(expression, (node) => {
+					if (node.type.startsWith('JSX')) renderable = true;
+				});
+				return !renderable;
+			},
+			localProgram: (name) => {
+				const child = localFunctions.get(name);
+				return child ? programFor(child, bindingRender(child, filename, false)) : null;
+			},
+			nativePlan: (element, namespace, ancestors) =>
+				planView(fn, filename, source, imports, lexical, { element, namespace, ancestors }),
+			assertProjection: (expression) =>
+				assertProjection(
+					expression,
+					filename,
+					imports,
+					lexical,
+					lexical.nodeScopes.get(fn.body) ?? lexical.rootScope,
+				),
+			assertAdapter: (expression) =>
+				walk(expression, (node, parent, key) => {
+					if (node.type.startsWith('TS') && !UNWRAP.has(node.type)) return false;
+					if (
+						isRuntimeReference(node, lexical, parent, key) &&
+						lexical.resolveBinding(lexical.nodeScopes.get(node) ?? lexical.rootScope, node.name)
+							?.scope === lexical.rootScope &&
+						!imports.has(node.name)
+					)
+						error(
+							filename,
+							node,
+							'native adapters must receive module-local callbacks through props or imports',
+						);
+				}),
+		});
+		inProgress.delete(fn);
+		programPlans.set(fn, plan);
+		replacements.set(fn, { ...mapCow(fn, plan.replacements), _octaneBindingView: { id: plan.id } });
+		return plan;
+	};
 	walk(ast, (node, parent) => {
 		if (
 			!['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression'].includes(node.type)
@@ -658,25 +1422,53 @@ export function prepareDomBindings(ast, source, filename, selectedExport) {
 		) {
 			error(filename, node, 'binding views must be named top-level exported functions');
 		}
+		const render = bindingRender(node, filename);
+		const structural =
+			needsBindingProgram(render, isUnbound) ||
+			statements(node).some((statement) => statement.type === 'VariableDeclaration');
+		if (structural || (helpers.mount && selectedExport === node.id.name)) {
+			const plan = programFor(node, render);
+			if (!structural) plan.scalar = planView(node, filename, source, imports, lexical);
+			plans.set(node.id.name, plan);
+			return false;
+		}
 		const plan = planView(node, filename, source, imports, lexical);
 		plans.set(node.id.name, plan);
-		for (const [call, value] of plan.unbound) replacements.set(call, value);
-		const marker = inheritHookMemoOrigin(
-			b.jsx_attribute(b.jsx_id(MARKER), b.literal(plan.id)),
-			plan.render,
-		);
-		const root = mapCow(plan.render, plan.unbound);
-		if (plan.render.openingElement) {
-			replacements.set(plan.render, {
-				...root,
-				openingElement: {
-					...root.openingElement,
-					attributes: [...root.openingElement.attributes, marker],
-				},
-			});
-		} else {
-			replacements.set(plan.render, { ...root, attributes: [...root.attributes, marker] });
+		const rewritten = new Map([...plan.unbound, ...plan.classAttributes]);
+		// Rewrite from leaves to root so parent replacements retain every child
+		// address and stripped ownership intrinsic without mutating the parser AST.
+		for (let index = plan.elements.length - 1; index >= 0; index--) {
+			if (index !== 0 && !plan.addressed) continue;
+			const element = plan.elements[index];
+			const markers = [];
+			if (index === 0) {
+				markers.push(
+					inheritHookMemoOrigin(b.jsx_attribute(b.jsx_id(MARKER), b.literal(plan.id)), element),
+				);
+			}
+			if (plan.addressed) {
+				markers.push(
+					inheritHookMemoOrigin(
+						b.jsx_attribute(b.jsx_id(NODE_MARKER), b.literal(`${plan.id}:${index}`)),
+						element,
+					),
+				);
+			}
+			const target = mapCow(element, rewritten);
+			rewritten.set(
+				element,
+				target.openingElement
+					? {
+							...target,
+							openingElement: {
+								...target.openingElement,
+								attributes: [...target.openingElement.attributes, ...markers],
+							},
+						}
+					: { ...target, attributes: [...target.attributes, ...markers] },
+			);
 		}
+		for (const [node, replacement] of rewritten) replacements.set(node, replacement);
 	});
 	if (selectedExport !== null) {
 		const plan = plans.get(selectedExport);

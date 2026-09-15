@@ -27,10 +27,23 @@ function sizes(bytes) {
 
 export async function buildFixture(
 	output = fs.mkdtempSync(path.join(os.tmpdir(), 'octane-behavior-only-')),
-	{ composerReceipts = false, bundler = 'esbuild', projection = 'none' } = {},
+	{
+		composerReceipts = false,
+		bundler = 'esbuild',
+		projection = 'none',
+		richPresentation = 'none',
+	} = {},
 ) {
 	assert.ok(bundler === 'esbuild' || bundler === 'vite', 'Unknown client bundler');
 	assert.ok(['none', 'manual', 'authored'].includes(projection), 'Unknown projection variant');
+	assert.ok(
+		['none', 'authored', 'renderer'].includes(richPresentation),
+		'Unknown rich presentation variant',
+	);
+	assert.ok(
+		richPresentation === 'none' || (!composerReceipts && projection === 'none'),
+		'Rich presentation is a separate equal-work workload',
+	);
 	assert.ok(
 		projection === 'none' || composerReceipts,
 		'Projection comparison uses composer receipts',
@@ -94,6 +107,18 @@ export async function buildFixture(
 		return compiled?.code ?? authored;
 	};
 	const resolveSource = (request, importer, environment) => {
+		if (
+			richPresentation !== 'none' &&
+			request === './Shell.tsrx' &&
+			importer === path.join(HERE, 'server.ts')
+		)
+			return path.join(HERE, 'rich/Shell.tsrx');
+		if (
+			richPresentation === 'renderer' &&
+			request === './activate.tsrx' &&
+			importer === path.join(HERE, 'rich/client.ts')
+		)
+			return path.join(HERE, 'rich/activate-renderer.ts');
 		if (request.includes('?octane-bindings=')) {
 			const [file, query] = request.split('?');
 			return path.resolve(path.dirname(importer), file) + '?' + query;
@@ -125,7 +150,7 @@ export async function buildFixture(
 				builder.onResolve(
 					{
 						filter:
-							/^octane(?:\/|$)|^\.\/(?:State|loaders|primary-action-manual)\.ts$|\?octane-bindings=/,
+							/^octane(?:\/|$)|^\.\/(?:State|loaders|primary-action-manual)\.ts$|^\.\/(?:Shell|activate)\.tsrx$|\?octane-bindings=/,
 					},
 					({ path: request, importer }) => {
 						const resolved = resolveSource(request, importer, environment);
@@ -153,7 +178,14 @@ export async function buildFixture(
 	};
 	let clientInputs, clientBundler;
 	const outputs = {};
-	const entry = path.join(HERE, composerReceipts ? 'receipt-client.ts' : 'client.ts');
+	const entry = path.join(
+		HERE,
+		richPresentation !== 'none'
+			? 'rich/client.ts'
+			: composerReceipts
+				? 'receipt-client.ts'
+				: 'client.ts',
+	);
 	if (bundler === 'esbuild') {
 		const client = await build({
 			...buildOptions,
@@ -265,11 +297,18 @@ export async function buildFixture(
 			JSON.stringify({ clientInputs, outputs }, null, 2),
 		);
 	}
-	assert.deepEqual(
-		clientInputs.filter((file) => forbidden.test(file)),
-		[],
-		'The browser graph must resolve no rendering engine, even if tree-shaken',
-	);
+	if (richPresentation === 'renderer') {
+		assert.ok(
+			clientInputs.some((file) => /\/src\/runtime\.ts$/.test(file)),
+			'The explicit equal-work renderer control must include the renderer',
+		);
+	} else {
+		assert.deepEqual(
+			clientInputs.filter((file) => forbidden.test(file)),
+			[],
+			'The browser graph must resolve no rendering engine, even if tree-shaken',
+		);
+	}
 	assert.ok(
 		clientInputs.includes(path.join(REPO, 'packages/octane/src/signals/document-owner.ts')),
 		'Real renderer-free document owner must be bundled',
@@ -377,6 +416,7 @@ export async function buildFixture(
 		serverBundler: { name: 'esbuild', version },
 		bundler,
 		projection,
+		richPresentation,
 		composerReceipts,
 		eagerOutputs: [...eagerOutputs],
 		compilations,
@@ -397,7 +437,9 @@ export async function buildFixture(
 		changedInputsDuringBuild,
 		limitations: [
 			`Local production ${bundler} split client and esbuild server output; fixture measurements do not establish deployed application performance or chunk policy.`,
-			'Server-owned lists keep first-value historical HTML; live outputs observe later signal results without reconciling those lists.',
+			richPresentation === 'none'
+				? 'Server-owned lists keep first-value historical HTML; live outputs observe later signal results without reconciling those lists.'
+				: 'Rich presentation updates authored DOM continuously; its deterministic SVG map is not a production map SDK measurement.',
 			'Payload sizes are raw/gzip9/brotli11; not network transfer, parse, paint, INP, or Safari-device measurements.',
 		],
 	};
@@ -505,6 +547,10 @@ if (process.argv[1] === import.meta.filename) {
 			process.argv
 				.find((argument) => argument.startsWith('--projection='))
 				?.slice('--projection='.length) ?? 'none',
+		richPresentation:
+			process.argv
+				.find((argument) => argument.startsWith('--rich-presentation='))
+				?.slice('--rich-presentation='.length) ?? 'none',
 	});
 	console.log(
 		JSON.stringify(

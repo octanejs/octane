@@ -64,6 +64,16 @@ async function openCase(mobile: boolean, legacyMovement = false): Promise<Page> 
 }
 
 const compositionCases = [
+	...([1, 2, 3, 4] as const).flatMap((id) =>
+		[false, true].map((legacy) => ({
+			kind: 'presentation' as const,
+			id,
+			mobile: true,
+			legacy,
+			shadow: false,
+		})),
+	),
+	{ kind: 'presentation' as const, id: 2, mobile: true, legacy: true, shadow: true },
 	...([1, 2, 3, 4] as const).map((id) => ({
 		kind: 'compiled' as const,
 		id,
@@ -110,7 +120,11 @@ describe.sequential('real-browser mobile input continuity', () => {
 				{ listKind: kind, focusedId: id, insideShadow: shadow },
 			);
 			const input = current.locator(
-				kind === 'compiled' ? '.nested-conditional-editor' : `[data-row="${id}"]`,
+				kind === 'compiled'
+					? '.nested-conditional-editor'
+					: kind === 'presentation'
+						? `input[name="${id}"]`
+						: `[data-row="${id}"]`,
 			);
 			await input.fill('');
 			await input.focus();

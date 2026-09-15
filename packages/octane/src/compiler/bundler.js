@@ -14,6 +14,7 @@ import * as nodeFs from 'node:fs';
 import * as nodeModule from 'node:module';
 import * as nodePath from 'node:path';
 import { parseModule } from '@tsrx/core';
+export { DOM_BINDING_COMPILER_ABI_VERSION } from './dom-bindings.js';
 import {
 	compile,
 	compileForBundler,
@@ -23,7 +24,11 @@ import {
 } from './compile.js';
 import { validateRendererModuleSource } from './compile-universal.js';
 import { HYDRATE_QUERY_PARAM, hydrateBoundaryPathFromId } from './hydrate-boundaries.js';
-import { DOM_BINDINGS_QUERY, domBindingExportFromId } from './dom-bindings.js';
+import {
+	DOM_BINDINGS_QUERY,
+	DOM_BINDINGS_MOUNT_QUERY,
+	domBindingExportFromId,
+} from './dom-bindings.js';
 import {
 	DOM_RENDERER_MODULE,
 	normalizeRendererConfig,
@@ -518,6 +523,7 @@ class OctaneBundlerCompiler {
 			profile: options.profile === true,
 			inlineHookMemo: options.inlineHookMemo !== false,
 			strong: options.strong === true,
+			knownAttributeSpreads: options.knownAttributeSpreads,
 			universalRuntime: normalizeUniversalRuntime(options.universalRuntime),
 		};
 		this.renderers = normalizeRendererConfig(options.renderers);
@@ -1067,6 +1073,11 @@ class OctaneBundlerCompiler {
 		const file = cleanModuleId(id);
 		const hydrateBoundaryPath = hydrateBoundaryPathFromId(id);
 		const domBindingExport = domBindingExportFromId(id);
+		const bindingMount =
+			domBindingExport !== null &&
+			new URLSearchParams(id.slice(id.indexOf('?') + 1).split('#')[0]).get(
+				DOM_BINDINGS_MOUNT_QUERY,
+			) === '1';
 		if (domBindingExport !== null && hydrateBoundaryPath !== null) {
 			throw new Error('Octane DOM binding and Hydrate queries cannot be combined.');
 		}
@@ -1188,7 +1199,7 @@ class OctaneBundlerCompiler {
 				typeof options.resolveCssModuleConstant === 'function';
 			const compileFilename =
 				domBindingExport !== null
-					? `${filename}?${DOM_BINDINGS_QUERY}=${encodeURIComponent(domBindingExport)}`
+					? `${filename}?${DOM_BINDINGS_QUERY}=${encodeURIComponent(domBindingExport)}${bindingMount ? `&${DOM_BINDINGS_MOUNT_QUERY}=1` : ''}`
 					: hydrateBoundaryPath === null
 						? filename
 						: `${filename}?${HYDRATE_QUERY_PARAM}=${encodeURIComponent(hydrateBoundaryPath)}`;
@@ -1196,6 +1207,13 @@ class OctaneBundlerCompiler {
 				hmr,
 				mode: environment,
 				dev,
+				...(renderer.target === 'dom' &&
+				(options.knownAttributeSpreads ?? this.defaults.knownAttributeSpreads) !== undefined
+					? {
+							knownAttributeSpreads:
+								options.knownAttributeSpreads ?? this.defaults.knownAttributeSpreads,
+						}
+					: null),
 				...(renderer.target === 'dom' && options.textTypeFacts !== undefined
 					? { textTypeFacts: options.textTypeFacts }
 					: null),

@@ -1601,6 +1601,32 @@ export function analyzeHookDependencies(ast, options = {}) {
 	return analyzeInternal(ast, options).inferred;
 }
 
+/**
+ * Infer callback captures for compiler-owned lifetimes without manufacturing a
+ * hook call. Results retain the hook collector's receiver-aware method records;
+ * null means the expression is not an analyzable callback, never an empty list.
+ * The supplied callbacks must belong to this AST so lexical bindings are shared.
+ */
+export function analyzeCallbackDependencies(ast, callbacks, options = {}) {
+	const analysis = buildScopes(
+		ast,
+		options.onlyImported === true,
+		new Set(['octane', ...(options.hookRuntimeModules || [])]),
+	);
+	markDependencyInvariantBindings(analysis);
+	const inferred = new Map();
+	for (const original of callbacks) {
+		const callback = unwrapValue(original);
+		inferred.set(
+			original,
+			isFunction(callback)
+				? collectDependencies(callback, analysis.functionScopes.get(callback) || null, analysis)
+				: collectCallbackReference(callback, analysis),
+		);
+	}
+	return inferred;
+}
+
 // Strong dependency policy deliberately shares inference's lexical graph and
 // dependency collector. Comparing source strings, or independently collecting
 // free names here, would disagree on stable hooks and Effect Event exclusions.

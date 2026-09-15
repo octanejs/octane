@@ -1,5 +1,43 @@
 # Scoped signal graph experiment
 
+## Compiled native presentation channels
+
+`run-native-presentation.mjs` compiles the authored `native-presentation/View.tsrx`
+and its real `adoptBindings` activation, uses authentic SSR output, and compares
+coarse immutable snapshots with direct signal/derived-signal channels on the same
+view. The fixture deliberately passes unsuffixed aliases for classes, two CSS
+custom properties, text, and an unrelated title. StyleX atoms come from its Babel
+compiler, and the runtime calls the actual `@octanejs/stylex` `attrs` merge so
+competing variants keep their normal precedence. There are no copied class hashes.
+
+```bash
+BENCH_JSON=/absolute/path/new-native-presentation.json node benchmarks/scoped-signals/run-native-presentation.mjs --samples=7 --updates=5000
+```
+
+If this checkout has no StyleX dependencies, select an existing approved
+installation with `--stylex-tooling-root=/absolute/path/to/package`. The runner
+does not install or copy dependencies. Both lanes use that same installation and
+the real workspace `@octanejs/stylex` source wrapper; the report identifies the
+selected runtime and hashes all loaded source inputs.
+
+Every run checks identical native classes/styles/text, preserved host identity,
+no equal-SSR adoption rewrite, variant precedence, replaced-source detachment,
+and disposal. Deterministic counters distinguish source snapshots, projected
+field reads, and StyleX merge calls. Direct progress/title notifications must not
+run the whole projection or StyleX selector; changing the variant must run it once.
+Two warmups precede samples, and lane order alternates. All timing samples are
+retained. These are synchronous happy-dom measurements, not browser layout,
+paint, Safari, or application latency evidence; timing has no hard pass threshold.
+
+Byte accounting separates the complete renderer-free activation, the isolated
+optional signal connector, and the fixture plus real graph/StyleX. Isolated
+connector bytes are not an incremental application delta because dependencies
+can be shared. Resolved client graphs must exclude the renderer, and activation
+alone must exclude the signal graph/facade. `BENCH_JSON` must be a new absolute
+filename; source drift during a run fails instead of publishing mixed evidence.
+
+## Graph engine comparison
+
 This suite compares the experimental `octane/signals` engine with the exact
 Alien Signals 3.2.0 dependency selected by `packages/octane`. It never resolves
 the old binding's 1.0.4 catalog entry as the raw comparator. Both APIs are

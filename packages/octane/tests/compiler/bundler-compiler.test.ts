@@ -48,7 +48,12 @@ function emittedHeadKey(code: string | undefined): string | undefined {
 
 describe('bundler-neutral compiler integration', () => {
 	it('preserves compiler signal capability through client and server runtime-request transforms', () => {
-		const compiler = createOctaneCompiler({ root: '/project' });
+		const compiler = createOctaneCompiler({
+			root: '/project',
+			knownAttributeSpreads: [
+				{ source: '@stylexjs/stylex', imported: 'attrs', fields: ['class', 'style'] },
+			],
+		});
 		for (const environment of ['client', 'server'] as const) {
 			for (const extension of ['ts', 'js', 'tsrx']) {
 				const result = compiler.transform(
@@ -64,6 +69,24 @@ describe('bundler-neutral compiler integration', () => {
 					explicitRuntimeRequests: true,
 				})?.streamedSignals,
 			).toBeUndefined();
+			const source = `import { attrs as nativeAttrs } from '@stylexjs/stylex';
+export function Styled(props) @{ 'use dom bindings'; <div {...nativeAttrs(props.styles)} /> }`;
+			expect(
+				compiler.transform(source, '/project/src/Styled.tsrx', { environment }),
+			).not.toBeNull();
+			if (environment === 'client')
+				expect(
+					compiler.transform(source, '/project/src/Styled.tsrx?octane-bindings=Styled', {
+						environment,
+					}),
+				).not.toBeNull();
+			expect(() =>
+				createOctaneCompiler({ root: '/project' }).transform(
+					source,
+					'/project/src/Styled.tsrx?octane-bindings=Styled',
+					{ environment },
+				),
+			).toThrow();
 		}
 	});
 

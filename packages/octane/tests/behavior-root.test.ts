@@ -1,13 +1,102 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { attachBehaviorRoot, flushSync, hydrateRoot } from 'octane';
 import { renderToReadableStream, renderToString } from 'octane/server';
 import { flushEffects } from './_helpers.js';
 import { loadCompiledFixtureSource, loadServerFixture } from './_server-fixture.js';
 import * as DomBindings from '../src/dom-bindings.js';
+import * as DomBindingPrograms from '../src/dom-binding-program.js';
+import * as DomBindingClasses from '../src/dom-binding-classes.js';
+import * as DomBindingSignals from '../src/dom-binding-signals.js';
+import {
+	createScope,
+	__signalAt,
+	runWithSignalOwner,
+	SIGNAL_BINDING_SUBSCRIBE,
+	createResource,
+	query,
+} from '../src/signals/index.js';
+import type {
+	AttachmentPresentationProps,
+	SafetyPresentationProps,
+} from './_fixtures/dom-presentation.tsrx';
 import * as staticClient from './hydration/_fixtures/deferred-hydration-static.tsrx';
 
 const STATIC_FIXTURE = 'packages/octane/tests/hydration/_fixtures/deferred-hydration-static.tsrx';
 const staticServer = loadServerFixture<typeof staticClient>(STATIC_FIXTURE);
+const presentationSource = readFileSync(
+	'packages/octane/tests/_fixtures/dom-presentation.tsrx',
+	'utf8',
+);
+
+function authoredPresentation<Props extends object>(view: string, initial: Props, dev = false) {
+	const id = '/src/dom-presentation.tsrx';
+	const options = {
+		compileOptions: { dev, hmr: false },
+		runtimeModules: {
+			'octane/behavior': DomBindings,
+			'octane/dom-bindings': DomBindings,
+			'octane/dom-binding-program': DomBindingPrograms,
+			'octane/dom-binding-classes': DomBindingClasses,
+			'octane/dom-binding-signals': DomBindingSignals,
+		},
+	};
+	const server = loadCompiledFixtureSource(presentationSource, { ...options, id, mode: 'server' });
+	const artifact = (mount: boolean) =>
+		loadCompiledFixtureSource(presentationSource, {
+			...options,
+			id: id + '?octane-bindings=' + view + (mount ? '&octane-mount=1' : ''),
+			mode: 'client',
+		});
+	const client = loadCompiledFixtureSource(
+		`import { adoptBindings, mountBindings } from 'octane/behavior';
+import { ${view} } from './dom-presentation.tsrx';
+export function attach(root, source, options) { return adoptBindings(root, ${view}, source, options); }
+export function mount(target, source, options) { return mountBindings(target, ${view}, source, options); }`,
+		{
+			...options,
+			id: '/src/presentation-activation.tsrx',
+			mode: 'client',
+			runtimeModules: {
+				...options.runtimeModules,
+				['./dom-presentation.tsrx?octane-bindings=' + view]: artifact(false),
+				['./dom-presentation.tsrx?octane-bindings=' + view + '&octane-mount=1']: artifact(true),
+			},
+		},
+	);
+	let snapshot = initial;
+	const subscriptions = new Set<() => void>();
+	const cleanup = vi.fn();
+	const state: DomBindings.BindingSource<Props> = {
+		getSnapshot: () => snapshot,
+		subscribe(notify) {
+			subscriptions.add(notify);
+			return () => {
+				subscriptions.delete(notify);
+				cleanup();
+			};
+		},
+	};
+	return {
+		html: renderToString(server[view], initial).html,
+		state,
+		cleanup,
+		attach: client.attach as (
+			root: Element | DomBindingPrograms.BindingRange,
+			source: typeof state,
+			options?: DomBindings.BindingOptions,
+		) => DomBindings.BindingHandle,
+		mount: client.mount as (
+			target: DomBindingPrograms.BindingMountTarget,
+			source: typeof state,
+			options?: DomBindings.BindingOptions,
+		) => DomBindings.BindingHandle,
+		publish(next: Partial<Props>, notify = true) {
+			snapshot = { ...snapshot, ...next };
+			if (notify) for (const callback of subscriptions) callback();
+		},
+	};
+}
 
 function authoredBindings(dev = false) {
 	const id = '/src/behavior-action.tsrx';
@@ -23,7 +112,10 @@ export function Action(props) @{
 }`;
 	const options = {
 		compileOptions: { dev, hmr: false },
-		runtimeModules: { 'octane/behavior': DomBindings },
+		runtimeModules: {
+			'octane/behavior': DomBindings,
+			'octane/dom-binding-signals': DomBindingSignals,
+		},
 	};
 	const server = loadCompiledFixtureSource(source, { ...options, id, mode: 'server' });
 	const descriptor = loadCompiledFixtureSource(source, {
@@ -99,6 +191,90 @@ export function attachPair(first, second, source) {
 		publish(next: Record<string, unknown>, notify = true) {
 			snapshot = { ...snapshot, ...next };
 			if (notify) for (const callback of subscriptions) callback();
+		},
+	};
+}
+
+function authoredControlBindings(dev = false) {
+	const id = '/src/behavior-composer.tsrx';
+	const source = `import { unbound } from 'octane/behavior';
+export function Composer(props) @{
+  'use dom bindings';
+  <form action={unbound('/send')} data-mode={props.mode}
+    class={[unbound(props.externalClass), props.expanded ? 'expanded atom-shared' : 'compact']}>
+    <label for={unbound('draft')}>{unbound(props.label)}</label>
+    <textarea id={unbound('draft')} name={unbound('draft')} value={unbound(props.draft)}
+      aria-invalid={props.invalid} disabled={props.disabled} class={{ 'composer-large': props.expanded }} />
+    <input type="hidden" name="token" value={unbound(props.token)} />
+    <span aria-live="polite">{unbound(props.status)}</span>
+    {unbound(props.children)}
+  </form>
+}`;
+	const options = {
+		compileOptions: { dev, hmr: false },
+		runtimeModules: {
+			'octane/behavior': DomBindings,
+			'octane/dom-binding-classes': DomBindingClasses,
+			'octane/dom-binding-signals': DomBindingSignals,
+		},
+	};
+	const server = loadCompiledFixtureSource(source, { ...options, id, mode: 'server' });
+	const descriptor = loadCompiledFixtureSource(source, {
+		...options,
+		id: id + '?octane-bindings=Composer',
+		mode: 'client',
+	});
+	const client = loadCompiledFixtureSource(
+		`import { adoptBindings } from 'octane/behavior';
+import { Composer } from './behavior-composer.tsrx';
+export function attach(root, source, options) { return adoptBindings(root, Composer, source, options); }`,
+		{
+			...options,
+			id: '/src/behavior-composer-activation.tsrx',
+			mode: 'client',
+			runtimeModules: {
+				'octane/behavior': DomBindings,
+				'octane/dom-bindings': DomBindings,
+				'./behavior-composer.tsrx?octane-bindings=Composer': descriptor,
+			},
+		},
+	);
+	let snapshot = {
+		mode: 'idle',
+		externalClass: 'theme atom-shared',
+		expanded: true,
+		label: 'Message',
+		draft: 'Server draft',
+		invalid: false,
+		disabled: false,
+		token: 'server-token',
+		status: 'Ready',
+		children: null,
+	};
+	const subscriptions = new Set<() => void>();
+	const cleanup = vi.fn();
+	const state = {
+		getSnapshot: () => snapshot,
+		subscribe(notify: () => void) {
+			subscriptions.add(notify);
+			return () => {
+				subscriptions.delete(notify);
+				cleanup();
+			};
+		},
+	};
+	return {
+		html: renderToString(server.Composer, snapshot).html,
+		state,
+		cleanup,
+		attach: client.attach as (
+			root: Element,
+			source: typeof state,
+			options?: DomBindings.BindingOptions,
+		) => DomBindings.BindingHandle,
+		publish(next: Partial<typeof snapshot>) {
+			snapshot = { ...snapshot, ...next };
+			for (const callback of subscriptions) callback();
 		},
 	};
 }
@@ -228,6 +404,117 @@ describe('behavior-only roots', () => {
 				binding.dispose();
 			}
 		}
+		for (const dev of [false, true]) {
+			const fixture = authoredControlBindings(dev);
+			article.innerHTML = fixture.html;
+			const form = article.querySelector('form')!;
+			const textarea = form.querySelector('textarea')!;
+			const hidden = form.querySelector('input')!;
+			const label = form.querySelector('label')!;
+			const status = form.querySelector('span')!;
+			textarea.value = 'User draft before activation';
+			textarea.setSelectionRange(4, 9, 'backward');
+			hidden.value = 'native-token';
+			const external = document.createElement('canvas');
+			form.insertBefore(external, textarea);
+			form.classList.add('native-measured');
+			textarea.classList.add('external-height');
+			fixture.publish({ expanded: false, mode: 'sending', invalid: true });
+			const binding = fixture.attach(form, fixture.state);
+			try {
+				expect(form.classList.contains('expanded')).toBe(false);
+				expect(form.classList.contains('compact')).toBe(true);
+				expect(form.classList.contains('atom-shared')).toBe(true);
+				expect(form.classList.contains('theme')).toBe(true);
+				expect(form.classList.contains('native-measured')).toBe(true);
+				expect(textarea.classList.contains('composer-large')).toBe(false);
+				expect(textarea.classList.contains('external-height')).toBe(true);
+				expect(form.getAttribute('data-mode')).toBe('sending');
+				expect(textarea.getAttribute('aria-invalid')).toBe('true');
+				expect(textarea.value).toBe('User draft before activation');
+				expect([
+					textarea.selectionStart,
+					textarea.selectionEnd,
+					textarea.selectionDirection,
+				]).toEqual([4, 9, 'backward']);
+				expect(hidden.value).toBe('native-token');
+				fixture.publish({
+					expanded: true,
+					disabled: true,
+					draft: 'Late draft',
+					status: 'Late status',
+				});
+				expect(form.classList.contains('expanded')).toBe(true);
+				expect(textarea.disabled).toBe(true);
+				expect(textarea.value).toBe('User draft before activation');
+				expect(status.textContent).toBe('Ready');
+				expect(label.textContent).toBe('Message');
+				expect(form.querySelector('textarea')).toBe(textarea);
+				expect(form.querySelector('canvas')).toBe(external);
+			} finally {
+				binding.dispose();
+			}
+			expect(form.classList.contains('expanded')).toBe(false);
+			expect(form.classList.contains('compact')).toBe(false);
+			expect(form.classList.contains('atom-shared')).toBe(true);
+			expect(form.classList.contains('native-measured')).toBe(true);
+			expect(textarea.classList.contains('composer-large')).toBe(false);
+			expect(textarea.classList.contains('external-height')).toBe(true);
+			expect(fixture.cleanup).toHaveBeenCalledOnce();
+			const replacement = fixture.attach(form, fixture.state);
+			expect(form.classList.contains('expanded')).toBe(true);
+			expect(form.querySelector('textarea')).toBe(textarea);
+			replacement.dispose();
+		}
+		for (const dev of [false, true]) {
+			const fixture = authoredPresentation(
+				'LoginPresentation',
+				{
+					label: 'Email',
+					error: '',
+					pending: false,
+					submitLabel: 'Continue',
+				},
+				dev,
+			);
+			article.innerHTML = fixture.html;
+			const form = article.querySelector('form')!;
+			const input = form.querySelector('input')!;
+			const button = form.querySelector('button')!;
+			input.value = 'typed@example.com';
+			fixture.publish({ error: 'Check this address', submitLabel: 'Try again' });
+			const binding = fixture.attach(form, fixture.state);
+			try {
+				expect(form.querySelector('input')).toBe(input);
+				expect(input.value).toBe('typed@example.com');
+				expect(form.querySelector('p')!.textContent).toBe('Check this address');
+				expect(button.textContent).toBe('Try again');
+				fixture.publish({ pending: true, error: '', submitLabel: 'Signing in…' });
+				expect(form.querySelector('button')).toBe(button);
+				expect(button.disabled).toBe(true);
+				expect(input.disabled).toBe(true);
+				expect(button.querySelector('svg')).not.toBeNull();
+				expect(button.querySelector('span')!.textContent).toBe('Signing in…');
+				fixture.publish({ pending: false, submitLabel: 'Continue' });
+				expect(button.querySelector('svg')).toBeNull();
+				expect(input.value).toBe('typed@example.com');
+			} finally {
+				binding.dispose();
+			}
+			const adjacent = authoredPresentation('AdjacentPresentation', { first: '', last: '' }, dev);
+			article.innerHTML = adjacent.html;
+			const paragraph = article.querySelector('p')!;
+			const text = adjacent.attach(paragraph, adjacent.state);
+			try {
+				adjacent.publish({ first: '<one>', last: '&two' });
+				expect(paragraph.textContent).toBe('Before <one>&two after');
+				expect(paragraph.children).toHaveLength(0);
+				adjacent.publish({ first: '', last: '' });
+				expect(paragraph.textContent).toBe('Before  after');
+			} finally {
+				text.dispose();
+			}
+		}
 	});
 
 	it('preserves externally owned DOM when disposed by default', async () => {
@@ -282,6 +569,21 @@ describe('behavior-only roots', () => {
 			pair.outer.dispose();
 			pair.inner.dispose();
 		}
+		section.innerHTML = fixture.html;
+		const measured = section.querySelector('button')!;
+		measured.style.setProperty('width', '45px', 'important');
+		measured.style.setProperty('opacity', '0.7');
+		measured.style.setProperty('margin-left', '9px');
+		const restoring = fixture.attach(measured, fixture.state, { restoreStyles: true });
+		fixture.publish({ width: 80, opacity: 0.2 });
+		expect(measured.style.width).toBe('80px');
+		measured.style.setProperty('opacity', '0.9', 'important');
+		restoring.dispose();
+		expect(measured.style.width).toBe('45px');
+		expect(measured.style.getPropertyPriority('width')).toBe('important');
+		expect(measured.style.opacity).toBe('0.9');
+		expect(measured.style.getPropertyPriority('opacity')).toBe('important');
+		expect(measured.style.marginLeft).toBe('9px');
 	});
 
 	it('removes externally managed descendants only when explicitly requested', () => {
@@ -293,6 +595,43 @@ describe('behavior-only roots', () => {
 		expect(root.signal.aborted).toBe(true);
 		expect(container.isConnected).toBe(true);
 		expect(container.childNodes).toHaveLength(0);
+		const before = document.createElement('input');
+		const after = document.createElement('button');
+		container.append(before, after);
+		const onAction = vi.fn();
+		const fixture = authoredPresentation<SafetyPresentationProps>('SafetyPresentation', {
+			visible: false,
+			title: '',
+			message: '',
+			actions: [],
+			onAction,
+		});
+		const binding = fixture.mount({ parent: container, before: after }, fixture.state);
+		try {
+			expect([...container.children]).toEqual([before, after]);
+			fixture.publish({
+				visible: true,
+				title: 'Review required',
+				message: 'Please continue.',
+				actions: [
+					{ id: 'continue', label: 'Continue', href: null },
+					{ id: 'help', label: 'Help', href: '/help' },
+				],
+			});
+			const gate = container.querySelector('section')!;
+			expect([...container.children]).toEqual([before, gate, after]);
+			gate.querySelector('button')!.click();
+			expect(onAction).toHaveBeenCalledWith('continue');
+			expect(gate.querySelector('a')!.getAttribute('href')).toBe('/help');
+			fixture.publish({ visible: false });
+			expect([...container.children]).toEqual([before, after]);
+			fixture.publish({ visible: true, title: 'Try again' });
+			expect(container.querySelector('strong')!.textContent).toBe('Try again');
+		} finally {
+			binding.dispose({ preserveDOM: false });
+		}
+		expect([...container.childNodes]).toEqual([before, after]);
+		expect(fixture.cleanup).toHaveBeenCalledOnce();
 	});
 
 	it('adopts selector targets and an explicitly supplied element without rendering', async () => {
@@ -501,6 +840,87 @@ describe('behavior-only roots', () => {
 
 		root.dispose();
 		expect(cleanup).toHaveBeenCalledOnce();
+		for (const dev of [false, true]) {
+			const releases = new Map<Element, ReturnType<typeof vi.fn>>();
+			const onInput = (element: Element | null) => {
+				if (element === null) return;
+				const release = vi.fn();
+				releases.set(element, release);
+				return release;
+			};
+			const onRemove = vi.fn();
+			const onRetry = vi.fn();
+			const items: AttachmentPresentationProps['items'] = [
+				{ id: 'a', name: 'First', preview: null, state: 'uploading', error: '' },
+				{ id: 'b--<', name: 'Second', preview: null, state: 'ready', error: '' },
+				{ id: 'c', name: 'Third', preview: '/preview.png', state: 'error', error: 'Retry this' },
+			];
+			const fixture = authoredPresentation<AttachmentPresentationProps>(
+				'AttachmentPresentation',
+				{
+					items,
+					locked: false,
+					onInput,
+					onRemove,
+					onRetry,
+				},
+				dev,
+			);
+			container.innerHTML = fixture.html;
+			const original = [...container.querySelectorAll('figure')];
+			const inputs = original.map((figure) => figure.querySelector('input')!);
+			inputs[1]!.value = 'User editing';
+			inputs[1]!.focus();
+			inputs[1]!.setSelectionRange(2, 7, 'backward');
+			fixture.publish({ items: [items[1]!, items[0]!, items[2]!] });
+			const range = { start: container.firstChild as Comment, end: container.lastChild as Comment };
+			const binding = fixture.attach(range, fixture.state);
+			try {
+				expect([...container.querySelectorAll('figure')]).toEqual([
+					original[1],
+					original[0],
+					original[2],
+				]);
+				expect(document.activeElement).toBe(inputs[1]);
+				expect(inputs[1]!.value).toBe('User editing');
+				expect([
+					inputs[1]!.selectionStart,
+					inputs[1]!.selectionEnd,
+					inputs[1]!.selectionDirection,
+				]).toEqual([2, 7, 'backward']);
+				expect(releases.size).toBe(3);
+				fixture.publish({
+					items: [
+						{ ...items[2]!, name: 'Updated third', state: 'ready', preview: null },
+						{ ...items[1]!, name: 'Renamed second' },
+					],
+				});
+				expect([...container.querySelectorAll('figure')]).toEqual([original[2], original[1]]);
+				expect(original[2]!.querySelector('figcaption')!.textContent).toBe('Updated third');
+				expect(original[2]!.querySelector('img')).toBeNull();
+				expect(inputs[1]!.value).toBe('User editing');
+				expect(releases.get(inputs[0]!)!).toHaveBeenCalledOnce();
+				expect(releases.get(inputs[1]!)!).not.toHaveBeenCalled();
+				original[1]!.querySelector('button')!.click();
+				expect(onRemove).toHaveBeenLastCalledWith('b--<');
+				fixture.publish({ locked: true }, false);
+				binding.refresh();
+				expect(original[1]!.querySelector('button')!.disabled).toBe(true);
+				fixture.publish({ items: [] });
+				expect(container.querySelectorAll('figure')).toHaveLength(0);
+				expect(container.textContent).toBe('No attachments');
+				for (const release of releases.values()) expect(release).toHaveBeenCalledOnce();
+			} finally {
+				binding.dispose();
+			}
+			expect(fixture.cleanup).toHaveBeenCalledOnce();
+			const replacement = fixture.attach(range, fixture.state);
+			fixture.publish({ items: [items[0]!] });
+			expect(container.querySelector('input')!.value).toBe('First');
+			expect(container.querySelector('figcaption')!.textContent).toBe('First');
+			replacement.dispose({ preserveDOM: false });
+			expect(container.childNodes).toHaveLength(0);
+		}
 	});
 
 	it('waits for an external range while preserving mutations before and during readiness', async () => {
@@ -802,7 +1222,7 @@ describe('behavior-only roots', () => {
 		expect(handled).not.toHaveBeenCalled();
 		expect(rangeElement.firstElementChild).toBe(button);
 		button.textContent = 'Current owner';
-		button.click();
+		button.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 		expect(handled).toHaveBeenCalledOnce();
 		expect(handled.mock.calls[0][3]).toBe('Current owner');
 	});
@@ -1186,6 +1606,20 @@ describe('behavior-only roots', () => {
 		} finally {
 			binding.dispose();
 		}
+		const text = authoredPresentation('AdjacentPresentation', { first: 'one', last: 'two' });
+		const textHost = document.createElement('section');
+		container.append(textHost);
+		textHost.innerHTML = text.html;
+		const textNode = textHost.querySelector('p')!;
+		const textBinding = text.attach(textNode, text.state);
+		try {
+			expect(() => text.attach(textNode, text.state)).toThrow(/already.*binding/i);
+			text.publish({ first: 'Still owned' });
+			expect(textNode.textContent).toContain('Still owned');
+		} finally {
+			textBinding.dispose();
+		}
+		text.attach(textNode, text.state).dispose({ preserveDOM: false });
 	});
 
 	it('propagates a rejected external range readiness without adopting protected descendants', async () => {
@@ -1256,6 +1690,266 @@ describe('behavior-only roots', () => {
 						mode,
 					}),
 				).toThrow(/SVG|static DOM bindings/i);
+			}
+		}
+		const controls = authoredControlBindings();
+		range.innerHTML = controls.html;
+		const form = range.querySelector('form')!;
+		const textarea = form.querySelector('textarea')!;
+		const duplicate = textarea.cloneNode(true);
+		form.appendChild(duplicate);
+		controls.publish({ mode: 'must-not-publish', expanded: false });
+		const duplicated = form.outerHTML;
+		expect(() => controls.attach(form, controls.state)).toThrow(
+			/topology|mismatch|duplicate|unique/i,
+		);
+		expect(form.outerHTML).toBe(duplicated);
+		form.removeChild(duplicate);
+		const originalParent = textarea.parentElement!;
+		const nextSibling = textarea.nextSibling;
+		const foreignParent = document.createElement('div');
+		form.appendChild(foreignParent);
+		foreignParent.appendChild(textarea);
+		const misplaced = form.outerHTML;
+		expect(() => controls.attach(form, controls.state)).toThrow(/topology|mismatch/i);
+		expect(form.outerHTML).toBe(misplaced);
+		originalParent.insertBefore(textarea, nextSibling);
+		foreignParent.remove();
+		const canceled = new AbortController();
+		canceled.abort();
+		const canceledMarkup = form.outerHTML;
+		controls.attach(form, controls.state, { signal: canceled.signal }).dispose();
+		expect(form.outerHTML).toBe(canceledMarkup);
+		const controlBinding = controls.attach(form, controls.state);
+		expect(form.getAttribute('data-mode')).toBe('must-not-publish');
+		controlBinding.dispose();
+		for (const failureKind of ['duplicate', 'projection']) {
+			const items: AttachmentPresentationProps['items'] = [
+				{ id: 'a', name: 'First', preview: null, state: 'ready', error: '' },
+				{ id: 'b', name: 'Second', preview: null, state: 'ready', error: '' },
+			];
+			const releases = [vi.fn(), vi.fn()];
+			let attached = 0;
+			const fixture = authoredPresentation<AttachmentPresentationProps>('AttachmentPresentation', {
+				items,
+				locked: false,
+				onRemove() {},
+				onRetry() {},
+				onInput: () => releases[attached++],
+			});
+			const host = document.createElement('section');
+			container.append(host);
+			host.innerHTML = fixture.html;
+			const range = { start: host.firstChild as Comment, end: host.lastChild as Comment };
+			const handle = fixture.attach(range, fixture.state);
+			const before = host.innerHTML;
+			const inputs = [...host.querySelectorAll('input')];
+			inputs[0]!.value = 'Preserve this edit';
+			const failure = new Error('A later row text projection failed');
+			const badName = {
+				toString() {
+					throw failure;
+				},
+			} as unknown as string;
+			expect(() =>
+				fixture.publish({
+					locked: true,
+					items: [
+						{ ...items[0]!, name: 'Must not publish' },
+						failureKind === 'duplicate'
+							? { ...items[1]!, id: 'a' }
+							: { ...items[1]!, name: badName },
+					],
+				}),
+			).toThrow(failureKind === 'duplicate' ? /duplicate keys/ : failure);
+			expect(host.innerHTML).toBe(before);
+			expect([...host.querySelectorAll('input')]).toEqual(inputs);
+			expect(inputs[0]!.value).toBe('Preserve this edit');
+			for (const release of releases) expect(release).toHaveBeenCalledOnce();
+			expect(fixture.cleanup).toHaveBeenCalledOnce();
+			handle.refresh();
+			handle.dispose();
+			fixture.publish({ items, locked: false, onInput: undefined }, false);
+			fixture.attach(range, fixture.state).dispose({ preserveDOM: false });
+			expect(host.childNodes).toHaveLength(0);
+		}
+		for (const dev of [false, true]) {
+			for (const invalid of [{ unexpected: true }, Symbol('invalid-text'), () => 'invalid']) {
+				const scope = createScope({ scopeKey: `invalid-presentation-text-${dev}` });
+				const value = scope.signal$<unknown>('value', 'ready');
+				const fixture = authoredPresentation<{ value: unknown }>(
+					'SignalTextPresentation',
+					{ value: 'server' },
+					dev,
+				);
+				const host = document.createElement('section');
+				container.append(host);
+				host.innerHTML = fixture.html;
+				const paragraph = host.querySelector('p')!;
+				fixture.publish({ value }, false);
+				const handle = fixture.attach(paragraph, fixture.state);
+				try {
+					const before = paragraph.innerHTML;
+					expect(() => value.set(() => invalid)).toThrow(/primitive value/);
+					expect(paragraph.innerHTML).toBe(before);
+					expect(fixture.cleanup).toHaveBeenCalledOnce();
+					expect(scope.inspect().nodes.find((node) => node.key === 'value')?.subscribers).toBe(0);
+					expect(value.get()).toBe(invalid);
+				} finally {
+					handle.dispose();
+					scope.dispose();
+				}
+			}
+			const scope = createScope({ scopeKey: `coherent-presentation-${dev}` });
+			const label = scope.signal$('label', 'first');
+			const fixture = authoredPresentation<{ first: unknown; last: unknown }>(
+				'AdjacentPresentation',
+				{ first: 'server', last: 'tail' },
+				dev,
+			);
+			const host = document.createElement('section');
+			container.append(host);
+			host.innerHTML = fixture.html;
+			const paragraph = host.querySelector('p')!;
+			fixture.publish({ first: label }, false);
+			const handle = fixture.attach(paragraph, fixture.state);
+			try {
+				fixture.publish({
+					last: {
+						toString() {
+							label.set('settled during preparation');
+							return 'tail';
+						},
+					},
+				});
+				expect(paragraph.textContent).toBe('Before settled during preparationtail after');
+				const failure = new Error('connected text read failed');
+				const failing = scope.derived$('failing', () => {
+					if (label.get() === 'fail') throw failure;
+					return 'healthy';
+				});
+				fixture.publish({ first: failing, last: 'tail' });
+				const before = paragraph.innerHTML;
+				expect(() =>
+					fixture.publish({
+						last: {
+							toString() {
+								label.set('fail');
+								return 'must not publish';
+							},
+						},
+					}),
+				).toThrow(failure);
+				expect(paragraph.innerHTML).toBe(before);
+				expect(fixture.cleanup).toHaveBeenCalledOnce();
+			} finally {
+				handle.dispose();
+				scope.dispose();
+			}
+			const abortScope = createScope({ scopeKey: `aborted-subscription-${dev}` });
+			const abortValue = abortScope.signal$('value', 'must not write');
+			const aborted = authoredPresentation<{ value: unknown }>(
+				'SignalTextPresentation',
+				{ value: 'server' },
+				dev,
+			);
+			const abortHost = document.createElement('section');
+			container.append(abortHost);
+			abortHost.innerHTML = aborted.html;
+			aborted.publish({ value: abortValue }, false);
+			const abort = new AbortController();
+			const subscribe = abortValue[SIGNAL_BINDING_SUBSCRIBE].bind(abortValue);
+			const stopped = vi.fn();
+			const subscription = vi
+				.spyOn(abortValue, SIGNAL_BINDING_SUBSCRIBE)
+				.mockImplementation((notify) => {
+					const stop = subscribe(notify);
+					abort.abort();
+					return () => {
+						stopped();
+						stop();
+					};
+				});
+			try {
+				const before = abortHost.innerHTML;
+				aborted
+					.attach(abortHost.querySelector('p')!, aborted.state, { signal: abort.signal })
+					.dispose();
+				expect(abortHost.innerHTML).toBe(before);
+				expect(stopped).toHaveBeenCalledOnce();
+				expect(aborted.cleanup).toHaveBeenCalledOnce();
+				expect(abortScope.inspect().nodes.find((node) => node.key === 'value')?.subscribers).toBe(
+					0,
+				);
+			} finally {
+				subscription.mockRestore();
+				abortScope.dispose();
+			}
+			const failureScope = createScope({ scopeKey: `pending-presentation-${dev}` });
+			const loadPending = query(
+				'pending-presentation',
+				(_argument: undefined) => new Promise<string>(() => {}),
+			);
+			const pendingValue = createResource(failureScope, 'pending', () => loadPending(undefined));
+			const pending = authoredPresentation<{ value: unknown }>(
+				'SignalTextPresentation',
+				{ value: 'server' },
+				dev,
+			);
+			const pendingHost = document.createElement('section');
+			container.append(pendingHost);
+			pendingHost.innerHTML = pending.html;
+			pending.publish({ value: pendingValue }, false);
+			try {
+				const before = pendingHost.innerHTML;
+				expect(
+					failureScope.isPending(() =>
+						pending.attach(pendingHost.querySelector('p')!, pending.state),
+					),
+				).toBe(true);
+				expect(pendingHost.innerHTML).toBe(before);
+				expect(pending.cleanup).toHaveBeenCalledOnce();
+				expect(
+					failureScope.inspect().nodes.find((node) => node.key === 'pending')?.subscribers,
+				).toBe(0);
+			} finally {
+				failureScope.dispose();
+			}
+			const cleanupScope = createScope({ scopeKey: `throwing-signal-cleanup-${dev}` });
+			const first = cleanupScope.signal$('first', 'first');
+			const second = cleanupScope.signal$('second', 'second');
+			const cleanupFailure = new Error('signal cleanup failed');
+			const firstSubscribe = first[SIGNAL_BINDING_SUBSCRIBE].bind(first);
+			const throwingSubscription = vi
+				.spyOn(first, SIGNAL_BINDING_SUBSCRIBE)
+				.mockImplementation((notify) => {
+					const stop = firstSubscribe(notify);
+					return () => {
+						stop();
+						throw cleanupFailure;
+					};
+				});
+			const cleanupFixture = authoredPresentation<{ first: unknown; last: unknown }>(
+				'AdjacentPresentation',
+				{ first: 'server', last: 'server' },
+				dev,
+			);
+			const cleanupHost = document.createElement('section');
+			container.append(cleanupHost);
+			cleanupHost.innerHTML = cleanupFixture.html;
+			cleanupFixture.publish({ first, last: second }, false);
+			const cleanupHandle = cleanupFixture.attach(
+				cleanupHost.querySelector('p')!,
+				cleanupFixture.state,
+			);
+			try {
+				expect(() => cleanupHandle.dispose()).toThrow(cleanupFailure);
+				expect(cleanupFixture.cleanup).toHaveBeenCalledOnce();
+				expect(cleanupScope.inspect().nodes.map((node) => node.subscribers)).toEqual([0, 0]);
+			} finally {
+				cleanupHandle.dispose();
+				throwingSubscription.mockRestore();
+				cleanupScope.dispose();
 			}
 		}
 	});
@@ -1332,6 +2026,40 @@ describe('behavior-only roots', () => {
 		});
 		await recovered.ready;
 		expect(recovered.signal.aborted).toBe(false);
+		const cleanupFailure = new Error('A row ref cleanup failed');
+		const rowCleanups = [
+			vi.fn(() => {
+				throw cleanupFailure;
+			}),
+			vi.fn(),
+		];
+		let attachedRows = 0;
+		const onRemove = vi.fn();
+		const fixture = authoredPresentation<AttachmentPresentationProps>('AttachmentPresentation', {
+			items: [
+				{ id: 'a', name: 'First', preview: null, state: 'ready', error: '' },
+				{ id: 'b', name: 'Second', preview: null, state: 'ready', error: '' },
+			],
+			locked: false,
+			onRemove,
+			onRetry() {},
+			onInput: () => rowCleanups[attachedRows++],
+		});
+		const host = document.createElement('section');
+		container.append(host);
+		host.innerHTML = fixture.html;
+		const range = { start: host.firstChild as Comment, end: host.lastChild as Comment };
+		const rows = [...host.querySelectorAll('figure')];
+		const handle = fixture.attach(range, fixture.state);
+		expect(() => handle.dispose()).toThrow(cleanupFailure);
+		for (const release of rowCleanups) expect(release).toHaveBeenCalledOnce();
+		expect(fixture.cleanup).toHaveBeenCalledOnce();
+		expect([...host.querySelectorAll('figure')]).toEqual(rows);
+		rows[0]!.querySelector('button')!.click();
+		expect(onRemove).not.toHaveBeenCalled();
+		handle.dispose();
+		fixture.publish({ onInput: undefined }, false);
+		fixture.attach(range, fixture.state).dispose({ preserveDOM: false });
 	});
 
 	it('rejects an owner-constrained behavior when its range fails before its own module loads', async () => {
@@ -1484,6 +2212,47 @@ describe('behavior-only roots', () => {
 		expect(behavior.signal.aborted).toBe(true);
 		expect(cleanup).toHaveBeenCalledOnce();
 		expect(container.firstElementChild).toBe(button);
+		const items: AttachmentPresentationProps['items'] = [
+			{ id: 'a', name: 'First', preview: null, state: 'ready', error: '' },
+			{ id: 'b', name: 'Second', preview: null, state: 'ready', error: '' },
+		];
+		const canceledProjection = new AbortController();
+		const rowCleanup = vi.fn();
+		const fixture = authoredPresentation<AttachmentPresentationProps>('AttachmentPresentation', {
+			items,
+			locked: false,
+			onRemove() {},
+			onRetry() {},
+			onInput: () => rowCleanup,
+		});
+		const host = document.createElement('section');
+		container.append(host);
+		host.innerHTML = fixture.html;
+		const range = { start: host.firstChild as Comment, end: host.lastChild as Comment };
+		const handle = fixture.attach(range, fixture.state, { signal: canceledProjection.signal });
+		const before = host.innerHTML;
+		const abortingText = {
+			toString() {
+				canceledProjection.abort();
+				return 'Canceled';
+			},
+		} as unknown as string;
+		expect(() =>
+			fixture.publish({
+				items: [
+					{ ...items[0]!, name: 'Must not publish' },
+					{ ...items[1]!, name: abortingText },
+				],
+			}),
+		).not.toThrow();
+		expect(host.innerHTML).toBe(before);
+		expect(rowCleanup).toHaveBeenCalledTimes(2);
+		expect(fixture.cleanup).toHaveBeenCalledOnce();
+		handle.refresh();
+		handle.dispose();
+		expect(host.innerHTML).toBe(before);
+		fixture.publish({ items, onInput: undefined }, false);
+		fixture.attach(range, fixture.state).dispose({ preserveDOM: false });
 	});
 
 	it('returns a settled disposed root for a pre-aborted signal without retaining container ownership', async () => {
@@ -1542,6 +2311,39 @@ describe('behavior-only roots', () => {
 		expect(subscribeCleanup).toHaveBeenCalledOnce();
 		expect(readSnapshot).not.toHaveBeenCalled();
 		fixture.attach(action, fixture.state).dispose();
+		const mountedRefs = vi.fn(() => vi.fn());
+		const acceptedItem = {
+			id: 'accepted',
+			name: 'Accepted snapshot',
+			preview: null,
+			state: 'ready' as const,
+			error: '',
+		};
+		const fresh = authoredPresentation<AttachmentPresentationProps>('AttachmentPresentation', {
+			items: [],
+			locked: false,
+			onInput: mountedRefs,
+			onRemove() {},
+			onRetry() {},
+		});
+		const staleName = {
+			toString() {
+				fresh.publish({ items: [acceptedItem] });
+				return 'Discarded snapshot';
+			},
+		} as unknown as string;
+		fresh.publish({ items: [{ ...acceptedItem, id: 'stale', name: staleName }] }, false);
+		const mountHost = document.createElement('section');
+		container.append(mountHost);
+		const mounted = fresh.mount({ parent: mountHost }, fresh.state);
+		expect(mountHost.querySelector('figure')!.getAttribute('data-file')).toBe('accepted');
+		expect(mountHost.querySelector('input')!.value).toBe('Accepted snapshot');
+		expect(mountHost.textContent).not.toContain('Discarded snapshot');
+		expect(mountedRefs).toHaveBeenCalledOnce();
+		mounted.dispose({ preserveDOM: false });
+		expect(mountedRefs.mock.results[0]!.value).toHaveBeenCalledOnce();
+		expect(fresh.cleanup).toHaveBeenCalledOnce();
+		expect(mountHost.childNodes).toHaveLength(0);
 	});
 
 	it('does not evict a healthy root when its explicitly requested replacement is already canceled', async () => {
@@ -1858,6 +2660,274 @@ describe('behavior-only roots', () => {
 
 		expect(cleanup).toHaveBeenCalledOnce();
 		expect(container.querySelector('[data-action]')).not.toBeNull();
+		for (const dev of [false, true]) {
+			const refA = { current: null as HTMLInputElement | null };
+			const refB = { current: null as HTMLInputElement | null };
+			const order: string[] = [];
+			const callbackA = vi.fn((element: Element | null) => {
+				if (element === null) return;
+				expect(refB.current).toBeNull();
+				order.push('attach A');
+				return () => {
+					order.push('detach A');
+				};
+			});
+			const callbackB = vi.fn((element: Element | null) => {
+				order.push(element ? 'attach B' : 'detach B');
+			});
+			const onRemove = vi.fn();
+			const fixture = authoredPresentation<AttachmentPresentationProps>(
+				'AttachmentPresentation',
+				{
+					items: [{ id: 'row', name: 'First', preview: null, state: 'ready', error: '' }],
+					locked: false,
+					onInput: refA,
+					onRemove,
+					onRetry() {},
+				},
+				dev,
+			);
+			const host = document.createElement('section');
+			container.append(host);
+			host.innerHTML = fixture.html;
+			const range = { start: host.firstChild as Comment, end: host.lastChild as Comment };
+			const input = host.querySelector('input')!;
+			input.value = 'Native edit';
+			const handle = fixture.attach(range, fixture.state);
+			try {
+				expect(refA.current).toBe(input);
+				fixture.publish({ onInput: refB });
+				expect(refA.current).toBeNull();
+				expect(refB.current).toBe(input);
+				fixture.publish({ locked: true });
+				expect(refB.current).toBe(input);
+				fixture.publish({ onInput: callbackA, locked: false });
+				expect(refB.current).toBeNull();
+				expect(callbackA).toHaveBeenCalledOnce();
+				fixture.publish({ locked: true });
+				fixture.publish({ onInput: callbackA, locked: false });
+				expect(callbackA).toHaveBeenCalledOnce();
+				expect(order).toEqual(['attach A']);
+				fixture.publish({ onInput: callbackB });
+				expect(order).toEqual(['attach A', 'detach A', 'attach B']);
+				fixture.publish({ onInput: null });
+				expect(callbackB.mock.calls.map(([element]) => element)).toEqual([input, null]);
+				fixture.publish({ onInput: undefined });
+				expect(order).toEqual(['attach A', 'detach A', 'attach B', 'detach B']);
+				expect(host.querySelector('input')).toBe(input);
+				expect(input.value).toBe('Native edit');
+				host.querySelector('button')!.click();
+				expect(onRemove).toHaveBeenCalledExactlyOnceWith('row');
+				fixture.publish({ onInput: refA });
+			} finally {
+				handle.dispose();
+			}
+			expect(refA.current).toBeNull();
+			expect(fixture.cleanup).toHaveBeenCalledOnce();
+			host.querySelector('button')!.click();
+			expect(onRemove).toHaveBeenCalledOnce();
+			const failure = new Error('Replaced ref cleanup failed');
+			const oldCleanup = vi.fn(() => {
+				throw failure;
+			});
+			const newRef = vi.fn();
+			const failing = authoredPresentation<AttachmentPresentationProps>(
+				'AttachmentPresentation',
+				{
+					items: [{ id: 'row', name: 'Retained', preview: null, state: 'ready', error: '' }],
+					locked: false,
+					onInput: () => oldCleanup,
+					onRemove() {},
+					onRetry() {},
+				},
+				dev,
+			);
+			const failedHost = document.createElement('section');
+			container.append(failedHost);
+			failedHost.innerHTML = failing.html;
+			const failedRange = {
+				start: failedHost.firstChild as Comment,
+				end: failedHost.lastChild as Comment,
+			};
+			const failedInput = failedHost.querySelector('input');
+			const failedHandle = failing.attach(failedRange, failing.state);
+			expect(() => failing.publish({ onInput: newRef })).toThrow(failure);
+			expect(oldCleanup).toHaveBeenCalledOnce();
+			expect(newRef).not.toHaveBeenCalled();
+			expect(failing.cleanup).toHaveBeenCalledOnce();
+			expect(failedHost.querySelector('input')).toBe(failedInput);
+			failedHandle.dispose();
+			expect(oldCleanup).toHaveBeenCalledOnce();
+			failing.publish({ onInput: null }, false);
+			failing.attach(failedRange, failing.state).dispose({ preserveDOM: false });
+			const inlineOrder: string[] = [];
+			const inlineA = vi.fn((_element: Element | null) => {
+				inlineOrder.push('attach A');
+				return () => {
+					inlineOrder.push('detach A');
+				};
+			});
+			const inlineB = vi.fn((_element: Element | null) => {
+				inlineOrder.push('attach B');
+				return () => {
+					inlineOrder.push('detach B');
+				};
+			});
+			const inline = authoredPresentation(
+				'InlineRefPresentation',
+				{ title: 'First', onAttach: inlineA },
+				dev,
+			);
+			const inlineHost = document.createElement('section');
+			container.append(inlineHost);
+			inlineHost.innerHTML = inline.html;
+			const inlineInput = inlineHost.querySelector('input')!;
+			const inlineHandle = inline.attach(inlineInput, inline.state);
+			try {
+				inline.publish({ title: 'Unrelated change' });
+				expect(inlineA).toHaveBeenCalledOnce();
+				expect(inlineOrder).toEqual(['attach A']);
+				inline.publish({ onAttach: inlineB });
+				expect(inlineOrder).toEqual(['attach A', 'detach A', 'attach B']);
+				inline.publish({ title: 'Another unrelated change' });
+				expect(inlineB).toHaveBeenCalledOnce();
+				expect(inlineHost.querySelector('input')).toBe(inlineInput);
+			} finally {
+				inlineHandle.dispose();
+			}
+			expect(inlineOrder).toEqual(['attach A', 'detach A', 'attach B', 'detach B']);
+			const scope = createScope({ scopeKey: `presentation-signal-ref-${dev}` });
+			const other = createScope({ scopeKey: `presentation-signal-other-${dev}` });
+			const label = __signalAt('presentation-label', 'initial label');
+			const suffix = scope.signal$('suffix', 'initial suffix');
+			const replacement = scope.signal$('replacement', 'replacement label');
+			const textFixture = authoredPresentation<{ first: unknown; last: unknown }>(
+				'AdjacentPresentation',
+				{ first: 'server label', last: 'server suffix' },
+				dev,
+			);
+			const textHost = document.createElement('section');
+			container.append(textHost);
+			textHost.innerHTML = textFixture.html;
+			const paragraph = textHost.querySelector('p')!;
+			textFixture.publish({ first: label, last: suffix }, false);
+			const reads = vi.spyOn(textFixture.state, 'getSnapshot');
+			const abort = new AbortController();
+			const textHandle = runWithSignalOwner(scope, () =>
+				textFixture.attach(paragraph, textFixture.state, { signal: abort.signal }),
+			);
+			try {
+				const originalText = [...paragraph.childNodes].find(
+					(node) => node.nodeValue === 'initial label',
+				);
+				expect(originalText).toBeDefined();
+				reads.mockClear();
+				runWithSignalOwner(other, () => label.set('other document label'));
+				expect(originalText!.nodeValue).toBe('initial label');
+				runWithSignalOwner(scope, () => label.set('connected label'));
+				expect(originalText!.nodeValue).toBe('connected label');
+				expect(reads).not.toHaveBeenCalled();
+				textFixture.publish({ first: replacement });
+				expect(originalText!.nodeValue).toBe('replacement label');
+				reads.mockClear();
+				runWithSignalOwner(scope, () => label.set('retired original'));
+				expect(originalText!.nodeValue).toBe('replacement label');
+				replacement.set('connected replacement');
+				expect(originalText!.nodeValue).toBe('connected replacement');
+				expect(reads).not.toHaveBeenCalled();
+				textFixture.publish({ first: 'constant' });
+				replacement.set('retired replacement');
+				expect(originalText!.nodeValue).toBe('constant');
+				textFixture.publish({ first: label });
+				expect(originalText!.nodeValue).toBe('retired original');
+				abort.abort();
+				const before = paragraph.innerHTML;
+				runWithSignalOwner(scope, () => label.set('owner remains alive'));
+				suffix.set('after abort');
+				expect(paragraph.innerHTML).toBe(before);
+				expect(runWithSignalOwner(scope, () => label.get())).toBe('owner remains alive');
+				expect(textFixture.cleanup).toHaveBeenCalledOnce();
+			} finally {
+				textHandle.dispose();
+				scope.dispose();
+				other.dispose();
+			}
+			const rowsOwner = createScope({ scopeKey: `presentation-rows-${dev}` });
+			const foreignOwner = createScope({ scopeKey: `presentation-foreign-${dev}` });
+			const rowLabel = __signalAt('presentation-row-label', 'owned label');
+			const progress = rowsOwner.signal$('progress', 0);
+			const active = rowsOwner.signal$('active', false);
+			const computeClasses = vi.fn(() => (active.get() ? 'ready active' : 'ready'));
+			const classes = rowsOwner.derived$('classes', computeClasses);
+			const rowFixture = authoredPresentation<{
+				items: Array<{ id: string; label: unknown; progress: unknown; classes: unknown }>;
+			}>(
+				'SignalRowPresentation',
+				{ items: [{ id: 'a', label: 'server', progress: 0, classes: 'ready' }] },
+				dev,
+			);
+			const rowHost = document.createElement('section');
+			container.append(rowHost);
+			rowHost.innerHTML = rowFixture.html;
+			const rowRange = { start: rowHost.firstChild as Comment, end: rowHost.lastChild as Comment };
+			const row = rowHost.querySelector('figure')!;
+			const rowInput = row.querySelector('input')!;
+			rowInput.value = 'native edit';
+			rowInput.focus();
+			rowInput.setSelectionRange(2, 7);
+			const rowProps = { id: 'a', label: rowLabel, progress, classes };
+			rowFixture.publish({ items: [rowProps] }, false);
+			const rowReads = vi.spyOn(rowFixture.state, 'getSnapshot');
+			const rowHandle = runWithSignalOwner(rowsOwner, () =>
+				rowFixture.attach(rowRange, rowFixture.state),
+			);
+			try {
+				computeClasses.mockClear();
+				rowReads.mockClear();
+				for (let index = 1; index <= 25; index++) progress.set(index);
+				expect(row.style.getPropertyValue('--progress')).toBe('25');
+				expect(computeClasses).not.toHaveBeenCalled();
+				expect(rowReads).not.toHaveBeenCalled();
+				expect(row.querySelector('input')).toBe(rowInput);
+				expect(rowInput.value).toBe('native edit');
+				expect(document.activeElement).toBe(rowInput);
+				expect([rowInput.selectionStart, rowInput.selectionEnd]).toEqual([2, 7]);
+				active.set(true);
+				expect(row.className).toBe('ready active');
+				expect(computeClasses).toHaveBeenCalledOnce();
+				runWithSignalOwner(foreignOwner, () => rowLabel.set('wrong owner'));
+				rowFixture.publish({ items: [rowProps, { ...rowProps, id: 'b' }] });
+				expect([...rowHost.querySelectorAll('figcaption')].map((node) => node.textContent)).toEqual(
+					['owned label', 'owned label'],
+				);
+				rowFixture.publish({ items: [{ ...rowProps, id: 'b' }, rowProps] });
+				expect(rowHost.querySelectorAll('figure')[1]).toBe(row);
+				expect(document.activeElement).toBe(rowInput);
+				rowFixture.publish({ items: [{ ...rowProps, id: 'b' }] });
+				expect(rowsOwner.inspect().nodes.find((node) => node.key === 'progress')?.subscribers).toBe(
+					1,
+				);
+				const removed = row.outerHTML;
+				progress.set(30);
+				expect(row.outerHTML).toBe(removed);
+				expect(rowHost.querySelector('figure')!.style.getPropertyValue('--progress')).toBe('30');
+				rowFixture.publish({ items: [] });
+				expect(rowsOwner.inspect().nodes.find((node) => node.key === 'progress')?.subscribers).toBe(
+					0,
+				);
+				runWithSignalOwner(foreignOwner, () => rowFixture.publish({ items: [rowProps] }));
+				expect(rowHost.querySelector('figcaption')!.textContent).toBe('owned label');
+				rowHandle.dispose();
+				expect(rowsOwner.inspect().nodes.find((node) => node.key === 'progress')?.subscribers).toBe(
+					0,
+				);
+				expect(progress.get()).toBe(30);
+			} finally {
+				rowHandle.dispose();
+				rowsOwner.dispose();
+				foreignOwner.dispose();
+			}
+		}
 	});
 
 	it('requires explicit root replacement and releases the previous root exactly once', async () => {

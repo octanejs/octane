@@ -152,6 +152,8 @@ import {
 } from './component-flags.js';
 import { formatClientError } from './error-codes.client.generated.js';
 import { formAuthoringDiagnostics } from './form-diagnostics.js';
+import { isBindingOpenComment } from './dom-binding-protocol.js';
+import { moveNativeNodeBefore } from './dom-focused-move.js';
 import {
 	HYDRATE_STREAM_TOKEN_ATTR,
 	isRendererStreamBoundaryTemplate,
@@ -15408,6 +15410,64 @@ export function htextSwap(posNode: Node | null, value: unknown): Text {
 	return t;
 }
 
+/** @internal Text holes in authored binding views retain an addressable range, including when empty. */
+export function bindingText(posNode: Node | null, value: unknown, marker: string): Text {
+	const text = coerceText(value);
+	const hydration = activeHydration();
+	if (hydration !== null && isBlockOpen(posNode)) {
+		const close = hydration.close(posNode);
+		const existing = posNode.nextSibling;
+		if (existing !== close && existing?.nodeType === 3 && existing.nextSibling === close) {
+			if (existing.nodeValue !== text) existing.nodeValue = text;
+			return existing as Text;
+		}
+		if (existing !== close)
+			throw new TypeError('Octane DOM binding text range does not match its template.');
+		const node = document.createTextNode(text);
+		close.parentNode!.insertBefore(node, close);
+		return node;
+	}
+	const parent = posNode!.parentNode!;
+	const close = document.createComment(HYDRATION_END);
+	(posNode as Comment).data = marker;
+	parent.insertBefore(close, posNode!.nextSibling);
+	const node = document.createTextNode(text);
+	parent.insertBefore(node, close);
+	return node;
+}
+
+const BINDING_VIEW_ROOT = /* @__PURE__ */ Symbol.for('octane.binding.view-root');
+
+/** @internal Authored presentation ranges may not inherit an unrelated caller's boundary. */
+export function bindPresentationView<T extends Function>(view: T, id: string): T {
+	(view as T & { [BINDING_VIEW_ROOT]: string })[BINDING_VIEW_ROOT] = '[b;' + id + ';root';
+	return markComponentFlags(view, COMPONENT_FLAG_BOUNDARY, view.name);
+}
+
+/** @internal Keep historical class ownership beside the full renderer's composed class. */
+export function setBindingClass(
+	element: Element,
+	receipt: string,
+	values: [unknown, unknown[]],
+): void {
+	const snapshot = [normalizeClass(values[0]), values[1].map(normalizeClass)] as const;
+	const classes = [snapshot[0], ...snapshot[1]].filter(Boolean).join(' ');
+	if (element.getAttribute('class') !== classes) setClassAttr(element, classes);
+	const serialized = JSON.stringify(snapshot);
+	if (element.getAttribute(receipt) !== serialized) setStringData(element, receipt, serialized);
+}
+
+/** @internal Attribute-binding comparison ABI for the opt-in class receipt writer. */
+export function setBindingClassIfChanged(
+	value: [unknown, unknown[]],
+	previous: unknown,
+	element: Element,
+	receipt: string,
+): unknown {
+	if (value !== previous) setBindingClass(element, receipt, value);
+	return value;
+}
+
 // ---------------------------------------------------------------------------
 // Hydration navigation helpers. The compiler emits `child`/`sibling` instead of
 // raw `.firstChild`/`.nextSibling` ONLY for templates containing control-flow /
@@ -15434,6 +15494,8 @@ function hydrationMarkerMultiplicity(data: string, open: boolean): number {
 	const marker = open ? HYDRATION_START : HYDRATION_END;
 	if (data === marker) return 1;
 	if (open && (data === HYDRATION_FOR_EMPTY || data === HYDRATION_FOR_ITEMS)) return 1;
+	if (open && (data.startsWith('[b;') || data.startsWith('[f')) && isBindingOpenComment(data))
+		return 1;
 	if (data.length < 2 || data.charCodeAt(0) !== marker.charCodeAt(0)) return 0;
 	// Canonical positive decimal: no signs, whitespace, zero, or leading zeroes.
 	const first = data.charCodeAt(1);
@@ -15526,7 +15588,13 @@ function findMatchingClose(open: Node, matches: WeakMap<Node, Comment>): Comment
 function ssrForMarkerState(node: Node): -1 | 0 | 1 {
 	if (node.nodeType !== 8) return -1;
 	const data = (node as Comment).data;
-	return data === HYDRATION_FOR_EMPTY ? 0 : data === HYDRATION_FOR_ITEMS ? 1 : -1;
+	if (data === HYDRATION_FOR_EMPTY) return 0;
+	if (data === HYDRATION_FOR_ITEMS) return 1;
+	return isBindingOpenComment(data) && data.startsWith('[f')
+		? data.charCodeAt(2) === 48
+			? 0
+			: 1
+		: -1;
 }
 
 /** Logical index-0 child: `node.firstChild` for both client and hydration. */
@@ -16002,7 +16070,16 @@ export function bindSignalText(
 	site: string,
 	onlyChild = false,
 	seededText: 1 | undefined = undefined,
+	bindingMarker?: string,
 ): unknown {
+	if (previous === undefined && bindingMarker !== undefined) {
+		const existing = activeHydration() !== null ? position.nextSibling : null;
+		previous = bindingText(
+			position,
+			existing?.nodeType === 3 ? existing.nodeValue : '',
+			bindingMarker,
+		);
+	}
 	// Only the compiler's fresh native template placeholder is already owned.
 	// Hydration still goes through htext to adopt and advance the server cursor.
 	if (previous === undefined && onlyChild && seededText === 1 && activeHydration() === null) {
@@ -27340,6 +27417,7 @@ export function bindSignalChild(
 	compactable?: boolean,
 	// Compiler proof that this hole owns the host's markerless only-child ABI.
 	onlyChild?: boolean,
+	bindingMarker?: string,
 ): unknown {
 	const prior =
 		typeof previous === 'object' &&
@@ -27351,7 +27429,9 @@ export function bindSignalChild(
 	if (!isSignalHandle(value)) {
 		const text = onlyChild
 			? childTextHole(parentScope, slotKey, domParent, value, cachedText)
-			: (childSlot(parentScope, slotKey, domParent, value, anchor, ownEnd, ownsHost, compactable),
+			: (bindingMarker === undefined
+					? childSlot(parentScope, slotKey, domParent, value, anchor, ownEnd, ownsHost, compactable)
+					: bindingChildSlot(parentScope, slotKey, domParent, value, bindingMarker, anchor, ownEnd),
 				null);
 		if (prior !== null) {
 			if (TRANSITION_JOURNAL !== null) journalBag();
@@ -27366,6 +27446,8 @@ export function bindSignalChild(
 	if (prior !== null && !prior.disposed && prior.handle === value) {
 		const next = readSignalBinding(value);
 		if (onlyChild) prior.text = childTextHole(parentScope, slotKey, domParent, next, cachedText);
+		else if (bindingMarker !== undefined)
+			bindingChildSlot(parentScope, slotKey, domParent, next, bindingMarker, anchor, ownEnd);
 		else childSlot(parentScope, slotKey, domParent, next, anchor, ownEnd, ownsHost, compactable);
 		prior.value = next;
 		prior.state = parentScope.slots[slotKey] as ChildSlot | undefined;
@@ -27374,7 +27456,9 @@ export function bindSignalChild(
 	const initial = readSignalBinding(value);
 	const text = onlyChild
 		? childTextHole(parentScope, slotKey, domParent, initial, cachedText)
-		: (childSlot(parentScope, slotKey, domParent, initial, anchor, ownEnd, ownsHost, compactable),
+		: (bindingMarker === undefined
+				? childSlot(parentScope, slotKey, domParent, initial, anchor, ownEnd, ownsHost, compactable)
+				: bindingChildSlot(parentScope, slotKey, domParent, initial, bindingMarker, anchor, ownEnd),
 			null);
 	if (TRANSITION_JOURNAL !== null) journalBag();
 	const binding: DirectSignalChildBinding = {
@@ -27396,6 +27480,35 @@ export function bindSignalChild(
 		else (WIP_CAPTURE.renderCleanups ??= []).push(finish);
 	}
 	return binding;
+}
+
+/** @internal Address an ordinary renderable slot without narrowing its value semantics. */
+export function bindingChildSlot(
+	parentScope: Scope,
+	slotKey: number,
+	domParent: Node,
+	value: unknown,
+	marker: string,
+	anchor?: Node | null,
+	ownEnd?: boolean,
+): void {
+	childSlot(
+		parentScope,
+		slotKey,
+		domParent,
+		value,
+		anchor,
+		ownEnd,
+		undefined,
+		false,
+		true,
+		undefined,
+		undefined,
+		undefined,
+		undefined,
+		undefined,
+		marker,
+	);
 }
 
 export function childSlot(
@@ -27426,6 +27539,7 @@ export function childSlot(
 	compiledMapFlags?: number,
 	compiledMapDeps?: any[],
 	mappedFallback?: boolean,
+	bindingMarker?: string,
 ): void {
 	if (CURRENT_BLOCK?.pending && !CURRENT_BLOCK.crossRenderUpdate) return;
 	if (IMPLICIT_SIGNAL_CHILD_DEPTH === 0) {
@@ -27451,6 +27565,8 @@ export function childSlot(
 						ownEnd,
 						ownsHost,
 						compactable,
+						undefined,
+						bindingMarker,
 					),
 				);
 			} finally {
@@ -27502,6 +27618,7 @@ export function childSlot(
 				compiledMapFlags,
 				compiledMapDeps,
 				mappedFallback,
+				bindingMarker,
 			),
 		);
 		return;
@@ -27636,6 +27753,7 @@ export function childSlot(
 				compiledMapFlags,
 				compiledMapDeps,
 				mappedFallback,
+				bindingMarker,
 			);
 			return;
 		}
@@ -27693,6 +27811,14 @@ export function childSlot(
 				hydration.claimRootRemainder(end.nextSibling);
 			}
 			hydration.node = start.nextSibling;
+		} else if (bindingMarker !== undefined) {
+			// An authored binding value retains its ordinary child-slot lifecycle,
+			// but its range must remain addressable even while empty or primitive.
+			start = document.createComment(bindingMarker);
+			end = ownEnd && anchor != null ? (anchor as Comment) : document.createComment(HYDRATION_END);
+			end.data = HYDRATION_END;
+			domParent.insertBefore(start, anchor ?? null);
+			if (end !== anchor) domParent.insertBefore(end, anchor ?? null);
 		} else if (ownEnd && anchor != null) {
 			// Client mount, dedicated placeholder: reuse the slot's own `<!>` as the end
 			// marker — content inserts before it just the same. Saves a comment + an
@@ -36796,48 +36922,13 @@ function moveFocusedNodeBefore(
 	} else if (snapshots.focused.ownerDocument === node.ownerDocument) {
 		snapshot = snapshots;
 	}
-	const focused = snapshot?.focused ?? null;
-	if (
-		focused === null ||
-		(node !== focused && (node.nodeType !== 1 || !(node as Element).contains(focused)))
-	) {
-		parent.insertBefore(node, anchor);
-		return;
-	}
-
-	const moveBefore = (parent as Node & { moveBefore?: (node: Node, anchor: Node | null) => void })
-		.moveBefore;
-	// Chromium's state-preserving move keeps input composition alive but still
-	// collapses live Range selections inside a moved content-editable subtree.
-	if (!snapshot!.contentEditable && typeof moveBefore === 'function') {
-		moveBefore.call(parent, node, anchor);
-		return;
-	}
-
-	// insertBefore detaches an existing node, which ends a trusted keyboard
-	// composition even when the commit later restores focus. Older Chromium,
-	// Samsung Internet, and editable Range selections instead keep the focused
-	// node attached and rotate only its intervening siblings around it.
-	if (node === anchor || node.nextSibling === anchor) return;
-	if (
-		anchor === null ||
-		(node.compareDocumentPosition(anchor) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
-	) {
-		let cursor = node.nextSibling;
-		while (cursor !== anchor) {
-			const next = cursor!.nextSibling;
-			parent.insertBefore(cursor!, node);
-			cursor = next;
-		}
-	} else {
-		const end = node.nextSibling;
-		let cursor: Node | null = anchor;
-		while (cursor !== node) {
-			const next: Node | null = cursor!.nextSibling;
-			parent.insertBefore(cursor!, end);
-			cursor = next;
-		}
-	}
+	moveNativeNodeBefore(
+		parent,
+		node,
+		anchor,
+		snapshot?.focused ?? null,
+		snapshot?.contentEditable ?? false,
+	);
 }
 
 /**
@@ -36952,6 +37043,8 @@ function coalesceHydratedRanges(
 		owner?: CoalescedRangeOwner,
 	): HydrationRangeGroup | null {
 		if (!isBlockOpen(startNode) || !isBlockClose(endNode) || startNode === endNode) return null;
+		// Binding receipts are observable to later renderer-free adoption; never compact them away.
+		if (isBindingOpenComment(startNode.data)) return null;
 		if (startNode.parentNode === null || startNode.parentNode !== endNode.parentNode) return null;
 		const openDepth = hydrationMarkerMultiplicity(startNode.data, true);
 		const closeDepth = hydrationMarkerMultiplicity(endNode.data, false);
@@ -38355,6 +38448,18 @@ export function hydrateRoot(
 		while (firstNode !== null && (firstNode.nodeType === 10 || isRendererHydrationStyle(firstNode)))
 			firstNode = firstNode.nextSibling;
 		const hydration = new HydrationCapability(rootBlock, firstNode, seeds);
+		if (
+			firstNode?.nodeType === 8 &&
+			(firstNode as Comment).data ===
+				(body as ComponentBody & { [BINDING_VIEW_ROOT]?: string })[BINDING_VIEW_ROOT]
+		) {
+			// A marked entry view has one compiler-owned root pair, even when its
+			// authored output is initially empty. Only that exact entry may consume
+			// it: an unmarked parent may begin with a marked child's own range.
+			rootBlock.startMarker = firstNode;
+			rootBlock.endMarker = hydration.close(firstNode);
+			hydration.node = firstNode.nextSibling;
+		}
 		if (nativeManifest !== undefined)
 			hydration.nativeAdoption = ownNativeAdoption(rootBlock, nativeManifest);
 		hydration.passthroughRanges =

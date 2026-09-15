@@ -110,6 +110,51 @@ ownership. This first slice excludes structural rendering and direct
 `value`/`checked` authoring; the existing control adapter above remains in use.
 It is not a new signal graph or a replacement for stream-result authority.
 
+The first integration did **not** deliver the intended migration to canonical
+authored presentation. Manual DOM operations, HTML builders, class/attribute
+writers, marker readback, observers, and reconciliation maps remained throughout
+the host. Successful resource adoption and smaller native cleanups do not close
+that omission. The fixed-element binding slice above is an implementation limit,
+not the desired endpoint of this RFC.
+
+The required next implementation uses one authored view for SSR and live
+presentation, including text, conditional content, and keyed rows. It must adopt
+real native elements and explicitly owned attribute, class-token, and style
+channels while leaving unowned descendants opaque. It must support a wrapper
+with both owned controls and externally managed siblings, not merely an empty
+element or an artificial replacement root. Keyed adoption must identify the
+historical server rows even when live state advanced before activation.
+
+Completion requires deleting the replaced presentation machinery in real
+consumers. A shared imperative HTML builder, a signal effect calling an old
+repaint routine, or a resource-only migration does not meet that requirement.
+Native measurement, focus, composition, form serialization, and external range
+ownership remain legitimate adapters; each retained imperative presentation path
+must have an explicit owner and reason. Do not remove a readback observer until
+every producer publishes the required state synchronously. These capabilities
+must preserve early controls and streaming authority without pulling the general
+client renderer into a renderer-free route or silently increasing its budget.
+
+Fine-grained native bindings should reuse the existing signal graph. A direct
+signal-valued class or fixed CSS property subscribes to that handle and updates
+only its owned channel; it must not rerun the entire presentation snapshot on
+each unrelated signal notification. Runtime Symbol identity is authoritative,
+not a variable's `$` suffix. An explicit `.get()` remains a sampled value; the
+surrounding source publication or explicit refresh samples it again. Replacing a
+handle, retiring a keyed row, and aborting the view must release its subscription
+without retiring the shared document state.
+
+Style adapters may supply an exact imported-factory contract through
+`knownAttributeSpreads`. The compiler evaluates that pure factory once and
+projects its declared stable own data fields. For StyleX, class and optional
+serialized inline style come from one ordered merge, preserving property
+precedence. The adapter must not expand one authored call into three independent
+calls, and fine-grained subscriptions must not split conflicting style variants
+into independently concatenated class tokens. Dynamic style functions remain
+ordinary signal derivations; the integration must not create a parallel state
+graph. Compiler work, initial subscriptions, emitted bytes, and update work are
+all part of the performance accounting.
+
 Integration should replace the host's bespoke state carrier, early-control
 handoff, and stream receiver where these primitives cover the same responsibility,
 not mirror state through old and new stores. Storage keys, draft recovery policy,
@@ -133,6 +178,16 @@ the exact displayed HTML. Arrival order is not freshness. A to B to A creates a
 new selection generation. Cached revision-10 HTML uses its revision-10 frame even
 if the live graph has advanced to revision 11.
 
+On A to B to A navigation, the application may show cached A immediately and
+revalidate or reconnect to newer accepted server work. It must not resubmit the
+generation merely because A's view was disposed. Client-owned drafts, selected
+map places, and viewport state are keyed by conversation and outlive the visible
+widget. A disposed widget may be reconstructed with those values; retaining its
+actual native nodes or SDK instance is an optional keepalive policy with a memory
+cost, not a continuity guarantee. A fresh read on return is compatible with this
+contract. Every visit has a new presentation generation, so frames from the prior
+visit cannot mutate the current view without passing the new adoption checks.
+
 Dormant regions retain early input and native focus; validated placement preserves
 them. After native activation the renderer alone owns its DOM range; behavior-only
 activation leaves the host in charge of structure and claims only explicit
@@ -142,6 +197,32 @@ required. Leaving a view ends its subscription, not accepted server generation.
 The host owns completion, timeout, explicit Stop, durable receipts, and reconnect.
 Uncertain actions retain their original operation ID and selection, without
 automatic duplicate submission.
+
+### Rich, continuously updating conversation
+
+A representative acceptance case interleaves several kinds of work in the same
+conversation. A useful title appears immediately and may be revised independently
+while visible thinking/progress content, response text, keyed lists, and links
+continue changing. A map starts as a placeholder, becomes an interactive widget,
+and receives more places during the same stream. Title or map readiness must not
+hold back an unrelated text or history update.
+
+The renderer-free path must use the same authored Octane views for the initial
+SSR and each subsequent presentation change. Stable map places and list rows
+retain their native identity; incoming data does not reset the user's selected
+place, map viewport, focus, or editor contents. A map provider's own library may
+activate behind an explicitly opaque boundary. Its implementation and asset cost
+are separate from Octane's renderer, and neither should load merely because a
+placeholder was emitted.
+
+The maintained workload must exercise interleaving, placeholder upgrade, keyed
+insertion/update/removal, safe link updates, and independent title revision. It
+must also navigate away mid-stream and prove that late results cannot mutate the
+new conversation, that widget/view subscriptions are released, and that accepted
+server work is not accidentally canceled merely because its view was retired.
+Report exact HTML, inline script, CSS, startup, first interaction, widget activation,
+and eventual deduplicated asset costs. A deterministic map fixture proves the
+Octane contract; it is not evidence about a production map SDK's behavior or size.
 
 ## Relation to the original Octane APIs
 
@@ -662,6 +743,17 @@ The acceptance bar is observable:
    HTML and does not pay duplicate legacy/new state-carrier costs. Measure inline
    capture, live signal/behavior support, later islands, HTML/data, and CSS
    separately; a generic hydration fixture does not establish this acceptance.
+9. Source-faithful composer, standalone login, auth dialog, attachment, and safety
+   views share authored SSR/live presentation and delete their redundant DOM
+   builders, selectors, repair observers, and row maps. Existing controls retain
+   identity, selection, composition, and synchronous Send/Stop behavior. Keyed
+   survivors retain per-item lifetime; removing and re-adopting a view cannot
+   revive stale subscriptions or retire shared document state. Independently
+   owned tokens, styles, and opaque descendants survive updates and cleanup.
+   Report production HTML, inline JS, critical CSS, and deduplicated startup,
+   first-interaction, Send, and deferred asset costs against the same baseline.
+   Framework fixtures and passing resource tests alone do not establish the
+   downstream deletion or native-device acceptance.
 
 ## Engineering decisions to verify
 

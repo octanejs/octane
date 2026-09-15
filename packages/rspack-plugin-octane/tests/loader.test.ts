@@ -464,10 +464,13 @@ describe('octane Rspack loader', () => {
 
 	it.each([true, false])('forwards strong: %s to the neutral compiler', (strong) => {
 		mocks.transform.mockReturnValue(null);
-		runLoader({ options: { strong } });
+		const knownAttributeSpreads = [
+			{ source: '@stylexjs/stylex', imported: 'attrs', fields: ['class', 'style'] },
+		];
+		runLoader({ options: { strong, knownAttributeSpreads } });
 
 		expect(mocks.createOctaneCompiler).toHaveBeenCalledWith(
-			expect.objectContaining({ root: '/project', strong }),
+			expect.objectContaining({ root: '/project', strong, knownAttributeSpreads }),
 		);
 	});
 

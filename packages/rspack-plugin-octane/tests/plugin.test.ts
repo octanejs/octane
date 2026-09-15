@@ -269,12 +269,18 @@ describe('OctaneRspackPlugin', () => {
 
 	it.each([true, false])('forwards strong: %s to discovery and module compilation', (strong) => {
 		const compiler = createCompiler('web');
-		applyPlugin(new OctaneRspackPlugin({ strong }), compiler);
+		const knownAttributeSpreads = [
+			{ source: '@stylexjs/stylex', imported: 'attrs', fields: ['class', 'style'] },
+		];
+		applyPlugin(new OctaneRspackPlugin({ strong, knownAttributeSpreads }), compiler);
 
 		expect(mocks.createOctaneCompiler).toHaveBeenCalledWith(
-			expect.objectContaining({ root: '/project', strong }),
+			expect.objectContaining({ root: '/project', strong, knownAttributeSpreads }),
 		);
-		expect(compiler.options.module.rules[0].use[0].options).toMatchObject({ strong });
+		expect(compiler.options.module.rules[0].use[0].options).toMatchObject({
+			strong,
+			knownAttributeSpreads,
+		});
 	});
 
 	it('specializes compiler and runtime resolution by Rspack layer', () => {
@@ -493,6 +499,28 @@ describe('OctaneRspackPlugin', () => {
 		expect((strong.options as any).cache.version).not.toBe((dom.options as any).cache.version);
 		expect((explicitCompatibility.options as any).cache.version).toBe(
 			(dom.options as any).cache.version,
+		);
+		const knownShape = createCachedCompiler();
+		const changedShape = createCachedCompiler();
+		const sameShape = createCachedCompiler();
+		for (const [compiler, fields] of [
+			[knownShape, ['class', 'style']],
+			[sameShape, ['class', 'style']],
+			[changedShape, ['class']],
+		] as const) {
+			applyPlugin(
+				new OctaneRspackPlugin({
+					knownAttributeSpreads: [{ source: '@stylexjs/stylex', imported: 'attrs', fields }],
+				}),
+				compiler,
+			);
+		}
+		expect((knownShape.options as any).cache.version).not.toBe((dom.options as any).cache.version);
+		expect((knownShape.options as any).cache.version).not.toBe(
+			(changedShape.options as any).cache.version,
+		);
+		expect((knownShape.options as any).cache.version).toBe(
+			(sameShape.options as any).cache.version,
 		);
 	});
 

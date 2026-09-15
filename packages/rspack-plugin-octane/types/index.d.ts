@@ -1,5 +1,5 @@
 import type { Compiler, RspackPluginInstance } from '@rspack/core';
-import type { OctaneCssModuleConstants } from 'octane/compiler';
+import type { KnownAttributeSpread, OctaneCssModuleConstants } from 'octane/compiler';
 
 export type { OctaneCssModuleConstants } from 'octane/compiler';
 
@@ -144,6 +144,8 @@ export interface OctaneRspackLoaderOptions {
 	 * @default false
 	 */
 	strong?: boolean;
+	/** Fixed native-attribute shapes for trusted imported spread helpers. */
+	knownAttributeSpreads?: readonly KnownAttributeSpread[];
 	/**
 	 * Path fragments excluded from the plain `.ts`/`.js` hook-slot pass. With
 	 * `requireDirective`, excluded paths are exempt from Octane ownership

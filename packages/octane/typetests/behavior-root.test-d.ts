@@ -9,10 +9,13 @@ import {
 } from 'octane';
 import {
 	adoptBindings,
+	mountBindings,
 	attachBehaviorRoot as attachFocusedBehaviorRoot,
 	type BindingHandle,
 	type BindingOptions,
 	type BindingSource,
+	type BindingRange,
+	type BindingMountTarget,
 } from 'octane/behavior';
 
 const container = document.createElement('main');
@@ -75,7 +78,7 @@ const presentation: BindingSource<{ type: 'button' | 'submit'; disabled: boolean
 	getSnapshot: () => ({ type: 'submit', disabled: false }),
 	subscribe: () => () => {},
 };
-const bindingOptions: BindingOptions = { signal: lifetime.signal };
+const bindingOptions: BindingOptions = { signal: lifetime.signal, restoreStyles: true };
 const binding: BindingHandle = adoptBindings(
 	container,
 	PrimaryAction,
@@ -84,6 +87,19 @@ const binding: BindingHandle = adoptBindings(
 );
 binding.refresh();
 binding.dispose();
+
+const first = document.createComment('first');
+const last = document.createComment('last');
+const presentationRange: BindingRange = { start: first, end: last };
+const mountTarget: BindingMountTarget = { parent: container, before: last };
+const mounted: BindingHandle = mountBindings(
+	mountTarget,
+	PrimaryAction,
+	presentation,
+	bindingOptions,
+);
+adoptBindings(presentationRange, PrimaryAction, presentation, bindingOptions);
+mounted.dispose({ preserveDOM: false });
 
 adoptBindings(container, PrimaryAction, {
 	// @ts-expect-error — the source cannot widen the component's required prop types.

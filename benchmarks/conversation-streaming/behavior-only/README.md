@@ -1,9 +1,14 @@
 # Renderer-free streaming behavior workload
 
-This production-built workload is separate from the parent suite's independently
+The default production-built workload is separate from the parent suite's independently
 hydrated component fixture. It keeps conversation/history lists server-owned and
 never imports a client component,
 `hydrateRoot`, or a rendering engine in the browser graph.
+
+The separate `richPresentation` comparison below uses the same authored view for
+SSR and live text, conditional content, keyed lists, and a map fixture. Its
+`renderer` control deliberately retains the full renderer; all other modes keep
+the renderer-free dependency guard.
 
 The host emits public `earlySignalBootstrapScript()` before interactive HTML. The
 SSR shell contains the real native signal manifest and selected query
@@ -97,6 +102,9 @@ node benchmarks/conversation-streaming/behavior-only/build.mjs --composer-receip
 # Equal-work primary-action projection comparison, in separate output directories:
 node benchmarks/conversation-streaming/behavior-only/build.mjs --composer-receipts --bundler=vite --projection=manual
 node benchmarks/conversation-streaming/behavior-only/build.mjs --composer-receipts --bundler=vite --projection=authored
+# Rich authored streaming and its equal-work full-renderer control:
+node benchmarks/conversation-streaming/behavior-only/build.mjs --bundler=vite --rich-presentation=authored
+node benchmarks/conversation-streaming/behavior-only/build.mjs --bundler=vite --rich-presentation=renderer
 ```
 
 `BENCH_BUILD_DIR=/absolute/artifact/directory` selects a durable output directory.
@@ -162,6 +170,37 @@ Typecheck the authored fixture with:
 ```sh
 node node_modules/@tsrx/typescript-plugin/dist/tsc.js --noEmit -p benchmarks/conversation-streaming/behavior-only/tsconfig.json
 ```
+
+## Rich authored presentation
+
+Import `runRichBrowser` from `rich/run-browser.mjs` with an explicitly launched
+browser and `{ output, iterations: 3, presentation: 'authored' }`. Run the same
+workload separately with `presentation: 'renderer'` and the same browser and
+toolchain. Each mode has one excluded warmup and the requested measured samples.
+Both use the same server shell, query sources, native draft control, data
+projection, authored rich view, map controls, and navigation policy.
+
+After one shared authorization, four interleaved body/history waves independently
+revise the title, progress, paragraphs, links, and map places. Native interaction
+upgrades a placeholder to an SVG map, selects a place, and changes its viewport
+before the stream finishes. One wave removes a prior row and reorders survivors;
+the final wave reintroduces that row with fresh native nodes. Surviving nodes and
+map intent must stay intact.
+
+The navigation lane disposes A's visible presentation, mounts B, lets A's accepted
+server work finish, and reconstructs A from the latest retained results and
+per-conversation map intent. Late A results cannot change B. The document result
+bridge outlives these view subscriptions; returning must not restart the loaders.
+This is local SPA presentation continuity, not a claim of complete cached-HTML
+placement or a production generation-reconnect protocol.
+
+`rich-browser.json` records original-node identity, subscription and server trace
+assertions, DOM-observation marks, HTML/inline/CSS raw and compressed bytes, and
+startup/map-activation/eventual requested asset sets. Deduplicate physical files
+against `build.json` before totaling each phase. The deliberately held auth and
+400 ms inter-wave waits enable interaction; they are not renderer CPU timings.
+The small cold zoom helper is not a production map SDK or its loading cost.
+WebKit results are not native Safari or iOS device qualification.
 
 ## Observation limits
 

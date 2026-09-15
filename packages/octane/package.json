@@ -44,6 +44,9 @@
     "./hydration/streamed-signals": "./src/hydration/streamed-signals.ts",
     "./behavior": "./src/behavior-root.ts",
     "./dom-bindings": "./src/dom-bindings.ts",
+    "./dom-binding-program": "./src/dom-binding-program.ts",
+    "./dom-binding-classes": "./src/dom-binding-classes.ts",
+    "./dom-binding-signals": "./src/dom-binding-signals.ts",
     "./react/server": "./src/react/server.ts",
     "./server": "./src/server/index.ts",
     "./signals": "./src/signals/index.ts",
@@ -127,6 +130,18 @@
       "./dom-bindings": {
         "types": "./dist/dom-bindings.d.ts",
         "default": "./dist/dom-bindings.js"
+      },
+      "./dom-binding-program": {
+        "types": "./dist/dom-binding-program.d.ts",
+        "default": "./dist/dom-binding-program.js"
+      },
+      "./dom-binding-classes": {
+        "types": "./dist/dom-binding-classes.d.ts",
+        "default": "./dist/dom-binding-classes.js"
+      },
+      "./dom-binding-signals": {
+        "types": "./dist/dom-binding-signals.d.ts",
+        "default": "./dist/dom-binding-signals.js"
       },
       "./react/server": {
         "types": "./dist/react/server.d.ts",

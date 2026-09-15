@@ -33,6 +33,9 @@ export interface OctaneCssModuleConstants {
 /** The version checked by compiler-emitted external Valdi adapter calls. */
 export const VALDI_COMPILER_ABI_VERSION: 1;
 
+/** Compiler-owned native presentation, known-shape spreads, and direct signal artifacts. */
+export const DOM_BINDING_COMPILER_ABI_VERSION: 1;
+
 export type ValdiWriterEffectiveType = 'boolean' | 'number' | 'string' | 'function' | 'style';
 
 /** An exact authored-expression fact supplied by an integration's type checker. */
@@ -51,6 +54,21 @@ export interface ValdiWriterFacts {
 	expressions: readonly ValdiWriterExpressionFact[];
 }
 
+/**
+ * A provider guarantee for a pure factory returning nullish or an object with
+ * exactly these own data fields. Result fields must remain stable throughout
+ * the render; getters or a shared result mutated during render are not valid.
+ */
+export interface KnownAttributeSpread {
+	/** Exact module specifier and imported export (`*` for a namespace). */
+	source: string;
+	imported: string;
+	/** Statically named member path from the imported binding to the factory. */
+	members?: readonly string[];
+	/** Exact stable own native presentation data fields; never accessors. */
+	fields: readonly string[];
+}
+
 export interface CompileOptions {
 	mode?: 'client' | 'server';
 	hmr?: boolean | 'vite' | 'webpack';
@@ -67,6 +85,8 @@ export interface CompileOptions {
 	dataCallbackHooks?: readonly string[];
 	/** Exact authored-source facts from octane/compiler/typescript. */
 	textTypeFacts?: TextTypeFacts;
+	/** Trusted provider contracts for pure, fixed-shape native attribute factories. */
+	knownAttributeSpreads?: readonly KnownAttributeSpread[];
 	/** Optional exact attribute-expression proofs; used only by the Valdi target. */
 	valdiWriterFacts?: ValdiWriterFacts;
 	/**

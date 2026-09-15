@@ -26,6 +26,7 @@ export { trustHTML, type TrustedHTML } from './trusted-html.js';
 // ---------------------------------------------------------------------------
 
 import { resolveHookPath } from './hook-slot-cache.js';
+import { encodeBindingKey, isBindingOpenComment, type BindingKey } from './dom-binding-protocol.js';
 
 import {
 	BLOCK_OPEN,
@@ -1897,6 +1898,20 @@ export function ssrHtml(html: string): string {
 	return typeof html === 'string' ? (new ServerHtml(html) as unknown as string) : html;
 }
 
+const BINDING_HTML_ROOT = /* @__PURE__ */ Symbol.for('octane.binding.html');
+
+/** @internal Preserve the existing component range while identifying an authored binding view. */
+export function ssrBindingHtml(html: string, id: string): string {
+	const output = new ServerHtml(html) as ServerHtml & { [BINDING_HTML_ROOT]: string };
+	output[BINDING_HTML_ROOT] = '[b;' + id + ';root';
+	return output as unknown as string;
+}
+
+/** @internal Match the client definition-site boundary capability. */
+export function bindPresentationView<T extends Function>(view: T, _id: string): T {
+	return markComponentFlags(view, COMPONENT_FLAG_BOUNDARY, view.name);
+}
+
 function serverComponentOutput(out: unknown, scope: SSRScope): string {
 	if (out == null) return '';
 	if (typeof out === 'string') return escapeHtml(out);
@@ -2010,6 +2025,23 @@ export function ssrChild(v: unknown, scope: SSRScope): string {
 	}
 	if (probingDangerHtmlChild(v)) return '';
 	return ssrChildValue(v, scope, true);
+}
+
+/** @internal Give an authored child slot an identity without adding a second hydration range. */
+export function ssrBindingChild(value: unknown, scope: SSRScope, marker: string): string {
+	const html = ssrChild(value, scope);
+	if (!MARKERS) return html;
+	// Ordinary renderables already own exactly one child-slot range. The private
+	// compiled-HTML carrier is the sole unframed exception.
+	const openingEnd = html.indexOf('-->');
+	const framed =
+		html.startsWith(BLOCK_OPEN) ||
+		(html.startsWith('<!--') &&
+			openingEnd !== -1 &&
+			isBindingOpenComment(html.slice(4, openingEnd)));
+	const content =
+		framed && html.endsWith(BLOCK_CLOSE) ? html.slice(openingEnd + 3, -BLOCK_CLOSE.length) : html;
+	return ssrBindingBlock(content, marker);
 }
 
 function ssrChildValue(
@@ -2456,6 +2488,34 @@ function ssrDescriptorContent(v: unknown, scope: SSRScope): string {
  */
 export function ssrBlock(content: string): string {
 	return MARKERS ? BLOCK_OPEN + content + BLOCK_CLOSE : String(content);
+}
+
+/** @internal Opt-in identity payload on an otherwise ordinary hydration range. */
+export function ssrBindingBlock(content: string, marker: string): string {
+	return MARKERS ? '<!--' + marker + '-->' + content + BLOCK_CLOSE : String(content);
+}
+
+/** @internal Authenticate keyed item identity before emitting any item HTML. */
+export function ssrBindingKey(key: unknown, seen: Set<string>): string {
+	const encoded = encodeBindingKey(key as BindingKey);
+	if (seen.has(encoded)) throw new TypeError('Octane DOM bindings require unique list keys.');
+	seen.add(encoded);
+	return encoded;
+}
+
+/** @internal One evaluation supplies both presentation classes and their adoption receipt. */
+export function ssrBindingClass(receipt: string, values: [unknown, unknown[]]): string {
+	const snapshot = [normalizeClass(values[0]), values[1].map(normalizeClass)] as const;
+	const classes = [snapshot[0], ...snapshot[1]].filter(Boolean).join(' ');
+	return (
+		' class="' +
+		escapeAttr(classes) +
+		'" ' +
+		receipt +
+		'="' +
+		escapeAttr(JSON.stringify(snapshot)) +
+		'"'
+	);
 }
 
 /**
@@ -4500,6 +4560,7 @@ function renderComponentFramed(
 	// componentSlot(inherit) borrows the parent range instead of adopting.
 	inherit?: boolean,
 	instanceKey?: string,
+	bindingMarker?: string,
 ): string {
 	const previous = captureServerComponentContext();
 	const parentScope = parent ?? previous.scope;
@@ -4575,7 +4636,13 @@ function renderComponentFramed(
 		// An inherit-range site (M3) skips the wrap: the parent's own pair bounds
 		// this output, and the client borrows it instead of adopting.
 		nativeCompleted = true;
-		return MARKERS && !inherit ? BLOCK_OPEN + inner + BLOCK_CLOSE : inner;
+		if (!MARKERS || inherit) return inner;
+		const marker =
+			bindingMarker ??
+			(out !== null && typeof out === 'object'
+				? (out as { [BINDING_HTML_ROOT]?: string })[BINDING_HTML_ROOT]
+				: undefined);
+		return (marker === undefined ? BLOCK_OPEN : '<!--' + marker + '-->') + inner + BLOCK_CLOSE;
 	} catch (error) {
 		throw normalizeThrownServerThenable(error);
 	} finally {
@@ -4607,6 +4674,7 @@ export function ssrComponent(
 	key?: unknown,
 	identityScoped?: boolean,
 	invocationSite?: string,
+	bindingMarker?: string,
 ): string {
 	// A runtime-resolved Activity is a symbol, not a callable component. Keep its
 	// original identity for async keys, then use the stable cold body below. A
@@ -4725,6 +4793,7 @@ export function ssrComponent(
 			frame,
 			inherit,
 			signalInstanceKey,
+			bindingMarker,
 		);
 	} finally {
 		if (identityScoped !== true) ASYNC_SCOPE = previousIdentityScope;
@@ -4742,11 +4811,21 @@ export function ssrComponentNS(
 	inherit?: boolean,
 	key?: unknown,
 	invocationSite?: string,
+	bindingMarker?: string,
 ): string {
 	const previous = NEXT_COMPONENT_NAMESPACE;
 	NEXT_COMPONENT_NAMESPACE = namespace;
 	try {
-		return ssrComponent(parent, comp, props, inherit, key, undefined, invocationSite);
+		return ssrComponent(
+			parent,
+			comp,
+			props,
+			inherit,
+			key,
+			undefined,
+			invocationSite,
+			bindingMarker,
+		);
 	} finally {
 		NEXT_COMPONENT_NAMESPACE = previous;
 	}
@@ -7817,6 +7896,10 @@ function runFullFramedPass(
 		// createElement descriptor that must render through ssrChild.
 		const out = invokeComponentBody(component, props, root, FRAME);
 		body = serverComponentOutput(out, root);
+		if (markers && out !== null && typeof out === 'object') {
+			const marker = (out as { [BINDING_HTML_ROOT]?: string })[BINDING_HTML_ROOT];
+			if (marker !== undefined) body = ssrBindingBlock(body, marker);
+		}
 		nativePassCompleted = true;
 	} catch (err) {
 		err = normalizeThrownServerThenable(err);
