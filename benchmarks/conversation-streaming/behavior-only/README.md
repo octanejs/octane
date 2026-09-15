@@ -181,20 +181,29 @@ Both use the same server shell, query sources, native draft control, data
 projection, authored rich view, map controls, and navigation policy.
 
 After one shared authorization, four interleaved body/history waves independently
-revise the title, progress, paragraphs, links, and map places. Native interaction
-upgrades a placeholder to an SVG map, selects a place, and changes its viewport
-before the stream finishes. One wave removes a prior row and reorders survivors;
-the final wave reintroduces that row with fresh native nodes. Surviving nodes and
-map intent must stay intact.
+revise the title, progress, paragraphs, links, and map places. The `stay` identity
+lane activates the initially cold map before releasing authorization so it observes
+every place-row lifetime. An observer captures the first nodes independently of
+later click timing. One wave removes a prior row and reorders survivors; the final
+wave reintroduces that row with fresh native nodes. Surviving nodes and map intent
+must stay intact.
 
-The navigation lane disposes A's visible presentation, mounts B, lets A's accepted
-server work finish, and reconstructs A from the latest retained results and
+The `roundtrip` lane instead upgrades the placeholder through a cold map import
+after initial streamed content appears, then selects a place and changes the
+viewport. Its `postActivationState` is sampled after map visibility: incomplete
+flags prove the stream was still running at that observation, while complete flags
+leave the exact activation timing uncertain. Completed-stream catch-up needs
+separate evidence that the map import remained held until after stream completion.
+It does not assert deletion of place lifetimes that preceded map activation.
+
+The navigation lane disposes A's visible presentation, mounts B, lets any remaining
+accepted A server work finish, and reconstructs A from the latest retained results and
 per-conversation map intent. Late A results cannot change B. The document result
 bridge outlives these view subscriptions; returning must not restart the loaders.
 This is local SPA presentation continuity, not a claim of complete cached-HTML
 placement or a production generation-reconnect protocol.
 
-`rich-browser.json` records original-node identity, subscription and server trace
+`rich-browser.json` records post-activation state, original-node identity, subscription and server trace
 assertions, DOM-observation marks, HTML/inline/CSS raw and compressed bytes, and
 startup/map-activation/eventual requested asset sets. Deduplicate physical files
 against `build.json` before totaling each phase. The deliberately held auth and

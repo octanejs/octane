@@ -51,8 +51,16 @@ export async function runRichBrowser(
 				try {
 					await page.addInitScript(() => {
 						window.__richMarks = [];
+						window.__richIdentity = {};
 						let prior = '';
 						new MutationObserver(() => {
+							// Capture first visible lifetimes, independently of later import/click latency.
+							const identity = window.__richIdentity;
+							identity.map ??= document.querySelector('#rich-map-svg');
+							identity.paragraph ??= document.querySelector('#rich-response p');
+							identity.place ??= document.querySelector('#rich-places li');
+							identity.removedParagraph ??= document.querySelector('[data-paragraph="turn-2"]');
+							identity.removedPlace ??= document.querySelector('[data-place-row="turn-2"]');
 							const title = document.querySelector('#rich-title')?.textContent;
 							const paragraphs = document.querySelectorAll('#rich-response p').length;
 							const progress = document.querySelector('#rich-progress')?.textContent;
@@ -109,6 +117,33 @@ export async function runRichBrowser(
 						'Map controls must remain cold at startup',
 					);
 					await page.locator('#draft').fill('Draft survives the entire stream');
+					// Trusted input without actionability's animation-frame wait while EOF is held.
+					const click = async (selector) => {
+						await page
+							.locator(selector)
+							.evaluate((element) =>
+								element.scrollIntoView({ block: 'center', behavior: 'instant' }),
+							);
+						const box = await page.locator(selector).boundingBox();
+						assert.ok(box, `Visible native target ${selector}`);
+						await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+					};
+					const activateMap = async () => {
+						await click('#rich-activate-map');
+						await page.locator('#rich-map').waitFor();
+						return page.evaluate(() => {
+							const state = window.__richPresentation.snapshot();
+							return {
+								bodyRevision: state.bodyRevision,
+								historyRevision: state.historyRevision,
+								bodyComplete: state.bodyComplete,
+								historyComplete: state.historyComplete,
+							};
+						});
+					};
+					// The identity lane must observe places from their first insertion. The
+					// roundtrip lane separately exercises cold activation after streaming begins.
+					let postActivationState = mode === 'stay' ? await activateMap() : undefined;
 					const release = await fetch(`${server.url}/release?run=${run}`, { method: 'POST' });
 					assert.equal(release.status, 200);
 					await page.waitForFunction(
@@ -116,14 +151,7 @@ export async function runRichBrowser(
 						null,
 						{ polling: 10 },
 					);
-					// Trusted input without actionability's animation-frame wait while EOF is held.
-					const click = async (selector) => {
-						const box = await page.locator(selector).boundingBox();
-						assert.ok(box, `Visible native target ${selector}`);
-						await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-					};
-					await click('#rich-activate-map');
-					await page.locator('#rich-map').waitFor();
+					if (mode === 'roundtrip') postActivationState = await activateMap();
 					await click('#rich-places li:first-child button');
 					await click('#rich-zoom-in');
 					assert.equal(await page.locator('#rich-map-svg').getAttribute('viewBox'), '20 10 60 30');
@@ -131,15 +159,15 @@ export async function runRichBrowser(
 						await page.locator('#rich-places li:first-child button').getAttribute('aria-pressed'),
 						'true',
 					);
-					await page.evaluate(() => {
-						window.__richIdentity = {
-							map: document.querySelector('#rich-map-svg'),
-							paragraph: document.querySelector('#rich-response p'),
-							place: document.querySelector('#rich-places li'),
-							removedParagraph: document.querySelector('[data-paragraph="turn-2"]'),
-							removedPlace: document.querySelector('[data-place-row="turn-2"]'),
-						};
-					});
+					assert.deepEqual(
+						await page.evaluate((mode) => {
+							const names = ['map', 'paragraph', 'place'];
+							if (mode === 'stay') names.push('removedParagraph', 'removedPlace');
+							return names.filter((name) => !window.__richIdentity[name]);
+						}, mode),
+						[],
+						'Every asserted node lifetime must have been observed before deletion',
+					);
 					const activationAssets = [...requested];
 					assert.ok(activationAssets.some((file) => file.includes('map-interaction')));
 					if (mode === 'roundtrip') {
@@ -248,6 +276,7 @@ export async function runRichBrowser(
 						iteration,
 						warmup: iteration < 0,
 						mode,
+						postActivationState,
 						html: bytes(html),
 						inline: bytes(markup.inline),
 						css: bytes(markup.css),

@@ -8,6 +8,7 @@ export * from '../../octane/src/index.js';
 export {
 	enableSignalBindings,
 	createElementAt,
+	createElementFromConfig,
 	bindSignalText,
 	bindSignalChild,
 	bindSignalAttribute,
