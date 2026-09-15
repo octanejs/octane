@@ -9163,7 +9163,9 @@ function markKnownAttributeSpreads(ast, contracts) {
 					contract.members.some(
 						(member) => typeof member !== 'string' || !/^[A-Za-z_$][\w$]*$/.test(member),
 					))) ||
-			(contract.imported === '*' && !contract.members?.length)
+			(contract.imported === '*' && !contract.members?.length) ||
+			(contract.style !== undefined &&
+				(contract.style !== 'object' || !contract.fields.includes('style')))
 		)
 			throw new TypeError(
 				'Invalid knownAttributeSpreads import or fixed native attribute contract.',
@@ -9221,7 +9223,10 @@ function markKnownAttributeSpreads(ast, contracts) {
 			);
 		});
 		return contract
-			? { ...node, _octaneKnownAttributeSpread: { fields: [...contract.fields] } }
+			? {
+					...node,
+					_octaneKnownAttributeSpread: { fields: [...contract.fields], style: contract.style },
+				}
 			: null;
 	});
 }

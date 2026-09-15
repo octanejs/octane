@@ -7,6 +7,14 @@ interchangeable results.
 
 Each section identifies its measured source or historical checkpoint. Results from different checkpoints must not be treated as current bundle sizes or added together.
 
+## Style-object spread follow-up
+
+The compiler-only `knownAttributeSpreads` style-object opt-in was compared with its parent `45d45ebd5` using the same installed toolchain and `behavior-only/build.mjs --bundler=vite --rich-presentation=authored`. The existing rich entry, map interaction chunk, and inline capture remain byte-identical: their SHA-256 values are respectively `ddb4b0dda959d106c91f8087717bc3915d99038448207fcf04ecc12a21736aed`, `16e4f0a2b53604f699d80a9e0c4bb2cd5357bf8f9862e1139f1a99ba6c106045`, and `9170ed8229ac673a79ef56a574d76424f5da23c9aabbfc4f4ce703dd8e872f93`. This is a feature-off regression control, not a claim that selecting whole-style support is free.
+
+A separate local production probe runs the real StyleX 0.19.0 transform after Octane compilation. It compares the shorthand props spread with explicit class/style fields for the same non-null scale signal. Complete fixture closures are 23,532 versus 23,523 gzip bytes, including the signal engine, bindings, StyleX, and test driver; the 9-byte difference is not an application budget measurement. Both graphs exclude the renderer. Chromium 149 and Playwright WebKit 26.5 pass SSR catch-up, signal updates, source replacement, node identity, and disposal checks. Seven batches of 1,000 updates each perform zero parent snapshot evaluations in both forms. Timings are too small and narrowly instrumented to establish a speedup; they exclude paint and input latency. WebKit is not physical iOS Safari qualification.
+
+This first follow-up does not implement automatic dynamic-function type lifting, numeric-unit conversion on handles, nullable class selection, or fixed-variable lowering. The existing whole-style capability still reads and diffs its object on notifications. Those follow-ups must be measured against the same semantic workload, including the explicit shared-derivation control.
+
 ## Parallel-start and demand-ownership candidate
 
 Matched minified esbuild closures compare upstream `733c98d57` with the parallel-start candidate based on `4cd85fbcb` plus the resolved upstream merge, lightweight retry-ancestry repair, and exact-owner control retirement. The measured renderer SHA-256 is `fb5e438ee14d78fe26c585b37d766da8c06d5c625ec262b24fc7aa88ff76dbc4`; the control implementation is `97c33f57a4ebafd35006125e7f11718b8e663acd5b0290d100481443304a019f`. No loaded source changed during measurement. Both use the same installed toolchain and production flags.

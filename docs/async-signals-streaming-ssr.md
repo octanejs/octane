@@ -186,14 +186,28 @@ Style adapters may supply an exact imported-factory contract through
 import, and member binding, not purity or shape inferred from a function's name.
 The compiler evaluates the declared pure factory once and projects only its
 declared stable own data fields; conflicting fixed ownership is rejected. It
-does not interpret arbitrary attribute factories. For StyleX, class and optional
-serialized inline style come from one ordered merge, preserving property
-precedence. The adapter must not expand one authored call into three independent
+does not interpret arbitrary attribute factories. The default `style` field is serialized CSS text, as returned by `stylex.attrs()`. A contract with `style: 'object'` instead selects the existing signal-aware whole-style capability, as needed by `stylex.props()`:
+
+```ts
+knownAttributeSpreads: [{
+  source: '@octanejs/stylex',
+  imported: '*',
+  members: ['props'],
+  fields: ['className', 'style'],
+  style: 'object',
+}]
+```
+
+The source and import must match the actual author module; a named import uses its own contract. Omitted style-object support preserves the smaller CSS-text path. For StyleX, class and style come from one ordered merge, preserving property precedence. The adapter must not expand one authored call into three independent
 calls, and fine-grained subscriptions must not split conflicting style variants
 into independently concatenated class tokens. Dynamic style functions remain
 ordinary signal derivations; the integration must not create a parallel state
 graph. Compiler work, initial subscriptions, emitted bytes, and update work are
 all part of the performance accounting.
+
+This channel support does not make every StyleX dynamic function signal-aware. A passthrough such as `stylex.props(styles.dy(scale$))`, where `dy` returns `{ scale }`, can retain a non-null CSS-ready handle and update its variable without rerunning the merge. StyleX's numeric-unit conversion, arithmetic on arguments, and null-dependent class selection still expect primitive values. A nullable handle is not itself null: removing its CSS variable cannot reproduce StyleX's class precedence. Use explicit primitive reads inside a shared derivation for those cases, and derive the class and style fields from that shared result. This preserves StyleX's existing types and semantics with one merge per result change; automatic lifting of arbitrary dynamic functions and their types is not part of this compiler contract.
+
+Whole-style notifications still read and diff the style object. This is not a fixed-variable, constant-work compiler optimization. Native graph identity and cleanup remain shared with ordinary style bindings, and consumers that do not select object-style spreads acquire no new runtime dependency.
 
 Within the explicit pure-projection contract, an immutable imported-factory configuration may expose checked expression-bodied dynamic functions, such as `styles.position(inlineStart, blockStart)`. The compiler verifies the exact static member and its expression rather than trusting a method name. Imported immutable string tokens may also use the supported native string operations, including computed CSS property names. Ordered attribute merging still runs once per source projection; this acceptance does not turn a sampled `.get()` projection into a fine-grained derived subscription.
 

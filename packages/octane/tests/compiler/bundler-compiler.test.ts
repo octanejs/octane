@@ -66,6 +66,12 @@ export function View(props) @{ 'use dom bindings'; <p>{props.label as string}</p
 			root: '/project',
 			knownAttributeSpreads: [
 				{ source: '@stylexjs/stylex', imported: 'attrs', fields: ['class', 'style'] },
+				{
+					source: '@stylexjs/stylex',
+					imported: 'props',
+					fields: ['className', 'style'],
+					style: 'object',
+				},
 			],
 		});
 		for (const environment of ['client', 'server'] as const) {
@@ -101,6 +107,22 @@ export function Styled(props) @{ 'use dom bindings'; <div {...nativeAttrs(props.
 					{ environment },
 				),
 			).toThrow();
+			for (const extension of ['tsx', 'tsrx']) {
+				const source = `import { props as styleProps } from '@stylexjs/stylex';
+export function Styled(props) ${extension === 'tsrx' ? "@{ 'use dom bindings'; <div {...styleProps(props.styles)} /> }" : "{ 'use dom bindings'; return <div {...styleProps(props.styles)} />; }"}`;
+				expect(
+					compiler.transform(source, `/project/src/Styled.${extension}`, { environment }),
+				).not.toBeNull();
+				if (environment === 'client') {
+					const selected = compiler.transform(
+						source,
+						`/project/src/Styled.${extension}?octane-bindings=Styled`,
+						{ environment },
+					);
+					expect(selected?.code).toContain('octane/dom-binding-styles');
+					expect(selected?.code).not.toContain('octane/internal/client');
+				}
+			}
 		}
 	});
 

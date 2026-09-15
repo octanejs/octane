@@ -271,6 +271,12 @@ describe('OctaneRspackPlugin', () => {
 		const compiler = createCompiler('web');
 		const knownAttributeSpreads = [
 			{ source: '@stylexjs/stylex', imported: 'attrs', fields: ['class', 'style'] },
+			{
+				source: '@stylexjs/stylex',
+				imported: 'props',
+				fields: ['className', 'style'],
+				style: 'object' as const,
+			},
 		];
 		applyPlugin(new OctaneRspackPlugin({ strong, knownAttributeSpreads }), compiler);
 
@@ -503,14 +509,16 @@ describe('OctaneRspackPlugin', () => {
 		const knownShape = createCachedCompiler();
 		const changedShape = createCachedCompiler();
 		const sameShape = createCachedCompiler();
-		for (const [compiler, fields] of [
+		const objectStyle = createCachedCompiler();
+		for (const [compiler, fields, style] of [
 			[knownShape, ['class', 'style']],
 			[sameShape, ['class', 'style']],
 			[changedShape, ['class']],
+			[objectStyle, ['class', 'style'], 'object'],
 		] as const) {
 			applyPlugin(
 				new OctaneRspackPlugin({
-					knownAttributeSpreads: [{ source: '@stylexjs/stylex', imported: 'attrs', fields }],
+					knownAttributeSpreads: [{ source: '@stylexjs/stylex', imported: 'attrs', fields, style }],
 				}),
 				compiler,
 			);
@@ -518,6 +526,9 @@ describe('OctaneRspackPlugin', () => {
 		expect((knownShape.options as any).cache.version).not.toBe((dom.options as any).cache.version);
 		expect((knownShape.options as any).cache.version).not.toBe(
 			(changedShape.options as any).cache.version,
+		);
+		expect((knownShape.options as any).cache.version).not.toBe(
+			(objectStyle.options as any).cache.version,
 		);
 		expect((knownShape.options as any).cache.version).toBe(
 			(sameShape.options as any).cache.version,

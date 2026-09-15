@@ -338,96 +338,139 @@ export function ClassView(props) { 'use dom bindings'; return <button class={[un
 				classRoot.unmount();
 			}
 
-			for (const named of [false, true]) {
-				const imported = named ? '{ attrs as nativeAttrs }' : '* as sx';
-				const callee = named ? 'nativeAttrs' : 'sx.attrs';
-				const knownSource = `import ${imported} from 'binding-styles';
+			for (const factory of ['attrs', 'props'] as const) {
+				for (const named of [false, true]) {
+					const imported = named ? `{ ${factory} as nativeAttrs }` : '* as sx';
+					const callee = named ? 'nativeAttrs' : `sx.${factory}`;
+					const knownSource = `import 'octane/signals';
+import ${imported} from 'binding-styles';
 export function Known(props) @{ 'use dom bindings'; <ul>@for (const row of props.rows; key row.id) { <li {...${callee}(row)}>{row.label as string}</li> }</ul> }`;
-				const knownAttributeSpreads = [
-					{
-						source: 'binding-styles',
-						imported: named ? 'attrs' : '*',
-						members: named ? [] : ['attrs'],
-						fields: ['class', 'style', 'data-style-src'],
-					},
-				];
-				const calls: string[] = [];
-				const knownOptions = {
-					id: '/src/known-attributes.tsrx',
-					compileOptions: { dev, hmr: false, knownAttributeSpreads },
-					runtimeModules: {
-						'binding-styles': {
-							attrs(row: { id: string; label: string; tone: string | null }) {
-								calls.push(row.id);
-								return row.tone === null
-									? null
-									: { class: row.tone, style: `--tone:${row.tone}`, 'data-style-src': row.id };
+					const scale = createScope({
+						scopeKey: `style-spread-${dev}-${factory}-${named}`,
+					}).signal$<number | null>('scale', 2);
+					const knownAttributeSpreads = [
+						{
+							source: 'binding-styles',
+							imported: named ? factory : '*',
+							members: named ? [] : [factory],
+							fields: [factory === 'props' ? 'className' : 'class', 'style', 'data-style-src'],
+							...(factory === 'props' ? { style: 'object' as const } : {}),
+						},
+					];
+					const calls: string[] = [];
+					const knownOptions = {
+						id: '/src/known-attributes.tsrx',
+						compileOptions: { dev, hmr: false, knownAttributeSpreads },
+						runtimeModules: {
+							'binding-styles': {
+								[factory](row: { id: string; label: string; tone: string | null }) {
+									calls.push(row.id);
+									return row.tone === null
+										? null
+										: {
+												[factory === 'props' ? 'className' : 'class']: row.tone,
+												style:
+													factory === 'props'
+														? { '--tone': row.tone, '--scale': scale }
+														: `--tone:${row.tone}`,
+												'data-style-src': row.id,
+											};
+								},
 							},
 						},
-					},
-				};
-				const knownClient = loadCompiledFixtureSource(knownSource, {
-					...knownOptions,
-					mode: 'client',
-				});
-				const knownServer = loadCompiledFixtureSource(knownSource, {
-					...knownOptions,
-					mode: 'server',
-				});
-				const rows = [
-					{ id: 'a', label: 'First', tone: 'red' },
-					{ id: 'b', label: 'Second', tone: 'blue' },
-				];
-				container.innerHTML = ServerRT.renderToString(knownServer.Known, { rows }).html;
-				expect(calls.splice(0)).toEqual(['a', 'b']);
-				const elements = [...container.querySelectorAll('li')];
-				const knownRoot = hydrateRoot(container, knownClient.Known, { rows });
-				try {
-					flushSync(() => {});
+					};
+					const knownClient = loadCompiledFixtureSource(knownSource, {
+						...knownOptions,
+						mode: 'client',
+					});
+					const knownServer = loadCompiledFixtureSource(knownSource, {
+						...knownOptions,
+						mode: 'server',
+					});
+					const rows = [
+						{ id: 'a', label: 'First', tone: 'red' },
+						{ id: 'b', label: 'Second', tone: 'blue' },
+					];
+					container.innerHTML = ServerRT.renderToString(knownServer.Known, { rows }).html;
 					expect(calls.splice(0)).toEqual(['a', 'b']);
-					expect([...container.querySelectorAll('li')]).toEqual(elements);
-					flushSync(() =>
-						knownRoot.render(knownClient.Known, {
-							rows: [
-								{ id: 'b', label: 'Updated second', tone: 'green' },
-								{ id: 'a', label: 'Updated first', tone: null },
+					const elements = [...container.querySelectorAll('li')];
+					if (factory === 'props') expect(elements[0]!.style.getPropertyValue('--scale')).toBe('2');
+					const knownRoot = hydrateRoot(container, knownClient.Known, { rows });
+					try {
+						flushSync(() => {});
+						expect(calls.splice(0)).toEqual(['a', 'b']);
+						expect([...container.querySelectorAll('li')]).toEqual(elements);
+						if (factory === 'props') {
+							flushSync(() => scale.set(3));
+							expect(elements.map((element) => element.style.getPropertyValue('--scale'))).toEqual([
+								'3',
+								'3',
+							]);
+						}
+						flushSync(() =>
+							knownRoot.render(knownClient.Known, {
+								rows: [
+									{ id: 'b', label: 'Updated second', tone: 'green' },
+									{ id: 'a', label: 'Updated first', tone: null },
+								],
+							}),
+						);
+						expect(calls.splice(0).sort()).toEqual(['a', 'b']);
+						expect([...container.querySelectorAll('li')]).toEqual([elements[1], elements[0]]);
+						expect(elements[1]!.textContent).toBe('Updated second');
+						expect(elements[1]!.className).toBe('green');
+						expect(elements[1]!.style.getPropertyValue('--tone')).toBe('green');
+						expect(elements[0]!.className).toBe('');
+						expect(elements[0]!.style.cssText).toBe('');
+						expect(elements[0]!.getAttribute('data-style-src')).toBe(null);
+					} finally {
+						knownRoot.unmount();
+					}
+					if (factory === 'props') {
+						flushSync(() => scale.set(4));
+						expect(elements[1]!.style.getPropertyValue('--scale')).toBe('3');
+					}
+					const selected = compile(
+						knownSource,
+						knownOptions.id + '?octane-bindings=Known',
+						knownOptions.compileOptions,
+					).code;
+					expect(selected).toContain('dom-binding-program');
+					expect(selected).not.toContain('octane/internal/client');
+					if (factory === 'props') expect(selected).toContain('octane/dom-binding-styles');
+					else expect(selected).not.toContain('octane/dom-binding-styles');
+					const shadowName = named ? 'nativeAttrs' : 'sx';
+					const shadow = knownSource
+						.replace('Known(props)', `Known(${shadowName})`)
+						.replace('props.rows', `${shadowName}.rows`);
+					expect(() =>
+						compile(
+							shadow,
+							knownOptions.id + '?octane-bindings=Known',
+							knownOptions.compileOptions,
+						),
+					).toThrow(/DOM bindings/);
+					expect(() =>
+						compile(knownSource, knownOptions.id, {
+							...knownOptions.compileOptions,
+							knownAttributeSpreads: [
+								...knownAttributeSpreads,
+								{ ...knownAttributeSpreads[0]!, fields: ['class', 'style'] },
 							],
 						}),
-					);
-					expect(calls.splice(0).sort()).toEqual(['a', 'b']);
-					expect([...container.querySelectorAll('li')]).toEqual([elements[1], elements[0]]);
-					expect(elements[1]!.textContent).toBe('Updated second');
-					expect(elements[1]!.className).toBe('green');
-					expect(elements[1]!.style.getPropertyValue('--tone')).toBe('green');
-					expect(elements[0]!.className).toBe('');
-					expect(elements[0]!.style.cssText).toBe('');
-					expect(elements[0]!.getAttribute('data-style-src')).toBe(null);
-				} finally {
-					knownRoot.unmount();
+					).toThrow(/Duplicate knownAttributeSpreads contract/);
+					for (const invalid of [
+						{ ...knownAttributeSpreads[0]!, style: 'unknown' },
+						{ ...knownAttributeSpreads[0]!, fields: ['class'], style: 'object' },
+					]) {
+						expect(() =>
+							compile(knownSource, knownOptions.id, {
+								...knownOptions.compileOptions,
+								knownAttributeSpreads: [invalid] as any,
+							}),
+						).toThrow(/Invalid knownAttributeSpreads/);
+					}
 				}
-				const selected = compile(
-					knownSource,
-					knownOptions.id + '?octane-bindings=Known',
-					knownOptions.compileOptions,
-				).code;
-				expect(selected).toContain('dom-binding-program');
-				expect(selected).not.toContain('octane/internal/client');
-				const shadowName = named ? 'nativeAttrs' : 'sx';
-				const shadow = knownSource
-					.replace('Known(props)', `Known(${shadowName})`)
-					.replace('props.rows', `${shadowName}.rows`);
-				expect(() =>
-					compile(shadow, knownOptions.id + '?octane-bindings=Known', knownOptions.compileOptions),
-				).toThrow(/DOM bindings/);
-				expect(() =>
-					compile(knownSource, knownOptions.id, {
-						...knownOptions.compileOptions,
-						knownAttributeSpreads: [
-							...knownAttributeSpreads,
-							{ ...knownAttributeSpreads[0]!, fields: ['class'] },
-						],
-					}),
-				).toThrow(/Duplicate knownAttributeSpreads contract/);
 			}
 		}
 	});

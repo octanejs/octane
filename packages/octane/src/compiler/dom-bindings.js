@@ -775,8 +775,13 @@ function planView(fn, filename, source, imports, lexical, native = null) {
 							error(filename, attr, `known spread conflicts with attribute ${JSON.stringify(raw)}`);
 						owned.add(name);
 						knownFields.add(lower);
-						signalIndices.push(bindings.length);
-						bindings.push([index, bindingKind(tag, name), name]);
+						if (name === 'style' && attr._octaneKnownAttributeSpread.style === 'object') {
+							styleIndices.push(bindings.length);
+							bindings.push([index, 'styleObject', name]);
+						} else {
+							signalIndices.push(bindings.length);
+							bindings.push([index, bindingKind(tag, name), name]);
+						}
 						values.push(
 							inheritHookMemoOrigin(
 								b.conditional(

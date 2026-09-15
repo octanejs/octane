@@ -747,6 +747,12 @@ export function App(props: { label: Label }) @{ <p>{props.label}</p> }`;
 				strong: true,
 				knownAttributeSpreads: [
 					{ source: '@stylexjs/stylex', imported: 'attrs', fields: ['class', 'style'] },
+					{
+						source: '@stylexjs/stylex',
+						imported: 'props',
+						fields: ['className', 'style'],
+						style: 'object',
+					},
 				],
 			});
 			configure(plugin, 'build', { ssr });
@@ -763,6 +769,20 @@ export function Styled(props) @{ 'use dom bindings'; <div {...nativeAttrs(props.
 						ssr,
 					}),
 				).not.toBeNull();
+			const objectSource = source.replace('attrs as nativeAttrs', 'props as nativeAttrs');
+			expect(
+				await transform(plugin, objectSource, `${ROOT}/src/StyleProps.tsrx`, { ssr }),
+			).not.toBeNull();
+			if (!ssr) {
+				const selected = await transform(
+					plugin,
+					objectSource,
+					`${ROOT}/src/StyleProps.tsrx?octane-bindings=Styled`,
+					{ ssr },
+				);
+				expect(selected?.code).toContain('octane/dom-binding-styles');
+				expect(selected?.code).not.toContain('octane/internal/client');
+			}
 			await (plugin.closeBundle as any)?.();
 			if (!ssr)
 				expect(

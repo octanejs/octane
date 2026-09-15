@@ -67,6 +67,8 @@ export interface KnownAttributeSpread {
 	members?: readonly string[];
 	/** Exact stable own native presentation data fields; never accessors. */
 	fields: readonly string[];
+	/** Use signal-aware style-object bindings; fields must include style. Omitted retains CSS text. */
+	style?: 'object';
 }
 
 export interface CompileOptions {

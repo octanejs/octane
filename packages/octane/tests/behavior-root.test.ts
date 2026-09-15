@@ -3228,6 +3228,85 @@ export function NumericPresentation(props) @{ 'use dom bindings';
 			expect(spreadNode.style.left).toBe('15px');
 			expect(spreadNode.style.top).toBe('3px');
 			spreadHandle.dispose();
+			for (const adopt of [false, true]) {
+				const scale = controlScope.signal$<number | null>(`spread-scale-${adopt}`, 2);
+				const replacement = controlScope.signal$<number | null>(`spread-next-scale-${adopt}`, 4);
+				const projected = authoredPresentation(
+					'SignalStyleProps',
+					{ scale, enabled: true },
+					dev,
+					`import 'octane/signals';
+import * as stylex from 'binding-styles';
+const styles = stylex.create({ dy: (scale) => ({ className: 'scaled', style: { '--scale': scale } }) });
+export function SignalStyleProps(props) @{ 'use dom bindings';
+  <section {...stylex.props(props.enabled ? styles.dy(props.scale) : null)}><input /></section>
+}`,
+					{
+						'binding-styles': {
+							create: (config: unknown) => config,
+							props: (value: unknown) => value,
+						},
+					},
+					{
+						knownAttributeSpreads: [
+							{
+								source: 'binding-styles',
+								imported: '*',
+								members: ['props'],
+								fields: ['className', 'style'],
+								style: 'object',
+							},
+						],
+					},
+				);
+				const projectedHost = document.createElement('div');
+				container.append(projectedHost);
+				projectedHost.innerHTML = projected.html;
+				const serverNode = projectedHost.querySelector('section')!;
+				const serverInput = serverNode.querySelector('input')!;
+				expect(serverNode.style.getPropertyValue('--scale')).toBe('2');
+				serverInput.value = 'early native edit';
+				scale.set(3);
+				if (!adopt) projectedHost.replaceChildren();
+				const projectedHandle = adopt
+					? projected.attach(serverNode, projected.state)
+					: projected.mount({ parent: projectedHost }, projected.state);
+				const projectedNode = projectedHost.querySelector('section')!;
+				const projectedInput = projectedNode.querySelector('input')!;
+				if (adopt) {
+					expect(projectedNode).toBe(serverNode);
+					expect(projectedInput).toBe(serverInput);
+					expect(projectedInput.value).toBe('early native edit');
+				}
+				expect(projectedNode.className).toBe('scaled');
+				expect(projectedNode.style.getPropertyValue('--scale')).toBe('3');
+				projectedNode.style.setProperty('--external', 'preserved');
+				scale.set(5);
+				expect(projectedNode.style.getPropertyValue('--scale')).toBe('5');
+				projected.publish({ scale: replacement });
+				expect(projectedNode.style.getPropertyValue('--scale')).toBe('4');
+				scale.set(6);
+				expect(projectedNode.style.getPropertyValue('--scale')).toBe('4');
+				replacement.set(null);
+				expect(projectedNode.style.getPropertyValue('--scale')).toBe('');
+				replacement.set(7);
+				expect(projectedNode.style.getPropertyValue('--scale')).toBe('7');
+				projected.publish({ enabled: false });
+				expect(projectedNode.className).toBe('');
+				expect(projectedNode.style.getPropertyValue('--scale')).toBe('');
+				expect(projectedNode.style.getPropertyValue('--external')).toBe('preserved');
+				replacement.set(8);
+				expect(projectedNode.style.getPropertyValue('--scale')).toBe('');
+				projected.publish({ enabled: true });
+				expect(projectedNode.style.getPropertyValue('--scale')).toBe('8');
+				expect(projectedNode.querySelector('input')).toBe(projectedInput);
+				projectedHandle.dispose();
+				replacement.set(9);
+				projected.publish({ enabled: false });
+				expect(projectedNode.style.getPropertyValue('--scale')).toBe('8');
+				expect(projectedNode.className).toBe('scaled');
+				expect(projected.cleanup).toHaveBeenCalledOnce();
+			}
 			for (const reversed of [false, true]) {
 				const projected = authoredPresentation(
 					'DynamicStyles',

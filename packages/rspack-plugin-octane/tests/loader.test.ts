@@ -466,6 +466,12 @@ describe('octane Rspack loader', () => {
 		mocks.transform.mockReturnValue(null);
 		const knownAttributeSpreads = [
 			{ source: '@stylexjs/stylex', imported: 'attrs', fields: ['class', 'style'] },
+			{
+				source: '@stylexjs/stylex',
+				imported: 'props',
+				fields: ['className', 'style'],
+				style: 'object' as const,
+			},
 		];
 		runLoader({ options: { strong, knownAttributeSpreads } });
 
