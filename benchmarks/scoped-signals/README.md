@@ -234,6 +234,13 @@ A separate case retains the automatic streamed-signal bootstrap and document
 lifecycle exports. Both must remain renderer-free. These are entry/compiled-state
 costs, not compiled `.tsrx` applications or incremental hook costs in an app.
 
+Scalar and structural DOM-binding entries are compared when the archived package
+exports them. Older, pre-RFC baselines report those comparisons as `unavailable`
+with a reason and no numeric delta; ordinary client/server comparisons remain
+mandatory. Optional control and whole-style leaves are measured separately and
+together with the scalar runner. Use the combined closure for their shared cost:
+independently compressed gzip/Brotli byte counts must not be added together.
+
 Prepare an archive containing `packages/octane/src`,
 `packages/octane/package.json`, and the root `package.json`,
 `pnpm-workspace.yaml`, and `pnpm-lock.yaml` from the exact baseline revision.
@@ -244,7 +251,8 @@ package directory and the same revision:
 ```bash
 BENCH_JSON=/private/tmp/scoped-signals-bundles.json node benchmarks/scoped-signals/run-bundles.mjs \
   --baseline-ref=<git-commit> \
-  --baseline-package=/absolute/path/to/baseline/packages/octane
+  --baseline-package=/absolute/path/to/baseline/packages/octane \
+  --tooling-root=/absolute/path/to/current/packages/octane
 node --test benchmarks/scoped-signals/bundle-boundaries.test.mjs
 ```
 
@@ -272,8 +280,10 @@ automatic owner initialization. Native hook entries must include the correct run
 the emitted-byte check requires all client/server adapter, collector, inspection,
 and retry implementations, plus server query-observation mirrors, to tree-shake
 to zero bytes. The read/event protocol
-and empty server seed map remain separate, measured seams. All exported
-functions must load, the empty server render must agree,
+and empty server seed map remain separate, measured seams. Renderer-free
+binding entries also reject the renderer, signal graph/facade, Alien Signals, and
+unselected control/style/class/signal/structural leaves in their resolved graph.
+All exported functions must load, the empty server render must agree,
 and a small engine write/subscription/disposal smoke must pass. The compiled
 state case also checks derived updates, async query completion, and fresh values
 after retiring an owner. These checks do not establish browser capture, streamed

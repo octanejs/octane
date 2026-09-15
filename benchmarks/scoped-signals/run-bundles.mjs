@@ -8,6 +8,7 @@ import { pathToFileURL } from 'node:url';
 import { brotliCompressSync, constants as zlib, gzipSync } from 'node:zlib';
 import {
 	BUNDLE_CASES,
+	baselineUnavailableReason,
 	entrySource,
 	gitBlobHash,
 	sha256,
@@ -45,6 +46,7 @@ const payload = {
 	limitations: [
 		'Public source-entry exports and a compiled plain state module, not compiled .tsrx application bundles.',
 		'Native client/server hook entries are measured independently; their sizes are not incremental application costs.',
+		'Binding capability entries are isolated closures; use the combined entry instead of adding independently compressed leaf sizes.',
 		'Export loading and focused signal semantics do not establish DOM, streamed handoff, hydration, or browser behavior.',
 		'Preliminary while integration source is changing; rerun after the final source freeze.',
 	],
@@ -255,11 +257,11 @@ try {
 				entry: compilerEntry,
 				options: compilerOptions,
 				dependencies: Object.fromEntries(
-					['@tsrx/core', 'esrap', 'entities', 'es-module-lexer', 'oxc-tsrx'].map((name) => [
+					['@tsrx/core', 'esrap', 'entities', 'es-module-lexer', '@tsrx/oxc'].map((name) => [
 						name,
 						packageEvidence(
 							createRequire(compilerEntry).resolve(
-								name === 'oxc-tsrx' ? 'oxc-tsrx/tsrx-core-compat' : name,
+								name === '@tsrx/oxc' ? '@tsrx/oxc/tsrx-core-compat' : name,
 							),
 							name,
 						),
@@ -281,9 +283,16 @@ try {
 	}
 
 	for (const scenario of BUNDLE_CASES) {
-		for (const label of scenario.baseline ? ['baseline', 'candidate'] : ['candidate']) {
+		const unavailable = baselineUnavailableReason(scenario, manifests.baseline.exports);
+		for (const label of scenario.baseline && unavailable === null
+			? ['baseline', 'candidate']
+			: ['candidate']) {
 			const root = roots[label];
 			const authored = entrySource(scenario);
+			const exports = [
+				...scenario.exports,
+				...Object.values(scenario.additionalExports ?? {}).flat(),
+			];
 			const sourcefile = `${label}-${scenario.id}-public-entry.mjs`;
 			const source = scenario.compilePlain
 				? await compilePlainSource(authored, path.join(root, 'renderer-free-state.ts'))
@@ -363,7 +372,8 @@ try {
 				ops: Object.fromEntries(Object.entries(measured).map(([key, value]) => [key, stat(value)])),
 				meta: {
 					request: scenario.request,
-					exports: scenario.exports,
+					exports,
+					...(scenario.additionalExports ? { additionalExports: scenario.additionalExports } : {}),
 					...(scenario.compilePlain
 						? {
 								authoredSource: authored,
@@ -382,19 +392,23 @@ try {
 			payload.targets.push(row);
 			try {
 				verifyBundleInputs(scenario, inputs);
-				const exportKey =
-					scenario.request === 'octane' ? '.' : `.${scenario.request.slice('octane'.length)}`;
-				const entryExport = manifests[label].exports[exportKey];
-				assert.equal(
-					typeof entryExport,
-					'string',
-					`${label}/${scenario.id}: expected direct public source export`,
-				);
-				const expectedEntry = `packages/octane/${entryExport.replace(/^\.\//, '')}`;
-				assert.ok(
-					inputs.some((input) => input.path === expectedEntry),
-					`${label}/${scenario.id}: public package export not bundled`,
-				);
+				for (const request of [
+					scenario.request,
+					...Object.keys(scenario.additionalExports ?? {}),
+				]) {
+					const exportKey = request === 'octane' ? '.' : `.${request.slice('octane'.length)}`;
+					const entryExport = manifests[label].exports[exportKey];
+					assert.equal(
+						typeof entryExport,
+						'string',
+						`${label}/${scenario.id}: expected direct public source export for ${request}`,
+					);
+					const expectedEntry = `packages/octane/${entryExport.replace(/^\.\//, '')}`;
+					assert.ok(
+						inputs.some((input) => input.path === expectedEntry),
+						`${label}/${scenario.id}: public package export not bundled for ${request}`,
+					);
+				}
 				row.meta.boundaryChecks = 'passed';
 			} catch (error) {
 				row.meta.boundaryChecks = error.message;
@@ -406,10 +420,10 @@ try {
 				);
 				assert.deepEqual(
 					Object.keys(api).sort(),
-					[...scenario.exports].sort(),
+					[...exports].sort(),
 					`${row.name}: wrong runtime export surface`,
 				);
-				for (const name of scenario.exports)
+				for (const name of exports)
 					assert.equal(typeof api[name], 'function', `${row.name}: ${name} did not load`);
 				if (scenario.id === 'ordinary-server') {
 					assert.deepEqual(
@@ -449,10 +463,21 @@ try {
 		}
 	}
 	for (const scenario of BUNDLE_CASES.filter((entry) => entry.baseline)) {
+		const unavailable = baselineUnavailableReason(scenario, manifests.baseline.exports);
+		if (unavailable !== null) {
+			payload.comparisons.push({
+				scenario: scenario.id,
+				status: 'unavailable',
+				reason: unavailable,
+			});
+			console.log(`${scenario.id}: baseline comparison unavailable — ${unavailable}`);
+			continue;
+		}
 		const baseline = payload.targets.find((entry) => entry.name === `baseline/${scenario.id}`);
 		const candidate = payload.targets.find((entry) => entry.name === `candidate/${scenario.id}`);
 		payload.comparisons.push({
 			scenario: scenario.id,
+			status: 'available',
 			metrics: Object.fromEntries(
 				['raw', 'gzip', 'brotli'].map((metric) => {
 					const before = baseline.ops[metric].median;

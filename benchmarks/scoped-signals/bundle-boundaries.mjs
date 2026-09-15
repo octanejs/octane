@@ -17,6 +17,60 @@ export const BUNDLE_CASES = [
 		baseline: true,
 	},
 	{
+		id: 'binding-scalar',
+		request: 'octane/dom-bindings',
+		exports: ['__adoptBindings'],
+		platform: 'browser',
+		baseline: 'if-exported',
+		rendererFree: true,
+		graphFree: true,
+		bindingCapabilities: [],
+	},
+	{
+		id: 'binding-structural',
+		request: 'octane/dom-binding-program',
+		exports: ['__adoptBindingProgram', '__mountBindingProgram'],
+		platform: 'browser',
+		baseline: 'if-exported',
+		rendererFree: true,
+		graphFree: true,
+		bindingCapabilities: ['program'],
+	},
+	{
+		id: 'binding-controls',
+		request: 'octane/dom-binding-controls',
+		exports: ['__createBindingControls'],
+		platform: 'browser',
+		baseline: false,
+		rendererFree: true,
+		graphFree: true,
+		bindingCapabilities: ['controls'],
+	},
+	{
+		id: 'binding-whole-style',
+		request: 'octane/dom-binding-styles',
+		exports: ['__createBindingStyles'],
+		platform: 'browser',
+		baseline: false,
+		rendererFree: true,
+		graphFree: true,
+		bindingCapabilities: ['styles'],
+	},
+	{
+		id: 'binding-scalar-controls-style',
+		request: 'octane/dom-bindings',
+		exports: ['__adoptBindings'],
+		additionalExports: {
+			'octane/dom-binding-controls': ['__createBindingControls'],
+			'octane/dom-binding-styles': ['__createBindingStyles'],
+		},
+		platform: 'browser',
+		baseline: false,
+		rendererFree: true,
+		graphFree: true,
+		bindingCapabilities: ['controls', 'styles'],
+	},
+	{
 		id: 'engine',
 		request: 'octane/signals',
 		exports: ['createScope', 'query'],
@@ -64,6 +118,12 @@ export const BUNDLE_CASES = [
 	},
 ];
 
+export function baselineUnavailableReason(scenario, exports) {
+	if (scenario.baseline !== 'if-exported') return null;
+	const key = scenario.request === 'octane' ? '.' : `.${scenario.request.slice('octane'.length)}`;
+	return exports?.[key] == null ? `Archived baseline does not export ${scenario.request}.` : null;
+}
+
 export function entrySource(scenario) {
 	if (scenario.compilePlain) {
 		return `import { signal$, derived$, query$, runWithSignalOwner, retireSignalOwnerIdentity } from 'octane/signals';
@@ -88,7 +148,9 @@ export async function exercise() {
 }
 `;
 	}
-	return `export { ${scenario.exports.join(', ')} } from ${JSON.stringify(scenario.request)};\n`;
+	return Object.entries({ [scenario.request]: scenario.exports, ...scenario.additionalExports })
+		.map(([request, names]) => `export { ${names.join(', ')} } from ${JSON.stringify(request)};\n`)
+		.join('');
 }
 
 export function sha256(contents) {
@@ -107,7 +169,9 @@ export function verifyBundleInputs(scenario, inputs) {
 	const names = inputs.map((input) => input.path.replaceAll('\\', '/'));
 	const alien = inputs.filter((input) => input.package?.name === 'alien-signals');
 	const engine = names.filter((name) =>
-		/\/src\/signals\/(?:index|engine|graph|requests|encoding|client|server)\.[jt]s$/.test(name),
+		/\/src\/signals\/(?:index|engine|graph|requests|encoding|client|server|facade)\.[jt]s$/.test(
+			name,
+		),
 	);
 	const compiler = names.filter((name) => /\/src\/compiler\//.test(name));
 	const react = inputs.filter((input) => /^(?:react|react-dom)$/.test(input.package?.name ?? ''));
@@ -132,6 +196,9 @@ export function verifyBundleInputs(scenario, inputs) {
 				`${scenario.id}: ordinary entry retained native adapter ${input.path}`,
 			);
 		}
+	} else if (scenario.graphFree) {
+		assert.deepEqual(alien, [], `${scenario.id}: binding entry reached Alien Signals`);
+		assert.deepEqual(engine, [], `${scenario.id}: binding entry reached the signal graph`);
 	} else {
 		assert.ok(alien.length > 0, `${scenario.id}: selected engine dependency is missing`);
 		for (const input of alien) {
@@ -140,7 +207,7 @@ export function verifyBundleInputs(scenario, inputs) {
 	}
 	if (scenario.id === 'engine' || scenario.rendererFree) {
 		const renderer = names.filter((name) =>
-			/\/src\/(?:runtime(?:\.server)?\.[jt]s$|server\/|react\/|internal\/|[^/]*devtools[^/]*\.[jt]s$)/.test(
+			/\/src\/(?:runtime(?:\.server)?\.[jt]s$|signals\/native-read-(?:client|server)\.[jt]s$|server\/|react\/|internal\/|[^/]*devtools[^/]*\.[jt]s$)/.test(
 				name,
 			),
 		);
@@ -149,6 +216,24 @@ export function verifyBundleInputs(scenario, inputs) {
 			[],
 			`${scenario.id}: renderer or DevTools reached the independent engine`,
 		);
+	}
+	if (scenario.bindingCapabilities) {
+		for (const name of names) {
+			const capability =
+				/\/src\/dom-binding-(program|controls|styles|classes|signals)\.[jt]s$/.exec(name)?.[1];
+			if (capability !== undefined) {
+				assert.ok(
+					scenario.bindingCapabilities.includes(capability),
+					`${scenario.id}: unselected binding capability reached ${name}`,
+				);
+			}
+		}
+		if (!scenario.bindingCapabilities.includes('controls')) {
+			assert.ok(
+				!names.some((name) => /\/src\/signals\/control-binding\.[jt]s$/.test(name)),
+				`${scenario.id}: unselected canonical control implementation reached the entry`,
+			);
+		}
 	}
 	if (scenario.id === 'compiled-plain-signals') {
 		// This fixture has a compiler-proven scalar derivation and a real async

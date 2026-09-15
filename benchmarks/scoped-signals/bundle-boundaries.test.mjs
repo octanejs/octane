@@ -5,6 +5,7 @@ import { compile } from '../../packages/octane/src/compiler/compile.js';
 import { slotHooks } from '../../packages/octane/src/compiler/slot-hooks.js';
 import {
 	BUNDLE_CASES,
+	baselineUnavailableReason,
 	entrySource,
 	gitBlobHash,
 	verifyBundleInputs,
@@ -27,7 +28,31 @@ test('entry fixtures retain precisely the named public functions', () => {
 		entrySource(scenario('engine')),
 		'export { createScope, query } from "octane/signals";\n',
 	);
-	assert.equal(BUNDLE_CASES.filter((entry) => entry.baseline).length, 2);
+	assert.equal(BUNDLE_CASES.filter((entry) => entry.baseline).length, 4);
+	for (const id of ['binding-scalar', 'binding-structural']) {
+		assert.equal(scenario(id).baseline, 'if-exported');
+		assert.equal(
+			baselineUnavailableReason(scenario(id), { '.': './src/index.ts' }),
+			`Archived baseline does not export ${scenario(id).request}.`,
+		);
+		assert.equal(
+			baselineUnavailableReason(scenario(id), {
+				[`.${scenario(id).request.slice('octane'.length)}`]: './src/bindings.ts',
+			}),
+			null,
+		);
+	}
+	for (const id of ['ordinary-client', 'ordinary-server']) {
+		// A malformed ordinary baseline must still fail, not silently skip its comparison.
+		assert.equal(scenario(id).baseline, true);
+		assert.equal(baselineUnavailableReason(scenario(id), {}), null);
+	}
+	assert.equal(
+		entrySource(scenario('binding-scalar-controls-style')),
+		'export { __adoptBindings } from "octane/dom-bindings";\n' +
+			'export { __createBindingControls } from "octane/dom-binding-controls";\n' +
+			'export { __createBindingStyles } from "octane/dom-binding-styles";\n',
+	);
 });
 
 test('baseline blob evidence agrees with Git for exact UTF-8 source bytes', () => {
@@ -120,6 +145,39 @@ test('native entries require their actual runtime and pinned engine', () => {
 });
 
 test('scalar and result-only entries do not retain their optional implementations', () => {
+	for (const binding of BUNDLE_CASES.filter((entry) => entry.graphFree)) {
+		const selected = binding.bindingCapabilities.map((name) => source(`dom-binding-${name}.ts`));
+		verifyBundleInputs(binding, selected);
+		for (const filename of ['signals/engine.ts', 'signals/graph.ts', 'signals/facade.ts']) {
+			assert.throws(
+				() => verifyBundleInputs(binding, [...selected, source(filename)]),
+				/binding entry reached the signal graph/,
+			);
+		}
+		assert.throws(
+			() => verifyBundleInputs(binding, [...selected, alien()]),
+			/reached Alien Signals/,
+		);
+		for (const filename of ['runtime.ts', 'signals/native-read-client.ts', 'internal/client.ts']) {
+			assert.throws(
+				() => verifyBundleInputs(binding, [...selected, source(filename)]),
+				/renderer or DevTools/,
+			);
+		}
+		for (const capability of ['program', 'controls', 'styles', 'classes', 'signals']) {
+			if (binding.bindingCapabilities.includes(capability)) continue;
+			assert.throws(
+				() => verifyBundleInputs(binding, [...selected, source(`dom-binding-${capability}.ts`)]),
+				/unselected binding capability/,
+			);
+		}
+		if (!binding.bindingCapabilities.includes('controls')) {
+			assert.throws(
+				() => verifyBundleInputs(binding, [...selected, source('signals/control-binding.ts')]),
+				/unselected canonical control implementation/,
+			);
+		}
+	}
 	const inputs = [source('signals/engine.ts'), source('signals/graph.ts'), alien()];
 	verifyBundleInputs(scenario('compiled-plain-signals'), inputs);
 	verifyBundleInputs(scenario('compiled-plain-signals'), [
