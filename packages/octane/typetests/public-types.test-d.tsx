@@ -94,6 +94,8 @@ const badExplicitElement = <MemoExplicit />;
 // automatic host JSX separately accepts live signal bindings.
 declare const publicWidth: CSSProperties['width'];
 const reusableWidth: React.CSSProperties['width'] = publicWidth;
+declare const publicStyle: HTMLAttributes<HTMLElement>['style'];
+const reusableStyle: string | CSSProperties | undefined = publicStyle;
 declare const publicId: HTMLAttributes<HTMLElement>['id'];
 const reusableId: string | undefined = publicId;
 declare const publicFill: SVGProps<SVGPathElement>['fill'];

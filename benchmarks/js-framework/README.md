@@ -399,6 +399,16 @@ fixed, run A–B–B–A without concurrent tests, and compare the generic contr
 before claiming a timing benefit. Omit `WORK_CASES` to retain the original literal
 and duplicate-key gates as well.
 
+For a bounded comparison with closer controls, alternate baseline/candidate URLs
+within each sample and rotate the four modes each round. Both artifacts must
+pass the same post-timer CSS and DOM assertions. `pairedMedianRatio` is the
+median candidate/baseline ratio of those adjacent samples;
+`controlAdjustedMedianRatio` divides each pair by its same-round generic control:
+
+```bash
+WORK_CASES=leadingSpread,leadingGeneric,collisionSpread,collisionGeneric WORK_TIMING_OPERATIONS=select_another,unrelated_update WORK_SAMPLES=15 TARGET_URL=http://127.0.0.1:5334/style-literals.html WORK_TIMING_URL=http://127.0.0.1:5336/style-literals.html WORK_TIMING_BASELINE_URL=http://127.0.0.1:5335/style-literals.html WORK_JSON=/tmp/style-spreads-paired.json node benchmarks/js-framework/style-literals-work.mjs
+```
+
 ## Keyed-reorder matrix (`run-reorder.mjs`)
 
 The canonical suite only ever reorders two rows (`swap`). `run-reorder.mjs`

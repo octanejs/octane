@@ -16,6 +16,7 @@ let root: Root | undefined;
 let presentation: ReturnType<typeof mountPresentationRows> | undefined;
 let input: HTMLInputElement;
 let queryRoot: Document | ShadowRoot = document;
+let inputRoot: Document | ShadowRoot = document;
 let focusedId = 0;
 let currentRows = rows;
 let kind: ListKind = 'compiled';
@@ -50,7 +51,12 @@ function renderRows(): void {
 	}
 }
 
-function mount(nextKind: ListKind, nextFocusedId: number, shadow = false): void {
+function mount(
+	nextKind: ListKind,
+	nextFocusedId: number,
+	shadow = false,
+	shadowEditor = false,
+): void {
 	root?.unmount();
 	root = undefined;
 	presentation?.dispose();
@@ -71,16 +77,20 @@ function mount(nextKind: ListKind, nextFocusedId: number, shadow = false): void 
 		container = document.createElement('section');
 		queryRoot.appendChild(container);
 	}
-	if (kind === 'presentation') presentation = mountPresentationRows(container, currentRows);
+	if (kind === 'presentation')
+		presentation = mountPresentationRows(container, currentRows, shadowEditor);
 	else root = createRoot(container);
 	renderRows();
 	flushSync(() => {});
+	inputRoot = shadowEditor
+		? queryRoot.querySelector(`[data-editor-id="${focusedId}"]`)!.shadowRoot!
+		: queryRoot;
 	input =
 		kind === 'compiled'
-			? queryRoot.querySelector<HTMLInputElement>('.nested-conditional-editor')!
+			? inputRoot.querySelector<HTMLInputElement>('.nested-conditional-editor')!
 			: kind === 'presentation'
-				? queryRoot.querySelector<HTMLInputElement>(`input[name="${focusedId}"]`)!
-				: queryRoot.querySelector<HTMLInputElement>(`[data-row="${focusedId}"]`)!;
+				? inputRoot.querySelector<HTMLInputElement>(`input[name="${focusedId}"]`)!
+				: inputRoot.querySelector<HTMLInputElement>(`[data-row="${focusedId}"]`)!;
 	for (const name of ['blur', 'focusout']) {
 		input.addEventListener(name, () => interruptions.push(name));
 	}
@@ -112,10 +122,10 @@ function snapshot() {
 		connected: input.isConnected,
 		same:
 			kind === 'compiled'
-				? queryRoot.querySelector('.nested-conditional-editor') === input
+				? inputRoot.querySelector('.nested-conditional-editor') === input
 				: kind === 'presentation'
-					? queryRoot.querySelector(`input[name="${focusedId}"]`) === input
-					: queryRoot.querySelector(`[data-row="${focusedId}"]`) === input,
+					? inputRoot.querySelector(`input[name="${focusedId}"]`) === input
+					: inputRoot.querySelector(`[data-row="${focusedId}"]`) === input,
 		value: input.value,
 		selection: [input.selectionStart, input.selectionEnd],
 		interruptions: interruptions.slice(),

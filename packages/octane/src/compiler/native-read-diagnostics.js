@@ -528,6 +528,27 @@ export function analyzeNativeReadDiagnostics(ast, source, filename, options = {}
 			FUNCTION_TYPES.has(node.type)
 		);
 	}
+	function isDomStyleProperty(node) {
+		let object = parents.get(node);
+		let container = parents.get(object);
+		while (
+			container &&
+			(WRAPPERS.has(container.type) ||
+				(container.type === 'LogicalExpression' &&
+					(container.operator !== '&&' || container.right === object)) ||
+				(container.type === 'ConditionalExpression' &&
+					(container.consequent === object || container.alternate === object)))
+		) {
+			object = container;
+			container = parents.get(object);
+		}
+		if (container?.type !== 'JSXExpressionContainer') return false;
+		const attribute = parents.get(container);
+		if (attribute?.type !== 'JSXAttribute' || attribute.name?.name !== 'style') return false;
+		const opening = parents.get(attribute);
+		const tag = opening?.name;
+		return tag?.type === 'JSXIdentifier' && /^[a-z]/.test(tag.name);
+	}
 	for (const record of allRecords) {
 		const value = recordValue(record);
 		if (
@@ -551,7 +572,7 @@ export function analyzeNativeReadDiagnostics(ast, source, filename, options = {}
 			);
 		} else if (node.type === 'Property' && parents.get(node)?.type === 'ObjectExpression') {
 			const value = valueOf(node.value);
-			if (createsCapability(node.value, value))
+			if (!isDomStyleProperty(node) && createsCapability(node.value, value))
 				checkName(node.key, propertyName(node.key, node.computed), value);
 		} else if (node.type === 'AssignmentExpression' && node.operator === '=') {
 			const left = unwrap(node.left);

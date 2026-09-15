@@ -303,6 +303,13 @@ const SUITES = [
 		],
 	},
 	{
+		name: 'signal-dom-bindings',
+		cwd: 'scoped-signals',
+		servers: [],
+		iter: { normal: 9, quick: 3 },
+		runs: [{ script: 'run-dom-bindings.mjs', args: (_n, quick) => (quick ? ['--quick'] : []) }],
+	},
+	{
 		name: 'signal-favoring',
 		cwd: 'signal-favoring',
 		servers: [

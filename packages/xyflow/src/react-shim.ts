@@ -1,12 +1,7 @@
-import type { ComponentBody, OctaneNode } from 'octane';
+import type { CSSProperties, ComponentBody, OctaneNode } from 'octane';
 import type { Octane as OctaneJSXRuntime } from 'octane/jsx-runtime';
 
-export type { OctaneNode as ReactNode, OctaneNode };
-
-export type CSSProperties = Exclude<
-	OctaneJSXRuntime.JSX.IntrinsicElements['div']['style'],
-	string | undefined
->;
+export type { CSSProperties, OctaneNode as ReactNode, OctaneNode };
 
 export type RefObject<T> = { current: T | null };
 export type Ref<T> = OctaneJSXRuntime.Ref<T>;

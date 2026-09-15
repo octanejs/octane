@@ -169,6 +169,7 @@ import {
 import { createNativeReadRetry, type NativeReadRetry } from './signals/native-read-retry.js';
 import {
 	NativeAdoptionMiss,
+	readNativeDomStyle,
 	runNativeBatch,
 	setNativeAdoptionResolver,
 } from './signals/read-protocol.js';
@@ -562,6 +563,78 @@ function runWithBlockSignalOwner<T>(scope: Scope | null, callback: () => T): T {
 	return owner === undefined || currentSignalOwner() === owner
 		? callback()
 		: runWithSignalOwner(owner, callback);
+}
+
+export { readNativeDomStyle, readNativeDomProps } from './signals/read-protocol.js';
+
+interface NativeStyleBinding {
+	__kind: 'nativeStyleBinding';
+	__flags: number;
+	__teardown: typeof disposeNativeStyleBinding;
+	block: Block | null;
+}
+
+function disposeNativeStyleBinding(binding: NativeStyleBinding): void {
+	if (binding.block !== null) unmountBlock(binding.block, false);
+	binding.block = null;
+}
+
+function nativeStyleBody(props: { el: HTMLElement | SVGElement; value: any }, scope: Scope): void {
+	// This Block owns native subscriptions, not an authored component instance.
+	// Facades must resolve in the enclosing component's owner, just as their
+	// event callbacks do, while the existing native read frame stays active here.
+	const value = SIGNAL_BINDINGS_ENABLED
+		? runWithBlockSignalOwner(scope.parent, () => readNativeDomStyle(props.value))
+		: readNativeDomStyle(props.value);
+	setStyle(props.el, value, scope.slots[0]);
+	journalRootProperty(scope.slots, 0, scope.slots[0]);
+	scope.slots[0] = value;
+}
+
+/**
+ * A style binding owns reads in a normal scheduled Block, but owns no DOM range.
+ * The enclosing template owns the host and its children. Reusing the native
+ * read driver keeps speculative subscriptions, errors, and adoption transactional.
+ * @internal
+ */
+export function nativeStyleBinding(
+	owner: Scope,
+	slotIndex: number,
+	el: HTMLElement | SVGElement,
+	value: any,
+): void {
+	let binding = owner.slots[slotIndex] as NativeStyleBinding | undefined;
+	if (binding === undefined) {
+		const block = createBlock('control-flow', owner.block, el, null, null, nativeStyleBody, {
+			el,
+			value,
+		});
+		block.parent = owner;
+		binding = {
+			__kind: 'nativeStyleBinding',
+			__flags: SLOT_FLAG_TEARDOWN,
+			__teardown: disposeNativeStyleBinding,
+			block,
+		};
+		// The template bag commits after its bindings. Reserve its first index
+		// to keep the array packed, and publish ownership before a read can suspend.
+		if (owner.slots.length === 0) owner.slots.push(undefined);
+		owner.slots[slotIndex] = binding;
+		registerSlot(owner, binding);
+	} else {
+		const block = binding.block!;
+		if (block.parentNode !== el) {
+			// An incomplete template mount retries with a fresh clone. Its styles
+			// must be applied even when the resolved values match the abandoned host.
+			journalRootProperty(block, 'parentNode', block.parentNode);
+			journalRootProperty(block.slots, 0, block.slots[0]);
+			block.parentNode = el;
+			block.slots[0] = undefined;
+		}
+		journalRootProperty(block, 'props', block.props);
+		block.props = { el, value };
+	}
+	renderBlock(binding.block!);
 }
 
 /** @internal Enable invocation collection before an opted-in module renders. */
@@ -15671,8 +15744,7 @@ export function setText(node: Text, value: any): void {
 }
 
 const DIRECT_SIGNAL_BINDING = /* @__PURE__ */ Symbol('octane.direct-signal-binding');
-type DirectSignalBindingKind =
-	'text' | 'textOnlyChild' | 'attribute' | 'style' | 'value' | 'checked';
+type DirectSignalBindingKind = 'text' | 'textOnlyChild' | 'attribute' | 'value' | 'checked';
 type DirectSignalAttributeKind = 'attr' | 'class' | 'booleanAttr' | 'ariaAttr' | 'stringData';
 
 interface DirectSignalBinding {
@@ -15683,7 +15755,6 @@ interface DirectSignalBinding {
 	readonly site: string;
 	readonly name?: string;
 	readonly attributeKind?: DirectSignalAttributeKind;
-	readonly staticCss?: string;
 	readonly handle: SignalHandle<unknown> | null;
 	text?: Text;
 	value: unknown;
@@ -15772,14 +15843,6 @@ function writeDirectSignalBinding(binding: DirectSignalBinding, value: unknown):
 			default:
 				setAttribute(element, binding.name!, value);
 		}
-	} else if (binding.kind === 'style') {
-		setStyleProperty(
-			binding.target as HTMLElement | SVGElement,
-			binding.name!,
-			value,
-			binding.staticCss!,
-			binding.value,
-		);
 	} else if (binding.kind === 'value') {
 		const element = binding.target as Element;
 		if (element.localName === 'select') setSelectValue(element, value);
@@ -15796,7 +15859,6 @@ function writeDirectSignalScalar(
 	kind: DirectSignalBindingKind,
 	previous: unknown,
 	name?: string,
-	staticCss?: string,
 	attributeKind?: DirectSignalAttributeKind,
 ): unknown {
 	if (kind === 'text' || kind === 'textOnlyChild') {
@@ -15827,8 +15889,6 @@ function writeDirectSignalScalar(
 			default:
 				setAttribute(element, name!, value);
 		}
-	} else if (kind === 'style') {
-		setStyleProperty(target as HTMLElement | SVGElement, name!, value, staticCss!, previous);
 	} else if (kind === 'value') {
 		const element = target as Element;
 		if (element.localName === 'select') setSelectValue(element, value);
@@ -15916,7 +15976,6 @@ function createDirectSignalBinding(
 	site: string,
 	kind: DirectSignalBindingKind,
 	name?: string,
-	staticCss?: string,
 	attributeKind?: DirectSignalAttributeKind,
 	text?: Text,
 ): DirectSignalBinding {
@@ -15929,7 +15988,6 @@ function createDirectSignalBinding(
 		site,
 		name,
 		attributeKind,
-		staticCss,
 		handle,
 		value: scope,
 		disposed: false,
@@ -15968,7 +16026,6 @@ function bindDirectSignal(
 	site: string,
 	kind: DirectSignalBindingKind,
 	name?: string,
-	staticCss?: string,
 	attributeKind?: DirectSignalAttributeKind,
 ): unknown {
 	const prior =
@@ -15983,15 +16040,7 @@ function bindDirectSignal(
 		if (TRANSITION_JOURNAL !== null) journalBag();
 		const scalarTarget =
 			(kind === 'text' || kind === 'textOnlyChild') && previous instanceof Text ? previous : target;
-		return writeDirectSignalScalar(
-			scalarTarget,
-			value,
-			kind,
-			previous,
-			name,
-			staticCss,
-			attributeKind,
-		);
+		return writeDirectSignalScalar(scalarTarget, value, kind, previous, name, attributeKind);
 	}
 	if (
 		prior !== null &&
@@ -16000,7 +16049,6 @@ function bindDirectSignal(
 		prior.kind === kind &&
 		prior.site === site &&
 		prior.name === name &&
-		prior.staticCss === staticCss &&
 		prior.attributeKind === attributeKind &&
 		prior.handle === handle
 	) {
@@ -16025,7 +16073,6 @@ function bindDirectSignal(
 			kind,
 			kind === 'text' || kind === 'textOnlyChild' ? prior?.text : (prior?.value ?? previous),
 			name,
-			staticCss,
 			attributeKind,
 		);
 		if (prior !== null) {
@@ -16046,7 +16093,6 @@ function bindDirectSignal(
 		site,
 		kind,
 		name,
-		staticCss,
 		attributeKind,
 		kind === 'text' || kind === 'textOnlyChild'
 			? (prior?.text ?? (previous instanceof Text ? previous : undefined))
@@ -16107,30 +16153,7 @@ export function bindSignalAttribute(
 	site: string,
 	attributeKind: DirectSignalAttributeKind = 'attr',
 ): unknown {
-	return bindDirectSignal(
-		scope,
-		previous,
-		element,
-		value,
-		site,
-		'attribute',
-		name,
-		undefined,
-		attributeKind,
-	);
-}
-
-/** @internal Compiler target for a direct signal/scalar fixed style property. */
-export function bindSignalStyleProperty(
-	scope: Scope,
-	previous: unknown,
-	element: HTMLElement | SVGElement,
-	name: string,
-	value: unknown,
-	staticCss: string,
-	site: string,
-): unknown {
-	return bindDirectSignal(scope, previous, element, value, site, 'style', name, staticCss);
+	return bindDirectSignal(scope, previous, element, value, site, 'attribute', name, attributeKind);
 }
 
 /** @internal Compiler target for a direct signal/scalar value binding. */
@@ -18025,6 +18048,9 @@ export function isHydratingStyle(): boolean {
 	return activeHydration() !== null;
 }
 
+/** Intrinsic prototype used to guard completion of fresh style spread snapshots. @internal */
+export const styleObjectPrototype = Object.prototype;
+
 /** Whether a spread prefix and its fixed trailing declarations can be diffed separately. @internal */
 export function canSplitStyleProperties(): boolean {
 	if (activeHydration() !== null) return false;
@@ -18393,6 +18419,7 @@ export function setHostPropSources(
 	prev: Record<string, unknown> | undefined,
 	scope: Scope,
 	hasNestedChildren = false,
+	readStyle?: (value: unknown) => unknown,
 	deferControl = false,
 ): Record<string, unknown> {
 	interface PropWriter {
@@ -18481,6 +18508,7 @@ export function setHostPropSources(
 		? [...values.values()].sort((a, b) => a.firstOrder - b.firstOrder)
 		: values.values();
 	for (const { name, value } of ordered) resolved[name] = value;
+	if (readStyle !== undefined && 'style' in resolved) resolved.style = readStyle(resolved.style);
 	const tag = el.localName;
 	const formHost = tag === 'input' || tag === 'textarea' || tag === 'select';
 	setSpread(el, resolved, prev, scope, true, formHost);
@@ -18509,6 +18537,7 @@ interface SignalHostPropSourcesBinding {
 	readonly element: Element;
 	readonly site: string;
 	readonly hasNestedChildren: boolean;
+	readonly readStyle: ((value: unknown) => unknown) | undefined;
 	sources: readonly HostPropSource[];
 	resolved: Record<string, unknown> | undefined;
 	subscriptions: Map<SignalHandle<unknown>, () => void>;
@@ -18519,6 +18548,8 @@ interface SignalHostPropSourcesBinding {
 }
 
 function resolveSignalStyle(value: unknown, handles: Set<SignalHandle<unknown>>): unknown {
+	// Only non-native hosts use this targeted, untracked subscription policy.
+	// Native hosts defer to readNativeDomStyle after choosing the winning source.
 	if (isSignalHandle(value)) {
 		handles.add(value);
 		return readSignalBinding(value);
@@ -18535,7 +18566,10 @@ function resolveSignalStyle(value: unknown, handles: Set<SignalHandle<unknown>>)
 	return copy ?? value;
 }
 
-function resolveSignalHostPropSources(sources: readonly HostPropSource[]): {
+function resolveSignalHostPropSources(
+	sources: readonly HostPropSource[],
+	readStyle?: (value: unknown) => unknown,
+): {
 	sources: readonly HostPropSource[];
 	handles: Set<SignalHandle<unknown>>;
 } {
@@ -18547,7 +18581,7 @@ function resolveSignalHostPropSources(sources: readonly HostPropSource[]): {
 		const source = sources[i];
 		if (!source[0]) {
 			const value =
-				source[1] === 'children'
+				source[1] === 'children' || (source[1] === 'style' && readStyle !== undefined)
 					? source[2]
 					: source[1] === 'style'
 						? resolveSignalStyle(source[2], handles)
@@ -18566,7 +18600,7 @@ function resolveSignalHostPropSources(sources: readonly HostPropSource[]): {
 		for (const name of Object.keys(spread)) {
 			const current = (spread as Record<string, unknown>)[name];
 			const value =
-				name === 'children'
+				name === 'children' || (name === 'style' && readStyle !== undefined)
 					? current
 					: name === 'style'
 						? resolveSignalStyle(current, handles)
@@ -18612,13 +18646,14 @@ function updateSignalHostPropSources(binding: SignalHostPropSourcesBinding): voi
 	if (binding.disposed || binding.pendingControl || binding.scope.block.disposed) return;
 	try {
 		runWithBlockSignalOwner(binding.scope, () => {
-			const next = resolveSignalHostPropSources(binding.sources);
+			const next = resolveSignalHostPropSources(binding.sources, binding.readStyle);
 			binding.resolved = setHostPropSources(
 				binding.element,
 				next.sources,
 				binding.resolved,
 				binding.scope,
 				binding.hasNestedChildren,
+				binding.readStyle,
 			);
 		});
 	} catch {
@@ -18791,6 +18826,7 @@ export function bindSignalHostPropSources(
 	sources: readonly HostPropSource[],
 	site: string,
 	hasNestedChildren = false,
+	readStyle?: (value: unknown) => unknown,
 ): unknown {
 	let binding =
 		typeof previous === 'object' &&
@@ -18805,6 +18841,7 @@ export function bindSignalHostPropSources(
 			element,
 			site,
 			hasNestedChildren,
+			readStyle,
 			sources,
 			resolved: undefined,
 			subscriptions: new Map(),
@@ -18828,13 +18865,14 @@ export function bindSignalHostPropSources(
 		validateDirectSignalControl(element, site);
 		binding.pendingControl ||= activeHydration() !== null && controlSnapshot.editRevision > 0;
 	}
-	const next = resolveSignalHostPropSources(sources);
+	const next = resolveSignalHostPropSources(sources, readStyle);
 	binding.resolved = setHostPropSources(
 		element,
 		next.sources,
 		binding.resolved,
 		scope,
 		hasNestedChildren,
+		readStyle,
 		binding.pendingControl,
 	);
 	rebindSignalHostSubscriptions(binding, next.handles);
@@ -36006,19 +36044,25 @@ function reconcileKeyed<T>(
 	let oldFirst: Block | null = state.head;
 	let prefixLen = 0;
 	while (oldFirst !== null && prefixLen < newLen) {
-		const newKey = readListKey(keySource, items[prefixLen], prefixLen, normalizeKey);
+		const newItem = items[prefixLen];
+		const newKey = readListKey(keySource, newItem, prefixLen, normalizeKey);
 		if (oldFirst.key !== newKey) break;
 		const block = oldFirst;
-		updateSurvivor(
-			block,
-			items[prefixLen],
-			prefixLen,
-			itemBody,
-			pure,
-			lite,
-			indexIndependent,
-			state.env,
-		);
+		// Stable-survivor skip: updateSurvivor writes itemIndex/body only when
+		// they differ, journals only on a difference, and renders only when the
+		// item (or index, for an index-reading body) changed. A pure body whose
+		// item ref, body, and position all match is a provable no-op call — on a
+		// mostly-stable list that is one call per row per update. Skip it; the
+		// key read above already ran, so dev-mode duplicate-key checks are
+		// unchanged. The env tuple is never consumed by the pure branch, and a
+		// non-pure body still enters updateSurvivor for its renderBlock.
+		if (
+			!pure ||
+			block.props !== newItem ||
+			block.body !== itemBody ||
+			block.itemIndex !== prefixLen
+		)
+			updateSurvivor(block, newItem, prefixLen, itemBody, pure, lite, indexIndependent, state.env);
 		oldFirst = block.nextSibling!;
 		prefixLen++;
 	}
@@ -36031,10 +36075,13 @@ function reconcileKeyed<T>(
 	let newEnd = newLen - 1;
 	let oldRemain = oldSize - prefixLen;
 	while (oldLast !== null && oldRemain > 0 && newEnd >= prefixLen) {
-		const newKey = readListKey(keySource, items[newEnd], newEnd, normalizeKey);
+		const newItem = items[newEnd];
+		const newKey = readListKey(keySource, newItem, newEnd, normalizeKey);
 		if (oldLast.key !== newKey) break;
 		const block = oldLast;
-		updateSurvivor(block, items[newEnd], newEnd, itemBody, pure, lite, indexIndependent, state.env);
+		// Same stable-survivor skip as the prefix walk (see above).
+		if (!pure || block.props !== newItem || block.body !== itemBody || block.itemIndex !== newEnd)
+			updateSurvivor(block, newItem, newEnd, itemBody, pure, lite, indexIndependent, state.env);
 		oldLast = block.prevSibling!;
 		newEnd--;
 		oldRemain--;
@@ -36206,16 +36253,10 @@ function reconcileKeyed<T>(
 				else lastIdx = newRelIdx;
 				patched++;
 				const newIdx = prefixLen + newRelIdx;
-				updateSurvivor(
-					cur!,
-					items[newIdx],
-					newIdx,
-					itemBody,
-					pure,
-					lite,
-					indexIndependent,
-					state.env,
-				);
+				const newItem = items[newIdx];
+				// Same stable-survivor skip as the prefix walk (see above).
+				if (!pure || cur!.props !== newItem || cur!.body !== itemBody || cur!.itemIndex !== newIdx)
+					updateSurvivor(cur!, newItem, newIdx, itemBody, pure, lite, indexIndependent, state.env);
 			}
 			cur = next;
 			oldIdx++;

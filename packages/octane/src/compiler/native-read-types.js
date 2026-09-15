@@ -293,12 +293,39 @@ export function validateNativeSignalNames(program, file) {
 			(exposesHandle(checker.getTypeAtLocation(node)) || exposesLiveRead(node))
 		);
 	}
+	function isDomStyleProperty(node) {
+		let object = node.parent;
+		if (!ts.isObjectLiteralExpression(object)) return false;
+		while (
+			object.parent &&
+			(ts.isParenthesizedExpression(object.parent) ||
+				ts.isAsExpression(object.parent) ||
+				ts.isSatisfiesExpression(object.parent) ||
+				ts.isNonNullExpression(object.parent) ||
+				(ts.isBinaryExpression(object.parent) &&
+					(object.parent.operatorToken.kind === ts.SyntaxKind.BarBarToken ||
+						object.parent.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken ||
+						(object.parent.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken &&
+							object.parent.right === object))) ||
+				(ts.isConditionalExpression(object.parent) &&
+					(object.parent.whenTrue === object || object.parent.whenFalse === object)))
+		)
+			object = object.parent;
+		const container = object.parent;
+		if (!container || !ts.isJsxExpression(container)) return false;
+		const attribute = container.parent;
+		if (!ts.isJsxAttribute(attribute) || attribute.name.getText(sourceFile) !== 'style')
+			return false;
+		const tag = attribute.parent.parent.tagName;
+		return ts.isIdentifier(tag) && /^[a-z]/.test(tag.text);
+	}
 	function visit(node) {
 		if (ts.isVariableDeclaration(node)) {
 			if (node.initializer && createsCapability(node.initializer))
 				checkName(node.name, node.initializer);
 		} else if (ts.isPropertyAssignment(node)) {
-			if (createsCapability(node.initializer)) checkName(node.name, node.initializer);
+			if (!isDomStyleProperty(node) && createsCapability(node.initializer))
+				checkName(node.name, node.initializer);
 		} else if (ts.isPropertyDeclaration(node)) {
 			if (node.initializer && createsCapability(node.initializer))
 				checkName(node.name, node.initializer);

@@ -1,4 +1,5 @@
 export { trustHTML, type TrustedHTML } from './trusted-html.js';
+export { readNativeDomStyle, readNativeDomProps } from './signals/read-protocol.js';
 /**
  * octane server runtime (SSR).
  *
@@ -3187,6 +3188,7 @@ export function ssrAttrs(
 	tag?: string,
 	namespace: AttributeNamespace = 'html',
 	skipFormControls = false,
+	readStyle?: (value: unknown) => unknown,
 ): string {
 	const dev = process.env.NODE_ENV !== 'production';
 	namespace = resolveAttributeNamespace(namespace);
@@ -3258,7 +3260,12 @@ export function ssrAttrs(
 					(skipFormControls && isAggregatedFormAttribute(tag, rawName))
 				)
 					continue;
-				out += ssrAttrEntry(rawName, value, tag, namespace);
+				out += ssrAttrEntry(
+					rawName,
+					readStyle !== undefined && rawName === 'style' ? readStyle(value) : value,
+					tag,
+					namespace,
+				);
 			}
 			return out;
 		}
@@ -3318,6 +3325,8 @@ export function ssrAttrs(
 		}
 	}
 
+	const style = resolved.get('style');
+	if (readStyle !== undefined && style !== undefined) style.value = readStyle(style.value);
 	let out = '';
 	const ordered = dev || needsWinningOrderSort ? [...resolved.values()] : resolved.values();
 	if (needsWinningOrderSort) (ordered as PropWriter[]).sort((a, b) => a.firstOrder - b.firstOrder);
@@ -3392,6 +3401,7 @@ export function ssrClass(sources: Array<[boolean, unknown]>): string {
 export function ssrSnapshotSpread(
 	obj: unknown,
 	controlSite?: string,
+	deferStyle = false,
 ): Record<string, unknown> | null {
 	if (obj == null) return null;
 	const source = Object(obj) as Record<PropertyKey, unknown>;
@@ -3403,6 +3413,11 @@ export function ssrSnapshotSpread(
 		if (!Object.prototype.propertyIsEnumerable.call(source, key)) continue;
 		let value = source[key];
 		if (typeof key !== 'string') continue;
+		if (key === 'style' && deferStyle) {
+			// Native style reads happen after JSX precedence chooses the winner.
+			snapshot[key] = value;
+			continue;
+		}
 		if (
 			controlSite !== undefined &&
 			(key === 'value' || key === 'checked') &&
@@ -3411,6 +3426,8 @@ export function ssrSnapshotSpread(
 			value = ssrSignalControlValue(value, controlSite);
 		} else if (isSignalHandle(value)) value = readSignalBinding(value);
 		else if (key === 'style' && value !== null && typeof value === 'object') {
+			// Non-native SSR retains targeted binding reads, without introducing
+			// native observation or allocating snapshots for ordinary styles.
 			let style: Record<string, unknown> | undefined;
 			for (const name of Object.keys(value)) {
 				const current = (value as Record<string, unknown>)[name];

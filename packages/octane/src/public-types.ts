@@ -10,7 +10,13 @@ import type {
 	Suspense,
 } from './runtime.js';
 
-export type { Octane, OctaneElement, ClassValue, CSSProperties } from './jsx-runtime.js';
+export type {
+	Octane,
+	OctaneElement,
+	ClassValue,
+	CSSProperties,
+	SignalCSSProperties,
+} from './jsx-runtime.js';
 /** Reusable component props remain scalar; the automatic JSX runtime adds bindings. */
 export declare namespace JSX {
 	type ElementType = Octane.JSX.ElementType;

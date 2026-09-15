@@ -44,6 +44,28 @@ export type NativeReadObserver = (source: NativeReadSource, version: number) => 
 let nativeReadObserver: NativeReadObserver | null = null;
 let nativeWriteGuarded = false;
 
+/** Private protocol implemented on native handles, never inferred from a get method. */
+export const NATIVE_DOM_VALUE: unique symbol = Symbol('octane.nativeDomValue');
+
+export function readNativeDomValue(value: any): any {
+	return value !== null && typeof value === 'object' && NATIVE_DOM_VALUE in value
+		? value[NATIVE_DOM_VALUE]()
+		: value;
+}
+
+/** Snapshot values so later writes can diff against the last applied style. */
+export function readNativeDomStyle(value: any): any {
+	value = readNativeDomValue(value);
+	if (value === null || typeof value !== 'object') return value;
+	const result: Record<string, unknown> = Object.create(null);
+	for (const name in value) result[name] = readNativeDomValue(value[name]);
+	return result;
+}
+
+export function readNativeDomProps(props: Record<string, unknown>): Record<string, unknown> {
+	return 'style' in props ? { ...props, style: readNativeDomStyle(props.style) } : props;
+}
+
 /** A renderer supplies historical data only for a data scope actually read. */
 export interface NativeAdoptionOwner {
 	readonly scopeKey: string;

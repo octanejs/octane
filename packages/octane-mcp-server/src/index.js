@@ -58,6 +58,7 @@ export const BENCHMARK_SUITES = [
 	'scoped-signals',
 	'scoped-signals-trace',
 	'scoped-native-reads',
+	'signal-dom-bindings',
 	'signal-favoring',
 	'news',
 	'hydration-interactivity',

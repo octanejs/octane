@@ -282,6 +282,39 @@ The handle remains stable for that hook lifetime. Letting it escape does not tra
 
 Local `useDerived$` and local async hooks are not part of the API. A local derived facade alone cannot keep captured props isolated through speculative renders, transitive graph caches, and memoized children. Mutating the committed computation early would expose speculative state. Use `scope.derived$` for explicitly owned computations; local closure staging is outside this API.
 
+### Signal-valued styles
+
+DOM `style` accepts native signal handles as property values, using the actual CSS
+property names:
+
+```tsrx
+import { useSignal$ } from 'octane/signals/client';
+
+export function Position(props) @{
+	const left$ = useSignal$(0);
+	const right$ = useSignal$(0);
+	<div style={{ ...props.style, left: left$, right: right$ }} />
+}
+```
+
+For a direct template style, signal changes update the style binding without
+rerunning component setup. The binding uses the normal scheduler, CSS value
+rules, Suspense, and hydration. Numeric lengths receive `px`; unitless values,
+custom properties, `!important`, and property removal retain their normal behavior.
+You can also pass a signal containing an entire style object, CSS string, or `null`.
+Unmounting releases subscriptions without disposing shared signals.
+
+Use `SignalCSSProperties` from `octane` for types that accept signal-valued CSS
+properties. `CSSProperties` describes ordinary CSS values for compatibility with
+libraries that consume them. The `$` naming rule still applies to signal bindings
+and ordinary JavaScript object fields; inline DOM style keys use CSS names.
+
+Hosts with JSX prop spreads or duplicate attributes, and stored return-JSX
+elements, retain their existing render scopes and source-order resolution. Their
+styles also accept signals, but may rerun that broader scope. Explicit `.get()`
+reads continue to subscribe the scope that executes them. Other DOM attributes
+continue to use explicit reads.
+
 ### Stored element compatibility
 
 The primary native component path remains compiled `@{}` TSRX. Ordinary `return <…>` syntax inside a `.tsrx` file is also supported, with different stored-value behavior and measured costs.

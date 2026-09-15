@@ -54,11 +54,17 @@ import type { SignalHandle } from './signals/types.js';
  */
 export interface OctaneElement<P = any> extends ElementDescriptor<P> {}
 
-type SignalProperties<P> = { [K in keyof P]: P[K] | SignalHandle<P[K]> };
-
 export interface CSSProperties extends React.CSSProperties {
 	cssFloat?: React.CSSProperties['float'];
 }
+
+/** Native DOM style values; plain CSSProperties remains usable by CSS-consuming libraries. */
+export type SignalCSSProperties = {
+	[K in keyof CSSProperties]: CSSProperties[K] | SignalHandle<CSSProperties[K] | null>;
+} & {
+	[customProperty: `--${string}`]:
+		string | number | SignalHandle<string | number | null | undefined> | undefined;
+};
 
 export type ClassValue =
 	| string
@@ -159,7 +165,7 @@ type Transformed<P, T> = Omit<P, ReactSyntheticProps | 'className' | 'style' | '
 		children?: unknown;
 	};
 
-type BoundStyle<S> = S extends object ? SignalProperties<S> : S;
+type BoundStyle<S> = S | SignalCSSProperties | SignalHandle<S | SignalCSSProperties | null>;
 
 /**
  * Only a host JSX site installs direct bindings. Keep reusable attribute and

@@ -3,7 +3,12 @@ import type { JSX as CompatibilityJSX } from './jsx-runtime.js';
 import type { TrustedHTML } from './trusted-html.js';
 
 export { Fragment, jsx, jsxs, jsxDEV } from './jsx-runtime.js';
-export type { ClassValue, CSSProperties, OctaneElement } from './jsx-runtime.js';
+export type {
+	ClassValue,
+	CSSProperties,
+	SignalCSSProperties,
+	OctaneElement,
+} from './jsx-runtime.js';
 
 type StrongIntrinsicProps<P> = Omit<
 	P,

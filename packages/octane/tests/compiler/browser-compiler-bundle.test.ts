@@ -15,6 +15,7 @@ describe('octane/compiler browser bundle', () => {
 			stdin: {
 				contents:
 					"import { compile } from 'octane/compiler';\n" +
+					'export { compile };\n' +
 					"compile(`export function App() @{ <p>{'browser compiler'}</p> }`, 'App.tsrx');\n" +
 					'compile(`export function Scene() @{ <label value="writer" /> }`, \'Scene.tsrx\', {' +
 					"hmr: false, renderer: { id: 'native', module: '@test/valdi-writer', target: 'valdi' } });\n",
@@ -39,10 +40,22 @@ describe('octane/compiler browser bundle', () => {
 					input !== '<stdin>' && realpathSync(resolve(OCTANE_PACKAGE_ROOT, input)) === coreEntry,
 			),
 		).toBe(true);
-		expect(inputs.some((input) => input.includes('/oxc-tsrx/'))).toBe(false);
+		expect(inputs.some((input) => input.includes('/@tsrx/oxc/'))).toBe(false);
 		expect(inputs.some((input) => input.endsWith('/compiler/typescript.js'))).toBe(false);
 		expect(inputs.some((input) => input.includes('/node_modules/typescript/'))).toBe(false);
 		expect(inputs.some((input) => input.includes('/@volar/'))).toBe(false);
 		expect(inputs.some((input) => input.includes('/@tsrx/typescript-plugin/'))).toBe(false);
+
+		const browserCompiler = await import(
+			`data:text/javascript;base64,${Buffer.from(result.outputFiles[0].text).toString('base64')}`
+		);
+		for (const mode of ['client', 'server']) {
+			const source =
+				'export function App(props) @{ const &{ value } = props; <p>{value as string}</p> }';
+			expect(() => browserCompiler.compile(source, 'removed.tsrx', { mode })).toThrow(SyntaxError);
+			expect(
+				browserCompiler.compile(source.replace('&{', '{'), 'ordinary.tsrx', { mode }).code,
+			).not.toBe('');
+		}
 	});
 });

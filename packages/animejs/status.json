@@ -8,12 +8,53 @@
   "surface": "Anime.js is re-exported unchanged; `useAnimeScope` binds scoped DOM animation setup, refresh, dependency recreation, and cleanup to Octane, and `@octanejs/animejs/adapters/three` exposes Anime.js's official Three adapter.",
   "divergences": [
     "`useAnimeScope` is an Octane-native lifecycle helper; it is not an upstream Anime.js API.",
-    "Only the root and `adapters/three` entry points are re-exported; other Anime.js subpaths are explicit gaps whose APIs remain available from the supported root where upstream exposes them there.",
+    "Use additional Anime.js subpaths directly from animejs; the root and adapters/three convenience exports remain supported.",
     "The Three adapter mutates raw objects while `@octanejs/three` retains frame-loop ownership; demand and never loops require explicit invalidation or advancement."
   ],
   "ssr": "Supported. The hook returns inert refs during server rendering and creates no Anime.js scope until its client effect runs.",
   "verified": "2026-07-30",
   "notes": [
     "Verified with real Anime.js scopes, dependency-driven cleanup, SSR rendering, the official adapter against an @octanejs/three-owned mesh, and a DOM plus demand-loop Three playground journey."
+  ],
+  "surfaces": [
+    {
+      "entrypoint": ".",
+      "exports": ["*"],
+      "ownership": "imported",
+      "files": ["src/index.ts"],
+      "dependency": {
+        "package": "animejs",
+        "version": "catalog:default",
+        "specifier": "animejs"
+      },
+      "evidence": ["tests/exports.test.ts", "tests/types/public-api.test-d.ts"]
+    },
+    {
+      "entrypoint": ".",
+      "exports": ["useAnimeScope", "AnimeScopeSetup", "UseAnimeScopeResult"],
+      "ownership": "adapter",
+      "files": ["src/useAnimeScope.ts", "src/internal.ts"],
+      "dependency": {
+        "package": "animejs",
+        "version": "catalog:default"
+      },
+      "evidence": ["tests/scope.test.ts", "tests/ssr.test.ts", "tests/types/public-api.test-d.ts"]
+    },
+    {
+      "entrypoint": "./adapters/three",
+      "exports": ["*"],
+      "ownership": "imported",
+      "files": ["src/adapters/three.ts"],
+      "dependency": {
+        "package": "animejs",
+        "version": "catalog:default",
+        "specifier": "animejs/adapters/three"
+      },
+      "evidence": [
+        "tests/exports.test.ts",
+        "tests/three-adapter.test.ts",
+        "tests/types/public-api.test-d.ts"
+      ]
+    }
   ]
 }

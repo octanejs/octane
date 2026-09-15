@@ -10,6 +10,7 @@ import { createDeclaredScalarCell } from './scalar-computations.js';
 import { ScopeDisposedError, SignalStreamError } from './errors.js';
 import { readSignalBinding as readBinding } from './graph.js';
 import { readEarlySignalValue } from './early-values.js';
+import { NATIVE_DOM_VALUE } from './read-protocol.js';
 import {
 	captureSignalOwner,
 	currentSignalOwner,
@@ -326,6 +327,12 @@ export abstract class Descriptor<T, H extends SignalHandle<T>> implements OwnerB
 
 	get(): T {
 		return this.resolve().get();
+	}
+
+	[NATIVE_DOM_VALUE](): T {
+		// Native styles belong to the active renderer read frame. Unlike targeted
+		// binding reads, they must retain observation and historical seed evidence.
+		return this.get();
 	}
 
 	[SIGNAL_BINDING_READ](): T {

@@ -15,7 +15,7 @@ declare const task$: Resource<number>;
 `;
 
 function fixture(source: string, otherFiles: Record<string, string> = {}) {
-	const filename = `${ROOT}/main.ts`;
+	const filename = `${ROOT}/main.tsx`;
 	const files = new Map<string, string>([
 		[filename, source],
 		...Object.entries(otherFiles).map(
@@ -27,12 +27,14 @@ function fixture(source: string, otherFiles: Record<string, string> = {}) {
 		module: ts.ModuleKind.ESNext,
 		moduleResolution: ts.ModuleResolutionKind.Bundler,
 		strict: true,
+		jsx: ts.JsxEmit.Preserve,
 		noEmit: true,
 		skipLibCheck: true,
 		types: [],
 		paths: {
 			'octane/signals': [SIGNALS],
 			octane: [OCTANE],
+			'octane/jsx-runtime': [fileURLToPath(new URL('../../src/jsx-runtime.d.ts', import.meta.url))],
 			'octane/signals/client': [CLIENT_HOOKS],
 			'octane/signals/server': [SERVER_HOOKS],
 		},
@@ -77,6 +79,55 @@ const value = signal$(1);`);
 		);
 	});
 
+	it('exempts logical host style values and shorthand CSS keys while checking capability creation', () => {
+		const result = fixture(`/** @jsxImportSource octane */
+${PRELUDE}
+import { signal$ } from 'octane/signals';
+declare const enabled: boolean;
+declare const fallback: import('octane').CSSProperties | undefined;
+declare const left: SignalHandle<number>;
+const andStyle = <div style={enabled && { left: signal$(1) } || undefined} />;
+const orStyle = <div style={fallback || { left: signal$(1) }} />;
+const nullishStyle = <div style={fallback ?? { left: signal$(1) }} />;
+const shorthand = <div style={{ left }} />;
+const ordinary = { left };
+const created = { left: signal$(1) };
+`);
+		// Aliases remain ordinary names; a newly created capability is checked.
+		expect(result.names).toEqual(['left']);
+	});
+
+	it('accepts precise signal CSS types while preserving ordinary CSSProperties', () => {
+		fixture(`/** @jsxImportSource octane */
+${PRELUDE}
+import type { CSSProperties, SignalCSSProperties } from 'octane';
+declare const whole$: SignalHandle<SignalCSSProperties | string | null>;
+const style: SignalCSSProperties = { left: task$, opacity: task$ };
+const host = <div style={style} />;
+const whole = <svg style={whole$} />;
+const ordinary: CSSProperties = { left: 1, opacity: 0.5 };
+const plainHost = <div style={ordinary} />;
+// @ts-expect-error Plain CSS values remain usable by libraries without signal unwrapping.
+const badPlain: CSSProperties = { left: task$ };
+declare const wrong$: SignalHandle<boolean>;
+// @ts-expect-error A length signal must contain an accepted CSS length.
+const badSignal: SignalCSSProperties = { left: wrong$ };
+`);
+	});
+
+	it('accepts native style keys while checking capability creation in component props and ordinary objects', () => {
+		const result = fixture(`/** @jsxImportSource octane */
+${PRELUDE}
+import { signal$ } from 'octane/signals';
+const host = <div style={{ left: signal$(1) }} />;
+declare const enabled: boolean;
+const conditional = <div style={enabled ? { left: signal$(1) } : { right: signal$(1) }} />;
+declare function Custom(props: { style: { left: SignalHandle<number> } }): null;
+const custom = <Custom style={{ left: signal$(1) }} />;
+const bag = { left: signal$(1) };
+`);
+		expect(result.names).toEqual(['left', 'left']);
+	});
 	it.each(['client', 'server'])(
 		'recognizes handles imported only through the real %s local hook entry',
 		(entry) => {

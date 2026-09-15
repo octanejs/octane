@@ -5412,7 +5412,7 @@ describe('compiler-owned component-region memoization', () => {
 		const destructuringDefault = compile(
 			`import { fallback } from './live';
 			 function Rows(props) @{
-				<ul>@for (const &{ label = fallback } of props.items; key label) { <li>{label}</li> }</ul>
+				<ul>@for (const { label = fallback } of props.items; key label) { <li>{label}</li> }</ul>
 			 }
 			 function App(props) @{ <Rows items={props.items} /> }`,
 			'auto-memo-binding-default.tsrx',

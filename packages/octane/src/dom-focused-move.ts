@@ -10,10 +10,20 @@ export function moveNativeNodeBefore(
 	focused: Element | null,
 	contentEditable: boolean,
 ): void {
-	if (
-		focused === null ||
-		(node !== focused && (node.nodeType !== 1 || !(node as Element).contains(focused)))
-	) {
+	let containsFocused = node === focused;
+	if (!containsFocused && focused !== null && node.nodeType === 1) {
+		let candidate: Element | undefined = focused;
+		do {
+			if ((node as Element).contains(candidate)) {
+				containsFocused = true;
+				break;
+			}
+			// Native contains() stops at a shadow root. Its host remains part of
+			// the editing subtree, including across nested or closed shadow roots.
+			candidate = (candidate.getRootNode() as ShadowRoot).host;
+		} while (candidate !== undefined);
+	}
+	if (!containsFocused) {
 		parent.insertBefore(node, anchor);
 		return;
 	}

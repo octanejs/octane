@@ -8290,5 +8290,13 @@
     "reference": "wave-budget",
     "maxRatio": 1,
     "note": "Retained 32-wave work:33 full passes, 528 suspended visits, 496 pending probes, 13,728 closure expression events. Positive measured work budgets, with complete output controls; no latency or engine allocation inference."
+  },
+  {
+    "suite": "signal-dom-bindings",
+    "op": "setup_calls",
+    "target": "direct",
+    "reference": "sampled",
+    "maxRatio": 0,
+    "note": "Direct signal-valued styles update through their DOM binding without re-running component setup. The sampled-read control must display the same styles and preserve the same host and child identities."
   }
 ]

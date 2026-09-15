@@ -36,6 +36,25 @@ can be shared. Resolved client graphs must exclude the renderer, and activation
 alone must exclude the signal graph/facade. `BENCH_JSON` must be a new absolute
 filename; source drift during a run fails instead of publishing mixed evidence.
 
+## Signal-valued DOM styles
+
+`run-dom-bindings.mjs` compiles and bundles two production components through the
+public entries. Both update two CSS properties and preserve a child node. One
+passes signal handles directly; the control samples them with `.get()` in setup.
+Every sample checks the resulting CSS, host and child identity, and teardown.
+
+```bash
+node benchmarks/bench.mjs --quick signal-dom-bindings
+BENCH_JSON=/private/tmp/signal-dom-bindings.json node benchmarks/scoped-signals/run-dom-bindings.mjs
+node benchmarks/scoped-signals/run-dom-bindings.mjs --quick --fault-component-read
+```
+
+The ratio guard requires zero component-setup calls for direct signal updates;
+the sampled control must execute setup for every update. The fault command
+deliberately adds component reads and must fail that guard. JSON records source,
+compiler-output, bundle and input hashes. Synchronous happy-dom timings are
+supplemental: they exclude browser layout/paint and have no hard speed threshold.
+
 ## Graph engine comparison
 
 This suite compares the experimental `octane/signals` engine with the exact

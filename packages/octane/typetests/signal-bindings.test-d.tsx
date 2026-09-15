@@ -1,12 +1,13 @@
 /** @jsxImportSource octane */
 import type { DerivedSignal, WritableSignal } from 'octane/signals';
-import type { ComponentProps } from 'octane';
+import type { ComponentProps, SignalCSSProperties } from 'octane';
 import type { JSX } from 'octane/jsx-runtime';
 
 declare const text: WritableSignal<string>;
 declare const label: DerivedSignal<string>;
 declare const enabled: WritableSignal<boolean>;
 declare const width: DerivedSignal<number>;
+declare const wholeStyle: DerivedSignal<SignalCSSProperties | string | null>;
 declare const invalid: WritableSignal<{ invalid: true }>;
 declare const clickHandler: DerivedSignal<NonNullable<ComponentProps<'button'>['onClick']>>;
 declare const elementRef: DerivedSignal<NonNullable<ComponentProps<'div'>['ref']>>;
@@ -24,6 +25,8 @@ export function DirectSignalProps() {
 			</button>
 			<label for={label}>Label</label>
 			<div style={{ color: label, width, opacity: width }} />
+			<div style={{ '--progress': width }} />
+			<svg style={wholeStyle} />
 			<svg>
 				<circle cx={width} />
 			</svg>
@@ -45,6 +48,8 @@ export function DirectSignalProps() {
 			<div ref={elementRef} />
 			{/* @ts-expect-error Invalid CSS payloads do not become valid inside a handle. */}
 			<div style={{ width: invalid }} />
+			{/* @ts-expect-error A whole-style handle must contain a supported CSS value. */}
+			<div style={enabled} />
 		</>
 	);
 }
@@ -61,3 +66,17 @@ function BindingInputWrapper(props: JSX.IntrinsicElements['input']) {
 	return <input {...props} />;
 }
 const explicitBindingInput = <BindingInputWrapper value={text} />;
+
+function StyleWrapper(props: ComponentProps<'div'>) {
+	return <div {...props} />;
+}
+const plainWrappedStyle = <StyleWrapper style={{ width: 1 }} />;
+// @ts-expect-error Reusable component props retain scalar CSS values.
+const signalWrappedStyle = <StyleWrapper style={{ width }} />;
+// @ts-expect-error Whole-style bindings are available at native JSX sites, not scalar wrappers.
+const wholeWrappedStyle = <StyleWrapper style={wholeStyle} />;
+
+function BindingStyleWrapper(props: JSX.IntrinsicElements['div']) {
+	return <div {...props} />;
+}
+const explicitBindingStyle = <BindingStyleWrapper style={wholeStyle} />;

@@ -1,5 +1,5 @@
+import type { CSSProperties } from 'octane';
 import { type OctaneNode, useEffect, useRef, useState } from 'octane';
-import type { Octane } from 'octane/jsx-runtime';
 
 import type { Crop, Ords, PercentCrop, PixelCrop, XYOrds } from './types';
 import {
@@ -32,8 +32,6 @@ interface Rectangle {
 	width: number;
 	height: number;
 }
-
-type CSSProperties = Exclude<NonNullable<Octane.HTMLAttributes<Element>['style']>, string>;
 
 const DOC_MOVE_OPTS = { capture: true, passive: false };
 let instanceCount = 0;

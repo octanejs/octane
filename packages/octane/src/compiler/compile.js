@@ -4,7 +4,7 @@
  *
  * Architecture:
  *   1. Parse TSRX through the environment-selected @tsrx/core-compatible
- *      parser (native oxc-tsrx in Node, pure JavaScript elsewhere), then run
+ *      parser (native @tsrx/oxc in Node, pure JavaScript elsewhere), then run
  *      @tsrx/core's target-neutral semantic analysis on the authored module.
  *   2. For each top-level node:
  *        - Component (`@{ … }` body or a return-JSX function) → compile to a
@@ -673,6 +673,8 @@ function ssrSignalValue(node, ctx, origin, capability = false) {
 }
 
 function ssrSignalStyleObject(node, ctx, origin) {
+	// Non-native compilation only: preserve targeted binding reads without
+	// opting an otherwise ordinary module into a native renderer read frame.
 	if (node?.type !== 'ObjectExpression') return node;
 	let changed = false;
 	const properties = (node.properties ?? []).map((property) => {
@@ -1373,6 +1375,9 @@ const HOOK_MEMO_RUNTIME_HELPERS = new Set([
 	'memoPublishAlways',
 ]);
 const NATIVE_READ_RUNTIME_HELPERS = new Set([
+	'nativeStyleBinding',
+	'readNativeDomStyle',
+	'readNativeDomProps',
 	'enableNativeReadCollection',
 	'beginNativeReadScope',
 	'endNativeReadScope',
@@ -1402,11 +1407,11 @@ const INTERNAL_CLIENT_RUNTIME_HELPERS = new Set([
 	'bindSignalText',
 	'bindSignalChild',
 	'bindSignalAttribute',
-	'bindSignalStyleProperty',
 	'bindSignalValue',
 	'bindSignalChecked',
 	'bindSignalHostPropSources',
 	'canSplitStyleProperties',
+	'styleObjectPrototype',
 	'replaceRef',
 	'queueOwnRefDetach',
 	'setPlainAttribute',
@@ -4690,6 +4695,7 @@ function containsAutoMemoContextRead(root, ctx) {
 		}
 		if (seen.has(node)) return;
 		seen.add(node);
+
 		if (
 			node.type === 'ArrowFunctionExpression' ||
 			node.type === 'FunctionExpression' ||
@@ -6586,6 +6592,26 @@ function containsAutoMemoUnsafeStructure(stmts, ctx = null) {
 			// that child's render. Keep mutable ref reads opaque even though ordinary
 			// event-handler calls/mutations remain deferred.
 			if (containsDeferredRefRead(n)) found = true;
+			return;
+		}
+		// Native styles perform implicit reads, including styles carried by a host
+		// prop spread. Equal props cannot prove the subtree complete during a
+		// boundary retry: these reads are outside the parent call's memo witness.
+		if (
+			ctx?.nativeReads &&
+			n.type === 'JSXOpeningElement' &&
+			n.name?.type === 'JSXIdentifier' &&
+			/^[a-z]/.test(n.name.name) &&
+			n.attributes.some((attribute) => {
+				if (attribute.type === 'JSXSpreadAttribute' || attribute.type === 'SpreadAttribute')
+					return true;
+				if (attribute.name?.name !== 'style' || attribute.value?.type !== 'JSXExpressionContainer')
+					return false;
+				const value = unwrapTsExpr(attribute.value.expression);
+				return value.type !== 'ObjectExpression' || !objectExprIsStaticLiteral(value);
+			})
+		) {
+			found = true;
 			return;
 		}
 		if (
@@ -12567,7 +12593,10 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 						tsrxExprNode(attr.argument, ctx, name, inlinedSubs),
 						...(tag === 'input' || tag === 'textarea' || tag === 'select'
 							? [b.literal(hostSignalSite)]
-							: []),
+							: ctx.nativeReads
+								? [undefinedNode()]
+								: []),
+						...(ctx.nativeReads ? [b.literal(true)] : []),
 					],
 					attr,
 				),
@@ -12867,7 +12896,9 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 					val.type === 'JSXExpressionContainer' ? val.expression : val,
 					cssHash,
 				);
-				attrExpr = ssrSignalValue(tsrxExprNode(attrInner, ctx, name, inlinedSubs), ctx, attr, true);
+				attrExpr = tsrxExprNode(attrInner, ctx, name, inlinedSubs);
+				if (!(ctx.nativeReads && attrName === 'style'))
+					attrExpr = ssrSignalValue(attrExpr, ctx, attr, true);
 			}
 			attrSources.push(
 				ssrDirectSource(
@@ -12909,7 +12940,7 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 		let inner = val.type === 'JSXExpressionContainer' ? val.expression : val;
 
 		if (attrName === 'style') {
-			if (isDirectSignalHandleExpression(inner)) {
+			if (!ctx.nativeReads && isDirectSignalHandleExpression(inner)) {
 				throw new Error(
 					'Direct signal style objects cannot install property-targeted bindings. ' +
 						'Use fixed style properties such as `style={{ color: color$ }}`, or use `.get()` ' +
@@ -12934,17 +12965,11 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 			flush();
 			ctx.runtimeNeeded.add('ssrStyle');
 			registerAttrLoweringOrigin(ctx, attr.name, 'ssrStyle', null);
-			parts.push(
-				ssrCall(
-					'ssrStyle',
-					[
-						bindAttributeEvaluation(
-							ssrSignalStyleObject(tsrxExprNode(inner, ctx, name, inlinedSubs), ctx, attr),
-						),
-					],
-					attr,
-				),
-			);
+			inner = tsrxExprNode(inner, ctx, name, inlinedSubs);
+			if (ctx.nativeReads)
+				inner = b.call(requireRuntimeForContext(ctx, 'readNativeDomStyle'), inner);
+			else inner = ssrSignalStyleObject(inner, ctx, attr);
+			parts.push(ssrCall('ssrStyle', [bindAttributeEvaluation(inner)], attr));
 			continue;
 		}
 
@@ -13100,6 +13125,7 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 				b.literal(tag, JSON.stringify(tag)),
 				b.literal(selfNs, JSON.stringify(selfNs)),
 				b.literal(resolveFormControlsAcrossSpreads),
+				...(ctx.nativeReads ? [b.id(requireRuntimeForContext(ctx, 'readNativeDomStyle'))] : []),
 			],
 			node,
 		);
@@ -21090,7 +21116,21 @@ function jsxElementToCreateElement(node, ctx, eagerRoot = false) {
 			);
 		}
 	}
-	const propsNode = inheritOriginLoc(b.object(properties), node);
+	const propsObject = inheritOriginLoc(b.object(properties), node);
+	const propsNode =
+		ctx.nativeReads &&
+		!componentTag &&
+		attrs.some(
+			(attr) =>
+				attr.type === 'SpreadAttribute' ||
+				attr.type === 'JSXSpreadAttribute' ||
+				(attr.name?.name ?? attr.name) === 'style',
+		)
+			? inheritOriginLoc(
+					b.call(requireRuntimeForContext(ctx, 'readNativeDomProps'), propsObject),
+					node,
+				)
+			: propsObject;
 	const childrenNeedRenderScope = jsxValueChildrenNeedRenderScope(node);
 	const eagerProviderChildren =
 		eagerRoot &&
@@ -23954,6 +23994,7 @@ function planJsx(
 	// happens on the intact template. (Regression: StoryRow's `.meta` interleaves text holes
 	// with `<Link>` components.)
 	const deferredTextMounts = [];
+	let nativeStyleSlots = 0;
 	// Emit per-binding mount code.
 	for (const b of elementBindings) {
 		// A sibling-position `{x as string}` text hole resolves to its POSITION node
@@ -24001,6 +24042,7 @@ function planJsx(
 		if (b.kind === 'dangerCommit') ctx.runtimeNeeded.add('setDangerouslySetInnerHTMLSources');
 		if (b.kind === 'formCommit') ctx.runtimeNeeded.add('setFormControlSources');
 		if (b.kind === 'hostCommit') {
+			if (ctx.nativeReads) b.readStyle = requireRuntimeForContext(ctx, 'readNativeDomStyle');
 			if (b.signalHostSources) ctx.runtimeNeeded.add('bindSignalHostPropSources');
 			else {
 				ctx.runtimeNeeded.add('setHostPropSources');
@@ -24038,6 +24080,11 @@ function planJsx(
 		if (b.kind === 'styleProperties') {
 			ctx.runtimeNeeded.add('setStyleProperty');
 			ctx.runtimeNeeded.add(b.spread ? 'canSplitStyleProperties' : 'isHydratingStyle');
+			if (b.spread) ctx.runtimeNeeded.add('styleObjectPrototype');
+		}
+		if (b.kind === 'nativeStyle') {
+			b.slotIndex = ++nativeStyleSlots;
+			b.helper = requireRuntimeForContext(ctx, 'nativeStyleBinding');
 		}
 		if (b.kind === 'spread') {
 			ctx.runtimeNeeded.add('setSpread');
@@ -24299,7 +24346,8 @@ function planJsx(
 	const afterCalls = [];
 	const pushAfter = (id, line) => afterCalls.push({ id, line });
 	// Dense per-body slot indices. Slot 0 is this body's binding bag (`__s.slots[0]`);
-	// each control-flow / component / child construct gets index 1..N. The runtime
+	// native styles fill the following indices during binding mount. Each remaining
+	// control-flow / component / child construct gets the next index. The runtime
 	// runs the slot calls in `afterCalls` SORTED by source id, so we assign indices in
 	// that same id order — the scope's `slots` array is then written 0,1,2,… and stays
 	// PACKED (a holey array, written out of order, would be a slower elements-kind).
@@ -24314,7 +24362,7 @@ function planJsx(
 	allConstructs.sort((a, b) => a.id - b.id);
 	// Slot 0 is the binding bag for template bodies; control-flow-only (noTemplate)
 	// bodies have no bag, so their constructs start at slot 0.
-	const slotBase = noTemplate ? 0 : 1;
+	const slotBase = noTemplate ? 0 : 1 + nativeStyleSlots;
 	for (let i = 0; i < allConstructs.length; i++) allConstructs[i].slotIndex = i + slotBase;
 	// Hoisted head elements take the slots AFTER the constructs (and `plan.head` runs
 	// after `plan.after`), so the scope's `slots` array fills 0,1,…,N,N+1,… packed.
@@ -25465,6 +25513,44 @@ function styleSpreadObject(bind, spread, valueOf) {
 	]);
 }
 
+function styleSpreadNeedsFullStyle(bind, spread) {
+	return orChain([
+		...bind.properties.map((property) => b.binary('in', b.literal(property.name), spread)),
+		b.unary('!', b.call('_$canSplitStyleProperties')),
+	]);
+}
+
+// Native spreads create writable own data properties. Complete that fresh
+// snapshot in place only when it will be retained as the full style, and no
+// inherited setter or read-only property could intercept a trailing assignment.
+function completeStyleSpread(bind, spread, valueOf, needsFull) {
+	return b.conditional(
+		b.logical(
+			'&&',
+			needsFull,
+			b.unary(
+				'!',
+				orChain(
+					bind.properties.map((property) =>
+						b.binary('in', b.literal(property.name), b.id('_$styleObjectPrototype')),
+					),
+				),
+			),
+		),
+		b.sequence([
+			...bind.properties.map((property, i) =>
+				b.assignment(
+					'=',
+					b.member(spread, inheritOriginLoc(b.literal(property.name), property.key), true),
+					valueOf(property, i),
+				),
+			),
+			spread,
+		]),
+		styleSpreadObject(bind, spread, valueOf),
+	);
+}
+
 // Mount for a DEFERRED property-write binding: store the element ref + seed the
 // diff field to `undefined`. The every-render diff then performs the actual
 // write — including on the first render, since the `undefined` seed makes its
@@ -25472,8 +25558,8 @@ function styleSpreadObject(bind, spread, valueOf) {
 // `setClassName(el, undefined)` no-op on a freshly-cloned element (so the output
 // is byte-identical to the old unconditional mount write).
 function emitDeferredMount(bind, elVar, bag) {
-	// Whole-object styles diff on `_sty`; grouped styles use it only as a
-	// first-render marker. Each grouped property keeps a scalar previous value.
+	// Whole-object and spread-prefix styles diff on `_sty`; other grouped styles
+	// use it only as a first-render marker. Each trailing property keeps a scalar.
 	bag.constField(
 		bind.signalDirect
 			? `_sig$${bind.id}`
@@ -25483,6 +25569,7 @@ function emitDeferredMount(bind, elVar, bag) {
 		bind.kind === 'styleProperty' || bind.kind === 'styleProperties' ? 'style-unset' : 'undefined',
 	);
 	if (bind.kind === 'styleProperties') {
+		if (bind.spread) bag.constField(`_styFull$${bind.id}`, 'undefined');
 		for (let i = 0; i < bind.properties.length; i++) {
 			bag.constField(`_prev$${bind.id}_${i}`, 'undefined');
 		}
@@ -25505,7 +25592,6 @@ function bindingOrigin(bind) {
 function directSignalBindingHelper(bind) {
 	if (!bind.signalDirect) return null;
 	if (bind.kind === 'text' || bind.kind === 'textOnlyChild') return 'bindSignalText';
-	if (bind.kind === 'styleProperty') return 'bindSignalStyleProperty';
 	if (bind.kind === 'value' || bind.kind === 'selectValue') return 'bindSignalValue';
 	if (bind.kind === 'checked' || bind.kind === 'checkedCheckable') return 'bindSignalChecked';
 	return 'bindSignalAttribute';
@@ -25524,15 +25610,6 @@ function directSignalBindingArgs(bind, host, previous) {
 				: bind.seededText
 					? [b.literal(1)]
 					: []),
-		];
-	}
-	if (bind.kind === 'styleProperty') {
-		return [
-			...common,
-			inheritOriginLoc(b.literal(bind.name), bind.propertyOrigin),
-			bind.expr,
-			inheritOriginLoc(b.literal(bind.staticCss), bind.staticOrigin),
-			b.literal(bind.signalSite, JSON.stringify(bind.signalSite)),
 		];
 	}
 	if (
@@ -25624,6 +25701,14 @@ function emitBindingMount(bind, elVar, bag) {
 		return st(b.stmt(b.call('_$queueFormAuthoringDiagnostic', ...args)));
 	}
 	switch (bind.kind) {
+		case 'nativeStyle': {
+			return st(
+				b.block([
+					...mountHost(),
+					b.stmt(b.call(bind.helper, b.id('__s'), b.literal(bind.slotIndex), el(), bind.expr)),
+				]),
+			);
+		}
 		case 'textOnlyChild': {
 			// Only compiler-admitted native placeholders may be reused. An old
 			// two-argument caller or an excluded custom/template host must retain
@@ -25713,6 +25798,7 @@ function emitBindingMount(bind, elVar, bag) {
 									sources,
 									b.literal(bind.signalSite, JSON.stringify(bind.signalSite)),
 									b.literal(bind.hasNestedChildren === true),
+									...(bind.readStyle ? [b.id(bind.readStyle)] : []),
 								),
 							),
 						),
@@ -25744,6 +25830,7 @@ function emitBindingMount(bind, elVar, bag) {
 								undefinedNode(),
 								b.id('__s'),
 								b.literal(bind.hasNestedChildren === true),
+								...(bind.readStyle ? [b.id(bind.readStyle)] : []),
 							),
 						),
 					),
@@ -25838,16 +25925,25 @@ function emitBindingMount(bind, elVar, bag) {
 			if (bind.spread) {
 				const spreadValues = () => b.id(bind.spreadName);
 				const spread = () => b.member(spreadValues(), b.literal(0), true);
+				const full = () => b.id(bind.fullName);
+				const merged = () => b.id(bind.mergedName);
 				const valueOf = (property) =>
 					b.member(spreadValues(), b.literal(property.evaluationIndex + 1), true);
 				return st(
 					b.block([
 						b.const(bind.spreadName, bind.expr),
-						b.stmt(
-							b.call(callee(), el(), styleSpreadObject(bind, spread(), valueOf), undefinedNode()),
-						),
+						b.const(bind.fullName, styleSpreadNeedsFullStyle(bind, spread())),
+						b.const(bind.mergedName, completeStyleSpread(bind, spread(), valueOf, full())),
+						b.stmt(b.call(callee(), el(), merged(), undefinedNode())),
 						...mountHost(),
-						b.stmt(b.assignment('=', local(`_sty$${bind.id}`), spread())),
+						b.stmt(
+							b.assignment(
+								'=',
+								local(`_sty$${bind.id}`),
+								b.conditional(full(), merged(), spread()),
+							),
+						),
+						b.stmt(b.assignment('=', local(`_styFull$${bind.id}`), full())),
 						...bind.properties.map((property, i) =>
 							b.stmt(b.assignment('=', local(`_prev$${bind.id}_${i}`), valueOf(property))),
 						),
@@ -26052,6 +26148,11 @@ function emitBindingUpdate(bind, bag, inlineBindingGuards = false) {
 		);
 	}
 	switch (bind.kind) {
+		case 'nativeStyle': {
+			return st(
+				b.stmt(b.call(bind.helper, b.id('__s'), b.literal(bind.slotIndex), F('_el'), bind.expr)),
+			);
+		}
 		case 'nativeChangeRuntime': {
 			return st(b.stmt(b.call('_$queueNativeChangeDiagnostic', F('_el'))));
 		}
@@ -26135,6 +26236,7 @@ function emitBindingUpdate(bind, bag, inlineBindingGuards = false) {
 								sources,
 								b.literal(bind.signalSite, JSON.stringify(bind.signalSite)),
 								b.literal(bind.hasNestedChildren === true),
+								...(bind.readStyle ? [b.id(bind.readStyle)] : []),
 							),
 						),
 					),
@@ -26152,6 +26254,7 @@ function emitBindingUpdate(bind, bag, inlineBindingGuards = false) {
 							F('_host'),
 							b.id('__s'),
 							b.literal(bind.hasNestedChildren === true),
+							...(bind.readStyle ? [b.id(bind.readStyle)] : []),
 						),
 					),
 				),
@@ -26274,24 +26377,21 @@ function emitBindingUpdate(bind, bag, inlineBindingGuards = false) {
 			const valueOf = (property) => b.id(valueName(property.evaluationIndex));
 			if (bind.spread) {
 				const spread = b.id(bind.spreadName);
+				const needsFull = b.id(bind.fullName);
+				const merged = b.id(bind.mergedName);
 				const previous = (property, i) => bagFieldNode(bag, `_prev$${bind.id}_${i}`);
 				const initial = bind.deferred ? b.binary('===', F('_sty'), b.id('__s')) : b.literal(false);
-				const collisions = bind.properties.flatMap((property) => [
-					b.binary('in', b.literal(property.name), spread),
-					b.binary('in', b.literal(property.name), F('_sty')),
-				]);
+				const previousStyle = b.conditional(
+					F('_styFull'),
+					F('_sty'),
+					styleSpreadObject(bind, F('_sty'), previous),
+				);
 				const full = b.stmt(
 					b.call(
 						callee(),
 						F('_el'),
-						styleSpreadObject(bind, spread, valueOf),
-						bind.deferred
-							? b.conditional(
-									initial,
-									undefinedNode(),
-									styleSpreadObject(bind, F('_sty'), previous),
-								)
-							: styleSpreadObject(bind, F('_sty'), previous),
+						merged,
+						bind.deferred ? b.conditional(initial, undefinedNode(), previousStyle) : previousStyle,
 					),
 				);
 				const scalar = bind.properties.map((property, i) =>
@@ -26312,19 +26412,30 @@ function emitBindingUpdate(bind, bag, inlineBindingGuards = false) {
 						null,
 					),
 				);
-				// A spread can insert a trailing key before a shorthand. Check both
-				// snapshots: leaving that case also needs a complete diff so prefix
-				// removal cannot erase an unchanged trailing declaration.
+				// A spread can insert a trailing key before a shorthand. Retain the
+				// complete object when required, so consecutive full diffs reuse it.
+				// This also preserves mutations by inherited getters on the complete
+				// receiver. Leaving full mode needs one complete diff before returning
+				// to prefix/scalar updates.
 				return st(
 					b.block([
 						b.const(bind.spreadName, bind.spread),
 						...values,
+						b.const(bind.fullName, styleSpreadNeedsFullStyle(bind, spread)),
 						b.if(
-							orChain([initial, b.unary('!', b.call('_$canSplitStyleProperties')), ...collisions]),
-							b.block([full]),
-							b.block([b.stmt(b.call(callee(), F('_el'), spread, F('_sty'))), ...scalar]),
+							orChain([initial, needsFull, F('_styFull')]),
+							b.block([
+								b.const(bind.mergedName, completeStyleSpread(bind, spread, valueOf, needsFull)),
+								full,
+								b.stmt(b.assignment('=', F('_sty'), b.conditional(needsFull, merged, spread))),
+							]),
+							b.block([
+								b.stmt(b.call(callee(), F('_el'), spread, F('_sty'))),
+								...scalar,
+								b.stmt(b.assignment('=', F('_sty'), spread)),
+							]),
 						),
-						b.stmt(b.assignment('=', F('_sty'), spread)),
+						b.stmt(b.assignment('=', F('_styFull'), needsFull)),
 						...bind.properties.map((property, i) =>
 							b.stmt(b.assignment('=', previous(property, i), valueOf(property))),
 						),
@@ -27006,13 +27117,15 @@ function emitElementHtml(
 		(tag === 'select' &&
 			directPropNames.has('multiple') &&
 			(directPropNames.has('value') || directPropNames.has('defaultValue')));
-	const hasDirectSignalStyle = attrs.some((attr) => {
-		if (attr.type !== 'Attribute' && attr.type !== 'JSXAttribute') return false;
-		if (normalizeJsxAttrName(jsxAttrRawName(attr), tag, hostNs) !== 'style') return false;
-		const value = attr.value;
-		const inner = value?.type === 'JSXExpressionContainer' ? value.expression : value;
-		return spreadContainsDirectSignalHandle(inner);
-	});
+	const hasDirectSignalStyle =
+		!ctx.nativeReads &&
+		attrs.some((attr) => {
+			if (attr.type !== 'Attribute' && attr.type !== 'JSXAttribute') return false;
+			if (normalizeJsxAttrName(jsxAttrRawName(attr), tag, hostNs) !== 'style') return false;
+			const value = attr.value;
+			const inner = value?.type === 'JSXExpressionContainer' ? value.expression : value;
+			return spreadContainsDirectSignalHandle(inner);
+		});
 	const resolveHostPropsAcrossSources =
 		firstSpreadIdx !== -1 ||
 		hasDuplicateDirectProp ||
@@ -27476,7 +27589,7 @@ function emitElementHtml(
 		// template (unless we're after a spread, which would clobber it); a fixed
 		// literal prefix plus dynamic suffix can avoid a whole-object diff.
 		if (attrName === 'style') {
-			if (isDirectSignalHandleExpression(inner)) {
+			if (!ctx.nativeReads && isDirectSignalHandleExpression(inner)) {
 				throw new Error(
 					'Direct signal style objects cannot install property-targeted bindings. ' +
 						'Use fixed style properties such as `style={{ color: color$ }}`, or use `.get()` ' +
@@ -27486,6 +27599,20 @@ function emitElementHtml(
 			if (!isAfterSpread && inner.type === 'Literal' && typeof inner.value === 'string') {
 				const chunk = ` style="${escapeAttr(inner.value)}"`;
 				appendBakedAttribute(attrTemplate, chunk, attrName, attr.name, inner, ctx.inspect);
+				continue;
+			}
+			if (
+				ctx.nativeReads &&
+				(inner.type !== 'ObjectExpression' || !objectExprIsStaticLiteral(inner))
+			) {
+				bindings.push({
+					id: bindings.length,
+					kind: 'nativeStyle',
+					expr: tsrxExprNode(inner, ctx, componentName, inlinedSubs),
+					path,
+					ns: hostNs,
+					nameOrigin: attr.name,
+				});
 				continue;
 			}
 			if (
@@ -27522,32 +27649,7 @@ function emitElementHtml(
 					for (const entry of mixed.dynamics) {
 						registerAttrLoweringOrigin(ctx, entry.key, null, entry.name);
 					}
-					if (mixed.dynamics.some((entry) => isDirectSignalHandleExpression(entry.value))) {
-						for (let i = 0; i < mixed.dynamics.length; i++) {
-							const entry = mixed.dynamics[i];
-							const value = tsrxExprNode(entry.value, ctx, componentName, inlinedSubs);
-							bindings.push(
-								markDirectSignalBinding(
-									{
-										id: bindings.length,
-										kind: 'styleProperty',
-										name: entry.name,
-										expr: value,
-										path,
-										ns: hostNs,
-										nameOrigin: attr.name,
-										propertyOrigin: entry.key,
-										staticOrigin: inner,
-										staticCss: i === 0 ? mixed.css : '',
-									},
-									ctx,
-									componentName,
-									entry.value,
-									'binding',
-								),
-							);
-						}
-					} else if (mixed.dynamics.length === 1 && mixed.spread === null) {
+					if (mixed.dynamics.length === 1 && mixed.spread === null) {
 						const entry = mixed.dynamics[0];
 						bindings.push({
 							id: bindings.length,
@@ -27584,6 +27686,8 @@ function emitElementHtml(
 							expr: inheritOriginLoc(b.array(spread ? [spread, ...evaluations] : entries), inner),
 							spread,
 							spreadName: spread ? allocCompilerName(ctx, '__styleSpread') : null,
+							fullName: spread ? allocCompilerName(ctx, '__styleFull') : null,
+							mergedName: spread ? allocCompilerName(ctx, '__styleObject') : null,
 							valueNames: spread
 								? evaluations.map(() => allocCompilerName(ctx, '__styleValue'))
 								: null,
@@ -29929,7 +30033,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 				'`use(promise)` first.',
 		);
 	}
-	// node.left = const x  OR  const &{x,y} / const [a,b]  (destructured)
+	// node.left = const x  OR  const {x,y} / const [a,b]  (destructured)
 	// node.right = expr, node.body = BlockStatement,
 	// node.key = optional `key …` expression, node.index = optional `index <id>`.
 	// `@for (...) { ... } @empty { ... }` — hoist the empty branch as its own
@@ -29945,7 +30049,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 	const leftDeclId = node.left.declarations[0].id;
 	const isDestructured = leftDeclId.type !== 'Identifier';
 	// `itemName` is the identifier used in the body signature + keyFn. For a
-	// plain `const x of …`, that's `x`. For a destructured `const &{id} of …`,
+	// plain `const x of …`, that's `x`. For a destructured `const {id} of …`,
 	// we synthesize a fresh name and emit the destructuring inside the body so
 	// the keyFn still gets the whole item and the body still sees the fields.
 	const itemName = isDestructured ? '_item' : leftDeclId.name;
@@ -30052,7 +30156,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 			]
 		: [];
 
-	// Destructured header `const &{x,y} of …` — synthesize a destructure stmt
+	// Destructured header `const {x,y} of …` — synthesize a destructure stmt
 	// at the top of the body so the user fields bind from the synthetic item.
 	const destructureInjection = isDestructured
 		? [

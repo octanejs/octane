@@ -32,7 +32,7 @@ The octane app is authored twice over the same octane core — `.tsrx` (directiv
 `@for`, `class`) and React-style `.tsx` (`{data.map(... key=)}`, `className`).
 Both compile through `octane/compiler/vite`, so the two octane columns read the
 JSX backwards-compat path's cost on this update-heavy workload. React is the
-canonical VDOM baseline, and Ripple (`let &[items] = track(...)` + a keyed
+canonical VDOM baseline, and Ripple (`const items = track(...)` with `.value` reads + a keyed
 `@for`) reassigns the whole array each tick — so octane/react/ripple share the
 exact same immutable-newArray + keyed-reconcile model. Solid is the fine-grained
 foil: a plain `createStore` of the rows with `reconcile` on each tick (the

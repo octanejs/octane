@@ -112,7 +112,7 @@ function dependencies(root) {
 	return Object.fromEntries(
 		[
 			'@tsrx/core',
-			'oxc-tsrx/tsrx-core-compat',
+			'@tsrx/oxc/tsrx-core-compat',
 			'entities',
 			'esrap',
 			'esrap/languages/tsx',

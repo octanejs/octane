@@ -7,24 +7,15 @@
 import { isShadowRoot, isHTMLElement } from '@floating-ui/utils/dom';
 import { floor } from '@floating-ui/utils';
 import { tabbable, type FocusableElement } from 'tabbable';
-import { useCallback, useLayoutEffect, useRef } from 'octane';
-import type { Octane } from 'octane/jsx-runtime';
+import { useCallback, useLayoutEffect, useRef, type CSSProperties } from 'octane';
 import type { Dimensions } from '@floating-ui/dom';
 
 import { subSlot } from '../internal';
 import type { Delay, MutableRefObject } from '../types';
 
-export { getDeepestNode, getNodeAncestors, getNodeChildren } from './nodes';
+export type { CSSProperties } from 'octane';
 
-/**
- * The OBJECT form of octane's `style` prop — the port's analog of
- * `React.CSSProperties` (octane's `style` additionally accepts a plain string;
- * helpers that merge/inspect style objects require this form).
- */
-export type CSSProperties = Exclude<
-	Octane.HTMLAttributes<HTMLElement>['style'],
-	string | undefined
->;
+export { getDeepestNode, getNodeAncestors, getNodeChildren } from './nodes';
 
 /** Which list items are disabled (mirrors upstream's unexported `DisabledIndices`). */
 export type DisabledIndices = Array<number> | ((index: number) => boolean);

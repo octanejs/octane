@@ -144,6 +144,13 @@ surrounding source publication or explicit refresh samples it again. Replacing a
 handle, retiring a keyed row, and aborting the view must release its subscription
 without retiring the shared document state.
 
+The landed native signal-style implementation is canonical for style-object
+reading and renderer-backed native style updates. This work should extend that
+implementation with the required request and instance ownership, not maintain a
+parallel style engine. Renderer-free views retain only their compiler-proven
+channel writes and adoption/cleanup lifetimes; sharing style behavior must not
+import the general renderer or its scheduled blocks into that path.
+
 Style adapters may supply an exact imported-factory contract through
 `knownAttributeSpreads`. The compiler evaluates that pure factory once and
 projects its declared stable own data fields. For StyleX, class and optional
