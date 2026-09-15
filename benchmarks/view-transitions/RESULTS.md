@@ -6,8 +6,15 @@ The cleanup comparison starts from `ead781345500f7245d9efbb076cdfc2313b474eb`,
 which includes main `1198cdc6c14e44ef7c63e6f2e77948f13048b2a3`. It isolates this
 follow-up from the earlier changes below. Exact source, compiler, fixture,
 dependency, harness and asset hashes are in
-[effect-cleanup.json](measurements/effect-cleanup.json). The final package hash is
+[effect-cleanup.json](measurements/effect-cleanup.json). The measured package hash is
 `0b260f33…`; the baseline package hash is `3e715763…`.
+
+Main subsequently advanced to `ede01deec` with native signal styles. Merge
+`b6d95390b` has package hash `9217bde2…` and a changed compiler source hash, but
+the final verification produces identical compiled fixtures, complete emitted
+asset manifests, lifecycle observations, native primer outcomes and call counts.
+The report preserves the original comparison and records this verification
+separately. The results below therefore also describe the merged implementation.
 
 The optional driver remains installed after a ViewTransition finishes. Ordinary
 deletions were still entering `stageTeardown`, which immediately returned because
@@ -56,7 +63,9 @@ one sample per operation; that smoke run is not a timing comparison.
 
 Correctness validation passes 534 focused development/production tests and 89
 native browser cases, plus strict runtime/TSRX fixture types and 72 staged-DOM
-checker/workflow tests. New observations cover cleanup exactly once, connected
+checker/workflow tests. After the native signal-style merge, the expanded focused
+selection passes 616 tests; native tests, strict types and checker/workflow tests
+pass again. New observations cover cleanup exactly once, connected
 DOM during synchronous deletion cleanup, Activity disconnect/reconnect and
 native urgent-abort cleanup. Deliberately bypassing staged teardown makes the
 held-update tests fail; incorrectly suppressing ordinary cleanup makes the
