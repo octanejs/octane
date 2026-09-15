@@ -8,6 +8,13 @@
     "packages/octane/src/runtime.server.ts": "5bb525da95f8fd6298dc01f83b455718df11cd8c94f65364406f3e455961f3c0",
     "packages/octane/src/dom-stage.ts": "4431364b5f367318b2f7bd3c7804ef1a6636194da136aedc904af098e3b1d331"
   },
+  "finalFilesNote": "Measured source snapshot before the post-measurement Node strip-only syntax correction; current source hashes and byte-identical emitted output are recorded in postMeasurementSyntaxFix.",
+  "postMeasurementSyntaxFix": {
+    "evidenceFile": "server-strip-only-equivalence.json",
+    "serverSourceHash": "4f979f2f5d21de0afb95c92db14e4d8571fb09a8927b22ad86f4ed97118967c0",
+    "sourceSha256": "17c3f8887d5e323b1fb10adcd0eaee24690cf85b6098d6506793ee8769305237",
+    "unchangedMeasuredBundleHash": "d29b44577cf29022a59503080350cb0dc41a6325a8e8b6ec8f195afcb44be040"
+  },
   "ssr": {
     "node": "v24.20.0",
     "platform": "darwin",

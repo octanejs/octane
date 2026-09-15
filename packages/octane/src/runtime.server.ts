@@ -1751,7 +1751,10 @@ class ServerHtml {
 // Restore raw provenance through the existing branded read, keeping ordinary
 // ServerHtml values and their consumption path unchanged.
 class RawServerHtml {
-	constructor(private readonly html: string) {}
+	constructor(html: string) {
+		this.html = html;
+	}
+	private readonly html: string;
 	get [SERVER_HTML](): string {
 		VT_SSR_HAS_RAW_HTML = true;
 		return this.html;

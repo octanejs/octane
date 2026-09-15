@@ -4,9 +4,19 @@
 
 The final runtime comparison uses reviewed head `759330f3`; the client baseline
 `c7b523571` merges that runtime with main `bb11d0b3e` so both client builds use
-the same updated compiler. All final source, fixture, dependency and asset hashes,
+the same updated compiler. All measured source, fixture, dependency and asset hashes,
 raw timing samples, semantic observations, and rejected intermediate SSR runs
 are in [review-round-two.json](measurements/review-round-two.json).
+
+After timing, CI exposed a constructor parameter property unsupported by Node's
+strip-only TypeScript loader. An explicit field and constructor assignment fix
+that syntax. Historical measured hashes remain unchanged in the reports;
+[server-strip-only-equivalence.json](measurements/server-strip-only-equivalence.json)
+records the corrected source hash, byte-identical minified and unminified server
+transforms, and a verification run whose complete SSR bundle matches the measured
+asset exactly (`d29b4457…`, 612,914 raw / 38,286 gzip bytes). All 22 benchmark
+outputs pass, the six register-hook regressions turn green, and strict core types
+pass. The existing timing results therefore describe the same emitted JavaScript.
 
 Environment: Node 24.20.0, Chromium 149.0.7827.55, Vite 8.1.5, esbuild 0.28.1,
 @tsrx/core 0.2.0, @tsrx/oxc 0.13.0, Playwright 1.61.1, macOS arm64. SSR timings
