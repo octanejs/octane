@@ -43,6 +43,21 @@ export function PassiveDeferred(props) @{
 	<span>{'z'}</span>
 }
 
+export function ReentrantPassiveEffect(props: {
+	tick: number;
+	log: string[];
+	onEffect: () => void;
+}) @{
+	useEffect(() => {
+		props.log.push('body:' + props.tick);
+		props.onEffect();
+		return () => {
+			props.log.push('cleanup:' + props.tick);
+		};
+	}, [props.tick, props.log, props.onEffect]);
+	<span>{String(props.tick)}</span>
+}
+
 // Models an imperative integration (a chart/canvas library, for example) that
 // installs one artifact and removes exactly that artifact from its cleanup.
 // Back-to-back dependency changes must never leave both revisions installed.
