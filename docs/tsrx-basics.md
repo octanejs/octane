@@ -398,6 +398,32 @@ JavaScript. Only inject source you trust.
 
 ## Styles
 
+### Inline styles
+
+The `style` attribute accepts a CSS string or an object. Object keys support
+camelCase, kebab-case, vendor prefixes, and CSS custom properties. Import
+`CSSProperties` from `octane` or `octane/jsx-runtime` to check reusable objects:
+
+```ts
+import type { CSSProperties } from 'octane';
+
+const panelStyle = {
+  width: 400,
+  'font-size': '1rem',
+  lineHeight: 1.5,
+  '--accent': 'rebeccapurple',
+} satisfies CSSProperties;
+```
+
+Octane adds `px` to numeric lengths (`width: 400` becomes `400px`). Zero,
+unitless properties such as `lineHeight`, and custom properties keep their
+numeric values without units. Durations still need explicit units, such as
+`transitionDuration: '200ms'`. HTML and SVG use the same property-specific
+style types; CSS strings and custom property values are not syntax-checked.
+`SignalCSSProperties` also accepts signals for individual property values.
+
+### Scoped styles
+
 A `<style>` block written among the children of an element or a fragment is
 scoped CSS. The block is scoped to its siblings, not to the `@{ … }` body around
 it: it styles the items beside it and everything below them and never the
