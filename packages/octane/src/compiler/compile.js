@@ -1211,6 +1211,7 @@ const NATIVE_READ_RUNTIME_HELPERS = new Set([
 ]);
 const INTERNAL_CLIENT_RUNTIME_HELPERS = new Set([
 	'canSplitStyleProperties',
+	'styleObjectPrototype',
 	'replaceRef',
 	'queueOwnRefDetach',
 	'setPlainAttribute',
@@ -23156,6 +23157,7 @@ function planJsx(
 		if (b.kind === 'styleProperties') {
 			ctx.runtimeNeeded.add('setStyleProperty');
 			ctx.runtimeNeeded.add(b.spread ? 'canSplitStyleProperties' : 'isHydratingStyle');
+			if (b.spread) ctx.runtimeNeeded.add('styleObjectPrototype');
 		}
 		if (b.kind === 'spread') {
 			ctx.runtimeNeeded.add('setSpread');
@@ -24547,6 +24549,44 @@ function styleSpreadObject(bind, spread, valueOf) {
 	]);
 }
 
+function styleSpreadNeedsFullStyle(bind, spread) {
+	return orChain([
+		...bind.properties.map((property) => b.binary('in', b.literal(property.name), spread)),
+		b.unary('!', b.call('_$canSplitStyleProperties')),
+	]);
+}
+
+// Native spreads create writable own data properties. Complete that fresh
+// snapshot in place only when it will be retained as the full style, and no
+// inherited setter or read-only property could intercept a trailing assignment.
+function completeStyleSpread(bind, spread, valueOf, needsFull) {
+	return b.conditional(
+		b.logical(
+			'&&',
+			needsFull,
+			b.unary(
+				'!',
+				orChain(
+					bind.properties.map((property) =>
+						b.binary('in', b.literal(property.name), b.id('_$styleObjectPrototype')),
+					),
+				),
+			),
+		),
+		b.sequence([
+			...bind.properties.map((property, i) =>
+				b.assignment(
+					'=',
+					b.member(spread, inheritOriginLoc(b.literal(property.name), property.key), true),
+					valueOf(property, i),
+				),
+			),
+			spread,
+		]),
+		styleSpreadObject(bind, spread, valueOf),
+	);
+}
+
 // Mount for a DEFERRED property-write binding: store the element ref + seed the
 // diff field to `undefined`. The every-render diff then performs the actual
 // write — including on the first render, since the `undefined` seed makes its
@@ -24554,8 +24594,8 @@ function styleSpreadObject(bind, spread, valueOf) {
 // `setClassName(el, undefined)` no-op on a freshly-cloned element (so the output
 // is byte-identical to the old unconditional mount write).
 function emitDeferredMount(bind, elVar, bag) {
-	// Whole-object styles diff on `_sty`; grouped styles use it only as a
-	// first-render marker. Each grouped property keeps a scalar previous value.
+	// Whole-object and spread-prefix styles diff on `_sty`; other grouped styles
+	// use it only as a first-render marker. Each trailing property keeps a scalar.
 	bag.constField(
 		bind.kind === 'style' || bind.kind === 'styleProperties'
 			? `_sty$${bind.id}`
@@ -24563,6 +24603,7 @@ function emitDeferredMount(bind, elVar, bag) {
 		bind.kind === 'styleProperty' || bind.kind === 'styleProperties' ? 'style-unset' : 'undefined',
 	);
 	if (bind.kind === 'styleProperties') {
+		if (bind.spread) bag.constField(`_styFull$${bind.id}`, 'undefined');
 		for (let i = 0; i < bind.properties.length; i++) {
 			bag.constField(`_prev$${bind.id}_${i}`, 'undefined');
 		}
@@ -24807,16 +24848,25 @@ function emitBindingMount(bind, elVar, bag) {
 			if (bind.spread) {
 				const spreadValues = () => b.id(bind.spreadName);
 				const spread = () => b.member(spreadValues(), b.literal(0), true);
+				const full = () => b.id(bind.fullName);
+				const merged = () => b.id(bind.mergedName);
 				const valueOf = (property) =>
 					b.member(spreadValues(), b.literal(property.evaluationIndex + 1), true);
 				return st(
 					b.block([
 						b.const(bind.spreadName, bind.expr),
-						b.stmt(
-							b.call(callee(), el(), styleSpreadObject(bind, spread(), valueOf), undefinedNode()),
-						),
+						b.const(bind.fullName, styleSpreadNeedsFullStyle(bind, spread())),
+						b.const(bind.mergedName, completeStyleSpread(bind, spread(), valueOf, full())),
+						b.stmt(b.call(callee(), el(), merged(), undefinedNode())),
 						...mountHost(),
-						b.stmt(b.assignment('=', local(`_sty$${bind.id}`), spread())),
+						b.stmt(
+							b.assignment(
+								'=',
+								local(`_sty$${bind.id}`),
+								b.conditional(full(), merged(), spread()),
+							),
+						),
+						b.stmt(b.assignment('=', local(`_styFull$${bind.id}`), full())),
 						...bind.properties.map((property, i) =>
 							b.stmt(b.assignment('=', local(`_prev$${bind.id}_${i}`), valueOf(property))),
 						),
@@ -25205,24 +25255,21 @@ function emitBindingUpdate(bind, bag, inlineBindingGuards = false) {
 			const valueOf = (property) => b.id(valueName(property.evaluationIndex));
 			if (bind.spread) {
 				const spread = b.id(bind.spreadName);
+				const needsFull = b.id(bind.fullName);
+				const merged = b.id(bind.mergedName);
 				const previous = (property, i) => bagFieldNode(bag, `_prev$${bind.id}_${i}`);
 				const initial = bind.deferred ? b.binary('===', F('_sty'), b.id('__s')) : b.literal(false);
-				const collisions = bind.properties.flatMap((property) => [
-					b.binary('in', b.literal(property.name), spread),
-					b.binary('in', b.literal(property.name), F('_sty')),
-				]);
+				const previousStyle = b.conditional(
+					F('_styFull'),
+					F('_sty'),
+					styleSpreadObject(bind, F('_sty'), previous),
+				);
 				const full = b.stmt(
 					b.call(
 						callee(),
 						F('_el'),
-						styleSpreadObject(bind, spread, valueOf),
-						bind.deferred
-							? b.conditional(
-									initial,
-									undefinedNode(),
-									styleSpreadObject(bind, F('_sty'), previous),
-								)
-							: styleSpreadObject(bind, F('_sty'), previous),
+						merged,
+						bind.deferred ? b.conditional(initial, undefinedNode(), previousStyle) : previousStyle,
 					),
 				);
 				const scalar = bind.properties.map((property, i) =>
@@ -25243,19 +25290,30 @@ function emitBindingUpdate(bind, bag, inlineBindingGuards = false) {
 						null,
 					),
 				);
-				// A spread can insert a trailing key before a shorthand. Check both
-				// snapshots: leaving that case also needs a complete diff so prefix
-				// removal cannot erase an unchanged trailing declaration.
+				// A spread can insert a trailing key before a shorthand. Retain the
+				// complete object when required, so consecutive full diffs reuse it.
+				// This also preserves mutations by inherited getters on the complete
+				// receiver. Leaving full mode needs one complete diff before returning
+				// to prefix/scalar updates.
 				return st(
 					b.block([
 						b.const(bind.spreadName, bind.spread),
 						...values,
+						b.const(bind.fullName, styleSpreadNeedsFullStyle(bind, spread)),
 						b.if(
-							orChain([initial, b.unary('!', b.call('_$canSplitStyleProperties')), ...collisions]),
-							b.block([full]),
-							b.block([b.stmt(b.call(callee(), F('_el'), spread, F('_sty'))), ...scalar]),
+							orChain([initial, needsFull, F('_styFull')]),
+							b.block([
+								b.const(bind.mergedName, completeStyleSpread(bind, spread, valueOf, needsFull)),
+								full,
+								b.stmt(b.assignment('=', F('_sty'), b.conditional(needsFull, merged, spread))),
+							]),
+							b.block([
+								b.stmt(b.call(callee(), F('_el'), spread, F('_sty'))),
+								...scalar,
+								b.stmt(b.assignment('=', F('_sty'), spread)),
+							]),
 						),
-						b.stmt(b.assignment('=', F('_sty'), spread)),
+						b.stmt(b.assignment('=', F('_styFull'), needsFull)),
 						...bind.properties.map((property, i) =>
 							b.stmt(b.assignment('=', previous(property, i), valueOf(property))),
 						),
@@ -26564,6 +26622,8 @@ function emitElementHtml(
 							expr: inheritOriginLoc(b.array(spread ? [spread, ...evaluations] : entries), inner),
 							spread,
 							spreadName: spread ? allocCompilerName(ctx, '__styleSpread') : null,
+							fullName: spread ? allocCompilerName(ctx, '__styleFull') : null,
+							mergedName: spread ? allocCompilerName(ctx, '__styleObject') : null,
 							valueNames: spread
 								? evaluations.map(() => allocCompilerName(ctx, '__styleValue'))
 								: null,
