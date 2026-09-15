@@ -49,3 +49,9 @@ are retained as evidence:
 There is no claim of full React parity, a pristine upstream test lane, or a one-to-one
 adapted test inventory. The vendored files make the source and test basis auditable;
 Octane-specific tests remain the executable evidence for this binding.
+
+## Dependency compatibility update (2026-09-12)
+
+The installed Better Auth dependency is now `1.7.4`. Its React store adapter is byte-identical to `1.6.29`. The React client adds `hydrateSession` forwarding, which the existing Octane vanilla-client projection already supplies. Runtime and precise type probes cover initial session hydration and preservation of later server state. The source and snapshot pin above stays at `1.6.29`; the documented full-suite limits remain.
+
+`audit/release-compatibility.json` records the archive and compared-file hashes.
