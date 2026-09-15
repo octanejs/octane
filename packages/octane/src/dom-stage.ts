@@ -146,7 +146,7 @@ export class DOMStage {
 		return node;
 	}
 
-	view<T extends Node>(node: T): T {
+	view<T extends Node | null | undefined>(node: T): T {
 		if (
 			this.ended ||
 			node === null ||

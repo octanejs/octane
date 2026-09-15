@@ -30,6 +30,10 @@ const NATIVE_READS = new Set(
 // by reusing a reviewed name. New operations still fail unless listed here.
 const NATIVE_OPERATIONS = new Map(
 	Object.entries({
+		// These module-level getters route preparation first, then use committed
+		// native access if DOM initialization has not supplied the cached getter.
+		getFirstChild: ['read:firstChild'],
+		getNextSibling: ['read:nextSibling'],
 		// Transition handles inspect the current animation tree and committed resources.
 		vtScopeName: ['read:style', 'read:activeViewTransition'],
 		'ViewTransitionPseudoElement.animate': ['call:animate'],
@@ -109,6 +113,18 @@ export function inspectStagedDOM(text, file = runtimeFile) {
 	const checker = program.getTypeChecker();
 	const source = program.getSourceFile(file);
 	if (!source) throw new Error(`Cannot read ${file}`);
+	const moduleBindings = new Map();
+	for (const statement of source.statements) {
+		if (ts.isVariableStatement(statement))
+			for (const declaration of statement.declarationList.declarations)
+				if (ts.isIdentifier(declaration.name))
+					moduleBindings.set(declaration.name.text, checker.getSymbolAtLocation(declaration.name));
+	}
+	const moduleBinding = (node, name) =>
+		ts.isIdentifier(node) &&
+		node.text === name &&
+		moduleBindings.has(name) &&
+		checker.getSymbolAtLocation(node) === moduleBindings.get(name);
 	const failures = [];
 	const fromDOM = (symbol) =>
 		symbol?.declarations?.some((entry) =>
@@ -139,6 +155,32 @@ export function inspectStagedDOM(text, file = runtimeFile) {
 	function preparedReceiver(expression, depth = 0) {
 		if (depth > 12) return false;
 		const node = unwrap(expression);
+		if (
+			ts.isBinaryExpression(node) &&
+			node.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken
+		) {
+			const native = unwrap(node.right);
+			const prepared = unwrap(node.left);
+			const view = ts.isCallExpression(prepared) ? unwrap(prepared.expression) : undefined;
+			// The cold preparation branch is inlined only around local identifiers.
+			// Matching bindings proves that the optional stage and both selected receivers
+			// refer to the renderer's actual stage and the same native node. Restricting
+			// the receiver also preserves evaluation order for getters and function calls.
+			return (
+				ts.isIdentifier(native) &&
+				ts.isCallExpression(prepared) &&
+				prepared.questionDotToken === undefined &&
+				ts.isPropertyAccessExpression(view) &&
+				view.questionDotToken !== undefined &&
+				view.name.text === 'view' &&
+				moduleBinding(unwrap(view.expression), 'STAGED_DOM') &&
+				prepared.arguments.length === 1 &&
+				ts.isIdentifier(unwrap(prepared.arguments[0])) &&
+				checker.getSymbolAtLocation(native) !== undefined &&
+				checker.getSymbolAtLocation(native) ===
+					checker.getSymbolAtLocation(unwrap(prepared.arguments[0]))
+			);
+		}
 		if (ts.isCallExpression(node)) {
 			const callee = node.expression;
 			return (

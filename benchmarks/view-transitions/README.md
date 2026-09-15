@@ -133,6 +133,47 @@ state, and do not measure heap allocation or browser layout cost. The generic
 case is the control for machine variation. Source or fixture changes during a
 run fail the wrapper.
 
+## Ordinary js-framework benchmark
+
+The minimal root controls do not exercise a real table's per-row work. Run the
+existing TSRX and JSX benchmark applications through their unchanged canonical
+harness with the selected complete Octane package and compiler:
+
+```sh
+BENCH_JSON=/tmp/vt-js-framework-main.json node benchmarks/view-transitions/js-framework.mjs 8 --octane-revision=bb11d0b3ec9fc0cbe3723fc4e6bf0217d4149892
+BENCH_JSON=/tmp/vt-js-framework-candidate.json node benchmarks/view-transitions/js-framework.mjs 8
+```
+
+The optional positional argument is measured samples per operation (default
+eight). Both builds use the same current fixture sources, dependencies, Vite
+production settings, and esbuild minifier. Source and compiler hashes, fixture
+and compiled-input hashes, the lockfile, harness, emitted asset hashes, raw/gzip
+JavaScript bytes, and Node/tool/browser versions accompany the raw harness
+results. Source, fixture, harness, or lockfile edits during a run fail the wrapper.
+Temporary preview servers and build assets are removed afterward; the shared
+revision helper retains its ignored source snapshots for reuse.
+
+Each dialect runs under its canonical `octane-tsrx` or `octane-jsx` target name,
+so all existing DOM/identity/event checks, direct-insertion checks, and production
+call-count limits remain active. No guard is relaxed. The wrapper runs both
+dialects even when the first fails; it retains the original standard output and
+error alongside a nonzero exit status. A failed canonical run may produce no
+timing JSON, in which case the wrapper records its failure without inventing
+partial timing results.
+
+The Chromium integration CI lane runs this wrapper with one measured sample per
+operation and uploads its raw result even when a guard fails. This enforces the
+existing correctness, insertion, and call-count limits on pull requests; one
+sample is not evidence for a timing claim and introduces no timing threshold.
+
+Run baseline–candidate–candidate–baseline sequentially on a quiet machine using
+the same Node version and `CPU_THROTTLE` setting. The canonical harness performs
+three warmup cycles, measures synchronous click/commit time, and checks calls
+separately in a jitless browser. These are local timings excluding paint, not the
+official benchmark's Chrome timeline scores. Call counts are deterministic work
+evidence, not CPU-time percentages; differences within timing variation remain
+inconclusive.
+
 ## Scoped native work
 
 The separate scoped runner reuses the element-scope browser fixture. It reports

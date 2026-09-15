@@ -1,5 +1,125 @@
 # View Transition parity performance evidence
 
+## Ordinary client regression and fix
+
+The ordinary table workloads exposed a regression that the smaller root controls
+missed. Compare main `bb11d0b3e`, reviewed PR `ab2c29e65`, and the final source/asset
+hashes in [js-framework-regression.json](measurements/js-framework-regression.json).
+This section supersedes the client-byte observations in the historical sections.
+The report retains complete canonical outputs, failure controls, focused raw
+samples, source/fixture/compiler/dependency hashes, and alternate implementations.
+
+### Deterministic work
+
+Both actual `benchmarks/js-framework` applications import ordinary root/state
+APIs and do not install ViewTransition. Production builds remove the optional
+transition driver and DOMStage class, but the reviewed identity receiver helper
+remained reachable. It ran 12,006 times in the TSRX mount and 14,046 in JSX.
+Driver exclusion alone therefore did not establish an inexpensive ordinary path.
+
+| 1,000-row mount calls | Main | Reviewed PR | Final | Unchanged maximum |
+| --- | ---: | ---: | ---: | ---: |
+| TSRX | 34,083 | 46,090 | 34,088 | 35,000 |
+| JSX | 46,162 | 60,209 | 46,167 | 50,000 |
+
+Local DOM receivers now select their staged view inline. Complex receivers retain
+single evaluation before stage selection; twelve immediate local captures remove
+per-row insertion helper calls without spanning component callbacks. The typed
+checker validates the actual stage binding and matching identifier receivers.
+No prepared receiver is cached across user code.
+
+The final counts reproduce exactly in both balanced runs. Original row output,
+identity, insertion, fragment, delegated-event and selection gates all pass.
+The unchanged canonical harness rejects both reviewed builds in a separate
+failure control. PR Chromium CI now runs this same harness with one timing
+sample, both canonical target names and both existing call ceilings, and uploads
+its report. CI gates correctness and work counts; its single timing sample is
+not a performance comparison.
+
+### Event updates and timing
+
+Fixing mount calls alone left a repeatable JSX selection slowdown. The first
+canonical comparison prompted a focused check with 40 warmup actions and 80
+samples for each operation, in four independent browsers ordered
+main–candidate–candidate–main. Selection alternates two rows; swaps always change
+order. Every action checks all retained row identities and the selected class.
+The diagnostic copies the canonical click/commit boundary, including `gc()`
+before timing and awaited `__benchFlush` inside timing. It records every sample.
+
+The receiver-only candidate's selection medians were **0.50/0.55 ms**, against
+**0.30/0.40 ms** for main. Precise coverage showed only 9,176→9,177 calls for
+selection and 9,173→9,178 for swapping, so the extra mount helper calls did not
+explain this remaining cost. Each selection refreshes 2,000 event bundles;
+the reviewed helper reassigned each bundle through an optional projection call.
+
+The final helper projects only during an active staged capture. Capture creation
+initializes the driver first; when capture is absent its projection already
+returns the original bundle. A direct conditional avoids ordinary self-assignment
+and also skips idle projection calls after the driver has been installed.
+Projection still precedes dispatch snapshots and transaction journaling.
+
+| Focused median, ms | Main A1 | Final B1 | Final B2 | Main A2 |
+| --- | ---: | ---: | ---: | ---: |
+| JSX selection | 0.30 | 0.35 | 0.30 | 0.40 |
+| JSX swap | 0.50 | 0.50 | 0.50 | 0.60 |
+
+The previous repeatable increase is absent in this comparison. Distributions
+overlap main, so no speedup is claimed. The final production assets match the
+measured capture-guard prototype byte-for-byte. The complete canonical workloads
+also run again on final source, with three warmup cycles and eight samples per
+operation in each of four balanced runs. Its original JSON retains per-run
+score, mean, median, min, p95, standard deviation and RME, but not individual
+sample values. Those summaries are not pooled into invented sample distributions.
+
+These are local synchronous click/commit timings, excluding paint, not official
+js-framework-benchmark Chrome timeline scores. Short-action timer quantization,
+JIT behavior and browser-process variation limit precision. Startup, heap/GC,
+active large-tree transition latency and official benchmark scores are not measured.
+
+### Bundle and native controls
+
+| Canonical JS gzip bytes | Main | Reviewed PR | Final | Final − main |
+| --- | ---: | ---: | ---: | ---: |
+| TSRX | 32,273 | 32,858 | 33,040 | +767 (2.38%) |
+| JSX | 60,228 | 61,075 | 61,653 | +1,425 (2.37%) |
+
+Final raw JavaScript is 99,795/194,694 bytes, versus main's 96,612/187,384.
+The fix adds 182/578 gzip bytes versus the reviewed PR. Inline checks remove
+function calls, but retain branches and shared code; this is not zero overhead.
+
+| Other fixture | Reviewed raw → final | Reviewed gzip → final |
+| --- | ---: | ---: |
+| Ordinary static root | 166,474 → 171,732 | 53,663 → 54,126 |
+| Ordinary stateful root | 174,676 → 180,012 | 56,565 → 57,070 |
+| Document transition | 323,705 → 331,713 | 90,415 → 91,196 |
+| Element scopes | 320,533 → 328,267 | 89,380 → 90,001 |
+
+All native semantic observations and capture/rectangle/computed-style counts
+remain unchanged. Ordinary controls still exclude the optional driver/adapter
+and perform no captures or geometry/style reads. Server runtime is unchanged
+by this follow-up. No new per-node cache, projection allocation or retained state
+is introduced on the ordinary path.
+
+Rejected alternatives are retained in the evidence. A helper-arm ternary kept
+more bundle bytes; a direct DOM ternary and a driver-guarded event assignment were
+built but not selected or assigned a CPU benefit. The active-capture event guard
+addresses the measured hot operation while also avoiding idle driver calls.
+
+Final strict core types, 85 native browser tests, 74 event/dispatch tests in
+both compilation modes, and 72 checker/workflow tests pass. The preceding
+receiver implementation passed all 18,280 local core tests. Its public host-state
+control passes, while replacing the inline receiver with a native node makes
+both modes fail before the native callback publishes. Full repository and React
+parity coverage run in PR CI.
+
+Environment: Node 24.20.0, Chromium 149.0.7827.55, Playwright 1.61.1, Vite 8.1.5,
+esbuild 0.28.1, @tsrx/core 0.2.0, @tsrx/oxc 0.13.0, macOS arm64. Timed comparisons
+run sequentially after other agent-owned test/build workloads finish. Main and
+candidate use identical fixture/compiler inputs, dependencies and production
+options. Reproduce the canonical comparison with the README's
+`js-framework.mjs` commands; the focused diagnostic source is retained in the report.
+
+
 ## Second review: large-page SSR and scope fixes
 
 The final runtime comparison uses reviewed head `759330f3`; the client baseline
