@@ -5,11 +5,52 @@ does, and which behavior the measurements actually exercise. A smaller entry
 chunk, a passing browser test, and faster application interaction are not
 interchangeable results.
 
-The latest measurements here apply to runtime checkpoint `61e51dd8b`.
-Earlier experiments are labeled historical and must not be treated as current
-bundle sizes or added together.
+Each section identifies its measured source or historical checkpoint. Results from different checkpoints must not be treated as current bundle sizes or added together.
 
-## Latest renderer-free binding comparison
+## Parallel-start and demand-ownership candidate
+
+Matched minified esbuild closures compare upstream `733c98d57` with the parallel-start candidate based on `4cd85fbcb` plus the resolved upstream merge, lightweight retry-ancestry repair, and exact-owner control retirement. The measured renderer SHA-256 is `fb5e438ee14d78fe26c585b37d766da8c06d5c625ec262b24fc7aa88ff76dbc4`; the control implementation is `97c33f57a4ebafd35006125e7f11718b8e663acd5b0290d100481443304a019f`. No loaded source changed during measurement. Both use the same installed toolchain and production flags.
+
+| Complete dependency closure | Upstream gzip bytes | Candidate gzip bytes |
+| --- | ---: | ---: |
+| Ordinary `createRoot` | 53,285 | 58,405 |
+| Ordinary `renderToString` | 14,906 | 17,654 |
+| Scalar authored bindings | Export unavailable | 3,653 |
+| Structural authored bindings | Export unavailable | 8,286 |
+| Optional control capability | Not measured | 3,221 |
+| Optional whole-style capability | Not measured | 2,216 |
+| Scalar bindings with controls and whole styles | Not measured | 7,941 |
+| Scoped signal engine | Not measured | 9,543 |
+| Native client signals | Not measured | 10,933 |
+| Native server signals | Not measured | 10,845 |
+| Compiled plain-module signals | Not measured | 15,155 |
+| Full streamed-signals bootstrap | Not measured | 18,545 |
+| Results-only bootstrap | Not measured | 16,561 |
+
+The ordinary client adds 5,120 gzip bytes and the ordinary server adds 2,748 versus upstream. These measure the entire RFC branch, not just the latest fix. Neither ordinary entry retains the optional scoped graph. Scalar and structural binding entries exclude the optional control/style capabilities and retain their published `f3eccc2fc` sizes. The fifteen available baseline/candidate closures pass boundary and export-load checks; two baseline binding exports are unavailable. Complete closures overlap: they cannot be added together or read as an application's startup increment. The runner labels these source-qualified bundle measurements preliminary, not application-budget acceptance.
+
+The matched Chromium mount gate records 34,090 compiled calls versus upstream's 34,088, below the existing 35,000 limit; the previously published branch recorded 50,112. All twelve effect-cleanup gates pass, with compiled counts equal to upstream and JSX counts one call higher. These are work counts, not wall-clock speedups.
+
+The final rich streaming fixture emits 35,086 gzip bytes for its renderer-free authored entry versus 100,459 for the renderer-backed entry. Both deliver an additional 457 gzip bytes of inline capture and load a 92-byte interaction chunk only upon map activation. These complete fixture entries include their signal/query engine, transport, view, and driver; they are not isolated framework overhead. Chromium and Playwright WebKit produce matching assets and pass 24 measured flows plus eight warmups, including page teardown. Neither those passes nor the byte difference establishes application startup cost, paint, input latency, or physical-device performance.
+
+The no-signal 800-card diagnostic retains complete output while eliminating 1,601 speculative signal owners and 3,200 serialized signal-identity paths. Existing structural frame metadata still exists. Matched SSR timing and browser qualification are separate from this allocation diagnostic.
+
+### Matched SSR timing
+
+Four fresh production-build processes ran published `f3eccc2fc` and the candidate in A–B–B–A order, with five warmups and thirty timed renders per scenario. All six output gates passed in each process. Node 24.21.0 on Darwin arm64, TSRX core/runtime 0.2.0, OXC 0.13.0, Vite 8.1.5, esbuild 0.28.1, fixture inputs, and the dependency lock were held constant. Each variant's emitted entry hash remained identical between its two runs.
+
+| Stream completion | Published score range, ms | Candidate score range, ms |
+| --- | ---: | ---: |
+| 10 cards | 0.160–0.299 | 0.177–0.297 |
+| 100 cards | 1.342–1.438 | 1.275–1.421 |
+| 800 cards | 9.763–10.216 | 9.518–10.135 |
+| 50 cards in reverse waves | 1.910–1.912 | 1.870–1.915 |
+
+These are ranges of two process scores, not confidence intervals. The 800-card score's reported relative uncertainty is approximately 1.8–2.8%; the smaller cases have substantially more noise. The ranges overlap, so this comparison establishes neither a speedup nor a regression. A separate same-configuration upstream `733c98d57` control records 10.213 ms for 800 cards and 1.865 ms for reverse waves; one control process is not a paired upstream performance claim. All thirty-iteration 800-card variants emit 1,433,920 bytes in two chunks. Shorter runs emit smaller request tokens; the separate allocation diagnostic's smaller byte count is not missing card output.
+
+A fresh six-scenario correctness smoke after the control-retirement repair produces the same server entry SHA-256 (`29bc9b3ae7cae643b4b071ff91bb314340136b0c6bcc0e91daa3e1729de6acde`) as both timed candidate processes. The browser-side repair therefore does not change this measured executable. The smoke's three-iteration timings are not compared with the thirty-iteration measurements.
+
+## Historical renderer-free binding comparison (`61e51dd8b`)
 
 The [behavior-only benchmark](../benchmarks/conversation-streaming/behavior-only/README.md)
 compares the same fixed native button, icon spans, SVG, state source, events,

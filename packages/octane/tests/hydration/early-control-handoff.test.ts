@@ -7,7 +7,10 @@ import {
 	initializeHydrationEventCapture,
 	snapshotHydrationControl,
 } from '../../src/hydration/event-capture.js';
-import { bootstrapStreamedSignalResults } from '../../src/hydration/streamed-signals.js';
+import {
+	bootstrapStreamedSignalResults,
+	installSignalDocumentLifecycle,
+} from '../../src/hydration/streamed-signals.js';
 import {
 	registerIndependentHydrationIsland,
 	type IndependentHydrateActivationContext,
@@ -20,6 +23,7 @@ import {
 	bindSignalControl,
 	createScope,
 	runWithSignalOwner,
+	ScopeDisposedError,
 } from '../../src/signals/index.js';
 import type { SignalRendererOwnerIdentity } from '../../src/signals/types.js';
 
@@ -392,11 +396,87 @@ describe('early hydration control handoff', () => {
 		const retiringInput = document.createElement('input');
 		document.body.append(retiringInput);
 		cleanups.push(() => retiringInput.remove());
-		cleanups.push(bindSignalControl(retiringInput, 'value', retiring.signal$('value', 'alive')));
-		expect(() => retiring.dispose()).toThrow(/disposed/i);
+		const retiringValue = retiring.signal$('value', 'alive');
+		const stopRetiring = bindSignalControl(retiringInput, 'value', retiringValue);
+		cleanups.push(stopRetiring);
+		expect(() => retiring.dispose()).not.toThrow();
 		expect(retiringInput.value).toBe('alive');
-		cleanups.push(bindSignalControl(retiringInput, 'value', draft$));
+		expect(() => retiringValue.get()).toThrow(/disposed/i);
+		expect(() => bindSignalControl(retiringInput, 'value', retiringValue)).toThrow(/disposed/i);
+		stopRetiring();
+		stopRetiring();
+		const rebound = bindSignalControl(retiringInput, 'value', draft$);
+		cleanups.push(rebound);
 		expect(retiringInput.value).toBe('after failure');
+		rebound();
+		// A live producer can throw the same error class; it is not retirement
+		// of this control's owner and must retain the normal projection error path.
+		const fail = scope.signal$('fail-retirement-error', false);
+		const foreignError = new ScopeDisposedError('another-owner');
+		const live = scope.derived$('live-retirement-error', () => {
+			if (fail.get()) throw foreignError;
+			return 'live producer';
+		});
+		cleanups.push(bindSignalControl(retiringInput, 'value', live));
+		expect(() => fail.set(true)).toThrow(foreignError);
+		expect(scope.retired).toBe(false);
+		expect(retiringInput.value).toBe('live producer');
+		const afterError = bindSignalControl(retiringInput, 'value', draft$);
+		cleanups.push(afterError);
+		afterError();
+		// Retirement may already have queued a terminal notification when the
+		// native property transfers. That old callback cannot release its successor.
+		const queuedOwner = createScope({ scopeKey: 'queued-control-retirement' });
+		const stopQueued = bindSignalControl(
+			retiringInput,
+			'value',
+			queuedOwner.signal$('value', 'old'),
+		);
+		let stopSuccessor!: () => void;
+		scope.batch(() => {
+			queuedOwner.dispose();
+			stopQueued();
+			stopSuccessor = bindSignalControl(retiringInput, 'value', draft$);
+		});
+		cleanups.push(stopSuccessor);
+		draft$.set('successor');
+		expect(retiringInput.value).toBe('successor');
+		stopSuccessor();
+		// Document lifetime installs its pagehide listener before application
+		// controls. Terminal release must not depend on listener registration order.
+		const owner = { scopeKey: 'pagehide-control-owner' };
+		const lifecycle = installSignalDocumentLifecycle({
+			document,
+			signalOwner: owner,
+			buildId: 'control-build',
+			documentId: 'control-document',
+			readIdentity: () => ({ buildId: 'control-build', documentId: 'control-document' }),
+		});
+		cleanups.push(lifecycle.dispose);
+		const pageDraft = __signalAt('g:pagehide-control', 'draft', 'page draft');
+		const stopPage = runWithSignalOwner(owner, () =>
+			bindSignalControl(retiringInput, 'value', pageDraft),
+		);
+		cleanups.push(stopPage);
+		const errors: unknown[] = [];
+		const onError = (event: ErrorEvent) => {
+			errors.push(event.error);
+			event.preventDefault();
+		};
+		window.addEventListener('error', onError);
+		cleanups.push(() => window.removeEventListener('error', onError));
+		window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true }));
+		window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }));
+		runWithSignalOwner(owner, () => pageDraft.set('restored page'));
+		expect(retiringInput.value).toBe('restored page');
+		window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: false }));
+		expect(errors).toEqual([]);
+		expect(() => runWithSignalOwner(owner, () => pageDraft.get())).toThrow(/disposed/i);
+		retiringInput.value = 'after retirement';
+		retiringInput.dispatchEvent(new InputEvent('input', { bubbles: true }));
+		expect(errors).toEqual([]);
+		stopPage();
+		stopPage();
 	});
 
 	it('rejects a storage candidate after an early clear', () => {

@@ -9,7 +9,7 @@ The earlier published validation checkpoint `ac8f008e9` is recorded in
 Its [26-job CI run](https://github.com/octanejs/octane/actions/runs/34922143270)
 and automated review passed. Those results do not establish every browser,
 performance, or deployment requirement in the RFC.
-The renderer-free follow-up and integration with upstream `777cef385` are documented below; consult the PR for the current head's CI state rather than applying the earlier checkpoint to later changes.
+The renderer-free follow-up and integration with upstream `733c98d57` are documented below; consult the PR for the current head's CI state rather than applying the earlier checkpoint to later changes.
 
 ## What authors get
 
@@ -126,7 +126,7 @@ const history = history$.get();
 
 This is a bounded compiler optimization, not universal parallelization. Imported handles, property receivers, opaque aliases, direct JSX holes, and uncompiled helpers are not covered. Dependencies on an earlier local result preserve sequencing, including captures through local closures. Separate boundaries still determine independent reveal; starting both requests does not make one boundary display a partially evaluated result.
 
-Pending component-local work belongs to a retry episode. Retrying the same logical instance reuses its work rather than starting duplicate loaders; replacement, cancellation, and unmount retire obsolete work. The cache retains signal owners and logical identity tokens, not discarded DOM or scope trees. Ordinary signal-free renders do not allocate this retry state.
+Pending component-local work belongs to a retry episode. Retrying the same logical instance reuses its work rather than starting duplicate loaders; replacement, cancellation, and unmount retire obsolete work. The cache retains signal owners and logical identity tokens, not discarded DOM or scope trees. Ordinary signal-free renders do not allocate this retry state. Removed keyed entries retire once ordinary reconciliation establishes complete incoming membership. If a row suspends before later keys are read, those unknown keys remain retained until membership is known or the episode ends; arbitrary authored key functions are not evaluated early to force cancellation.
 
 ### Historical HTML and live state are different
 
@@ -252,6 +252,16 @@ An initial host integration need not use explicit signal transitions. It may ret
 The candidate now builds with the normally installed, frozen dependency lockfile: TSRX core/runtime 0.2.0 and OXC 0.13.0, without a dependency override. Compiler-selected controls and whole/spread styles use the same native adapters as their explicit APIs. A binding-only activation no longer imports the renderer's collection driver. The exact chained-string extraction example is exercised alongside rejection cases for opaque or mutating calls. Sampled numeric values retain native coercion and number-input equality; nullish values leave the control uncontrolled. These ordinary values do not acquire a signal writer or relax writable-handle validation.
 
 The upstream ViewTransition integration preserves committed control sources and listeners until native publication, stages authored text and structural changes, and runs deferred cleanup under the exact retiring signal owner. Regression faults reproduce early text publication and cleanup reading the wrong owner. An already-committed signal update drains only its own development diagnostic so that diagnostic cannot accidentally interrupt an unrelated held transition. Ordinary asynchronous server components can still compose cached markup after `await` when no render pass is active; that path does not invent a request owner.
+
+### Parallel-start and demand-ownership candidate
+
+After integrating upstream `733c98d57`, correcting retry ancestry through lightweight DOM-context proxies, and fixing terminal native-control cleanup, the final full core development/production run passes 19,913 cases across 1,099 test-file runs. All five signal modes pass 635 cases across 44 test-file runs. Independent review confirms that retry identity does not add fields to ordinary lightweight blocks and terminal control cleanup does not suppress computation errors. Core and public source types, the distribution build/import checks, and repository synchronization also pass. Current-head CI remains a separate gate.
+
+The compiled mount work gate records 34,090 calls, versus 34,088 for the matched upstream control and 50,112 on the published `f3eccc2fc` branch. All twelve cleanup work gates pass: compiled counts equal upstream, while JSX differs by one call per case. These deterministic counts do not establish a CPU percentage or application latency improvement. See the [performance evidence](./async-signals-performance.md) for dependency-closure sizes and measurement boundaries.
+
+The browser rerun also exposed a pre-existing page-cleanup ordering defect: document retirement could notify a still-bound native control before the application's later `pagehide` listener released it. The private binding subscription now provides exact-owner terminal cleanup. It does not catch errors by class: a live computation throwing `ScopeDisposedError` still fails, and initial reads from retired owners remain errors. The rich browser harness now observes nonpersisted navigation and context teardown before accepting a sample.
+
+The final rich authored/renderer comparison passes all four Chromium/WebKit lanes: 24 measured scenarios plus eight excluded warmups, with no console, HTTP, or page errors through actual nonpersisted navigation and context closure. The existing mobile-input suite passes 35 Chromium cases covering CDP composition, keyed movement, shadow focus/selection, and touch cancellation. Playwright WebKit and emulated Chromium input are not native iOS or operating-system IME qualification.
 
 ### Published scalar-cache checkpoint
 
@@ -436,8 +446,7 @@ acceptance work, not an invitation to weaken the contract.
 - [x] V6: At runtime checkpoint `61e51dd8b`, public API types, authored exports,
   changesets, generators, and the applicable CI matrix pass. Documentation-only
   follow-ups require their own current-head checks.
-- [x] V7: Two-pass independent review and adversarial self-review findings resolved;
-  final candidate rerun after fixes, with remaining risk explicitly documented.
+- [x] V7: Two-pass independent review and adversarial self-review findings were resolved at the published checkpoints above, with their post-fix reruns and remaining risks recorded. New candidate validation is reported separately and does not inherit those results.
 - [x] V8: Runtime checkpoint `61e51dd8b` is published in PR #1069 with agent
   provenance, committed sync output, and passing CI. This records that exact
   checkpoint, not a merge, release, or result for later commits.

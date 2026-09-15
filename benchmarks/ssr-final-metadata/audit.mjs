@@ -141,7 +141,7 @@ function rejected(source, kind) {
 	if (kind === 'unscoped-child-segments')
 		return replaceOnce(
 			source,
-			"return nextScopedCount(frame, 'scopedChildren', ASYNC_SCOPE);",
+			"return nextScopedCount(frame, 'scopedChildren', scopeSuffix(frame));",
 			'return frame.nextChild++;',
 		);
 	if (kind === 'skip-children-mark')

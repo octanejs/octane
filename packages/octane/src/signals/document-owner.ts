@@ -25,7 +25,7 @@ export function documentSignalOwner(container: Node): SignalOwnerIdentity {
 
 /** @internal Compiler capability for global signals without a rendering engine. */
 export function enableSignalDocument(abi = 1): void {
-	if (abi !== 1) throw new TypeError(formatClientError(65));
+	if (abi !== 1) throw new TypeError(formatClientError(74));
 	signalDocumentEnabled = true;
 	if (defaultInstalled) return;
 	defaultInstalled = true;

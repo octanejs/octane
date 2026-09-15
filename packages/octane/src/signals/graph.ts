@@ -429,9 +429,15 @@ export class ScopedNode<T = any> implements SignalHandle<T>, ReactiveNode {
 		return readSignalBinding(this);
 	}
 
-	[SIGNAL_BINDING_SUBSCRIBE](notify: () => void): () => void {
+	[SIGNAL_BINDING_SUBSCRIBE](notify: () => void, onRetire?: () => void): () => void {
 		assertAlive(this.owner);
-		return attachObserver(this, notify, true);
+		// An optional native lease can end when its exact owner retires. A live
+		// computation throwing ScopeDisposedError still uses normal invalidation.
+		return attachObserver(
+			this,
+			onRetire === undefined ? notify : () => (this.owner.retired ? onRetire() : notify()),
+			true,
+		);
 	}
 
 	[SIGNAL_BINDING_IDENTITY]() {

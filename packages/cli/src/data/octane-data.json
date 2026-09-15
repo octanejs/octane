@@ -2146,8 +2146,8 @@
       "status": "active"
     },
     "65": {
-      "message": "Unsupported Octane signal binding ABI.",
-      "runtime": ["client"],
+      "message": "Internal SSR invariant violated: ASYNC_SCOPE is not an extension of the active frame's async scope. Please file an Octane issue.",
+      "runtime": ["server"],
       "status": "active"
     },
     "66": {
@@ -2188,6 +2188,11 @@
     "73": {
       "message": "Octane DOM bindings require unique list keys.",
       "runtime": ["server"],
+      "status": "active"
+    },
+    "74": {
+      "message": "Unsupported Octane signal binding ABI.",
+      "runtime": ["client"],
       "status": "active"
     }
   }

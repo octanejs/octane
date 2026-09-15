@@ -461,6 +461,10 @@ export async function startServer(report) {
 	const server = createServer(async (incoming, response) => {
 		const url = new URL(incoming.url, 'http://127.0.0.1');
 		try {
+			if (url.pathname === '/favicon.ico') {
+				response.writeHead(204).end();
+				return;
+			}
 			if (url.pathname.startsWith('/assets/')) {
 				const file = url.pathname.slice('/assets/'.length);
 				if (!Object.hasOwn(report.outputs, file)) {

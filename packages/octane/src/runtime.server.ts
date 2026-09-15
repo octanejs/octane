@@ -664,11 +664,10 @@ function asyncFramePath(frame: Frame | null): string {
 }
 
 // Scoped counters live in a flat [key, count, …] pair list until they outgrow
-// it: scope keys are long path strings, so a Map pays a full hash of the key on
-// every get/set while a short scan compares them directly (and scopedChildren
-// lookups carry the same ASYNC_SCOPE string object across an arm, which string
-// equality resolves by identity). Frames seeing more distinct scopes than the
-// limit promote to a Map so a pathological fan-out still gets O(1) lookups.
+// it: keys are the frame-relative scope suffix (short — see the call sites
+// below), so a short scan compares them directly while a Map would still pay a
+// hash per get/set. Frames seeing more distinct scopes than the limit promote
+// to a Map so a pathological fan-out still gets O(1) lookups.
 type ScopedCounts = (string | number)[] | Map<string, number>;
 const SCOPED_COUNTS_ARRAY_LIMIT = 8;
 
@@ -703,14 +702,29 @@ function nextScopedCount(frame: Frame, slot: 'occ' | 'scopedChildren', key: stri
 	return 0;
 }
 
+// Every scope key reaching nextScopedCount under `frame` is frame.asyncScope or
+// a membrane extension of it (all ASYNC_SCOPE writes append to, or restore
+// toward, the active frame's scope). The suffix alone discriminates between
+// this frame's scopes, so counters key on it rather than re-scanning a shared
+// path prefix that grows with component depth. Development asserts the prefix
+// invariant: a violated scope would slice to a colliding key and silently merge
+// counters where the old full-path keys stayed unique.
+function scopeSuffix(frame: Frame): string {
+	const scope = ASYNC_SCOPE;
+	if (process.env.NODE_ENV !== 'production' && !scope.startsWith(frame.asyncScope)) {
+		throw new Error(formatServerError(65));
+	}
+	return scope.slice(frame.asyncScope.length);
+}
+
 function nextFrameOccurrence(frame: Frame, base: string): number {
-	const scopedBase = ASYNC_SCOPE === frame.asyncScope ? base : ASYNC_SCOPE + '\0' + base;
+	const scopedBase = ASYNC_SCOPE === frame.asyncScope ? base : scopeSuffix(frame) + '\0' + base;
 	return nextScopedCount(frame, 'occ', scopedBase);
 }
 
 function nextChildSegment(frame: Frame): number {
 	if (ASYNC_SCOPE === frame.asyncScope) return frame.nextChild++;
-	return nextScopedCount(frame, 'scopedChildren', ASYNC_SCOPE);
+	return nextScopedCount(frame, 'scopedChildren', scopeSuffix(frame));
 }
 
 function ssrScope(parent: SSRScope | null): SSRScope {
@@ -2733,12 +2747,21 @@ export function ssrControl<T>(siteKey: string, fn: () => T): T {
 function enterAsyncArm(armKey: unknown, mapped = false): void {
 	const previous = ASYNC_SCOPE;
 	const frame = FRAME;
-	const occurrence = frame === null ? 0 : nextFrameOccurrence(frame, '@arm-position:' + previous);
+	// The counter key already carries the frame-relative scope suffix; embedding
+	// `previous` again would only lengthen every stored key without changing the
+	// (frame, scope) partition the counter counts within.
+	const occurrence = frame === null ? 0 : nextFrameOccurrence(frame, '@arm-position:');
 	// A freshly allocated object key has no cross-pass identity. Reuse the same
 	// lexical item position only as its fallback lookup. The final scope remains
 	// keyed solely by armKey, so a stable primitive/object key keeps its identity
-	// when an @for reorders between streaming passes.
-	const fallbackPosition = previous + '|@arm-position:' + occurrence;
+	// when an @for reorders between streaming passes. Only object/function/symbol
+	// keys ever consult the fallback (asyncIdentityKey), so primitive-keyed arms
+	// skip building the position string.
+	const fallbackPosition =
+		armKey !== null &&
+		(typeof armKey === 'object' || typeof armKey === 'function' || typeof armKey === 'symbol')
+			? previous + '|@arm-position:' + occurrence
+			: undefined;
 	if (SERVER_SIGNAL_BINDINGS_POTENTIAL && SIGNAL_CONTROL_SITE.charCodeAt(0) === 102) {
 		SIGNAL_LIST_KEYS = [
 			...SIGNAL_LIST_KEYS,

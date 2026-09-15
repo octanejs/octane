@@ -33,8 +33,8 @@ export type SignalSnapshot<T> = SnapshotActivity &
 export interface SignalHandle<T> {
 	readonly [SIGNAL_HANDLE]: true;
 	readonly [SIGNAL_BINDING_READ]: () => T;
-	/** @internal Observe invalidation without running user code during render. */
-	readonly [SIGNAL_BINDING_SUBSCRIBE]: (notify: () => void) => () => void;
+	/** @internal Observe invalidation; optional teardown replaces the owning scope's final invalidation. */
+	readonly [SIGNAL_BINDING_SUBSCRIBE]: (notify: () => void, onRetire?: () => void) => () => void;
 	readonly [SIGNAL_BINDING_IDENTITY]: () => SignalBindingIdentity;
 	readonly key: string;
 	readonly kind: 'signal' | 'derived' | 'async';

@@ -244,7 +244,7 @@ export async function runRichBrowser(
 							.map((style) => style.textContent)
 							.join('\n'),
 					}));
-					result.samples.push({
+					const sample = {
 						iteration,
 						warmup: iteration < 0,
 						mode,
@@ -261,7 +261,12 @@ export async function runRichBrowser(
 						final,
 						marks: await page.evaluate(() => window.__richMarks),
 						trace,
-					});
+					};
+					// Observe real nonpersisted pagehide and context teardown before accepting a sample.
+					await page.goto('about:blank');
+					await context.close();
+					assert.deepEqual(errors, []);
+					result.samples.push(sample);
 				} catch (error) {
 					result.failures.push({
 						iteration,

@@ -206,12 +206,19 @@ export function __createBindingControls() {
 					if (handle) {
 						const candidate = handle;
 						const stopNext = run(() =>
-							candidate[SIGNAL_BINDING_SUBSCRIBE](() => {
-								if (!disposed && generation === ticket) {
-									revision++;
-									notify();
-								}
-							}),
+							candidate[SIGNAL_BINDING_SUBSCRIBE](
+								() => {
+									if (!disposed && generation === ticket) {
+										revision++;
+										notify();
+									}
+								},
+								() => {
+									// The document may retire before application pagehide cleanup.
+									// Do not read dead authority or release a replacement's lease.
+									if (!disposed && generation === ticket) dispose();
+								},
+							),
 						);
 						if (typeof stopNext !== 'function')
 							throw new TypeError('A signal control subscription must return cleanup.');

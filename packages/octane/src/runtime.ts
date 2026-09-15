@@ -549,7 +549,11 @@ function signalRetrySlot(scope: Scope, target: Scope): unknown[] | null {
 function signalRetryPath(scope: Scope, root: Scope): unknown[] | null {
 	if (scope === root) return [];
 	const location = SIGNAL_RETRY_LOCATIONS.get(scope);
-	const parent = location?.parent ?? scope.parent ?? scope.block.parentBlock;
+	let parent = location?.parent ?? scope.parent ?? scope.block.parentBlock;
+	// A lite body's DOM context is not a Scope. Start at its real ancestor;
+	// signalRetrySlot descends the registered children and retains each lite
+	// call-site segment on the way to this target, without widening the proxy.
+	while (parent instanceof LiteBlockImpl) parent = parent.parentBlock;
 	if (parent === null) return null;
 	const segment =
 		location === undefined
@@ -637,6 +641,9 @@ function discardSignalRetryItem(block: Block, error: unknown): void {
 }
 
 function signalRetryListPath(scope: Scope, state: ForSlot, root: Scope): unknown[] | null {
+	// Lists can inherit a lite DOM proxy as parentBlock. Its owning Scope is
+	// already registered below the real ancestor and found by this same walk.
+	while (scope instanceof LiteBlockImpl) scope = scope.parentBlock;
 	for (let index = 0; index < scope.slots.length; index++) {
 		const slot = scope.slots[index];
 		if (slot === state || slot?.forSlot === state) {
@@ -719,7 +726,7 @@ function trackSignalRetryListKeys<T>(
 
 /** @internal Compiler/runtime module-signal capability version 1. */
 export function enableSignalBindings(abi = 1, potentialOnly = false): void {
-	if (abi !== 1) throw new TypeError(formatClientError(65));
+	if (abi !== 1) throw new TypeError(formatClientError(74));
 	SIGNAL_BINDINGS_ENABLED = true;
 	if (!potentialOnly) enableSignalDocument(abi);
 }

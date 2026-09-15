@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "nextCode": 74,
+  "nextCode": 75,
   "codes": {
     "1": {
       "message": "Maximum update depth exceeded. Octane limits the number of nested updates to prevent infinite loops.",
@@ -387,9 +387,9 @@
       "status": "active"
     },
     "65": {
-      "message": "Unsupported Octane signal binding ABI.",
+      "message": "Internal SSR invariant violated: ASYNC_SCOPE is not an extension of the active frame's async scope. Please file an Octane issue.",
       "argumentCount": 0,
-      "runtime": ["client"],
+      "runtime": ["server"],
       "status": "active"
     },
     "66": {
@@ -438,6 +438,12 @@
       "message": "Octane DOM bindings require unique list keys.",
       "argumentCount": 0,
       "runtime": ["server"],
+      "status": "active"
+    },
+    "74": {
+      "message": "Unsupported Octane signal binding ABI.",
+      "argumentCount": 0,
+      "runtime": ["client"],
       "status": "active"
     }
   }

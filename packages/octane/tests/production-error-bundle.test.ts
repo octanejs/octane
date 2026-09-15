@@ -315,7 +315,7 @@ describe('production error bundles', () => {
 			expect(development).toEqual(
 				messages.map((message, index) => ({ name: index === 2 ? 'TypeError' : 'Error', message })),
 			);
-			const codes = surface === 'client' ? [58, 58, 65] : [58, 58, 71, 59];
+			const codes = surface === 'client' ? [58, 58, 74] : [58, 58, 71, 59];
 			expect(production).toHaveLength(messages.length);
 			for (const [index, error] of production.entries()) {
 				expect(error.name).toBe(index === 2 ? 'TypeError' : 'Error');

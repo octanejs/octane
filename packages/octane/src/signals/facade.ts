@@ -342,9 +342,12 @@ export abstract class Descriptor<T, H extends SignalHandle<T>> implements OwnerB
 		return readBinding(this.resolve());
 	}
 
-	[SIGNAL_BINDING_SUBSCRIBE](notify: () => void): () => void {
+	[SIGNAL_BINDING_SUBSCRIBE](notify: () => void, onRetire?: () => void): () => void {
 		const run = captureSignalOwner(requireOwner());
-		return this.resolve()[SIGNAL_BINDING_SUBSCRIBE](() => run(notify));
+		return this.resolve()[SIGNAL_BINDING_SUBSCRIBE](
+			() => run(notify),
+			onRetire === undefined ? undefined : () => run(onRetire),
+		);
 	}
 
 	[SIGNAL_BINDING_IDENTITY]() {
