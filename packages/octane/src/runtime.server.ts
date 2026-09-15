@@ -6915,6 +6915,10 @@ export function isChildrenBlock(value: unknown): boolean {
 
 export function injectStyle(id: string, css: string, nonce?: string): void {
 	if (CSS !== null) {
+		const previous = CSS.get(id);
+		// Repeated component/theme styles leave the replay generation unchanged.
+		// Changed CSS or nonce still replaces the sheet without moving its order.
+		if (previous !== undefined && previous.css === css && previous.nonce === nonce) return;
 		CSS.replay = null;
 		CSS.set(id, nonce === undefined ? { css } : { css, nonce });
 	}
