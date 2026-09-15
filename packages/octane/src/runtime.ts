@@ -15494,8 +15494,7 @@ export function bindingText(posNode: Node | null, value: unknown, marker: string
 			if (existing.nodeValue !== text) existing.nodeValue = text;
 			return existing as Text;
 		}
-		if (existing !== close)
-			throw new TypeError('Octane DOM binding text range does not match its template.');
+		if (existing !== close) throw new TypeError(formatClientError(72));
 		const node = document.createTextNode(text);
 		close.parentNode!.insertBefore(node, close);
 		return node;

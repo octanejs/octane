@@ -264,18 +264,19 @@ function assertProjection(
 	parameterScope,
 	constants = new Set(),
 ) {
-	const readMethod = (node) => {
-		const callee = unwrap(node?.callee);
-		const sampled =
-			(node?.type === 'CallExpression' || node?.type === 'OptionalCallExpression') &&
-			node.arguments.length === 0 &&
-			(callee?.computed ? callee.property?.value === 'get' : callee?.property?.name === 'get');
-		if (
-			!['MemberExpression', 'OptionalMemberExpression'].includes(callee?.type) ||
-			(!sampled && (callee.computed || !['includes', 'find'].includes(callee.property.name)))
-		)
-			return false;
-		let receiver = unwrap(callee.object);
+	// Like imported projections, these native reads rely on the directive's
+	// immutable-props contract. A string result cast does not admit arbitrary
+	// methods: every call in a chain must independently satisfy this boundary.
+	const readReceiver = (input, sampled = false) => {
+		let receiver = unwrap(input);
+		if (receiver?.type === 'ChainExpression') return readReceiver(receiver.expression, sampled);
+		if (receiver?.type === 'LogicalExpression')
+			return readReceiver(receiver.left) && readReceiver(receiver.right);
+		if (receiver?.type === 'ConditionalExpression')
+			return readReceiver(receiver.consequent) && readReceiver(receiver.alternate);
+		if (receiver?.type === 'Literal') return typeof receiver.value === 'string';
+		if (['CallExpression', 'OptionalCallExpression'].includes(receiver?.type))
+			return readMethod(receiver);
 		while (['MemberExpression', 'OptionalMemberExpression'].includes(receiver?.type))
 			receiver = unwrap(receiver.object);
 		if (receiver?.type !== 'Identifier') return false;
@@ -287,6 +288,21 @@ function assertProjection(
 			binding != null &&
 			(binding.scope !== lexical.rootScope || (sampled && imports.has(receiver.name)))
 		);
+	};
+	const readMethod = (node) => {
+		const callee = unwrap(node?.callee);
+		const sampled =
+			(node?.type === 'CallExpression' || node?.type === 'OptionalCallExpression') &&
+			node.arguments.length === 0 &&
+			(callee?.computed ? callee.property?.value === 'get' : callee?.property?.name === 'get');
+		if (
+			!['MemberExpression', 'OptionalMemberExpression'].includes(callee?.type) ||
+			(!sampled &&
+				(callee.computed ||
+					!['includes', 'find', 'trim', 'slice', 'toUpperCase'].includes(callee.property.name)))
+		)
+			return false;
+		return readReceiver(callee.object, sampled);
 	};
 	walk(expression, (node, parent, key) => {
 		if (node.type.startsWith('TS') && !UNWRAP.has(node.type)) return false;
@@ -303,6 +319,7 @@ function assertProjection(
 				!(
 					key === 'arguments' &&
 					readMethod(parent) &&
+					['includes', 'find'].includes(unwrap(parent.callee)?.property?.name) &&
 					node.body.type !== 'BlockStatement' &&
 					!node.async &&
 					node.params.every((param) => param.type === 'Identifier')
@@ -422,6 +439,7 @@ function planView(fn, filename, source, imports, lexical, native = null) {
 	const values = [];
 	const projections = [];
 	const signalIndices = [];
+	const styleIndices = [];
 	const classAttributes = new Map();
 	const id = `d:${strongHash(`octane:dom-bindings:2\0${filename}\0${fn.id.name}\0${source}`)}`;
 	const parameterScope = lexical.nodeScopes.get(fn.body) ?? lexical.rootScope;
@@ -457,7 +475,8 @@ function planView(fn, filename, source, imports, lexical, native = null) {
 		// Static authored markup is not a behavior-owned channel. In particular,
 		// SVG paths remain in SSR rather than shipping again in every projector.
 		if (unwrap(value)?.type === 'Literal') return;
-		if (kind !== 'classToken' && lexical.domBindingCanCarrySignal(value))
+		if (kind === 'styleObject') styleIndices.push(bindings.length);
+		else if (kind !== 'classToken' && kind !== 'control' && lexical.domBindingCanCarrySignal(value))
 			signalIndices.push(bindings.length);
 		bindings.push([node, kind, name, ...(unitless === undefined ? [] : [unitless])]);
 		values.push(value);
@@ -755,6 +774,25 @@ function planView(fn, filename, source, imports, lexical, native = null) {
 				);
 			if (externalAttribute(tag, lower)) {
 				if (value?.type === 'Literal') continue;
+				if (
+					(lower === 'value' && ['input', 'textarea', 'select'].includes(tag)) ||
+					(lower === 'checked' && tag === 'input')
+				) {
+					if (lower === 'checked') {
+						const type = (element.openingElement?.attributes ?? element.attributes ?? []).find(
+							(attribute) => attrName(attribute) === 'type',
+						);
+						const inputType = type && unwrap(attrValueForBinding(type));
+						if (inputType?.type !== 'Literal' || !['checkbox', 'radio'].includes(inputType.value))
+							error(
+								filename,
+								attr,
+								'a checked binding requires a fixed checkbox or radio input type',
+							);
+					}
+					add(index, 'control', lower, value, attr);
+					continue;
+				}
 				error(
 					filename,
 					attr,
@@ -772,8 +810,19 @@ function planView(fn, filename, source, imports, lexical, native = null) {
 			if (name === 'class' && hasPartialClass(value)) {
 				if (!addClassGroups(index, attr, value)) addClassTokens(index, value);
 			} else if (name === 'style') {
-				if (value?.type !== 'ObjectExpression') {
-					add(index, 'styleAttribute', 'style', value, attr);
+				if (
+					value?.type !== 'ObjectExpression' ||
+					value.properties.some(
+						(property) => property.type === 'SpreadElement' || property.computed,
+					)
+				) {
+					add(
+						index,
+						value?.type === 'Literal' ? 'styleAttribute' : 'styleObject',
+						'style',
+						value,
+						attr,
+					);
 					continue;
 				}
 				const properties = new Set();
@@ -834,6 +883,7 @@ function planView(fn, filename, source, imports, lexical, native = null) {
 		values,
 		projections,
 		signalIndices,
+		styleIndices,
 		unbound,
 		classAttributes,
 		id,
@@ -844,7 +894,14 @@ function literalData(value) {
 	return Array.isArray(value) ? b.array(value.map(literalData)) : b.literal(value);
 }
 
-function scalarProperties(plan, project, classFactory, signalFactory = null) {
+function scalarProperties(
+	plan,
+	project,
+	classFactory,
+	signalFactory = null,
+	styleFactory = null,
+	controlFactory = null,
+) {
 	return [
 		b.prop('init', b.id('id'), b.literal(plan.id)),
 		...(plan.addressed ? [b.prop('init', b.id('addressed'), b.literal(true))] : []),
@@ -858,6 +915,13 @@ function scalarProperties(plan, project, classFactory, signalFactory = null) {
 				]
 			: []),
 		...(classFactory ? [b.prop('init', b.id('createClassGroup'), classFactory)] : []),
+		...(styleFactory
+			? [
+					b.prop('init', b.id('styleIndices'), literalData(plan.styleIndices)),
+					b.prop('init', b.id('connectStyle'), styleFactory),
+				]
+			: []),
+		...(controlFactory ? [b.prop('init', b.id('createControls'), controlFactory)] : []),
 	];
 }
 
@@ -946,6 +1010,18 @@ function projectProgram(ast, plan, filename, lexical) {
 		const mount = allocate('_$mountBindingProgram');
 		const adoptScalar = plan.scalar ? allocate('_$adoptScalarBindings') : null;
 		const signalFactory = plan.signals ? allocate('_bindingSignals') : null;
+		const styleFactory = plan.styles ? allocate('_bindingStyles') : null;
+		const controlFactory = plan.controls ? allocate('_bindingControls') : null;
+		// Imported child artifacts carry their optional capabilities. Forward a
+		// factory rather than loading every capability for every parent view.
+		const capability = (name, local) => {
+			const value = local
+				? b.id(local)
+				: [...plan.childPrograms]
+						.map((child) => b.member(b.id(child), name))
+						.reduce((left, right) => (left ? b.logical('||', left, right) : right), null);
+			return value ? [b.prop('init', b.id(name), value)] : [];
+		};
 		const root = plan.scalar ? b.id(allocate('_bindingRoot')) : null;
 		const scalar =
 			plan.scalar &&
@@ -957,6 +1033,8 @@ function projectProgram(ast, plan, filename, lexical) {
 						? b.member(root, 'createClassGroup')
 						: null,
 					signalFactory ? b.id(signalFactory) : null,
+					styleFactory ? b.id(styleFactory) : null,
+					controlFactory ? b.id(controlFactory) : null,
 				),
 			);
 		return {
@@ -964,6 +1042,25 @@ function projectProgram(ast, plan, filename, lexical) {
 			body: [
 				...importNodes,
 				...plan.dependencies,
+				...(styleFactory
+					? [
+							inheritHookMemoOrigin(
+								b.imports([['__createBindingStyles', styleFactory]], 'octane/dom-binding-styles'),
+								plan.fn,
+							),
+						]
+					: []),
+				...(controlFactory
+					? [
+							inheritHookMemoOrigin(
+								b.imports(
+									[['__createBindingControls', controlFactory]],
+									'octane/dom-binding-controls',
+								),
+								plan.fn,
+							),
+						]
+					: []),
 				...(signalFactory
 					? [
 							inheritHookMemoOrigin(
@@ -1004,6 +1101,8 @@ function projectProgram(ast, plan, filename, lexical) {
 							b.prop('init', b.id('mount'), b.id(mount)),
 							...(scalar ? [b.prop('init', b.id('scalar'), scalar)] : []),
 							...(adoptScalar ? [b.prop('init', b.id('adoptScalar'), b.id(adoptScalar))] : []),
+							...capability('connectStyle', styleFactory),
+							...capability('createControls', controlFactory),
 							...(signalFactory
 								? [b.prop('init', b.id('connectSignal'), b.id(signalFactory))]
 								: []),
@@ -1025,6 +1124,26 @@ function projectProgram(ast, plan, filename, lexical) {
 	);
 	let classFactory = null;
 	let signalFactory = null;
+	let styleFactory = null;
+	let controlFactory = null;
+	if (plan.styleIndices.length > 0) {
+		styleFactory = lexical.domBindingAllocateName('_bindingStyles');
+		importNodes.push(
+			inheritHookMemoOrigin(
+				b.imports([['__createBindingStyles', styleFactory]], 'octane/dom-binding-styles'),
+				plan.fn,
+			),
+		);
+	}
+	if (plan.bindings.some((binding) => binding[1] === 'control')) {
+		controlFactory = lexical.domBindingAllocateName('_bindingControls');
+		importNodes.push(
+			inheritHookMemoOrigin(
+				b.imports([['__createBindingControls', controlFactory]], 'octane/dom-binding-controls'),
+				plan.fn,
+			),
+		);
+	}
 	if (plan.signalIndices.length > 0) {
 		signalFactory = lexical.domBindingAllocateName('_bindingSignals');
 		importNodes.push(
@@ -1056,6 +1175,8 @@ function projectProgram(ast, plan, filename, lexical) {
 							project,
 							classFactory ? b.id(classFactory) : null,
 							signalFactory ? b.id(signalFactory) : null,
+							styleFactory ? b.id(styleFactory) : null,
+							controlFactory ? b.id(controlFactory) : null,
 						),
 					),
 				),

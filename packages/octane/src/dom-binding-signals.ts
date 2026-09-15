@@ -11,6 +11,8 @@ export interface BindingSignalConnection {
 	read(value: unknown): unknown;
 	/** Read only the already connected channel; never reevaluate the authored projection. */
 	get(): unknown;
+	/** Optional whole-style writer, present only on the selected style capability. */
+	write?(value: unknown): void;
 	dispose(): void;
 }
 

@@ -191,6 +191,8 @@ export function analyzeNativeReadDiagnostics(ast, source, filename, options = {}
 		}
 	}
 	function importedValue(module, name) {
+		if (module === 'octane/behavior' && (name === 'adoptBindings' || name === 'mountBindings'))
+			return { kind: 'builtin', name, bindingSource: true };
 		if (module === SIGNALS_MODULE && name === 'createScope')
 			return { kind: 'builtin', name: 'createScope' };
 		if (SIGNAL_MODULES.has(module) && SIGNAL_FACTORIES.has(name))
@@ -473,6 +475,16 @@ export function analyzeNativeReadDiagnostics(ast, source, filename, options = {}
 			}
 		}
 	} while (changed);
+	// BindingSource uses a fixed protocol key even when its snapshot carries
+	// native handles. Exempt only callbacks reached through the source argument
+	// of a directly imported bindings API, never arbitrary getSnapshot methods.
+	const bindingSnapshots = new WeakSet();
+	for (const node of nodes) {
+		if (node.type !== 'CallExpression' && node.type !== 'OptionalCallExpression') continue;
+		if (recordFor(unwrap(node.callee))?.forced?.bindingSource !== true) continue;
+		const snapshot = memberValue(valueOf(node.arguments[2]), 'getSnapshot');
+		if (snapshot.kind === 'function') bindingSnapshots.add(snapshot.fn);
+	}
 	function containsHandle(value, active = new Set()) {
 		if (value.kind === 'handle') return true;
 		if (value.kind !== 'object' || active.has(value)) return false;
@@ -572,7 +584,10 @@ export function analyzeNativeReadDiagnostics(ast, source, filename, options = {}
 			);
 		} else if (node.type === 'Property' && parents.get(node)?.type === 'ObjectExpression') {
 			const value = valueOf(node.value);
-			if (!isDomStyleProperty(node) && createsCapability(node.value, value))
+			const bindingSnapshot =
+				propertyName(node.key, node.computed) === 'getSnapshot' &&
+				bindingSnapshots.has(unwrap(node.value));
+			if (!isDomStyleProperty(node) && !bindingSnapshot && createsCapability(node.value, value))
 				checkName(node.key, propertyName(node.key, node.computed), value);
 		} else if (node.type === 'AssignmentExpression' && node.operator === '=') {
 			const left = unwrap(node.left);

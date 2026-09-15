@@ -42,6 +42,7 @@ type ServerErrorArguments = {
 	69: [];
 	70: [];
 	71: [];
+	73: [];
 };
 
 export function formatServerError<Code extends keyof ServerErrorArguments>(
@@ -191,6 +192,8 @@ export function formatServerError<Code extends keyof ServerErrorArguments>(
 				);
 			case 71:
 				return formatDevErrorMessage('Unsupported Octane server signal binding ABI.', args);
+			case 73:
+				return formatDevErrorMessage('Octane DOM bindings require unique list keys.', args);
 			default:
 				return formatUnknownDevErrorMessage(code);
 		}

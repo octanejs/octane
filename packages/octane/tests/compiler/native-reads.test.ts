@@ -119,6 +119,88 @@ const result = resource(owner, 'result', describe);`,
 				),
 			).toThrow(NAMING);
 		}
+		const bindingModule = `${PREFIX}
+import { adoptBindings as adopt, mountBindings as mount } from 'octane/behavior';
+import { View } from './view.tsrx';
+let props = { count: count$ };
+`;
+		for (const dev of [false, true]) {
+			for (const setup of [
+				`export function activate(root) {
+  return adopt(root, View, { getSnapshot: () => props, subscribe() { return () => {}; } });
+}`,
+				`const source = { getSnapshot() { return props; }, subscribe() { return () => {}; } };
+const alias = { ...source };
+export function activate(root) { return mount({ parent: root }, View, alias); }`,
+			]) {
+				for (const extension of ['ts', 'tsrx']) {
+					const output = compiler.transform(
+						bindingModule + setup,
+						'/project/src/controls.' + extension,
+						{ dev, hmr: false },
+					);
+					expect(output?.code).toContain('getSnapshot');
+					if (extension === 'tsrx') {
+						expect(output?.code).toContain('?octane-bindings=View');
+						expect(output?.code).not.toContain('enableNativeReadCollection');
+						expect(output?.code).not.toContain('octane/internal/client');
+					}
+				}
+			}
+			const activation = `export function activate(root) {
+  return adopt(root, View, { getSnapshot: () => props, subscribe() { return () => {}; } });
+}`;
+			for (const reader of [
+				`export function Reader({ value = count$.get() } = {}) @{ <p>{value as string}</p> }`,
+				`function Reader({ value = count$.get() } = {}) {
+  return createElement('p', null, String(value));
+}`,
+			]) {
+				const output = compiler.transform(
+					`${bindingModule}
+import { createElement, createRoot } from 'octane';
+${reader}
+const root = createRoot(document.createElement('div'));
+root.render(Reader, {});
+${activation}`,
+					'/project/src/mixed-controls.tsrx',
+					{ dev, hmr: false },
+				)!;
+				const beforeParameters = output.code.indexOf('_$enableNativeReadCollection(1);');
+				expect(beforeParameters).toBeGreaterThan(-1);
+				expect(beforeParameters).toBeLessThan(output.code.indexOf('root.render('));
+			}
+			const component = compiler.transform(
+				`${bindingModule}${activation}
+export function Reader({ value = count$.get() } = {}) @{ <p>{value as string}</p> }`,
+				'/project/src/component-controls.tsrx',
+				{ dev, hmr: false },
+			)!;
+			expect(component.code).toContain('_$enableNativeReadCollection(1);');
+			// Only the proven BindingSource protocol property receives the exemption.
+			for (const setup of [
+				`const unrelated = { getSnapshot: () => props };`,
+				`export function activate(adopt, root) {
+  return adopt(root, View, { getSnapshot: () => props, subscribe() { return () => {}; } });
+}`,
+				`export function activate(root) {
+  return adopt(root, { getSnapshot: () => props }, {});
+}`,
+				`export function activate(root) {
+  return adopt(root, View, { getSnapshot: () => props, peek: () => props, subscribe() { return () => {}; } });
+}`,
+				`const getSnapshot = () => props;
+export function activate(root) {
+  return adopt(root, View, { getSnapshot, subscribe() { return () => {}; } });
+}`,
+			])
+				expect(() =>
+					compiler.transform(bindingModule + setup, '/project/src/controls.ts', {
+						dev,
+						hmr: false,
+					}),
+				).toThrow(NAMING);
+		}
 	});
 
 	it('checks runtime capabilities alongside inline type imports', () => {

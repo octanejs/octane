@@ -27,6 +27,8 @@ export function DirectSignalProps() {
 			<div style={{ color: label, width, opacity: width }} />
 			<div style={{ '--progress': width }} />
 			<svg style={wholeStyle} />
+			<svg style={wholeStyle.get()} />
+			<div style={null} />
 			<svg>
 				<circle cx={width} />
 			</svg>

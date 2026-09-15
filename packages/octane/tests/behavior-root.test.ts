@@ -8,6 +8,9 @@ import * as DomBindings from '../src/dom-bindings.js';
 import * as DomBindingPrograms from '../src/dom-binding-program.js';
 import * as DomBindingClasses from '../src/dom-binding-classes.js';
 import * as DomBindingSignals from '../src/dom-binding-signals.js';
+import * as DomBindingControls from '../src/dom-binding-controls.js';
+import * as DomBindingStyles from '../src/dom-binding-styles.js';
+import { setStyle } from '../src/runtime.js';
 import {
 	createScope,
 	__signalAt,
@@ -18,6 +21,7 @@ import {
 } from '../src/signals/index.js';
 import type {
 	AttachmentPresentationProps,
+	ControlPresentationProps,
 	SafetyPresentationProps,
 } from './_fixtures/dom-presentation.tsrx';
 import * as staticClient from './hydration/_fixtures/deferred-hydration-static.tsrx';
@@ -29,7 +33,13 @@ const presentationSource = readFileSync(
 	'utf8',
 );
 
-function authoredPresentation<Props extends object>(view: string, initial: Props, dev = false) {
+function authoredPresentation<Props extends object>(
+	view: string,
+	initial: Props,
+	dev = false,
+	source = presentationSource,
+	modules: Readonly<Record<string, Record<string, unknown>>> = {},
+) {
 	const id = '/src/dom-presentation.tsrx';
 	const options = {
 		compileOptions: { dev, hmr: false },
@@ -39,11 +49,14 @@ function authoredPresentation<Props extends object>(view: string, initial: Props
 			'octane/dom-binding-program': DomBindingPrograms,
 			'octane/dom-binding-classes': DomBindingClasses,
 			'octane/dom-binding-signals': DomBindingSignals,
+			'octane/dom-binding-controls': DomBindingControls,
+			'octane/dom-binding-styles': DomBindingStyles,
+			...modules,
 		},
 	};
-	const server = loadCompiledFixtureSource(presentationSource, { ...options, id, mode: 'server' });
+	const server = loadCompiledFixtureSource(source, { ...options, id, mode: 'server' });
 	const artifact = (mount: boolean) =>
-		loadCompiledFixtureSource(presentationSource, {
+		loadCompiledFixtureSource(source, {
 			...options,
 			id: id + '?octane-bindings=' + view + (mount ? '&octane-mount=1' : ''),
 			mode: 'client',
@@ -2927,6 +2940,401 @@ describe('behavior-only roots', () => {
 				rowsOwner.dispose();
 				foreignOwner.dispose();
 			}
+			const controlScope = createScope({ scopeKey: `authored-controls-${dev}` });
+			const draft = controlScope.signal$('draft', 'server');
+			const checked = controlScope.signal$('checked', false);
+			const nextDraft = controlScope.signal$('replacement', 'replacement');
+			const controls = authoredPresentation<ControlPresentationProps>(
+				'ControlPresentation',
+				{ draft, checked, title: 'initial' },
+				dev,
+			);
+			const controlHost = document.createElement('div');
+			container.append(controlHost);
+			controlHost.innerHTML = controls.html;
+			const controlRoot = controlHost.querySelector('section')!;
+			const editor = controlRoot.querySelector('input')!;
+			const checkable = controlRoot.querySelector<HTMLInputElement>('[type="checkbox"]')!;
+			// Capture is initialized independently of this presentation's delayed activation.
+			const capture = await import('../src/hydration/control-capture.js');
+			capture.initializeHydrationControlCapture(document);
+			editor.value = '';
+			editor.dispatchEvent(new InputEvent('input', { bubbles: true }));
+			editor.focus();
+			const controlled = controls.attach(controlRoot, controls.state);
+			try {
+				expect(draft.get()).toBe('');
+				expect(controlRoot.querySelector('input')).toBe(editor);
+				editor.value = 'native edit';
+				editor.setSelectionRange(2, 5);
+				editor.dispatchEvent(new InputEvent('input', { bubbles: true }));
+				expect(draft.get()).toBe('native edit');
+				controls.publish({ title: 'unchanged handle' });
+				expect(document.activeElement).toBe(editor);
+				expect([editor.selectionStart, editor.selectionEnd]).toEqual([2, 5]);
+				controls.publish({ draft: nextDraft });
+				expect(editor.value).toBe('replacement');
+				expect(nextDraft.get()).toBe('replacement');
+				draft.set('old owner');
+				expect(editor.value).toBe('replacement');
+				checkable.click();
+				expect(checked.get()).toBe(true);
+				checked.set(false);
+				expect(checkable.checked).toBe(false);
+				const readonly = controlScope.derived$('readonly', () => nextDraft.get().toUpperCase());
+				controls.publish({ draft: readonly });
+				expect(editor.value).toBe('REPLACEMENT');
+				editor.value = 'does not mutate readonly';
+				editor.dispatchEvent(new InputEvent('input', { bubbles: true }));
+				expect(nextDraft.get()).toBe('replacement');
+				nextDraft.set('author update');
+				expect(editor.value).toBe('AUTHOR UPDATE');
+				controlled.dispose();
+				nextDraft.set('disposed');
+				expect(editor.value).toBe('AUTHOR UPDATE');
+				const mounted = controls.mount({ parent: controlHost }, controls.state);
+				expect(controlHost.lastElementChild!.querySelector('input')!.value).toBe('DISPOSED');
+				mounted.dispose({ preserveDOM: false });
+			} finally {
+				controlled.dispose();
+			}
+			const invalidDraft = controlScope.signal$<string | number>('invalid-draft', 1);
+			controls.publish({ draft: invalidDraft as typeof draft, title: 'must not publish' }, false);
+			const beforeInvalidControl = controlRoot.outerHTML;
+			expect(() => controls.attach(controlRoot, controls.state)).toThrow(
+				/value signal must contain a string/,
+			);
+			expect(controlRoot.outerHTML).toBe(beforeInvalidControl);
+			controls.publish({ draft: nextDraft, title: 'abortable' }, false);
+			const controlAbort = new AbortController();
+			const abortableControl = controls.attach(controlRoot, controls.state, {
+				signal: controlAbort.signal,
+			});
+			controlAbort.abort();
+			const afterControlAbort = editor.value;
+			nextDraft.set('after abort');
+			expect(editor.value).toBe(afterControlAbort);
+			abortableControl.dispose();
+			const sampled = authoredPresentation(
+				'SampledControlPresentation',
+				{ draft, checked, plain: 'plain value' },
+				dev,
+			);
+			const sampledHost = document.createElement('div');
+			container.append(sampledHost);
+			sampledHost.innerHTML = sampled.html;
+			const sampledRoot = sampledHost.querySelector('section')!;
+			const sampledInput = sampledRoot.querySelector('input')!;
+			const sampledCheck = sampledRoot.querySelector<HTMLInputElement>('[type="checkbox"]')!;
+			const sampledHandle = sampled.attach(sampledRoot, sampled.state);
+			const initialSample = sampledInput.value;
+			draft.set('not subscribed');
+			checked.set(true);
+			expect(sampledInput.value).toBe(initialSample);
+			expect(sampledCheck.checked).toBe(false);
+			sampledInput.value = 'unpublished native edit';
+			sampledInput.dispatchEvent(new InputEvent('input', { bubbles: true }));
+			expect(draft.get()).toBe('not subscribed');
+			sampled.publish({ plain: 'refreshed plain' });
+			expect(sampledInput.value).toBe('not subscribed');
+			expect(sampledCheck.checked).toBe(true);
+			expect(sampledRoot.querySelector('textarea')!.value).toBe('refreshed plain');
+			sampledHandle.dispose();
+			const firstRadio = controlScope.signal$('radio-first', true);
+			const secondRadio = controlScope.signal$('radio-second', false);
+			const radio = authoredPresentation(
+				'RadioControlPresentation',
+				{ first: firstRadio, second: secondRadio },
+				dev,
+			);
+			host.innerHTML = radio.html;
+			const radioRoot = host.firstElementChild!;
+			const radioHandle = radio.attach(radioRoot, radio.state);
+			// A whole-source observer can reenter after the selected control's own
+			// signal subscription and project the not-yet-published old cousin.
+			const stopRadioObserver = secondRadio.subscribe(() => radio.publish({}));
+			const [secondNative, firstNative] = radioRoot.querySelectorAll('input');
+			secondNative!.click();
+			expect([firstRadio.get(), secondRadio.get()]).toEqual([false, true]);
+			expect([firstNative!.checked, secondNative!.checked]).toEqual([false, true]);
+			stopRadioObserver();
+			radioHandle.dispose();
+
+			const rows = authoredPresentation(
+				'ControlRowsPresentation',
+				{
+					items: [
+						{ id: 'a', draft },
+						{ id: 'b', draft: nextDraft },
+					],
+				},
+				dev,
+			);
+			const rowsHost = document.createElement('div');
+			container.append(rowsHost);
+			const rowsHandle = rows.mount({ parent: rowsHost }, rows.state);
+			const retained = rowsHost.querySelector('input')!;
+			retained.focus();
+			rows.publish({
+				items: [
+					{ id: 'b', draft: nextDraft },
+					{ id: 'a', draft },
+				],
+			});
+			expect(rowsHost.querySelectorAll('input')[1]).toBe(retained);
+			expect(document.activeElement).toBe(retained);
+			rows.publish({ items: [{ id: 'b', draft: nextDraft }] });
+			const retiredValue = retained.value;
+			draft.set('removed row');
+			expect(retained.value).toBe(retiredValue);
+			rowsHandle.dispose();
+			expect(nextDraft.get()).toBe('after abort');
+
+			const selected = controlScope.signal$<readonly string[]>('selected', ['b']);
+			const select = authoredPresentation(
+				'ControlSelectPresentation',
+				{ values: selected, options: ['a'] },
+				dev,
+			);
+			const selectHost = document.createElement('div');
+			container.append(selectHost);
+			const selectHandle = select.mount({ parent: selectHost }, select.state);
+			select.publish({ options: ['a', 'b'] });
+			const selectNode = selectHost.querySelector('select')!;
+			expect([...selectNode.selectedOptions].map((option) => option.value)).toEqual(['b']);
+			selectNode.options[0]!.selected = true;
+			selectNode.dispatchEvent(new Event('input', { bubbles: true }));
+			expect(selected.get()).toEqual(['a', 'b']);
+			selectHandle.dispose();
+
+			const left = controlScope.signal$('left', 4);
+			const map = controlScope.signal$('styles', { left, opacity: 0.5 });
+			const style = authoredPresentation<{ styles: unknown }>(
+				'WholeStylePresentation',
+				{ styles: map },
+				dev,
+			);
+			const styleHost = document.createElement('div');
+			container.append(styleHost);
+			styleHost.innerHTML = style.html;
+			const styled = styleHost.querySelector('section')!;
+			const styleInput = styled.querySelector('input')!;
+			styleInput.value = 'native style edit';
+			const styleHandle = style.attach(styled, style.state);
+			left.set(9);
+			expect(styled.style.left).toBe('9px');
+			expect(styled.querySelector('input')).toBe(styleInput);
+			expect(styleInput.value).toBe('native style edit');
+			style.publish({ styles: { top: left } });
+			expect(styled.style.left).toBe('');
+			expect(styled.style.top).toBe('9px');
+			left.set(12);
+			expect(styled.style.top).toBe('12px');
+			style.publish({ styles: 'color: red' });
+			expect(styled.style.top).toBe('');
+			expect(styled.style.color).toBe('red');
+			styled.style.padding = '7px';
+			style.publish({ styles: { left } });
+			expect(styled.style.padding).toBe('');
+			styled.style.marginLeft = '3px';
+			left.set(13);
+			expect(styled.style.marginLeft).toBe('3px');
+			style.publish({ styles: null });
+			expect(styled.style.left).toBe('');
+			expect(styled.style.marginLeft).toBe('3px');
+			styleHandle.dispose();
+			const spread = authoredPresentation(
+				'SpreadStylePresentation',
+				{ base: { opacity: 0.5 }, left, extra: { top: 3 } },
+				dev,
+			);
+			styleHost.innerHTML = spread.html;
+			const spreadNode = styleHost.querySelector('section')!;
+			const spreadHandle = spread.attach(spreadNode, spread.state);
+			left.set(15);
+			expect(spreadNode.style.left).toBe('15px');
+			expect(spreadNode.style.top).toBe('3px');
+			spreadHandle.dispose();
+			const aliases = { marginLeft: '2px', margin: '1px', 'margin-left': '3px' };
+			const canonicalStyle = document.createElement('section');
+			const margins = (element: HTMLElement) => [
+				element.style.marginTop,
+				element.style.marginRight,
+				element.style.marginBottom,
+				element.style.marginLeft,
+			];
+			setStyle(canonicalStyle, aliases, null);
+			expect(canonicalStyle.style.marginLeft).toBe('3px');
+			for (const view of ['WholeStylePresentation', 'SpreadStylePresentation']) {
+				for (const mount of [false, true]) {
+					const aliasFixture = authoredPresentation<Record<string, unknown>>(
+						view,
+						view === 'WholeStylePresentation'
+							? { styles: aliases }
+							: {
+									base: { marginLeft: '2px' },
+									left,
+									extra: { margin: '1px', 'margin-left': '3px' },
+								},
+						dev,
+					);
+					const aliasHost = document.createElement('div');
+					container.append(aliasHost);
+					if (!mount) aliasHost.innerHTML = aliasFixture.html;
+					const serverNode = aliasHost.querySelector('section');
+					// Preserve actual SSR declaration order; jsdom's CSS text parser
+					// collapses repeated longhands around a shorthand differently from
+					// native setProperty, so compare the projected state below.
+					if (serverNode)
+						expect(serverNode.getAttribute('style')).toMatch(
+							/margin-left:2px;.*margin:1px;margin-left:3px;/,
+						);
+					const aliasHandle = mount
+						? aliasFixture.mount({ parent: aliasHost }, aliasFixture.state)
+						: aliasFixture.attach(serverNode!, aliasFixture.state);
+					const aliasNode = aliasHost.querySelector('section')!;
+					expect(margins(aliasNode)).toEqual(margins(canonicalStyle));
+					if (serverNode) expect(aliasNode).toBe(serverNode);
+					if (view === 'WholeStylePresentation') {
+						aliasFixture.publish({ styles: 'margin: 9px' });
+						expect(aliasNode.style.marginLeft).toBe('9px');
+						aliasFixture.publish({ styles: aliases });
+						expect(margins(aliasNode)).toEqual(margins(canonicalStyle));
+					}
+					aliasHandle.dispose();
+					aliasNode.style.cssText = 'margin: 7px !important';
+					const restored = aliasFixture.attach(aliasNode, aliasFixture.state, {
+						restoreStyles: true,
+					});
+					expect(margins(aliasNode)).toEqual(margins(canonicalStyle));
+					aliasNode.style.color = 'red';
+					restored.dispose();
+					expect(margins(aliasNode)).toEqual(['7px', '7px', '7px', '7px']);
+					expect(aliasNode.style.getPropertyPriority('margin')).toBe('important');
+					expect(aliasNode.style.color).toBe('red');
+					const throwingRestore = aliasFixture.attach(aliasNode, aliasFixture.state, {
+						restoreStyles: true,
+					});
+					const restoreFailure = new Error('first style restoration failed');
+					const setProperty = aliasNode.style.setProperty.bind(aliasNode.style);
+					const failFirstRestore = vi
+						.spyOn(aliasNode.style, 'setProperty')
+						.mockImplementation((name, value, priority) => {
+							if (name === 'margin-left') throw restoreFailure;
+							setProperty(name, value, priority);
+						});
+					try {
+						expect(() => throwingRestore.dispose()).toThrow(restoreFailure);
+						expect(aliasNode.style.marginTop).toBe('7px');
+						expect(aliasNode.style.color).toBe('red');
+					} finally {
+						failFirstRestore.mockRestore();
+					}
+				}
+			}
+			styled.style.cssText = 'left: 5px !important; opacity: 0.8';
+			style.publish({ styles: { left, opacity: 0.4 } }, false);
+			const restoringStyle = style.attach(styled, style.state, { restoreStyles: true });
+			expect(styled.style.left).toBe('15px');
+			styled.style.opacity = '0.9';
+			restoringStyle.dispose();
+			expect(styled.style.left).toBe('5px');
+			expect(styled.style.getPropertyPriority('left')).toBe('important');
+			expect(styled.style.opacity).toBe('0.9');
+			const failedStyle = controlScope.signal$<unknown>('failed-style', { left: 17 });
+			style.publish({ styles: failedStyle }, false);
+			const failingStyle = style.attach(styled, style.state);
+			const beforeStyle = styled.getAttribute('style');
+			expect(() =>
+				failedStyle.set({
+					get left() {
+						throw new Error('style read failed');
+					},
+				}),
+			).toThrow('style read failed');
+			expect(styled.getAttribute('style')).toBe(beforeStyle);
+			failedStyle.set({ left: 99 });
+			expect(styled.getAttribute('style')).toBe(beforeStyle);
+			failingStyle.dispose();
+
+			const string = authoredPresentation(
+				'StringProjectionPresentation',
+				{ account: { name: '  alice  ' }, identifier: 'bob' },
+				dev,
+			);
+			styleHost.innerHTML = string.html;
+			const initial = styleHost.querySelector('span')!;
+			expect(initial.title).toBe('A');
+			const stringHandle = string.attach(initial, string.state);
+			string.publish({ account: { name: '   ' } });
+			expect(initial.title).toBe('B');
+			stringHandle.dispose();
+			const childSource = readFileSync(
+				'packages/octane/tests/_fixtures/dom-presentation-child.tsrx',
+				'utf8',
+			);
+			const childOptions = {
+				compileOptions: { dev, hmr: false },
+				runtimeModules: {
+					'octane/dom-bindings': DomBindings,
+					'octane/dom-binding-program': DomBindingPrograms,
+					'octane/dom-binding-controls': DomBindingControls,
+					'octane/dom-binding-styles': DomBindingStyles,
+					'octane/dom-binding-signals': DomBindingSignals,
+				},
+			};
+			const childServer = loadCompiledFixtureSource(childSource, {
+				...childOptions,
+				id: '/src/dom-presentation-child.tsrx',
+				mode: 'server',
+			});
+			const childProgram = loadCompiledFixtureSource(childSource, {
+				...childOptions,
+				id: '/src/dom-presentation-child.tsrx?octane-bindings=ControlStyleChild&octane-mount=1',
+				mode: 'client',
+			});
+			const imported = authoredPresentation(
+				'ImportedControlStylePresentation',
+				{ draft, styles: { left } },
+				dev,
+				readFileSync('packages/octane/tests/_fixtures/dom-presentation-imported.tsrx', 'utf8'),
+				{
+					'./dom-presentation-child.tsrx': childServer,
+					'./dom-presentation-child.tsrx?octane-bindings=ControlStyleChild&octane-mount=1':
+						childProgram,
+				},
+			);
+			styleHost.innerHTML = imported.html;
+			const importedRoot = styleHost.querySelector('section')!;
+			const importedInput = importedRoot.querySelector('input')!;
+			const importedHandle = imported.attach(importedRoot, imported.state);
+			draft.set('imported control');
+			left.set(19);
+			expect(importedInput.value).toBe('imported control');
+			expect(importedInput.style.left).toBe('19px');
+			expect(importedRoot.querySelector('input')).toBe(importedInput);
+			importedHandle.dispose();
+			expect(() =>
+				loadCompiledFixtureSource(
+					`export function Invalid(props) @{ 'use dom bindings'; <span title={(props.account.save() || props.identifier).slice(0, 1).toUpperCase() as string} /> }`,
+					{
+						id: '/src/invalid-string-chain.tsrx?octane-bindings=Invalid',
+						mode: 'client',
+						compileOptions: { dev, hmr: false },
+					},
+				),
+			).toThrow(/calls in bindings must be imported pure projections/);
+			expect(() =>
+				loadCompiledFixtureSource(
+					`export function Invalid(props) @{ 'use dom bindings'; <input type={props.type} checked={props.checked} /> }`,
+					{
+						id: '/src/invalid-checked-host.tsrx?octane-bindings=Invalid',
+						mode: 'client',
+						compileOptions: { dev, hmr: false },
+					},
+				),
+			).toThrow(/"type" must be static or explicitly unbound/);
+			controlScope.dispose();
 		}
 	});
 

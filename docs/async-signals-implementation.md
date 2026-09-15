@@ -4,9 +4,9 @@ This guide explains how the [accepted RFC](./async-signals-streaming-ssr.md)
 maps to Octane's implementation. It separates supported behavior, implementation
 choices, measured results, and unfinished acceptance work.
 
-The runtime checkpoint is `61e51dd8b` in
+The last published validation checkpoint documented here is `ac8f008e9` in
 [PR #1069](https://github.com/octanejs/octane/pull/1069).
-Its [26-job CI run](https://github.com/octanejs/octane/actions/runs/34872980454)
+Its [26-job CI run](https://github.com/octanejs/octane/actions/runs/34922143270)
 and automated review passed. Those results do not establish every browser,
 performance, or deployment requirement in the RFC.
 
@@ -39,7 +39,7 @@ The RFC's `renderDocument`/`hydrateIsland` host sketches are not current exports
 | --- | --- | --- |
 | Native Octane rendering and hydration | The renderer owns its component ranges | Direct signal bindings, historical-state adoption, keyed updates, independent widget activation |
 | Server-owned HTML with signal results | The host owns structure and replacement | `bootstrapStreamedSignalResults`, document signals, early edits, result adoption, optional native-control adapters |
-| Fixed-tree authored bindings | The host owns structure and events; the adopter owns declared properties | `adoptBindings`, compiler-generated property updates, synchronous refresh, cleanup |
+| Renderer-free authored presentation | The host owns the enclosing range; compiled bindings own declared presentation and controls | `adoptBindings`, `mountBindings`, keyed structure, property updates, synchronous refresh, cleanup |
 
 For hosts that also delegate streamed HTML placement to Octane,
 `bootstrapStreamedSignalHydration` adds `receiver.registerRegion`.
@@ -52,13 +52,18 @@ a renderer. Live reads, subscriptions, derivations, and async computations need
 the renderer-free signal engine. A host that needs those behaviors before
 interaction must deliver that engine and its handlers early.
 
-**Fixed-tree adoption is not structural rendering.** The current
-`'use dom bindings'` view supports a compiler-proven, element-only native tree
-and declared attributes/classes/style properties. It does not support text
-children (even static text), lists, child components, or direct `value`/`checked`
-bindings. Use `bindSignalControl` for renderer-free controls. Use the native renderer for
-component reconciliation, or keep streamed HTML placement with the host or
-registered-region receiver. Receiving streamed data alone does not update a list.
+**Authored presentation is not unrestricted component execution.** The current
+`'use dom bindings'` view supports compiler-proven text, conditionals, keyed lists,
+pure child views, slots, native controls, and attributes/classes/styles. Unsupported
+effects, ownership, and arbitrary calls fail extraction. Whole/spread styles use
+the canonical native style reader through an optional capability; fixed properties
+keep their scalar fast path. Writable `value`/`checked` handles select the canonical
+control adapter; read-only handles and sampled `.get()` values never write back.
+Owned `checked` requires a fixed checkbox/radio type. Native input synchronizes
+bound radio-group members, not entirely unbound targets or programmatic sibling
+writes. The explicit `bindSignalControl` API remains available for host-owned DOM.
+Streamed data updates a list only through an authored binding or an explicit host
+placement policy; receiving data alone does not mutate structure.
 
 ## Core implementation map
 
@@ -204,7 +209,30 @@ all Safari loading problems. See the [Safari investigation](./safari-esm-investi
 
 ## Validation and remaining limits
 
-The September 15 core-feedback follow-up adds controlled regressions for event-time command snapshots, reverse-order authoritative receipts, and safe GET/POST entry. The previous implementations reproduced missing payloads, revision rollback, and GET-triggered mutation respectively. The fixes pass 238 existing signal test cases, 52 behavior/bundle cases in each of development and production, six existing browser lifecycle cases, and four existing production integration scenarios. Production-built Chromium 149 and Playwright WebKit 26.5 both preserve A/B submissions and Save-then-clear through delayed real signal binding; 21 additional measured WebKit streaming scenarios plus warmups pass. These lanes overlap and are not summed into a unique-test count. Scoped source/public types, formatting, repository sync, and existing shell-fragmentation/bundle-boundary checks also pass. The root local Vitest configuration remains blocked by missing unrelated dependencies; these are scoped genuine-toolchain runs, not a full-workspace local pass. Installed Chrome automation was blocked by managed DevTools policy; Playwright engine results do not establish installed Safari/iOS qualification.
+### Renderer-free controls and styles follow-up
+
+The candidate now builds with the normally installed, frozen dependency lockfile: TSRX core/runtime 0.2.0 and OXC 0.13.0, without a dependency override. Compiler-selected controls and whole/spread styles use the same native adapters as their explicit APIs. A binding-only activation no longer imports the renderer's collection driver. The exact chained-string extraction example is exercised alongside rejection cases for opaque or mutating calls.
+
+All five signal test modes pass 635 cases. Renderer-free behavior passes 49 cases in each of development and production; public control handoff passes six; native-read compiler/collection/plain-module coverage passes 75 in each mode. Public types, selected runtime types, distribution build/import checks, and 26 streaming-workload/bundle-boundary/fragmentation cases pass. These overlapping lanes are not added together. Full-core validation and current-head CI are separate gates.
+
+Production-compiled controls pass in Chromium and Playwright WebKit 26.5 using actual server control receipts and the inline bootstrap. Early typing, original node identity, focus and selection survive adoption; writable and sampled controls, nested styles, and the chained-string example behave as declared. Composition events exercise the guard but do not establish operating-system IME behavior. The matched rich streaming workload passes six measured WebKit cases plus two warmups per mode, including A → B → A navigation and retained map selection. The authored mode imports no renderer.
+
+Matched minified esbuild closures against parent `083d0c179` isolate the optional capabilities:
+
+| Entry | Parent gzip bytes | Candidate gzip bytes | Increment |
+| --- | ---: | ---: | ---: |
+| Scalar authored bindings | 3,363 | 3,653 | 290 |
+| Structural authored bindings | 7,942 | 8,286 | 344 |
+| Scalar bindings with whole styles | — | 5,253 | 1,600 beyond candidate scalar |
+| Scalar bindings with controls | — | 6,388 | 2,735 beyond candidate scalar |
+
+The scalar and structural entries exclude both optional leaves. These closure sizes are not an application's home-route increment. In the matched rich Vite fixture, the renderer-free entry is 34,940 gzip bytes versus 96,197 for the renderer-backed entry; both share an 811 raw / 457 gzip byte inline capture script and a 92 gzip byte lazy interaction chunk. The fixture includes its signal/query engine, transport, authored view, and benchmark driver; it is not an isolated binding-runtime measurement or proof of the application startup budget.
+
+The native-presentation benchmark uses the actual StyleX compiler and canonical native reader. For 5,000 progress updates, targeted subscriptions remove 5,000 whole-source snapshots, 25,000 projected reads, and 5,000 StyleX merges while retaining the same terminal DOM. Seven-sample median synchronous update time was 12.72 ms versus 23.71 ms for whole-source projection; unrelated updates were 4.78 ms versus 14.30 ms. These happy-dom measurements establish work avoided, not browser paint, input latency, or production speedup. An actual style variant change still performs its required merge.
+
+### Earlier core-feedback checkpoint
+
+The September 15 core-feedback follow-up added controlled regressions for event-time command snapshots, reverse-order authoritative receipts, and safe GET/POST entry. The previous implementations reproduced missing payloads, revision rollback, and GET-triggered mutation respectively. The fixes passed 238 existing signal test cases, 52 behavior/bundle cases in each of development and production, six existing browser lifecycle cases, and four existing production integration scenarios. Production-built Chromium 149 and Playwright WebKit 26.5 both preserved A/B submissions and Save-then-clear through delayed real signal binding; 21 additional measured WebKit streaming scenarios plus warmups passed. These lanes overlap and are not summed into a unique-test count. Scoped source/public types, formatting, repository sync, and existing shell-fragmentation/bundle-boundary checks also passed. At that checkpoint, missing unrelated dependencies prevented the root local Vitest run; that installation blocker has since cleared. Installed Chrome automation was blocked by managed DevTools policy; Playwright engine results do not establish installed Safari/iOS qualification.
 
 Matched production full-query and receipt streaming fixtures retain byte-identical inline, client, and server output relative to `aff08430c`; neither imports these optional action/behavior APIs. Separate minified esbuild API closures measure the changed code: behavior capture adds 403 raw / 125 gzip / 101 Brotli bytes; action authority ordering adds 857 / 211 / 181 bytes; the combined closure adds 1,263 / 331 / 308 bytes. Both variants retain the same renderer-free module boundary. The default inline capture remains 811 raw / 457 gzip / 367 Brotli bytes including its script tag. These are incremental bundle measurements, not a latency improvement or application startup-budget qualification.
 
@@ -230,10 +258,13 @@ They are not final-head iOS or physical-device proof. Native IME, persisted
 BFCache, interrupted-network recovery, mobile first-click latency, feature-off
 shared support cost, and broad application performance remain open.
 
-The fixed-tree adopter does not yet provide renderer-free dynamic lists or
-component rendering. The maintained behavior-only workload deliberately retains
-historical server-owned lists while checking live streamed data. Do not use its
-pass as evidence of structural list updates.
+The rich authored workload now exercises live paragraphs, keyed lists, links,
+title/progress revisions, placeholder-to-map activation, and A-to-B-to-A
+navigation without a renderer import. It has a matched renderer-backed mode;
+both preserve survivor identity and retained per-conversation intent. These are
+local compiled fixtures, not production authentication, real map-SDK, native IME,
+or application startup-budget qualification. The earlier data-only workload still
+does not establish structural list updates.
 
 The following checklist retains the RFC requirement IDs. Checked items record
 implemented behavior and its scoped evidence; unchecked items identify remaining

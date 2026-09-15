@@ -2179,6 +2179,16 @@
       "message": "Unsupported Octane server signal binding ABI.",
       "runtime": ["server"],
       "status": "active"
+    },
+    "72": {
+      "message": "Octane DOM binding text range does not match its template.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "73": {
+      "message": "Octane DOM bindings require unique list keys.",
+      "runtime": ["server"],
+      "status": "active"
     }
   }
 }

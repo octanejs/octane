@@ -2499,7 +2499,7 @@ export function ssrBindingBlock(content: string, marker: string): string {
 /** @internal Authenticate keyed item identity before emitting any item HTML. */
 export function ssrBindingKey(key: unknown, seen: Set<string>): string {
 	const encoded = encodeBindingKey(key as BindingKey);
-	if (seen.has(encoded)) throw new TypeError('Octane DOM bindings require unique list keys.');
+	if (seen.has(encoded)) throw new TypeError(formatServerError(73));
 	seen.add(encoded);
 	return encoded;
 }

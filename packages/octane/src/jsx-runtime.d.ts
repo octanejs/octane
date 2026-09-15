@@ -165,7 +165,7 @@ type Transformed<P, T> = Omit<P, ReactSyntheticProps | 'className' | 'style' | '
 		children?: unknown;
 	};
 
-type BoundStyle<S> = S | SignalCSSProperties | SignalHandle<S | SignalCSSProperties | null>;
+type BoundStyle<S> = S | SignalCSSProperties | null | SignalHandle<S | SignalCSSProperties | null>;
 
 /**
  * Only a host JSX site installs direct bindings. Keep reusable attribute and

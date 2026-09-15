@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "nextCode": 72,
+  "nextCode": 74,
   "codes": {
     "1": {
       "message": "Maximum update depth exceeded. Octane limits the number of nested updates to prevent infinite loops.",
@@ -424,6 +424,18 @@
     },
     "71": {
       "message": "Unsupported Octane server signal binding ABI.",
+      "argumentCount": 0,
+      "runtime": ["server"],
+      "status": "active"
+    },
+    "72": {
+      "message": "Octane DOM binding text range does not match its template.",
+      "argumentCount": 0,
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "73": {
+      "message": "Octane DOM bindings require unique list keys.",
       "argumentCount": 0,
       "runtime": ["server"],
       "status": "active"

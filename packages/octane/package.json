@@ -47,6 +47,8 @@
     "./dom-binding-program": "./src/dom-binding-program.ts",
     "./dom-binding-classes": "./src/dom-binding-classes.ts",
     "./dom-binding-signals": "./src/dom-binding-signals.ts",
+    "./dom-binding-controls": "./src/dom-binding-controls.ts",
+    "./dom-binding-styles": "./src/dom-binding-styles.ts",
     "./react/server": "./src/react/server.ts",
     "./server": "./src/server/index.ts",
     "./signals": "./src/signals/index.ts",
@@ -142,6 +144,14 @@
       "./dom-binding-signals": {
         "types": "./dist/dom-binding-signals.d.ts",
         "default": "./dist/dom-binding-signals.js"
+      },
+      "./dom-binding-controls": {
+        "types": "./dist/dom-binding-controls.d.ts",
+        "default": "./dist/dom-binding-controls.js"
+      },
+      "./dom-binding-styles": {
+        "types": "./dist/dom-binding-styles.d.ts",
+        "default": "./dist/dom-binding-styles.js"
       },
       "./react/server": {
         "types": "./dist/react/server.d.ts",

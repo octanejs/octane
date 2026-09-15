@@ -1,5 +1,6 @@
 import { unbound } from 'octane/behavior';
 import type { SignalHandle } from 'octane/signals';
+import type { SignalCSSProperties } from 'octane/jsx-runtime';
 
 interface SubmitProps {
 	label: string;
@@ -153,4 +154,94 @@ export function SignalTextPresentation(props: {
 }) @{
 	'use dom bindings';
 	<p>{props.value}</p>
+}
+
+export interface ControlPresentationProps {
+	draft: SignalHandle<string>;
+	checked: SignalHandle<boolean>;
+	title: string;
+}
+
+export function ControlPresentation(props: ControlPresentationProps) @{
+	'use dom bindings';
+	<section title={props.title}>
+		<input type="text" value={props.draft} />
+		<input type="checkbox" checked={props.checked} />
+	</section>
+}
+
+export function SampledControlPresentation(props: {
+	draft: SignalHandle<string>;
+	checked: SignalHandle<boolean>;
+	plain: string;
+}) @{
+	'use dom bindings';
+	<section>
+		<input value={props.draft.get()} />
+		<input type="checkbox" checked={props.checked.get()} />
+		<textarea value={props.plain} />
+	</section>
+}
+
+export function RadioControlPresentation(props: {
+	first: SignalHandle<boolean>;
+	second: SignalHandle<boolean>;
+}) @{
+	'use dom bindings';
+	<section>
+		<input type="radio" name="reentrant-choice" checked={props.second} />
+		<input type="radio" name="reentrant-choice" checked={props.first} />
+	</section>
+}
+
+export function ControlRowsPresentation(props: {
+	items: readonly { id: string; draft: SignalHandle<string> }[];
+}) @{
+	'use dom bindings';
+	<>
+		@for (const item of props.items; key item.id) {
+			<label data-control={item.id}>
+				<input value={item.draft} />
+				<span>{item.id as string}</span>
+			</label>
+		}
+	</>
+}
+
+export function ControlSelectPresentation(props: {
+	values: SignalHandle<readonly string[]>;
+	options: readonly string[];
+}) @{
+	'use dom bindings';
+	<select multiple value={props.values}>
+		@for (const option of props.options; key option) {
+			<option value={unbound(option)}>{option as string}</option>
+		}
+	</select>
+}
+
+export function WholeStylePresentation(props: {
+	styles: SignalCSSProperties | string | SignalHandle<SignalCSSProperties | string | null> | null;
+}) @{
+	'use dom bindings';
+	<section style={props.styles}>
+		<input defaultValue={unbound('native')} />
+	</section>
+}
+
+export function SpreadStylePresentation(props: {
+	base: SignalCSSProperties;
+	left: SignalHandle<number>;
+	extra: SignalCSSProperties;
+}) @{
+	'use dom bindings';
+	<section style={{ ...props.base, left: props.left, ...props.extra }} />
+}
+
+export function StringProjectionPresentation(props: {
+	account: { name: string } | null;
+	identifier: string;
+}) @{
+	'use dom bindings';
+	<span title={(props.account?.name.trim() || props.identifier).slice(0, 1).toUpperCase()} />
 }

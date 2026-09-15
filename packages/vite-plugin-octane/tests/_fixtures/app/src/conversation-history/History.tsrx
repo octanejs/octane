@@ -1,3 +1,4 @@
+import 'octane/signals';
 import { history$ } from './State.tsrx';
 
 export function History() @{

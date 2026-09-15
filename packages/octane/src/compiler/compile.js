@@ -23223,8 +23223,24 @@ function stripTsOnlyWrappers(node) {
 function nativeReadActivationNodes(ctx, origin) {
 	// Install the graph-free driver before any authored root invocation, not
 	// after parameter evaluation inside a syntactically recognized component.
-	// Plain data modules do not pass through this renderer compilation path.
-	if (!ctx.nativeReads) return [];
+	// Binding-only activation modules use their selected native adapters, not
+	// this renderer driver. Retain the plain-module renderer-import policy for
+	// hand-authored createElement/root calls without generated runtime helpers.
+	if (
+		!ctx.nativeReads ||
+		(ctx.runtimeNeeded.size === 0 &&
+			!ctx.activityModuleAst.body.some(
+				(node) =>
+					node.type === 'ImportDeclaration' &&
+					node.importKind !== 'type' &&
+					['octane', 'octane/server', 'octane/signals/client', 'octane/signals/server'].includes(
+						node.source?.value,
+					) &&
+					(node.specifiers.length === 0 ||
+						node.specifiers.some((specifier) => specifier.importKind !== 'type')),
+			))
+	)
+		return [];
 	return [
 		inheritOriginLoc(
 			b.stmt(b.call(requireRuntimeForContext(ctx, 'enableNativeReadCollection'), b.literal(1))),

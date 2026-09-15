@@ -9,6 +9,7 @@ import {
 	type BindingOperation,
 	type BindingOptions,
 	type BindingSource,
+	type BindingValue,
 	type CompiledBindings,
 } from './dom-bindings.js';
 import { encodeBindingKey, parseBindingMarker, type BindingKey } from './dom-binding-protocol.js';
@@ -16,6 +17,12 @@ import { moveNativeNodeBefore } from './dom-focused-move.js';
 import { rendererRangeClose } from './stream-protocol.js';
 import type { createBindingClassGroup, BindingClassGroup } from './dom-binding-classes.js';
 import type { __createBindingSignals, BindingSignalConnection } from './dom-binding-signals.js';
+import type { __createBindingStyles } from './dom-binding-styles.js';
+import type {
+	__createBindingControls,
+	BindingControlLease,
+	BindingControlPrepared,
+} from './dom-binding-controls.js';
 
 export { __methodDep } from './method-dep.js';
 
@@ -237,6 +244,7 @@ export interface BindingFragment {
 	readonly bindings: readonly BindingOperation[];
 	readonly createClassGroup?: typeof createBindingClassGroup;
 	readonly signalIndices?: readonly number[];
+	readonly styleIndices?: readonly number[];
 	project(environment: readonly unknown[]): readonly unknown[];
 	readonly regions: readonly BindingRegion[];
 	readonly constructible?: false;
@@ -304,6 +312,8 @@ export interface CompiledBindingProgram<Props> {
 	readonly scalar?: CompiledBindings<Props>;
 	readonly adoptScalar?: typeof __adoptBindings;
 	readonly connectSignal?: typeof __createBindingSignals;
+	readonly connectStyle?: typeof __createBindingStyles;
+	readonly createControls?: typeof __createBindingControls;
 	readonly adopt: typeof __adoptBindingProgram<Props>;
 	readonly mount: typeof __mountBindingProgram<Props>;
 }
@@ -329,10 +339,11 @@ interface FragmentInstance {
 	nodes: Node[];
 	regions: RegionInstance[];
 	owned: Array<readonly [Element, string]>;
-	previous: Array<string | null | undefined>;
+	previous: Array<BindingValue | undefined>;
 	groups: Map<number, BindingClassGroup>;
 	styles?: Map<number, ReturnType<typeof __createBindingStyleRestoration>>;
 	signals?: Map<number, BindingSignalConnection>;
+	controls?: Map<number, BindingControlLease>;
 	signalPlan?: FragmentPlan;
 	signalFrame?: number;
 	environment: readonly unknown[];
@@ -347,10 +358,11 @@ interface FragmentInstance {
 interface FragmentPlan {
 	instance: FragmentInstance;
 	environment: readonly unknown[];
-	values: Array<string | null>;
+	values: BindingValue[];
 	initial: Array<string | boolean | readonly string[] | null> | null;
 	regions: RegionPlan[];
 	groups: Map<number, { commit(): void }>;
+	controls?: Map<number, BindingControlPrepared>;
 	adapters?: () => void;
 }
 
@@ -370,6 +382,8 @@ interface Transaction {
 	contentEditable: boolean;
 	restoreStyles: boolean;
 	signals?: ReturnType<typeof __createBindingSignals>;
+	styles?: ReturnType<typeof __createBindingStyles>;
+	controls?: ReturnType<typeof __createBindingControls>;
 	notifySignal?(prepare: () => () => void): void;
 	preparing?: boolean;
 	frame: number;
@@ -432,6 +446,8 @@ function releaseInstance(instance: FragmentInstance, transaction: Transaction): 
 	};
 	// Abort native control/event bridges before releasing channels. An item owns
 	// this lifetime only; removing it does not retire the shared document source.
+	for (const control of instance.controls?.values() ?? []) attempt(() => control.dispose());
+	instance.controls?.clear();
 	attempt(() => instance.controller?.abort());
 	attempt(() => instance.cleanup?.());
 	instance.cleanup = undefined;
@@ -557,6 +573,30 @@ function resolveFragment(
 		const node = instance.nodes[binding[0]];
 		if (node?.nodeType !== 1) mismatch();
 		instance.owned.push([node as Element, __claimBinding(node as Element, binding)]);
+		if (binding[1] === 'control') {
+			if (!transaction.controls)
+				throw new TypeError('A DOM control binding requires its compiler-selected adapter.');
+			const prepare = (): (() => void) => {
+				if (
+					instance.disposed ||
+					(transaction.preparing && instance.signalFrame !== transaction.frame)
+				)
+					return () => {};
+				const prepared = instance.controls!.get(index)!.prepareCurrent();
+				prepared.publish();
+				if (transaction.preparing && instance.signalPlan) {
+					instance.signalPlan.controls!.set(index, prepared);
+					return () => {};
+				}
+				return prepared.commit;
+			};
+			(instance.controls ??= new Map()).set(
+				index,
+				transaction.controls.claim(node as Element, binding[2] as 'value' | 'checked', () =>
+					transaction.notifySignal!(prepare),
+				),
+			);
+		}
 		if (!fresh && binding[1] === 'classGroup')
 			instance.groups.set(
 				index,
@@ -655,16 +695,21 @@ function projectValues(
 	values: readonly unknown[],
 	instance: FragmentInstance,
 	transaction: Transaction,
-): Array<string | null> {
+	controls?: Map<number, BindingControlPrepared>,
+): BindingValue[] {
 	const operations = instance.definition.bindings;
 	if (!Array.isArray(values) || values.length !== operations.length)
 		throw new TypeError('A DOM presentation projection must return its synchronous scalar values.');
-	if (transaction.signals && instance.definition.signalIndices) {
+	if (transaction.signals || transaction.styles) {
 		let copied = false;
-		for (const index of instance.definition.signalIndices) {
+		const indices = instance.definition.styleIndices
+			? [...(instance.definition.signalIndices ?? []), ...instance.definition.styleIndices]
+			: (instance.definition.signalIndices ?? []);
+		for (const index of indices) {
 			requireActive(transaction);
 			let connection = instance.signals?.get(index);
-			if (!connection && transaction.signals.isSignal(values[index])) {
+			const style = operations[index]![1] === 'styleObject';
+			if (!connection && (style || transaction.signals?.isSignal(values[index]))) {
 				const prepare = (): (() => void) => {
 					if (
 						instance.disposed ||
@@ -672,7 +717,7 @@ function projectValues(
 					)
 						return () => {};
 					const value = __normalizeBinding(operations[index]!, connection!.get());
-					const group = instance.groups.get(index)?.prepare(value ?? '');
+					const group = instance.groups.get(index)?.prepare((value as string | null) ?? '');
 					if (transaction.preparing && instance.signalPlan) {
 						instance.signalPlan.values[index] = value;
 						if (group) instance.signalPlan.groups.set(index, group);
@@ -680,7 +725,14 @@ function projectValues(
 					}
 					return () => writeOperation(instance, index, value, group, transaction);
 				};
-				connection = transaction.signals.connect(() => transaction.notifySignal!(prepare));
+				const notify = (): void => transaction.notifySignal!(prepare);
+				connection = style
+					? transaction.styles!.connect(
+							instance.nodes[operations[index]![0]] as Element,
+							notify,
+							transaction.restoreStyles,
+						)
+					: transaction.signals!.connect(notify);
 				(instance.signals ??= new Map()).set(index, connection);
 			}
 			if (connection) {
@@ -692,7 +744,13 @@ function projectValues(
 			}
 		}
 	}
-	return values.map((value, index) => __normalizeBinding(operations[index]!, value));
+	return values.map((value, index) => {
+		if (operations[index]![1] === 'control') {
+			controls!.set(index, instance.controls!.get(index)!.prepare(value));
+			return null;
+		}
+		return __normalizeBinding(operations[index]!, value);
+	});
 }
 
 function textValue(value: unknown, generic?: boolean): string {
@@ -744,7 +802,7 @@ function initialValues(
 					return value.map(String);
 				return value == null ? '' : String(value);
 			default:
-				return __normalizeBinding(operation, value);
+				return __normalizeBinding(operation, value) as string | null;
 		}
 	});
 }
@@ -756,16 +814,18 @@ function prepareFragment(
 ): FragmentPlan {
 	requireActive(transaction);
 	const definition = instance.definition;
+	const controls = instance.controls && new Map<number, BindingControlPrepared>();
 	const plan: FragmentPlan = {
 		instance,
 		environment,
-		values: projectValues(definition.project(environment), instance, transaction),
+		values: projectValues(definition.project(environment), instance, transaction, controls),
 		initial: initialValues(instance, environment),
 		regions: [],
 		groups: new Map(),
+		controls,
 		adapters: instance.cleanup?.prepare?.(environment),
 	};
-	if (instance.signals) {
+	if (instance.signals || instance.controls) {
 		instance.signalPlan = plan;
 		instance.signalFrame = transaction.frame;
 	}
@@ -791,7 +851,7 @@ function prepareFragment(
 			);
 			instance.groups.set(index, group);
 		}
-		plan.groups.set(index, group.prepare(plan.values[index] ?? ''));
+		plan.groups.set(index, group.prepare((plan.values[index] as string | null) ?? ''));
 	}
 	const document = instance.range.start.ownerDocument;
 	requireActive(transaction);
@@ -1095,14 +1155,15 @@ function writeText(region: RegionInstance, value: string): void {
 function writeOperation(
 	instance: FragmentInstance,
 	index: number,
-	value: string | null,
+	value: BindingValue,
 	group: { commit(): void } | undefined,
 	transaction: Transaction,
 ): void {
 	if (transaction.disposed || instance.disposed || value === instance.previous[index]) return;
 	const operation = instance.definition.bindings[index]!;
 	if (operation[1] === 'classToken') instance.previous[index] = value;
-	if (operation[1] === 'classGroup') group!.commit();
+	if (operation[1] === 'styleObject') instance.signals!.get(index)!.write!(value);
+	else if (operation[1] === 'classGroup') group!.commit();
 	else if (
 		(operation[1] === 'styleProperty' || operation[1] === 'styleAttribute') &&
 		transaction.restoreStyles
@@ -1117,8 +1178,8 @@ function writeOperation(
 					operation,
 				)),
 			);
-		style.write(value);
-	} else __writeBinding(instance.nodes[operation[0]] as Element, operation, value);
+		style.write(value as string | null);
+	} else __writeBinding(instance.nodes[operation[0]] as Element, operation, value as string | null);
 	if (!transaction.disposed && !instance.disposed) instance.previous[index] = value;
 }
 
@@ -1130,6 +1191,7 @@ function commitFragment(plan: FragmentPlan, transaction: Transaction): void {
 	instance.updateAdapters = plan.adapters;
 	initializeProperties(plan, false, transaction);
 	for (let index = 0; index < plan.values.length && !transaction.disposed; index++) {
+		if (instance.definition.bindings[index]![1] === 'control') continue;
 		writeOperation(instance, index, plan.values[index]!, plan.groups.get(index), transaction);
 	}
 	for (const region of plan.regions) {
@@ -1137,7 +1199,24 @@ function commitFragment(plan: FragmentPlan, transaction: Transaction): void {
 		commitRegion(region, instance.id, transaction);
 	}
 	initializeProperties(plan, true, transaction);
+	for (const control of plan.controls?.values() ?? []) {
+		if (transaction.disposed) return;
+		control.commit();
+	}
 	if (!transaction.disposed) instance.fresh = false;
+}
+
+function publishControls(plan: FragmentPlan, transaction: Transaction): void {
+	if (transaction.disposed) return;
+	for (const control of plan.controls?.values() ?? []) {
+		if (transaction.disposed) return;
+		control.publish();
+	}
+	for (const region of plan.regions) {
+		if (region.child) publishControls(region.child, transaction);
+		if (region.items)
+			for (const child of region.items.values()) publishControls(child, transaction);
+	}
 }
 
 function activateInstance(instance: FragmentInstance, transaction: Transaction): void {
@@ -1195,9 +1274,14 @@ function bindProgram<Props>(
 		contentEditable: false,
 		restoreStyles: options?.restoreStyles === true,
 		signals: descriptor.connectSignal?.(),
+		styles: descriptor.connectStyle?.(),
+		controls: descriptor.createControls?.(),
 		frame: 0,
 	};
-	const signalUpdates = transaction.signals ? new Set<() => () => void>() : undefined;
+	const signalUpdates =
+		transaction.signals || transaction.styles || transaction.controls
+			? new Set<() => () => void>()
+			: undefined;
 	let instance: FragmentInstance | undefined;
 	let ownedRoot: Comment | undefined;
 	let busy = true;
@@ -1272,6 +1356,8 @@ function bindProgram<Props>(
 				transaction.preparing = true;
 				transaction.frame++;
 				const plan = prepareFragment(instance!, [snapshot], transaction);
+				if (!dirty && !transaction.disposed && transaction.controls)
+					publishControls(plan, transaction);
 				while (signalUpdates?.size && !dirty && !transaction.disposed) {
 					const pending = [...signalUpdates];
 					signalUpdates.clear();

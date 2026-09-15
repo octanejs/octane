@@ -2,6 +2,12 @@ import { normalizeClass } from './class-names.js';
 import { sanitizeURL } from './sanitize-url.js';
 import type { createBindingClassGroup } from './dom-binding-classes.js';
 import type { __createBindingSignals, BindingSignalConnection } from './dom-binding-signals.js';
+import type { __createBindingStyles, BindingStyleSnapshot } from './dom-binding-styles.js';
+import type {
+	__createBindingControls,
+	BindingControlLease,
+	BindingControlPrepared,
+} from './dom-binding-controls.js';
 import type {
 	BindingMountTarget,
 	BindingRange,
@@ -94,10 +100,15 @@ export type BindingOperation = readonly [
 		| 'classGroup'
 		| 'styleProperty'
 		| 'styleAttribute'
+		| 'styleObject'
+		| 'control'
 		| 'url',
 	name: string,
 	unitlessOrGroup?: boolean | number,
 ];
+
+/** @internal Whole styles carry canonical snapshots; scalar channels remain strings. */
+export type BindingValue = string | null | BindingStyleSnapshot;
 
 /** @internal No application function is invoked to discover the DOM topology. */
 export interface CompiledBindings<Props> {
@@ -109,6 +120,9 @@ export interface CompiledBindings<Props> {
 	readonly createClassGroup?: typeof createBindingClassGroup;
 	readonly connectSignal?: typeof __createBindingSignals;
 	readonly signalIndices?: readonly number[];
+	readonly connectStyle?: typeof __createBindingStyles;
+	readonly styleIndices?: readonly number[];
+	readonly createControls?: typeof __createBindingControls;
 	project(props: Props): readonly unknown[];
 }
 
@@ -274,9 +288,11 @@ function resolveAddressedNodes(root: Element, descriptor: CompiledBindings<unkno
 	return nodes;
 }
 
-function normalize(binding: BindingOperation, value: unknown): string | null {
+function normalize(binding: BindingOperation, value: unknown): BindingValue {
 	const type = typeof value;
 	switch (binding[1]) {
+		case 'styleObject':
+			return value as BindingValue;
 		case 'class':
 			return value == null || value === false ? null : normalizeClass(value);
 		case 'classGroup':
@@ -422,12 +438,17 @@ export function __adoptBindings<Props>(
 	const nodes = resolveNodes(root as Element, descriptor);
 	const bindings = descriptor.bindings;
 	const owned: Array<readonly [Element, string]> = [];
-	const previous: Array<string | null | undefined> = [];
+	const previous: Array<BindingValue | undefined> = [];
 	let groups: Map<number, ReturnType<typeof createBindingClassGroup>> | undefined;
 	let styles: Map<number, ReturnType<typeof __createBindingStyleRestoration>> | undefined;
 	const signalFactory = descriptor.connectSignal?.();
-	const signalConnections = signalFactory ? new Map<number, BindingSignalConnection>() : undefined;
-	const signalUpdates = signalFactory ? new Set<number>() : undefined;
+	const styleFactory = descriptor.connectStyle?.();
+	const controlFactory = descriptor.createControls?.();
+	const controls = controlFactory ? new Map<number, BindingControlLease>() : undefined;
+	const signalConnections =
+		signalFactory || styleFactory ? new Map<number, BindingSignalConnection>() : undefined;
+	const signalUpdates =
+		signalFactory || styleFactory || controlFactory ? new Set<number>() : undefined;
 	let disposed = false;
 	let busy = true;
 	let dirty = false;
@@ -449,6 +470,17 @@ export function __adoptBindings<Props>(
 				}
 			}
 		}
+		for (const control of controls?.values() ?? []) {
+			try {
+				control.dispose();
+			} catch (error) {
+				if (!failed) {
+					failed = true;
+					failure = error;
+				}
+			}
+		}
+		controls?.clear();
 		signalConnections?.clear();
 		signalUpdates?.clear();
 		for (let i = 0; i < owned.length; i++) {
@@ -487,8 +519,9 @@ export function __adoptBindings<Props>(
 		busy = true;
 		try {
 			while ((dirty || signalUpdates?.size) && !disposed) {
-				let next: Array<string | null>;
+				let next: BindingValue[];
 				let indices: number[] | undefined;
+				const preparedControls = controls ? new Map<number, BindingControlPrepared>() : undefined;
 				if (dirty) {
 					dirty = false;
 					signalUpdates?.clear();
@@ -510,6 +543,27 @@ export function __adoptBindings<Props>(
 							'A DOM binding projection must return its synchronous scalar values.',
 						);
 					let resolved = values;
+					if (styleFactory && descriptor.styleIndices) {
+						for (const index of descriptor.styleIndices) {
+							if (disposed || dirty) break;
+							let connection = signalConnections!.get(index);
+							if (!connection) {
+								connection = styleFactory.connect(
+									nodes[bindings[index]![0]]!,
+									() => {
+										if (!disposed) {
+											signalUpdates!.add(index);
+											drain();
+										}
+									},
+									options?.restoreStyles,
+								);
+								signalConnections!.set(index, connection);
+							}
+							if (resolved === values) resolved = [...values];
+							(resolved as unknown[])[index] = connection.read(values[index]);
+						}
+					}
 					if (signalFactory && descriptor.signalIndices) {
 						for (const index of descriptor.signalIndices) {
 							if (disposed || dirty) break;
@@ -529,13 +583,23 @@ export function __adoptBindings<Props>(
 							}
 						}
 					}
-					next = resolved.map((value, index) => normalize(bindings[index]!, value));
+					next = resolved.map((value, index) => {
+						const control = controls?.get(index);
+						if (control) {
+							preparedControls!.set(index, control.prepare(value));
+							return null;
+						}
+						return normalize(bindings[index]!, value);
+					});
 				} else {
 					indices = [...signalUpdates!];
 					signalUpdates!.clear();
 					next = [];
-					for (const index of indices)
-						next[index] = normalize(bindings[index]!, signalConnections!.get(index)!.get());
+					for (const index of indices) {
+						const control = controls?.get(index);
+						if (control) preparedControls!.set(index, control.prepareCurrent());
+						else next[index] = normalize(bindings[index]!, signalConnections!.get(index)!.get());
+					}
 				}
 				// Invalidation during another channel's coercion settles only connected
 				// values, without fetching or projecting the application source again.
@@ -543,7 +607,9 @@ export function __adoptBindings<Props>(
 					const pending = [...signalUpdates];
 					signalUpdates.clear();
 					for (const index of pending) {
-						next[index] = normalize(bindings[index]!, signalConnections!.get(index)!.get());
+						const control = controls?.get(index);
+						if (control) preparedControls!.set(index, control.prepareCurrent());
+						else next[index] = normalize(bindings[index]!, signalConnections!.get(index)!.get());
 						if (indices && !indices.includes(index)) indices.push(index);
 					}
 				}
@@ -552,8 +618,35 @@ export function __adoptBindings<Props>(
 					new Map(
 						[...groups]
 							.filter(([index]) => !indices || indices.includes(index))
-							.map(([index, group]) => [index, group.prepare(next[index] ?? '')]),
+							.map(([index, group]) => [
+								index,
+								group.prepare((next[index] as string | null) ?? ''),
+							]),
 					);
+				// Early edits publish only after every channel has prepared successfully.
+				// Settle their derived channels before committing any native writes.
+				if (preparedControls) {
+					while (!dirty && !disposed) {
+						for (const control of preparedControls.values()) {
+							control.publish();
+							if (dirty || disposed) break;
+						}
+						if (!signalUpdates?.size || dirty || disposed) break;
+						const pending = [...signalUpdates];
+						signalUpdates.clear();
+						for (const index of pending) {
+							const control = controls?.get(index);
+							if (control) preparedControls.set(index, control.prepareCurrent());
+							else {
+								next[index] = normalize(bindings[index]!, signalConnections!.get(index)!.get());
+								const group = groups?.get(index);
+								if (group)
+									preparedGroups!.set(index, group.prepare((next[index] as string | null) ?? ''));
+							}
+							if (indices && !indices.includes(index)) indices.push(index);
+						}
+					}
+				}
 				// A getter/coercion may synchronously notify or end the owner lifetime.
 				// Never publish an obsolete prepared snapshot or mutate after disposal.
 				if (dirty || disposed) continue;
@@ -563,12 +656,17 @@ export function __adoptBindings<Props>(
 					position++
 				) {
 					const i = indices ? indices[position]! : position;
+					if (bindings[i]![1] === 'control') {
+						preparedControls!.get(i)!.commit();
+						continue;
+					}
 					if (next[i] === previous[i]) continue;
 					const binding = bindings[i]!;
 					// Native attribute reactions may dispose synchronously during the
 					// write. Token cleanup must already know the contribution to retire.
 					if (binding[1] === 'classToken') previous[i] = next[i]!;
-					if (binding[1] === 'classGroup') preparedGroups!.get(i)!.commit();
+					if (binding[1] === 'styleObject') signalConnections!.get(i)!.write!(next[i]);
+					else if (binding[1] === 'classGroup') preparedGroups!.get(i)!.commit();
 					else if (
 						(binding[1] === 'styleProperty' || binding[1] === 'styleAttribute') &&
 						options?.restoreStyles
@@ -577,8 +675,8 @@ export function __adoptBindings<Props>(
 						let style = styles.get(i);
 						if (!style)
 							styles.set(i, (style = __createBindingStyleRestoration(nodes[binding[0]]!, binding)));
-						style.write(next[i]!);
-					} else write(nodes[binding[0]]!, binding, next[i]!);
+						style.write(next[i] as string | null);
+					} else write(nodes[binding[0]]!, binding, next[i] as string | null);
 					if (!disposed) previous[i] = next[i]!;
 				}
 			}
@@ -610,6 +708,17 @@ export function __adoptBindings<Props>(
 			const node = nodes[binding[0]];
 			if (node === undefined) throw new TypeError('A DOM binding targets an unknown element.');
 			owned.push([node, __claimBinding(node, binding)]);
+			if (binding[1] === 'control') {
+				controls!.set(
+					index,
+					controlFactory!.claim(node, binding[2] as 'value' | 'checked', () => {
+						if (!disposed) {
+							signalUpdates!.add(index);
+							drain();
+						}
+					}),
+				);
+			}
 			if (binding[1] === 'classGroup') {
 				groups ??= new Map();
 				groups.set(index, descriptor.createClassGroup!(node, binding[2], binding[3] as number));

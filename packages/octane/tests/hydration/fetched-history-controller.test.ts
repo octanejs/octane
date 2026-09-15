@@ -138,12 +138,16 @@ function setup() {
 				const serverOwner = createScope({ scopeKey: identity.ownerKey });
 				try {
 					runWithSignalOwner(serverOwner, () => serverState.history$.set(value));
+					const rendered = renderToString(server.History, {}, { signalOwner: serverOwner });
+					expect(rendered.signals?.scopes.map((scope) => scope.scopeKey)).toEqual([
+						identity.ownerKey,
+					]);
 					emit(
-						createStreamedRegionPlacementFrame(
-							identity,
-							renderToString(server.History, {}, { signalOwner: serverOwner }),
-							{ sequence: placementSequence++, contentRevision: value.revision + 1, styles },
-						),
+						createStreamedRegionPlacementFrame(identity, rendered, {
+							sequence: placementSequence++,
+							contentRevision: value.revision + 1,
+							styles,
+						}),
 					);
 				} finally {
 					serverOwner.dispose();

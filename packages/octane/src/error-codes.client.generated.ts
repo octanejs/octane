@@ -57,6 +57,7 @@ type ClientErrorArguments = {
 	65: [];
 	66: [];
 	67: [unknown];
+	72: [];
 };
 
 export function formatClientError<Code extends keyof ClientErrorArguments>(
@@ -260,6 +261,11 @@ export function formatClientError<Code extends keyof ClientErrorArguments>(
 				);
 			case 67:
 				return formatDevErrorMessage('Signal control identity mismatch for "%s".', args);
+			case 72:
+				return formatDevErrorMessage(
+					'Octane DOM binding text range does not match its template.',
+					args,
+				);
 			default:
 				return formatUnknownDevErrorMessage(code);
 		}

@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { act, flushSync, hydrateRoot, startTransition } from 'octane';
 import { renderToString } from 'octane/server';
-import { createScope, query } from 'octane/signals';
+import { createResource, createScope, query } from 'octane/signals';
 import type { CSSProperties } from 'octane/jsx-runtime';
 import * as Signals from 'octane/signals';
 import * as ClientSignals from 'octane/signals/client';
@@ -29,7 +29,7 @@ describe('signal-valued DOM styles', () => {
 						resolve = done;
 					}),
 			);
-			const initial$ = scope.asyncSignal$('initial', () => request(undefined));
+			const initial$ = createResource(scope, 'initial', () => request(undefined));
 			const replacement$ = scope.signal$<number | null>('replacement', 30);
 			const rendered = mount(Component, { left$: initial$ });
 			try {
@@ -61,7 +61,7 @@ describe('signal-valued DOM styles', () => {
 					resolve = done;
 				}),
 		);
-		const pending$ = scope.asyncSignal$('pending', () => request(undefined));
+		const pending$ = createResource(scope, 'pending', () => request(undefined));
 		const rendered = mount(client.InlineGuardedStylePair, { left$: first$, right$: pending$ });
 		try {
 			await act(() => resolve(20));
@@ -93,7 +93,7 @@ describe('signal-valued DOM styles', () => {
 							resolve = done;
 						}),
 			);
-			const right$ = scope.asyncSignal$('right', () => request(key$.get()));
+			const right$ = createResource(scope, 'right', () => request(key$.get()));
 			const rendered = mount(Component, {
 				left$,
 				right$,
@@ -183,7 +183,7 @@ describe('signal-valued DOM styles', () => {
 					resolve = done;
 				}),
 		);
-		const left$ = scope.asyncSignal$('left', () => request(undefined));
+		const left$ = createResource(scope, 'left', () => request(undefined));
 		const rendered = mount(client.GuardedStyles, { left$ });
 		try {
 			expect(rendered.container.textContent).toBe('waiting');
@@ -331,7 +331,7 @@ describe('signal-valued DOM styles', () => {
 		// Native style-only scopes must observe facade aliases in the enclosing
 		// component's owner, not create independent cells for each style block.
 		const source = readFileSync(
-			new URL('./_fixtures/signals-dom-bindings.tsrx', import.meta.url),
+			'packages/octane/tests/_fixtures/signals-dom-bindings.tsrx',
 			'utf8',
 		);
 		for (const dev of [false, true]) {

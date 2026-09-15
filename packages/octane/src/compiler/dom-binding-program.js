@@ -118,11 +118,14 @@ export function planBindingProgram(fn, render, context) {
 	const hoists = [];
 	const expressions = [];
 	const importedPrograms = new Map();
+	const childPrograms = new Set();
 	let activationHelper = null;
 	let classFactory = null;
 	let methodDependency = null;
 	let slotFactory = null;
 	let signals = false;
+	let controls = false;
+	let styles = false;
 	let nextSite = 0;
 	const fail = (node, message) => {
 		const error = new Error(
@@ -222,6 +225,7 @@ export function planBindingProgram(fn, render, context) {
 		const bindings = [];
 		const values = [];
 		const signalIndices = [];
+		const styleIndices = [];
 		const projections = [];
 		const initializers = [];
 		const initialValues = [];
@@ -406,6 +410,7 @@ export function planBindingProgram(fn, render, context) {
 				if (local === undefined && !child) {
 					local = allocateProgramName('_bindingChild');
 					importedPrograms.set(tag, local);
+					childPrograms.add(local);
 					dependencies.push(
 						origin(
 							b.imports(
@@ -418,6 +423,9 @@ export function planBindingProgram(fn, render, context) {
 				}
 				if (child) {
 					signals ||= child.signals;
+					controls ||= child.controls;
+					styles ||= child.styles;
+					for (const program of child.childPrograms) childPrograms.add(program);
 					for (const dependency of child.dependencies)
 						if (!dependencies.includes(dependency)) dependencies.push(dependency);
 					for (const hoist of child.hoists) if (!hoists.includes(hoist)) hoists.push(hoist);
@@ -575,7 +583,10 @@ export function planBindingProgram(fn, render, context) {
 			projections.push(...native.projections);
 			for (const signalIndex of native.signalIndices)
 				signalIndices.push(bindings.length + signalIndex);
+			for (const styleIndex of native.styleIndices) styleIndices.push(bindings.length + styleIndex);
 			signals ||= native.signalIndices.length > 0;
+			controls ||= native.bindings.some((binding) => binding[1] === 'control');
+			styles ||= native.styleIndices.length > 0;
 			const normalizedChildren = normalize(node.children ?? [], selfNs);
 			const opaqueChildren =
 				normalizedChildren.length > 0 &&
@@ -611,6 +622,15 @@ export function planBindingProgram(fn, render, context) {
 				}
 				const raw = rawName(attr);
 				const name = raw === 'className' ? 'class' : (ATTRIBUTE_ALIASES.get(raw) ?? raw);
+				// The staged capability owns these values after native construction.
+				if (
+					native.bindings.some(
+						(binding) =>
+							(binding[1] === 'control' && binding[2] === name) ||
+							(binding[1] === 'styleObject' && name === 'style'),
+					)
+				)
+					continue;
 				const expression = attrValue(attr);
 				const bare = unwrap(expression);
 				const external = native.unbound.has(bare);
@@ -726,6 +746,7 @@ export function planBindingProgram(fn, render, context) {
 			project: project(names, b.array(values), fn, projections),
 			regions: b.array(regions),
 			...(signalIndices.length ? { signalIndices: data(signalIndices) } : {}),
+			...(styleIndices.length ? { styleIndices: data(styleIndices) } : {}),
 		};
 		if (initializers.length > 0) {
 			properties.initializers = data(initializers);
@@ -787,5 +808,8 @@ export function planBindingProgram(fn, render, context) {
 		replacements,
 		unbound,
 		signals,
+		controls,
+		styles,
+		childPrograms,
 	};
 }

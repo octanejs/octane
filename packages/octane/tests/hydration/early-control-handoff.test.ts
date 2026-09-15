@@ -191,6 +191,22 @@ describe('early hydration control handoff', () => {
 		input.value = 'unbound edit';
 		input.dispatchEvent(new InputEvent('input', { bubbles: true }));
 		expect(runWithSignalOwner(owner, () => draft$.get())).toBe('after disposal');
+
+		input.value = 'first captured edit';
+		input.dispatchEvent(new InputEvent('input', { bubbles: true }));
+		const scope = createScope({ scopeKey: 'reentrant-control-adoption' });
+		cleanups.push(() => scope.dispose());
+		const reentrant$ = scope.signal$('draft', 'server');
+		cleanups.push(
+			reentrant$.subscribe(() => {
+				if (reentrant$.get() !== 'first captured edit') return;
+				input.value = 'newer native edit';
+				input.dispatchEvent(new InputEvent('input', { bubbles: true }));
+			}),
+		);
+		cleanups.push(bindSignalControl(input, 'value', reentrant$));
+		expect(reentrant$.get()).toBe('newer native edit');
+		expect(input.value).toBe('newer native edit');
 	});
 
 	it('preserves live focus, selection, and composition state', async () => {
@@ -358,8 +374,29 @@ describe('early hydration control handoff', () => {
 		await suspension;
 		expect(input.value).toBe('typed again');
 		const draft$ = scope.signal$('after-failure', 'after failure');
+		const stop = bindSignalControl(input, 'value', draft$);
+		cleanups.push(stop);
+		expect(input.value).toBe('after failure');
+		stop();
+		const invalid$ = scope.signal$<string | number>('invalid-after-activation', 'valid');
+		cleanups.push(bindSignalControl(input, 'value', invalid$ as typeof draft$));
+		expect(() => invalid$.set(1)).toThrow(/value signal must contain a string/);
+		expect(input.value).toBe('valid');
+		// A failed live projection relinquishes only its native lease. The same
+		// source and control remain available to a new independently owned binding.
+		invalid$.set('recovered');
+		expect(input.value).toBe('valid');
 		cleanups.push(bindSignalControl(input, 'value', draft$));
 		expect(input.value).toBe('after failure');
+		const retiring = createScope({ scopeKey: 'retiring-control' });
+		const retiringInput = document.createElement('input');
+		document.body.append(retiringInput);
+		cleanups.push(() => retiringInput.remove());
+		cleanups.push(bindSignalControl(retiringInput, 'value', retiring.signal$('value', 'alive')));
+		expect(() => retiring.dispose()).toThrow(/disposed/i);
+		expect(retiringInput.value).toBe('alive');
+		cleanups.push(bindSignalControl(retiringInput, 'value', draft$));
+		expect(retiringInput.value).toBe('after failure');
 	});
 
 	it('rejects a storage candidate after an early clear', () => {
@@ -433,5 +470,67 @@ describe('early hydration control handoff', () => {
 		checked$.set(false);
 		expect(Array.from(select.selectedOptions, (option) => option.value)).toEqual(['b']);
 		expect(checkbox.checked).toBe(false);
+
+		const radios = document.createElement('form');
+		radios.innerHTML = '<input type="radio" name="choice"><input type="radio" name="choice">';
+		const otherForm = document.createElement('form');
+		otherForm.innerHTML = '<input type="radio" name="choice">';
+		document.body.append(radios, otherForm);
+		cleanups.push(
+			() => radios.remove(),
+			() => otherForm.remove(),
+		);
+		const [first, second] = radios.querySelectorAll('input');
+		const external = otherForm.querySelector('input')!;
+		const first$ = scope.signal$('first-radio', true);
+		const second$ = scope.signal$('second-radio', false);
+		const external$ = scope.signal$('external-radio', true);
+		const stopFirst = bindSignalControl(first!, 'checked', first$);
+		cleanups.push(
+			stopFirst,
+			bindSignalControl(second!, 'checked', second$),
+			bindSignalControl(external, 'checked', external$),
+		);
+		second!.click();
+		expect([first!.checked, second!.checked]).toEqual([false, true]);
+		expect([first$.get(), second$.get()]).toEqual([false, true]);
+		expect(external.checked).toBe(true);
+		expect(external$.get()).toBe(true);
+		const readonlyRadio = document.createElement('input');
+		readonlyRadio.type = 'radio';
+		readonlyRadio.name = 'choice';
+		radios.append(readonlyRadio);
+		const readonlyRadio$ = scope.derived$('readonly-radio', () => true);
+		cleanups.push(bindSignalControl(readonlyRadio, 'checked', readonlyRadio$));
+		second!.click();
+		expect(readonlyRadio.checked).toBe(false);
+		expect(readonlyRadio$.get()).toBe(true);
+		expect([first$.get(), second$.get()]).toEqual([false, true]);
+		stopFirst();
+		first$.set(true);
+		expect(first!.checked).toBe(false);
+
+		const host = document.createElement('div');
+		const shadow = host.attachShadow({ mode: 'open' });
+		shadow.innerHTML = '<input type="radio" name="choice"><input type="radio" name="choice">';
+		document.body.append(host);
+		cleanups.push(() => host.remove());
+		const [shadowFirst, shadowSecond] = shadow.querySelectorAll('input');
+		const shadowFirst$ = scope.signal$('shadow-first-radio', true);
+		const shadowSecond$ = scope.signal$('shadow-second-radio', false);
+		cleanups.push(
+			bindSignalControl(shadowFirst!, 'checked', shadowFirst$),
+			bindSignalControl(shadowSecond!, 'checked', shadowSecond$),
+		);
+		shadowSecond!.click();
+		expect([shadowFirst$.get(), shadowSecond$.get()]).toEqual([false, true]);
+		expect(second$.get()).toBe(true);
+		expect(external$.get()).toBe(true);
+		// Programmatic writes still use native checked behavior; only input events
+		// publish the browser's accompanying unchecks into other writable cells.
+		shadowFirst$.set(true);
+		expect([shadowFirst!.checked, shadowSecond!.checked]).toEqual([true, false]);
+		expect(shadowSecond$.get()).toBe(true);
+		expect(() => bindSignalControl(input, 'value', 'sample' as never)).toThrow(/signal/);
 	});
 });

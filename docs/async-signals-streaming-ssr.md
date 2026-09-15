@@ -101,29 +101,46 @@ optional native island takes ownership. Controllers and behavior roots may be
 installed early; deferring their code does not magically provide synchronous
 navigation cancellation or trusted user activation.
 
-Fixed native presentation has an explicit compiler-backed path through
+The first fixed-native-presentation slice introduced a compiler-backed path through
 [`adoptBindings`](./deferred-hydration.md#compiled-presentation-on-existing-dom).
-An opted-in static view projects one owned snapshot onto matching existing SSR
-elements without retaining the renderer. The application hands over only the
-declared dynamic properties and retains event, structure, and document lifetime
-ownership. This first slice excludes structural rendering and direct
-`value`/`checked` authoring; the existing control adapter above remains in use.
-It is not a new signal graph or a replacement for stream-result authority.
+An opted-in static view projected one owned snapshot onto matching existing SSR
+elements without retaining the renderer. That slice handed over only declared
+dynamic properties, leaving event, structure, and document lifetime ownership
+with the application. It excluded structural rendering and direct writable
+`value`/`checked` authoring. Neither presentation bindings nor the control adapter
+above introduce a new signal graph or replace stream-result authority.
 
 The first integration did **not** deliver the intended migration to canonical
 authored presentation. Manual DOM operations, HTML builders, class/attribute
 writers, marker readback, observers, and reconciliation maps remained throughout
 the host. Successful resource adoption and smaller native cleanups do not close
-that omission. The fixed-element binding slice above is an implementation limit,
+that omission. The fixed-element binding slice above was an implementation limit,
 not the desired endpoint of this RFC.
 
-The required next implementation uses one authored view for SSR and live
-presentation, including text, conditional content, and keyed rows. It must adopt
+The current local candidate extends `adoptBindings` and adds `mountBindings` for
+compiler-proven text, `@if`, keyed `@for`, pure child views, and authored JSX
+slots. Direct native `value`/`checked` bindings select the same control adapter
+automatically: writable handles receive native edits, read-only handles project
+one-way, and `.get()` or ordinary values remain sampled. Owned `checked` bindings
+require a fixed checkbox or radio input type. Radio synchronization covers native
+input on bound group members; entirely unbound members and programmatic writes
+do not acquire implicit sibling-signal authority. Source-faithful consumer
+deletion, application budgets, and current-head CI remain integration gates.
+
+The required contract uses one authored view for SSR and live presentation. It must adopt
 real native elements and explicitly owned attribute, class-token, and style
 channels while leaving unowned descendants opaque. It must support a wrapper
 with both owned controls and externally managed siblings, not merely an empty
 element or an artificial replacement root. Keyed adoption must identify the
 historical server rows even when live state advanced before activation.
+
+Projection analysis remains conservative. Under the directive's immutable-props
+contract, selected native string reads can compose, including
+`(props.account?.name.trim() || props.identifier).slice(0, 1).toUpperCase()`.
+Every call must satisfy the projection boundary; an `as string` cast does not
+admit arbitrary methods, computed calls, or mutation. A view that hits an
+extraction diagnostic is not a completed authored migration, and replacing it
+with an imperative repaint is not a fix.
 
 Completion requires deleting the replaced presentation machinery in real
 consumers. A shared imperative HTML builder, a signal effect calling an old
@@ -139,8 +156,10 @@ Fine-grained native bindings should reuse the existing signal graph. A direct
 signal-valued class or fixed CSS property subscribes to that handle and updates
 only its owned channel; it must not rerun the entire presentation snapshot on
 each unrelated signal notification. Runtime Symbol identity is authoritative,
-not a variable's `$` suffix. An explicit `.get()` remains a sampled value; the
-surrounding source publication or explicit refresh samples it again. Replacing a
+not a variable's `$` suffix. Within renderer-free `BindingSource` projections,
+an explicit `.get()` remains a sampled value; the surrounding source publication
+or explicit refresh samples it again. Ordinary renderer-backed native-read mode
+still observes `.get()` through its native read frame. Replacing a
 handle, retiring a keyed row, and aborting the view must release its subscription
 without retiring the shared document state.
 
@@ -151,9 +170,20 @@ parallel style engine. Renderer-free views retain only their compiler-proven
 channel writes and adoption/cleanup lifetimes; sharing style behavior must not
 import the general renderer or its scheduled blocks into that path.
 
+Renderer-free styles now also accept whole style objects, object spreads, nested
+property handles, and whole `SignalCSSProperties` handles. The optional whole-style
+capability uses the canonical native style reader; it owns only subscription,
+adoption, and native-write lifetimes. Fixed-property artifacts retain their
+smaller scalar path. Neither style nor control capability imports the renderer
+or creates a second signal graph, and each is omitted when the compiled view
+does not need it.
+
 Style adapters may supply an exact imported-factory contract through
-`knownAttributeSpreads`. The compiler evaluates that pure factory once and
-projects its declared stable own data fields. For StyleX, class and optional
+`knownAttributeSpreads`. This is a trusted adapter declaration matched by module,
+import, and member binding, not purity or shape inferred from a function's name.
+The compiler evaluates the declared pure factory once and projects only its
+declared stable own data fields; conflicting fixed ownership is rejected. It
+does not interpret arbitrary attribute factories. For StyleX, class and optional
 serialized inline style come from one ordered merge, preserving property
 precedence. The adapter must not expand one authored call into three independent
 calls, and fine-grained subscriptions must not split conflicting style variants
@@ -618,7 +648,7 @@ The receiver hands off an event only to its matching widget:
 
 After activation, a signal changing one attribute or style property should update its owned DOM slot without component-wide reconciliation or a duplicated stylesheet:
 
-- Build on [fixed-key style lowering](https://github.com/octanejs/octane/pull/1051), preserving scalar fast paths. [Direct signal style binding](https://github.com/octanejs/octane/issues/1049), including `style={{ ...props.style, left: left$ }}`, is in scope along with text, attributes, and writable native controls.
+- Build on [fixed-key style lowering](https://github.com/octanejs/octane/pull/1051), preserving scalar fast paths. The landed [native signal styles](https://github.com/octanejs/octane/pull/1099) are canonical for style reading, including `style={{ ...props.style, left: left$ }}`. The renderer-free capability reuses that reader with separately tested property ownership and cleanup; native renderer support alone is not proof of renderer-free support.
 - Any direct-binding syntax must preserve static CSS extraction, specificity/order, cleanup, and hydration ownership. `universalHostBinding` is opt-in for host properties, not proof of general native DOM binding.
 
 ## Core and signals work
