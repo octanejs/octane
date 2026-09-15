@@ -8634,5 +8634,13 @@
     "reference": "vt-effect-cleanup-jsx-idle-remove_100_scattered-budget",
     "maxRatio": 1,
     "note": "Measured original effectful-list cleanup work with 32 calls of allowance, below one extra call per removed row; catches ordinary work even if an optional staging helper is renamed or replaced."
+  },
+  {
+    "suite": "signal-dom-bindings",
+    "op": "setup_calls",
+    "target": "direct",
+    "reference": "sampled",
+    "maxRatio": 0,
+    "note": "Direct signal-valued styles update through their DOM binding without re-running component setup. The sampled-read control must display the same styles and preserve the same host and child identities."
   }
 ]

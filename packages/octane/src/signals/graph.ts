@@ -11,6 +11,7 @@ import {
 } from './errors.js';
 import {
 	NativeAdoptionMiss,
+	NATIVE_DOM_VALUE,
 	getNativeReadObserver,
 	getNativeAdoptionResolver,
 	isNativeWriteGuarded,
@@ -399,6 +400,10 @@ export class ScopedNode<T = any> implements SignalHandle<T>, ReactiveNode {
 
 	get(): T {
 		return strictValue(readNode(this));
+	}
+
+	[NATIVE_DOM_VALUE](): T {
+		return this.get();
 	}
 
 	set(value: T | ((previous: T) => T)): void {

@@ -1191,6 +1191,9 @@ const HOOK_MEMO_RUNTIME_HELPERS = new Set([
 	'memoPublishAlways',
 ]);
 const NATIVE_READ_RUNTIME_HELPERS = new Set([
+	'nativeStyleBinding',
+	'readNativeDomStyle',
+	'readNativeDomProps',
 	'enableNativeReadCollection',
 	'beginNativeReadScope',
 	'endNativeReadScope',
@@ -4483,6 +4486,7 @@ function containsAutoMemoContextRead(root, ctx) {
 		}
 		if (seen.has(node)) return;
 		seen.add(node);
+
 		if (
 			node.type === 'ArrowFunctionExpression' ||
 			node.type === 'FunctionExpression' ||
@@ -6379,6 +6383,26 @@ function containsAutoMemoUnsafeStructure(stmts, ctx = null) {
 			// that child's render. Keep mutable ref reads opaque even though ordinary
 			// event-handler calls/mutations remain deferred.
 			if (containsDeferredRefRead(n)) found = true;
+			return;
+		}
+		// Native styles perform implicit reads, including styles carried by a host
+		// prop spread. Equal props cannot prove the subtree complete during a
+		// boundary retry: these reads are outside the parent call's memo witness.
+		if (
+			ctx?.nativeReads &&
+			n.type === 'JSXOpeningElement' &&
+			n.name?.type === 'JSXIdentifier' &&
+			/^[a-z]/.test(n.name.name) &&
+			n.attributes.some((attribute) => {
+				if (attribute.type === 'JSXSpreadAttribute' || attribute.type === 'SpreadAttribute')
+					return true;
+				if (attribute.name?.name !== 'style' || attribute.value?.type !== 'JSXExpressionContainer')
+					return false;
+				const value = unwrapTsExpr(attribute.value.expression);
+				return value.type !== 'ObjectExpression' || !objectExprIsStaticLiteral(value);
+			})
+		) {
+			found = true;
 			return;
 		}
 		if (
@@ -12332,6 +12356,8 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 			flush();
 			ctx.runtimeNeeded.add('ssrStyle');
 			registerAttrLoweringOrigin(ctx, attr.name, 'ssrStyle', null);
+			if (ctx.nativeReads)
+				inner = b.call(requireRuntimeForContext(ctx, 'readNativeDomStyle'), inner);
 			parts.push(
 				ssrCall(
 					'ssrStyle',
@@ -12474,6 +12500,7 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 				b.literal(tag, JSON.stringify(tag)),
 				b.literal(selfNs, JSON.stringify(selfNs)),
 				b.literal(resolveFormControlsAcrossSpreads),
+				...(ctx.nativeReads ? [b.id(requireRuntimeForContext(ctx, 'readNativeDomStyle'))] : []),
 			],
 			node,
 		);
@@ -20252,7 +20279,21 @@ function jsxElementToCreateElement(node, ctx, eagerRoot = false) {
 			);
 		}
 	}
-	const propsNode = inheritOriginLoc(b.object(properties), node);
+	const propsObject = inheritOriginLoc(b.object(properties), node);
+	const propsNode =
+		ctx.nativeReads &&
+		!componentTag &&
+		attrs.some(
+			(attr) =>
+				attr.type === 'SpreadAttribute' ||
+				attr.type === 'JSXSpreadAttribute' ||
+				(attr.name?.name ?? attr.name) === 'style',
+		)
+			? inheritOriginLoc(
+					b.call(requireRuntimeForContext(ctx, 'readNativeDomProps'), propsObject),
+					node,
+				)
+			: propsObject;
 	const childrenNeedRenderScope = jsxValueChildrenNeedRenderScope(node);
 	const eagerProviderChildren =
 		eagerRoot &&
@@ -23084,6 +23125,7 @@ function planJsx(
 	// happens on the intact template. (Regression: StoryRow's `.meta` interleaves text holes
 	// with `<Link>` components.)
 	const deferredTextMounts = [];
+	let nativeStyleSlots = 0;
 	// Emit per-binding mount code.
 	for (const b of elementBindings) {
 		// A sibling-position `{x as string}` text hole resolves to its POSITION node
@@ -23124,6 +23166,7 @@ function planJsx(
 		if (b.kind === 'formCommit') ctx.runtimeNeeded.add('setFormControlSources');
 		if (b.kind === 'hostCommit') {
 			ctx.runtimeNeeded.add('setHostPropSources');
+			if (ctx.nativeReads) b.readStyle = requireRuntimeForContext(ctx, 'readNativeDomStyle');
 			ctx.runtimeNeeded.add('queueOwnRefDetach');
 		}
 		// A commit-phase collector takes the element's props as one grouped call,
@@ -23158,6 +23201,10 @@ function planJsx(
 			ctx.runtimeNeeded.add('setStyleProperty');
 			ctx.runtimeNeeded.add(b.spread ? 'canSplitStyleProperties' : 'isHydratingStyle');
 			if (b.spread) ctx.runtimeNeeded.add('styleObjectPrototype');
+		}
+		if (b.kind === 'nativeStyle') {
+			b.slotIndex = ++nativeStyleSlots;
+			b.helper = requireRuntimeForContext(ctx, 'nativeStyleBinding');
 		}
 		if (b.kind === 'spread') {
 			ctx.runtimeNeeded.add('setSpread');
@@ -23419,7 +23466,8 @@ function planJsx(
 	const afterCalls = [];
 	const pushAfter = (id, line) => afterCalls.push({ id, line });
 	// Dense per-body slot indices. Slot 0 is this body's binding bag (`__s.slots[0]`);
-	// each control-flow / component / child construct gets index 1..N. The runtime
+	// native styles fill the following indices during binding mount. Each remaining
+	// control-flow / component / child construct gets the next index. The runtime
 	// runs the slot calls in `afterCalls` SORTED by source id, so we assign indices in
 	// that same id order — the scope's `slots` array is then written 0,1,2,… and stays
 	// PACKED (a holey array, written out of order, would be a slower elements-kind).
@@ -23434,7 +23482,7 @@ function planJsx(
 	allConstructs.sort((a, b) => a.id - b.id);
 	// Slot 0 is the binding bag for template bodies; control-flow-only (noTemplate)
 	// bodies have no bag, so their constructs start at slot 0.
-	const slotBase = noTemplate ? 0 : 1;
+	const slotBase = noTemplate ? 0 : 1 + nativeStyleSlots;
 	for (let i = 0; i < allConstructs.length; i++) allConstructs[i].slotIndex = i + slotBase;
 	// Hoisted head elements take the slots AFTER the constructs (and `plan.head` runs
 	// after `plan.after`), so the scope's `slots` array fills 0,1,…,N,N+1,… packed.
@@ -24667,6 +24715,14 @@ function emitBindingMount(bind, elVar, bag) {
 		return st(b.stmt(b.call('_$queueFormAuthoringDiagnostic', ...args)));
 	}
 	switch (bind.kind) {
+		case 'nativeStyle': {
+			return st(
+				b.block([
+					...mountHost(),
+					b.stmt(b.call(bind.helper, b.id('__s'), b.literal(bind.slotIndex), el(), bind.expr)),
+				]),
+			);
+		}
 		case 'textOnlyChild': {
 			// Only compiler-admitted native placeholders may be reused. An old
 			// two-argument caller or an excluded custom/template host must retain
@@ -24765,6 +24821,7 @@ function emitBindingMount(bind, elVar, bag) {
 								undefinedNode(),
 								b.id('__s'),
 								b.literal(bind.hasNestedChildren === true),
+								...(bind.readStyle ? [b.id(bind.readStyle)] : []),
 							),
 						),
 					),
@@ -25052,6 +25109,11 @@ function emitBindingUpdate(bind, bag, inlineBindingGuards = false) {
 		attrLoweringToken(b.id(`_$${attrBindingUpdateHelper(bind, inlineBindingGuards)}`), bind);
 	const nameLit = () => attrLoweringToken(b.literal(bind.name), bind);
 	switch (bind.kind) {
+		case 'nativeStyle': {
+			return st(
+				b.stmt(b.call(bind.helper, b.id('__s'), b.literal(bind.slotIndex), F('_el'), bind.expr)),
+			);
+		}
 		case 'nativeChangeRuntime': {
 			return st(b.stmt(b.call('_$queueNativeChangeDiagnostic', F('_el'))));
 		}
@@ -25133,6 +25195,7 @@ function emitBindingUpdate(bind, bag, inlineBindingGuards = false) {
 							F('_host'),
 							b.id('__s'),
 							b.literal(bind.hasNestedChildren === true),
+							...(bind.readStyle ? [b.id(bind.readStyle)] : []),
 						),
 					),
 				),
@@ -26549,6 +26612,20 @@ function emitElementHtml(
 			if (!isAfterSpread && inner.type === 'Literal' && typeof inner.value === 'string') {
 				const chunk = ` style="${escapeAttr(inner.value)}"`;
 				appendBakedAttribute(attrTemplate, chunk, attrName, attr.name, inner, ctx.inspect);
+				continue;
+			}
+			if (
+				ctx.nativeReads &&
+				(inner.type !== 'ObjectExpression' || !objectExprIsStaticLiteral(inner))
+			) {
+				bindings.push({
+					id: bindings.length,
+					kind: 'nativeStyle',
+					expr: tsrxExprNode(inner, ctx, componentName, inlinedSubs),
+					path,
+					ns: hostNs,
+					nameOrigin: attr.name,
+				});
 				continue;
 			}
 			if (

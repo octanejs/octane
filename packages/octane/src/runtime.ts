@@ -159,6 +159,7 @@ import {
 import { createNativeReadRetry, type NativeReadRetry } from './signals/native-read-retry.js';
 import {
 	NativeAdoptionMiss,
+	readNativeDomStyle,
 	runNativeBatch,
 	setNativeAdoptionResolver,
 } from './signals/read-protocol.js';
@@ -409,6 +410,73 @@ function registerHookCleanup(scope: Scope, cleanup: Cleanup): void {
 let NATIVE_READ_DRIVER: NativeReadDriver | null = null;
 let NATIVE_BLOCK_RETRIES: WeakMap<Block, NativeReadRetry> | null = null;
 let NATIVE_ADOPTION_RELEASES: NativeAdoptionState[] | null = null;
+
+export { readNativeDomStyle, readNativeDomProps } from './signals/read-protocol.js';
+
+interface NativeStyleBinding {
+	__kind: 'nativeStyleBinding';
+	__flags: number;
+	__teardown: typeof disposeNativeStyleBinding;
+	block: Block | null;
+}
+
+function disposeNativeStyleBinding(binding: NativeStyleBinding): void {
+	if (binding.block !== null) unmountBlock(binding.block, false);
+	binding.block = null;
+}
+
+function nativeStyleBody(props: { el: HTMLElement | SVGElement; value: any }, scope: Scope): void {
+	const value = readNativeDomStyle(props.value);
+	setStyle(props.el, value, scope.slots[0]);
+	journalRootProperty(scope.slots, 0, scope.slots[0]);
+	scope.slots[0] = value;
+}
+
+/**
+ * A style binding owns reads in a normal scheduled Block, but owns no DOM range.
+ * The enclosing template owns the host and its children. Reusing the native
+ * read driver keeps speculative subscriptions, errors, and adoption transactional.
+ * @internal
+ */
+export function nativeStyleBinding(
+	owner: Scope,
+	slotIndex: number,
+	el: HTMLElement | SVGElement,
+	value: any,
+): void {
+	let binding = owner.slots[slotIndex] as NativeStyleBinding | undefined;
+	if (binding === undefined) {
+		const block = createBlock('control-flow', owner.block, el, null, null, nativeStyleBody, {
+			el,
+			value,
+		});
+		block.parent = owner;
+		binding = {
+			__kind: 'nativeStyleBinding',
+			__flags: SLOT_FLAG_TEARDOWN,
+			__teardown: disposeNativeStyleBinding,
+			block,
+		};
+		// The template bag commits after its bindings. Reserve its first index
+		// to keep the array packed, and publish ownership before a read can suspend.
+		if (owner.slots.length === 0) owner.slots.push(undefined);
+		owner.slots[slotIndex] = binding;
+		registerSlot(owner, binding);
+	} else {
+		const block = binding.block!;
+		if (block.parentNode !== el) {
+			// An incomplete template mount retries with a fresh clone. Its styles
+			// must be applied even when the resolved values match the abandoned host.
+			journalRootProperty(block, 'parentNode', block.parentNode);
+			journalRootProperty(block.slots, 0, block.slots[0]);
+			block.parentNode = el;
+			block.slots[0] = undefined;
+		}
+		journalRootProperty(block, 'props', block.props);
+		block.props = { el, value };
+	}
+	renderBlock(binding.block!);
+}
 
 /** @internal Enable invocation collection before an opted-in module renders. */
 export function enableNativeReadCollection(abi = 1): void {
@@ -20051,6 +20119,7 @@ export function setHostPropSources(
 	prev: Record<string, unknown> | undefined,
 	scope: Scope,
 	hasNestedChildren = false,
+	readStyle?: (value: unknown) => unknown,
 ): Record<string, unknown> {
 	interface PropWriter {
 		name: string;
@@ -20138,6 +20207,7 @@ export function setHostPropSources(
 		? [...values.values()].sort((a, b) => a.firstOrder - b.firstOrder)
 		: values.values();
 	for (const { name, value } of ordered) resolved[name] = value;
+	if (readStyle !== undefined && 'style' in resolved) resolved.style = readStyle(resolved.style);
 	const tag = el.localName;
 	const formHost = tag === 'input' || tag === 'textarea' || tag === 'select';
 	setSpread(el, resolved, prev, scope, true, formHost);

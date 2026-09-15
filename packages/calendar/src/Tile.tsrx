@@ -1,5 +1,5 @@
+import type { CSSProperties } from 'octane';
 import { useMemo, type OctaneNode } from 'octane';
-import type { Octane } from 'octane/jsx-runtime';
 import clsx from 'clsx';
 
 import type {
@@ -9,8 +9,6 @@ import type {
 	TileDisabledFunc,
 	View,
 } from './shared/types.js';
-
-type CSSProperties = Exclude<NonNullable<Octane.HTMLAttributes<Element>['style']>, string>;
 
 type TileProps = {
 	/**
