@@ -439,10 +439,11 @@ function nativeStyleBody(props: { el: HTMLElement | SVGElement; value: any }, sc
  */
 export function nativeStyleBinding(
 	owner: Scope,
-	binding: NativeStyleBinding | undefined,
+	slotIndex: number,
 	el: HTMLElement | SVGElement,
 	value: any,
-): NativeStyleBinding {
+): void {
+	let binding = owner.slots[slotIndex] as NativeStyleBinding | undefined;
 	if (binding === undefined) {
 		const block = createBlock('control-flow', owner.block, el, null, null, nativeStyleBody, {
 			el,
@@ -455,13 +456,25 @@ export function nativeStyleBinding(
 			__teardown: disposeNativeStyleBinding,
 			block,
 		};
+		// The template bag commits after its bindings. Reserve its first index
+		// to keep the array packed, and publish ownership before a read can suspend.
+		if (owner.slots.length === 0) owner.slots.push(undefined);
+		owner.slots[slotIndex] = binding;
 		registerSlot(owner, binding);
 	} else {
-		journalRootProperty(binding.block!, 'props', binding.block!.props);
-		binding.block!.props = { el, value };
+		const block = binding.block!;
+		if (block.parentNode !== el) {
+			// An incomplete template mount retries with a fresh clone. Its styles
+			// must be applied even when the resolved values match the abandoned host.
+			journalRootProperty(block, 'parentNode', block.parentNode);
+			journalRootProperty(block.slots, 0, block.slots[0]);
+			block.parentNode = el;
+			block.slots[0] = undefined;
+		}
+		journalRootProperty(block, 'props', block.props);
+		block.props = { el, value };
 	}
 	renderBlock(binding.block!);
-	return binding;
 }
 
 /** @internal Enable invocation collection before an opted-in module renders. */

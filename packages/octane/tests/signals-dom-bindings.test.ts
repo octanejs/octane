@@ -14,6 +14,68 @@ const server = loadServerFixture<typeof client>(
 );
 
 describe('signal-valued DOM styles', () => {
+	it.each([client.GuardedStyles, client.SignalStyles, client.InlineGuardedStyles])(
+		'releases a replaced style source after its initial render suspends',
+		async (Component) => {
+			const scope = createScope({ scopeKey: 'initial-style-retry' });
+			let resolve!: (value: number) => void;
+			const request = query(
+				'position',
+				() =>
+					new Promise<number>((done) => {
+						resolve = done;
+					}),
+			);
+			const initial$ = scope.asyncSignal$('initial', () => request(undefined));
+			const replacement$ = scope.signal$<number | null>('replacement', 30);
+			const rendered = mount(Component, { left$: initial$ });
+			try {
+				await act(() => resolve(15));
+				const host = rendered.find('div') as HTMLElement;
+				expect(host.style.left).toBe('15px');
+				rendered.update(Component, { left$: replacement$ });
+				expect(rendered.find('div')).toBe(host);
+				expect(host.style.left).toBe('30px');
+				expect(scope.inspect().nodes.find((node) => node.key === 'initial')?.subscribers).toBe(0);
+				flushSync(() => replacement$.set(31));
+				expect(host.style.left).toBe('31px');
+			} finally {
+				rendered.unmount();
+				scope.dispose();
+			}
+		},
+	);
+
+	it('releases styles completed before a sibling initially suspends', async () => {
+		const scope = createScope({ scopeKey: 'initial-style-pair' });
+		const first$ = scope.signal$<number | null>('first', 10);
+		const replacement$ = scope.signal$<number | null>('replacement', 30);
+		let resolve!: (value: number) => void;
+		const request = query(
+			'position',
+			() =>
+				new Promise<number>((done) => {
+					resolve = done;
+				}),
+		);
+		const pending$ = scope.asyncSignal$('pending', () => request(undefined));
+		const rendered = mount(client.InlineGuardedStylePair, { left$: first$, right$: pending$ });
+		try {
+			await act(() => resolve(20));
+			const hosts = rendered.findAll('section > div') as HTMLElement[];
+			expect(hosts.map((host) => host.style.left)).toEqual(['10px', '20px', '10px']);
+			rendered.update(client.InlineGuardedStylePair, { left$: replacement$, right$: replacement$ });
+			expect(rendered.findAll('section > div')).toEqual(hosts);
+			expect(hosts.map((host) => host.style.left)).toEqual(['30px', '30px', '30px']);
+			expect(scope.inspect().nodes.find((node) => node.key === 'first')?.subscribers).toBe(0);
+			flushSync(() => first$.set(11));
+			expect(hosts.map((host) => host.style.left)).toEqual(['30px', '30px', '30px']);
+		} finally {
+			rendered.unmount();
+			scope.dispose();
+		}
+	});
+
 	it.each([client.GuardedStylePair, client.GuardedSpreadStylePair])(
 		'restores accepted styles while a sibling suspends in a transition',
 		async (Component) => {

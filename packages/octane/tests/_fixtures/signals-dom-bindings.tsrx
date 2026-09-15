@@ -78,6 +78,29 @@ export function GuardedStyles(props: { left$: SignalHandle<number | null> }) @{
 	</section>
 }
 
+export function InlineGuardedStyles(props: { left$: SignalHandle<number | null> }) @{
+	@try {
+		<div style={{ left: props.left$ }} />
+	} @pending {
+		<p>{'waiting'}</p>
+	}
+}
+
+export function InlineGuardedStylePair(props: {
+	left$: SignalHandle<number | null>;
+	right$: SignalHandle<number | null>;
+}) @{
+	@try {
+		<section>
+			<div style={{ left: props.left$ }} />
+			<div style={{ left: props.right$ }} />
+			<SignalStyles left$={props.left$} />
+		</section>
+	} @pending {
+		<p>{'waiting'}</p>
+	}
+}
+
 export function GuardedStylePair(props: {
 	left$: SignalHandle<number | null>;
 	right$: SignalHandle<number | null>;

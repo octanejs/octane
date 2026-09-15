@@ -23125,6 +23125,7 @@ function planJsx(
 	// happens on the intact template. (Regression: StoryRow's `.meta` interleaves text holes
 	// with `<Link>` components.)
 	const deferredTextMounts = [];
+	let nativeStyleSlots = 0;
 	// Emit per-binding mount code.
 	for (const b of elementBindings) {
 		// A sibling-position `{x as string}` text hole resolves to its POSITION node
@@ -23202,6 +23203,7 @@ function planJsx(
 			if (b.spread) ctx.runtimeNeeded.add('styleObjectPrototype');
 		}
 		if (b.kind === 'nativeStyle') {
+			b.slotIndex = ++nativeStyleSlots;
 			b.helper = requireRuntimeForContext(ctx, 'nativeStyleBinding');
 		}
 		if (b.kind === 'spread') {
@@ -23464,7 +23466,8 @@ function planJsx(
 	const afterCalls = [];
 	const pushAfter = (id, line) => afterCalls.push({ id, line });
 	// Dense per-body slot indices. Slot 0 is this body's binding bag (`__s.slots[0]`);
-	// each control-flow / component / child construct gets index 1..N. The runtime
+	// native styles fill the following indices during binding mount. Each remaining
+	// control-flow / component / child construct gets the next index. The runtime
 	// runs the slot calls in `afterCalls` SORTED by source id, so we assign indices in
 	// that same id order — the scope's `slots` array is then written 0,1,2,… and stays
 	// PACKED (a holey array, written out of order, would be a slower elements-kind).
@@ -23479,7 +23482,7 @@ function planJsx(
 	allConstructs.sort((a, b) => a.id - b.id);
 	// Slot 0 is the binding bag for template bodies; control-flow-only (noTemplate)
 	// bodies have no bag, so their constructs start at slot 0.
-	const slotBase = noTemplate ? 0 : 1;
+	const slotBase = noTemplate ? 0 : 1 + nativeStyleSlots;
 	for (let i = 0; i < allConstructs.length; i++) allConstructs[i].slotIndex = i + slotBase;
 	// Hoisted head elements take the slots AFTER the constructs (and `plan.head` runs
 	// after `plan.after`), so the scope's `slots` array fills 0,1,…,N,N+1,… packed.
@@ -24716,13 +24719,7 @@ function emitBindingMount(bind, elVar, bag) {
 			return st(
 				b.block([
 					...mountHost(),
-					b.stmt(
-						b.assignment(
-							'=',
-							local(`_native$${bind.id}`),
-							b.call(bind.helper, b.id('__s'), undefinedNode(), el(), bind.expr),
-						),
-					),
+					b.stmt(b.call(bind.helper, b.id('__s'), b.literal(bind.slotIndex), el(), bind.expr)),
 				]),
 			);
 		}
@@ -25113,7 +25110,9 @@ function emitBindingUpdate(bind, bag, inlineBindingGuards = false) {
 	const nameLit = () => attrLoweringToken(b.literal(bind.name), bind);
 	switch (bind.kind) {
 		case 'nativeStyle': {
-			return st(b.stmt(b.call(bind.helper, b.id('__s'), F('_native'), F('_el'), bind.expr)));
+			return st(
+				b.stmt(b.call(bind.helper, b.id('__s'), b.literal(bind.slotIndex), F('_el'), bind.expr)),
+			);
 		}
 		case 'nativeChangeRuntime': {
 			return st(b.stmt(b.call('_$queueNativeChangeDiagnostic', F('_el'))));
