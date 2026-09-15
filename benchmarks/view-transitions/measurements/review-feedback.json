@@ -1,0 +1,5074 @@
+{
+  "reviewedBaseline": "e36dec2b41d61bf5c0ea118b98565fc30f7b94ce",
+  "mainBaseline": "277c10c3fa80f56ef162959832dba35c1b43b32e",
+  "candidateImplementation": "fc0dbf32b6fa4f20d88edf510f8495ef5d0204d2",
+  "finalSources": {
+    "clientRuntimeSha256": "e7403cf81520f470d83f3c377e5f19e2662fd74c318dc4869e4f5e072baa215c",
+    "serverRuntimeSha256": "559abbf8a5e080c246198bc67b00c0adbd06ed222e259f7c4d4c5f132fb5942b",
+    "adapterSha256": "5468e10995cdf7853ef6cb7fad252121fee78187fa4550dfebf9adf35e6e3ac6"
+  },
+  "bundle": {
+    "baseline": {
+      "suite": "view-transitions",
+      "targets": [
+        {
+          "name": "vt-bundle-root-static",
+          "ops": {
+            "raw": {
+              "score": 168394,
+              "median": 168394,
+              "min": 168394,
+              "samples": 1
+            },
+            "gzip": {
+              "score": 53774,
+              "median": 53774,
+              "min": 53774,
+              "samples": 1
+            },
+            "driver_reachable": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            },
+            "staging_reachable": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            }
+          },
+          "meta": {
+            "revision": "e36dec2b41d61bf5c0ea118b98565fc30f7b94ce",
+            "sourceSha256": "9cc1672785c39df29e1c45088216263703e725e3d1605b975ffba6278ac62471",
+            "fixtureSourceSha256": "bbb786f2c180fe8dba7e276ce1d3ef52731a0e172c8bb0b3fde349a06a3ec851",
+            "node": "v24.20.0",
+            "platform": "darwin",
+            "arch": "arm64",
+            "lockfileSha256": "1c3467abe3f112e1f5b5f25589fa19f72765195351ddd6d1a6a35c45db231873",
+            "toolchain": {
+              "vite": "8.1.5",
+              "esbuild": "0.28.1",
+              "tsrxCore": "0.1.71",
+              "playwright": "1.61.1"
+            },
+            "snapshot": {
+              "text": "Octane",
+              "cleaned": true
+            },
+            "bundleSha256": "e38555e48cd38b259be21f2bf6852f1716e2996398f5ed5f1198f805852730d8"
+          }
+        },
+        {
+          "name": "vt-bundle-hooks-state",
+          "ops": {
+            "raw": {
+              "score": 176596,
+              "median": 176596,
+              "min": 176596,
+              "samples": 1
+            },
+            "gzip": {
+              "score": 56723,
+              "median": 56723,
+              "min": 56723,
+              "samples": 1
+            },
+            "driver_reachable": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            },
+            "staging_reachable": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            }
+          },
+          "meta": {
+            "revision": "e36dec2b41d61bf5c0ea118b98565fc30f7b94ce",
+            "sourceSha256": "9cc1672785c39df29e1c45088216263703e725e3d1605b975ffba6278ac62471",
+            "fixtureSourceSha256": "bbb786f2c180fe8dba7e276ce1d3ef52731a0e172c8bb0b3fde349a06a3ec851",
+            "node": "v24.20.0",
+            "platform": "darwin",
+            "arch": "arm64",
+            "lockfileSha256": "1c3467abe3f112e1f5b5f25589fa19f72765195351ddd6d1a6a35c45db231873",
+            "toolchain": {
+              "vite": "8.1.5",
+              "esbuild": "0.28.1",
+              "tsrxCore": "0.1.71",
+              "playwright": "1.61.1"
+            },
+            "snapshot": {
+              "before": "0",
+              "after": "1",
+              "clicks": 1,
+              "effects": 1,
+              "cleanups": 1,
+              "cleaned": true
+            },
+            "bundleSha256": "550fbed9d35d82b5b0ba4f009006d40bd0e2cd67ef6cc0ee1753a6b262734446"
+          }
+        },
+        {
+          "name": "vt-work-root-static",
+          "ops": {
+            "rect_reads": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            },
+            "computed_style_reads": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            },
+            "native_transitions": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            }
+          },
+          "meta": {
+            "revision": "e36dec2b41d61bf5c0ea118b98565fc30f7b94ce",
+            "sourceSha256": "9cc1672785c39df29e1c45088216263703e725e3d1605b975ffba6278ac62471",
+            "fixtureSourceSha256": "bbb786f2c180fe8dba7e276ce1d3ef52731a0e172c8bb0b3fde349a06a3ec851",
+            "node": "v24.20.0",
+            "platform": "darwin",
+            "arch": "arm64",
+            "lockfileSha256": "1c3467abe3f112e1f5b5f25589fa19f72765195351ddd6d1a6a35c45db231873",
+            "toolchain": {
+              "vite": "8.1.5",
+              "esbuild": "0.28.1",
+              "tsrxCore": "0.1.71",
+              "playwright": "1.61.1"
+            },
+            "browser": "149.0.7827.55",
+            "snapshot": {
+              "text": "Octane",
+              "cleaned": true
+            }
+          }
+        },
+        {
+          "name": "vt-work-hooks-state",
+          "ops": {
+            "rect_reads": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            },
+            "computed_style_reads": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            },
+            "native_transitions": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            }
+          },
+          "meta": {
+            "revision": "e36dec2b41d61bf5c0ea118b98565fc30f7b94ce",
+            "sourceSha256": "9cc1672785c39df29e1c45088216263703e725e3d1605b975ffba6278ac62471",
+            "fixtureSourceSha256": "bbb786f2c180fe8dba7e276ce1d3ef52731a0e172c8bb0b3fde349a06a3ec851",
+            "node": "v24.20.0",
+            "platform": "darwin",
+            "arch": "arm64",
+            "lockfileSha256": "1c3467abe3f112e1f5b5f25589fa19f72765195351ddd6d1a6a35c45db231873",
+            "toolchain": {
+              "vite": "8.1.5",
+              "esbuild": "0.28.1",
+              "tsrxCore": "0.1.71",
+              "playwright": "1.61.1"
+            },
+            "browser": "149.0.7827.55",
+            "snapshot": {
+              "before": "0",
+              "after": "1",
+              "clicks": 1,
+              "effects": 1,
+              "cleanups": 1,
+              "cleaned": true
+            }
+          }
+        },
+        {
+          "name": "vt-bundle-active",
+          "ops": {
+            "raw": {
+              "score": 322644,
+              "median": 322644,
+              "min": 322644,
+              "samples": 1
+            },
+            "gzip": {
+              "score": 89670,
+              "median": 89670,
+              "min": 89670,
+              "samples": 1
+            },
+            "driver_reachable": {
+              "score": 1,
+              "median": 1,
+              "min": 1,
+              "samples": 1
+            },
+            "staging_reachable": {
+              "score": 1,
+              "median": 1,
+              "min": 1,
+              "samples": 1
+            }
+          },
+          "meta": {
+            "revision": "e36dec2b41d61bf5c0ea118b98565fc30f7b94ce",
+            "sourceSha256": "9cc1672785c39df29e1c45088216263703e725e3d1605b975ffba6278ac62471",
+            "fixtureSourceSha256": "bbb786f2c180fe8dba7e276ce1d3ef52731a0e172c8bb0b3fde349a06a3ec851",
+            "node": "v24.20.0",
+            "platform": "darwin",
+            "arch": "arm64",
+            "lockfileSha256": "1c3467abe3f112e1f5b5f25589fa19f72765195351ddd6d1a6a35c45db231873",
+            "toolchain": {
+              "vite": "8.1.5",
+              "esbuild": "0.28.1",
+              "tsrxCore": "0.1.71",
+              "playwright": "1.61.1"
+            },
+            "browser": "149.0.7827.55",
+            "snapshot": [
+              {
+                "text": "generation 1",
+                "inputIdentity": true,
+                "inputValue": "retained draft",
+                "kinds": ["update"],
+                "animated": true
+              },
+              {
+                "text": "generation 2",
+                "inputIdentity": true,
+                "inputValue": "retained draft",
+                "kinds": ["update"],
+                "animated": true
+              },
+              {
+                "text": "generation 3",
+                "inputIdentity": true,
+                "inputValue": "retained draft",
+                "kinds": ["update"],
+                "animated": true
+              },
+              {
+                "text": "generation 4",
+                "inputIdentity": true,
+                "inputValue": "retained draft",
+                "kinds": ["update"],
+                "animated": true
+              }
+            ],
+            "bundleSha256": "9d75edc73fc3953e6a2caf026f7c9469b67e5574dd7bb76768b2ad8188c84f5f"
+          }
+        },
+        {
+          "name": "vt-work-four-updates",
+          "ops": {
+            "rect_reads": {
+              "score": 8,
+              "median": 8,
+              "min": 8,
+              "samples": 1
+            },
+            "computed_style_reads": {
+              "score": 28,
+              "median": 28,
+              "min": 28,
+              "samples": 1
+            },
+            "native_transitions": {
+              "score": 4,
+              "median": 4,
+              "min": 4,
+              "samples": 1
+            }
+          },
+          "meta": {
+            "revision": "e36dec2b41d61bf5c0ea118b98565fc30f7b94ce",
+            "sourceSha256": "9cc1672785c39df29e1c45088216263703e725e3d1605b975ffba6278ac62471",
+            "fixtureSourceSha256": "bbb786f2c180fe8dba7e276ce1d3ef52731a0e172c8bb0b3fde349a06a3ec851",
+            "node": "v24.20.0",
+            "platform": "darwin",
+            "arch": "arm64",
+            "lockfileSha256": "1c3467abe3f112e1f5b5f25589fa19f72765195351ddd6d1a6a35c45db231873",
+            "toolchain": {
+              "vite": "8.1.5",
+              "esbuild": "0.28.1",
+              "tsrxCore": "0.1.71",
+              "playwright": "1.61.1"
+            },
+            "browser": "149.0.7827.55",
+            "snapshot": [
+              {
+                "text": "generation 1",
+                "inputIdentity": true,
+                "inputValue": "retained draft",
+                "kinds": ["update"],
+                "animated": true
+              },
+              {
+                "text": "generation 2",
+                "inputIdentity": true,
+                "inputValue": "retained draft",
+                "kinds": ["update"],
+                "animated": true
+              },
+              {
+                "text": "generation 3",
+                "inputIdentity": true,
+                "inputValue": "retained draft",
+                "kinds": ["update"],
+                "animated": true
+              },
+              {
+                "text": "generation 4",
+                "inputIdentity": true,
+                "inputValue": "retained draft",
+                "kinds": ["update"],
+                "animated": true
+              }
+            ]
+          }
+        },
+        {
+          "name": "vt-work-model",
+          "ops": {
+            "updates": {
+              "score": 4,
+              "median": 4,
+              "min": 4,
+              "samples": 1
+            },
+            "rect_reads": {
+              "score": 4,
+              "median": 4,
+              "min": 4,
+              "samples": 1
+            },
+            "computed_style_reads": {
+              "score": 4,
+              "median": 4,
+              "min": 4,
+              "samples": 1
+            },
+            "native_transitions": {
+              "score": 4,
+              "median": 4,
+              "min": 4,
+              "samples": 1
+            },
+            "driver_reachable": {
+              "score": 1,
+              "median": 1,
+              "min": 1,
+              "samples": 1
+            },
+            "staging_reachable": {
+              "score": 1,
+              "median": 1,
+              "min": 1,
+              "samples": 1
+            }
+          },
+          "meta": {
+            "revision": "e36dec2b41d61bf5c0ea118b98565fc30f7b94ce",
+            "sourceSha256": "9cc1672785c39df29e1c45088216263703e725e3d1605b975ffba6278ac62471",
+            "fixtureSourceSha256": "bbb786f2c180fe8dba7e276ce1d3ef52731a0e172c8bb0b3fde349a06a3ec851",
+            "node": "v24.20.0",
+            "platform": "darwin",
+            "arch": "arm64",
+            "lockfileSha256": "1c3467abe3f112e1f5b5f25589fa19f72765195351ddd6d1a6a35c45db231873",
+            "toolchain": {
+              "vite": "8.1.5",
+              "esbuild": "0.28.1",
+              "tsrxCore": "0.1.71",
+              "playwright": "1.61.1"
+            },
+            "semanticControl": "four completed native animations preserve the input and final text"
+          }
+        }
+      ]
+    },
+    "candidate": {
+      "suite": "view-transitions",
+      "targets": [
+        {
+          "name": "vt-bundle-root-static",
+          "ops": {
+            "raw": {
+              "score": 166474,
+              "median": 166474,
+              "min": 166474,
+              "samples": 1
+            },
+            "gzip": {
+              "score": 53663,
+              "median": 53663,
+              "min": 53663,
+              "samples": 1
+            },
+            "driver_reachable": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            },
+            "staging_reachable": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            }
+          },
+          "meta": {
+            "revision": "fc0dbf32b6fa4f20d88edf510f8495ef5d0204d2",
+            "sourceSha256": "a00ac687f2bc505d5cca78d67b108776999ecec53b6afb1312947597e98c3ccc",
+            "fixtureSourceSha256": "bbb786f2c180fe8dba7e276ce1d3ef52731a0e172c8bb0b3fde349a06a3ec851",
+            "node": "v24.20.0",
+            "platform": "darwin",
+            "arch": "arm64",
+            "lockfileSha256": "1c3467abe3f112e1f5b5f25589fa19f72765195351ddd6d1a6a35c45db231873",
+            "toolchain": {
+              "vite": "8.1.5",
+              "esbuild": "0.28.1",
+              "tsrxCore": "0.1.71",
+              "playwright": "1.61.1"
+            },
+            "snapshot": {
+              "text": "Octane",
+              "cleaned": true
+            },
+            "bundleSha256": "25e59d097f5e4bb1ca7bd6d2ee82682438e12f3aad923edf9cbe7df2421e2fa7"
+          }
+        },
+        {
+          "name": "vt-bundle-hooks-state",
+          "ops": {
+            "raw": {
+              "score": 174676,
+              "median": 174676,
+              "min": 174676,
+              "samples": 1
+            },
+            "gzip": {
+              "score": 56565,
+              "median": 56565,
+              "min": 56565,
+              "samples": 1
+            },
+            "driver_reachable": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            },
+            "staging_reachable": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            }
+          },
+          "meta": {
+            "revision": "fc0dbf32b6fa4f20d88edf510f8495ef5d0204d2",
+            "sourceSha256": "a00ac687f2bc505d5cca78d67b108776999ecec53b6afb1312947597e98c3ccc",
+            "fixtureSourceSha256": "bbb786f2c180fe8dba7e276ce1d3ef52731a0e172c8bb0b3fde349a06a3ec851",
+            "node": "v24.20.0",
+            "platform": "darwin",
+            "arch": "arm64",
+            "lockfileSha256": "1c3467abe3f112e1f5b5f25589fa19f72765195351ddd6d1a6a35c45db231873",
+            "toolchain": {
+              "vite": "8.1.5",
+              "esbuild": "0.28.1",
+              "tsrxCore": "0.1.71",
+              "playwright": "1.61.1"
+            },
+            "snapshot": {
+              "before": "0",
+              "after": "1",
+              "clicks": 1,
+              "effects": 1,
+              "cleanups": 1,
+              "cleaned": true
+            },
+            "bundleSha256": "ddedf77f8bcf4018cf5fa8ee03420b0a78a06794608b49bbca1456faa171571f"
+          }
+        },
+        {
+          "name": "vt-work-root-static",
+          "ops": {
+            "rect_reads": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            },
+            "computed_style_reads": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            },
+            "native_transitions": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            }
+          },
+          "meta": {
+            "revision": "fc0dbf32b6fa4f20d88edf510f8495ef5d0204d2",
+            "sourceSha256": "a00ac687f2bc505d5cca78d67b108776999ecec53b6afb1312947597e98c3ccc",
+            "fixtureSourceSha256": "bbb786f2c180fe8dba7e276ce1d3ef52731a0e172c8bb0b3fde349a06a3ec851",
+            "node": "v24.20.0",
+            "platform": "darwin",
+            "arch": "arm64",
+            "lockfileSha256": "1c3467abe3f112e1f5b5f25589fa19f72765195351ddd6d1a6a35c45db231873",
+            "toolchain": {
+              "vite": "8.1.5",
+              "esbuild": "0.28.1",
+              "tsrxCore": "0.1.71",
+              "playwright": "1.61.1"
+            },
+            "browser": "149.0.7827.55",
+            "snapshot": {
+              "text": "Octane",
+              "cleaned": true
+            }
+          }
+        },
+        {
+          "name": "vt-work-hooks-state",
+          "ops": {
+            "rect_reads": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            },
+            "computed_style_reads": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            },
+            "native_transitions": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            }
+          },
+          "meta": {
+            "revision": "fc0dbf32b6fa4f20d88edf510f8495ef5d0204d2",
+            "sourceSha256": "a00ac687f2bc505d5cca78d67b108776999ecec53b6afb1312947597e98c3ccc",
+            "fixtureSourceSha256": "bbb786f2c180fe8dba7e276ce1d3ef52731a0e172c8bb0b3fde349a06a3ec851",
+            "node": "v24.20.0",
+            "platform": "darwin",
+            "arch": "arm64",
+            "lockfileSha256": "1c3467abe3f112e1f5b5f25589fa19f72765195351ddd6d1a6a35c45db231873",
+            "toolchain": {
+              "vite": "8.1.5",
+              "esbuild": "0.28.1",
+              "tsrxCore": "0.1.71",
+              "playwright": "1.61.1"
+            },
+            "browser": "149.0.7827.55",
+            "snapshot": {
+              "before": "0",
+              "after": "1",
+              "clicks": 1,
+              "effects": 1,
+              "cleanups": 1,
+              "cleaned": true
+            }
+          }
+        },
+        {
+          "name": "vt-bundle-active",
+          "ops": {
+            "raw": {
+              "score": 323694,
+              "median": 323694,
+              "min": 323694,
+              "samples": 1
+            },
+            "gzip": {
+              "score": 90391,
+              "median": 90391,
+              "min": 90391,
+              "samples": 1
+            },
+            "driver_reachable": {
+              "score": 1,
+              "median": 1,
+              "min": 1,
+              "samples": 1
+            },
+            "staging_reachable": {
+              "score": 1,
+              "median": 1,
+              "min": 1,
+              "samples": 1
+            }
+          },
+          "meta": {
+            "revision": "fc0dbf32b6fa4f20d88edf510f8495ef5d0204d2",
+            "sourceSha256": "a00ac687f2bc505d5cca78d67b108776999ecec53b6afb1312947597e98c3ccc",
+            "fixtureSourceSha256": "bbb786f2c180fe8dba7e276ce1d3ef52731a0e172c8bb0b3fde349a06a3ec851",
+            "node": "v24.20.0",
+            "platform": "darwin",
+            "arch": "arm64",
+            "lockfileSha256": "1c3467abe3f112e1f5b5f25589fa19f72765195351ddd6d1a6a35c45db231873",
+            "toolchain": {
+              "vite": "8.1.5",
+              "esbuild": "0.28.1",
+              "tsrxCore": "0.1.71",
+              "playwright": "1.61.1"
+            },
+            "browser": "149.0.7827.55",
+            "snapshot": [
+              {
+                "text": "generation 1",
+                "inputIdentity": true,
+                "inputValue": "retained draft",
+                "kinds": ["update"],
+                "animated": true
+              },
+              {
+                "text": "generation 2",
+                "inputIdentity": true,
+                "inputValue": "retained draft",
+                "kinds": ["update"],
+                "animated": true
+              },
+              {
+                "text": "generation 3",
+                "inputIdentity": true,
+                "inputValue": "retained draft",
+                "kinds": ["update"],
+                "animated": true
+              },
+              {
+                "text": "generation 4",
+                "inputIdentity": true,
+                "inputValue": "retained draft",
+                "kinds": ["update"],
+                "animated": true
+              }
+            ],
+            "bundleSha256": "02fdb8a0f35fc52814bdc0cc74c90c321cce8baf95c1b9104641a880958b6342"
+          }
+        },
+        {
+          "name": "vt-work-four-updates",
+          "ops": {
+            "rect_reads": {
+              "score": 8,
+              "median": 8,
+              "min": 8,
+              "samples": 1
+            },
+            "computed_style_reads": {
+              "score": 24,
+              "median": 24,
+              "min": 24,
+              "samples": 1
+            },
+            "native_transitions": {
+              "score": 4,
+              "median": 4,
+              "min": 4,
+              "samples": 1
+            }
+          },
+          "meta": {
+            "revision": "fc0dbf32b6fa4f20d88edf510f8495ef5d0204d2",
+            "sourceSha256": "a00ac687f2bc505d5cca78d67b108776999ecec53b6afb1312947597e98c3ccc",
+            "fixtureSourceSha256": "bbb786f2c180fe8dba7e276ce1d3ef52731a0e172c8bb0b3fde349a06a3ec851",
+            "node": "v24.20.0",
+            "platform": "darwin",
+            "arch": "arm64",
+            "lockfileSha256": "1c3467abe3f112e1f5b5f25589fa19f72765195351ddd6d1a6a35c45db231873",
+            "toolchain": {
+              "vite": "8.1.5",
+              "esbuild": "0.28.1",
+              "tsrxCore": "0.1.71",
+              "playwright": "1.61.1"
+            },
+            "browser": "149.0.7827.55",
+            "snapshot": [
+              {
+                "text": "generation 1",
+                "inputIdentity": true,
+                "inputValue": "retained draft",
+                "kinds": ["update"],
+                "animated": true
+              },
+              {
+                "text": "generation 2",
+                "inputIdentity": true,
+                "inputValue": "retained draft",
+                "kinds": ["update"],
+                "animated": true
+              },
+              {
+                "text": "generation 3",
+                "inputIdentity": true,
+                "inputValue": "retained draft",
+                "kinds": ["update"],
+                "animated": true
+              },
+              {
+                "text": "generation 4",
+                "inputIdentity": true,
+                "inputValue": "retained draft",
+                "kinds": ["update"],
+                "animated": true
+              }
+            ]
+          }
+        },
+        {
+          "name": "vt-work-model",
+          "ops": {
+            "updates": {
+              "score": 4,
+              "median": 4,
+              "min": 4,
+              "samples": 1
+            },
+            "rect_reads": {
+              "score": 4,
+              "median": 4,
+              "min": 4,
+              "samples": 1
+            },
+            "computed_style_reads": {
+              "score": 4,
+              "median": 4,
+              "min": 4,
+              "samples": 1
+            },
+            "native_transitions": {
+              "score": 4,
+              "median": 4,
+              "min": 4,
+              "samples": 1
+            },
+            "driver_reachable": {
+              "score": 1,
+              "median": 1,
+              "min": 1,
+              "samples": 1
+            },
+            "staging_reachable": {
+              "score": 1,
+              "median": 1,
+              "min": 1,
+              "samples": 1
+            }
+          },
+          "meta": {
+            "revision": "fc0dbf32b6fa4f20d88edf510f8495ef5d0204d2",
+            "sourceSha256": "a00ac687f2bc505d5cca78d67b108776999ecec53b6afb1312947597e98c3ccc",
+            "fixtureSourceSha256": "bbb786f2c180fe8dba7e276ce1d3ef52731a0e172c8bb0b3fde349a06a3ec851",
+            "node": "v24.20.0",
+            "platform": "darwin",
+            "arch": "arm64",
+            "lockfileSha256": "1c3467abe3f112e1f5b5f25589fa19f72765195351ddd6d1a6a35c45db231873",
+            "toolchain": {
+              "vite": "8.1.5",
+              "esbuild": "0.28.1",
+              "tsrxCore": "0.1.71",
+              "playwright": "1.61.1"
+            },
+            "semanticControl": "four completed native animations preserve the input and final text"
+          }
+        }
+      ]
+    }
+  },
+  "scopes": {
+    "baseline": {
+      "suite": "view-transition-scopes",
+      "bytesOnly": false,
+      "metadata": {
+        "revision": "e36dec2b41d61bf5c0ea118b98565fc30f7b94ce",
+        "sourceSha256": "9cc1672785c39df29e1c45088216263703e725e3d1605b975ffba6278ac62471",
+        "fixtureSha256": "21de6f46b5acf90644e44aa86eed19cef5d3c73755acda4754bcfb2fedac3d41",
+        "lockfileSha256": "1c3467abe3f112e1f5b5f25589fa19f72765195351ddd6d1a6a35c45db231873",
+        "node": "v24.20.0",
+        "platform": "darwin",
+        "arch": "arm64",
+        "toolchain": {
+          "vite": "8.1.5",
+          "esbuild": "0.28.1",
+          "tsrxCore": "0.1.71",
+          "playwright": "1.61.1"
+        },
+        "chromium": "149.0.7827.55"
+      },
+      "bundle": {
+        "rawBytes": 317647,
+        "gzipBytes": 88076,
+        "sha256": "9aa428565bfd832735190e3c869cb5f6e025a4671a294abe4605b2dd7bb91fb9",
+        "driverReachable": 1,
+        "stagingReachable": 1
+      },
+      "cases": {
+        "single": {
+          "counts": {
+            "rectReads": 4,
+            "styleReads": 22,
+            "elementCaptures": 1,
+            "documentCaptures": 0
+          },
+          "semantic": {
+            "owners": ["left"],
+            "ready": [["fulfilled", "fulfilled", null]],
+            "finished": ["fulfilled"],
+            "hostsRetained": true,
+            "roots": [
+              {
+                "id": "left",
+                "scope": "all"
+              }
+            ],
+            "text": [["left", "left-after"]],
+            "events": [
+              {
+                "id": "left-root",
+                "targets": ["left", "left"],
+                "animatedTarget": "left",
+                "styleOwner": "left"
+              },
+              {
+                "id": "left",
+                "targets": ["left", "left"],
+                "animatedTarget": "left",
+                "styleOwner": "left"
+              }
+            ]
+          }
+        },
+        "siblings": {
+          "counts": {
+            "rectReads": 8,
+            "styleReads": 44,
+            "elementCaptures": 2,
+            "documentCaptures": 0
+          },
+          "semantic": {
+            "owners": ["left", "right"],
+            "ready": [
+              ["fulfilled", "fulfilled", null],
+              ["fulfilled", "fulfilled", null]
+            ],
+            "finished": ["fulfilled", "fulfilled"],
+            "hostsRetained": true,
+            "roots": [
+              {
+                "id": "left",
+                "scope": "all"
+              },
+              {
+                "id": "right",
+                "scope": "all"
+              }
+            ],
+            "text": [
+              ["left", "left-after"],
+              ["right", "right-after"]
+            ],
+            "events": [
+              {
+                "id": "left-root",
+                "targets": ["left", "left"],
+                "animatedTarget": "left",
+                "styleOwner": "left"
+              },
+              {
+                "id": "left",
+                "targets": ["left", "left"],
+                "animatedTarget": "left",
+                "styleOwner": "left"
+              },
+              {
+                "id": "right-root",
+                "targets": ["right", "right"],
+                "animatedTarget": "right",
+                "styleOwner": "right"
+              },
+              {
+                "id": "right",
+                "targets": ["right", "right"],
+                "animatedTarget": "right",
+                "styleOwner": "right"
+              }
+            ]
+          }
+        },
+        "nested": {
+          "counts": {
+            "rectReads": 8,
+            "styleReads": 44,
+            "elementCaptures": 2,
+            "documentCaptures": 0
+          },
+          "semantic": {
+            "owners": ["inner", "left"],
+            "ready": [
+              ["fulfilled", "fulfilled", null],
+              ["fulfilled", "fulfilled", null]
+            ],
+            "finished": ["fulfilled", "fulfilled"],
+            "hostsRetained": true,
+            "roots": [
+              {
+                "id": "left",
+                "scope": "all"
+              },
+              {
+                "id": "inner",
+                "scope": "all"
+              }
+            ],
+            "text": [
+              ["left", "left-after"],
+              ["inner", "inner-after"]
+            ],
+            "events": [
+              {
+                "id": "left-root",
+                "targets": ["left", "left"],
+                "animatedTarget": "left",
+                "styleOwner": "left"
+              },
+              {
+                "id": "left",
+                "targets": ["left", "left"],
+                "animatedTarget": "left",
+                "styleOwner": "left"
+              },
+              {
+                "id": "inner-root",
+                "targets": ["inner", "inner"],
+                "animatedTarget": "inner",
+                "styleOwner": "inner"
+              },
+              {
+                "id": "inner",
+                "targets": ["inner", "inner"],
+                "animatedTarget": "inner",
+                "styleOwner": "inner"
+              }
+            ]
+          }
+        },
+        "mixed": {
+          "counts": {
+            "rectReads": 14,
+            "styleReads": 71,
+            "elementCaptures": 3,
+            "documentCaptures": 1
+          },
+          "semantic": {
+            "owners": ["document", "inner", "left", "right"],
+            "ready": [
+              ["fulfilled", "fulfilled", null],
+              ["fulfilled", "fulfilled", null],
+              ["fulfilled", "fulfilled", null],
+              ["fulfilled", "fulfilled", null]
+            ],
+            "finished": ["fulfilled", "fulfilled", "fulfilled", "fulfilled"],
+            "hostsRetained": true,
+            "roots": [
+              {
+                "id": "left",
+                "scope": "all"
+              },
+              {
+                "id": "inner",
+                "scope": "all"
+              },
+              {
+                "id": "right",
+                "scope": "all"
+              }
+            ],
+            "text": [
+              ["page", "page-after"],
+              ["left", "left-after"],
+              ["inner", "inner-after"],
+              ["right", "right-after"]
+            ],
+            "events": [
+              {
+                "id": "left-root",
+                "targets": ["left", "left"],
+                "animatedTarget": "left",
+                "styleOwner": "left"
+              },
+              {
+                "id": "left",
+                "targets": ["left", "left"],
+                "animatedTarget": "left",
+                "styleOwner": "left"
+              },
+              {
+                "id": "inner-root",
+                "targets": ["inner", "inner"],
+                "animatedTarget": "inner",
+                "styleOwner": "inner"
+              },
+              {
+                "id": "inner",
+                "targets": ["inner", "inner"],
+                "animatedTarget": "inner",
+                "styleOwner": "inner"
+              },
+              {
+                "id": "right-root",
+                "targets": ["right", "right"],
+                "animatedTarget": "right",
+                "styleOwner": "right"
+              },
+              {
+                "id": "right",
+                "targets": ["right", "right"],
+                "animatedTarget": "right",
+                "styleOwner": "right"
+              },
+              {
+                "id": "page",
+                "targets": ["document", "document"],
+                "animatedTarget": "document",
+                "styleOwner": "document"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "candidate": {
+      "suite": "view-transition-scopes",
+      "bytesOnly": false,
+      "metadata": {
+        "revision": "fc0dbf32b6fa4f20d88edf510f8495ef5d0204d2",
+        "sourceSha256": "a00ac687f2bc505d5cca78d67b108776999ecec53b6afb1312947597e98c3ccc",
+        "fixtureSha256": "21de6f46b5acf90644e44aa86eed19cef5d3c73755acda4754bcfb2fedac3d41",
+        "lockfileSha256": "1c3467abe3f112e1f5b5f25589fa19f72765195351ddd6d1a6a35c45db231873",
+        "node": "v24.20.0",
+        "platform": "darwin",
+        "arch": "arm64",
+        "toolchain": {
+          "vite": "8.1.5",
+          "esbuild": "0.28.1",
+          "tsrxCore": "0.1.71",
+          "playwright": "1.61.1"
+        },
+        "chromium": "149.0.7827.55"
+      },
+      "bundle": {
+        "rawBytes": 318636,
+        "gzipBytes": 88750,
+        "sha256": "ebe01cc054e67afa9f51533e1ba8ae7d37524e6d0fbbdd8ec391d2e7535ac0cd",
+        "driverReachable": 1,
+        "stagingReachable": 1
+      },
+      "cases": {
+        "single": {
+          "counts": {
+            "rectReads": 4,
+            "styleReads": 20,
+            "elementCaptures": 1,
+            "documentCaptures": 0
+          },
+          "semantic": {
+            "owners": ["left"],
+            "ready": [["fulfilled", "fulfilled", null]],
+            "finished": ["fulfilled"],
+            "hostsRetained": true,
+            "roots": [
+              {
+                "id": "left",
+                "scope": "all"
+              }
+            ],
+            "text": [["left", "left-after"]],
+            "events": [
+              {
+                "id": "left-root",
+                "targets": ["left", "left"],
+                "animatedTarget": "left",
+                "styleOwner": "left"
+              },
+              {
+                "id": "left",
+                "targets": ["left", "left"],
+                "animatedTarget": "left",
+                "styleOwner": "left"
+              }
+            ]
+          }
+        },
+        "siblings": {
+          "counts": {
+            "rectReads": 8,
+            "styleReads": 40,
+            "elementCaptures": 2,
+            "documentCaptures": 0
+          },
+          "semantic": {
+            "owners": ["left", "right"],
+            "ready": [
+              ["fulfilled", "fulfilled", null],
+              ["fulfilled", "fulfilled", null]
+            ],
+            "finished": ["fulfilled", "fulfilled"],
+            "hostsRetained": true,
+            "roots": [
+              {
+                "id": "left",
+                "scope": "all"
+              },
+              {
+                "id": "right",
+                "scope": "all"
+              }
+            ],
+            "text": [
+              ["left", "left-after"],
+              ["right", "right-after"]
+            ],
+            "events": [
+              {
+                "id": "left-root",
+                "targets": ["left", "left"],
+                "animatedTarget": "left",
+                "styleOwner": "left"
+              },
+              {
+                "id": "left",
+                "targets": ["left", "left"],
+                "animatedTarget": "left",
+                "styleOwner": "left"
+              },
+              {
+                "id": "right-root",
+                "targets": ["right", "right"],
+                "animatedTarget": "right",
+                "styleOwner": "right"
+              },
+              {
+                "id": "right",
+                "targets": ["right", "right"],
+                "animatedTarget": "right",
+                "styleOwner": "right"
+              }
+            ]
+          }
+        },
+        "nested": {
+          "counts": {
+            "rectReads": 8,
+            "styleReads": 40,
+            "elementCaptures": 2,
+            "documentCaptures": 0
+          },
+          "semantic": {
+            "owners": ["inner", "left"],
+            "ready": [
+              ["fulfilled", "fulfilled", null],
+              ["fulfilled", "fulfilled", null]
+            ],
+            "finished": ["fulfilled", "fulfilled"],
+            "hostsRetained": true,
+            "roots": [
+              {
+                "id": "left",
+                "scope": "all"
+              },
+              {
+                "id": "inner",
+                "scope": "all"
+              }
+            ],
+            "text": [
+              ["left", "left-after"],
+              ["inner", "inner-after"]
+            ],
+            "events": [
+              {
+                "id": "left-root",
+                "targets": ["left", "left"],
+                "animatedTarget": "left",
+                "styleOwner": "left"
+              },
+              {
+                "id": "left",
+                "targets": ["left", "left"],
+                "animatedTarget": "left",
+                "styleOwner": "left"
+              },
+              {
+                "id": "inner-root",
+                "targets": ["inner", "inner"],
+                "animatedTarget": "inner",
+                "styleOwner": "inner"
+              },
+              {
+                "id": "inner",
+                "targets": ["inner", "inner"],
+                "animatedTarget": "inner",
+                "styleOwner": "inner"
+              }
+            ]
+          }
+        },
+        "mixed": {
+          "counts": {
+            "rectReads": 14,
+            "styleReads": 64,
+            "elementCaptures": 3,
+            "documentCaptures": 1
+          },
+          "semantic": {
+            "owners": ["document", "inner", "left", "right"],
+            "ready": [
+              ["fulfilled", "fulfilled", null],
+              ["fulfilled", "fulfilled", null],
+              ["fulfilled", "fulfilled", null],
+              ["fulfilled", "fulfilled", null]
+            ],
+            "finished": ["fulfilled", "fulfilled", "fulfilled", "fulfilled"],
+            "hostsRetained": true,
+            "roots": [
+              {
+                "id": "left",
+                "scope": "all"
+              },
+              {
+                "id": "inner",
+                "scope": "all"
+              },
+              {
+                "id": "right",
+                "scope": "all"
+              }
+            ],
+            "text": [
+              ["page", "page-after"],
+              ["left", "left-after"],
+              ["inner", "inner-after"],
+              ["right", "right-after"]
+            ],
+            "events": [
+              {
+                "id": "left-root",
+                "targets": ["left", "left"],
+                "animatedTarget": "left",
+                "styleOwner": "left"
+              },
+              {
+                "id": "left",
+                "targets": ["left", "left"],
+                "animatedTarget": "left",
+                "styleOwner": "left"
+              },
+              {
+                "id": "inner-root",
+                "targets": ["inner", "inner"],
+                "animatedTarget": "inner",
+                "styleOwner": "inner"
+              },
+              {
+                "id": "inner",
+                "targets": ["inner", "inner"],
+                "animatedTarget": "inner",
+                "styleOwner": "inner"
+              },
+              {
+                "id": "right-root",
+                "targets": ["right", "right"],
+                "animatedTarget": "right",
+                "styleOwner": "right"
+              },
+              {
+                "id": "right",
+                "targets": ["right", "right"],
+                "animatedTarget": "right",
+                "styleOwner": "right"
+              },
+              {
+                "id": "page",
+                "targets": ["document", "document"],
+                "animatedTarget": "document",
+                "styleOwner": "document"
+              }
+            ]
+          }
+        }
+      }
+    }
+  },
+  "ordinaryStyles": {
+    "baseline": {
+      "suite": "style-literals-work",
+      "results": {
+        "single": {
+          "mount_1k": {
+            "setStyle": 0,
+            "setStyleProperty": 1000,
+            "setStyleProperties": 0,
+            "applyStyleValue": 0,
+            "applyStyleProperty": 1000,
+            "SingleRow": 1000,
+            "MultiRow": 0,
+            "GenericRow": 0,
+            "InterleavedRow": 0,
+            "DuplicateStaticRow": 0,
+            "DuplicateDynamicRow": 0,
+            "LeadingSpreadRow": 0,
+            "LeadingGenericRow": 0,
+            "CollisionSpreadRow": 0,
+            "CollisionGenericRow": 0,
+            "stylePreviousScans": 0,
+            "styleValueScans": 0,
+            "rows": 1000,
+            "colorEvaluations": 0,
+            "styleSets": 1000,
+            "styleRemoves": 0,
+            "fontStyleWrites": 0
+          },
+          "select_one": {
+            "setStyle": 0,
+            "setStyleProperty": 1,
+            "setStyleProperties": 0,
+            "applyStyleValue": 0,
+            "applyStyleProperty": 1,
+            "SingleRow": 1000,
+            "MultiRow": 0,
+            "GenericRow": 0,
+            "InterleavedRow": 0,
+            "DuplicateStaticRow": 0,
+            "DuplicateDynamicRow": 0,
+            "LeadingSpreadRow": 0,
+            "LeadingGenericRow": 0,
+            "CollisionSpreadRow": 0,
+            "CollisionGenericRow": 0,
+            "stylePreviousScans": 0,
+            "styleValueScans": 0,
+            "rows": 1000,
+            "colorEvaluations": 0,
+            "styleSets": 1,
+            "styleRemoves": 0,
+            "fontStyleWrites": 0
+          },
+          "select_another": {
+            "setStyle": 0,
+            "setStyleProperty": 2,
+            "setStyleProperties": 0,
+            "applyStyleValue": 0,
+            "applyStyleProperty": 2,
+            "SingleRow": 1000,
+            "MultiRow": 0,
+            "GenericRow": 0,
+            "InterleavedRow": 0,
+            "DuplicateStaticRow": 0,
+            "DuplicateDynamicRow": 0,
+            "LeadingSpreadRow": 0,
+            "LeadingGenericRow": 0,
+            "CollisionSpreadRow": 0,
+            "CollisionGenericRow": 0,
+            "stylePreviousScans": 0,
+            "styleValueScans": 0,
+            "rows": 1000,
+            "colorEvaluations": 0,
+            "styleSets": 2,
+            "styleRemoves": 0,
+            "fontStyleWrites": 0
+          },
+          "unrelated_update": {
+            "setStyle": 0,
+            "setStyleProperty": 0,
+            "setStyleProperties": 0,
+            "applyStyleValue": 0,
+            "applyStyleProperty": 0,
+            "SingleRow": 1000,
+            "MultiRow": 0,
+            "GenericRow": 0,
+            "InterleavedRow": 0,
+            "DuplicateStaticRow": 0,
+            "DuplicateDynamicRow": 0,
+            "LeadingSpreadRow": 0,
+            "LeadingGenericRow": 0,
+            "CollisionSpreadRow": 0,
+            "CollisionGenericRow": 0,
+            "stylePreviousScans": 0,
+            "styleValueScans": 0,
+            "rows": 1000,
+            "colorEvaluations": 0,
+            "styleSets": 0,
+            "styleRemoves": 0,
+            "fontStyleWrites": 0
+          }
+        },
+        "multi": {
+          "mount_1k": {
+            "setStyle": 0,
+            "setStyleProperty": 0,
+            "setStyleProperties": 1000,
+            "applyStyleValue": 0,
+            "applyStyleProperty": 2000,
+            "SingleRow": 0,
+            "MultiRow": 1000,
+            "GenericRow": 0,
+            "InterleavedRow": 0,
+            "DuplicateStaticRow": 0,
+            "DuplicateDynamicRow": 0,
+            "LeadingSpreadRow": 0,
+            "LeadingGenericRow": 0,
+            "CollisionSpreadRow": 0,
+            "CollisionGenericRow": 0,
+            "stylePreviousScans": 0,
+            "styleValueScans": 0,
+            "rows": 1000,
+            "colorEvaluations": 0,
+            "styleSets": 2000,
+            "styleRemoves": 0,
+            "fontStyleWrites": 0
+          },
+          "select_one": {
+            "setStyle": 0,
+            "setStyleProperty": 2,
+            "setStyleProperties": 0,
+            "applyStyleValue": 0,
+            "applyStyleProperty": 2,
+            "SingleRow": 0,
+            "MultiRow": 1000,
+            "GenericRow": 0,
+            "InterleavedRow": 0,
+            "DuplicateStaticRow": 0,
+            "DuplicateDynamicRow": 0,
+            "LeadingSpreadRow": 0,
+            "LeadingGenericRow": 0,
+            "CollisionSpreadRow": 0,
+            "CollisionGenericRow": 0,
+            "stylePreviousScans": 0,
+            "styleValueScans": 0,
+            "rows": 1000,
+            "colorEvaluations": 0,
+            "styleSets": 2,
+            "styleRemoves": 0,
+            "fontStyleWrites": 0
+          },
+          "select_another": {
+            "setStyle": 0,
+            "setStyleProperty": 4,
+            "setStyleProperties": 0,
+            "applyStyleValue": 0,
+            "applyStyleProperty": 4,
+            "SingleRow": 0,
+            "MultiRow": 1000,
+            "GenericRow": 0,
+            "InterleavedRow": 0,
+            "DuplicateStaticRow": 0,
+            "DuplicateDynamicRow": 0,
+            "LeadingSpreadRow": 0,
+            "LeadingGenericRow": 0,
+            "CollisionSpreadRow": 0,
+            "CollisionGenericRow": 0,
+            "stylePreviousScans": 0,
+            "styleValueScans": 0,
+            "rows": 1000,
+            "colorEvaluations": 0,
+            "styleSets": 4,
+            "styleRemoves": 0,
+            "fontStyleWrites": 0
+          },
+          "unrelated_update": {
+            "setStyle": 0,
+            "setStyleProperty": 0,
+            "setStyleProperties": 0,
+            "applyStyleValue": 0,
+            "applyStyleProperty": 0,
+            "SingleRow": 0,
+            "MultiRow": 1000,
+            "GenericRow": 0,
+            "InterleavedRow": 0,
+            "DuplicateStaticRow": 0,
+            "DuplicateDynamicRow": 0,
+            "LeadingSpreadRow": 0,
+            "LeadingGenericRow": 0,
+            "CollisionSpreadRow": 0,
+            "CollisionGenericRow": 0,
+            "stylePreviousScans": 0,
+            "styleValueScans": 0,
+            "rows": 1000,
+            "colorEvaluations": 0,
+            "styleSets": 0,
+            "styleRemoves": 0,
+            "fontStyleWrites": 0
+          }
+        },
+        "generic": {
+          "mount_1k": {
+            "setStyle": 1000,
+            "setStyleProperty": 0,
+            "setStyleProperties": 0,
+            "applyStyleValue": 1000,
+            "applyStyleProperty": 3000,
+            "SingleRow": 0,
+            "MultiRow": 0,
+            "GenericRow": 1000,
+            "InterleavedRow": 0,
+            "DuplicateStaticRow": 0,
+            "DuplicateDynamicRow": 0,
+            "LeadingSpreadRow": 0,
+            "LeadingGenericRow": 0,
+            "CollisionSpreadRow": 0,
+            "CollisionGenericRow": 0,
+            "stylePreviousScans": 0,
+            "styleValueScans": 3000,
+            "rows": 1000,
+            "colorEvaluations": 0,
+            "styleSets": 3000,
+            "styleRemoves": 0,
+            "fontStyleWrites": 1000
+          },
+          "select_one": {
+            "setStyle": 1000,
+            "setStyleProperty": 0,
+            "setStyleProperties": 0,
+            "applyStyleValue": 1000,
+            "applyStyleProperty": 2,
+            "SingleRow": 0,
+            "MultiRow": 0,
+            "GenericRow": 1000,
+            "InterleavedRow": 0,
+            "DuplicateStaticRow": 0,
+            "DuplicateDynamicRow": 0,
+            "LeadingSpreadRow": 0,
+            "LeadingGenericRow": 0,
+            "CollisionSpreadRow": 0,
+            "CollisionGenericRow": 0,
+            "stylePreviousScans": 3000,
+            "styleValueScans": 3000,
+            "rows": 1000,
+            "colorEvaluations": 0,
+            "styleSets": 2,
+            "styleRemoves": 0,
+            "fontStyleWrites": 0
+          },
+          "select_another": {
+            "setStyle": 1000,
+            "setStyleProperty": 0,
+            "setStyleProperties": 0,
+            "applyStyleValue": 1000,
+            "applyStyleProperty": 4,
+            "SingleRow": 0,
+            "MultiRow": 0,
+            "GenericRow": 1000,
+            "InterleavedRow": 0,
+            "DuplicateStaticRow": 0,
+            "DuplicateDynamicRow": 0,
+            "LeadingSpreadRow": 0,
+            "LeadingGenericRow": 0,
+            "CollisionSpreadRow": 0,
+            "CollisionGenericRow": 0,
+            "stylePreviousScans": 3000,
+            "styleValueScans": 3000,
+            "rows": 1000,
+            "colorEvaluations": 0,
+            "styleSets": 4,
+            "styleRemoves": 0,
+            "fontStyleWrites": 0
+          },
+          "unrelated_update": {
+            "setStyle": 1000,
+            "setStyleProperty": 0,
+            "setStyleProperties": 0,
+            "applyStyleValue": 1000,
+            "applyStyleProperty": 0,
+            "SingleRow": 0,
+            "MultiRow": 0,
+            "GenericRow": 1000,
+            "InterleavedRow": 0,
+            "DuplicateStaticRow": 0,
+            "DuplicateDynamicRow": 0,
+            "LeadingSpreadRow": 0,
+            "LeadingGenericRow": 0,
+            "CollisionSpreadRow": 0,
+            "CollisionGenericRow": 0,
+            "stylePreviousScans": 3000,
+            "styleValueScans": 3000,
+            "rows": 1000,
+            "colorEvaluations": 0,
+            "styleSets": 0,
+            "styleRemoves": 0,
+            "fontStyleWrites": 0
+          }
+        },
+        "interleaved": {
+          "mount_1k": {
+            "setStyle": 0,
+            "setStyleProperty": 0,
+            "setStyleProperties": 1000,
+            "applyStyleValue": 0,
+            "applyStyleProperty": 4000,
+            "SingleRow": 0,
+            "MultiRow": 0,
+            "GenericRow": 0,
+            "InterleavedRow": 1000,
+            "DuplicateStaticRow": 0,
+            "DuplicateDynamicRow": 0,
+            "LeadingSpreadRow": 0,
+            "LeadingGenericRow": 0,
+            "CollisionSpreadRow": 0,
+            "CollisionGenericRow": 0,
+            "stylePreviousScans": 0,
+            "styleValueScans": 0,
+            "rows": 1000,
+            "colorEvaluations": 0,
+            "styleSets": 4000,
+            "styleRemoves": 0,
+            "fontStyleWrites": 0
+          },
+          "select_one": {
+            "setStyle": 0,
+            "setStyleProperty": 2,
+            "setStyleProperties": 0,
+            "applyStyleValue": 0,
+            "applyStyleProperty": 2,
+            "SingleRow": 0,
+            "MultiRow": 0,
+            "GenericRow": 0,
+            "InterleavedRow": 1000,
+            "DuplicateStaticRow": 0,
+            "DuplicateDynamicRow": 0,
+            "LeadingSpreadRow": 0,
+            "LeadingGenericRow": 0,
+            "CollisionSpreadRow": 0,
+            "CollisionGenericRow": 0,
+            "stylePreviousScans": 0,
+            "styleValueScans": 0,
+            "rows": 1000,
+            "colorEvaluations": 0,
+            "styleSets": 2,
+            "styleRemoves": 0,
+            "fontStyleWrites": 0
+          },
+          "select_another": {
+            "setStyle": 0,
+            "setStyleProperty": 4,
+            "setStyleProperties": 0,
+            "applyStyleValue": 0,
+            "applyStyleProperty": 4,
+            "SingleRow": 0,
+            "MultiRow": 0,
+            "GenericRow": 0,
+            "InterleavedRow": 1000,
+            "DuplicateStaticRow": 0,
+            "DuplicateDynamicRow": 0,
+            "LeadingSpreadRow": 0,
+            "LeadingGenericRow": 0,
+            "CollisionSpreadRow": 0,
+            "CollisionGenericRow": 0,
+            "stylePreviousScans": 0,
+            "styleValueScans": 0,
+            "rows": 1000,
+            "colorEvaluations": 0,
+            "styleSets": 4,
+            "styleRemoves": 0,
+            "fontStyleWrites": 0
+          },
+          "unrelated_update": {
+            "setStyle": 0,
+            "setStyleProperty": 0,
+            "setStyleProperties": 0,
+            "applyStyleValue": 0,
+            "applyStyleProperty": 0,
+            "SingleRow": 0,
+            "MultiRow": 0,
+            "GenericRow": 0,
+            "InterleavedRow": 1000,
+            "DuplicateStaticRow": 0,
+            "DuplicateDynamicRow": 0,
+            "LeadingSpreadRow": 0,
+            "LeadingGenericRow": 0,
+            "CollisionSpreadRow": 0,
+            "CollisionGenericRow": 0,
+            "stylePreviousScans": 0,
+            "styleValueScans": 0,
+            "rows": 1000,
+            "colorEvaluations": 0,
+            "styleSets": 0,
+            "styleRemoves": 0,
+            "fontStyleWrites": 0
+          }
+        },
+        "duplicateStatic": {
+          "mount_1k": {
+            "setStyle": 0,
+            "setStyleProperty": 0,
+            "setStyleProperties": 1000,
+            "applyStyleValue": 0,
+            "applyStyleProperty": 2000,
+            "SingleRow": 0,
+            "MultiRow": 0,
+            "GenericRow": 0,
+            "InterleavedRow": 0,
+            "DuplicateStaticRow": 1000,
+            "DuplicateDynamicRow": 0,
+            "LeadingSpreadRow": 0,
+            "LeadingGenericRow": 0,
+            "CollisionSpreadRow": 0,
+            "CollisionGenericRow": 0,
+            "stylePreviousScans": 0,
+            "styleValueScans": 0,
+            "rows": 1000,
+            "colorEvaluations": 1000,
+            "styleSets": 2000,
+            "styleRemoves": 0,
+            "fontStyleWrites": 0
+          },
+          "select_one": {
+            "setStyle": 0,
+            "setStyleProperty": 1,
+            "setStyleProperties": 0,
+            "applyStyleValue": 0,
+            "applyStyleProperty": 1,
+            "SingleRow": 0,
+            "MultiRow": 0,
+            "GenericRow": 0,
+            "InterleavedRow": 0,
+            "DuplicateStaticRow": 1000,
+            "DuplicateDynamicRow": 0,
+            "LeadingSpreadRow": 0,
+            "LeadingGenericRow": 0,
+            "CollisionSpreadRow": 0,
+            "CollisionGenericRow": 0,
+            "stylePreviousScans": 0,
+            "styleValueScans": 0,
+            "rows": 1000,
+            "colorEvaluations": 1000,
+            "styleSets": 1,
+            "styleRemoves": 0,
+            "fontStyleWrites": 0
+          },
+          "select_another": {
+            "setStyle": 0,
+            "setStyleProperty": 2,
+            "setStyleProperties": 0,
+            "applyStyleValue": 0,
+            "applyStyleProperty": 2,
+            "SingleRow": 0,
+            "MultiRow": 0,
+            "GenericRow": 0,
+            "InterleavedRow": 0,
+            "DuplicateStaticRow": 1000,
+            "DuplicateDynamicRow": 0,
+            "LeadingSpreadRow": 0,
+            "LeadingGenericRow": 0,
+            "CollisionSpreadRow": 0,
+            "CollisionGenericRow": 0,
+            "stylePreviousScans": 0,
+            "styleValueScans": 0,
+            "rows": 1000,
+            "colorEvaluations": 1000,
+            "styleSets": 2,
+            "styleRemoves": 0,
+            "fontStyleWrites": 0
+          },
+          "unrelated_update": {
+            "setStyle": 0,
+            "setStyleProperty": 0,
+            "setStyleProperties": 0,
+            "applyStyleValue": 0,
+            "applyStyleProperty": 0,
+            "SingleRow": 0,
+            "MultiRow": 0,
+            "GenericRow": 0,
+            "InterleavedRow": 0,
+            "DuplicateStaticRow": 1000,
+            "DuplicateDynamicRow": 0,
+            "LeadingSpreadRow": 0,
+            "LeadingGenericRow": 0,
+            "CollisionSpreadRow": 0,
+            "CollisionGenericRow": 0,
+            "stylePreviousScans": 0,
+            "styleValueScans": 0,
+            "rows": 1000,
+            "colorEvaluations": 1000,
+            "styleSets": 0,
+            "styleRemoves": 0,
+            "fontStyleWrites": 0
+          }
+        },
+        "duplicateDynamic": {
+          "mount_1k": {
+            "setStyle": 0,
+            "setStyleProperty": 0,
+            "setStyleProperties": 1000,
+            "applyStyleValue": 0,
+            "applyStyleProperty": 2000,
+            "SingleRow": 0,
+            "MultiRow": 0,
+            "GenericRow": 0,
+            "InterleavedRow": 0,
+            "DuplicateStaticRow": 0,
+            "DuplicateDynamicRow": 1000,
+            "LeadingSpreadRow": 0,
+            "LeadingGenericRow": 0,
+            "CollisionSpreadRow": 0,
+            "CollisionGenericRow": 0,
+            "stylePreviousScans": 0,
+            "styleValueScans": 0,
+            "rows": 1000,
+            "colorEvaluations": 1000,
+            "styleSets": 2000,
+            "styleRemoves": 0,
+            "fontStyleWrites": 0
+          },
+          "select_one": {
+            "setStyle": 0,
+            "setStyleProperty": 2,
+            "setStyleProperties": 0,
+            "applyStyleValue": 0,
+            "applyStyleProperty": 2,
+            "SingleRow": 0,
+            "MultiRow": 0,
+            "GenericRow": 0,
+            "InterleavedRow": 0,
+            "DuplicateStaticRow": 0,
+            "DuplicateDynamicRow": 1000,
+            "LeadingSpreadRow": 0,
+            "LeadingGenericRow": 0,
+            "CollisionSpreadRow": 0,
+            "CollisionGenericRow": 0,
+            "stylePreviousScans": 0,
+            "styleValueScans": 0,
+            "rows": 1000,
+            "colorEvaluations": 1000,
+            "styleSets": 2,
+            "styleRemoves": 0,
+            "fontStyleWrites": 0
+          },
+          "select_another": {
+            "setStyle": 0,
+            "setStyleProperty": 4,
+            "setStyleProperties": 0,
+            "applyStyleValue": 0,
+            "applyStyleProperty": 4,
+            "SingleRow": 0,
+            "MultiRow": 0,
+            "GenericRow": 0,
+            "InterleavedRow": 0,
+            "DuplicateStaticRow": 0,
+            "DuplicateDynamicRow": 1000,
+            "LeadingSpreadRow": 0,
+            "LeadingGenericRow": 0,
+            "CollisionSpreadRow": 0,
+            "CollisionGenericRow": 0,
+            "stylePreviousScans": 0,
+            "styleValueScans": 0,
+            "rows": 1000,
+            "colorEvaluations": 1000,
+            "styleSets": 4,
+            "styleRemoves": 0,
+            "fontStyleWrites": 0
+          },
+          "unrelated_update": {
+            "setStyle": 0,
+            "setStyleProperty": 0,
+            "setStyleProperties": 0,
+            "applyStyleValue": 0,
+            "applyStyleProperty": 0,
+            "SingleRow": 0,
+            "MultiRow": 0,
+            "GenericRow": 0,
+            "InterleavedRow": 0,
+            "DuplicateStaticRow": 0,
+            "DuplicateDynamicRow": 1000,
+            "LeadingSpreadRow": 0,
+            "LeadingGenericRow": 0,
+            "CollisionSpreadRow": 0,
+            "CollisionGenericRow": 0,
+            "stylePreviousScans": 0,
+            "styleValueScans": 0,
+            "rows": 1000,
+            "colorEvaluations": 1000,
+            "styleSets": 0,
+            "styleRemoves": 0,
+            "fontStyleWrites": 0
+          }
+        },
+        "leadingSpread": {
+          "mount_1k": {
+            "setStyle": 1000,
+            "setStyleProperty": 0,
+            "setStyleProperties": 0,
+            "applyStyleValue": 1000,
+            "applyStyleProperty": 4000,
+            "SingleRow": 0,
+            "MultiRow": 0,
+            "GenericRow": 0,
+            "InterleavedRow": 0,
+            "DuplicateStaticRow": 0,
+            "DuplicateDynamicRow": 0,
+            "LeadingSpreadRow": 1000,
+            "LeadingGenericRow": 0,
+            "CollisionSpreadRow": 0,
+            "CollisionGenericRow": 0,
+            "stylePreviousScans": 0,
+            "styleValueScans": 4000,
+            "rows": 1000,
+            "colorEvaluations": 0,
+            "styleSets": 4000,
+            "styleRemoves": 0,
+            "fontStyleWrites": 1000
+          },
+          "select_one": {
+            "setStyle": 1000,
+            "setStyleProperty": 2,
+            "setStyleProperties": 0,
+            "applyStyleValue": 1000,
+            "applyStyleProperty": 2,
+            "SingleRow": 0,
+            "MultiRow": 0,
+            "GenericRow": 0,
+            "InterleavedRow": 0,
+            "DuplicateStaticRow": 0,
+            "DuplicateDynamicRow": 0,
+            "LeadingSpreadRow": 1000,
+            "LeadingGenericRow": 0,
+            "CollisionSpreadRow": 0,
+            "CollisionGenericRow": 0,
+            "stylePreviousScans": 2000,
+            "styleValueScans": 2000,
+            "rows": 1000,
+            "colorEvaluations": 0,
+            "styleSets": 2,
+            "styleRemoves": 0,
+            "fontStyleWrites": 0
+          },
+          "select_another": {
+            "setStyle": 1000,
+            "setStyleProperty": 4,
+            "setStyleProperties": 0,
+            "applyStyleValue": 1000,
+            "applyStyleProperty": 4,
+            "SingleRow": 0,
+            "MultiRow": 0,
+            "GenericRow": 0,
+            "InterleavedRow": 0,
+            "DuplicateStaticRow": 0,
+            "DuplicateDynamicRow": 0,
+            "LeadingSpreadRow": 1000,
+            "LeadingGenericRow": 0,
+            "CollisionSpreadRow": 0,
+            "CollisionGenericRow": 0,
+            "stylePreviousScans": 2000,
+            "styleValueScans": 2000,
+            "rows": 1000,
+            "colorEvaluations": 0,
+            "styleSets": 4,
+            "styleRemoves": 0,
+            "fontStyleWrites": 0
+          },
+          "unrelated_update": {
+            "setStyle": 1000,
+            "setStyleProperty": 0,
+            "setStyleProperties": 0,
+            "applyStyleValue": 1000,
+            "applyStyleProperty": 0,
+            "SingleRow": 0,
+            "MultiRow": 0,
+            "GenericRow": 0,
+            "InterleavedRow": 0,
+            "DuplicateStaticRow": 0,
+            "DuplicateDynamicRow": 0,
+            "LeadingSpreadRow": 1000,
+            "LeadingGenericRow": 0,
+            "CollisionSpreadRow": 0,
+            "CollisionGenericRow": 0,
+            "stylePreviousScans": 2000,
+            "styleValueScans": 2000,
+            "rows": 1000,
+            "colorEvaluations": 0,
+            "styleSets": 0,
+            "styleRemoves": 0,
+            "fontStyleWrites": 0
+          }
+        },
+        "leadingGeneric": {
+          "mount_1k": {
+            "setStyle": 1000,
+            "setStyleProperty": 0,
+            "setStyleProperties": 0,
+            "applyStyleValue": 1000,
+            "applyStyleProperty": 4000,
+            "SingleRow": 0,
+            "MultiRow": 0,
+            "GenericRow": 0,
+            "InterleavedRow": 0,
+            "DuplicateStaticRow": 0,
+            "DuplicateDynamicRow": 0,
+            "LeadingSpreadRow": 0,
+            "LeadingGenericRow": 1000,
+            "CollisionSpreadRow": 0,
+            "CollisionGenericRow": 0,
+            "stylePreviousScans": 0,
+            "styleValueScans": 4000,
+            "rows": 1000,
+            "colorEvaluations": 0,
+            "styleSets": 4000,
+            "styleRemoves": 0,
+            "fontStyleWrites": 1000
+          },
+          "select_one": {
+            "setStyle": 1000,
+            "setStyleProperty": 0,
+            "setStyleProperties": 0,
+            "applyStyleValue": 1000,
+            "applyStyleProperty": 2,
+            "SingleRow": 0,
+            "MultiRow": 0,
+            "GenericRow": 0,
+            "InterleavedRow": 0,
+            "DuplicateStaticRow": 0,
+            "DuplicateDynamicRow": 0,
+            "LeadingSpreadRow": 0,
+            "LeadingGenericRow": 1000,
+            "CollisionSpreadRow": 0,
+            "CollisionGenericRow": 0,
+            "stylePreviousScans": 4000,
+            "styleValueScans": 4000,
+            "rows": 1000,
+            "colorEvaluations": 0,
+            "styleSets": 2,
+            "styleRemoves": 0,
+            "fontStyleWrites": 0
+          },
+          "select_another": {
+            "setStyle": 1000,
+            "setStyleProperty": 0,
+            "setStyleProperties": 0,
+            "applyStyleValue": 1000,
+            "applyStyleProperty": 4,
+            "SingleRow": 0,
+            "MultiRow": 0,
+            "GenericRow": 0,
+            "InterleavedRow": 0,
+            "DuplicateStaticRow": 0,
+            "DuplicateDynamicRow": 0,
+            "LeadingSpreadRow": 0,
+            "LeadingGenericRow": 1000,
+            "CollisionSpreadRow": 0,
+            "CollisionGenericRow": 0,
+            "stylePreviousScans": 4000,
+            "styleValueScans": 4000,
+            "rows": 1000,
+            "colorEvaluations": 0,
+            "styleSets": 4,
+            "styleRemoves": 0,
+            "fontStyleWrites": 0
+          },
+          "unrelated_update": {
+            "setStyle": 1000,
+            "setStyleProperty": 0,
+            "setStyleProperties": 0,
+            "applyStyleValue": 1000,
+            "applyStyleProperty": 0,
+            "SingleRow": 0,
+            "MultiRow": 0,
+            "GenericRow": 0,
+            "InterleavedRow": 0,
+            "DuplicateStaticRow": 0,
+            "DuplicateDynamicRow": 0,
+            "LeadingSpreadRow": 0,
+            "LeadingGenericRow": 1000,
+            "CollisionSpreadRow": 0,
+            "CollisionGenericRow": 0,
+            "stylePreviousScans": 4000,
+            "styleValueScans": 4000,
+            "rows": 1000,
+            "colorEvaluations": 0,
+            "styleSets": 0,
+            "styleRemoves": 0,
+            "fontStyleWrites": 0
+          }
+        },
+        "collisionSpread": {
+          "mount_1k": {
+            "setStyle": 1000,
+            "setStyleProperty": 0,
+            "setStyleProperties": 0,
+            "applyStyleValue": 1000,
+            "applyStyleProperty": 4000,
+            "SingleRow": 0,
+            "MultiRow": 0,
+            "GenericRow": 0,
+            "InterleavedRow": 0,
+            "DuplicateStaticRow": 0,
+            "DuplicateDynamicRow": 0,
+            "LeadingSpreadRow": 0,
+            "LeadingGenericRow": 0,
+            "CollisionSpreadRow": 1000,
+            "CollisionGenericRow": 0,
+            "stylePreviousScans": 0,
+            "styleValueScans": 4000,
+            "rows": 1000,
+            "colorEvaluations": 0,
+            "styleSets": 4000,
+            "styleRemoves": 0,
+            "fontStyleWrites": 1000
+          },
+          "select_one": {
+            "setStyle": 1000,
+            "setStyleProperty": 0,
+            "setStyleProperties": 0,
+            "applyStyleValue": 1000,
+            "applyStyleProperty": 2,
+            "SingleRow": 0,
+            "MultiRow": 0,
+            "GenericRow": 0,
+            "InterleavedRow": 0,
+            "DuplicateStaticRow": 0,
+            "DuplicateDynamicRow": 0,
+            "LeadingSpreadRow": 0,
+            "LeadingGenericRow": 0,
+            "CollisionSpreadRow": 1000,
+            "CollisionGenericRow": 0,
+            "stylePreviousScans": 4000,
+            "styleValueScans": 4000,
+            "rows": 1000,
+            "colorEvaluations": 0,
+            "styleSets": 2,
+            "styleRemoves": 0,
+            "fontStyleWrites": 0
+          },
+          "select_another": {
+            "setStyle": 1000,
+            "setStyleProperty": 0,
+            "setStyleProperties": 0,
+            "applyStyleValue": 1000,
+            "applyStyleProperty": 4,
+            "SingleRow": 0,
+            "MultiRow": 0,
+            "GenericRow": 0,
+            "InterleavedRow": 0,
+            "DuplicateStaticRow": 0,
+            "DuplicateDynamicRow": 0,
+            "LeadingSpreadRow": 0,
+            "LeadingGenericRow": 0,
+            "CollisionSpreadRow": 1000,
+            "CollisionGenericRow": 0,
+            "stylePreviousScans": 4000,
+            "styleValueScans": 4000,
+            "rows": 1000,
+            "colorEvaluations": 0,
+            "styleSets": 4,
+            "styleRemoves": 0,
+            "fontStyleWrites": 0
+          },
+          "unrelated_update": {
+            "setStyle": 1000,
+            "setStyleProperty": 0,
+            "setStyleProperties": 0,
+            "applyStyleValue": 1000,
+            "applyStyleProperty": 0,
+            "SingleRow": 0,
+            "MultiRow": 0,
+            "GenericRow": 0,
+            "InterleavedRow": 0,
+            "DuplicateStaticRow": 0,
+            "DuplicateDynamicRow": 0,
+            "LeadingSpreadRow": 0,
+            "LeadingGenericRow": 0,
+            "CollisionSpreadRow": 1000,
+            "CollisionGenericRow": 0,
+            "stylePreviousScans": 4000,
+            "styleValueScans": 4000,
+            "rows": 1000,
+            "colorEvaluations": 0,
+            "styleSets": 0,
+            "styleRemoves": 0,
+            "fontStyleWrites": 0
+          }
+        },
+        "collisionGeneric": {
+          "mount_1k": {
+            "setStyle": 1000,
+            "setStyleProperty": 0,
+            "setStyleProperties": 0,
+            "applyStyleValue": 1000,
+            "applyStyleProperty": 4000,
+            "SingleRow": 0,
+            "MultiRow": 0,
+            "GenericRow": 0,
+            "InterleavedRow": 0,
+            "DuplicateStaticRow": 0,
+            "DuplicateDynamicRow": 0,
+            "LeadingSpreadRow": 0,
+            "LeadingGenericRow": 0,
+            "CollisionSpreadRow": 0,
+            "CollisionGenericRow": 1000,
+            "stylePreviousScans": 0,
+            "styleValueScans": 4000,
+            "rows": 1000,
+            "colorEvaluations": 0,
+            "styleSets": 4000,
+            "styleRemoves": 0,
+            "fontStyleWrites": 1000
+          },
+          "select_one": {
+            "setStyle": 1000,
+            "setStyleProperty": 0,
+            "setStyleProperties": 0,
+            "applyStyleValue": 1000,
+            "applyStyleProperty": 2,
+            "SingleRow": 0,
+            "MultiRow": 0,
+            "GenericRow": 0,
+            "InterleavedRow": 0,
+            "DuplicateStaticRow": 0,
+            "DuplicateDynamicRow": 0,
+            "LeadingSpreadRow": 0,
+            "LeadingGenericRow": 0,
+            "CollisionSpreadRow": 0,
+            "CollisionGenericRow": 1000,
+            "stylePreviousScans": 4000,
+            "styleValueScans": 4000,
+            "rows": 1000,
+            "colorEvaluations": 0,
+            "styleSets": 2,
+            "styleRemoves": 0,
+            "fontStyleWrites": 0
+          },
+          "select_another": {
+            "setStyle": 1000,
+            "setStyleProperty": 0,
+            "setStyleProperties": 0,
+            "applyStyleValue": 1000,
+            "applyStyleProperty": 4,
+            "SingleRow": 0,
+            "MultiRow": 0,
+            "GenericRow": 0,
+            "InterleavedRow": 0,
+            "DuplicateStaticRow": 0,
+            "DuplicateDynamicRow": 0,
+            "LeadingSpreadRow": 0,
+            "LeadingGenericRow": 0,
+            "CollisionSpreadRow": 0,
+            "CollisionGenericRow": 1000,
+            "stylePreviousScans": 4000,
+            "styleValueScans": 4000,
+            "rows": 1000,
+            "colorEvaluations": 0,
+            "styleSets": 4,
+            "styleRemoves": 0,
+            "fontStyleWrites": 0
+          },
+          "unrelated_update": {
+            "setStyle": 1000,
+            "setStyleProperty": 0,
+            "setStyleProperties": 0,
+            "applyStyleValue": 1000,
+            "applyStyleProperty": 0,
+            "SingleRow": 0,
+            "MultiRow": 0,
+            "GenericRow": 0,
+            "InterleavedRow": 0,
+            "DuplicateStaticRow": 0,
+            "DuplicateDynamicRow": 0,
+            "LeadingSpreadRow": 0,
+            "LeadingGenericRow": 0,
+            "CollisionSpreadRow": 0,
+            "CollisionGenericRow": 1000,
+            "stylePreviousScans": 4000,
+            "styleValueScans": 4000,
+            "rows": 1000,
+            "colorEvaluations": 0,
+            "styleSets": 0,
+            "styleRemoves": 0,
+            "fontStyleWrites": 0
+          }
+        }
+      },
+      "timing": null,
+      "failures": [],
+      "metadata": {
+        "revision": "277c10c3fa80f56ef162959832dba35c1b43b32e",
+        "sourceSha256": "3a546f6cb3dd85604e2f401ab916c51c0f7d44a816789a0346e076579f954f4a",
+        "fixtureSha256": "9f73a69936282cdbb97ee42a62e7a848bc99c8db73d816f826fb1a1c8bd4f146",
+        "lockfileSha256": "1c3467abe3f112e1f5b5f25589fa19f72765195351ddd6d1a6a35c45db231873",
+        "node": "v24.20.0",
+        "platform": "darwin",
+        "arch": "arm64",
+        "toolchain": {
+          "vite": "8.1.5",
+          "esbuild": "0.28.1",
+          "tsrxCore": "0.1.71",
+          "playwright": "1.61.1"
+        },
+        "artifacts": {
+          "readable": {
+            "rawBytes": 293707,
+            "gzipBytes": 73040,
+            "driverReachable": 0,
+            "stagingReachable": 0,
+            "assetsSha256": "48eb67a92a2a90da1cc5a6f308af7c1b6f55ce83e26eadea3c71df0fc5440240"
+          },
+          "minified": {
+            "rawBytes": 115862,
+            "gzipBytes": 36957,
+            "driverReachable": 0,
+            "stagingReachable": 0,
+            "assetsSha256": "b1ed94156544a0666e1ec96d47581a644e66fd5157d2b50dec8d55bec848157a"
+          }
+        }
+      }
+    },
+    "candidate": {
+      "suite": "style-literals-work",
+      "results": {
+        "single": {
+          "mount_1k": {
+            "setStyle": 0,
+            "setStyleProperty": 1000,
+            "setStyleProperties": 0,
+            "applyStyleValue": 0,
+            "applyStyleProperty": 1000,
+            "SingleRow": 1000,
+            "MultiRow": 0,
+            "GenericRow": 0,
+            "InterleavedRow": 0,
+            "DuplicateStaticRow": 0,
+            "DuplicateDynamicRow": 0,
+            "LeadingSpreadRow": 0,
+            "LeadingGenericRow": 0,
+            "CollisionSpreadRow": 0,
+            "CollisionGenericRow": 0,
+            "stylePreviousScans": 0,
+            "styleValueScans": 0,
+            "rows": 1000,
+            "colorEvaluations": 0,
+            "styleSets": 1000,
+            "styleRemoves": 0,
+            "fontStyleWrites": 0
+          },
+          "select_one": {
+            "setStyle": 0,
+            "setStyleProperty": 1,
+            "setStyleProperties": 0,
+            "applyStyleValue": 0,
+            "applyStyleProperty": 1,
+            "SingleRow": 1000,
+            "MultiRow": 0,
+            "GenericRow": 0,
+            "InterleavedRow": 0,
+            "DuplicateStaticRow": 0,
+            "DuplicateDynamicRow": 0,
+            "LeadingSpreadRow": 0,
+            "LeadingGenericRow": 0,
+            "CollisionSpreadRow": 0,
+            "CollisionGenericRow": 0,
+            "stylePreviousScans": 0,
+            "styleValueScans": 0,
+            "rows": 1000,
+            "colorEvaluations": 0,
+            "styleSets": 1,
+            "styleRemoves": 0,
+            "fontStyleWrites": 0
+          },
+          "select_another": {
+            "setStyle": 0,
+            "setStyleProperty": 2,
+            "setStyleProperties": 0,
+            "applyStyleValue": 0,
+            "applyStyleProperty": 2,
+            "SingleRow": 1000,
+            "MultiRow": 0,
+            "GenericRow": 0,
+            "InterleavedRow": 0,
+            "DuplicateStaticRow": 0,
+            "DuplicateDynamicRow": 0,
+            "LeadingSpreadRow": 0,
+            "LeadingGenericRow": 0,
+            "CollisionSpreadRow": 0,
+            "CollisionGenericRow": 0,
+            "stylePreviousScans": 0,
+            "styleValueScans": 0,
+            "rows": 1000,
+            "colorEvaluations": 0,
+            "styleSets": 2,
+            "styleRemoves": 0,
+            "fontStyleWrites": 0
+          },
+          "unrelated_update": {
+            "setStyle": 0,
+            "setStyleProperty": 0,
+            "setStyleProperties": 0,
+            "applyStyleValue": 0,
+            "applyStyleProperty": 0,
+            "SingleRow": 1000,
+            "MultiRow": 0,
+            "GenericRow": 0,
+            "InterleavedRow": 0,
+            "DuplicateStaticRow": 0,
+            "DuplicateDynamicRow": 0,
+            "LeadingSpreadRow": 0,
+            "LeadingGenericRow": 0,
+            "CollisionSpreadRow": 0,
+            "CollisionGenericRow": 0,
+            "stylePreviousScans": 0,
+            "styleValueScans": 0,
+            "rows": 1000,
+            "colorEvaluations": 0,
+            "styleSets": 0,
+            "styleRemoves": 0,
+            "fontStyleWrites": 0
+          }
+        },
+        "multi": {
+          "mount_1k": {
+            "setStyle": 0,
+            "setStyleProperty": 0,
+            "setStyleProperties": 1000,
+            "applyStyleValue": 0,
+            "applyStyleProperty": 2000,
+            "SingleRow": 0,
+            "MultiRow": 1000,
+            "GenericRow": 0,
+            "InterleavedRow": 0,
+            "DuplicateStaticRow": 0,
+            "DuplicateDynamicRow": 0,
+            "LeadingSpreadRow": 0,
+            "LeadingGenericRow": 0,
+            "CollisionSpreadRow": 0,
+            "CollisionGenericRow": 0,
+            "stylePreviousScans": 0,
+            "styleValueScans": 0,
+            "rows": 1000,
+            "colorEvaluations": 0,
+            "styleSets": 2000,
+            "styleRemoves": 0,
+            "fontStyleWrites": 0
+          },
+          "select_one": {
+            "setStyle": 0,
+            "setStyleProperty": 2,
+            "setStyleProperties": 0,
+            "applyStyleValue": 0,
+            "applyStyleProperty": 2,
+            "SingleRow": 0,
+            "MultiRow": 1000,
+            "GenericRow": 0,
+            "InterleavedRow": 0,
+            "DuplicateStaticRow": 0,
+            "DuplicateDynamicRow": 0,
+            "LeadingSpreadRow": 0,
+            "LeadingGenericRow": 0,
+            "CollisionSpreadRow": 0,
+            "CollisionGenericRow": 0,
+            "stylePreviousScans": 0,
+            "styleValueScans": 0,
+            "rows": 1000,
+            "colorEvaluations": 0,
+            "styleSets": 2,
+            "styleRemoves": 0,
+            "fontStyleWrites": 0
+          },
+          "select_another": {
+            "setStyle": 0,
+            "setStyleProperty": 4,
+            "setStyleProperties": 0,
+            "applyStyleValue": 0,
+            "applyStyleProperty": 4,
+            "SingleRow": 0,
+            "MultiRow": 1000,
+            "GenericRow": 0,
+            "InterleavedRow": 0,
+            "DuplicateStaticRow": 0,
+            "DuplicateDynamicRow": 0,
+            "LeadingSpreadRow": 0,
+            "LeadingGenericRow": 0,
+            "CollisionSpreadRow": 0,
+            "CollisionGenericRow": 0,
+            "stylePreviousScans": 0,
+            "styleValueScans": 0,
+            "rows": 1000,
+            "colorEvaluations": 0,
+            "styleSets": 4,
+            "styleRemoves": 0,
+            "fontStyleWrites": 0
+          },
+          "unrelated_update": {
+            "setStyle": 0,
+            "setStyleProperty": 0,
+            "setStyleProperties": 0,
+            "applyStyleValue": 0,
+            "applyStyleProperty": 0,
+            "SingleRow": 0,
+            "MultiRow": 1000,
+            "GenericRow": 0,
+            "InterleavedRow": 0,
+            "DuplicateStaticRow": 0,
+            "DuplicateDynamicRow": 0,
+            "LeadingSpreadRow": 0,
+            "LeadingGenericRow": 0,
+            "CollisionSpreadRow": 0,
+            "CollisionGenericRow": 0,
+            "stylePreviousScans": 0,
+            "styleValueScans": 0,
+            "rows": 1000,
+            "colorEvaluations": 0,
+            "styleSets": 0,
+            "styleRemoves": 0,
+            "fontStyleWrites": 0
+          }
+        },
+        "generic": {
+          "mount_1k": {
+            "setStyle": 1000,
+            "setStyleProperty": 0,
+            "setStyleProperties": 0,
+            "applyStyleValue": 1000,
+            "applyStyleProperty": 3000,
+            "SingleRow": 0,
+            "MultiRow": 0,
+            "GenericRow": 1000,
+            "InterleavedRow": 0,
+            "DuplicateStaticRow": 0,
+            "DuplicateDynamicRow": 0,
+            "LeadingSpreadRow": 0,
+            "LeadingGenericRow": 0,
+            "CollisionSpreadRow": 0,
+            "CollisionGenericRow": 0,
+            "stylePreviousScans": 0,
+            "styleValueScans": 3000,
+            "rows": 1000,
+            "colorEvaluations": 0,
+            "styleSets": 3000,
+            "styleRemoves": 0,
+            "fontStyleWrites": 1000
+          },
+          "select_one": {
+            "setStyle": 1000,
+            "setStyleProperty": 0,
+            "setStyleProperties": 0,
+            "applyStyleValue": 1000,
+            "applyStyleProperty": 2,
+            "SingleRow": 0,
+            "MultiRow": 0,
+            "GenericRow": 1000,
+            "InterleavedRow": 0,
+            "DuplicateStaticRow": 0,
+            "DuplicateDynamicRow": 0,
+            "LeadingSpreadRow": 0,
+            "LeadingGenericRow": 0,
+            "CollisionSpreadRow": 0,
+            "CollisionGenericRow": 0,
+            "stylePreviousScans": 3000,
+            "styleValueScans": 3000,
+            "rows": 1000,
+            "colorEvaluations": 0,
+            "styleSets": 2,
+            "styleRemoves": 0,
+            "fontStyleWrites": 0
+          },
+          "select_another": {
+            "setStyle": 1000,
+            "setStyleProperty": 0,
+            "setStyleProperties": 0,
+            "applyStyleValue": 1000,
+            "applyStyleProperty": 4,
+            "SingleRow": 0,
+            "MultiRow": 0,
+            "GenericRow": 1000,
+            "InterleavedRow": 0,
+            "DuplicateStaticRow": 0,
+            "DuplicateDynamicRow": 0,
+            "LeadingSpreadRow": 0,
+            "LeadingGenericRow": 0,
+            "CollisionSpreadRow": 0,
+            "CollisionGenericRow": 0,
+            "stylePreviousScans": 3000,
+            "styleValueScans": 3000,
+            "rows": 1000,
+            "colorEvaluations": 0,
+            "styleSets": 4,
+            "styleRemoves": 0,
+            "fontStyleWrites": 0
+          },
+          "unrelated_update": {
+            "setStyle": 1000,
+            "setStyleProperty": 0,
+            "setStyleProperties": 0,
+            "applyStyleValue": 1000,
+            "applyStyleProperty": 0,
+            "SingleRow": 0,
+            "MultiRow": 0,
+            "GenericRow": 1000,
+            "InterleavedRow": 0,
+            "DuplicateStaticRow": 0,
+            "DuplicateDynamicRow": 0,
+            "LeadingSpreadRow": 0,
+            "LeadingGenericRow": 0,
+            "CollisionSpreadRow": 0,
+            "CollisionGenericRow": 0,
+            "stylePreviousScans": 3000,
+            "styleValueScans": 3000,
+            "rows": 1000,
+            "colorEvaluations": 0,
+            "styleSets": 0,
+            "styleRemoves": 0,
+            "fontStyleWrites": 0
+          }
+        },
+        "interleaved": {
+          "mount_1k": {
+            "setStyle": 0,
+            "setStyleProperty": 0,
+            "setStyleProperties": 1000,
+            "applyStyleValue": 0,
+            "applyStyleProperty": 4000,
+            "SingleRow": 0,
+            "MultiRow": 0,
+            "GenericRow": 0,
+            "InterleavedRow": 1000,
+            "DuplicateStaticRow": 0,
+            "DuplicateDynamicRow": 0,
+            "LeadingSpreadRow": 0,
+            "LeadingGenericRow": 0,
+            "CollisionSpreadRow": 0,
+            "CollisionGenericRow": 0,
+            "stylePreviousScans": 0,
+            "styleValueScans": 0,
+            "rows": 1000,
+            "colorEvaluations": 0,
+            "styleSets": 4000,
+            "styleRemoves": 0,
+            "fontStyleWrites": 0
+          },
+          "select_one": {
+            "setStyle": 0,
+            "setStyleProperty": 2,
+            "setStyleProperties": 0,
+            "applyStyleValue": 0,
+            "applyStyleProperty": 2,
+            "SingleRow": 0,
+            "MultiRow": 0,
+            "GenericRow": 0,
+            "InterleavedRow": 1000,
+            "DuplicateStaticRow": 0,
+            "DuplicateDynamicRow": 0,
+            "LeadingSpreadRow": 0,
+            "LeadingGenericRow": 0,
+            "CollisionSpreadRow": 0,
+            "CollisionGenericRow": 0,
+            "stylePreviousScans": 0,
+            "styleValueScans": 0,
+            "rows": 1000,
+            "colorEvaluations": 0,
+            "styleSets": 2,
+            "styleRemoves": 0,
+            "fontStyleWrites": 0
+          },
+          "select_another": {
+            "setStyle": 0,
+            "setStyleProperty": 4,
+            "setStyleProperties": 0,
+            "applyStyleValue": 0,
+            "applyStyleProperty": 4,
+            "SingleRow": 0,
+            "MultiRow": 0,
+            "GenericRow": 0,
+            "InterleavedRow": 1000,
+            "DuplicateStaticRow": 0,
+            "DuplicateDynamicRow": 0,
+            "LeadingSpreadRow": 0,
+            "LeadingGenericRow": 0,
+            "CollisionSpreadRow": 0,
+            "CollisionGenericRow": 0,
+            "stylePreviousScans": 0,
+            "styleValueScans": 0,
+            "rows": 1000,
+            "colorEvaluations": 0,
+            "styleSets": 4,
+            "styleRemoves": 0,
+            "fontStyleWrites": 0
+          },
+          "unrelated_update": {
+            "setStyle": 0,
+            "setStyleProperty": 0,
+            "setStyleProperties": 0,
+            "applyStyleValue": 0,
+            "applyStyleProperty": 0,
+            "SingleRow": 0,
+            "MultiRow": 0,
+            "GenericRow": 0,
+            "InterleavedRow": 1000,
+            "DuplicateStaticRow": 0,
+            "DuplicateDynamicRow": 0,
+            "LeadingSpreadRow": 0,
+            "LeadingGenericRow": 0,
+            "CollisionSpreadRow": 0,
+            "CollisionGenericRow": 0,
+            "stylePreviousScans": 0,
+            "styleValueScans": 0,
+            "rows": 1000,
+            "colorEvaluations": 0,
+            "styleSets": 0,
+            "styleRemoves": 0,
+            "fontStyleWrites": 0
+          }
+        },
+        "duplicateStatic": {
+          "mount_1k": {
+            "setStyle": 0,
+            "setStyleProperty": 0,
+            "setStyleProperties": 1000,
+            "applyStyleValue": 0,
+            "applyStyleProperty": 2000,
+            "SingleRow": 0,
+            "MultiRow": 0,
+            "GenericRow": 0,
+            "InterleavedRow": 0,
+            "DuplicateStaticRow": 1000,
+            "DuplicateDynamicRow": 0,
+            "LeadingSpreadRow": 0,
+            "LeadingGenericRow": 0,
+            "CollisionSpreadRow": 0,
+            "CollisionGenericRow": 0,
+            "stylePreviousScans": 0,
+            "styleValueScans": 0,
+            "rows": 1000,
+            "colorEvaluations": 1000,
+            "styleSets": 2000,
+            "styleRemoves": 0,
+            "fontStyleWrites": 0
+          },
+          "select_one": {
+            "setStyle": 0,
+            "setStyleProperty": 1,
+            "setStyleProperties": 0,
+            "applyStyleValue": 0,
+            "applyStyleProperty": 1,
+            "SingleRow": 0,
+            "MultiRow": 0,
+            "GenericRow": 0,
+            "InterleavedRow": 0,
+            "DuplicateStaticRow": 1000,
+            "DuplicateDynamicRow": 0,
+            "LeadingSpreadRow": 0,
+            "LeadingGenericRow": 0,
+            "CollisionSpreadRow": 0,
+            "CollisionGenericRow": 0,
+            "stylePreviousScans": 0,
+            "styleValueScans": 0,
+            "rows": 1000,
+            "colorEvaluations": 1000,
+            "styleSets": 1,
+            "styleRemoves": 0,
+            "fontStyleWrites": 0
+          },
+          "select_another": {
+            "setStyle": 0,
+            "setStyleProperty": 2,
+            "setStyleProperties": 0,
+            "applyStyleValue": 0,
+            "applyStyleProperty": 2,
+            "SingleRow": 0,
+            "MultiRow": 0,
+            "GenericRow": 0,
+            "InterleavedRow": 0,
+            "DuplicateStaticRow": 1000,
+            "DuplicateDynamicRow": 0,
+            "LeadingSpreadRow": 0,
+            "LeadingGenericRow": 0,
+            "CollisionSpreadRow": 0,
+            "CollisionGenericRow": 0,
+            "stylePreviousScans": 0,
+            "styleValueScans": 0,
+            "rows": 1000,
+            "colorEvaluations": 1000,
+            "styleSets": 2,
+            "styleRemoves": 0,
+            "fontStyleWrites": 0
+          },
+          "unrelated_update": {
+            "setStyle": 0,
+            "setStyleProperty": 0,
+            "setStyleProperties": 0,
+            "applyStyleValue": 0,
+            "applyStyleProperty": 0,
+            "SingleRow": 0,
+            "MultiRow": 0,
+            "GenericRow": 0,
+            "InterleavedRow": 0,
+            "DuplicateStaticRow": 1000,
+            "DuplicateDynamicRow": 0,
+            "LeadingSpreadRow": 0,
+            "LeadingGenericRow": 0,
+            "CollisionSpreadRow": 0,
+            "CollisionGenericRow": 0,
+            "stylePreviousScans": 0,
+            "styleValueScans": 0,
+            "rows": 1000,
+            "colorEvaluations": 1000,
+            "styleSets": 0,
+            "styleRemoves": 0,
+            "fontStyleWrites": 0
+          }
+        },
+        "duplicateDynamic": {
+          "mount_1k": {
+            "setStyle": 0,
+            "setStyleProperty": 0,
+            "setStyleProperties": 1000,
+            "applyStyleValue": 0,
+            "applyStyleProperty": 2000,
+            "SingleRow": 0,
+            "MultiRow": 0,
+            "GenericRow": 0,
+            "InterleavedRow": 0,
+            "DuplicateStaticRow": 0,
+            "DuplicateDynamicRow": 1000,
+            "LeadingSpreadRow": 0,
+            "LeadingGenericRow": 0,
+            "CollisionSpreadRow": 0,
+            "CollisionGenericRow": 0,
+            "stylePreviousScans": 0,
+            "styleValueScans": 0,
+            "rows": 1000,
+            "colorEvaluations": 1000,
+            "styleSets": 2000,
+            "styleRemoves": 0,
+            "fontStyleWrites": 0
+          },
+          "select_one": {
+            "setStyle": 0,
+            "setStyleProperty": 2,
+            "setStyleProperties": 0,
+            "applyStyleValue": 0,
+            "applyStyleProperty": 2,
+            "SingleRow": 0,
+            "MultiRow": 0,
+            "GenericRow": 0,
+            "InterleavedRow": 0,
+            "DuplicateStaticRow": 0,
+            "DuplicateDynamicRow": 1000,
+            "LeadingSpreadRow": 0,
+            "LeadingGenericRow": 0,
+            "CollisionSpreadRow": 0,
+            "CollisionGenericRow": 0,
+            "stylePreviousScans": 0,
+            "styleValueScans": 0,
+            "rows": 1000,
+            "colorEvaluations": 1000,
+            "styleSets": 2,
+            "styleRemoves": 0,
+            "fontStyleWrites": 0
+          },
+          "select_another": {
+            "setStyle": 0,
+            "setStyleProperty": 4,
+            "setStyleProperties": 0,
+            "applyStyleValue": 0,
+            "applyStyleProperty": 4,
+            "SingleRow": 0,
+            "MultiRow": 0,
+            "GenericRow": 0,
+            "InterleavedRow": 0,
+            "DuplicateStaticRow": 0,
+            "DuplicateDynamicRow": 1000,
+            "LeadingSpreadRow": 0,
+            "LeadingGenericRow": 0,
+            "CollisionSpreadRow": 0,
+            "CollisionGenericRow": 0,
+            "stylePreviousScans": 0,
+            "styleValueScans": 0,
+            "rows": 1000,
+            "colorEvaluations": 1000,
+            "styleSets": 4,
+            "styleRemoves": 0,
+            "fontStyleWrites": 0
+          },
+          "unrelated_update": {
+            "setStyle": 0,
+            "setStyleProperty": 0,
+            "setStyleProperties": 0,
+            "applyStyleValue": 0,
+            "applyStyleProperty": 0,
+            "SingleRow": 0,
+            "MultiRow": 0,
+            "GenericRow": 0,
+            "InterleavedRow": 0,
+            "DuplicateStaticRow": 0,
+            "DuplicateDynamicRow": 1000,
+            "LeadingSpreadRow": 0,
+            "LeadingGenericRow": 0,
+            "CollisionSpreadRow": 0,
+            "CollisionGenericRow": 0,
+            "stylePreviousScans": 0,
+            "styleValueScans": 0,
+            "rows": 1000,
+            "colorEvaluations": 1000,
+            "styleSets": 0,
+            "styleRemoves": 0,
+            "fontStyleWrites": 0
+          }
+        },
+        "leadingSpread": {
+          "mount_1k": {
+            "setStyle": 1000,
+            "setStyleProperty": 0,
+            "setStyleProperties": 0,
+            "applyStyleValue": 1000,
+            "applyStyleProperty": 4000,
+            "SingleRow": 0,
+            "MultiRow": 0,
+            "GenericRow": 0,
+            "InterleavedRow": 0,
+            "DuplicateStaticRow": 0,
+            "DuplicateDynamicRow": 0,
+            "LeadingSpreadRow": 1000,
+            "LeadingGenericRow": 0,
+            "CollisionSpreadRow": 0,
+            "CollisionGenericRow": 0,
+            "stylePreviousScans": 0,
+            "styleValueScans": 4000,
+            "rows": 1000,
+            "colorEvaluations": 0,
+            "styleSets": 4000,
+            "styleRemoves": 0,
+            "fontStyleWrites": 1000
+          },
+          "select_one": {
+            "setStyle": 1000,
+            "setStyleProperty": 2,
+            "setStyleProperties": 0,
+            "applyStyleValue": 1000,
+            "applyStyleProperty": 2,
+            "SingleRow": 0,
+            "MultiRow": 0,
+            "GenericRow": 0,
+            "InterleavedRow": 0,
+            "DuplicateStaticRow": 0,
+            "DuplicateDynamicRow": 0,
+            "LeadingSpreadRow": 1000,
+            "LeadingGenericRow": 0,
+            "CollisionSpreadRow": 0,
+            "CollisionGenericRow": 0,
+            "stylePreviousScans": 2000,
+            "styleValueScans": 2000,
+            "rows": 1000,
+            "colorEvaluations": 0,
+            "styleSets": 2,
+            "styleRemoves": 0,
+            "fontStyleWrites": 0
+          },
+          "select_another": {
+            "setStyle": 1000,
+            "setStyleProperty": 4,
+            "setStyleProperties": 0,
+            "applyStyleValue": 1000,
+            "applyStyleProperty": 4,
+            "SingleRow": 0,
+            "MultiRow": 0,
+            "GenericRow": 0,
+            "InterleavedRow": 0,
+            "DuplicateStaticRow": 0,
+            "DuplicateDynamicRow": 0,
+            "LeadingSpreadRow": 1000,
+            "LeadingGenericRow": 0,
+            "CollisionSpreadRow": 0,
+            "CollisionGenericRow": 0,
+            "stylePreviousScans": 2000,
+            "styleValueScans": 2000,
+            "rows": 1000,
+            "colorEvaluations": 0,
+            "styleSets": 4,
+            "styleRemoves": 0,
+            "fontStyleWrites": 0
+          },
+          "unrelated_update": {
+            "setStyle": 1000,
+            "setStyleProperty": 0,
+            "setStyleProperties": 0,
+            "applyStyleValue": 1000,
+            "applyStyleProperty": 0,
+            "SingleRow": 0,
+            "MultiRow": 0,
+            "GenericRow": 0,
+            "InterleavedRow": 0,
+            "DuplicateStaticRow": 0,
+            "DuplicateDynamicRow": 0,
+            "LeadingSpreadRow": 1000,
+            "LeadingGenericRow": 0,
+            "CollisionSpreadRow": 0,
+            "CollisionGenericRow": 0,
+            "stylePreviousScans": 2000,
+            "styleValueScans": 2000,
+            "rows": 1000,
+            "colorEvaluations": 0,
+            "styleSets": 0,
+            "styleRemoves": 0,
+            "fontStyleWrites": 0
+          }
+        },
+        "leadingGeneric": {
+          "mount_1k": {
+            "setStyle": 1000,
+            "setStyleProperty": 0,
+            "setStyleProperties": 0,
+            "applyStyleValue": 1000,
+            "applyStyleProperty": 4000,
+            "SingleRow": 0,
+            "MultiRow": 0,
+            "GenericRow": 0,
+            "InterleavedRow": 0,
+            "DuplicateStaticRow": 0,
+            "DuplicateDynamicRow": 0,
+            "LeadingSpreadRow": 0,
+            "LeadingGenericRow": 1000,
+            "CollisionSpreadRow": 0,
+            "CollisionGenericRow": 0,
+            "stylePreviousScans": 0,
+            "styleValueScans": 4000,
+            "rows": 1000,
+            "colorEvaluations": 0,
+            "styleSets": 4000,
+            "styleRemoves": 0,
+            "fontStyleWrites": 1000
+          },
+          "select_one": {
+            "setStyle": 1000,
+            "setStyleProperty": 0,
+            "setStyleProperties": 0,
+            "applyStyleValue": 1000,
+            "applyStyleProperty": 2,
+            "SingleRow": 0,
+            "MultiRow": 0,
+            "GenericRow": 0,
+            "InterleavedRow": 0,
+            "DuplicateStaticRow": 0,
+            "DuplicateDynamicRow": 0,
+            "LeadingSpreadRow": 0,
+            "LeadingGenericRow": 1000,
+            "CollisionSpreadRow": 0,
+            "CollisionGenericRow": 0,
+            "stylePreviousScans": 4000,
+            "styleValueScans": 4000,
+            "rows": 1000,
+            "colorEvaluations": 0,
+            "styleSets": 2,
+            "styleRemoves": 0,
+            "fontStyleWrites": 0
+          },
+          "select_another": {
+            "setStyle": 1000,
+            "setStyleProperty": 0,
+            "setStyleProperties": 0,
+            "applyStyleValue": 1000,
+            "applyStyleProperty": 4,
+            "SingleRow": 0,
+            "MultiRow": 0,
+            "GenericRow": 0,
+            "InterleavedRow": 0,
+            "DuplicateStaticRow": 0,
+            "DuplicateDynamicRow": 0,
+            "LeadingSpreadRow": 0,
+            "LeadingGenericRow": 1000,
+            "CollisionSpreadRow": 0,
+            "CollisionGenericRow": 0,
+            "stylePreviousScans": 4000,
+            "styleValueScans": 4000,
+            "rows": 1000,
+            "colorEvaluations": 0,
+            "styleSets": 4,
+            "styleRemoves": 0,
+            "fontStyleWrites": 0
+          },
+          "unrelated_update": {
+            "setStyle": 1000,
+            "setStyleProperty": 0,
+            "setStyleProperties": 0,
+            "applyStyleValue": 1000,
+            "applyStyleProperty": 0,
+            "SingleRow": 0,
+            "MultiRow": 0,
+            "GenericRow": 0,
+            "InterleavedRow": 0,
+            "DuplicateStaticRow": 0,
+            "DuplicateDynamicRow": 0,
+            "LeadingSpreadRow": 0,
+            "LeadingGenericRow": 1000,
+            "CollisionSpreadRow": 0,
+            "CollisionGenericRow": 0,
+            "stylePreviousScans": 4000,
+            "styleValueScans": 4000,
+            "rows": 1000,
+            "colorEvaluations": 0,
+            "styleSets": 0,
+            "styleRemoves": 0,
+            "fontStyleWrites": 0
+          }
+        },
+        "collisionSpread": {
+          "mount_1k": {
+            "setStyle": 1000,
+            "setStyleProperty": 0,
+            "setStyleProperties": 0,
+            "applyStyleValue": 1000,
+            "applyStyleProperty": 4000,
+            "SingleRow": 0,
+            "MultiRow": 0,
+            "GenericRow": 0,
+            "InterleavedRow": 0,
+            "DuplicateStaticRow": 0,
+            "DuplicateDynamicRow": 0,
+            "LeadingSpreadRow": 0,
+            "LeadingGenericRow": 0,
+            "CollisionSpreadRow": 1000,
+            "CollisionGenericRow": 0,
+            "stylePreviousScans": 0,
+            "styleValueScans": 4000,
+            "rows": 1000,
+            "colorEvaluations": 0,
+            "styleSets": 4000,
+            "styleRemoves": 0,
+            "fontStyleWrites": 1000
+          },
+          "select_one": {
+            "setStyle": 1000,
+            "setStyleProperty": 0,
+            "setStyleProperties": 0,
+            "applyStyleValue": 1000,
+            "applyStyleProperty": 2,
+            "SingleRow": 0,
+            "MultiRow": 0,
+            "GenericRow": 0,
+            "InterleavedRow": 0,
+            "DuplicateStaticRow": 0,
+            "DuplicateDynamicRow": 0,
+            "LeadingSpreadRow": 0,
+            "LeadingGenericRow": 0,
+            "CollisionSpreadRow": 1000,
+            "CollisionGenericRow": 0,
+            "stylePreviousScans": 4000,
+            "styleValueScans": 4000,
+            "rows": 1000,
+            "colorEvaluations": 0,
+            "styleSets": 2,
+            "styleRemoves": 0,
+            "fontStyleWrites": 0
+          },
+          "select_another": {
+            "setStyle": 1000,
+            "setStyleProperty": 0,
+            "setStyleProperties": 0,
+            "applyStyleValue": 1000,
+            "applyStyleProperty": 4,
+            "SingleRow": 0,
+            "MultiRow": 0,
+            "GenericRow": 0,
+            "InterleavedRow": 0,
+            "DuplicateStaticRow": 0,
+            "DuplicateDynamicRow": 0,
+            "LeadingSpreadRow": 0,
+            "LeadingGenericRow": 0,
+            "CollisionSpreadRow": 1000,
+            "CollisionGenericRow": 0,
+            "stylePreviousScans": 4000,
+            "styleValueScans": 4000,
+            "rows": 1000,
+            "colorEvaluations": 0,
+            "styleSets": 4,
+            "styleRemoves": 0,
+            "fontStyleWrites": 0
+          },
+          "unrelated_update": {
+            "setStyle": 1000,
+            "setStyleProperty": 0,
+            "setStyleProperties": 0,
+            "applyStyleValue": 1000,
+            "applyStyleProperty": 0,
+            "SingleRow": 0,
+            "MultiRow": 0,
+            "GenericRow": 0,
+            "InterleavedRow": 0,
+            "DuplicateStaticRow": 0,
+            "DuplicateDynamicRow": 0,
+            "LeadingSpreadRow": 0,
+            "LeadingGenericRow": 0,
+            "CollisionSpreadRow": 1000,
+            "CollisionGenericRow": 0,
+            "stylePreviousScans": 4000,
+            "styleValueScans": 4000,
+            "rows": 1000,
+            "colorEvaluations": 0,
+            "styleSets": 0,
+            "styleRemoves": 0,
+            "fontStyleWrites": 0
+          }
+        },
+        "collisionGeneric": {
+          "mount_1k": {
+            "setStyle": 1000,
+            "setStyleProperty": 0,
+            "setStyleProperties": 0,
+            "applyStyleValue": 1000,
+            "applyStyleProperty": 4000,
+            "SingleRow": 0,
+            "MultiRow": 0,
+            "GenericRow": 0,
+            "InterleavedRow": 0,
+            "DuplicateStaticRow": 0,
+            "DuplicateDynamicRow": 0,
+            "LeadingSpreadRow": 0,
+            "LeadingGenericRow": 0,
+            "CollisionSpreadRow": 0,
+            "CollisionGenericRow": 1000,
+            "stylePreviousScans": 0,
+            "styleValueScans": 4000,
+            "rows": 1000,
+            "colorEvaluations": 0,
+            "styleSets": 4000,
+            "styleRemoves": 0,
+            "fontStyleWrites": 1000
+          },
+          "select_one": {
+            "setStyle": 1000,
+            "setStyleProperty": 0,
+            "setStyleProperties": 0,
+            "applyStyleValue": 1000,
+            "applyStyleProperty": 2,
+            "SingleRow": 0,
+            "MultiRow": 0,
+            "GenericRow": 0,
+            "InterleavedRow": 0,
+            "DuplicateStaticRow": 0,
+            "DuplicateDynamicRow": 0,
+            "LeadingSpreadRow": 0,
+            "LeadingGenericRow": 0,
+            "CollisionSpreadRow": 0,
+            "CollisionGenericRow": 1000,
+            "stylePreviousScans": 4000,
+            "styleValueScans": 4000,
+            "rows": 1000,
+            "colorEvaluations": 0,
+            "styleSets": 2,
+            "styleRemoves": 0,
+            "fontStyleWrites": 0
+          },
+          "select_another": {
+            "setStyle": 1000,
+            "setStyleProperty": 0,
+            "setStyleProperties": 0,
+            "applyStyleValue": 1000,
+            "applyStyleProperty": 4,
+            "SingleRow": 0,
+            "MultiRow": 0,
+            "GenericRow": 0,
+            "InterleavedRow": 0,
+            "DuplicateStaticRow": 0,
+            "DuplicateDynamicRow": 0,
+            "LeadingSpreadRow": 0,
+            "LeadingGenericRow": 0,
+            "CollisionSpreadRow": 0,
+            "CollisionGenericRow": 1000,
+            "stylePreviousScans": 4000,
+            "styleValueScans": 4000,
+            "rows": 1000,
+            "colorEvaluations": 0,
+            "styleSets": 4,
+            "styleRemoves": 0,
+            "fontStyleWrites": 0
+          },
+          "unrelated_update": {
+            "setStyle": 1000,
+            "setStyleProperty": 0,
+            "setStyleProperties": 0,
+            "applyStyleValue": 1000,
+            "applyStyleProperty": 0,
+            "SingleRow": 0,
+            "MultiRow": 0,
+            "GenericRow": 0,
+            "InterleavedRow": 0,
+            "DuplicateStaticRow": 0,
+            "DuplicateDynamicRow": 0,
+            "LeadingSpreadRow": 0,
+            "LeadingGenericRow": 0,
+            "CollisionSpreadRow": 0,
+            "CollisionGenericRow": 1000,
+            "stylePreviousScans": 4000,
+            "styleValueScans": 4000,
+            "rows": 1000,
+            "colorEvaluations": 0,
+            "styleSets": 0,
+            "styleRemoves": 0,
+            "fontStyleWrites": 0
+          }
+        }
+      },
+      "timing": null,
+      "failures": [],
+      "metadata": {
+        "revision": "fc0dbf32b6fa4f20d88edf510f8495ef5d0204d2",
+        "sourceSha256": "a00ac687f2bc505d5cca78d67b108776999ecec53b6afb1312947597e98c3ccc",
+        "fixtureSha256": "9f73a69936282cdbb97ee42a62e7a848bc99c8db73d816f826fb1a1c8bd4f146",
+        "lockfileSha256": "1c3467abe3f112e1f5b5f25589fa19f72765195351ddd6d1a6a35c45db231873",
+        "node": "v24.20.0",
+        "platform": "darwin",
+        "arch": "arm64",
+        "toolchain": {
+          "vite": "8.1.5",
+          "esbuild": "0.28.1",
+          "tsrxCore": "0.1.71",
+          "playwright": "1.61.1"
+        },
+        "artifacts": {
+          "readable": {
+            "rawBytes": 298741,
+            "gzipBytes": 73904,
+            "driverReachable": 0,
+            "stagingReachable": 0,
+            "assetsSha256": "dbeb3ff54ade3de6b63001a47ec9cbcc0c70f9a297968c7a57ae1ca23cc687cd"
+          },
+          "minified": {
+            "rawBytes": 117064,
+            "gzipBytes": 37601,
+            "driverReachable": 0,
+            "stagingReachable": 0,
+            "assetsSha256": "cd1c354d8a27ed50aba7af720a49d5dde057e55de4e8a8da63cd23a1fbe165ad"
+          }
+        }
+      }
+    }
+  },
+  "ordinaryBranches": {
+    "baselineBuild": {
+      "suite": "client-hot-paths",
+      "node": "v24.20.0",
+      "sourceRoot": "/private/tmp/octane-vt-final-base-277",
+      "compilerRoot": "/Users/domgan/.codex/worktrees/octane-react-view-transition-parity",
+      "runtimeSha256": "139fddb5fe3fcb12b76e3a776df6a774381447ecdc160edeadea87d90e8e30f2",
+      "sourceSha256": "20ce1e8bf1a1ceb4c88b52b265f48f517f91c1d6c327bf8e7684cd027062e0f5",
+      "compiledSha256": "564444bb70b0a9df3c6b0c6f37b3d08ebca4a392a73350b788ae2543e3f3509b",
+      "bundle": {
+        "minified": 196544,
+        "gzip": 60371
+      }
+    },
+    "candidateBuild": {
+      "suite": "client-hot-paths",
+      "node": "v24.20.0",
+      "sourceRoot": "/Users/domgan/.codex/worktrees/octane-react-view-transition-parity",
+      "compilerRoot": "/Users/domgan/.codex/worktrees/octane-react-view-transition-parity",
+      "runtimeSha256": "e7403cf81520f470d83f3c377e5f19e2662fd74c318dc4869e4f5e072baa215c",
+      "sourceSha256": "20ce1e8bf1a1ceb4c88b52b265f48f517f91c1d6c327bf8e7684cd027062e0f5",
+      "compiledSha256": "564444bb70b0a9df3c6b0c6f37b3d08ebca4a392a73350b788ae2543e3f3509b",
+      "bundle": {
+        "minified": 198422,
+        "gzip": 61268
+      }
+    },
+    "timing": {
+      "node": "v24.20.0",
+      "chromium": "149.0.7827.55",
+      "platform": "darwin",
+      "arch": "arm64",
+      "samples": 30,
+      "cycles": 4096,
+      "warmup": 4096,
+      "unit": "ms per update",
+      "results": [
+        {
+          "mode": "stable",
+          "file": "/private/tmp/vt-review-branches/baseline/branches.mjs",
+          "bundleHash": "bb429ac36057f3cd6111bf79935066cec7152bd411c6d970a370e7e1fdfbaba1",
+          "semantic": {
+            "text": "value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976",
+            "buttons": 32,
+            "effects": 126977,
+            "cleanups": 126976
+          },
+          "median": 0.012280273425858468,
+          "min": 0.011938476527575403,
+          "max": 0.014965820359066129,
+          "samples": [
+            0.012866210949141532, 0.012646484363358468, 0.013378906296566129, 0.01416015625,
+            0.0126953125, 0.012426757777575403, 0.012744140636641532, 0.01220703125,
+            0.014965820359066129, 0.0120849609375, 0.012133789015933871, 0.011938476527575403,
+            0.012060546840075403, 0.012499999953433871, 0.012060546898283064, 0.012255859386641532,
+            0.012792968773283064, 0.012182617152575403, 0.012036132800858468, 0.012109374976716936,
+            0.012426757777575403, 0.012280273425858468, 0.011987304664216936, 0.011962890625,
+            0.011938476527575403, 0.012036132800858468, 0.012036132800858468, 0.012524414050858468,
+            0.0126953125, 0.013012695300858468
+          ]
+        },
+        {
+          "mode": "stable",
+          "file": "/private/tmp/vt-review-branches/candidate/branches.mjs",
+          "bundleHash": "9d97f9a6cfe83b125415e934820c971a79df8fe9fd7e38c0966fe03241f1444d",
+          "semantic": {
+            "text": "value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976",
+            "buttons": 32,
+            "effects": 126977,
+            "cleanups": 126976
+          },
+          "median": 0.012353515601716936,
+          "min": 0.012011718761641532,
+          "max": 0.013818359409924597,
+          "samples": [
+            0.013208007789216936, 0.012866210949141532, 0.013574218726716936, 0.013818359409924597,
+            0.012768554675858468, 0.012646484363358468, 0.012915039085783064, 0.012280273425858468,
+            0.013476562511641532, 0.012109374976716936, 0.0123291015625, 0.012280273425858468,
+            0.012304687523283064, 0.012377929699141532, 0.012451171875, 0.012255859386641532,
+            0.012597656284924597, 0.012500000011641532, 0.012158203113358468, 0.012255859386641532,
+            0.012353515601716936, 0.012182617152575403, 0.012158203113358468, 0.0123291015625,
+            0.012011718761641532, 0.012133789074141532, 0.012133789074141532, 0.012353515601716936,
+            0.012524414050858468, 0.012768554675858468
+          ]
+        },
+        {
+          "mode": "toggle",
+          "file": "/private/tmp/vt-review-branches/baseline/branches.mjs",
+          "bundleHash": "bb429ac36057f3cd6111bf79935066cec7152bd411c6d970a370e7e1fdfbaba1",
+          "semantic": {
+            "text": "value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976",
+            "buttons": 32,
+            "effects": 126977,
+            "cleanups": 126976
+          },
+          "median": 0.016821289085783064,
+          "min": 0.015600585960783064,
+          "max": 0.023486328136641532,
+          "samples": [
+            0.018774414085783064, 0.017773437488358468, 0.017773437488358468, 0.016748046851716936,
+            0.015942382800858468, 0.015625, 0.016210937523283064, 0.023486328136641532,
+            0.020434570324141532, 0.015893554664216936, 0.016259765601716936, 0.017309570277575403,
+            0.0172119140625, 0.0169677734375, 0.015649414097424597, 0.016088867210783064,
+            0.015771484351716936, 0.015722656273283064, 0.015600585960783064, 0.023022460925858468,
+            0.016333007777575403, 0.017602539039216936, 0.017187500023283064, 0.0174560546875,
+            0.017871093761641532, 0.016821289085783064, 0.015917968761641532, 0.023291015590075403,
+            0.016381835972424597, 0.0162353515625
+          ]
+        },
+        {
+          "mode": "toggle",
+          "file": "/private/tmp/vt-review-branches/candidate/branches.mjs",
+          "bundleHash": "9d97f9a6cfe83b125415e934820c971a79df8fe9fd7e38c0966fe03241f1444d",
+          "semantic": {
+            "text": "value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976value:126976",
+            "buttons": 32,
+            "effects": 126977,
+            "cleanups": 126976
+          },
+          "median": 0.017138671886641532,
+          "min": 0.016210937523283064,
+          "max": 0.0240478515625,
+          "samples": [
+            0.018603515636641532, 0.018139648425858468, 0.018969726574141532, 0.01701660151593387,
+            0.016333007777575403, 0.016357421875, 0.016577148460783064, 0.01691894535906613,
+            0.016381835914216936, 0.023535156273283064, 0.016625976539216936, 0.016943359340075403,
+            0.017260742199141532, 0.017797851585783064, 0.017358398414216936, 0.017529296863358468,
+            0.016210937523283064, 0.023583984409924597, 0.016625976597424597, 0.01652832026593387,
+            0.01704101567156613, 0.01806640625, 0.017797851527575403, 0.018652343715075403,
+            0.017260742199141532, 0.0240478515625, 0.017138671886641532, 0.017065429652575403,
+            0.016943359340075403, 0.017138671886641532
+          ]
+        },
+        {
+          "mode": "absent",
+          "file": "/private/tmp/vt-review-branches/baseline/branches.mjs",
+          "bundleHash": "bb429ac36057f3cd6111bf79935066cec7152bd411c6d970a370e7e1fdfbaba1",
+          "semantic": {
+            "text": "",
+            "buttons": 0,
+            "effects": 126977,
+            "cleanups": 126976
+          },
+          "median": 0.0006103515625,
+          "min": 0.0005615234258584678,
+          "max": 0.0008056640508584678,
+          "samples": [
+            0.0008056640508584678, 0.0005615234258584678, 0.0005615234258584678,
+            0.0007568359142169356, 0.0006103515625, 0.0005859375232830644, 0.0007080078357830644,
+            0.0005615234258584678, 0.0005859375232830644, 0.0006103515625, 0.0005859375232830644,
+            0.0006591796409338713, 0.0005859374650754035, 0.0006347656599245965,
+            0.0007080077775754035, 0.0006103515625, 0.0005859375232830644, 0.0006835937383584678,
+            0.0006103515625, 0.0005859374650754035, 0.0007080077775754035, 0.0005859374650754035,
+            0.0005859374650754035, 0.0005859374650754035, 0.0006103515625, 0.0006835937383584678,
+            0.0005859374650754035, 0.0005859374650754035, 0.0007080078357830644, 0.0006103515625
+          ]
+        },
+        {
+          "mode": "absent",
+          "file": "/private/tmp/vt-review-branches/candidate/branches.mjs",
+          "bundleHash": "9d97f9a6cfe83b125415e934820c971a79df8fe9fd7e38c0966fe03241f1444d",
+          "semantic": {
+            "text": "",
+            "buttons": 0,
+            "effects": 126977,
+            "cleanups": 126976
+          },
+          "median": 0.0006103515625,
+          "min": 0.0005859374650754035,
+          "max": 0.0007568359142169356,
+          "samples": [
+            0.0006103515625, 0.0005859374650754035, 0.0006103515625, 0.0007568359142169356,
+            0.0006347656599245965, 0.0006103515625, 0.000732421875, 0.0006347656017169356,
+            0.0006347656017169356, 0.0006835937383584678, 0.0005859374650754035, 0.0006103515625,
+            0.0006835937383584678, 0.0006103515625, 0.0005859375232830644, 0.0005859375232830644,
+            0.0006103515625, 0.0006835937383584678, 0.0005859375232830644, 0.0005859375232830644,
+            0.0007080077775754035, 0.0005859375232830644, 0.0006103515625, 0.0007080078357830644,
+            0.0006103515625, 0.0006103515625, 0.000732421875, 0.0006103515625, 0.0006103515625,
+            0.0006347656599245965
+          ]
+        }
+      ]
+    }
+  },
+  "ssr": {
+    "intermediate": {
+      "node": "v24.20.0",
+      "platform": "darwin",
+      "arch": "arm64",
+      "verifyOnly": false,
+      "baselineRevision": "e36dec2b41d61bf5c0ea118b98565fc30f7b94ce",
+      "candidateRevision": "9aa4d762156ae55a99b844aa39f7eda00d4a53f2",
+      "compiledHash": "8c79e2a68de783130c6e0a596d7848c7090a3adc1849ce2d7561a7aa999cb8bc",
+      "lockfileHash": "1c3467abe3f112e1f5b5f25589fa19f72765195351ddd6d1a6a35c45db231873",
+      "method": "Identical compiled fixture; production minified bundles; five warmup batches per side; 11 paired alternating batches; same process/dependencies; per-operation batch times in milliseconds. Ready:50000 warmup/10000 per sample; streamed:5000 warmup/1000 per sample.",
+      "limitations": [
+        "Small synthetic server-only scenarios; browser capture/animation/resource waits, backpressure, concurrency, and allocation/GC behavior are not measured.",
+        "Ready response bytes include RenderResult.css followed by RenderResult.html; timing still measures renderToString itself. Streamed CSS is already included in the response.",
+        "Batch timings and observed spread limit conclusions about individual latency; distributions are descriptive, not a performance guarantee."
+      ],
+      "meta": {
+        "baseline": {
+          "sourceSha256": "9cc1672785c39df29e1c45088216263703e725e3d1605b975ffba6278ac62471",
+          "serverSourceHash": "68e52cba39185acd69416749ad3af5412e5def5b711748ebb8b3f696d26cf619",
+          "bundleHash": "b1ad665cfa2525bff943985893c79b4604c3b95b6516a9f6ba37328b651a07b6",
+          "bundleBytes": 75775,
+          "bundleGzip": 25598
+        },
+        "candidate": {
+          "sourceSha256": "2e6c527707c21670965bb3ecdac4313880e629d3330c4f0509a9c101c52cf71c",
+          "serverSourceHash": "7c27d2216af0e7dd425ba7d577fb4527a6557fe34d7f15ccbefa16767ba54836",
+          "bundleHash": "ea742a6af74a08eead9be128cce5845d2acef76f636b764b99be115343d36bf7",
+          "bundleBytes": 76262,
+          "bundleGzip": 25774
+        }
+      },
+      "samples": {
+        "Plain": {
+          "repetitions": 10000,
+          "warmupRepetitions": 50000,
+          "baseline": [
+            0.00036307500000000344, 0.0003410416999999995, 0.00032987909999999943,
+            0.00032289159999999696, 0.00033828340000000023, 0.0003174250000000029,
+            0.0003339458000000036, 0.00032096669999999677, 0.0003166541999999993,
+            0.00031700840000000314, 0.00032368330000000467
+          ],
+          "candidate": [
+            0.00033068329999999833, 0.00034454999999999816, 0.0003379374999999982,
+            0.00033485829999999625, 0.000351400000000001, 0.0003306458000000021,
+            0.0003245625000000018, 0.00031610840000000166, 0.0003212582999999995,
+            0.0003213624999999979, 0.0003135458000000028
+          ],
+          "wire": {
+            "baseline": {
+              "bytes": 31,
+              "separateCssBytes": 0,
+              "gzip": 45,
+              "hasAnimationDriver": false,
+              "hasElementScope": false,
+              "scopeHosts": 0,
+              "scriptBytes": 0
+            },
+            "candidate": {
+              "bytes": 31,
+              "separateCssBytes": 0,
+              "gzip": 45,
+              "hasAnimationDriver": false,
+              "hasElementScope": false,
+              "scopeHosts": 0,
+              "scriptBytes": 0
+            }
+          },
+          "baselineMedianMs": 0.00032368330000000467,
+          "baselineDistributionMs": {
+            "min": 0.0003166541999999993,
+            "p25": 0.0003174250000000029,
+            "median": 0.00032368330000000467,
+            "p75": 0.00033828340000000023,
+            "max": 0.00036307500000000344
+          },
+          "baselineMedianOpsPerSecond": 3089439.584927568,
+          "candidateMedianMs": 0.0003306458000000021,
+          "candidateDistributionMs": {
+            "min": 0.0003135458000000028,
+            "p25": 0.0003212582999999995,
+            "median": 0.0003306458000000021,
+            "p75": 0.0003379374999999982,
+            "max": 0.000351400000000001
+          },
+          "candidateMedianOpsPerSecond": 3024384.4016769417,
+          "pairedCandidateBaselineRatios": [
+            0.9107850994973358, 1.0102870118228904, 1.0244283435961805, 1.0370610446354114,
+            1.0387739983694169, 1.0416501535795828, 0.9719017277653987, 0.9848635388032616,
+            1.0145398355682642, 1.0137349672752984, 0.968680806207791
+          ]
+        },
+        "View": {
+          "repetitions": 10000,
+          "warmupRepetitions": 50000,
+          "baseline": [
+            0.0011794374999999945, 0.0013316999999999893, 0.0011899166000000037,
+            0.0011743957999999907, 0.0011917540999999915, 0.0011814833000000022,
+            0.0011551917000000003, 0.00117645, 0.0012084707999999865, 0.0012607666999999991,
+            0.0011751541000000088
+          ],
+          "candidate": [
+            0.0046148583000000035, 0.004773679100000004, 0.004581308300000001, 0.004536537499999997,
+            0.004616366699999992, 0.004483933400000001, 0.004692195800000002, 0.0046871708000000125,
+            0.004765349999999989, 0.004812191700000017, 0.0050068874999999935
+          ],
+          "wire": {
+            "baseline": {
+              "bytes": 113,
+              "separateCssBytes": 0,
+              "gzip": 105,
+              "hasAnimationDriver": false,
+              "hasElementScope": false,
+              "scopeHosts": 0,
+              "scriptBytes": 0
+            },
+            "candidate": {
+              "bytes": 113,
+              "separateCssBytes": 0,
+              "gzip": 105,
+              "hasAnimationDriver": false,
+              "hasElementScope": false,
+              "scopeHosts": 0,
+              "scriptBytes": 0
+            }
+          },
+          "baselineMedianMs": 0.0011814833000000022,
+          "baselineDistributionMs": {
+            "min": 0.0011551917000000003,
+            "p25": 0.0011751541000000088,
+            "median": 0.0011814833000000022,
+            "p75": 0.0012084707999999865,
+            "max": 0.0013316999999999893
+          },
+          "baselineMedianOpsPerSecond": 846393.6815695983,
+          "candidateMedianMs": 0.0046871708000000125,
+          "candidateDistributionMs": {
+            "min": 0.004483933400000001,
+            "p25": 0.004581308300000001,
+            "median": 0.0046871708000000125,
+            "p75": 0.004773679100000004,
+            "max": 0.0050068874999999935
+          },
+          "candidateMedianOpsPerSecond": 213348.3166433784,
+          "pairedCandidateBaselineRatios": [
+            3.912762058184537, 3.5846505218893463, 3.850108738713273, 3.8628693154386564,
+            3.873589946113905, 3.795172898338887, 4.0618330273668, 3.9841649028858113,
+            3.943289320685318, 3.8168772224076193, 4.260622075011232
+          ]
+        },
+        "PlainStream": {
+          "repetitions": 1000,
+          "warmupRepetitions": 5000,
+          "baseline": [
+            0.021935208000000102, 0.021787000000000036, 0.020140500000000203, 0.02029320800000005,
+            0.020812959000000093, 0.020223624999999856, 0.019704582999999956, 0.020632499999999936,
+            0.02028929100000005, 0.02038375000000019, 0.020349457999999914
+          ],
+          "candidate": [
+            0.021313957999999956, 0.02006925000000001, 0.021196957999999995, 0.020891541999999846,
+            0.02119120799999996, 0.020038790999999948, 0.020501291000000036, 0.020056542000000035,
+            0.02028579100000002, 0.020315292, 0.020596125000000028
+          ],
+          "wire": {
+            "baseline": {
+              "bytes": 2443,
+              "separateCssBytes": 0,
+              "gzip": 1037,
+              "hasAnimationDriver": false,
+              "hasElementScope": false,
+              "scopeHosts": 0,
+              "scriptBytes": 2109
+            },
+            "candidate": {
+              "bytes": 2830,
+              "separateCssBytes": 0,
+              "gzip": 1176,
+              "hasAnimationDriver": false,
+              "hasElementScope": false,
+              "scopeHosts": 0,
+              "scriptBytes": 2496
+            }
+          },
+          "baselineMedianMs": 0.020349457999999914,
+          "baselineDistributionMs": {
+            "min": 0.019704582999999956,
+            "p25": 0.020223624999999856,
+            "median": 0.020349457999999914,
+            "p75": 0.020812959000000093,
+            "max": 0.021935208000000102
+          },
+          "baselineMedianOpsPerSecond": 49141.35796638929,
+          "candidateMedianMs": 0.020501291000000036,
+          "candidateDistributionMs": {
+            "min": 0.020038790999999948,
+            "p25": 0.02006925000000001,
+            "median": 0.020501291000000036,
+            "p75": 0.02119120799999996,
+            "max": 0.021313957999999956
+          },
+          "candidateMedianOpsPerSecond": 48777.416017361946,
+          "pairedCandidateBaselineRatios": [
+            0.9716779526321272, 0.9211571120392885, 1.0524544077852973, 1.0294844462245594,
+            1.018173725321799, 0.9908604911335179, 1.0404326242275759, 0.9720849145765224,
+            0.999827495204242, 0.9966415404427453, 1.0121215513455009
+          ]
+        },
+        "ViewStream": {
+          "repetitions": 1000,
+          "warmupRepetitions": 5000,
+          "baseline": [
+            0.037350666000000275, 0.03573100000000022, 0.034177584000000025, 0.027698209000000133,
+            0.02908075000000008, 0.028781417000000146, 0.028965166999999837, 0.029215417000000344,
+            0.029377500000000053, 0.02863866700000017, 0.029141041999999742
+          ],
+          "candidate": [
+            0.04266645900000003, 0.03944658299999992, 0.037063458000000084, 0.0341892499999999,
+            0.03176699999999982, 0.03144233399999984, 0.03121991700000035, 0.03162579099999994,
+            0.032016834000000015, 0.03078120799999988, 0.03163787499999989
+          ],
+          "wire": {
+            "baseline": {
+              "bytes": 12621,
+              "separateCssBytes": 0,
+              "gzip": 3922,
+              "hasAnimationDriver": true,
+              "hasElementScope": false,
+              "scopeHosts": 0,
+              "scriptBytes": 12199
+            },
+            "candidate": {
+              "bytes": 13118,
+              "separateCssBytes": 0,
+              "gzip": 4134,
+              "hasAnimationDriver": true,
+              "hasElementScope": false,
+              "scopeHosts": 0,
+              "scriptBytes": 12696
+            }
+          },
+          "baselineMedianMs": 0.029141041999999742,
+          "baselineDistributionMs": {
+            "min": 0.027698209000000133,
+            "p25": 0.028781417000000146,
+            "median": 0.029141041999999742,
+            "p75": 0.034177584000000025,
+            "max": 0.037350666000000275
+          },
+          "baselineMedianOpsPerSecond": 34315.86283016266,
+          "candidateMedianMs": 0.03176699999999982,
+          "candidateDistributionMs": {
+            "min": 0.03078120799999988,
+            "p25": 0.03144233399999984,
+            "median": 0.03176699999999982,
+            "p75": 0.037063458000000084,
+            "max": 0.04266645900000003
+          },
+          "candidateMedianOpsPerSecond": 31479.20798312732,
+          "pairedCandidateBaselineRatios": [
+            1.142321237324114, 1.1039876577761516, 1.0844376243797706, 1.234348762405531,
+            1.0923721018199233, 1.0924526057907324, 1.0778435007814913, 1.0825034946446106,
+            1.089842021955577, 1.074812874495859, 1.0856809787378285
+          ]
+        },
+        "ScopedView": {
+          "repetitions": 10000,
+          "warmupRepetitions": 50000,
+          "baseline": [
+            0.005678995900000018, 0.005634879100000035, 0.005640724999999975, 0.005615266599999996,
+            0.005573412499999995, 0.005581241599999976, 0.005707595800000035, 0.005914966600000025,
+            0.006042220799999995, 0.005901529200000004, 0.005784508300000016
+          ],
+          "candidate": [
+            0.008017149999999992, 0.007942679199999974, 0.008144449999999961, 0.008459199999999964,
+            0.008115058399999998, 0.008101258400000005, 0.008344445799999994, 0.008266220799999974,
+            0.010138420899999983, 0.010201395899999988, 0.008172179199999937
+          ],
+          "wire": {
+            "baseline": {
+              "bytes": 213,
+              "separateCssBytes": 0,
+              "gzip": 155,
+              "hasAnimationDriver": false,
+              "hasElementScope": true,
+              "scopeHosts": 1,
+              "scriptBytes": 0
+            },
+            "candidate": {
+              "bytes": 266,
+              "separateCssBytes": 115,
+              "gzip": 176,
+              "hasAnimationDriver": false,
+              "hasElementScope": true,
+              "scopeHosts": 1,
+              "scriptBytes": 0
+            }
+          },
+          "baselineMedianMs": 0.005678995900000018,
+          "baselineDistributionMs": {
+            "min": 0.005573412499999995,
+            "p25": 0.005615266599999996,
+            "median": 0.005678995900000018,
+            "p75": 0.005901529200000004,
+            "max": 0.006042220799999995
+          },
+          "baselineMedianOpsPerSecond": 176087.46644807348,
+          "candidateMedianMs": 0.008172179199999937,
+          "candidateDistributionMs": {
+            "min": 0.007942679199999974,
+            "p25": 0.008101258400000005,
+            "median": 0.008172179199999937,
+            "p75": 0.008459199999999964,
+            "max": 0.010201395899999988
+          },
+          "candidateMedianOpsPerSecond": 122366.38178467841,
+          "pairedCandidateBaselineRatios": [
+            1.411719631634171, 1.4095562760166274, 1.4438658151212826, 1.5064645372314058,
+            1.4560304660744212, 1.4515154477455412, 1.461989617414734, 1.397509294473436,
+            1.6779295619253092, 1.7286021223109393, 1.4127698978320964
+          ]
+        },
+        "ScopedViewStream": {
+          "repetitions": 1000,
+          "warmupRepetitions": 5000,
+          "baseline": [
+            0.040106708000000255, 0.03999004200000036, 0.039681542000000264, 0.03981304099999943,
+            0.04024612499999967, 0.0405272500000001, 0.04014991699999973, 0.03913433299999997,
+            0.039825041999999485, 0.03768775000000005, 0.03788641699999971
+          ],
+          "candidate": [
+            0.03911024999999972, 0.040340250000000195, 0.040786041999999724, 0.03926429100000041,
+            0.03912787500000013, 0.03903091700000005, 0.03866012500000034, 0.04007458299999962,
+            0.03980000000000018, 0.03849295799999981, 0.037889083000000025
+          ],
+          "wire": {
+            "baseline": {
+              "bytes": 12663,
+              "separateCssBytes": 0,
+              "gzip": 3937,
+              "hasAnimationDriver": true,
+              "hasElementScope": true,
+              "scopeHosts": 1,
+              "scriptBytes": 12141
+            },
+            "candidate": {
+              "bytes": 13213,
+              "separateCssBytes": 0,
+              "gzip": 4163,
+              "hasAnimationDriver": true,
+              "hasElementScope": true,
+              "scopeHosts": 1,
+              "scriptBytes": 12638
+            }
+          },
+          "baselineMedianMs": 0.039825041999999485,
+          "baselineDistributionMs": {
+            "min": 0.03768775000000005,
+            "p25": 0.03913433299999997,
+            "median": 0.039825041999999485,
+            "p75": 0.04014991699999973,
+            "max": 0.0405272500000001
+          },
+          "baselineMedianOpsPerSecond": 25109.829137154782,
+          "candidateMedianMs": 0.03912787500000013,
+          "candidateDistributionMs": {
+            "min": 0.037889083000000025,
+            "p25": 0.03866012500000034,
+            "median": 0.03912787500000013,
+            "p75": 0.04007458299999962,
+            "max": 0.040786041999999724
+          },
+          "candidateMedianOpsPerSecond": 25557.2274241828,
+          "pairedCandidateBaselineRatios": [
+            0.9751548294614326, 1.0087573801497842, 1.0278340997937896, 0.9862168277977301,
+            0.9722147163236325, 0.9630783485185882, 0.9628942694950178, 1.0240262175926098,
+            0.9993711996587649, 1.0213652446749877, 1.0000703682272283
+          ]
+        }
+      }
+    },
+    "final": {
+      "node": "v24.20.0",
+      "platform": "darwin",
+      "arch": "arm64",
+      "verifyOnly": false,
+      "baselineRevision": "e36dec2b41d61bf5c0ea118b98565fc30f7b94ce",
+      "candidateRevision": "fc0dbf32b6fa4f20d88edf510f8495ef5d0204d2",
+      "compiledHash": "8c79e2a68de783130c6e0a596d7848c7090a3adc1849ce2d7561a7aa999cb8bc",
+      "lockfileHash": "1c3467abe3f112e1f5b5f25589fa19f72765195351ddd6d1a6a35c45db231873",
+      "method": "Identical compiled fixture; production minified bundles; five warmup batches per side; 11 paired alternating batches; same process/dependencies; per-operation batch times in milliseconds. Ready:50000 warmup/10000 per sample; streamed:5000 warmup/1000 per sample.",
+      "limitations": [
+        "Small synthetic server-only scenarios; browser capture/animation/resource waits, backpressure, concurrency, and allocation/GC behavior are not measured.",
+        "Ready response bytes include RenderResult.css followed by RenderResult.html; timing still measures renderToString itself. Streamed CSS is already included in the response.",
+        "Batch timings and observed spread limit conclusions about individual latency; distributions are descriptive, not a performance guarantee."
+      ],
+      "meta": {
+        "baseline": {
+          "sourceSha256": "9cc1672785c39df29e1c45088216263703e725e3d1605b975ffba6278ac62471",
+          "serverSourceHash": "68e52cba39185acd69416749ad3af5412e5def5b711748ebb8b3f696d26cf619",
+          "bundleHash": "b1ad665cfa2525bff943985893c79b4604c3b95b6516a9f6ba37328b651a07b6",
+          "bundleBytes": 75775,
+          "bundleGzip": 25598
+        },
+        "candidate": {
+          "sourceSha256": "a00ac687f2bc505d5cca78d67b108776999ecec53b6afb1312947597e98c3ccc",
+          "serverSourceHash": "559abbf8a5e080c246198bc67b00c0adbd06ed222e259f7c4d4c5f132fb5942b",
+          "bundleHash": "6d4fd606e7d9c30de7b126bea2269f4ff4b0bdd90fd5c00a747e539e60ed2505",
+          "bundleBytes": 76517,
+          "bundleGzip": 25879
+        }
+      },
+      "samples": {
+        "Plain": {
+          "repetitions": 10000,
+          "warmupRepetitions": 50000,
+          "baseline": [
+            0.0003950124999999957, 0.00041216249999999945, 0.0003730999999999995,
+            0.0003906583000000012, 0.0003816042000000039, 0.0003655084000000045,
+            0.0003575749999999971, 0.00034640830000000166, 0.0003582540999999992,
+            0.0003547333000000037, 0.0003397207999999978
+          ],
+          "candidate": [
+            0.00041708329999999593, 0.0003765542000000039, 0.00038552080000000047,
+            0.0003679624999999987, 0.000374354100000005, 0.0003568166000000019,
+            0.00034562080000000037, 0.00036622919999999793, 0.0003921166000000028,
+            0.00035272500000000376, 0.0003747749999999996
+          ],
+          "wire": {
+            "baseline": {
+              "bytes": 31,
+              "separateCssBytes": 0,
+              "gzip": 45,
+              "hasAnimationDriver": false,
+              "hasElementScope": false,
+              "scopeHosts": 0,
+              "scriptBytes": 0
+            },
+            "candidate": {
+              "bytes": 31,
+              "separateCssBytes": 0,
+              "gzip": 45,
+              "hasAnimationDriver": false,
+              "hasElementScope": false,
+              "scopeHosts": 0,
+              "scriptBytes": 0
+            }
+          },
+          "baselineMedianMs": 0.0003655084000000045,
+          "baselineDistributionMs": {
+            "min": 0.0003397207999999978,
+            "p25": 0.0003547333000000037,
+            "median": 0.0003655084000000045,
+            "p75": 0.0003906583000000012,
+            "max": 0.00041216249999999945
+          },
+          "baselineMedianOpsPerSecond": 2735915.2347797966,
+          "candidateMedianMs": 0.000374354100000005,
+          "candidateDistributionMs": {
+            "min": 0.00034562080000000037,
+            "p25": 0.0003568166000000019,
+            "median": 0.000374354100000005,
+            "p75": 0.00038552080000000047,
+            "max": 0.00041708329999999593
+          },
+          "candidateMedianOpsPerSecond": 2671267.65808091,
+          "pairedCandidateBaselineRatios": [
+            1.0558736748837074, 0.9136061626179102, 1.0332908067542241, 0.9419037045929847,
+            0.9810009952720677, 0.9762199719623339, 0.9665686918828307, 1.0572183172285312,
+            1.094520900109737, 0.9943385636476758, 1.1031853215935028
+          ]
+        },
+        "View": {
+          "repetitions": 10000,
+          "warmupRepetitions": 50000,
+          "baseline": [
+            0.0013226499999999988, 0.0012853749999999992, 0.001282020799999998,
+            0.0012287791000000084, 0.0013708582999999977, 0.0013024917000000074,
+            0.0012930165999999986, 0.0012772166999999968, 0.0012489874999999984,
+            0.0012345209000000068, 0.001258812499999999
+          ],
+          "candidate": [
+            0.0026898541000000024, 0.002405687499999999, 0.002354195900000002,
+            0.0022704417000000035, 0.0024058333999999945, 0.002336629199999993,
+            0.002314274999999998, 0.0023144374999999966, 0.0022890332999999942,
+            0.0022912665999999943, 0.0022500583000000006
+          ],
+          "wire": {
+            "baseline": {
+              "bytes": 113,
+              "separateCssBytes": 0,
+              "gzip": 105,
+              "hasAnimationDriver": false,
+              "hasElementScope": false,
+              "scopeHosts": 0,
+              "scriptBytes": 0
+            },
+            "candidate": {
+              "bytes": 113,
+              "separateCssBytes": 0,
+              "gzip": 105,
+              "hasAnimationDriver": false,
+              "hasElementScope": false,
+              "scopeHosts": 0,
+              "scriptBytes": 0
+            }
+          },
+          "baselineMedianMs": 0.001282020799999998,
+          "baselineDistributionMs": {
+            "min": 0.0012287791000000084,
+            "p25": 0.0012489874999999984,
+            "median": 0.001282020799999998,
+            "p75": 0.0013024917000000074,
+            "max": 0.0013708582999999977
+          },
+          "baselineMedianOpsPerSecond": 780018.5457209443,
+          "candidateMedianMs": 0.0023144374999999966,
+          "candidateDistributionMs": {
+            "min": 0.0022500583000000006,
+            "p25": 0.0022890332999999942,
+            "median": 0.0023144374999999966,
+            "p75": 0.002405687499999999,
+            "max": 0.0026898541000000024
+          },
+          "candidateMedianOpsPerSecond": 432070.4274796798,
+          "pairedCandidateBaselineRatios": [
+            2.033685479907765, 1.8715841680443455, 1.8363164622602113, 1.8477216124525457,
+            1.7549832831008125, 1.7939685911242118, 1.7898262095011004, 1.812094611666135,
+            1.832711136020174, 1.8559966056467587, 1.7874451516806533
+          ]
+        },
+        "PlainStream": {
+          "repetitions": 1000,
+          "warmupRepetitions": 5000,
+          "baseline": [
+            0.03275420800000006, 0.02269354199999998, 0.024773999999999886, 0.023811292000000095,
+            0.02368687499999987, 0.020679416000000173, 0.02101475000000005, 0.02332112499999994,
+            0.022231874999999946, 0.021202832999999827, 0.023182250000000067
+          ],
+          "candidate": [
+            0.026597249999999805, 0.021940042000000177, 0.022825458000000028, 0.025186542000000145,
+            0.020703042000000095, 0.02181316599999991, 0.020934416000000056, 0.02104508299999998,
+            0.021600791999999956, 0.02170791699999995, 0.024837125000000015
+          ],
+          "wire": {
+            "baseline": {
+              "bytes": 2443,
+              "separateCssBytes": 0,
+              "gzip": 1040,
+              "hasAnimationDriver": false,
+              "hasElementScope": false,
+              "scopeHosts": 0,
+              "scriptBytes": 2109
+            },
+            "candidate": {
+              "bytes": 2830,
+              "separateCssBytes": 0,
+              "gzip": 1176,
+              "hasAnimationDriver": false,
+              "hasElementScope": false,
+              "scopeHosts": 0,
+              "scriptBytes": 2496
+            }
+          },
+          "baselineMedianMs": 0.023182250000000067,
+          "baselineDistributionMs": {
+            "min": 0.020679416000000173,
+            "p25": 0.021202832999999827,
+            "median": 0.023182250000000067,
+            "p75": 0.023811292000000095,
+            "max": 0.03275420800000006
+          },
+          "baselineMedianOpsPerSecond": 43136.451379827115,
+          "candidateMedianMs": 0.02181316599999991,
+          "candidateDistributionMs": {
+            "min": 0.020703042000000095,
+            "p25": 0.02104508299999998,
+            "median": 0.02181316599999991,
+            "p75": 0.024837125000000015,
+            "max": 0.026597249999999805
+          },
+          "candidateMedianOpsPerSecond": 45843.872457579244,
+          "pairedCandidateBaselineRatios": [
+            0.8120254350219598, 0.9667967212875009, 0.9213472995882833, 1.0577562107927636,
+            0.8740301116124524, 1.0548250492180113, 0.9961772564508264, 0.9024042793818923,
+            0.9716135953445226, 1.0238215336601542, 1.0713854349771892
+          ]
+        },
+        "ViewStream": {
+          "repetitions": 1000,
+          "warmupRepetitions": 5000,
+          "baseline": [
+            0.041519542, 0.033646374999999805, 0.035988166999999974, 0.03768070799999987,
+            0.03240204199999971, 0.03238299999999981, 0.031048125000000256, 0.03047270800000024,
+            0.029473209000000226, 0.03423691700000018, 0.035795666999999864
+          ],
+          "candidate": [
+            0.03567029199999979, 0.03085279199999968, 0.03799895900000001, 0.037659667000000355,
+            0.029694499999999607, 0.031568707999999786, 0.02866975000000002, 0.02869616599999972,
+            0.02834220800000003, 0.02938158300000032, 0.03128058300000021
+          ],
+          "wire": {
+            "baseline": {
+              "bytes": 12621,
+              "separateCssBytes": 0,
+              "gzip": 3925,
+              "hasAnimationDriver": true,
+              "hasElementScope": false,
+              "scopeHosts": 0,
+              "scriptBytes": 12199
+            },
+            "candidate": {
+              "bytes": 13118,
+              "separateCssBytes": 0,
+              "gzip": 4133,
+              "hasAnimationDriver": true,
+              "hasElementScope": false,
+              "scopeHosts": 0,
+              "scriptBytes": 12696
+            }
+          },
+          "baselineMedianMs": 0.033646374999999805,
+          "baselineDistributionMs": {
+            "min": 0.029473209000000226,
+            "p25": 0.031048125000000256,
+            "median": 0.033646374999999805,
+            "p75": 0.035988166999999974,
+            "max": 0.041519542
+          },
+          "baselineMedianOpsPerSecond": 29720.883750478493,
+          "candidateMedianMs": 0.03085279199999968,
+          "candidateDistributionMs": {
+            "min": 0.02834220800000003,
+            "p25": 0.02869616599999972,
+            "median": 0.03085279199999968,
+            "p75": 0.03567029199999979,
+            "max": 0.03799895900000001
+          },
+          "candidateMedianOpsPerSecond": 32411.97749623471,
+          "pairedCandidateBaselineRatios": [
+            0.8591205558095942, 0.9169722444096834, 1.0558736987076902, 0.9994415975411207,
+            0.9164391552853328, 0.9748543371522087, 0.9233971455603127, 0.9417005538201427,
+            0.9616261330756285, 0.8581842518121642, 0.8738650686408589
+          ]
+        },
+        "ScopedView": {
+          "repetitions": 10000,
+          "warmupRepetitions": 50000,
+          "baseline": [
+            0.006869854200000009, 0.007786891699999978, 0.007310050000000001, 0.007335845800000016,
+            0.007607566600000018, 0.007429495899999984, 0.0071658124999999925, 0.008098491600000033,
+            0.007753254099999958, 0.008476079200000004, 0.007737945899999977
+          ],
+          "candidate": [
+            0.005727745800000002, 0.006080879199999981, 0.005844491700000026, 0.006002575000000025,
+            0.005996249999999963, 0.005761949999999979, 0.005827104099999997, 0.006585712500000045,
+            0.006427137500000026, 0.006852312499999971, 0.006156958399999985
+          ],
+          "wire": {
+            "baseline": {
+              "bytes": 213,
+              "separateCssBytes": 0,
+              "gzip": 155,
+              "hasAnimationDriver": false,
+              "hasElementScope": true,
+              "scopeHosts": 1,
+              "scriptBytes": 0
+            },
+            "candidate": {
+              "bytes": 266,
+              "separateCssBytes": 115,
+              "gzip": 176,
+              "hasAnimationDriver": false,
+              "hasElementScope": true,
+              "scopeHosts": 1,
+              "scriptBytes": 0
+            }
+          },
+          "baselineMedianMs": 0.007607566600000018,
+          "baselineDistributionMs": {
+            "min": 0.006869854200000009,
+            "p25": 0.007310050000000001,
+            "median": 0.007607566600000018,
+            "p75": 0.007786891699999978,
+            "max": 0.008476079200000004
+          },
+          "baselineMedianOpsPerSecond": 131448.07697115626,
+          "candidateMedianMs": 0.006002575000000025,
+          "candidateDistributionMs": {
+            "min": 0.005727745800000002,
+            "p25": 0.005827104099999997,
+            "median": 0.006002575000000025,
+            "p75": 0.006427137500000026,
+            "max": 0.006852312499999971
+          },
+          "candidateMedianOpsPerSecond": 166595.16957305753,
+          "pairedCandidateBaselineRatios": [
+            0.8337507075477665, 0.7809122605365114, 0.7995145997633429, 0.8182526137613214,
+            0.788195531538291, 0.775550599603937, 0.8131812128771165, 0.8132023622769478,
+            0.8289599975834742, 0.8084295035846254, 0.7956838261172133
+          ]
+        },
+        "ScopedViewStream": {
+          "repetitions": 1000,
+          "warmupRepetitions": 5000,
+          "baseline": [
+            0.046001208000000585, 0.04328412500000013, 0.04602204100000017, 0.05223458300000038,
+            0.047732958000000505, 0.04712174999999934, 0.04900204200000007, 0.04825608400000055,
+            0.04719587499999943, 0.04702654200000052, 0.04832837500000005
+          ],
+          "candidate": [
+            0.03863354199999958, 0.03650666700000056, 0.049842625000000224, 0.04392566700000043,
+            0.03900525000000016, 0.03775470900000073, 0.04772520900000018, 0.04752833399999963,
+            0.04329708399999981, 0.038963125000000216, 0.04183283300000039
+          ],
+          "wire": {
+            "baseline": {
+              "bytes": 12663,
+              "separateCssBytes": 0,
+              "gzip": 3938,
+              "hasAnimationDriver": true,
+              "hasElementScope": true,
+              "scopeHosts": 1,
+              "scriptBytes": 12141
+            },
+            "candidate": {
+              "bytes": 13213,
+              "separateCssBytes": 0,
+              "gzip": 4163,
+              "hasAnimationDriver": true,
+              "hasElementScope": true,
+              "scopeHosts": 1,
+              "scriptBytes": 12638
+            }
+          },
+          "baselineMedianMs": 0.04719587499999943,
+          "baselineDistributionMs": {
+            "min": 0.04328412500000013,
+            "p25": 0.04602204100000017,
+            "median": 0.04719587499999943,
+            "p75": 0.04832837500000005,
+            "max": 0.05223458300000038
+          },
+          "baselineMedianOpsPerSecond": 21188.292409029647,
+          "candidateMedianMs": 0.04183283300000039,
+          "candidateDistributionMs": {
+            "min": 0.03650666700000056,
+            "p25": 0.03863354199999958,
+            "median": 0.04183283300000039,
+            "p75": 0.04752833399999963,
+            "max": 0.049842625000000224
+          },
+          "candidateMedianOpsPerSecond": 23904.66837376256,
+          "pairedCandidateBaselineRatios": [
+            0.8398375538311752, 0.8434193136629295, 1.0830163964262263, 0.8409307488871905,
+            0.817155517577598, 0.8012161899759933, 0.9739432695478304, 0.9849190000580877,
+            0.917391276250315, 0.828534766600525, 0.8655956878335004
+          ]
+        }
+      }
+    },
+    "optimization": {
+      "node": "v24.20.0",
+      "platform": "darwin",
+      "arch": "arm64",
+      "verifyOnly": false,
+      "baselineRevision": "9aa4d762156ae55a99b844aa39f7eda00d4a53f2",
+      "candidateRevision": "fc0dbf32b6fa4f20d88edf510f8495ef5d0204d2",
+      "compiledHash": "8c79e2a68de783130c6e0a596d7848c7090a3adc1849ce2d7561a7aa999cb8bc",
+      "lockfileHash": "1c3467abe3f112e1f5b5f25589fa19f72765195351ddd6d1a6a35c45db231873",
+      "method": "Identical compiled fixture; production minified bundles; five warmup batches per side; 11 paired alternating batches; same process/dependencies; per-operation batch times in milliseconds. Ready:50000 warmup/10000 per sample; streamed:5000 warmup/1000 per sample.",
+      "limitations": [
+        "Small synthetic server-only scenarios; browser capture/animation/resource waits, backpressure, concurrency, and allocation/GC behavior are not measured.",
+        "Ready response bytes include RenderResult.css followed by RenderResult.html; timing still measures renderToString itself. Streamed CSS is already included in the response.",
+        "Batch timings and observed spread limit conclusions about individual latency; distributions are descriptive, not a performance guarantee."
+      ],
+      "meta": {
+        "baseline": {
+          "sourceSha256": "2e6c527707c21670965bb3ecdac4313880e629d3330c4f0509a9c101c52cf71c",
+          "serverSourceHash": "7c27d2216af0e7dd425ba7d577fb4527a6557fe34d7f15ccbefa16767ba54836",
+          "bundleHash": "ea742a6af74a08eead9be128cce5845d2acef76f636b764b99be115343d36bf7",
+          "bundleBytes": 76262,
+          "bundleGzip": 25774
+        },
+        "candidate": {
+          "sourceSha256": "a00ac687f2bc505d5cca78d67b108776999ecec53b6afb1312947597e98c3ccc",
+          "serverSourceHash": "559abbf8a5e080c246198bc67b00c0adbd06ed222e259f7c4d4c5f132fb5942b",
+          "bundleHash": "6d4fd606e7d9c30de7b126bea2269f4ff4b0bdd90fd5c00a747e539e60ed2505",
+          "bundleBytes": 76517,
+          "bundleGzip": 25879
+        }
+      },
+      "samples": {
+        "Plain": {
+          "repetitions": 10000,
+          "warmupRepetitions": 50000,
+          "baseline": [
+            0.0004279958000000079, 0.00040149169999999685, 0.0003697417000000087,
+            0.00037494590000001154, 0.00038412920000000666, 0.00039704589999998914,
+            0.00042863750000001345, 0.0004678124999999909, 0.00042261670000000323,
+            0.00042793750000000725, 0.00040287909999999556
+          ],
+          "candidate": [
+            0.00040061670000000047, 0.0004071415999999999, 0.00037905829999999695,
+            0.0003771834000000126, 0.00042832499999999525, 0.0003689499999999953,
+            0.0003756959000000052, 0.0004299541999999974, 0.00042980830000001333,
+            0.0003927917000000207, 0.0004137499999999818
+          ],
+          "wire": {
+            "baseline": {
+              "bytes": 31,
+              "separateCssBytes": 0,
+              "gzip": 45,
+              "hasAnimationDriver": false,
+              "hasElementScope": false,
+              "scopeHosts": 0,
+              "scriptBytes": 0
+            },
+            "candidate": {
+              "bytes": 31,
+              "separateCssBytes": 0,
+              "gzip": 45,
+              "hasAnimationDriver": false,
+              "hasElementScope": false,
+              "scopeHosts": 0,
+              "scriptBytes": 0
+            }
+          },
+          "baselineMedianMs": 0.00040287909999999556,
+          "baselineDistributionMs": {
+            "min": 0.0003697417000000087,
+            "p25": 0.00038412920000000666,
+            "median": 0.00040287909999999556,
+            "p75": 0.0004279958000000079,
+            "max": 0.0004678124999999909
+          },
+          "baselineMedianOpsPerSecond": 2482134.218429328,
+          "candidateMedianMs": 0.00040061670000000047,
+          "candidateDistributionMs": {
+            "min": 0.0003689499999999953,
+            "p25": 0.0003771834000000126,
+            "median": 0.00040061670000000047,
+            "p75": 0.00042832499999999525,
+            "max": 0.0004299541999999974
+          },
+          "candidateMedianOpsPerSecond": 2496151.558334934,
+          "pairedCandidateBaselineRatios": [
+            0.9360295124391246, 1.0140722709834427, 1.0251975906422999, 1.005967527581982,
+            1.1150545181152274, 0.9292376523721951, 0.8764886413344455, 0.9190737742151092,
+            1.0170168381893334, 0.9178716518183474, 1.026983032875089
+          ]
+        },
+        "View": {
+          "repetitions": 10000,
+          "warmupRepetitions": 50000,
+          "baseline": [
+            0.005225912499999982, 0.0051834250000000115, 0.005159662499999967, 0.005412837500000023,
+            0.005617550000000028, 0.0051737541999999845, 0.005005629100000033, 0.00511491659999997,
+            0.005355324999999993, 0.004851116700000011, 0.005096854100000018
+          ],
+          "candidate": [
+            0.002444058300000006, 0.0024380583000000117, 0.002520316600000024,
+            0.0023997124999999868, 0.0025501042000000327, 0.002519404200000008,
+            0.002379750000000013, 0.002379966699999977, 0.0022738666999999623,
+            0.0023028499999999895, 0.002478587500000003
+          ],
+          "wire": {
+            "baseline": {
+              "bytes": 113,
+              "separateCssBytes": 0,
+              "gzip": 105,
+              "hasAnimationDriver": false,
+              "hasElementScope": false,
+              "scopeHosts": 0,
+              "scriptBytes": 0
+            },
+            "candidate": {
+              "bytes": 113,
+              "separateCssBytes": 0,
+              "gzip": 105,
+              "hasAnimationDriver": false,
+              "hasElementScope": false,
+              "scopeHosts": 0,
+              "scriptBytes": 0
+            }
+          },
+          "baselineMedianMs": 0.0051737541999999845,
+          "baselineDistributionMs": {
+            "min": 0.004851116700000011,
+            "p25": 0.005096854100000018,
+            "median": 0.0051737541999999845,
+            "p75": 0.005355324999999993,
+            "max": 0.005617550000000028
+          },
+          "baselineMedianOpsPerSecond": 193283.24488241112,
+          "candidateMedianMs": 0.0024380583000000117,
+          "candidateDistributionMs": {
+            "min": 0.0022738666999999623,
+            "p25": 0.002379750000000013,
+            "median": 0.0024380583000000117,
+            "p75": 0.002519404200000008,
+            "max": 0.0025501042000000327
+          },
+          "candidateMedianOpsPerSecond": 410162.46412154916,
+          "pairedCandidateBaselineRatios": [
+            0.467680677776372, 0.470356627133605, 0.48846539865738114, 0.44333725148777814,
+            0.45395309343041357, 0.48695861894637665, 0.4754147685452758, 0.4652992191505119,
+            0.42459919799451296, 0.47470513335619907, 0.48629751830643814
+          ]
+        },
+        "PlainStream": {
+          "repetitions": 1000,
+          "warmupRepetitions": 5000,
+          "baseline": [
+            0.02260270800000035, 0.020683790999999927, 0.020098500000000057, 0.02063354100000015,
+            0.020536041000000296, 0.021547291999999742, 0.02110525000000007, 0.02075158300000021,
+            0.021021833000000243, 0.019228207999999997, 0.018758334000000106
+          ],
+          "candidate": [
+            0.022838208000000124, 0.020752416000000266, 0.019959791999999654, 0.020703125,
+            0.019665124999999988, 0.02062583399999994, 0.021034958000000187, 0.02090729199999987,
+            0.020339750000000094, 0.018919874999999593, 0.018798624999999902
+          ],
+          "wire": {
+            "baseline": {
+              "bytes": 2830,
+              "separateCssBytes": 0,
+              "gzip": 1176,
+              "hasAnimationDriver": false,
+              "hasElementScope": false,
+              "scopeHosts": 0,
+              "scriptBytes": 2496
+            },
+            "candidate": {
+              "bytes": 2830,
+              "separateCssBytes": 0,
+              "gzip": 1175,
+              "hasAnimationDriver": false,
+              "hasElementScope": false,
+              "scopeHosts": 0,
+              "scriptBytes": 2496
+            }
+          },
+          "baselineMedianMs": 0.020683790999999927,
+          "baselineDistributionMs": {
+            "min": 0.018758334000000106,
+            "p25": 0.020098500000000057,
+            "median": 0.020683790999999927,
+            "p75": 0.02110525000000007,
+            "max": 0.02260270800000035
+          },
+          "baselineMedianOpsPerSecond": 48347.036575645325,
+          "candidateMedianMs": 0.02062583399999994,
+          "candidateDistributionMs": {
+            "min": 0.018798624999999902,
+            "p25": 0.019665124999999988,
+            "median": 0.02062583399999994,
+            "p75": 0.02090729199999987,
+            "max": 0.022838208000000124
+          },
+          "candidateMedianOpsPerSecond": 48482.88801315879,
+          "pairedCandidateBaselineRatios": [
+            1.0104191055337162, 1.00331781538502, 0.9930985894469536, 1.003372373166576,
+            0.9575908521023943, 0.9572355542404208, 0.9966694542827078, 1.0075034757589172,
+            0.9675535905931637, 0.9839645483343844, 1.002147898635337
+          ]
+        },
+        "ViewStream": {
+          "repetitions": 1000,
+          "warmupRepetitions": 5000,
+          "baseline": [
+            0.0335112079999999, 0.03149745899999971, 0.033865000000000235, 0.033539541999999985,
+            0.029611875000000055, 0.03260083299999997, 0.03281675000000041, 0.029834334000000125,
+            0.030414458000000196, 0.02954254200000014, 0.02898700000000008
+          ],
+          "candidate": [
+            0.02886541699999998, 0.027568874999999934, 0.02874541700000009, 0.029036417000000255,
+            0.026719333000000005, 0.02713774999999987, 0.028623207999999976, 0.026677582999999686,
+            0.028179791999999905, 0.026977750000000016, 0.025979542000000036
+          ],
+          "wire": {
+            "baseline": {
+              "bytes": 13118,
+              "separateCssBytes": 0,
+              "gzip": 4133,
+              "hasAnimationDriver": true,
+              "hasElementScope": false,
+              "scopeHosts": 0,
+              "scriptBytes": 12696
+            },
+            "candidate": {
+              "bytes": 13118,
+              "separateCssBytes": 0,
+              "gzip": 4132,
+              "hasAnimationDriver": true,
+              "hasElementScope": false,
+              "scopeHosts": 0,
+              "scriptBytes": 12696
+            }
+          },
+          "baselineMedianMs": 0.03149745899999971,
+          "baselineDistributionMs": {
+            "min": 0.02898700000000008,
+            "p25": 0.029611875000000055,
+            "median": 0.03149745899999971,
+            "p75": 0.0335112079999999,
+            "max": 0.033865000000000235
+          },
+          "baselineMedianOpsPerSecond": 31748.59279918451,
+          "candidateMedianMs": 0.027568874999999934,
+          "candidateDistributionMs": {
+            "min": 0.025979542000000036,
+            "p25": 0.026719333000000005,
+            "median": 0.027568874999999934,
+            "p75": 0.02874541700000009,
+            "max": 0.029036417000000255
+          },
+          "candidateMedianOpsPerSecond": 36272.78951353664,
+          "pairedCandidateBaselineRatios": [
+            0.8613660540079626, 0.8752729863066158, 0.8488237708548616, 0.8657368368357644,
+            0.9023181747187557, 0.8324250487709899, 0.8722133666496414, 0.8941906663644502,
+            0.9265261935622763, 0.9131830971078889, 0.8962480422258242
+          ]
+        },
+        "ScopedView": {
+          "repetitions": 10000,
+          "warmupRepetitions": 50000,
+          "baseline": [
+            0.00881688750000003, 0.008342975000000023, 0.008484883300000001, 0.008054591600000003,
+            0.00822532089999995, 0.008497733299999982, 0.008681608300000062, 0.008431195799999932,
+            0.008415887500000009, 0.008298891700000059, 0.008452804199999992
+          ],
+          "candidate": [
+            0.0049416874999999895, 0.004897029199999997, 0.00485137079999995, 0.004639862499999981,
+            0.004721662500000002, 0.004739583299999958, 0.00515659999999998, 0.0049292583000000376,
+            0.00497465000000002, 0.004889899999999944, 0.004826304100000016
+          ],
+          "wire": {
+            "baseline": {
+              "bytes": 266,
+              "separateCssBytes": 115,
+              "gzip": 176,
+              "hasAnimationDriver": false,
+              "hasElementScope": true,
+              "scopeHosts": 1,
+              "scriptBytes": 0
+            },
+            "candidate": {
+              "bytes": 266,
+              "separateCssBytes": 115,
+              "gzip": 176,
+              "hasAnimationDriver": false,
+              "hasElementScope": true,
+              "scopeHosts": 1,
+              "scriptBytes": 0
+            }
+          },
+          "baselineMedianMs": 0.008431195799999932,
+          "baselineDistributionMs": {
+            "min": 0.008054591600000003,
+            "p25": 0.008298891700000059,
+            "median": 0.008431195799999932,
+            "p75": 0.008497733299999982,
+            "max": 0.00881688750000003
+          },
+          "baselineMedianOpsPerSecond": 118607.13755455757,
+          "candidateMedianMs": 0.004889899999999944,
+          "candidateDistributionMs": {
+            "min": 0.004639862499999981,
+            "p25": 0.004739583299999958,
+            "median": 0.004889899999999944,
+            "p75": 0.0049416874999999895,
+            "max": 0.00515659999999998
+          },
+          "candidateMedianOpsPerSecond": 204503.15957381777,
+          "pairedCandidateBaselineRatios": [
+            0.5604798178495498, 0.5869643862051587, 0.5717663553486881, 0.5760518633868389,
+            0.5740399137497517, 0.5577467699533437, 0.593968285807129, 0.5846452172300491,
+            0.5911022456039264, 0.5892232573657888, 0.5709707673105714
+          ]
+        },
+        "ScopedViewStream": {
+          "repetitions": 1000,
+          "warmupRepetitions": 5000,
+          "baseline": [
+            0.040342666999999895, 0.039495832999999946, 0.03906133300000056, 0.04536787499999991,
+            0.0443710000000001, 0.04784925000000021, 0.044332875000000056, 0.04031566699999985,
+            0.03970958299999984, 0.04504016700000011, 0.040688583999999535
+          ],
+          "candidate": [
+            0.034122583999999734, 0.034603541999999834, 0.03382016699999985, 0.03352341700000033,
+            0.03935466600000018, 0.038712500000000545, 0.039368875000000116, 0.03515758300000016,
+            0.0335381669999997, 0.03391187499999978, 0.034570458000000144
+          ],
+          "wire": {
+            "baseline": {
+              "bytes": 13213,
+              "separateCssBytes": 0,
+              "gzip": 4163,
+              "hasAnimationDriver": true,
+              "hasElementScope": true,
+              "scopeHosts": 1,
+              "scriptBytes": 12638
+            },
+            "candidate": {
+              "bytes": 13213,
+              "separateCssBytes": 0,
+              "gzip": 4163,
+              "hasAnimationDriver": true,
+              "hasElementScope": true,
+              "scopeHosts": 1,
+              "scriptBytes": 12638
+            }
+          },
+          "baselineMedianMs": 0.040688583999999535,
+          "baselineDistributionMs": {
+            "min": 0.03906133300000056,
+            "p25": 0.03970958299999984,
+            "median": 0.040688583999999535,
+            "p75": 0.04504016700000011,
+            "max": 0.04784925000000021
+          },
+          "baselineMedianOpsPerSecond": 24576.918184226106,
+          "candidateMedianMs": 0.034570458000000144,
+          "candidateDistributionMs": {
+            "min": 0.03352341700000033,
+            "p25": 0.03382016699999985,
+            "median": 0.034570458000000144,
+            "p75": 0.038712500000000545,
+            "max": 0.039368875000000116
+          },
+          "candidateMedianOpsPerSecond": 28926.43192635735,
+          "pairedCandidateBaselineRatios": [
+            0.8458187456967042, 0.8761314642990282, 0.8658221418096348, 0.7389241175611685,
+            0.8869456627076264, 0.8090513435424876, 0.8880289175921946, 0.8720575799973814,
+            0.8445862299787897, 0.7529251612233075, 0.8496353178572285
+          ]
+        }
+      }
+    },
+    "noisy": {
+      "node": "v24.20.0",
+      "platform": "darwin",
+      "arch": "arm64",
+      "verifyOnly": false,
+      "baselineRevision": "e36dec2b41d61bf5c0ea118b98565fc30f7b94ce",
+      "candidateRevision": "fc0dbf32b6fa4f20d88edf510f8495ef5d0204d2",
+      "compiledHash": "8c79e2a68de783130c6e0a596d7848c7090a3adc1849ce2d7561a7aa999cb8bc",
+      "lockfileHash": "1c3467abe3f112e1f5b5f25589fa19f72765195351ddd6d1a6a35c45db231873",
+      "method": "Identical compiled fixture; production minified bundles; five warmup batches per side; 11 paired alternating batches; same process/dependencies; per-operation batch times in milliseconds. Ready:50000 warmup/10000 per sample; streamed:5000 warmup/1000 per sample.",
+      "limitations": [
+        "Small synthetic server-only scenarios; browser capture/animation/resource waits, backpressure, concurrency, and allocation/GC behavior are not measured.",
+        "Ready response bytes include RenderResult.css followed by RenderResult.html; timing still measures renderToString itself. Streamed CSS is already included in the response.",
+        "Batch timings and observed spread limit conclusions about individual latency; distributions are descriptive, not a performance guarantee."
+      ],
+      "meta": {
+        "baseline": {
+          "sourceSha256": "9cc1672785c39df29e1c45088216263703e725e3d1605b975ffba6278ac62471",
+          "serverSourceHash": "68e52cba39185acd69416749ad3af5412e5def5b711748ebb8b3f696d26cf619",
+          "bundleHash": "b1ad665cfa2525bff943985893c79b4604c3b95b6516a9f6ba37328b651a07b6",
+          "bundleBytes": 75775,
+          "bundleGzip": 25598
+        },
+        "candidate": {
+          "sourceSha256": "a00ac687f2bc505d5cca78d67b108776999ecec53b6afb1312947597e98c3ccc",
+          "serverSourceHash": "559abbf8a5e080c246198bc67b00c0adbd06ed222e259f7c4d4c5f132fb5942b",
+          "bundleHash": "6d4fd606e7d9c30de7b126bea2269f4ff4b0bdd90fd5c00a747e539e60ed2505",
+          "bundleBytes": 76517,
+          "bundleGzip": 25879
+        }
+      },
+      "samples": {
+        "Plain": {
+          "repetitions": 10000,
+          "warmupRepetitions": 50000,
+          "baseline": [
+            0.002572474999999986, 0.001623191699999984, 0.0013382542000000058,
+            0.0007554499999999962, 0.0007417875000000094, 0.0006741833000000042,
+            0.000667291699999987, 0.0007988292000000001, 0.000715033399999993,
+            0.0007100750000000062, 0.0006752791000000116
+          ],
+          "candidate": [
+            0.0024143291999999972, 0.0016314249999999902, 0.0017548749999999928,
+            0.0009554707999999891, 0.000629037500000004, 0.0007859042000000045,
+            0.0006450291999999991, 0.0009160874999999805, 0.0007068708999999899,
+            0.0006813000000000102, 0.000741904199999999
+          ],
+          "wire": {
+            "baseline": {
+              "bytes": 31,
+              "separateCssBytes": 0,
+              "gzip": 45,
+              "hasAnimationDriver": false,
+              "hasElementScope": false,
+              "scopeHosts": 0,
+              "scriptBytes": 0
+            },
+            "candidate": {
+              "bytes": 31,
+              "separateCssBytes": 0,
+              "gzip": 45,
+              "hasAnimationDriver": false,
+              "hasElementScope": false,
+              "scopeHosts": 0,
+              "scriptBytes": 0
+            }
+          },
+          "baselineMedianMs": 0.0007417875000000094,
+          "baselineDistributionMs": {
+            "min": 0.000667291699999987,
+            "p25": 0.0006752791000000116,
+            "median": 0.0007417875000000094,
+            "p75": 0.0013382542000000058,
+            "max": 0.002572474999999986
+          },
+          "baselineMedianOpsPerSecond": 1348094.973290851,
+          "candidateMedianMs": 0.0007859042000000045,
+          "candidateDistributionMs": {
+            "min": 0.000629037500000004,
+            "p25": 0.0006813000000000102,
+            "median": 0.0007859042000000045,
+            "p75": 0.0016314249999999902,
+            "max": 0.0024143291999999972
+          },
+          "candidateMedianOpsPerSecond": 1272419.7173141385,
+          "pairedCandidateBaselineRatios": [
+            0.9385238729239391, 1.0050722905988285, 1.311316639245358, 1.264770401747295,
+            0.8480022917614493, 1.1657129448326584, 0.9666375289847179, 1.1467876987971652,
+            0.9885844493418025, 0.9594761116783499, 1.0986630565050604
+          ]
+        },
+        "View": {
+          "repetitions": 10000,
+          "warmupRepetitions": 50000,
+          "baseline": [
+            0.007042450000000008, 0.00489074169999999, 0.006477933399999984, 0.007345416599999999,
+            0.004843200000000024, 0.004328179099999989, 0.004574208300000009, 0.004299812500000008,
+            0.0028134042000000138, 0.0028843832999999905, 0.009344662500000003
+          ],
+          "candidate": [
+            0.01369520419999999, 0.006768483300000025, 0.009398408300000029, 0.01046996250000002,
+            0.009915308300000016, 0.008515116699999999, 0.012696287500000016, 0.01061115420000001,
+            0.006441779100000031, 0.006772200000000021, 0.003966649999999981
+          ],
+          "wire": {
+            "baseline": {
+              "bytes": 113,
+              "separateCssBytes": 0,
+              "gzip": 105,
+              "hasAnimationDriver": false,
+              "hasElementScope": false,
+              "scopeHosts": 0,
+              "scriptBytes": 0
+            },
+            "candidate": {
+              "bytes": 113,
+              "separateCssBytes": 0,
+              "gzip": 105,
+              "hasAnimationDriver": false,
+              "hasElementScope": false,
+              "scopeHosts": 0,
+              "scriptBytes": 0
+            }
+          },
+          "baselineMedianMs": 0.004843200000000024,
+          "baselineDistributionMs": {
+            "min": 0.0028134042000000138,
+            "p25": 0.004299812500000008,
+            "median": 0.004843200000000024,
+            "p75": 0.007042450000000008,
+            "max": 0.009344662500000003
+          },
+          "baselineMedianOpsPerSecond": 206475.05781301516,
+          "candidateMedianMs": 0.009398408300000029,
+          "candidateDistributionMs": {
+            "min": 0.003966649999999981,
+            "p25": 0.006768483300000025,
+            "median": 0.009398408300000029,
+            "p75": 0.01061115420000001,
+            "max": 0.01369520419999999
+          },
+          "candidateMedianOpsPerSecond": 106400.9955813472,
+          "pairedCandidateBaselineRatios": [
+            1.9446647402537431, 1.383938002696, 1.4508343509675559, 1.4253735451846286,
+            2.0472638544763724, 1.9673669927383597, 2.775625128396534, 2.4678178874078793,
+            2.2896742316656806, 2.347884901427644, 0.4244829601925142
+          ]
+        },
+        "PlainStream": {
+          "repetitions": 1000,
+          "warmupRepetitions": 5000,
+          "baseline": [
+            0.0913842909999994, 0.22368991699999968, 0.08399862500000017, 0.05225895899999978,
+            0.04273541699999987, 0.06926241699999991, 0.040385833000000274, 0.3414337909999995,
+            0.6329987499999997, 0.6732519999999986, 0.3149253340000014
+          ],
+          "candidate": [
+            0.06641716700000051, 0.20011374999999954, 0.05916812500000015, 0.05525770899999952,
+            0.042033542000000125, 0.040375125000000484, 0.13177837499999986, 0.19387724999999956,
+            0.6618138749999989, 0.548032792, 0.5334251669999994
+          ],
+          "wire": {
+            "baseline": {
+              "bytes": 2443,
+              "separateCssBytes": 0,
+              "gzip": 1037,
+              "hasAnimationDriver": false,
+              "hasElementScope": false,
+              "scopeHosts": 0,
+              "scriptBytes": 2109
+            },
+            "candidate": {
+              "bytes": 2830,
+              "separateCssBytes": 0,
+              "gzip": 1175,
+              "hasAnimationDriver": false,
+              "hasElementScope": false,
+              "scopeHosts": 0,
+              "scriptBytes": 2496
+            }
+          },
+          "baselineMedianMs": 0.0913842909999994,
+          "baselineDistributionMs": {
+            "min": 0.040385833000000274,
+            "p25": 0.05225895899999978,
+            "median": 0.0913842909999994,
+            "p75": 0.3414337909999995,
+            "max": 0.6732519999999986
+          },
+          "baselineMedianOpsPerSecond": 10942.79978601581,
+          "candidateMedianMs": 0.13177837499999986,
+          "candidateDistributionMs": {
+            "min": 0.040375125000000484,
+            "p25": 0.05525770899999952,
+            "median": 0.13177837499999986,
+            "p75": 0.5334251669999994,
+            "max": 0.6618138749999989
+          },
+          "candidateMedianOpsPerSecond": 7588.498492260213,
+          "pairedCandidateBaselineRatios": [
+            0.726789760835382, 0.8946033539813054, 0.7043939707346403, 1.057382505457098,
+            0.9835762688357587, 0.5829297727222043, 3.262985190871239, 0.5678326372798873,
+            1.0455216143791741, 0.8140084128974011, 1.6938147218095736
+          ]
+        },
+        "ViewStream": {
+          "repetitions": 1000,
+          "warmupRepetitions": 5000,
+          "baseline": [
+            0.0688912079999991, 0.07106579099999909, 0.0787825840000005, 0.05719562500000029,
+            0.05781808399999863, 0.0564671670000007, 0.05142962500000067, 0.05148212499999863,
+            0.05580833299999904, 0.055694958000000044, 0.05445366699999977
+          ],
+          "candidate": [
+            0.05648129200000039, 0.05463108300000022, 0.07138966700000128, 0.06281858300000022,
+            0.050599625000000745, 0.05663125000000036, 0.05029083299999911, 0.05434966600000007,
+            0.05794866700000057, 0.04647991700000057, 0.05150566700000127
+          ],
+          "wire": {
+            "baseline": {
+              "bytes": 12621,
+              "separateCssBytes": 0,
+              "gzip": 3922,
+              "hasAnimationDriver": true,
+              "hasElementScope": false,
+              "scopeHosts": 0,
+              "scriptBytes": 12199
+            },
+            "candidate": {
+              "bytes": 13118,
+              "separateCssBytes": 0,
+              "gzip": 4132,
+              "hasAnimationDriver": true,
+              "hasElementScope": false,
+              "scopeHosts": 0,
+              "scriptBytes": 12696
+            }
+          },
+          "baselineMedianMs": 0.0564671670000007,
+          "baselineDistributionMs": {
+            "min": 0.05142962500000067,
+            "p25": 0.05445366699999977,
+            "median": 0.0564671670000007,
+            "p75": 0.0688912079999991,
+            "max": 0.0787825840000005
+          },
+          "baselineMedianOpsPerSecond": 17709.40624664219,
+          "candidateMedianMs": 0.05463108300000022,
+          "candidateDistributionMs": {
+            "min": 0.04647991700000057,
+            "p25": 0.050599625000000745,
+            "median": 0.05463108300000022,
+            "p75": 0.05794866700000057,
+            "max": 0.07138966700000128
+          },
+          "candidateMedianOpsPerSecond": 18304.5977690026,
+          "pairedCandidateBaselineRatios": [
+            0.8198621223190212, 0.7687395332024225, 0.9061605163902827, 1.0983109809535239,
+            0.8751522274588335, 1.0029058125051618, 0.9778572758404996, 1.0556997404439212,
+            1.038351512846685, 0.8345444303953068, 0.9458622318309892
+          ]
+        },
+        "ScopedView": {
+          "repetitions": 10000,
+          "warmupRepetitions": 50000,
+          "baseline": [
+            0.009858245899999929, 0.008190083400000003, 0.008557416600000034, 0.009414775000000009,
+            0.009184020899999996, 0.009208241699999961, 0.009240749999999935, 0.008810891700000139,
+            0.009171254100000078, 0.0089851541, 0.00848171250000014
+          ],
+          "candidate": [
+            0.007722383300000002, 0.007626454199999898, 0.00701629580000008, 0.007564020800000071,
+            0.008277158299999974, 0.007641895900000054, 0.00804859579999993, 0.007388483300000189,
+            0.007603450000000157, 0.007910791699999755, 0.007661470799999733
+          ],
+          "wire": {
+            "baseline": {
+              "bytes": 213,
+              "separateCssBytes": 0,
+              "gzip": 155,
+              "hasAnimationDriver": false,
+              "hasElementScope": true,
+              "scopeHosts": 1,
+              "scriptBytes": 0
+            },
+            "candidate": {
+              "bytes": 266,
+              "separateCssBytes": 115,
+              "gzip": 176,
+              "hasAnimationDriver": false,
+              "hasElementScope": true,
+              "scopeHosts": 1,
+              "scriptBytes": 0
+            }
+          },
+          "baselineMedianMs": 0.009171254100000078,
+          "baselineDistributionMs": {
+            "min": 0.008190083400000003,
+            "p25": 0.008557416600000034,
+            "median": 0.009171254100000078,
+            "p75": 0.009240749999999935,
+            "max": 0.009858245899999929
+          },
+          "baselineMedianOpsPerSecond": 109036.34215085061,
+          "candidateMedianMs": 0.007641895900000054,
+          "candidateDistributionMs": {
+            "min": 0.00701629580000008,
+            "p25": 0.007564020800000071,
+            "median": 0.007641895900000054,
+            "p75": 0.007910791699999755,
+            "max": 0.008277158299999974
+          },
+          "candidateMedianOpsPerSecond": 130857.57946532522,
+          "pairedCandidateBaselineRatios": [
+            0.7833425315552393, 0.9311815066498463, 0.8199081718190572, 0.803420241057281,
+            0.9012564747103284, 0.8298974059293085, 0.8709894543191826, 0.8385624919212289,
+            0.8290523757269023, 0.8804291625894045, 0.9032929140193808
+          ]
+        },
+        "ScopedViewStream": {
+          "repetitions": 1000,
+          "warmupRepetitions": 5000,
+          "baseline": [
+            0.059417875000002826, 0.06122404099999767, 0.05494691700000112, 0.05748779099999956,
+            0.05231412500000079, 0.048662041999999926, 0.051187583999999335, 0.04650408400000015,
+            0.044260000000002034, 0.043905750000001714, 0.04369504199999938
+          ],
+          "candidate": [
+            0.059526624999998605, 0.05890312500000073, 0.057832249999999474, 0.04871595799999705,
+            0.04431295799999862, 0.039651583999999275, 0.04573541699999987, 0.04636787499999991,
+            0.03733729200000016, 0.03645537499999773, 0.042757000000001426
+          ],
+          "wire": {
+            "baseline": {
+              "bytes": 12663,
+              "separateCssBytes": 0,
+              "gzip": 3935,
+              "hasAnimationDriver": true,
+              "hasElementScope": true,
+              "scopeHosts": 1,
+              "scriptBytes": 12141
+            },
+            "candidate": {
+              "bytes": 13213,
+              "separateCssBytes": 0,
+              "gzip": 4162,
+              "hasAnimationDriver": true,
+              "hasElementScope": true,
+              "scopeHosts": 1,
+              "scriptBytes": 12638
+            }
+          },
+          "baselineMedianMs": 0.051187583999999335,
+          "baselineDistributionMs": {
+            "min": 0.04369504199999938,
+            "p25": 0.044260000000002034,
+            "median": 0.051187583999999335,
+            "p75": 0.05748779099999956,
+            "max": 0.06122404099999767
+          },
+          "baselineMedianOpsPerSecond": 19535.98747696342,
+          "candidateMedianMs": 0.04573541699999987,
+          "candidateDistributionMs": {
+            "min": 0.03645537499999773,
+            "p25": 0.039651583999999275,
+            "median": 0.04573541699999987,
+            "p75": 0.057832249999999474,
+            "max": 0.059526624999998605
+          },
+          "candidateMedianOpsPerSecond": 21864.893021528653,
+          "pairedCandidateBaselineRatios": [
+            1.0018302573088615, 0.9620914274509089, 1.0525112810241617, 0.8474139839535219,
+            0.8470553220568623, 0.8148360070873996, 0.8934865337656972, 0.9970710314388682,
+            0.843589968368695, 0.8303098113571982, 0.9785320723573634
+          ]
+        }
+      }
+    }
+  }
+}

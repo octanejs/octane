@@ -1,0 +1,387 @@
+{
+  "description": "CI correction after timing: replace the unsupported TypeScript constructor parameter property with an explicit readonly field and assignment. Historical measured source hashes are retained; minified and unminified server transforms and the complete measured SSR bundle are byte-identical.",
+  "node": "v24.20.0",
+  "esbuild": "0.28.1",
+  "transform": {
+    "baselineRevision": "8c2fbf75301a4e87431fd4e97f784f274e14626f",
+    "file": "packages/octane/src/runtime.server.ts",
+    "baselineSourceHash": "5bb525da95f8fd6298dc01f83b455718df11cd8c94f65364406f3e455961f3c0",
+    "candidateSourceHash": "4f979f2f5d21de0afb95c92db14e4d8571fb09a8927b22ad86f4ed97118967c0",
+    "results": [
+      {
+        "options": {
+          "loader": "ts",
+          "format": "esm",
+          "target": "node24",
+          "minify": false
+        },
+        "bytes": 252873,
+        "baselineSha256": "1fca32deda635be4db1e7fec8d685172486499649997af530c6c080eaa7d2c07",
+        "candidateSha256": "1fca32deda635be4db1e7fec8d685172486499649997af530c6c080eaa7d2c07",
+        "byteEqual": true
+      },
+      {
+        "options": {
+          "loader": "ts",
+          "format": "esm",
+          "target": "node24",
+          "minify": true
+        },
+        "bytes": 119805,
+        "baselineSha256": "8fcd94d9a892d9069605397d0cfdb9f81d6201e6d55cc9faabd60c045589b7aa",
+        "candidateSha256": "8fcd94d9a892d9069605397d0cfdb9f81d6201e6d55cc9faabd60c045589b7aa",
+        "byteEqual": true
+      }
+    ]
+  },
+  "verify": {
+    "node": "v24.20.0",
+    "platform": "darwin",
+    "arch": "arm64",
+    "verifyOnly": true,
+    "baselineRevision": "8c2fbf75301a4e87431fd4e97f784f274e14626f",
+    "candidateRevision": "8c2fbf75301a4e87431fd4e97f784f274e14626f",
+    "compiledHash": "a3d2ce70f5355b1df7554618e8c1698e38a841f607bf6c4cbb37b0a4050173f7",
+    "lockfileHash": "51648462c4e126c7b945cb99c5390b8a77243538c3bc86fbf784021d16e0cace",
+    "method": "Build and verify authored output once per scenario; no timing samples. Stream IDs differ from a full run, so wire compression may differ.",
+    "limitations": [
+      "Synthetic server-only scenarios include tiny boundaries surrounded by 200/1600 unrelated four-host rows. Browser capture/animation/resource waits, backpressure, concurrency, and allocation/GC behavior are not measured.",
+      "Ready response bytes include RenderResult.css followed by RenderResult.html; timing still measures renderToString itself. Streamed CSS is already included in the response.",
+      "Batch timings and observed spread limit conclusions about individual latency; distributions are descriptive, not a performance guarantee."
+    ],
+    "meta": {
+      "baseline": {
+        "sourceSha256": "3c860af261dfb3cf023141d353750620473844cfe363cb03db50e53aa7021d12",
+        "serverSourceHash": "5bb525da95f8fd6298dc01f83b455718df11cd8c94f65364406f3e455961f3c0",
+        "bundleHash": "d29b44577cf29022a59503080350cb0dc41a6325a8e8b6ec8f195afcb44be040",
+        "bundleBytes": 612914,
+        "bundleGzip": 38286
+      },
+      "candidate": {
+        "sourceSha256": "17c3f8887d5e323b1fb10adcd0eaee24690cf85b6098d6506793ee8769305237",
+        "serverSourceHash": "4f979f2f5d21de0afb95c92db14e4d8571fb09a8927b22ad86f4ed97118967c0",
+        "bundleHash": "d29b44577cf29022a59503080350cb0dc41a6325a8e8b6ec8f195afcb44be040",
+        "bundleBytes": 612914,
+        "bundleGzip": 38286
+      }
+    },
+    "samples": {
+      "Plain": {
+        "repetitions": 10000,
+        "warmupRepetitions": 50000,
+        "baseline": [],
+        "candidate": [],
+        "wire": {
+          "baseline": {
+            "bytes": 31,
+            "separateCssBytes": 0,
+            "gzip": 45,
+            "hasAnimationDriver": false,
+            "hasElementScope": false,
+            "scopeHosts": 0,
+            "scriptBytes": 0
+          },
+          "candidate": {
+            "bytes": 31,
+            "separateCssBytes": 0,
+            "gzip": 45,
+            "hasAnimationDriver": false,
+            "hasElementScope": false,
+            "scopeHosts": 0,
+            "scriptBytes": 0
+          }
+        },
+        "unrelatedPageRows": 0,
+        "trustedRawHtml": false
+      },
+      "View": {
+        "repetitions": 10000,
+        "warmupRepetitions": 50000,
+        "baseline": [],
+        "candidate": [],
+        "wire": {
+          "baseline": {
+            "bytes": 113,
+            "separateCssBytes": 0,
+            "gzip": 105,
+            "hasAnimationDriver": false,
+            "hasElementScope": false,
+            "scopeHosts": 0,
+            "scriptBytes": 0
+          },
+          "candidate": {
+            "bytes": 113,
+            "separateCssBytes": 0,
+            "gzip": 105,
+            "hasAnimationDriver": false,
+            "hasElementScope": false,
+            "scopeHosts": 0,
+            "scriptBytes": 0
+          }
+        },
+        "unrelatedPageRows": 0,
+        "trustedRawHtml": false
+      },
+      "PlainStream": {
+        "repetitions": 1000,
+        "warmupRepetitions": 5000,
+        "baseline": [],
+        "candidate": [],
+        "wire": {
+          "baseline": {
+            "bytes": 2830,
+            "separateCssBytes": 0,
+            "gzip": 1179,
+            "hasAnimationDriver": false,
+            "hasElementScope": false,
+            "scopeHosts": 0,
+            "scriptBytes": 2496
+          },
+          "candidate": {
+            "bytes": 2830,
+            "separateCssBytes": 0,
+            "gzip": 1177,
+            "hasAnimationDriver": false,
+            "hasElementScope": false,
+            "scopeHosts": 0,
+            "scriptBytes": 2496
+          }
+        },
+        "unrelatedPageRows": 0,
+        "trustedRawHtml": false
+      },
+      "ViewStream": {
+        "repetitions": 1000,
+        "warmupRepetitions": 5000,
+        "baseline": [],
+        "candidate": [],
+        "wire": {
+          "baseline": {
+            "bytes": 13112,
+            "separateCssBytes": 0,
+            "gzip": 4136,
+            "hasAnimationDriver": true,
+            "hasElementScope": false,
+            "scopeHosts": 0,
+            "scriptBytes": 12694
+          },
+          "candidate": {
+            "bytes": 13112,
+            "separateCssBytes": 0,
+            "gzip": 4132,
+            "hasAnimationDriver": true,
+            "hasElementScope": false,
+            "scopeHosts": 0,
+            "scriptBytes": 12694
+          }
+        },
+        "unrelatedPageRows": 0,
+        "trustedRawHtml": false
+      },
+      "ScopedView": {
+        "repetitions": 10000,
+        "warmupRepetitions": 50000,
+        "baseline": [],
+        "candidate": [],
+        "wire": {
+          "baseline": {
+            "bytes": 266,
+            "separateCssBytes": 115,
+            "gzip": 176,
+            "hasAnimationDriver": false,
+            "hasElementScope": true,
+            "scopeHosts": 1,
+            "scriptBytes": 0
+          },
+          "candidate": {
+            "bytes": 266,
+            "separateCssBytes": 115,
+            "gzip": 176,
+            "hasAnimationDriver": false,
+            "hasElementScope": true,
+            "scopeHosts": 1,
+            "scriptBytes": 0
+          }
+        },
+        "unrelatedPageRows": 0,
+        "trustedRawHtml": false
+      },
+      "ScopedViewStream": {
+        "repetitions": 1000,
+        "warmupRepetitions": 5000,
+        "baseline": [],
+        "candidate": [],
+        "wire": {
+          "baseline": {
+            "bytes": 13207,
+            "separateCssBytes": 0,
+            "gzip": 4167,
+            "hasAnimationDriver": true,
+            "hasElementScope": true,
+            "scopeHosts": 1,
+            "scriptBytes": 12636
+          },
+          "candidate": {
+            "bytes": 13207,
+            "separateCssBytes": 0,
+            "gzip": 4163,
+            "hasAnimationDriver": true,
+            "hasElementScope": true,
+            "scopeHosts": 1,
+            "scriptBytes": 12636
+          }
+        },
+        "unrelatedPageRows": 0,
+        "trustedRawHtml": false
+      },
+      "PlainPage": {
+        "repetitions": 1000,
+        "warmupRepetitions": 5000,
+        "baseline": [],
+        "candidate": [],
+        "wire": {
+          "baseline": {
+            "bytes": 24521,
+            "separateCssBytes": 0,
+            "gzip": 711,
+            "hasAnimationDriver": false,
+            "hasElementScope": false,
+            "scopeHosts": 0,
+            "scriptBytes": 0
+          },
+          "candidate": {
+            "bytes": 24521,
+            "separateCssBytes": 0,
+            "gzip": 711,
+            "hasAnimationDriver": false,
+            "hasElementScope": false,
+            "scopeHosts": 0,
+            "scriptBytes": 0
+          }
+        },
+        "unrelatedPageRows": 200,
+        "trustedRawHtml": false
+      },
+      "ViewPage": {
+        "repetitions": 1000,
+        "warmupRepetitions": 5000,
+        "baseline": [],
+        "candidate": [],
+        "wire": {
+          "baseline": {
+            "bytes": 24603,
+            "separateCssBytes": 0,
+            "gzip": 771,
+            "hasAnimationDriver": false,
+            "hasElementScope": false,
+            "scopeHosts": 0,
+            "scriptBytes": 0
+          },
+          "candidate": {
+            "bytes": 24603,
+            "separateCssBytes": 0,
+            "gzip": 771,
+            "hasAnimationDriver": false,
+            "hasElementScope": false,
+            "scopeHosts": 0,
+            "scriptBytes": 0
+          }
+        },
+        "unrelatedPageRows": 200,
+        "trustedRawHtml": false
+      },
+      "PlainLargePage": {
+        "repetitions": 250,
+        "warmupRepetitions": 1250,
+        "baseline": [],
+        "candidate": [],
+        "wire": {
+          "baseline": {
+            "bytes": 197321,
+            "separateCssBytes": 0,
+            "gzip": 4651,
+            "hasAnimationDriver": false,
+            "hasElementScope": false,
+            "scopeHosts": 0,
+            "scriptBytes": 0
+          },
+          "candidate": {
+            "bytes": 197321,
+            "separateCssBytes": 0,
+            "gzip": 4651,
+            "hasAnimationDriver": false,
+            "hasElementScope": false,
+            "scopeHosts": 0,
+            "scriptBytes": 0
+          }
+        },
+        "unrelatedPageRows": 1600,
+        "trustedRawHtml": false
+      },
+      "ViewLargePage": {
+        "repetitions": 250,
+        "warmupRepetitions": 1250,
+        "baseline": [],
+        "candidate": [],
+        "wire": {
+          "baseline": {
+            "bytes": 197403,
+            "separateCssBytes": 0,
+            "gzip": 4727,
+            "hasAnimationDriver": false,
+            "hasElementScope": false,
+            "scopeHosts": 0,
+            "scriptBytes": 0
+          },
+          "candidate": {
+            "bytes": 197403,
+            "separateCssBytes": 0,
+            "gzip": 4727,
+            "hasAnimationDriver": false,
+            "hasElementScope": false,
+            "scopeHosts": 0,
+            "scriptBytes": 0
+          }
+        },
+        "unrelatedPageRows": 1600,
+        "trustedRawHtml": false
+      },
+      "ViewRawPage": {
+        "repetitions": 1000,
+        "warmupRepetitions": 5000,
+        "baseline": [],
+        "candidate": [],
+        "wire": {
+          "baseline": {
+            "bytes": 24614,
+            "separateCssBytes": 0,
+            "gzip": 778,
+            "hasAnimationDriver": false,
+            "hasElementScope": false,
+            "scopeHosts": 0,
+            "scriptBytes": 0
+          },
+          "candidate": {
+            "bytes": 24614,
+            "separateCssBytes": 0,
+            "gzip": 778,
+            "hasAnimationDriver": false,
+            "hasElementScope": false,
+            "scopeHosts": 0,
+            "scriptBytes": 0
+          }
+        },
+        "unrelatedPageRows": 200,
+        "trustedRawHtml": true
+      }
+    }
+  },
+  "correctness": {
+    "regressionCommand": "pnpm exec vitest run --config /private/tmp/vt-parity-vitest.config.mjs packages/octane/tests/register-hook.test.ts --silent=passed-only",
+    "before": "6 failed: ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX in Node strip-only mode",
+    "after": "6 passed across octane and octane-prod",
+    "typesCommand": "pnpm exec tsc --noEmit --project packages/octane/tsconfig.json",
+    "typesExitCode": 0
+  },
+  "reproduce": "BENCH_JSON=/tmp/vt-ssr-strip-only-verify.json node benchmarks/view-transitions/ssr.mjs --octane-revision=8c2fbf75301a4e87431fd4e97f784f274e14626f --verify-only"
+}

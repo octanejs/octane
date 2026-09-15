@@ -755,6 +755,31 @@ jobs:
           SPECS="$(node scripts/discover-heavy-browser-specs.mjs)"
           pnpm vitest run ${SPECS} --maxWorkers=1
 
+      # One sample exercises the canonical DOM and production-call guards.
+      # This is a deterministic work gate, not a CI timing comparison.
+      - name: Check ordinary js-framework benchmark work
+        if: ${{ matrix.lane == 'browser' && matrix.playwright_browser == 'chromium' }}
+        env:
+          BENCH_JSON: benchmarks/results/view-transitions-js-framework.json
+        run: node benchmarks/view-transitions/js-framework.mjs 1
+
+      - name: Check ordinary effect cleanup work after ViewTransition
+        if: ${{ matrix.lane == 'browser' && matrix.playwright_browser == 'chromium' }}
+        env:
+          BENCH_JSON: benchmarks/results/view-transitions-effect-cleanup.json
+        run: node benchmarks/view-transitions/effect-cleanup.mjs
+
+      - name: Upload js-framework work results
+        if: ${{ always() && matrix.lane == 'browser' && matrix.playwright_browser == 'chromium' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: js-framework-work-${{ matrix.playwright_browser }}
+          path: |
+            benchmarks/results/view-transitions-js-framework.json
+            benchmarks/results/view-transitions-effect-cleanup.json
+          if-no-files-found: ignore
+          retention-days: 1
+
   lint_checks:
     name: lint checks
     needs: release_change

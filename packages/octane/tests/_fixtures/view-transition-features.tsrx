@@ -104,3 +104,18 @@ export function PlainClickApp() @{
 		<div>{'Count: ' + count}</div>
 	</>
 }
+
+// A render error inside an animated commit is the caller's error, exactly as it
+// is for an unwrapped commit: it must not be demoted to a recoverable report.
+function ThrowingChild(props) @{
+	if (props.error !== null) throw props.error;
+	<div>{'ok'}</div>
+}
+
+export function RenderErrorApp(props) @{
+	<ViewTransition>
+		<section>
+			<ThrowingChild error={props.error} />
+		</section>
+	</ViewTransition>
+}

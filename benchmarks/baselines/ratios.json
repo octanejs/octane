@@ -8308,6 +8308,350 @@
     "note": "Retained 32-wave work:33 full passes, 528 suspended visits, 496 pending probes, 13,728 closure expression events. Positive measured work budgets, with complete output controls; no latency or engine allocation inference."
   },
   {
+    "suite": "view-transitions",
+    "op": "driver_reachable",
+    "target": "vt-bundle-root-static",
+    "reference": "vt-work-model",
+    "maxRatio": 0,
+    "note": "Ordinary production imports must exclude the optional View Transition driver; executable output and cleanup are checked before this reachability guard."
+  },
+  {
+    "suite": "view-transitions",
+    "op": "rect_reads",
+    "target": "vt-work-root-static",
+    "reference": "vt-work-model",
+    "maxRatio": 0,
+    "note": "An ordinary root/state update must not acquire View Transition browser work; the same minified bundle preserves its public text, state, event and lifecycle observations."
+  },
+  {
+    "suite": "view-transitions",
+    "op": "computed_style_reads",
+    "target": "vt-work-root-static",
+    "reference": "vt-work-model",
+    "maxRatio": 0,
+    "note": "An ordinary root/state update must not acquire View Transition browser work; the same minified bundle preserves its public text, state, event and lifecycle observations."
+  },
+  {
+    "suite": "view-transitions",
+    "op": "native_transitions",
+    "target": "vt-work-root-static",
+    "reference": "vt-work-model",
+    "maxRatio": 0,
+    "note": "An ordinary root/state update must not acquire View Transition browser work; the same minified bundle preserves its public text, state, event and lifecycle observations."
+  },
+  {
+    "suite": "view-transitions",
+    "op": "driver_reachable",
+    "target": "vt-bundle-hooks-state",
+    "reference": "vt-work-model",
+    "maxRatio": 0,
+    "note": "Ordinary production imports must exclude the optional View Transition driver; executable output and cleanup are checked before this reachability guard."
+  },
+  {
+    "suite": "view-transitions",
+    "op": "rect_reads",
+    "target": "vt-work-hooks-state",
+    "reference": "vt-work-model",
+    "maxRatio": 0,
+    "note": "An ordinary root/state update must not acquire View Transition browser work; the same minified bundle preserves its public text, state, event and lifecycle observations."
+  },
+  {
+    "suite": "view-transitions",
+    "op": "computed_style_reads",
+    "target": "vt-work-hooks-state",
+    "reference": "vt-work-model",
+    "maxRatio": 0,
+    "note": "An ordinary root/state update must not acquire View Transition browser work; the same minified bundle preserves its public text, state, event and lifecycle observations."
+  },
+  {
+    "suite": "view-transitions",
+    "op": "native_transitions",
+    "target": "vt-work-hooks-state",
+    "reference": "vt-work-model",
+    "maxRatio": 0,
+    "note": "An ordinary root/state update must not acquire View Transition browser work; the same minified bundle preserves its public text, state, event and lifecycle observations."
+  },
+  {
+    "suite": "view-transitions",
+    "op": "native_transitions",
+    "target": "vt-work-four-updates",
+    "reference": "vt-work-model",
+    "maxRatio": 1,
+    "note": "Four separately completed updates preserve the input and animate exactly once each; capture work must not exceed one native transition per update."
+  },
+  {
+    "suite": "view-transitions",
+    "op": "staging_reachable",
+    "target": "vt-bundle-root-static",
+    "reference": "vt-work-model",
+    "maxRatio": 0,
+    "note": "The optional DOM staging adapter must be absent from ordinary production imports; compiled text, state, event, identity and cleanup controls execute the measured bundles."
+  },
+  {
+    "suite": "view-transitions",
+    "op": "staging_reachable",
+    "target": "vt-bundle-hooks-state",
+    "reference": "vt-work-model",
+    "maxRatio": 0,
+    "note": "The optional DOM staging adapter must be absent from ordinary production imports; compiled text, state, event, identity and cleanup controls execute the measured bundles."
+  },
+  {
+    "suite": "view-transitions",
+    "op": "rect_reads",
+    "target": "vt-work-four-updates",
+    "reference": "vt-work-model",
+    "maxRatio": 2,
+    "note": "Four completed native updates read eight rectangles (old and new boundary geometry). Preserve this measured two-read budget per update, with actual animation and retained input controls."
+  },
+  {
+    "suite": "view-transitions",
+    "op": "computed_style_reads",
+    "target": "vt-work-four-updates",
+    "reference": "vt-work-model",
+    "maxRatio": 7,
+    "note": "Four completed native updates read 28 computed styles, including the fixture's public pseudo-element style observations. Preserve this measured seven-read budget per update; this is scenario work, not an isolated internal framework counter."
+  },
+  {
+    "suite": "view-transitions",
+    "op": "stage_teardown_calls",
+    "target": "vt-effect-cleanup-tsrx-cold-clear",
+    "reference": "vt-effect-cleanup-model",
+    "maxRatio": 0,
+    "note": "Original effectful-list lifecycle gate with identical production assets in cold and completed-native-transition modes; ordinary cleanup must not enter the optional stageTeardown method."
+  },
+  {
+    "suite": "view-transitions",
+    "op": "stage_teardown_calls",
+    "target": "vt-effect-cleanup-tsrx-cold-remount",
+    "reference": "vt-effect-cleanup-model",
+    "maxRatio": 0,
+    "note": "Original effectful-list lifecycle gate with identical production assets in cold and completed-native-transition modes; ordinary cleanup must not enter the optional stageTeardown method."
+  },
+  {
+    "suite": "view-transitions",
+    "op": "stage_teardown_calls",
+    "target": "vt-effect-cleanup-tsrx-cold-remove_100_scattered",
+    "reference": "vt-effect-cleanup-model",
+    "maxRatio": 0,
+    "note": "Original effectful-list lifecycle gate with identical production assets in cold and completed-native-transition modes; ordinary cleanup must not enter the optional stageTeardown method."
+  },
+  {
+    "suite": "view-transitions",
+    "op": "stage_teardown_calls",
+    "target": "vt-effect-cleanup-tsrx-idle-clear",
+    "reference": "vt-effect-cleanup-model",
+    "maxRatio": 0,
+    "note": "Original effectful-list lifecycle gate with identical production assets in cold and completed-native-transition modes; ordinary cleanup must not enter the optional stageTeardown method."
+  },
+  {
+    "suite": "view-transitions",
+    "op": "stage_teardown_calls",
+    "target": "vt-effect-cleanup-tsrx-idle-remount",
+    "reference": "vt-effect-cleanup-model",
+    "maxRatio": 0,
+    "note": "Original effectful-list lifecycle gate with identical production assets in cold and completed-native-transition modes; ordinary cleanup must not enter the optional stageTeardown method."
+  },
+  {
+    "suite": "view-transitions",
+    "op": "stage_teardown_calls",
+    "target": "vt-effect-cleanup-tsrx-idle-remove_100_scattered",
+    "reference": "vt-effect-cleanup-model",
+    "maxRatio": 0,
+    "note": "Original effectful-list lifecycle gate with identical production assets in cold and completed-native-transition modes; ordinary cleanup must not enter the optional stageTeardown method."
+  },
+  {
+    "suite": "view-transitions",
+    "op": "stage_teardown_calls",
+    "target": "vt-effect-cleanup-jsx-cold-clear",
+    "reference": "vt-effect-cleanup-model",
+    "maxRatio": 0,
+    "note": "Original effectful-list lifecycle gate with identical production assets in cold and completed-native-transition modes; ordinary cleanup must not enter the optional stageTeardown method."
+  },
+  {
+    "suite": "view-transitions",
+    "op": "stage_teardown_calls",
+    "target": "vt-effect-cleanup-jsx-cold-remount",
+    "reference": "vt-effect-cleanup-model",
+    "maxRatio": 0,
+    "note": "Original effectful-list lifecycle gate with identical production assets in cold and completed-native-transition modes; ordinary cleanup must not enter the optional stageTeardown method."
+  },
+  {
+    "suite": "view-transitions",
+    "op": "stage_teardown_calls",
+    "target": "vt-effect-cleanup-jsx-cold-remove_100_scattered",
+    "reference": "vt-effect-cleanup-model",
+    "maxRatio": 0,
+    "note": "Original effectful-list lifecycle gate with identical production assets in cold and completed-native-transition modes; ordinary cleanup must not enter the optional stageTeardown method."
+  },
+  {
+    "suite": "view-transitions",
+    "op": "stage_teardown_calls",
+    "target": "vt-effect-cleanup-jsx-idle-clear",
+    "reference": "vt-effect-cleanup-model",
+    "maxRatio": 0,
+    "note": "Original effectful-list lifecycle gate with identical production assets in cold and completed-native-transition modes; ordinary cleanup must not enter the optional stageTeardown method."
+  },
+  {
+    "suite": "view-transitions",
+    "op": "stage_teardown_calls",
+    "target": "vt-effect-cleanup-jsx-idle-remount",
+    "reference": "vt-effect-cleanup-model",
+    "maxRatio": 0,
+    "note": "Original effectful-list lifecycle gate with identical production assets in cold and completed-native-transition modes; ordinary cleanup must not enter the optional stageTeardown method."
+  },
+  {
+    "suite": "view-transitions",
+    "op": "stage_teardown_calls",
+    "target": "vt-effect-cleanup-jsx-idle-remove_100_scattered",
+    "reference": "vt-effect-cleanup-model",
+    "maxRatio": 0,
+    "note": "Original effectful-list lifecycle gate with identical production assets in cold and completed-native-transition modes; ordinary cleanup must not enter the optional stageTeardown method."
+  },
+  {
+    "suite": "view-transitions",
+    "op": "total_calls",
+    "target": "vt-effect-cleanup-tsrx-cold-clear",
+    "reference": "vt-effect-cleanup-tsrx-cold-clear-budget",
+    "maxRatio": 1,
+    "note": "Measured original effectful-list cleanup work with 32 calls of allowance, below one extra call per removed row; catches ordinary work even if an optional staging helper is renamed or replaced."
+  },
+  {
+    "suite": "view-transitions",
+    "op": "total_calls",
+    "target": "vt-effect-cleanup-tsrx-cold-remount",
+    "reference": "vt-effect-cleanup-tsrx-cold-remount-budget",
+    "maxRatio": 1,
+    "note": "Measured original effectful-list cleanup work with 32 calls of allowance, below one extra call per removed row; catches ordinary work even if an optional staging helper is renamed or replaced."
+  },
+  {
+    "suite": "view-transitions",
+    "op": "total_calls",
+    "target": "vt-effect-cleanup-tsrx-cold-remove_100_scattered",
+    "reference": "vt-effect-cleanup-tsrx-cold-remove_100_scattered-budget",
+    "maxRatio": 1,
+    "note": "Measured original effectful-list cleanup work with 32 calls of allowance, below one extra call per removed row; catches ordinary work even if an optional staging helper is renamed or replaced."
+  },
+  {
+    "suite": "view-transitions",
+    "op": "total_calls",
+    "target": "vt-effect-cleanup-tsrx-idle-clear",
+    "reference": "vt-effect-cleanup-tsrx-idle-clear-budget",
+    "maxRatio": 1,
+    "note": "Measured original effectful-list cleanup work with 32 calls of allowance, below one extra call per removed row; catches ordinary work even if an optional staging helper is renamed or replaced."
+  },
+  {
+    "suite": "view-transitions",
+    "op": "idle_extra_calls",
+    "target": "vt-effect-cleanup-tsrx-idle-clear",
+    "reference": "vt-effect-cleanup-tsrx-idle-clear-budget",
+    "maxRatio": 1,
+    "note": "Measured original effectful-list cleanup work with 32 calls of allowance, below one extra call per removed row; catches ordinary work even if an optional staging helper is renamed or replaced."
+  },
+  {
+    "suite": "view-transitions",
+    "op": "total_calls",
+    "target": "vt-effect-cleanup-tsrx-idle-remount",
+    "reference": "vt-effect-cleanup-tsrx-idle-remount-budget",
+    "maxRatio": 1,
+    "note": "Measured original effectful-list cleanup work with 32 calls of allowance, below one extra call per removed row; catches ordinary work even if an optional staging helper is renamed or replaced."
+  },
+  {
+    "suite": "view-transitions",
+    "op": "idle_extra_calls",
+    "target": "vt-effect-cleanup-tsrx-idle-remount",
+    "reference": "vt-effect-cleanup-tsrx-idle-remount-budget",
+    "maxRatio": 1,
+    "note": "Measured original effectful-list cleanup work with 32 calls of allowance, below one extra call per removed row; catches ordinary work even if an optional staging helper is renamed or replaced."
+  },
+  {
+    "suite": "view-transitions",
+    "op": "total_calls",
+    "target": "vt-effect-cleanup-tsrx-idle-remove_100_scattered",
+    "reference": "vt-effect-cleanup-tsrx-idle-remove_100_scattered-budget",
+    "maxRatio": 1,
+    "note": "Measured original effectful-list cleanup work with 32 calls of allowance, below one extra call per removed row; catches ordinary work even if an optional staging helper is renamed or replaced."
+  },
+  {
+    "suite": "view-transitions",
+    "op": "idle_extra_calls",
+    "target": "vt-effect-cleanup-tsrx-idle-remove_100_scattered",
+    "reference": "vt-effect-cleanup-tsrx-idle-remove_100_scattered-budget",
+    "maxRatio": 1,
+    "note": "Measured original effectful-list cleanup work with 32 calls of allowance, below one extra call per removed row; catches ordinary work even if an optional staging helper is renamed or replaced."
+  },
+  {
+    "suite": "view-transitions",
+    "op": "total_calls",
+    "target": "vt-effect-cleanup-jsx-cold-clear",
+    "reference": "vt-effect-cleanup-jsx-cold-clear-budget",
+    "maxRatio": 1,
+    "note": "Measured original effectful-list cleanup work with 32 calls of allowance, below one extra call per removed row; catches ordinary work even if an optional staging helper is renamed or replaced."
+  },
+  {
+    "suite": "view-transitions",
+    "op": "total_calls",
+    "target": "vt-effect-cleanup-jsx-cold-remount",
+    "reference": "vt-effect-cleanup-jsx-cold-remount-budget",
+    "maxRatio": 1,
+    "note": "Measured original effectful-list cleanup work with 32 calls of allowance, below one extra call per removed row; catches ordinary work even if an optional staging helper is renamed or replaced."
+  },
+  {
+    "suite": "view-transitions",
+    "op": "total_calls",
+    "target": "vt-effect-cleanup-jsx-cold-remove_100_scattered",
+    "reference": "vt-effect-cleanup-jsx-cold-remove_100_scattered-budget",
+    "maxRatio": 1,
+    "note": "Measured original effectful-list cleanup work with 32 calls of allowance, below one extra call per removed row; catches ordinary work even if an optional staging helper is renamed or replaced."
+  },
+  {
+    "suite": "view-transitions",
+    "op": "total_calls",
+    "target": "vt-effect-cleanup-jsx-idle-clear",
+    "reference": "vt-effect-cleanup-jsx-idle-clear-budget",
+    "maxRatio": 1,
+    "note": "Measured original effectful-list cleanup work with 32 calls of allowance, below one extra call per removed row; catches ordinary work even if an optional staging helper is renamed or replaced."
+  },
+  {
+    "suite": "view-transitions",
+    "op": "idle_extra_calls",
+    "target": "vt-effect-cleanup-jsx-idle-clear",
+    "reference": "vt-effect-cleanup-jsx-idle-clear-budget",
+    "maxRatio": 1,
+    "note": "Measured original effectful-list cleanup work with 32 calls of allowance, below one extra call per removed row; catches ordinary work even if an optional staging helper is renamed or replaced."
+  },
+  {
+    "suite": "view-transitions",
+    "op": "total_calls",
+    "target": "vt-effect-cleanup-jsx-idle-remount",
+    "reference": "vt-effect-cleanup-jsx-idle-remount-budget",
+    "maxRatio": 1,
+    "note": "Measured original effectful-list cleanup work with 32 calls of allowance, below one extra call per removed row; catches ordinary work even if an optional staging helper is renamed or replaced."
+  },
+  {
+    "suite": "view-transitions",
+    "op": "idle_extra_calls",
+    "target": "vt-effect-cleanup-jsx-idle-remount",
+    "reference": "vt-effect-cleanup-jsx-idle-remount-budget",
+    "maxRatio": 1,
+    "note": "Measured original effectful-list cleanup work with 32 calls of allowance, below one extra call per removed row; catches ordinary work even if an optional staging helper is renamed or replaced."
+  },
+  {
+    "suite": "view-transitions",
+    "op": "total_calls",
+    "target": "vt-effect-cleanup-jsx-idle-remove_100_scattered",
+    "reference": "vt-effect-cleanup-jsx-idle-remove_100_scattered-budget",
+    "maxRatio": 1,
+    "note": "Measured original effectful-list cleanup work with 32 calls of allowance, below one extra call per removed row; catches ordinary work even if an optional staging helper is renamed or replaced."
+  },
+  {
+    "suite": "view-transitions",
+    "op": "idle_extra_calls",
+    "target": "vt-effect-cleanup-jsx-idle-remove_100_scattered",
+    "reference": "vt-effect-cleanup-jsx-idle-remove_100_scattered-budget",
+    "maxRatio": 1,
+    "note": "Measured original effectful-list cleanup work with 32 calls of allowance, below one extra call per removed row; catches ordinary work even if an optional staging helper is renamed or replaced."
+  },
+  {
     "suite": "signal-dom-bindings",
     "op": "setup_calls",
     "target": "direct",
