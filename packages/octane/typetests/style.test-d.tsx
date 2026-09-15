@@ -20,12 +20,9 @@ const styles = {
 	'-webkit-line-clamp': 2,
 	transitionDuration: '200ms',
 	'transition-duration': '200ms',
-	'--space': '1rem',
-	'--scale': 2,
-	'--optional': undefined,
 } satisfies CSSProperties;
 
-const customOnly = { '--accent': 'red', '--scale': 2 } satisfies CSSProperties;
+const customOnly = { '--accent': 'red', '--scale': 2 } satisfies SignalCSSProperties;
 const publicStyle: PublicCSSProperties = styles;
 const dev: DevCSSProperties = styles;
 const strong: StrongCSSProperties = styles;
@@ -47,7 +44,7 @@ const color = { 'background-color': 42 } satisfies CSSProperties;
 // @ts-expect-error Durations require time units, including zero.
 const duration = { 'transition-duration': 0 } satisfies CSSProperties;
 // @ts-expect-error Custom properties accept strings and numbers, not objects.
-const custom = { '--theme': {} } satisfies CSSProperties;
+const custom = { '--theme': {} } satisfies SignalCSSProperties;
 // @ts-expect-error Fallback arrays are not supported.
 const array = { display: ['flex', 'block'] } satisfies CSSProperties;
 // @ts-expect-error HTML styles preserve the property's value type.
@@ -73,3 +70,15 @@ const plainSignal = { 'font-size': size$ } satisfies CSSProperties;
 const invalidSignal = { 'background-color': size$ } satisfies SignalCSSProperties;
 // @ts-expect-error Custom property signals cannot contain objects.
 const invalidCustomSignal = { '--theme': object$ } satisfies SignalCSSProperties;
+
+// Libraries can expose named style interfaces without a custom-property index signature.
+interface PositioningStyles {
+	position: 'absolute' | 'fixed';
+	top: number;
+	left: number;
+	transform?: string;
+}
+declare const positioning: PositioningStyles;
+const reusablePositioning: CSSProperties = positioning;
+const positionedHtml = <div style={positioning} />;
+const positionedSvg = <svg style={positioning} />;

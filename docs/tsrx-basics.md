@@ -411,7 +411,6 @@ const panelStyle = {
   width: 400,
   'font-size': '1rem',
   lineHeight: 1.5,
-  '--accent': 'rebeccapurple',
 } satisfies CSSProperties;
 ```
 
@@ -420,7 +419,9 @@ unitless properties such as `lineHeight`, and custom properties keep their
 numeric values without units. Durations still need explicit units, such as
 `transitionDuration: '200ms'`. HTML and SVG use the same property-specific
 style types; CSS strings and custom property values are not syntax-checked.
-`SignalCSSProperties` also accepts signals for individual property values.
+`SignalCSSProperties` accepts custom property keys (such as `--accent`) and
+signals for individual property values. Use it for reusable objects containing
+custom properties; these keys are also accepted directly in the `style` prop.
 
 ### Scoped styles
 

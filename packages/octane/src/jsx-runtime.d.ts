@@ -57,7 +57,6 @@ export interface OctaneElement<P = any> extends ElementDescriptor<P> {}
 
 /** Inline styles use Octane's numeric length coercion for both property spellings. */
 export interface CSSProperties extends React.CSSProperties, CSS.PropertiesHyphen<string | number> {
-	[customProperty: `--${string}`]: string | number | undefined;
 	cssFloat?: React.CSSProperties['float'];
 	/** Element-scoped View Transition isolation, including authored `!important` values. */
 	viewTransitionScope?: 'none' | 'all' | (string & {});
@@ -66,6 +65,9 @@ export interface CSSProperties extends React.CSSProperties, CSS.PropertiesHyphen
 /** Native DOM style values; plain CSSProperties remains usable by CSS-consuming libraries. */
 export type SignalCSSProperties = {
 	[K in keyof CSSProperties]: CSSProperties[K] | SignalHandle<CSSProperties[K] | null>;
+} & {
+	[customProperty: `--${string}`]:
+		string | number | SignalHandle<string | number | null | undefined> | undefined;
 };
 
 export type ClassValue =
