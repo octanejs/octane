@@ -37244,19 +37244,25 @@ function reconcileKeyed<T>(
 	let oldFirst: Block | null = state.head;
 	let prefixLen = 0;
 	while (oldFirst !== null && prefixLen < newLen) {
-		const newKey = readListKey(keySource, items[prefixLen], prefixLen, normalizeKey);
+		const newItem = items[prefixLen];
+		const newKey = readListKey(keySource, newItem, prefixLen, normalizeKey);
 		if (oldFirst.key !== newKey) break;
 		const block = oldFirst;
-		updateSurvivor(
-			block,
-			items[prefixLen],
-			prefixLen,
-			itemBody,
-			pure,
-			lite,
-			indexIndependent,
-			state.env,
-		);
+		// Stable-survivor skip: updateSurvivor writes itemIndex/body only when
+		// they differ, journals only on a difference, and renders only when the
+		// item (or index, for an index-reading body) changed. A pure body whose
+		// item ref, body, and position all match is a provable no-op call — on a
+		// mostly-stable list that is one call per row per update. Skip it; the
+		// key read above already ran, so dev-mode duplicate-key checks are
+		// unchanged. The env tuple is never consumed by the pure branch, and a
+		// non-pure body still enters updateSurvivor for its renderBlock.
+		if (
+			!pure ||
+			block.props !== newItem ||
+			block.body !== itemBody ||
+			block.itemIndex !== prefixLen
+		)
+			updateSurvivor(block, newItem, prefixLen, itemBody, pure, lite, indexIndependent, state.env);
 		oldFirst = block.nextSibling!;
 		prefixLen++;
 	}
@@ -37269,10 +37275,13 @@ function reconcileKeyed<T>(
 	let newEnd = newLen - 1;
 	let oldRemain = oldSize - prefixLen;
 	while (oldLast !== null && oldRemain > 0 && newEnd >= prefixLen) {
-		const newKey = readListKey(keySource, items[newEnd], newEnd, normalizeKey);
+		const newItem = items[newEnd];
+		const newKey = readListKey(keySource, newItem, newEnd, normalizeKey);
 		if (oldLast.key !== newKey) break;
 		const block = oldLast;
-		updateSurvivor(block, items[newEnd], newEnd, itemBody, pure, lite, indexIndependent, state.env);
+		// Same stable-survivor skip as the prefix walk (see above).
+		if (!pure || block.props !== newItem || block.body !== itemBody || block.itemIndex !== newEnd)
+			updateSurvivor(block, newItem, newEnd, itemBody, pure, lite, indexIndependent, state.env);
 		oldLast = block.prevSibling!;
 		newEnd--;
 		oldRemain--;
@@ -37444,16 +37453,10 @@ function reconcileKeyed<T>(
 				else lastIdx = newRelIdx;
 				patched++;
 				const newIdx = prefixLen + newRelIdx;
-				updateSurvivor(
-					cur!,
-					items[newIdx],
-					newIdx,
-					itemBody,
-					pure,
-					lite,
-					indexIndependent,
-					state.env,
-				);
+				const newItem = items[newIdx];
+				// Same stable-survivor skip as the prefix walk (see above).
+				if (!pure || cur!.props !== newItem || cur!.body !== itemBody || cur!.itemIndex !== newIdx)
+					updateSurvivor(cur!, newItem, newIdx, itemBody, pure, lite, indexIndependent, state.env);
 			}
 			cur = next;
 			oldIdx++;
