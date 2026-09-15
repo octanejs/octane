@@ -96,6 +96,7 @@ export const BENCHMARK_SUITES = [
 	'portal-swarm',
 	'react-hosted-islands',
 	'ssr-throughput',
+	'ssr-scope-keys',
 	'streaming-ssr',
 	'ssr-replay-streaming',
 	'ssr-final-metadata',
