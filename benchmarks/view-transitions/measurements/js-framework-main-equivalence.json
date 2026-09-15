@@ -1233,36 +1233,28 @@
               "text": "generation 1",
               "inputIdentity": true,
               "inputValue": "retained draft",
-              "kinds": [
-                "update"
-              ],
+              "kinds": ["update"],
               "animated": true
             },
             {
               "text": "generation 2",
               "inputIdentity": true,
               "inputValue": "retained draft",
-              "kinds": [
-                "update"
-              ],
+              "kinds": ["update"],
               "animated": true
             },
             {
               "text": "generation 3",
               "inputIdentity": true,
               "inputValue": "retained draft",
-              "kinds": [
-                "update"
-              ],
+              "kinds": ["update"],
               "animated": true
             },
             {
               "text": "generation 4",
               "inputIdentity": true,
               "inputValue": "retained draft",
-              "kinds": [
-                "update"
-              ],
+              "kinds": ["update"],
               "animated": true
             }
           ],
@@ -1311,36 +1303,28 @@
               "text": "generation 1",
               "inputIdentity": true,
               "inputValue": "retained draft",
-              "kinds": [
-                "update"
-              ],
+              "kinds": ["update"],
               "animated": true
             },
             {
               "text": "generation 2",
               "inputIdentity": true,
               "inputValue": "retained draft",
-              "kinds": [
-                "update"
-              ],
+              "kinds": ["update"],
               "animated": true
             },
             {
               "text": "generation 3",
               "inputIdentity": true,
               "inputValue": "retained draft",
-              "kinds": [
-                "update"
-              ],
+              "kinds": ["update"],
               "animated": true
             },
             {
               "text": "generation 4",
               "inputIdentity": true,
               "inputValue": "retained draft",
-              "kinds": [
-                "update"
-              ],
+              "kinds": ["update"],
               "animated": true
             }
           ]
@@ -1440,19 +1424,9 @@
           "documentCaptures": 0
         },
         "semantic": {
-          "owners": [
-            "left"
-          ],
-          "ready": [
-            [
-              "fulfilled",
-              "fulfilled",
-              null
-            ]
-          ],
-          "finished": [
-            "fulfilled"
-          ],
+          "owners": ["left"],
+          "ready": [["fulfilled", "fulfilled", null]],
+          "finished": ["fulfilled"],
           "hostsRetained": true,
           "roots": [
             {
@@ -1460,28 +1434,17 @@
               "scope": "all"
             }
           ],
-          "text": [
-            [
-              "left",
-              "left-after"
-            ]
-          ],
+          "text": [["left", "left-after"]],
           "events": [
             {
               "id": "left-root",
-              "targets": [
-                "left",
-                "left"
-              ],
+              "targets": ["left", "left"],
               "animatedTarget": "left",
               "styleOwner": "left"
             },
             {
               "id": "left",
-              "targets": [
-                "left",
-                "left"
-              ],
+              "targets": ["left", "left"],
               "animatedTarget": "left",
               "styleOwner": "left"
             }
@@ -1496,26 +1459,12 @@
           "documentCaptures": 0
         },
         "semantic": {
-          "owners": [
-            "left",
-            "right"
-          ],
+          "owners": ["left", "right"],
           "ready": [
-            [
-              "fulfilled",
-              "fulfilled",
-              null
-            ],
-            [
-              "fulfilled",
-              "fulfilled",
-              null
-            ]
+            ["fulfilled", "fulfilled", null],
+            ["fulfilled", "fulfilled", null]
           ],
-          "finished": [
-            "fulfilled",
-            "fulfilled"
-          ],
+          "finished": ["fulfilled", "fulfilled"],
           "hostsRetained": true,
           "roots": [
             {
@@ -1528,49 +1477,31 @@
             }
           ],
           "text": [
-            [
-              "left",
-              "left-after"
-            ],
-            [
-              "right",
-              "right-after"
-            ]
+            ["left", "left-after"],
+            ["right", "right-after"]
           ],
           "events": [
             {
               "id": "left-root",
-              "targets": [
-                "left",
-                "left"
-              ],
+              "targets": ["left", "left"],
               "animatedTarget": "left",
               "styleOwner": "left"
             },
             {
               "id": "left",
-              "targets": [
-                "left",
-                "left"
-              ],
+              "targets": ["left", "left"],
               "animatedTarget": "left",
               "styleOwner": "left"
             },
             {
               "id": "right-root",
-              "targets": [
-                "right",
-                "right"
-              ],
+              "targets": ["right", "right"],
               "animatedTarget": "right",
               "styleOwner": "right"
             },
             {
               "id": "right",
-              "targets": [
-                "right",
-                "right"
-              ],
+              "targets": ["right", "right"],
               "animatedTarget": "right",
               "styleOwner": "right"
             }
@@ -1585,26 +1516,12 @@
           "documentCaptures": 0
         },
         "semantic": {
-          "owners": [
-            "inner",
-            "left"
-          ],
+          "owners": ["inner", "left"],
           "ready": [
-            [
-              "fulfilled",
-              "fulfilled",
-              null
-            ],
-            [
-              "fulfilled",
-              "fulfilled",
-              null
-            ]
+            ["fulfilled", "fulfilled", null],
+            ["fulfilled", "fulfilled", null]
           ],
-          "finished": [
-            "fulfilled",
-            "fulfilled"
-          ],
+          "finished": ["fulfilled", "fulfilled"],
           "hostsRetained": true,
           "roots": [
             {
@@ -1617,49 +1534,31 @@
             }
           ],
           "text": [
-            [
-              "left",
-              "left-after"
-            ],
-            [
-              "inner",
-              "inner-after"
-            ]
+            ["left", "left-after"],
+            ["inner", "inner-after"]
           ],
           "events": [
             {
               "id": "left-root",
-              "targets": [
-                "left",
-                "left"
-              ],
+              "targets": ["left", "left"],
               "animatedTarget": "left",
               "styleOwner": "left"
             },
             {
               "id": "left",
-              "targets": [
-                "left",
-                "left"
-              ],
+              "targets": ["left", "left"],
               "animatedTarget": "left",
               "styleOwner": "left"
             },
             {
               "id": "inner-root",
-              "targets": [
-                "inner",
-                "inner"
-              ],
+              "targets": ["inner", "inner"],
               "animatedTarget": "inner",
               "styleOwner": "inner"
             },
             {
               "id": "inner",
-              "targets": [
-                "inner",
-                "inner"
-              ],
+              "targets": ["inner", "inner"],
               "animatedTarget": "inner",
               "styleOwner": "inner"
             }
@@ -1674,40 +1573,14 @@
           "documentCaptures": 1
         },
         "semantic": {
-          "owners": [
-            "document",
-            "inner",
-            "left",
-            "right"
-          ],
+          "owners": ["document", "inner", "left", "right"],
           "ready": [
-            [
-              "fulfilled",
-              "fulfilled",
-              null
-            ],
-            [
-              "fulfilled",
-              "fulfilled",
-              null
-            ],
-            [
-              "fulfilled",
-              "fulfilled",
-              null
-            ],
-            [
-              "fulfilled",
-              "fulfilled",
-              null
-            ]
+            ["fulfilled", "fulfilled", null],
+            ["fulfilled", "fulfilled", null],
+            ["fulfilled", "fulfilled", null],
+            ["fulfilled", "fulfilled", null]
           ],
-          "finished": [
-            "fulfilled",
-            "fulfilled",
-            "fulfilled",
-            "fulfilled"
-          ],
+          "finished": ["fulfilled", "fulfilled", "fulfilled", "fulfilled"],
           "hostsRetained": true,
           "roots": [
             {
@@ -1724,84 +1597,51 @@
             }
           ],
           "text": [
-            [
-              "page",
-              "page-after"
-            ],
-            [
-              "left",
-              "left-after"
-            ],
-            [
-              "inner",
-              "inner-after"
-            ],
-            [
-              "right",
-              "right-after"
-            ]
+            ["page", "page-after"],
+            ["left", "left-after"],
+            ["inner", "inner-after"],
+            ["right", "right-after"]
           ],
           "events": [
             {
               "id": "left-root",
-              "targets": [
-                "left",
-                "left"
-              ],
+              "targets": ["left", "left"],
               "animatedTarget": "left",
               "styleOwner": "left"
             },
             {
               "id": "left",
-              "targets": [
-                "left",
-                "left"
-              ],
+              "targets": ["left", "left"],
               "animatedTarget": "left",
               "styleOwner": "left"
             },
             {
               "id": "inner-root",
-              "targets": [
-                "inner",
-                "inner"
-              ],
+              "targets": ["inner", "inner"],
               "animatedTarget": "inner",
               "styleOwner": "inner"
             },
             {
               "id": "inner",
-              "targets": [
-                "inner",
-                "inner"
-              ],
+              "targets": ["inner", "inner"],
               "animatedTarget": "inner",
               "styleOwner": "inner"
             },
             {
               "id": "right-root",
-              "targets": [
-                "right",
-                "right"
-              ],
+              "targets": ["right", "right"],
               "animatedTarget": "right",
               "styleOwner": "right"
             },
             {
               "id": "right",
-              "targets": [
-                "right",
-                "right"
-              ],
+              "targets": ["right", "right"],
               "animatedTarget": "right",
               "styleOwner": "right"
             },
             {
               "id": "page",
-              "targets": [
-                "document",
-                "document"
-              ],
+              "targets": ["document", "document"],
               "animatedTarget": "document",
               "styleOwner": "document"
             }
