@@ -1,4 +1,4 @@
-import { track, type Tracked } from 'ripple';
+import { track, type Tracked, type Derived } from 'ripple';
 import { bindSetter } from '../../shared/bridge.js';
 import { INITIAL_SNAPSHOT } from '../../shared/workloads.js';
 
@@ -43,10 +43,10 @@ type RippleSnapshot =
 	| { kind: 'anim'; boxes: RippleAnimBox[] }
 	| { kind: 'tree'; nodes: TreeNode[] };
 
-function TableView(props: { rows: RippleTableRow[] }) @{
+function TableView(props: { rows: Derived<RippleTableRow[]> }) @{
 	<table class="uibench-table" data-kind="table">
 		<tbody>
-			@for (const row of props.rows; key row.id) {
+			@for (const row of props.rows.value; key row.id) {
 				<tr data-id={row.id} class={row.active.value ? 'active' : 'inactive'}>
 					<th>{row.label as string}</th>
 					@for (const cell of row.cells; key cell.id) {
@@ -58,31 +58,34 @@ function TableView(props: { rows: RippleTableRow[] }) @{
 	</table>
 }
 
-function AnimView(props: { boxes: RippleAnimBox[] }) @{
+function AnimView(props: { boxes: Derived<RippleAnimBox[]> }) @{
 	<div class="uibench-anim" data-kind="anim">
-		@for (const box of props.boxes; key box.id) {
+		@for (const box of props.boxes.value; key box.id) {
 			<div class="box" data-id={box.id} style={{ transform: box.transform.value }}></div>
 		}
 	</div>
 }
 
-function TreeItem(props: { node: TreeNode }) @{
-	<li data-id={props.node.id} class={props.node.children.length === 0 ? 'leaf' : 'container'}>
-		<span>{props.node.label as string}</span>
-		@if (props.node.children.length > 0) {
+function TreeItem(props: { node: Derived<TreeNode> }) @{
+	<li
+		data-id={props.node.value.id}
+		class={props.node.value.children.length === 0 ? 'leaf' : 'container'}
+	>
+		<span>{props.node.value.label as string}</span>
+		@if (props.node.value.children.length > 0) {
 			<ul>
-				@for (const child of props.node.children; key child.id) {
-					<TreeItem node={child} />
+				@for (const child of props.node.value.children; key child.id) {
+					<TreeItem node={track(() => child)} />
 				}
 			</ul>
 		}
 	</li>
 }
 
-function TreeView(props: { nodes: TreeNode[] }) @{
+function TreeView(props: { nodes: Derived<TreeNode[]> }) @{
 	<ul class="uibench-tree" data-kind="tree">
-		@for (const node of props.nodes; key node.id) {
-			<TreeItem node={node} />
+		@for (const node of props.nodes.value; key node.id) {
+			<TreeItem node={track(() => node)} />
 		}
 	</ul>
 }
@@ -127,20 +130,20 @@ export default function App() @{
 		return next;
 	};
 
-	let &[snapshot] = track<RippleSnapshot>(adapt(INITIAL_SNAPSHOT as Snapshot));
+	const snapshot = track<RippleSnapshot>(adapt(INITIAL_SNAPSHOT as Snapshot));
 	bindSetter((next: Snapshot) => {
-		snapshot = adapt(next);
+		snapshot.value = adapt(next);
 	});
 
-	@switch (snapshot.kind) {
+	@switch (snapshot.value.kind) {
 		@case 'table': {
-			<TableView rows={snapshot.rows} />
+			<TableView rows={track(() => snapshot.value.kind === 'table' ? snapshot.value.rows : [])} />
 		}
 		@case 'anim': {
-			<AnimView boxes={snapshot.boxes} />
+			<AnimView boxes={track(() => snapshot.value.kind === 'anim' ? snapshot.value.boxes : [])} />
 		}
 		@case 'tree': {
-			<TreeView nodes={snapshot.nodes} />
+			<TreeView nodes={track(() => snapshot.value.kind === 'tree' ? snapshot.value.nodes : [])} />
 		}
 	}
 }

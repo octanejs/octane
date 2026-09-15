@@ -117,6 +117,7 @@
     "prebindings:typecheck": "pnpm --filter @octanejs/dropzone typecheck"
   },
   "devDependencies": {
+    "octane": "workspace:*",
     "@babel/core": "catalog:default",
     "@changesets/changelog-git": "catalog:default",
     "@changesets/cli": "catalog:default",

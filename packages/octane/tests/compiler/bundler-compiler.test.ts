@@ -1,5 +1,5 @@
 import { parseModule } from '@tsrx/core';
-import { parseModule as parseCompilerModule } from 'oxc-tsrx/tsrx-core-compat';
+import { parseModule as parseCompilerModule } from '@tsrx/oxc/tsrx-core-compat';
 import { describe, expect, it } from 'vitest';
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';

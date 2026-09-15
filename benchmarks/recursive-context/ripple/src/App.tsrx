@@ -7,9 +7,8 @@ import { Context, track, type Tracked } from 'ripple';
 //   __updatePartial() — mutates state on a single mid-node at depth M=5; only
 //                       leaves in that subtree (2^(D-M) = 32) re-read.
 //
-// Each provider creates `let &[v, vT] = track(0)` — `v` is the reactive proxy
-// (writable from closures), `vT` is the underlying Tracked object placed into
-// Context so descendants can subscribe via `vT.value`.
+// Each provider puts a Tracked object into Context. Closures write its
+// `.value` and descendants read `.value` to subscribe to the same object.
 
 const D = 10;
 const M = 5;
@@ -35,15 +34,15 @@ export function showMid() {
 }
 
 function Mid(props) @{
-	let &[local, localT] = track(0);
-	let &[visible] = track(true);
+	const localT = track(0);
+	const visible = track(true);
 	_bumpLocal = () => {
-		local += 1;
+		localT.value += 1;
 	};
 	_setVisible = (v) => {
-		visible = v;
+		visible.value = v;
 	};
-	@if (visible) {
+	@if (visible.value) {
 		LocalCtx.set(localT);
 		<div class="mid">
 			<Node depth={props.depth - 1} path={props.path + 'L'} />
@@ -79,10 +78,10 @@ function Leaf(props) @{
 }
 
 export default function App(props) @{
-	let &[root, rootT] = track(0);
+	const rootT = track(0);
 	RootCtx.set(rootT);
 	_bumpRoot = () => {
-		root += 1;
+		rootT.value += 1;
 	};
 	<Node depth={props.depth} path="" />
 }
