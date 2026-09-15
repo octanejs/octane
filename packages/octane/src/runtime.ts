@@ -17258,6 +17258,9 @@ export function isHydratingStyle(): boolean {
 	return activeHydration() !== null;
 }
 
+/** Intrinsic prototype used to guard completion of fresh style spread snapshots. @internal */
+export const styleObjectPrototype = Object.prototype;
+
 /** Whether a spread prefix and its fixed trailing declarations can be diffed separately. @internal */
 export function canSplitStyleProperties(): boolean {
 	if (activeHydration() !== null) return false;
