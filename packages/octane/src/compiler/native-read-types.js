@@ -270,6 +270,32 @@ export function validateNativeSignalNames(program, file) {
 		const symbol = canonical(checker.getSymbolAtLocation(node.name));
 		return symbol && (symbol.flags & ts.SymbolFlags.Value) !== 0;
 	}
+	function isDomStyleProperty(node) {
+		let object = node.parent;
+		if (!ts.isObjectLiteralExpression(object)) return false;
+		while (
+			object.parent &&
+			(ts.isParenthesizedExpression(object.parent) ||
+				ts.isAsExpression(object.parent) ||
+				ts.isSatisfiesExpression(object.parent) ||
+				ts.isNonNullExpression(object.parent) ||
+				(ts.isBinaryExpression(object.parent) &&
+					(object.parent.operatorToken.kind === ts.SyntaxKind.BarBarToken ||
+						object.parent.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken ||
+						(object.parent.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken &&
+							object.parent.right === object))) ||
+				(ts.isConditionalExpression(object.parent) &&
+					(object.parent.whenTrue === object || object.parent.whenFalse === object)))
+		)
+			object = object.parent;
+		const container = object.parent;
+		if (!container || !ts.isJsxExpression(container)) return false;
+		const attribute = container.parent;
+		if (!ts.isJsxAttribute(attribute) || attribute.name.getText(sourceFile) !== 'style')
+			return false;
+		const tag = attribute.parent.parent.tagName;
+		return ts.isIdentifier(tag) && /^[a-z]/.test(tag.text);
+	}
 	function visit(node) {
 		if (ts.isVariableDeclaration(node) || ts.isParameter(node) || ts.isBindingElement(node)) {
 			checkName(node.name);
@@ -277,13 +303,10 @@ export function validateNativeSignalNames(program, file) {
 			if (!node.isTypeOnly && !node.parent.parent.isTypeOnly) checkName(node.name);
 		} else if (ts.isExportSpecifier(node)) {
 			if (valueExport(node)) checkName(node.name, node.propertyName ?? node.name);
-		} else if (ts.isPropertyAssignment(node)) {
-			checkName(node.name, node.initializer);
-		} else if (
-			ts.isShorthandPropertyAssignment(node) ||
-			ts.isPropertyDeclaration(node) ||
-			ts.isPropertySignature(node)
-		) {
+		} else if (ts.isPropertyAssignment(node) || ts.isShorthandPropertyAssignment(node)) {
+			if (!isDomStyleProperty(node))
+				checkName(node.name, ts.isPropertyAssignment(node) ? node.initializer : node.name);
+		} else if (ts.isPropertyDeclaration(node) || ts.isPropertySignature(node)) {
 			checkName(node.name);
 		} else if (
 			ts.isFunctionDeclaration(node) ||

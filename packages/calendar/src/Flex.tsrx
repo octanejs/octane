@@ -1,7 +1,7 @@
+import type { CSSProperties } from 'octane';
 import { Children, cloneElement, isValidElement, type OctaneNode } from 'octane';
 import type { Octane } from 'octane/jsx-runtime';
 
-type CSSProperties = Exclude<NonNullable<Octane.HTMLAttributes<Element>['style']>, string>;
 type DivProps = Octane.JSX.IntrinsicElements['div'];
 
 type FlexProps =

@@ -1,7 +1,7 @@
+import type { CSSProperties } from 'octane';
 import type { OctaneNode } from '../util/OctaneTypes.ts';
 import * as React from 'octane';
 import { useCallback, useEffect, useRef, useState } from 'octane';
-import type { Octane } from 'octane/jsx-runtime';
 import { noop } from '../util/DataUtils';
 import { resolveDefaultProps } from '../util/resolveDefaultProps';
 import { useAnimationController } from './useAnimationController';
@@ -12,12 +12,6 @@ import { CSSTransitionAnimation } from './AnimationHandle';
 import { RequestAnimationFrameTimeoutController } from './timeoutController';
 import { EasingInput, NamedBezier } from './easing';
 import type { AnimationController } from './AnimationController';
-
-// `octane` does not export `CSSProperties`. The object form of octane's JSX
-// `style` prop is the type this render prop hands out, so take it from there
-// (`octane/jsx-runtime` types it as `string | CSSProperties`) rather than
-// importing @types/react, which this package does not depend on.
-type CSSProperties = Exclude<NonNullable<Octane.HTMLAttributes<Element>['style']>, string>;
 
 type CSSTransitionAnimateProps = {
 	animationId: string;

@@ -10,7 +10,14 @@ import type {
 	Suspense,
 } from './runtime.js';
 
-export type { JSX, Octane, OctaneElement, ClassValue, CSSProperties } from './jsx-runtime.js';
+export type {
+	JSX,
+	Octane,
+	OctaneElement,
+	ClassValue,
+	CSSProperties,
+	SignalCSSProperties,
+} from './jsx-runtime.js';
 
 /** Migration alias. New Octane code should use OctaneNode. */
 export type ReactNode = OctaneNode;

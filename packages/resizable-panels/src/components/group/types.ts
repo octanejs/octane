@@ -1,4 +1,4 @@
-import type { OctaneNode } from 'octane';
+import type { CSSProperties as DivStyle, OctaneNode } from 'octane';
 import type { Octane } from 'octane/jsx-runtime';
 import type { RegisteredPanel } from '../panel/types';
 import type { RegisteredSeparator } from '../separator/types';
@@ -29,7 +29,6 @@ export interface GroupImperativeHandle {
 	setLayout(layout: Layout): Layout;
 }
 
-type DivStyle = Exclude<Octane.JSX.IntrinsicElements['div']['style'], string | undefined>;
 type DivProps = Omit<Octane.JSX.IntrinsicElements['div'], 'children' | 'id' | 'ref' | 'style'>;
 export type GroupProps = DivProps & {
 	children?: OctaneNode;

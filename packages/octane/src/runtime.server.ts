@@ -1,4 +1,5 @@
 export { trustHTML, type TrustedHTML } from './trusted-html.js';
+export { readNativeDomStyle, readNativeDomProps } from './signals/read-protocol.js';
 /**
  * octane server runtime (SSR).
  *
@@ -2941,6 +2942,7 @@ export function ssrAttrs(
 	tag?: string,
 	namespace: AttributeNamespace = 'html',
 	skipFormControls = false,
+	readStyle?: (value: unknown) => unknown,
 ): string {
 	const dev = process.env.NODE_ENV !== 'production';
 	namespace = resolveAttributeNamespace(namespace);
@@ -3012,7 +3014,12 @@ export function ssrAttrs(
 					(skipFormControls && isAggregatedFormAttribute(tag, rawName))
 				)
 					continue;
-				out += ssrAttrEntry(rawName, value, tag, namespace);
+				out += ssrAttrEntry(
+					rawName,
+					readStyle !== undefined && rawName === 'style' ? readStyle(value) : value,
+					tag,
+					namespace,
+				);
 			}
 			return out;
 		}
@@ -3072,6 +3079,8 @@ export function ssrAttrs(
 		}
 	}
 
+	const style = resolved.get('style');
+	if (readStyle !== undefined && style !== undefined) style.value = readStyle(style.value);
 	let out = '';
 	const ordered = dev || needsWinningOrderSort ? [...resolved.values()] : resolved.values();
 	if (needsWinningOrderSort) (ordered as PropWriter[]).sort((a, b) => a.firstOrder - b.firstOrder);

@@ -1,7 +1,7 @@
 import isBrowser from '#is-browser';
 import isDevelopment from '#is-development';
 import { useLayoutEffect, useRef } from 'octane';
-import type { JSX } from 'octane/jsx-runtime';
+import type { CSSProperties, JSX } from 'octane/jsx-runtime';
 import calculateNodeHeight from './calculateNodeHeight.js';
 import getSizingData, { type SizingData } from './getSizingData.js';
 import {
@@ -14,7 +14,7 @@ import { noop } from './utils.js';
 
 type NativeTextareaProps = JSX.IntrinsicElements['textarea'];
 type TextareaStyle =
-	Omit<Exclude<NonNullable<NativeTextareaProps['style']>, string>, 'maxHeight' | 'minHeight'> & {
+	Omit<CSSProperties, 'maxHeight' | 'minHeight'> & {
 		height?: number;
 	};
 type TextareaRef =

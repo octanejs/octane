@@ -510,6 +510,27 @@ export function analyzeNativeReadDiagnostics(ast, source, filename, options = {}
 			`Native signal handles and functions exposing handles or live reads must end in $. Rename ${JSON.stringify(name)} to ${JSON.stringify(name + '$')}; sampled values keep ordinary names.`,
 		);
 	}
+	function isDomStyleProperty(node) {
+		let object = parents.get(node);
+		let container = parents.get(object);
+		while (
+			container &&
+			(WRAPPERS.has(container.type) ||
+				(container.type === 'LogicalExpression' &&
+					(container.operator !== '&&' || container.right === object)) ||
+				(container.type === 'ConditionalExpression' &&
+					(container.consequent === object || container.alternate === object)))
+		) {
+			object = container;
+			container = parents.get(object);
+		}
+		if (container?.type !== 'JSXExpressionContainer') return false;
+		const attribute = parents.get(container);
+		if (attribute?.type !== 'JSXAttribute' || attribute.name?.name !== 'style') return false;
+		const opening = parents.get(attribute);
+		const tag = opening?.name;
+		return tag?.type === 'JSXIdentifier' && /^[a-z]/.test(tag.name);
+	}
 	for (const record of allRecords) {
 		const value = recordValue(record);
 		for (const declaration of record.declarations) checkName(declaration, record.name, value);
@@ -526,7 +547,8 @@ export function analyzeNativeReadDiagnostics(ast, source, filename, options = {}
 				'useDerived$ is not available. Create derived$ on an explicitly owned Scope and pass the handle to the component.',
 			);
 		} else if (node.type === 'Property' && parents.get(node)?.type === 'ObjectExpression') {
-			checkName(node.key, propertyName(node.key, node.computed), valueOf(node.value));
+			if (!isDomStyleProperty(node))
+				checkName(node.key, propertyName(node.key, node.computed), valueOf(node.value));
 		} else if (node.type === 'AssignmentExpression' && node.operator === '=') {
 			const left = unwrap(node.left);
 			if (left?.type === 'MemberExpression')

@@ -1,10 +1,7 @@
 import type { OctaneNode } from 'octane';
-import type { Octane } from 'octane/jsx-runtime';
+import type { CSSProperties, Octane } from 'octane/jsx-runtime';
 
-export type EmailStyle = Exclude<
-	Octane.HTMLAttributes<HTMLElement>['style'],
-	string | undefined
-> & {
+export type EmailStyle = CSSProperties & {
 	msoPaddingAlt?: string | number;
 	msoTextRaise?: string | number;
 };

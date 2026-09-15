@@ -42,6 +42,7 @@
  */
 import type * as React from 'react';
 import type { ElementDescriptor, FragmentInstance } from './index.js';
+import type { SignalHandle } from './signals/types.js';
 
 /**
  * Octane's element type — the analog of React's `ReactElement`, and what a
@@ -56,6 +57,14 @@ export interface OctaneElement<P = any> extends ElementDescriptor<P> {}
 export interface CSSProperties extends React.CSSProperties {
 	cssFloat?: React.CSSProperties['float'];
 }
+
+/** Native DOM style values; plain CSSProperties remains usable by CSS-consuming libraries. */
+export type SignalCSSProperties = {
+	[K in keyof CSSProperties]: CSSProperties[K] | SignalHandle<CSSProperties[K] | null>;
+} & {
+	[customProperty: `--${string}`]:
+		string | number | SignalHandle<string | number | null | undefined> | undefined;
+};
 
 export type ClassValue =
 	| string
@@ -139,7 +148,11 @@ type Transformed<P, T> = Omit<P, ReactSyntheticProps | 'className' | 'style' | '
 		className?: ClassValue;
 		for?: string;
 		xmlns?: string;
-		style?: string | CSSProperties;
+		style?:
+			| string
+			| CSSProperties
+			| SignalCSSProperties
+			| SignalHandle<string | CSSProperties | SignalCSSProperties | null | undefined>;
 		children?: unknown;
 	};
 
