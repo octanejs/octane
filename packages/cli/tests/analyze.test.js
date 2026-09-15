@@ -49,6 +49,28 @@ async function analyze(files, extra = []) {
 }
 
 describe('octane analyze', () => {
+	it('reports redundant Strong dependencies as hints without failing --strict', async () => {
+		const result = await analyze(
+			{
+				'src/Hint.tsrx': `"use strong";
+import { useEffect } from 'octane';
+import { observe } from './external';
+export function Hint({ value }) @{
+  useEffect(() => { observe(value); }, [value]);
+  <div />
+}`,
+			},
+			['--strict'],
+		);
+		expect(result.exitCode).toBe(0);
+		expect(result.json().summary).toEqual({ errors: 0, warnings: 0, hints: 1 });
+		expect(result.json().findings).toEqual([
+			expect.objectContaining({
+				code: 'OCTANE_STRONG_EXPLICIT_DEPENDENCIES',
+				severity: 'hint',
+			}),
+		]);
+	});
 	it('reports a compiler diagnostic with its code, position and suggestion', async () => {
 		const result = await analyze({
 			'src/Bad.tsrx':
@@ -82,7 +104,7 @@ describe('octane analyze', () => {
 		});
 
 		const report = result.json();
-		expect(report.summary).toEqual({ errors: 1, warnings: 0 });
+		expect(report.summary).toEqual({ errors: 1, warnings: 0, hints: 0 });
 		expect(report.analyzed).toBe(2);
 		expect(report.findings[0].code).toBe('OCTANE_PARSE_ERROR');
 		expect(result.exitCode).toBe(3);
@@ -127,7 +149,11 @@ describe('octane analyze', () => {
 			'src/Fine.tsrx': "export function Fine() @{ <div>{'ok' as string}</div> }\n",
 		});
 
-		expect(result.json()).toMatchObject({ ok: true, findings: [] });
+		expect(result.json()).toMatchObject({
+			ok: true,
+			summary: { errors: 0, warnings: 0, hints: 0 },
+			findings: [],
+		});
 		expect(result.exitCode).toBe(0);
 	});
 

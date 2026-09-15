@@ -8,9 +8,9 @@
 //
 // Timing protocol (shared with ../js-framework/run.mjs): interactions run
 // inside one page.evaluate, `performance.now()` around the batch. Frameworks
-// that commit synchronously on the dispatched event (octane native flush,
-// react/ripple/Svelte flushSync in handlers, solid flush()) are fully measured
-// by the synchronous window; Preact and vue-vapor expose
+// that commit synchronously on the dispatched event (react/ripple/Svelte
+// flushSync in handlers, solid flush()) are fully measured by the synchronous
+// window; Octane (public flushSync), Preact, and vue-vapor expose
 // `window.__benchFlush` and the loop awaits it after EACH interaction — one
 // scheduler flush per user action, matching how real input arrives (discrete
 // tasks), with each framework's own scheduling cost inside the measurement.

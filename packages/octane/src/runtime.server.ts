@@ -1,3 +1,4 @@
+export { trustHTML, type TrustedHTML } from './trusted-html.js';
 /**
  * octane server runtime (SSR).
  *
@@ -23,6 +24,8 @@
 // Per-render ambient state. A render is synchronous and single-threaded, so a
 // module-global "current scope" (mirroring the client's CURRENT_SCOPE) is safe.
 // ---------------------------------------------------------------------------
+
+import { resolveHookPath } from './hook-slot-cache.js';
 
 import {
 	BLOCK_OPEN,
@@ -314,7 +317,16 @@ interface InjectedStyle {
 	css: string;
 	nonce?: string;
 }
-let CSS: Map<string, InjectedStyle> | null = null;
+interface StyleCollector extends Map<string, InjectedStyle> {
+	/** Pristine replay copy for the current contents, released by the next write. */
+	replay: Map<string, InjectedStyle> | null;
+}
+function newStyleCollector(): StyleCollector {
+	const collector = new Map<string, InjectedStyle>() as StyleCollector;
+	collector.replay = null;
+	return collector;
+}
+let CSS: StyleCollector | null = null;
 // Pre-escaped ` nonce="..."` fragment for renderer-owned inline tags emitted
 // during the active pass. Saved/restored with every other ambient so nested or
 // concurrent server renders cannot leak a CSP nonce across requests.
@@ -335,7 +347,15 @@ let PERMANENT_STATIC_HYDRATE_DEPTH = 0;
 // per-pass local capture keeps accumulating via `HEAD.html +=` even though
 // strings are immutable). Folded into the result `html` by `spliceHead` (into
 // a document or leading fragment `<head>`, else prepended).
+interface HeadReplayCollections {
+	hints: Set<string>;
+	sheets: HeadBuffer['sheets'];
+	hintHtml: HeadBuffer['hintHtml'];
+	preloadXfer: HeadBuffer['preloadXfer'];
+}
 interface HeadBuffer {
+	/** Pristine collection copies shared until the next resource write. */
+	replay: HeadReplayCollections | null;
 	html: string;
 	/**
 	 * Priority hoistables, folded ahead of everything else (React Fizz parity:
@@ -435,11 +455,11 @@ interface Frame {
 	// Arm/list-local child counters. The same component position can be visited
 	// in multiple mutually-exclusive scopes during SSR retries; each scope must
 	// retain its own ordinal just as the client retains a separate Block tree.
-	scopedChildren: Map<string, number> | null;
+	scopedChildren: ScopedCounts | null;
 	// Per-site use() occurrence counter (a use() in an inline @for hits the same
 	// site N times → distinct keys). Lazily allocated (never for a use()-free
 	// component, i.e. the common case).
-	occ: Map<string, number> | null;
+	occ: ScopedCounts | null;
 	// Memoized materialized path ('/seg/seg…'); segs are immutable so it's stable.
 	path: string | null;
 	// Whether this component already registered a discovery job this pass (dedupe
@@ -503,20 +523,54 @@ function asyncFramePath(frame: Frame | null): string {
 	return (frame === null ? '' : framePath(frame)) + ASYNC_SCOPE;
 }
 
+// Scoped counters live in a flat [key, count, …] pair list until they outgrow
+// it: scope keys are long path strings, so a Map pays a full hash of the key on
+// every get/set while a short scan compares them directly (and scopedChildren
+// lookups carry the same ASYNC_SCOPE string object across an arm, which string
+// equality resolves by identity). Frames seeing more distinct scopes than the
+// limit promote to a Map so a pathological fan-out still gets O(1) lookups.
+type ScopedCounts = (string | number)[] | Map<string, number>;
+const SCOPED_COUNTS_ARRAY_LIMIT = 8;
+
+function nextScopedCount(frame: Frame, slot: 'occ' | 'scopedChildren', key: string): number {
+	let counts = frame[slot];
+	if (counts === null) {
+		frame[slot] = [key, 1];
+		return 0;
+	}
+	if (!Array.isArray(counts)) {
+		const next = counts.get(key) ?? 0;
+		counts.set(key, next + 1);
+		return next;
+	}
+	for (let i = 0; i < counts.length; i += 2) {
+		if (counts[i] === key) {
+			const next = counts[i + 1] as number;
+			counts[i + 1] = next + 1;
+			return next;
+		}
+	}
+	if (counts.length === SCOPED_COUNTS_ARRAY_LIMIT * 2) {
+		const promoted = new Map<string, number>();
+		for (let i = 0; i < counts.length; i += 2) {
+			promoted.set(counts[i] as string, counts[i + 1] as number);
+		}
+		promoted.set(key, 1);
+		frame[slot] = promoted;
+		return 0;
+	}
+	counts.push(key, 1);
+	return 0;
+}
+
 function nextFrameOccurrence(frame: Frame, base: string): number {
-	if (frame.occ === null) frame.occ = new Map();
 	const scopedBase = ASYNC_SCOPE === frame.asyncScope ? base : ASYNC_SCOPE + '\0' + base;
-	const next = frame.occ.get(scopedBase) ?? 0;
-	frame.occ.set(scopedBase, next + 1);
-	return next;
+	return nextScopedCount(frame, 'occ', scopedBase);
 }
 
 function nextChildSegment(frame: Frame): number {
 	if (ASYNC_SCOPE === frame.asyncScope) return frame.nextChild++;
-	if (frame.scopedChildren === null) frame.scopedChildren = new Map();
-	const next = frame.scopedChildren.get(ASYNC_SCOPE) ?? 0;
-	frame.scopedChildren.set(ASYNC_SCOPE, next + 1);
-	return next;
+	return nextScopedCount(frame, 'scopedChildren', ASYNC_SCOPE);
 }
 
 function ssrScope(parent: SSRScope | null): SSRScope {
@@ -1668,12 +1722,16 @@ export function createPortal(body: unknown, target: unknown, props: any = undefi
 // Escaping
 // ---------------------------------------------------------------------------
 
-// Guarded escapers: a single .test() scan first, so the common no-escape case
-// returns the ORIGINAL string with zero allocation (~5x on clean text). When
-// something does need escaping, native replacement passes are kept —
-// measured faster than an exec-loop or replace-with-callback single pass on V8
-// for both sparse and dense escape densities.
-const HTML_ESCAPE_RE = /[&<>]/g;
+// Guarded escapers: a cheap pre-scan decides whether the ORIGINAL string can
+// be returned with zero allocation. The regexps are deliberately non-global —
+// no lastIndex to reset per call, and a nested render cannot corrupt a shared
+// scan position. escapeHtml splits the pre-scan by length: a regexp .test()
+// has lower fixed cost on short strings, while three memchr-backed indexOf
+// scans win on long ones (crossover measured at ~32 chars). When something
+// does need escaping, native replacement passes are kept — measured faster
+// than an exec-loop or replace-with-callback single pass on V8 for both
+// sparse and dense escape densities.
+const HTML_ESCAPE_RE = /[&<>]/;
 
 // A primitive component return is user text. Only compiler-owned HTML may
 // bypass escaping; carrying the proof with the value also preserves it through
@@ -1703,17 +1761,19 @@ function serverComponentOutput(out: unknown, scope: SSRScope): string {
 
 export function escapeHtml(v: unknown): string {
 	const s = typeof v === 'string' ? v : String(v);
-	HTML_ESCAPE_RE.lastIndex = 0;
-	if (!HTML_ESCAPE_RE.test(s)) return s;
+	const needsEscape =
+		s.length < 32
+			? HTML_ESCAPE_RE.test(s)
+			: s.indexOf('&') !== -1 || s.indexOf('<') !== -1 || s.indexOf('>') !== -1;
+	if (!needsEscape) return s;
 	return s.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
 }
 
-const ATTR_ESCAPE_RE = /[&"]/g;
+const ATTR_ESCAPE_RE = /[&"]/;
 export function escapeAttr(v: unknown): string {
 	const s = typeof v === 'string' ? v : String(v);
-	ATTR_ESCAPE_RE.lastIndex = 0;
 	if (!ATTR_ESCAPE_RE.test(s)) return s;
-	return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+	return s.replaceAll('&', '&amp;').replaceAll('"', '&quot;');
 }
 
 // ---------------------------------------------------------------------------
@@ -2372,17 +2432,47 @@ export function ssrControl<T>(siteKey: string, fn: () => T): T {
 	return withAsyncIdentity('control:' + siteKey, occurrence, fn);
 }
 
-/** Compiler-emitted identity membrane for one arm/item inside ssrControl. */
-export function ssrArm<T>(armKey: unknown, fn: () => T): T {
+function enterAsyncArm(armKey: unknown): string {
+	const previous = ASYNC_SCOPE;
 	const frame = FRAME;
-	const occurrence =
-		frame === null ? 0 : nextFrameOccurrence(frame, '@arm-position:' + ASYNC_SCOPE);
+	const occurrence = frame === null ? 0 : nextFrameOccurrence(frame, '@arm-position:' + previous);
 	// A freshly allocated object key has no cross-pass identity. Reuse the same
 	// lexical item position only as its fallback lookup. The final scope remains
 	// keyed solely by armKey, so a stable primitive/object key keeps its identity
 	// when an @for reorders between streaming passes.
-	const fallbackPosition = ASYNC_SCOPE + '|@arm-position:' + occurrence;
-	return withAsyncIdentity('arm', armKey, fn, false, fallbackPosition);
+	const fallbackPosition = previous + '|@arm-position:' + occurrence;
+	ASYNC_SCOPE = previous + '|@arm:' + asyncIdentityKey(armKey, false, fallbackPosition);
+	return previous;
+}
+
+/** Compiler-emitted identity membrane for one arm/item inside ssrControl. */
+export function ssrArm<T>(armKey: unknown, fn: () => T): T {
+	const previous = enterAsyncArm(armKey);
+	try {
+		return fn();
+	} finally {
+		ASYNC_SCOPE = previous;
+	}
+}
+
+/** Invoke a compiled list body without allocating a callback per item. */
+export function ssrForItem(
+	armKey: unknown,
+	fn: (...args: any[]) => string,
+	item: unknown,
+	index: number | undefined,
+	scope: SSRScope,
+	block: boolean,
+): string {
+	const previous = enterAsyncArm(armKey);
+	try {
+		// Preserve the authored body's parameter/default evaluation and exact
+		// argument count, including an @for that declares no index binding.
+		const html = index === undefined ? fn(item, scope) : fn(item, index, scope);
+		return block ? ssrBlock(html) : html;
+	} finally {
+		ASYNC_SCOPE = previous;
+	}
 }
 
 /**
@@ -2517,14 +2607,14 @@ export function ssrAttr(
 	tag?: string,
 	namespace: AttributeNamespace = 'html',
 ): string {
+	// Hoisted env check: each `dev` use would otherwise be a fresh
+	// `process.env` lookup. Must stay the first statement — bundlers only
+	// fold the check into its uses (keeping prod bundles free of dev
+	// warnings) while it syntactically precedes other statements.
+	const dev = process.env.NODE_ENV !== 'production';
 	namespace = resolveAttributeNamespace(namespace);
 	const isCustomTag = namespace === 'html' && tag !== undefined && tag.indexOf('-') !== -1;
-	if (
-		process.env.NODE_ENV !== 'production' &&
-		!isCustomTag &&
-		tag !== undefined &&
-		DEV_SSR_CUSTOM_HOST_DEPTH === 0
-	) {
+	if (dev && !isCustomTag && tag !== undefined && DEV_SSR_CUSTOM_HOST_DEPTH === 0) {
 		const warning = isAriaAttributeName(name)
 			? ariaAttributeWarning(name, tag)
 			: hostPropertyWarning(
@@ -2550,11 +2640,7 @@ export function ssrAttr(
 		}
 		const alias = ATTRIBUTE_ALIASES.get(name);
 		if (alias !== undefined) name = alias;
-		else if (
-			process.env.NODE_ENV !== 'production' &&
-			(tag === 'button' || tag === 'input') &&
-			name === 'formAction'
-		) {
+		else if (dev && (tag === 'button' || tag === 'input') && name === 'formAction') {
 			name = 'formaction';
 		}
 	}
@@ -2607,7 +2693,7 @@ export function ssrAttr(
 		) {
 			return '';
 		}
-		if (process.env.NODE_ENV !== 'production' && !isCustomTag && tag !== undefined) {
+		if (dev && !isCustomTag && tag !== undefined) {
 			if (
 				t === 'function' &&
 				name.length > 2 &&
@@ -2644,7 +2730,7 @@ export function ssrAttr(
 		// the canonical `attr=""` presence form, falsy drops — mirroring the
 		// client's coerceAttrValue byte-for-byte (hydration parity).
 		if (BOOLEAN_ATTR_PROPS.has(lower)) {
-			if (process.env.NODE_ENV !== 'production' && tag !== undefined) {
+			if (dev && tag !== undefined) {
 				const warning = booleanAttributeStringWarning(name, v);
 				if (warning !== null) devWarnSsrAttributeOnce(name, warning);
 			}
@@ -2665,7 +2751,7 @@ export function ssrAttr(
 		// Booleans on non-boolean attributes never serialize (client parity:
 		// `title={true}` removes).
 		if (t === 'boolean') {
-			if (process.env.NODE_ENV !== 'production' && tag !== undefined) {
+			if (dev && tag !== undefined) {
 				devWarnSsrAttributeOnce(
 					name,
 					`Received \`${v}\` for a non-boolean attribute \`${name}\`. ` +
@@ -2685,7 +2771,7 @@ export function ssrAttr(
 	// A plain object has no useful attribute representation. Objects with an
 	// intentional toString retain their normal coercion and stay silent.
 	if (
-		process.env.NODE_ENV !== 'production' &&
+		dev &&
 		!isCustomTag &&
 		tag !== undefined &&
 		t === 'object' &&
@@ -2697,20 +2783,14 @@ export function ssrAttr(
 				'"[object Object]". Pass a string (or a value with a meaningful toString) instead.',
 		);
 	}
-	if (
-		process.env.NODE_ENV !== 'production' &&
-		!isCustomTag &&
-		tag !== undefined &&
-		t === 'number' &&
-		Number.isNaN(v)
-	) {
+	if (dev && !isCustomTag && tag !== undefined && t === 'number' && Number.isNaN(v)) {
 		devWarnSsrAttributeOnce(
 			name,
 			`Received NaN for the \`${name}\` attribute. If this is expected, cast the value to a string.`,
 		);
 	}
 	let s: string;
-	if (process.env.NODE_ENV !== 'production' && !isCustomTag && tag !== undefined) {
+	if (dev && !isCustomTag && tag !== undefined) {
 		try {
 			s = v === true ? '' : String(v);
 		} catch (error) {
@@ -2732,7 +2812,7 @@ export function ssrAttr(
 			(name === 'href' && tag !== undefined && tag !== 'a' && tag !== 'area') ||
 			(name === 'data' && tag === 'object'))
 	) {
-		if (process.env.NODE_ENV !== 'production' && !isCustomTag && tag !== undefined) {
+		if (dev && !isCustomTag && tag !== undefined) {
 			devWarnSsrAttributeOnce('empty:' + name, emptyResourceUrlWarning(name));
 		}
 		return '';
@@ -2742,6 +2822,7 @@ export function ssrAttr(
 }
 
 function styleObjectToCss(obj: Record<string, unknown>): string {
+	const dev = process.env.NODE_ENV !== 'production';
 	let out = '';
 	for (const k in obj) {
 		const val = obj[k];
@@ -2750,7 +2831,7 @@ function styleObjectToCss(obj: Record<string, unknown>): string {
 		if (val == null || typeof val === 'boolean') continue;
 		// React parity: numeric values get `px` (except 0 / unitless / custom props).
 		let serialized: string;
-		if (process.env.NODE_ENV !== 'production' && SSR_NESTING_WARNINGS !== null) {
+		if (dev && SSR_NESTING_WARNINGS !== null) {
 			devWarnStyleProperty(k, val, true);
 			try {
 				serialized = cssStyleValue(k, val);
@@ -2861,6 +2942,7 @@ export function ssrAttrs(
 	namespace: AttributeNamespace = 'html',
 	skipFormControls = false,
 ): string {
+	const dev = process.env.NODE_ENV !== 'production';
 	namespace = resolveAttributeNamespace(namespace);
 	interface PropWriter {
 		name: string;
@@ -2909,7 +2991,7 @@ export function ssrAttrs(
 		}
 	}
 
-	if (process.env.NODE_ENV === 'production' && classMerges === null) {
+	if (!dev && classMerges === null) {
 		let canonical = true;
 		for (const name of props.keys()) {
 			if (
@@ -2970,10 +3052,7 @@ export function ssrAttrs(
 			// an earlier normalized identity without moving its Map entry.
 			needsWinningOrderSort = true;
 		}
-		writer.name =
-			process.env.NODE_ENV !== 'production' && (rawName === 'tabIndex' || rawName === 'htmlFor')
-				? rawName
-				: name;
+		writer.name = dev && (rawName === 'tabIndex' || rawName === 'htmlFor') ? rawName : name;
 		resolved.set(identity, writer);
 	}
 	if (classMerges !== null) {
@@ -2994,12 +3073,9 @@ export function ssrAttrs(
 	}
 
 	let out = '';
-	const ordered =
-		process.env.NODE_ENV !== 'production' || needsWinningOrderSort
-			? [...resolved.values()]
-			: resolved.values();
+	const ordered = dev || needsWinningOrderSort ? [...resolved.values()] : resolved.values();
 	if (needsWinningOrderSort) (ordered as PropWriter[]).sort((a, b) => a.firstOrder - b.firstOrder);
-	if (process.env.NODE_ENV !== 'production') {
+	if (dev) {
 		devValidateSsrAriaProps(
 			(ordered as PropWriter[]).map(({ name }) => name),
 			tag,
@@ -3019,7 +3095,7 @@ export function ssrAttrs(
 		}
 	}
 	if (
-		process.env.NODE_ENV !== 'production' &&
+		dev &&
 		(ordered as PropWriter[]).some(({ name, value }) => name === 'is' && typeof value === 'string')
 	) {
 		DEV_SSR_CUSTOM_HOST_DEPTH++;
@@ -3637,8 +3713,8 @@ interface NativeLocalHookRec {
 type AnyHookRec = HookRec | LinkedHookRec<any, any> | MemoHookRec | RefHookRec | NativeLocalHookRec;
 type ServerHookSlot = symbol | string | number;
 
-// Server twin of the client helper/custom-hook ABI. Modules reserve a range
-// only when globally composable Symbol descriptions are required.
+// Server twin of the client slot ABI. Modules reserve disjoint ranges for
+// numeric base-hook identities and globally composable Symbol descriptions.
 let nextHookSlot = 0;
 export function hookSlots(count: number): number {
 	const base = nextHookSlot;
@@ -3647,10 +3723,11 @@ export function hookSlots(count: number): number {
 }
 
 interface HookPass {
-	/** Slot → occurrence-indexed records, persisting across this body's passes. */
-	hooks: Map<ServerHookSlot, AnyHookRec[]>;
+	/** Slot → occurrence-indexed records, persisting across this body's passes.
+	 * Allocated on first hook use — most presentational bodies never call one. */
+	hooks: Map<ServerHookSlot, AnyHookRec[]> | null;
 	/** Per-pass occurrence counters (fresh each pass, like Frame.occ). */
-	occ: Map<ServerHookSlot, number>;
+	occ: Map<ServerHookSlot, number> | null;
 	/** A dispatch fired during the current pass → re-invoke the body. */
 	update: boolean;
 }
@@ -3666,22 +3743,6 @@ const HOOK_SLOT_PATH: ServerHookSlot[] = [];
 // Key for slot-less hook calls outside any withSlot (plain call-order keying).
 const NO_SLOT = '@state';
 
-function appendHookSlotPath(key: string, slot: ServerHookSlot): string {
-	let type: string;
-	let value: string;
-	if (typeof slot === 'number') {
-		type = 'n';
-		value = String(slot);
-	} else if (typeof slot === 'symbol') {
-		type = 's';
-		value = slot.description ?? '';
-	} else {
-		type = 't';
-		value = slot;
-	}
-	return key + type + value.length + ':' + value;
-}
-
 function resolveHookSlot(slot: unknown): ServerHookSlot {
 	const own: ServerHookSlot | undefined =
 		typeof slot === 'symbol' || typeof slot === 'string' || typeof slot === 'number'
@@ -3691,10 +3752,7 @@ function resolveHookSlot(slot: unknown): ServerHookSlot {
 	if (depth === 0) return own ?? NO_SLOT;
 	if (own === undefined && depth === 1) return HOOK_SLOT_PATH[0];
 
-	let key = '@octane:hook:';
-	for (let i = 0; i < depth; i++) key = appendHookSlotPath(key, HOOK_SLOT_PATH[i]);
-	if (own !== undefined) key = appendHookSlotPath(key, own);
-	return Symbol.for(key);
+	return resolveHookPath(HOOK_SLOT_PATH, own, false, true);
 }
 
 // React's cap (and message shape): a dispatch that fires unconditionally during
@@ -3713,10 +3771,12 @@ function hookPosition(slot: unknown): {
 	const hp = HOOK_PASS;
 	if (hp === null) return null;
 	const key = resolveHookSlot(slot);
-	const index = hp.occ.get(key) ?? 0;
-	hp.occ.set(key, index + 1);
-	let list = hp.hooks.get(key);
-	if (list === undefined) hp.hooks.set(key, (list = []));
+	const occ = (hp.occ ??= new Map());
+	const index = occ.get(key) ?? 0;
+	occ.set(key, index + 1);
+	const hooks = (hp.hooks ??= new Map());
+	let list = hooks.get(key);
+	if (list === undefined) hooks.set(key, (list = []));
 	return { hp, list, index };
 }
 
@@ -3824,9 +3884,82 @@ function stateHook<S, A>(
 // Keep the large retry snapshot off the recursive component-call stack. Fizz
 // supports very deep trees; retaining dozens of snapshot locals in
 // invokeComponentBody's live frame would exhaust the JavaScript stack first.
+// Replay snapshots copy ambient collections so a discarded pass can be rewound,
+// yet in the common case every source is empty — share immutable empties rather
+// than allocate a private copy per component invocation. Every consumer only
+// iterates or re-copies them, and null remains the distinct "source absent"
+// state (absent skips the restore; empty still clears what a discarded pass
+// added). The list is frozen so an accidental write fails loudly instead of
+// leaking state into an unrelated snapshot; nothing mutates the maps or sets.
+const EMPTY_SNAPSHOT_MAP: Map<never, never> = new Map<never, never>();
+const EMPTY_SNAPSHOT_SET: Set<never> = new Set<never>();
+const EMPTY_SNAPSHOT_LIST = Object.freeze([]) as never[];
+
+function snapshotMap<K, V>(map: Map<K, V> | null | undefined): Map<K, V> | null {
+	return map == null ? null : map.size === 0 ? EMPTY_SNAPSHOT_MAP : new Map(map);
+}
+function snapshotSet<T>(set: Set<T> | null | undefined): Set<T> | null {
+	return set == null ? null : set.size === 0 ? EMPTY_SNAPSHOT_SET : new Set(set);
+}
+function snapshotList<T>(list: readonly T[] | null | undefined): T[] {
+	return list == null || list.length === 0 ? EMPTY_SNAPSHOT_LIST : list.slice();
+}
+// A populated collector often stays unchanged across hundreds of components.
+// Its pristine replay copy is shared until a write invalidates it; snapshots
+// already held by ancestor components keep the old copy for repeated rewinds.
+// These caches belong to pass-local collectors, so nested renders and completed
+// requests cannot share resources or retain each other's snapshots. Empty
+// collectors still use the shared empties without allocating a memo record.
+function snapshotStyles(css: StyleCollector | null): Map<string, InjectedStyle> | null {
+	if (css === null || css.size === 0) return snapshotMap(css);
+	return (css.replay ??= snapshotMap(css)!);
+}
+const EMPTY_HEAD_REPLAY: HeadReplayCollections = {
+	hints: EMPTY_SNAPSHOT_SET,
+	sheets: null,
+	hintHtml: null,
+	preloadXfer: null,
+};
+function snapshotHeadCollections(head: HeadBuffer | null): HeadReplayCollections | null {
+	if (head === null) return null;
+	if (head.replay !== null) return head.replay;
+	if (
+		head.hints.size === 0 &&
+		head.sheets === null &&
+		head.hintHtml === null &&
+		head.preloadXfer === null
+	)
+		return EMPTY_HEAD_REPLAY;
+	return (head.replay = {
+		hints: snapshotSet(head.hints)!,
+		sheets: snapshotMap(head.sheets),
+		hintHtml: snapshotMap(head.hintHtml),
+		preloadXfer: snapshotMap(head.preloadXfer),
+	});
+}
+function snapshotVtStack(): Array<{ candidate: VtSsrCandidate; consumed: boolean }> {
+	return VT_SSR_STACK.length === 0
+		? EMPTY_SNAPSHOT_LIST
+		: VT_SSR_STACK.map((candidate) => ({ candidate, consumed: candidate.consumed }));
+}
+function snapshotScopedCounts(counts: ScopedCounts | null | undefined): ScopedCounts | null {
+	if (counts == null) return null;
+	if (Array.isArray(counts)) {
+		return counts.length === 0 ? EMPTY_SNAPSHOT_LIST : counts.slice();
+	}
+	return snapshotMap(counts);
+}
+function restoreScopedCounts(snapshot: ScopedCounts | null): ScopedCounts | null {
+	if (snapshot === null) return null;
+	// Copy, never alias: the live list mutates in place, and a snapshot must
+	// restore identically on every retry that rewinds to it.
+	return Array.isArray(snapshot) ? snapshot.slice() : new Map(snapshot);
+}
+
 function captureComponentReplayState(scope: SSRScope, frame: Frame | null) {
 	const css = CSS;
 	const head = HEAD;
+	const headCollections = snapshotHeadCollections(head);
 	const serial = SERIAL;
 	const susp = SUSPENDED;
 	const jobs = DEFERRED;
@@ -3839,15 +3972,15 @@ function captureComponentReplayState(scope: SSRScope, frame: Frame | null) {
 		nativeMixed: NATIVE_SERVER_READS?.mixed ?? false,
 		nativeFailures: NATIVE_SERVER_FAILURES,
 		css,
-		cssEntries: css === null ? null : new Map(css),
+		cssEntries: snapshotStyles(css),
 		head,
 		headLength: head !== null ? head.html.length : 0,
 		headCharsetLength: head !== null ? head.charset.length : 0,
 		headViewportLength: head !== null ? head.viewport.length : 0,
-		headHints: head === null ? null : new Set(head.hints),
-		headSheets: head === null || head.sheets === null ? null : new Map(head.sheets),
-		headHintHtml: head === null || head.hintHtml === null ? null : new Map(head.hintHtml),
-		headXfer: head === null || head.preloadXfer === null ? null : new Map(head.preloadXfer),
+		headHints: headCollections?.hints ?? null,
+		headSheets: headCollections?.sheets ?? null,
+		headHintHtml: headCollections?.hintHtml ?? null,
+		headXfer: headCollections?.preloadXfer ?? null,
 		serial,
 		serialLength: serial !== null ? serial.length : 0,
 		susp,
@@ -3857,24 +3990,18 @@ function captureComponentReplayState(scope: SSRScope, frame: Frame | null) {
 		context: scope.$$ctxValues,
 		vtTrySeq: VT_SSR_TRY_SEQ,
 		vtHasCandidates: VT_SSR_HAS_CANDIDATES,
-		vtStack: VT_SSR_STACK.map((candidate) => ({
-			candidate,
-			consumed: candidate.consumed,
-		})),
+		vtStack: snapshotVtStack(),
 		stream,
 		streamNextId: stream?.nextId ?? 0,
-		streamActiveTryKeys: stream?.activeTryKeys.slice() ?? [],
-		streamActiveOwnerKeys: stream?.activeOwnerKeys.slice() ?? [],
+		streamActiveTryKeys: snapshotList(stream?.activeTryKeys),
+		streamActiveOwnerKeys: snapshotList(stream?.activeOwnerKeys),
 		streamPassBoundaryCount: stream?.activePassBoundaryKeys?.size ?? 0,
 		asyncScope: ASYNC_SCOPE,
 		streamReplayCheckpoint: stream?.replay?.length ?? 0,
 		frameDeferred: frame?.deferred ?? false,
 		frameNextChild: frame?.nextChild ?? 0,
-		frameScopedChildren:
-			frame?.scopedChildren === null || frame?.scopedChildren === undefined
-				? null
-				: new Map(frame.scopedChildren),
-		frameOccurrences: frame?.occ === null || frame?.occ === undefined ? null : new Map(frame.occ),
+		frameScopedChildren: snapshotScopedCounts(frame?.scopedChildren),
+		frameOccurrences: snapshotScopedCounts(frame?.occ),
 	};
 }
 
@@ -3894,10 +4021,12 @@ function rewindComponentReplayState(
 	NATIVE_SERVER_FAILURES = snapshot.nativeFailures;
 	ASYNC_SCOPE = snapshot.asyncScope;
 	if (snapshot.css !== null && snapshot.cssEntries !== null) {
+		snapshot.css.replay = null;
 		snapshot.css.clear();
 		for (const [hash, sheet] of snapshot.cssEntries) snapshot.css.set(hash, sheet);
 	}
 	if (snapshot.head !== null && snapshot.headHints !== null) {
+		snapshot.head.replay = null;
 		snapshot.head.html = snapshot.head.html.slice(0, snapshot.headLength);
 		snapshot.head.charset = snapshot.head.charset.slice(0, snapshot.headCharsetLength);
 		snapshot.head.viewport = snapshot.head.viewport.slice(0, snapshot.headViewportLength);
@@ -3955,9 +4084,8 @@ function rewindComponentReplayState(
 	if (frame !== null) {
 		frame.deferred = snapshot.frameDeferred;
 		frame.nextChild = snapshot.frameNextChild;
-		frame.scopedChildren =
-			snapshot.frameScopedChildren === null ? null : new Map(snapshot.frameScopedChildren);
-		frame.occ = snapshot.frameOccurrences === null ? null : new Map(snapshot.frameOccurrences);
+		frame.scopedChildren = restoreScopedCounts(snapshot.frameScopedChildren);
+		frame.occ = restoreScopedCounts(snapshot.frameOccurrences);
 	}
 }
 
@@ -3985,7 +4113,7 @@ function replayUpdatedComponentBody(
 			throw new Error(formatServerError(9));
 		}
 		hp.update = false;
-		hp.occ = new Map();
+		hp.occ = null;
 		rewindComponentReplayState(snapshot, scope, frame);
 		ACTIVE_PU_WARM_PLANS.length = warmPlanCheckpoint;
 		out = comp(props ?? {}, scope, undefined);
@@ -4000,7 +4128,7 @@ function invokeComponentBody(
 	frame: Frame | null,
 ): unknown {
 	const prevHP = HOOK_PASS;
-	const hp: HookPass = { hooks: new Map(), occ: new Map(), update: false };
+	const hp: HookPass = { hooks: null, occ: null, update: false };
 	const snapshot = captureComponentReplayState(scope, frame);
 	const warmPlanCheckpoint = ACTIVE_PU_WARM_PLANS.length;
 	HOOK_PASS = hp;
@@ -4065,7 +4193,7 @@ function renderComponentFramed(
 		// their shared loop lives behind a cold branch without charging that extra
 		// frame to normal component nesting.
 		const previousHookPass = HOOK_PASS;
-		const hookPass: HookPass = { hooks: new Map(), occ: new Map(), update: false };
+		const hookPass: HookPass = { hooks: null, occ: null, update: false };
 		const replaySnapshot = captureComponentReplayState(scope, frame);
 		const warmPlanCheckpoint = ACTIVE_PU_WARM_PLANS.length;
 		let out: unknown;
@@ -6179,18 +6307,29 @@ export function useTransition(): [boolean, (fn: () => void | Promise<unknown>) =
 	return [false, NOOP];
 }
 
-export function useDeferredValue<T>(value: T, ...rest: any[]): T {
+export function useDeferredValue<T>(value: T, ...rest: any[]): T;
+export function useDeferredValue<T>(
+	value: T,
+	initialValueOrSlot: unknown = undefined,
+	_slot?: unknown,
+): T {
 	// Optional initialValue precedes the trailing slot symbol.
-	return rest.length >= 2 ? (rest[0] as T) : value;
+	return arguments.length >= 3 ? (initialValueOrSlot as T) : value;
 }
 
 export function useSyncExternalStore<T>(
 	_subscribe: unknown,
 	getSnapshot: () => T,
 	...rest: any[]
+): T;
+export function useSyncExternalStore<T>(
+	_subscribe: unknown,
+	getSnapshot: () => T,
+	serverSnapshotOrSlot: unknown = undefined,
+	_slot?: unknown,
 ): T {
 	// `getServerSnapshot` (if provided) precedes the trailing slot symbol.
-	const getServerSnapshot = rest.length >= 2 ? (rest[0] as () => T) : undefined;
+	const getServerSnapshot = arguments.length >= 4 ? (serverSnapshotOrSlot as () => T) : undefined;
 	return getServerSnapshot ? getServerSnapshot() : getSnapshot();
 }
 
@@ -6406,7 +6545,10 @@ export function isChildrenBlock(value: unknown): boolean {
 // ---------------------------------------------------------------------------
 
 export function injectStyle(id: string, css: string, nonce?: string): void {
-	if (CSS !== null) CSS.set(id, nonce === undefined ? { css } : { css, nonce });
+	if (CSS !== null) {
+		CSS.replay = null;
+		CSS.set(id, nonce === undefined ? { css } : { css, nonce });
+	}
 }
 
 /**
@@ -6791,6 +6933,8 @@ type SuspenseOutcome = SuspenseResult & {
 //              can't know the unwraps' string keys, but puMemo makes instance
 //              identity stable across passes);
 type ResolvedMap = Map<string, SuspenseOutcome> & {
+	/** Pending streaming subscriptions shared across this request's settle waves. */
+	streamSettlements?: StreamSettlements;
 	/** Recoverable buffered-boundary errors are reported once across async retries. */
 	bufferedErrors?: Map<string, { error: unknown; reported: boolean }>;
 	/** Undefined for externally hosted passes whose request lifetime is not owned here. */
@@ -6886,6 +7030,16 @@ export function getServerRenderResourceContext(): ServerRenderResourceContext | 
 }
 
 function releaseServerRenderResources(resolved: ResolvedMap): void {
+	const settlements = resolved.streamSettlements;
+	if (settlements !== undefined) {
+		// Promise callbacks cannot be detached, but a late outcome must not retain
+		// or refill the completed request. Shared producers keep running normally.
+		resolved.streamSettlements = undefined;
+		settlements.resolved = null;
+		settlements.wake = null;
+		for (const recorder of settlements.pending.values()) recorder.keys = null;
+		settlements.pending.clear();
+	}
 	const resources = resolved.resources;
 	// Native thenable settlement callbacks can retain this cache after an abort.
 	// They must not also keep a completed request's options or foreign resources.
@@ -6940,7 +7094,7 @@ interface Ambient {
 	warmClaims: Set<object> | null;
 	id: number;
 	idPrefix: string;
-	css: Map<string, InjectedStyle> | null;
+	css: StyleCollector | null;
 	nonceAttr: string;
 	markers: boolean;
 	permanentStaticHydrateDepth: number;
@@ -6991,7 +7145,7 @@ function saveAmbient(): Ambient {
 		nestingWarnings: SSR_NESTING_WARNINGS,
 		vtTrySeq: VT_SSR_TRY_SEQ,
 		vtHasCandidates: VT_SSR_HAS_CANDIDATES,
-		vtStack: VT_SSR_STACK.map((candidate) => ({ candidate, consumed: candidate.consumed })),
+		vtStack: snapshotVtStack(),
 	};
 }
 function restoreAmbient(a: Ambient): void {
@@ -7084,8 +7238,9 @@ function runFullFramedPass(
 	VT_SSR_TRY_SEQ = 0;
 	VT_SSR_HAS_CANDIDATES = false;
 	VT_SSR_STACK.length = 0;
-	const cssMap = (CSS = new Map<string, InjectedStyle>());
+	const cssMap = (CSS = newStyleCollector());
 	const headBuf = (HEAD = {
+		replay: null,
 		html: '',
 		charset: '',
 		viewport: '',
@@ -7148,7 +7303,14 @@ function runFullFramedPass(
 			if (markers && nativePassCompleted)
 				signals = NATIVE_READ_COLLECTOR?.serialize(NATIVE_SERVER_READS);
 		} finally {
-			restoreAmbient(saved);
+			try {
+				restoreAmbient(saved);
+			} finally {
+				// Cleanup callbacks may render too; release memo copies only after
+				// they finish. Hosted results and streams can retain cssEntries.
+				cssMap.replay = null;
+				headBuf.replay = null;
+			}
 		}
 	}
 	if (resolved.bufferedErrors !== undefined) {
@@ -7213,8 +7375,9 @@ function runDiscoveryRound(
 	VT_SSR_TRY_SEQ = 0;
 	VT_SSR_HAS_CANDIDATES = false;
 	VT_SSR_STACK.length = 0;
-	CSS = new Map();
+	CSS = newStyleCollector();
 	HEAD = {
+		replay: null,
 		html: '',
 		charset: '',
 		viewport: '',
@@ -7360,6 +7523,50 @@ const yieldMacrotask: () => Promise<void> =
 		? () => new Promise((resolve) => setImmediate(resolve))
 		: () => new Promise((resolve) => setTimeout(resolve, 0));
 
+interface StreamSettlementRecorder {
+	promise: PromiseLike<unknown>;
+	key: string;
+	/** Batch registrations get a fresh synthetic key on every pass. */
+	keys: Set<string> | null;
+	batch: boolean;
+	wave: number;
+}
+
+interface StreamSettlements {
+	resolved: ResolvedMap | null;
+	pending: Map<PromiseLike<unknown>, StreamSettlementRecorder>;
+	wave: number;
+	wake: (() => void) | null;
+}
+
+async function recordStreamSettlement(
+	settlements: StreamSettlements,
+	recorder: StreamSettlementRecorder,
+): Promise<void> {
+	let outcome: SuspenseOutcome;
+	try {
+		outcome = { value: await recorder.promise, thenable: recorder.promise };
+	} catch (reason) {
+		outcome = { reason, thenable: recorder.promise };
+	}
+	const resolved = settlements.resolved;
+	if (resolved === null) return;
+	if (!resolved.has(recorder.key)) resolved.set(recorder.key, outcome);
+	if (recorder.keys !== null) {
+		for (const key of recorder.keys) {
+			if (!resolved.has(key)) resolved.set(key, outcome);
+		}
+		recorder.keys = null;
+	}
+	if (recorder.batch && !resolved.pu.resolvedT.has(recorder.promise)) {
+		resolved.pu.resolvedT.set(recorder.promise, outcome);
+	}
+	settlements.pending.delete(recorder.promise);
+	// Only a member of the current suspended list may end its wait. A vanished
+	// branch's late result can warm replay state without starting another pass.
+	if (recorder.wave === settlements.wave) settlements.wake?.();
+}
+
 // The STREAMING settle: await only until the FIRST unresolved thenable
 // settles, then coalesce — one macrotask yield plus microtask drains — so
 // everything else that landed in the same event-loop wave records into
@@ -7376,27 +7583,42 @@ async function settleFirstOfWave(
 ): Promise<void> {
 	const pu = (resolved as ResolvedMap).pu;
 	pu.recreate ??= { strikes: 0, prevCreated: pu.created.size };
-	const recorders: Promise<void>[] = [];
+	const settlements = (resolved.streamSettlements ??= {
+		resolved,
+		pending: new Map(),
+		wave: 0,
+		wake: null,
+	});
+	const wave = ++settlements.wave;
+	let waiting = false;
 	for (const { promise, key } of suspended) {
 		if (resolved.has(key)) continue;
-		const isPu = key.startsWith('|pu#');
-		recorders.push(
-			(async () => {
-				try {
-					const value = await promise;
-					const outcome = { value, thenable: promise };
-					if (!resolved.has(key)) resolved.set(key, outcome);
-					if (isPu && !pu.resolvedT.has(promise)) pu.resolvedT.set(promise, outcome);
-				} catch (reason) {
-					const outcome = { reason, thenable: promise };
-					if (!resolved.has(key)) resolved.set(key, outcome);
-					if (isPu && !pu.resolvedT.has(promise)) pu.resolvedT.set(promise, outcome);
-				}
-			})(),
-		);
+		let recorder = settlements.pending.get(promise);
+		if (recorder === undefined) {
+			recorder = { promise, key, keys: null, batch: key.startsWith('|pu#'), wave };
+			settlements.pending.set(promise, recorder);
+			// Attach once per thenable, preserving a first-writer outcome for each
+			// occurrence key. Even non-native thenables resume after this loop has
+			// installed the wake-up. A shared producer never merges its use sites.
+			void recordStreamSettlement(settlements, recorder);
+		} else {
+			if (key !== recorder.key) (recorder.keys ??= new Set()).add(key);
+			if (key.startsWith('|pu#')) recorder.batch = true;
+			recorder.wave = wave;
+		}
+		waiting = true;
 	}
-	if (recorders.length === 0) return;
-	await raceSettleGuards(Promise.race(recorders), timeoutMs, signal);
+	if (!waiting) return;
+	// A single wake-up replaces Promise.race's reaction on every still-pending
+	// recorder each wave. Recording always precedes waking the next full pass.
+	const first = new Promise<void>((resolve) => {
+		settlements.wake = resolve;
+	});
+	try {
+		await raceSettleGuards(first, timeoutMs, signal);
+	} finally {
+		settlements.wake = null;
+	}
 	// The winning recorder has recorded. Yield one macrotask so the rest of
 	// this turn's burst fires, then drain microtasks while settlements keep
 	// recording (a chained/non-native thenable needs an extra tick or two);
@@ -8026,6 +8248,13 @@ interface StreamState {
 	replay: StreamBoundaryReplayEntry[] | null;
 }
 
+function hasPendingStreamBoundary(stream: StreamState): boolean {
+	for (const boundary of stream.boundaries.values()) {
+		if (boundary.state === 'pending') return true;
+	}
+	return false;
+}
+
 interface StreamBoundaryReplayEntry {
 	key: string;
 	boundary: StreamBoundary | undefined;
@@ -8210,12 +8439,12 @@ export function ssrTry(
 	const armScope = outerAsyncScope + '|@arm:' + siteKey + '#' + occurrence.toString(36) + ':';
 	let entry: StreamBoundary | undefined;
 	const serialStart = SERIAL?.length ?? 0;
-	let ancestorKeys: string[] = [];
-	let ownerKeys: string[] = [];
+	let ancestorKeys: string[] = EMPTY_SNAPSHOT_LIST;
+	let ownerKeys: string[] = EMPTY_SNAPSHOT_LIST;
 	if (stream !== null) {
 		stream.activePassBoundaryKeys?.add(key);
-		ancestorKeys = stream.activeTryKeys.slice();
-		ownerKeys = stream.activeOwnerKeys.slice();
+		ancestorKeys = snapshotList(stream.activeTryKeys);
+		ownerKeys = snapshotList(stream.activeOwnerKeys);
 		entry = stream.boundaries.get(key);
 		if (entry !== undefined) {
 			recordStreamBoundaryMutation(stream, key);
@@ -8346,22 +8575,19 @@ export function ssrTry(
 			const deferredStart = DEFERRED?.length ?? 0;
 			const serialStart = SERIAL?.length ?? 0;
 			const css = CSS;
-			const cssSnapshot = css === null ? null : new Map(css);
+			const cssSnapshot = snapshotStyles(css);
 			const head = HEAD;
+			const headCollections = snapshotHeadCollections(head);
 			const headHtml = head?.html;
 			const headCharset = head?.charset;
 			const headViewport = head?.viewport;
-			const headHints = head === null ? null : new Set(head.hints);
-			const headSheets = head === null || head.sheets === null ? null : new Map(head.sheets);
-			const headHintHtml = head === null || head.hintHtml === null ? null : new Map(head.hintHtml);
-			const headXfer =
-				head === null || head.preloadXfer === null ? null : new Map(head.preloadXfer);
+			const headHints = headCollections?.hints ?? null;
+			const headSheets = headCollections?.sheets ?? null;
+			const headHintHtml = headCollections?.hintHtml ?? null;
+			const headXfer = headCollections?.preloadXfer ?? null;
 			const vtTrySeq = VT_SSR_TRY_SEQ;
 			const vtHasCandidates = VT_SSR_HAS_CANDIDATES;
-			const vtStack = VT_SSR_STACK.map((candidate) => ({
-				candidate,
-				consumed: candidate.consumed,
-			}));
+			const vtStack = snapshotVtStack();
 			try {
 				fallback = withStream(null, renderFallback);
 			} catch (error) {
@@ -8378,10 +8604,12 @@ export function ssrTry(
 				if (DEFERRED !== null) DEFERRED.length = deferredStart;
 				if (SERIAL !== null) SERIAL.length = serialStart;
 				if (css !== null && cssSnapshot !== null) {
+					css.replay = null;
 					css.clear();
 					for (const [hash, sheet] of cssSnapshot) css.set(hash, sheet);
 				}
 				if (head !== null && headHints !== null) {
+					head.replay = null;
 					head.html = headHtml!;
 					head.charset = headCharset!;
 					head.viewport = headViewport!;
@@ -9167,16 +9395,22 @@ async function runStream(
 		const done: StreamBoundary[] = [];
 		const reachable = new Set(flushedSegments);
 		for (;;) {
-			const next = [...stream.boundaries.values()]
-				.filter((boundary) => {
-					if (boundary.state !== 'done' || reachable.has(boundary.id)) return false;
-					for (let i = boundary.ancestors.length - 1; i >= 0; i--) {
-						const ancestor = stream.boundaries.get(boundary.ancestors[i]);
-						if (ancestor !== undefined) return reachable.has(ancestor.id);
+			const next: StreamBoundary[] = [];
+			// Selection only reads renderer-owned records; no render or transport
+			// callback can change the registry during this scan.
+			for (const boundary of stream.boundaries.values()) {
+				if (boundary.state !== 'done' || reachable.has(boundary.id)) continue;
+				let visible = true;
+				for (let i = boundary.ancestors.length - 1; i >= 0; i--) {
+					const ancestor = stream.boundaries.get(boundary.ancestors[i]);
+					if (ancestor !== undefined) {
+						visible = reachable.has(ancestor.id);
+						break;
 					}
-					return true;
-				})
-				.sort((a, b) => a.order - b.order);
+				}
+				if (visible) next.push(boundary);
+			}
+			next.sort((a, b) => a.order - b.order);
 			if (next.length === 0) return done;
 			for (const boundary of next) {
 				done.push(boundary);
@@ -9191,17 +9425,22 @@ async function runStream(
 			options?.onError?.(boundary.error);
 		}
 	};
-	const reachableErroredBoundaries = (): StreamBoundary[] =>
-		[...stream.boundaries.values()]
-			.filter((boundary) => {
-				if (boundary.state !== 'errored' || boundary.errorFlushed) return false;
-				for (let i = boundary.ancestors.length - 1; i >= 0; i--) {
-					const ancestor = stream.boundaries.get(boundary.ancestors[i]);
-					if (ancestor !== undefined) return flushedSegments.has(ancestor.id);
+	const reachableErroredBoundaries = (): StreamBoundary[] => {
+		const errors: StreamBoundary[] = [];
+		for (const boundary of stream.boundaries.values()) {
+			if (boundary.state !== 'errored' || boundary.errorFlushed) continue;
+			let visible = true;
+			for (let i = boundary.ancestors.length - 1; i >= 0; i--) {
+				const ancestor = stream.boundaries.get(boundary.ancestors[i]);
+				if (ancestor !== undefined) {
+					visible = flushedSegments.has(ancestor.id);
+					break;
 				}
-				return true;
-			})
-			.sort((a, b) => a.order - b.order);
+			}
+			if (visible) errors.push(boundary);
+		}
+		return errors.sort((a, b) => a.order - b.order);
+	};
 	const flushRecoverableBoundaryErrors = (): void | Promise<void> => {
 		const errors = reachableErroredBoundaries();
 		if (errors.length === 0) return;
@@ -9419,7 +9658,7 @@ async function runStream(
 		}
 		const initialErrorWrite = flushRecoverableBoundaryErrors();
 		if (initialErrorWrite !== undefined) await initialErrorWrite;
-		while ([...stream.boundaries.values()].some((b) => b.state === 'pending')) {
+		while (hasPendingStreamBoundary(stream)) {
 			signal?.throwIfAborted();
 			if (suspended.length === 0) {
 				throw new Error(formatServerError(36));
@@ -9500,9 +9739,10 @@ async function runStream(
 		// boundary whose segment was not accepted. A live consumer receives these
 		// through the same pressure gate; a disconnected consumer rejects and the
 		// renderer simply stops.
-		const pendingBoundaryCount = [...stream.boundaries.values()].filter(
-			(boundary) => boundary.state === 'pending' && !flushedSegments.has(boundary.id),
-		).length;
+		let pendingBoundaryCount = 0;
+		for (const boundary of stream.boundaries.values()) {
+			if (boundary.state === 'pending' && !flushedSegments.has(boundary.id)) pendingBoundaryCount++;
+		}
 		const reports = signal?.aborted ? Math.max(1, pendingBoundaryCount) : 1;
 		for (let i = 0; i < reports; i++) options?.onError?.(err);
 		// Rendering ends here, degraded — the source still gets its completion
@@ -10135,6 +10375,7 @@ export function renderToReadableStream(
 function emitHeadHint(key: string, html: string): void {
 	if (HEAD === null) return;
 	if (HEAD.hints.has(key)) return;
+	HEAD.replay = null;
 	HEAD.hints.add(key);
 	(HEAD.hintHtml ??= new Map()).set(key, html);
 }
@@ -10229,7 +10470,10 @@ export function preload(href: string, options: { as: string } & Record<string, u
 				const v = (options as any)[k];
 				if (v != null) (subset ??= {})[k] = v;
 			}
-			if (subset !== null) (HEAD.preloadXfer ??= new Map()).set(as + ':' + value, subset);
+			if (subset !== null) {
+				HEAD.replay = null;
+				(HEAD.preloadXfer ??= new Map()).set(as + ':' + value, subset);
+			}
 		}
 	}
 	const imageSrcSet = as === 'image' ? options.imageSrcSet : undefined;
@@ -10269,6 +10513,9 @@ export function preinit(href: string, options: { as: string } & Record<string, u
 	if (as !== 'style' && as !== 'script') return;
 	let seeded: Record<string, unknown> | null = null;
 	if (HEAD !== null) {
+		// Preinit may remove an existing hint/transfer even when the resource
+		// itself was already emitted, so invalidate before those deletions.
+		HEAD.replay = null;
 		const xfer = HEAD.preloadXfer?.get(as + ':' + value);
 		if (xfer !== undefined) {
 			seeded = xfer;
@@ -10386,6 +10633,7 @@ export function ssrStylesheetResource(
 	if (typeof href !== 'string' || href === '') return '';
 	const key = 'sheet:' + href;
 	if (HEAD.hints.has(key)) return '';
+	HEAD.replay = null;
 	HEAD.hints.add(key);
 	const precedence = attrs.precedence == null ? '' : String(attrs.precedence);
 	const tag =
@@ -10396,6 +10644,9 @@ export function ssrStylesheetResource(
 		'"' +
 		resourceAttrs(attrs, 'link') +
 		'>';
+	// Attribute coercion may render a child and capture another checkpoint.
+	// Invalidate again at the final write after all caller-controlled reads.
+	HEAD.replay = null;
 	const sheets = (HEAD.sheets ??= new Map());
 	sheets.set(href, { precedence, html: tag });
 	return '';
@@ -10446,6 +10697,7 @@ export function ssrStyleResource(
 		}
 		HEAD.hints.add('dev-inline-style:' + href);
 	}
+	HEAD.replay = null;
 	HEAD.hints.add(key);
 	const precedence = attrs.precedence == null ? '' : String(attrs.precedence);
 	const tag =
@@ -10458,6 +10710,9 @@ export function ssrStyleResource(
 		'>' +
 		css +
 		'</style>';
+	// Attribute coercion may render a child and capture another checkpoint.
+	// Invalidate again at the final write after all caller-controlled reads.
+	HEAD.replay = null;
 	const sheets = (HEAD.sheets ??= new Map());
 	sheets.set(href, { precedence, html: tag });
 	return '';
@@ -10471,6 +10726,7 @@ export function ssrScriptResource(attrs: Record<string, unknown> | null): string
 	const key = 'script:' + src;
 	// One executable per src per pass, across the classic and module forms.
 	if (HEAD.hints.has(key) || HEAD.hints.has('module:' + src)) return '';
+	HEAD.replay = null;
 	HEAD.hints.add(key);
 	HEAD.html +=
 		'<script src="' +

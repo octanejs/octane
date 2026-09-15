@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { parseModule } from 'oxc-tsrx/tsrx-core-compat';
+import { parseModule } from '@tsrx/oxc/tsrx-core-compat';
 import { describe, expect, it } from 'vitest';
 import { compile } from 'octane/compiler';
 

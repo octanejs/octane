@@ -259,8 +259,8 @@ catalogs:
     '@sanity/client': 7.26.2
     '@sanity/core-loader': 2.2.1
     '@sanity/react-loader': 2.2.1
-    '@ripple-ts/adapter': ^0.3.125
-    '@ripple-ts/vite-plugin': ^0.3.125
+    '@ripple-ts/adapter': ^0.4.0
+    '@ripple-ts/vite-plugin': ^0.4.0
     '@solidjs/web': '2.0.0-beta.20'
     '@stylexjs/babel-plugin': '0.19.0'
     '@stylexjs/stylex': '0.19.0'
@@ -293,14 +293,14 @@ catalogs:
     '@vitest/coverage-v8': 4.1.10
     '@volar/language-core': 2.4.28
     '@volar/typescript': 2.4.28
-    '@tsrx/core': ^0.1.71
-    '@tsrx/prettier-plugin': ^0.3.138
-    '@tsrx/typescript-plugin': ^0.3.138
-    '@tsrx/ripple': ^0.1.65
-    '@tsrx/react': ^0.2.71
-    '@tsrx/solid': ^0.1.71
-    '@tsrx/vite-plugin-react': ^0.0.104
-    '@tsrx/vite-plugin-solid': ^0.0.101
+    '@tsrx/core': ^0.2.0
+    '@tsrx/prettier-plugin': ^0.4.1
+    '@tsrx/typescript-plugin': ^0.4.1
+    '@tsrx/ripple': ^0.2.0
+    '@tsrx/react': ^0.3.0
+    '@tsrx/solid': ^0.2.0
+    '@tsrx/vite-plugin-react': ^0.0.105
+    '@tsrx/vite-plugin-solid': ^0.0.102
     '@types/babel__core': 7.20.5
     '@types/d3-array': 3.0.3
     '@types/d3-chord': ^1.0.14
@@ -349,7 +349,7 @@ catalogs:
     es-module-lexer: ^1.7.0
     esbuild: ^0.28.1
     esrap: ^2.3.2
-    oxc-tsrx: 0.5.0
+    '@tsrx/oxc': 0.13.0
     sucrase: ^3.35.1
     graphql: ^16.14.2
     gsap: 3.15.0
@@ -362,7 +362,7 @@ catalogs:
     html-parse-stringify: ^3.0.1
     i18next: 26.3.6
     jsdom: ^30.0.1
-    jotai: ^2.20.2
+    jotai: ^3.0.0
     mobx: 6.16.1
     monaco-editor: 0.55.1
     lexical: 0.46.0
@@ -462,7 +462,7 @@ catalogs:
     '@react-email/render': 2.0.6
     react-error-boundary: 6.1.2
     react-resizable-panels: 4.12.2
-    ripple: ^0.3.125
+    ripple: ^0.4.0
     rxjs: ^7.8.2
     rulesync: ^8.32.0
     solid-js: '2.0.0-beta.20'
@@ -594,29 +594,29 @@ minimumReleaseAgeExclude:
   - '@blocknote/core@0.53.0'
   - '@blocknote/react@0.53.0'
   - '@tanstack/db@0.7.0'
-  - '@oxc-tsrx/native-darwin-arm64@0.5.0'
-  - '@oxc-tsrx/native-darwin-x64@0.5.0'
-  - '@oxc-tsrx/native-linux-arm64-gnu@0.5.0'
-  - '@oxc-tsrx/native-linux-arm64-musl@0.5.0'
-  - '@oxc-tsrx/native-linux-x64-gnu@0.5.0'
-  - '@oxc-tsrx/native-linux-x64-musl@0.5.0'
-  - '@oxc-tsrx/native-win32-arm64-msvc@0.5.0'
-  - '@oxc-tsrx/native-win32-x64-msvc@0.5.0'
-  - oxc-tsrx@0.5.0
-  - '@ripple-ts/adapter@0.3.125'
-  - '@ripple-ts/vite-plugin@0.3.125'
-  - '@tsrx/core@0.1.71'
-  - '@tsrx/prettier-plugin@0.3.138'
-  - '@tsrx/react@0.2.71'
-  - '@tsrx/ripple@0.1.65'
-  - '@tsrx/solid@0.1.71'
-  - '@tsrx/typescript-plugin@0.3.138'
-  - '@tsrx/vite-plugin-react@0.0.104'
-  - '@tsrx/vite-plugin-solid@0.0.101'
-  - ripple@0.3.125
-  - '@tsrx/runtime@0.1.7'
-  - '@tsrx/react-runtime@0.1.7'
-  - '@tsrx/solid-runtime@0.1.7'
+  - '@tsrx/oxc-darwin-arm64@0.13.0'
+  - '@tsrx/oxc-darwin-x64@0.13.0'
+  - '@tsrx/oxc-linux-arm64-gnu@0.13.0'
+  - '@tsrx/oxc-linux-arm64-musl@0.13.0'
+  - '@tsrx/oxc-linux-x64-gnu@0.13.0'
+  - '@tsrx/oxc-linux-x64-musl@0.13.0'
+  - '@tsrx/oxc-win32-arm64-msvc@0.13.0'
+  - '@tsrx/oxc-win32-x64-msvc@0.13.0'
+  - '@tsrx/oxc@0.13.0'
+  - '@ripple-ts/adapter@0.4.0'
+  - '@ripple-ts/vite-plugin@0.4.0'
+  - '@tsrx/core@0.2.0'
+  - '@tsrx/prettier-plugin@0.4.1'
+  - '@tsrx/react@0.3.0'
+  - '@tsrx/ripple@0.2.0'
+  - '@tsrx/solid@0.2.0'
+  - '@tsrx/typescript-plugin@0.4.1'
+  - '@tsrx/vite-plugin-react@0.0.105'
+  - '@tsrx/vite-plugin-solid@0.0.102'
+  - ripple@0.4.0
+  - '@tsrx/runtime@0.2.0'
+  - '@tsrx/react-runtime@0.1.8'
+  - '@tsrx/solid-runtime@0.1.8'
   - cn@0.2.6
 
 # Changesets 2.31.1 assumes npm's error shape and crashes on pnpm 11 duplicate

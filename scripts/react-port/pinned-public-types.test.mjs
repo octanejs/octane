@@ -5,7 +5,13 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import ts from 'typescript';
-import { newOpaquePublicSymbol, pinnedPublicEntries } from './pinned-public-types.mjs';
+import {
+	newOpaquePublicSymbol,
+	pinnedPublicEntries,
+	pinnedPublicExport,
+} from './pinned-public-types.mjs';
+import { publicCompatibilityExport } from './public-compatibility.mjs';
+import { assertApprovedGateCommand } from './evidence.mjs';
 import { buildUpstreamLock, gitBlobSha1 } from './materialize-lib.mjs';
 import { buildTarGz, fixtureIdentity } from './__fixtures__/materialize-fixtures.mjs';
 
@@ -145,6 +151,13 @@ for (const source of [
 	test(`preserves the pinned contract: ${source}`, () => assert.equal(check(source, source), null));
 }
 
+test('compares each public overload constraint with its corresponding signature', () => {
+	const signatures = `export declare function value<T>(input: T): T;
+export declare function value<T extends { read(): unknown }>(input: T): T;`;
+	assert.equal(check(signatures, signatures), null);
+	assert.ok(check(signatures.replace('read(): unknown', 'read(): any'), signatures));
+});
+
 test('ignores private implementation fields while checking public members', () =>
 	assert.equal(
 		check(
@@ -162,25 +175,35 @@ test('matches an inlined generic public contract', () =>
 		null,
 	));
 
-function pinnedFixture(run) {
+function pinnedFixture(run, versioned = false, opaqueMember = false, options = {}) {
+	const {
+		packageName = 'mit-widget',
+		binding = '@octanejs/widget',
+		extraDeclarations = [],
+	} = options;
 	const directory = realpathSync(mkdtempSync(path.join(tmpdir(), 'pinned-public-artifact-')));
 	try {
 		const published = JSON.stringify({
-			name: 'mit-widget',
+			name: packageName,
 			version: '1.0.0',
 			exports: {
-				'.': { import: { types: './index.d.mts', default: './index.mjs' } },
+				'.': versioned
+					? { 'types@>=5.5': './index.d.mts', types: './unsupported.d.mts', default: './index.mjs' }
+					: { import: { types: './index.d.mts', default: './index.mjs' } },
 				'./package.json': './package.json',
 			},
 		});
-		const declaration = 'export declare class Widget { value: string; }';
-		const source =
-			'export declare class Widget {\n /** @internal */\n hidden(): unknown;\n value: string;\n }';
+		const member = opaqueMember ? 'metadata: unknown; ' : '';
+		const declaration = `export declare class Widget { ${member}value: string; }`;
+		const source = `export declare class Widget {\n /** @internal */\n hidden(): unknown;\n ${member}value: string;\n }`;
 		const artifact = buildTarGz([
 			['package/package.json', published],
 			['package/index.d.mts', declaration],
+			['package/unsupported.d.mts', 'export {};'],
+			...extraDeclarations.map(([file, source]) => [`package/${file}`, source]),
 		]);
 		const identity = fixtureIdentity({
+			packageName,
 			integrity: `sha512-${createHash('sha512').update(artifact).digest('base64')}`,
 		});
 		const files = { 'package.json': published, 'src/index.ts': source };
@@ -199,13 +222,16 @@ function pinnedFixture(run) {
 			mkdirSync(path.dirname(path.join(directory, file)), { recursive: true });
 			writeFileSync(path.join(directory, file), contents);
 		};
-		put('package.json', '{"name":"@octanejs/widget"}');
+		put('package.json', JSON.stringify({ name: binding }));
 		put('audit/upstream.lock.json', JSON.stringify(lock));
 		for (const [file, content] of Object.entries(files)) put(`upstream/${file}`, content);
 		put('upstream-artifact/widget.tgz', artifact);
-		put('node_modules/mit-widget/package.json', published);
-		put('node_modules/mit-widget/index.d.mts', declaration);
-		const node = { identity, binding: '@octanejs/widget' };
+		put(`node_modules/${packageName}/package.json`, published);
+		put(`node_modules/${packageName}/index.d.mts`, declaration);
+		put(`node_modules/${packageName}/unsupported.d.mts`, 'export {};');
+		for (const [file, source] of extraDeclarations)
+			put(`node_modules/${packageName}/${file}`, source);
+		const node = { identity, binding };
 		run({ directory, node, put, artifact, declaration });
 	} finally {
 		rmSync(directory, { recursive: true, force: true });
@@ -222,6 +248,14 @@ test('uses published declarations only after source, tarball, and installed byte
 		);
 		assert.deepEqual([...entries.internalMembers], [`${directory}/src/index.ts#Widget.hidden`]);
 	}));
+
+test('selects the published type condition supported by the checking compiler', () =>
+	pinnedFixture(({ directory, node }) => {
+		assert.equal(
+			pinnedPublicEntries(directory, node).get('@octanejs/widget'),
+			path.join(directory, 'node_modules/mit-widget/index.d.mts'),
+		);
+	}, true));
 
 for (const [label, mutate, message] of [
 	[
@@ -283,5 +317,135 @@ test('preserves the ref target through native nested ref arrays', () => {
 			`import type { Ref } from 'react'; export declare const value: Ref<HTMLDivElement>;`,
 		),
 		null,
+	);
+});
+
+test('counts exact structural type equality without allowing opaque or permissive assertions', () =>
+	pinnedFixture(
+		({ directory, node, put, declaration }) => {
+			put(
+				'package.json',
+				JSON.stringify({ name: '@octanejs/widget', exports: { '.': './src/index.ts' } }),
+			);
+			put('src/index.ts', declaration);
+			put(
+				'tests/types/tsconfig.json',
+				JSON.stringify({
+					compilerOptions: {
+						strict: true,
+						skipLibCheck: false,
+						noEmit: true,
+						module: 'ESNext',
+						moduleResolution: 'Bundler',
+						types: [],
+						paths: { '@octanejs/widget': ['../../src/index.ts'] },
+					},
+					files: ['public.ts'],
+					reactPortEvidence: { gate: 'public-types', publicMode: 'pinned' },
+				}),
+			);
+			const checkAssertion = (assertion) => {
+				put(
+					'tests/types/public.ts',
+					`import { expectTypeOf } from 'vitest';
+import { Widget } from '@octanejs/widget';
+${assertion}
+// @ts-expect-error value must be a string
+new Widget().value = 1;
+`,
+				);
+				return () =>
+					assertApprovedGateCommand(
+						['public-types'],
+						[
+							'pnpm',
+							'exec',
+							'tsrx-tsc',
+							'--noEmit',
+							'-p',
+							`${path.basename(directory)}/tests/types/tsconfig.json`,
+						],
+						{ ...node, bindingDirectory: path.basename(directory) },
+						{ workspaceRoot: path.dirname(directory) },
+					);
+			};
+			assert.doesNotThrow(
+				checkAssertion(
+					'expectTypeOf<Widget>().toEqualTypeOf<{ value: string; metadata: unknown }>();',
+				),
+			);
+			assert.throws(
+				checkAssertion('expectTypeOf<Widget>().toEqualTypeOf<unknown>();'),
+				/positive.*assertion/i,
+			);
+			assert.throws(
+				checkAssertion('expectTypeOf<Widget>().toMatchTypeOf<{ metadata: unknown }>();'),
+				/positive.*assertion/i,
+			);
+		},
+		false,
+		true,
+	));
+
+const hydrationDeclaration = 'dist/react/utils/useHydrateAtoms.d.ts';
+const jotaiCompatibilityFixture = {
+	packageName: 'jotai',
+	binding: '@octanejs/jotai',
+	extraDeclarations: [
+		[hydrationDeclaration, 'export type INTERNAL_InferAtomTuples<T> = readonly [T];'],
+	],
+};
+test('retained Jotai utility alias requires its authenticated published declaration', () => {
+	pinnedFixture(
+		({ directory, node, put }) => {
+			const entries = pinnedPublicEntries(directory, node);
+			const program = ts.createProgram([...entries.values()], {
+				strict: true,
+				noEmit: true,
+				types: [],
+			});
+			const checker = program.getTypeChecker();
+			for (const specifier of ['@octanejs/jotai/utils', '@octanejs/jotai/react/utils']) {
+				const symbol = pinnedPublicExport(
+					entries,
+					program,
+					checker,
+					specifier,
+					'INTERNAL_InferAtomTuples',
+				);
+				assert.equal(symbol?.name, 'INTERNAL_InferAtomTuples');
+				assert.equal(
+					symbol?.declarations[0].getSourceFile().fileName,
+					path.join(directory, 'node_modules/jotai', hydrationDeclaration),
+				);
+			}
+			assert.equal(
+				publicCompatibilityExport('@octanejs/jotai', 'INTERNAL_InferAtomTuples'),
+				undefined,
+			);
+			assert.equal(
+				publicCompatibilityExport('@octanejs/widget/utils', 'INTERNAL_InferAtomTuples'),
+				undefined,
+			);
+			assert.equal(publicCompatibilityExport('@octanejs/jotai/utils', 'invented'), undefined);
+			put(
+				`node_modules/jotai/${hydrationDeclaration}`,
+				'export type INTERNAL_InferAtomTuples<T> = any;',
+			);
+			assert.throws(() => pinnedPublicEntries(directory, node), /differs from pinned npm bytes/);
+		},
+		false,
+		false,
+		jotaiCompatibilityFixture,
+	);
+});
+test('rejects a compatibility declaration absent from the authenticated tarball', () => {
+	pinnedFixture(
+		({ directory, node }) => {
+			assert.throws(() => pinnedPublicEntries(directory, node), /Compatibility witness is absent/);
+		},
+		false,
+		false,
+		{ ...jotaiCompatibilityFixture, extraDeclarations: [] },
 	);
 });

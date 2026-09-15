@@ -1,6 +1,6 @@
 {
   "name": "octane",
-  "version": "0.2.10",
+  "version": "0.2.11",
   "license": "MIT",
   "type": "module",
   "sideEffects": [
@@ -70,7 +70,9 @@
       "types": "./src/compiler/vite.d.ts",
       "default": "./src/compiler/vite.js"
     },
-    "./compiler/volar": "./src/compiler/volar.js"
+    "./compiler/volar": "./src/compiler/volar.js",
+    "./strong/jsx-runtime": "./src/jsx-runtime-strong.d.ts",
+    "./strong/jsx-dev-runtime": "./src/jsx-runtime-strong.d.ts"
   },
   "publishConfig": {
     "access": "public",
@@ -195,7 +197,13 @@
         "types": "./dist/compiler/vite.d.ts",
         "default": "./dist/compiler/vite.js"
       },
-      "./compiler/volar": "./dist/compiler/volar.js"
+      "./compiler/volar": "./dist/compiler/volar.js",
+      "./strong/jsx-runtime": {
+        "types": "./dist/jsx-runtime-strong.d.ts"
+      },
+      "./strong/jsx-dev-runtime": {
+        "types": "./dist/jsx-runtime-strong.d.ts"
+      }
     }
   },
   "scripts": {
@@ -214,7 +222,7 @@
     "entities": "7.0.1",
     "es-module-lexer": "catalog:default",
     "esrap": "catalog:default",
-    "oxc-tsrx": "catalog:default"
+    "@tsrx/oxc": "catalog:default"
   },
   "peerDependencies": {
     "react": "^19.0.0",

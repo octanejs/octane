@@ -26,6 +26,7 @@ import { parseModule } from './parser.browser.js';
 
 import {
 	analyzeTsrx,
+	clone_ast_node as cloneAstNode,
 	createJsxTransform,
 	createVolarMappingsResult,
 	dedupeMappings,
@@ -137,20 +138,20 @@ function selectOctaneTransform(ast) {
  * LEADING comments (the position TS reads pragmas from)? Decided on the parse
  * artifacts — the collected comment nodes and the first statement's offset —
  * not by re-scanning text. `@tsrx/core` ≥0.1.43 re-emits preserved leading
- * comments into the virtual TSX, so when this is true the authored pragma is
- * already in the generated code and no renderer-config prelude may be added:
- * TS honors the FIRST pragma, so a prelude would shadow the authored one.
+ * comments into the virtual TSX, so the authored pragma is already
+ * in the generated code. Keep one effective pragma rather than introducing
+ * competing renderer and authored settings.
  */
-function hasAuthoredLeadingPragma(ast, comments) {
+function authoredLeadingPragma(ast, comments) {
 	const firstStatementStart = ast.body?.[0]?.start;
-	return comments.some(
+	return comments.find(
 		(comment) =>
 			(firstStatementStart == null || comment.end <= firstStatementStart) &&
 			jsxImportSourcePragmaModule(comment.value) !== null,
 	);
 }
 
-function createRendererTypePragma(renderer, ast) {
+function createRendererTypePragma(renderer, ast, strong = false) {
 	// A `.tsrx` file's JSX is octane's dialect BY DEFINITION, so the built-in
 	// DOM renderer pins the virtual TSX to octane's jsx-runtime types even when
 	// the registry entry declares no `intrinsics`. Without the pragma the host
@@ -171,7 +172,7 @@ function createRendererTypePragma(renderer, ast) {
 		type: 'Block',
 		// @tsrx/core's semantic-comment formatter turns this into the canonical
 		// `/** @jsxImportSource … */` spelling during the one type-only print.
-		value: `*@jsxImportSource ${intrinsics}`,
+		value: `*@jsxImportSource ${strong && intrinsics === DOM_RENDERER_MODULE ? 'octane/strong' : intrinsics}`,
 		start: ast.start ?? 0,
 		end: ast.start ?? 0,
 		loc: { start: { ...start }, end: { ...start } },
@@ -253,17 +254,26 @@ export function compileToVolarMappings(source, filename, options) {
 	});
 	const rendererConfig = normalizeRendererConfig(options?.renderers);
 	const renderer = resolveRendererForFile(rendererConfig, filename ?? 'untitled.tsrx');
-	const diagnostics = analyzeNativeChangeDiagnostics(ast, source, filename, {
-		dom: renderer.target === 'dom',
-		renderer,
-		rendererBoundaries: rendererConfig.boundaries,
-		rendererRegistry: rendererConfig.registry,
-	}).diagnostics;
-	const strongDiagnostics =
+	const strongAnalysis =
 		options?.strong === true || source.includes('use strong')
-			? analyzeStrongMode(ast, source, filename, options).diagnostics
+			? analyzeStrongMode(ast, source, filename, {
+					...options,
+					renderer,
+					rendererBoundaries: rendererConfig.boundaries,
+					rendererRegistry: rendererConfig.registry,
+				})
 			: null;
-	if (strongDiagnostics !== null) diagnostics.push(...strongDiagnostics);
+	const strongDiagnostics = strongAnalysis?.diagnostics ?? null;
+	const diagnostics = strongAnalysis?.enabled
+		? [...strongDiagnostics]
+		: analyzeNativeChangeDiagnostics(ast, source, filename, {
+				dom: renderer.target === 'dom',
+				renderer,
+				rendererBoundaries: rendererConfig.boundaries,
+				rendererRegistry: rendererConfig.registry,
+			}).diagnostics;
+	if (!strongAnalysis?.enabled && strongDiagnostics !== null)
+		diagnostics.push(...strongDiagnostics);
 	const nativeReadDiagnostics = analyzeNativeReadDiagnostics(
 		ast,
 		source,
@@ -279,10 +289,43 @@ export function compileToVolarMappings(source, filename, options) {
 	// The renderer pragma belongs to the semantic comment set consumed by
 	// @tsrx/core's type-only Program print. This keeps code and mappings in one
 	// coordinate system instead of prepending text and shifting every mapping.
-	const rendererPragma = hasAuthoredLeadingPragma(ast, comments)
-		? null
-		: createRendererTypePragma(renderer, ast);
-	const printComments = rendererPragma === null ? comments : [rendererPragma, ...comments];
+	const authoredPragma = authoredLeadingPragma(ast, comments);
+	const strongDOM = strongAnalysis?.enabled === true && renderer.target === 'dom';
+	const rendererPragma = authoredPragma ? null : createRendererTypePragma(renderer, ast, strongDOM);
+	const replacePragma =
+		authoredPragma &&
+		strongDOM &&
+		jsxImportSourcePragmaModule(authoredPragma.value) === DOM_RENDERER_MODULE;
+	// Keep the authored comment form: a line pragma prints as `// …`, so the
+	// block-comment body would leave TypeScript with no readable pragma.
+	const strongPragma = replacePragma
+		? {
+				...authoredPragma,
+				value:
+					authoredPragma.type === 'Line'
+						? ' @jsxImportSource octane/strong'
+						: '*@jsxImportSource octane/strong',
+			}
+		: null;
+	const printComments = strongPragma
+		? comments.map((comment) => (comment === authoredPragma ? strongPragma : comment))
+		: rendererPragma === null
+			? comments
+			: [rendererPragma, ...comments];
+	// Semantic comments are also attached to the first statement. Replace the
+	// attached copy on a cloned statement so the printer cannot retain a second,
+	// compatibility pragma. The parsed source tree and source positions stay intact.
+	let transformAst = ast;
+	if (strongPragma && ast.body.length > 0) {
+		const first = cloneAstNode(ast.body[0]);
+		first.leadingComments = first.leadingComments?.map((comment) =>
+			comment.start === authoredPragma.start && comment.end === authoredPragma.end
+				? strongPragma
+				: comment,
+		);
+		transformAst = { ...ast, body: [first, ...ast.body.slice(1)] };
+	}
+
 	// The `module server { … }` dialect is lowered to plain checkable TS by
 	// the shared transform itself (via the platform's `serverModule` option)
 	// before the typeOnly print. The lowering is copy-on-write inside
@@ -290,7 +333,7 @@ export function compileToVolarMappings(source, filename, options) {
 	// original parse, and replacement nodes keep authored locations so
 	// mappings/hover still work.
 	const transform = selectOctaneTransform(ast);
-	const transformed = transform(ast, source, filename, {
+	const transformed = transform(transformAst, source, filename, {
 		collect: true,
 		loose: !!options?.loose,
 		// @tsrx/core routes `typeOnly: true` to its TSX esrap language with
@@ -302,6 +345,7 @@ export function compileToVolarMappings(source, filename, options) {
 	});
 	if (strongDiagnostics !== null || nativeReadDiagnostics.length > 0) {
 		for (const diagnostic of [...(strongDiagnostics ?? []), ...nativeReadDiagnostics]) {
+			if (diagnostic.severity !== 'error') continue;
 			collectCompileError(
 				diagnostic.message,
 				diagnostic.filename ?? null,
@@ -525,7 +569,7 @@ export function compileTypesInspection(source, filename, options) {
 	analyzeTsrx(ast, filename, { collect: true, loose: true, to_ts: true, errors, comments });
 	const rendererConfig = normalizeRendererConfig(options?.renderers);
 	const renderer = resolveRendererForFile(rendererConfig, filename ?? 'untitled.tsrx');
-	const rendererPragma = hasAuthoredLeadingPragma(ast, comments)
+	const rendererPragma = authoredLeadingPragma(ast, comments)
 		? null
 		: createRendererTypePragma(renderer, ast);
 	const transform = selectOctaneTransform(ast);

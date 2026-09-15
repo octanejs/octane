@@ -18,6 +18,7 @@ const EFFECT_EVENT_DEPENDENCY = 'OCTANE_STRONG_EFFECT_EVENT_DEPENDENCY';
 const DIRECTIVE_PLACEMENT = 'OCTANE_STRONG_DIRECTIVE_PLACEMENT';
 const HOOK_LOCALITY = 'OCTANE_STRONG_HOOK_LOCALITY';
 const EVENT_HANDLER_LOCALITY = 'OCTANE_STRONG_EVENT_HANDLER_LOCALITY';
+const MANUAL_MEMO = 'OCTANE_STRONG_MANUAL_MEMO';
 
 describe('Strong mode immutable render inputs', () => {
 	const component = (
@@ -197,7 +198,7 @@ export function App(props) @{
 import { useState, useEffect } from 'octane';
 export function App() @{
   const [state, setState] = useState({ count: 0 });
-  useEffect(() => { const local = { count: state.count }; local.count++; }, [state]);
+  useEffect(() => { const local = { count: state.count }; local.count++; });
   <button onClick={() => setState({ count: state.count + 1 })}>{state.count as string}</button>
 }`;
 		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
@@ -324,7 +325,7 @@ export function Fixed() @{ const date = new Date(0); <div>{date.getTime() as str
 		const source = `"use strong";
 import { useEffect } from 'octane';
 export function App() @{
-  useEffect(() => { Date.now(); Math.random(); performance.now(); }, []);
+  useEffect(() => { Date.now(); Math.random(); performance.now(); });
   setTimeout(() => new Date(), 0);
   <button onClick={() => Date.now()}>Read clock</button>
 }`;
@@ -398,7 +399,7 @@ export function App(props) @{
 import { useEffect, useState } from 'octane';
 export function App(props) @{
   const [count, setCount] = useState(0);
-  useEffect(() => props.observe(count), [count]);
+  useEffect(() => props.observe(count));
   <div>
     @if (props.show) {
       <button onClick={() => setCount(count + 1)}>{count as string}</button>
@@ -417,7 +418,7 @@ import { useEffect, useState } from 'octane';
 export function App(props) @{
   const [count] = useState(0);
   <div>@if (props.show) {
-    useEffect(() => props.observe(count), [count]);
+    useEffect(() => props.observe(count));
     <span>shown</span>
   }</div>
 }`;
@@ -431,7 +432,7 @@ import { useEffect, useState } from 'octane';
 export function App(props) @{
   const [count, setCount] = useState(0);
   const [shared] = useState(0);
-  useEffect(() => props.observe(count, shared), [count, shared]);
+  useEffect(() => props.observe(count, shared));
   <div>
     <output>{shared as string}</output>
     @if (props.show) { <button onClick={() => setCount(count + 1)}>{count as string}</button> }
@@ -446,8 +447,8 @@ import { useEffect, useState } from 'octane';
 export function App(props) @{
   const [count, setCount] = useState(0);
   const [shared] = useState(0);
-  useEffect(() => props.observe(count), [count]);
-  useEffect(() => props.observe(count, shared), [count, shared]);
+  useEffect(() => props.observe(count));
+  useEffect(() => props.observe(count, shared));
   <div>
     <output>{shared as string}</output>
     @if (props.show) { <button onClick={() => setCount(count + 1)}>{count as string}</button> }
@@ -463,8 +464,8 @@ export function App(props) @{
   const [count, setCount] = useState(0);
   const [observed] = useState(0);
   const [shared] = useState(0);
-  useEffect(() => props.observe(count, observed), [count, observed]);
-  useEffect(() => props.observe(observed, shared), [observed, shared]);
+  useEffect(() => props.observe(count, observed));
+  useEffect(() => props.observe(observed, shared));
   <div>
     <output>{shared as string}</output>
     @if (props.show) { <button onClick={() => setCount(count + 1)}>{count as string}</button> }
@@ -479,7 +480,7 @@ import { useEffect, useState } from 'octane';
 export function App(props) @{
   const [count, setCount] = useState(0);
   const [observed] = useState(0);
-  useEffect(() => props.observe(count, observed), [count, observed]);
+  useEffect(() => props.observe(count, observed));
   <div>@if (props.show) { <button onClick={() => setCount(count + 1)}>{count as string}</button> }</div>
 }`;
 		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
@@ -493,8 +494,8 @@ export function App(props) @{
   const [left] = useState(0);
   const [right] = useState(0);
   const [shared] = useState(0);
-  useEffect(() => props.observe(left, shared), [left, shared]);
-  useEffect(() => props.observe(right, shared), [right, shared]);
+  useEffect(() => props.observe(left, shared));
+  useEffect(() => props.observe(right, shared));
   <div>
     @if (props.left) { <output>{left as string}</output> }
     @if (props.right) { <output>{right as string}</output> }
@@ -510,11 +511,13 @@ export function App(props) @{
   const [outer] = useState(0);
   const [inner] = useState(0);
   const [shared] = useState(0);
-  useEffect(() => props.observe(outer, shared), [outer, shared]);
-  useEffect(() => props.observe(inner, shared), [inner, shared]);
+  useEffect(() => props.observe(outer, shared));
+  useEffect(() => props.observe(inner, shared));
   <div>@if (props.show) {
-    <output>{outer as string}</output>
-    @if (props.nested) { <output>{inner as string}</output> }
+    <>
+      <output>{outer as string}</output>
+      @if (props.nested) { <output>{inner as string}</output> }
+    </>
   }</div>
 }`;
 		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
@@ -527,7 +530,7 @@ export function App(props) @{
   <div>
     @if (props.show) {
       const [count, setCount] = useState(0);
-      useEffect(() => props.observe(count), [count]);
+      useEffect(() => props.observe(count));
       <button onClick={() => setCount(count + 1)}>{count as string}</button>
     }
   </div>
@@ -592,7 +595,7 @@ export function App(props) @{
 			`"use strong";
 import { useState } from 'octane';
 export function Choices(props) @{
-  const [selected, setSelected] = useState(props.initial);
+  const [selected, setSelected] = useState(() => props.initial);
   <ul>@for (const choice of props.choices; key choice.id) {
     <li><button aria-pressed={selected === choice.id} onClick={() => setSelected(choice.id)}>{choice.label as string}</button></li>
   }</ul>
@@ -632,8 +635,8 @@ export function App(props) @{
 import { useCallback, useMemo, useState } from 'octane';
 export function App() @{
   const [count, setCount] = useState(0);
-  const doubled = useMemo(() => count * 2, [count]);
-  const increment = useCallback(() => setCount(count + 1), [count]);
+  const doubled = useMemo(() => count * 2);
+  const increment = useCallback(() => setCount(count + 1));
   <div>@{ <button onClick={increment}>{doubled as string}</button> }</div>
 }`;
 		const diagnostics = compileToVolarMappings(source, '/src/App.tsrx').diagnostics;
@@ -657,7 +660,12 @@ export function App(props) @{
   <div>@{ <span>{value.name as string}</span> }</div>
 }`;
 		const diagnostics = compileToVolarMappings(source, '/src/App.tsrx').diagnostics;
-		expect(diagnostics.map(({ code }) => code)).toEqual([HOOK_LOCALITY]);
+		expect(
+			diagnostics
+				.filter(({ code }) => code === HOOK_LOCALITY || code === EVENT_HANDLER_LOCALITY)
+				.map(({ code }) => code),
+		).toEqual([HOOK_LOCALITY]);
+		expect(diagnostics).toContainEqual(expect.objectContaining({ code: MANUAL_MEMO }));
 		expect(() => compile(source, '/src/App.tsrx')).toThrow(HOOK_LOCALITY);
 	});
 
@@ -703,7 +711,7 @@ import { useEffect, useState } from 'octane';
 export function App(props) @{
   const [count] = useState(0);
   function observe() { props.record(count); }
-  useEffect(observe, [count]);
+  useEffect(observe);
   <div>@{ <output>{count as string}</output> }</div>
 }`;
 		const diagnostics = compileToVolarMappings(source, '/src/App.tsrx').diagnostics;
@@ -763,7 +771,7 @@ export function App() @{
 	it('keeps a hook used by a parent custom effect hook above a nested block', () => {
 		const source = `"use strong";
 import { useEffect, useState } from 'octane';
-function useObserve(value, observe) { useEffect(() => observe(value), [value]); }
+function useObserve(value, observe) { useEffect(() => observe(value)); }
 export function App(props) @{
   const [count] = useState(0);
   useObserve(count, props.observe);
@@ -969,7 +977,7 @@ import { useEffect, useState } from 'octane';
 export function App(props) @{
   const [count] = useState(0);
   ${helper}
-  ${withEffect ? 'useEffect(() => props.observe(count), [count]);' : ''}
+  ${withEffect ? 'useEffect(() => props.observe(count));' : ''}
   <div>@{ <span>{count as string}</span> }</div>
 }`;
 		const diagnostics = compileToVolarMappings(source, '/src/App.tsrx').diagnostics;
@@ -987,8 +995,8 @@ export function App(props) @{
 		expect(() => compile(source, '/src/App.tsrx')).toThrow(HOOK_LOCALITY);
 
 		const fixed = source.replace(
-			`  const [count] = useState(0);\n  ${helper}\n  ${withEffect ? 'useEffect(() => props.observe(count), [count]);' : ''}\n  <div>@{ <span>{count as string}</span> }</div>`,
-			`  <div>@{\n    const [count] = useState(0);\n    ${withEffect ? 'useEffect(() => props.observe(count), [count]);' : ''}\n    <span>{count as string}</span>\n  }</div>`,
+			`  const [count] = useState(0);\n  ${helper}\n  ${withEffect ? 'useEffect(() => props.observe(count));' : ''}\n  <div>@{ <span>{count as string}</span> }</div>`,
+			`  <div>@{\n    const [count] = useState(0);\n    ${withEffect ? 'useEffect(() => props.observe(count));' : ''}\n    <span>{count as string}</span>\n  }</div>`,
 		);
 		for (const mode of ['client', 'server'] as const) {
 			expect(() => compile(fixed, '/src/App.tsrx', { mode })).not.toThrow();
@@ -1070,7 +1078,7 @@ export function App(props) @{
   const [root] = useState(0);
   const [count] = useState(0);
   const read = () => count;
-  useEffect(() => props.observe(root, read()), [root, read]);
+  useEffect(() => props.observe(root, read()));
   <div><output>{root as string}</output>@{ <span>{count as string}</span> }</div>
 }`;
 		for (const mode of ['client', 'server'] as const) {
@@ -1097,7 +1105,7 @@ export function Label() @{
 import { useEffect, useState } from 'octane';
 export function Counter({ title, observe }) @{
   const [count, setCount] = useState(0);
-  useEffect(() => observe(count), [count]);
+  useEffect(() => observe(count));
   <div>
     <h2>{title as string}</h2>
     @{
@@ -1136,7 +1144,7 @@ export function Counter({ title, observe }) @{
     <h2>{title as string}</h2>
     @{
       const [count, setCount] = useState(0);
-      useEffect(() => observe(count), [count]);
+      useEffect(() => observe(count));
       const onClick = () => setCount(count + 1);
       <button {onClick}>{count as string}</button>
     }
@@ -1490,7 +1498,7 @@ describe('Strong mode compiler enforcement', () => {
 		).toThrow(RENDER_STATE_UPDATE);
 	});
 
-	it('does not change emitted client or server code for valid globally opted-in modules', () => {
+	it('preserves emitted code for globally opted-in modules without cache-eligible declarations', () => {
 		const source = stateComponent('');
 
 		for (const mode of ['client', 'server'] as const) {
@@ -1501,6 +1509,22 @@ describe('Strong mode compiler enforcement', () => {
 			expect(strong.diagnostics).toEqual(standard.diagnostics);
 		}
 	});
+
+	it.each(['client', 'server'] as const)(
+		'caches eligible effect inputs under global Strong in %s',
+		(mode) => {
+			const source = `import { useEffect } from 'octane';
+export function App(props) @{
+  const input = { label: props.label };
+  useEffect(() => props.observe(input));
+  <div />
+}`;
+			const standard = compile(source, '/src/EffectInput.tsrx', { mode });
+			const strong = compile(source, '/src/EffectInput.tsrx', { mode, strong: true });
+			expect(strong.diagnostics).toEqual([]);
+			expect(strong.code).not.toBe(standard.code);
+		},
+	);
 
 	it('only recognizes the exact module directive prologue', () => {
 		const source = stateComponent('setCount(count + 1);');
@@ -2443,7 +2467,7 @@ export function App(props) @{
   useState(false && unsafe);
   useState(safe || unsafe);
   useState((() => count) ?? unsafe);
-  useMemo(safe || unsafe, [count]);
+  (safe || unsafe)(count);
   useLinkedState(count, props.reconcile ?? safe, {
     ...(props.options ?? { sourceEqual: unsafe }),
     sourceEqual: Object.is,
@@ -2754,16 +2778,16 @@ export function App() @{ const [, update] = Octane.useState(0); Octane['useMemo'
 		expect(() => compile(`"use strong";\n${source}`, '/src/App.tsrx')).toThrow(RENDER_STATE_UPDATE);
 	});
 
-	it('keeps deferred, unknown, and shadowed named memo callbacks legal', () => {
+	it('keeps deferred and unknown callback invocation and callback creation legal', () => {
 		const source = `"use strong";
 import { useMemo, useState } from 'octane';
 export function App(props) @{
   const [count, setCount] = useState(0);
   const apply = () => setTimeout(() => setCount(count + 1), 0);
   const external = props.calculate;
-  useMemo(apply, [count]);
-  useMemo(external, [count]);
-  useMemo(() => () => setCount(count + 1), [count]);
+  apply();
+  external(count);
+  const updateLater = () => setCount(count + 1);
   <div />
 }`;
 
@@ -2938,7 +2962,7 @@ export function App() @{
 		'rejects synchronous state updates in %s setup',
 		(effect) => {
 			const source = `"use strong";\n${stateComponent(
-				`${effect}(() => { setCount(count + 1); }, [count]);`,
+				`${effect}(() => { setCount(count + 1); });`,
 				`useState, ${effect}`,
 			)}`;
 
@@ -3001,12 +3025,12 @@ export function App() @{
 		expect(() => compile(source, '/src/App.tsrx')).toThrow(code);
 	});
 
-	it('allows state tuple memo callbacks after yielded dependency arguments', () => {
+	it('allows state tuple callbacks after an earlier argument yields', () => {
 		const source = `"use strong";
 import { useMemo, useState } from 'octane';
 export function App() @{
   const state = useState(0);
-  (async () => { useMemo(state[1], [await Promise.resolve(state[0])]); })();
+  (async () => { ((apply, value) => apply(value))(state[1], await Promise.resolve(state[0])); })();
   <div />
 }`;
 
@@ -3015,7 +3039,7 @@ export function App() @{
 
 	it('catches synchronous local callback invocation inside effect setup', () => {
 		const source = `"use strong";\n${stateComponent(
-			'useEffect(() => { const apply = () => setCount(1); apply(); }, []);',
+			'useEffect(() => { const apply = () => setCount(1); apply(); });',
 			'useState, useEffect',
 		)}`;
 
@@ -3034,7 +3058,7 @@ export function App() @{
 import { useEffect, useState } from 'octane';
 export function App(props) @{
   const [, setCount] = useState(0);
-  useEffect(() => { ${invocation} }, []);
+  useEffect(() => { ${invocation} });
   <div />
 }`;
 
@@ -3043,10 +3067,10 @@ export function App(props) @{
 
 	it.each([
 		['effect callbacks', 'useEffect(update, []);'],
-		['direct calls in effect setup', 'useEffect(() => { update(1); }, []);'],
+		['direct calls in effect setup', 'useEffect(() => { update(1); });'],
 		[
 			'concatenated tuple indexes in effect setup',
-			'useEffect(() => { const index = "" + "1"; const selected = tuple[index]; selected(1); }, []);',
+			'useEffect(() => { const index = "" + "1"; const selected = tuple[index]; selected(1); });',
 		],
 	])('rejects aliased tuple setters used as %s', (_label, effect) => {
 		const source = `"use strong";
@@ -3077,7 +3101,7 @@ export function App(props) @{
       await Promise.resolve();
       (props.trace, setCount)(1);
     })();
-  }, []);
+  });
   <div />
 }`;
 
@@ -3090,7 +3114,7 @@ export function App(props) @{
       setTimeout(() => setCount(count + 1), 0);
       Promise.resolve().then(() => setCount(count + 1));
       return () => setCount(count + 1);
-    }, [count]);`,
+    });`,
 			'useState, useEffect',
 		)}`;
 
@@ -3099,7 +3123,7 @@ export function App(props) @{
 
 	it('allows state updates after an async function has yielded', () => {
 		const effect = `"use strong";\n${stateComponent(
-			'useEffect(() => { (async () => { await Promise.resolve(); setCount(1); })(); }, []);',
+			'useEffect(() => { (async () => { await Promise.resolve(); setCount(1); })(); });',
 			'useState, useEffect',
 		)}`;
 		const render = `"use strong";\n${stateComponent(
@@ -3112,7 +3136,7 @@ export function App(props) @{
 			'(async () => { setCount(await Promise.resolve(1)); })();',
 		)}`;
 		const effectAwaitedArgument = `"use strong";\n${stateComponent(
-			'useEffect(() => { (async () => { setCount(await Promise.resolve(1)); })(); }, []);',
+			'useEffect(() => { (async () => { setCount(await Promise.resolve(1)); })(); });',
 			'useState, useEffect',
 		)}`;
 		const conditional = `"use strong";\n${stateComponent(
@@ -3180,11 +3204,11 @@ export function App(props) @{
 	])('allows updates after guaranteed awaits in nested %s', (_label, body) => {
 		const render = `"use strong";\n${stateComponent(`(async () => { ${body} })();`)}`;
 		const effect = `"use strong";\n${stateComponent(
-			`useEffect(() => { (async () => { ${body} })(); }, [count]);`,
+			`useEffect(() => { (async () => { ${body} })(); });`,
 			'useState, useEffect',
 		)}`;
 		const asyncEffect = `"use strong";\n${stateComponent(
-			`useEffect(async () => { ${body} }, [count]);`,
+			`useEffect(async () => { ${body} });`,
 			'useState, useEffect',
 		)}`;
 
@@ -3320,11 +3344,11 @@ export function App(props) @{
 	])('allows expression updates after guaranteed yields in %s', (_label, body) => {
 		const render = `"use strong";\n${stateComponent(`(async () => { ${body} })();`)}`;
 		const effect = `"use strong";\n${stateComponent(
-			`useEffect(() => { (async () => { ${body} })(); }, [count]);`,
+			`useEffect(() => { (async () => { ${body} })(); });`,
 			'useState, useEffect',
 		)}`;
 		const asyncEffect = `"use strong";\n${stateComponent(
-			`useEffect(async () => { ${body} }, [count]);`,
+			`useEffect(async () => { ${body} });`,
 			'useState, useEffect',
 		)}`;
 
@@ -3425,7 +3449,7 @@ export function App(props) @{
 	])('still rejects expression updates in %s', (_label, body) => {
 		const render = `"use strong";\n${stateComponent(`(async () => { ${body} })();`)}`;
 		const effect = `"use strong";\n${stateComponent(
-			`useEffect(async () => { ${body} }, [count]);`,
+			`useEffect(async () => { ${body} });`,
 			'useState, useEffect',
 		)}`;
 
@@ -3434,12 +3458,18 @@ export function App(props) @{
 	});
 
 	it.each([
-		['inline memo callbacks', 'useMemo(() => setCount(1), [await Promise.resolve(count)]);'],
 		[
-			'named memo callbacks',
-			'const calculate = () => setCount(1); useMemo(calculate, [await Promise.resolve(count)]);',
+			'inline callbacks',
+			'((apply, value) => apply(value))(() => setCount(1), await Promise.resolve(count));',
 		],
-		['state updaters as memo callbacks', 'useMemo(setCount, [await Promise.resolve(count)]);'],
+		[
+			'named callbacks',
+			'const calculate = () => setCount(1); ((apply, value) => apply(value))(calculate, await Promise.resolve(count));',
+		],
+		[
+			'state updaters as callbacks',
+			'((apply, value) => apply(value))(setCount, await Promise.resolve(count));',
+		],
 	])('allows %s when earlier arguments have yielded', (_label, body) => {
 		const source = `"use strong";\n${stateComponent(
 			`(async () => { ${body} })();`,
@@ -3508,7 +3538,7 @@ export function App(props) @{
 	])('still rejects %s', (_label, body) => {
 		const render = `"use strong";\n${stateComponent(`(async () => { ${body} })();`)}`;
 		const effect = `"use strong";\n${stateComponent(
-			`useEffect(async () => { ${body} }, [count]);`,
+			`useEffect(async () => { ${body} });`,
 			'useState, useEffect',
 		)}`;
 
@@ -3662,11 +3692,11 @@ export function App(props) @{
 	])('allows updates after guaranteed yields in %s', (_label, body) => {
 		const render = `"use strong";\n${stateComponent(`(async () => { ${body} })();`)}`;
 		const effect = `"use strong";\n${stateComponent(
-			`useEffect(() => { (async () => { ${body} })(); }, [count]);`,
+			`useEffect(() => { (async () => { ${body} })(); });`,
 			'useState, useEffect',
 		)}`;
 		const asyncEffect = `"use strong";\n${stateComponent(
-			`useEffect(async () => { ${body} }, [count]);`,
+			`useEffect(async () => { ${body} });`,
 			'useState, useEffect',
 		)}`;
 
@@ -3795,7 +3825,7 @@ export function App(props) @{
 	])('still rejects updates in %s', (_label, body) => {
 		const render = `"use strong";\n${stateComponent(`(async () => { ${body} })();`)}`;
 		const effect = `"use strong";\n${stateComponent(
-			`useEffect(async () => { ${body} }, [count]);`,
+			`useEffect(async () => { ${body} });`,
 			'useState, useEffect',
 		)}`;
 
@@ -3851,7 +3881,7 @@ export function App() @{
       }
       for (const value of await Promise.resolve([])) {}
       setCount(count + 1);
-    }, [count]);`,
+    });`,
 			'useState, useEffect',
 		)}`;
 
@@ -3869,7 +3899,7 @@ export function useCounter() {
     }
     for (const value of await Promise.resolve([])) {}
     setCount(count + 1);
-  }, [count]);
+  });
   return count;
 }`;
 		const synchronous = source.replace(
@@ -3887,7 +3917,7 @@ export function useCounter() {
       for await (const value of [count]) {
         setCount(value);
       }
-    }, [count]);`,
+    });`,
 			'useState, useEffect',
 		)}`;
 		const synchronous = source.replace(
@@ -3924,7 +3954,7 @@ export function useCounter() {
           setCount(0);
         }
       })();
-    }, [count]);`,
+    });`,
 			'useState, useEffect',
 		)}`;
 
@@ -3946,7 +3976,7 @@ export function useCounter() {
         setCount(0);
       }
     })();
-  }, [count]);
+  });
   return count;
 }`;
 		const synchronous = source.replace(
@@ -3968,7 +3998,7 @@ export function useCounter() {
         await Promise.resolve();
         setCount(0);
       }
-    }, [count]);`,
+    });`,
 			'useState, useEffect',
 		)}`;
 		const result = compileToVolarMappings(source, '/src/Counter.tsrx');
@@ -4001,7 +4031,7 @@ export function useCounter() {
       (await Promise.resolve(count > 0)) ? setCount(1) : setCount(2);
       Promise.resolve(await Promise.resolve(count), setCount(3));
       const { value = setCount(4) } = await Promise.resolve({});
-    }, [count]);`,
+    });`,
 				'useState, useEffect',
 			)}`;
 
@@ -4017,7 +4047,7 @@ export function useCounter() {
   useEffect(async () => {
     (await Promise.resolve(count > 0)) ? setCount(1) : setCount(2);
     Promise.resolve(await Promise.resolve(count), setCount(3));
-  }, [count]);
+  });
   return count;
 }`;
 		const synchronous = source.replace(
@@ -4033,7 +4063,7 @@ export function useCounter() {
 		const source = `"use strong";\n${stateComponent(
 			`useEffect(async () => {
       (await Promise.resolve(count > 0)) ? setCount(1) : setCount(2);
-    }, [count]);`,
+    });`,
 			'useState, useEffect',
 		)}`;
 		const synchronous = source.replace(
@@ -4279,13 +4309,13 @@ export function App() @{
 import { useRef, useEffect, useCallback } from 'octane';
 export function App(props) @{
   const ref = useRef(null);
-  const readLater = useCallback(() => ref.current, []);
+  const readLater = () => ref.current;
   const identity = { ref };
   useEffect(() => {
     const mounted = ref.current;
     setTimeout(() => ref.current, 0);
     return () => { const cleaned = ref.current; };
-  }, []);
+  });
   (async () => { await Promise.resolve(); const afterYield = ref.current; })();
   <button ref={ref} onClick={() => { const clicked = readLater(); }} />
 }`;
@@ -4538,11 +4568,11 @@ export function App() @{
 import { useState, useEffect, useCallback } from 'octane';
 export function App(props) @{
   const [count, setCount, getCount] = useState(0);
-  const readLater = useCallback(() => getCount(), []);
+  const readLater = () => getCount();
   useEffect(() => {
     props.record(getCount());
     return () => { props.record(getCount()); };
-  }, []);
+  });
   setTimeout(() => props.record(getCount()), 0);
   Promise.resolve().then(() => props.record(getCount()));
   (async () => { await Promise.resolve(); props.record(getCount()); })();
@@ -4904,7 +4934,7 @@ export function App(props) @{
   useEffect(() => {
     props.record(readRevision());
     return () => props.record(revision);
-  }, []);
+  });
   setTimeout(() => props.record(revision), 0);
   Promise.resolve().then(() => props.record(revision));
   (async () => { await Promise.resolve(); props.record(revision); })();
@@ -5335,7 +5365,7 @@ export function App(props) @{
   useEffect(() => {
     props.record(document.visibilityState, readWidth());
     return () => props.record(location.pathname);
-  }, []);
+  });
   setTimeout(() => props.record(navigator.language), 0);
   Promise.resolve().then(() => props.record(localStorage.getItem("theme")));
   (async () => { await Promise.resolve(); props.record(sessionStorage.getItem("theme")); })();
@@ -5675,16 +5705,16 @@ import { ${imports} } from 'octane';
 export function App(props) @{
   const [count, setCount] = useState(0);
   const ref = useRef(0);
-  const update = useCallback(() => setCount(count + 1), [count]);
+  const update = () => setCount(count + 1);
   const event = useEffectEvent(() => setCount(count + 1));
-  const memoized = useMemo(() => () => setCount(count + 1), [count]);
+  const memoized = () => setCount(count + 1);
   useEffect(() => {
-    setTimeout(update, 0);
-    Promise.resolve().then(event);
+    props.subscribe(update);
+    setTimeout(event, 0);
     queueMicrotask(memoized);
     return () => { update(); event(); memoized(); };
-  }, []);
-  useLayoutEffect(() => { ref.current = count; }, [count]);
+  });
+  useEffect(() => { ref.current = count; });
   <button ref={props.buttonRef} onClick={event}>{count as string}</button>
 }`;
 
@@ -5692,22 +5722,22 @@ export function App(props) @{
 	});
 
 	it('keeps returned callbacks legal after asynchronous work has yielded', () => {
-		const setup = `const update = useCallback(() => setCount(1), []);
+		const setup = `const update = () => setCount(1);
   const event = useEffectEvent(() => setCount(1));
-  const memoized = useMemo(() => () => setCount(1), []);
+  const memoized = () => setCount(1);
   (async () => { await Promise.resolve(); update(); event(); memoized(); })();
   useEffect(() => {
     (async () => { await Promise.resolve(); update(); event(); memoized(); })();
-  }, []);`;
+  });`;
 
 		expect(() => compile(`"use strong";\n${component(setup)}`, '/src/App.tsrx')).not.toThrow();
 	});
 
-	it('does not execute a memo-returned callback until the result is invoked', () => {
+	it('does not execute a factory-returned callback until the result is invoked', () => {
 		const setup = `function makeUpdate(apply) { return () => apply(1); }
-  const update = useMemo(() => makeUpdate(setCount), []);
+  const update = makeUpdate(setCount);
   const event = useEffectEvent(update);
-  useEffect(() => () => event(), []);`;
+  useEffect(() => () => event());`;
 
 		expect(() => compile(`"use strong";\n${component(setup)}`, '/src/App.tsrx')).not.toThrow();
 	});
@@ -5716,34 +5746,34 @@ export function App(props) @{
 		[
 			'separate factory captures',
 			`function makeUpdate(apply) { return () => apply(1); }
-  const deferred = useMemo(() => makeUpdate(setCount), []);
-  const safe = useMemo(() => makeUpdate(() => {}), []);
+  const deferred = makeUpdate(setCount);
+  const safe = makeUpdate(() => {});
   safe();
-  useEffect(() => deferred, []);`,
+  useEffect(() => deferred);`,
 		],
 		[
 			'reassigned factory parameters',
 			`function makeUpdate(apply) { apply = () => {}; return () => apply(1); }
-  const safe = useMemo(() => makeUpdate(setCount), []);
+  const safe = makeUpdate(setCount);
   safe();`,
 		],
 		[
 			'overridden factory returns',
-			`const safe = useMemo(() => {
+			`const safe = (() => {
     try { return () => setCount(1); }
     finally { return () => {}; }
-  }, []);
+  })();
   safe();`,
 		],
 		[
 			'asynchronous factory results',
-			`const pending = useMemo(async () => () => setCount(1), []);
-  useEffect(() => { pending.then((update) => update()); }, []);`,
+			`const pending = (async () => () => setCount(1))();
+  useEffect(() => { pending.then((update) => update()); });`,
 		],
 		[
 			'generator factory results',
-			`const iterator = useMemo(function* () { return () => setCount(1); }, []);
-  useEffect(() => () => { iterator.next().value?.(); }, []);`,
+			`const iterator = (function* () { return () => setCount(1); })();
+  useEffect(() => () => { iterator.next().value?.(); });`,
 		],
 	])('does not invent synchronous writes from %s', (_label, setup) => {
 		expect(() => compile(`"use strong";\n${component(setup)}`, '/src/App.tsrx')).not.toThrow();
@@ -5762,15 +5792,15 @@ export function App(props) @{
   const unrelated = useEffectEvent(() => { ref.current = 1; });
   ignored();
   unrelated();
-  const external = useMemo(props.makeCallback, []);
+  const external = props.makeCallback();
   const unknown = makeCallback(() => setCount(1));
   external();
   unknown();
   function makeUpdate(setCount) { return () => setCount(1); }
-  const safe = useMemo(() => makeUpdate(props.onUpdate), [props.onUpdate]);
+  const safe = makeUpdate(props.onUpdate);
   safe();
   const event = octaneEvent(() => props.value);
-  useEffect(() => { props.register(event); }, props.dependencies);
+  useEffect(() => { props.register(event); });
   <div />
 }`;
 
@@ -5779,22 +5809,19 @@ export function App(props) @{
 
 	it('keeps inferred dependencies, ordinary callbacks, and deferred ref writes legal', () => {
 		const setup = `const event = useEffectEvent(() => count);
-  const callback = useCallback(() => props.value, [props.value]);
-  const write = useMemo(() => () => { ref.current = count; }, [count]);
+  const callback = () => props.value;
+  const write = () => { ref.current = count; };
   useEffect(() => { props.register(event); });
-  useEffect(() => { write(); }, [callback]);
-  useMemo(() => callback, [callback]);`;
+  useEffect(() => { write(); props.record(callback()); });
+  const alias = callback;`;
 
 		expect(() => compile(`"use strong";\n${component(setup)}`, '/src/App.tsrx')).not.toThrow();
 	});
 
 	it.each([
-		['a return', 'const update = useCallback(() => { return; setCount(1); }, []); update();'],
-		[
-			'a false branch',
-			'const update = useCallback(() => { if (false) setCount(1); }, []); update();',
-		],
-		['short-circuiting', 'const update = useCallback(() => false && setCount(1), []); update();'],
+		['a return', 'const update = () => { return; setCount(1); }; update();'],
+		['a false branch', 'const update = () => { if (false) setCount(1); }; update();'],
+		['short-circuiting', 'const update = () => false && setCount(1); update();'],
 	])('does not report callback writes made unreachable by %s', (_label, setup) => {
 		expect(() => compile(`"use strong";\n${component(setup)}`, '/src/App.tsrx')).not.toThrow();
 	});
@@ -5870,7 +5897,7 @@ export function App(props) @{
     return () => {};
   }`;
 		const unsafe = `${make} const update = useMemo(() => make(true, setCount), []); update();`;
-		const safe = `${make} const update = useMemo(() => make(false, setCount), []); update();`;
+		const safe = `${make} const update = make(false, setCount); update();`;
 
 		expect(() => compile(`"use strong";\n${component(unsafe)}`, '/src/App.tsrx')).toThrow(
 			RENDER_STATE_UPDATE,
@@ -5889,9 +5916,9 @@ export function App(props) @{
 		);
 	});
 
-	it('preserves a known non-callable memo result when selecting a callback', () => {
-		const setup = `const disabled = useMemo(() => false, []);
-  const update = useCallback(disabled ? setCount : () => {}, []);
+	it('preserves a known non-callable factory result when selecting a callback', () => {
+		const setup = `const disabled = (() => false)();
+  const update = disabled ? setCount : () => {};
   update(1);`;
 
 		expect(() => compile(`"use strong";\n${component(setup)}`, '/src/App.tsrx')).not.toThrow();
@@ -6022,8 +6049,8 @@ export function App(props) @{
   const selected = useMemo(() => identity(event), []);
   useEffect(() => {}, [selected]);`;
 		const wrapped = `const event = useEffectEvent(() => count);
-  const wrapper = useMemo(() => () => event(), []);
-  useEffect(() => {}, [wrapper, () => event(), false ? event : wrapper]);`;
+  const wrapper = () => event();
+  useEffect(() => { props.register(wrapper, () => event(), false ? event : wrapper); });`;
 
 		expect(() => compile(`"use strong";\n${component(actual)}`, '/src/App.tsrx')).toThrow(
 			EFFECT_EVENT_DEPENDENCY,
@@ -6034,11 +6061,11 @@ export function App(props) @{
 	it.each([
 		[
 			'generator callback creation',
-			'const make = useCallback(function* () { setCount(1); }, []); const iterator = make(); useEffect(() => () => { iterator.next(); }, []);',
+			'const make = function* () { setCount(1); }; const iterator = make(); useEffect(() => () => { iterator.next(); });',
 		],
 		[
 			'asynchronous callbacks after yielding',
-			'const update = useCallback(async () => { await Promise.resolve(); setCount(1); }, []); useEffect(() => { update(); }, []);',
+			'const update = async () => { await Promise.resolve(); setCount(1); }; useEffect(() => { update(); });',
 		],
 		[
 			'optional calls after yielding',
@@ -6050,11 +6077,11 @@ export function App(props) @{
 		],
 		[
 			'recursive factory returns',
-			'function make(recur) { if (recur) return make(false); return () => {}; } const update = useMemo(() => make(true), []); update();',
+			'function make(recur) { if (recur) return make(false); return () => {}; } const update = make(true); update();',
 		],
 		[
 			'mutually recursive factory returns',
-			'function first(recur) { if (recur) return second(false); return () => {}; } function second(recur) { if (recur) return first(false); return () => {}; } const update = useMemo(() => first(true), []); update();',
+			'function first(recur) { if (recur) return second(false); return () => {}; } function second(recur) { if (recur) return first(false); return () => {}; } const update = first(true); update();',
 		],
 	])('keeps %s legal without inventing synchronous execution', (_label, setup) => {
 		expect(() => compile(`"use strong";\n${component(setup)}`, '/src/App.tsrx')).not.toThrow();

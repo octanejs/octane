@@ -1,0 +1,92 @@
+diff --git a/tests/upstream/react/vanilla-utils/atomWithObservable.test.tsx b/tests/upstream/react/vanilla-utils/atomWithObservable.test.tsx
+--- a/tests/upstream/react/vanilla-utils/atomWithObservable.test.tsx
++++ b/tests/upstream/react/vanilla-utils/atomWithObservable.test.tsx
+@@ -2,7 +2,7 @@
+ // FIXME
+ /* eslint-disable @typescript-eslint/no-explicit-any */
+ 
+-import { Component, StrictMode, Suspense, useState } from 'octane'
++import { ErrorBoundary as OctaneErrorBoundary, StrictMode, Suspense, useState } from 'octane'
+ import type { ReactElement, OctaneNode } from 'octane'
+ import { act, fireEvent, render, screen } from '@octanejs/testing-library'
+ import {
+@@ -51,24 +51,11 @@ afterEach(() => {
+   console.error = consoleError
+ })
+ 
+-class ErrorBoundary extends Component<
+-  { children: OctaneNode },
+-  { error: string }
+-> {
+-  state = {
+-    error: '',
+-  }
+-
+-  static getDerivedStateFromError(error: Error) {
+-    return { error: error.message }
+-  }
+-
+-  render() {
+-    if (this.state.error) {
+-      return <div>Error: {this.state.error}</div>
+-    }
+-    return this.props.children
+-  }
++// OCTANE DIVERGENCE[functional-error-boundary]: function boundary preserves the error message without React classes.
++function ErrorBoundary({ children }: { children: OctaneNode }) {
++  return <OctaneErrorBoundary fallback={(error: unknown) => (
++    <div>Error: {(error as Error).message}</div>
++  )}>{children}</OctaneErrorBoundary>
+ }
+ 
+ it('count state', () => {
+@@ -587,38 +574,18 @@ it("don't omit values emitted between init and mount", async () => {
+   expect(screen.getByText('count: 9')).toBeInTheDocument()
+ })
+ 
++// OCTANE DIVERGENCE[functional-error-boundary]: preserve the reset callback and retry UI with a function boundary.
++function RetryErrorBoundary(props: { message?: string; retry?: () => void; children: OctaneNode }) {
++  return <OctaneErrorBoundary fallback={(_error: unknown, reset: () => void) => (
++    <div>
++      {props.message || 'errored'}
++      {props.retry && <button onClick={() => { props.retry?.(); reset() }}>retry</button>}
++    </div>
++  )}>{props.children}</OctaneErrorBoundary>
++}
++
+ describe('error handling', () => {
+-  class ErrorBoundary extends Component<
+-    { message?: string; retry?: () => void; children: OctaneNode },
+-    { hasError: boolean }
+-  > {
+-    constructor(props: { message?: string; children: OctaneNode }) {
+-      super(props)
+-      this.state = { hasError: false }
+-    }
+-    static getDerivedStateFromError() {
+-      return { hasError: true }
+-    }
+-    render() {
+-      return this.state.hasError ? (
+-        <div>
+-          {this.props.message || 'errored'}
+-          {this.props.retry && (
+-            <button
+-              onClick={() => {
+-                this.props.retry?.()
+-                this.setState({ hasError: false })
+-              }}
+-            >
+-              retry
+-            </button>
+-          )}
+-        </div>
+-      ) : (
+-        this.props.children
+-      )
+-    }
+-  }
++  const ErrorBoundary = RetryErrorBoundary
+ 
+   it('can catch error in error boundary', async () => {
+     const subject = new Subject<number>()

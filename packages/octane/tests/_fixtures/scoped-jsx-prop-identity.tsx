@@ -54,28 +54,27 @@ export function Owner(props: {
 	);
 }
 
-export function NestedFailureOwner(props: {
-	seen: Array<() => void>;
-	bind: (fn: () => void) => void;
-}) {
+export function NestedFailureOwner(props: { events: string[]; bind: (fn: () => void) => void }) {
 	const throwing = {
 		get current(): number {
-			useContext(Ctx);
-			throw new Error('nested scoped record');
+			const value = useContext(Ctx);
+			if (value % 2 === 0) throw new Error('nested scoped record');
+			return value;
 		},
 	};
 	const nested = <span data-failure={throwing.current}>unreachable</span>;
 	const deferred = {
 		get callback(): () => void {
+			let result = 'caught';
 			try {
-				void (nested as ElementDescriptor).props;
+				result = String((nested as ElementDescriptor).props['data-failure']);
 			} catch {}
-			return () => {};
+			return () => props.events.push(result);
 		},
 	};
 	return (
 		<ContextHost bind={props.bind}>
-			<Consumer cb={deferred.callback} seen={props.seen} />
+			<button onClick={deferred.callback}>Inspect nested record</button>
 		</ContextHost>
 	);
 }
