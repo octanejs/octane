@@ -20,10 +20,31 @@ export async function render(request: Request, clientEntry: string) {
 	};
 	return requests.run({ request, owner }, async () => {
 		runWithSignalOwner(owner, () => draft$.set('from server'));
+		const metadata = JSON.stringify(streamedSignals)
+			.replace(/</g, '\\u003c')
+			.replace(/\u2028/g, '\\u2028')
+			.replace(/\u2029/g, '\\u2029');
+		let launcher =
+			'<script id="behavior-identity" type="application/json">' +
+			metadata +
+			'</script><script>import(' +
+			JSON.stringify(clientEntry) +
+			').catch(e=>{document.documentElement.dataset.bootstrapError=String(e)})</script>';
 		const stream = await renderToReadableStream(createElement(Shell), {
 			signalOwner: owner,
 			streamedSignals,
 			earlySignalBootstrap: 'external',
+			// The renderer places the launcher after shell seeds and selection authority,
+			// before auth-dependent EOF, regardless of downstream chunk boundaries.
+			injection: {
+				take() {
+					const html = launcher;
+					launcher = '';
+					return html;
+				},
+				subscribe: () => () => {},
+				done: Promise.resolve(),
+			},
 			// The browser intentionally holds authorization while testing interaction.
 			timeoutMs: 30_000,
 			signal: request.signal,
@@ -31,10 +52,6 @@ export async function render(request: Request, clientEntry: string) {
 		});
 		const reader = stream.getReader();
 		const encode = (text: string) => new TextEncoder().encode(text);
-		const metadata = JSON.stringify(streamedSignals)
-			.replace(/</g, '\\u003c')
-			.replace(/\u2028/g, '\\u2028')
-			.replace(/\u2029/g, '\\u2029');
 		return new ReadableStream<Uint8Array>({
 			async start(controller) {
 				try {
@@ -43,20 +60,6 @@ export async function render(request: Request, clientEntry: string) {
 							'<!doctype html><html><head><meta charset="utf-8"><title>Behavior-only benchmark</title>' +
 								earlySignalBootstrapScript() +
 								'</head><body>',
-						),
-					);
-					// The first renderer chunk includes the accepted shell native seeds and
-					// query selection authority. The launcher precedes auth-dependent EOF.
-					const shell = await reader.read();
-					if (shell.done) throw new Error('Missing SSR shell');
-					controller.enqueue(shell.value);
-					controller.enqueue(
-						encode(
-							'<script id="behavior-identity" type="application/json">' +
-								metadata +
-								'</script><script>import(' +
-								JSON.stringify(clientEntry) +
-								').catch(e=>{document.documentElement.dataset.bootstrapError=String(e)})</script>',
 						),
 					);
 					for (;;) {

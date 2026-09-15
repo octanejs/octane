@@ -6,9 +6,12 @@ never imports a client component,
 `hydrateRoot`, or a rendering engine in the browser graph.
 
 The host emits public `earlySignalBootstrapScript()` before interactive HTML. The
-first SSR chunk contains the real native signal manifest and selected query
-authority. A classic `import()` launcher immediately after that chunk starts one
-split ESM behavior graph before the auth-gated document reaches EOF. An optional
+SSR shell contains the real native signal manifest and selected query
+authority. A one-shot `StreamOptions.injection` source places the identity metadata
+and classic `import()` launcher after the complete shell at a renderer-owned HTML
+boundary. The document wrapper forwards every renderer chunk unchanged; it does
+not treat the first read as the complete shell. The launcher starts one split ESM
+behavior graph before the auth-gated document reaches EOF. An optional
 controller imports the same physical state/engine chunk; there is no second IIFE
 copy or hand-written state carrier. The host metadata uses its own identity schema
 with `installSignalDocumentLifecycle({ readIdentity })`.
@@ -74,6 +77,16 @@ modules. The receipt guard intentionally fails under esbuild; it is not disabled
 or replaced by a compiler import rewrite.
 
 ## Run
+
+The server regression exercises the real fixture with renderer output split inside
+tags, native seed JSON, query selection JSON, and UTF-8 characters before the
+document wrapper reads it. It checks complete seeds and authority before the
+launcher while authorization and EOF stay held, then checks final output after
+release:
+
+```sh
+node --test benchmarks/conversation-streaming/behavior-only/server.test.mjs
+```
 
 Build only, with existing installed dependencies:
 
