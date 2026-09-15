@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "artifacts": [
+    {
+      "path": "LICENSE.upstream",
+      "sha256": "0530d5d58026f4bb73367d195946f6a516a648ea62dd8b84763318f64d3cb3e2"
+    },
+    {
+      "path": "upstream-artifact/jotai-3.0.0.tgz",
+      "sha256": "dc9cfb4c901424eea4be448048a274c56472ab0956ee4e4e7d1623bc98e4ef00"
+    }
+  ],
+  "requiredFiles": [
+    "audit/upstream.lock.json",
+    "audit/registrations.json",
+    "audit/crosswalk.json",
+    "tests/types/public.ts",
+    "tsconfig.pristine.json",
+    "tsconfig.adapted.json"
+  ],
+  "packageIdentity": {
+    "path": "upstream/package.json",
+    "name": "jotai",
+    "version": "3.0.0",
+    "license": "MIT"
+  },
+  "unpublishedDirs": ["audit", "tests", "upstream", "upstream-artifact"]
+}

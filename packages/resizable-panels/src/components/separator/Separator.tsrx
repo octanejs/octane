@@ -74,7 +74,9 @@ export function Separator(props: SeparatorProps) @{
 					layout,
 					panelConstraints: derivedPanelConstraints,
 					panelId: primaryPanel.id,
-					panelIndex: panels.indexOf(primaryPanel),
+					panelIndex: derivedPanelConstraints.findIndex(
+						(constraints) => constraints.panelId === primaryPanel.id,
+					),
 				}),
 			);
 		});

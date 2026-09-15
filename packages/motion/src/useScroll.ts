@@ -2,7 +2,7 @@
 // scrollXProgress, scrollYProgress }`; bind a progress value to a `motion.*`
 // element's style, or read it imperatively. Reuses motion's framework-agnostic
 // `scroll`.
-import { motionValue, scroll } from 'motion';
+import { motionValue, scroll, type MotionValue } from 'motion';
 import { useState, useEffect } from 'octane';
 
 // Memoized — runs per hook call per render; the cache returns the identical
@@ -22,15 +22,18 @@ export interface ScrollOptions {
 	container?: HTMLElement;
 	target?: HTMLElement;
 	axis?: 'x' | 'y';
-	offset?: any;
+	offset?: NonNullable<Parameters<typeof scroll>[1]>['offset'];
 }
 
-export function useScroll(...args: any[]): {
-	scrollX: any;
-	scrollY: any;
-	scrollXProgress: any;
-	scrollYProgress: any;
-} {
+export interface ScrollValues {
+	scrollX: MotionValue<number>;
+	scrollY: MotionValue<number>;
+	scrollXProgress: MotionValue<number>;
+	scrollYProgress: MotionValue<number>;
+}
+
+export function useScroll(options?: ScrollOptions): ScrollValues;
+export function useScroll(...args: any[]): ScrollValues {
 	const tail = args[args.length - 1];
 	const slot = typeof tail === 'symbol' ? (tail as symbol) : undefined;
 	const options: ScrollOptions =

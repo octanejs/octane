@@ -1,4 +1,4 @@
-// Vendored from react-hook-form@7.81.0 src/useFormContext.tsx (octane port) —
+// Vendored from react-hook-form@7.88.0 src/useFormContext.tsx (octane port) —
 // the FormProvider component half of upstream's file. Propagates the useForm
 // methods to all children via context; the memoized value keeps context
 // identity stable across parent re-renders (same deps as upstream).
@@ -15,6 +15,7 @@ export function FormProvider<
 		children,
 		watch,
 		getValues,
+		getErrors,
 		getFieldState,
 		setError,
 		clearErrors,
@@ -37,6 +38,7 @@ export function FormProvider<
 		() => ({
 			watch,
 			getValues,
+			getErrors,
 			getFieldState,
 			setError,
 			clearErrors,
@@ -60,6 +62,7 @@ export function FormProvider<
 			formState,
 			getFieldState,
 			getValues,
+			getErrors,
 			handleSubmit,
 			register,
 			reset,

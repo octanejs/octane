@@ -1,0 +1,3 @@
+/tests/upstream/
+/.pristine-upstream-*/
+/.upstream-vitest-cache/

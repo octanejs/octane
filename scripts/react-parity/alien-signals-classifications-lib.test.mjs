@@ -32,6 +32,7 @@ async function fixture() {
 		'alien-signals-classifications-lib.test.mjs',
 		'alien-signals-runtime-lib.test.mjs',
 		'alien-signals-types-lib.test.mjs',
+		'alien-signals-oracle.test.mjs',
 	]) {
 		await cp(new URL(`./${file}`, import.meta.url), join(root, `scripts/react-parity/${file}`));
 	}
@@ -164,5 +165,5 @@ test('accepts the committed paired type-oracle classification', async function a
 	t.after(function cleanup() {
 		return rm(root, { recursive: true, force: true });
 	});
-	assert.deepEqual(verifyAlienSignalsTestClassifications(root), { tests: 13 });
+	assert.deepEqual(verifyAlienSignalsTestClassifications(root), { tests: 14 });
 });

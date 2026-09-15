@@ -1,0 +1,29 @@
+diff --git a/tests/upstream/trans.render.object.spec.jsx b/tests/upstream/trans.render.object.spec.jsx
+--- a/tests/upstream/trans.render.object.spec.jsx
++++ b/tests/upstream/trans.render.object.spec.jsx
+@@ -1,3 +1,4 @@
++// OCTANE DIVERGENCE[inspectable-children]: Trans inspects explicit descriptor children; Translation receives its callback as a prop.
+ import { describe, it, expect, afterEach } from 'vitest';
+ import * as React from 'octane';
+ import { render, cleanup } from '@octanejs/testing-library';
+@@ -256,7 +257,7 @@ describe('trans using children but components (object) - self closing tag', () =
+     return <button type="button">click me</button>;
+   }
+   function TestComponent() {
+-    return <Trans components={{ ClickMe: <Button /> }}>{'hello <ClickMe/>'}</Trans>;
++    return <Trans components={{ ClickMe: <Button /> }} children={<>{'hello <ClickMe/>'}</>} />;
+   }
+   it('should render translated string', () => {
+     const { container } = render(<TestComponent />);
+@@ -280,9 +281,9 @@ describe('trans using children and components (object) - should still allow for
+         i18nKey="some key"
+         defaults="Click <1>here</1> to continue"
+         components={{ unused: <span /> }}
+-      >
++       children={<>
+         pre <a href="#">link</a> post
+-      </Trans>
++      </>} />
+     );
+   }
+   it('should render translated string', () => {

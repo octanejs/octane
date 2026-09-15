@@ -11,7 +11,10 @@
     "integrity": "sha256:bc0080ec78244f8d7adeddcad45b270d726e599e6ead2e8183b42bbf97f1701a",
     "verification": "recorded-unverified"
   },
-  "upstreamSuites": { "runtime": "present", "types": "present" },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "present"
+  },
   "adaptedRoots": {
     "source": {
       "roots": ["packages/usehooks-ts/src"],
@@ -37,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "59b5197a457d62d05aa8866334bc41567581c414b30452a047b00c020d587883"
+      "lockfileSha256": "86e22c8a3652c4663ce8e347d3769f0572c09a1d66c39ed789bd914709b53946"
     }
   },
   "lanes": [

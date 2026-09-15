@@ -1,4 +1,4 @@
-import { useState } from 'octane';
+import { useMemo, useState } from 'octane';
 import {
 	createEffect,
 	type ReadableSignal,
@@ -9,6 +9,11 @@ import {
 	useSignalEffect,
 	useSignalScope,
 	useSignalValue,
+	useDeferredSignalValue,
+	useSignalSelector,
+	useSignalPassiveEffect,
+	useSignalLayoutEffect,
+	useSignalInsertionEffect,
 } from '@octanejs/alien-signals';
 
 export function SignalReaders(props: {
@@ -264,4 +269,124 @@ export function ServerSignalView(props: {
 	useSignalEffect(() => props.log('effect'));
 	useSignalScope(() => props.log('scope'));
 	<p id="server-signal">{value as string}</p>
+}
+
+export function SelectedReader(props: {
+	source: ReadableSignal<{ selected: number; unrelated: number }>;
+	selector: (value: { selected: number; unrelated: number }) => number;
+	observe: (value: number) => void;
+}) @{
+	const value = useSignalSelector(props.source, props.selector);
+	props.observe(value);
+	<output id="selected">{value as string}</output>
+}
+
+export function DeferredReader(props: { source: ReadableSignal<number> }) @{
+	const current = useSignalValue(props.source);
+	const deferred = useDeferredSignalValue(props.source);
+	<div>
+		<output id="current">{current as string}</output>
+		<output id="deferred">{deferred as string}</output>
+	</div>
+}
+
+export function PhasedEffects(props: {
+	signals: readonly ReadableSignal<number>[];
+	log: (entry: string) => void;
+}) @{
+	useSignalInsertionEffect(props.signals, () => {
+		const value = props.signals[0]();
+		props.log(`insertion:${value}`);
+		return () => props.log(`insertion-cleanup:${value}`);
+	});
+	useSignalLayoutEffect(props.signals, () => {
+		const value = props.signals[0]();
+		props.log(`layout:${value}`);
+		return () => props.log(`layout-cleanup:${value}`);
+	});
+	useSignalPassiveEffect(props.signals, () => {
+		const value = props.signals[0]();
+		props.log(`passive:${value}`);
+		return () => props.log(`passive-cleanup:${value}`);
+	});
+	<div>phased effects</div>
+}
+
+export function CleanupScope(props: {
+	source: ReadableSignal<number>;
+	onCleanup: () => void;
+	onStop: (stop: () => void) => void;
+}) @{
+	const stop = useSignalScope(() => {
+		createEffect(() => {
+			props.source();
+			return props.onCleanup;
+		});
+	}, []);
+	props.onStop(stop);
+	<div>scope</div>
+}
+
+export function EffectDependencies(props: {
+	source: ReadableSignal<number>;
+	label: string;
+	version: number;
+	log: (entry: string) => void;
+}) @{
+	useSignalEffect(() => {
+		const label = props.label;
+		const value = props.source();
+		props.log(`${label}:${value}`);
+		return () => props.log(`${label}:cleanup:${value}`);
+	}, [props.version]);
+	<div>dependencies</div>
+}
+
+export function FunctionValueReader(props: {
+	source: WritableSignal<() => string>;
+	next: () => string;
+}) @{
+	const [value, setValue] = useSignal(props.source);
+	<div>
+		<output id="function-name">{value.name}</output>
+		<button id="set-function" onClick={() => setValue(() => props.next)}>set function</button>
+	</div>
+}
+
+export function SignalPairReader(props: {
+	first: ReadableSignal<number>;
+	second: ReadableSignal<number>;
+	observe: (values: readonly [number, number]) => void;
+}) @{
+	const first = useSignalValue(props.first);
+	const second = useSignalValue(props.second);
+	props.observe([first, second]);
+	<output>{`${first}:${second}`}</output>
+}
+
+export function ServerSignalFeatures(props: {
+	source: ReadableSignal<number>;
+	log: (entry: string) => void;
+}) @{
+	const signals = useMemo(() => [props.source], [props.source]);
+	const value = useSignalValue(props.source);
+	const selected = useSignalSelector(props.source, (current) => current * 2);
+	const deferred = useDeferredSignalValue(props.source);
+	useSignalInsertionEffect(signals, () => {
+		props.log('insertion:' + props.source());
+		return () => props.log('insertion:cleanup');
+	}, []);
+	useSignalLayoutEffect(signals, () => {
+		props.log('layout:' + props.source());
+		return () => props.log('layout:cleanup');
+	}, []);
+	useSignalPassiveEffect(signals, () => {
+		props.log('passive:' + props.source());
+		return () => props.log('passive:cleanup');
+	}, []);
+	<div id="server-features">
+		<output id="current">{value as string}</output>
+		<output id="selected">{selected as string}</output>
+		<output id="deferred">{deferred as string}</output>
+	</div>
 }

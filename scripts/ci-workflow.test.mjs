@@ -517,6 +517,10 @@ describe('CI workflow aggregation', () => {
 			'hook-form',
 			'hook-form-differential',
 			'hook-form-server',
+			'hook-form-native',
+			'hook-form-browser',
+			'hook-form-pristine-browser',
+			'hook-form-adapted-browser',
 		]) {
 			assert.equal(baseProjects.get(project).testExecution.group, 'react-parity');
 		}
@@ -535,14 +539,23 @@ describe('CI workflow aggregation', () => {
 		assert.equal(shardedProjects.has('hook-form-pristine'), false);
 		assert.equal(shardedProjects.has('hook-form-differential'), false);
 		assert.equal(shardedProjects.has('hook-form-server'), false);
-		assert.deepEqual(shardedProjects.get('hook-form').test.include, [
-			'packages/hook-form/tests/**/*.test.ts',
-			'packages/hook-form/tests/**/*.test.tsx',
-		]);
-		for (const pattern of baseProjects.get('hook-form').testExecution.include) {
-			assert.equal(shardedProjects.get('hook-form').test.exclude.includes(pattern), true);
+		for (const project of [
+			'hook-form',
+			'hook-form-native',
+			'hook-form-browser',
+			'hook-form-pristine-browser',
+			'hook-form-adapted-browser',
+		]) {
+			assert.equal(shardedProjects.has(project), false);
 		}
-		assert.equal(shardedProjects.get('hook-form').testExecution, undefined);
+		assert.deepEqual(baseProjects.get('hook-form').test.include, [
+			'packages/hook-form/tests/upstream/**/*.test.ts',
+			'packages/hook-form/tests/upstream/**/*.test.tsx',
+		]);
+		assert.deepEqual(baseProjects.get('hook-form-native').test.include, [
+			'packages/hook-form/tests/conformance/**/*.test.*',
+			'packages/hook-form/tests/hydration.test.ts',
+		]);
 
 		assert.deepEqual(baseProjects.get('dnd-kit').test.include, [
 			'packages/dnd-kit/tests/conformance/**/*.test.ts',
@@ -764,7 +777,6 @@ describe('CI workflow aggregation', () => {
 			.split(/\s+/);
 		for (const browserRoot of [
 			'playground/octane/tests/doom',
-			'packages/colorful/tests/browser',
 			'packages/dropzone/tests/probes/browser',
 			'packages/octane/tests/browser',
 			'packages/pdf/tests/feasibility/pdfjs.browser.test.ts',
@@ -773,6 +785,7 @@ describe('CI workflow aggregation', () => {
 			assert.ok(discovered.includes(browserRoot));
 		}
 		for (const browserRoot of [
+			'packages/colorful/tests/browser',
 			'packages/draggable/tests/browser',
 			'packages/drei/tests/browser',
 			'packages/input-otp/tests/browser',

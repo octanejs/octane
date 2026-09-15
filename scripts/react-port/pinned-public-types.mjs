@@ -89,7 +89,11 @@ export function readCompatibilityBaseline(packageDirectory, node, baseline) {
 // An upstream declaration is an authority only after its complete source tree
 // has matched the immutable inventory. No package-local list of allowed `any`
 // paths can manufacture an exception to the public precision check.
-export function pinnedPublicEntries(packageDirectory, node, { baseline } = {}) {
+export function pinnedPublicEntries(
+	packageDirectory,
+	node,
+	{ baseline, publicSpecifiers = [] } = {},
+) {
 	const lock = validateUpstreamLock(
 		JSON.parse(readFileSync(path.join(packageDirectory, 'audit/upstream.lock.json'), 'utf8')),
 	);
@@ -163,21 +167,37 @@ export function pinnedPublicEntries(packageDirectory, node, { baseline } = {}) {
 		};
 		visit(source);
 	}
-	for (const [subpath, target] of Object.entries(manifest.exports ?? { '.': null })) {
+	const exportKeys = Object.keys(manifest.exports ?? { '.': null });
+	const subpaths = new Set(
+		exportKeys.filter((key) => !key.includes('*') && manifest.exports?.[key] !== null),
+	);
+	// A wildcard is not an import. Resolve concrete consumer entries through
+	// TypeScript so export precedence and null exclusions still apply, then
+	// authenticate each resulting declaration against the registry bytes below.
+	for (const specifier of publicSpecifiers) {
+		if (!specifier.startsWith(node.binding + '/')) continue;
+		const subpath = '.' + specifier.slice(node.binding.length);
+		if (
+			exportKeys.some((key) => {
+				if (!key.includes('*')) return false;
+				const [prefix, suffix] = key.split('*');
+				return subpath.startsWith(prefix) && subpath.endsWith(suffix);
+			})
+		)
+			subpaths.add(subpath);
+	}
+	for (const subpath of subpaths) {
 		if (subpath === './package.json') continue;
-		let file = target?.import?.types ?? target?.types ?? target?.default?.types;
-		if (typeof file !== 'string') {
-			const request = subpath === '.' ? manifest.name : manifest.name + subpath.slice(1);
-			const resolved = ts.resolveModuleName(
-				request,
-				path.join(packageDirectory, '__public_type_witness__.ts'),
-				{ moduleResolution: ts.ModuleResolutionKind.Bundler, module: ts.ModuleKind.ESNext },
-				ts.sys,
-			).resolvedModule?.resolvedFileName;
-			if (!resolved || !/\.d\.[cm]?ts$/.test(resolved))
-				throw new Error(`Public export has no pinned declaration: ${subpath}`);
-			file = './' + path.relative(installedRoot, resolved).split(path.sep).join('/');
-		}
+		const request = subpath === '.' ? manifest.name : manifest.name + subpath.slice(1);
+		const resolved = ts.resolveModuleName(
+			request,
+			path.join(packageDirectory, '__public_type_witness__.ts'),
+			{ moduleResolution: ts.ModuleResolutionKind.Bundler, module: ts.ModuleKind.ESNext },
+			ts.sys,
+		).resolvedModule?.resolvedFileName;
+		if (!resolved || !/\.d\.[cm]?ts$/.test(resolved))
+			throw new Error(`Public export has no pinned declaration: ${subpath}`);
+		const file = './' + path.relative(installedRoot, resolved).split(path.sep).join('/');
 		if (!published.files.has(`package/${file.slice(2)}`))
 			throw new Error(`Public export points outside the pinned declarations: ${file}`);
 		const specifier = subpath === '.' ? node.binding : node.binding + subpath.slice(1);
@@ -230,7 +250,7 @@ export function pinnedPublicExport(entries, program, checker, specifier, name) {
 
 	if (compatibility?.localDeclaration) {
 		return checker
-			.getSymbolsInScope(source, ts.SymbolFlags.Type)
+			.getSymbolsInScope(source, ts.SymbolFlags.Type | ts.SymbolFlags.Alias)
 			.find(
 				(entry) =>
 					entry.name === compatibility.path &&
@@ -307,6 +327,23 @@ function reactRenderable(type, checker, depth = 0) {
 	// Declaration emit can expand ReactNode while preserving its exact union.
 	// Recover the canonical symbol only through a real React element declaration.
 	if (type?.isUnion?.()) {
+		// A nullable element is still a renderer-owned return contract. Keep
+		// unrelated union members precise instead of accepting any union that
+		// merely contains an element somewhere inside it.
+		const rendered = type.types.filter(
+			(part) => !(part.flags & (ts.TypeFlags.Null | ts.TypeFlags.Undefined)),
+		);
+		if (
+			rendered.length > 0 &&
+			rendered.length < type.types.length &&
+			rendered.every(
+				(part) =>
+					!part.isUnion?.() &&
+					['ReactElement', 'Element'].includes(name(part)) &&
+					declarationFiles(part).some((file) => /\/@types\/react\/index\.d\.ts$/.test(file)),
+			)
+		)
+			return true;
 		const parts = [...type.types];
 		const seen = new Set();
 		for (let index = 0; index < parts.length; index++) {
@@ -741,7 +778,19 @@ export function newOpaquePublicType(
 				(declarations.length ? undefined : property.valueDeclaration);
 			if (!declaration) continue;
 			if (options.internalMembers?.has(memberKey(declaration))) continue;
-			const expected = witness && checker.getPropertyOfType(witness, property.name);
+			// Hook Form exposes its per-edit handler as onInput in Octane. The
+			// pinned onChange declaration remains the complete precision witness;
+			// this is a member rename, never permission for new opaque leaves.
+			const nativeInput =
+				options.binding === '@octanejs/hook-form' &&
+				property.name === 'onInput' &&
+				ts.isTypeLiteralNode(declaration.parent) &&
+				ts.isTypeAliasDeclaration(declaration.parent.parent) &&
+				['ControllerRenderProps', 'UseFormRegisterReturn'].includes(
+					declaration.parent.parent.name.text,
+				);
+			const expected =
+				witness && checker.getPropertyOfType(witness, nativeInput ? 'onChange' : property.name);
 			// memo exposes its original callable as `type` in Octane. React's
 			// NamedExoticComponent omits this platform member; compare the original
 			// callable against the same public call contract instead.

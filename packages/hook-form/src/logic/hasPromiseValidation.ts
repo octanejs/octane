@@ -1,4 +1,4 @@
-// Vendored from react-hook-form@7.81.0 src/logic/hasPromiseValidation.ts (octane port).
+// Adapted from react-hook-form@7.88.0 src/logic/hasPromiseValidation.ts for Octane.
 import type { Field, Validate } from '../types';
 import isFunction from '../utils/isFunction';
 import isObject from '../utils/isObject';

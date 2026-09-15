@@ -2,14 +2,14 @@
   "schemaVersion": 1,
   "identity": {
     "packageName": "react-intersection-observer",
-    "version": "10.1.0",
+    "version": "11.0.1",
     "repository": {
       "owner": "thebuilder",
       "repo": "react-intersection-observer",
-      "subdirectory": null
+      "subdirectory": "packages/react-intersection-observer"
     },
-    "commit": "5f82a7328fb63a2e54729f2205278209c14e30e8",
-    "integrity": "sha512-V8HDu3+Llg6OEhOxx8LnUSS0t4VS+1Xk9ZatkI8Jct/H0CwKnqFTCu8NT3q7ghJTghTdIrEMPSWr2dkKPG+gdQ=="
+    "commit": "aa231b3a23ec000db0edb434693f9661ff422970",
+    "integrity": "sha512-BIZ1M40GPSKDIT1MJbXK7SB0BwBaTKr84QfZCs5asKer7YMOYLzMi+RI1F4VStbZLGHoosJmd+aOQDDipUV1gA=="
   },
   "license": {
     "spdx": "MIT",
@@ -21,6 +21,7 @@
     ],
     "notices": []
   },
+  "scopes": [],
   "adaptedMappings": [
     {
       "fromRoot": "src/__tests__",
@@ -42,7 +43,7 @@
     },
     {
       "find": "import React, { useCallback } from \"react\";",
-      "replace": "import { useCallback, useEffect, useState } from \"octane\";"
+      "replace": "import { useCallback, useEffect, useState, StrictMode } from \"octane\";"
     },
     {
       "find": "from \"react\";",
@@ -87,93 +88,45 @@
     {
       "find": "from \"..\";",
       "replace": "from \"../../src/index\";"
+    },
+    {
+      "find": "from \"../useIntersectionObserverRef\";",
+      "replace": "from \"../../src/useIntersectionObserverRef.tsrx\";"
+    },
+    {
+      "find": "from \"react-dom/server\";",
+      "replace": "from \"octane/server\";"
+    },
+    {
+      "find": "React.StrictMode",
+      "replace": "StrictMode"
     }
   ],
   "files": [
     {
-      "path": ".gitattributes",
-      "gitBlob": "c8016164ef428b4d0c9c1024c0776d3907b6c49b",
-      "size": 1431
+      "path": "compat/packed.mts",
+      "gitBlob": "58201fc16db7653aacf64337276d35ced21f0fae",
+      "size": 2660
     },
     {
-      "path": ".github/ISSUE_TEMPLATE/bug_report.md",
-      "gitBlob": "38839855462468863f5ab6aff572cb13a231e26e",
-      "size": 1120
+      "path": "fixtures/react-compat/entry.jsx",
+      "gitBlob": "7d8de8933cb955efb9d6349581655637593bc349",
+      "size": 337
     },
     {
-      "path": ".github/ISSUE_TEMPLATE/feature_request.md",
-      "gitBlob": "2866f790faca2bf179881c4aa8c66ad268f4ba95",
-      "size": 594
-    },
-    {
-      "path": ".github/workflows/pkg-pr.yml",
-      "gitBlob": "cfc7f04c3e341876ef3c9de78d8604319a33cf94",
-      "size": 511
-    },
-    {
-      "path": ".github/workflows/test.yml",
-      "gitBlob": "730756bfe31d29f6d12d67e69aca1999fb627eb3",
-      "size": 1652
-    },
-    {
-      "path": ".gitignore",
-      "gitBlob": "f0ccb801c66e64f6f8d7989b6613a9d75bc8cfe3",
-      "size": 225
-    },
-    {
-      "path": ".npmignore",
-      "gitBlob": "b96de39eaa806b408bc9d9aa3dbf8fe44521bc76",
-      "size": 323
-    },
-    {
-      "path": ".npmrc",
-      "gitBlob": "e2a389c3236d83e3f0fdf460b8200c97b9089112",
-      "size": 32
-    },
-    {
-      "path": "biome.json",
-      "gitBlob": "ba713abc7ab0df4cf65e766172585d4a5eb16073",
-      "size": 749
-    },
-    {
-      "path": "CONTRIBUTING.md",
-      "gitBlob": "166ae69fa608b353c8535c4afcad4c87b5519178",
-      "size": 2775
-    },
-    {
-      "path": "docs/Recipes.md",
-      "gitBlob": "9f1bffd562ff88995427f858ecc5e76107b77892",
-      "size": 4403
-    },
-    {
-      "path": "LICENSE",
-      "gitBlob": "2afe4ed68cd6306d933836b286803e152c73ebc1",
-      "size": 1102
+      "path": "fixtures/react-compat/rsbuild.config.mjs",
+      "gitBlob": "11f055d2d821044a8bb203f58b158de1b4f58d6a",
+      "size": 227
     },
     {
       "path": "package.json",
-      "gitBlob": "e284a5b40dfdf2fbfa0db71dfe29129f2ea38e9d",
-      "size": 4210
+      "gitBlob": "124a4f3f8f4d0df1a55efda9a4c5911f67514c93",
+      "size": 3533
     },
     {
-      "path": "pnpm-lock.yaml",
-      "gitBlob": "f277a9932debead4ac075190143eb9c0be29bbc1",
-      "size": 322927
-    },
-    {
-      "path": "pnpm-workspace.yaml",
-      "gitBlob": "4ba9d6c43e113a8690ce235d39e01c55e66a5e50",
-      "size": 115
-    },
-    {
-      "path": "README.md",
-      "gitBlob": "426254aae70d47f20ac473c2442ca1bbdc83dc63",
-      "size": 28628
-    },
-    {
-      "path": "SECURITY.md",
-      "gitBlob": "68903767066b88175a6eec7d7fda49493d99026d",
-      "size": 379
+      "path": "scripts/package-metadata.mjs",
+      "gitBlob": "d2b00a8786e64c4f4c502cee1cec0e2aeed03532",
+      "size": 802
     },
     {
       "path": "src/__tests__/browser.test.tsx",
@@ -182,13 +135,13 @@
     },
     {
       "path": "src/__tests__/InView.test.tsx",
-      "gitBlob": "213a51cf2626e903df15765739ee5cad68da9dfb",
-      "size": 6504
+      "gitBlob": "971e9d0c620fdd15ec23e8aab51b3dfe2da5e39f",
+      "size": 9347
     },
     {
       "path": "src/__tests__/observe.test.ts",
-      "gitBlob": "40841e01f682621514a3380330cf6383118e02d7",
-      "size": 1529
+      "gitBlob": "d40175c8b0199878526ef7327310baf6daae8663",
+      "size": 2472
     },
     {
       "path": "src/__tests__/setup.test.ts",
@@ -196,14 +149,19 @@
       "size": 1220
     },
     {
+      "path": "src/__tests__/useInView.ssr.test.ts",
+      "gitBlob": "ebb03c9cbef36e80a38c084d6881d8ae41bc023b",
+      "size": 645
+    },
+    {
       "path": "src/__tests__/useInView.test.tsx",
-      "gitBlob": "cc664e86967120dc631beba7bbcdcd4e0dc11118",
-      "size": 12862
+      "gitBlob": "27280b2e485ccece4d690aff4cd92795eae16fcb",
+      "size": 21746
     },
     {
       "path": "src/__tests__/useOnInView.test.tsx",
-      "gitBlob": "ed9ccab039eb086be8383cb0184b42d2e9971da9",
-      "size": 13478
+      "gitBlob": "80aacf468f751edcfb31eec38e38111346cbabd9",
+      "size": 22182
     },
     {
       "path": "src/index.tsx",
@@ -212,118 +170,38 @@
     },
     {
       "path": "src/InView.tsx",
-      "gitBlob": "d130060a6b48242ddfc48dc694b79dd955b2c63c",
-      "size": 5740
+      "gitBlob": "ab159dc5e37840f5c89d467302417a028e8bb722",
+      "size": 5798
     },
     {
       "path": "src/observe.ts",
-      "gitBlob": "0e84176b1010084daf0b6889a3b72b6b5c19ae9f",
-      "size": 5638
+      "gitBlob": "529d073b30bdb3aed00da3e65fa93c59782eb7b6",
+      "size": 5716
     },
     {
       "path": "src/test-utils.ts",
-      "gitBlob": "3e3f557275cb6f5e8f608132d61f93358a95a8c4",
-      "size": 8296
+      "gitBlob": "f52488ab4ce4483d18ffcceaf3e0f56defd6f6e8",
+      "size": 8307
+    },
+    {
+      "path": "src/useIntersectionObserverRef.ts",
+      "gitBlob": "5cad2511196b721a459296feac5182067e26d191",
+      "size": 4018
     },
     {
       "path": "src/useInView.tsx",
-      "gitBlob": "791c5014297e4d7db37973ef8f42f63fe1ad970c",
-      "size": 4540
+      "gitBlob": "b979096500f413484f370d63d2b26ee6d3c5dc48",
+      "size": 3429
     },
     {
       "path": "src/useOnInView.tsx",
-      "gitBlob": "5e9069c0c451b51e72343c4fac2cf6037aff5d10",
-      "size": 4626
-    },
-    {
-      "path": "storybook/.storybook/main.ts",
-      "gitBlob": "57c841a0915ecf477185ef927e943629b098e7f8",
-      "size": 821
-    },
-    {
-      "path": "storybook/.storybook/manager.ts",
-      "gitBlob": "51a5066951b408fa22808f026b92e332adfcc318",
-      "size": 273
-    },
-    {
-      "path": "storybook/.storybook/preview-head.html",
-      "gitBlob": "f3a5644ab07034c34474e985c3fb3d5ad3097f52",
-      "size": 660
-    },
-    {
-      "path": "storybook/.storybook/preview.ts",
-      "gitBlob": "18645f2567611d3513b69ad58d35681b53c38825",
-      "size": 214
-    },
-    {
-      "path": "storybook/package.json",
-      "gitBlob": "0d173bbafa7ee54efb41e3f3f77af839d4ed4ead",
-      "size": 1095
-    },
-    {
-      "path": "storybook/postcss.config.js",
-      "gitBlob": "483f378543c055b9299d8bd02620999429cbeb83",
-      "size": 72
-    },
-    {
-      "path": "storybook/readme.md",
-      "gitBlob": "70f354ec6fbec9af951db00a8b78fc4d11c9b558",
-      "size": 9842
-    },
-    {
-      "path": "storybook/stories/elements.tsx",
-      "gitBlob": "d9ce568ebac892cec6cfce9761917e44ed968085",
-      "size": 7820
-    },
-    {
-      "path": "storybook/stories/Intro.mdx",
-      "gitBlob": "14a3905a4e1559c0658cb59f3ff61da432f17fc7",
-      "size": 127
-    },
-    {
-      "path": "storybook/stories/InView.story.tsx",
-      "gitBlob": "1cd0bb7342b5d8884f5ced70914d05efa80429a3",
-      "size": 3989
-    },
-    {
-      "path": "storybook/stories/Recipes.mdx",
-      "gitBlob": "9a0ef97b88c7bb11fc0c6927220f41930c2a6a47",
-      "size": 138
-    },
-    {
-      "path": "storybook/stories/story-utils.ts",
-      "gitBlob": "e7ae126347db1538df32e25323388f6f2374b967",
-      "size": 3085
-    },
-    {
-      "path": "storybook/stories/useInView.story.tsx",
-      "gitBlob": "3a54b32aad1f21dd7f5d1be86b33e6c42a9f7d43",
-      "size": 4728
-    },
-    {
-      "path": "storybook/stories/useOnInView.story.tsx",
-      "gitBlob": "e1d5876640a51325f747d56f50e78d4a29435c71",
-      "size": 3972
-    },
-    {
-      "path": "storybook/styles.css",
-      "gitBlob": "f1d8c73cdcf9eaacb01fec99963ad78d591305ae",
-      "size": 23
-    },
-    {
-      "path": "storybook/tailwind.config.js",
-      "gitBlob": "273b968a16e600dcf8b59a2ae6aa75326e1cb077",
-      "size": 131
-    },
-    {
-      "path": "storybook/tsconfig.json",
-      "gitBlob": "08dbc85d79b7207cfb10ee1d4061c80053b810c4",
-      "size": 568
+      "gitBlob": "84b19d33b49cee2a6bcb5903ebe4746d6f47b0a1",
+      "size": 2024
     },
     {
       "path": "tsconfig.json",
-      "gitBlob": "32f6584b23b8f46c63014ed8ed5410971b8e1a39",
-      "size": 579
+      "gitBlob": "5b1d5b43d18465dee2a5976e449bb012823587eb",
+      "size": 588
     },
     {
       "path": "tsup.config.ts",
@@ -332,9 +210,9 @@
     },
     {
       "path": "vitest.config.ts",
-      "gitBlob": "0dc2ad108389fa109090d056978eb5458541ac39",
-      "size": 630
+      "gitBlob": "84592d5e7e38b121386c2a20d8f558d5eb4df831",
+      "size": 1017
     }
   ],
-  "fingerprint": "91422b9a382f1e8b967caa7cace8c94e0f381b590ef4acee6b6d6f786c10ef0c"
+  "fingerprint": "21223a990eba907b981aabc20c5678f6c55ee4aa38dfbb19462f2efbc3cf31af"
 }

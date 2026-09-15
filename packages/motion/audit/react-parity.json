@@ -3,20 +3,27 @@
   "schemaVersion": 1,
   "provenance": {
     "repo": "https://github.com/motiondivision/motion.git",
-    "version": "motion@12.42.2",
-    "commit": "40e8756c63b258c9dd07de9501cb788410eefb02",
+    "version": "13.2.0",
+    "commit": "e871ba7f175d0609cef84f416f984e8e84be8333",
     "sourceRoot": "packages/framer-motion/src",
-    "testRoot": "packages/framer-motion/src and packages/framer-motion/cypress",
+    "testRoot": "packages/framer-motion/src",
     "license": "MIT",
-    "integrity": "sha256:d99821507dace914ef6924e95c25beb2d618438fc925517569dd6b083a4df793",
+    "integrity": "sha256:6d96212b304a73247aaf9fe58e45dc1ba980edd2a4bb828f3af93da1b1e9dde4",
     "verification": "recorded-unverified"
   },
-  "upstreamSuites": { "runtime": "present", "types": "present" },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "present"
+  },
   "adaptedRoots": {
-    "source": { "roots": ["packages/motion/src"], "include": ["\\.ts$"], "exclude": [] },
+    "source": {
+      "roots": ["packages/motion/src"],
+      "include": ["\\.ts$"],
+      "exclude": []
+    },
     "tests": {
       "roots": ["packages/motion/tests/upstream"],
-      "include": ["\\.test\\.ts$"],
+      "include": ["\\.test\\.tsx?$"],
       "exclude": []
     }
   },
@@ -33,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "59b5197a457d62d05aa8866334bc41567581c414b30452a047b00c020d587883"
+      "lockfileSha256": "86e22c8a3652c4663ce8e347d3769f0572c09a1d66c39ed789bd914709b53946"
     }
   },
   "lanes": [
@@ -44,7 +51,7 @@
       "environment": "workspace-node",
       "project": "motion-pristine",
       "evidenceOrigin": "upstream-suite",
-      "notes": "Wrapper lane: the Vitest project runs tests/upstream-original.test.ts, which verifies the lock-pinned upstream bytes offline, assembles a scratch Jest root from those bytes plus tests/_pristine-shims/, and runs all 82 pinned framer-motion@12.42.2 value-suite cases (9 files) byte-exact against motion/react, checking every passed identity against audit/pristine-runtime.json. The matcher-compat setup restores the alias matchers Jest 30 removed.",
+      "notes": "Complete immutable framer-motion 13.2.0 client and SSR suites: 870 passing runtime expansions across 101 files. Seven literal upstream-disabled cases are preserved separately and never counted as passing. The isolated oracle uses upstream-compatible React 18.3.1 and Jest 29.7.0; the binding is not loaded in this lane.",
       "execution": {
         "kind": "vitest-full",
         "inventory": "packages/motion/audit/pristine-wrapper-runtime.json"
@@ -53,107 +60,42 @@
         {
           "path": "packages/motion/tests/upstream-original.test.ts",
           "role": "support",
-          "sha256": "37e20e52820a0ed74cbae826eb6dd352a9e2f66440e9032a1a9b495176b8290b"
+          "sha256": "03c2b8d55245c49058c638c16f3abb3658b38b7c425299a8bc1e1827cf19910e"
         },
         {
           "path": "packages/motion/audit/pristine-runtime.json",
           "role": "support",
-          "sha256": "2d328f170129d9abf0ac742539b39b820cc80f8e4d41e0a84fe6493755fcc0b4"
+          "sha256": "4629bc313a3d9751ffcecf63779d47c7349db61ae4c954970db97c956b1d9dac"
         },
         {
           "path": "packages/motion/tests/upstream-jest.config.cjs",
           "role": "support",
-          "sha256": "3f03e349a91b65a88bcf5f94d73d113a18e9084763752246c10fb9ef31a39edd"
-        },
-        {
-          "path": "packages/motion/LICENSE.upstream",
-          "role": "support",
-          "sha256": "5ff46083b88563822b0560dd6221ab89d2f74bc97a52d4c97a75020fd62c6f32"
-        },
-        {
-          "path": "packages/motion/tests/_pristine-shims/package.json",
-          "role": "support",
-          "sha256": "b89dbd2ecda49863338123e0232ff32c0390918ca7f86943c7b327c4f099abef"
-        },
-        {
-          "path": "packages/motion/upstream/src/value/__tests__/use-motion-value.test.tsx",
-          "role": "support",
-          "sha256": "8e651d66fa7f5292f6f5d335e6bd492959a73d59682fb1c31a2f702d2894ef3b"
-        },
-        {
-          "path": "packages/motion/upstream/src/jest.setup.tsx",
-          "role": "support",
-          "sha256": "b3a4efce5810f0f4a83d9cdb5581b66de0746819d3d618ccb8e10070ae01a9dd"
-        },
-        {
-          "path": "packages/motion/upstream/src/gestures/__tests__/utils.ts",
-          "role": "support",
-          "sha256": "ee0d589731d082978838a05748c9a9166711932241c6ed0df9419555e2f3e5e6"
+          "sha256": "7af87f27505ca3ef54187492d52bb421aaaf60c6e3a367450fa39ce3dc582204"
         },
         {
           "path": "packages/motion/audit/upstream.lock.json",
           "role": "support",
-          "sha256": "e9c2c122fae8a55e7d79f63e427477edd336bf285a0f16eb18ba2ea65827b9c3"
+          "sha256": "044785151676cab2b6c49d28dc188fd2a2e7abae7526f905fd713b5dc2707676"
         },
         {
           "path": "packages/motion/audit/pristine-wrapper-runtime.json",
           "role": "support",
-          "sha256": "601d8ae74051c1ec5c8fc9a5da0be7d640b78b378a283e4bedde686e61f9bb3f"
+          "sha256": "ecfad234e3188aaae0adb30a6d2c03661fc4fabc3c87ea0073be334fa057c8e7"
         },
         {
-          "path": "packages/motion/tests/_pristine-shims/src/index.ts",
+          "path": "packages/motion/audit/provenance.json",
           "role": "support",
-          "sha256": "f841b01b3ef664c3a9d109afcfeaf777ebb648cbd0c742c337ea4b63dc07bb0e"
+          "sha256": "6b7c84976e83cba2f51c646a3bb63ffaf7f122a70dc6a38ae4123b91c19a7a29"
         },
         {
-          "path": "packages/motion/tests/_pristine-shims/src/value/use-motion-value.ts",
+          "path": "scripts/react-parity/motion-pristine-runtime.mjs",
           "role": "support",
-          "sha256": "27f28f89c2ca45219ba111bf2f5859ad361ce36fb0e28b000c108f1aae2671e3"
+          "sha256": "a5b6651d8dfd08851d8cbabaa1bdbc0bb353fba4648fd7318882a06a0f781598"
         },
         {
-          "path": "packages/motion/tests/_pristine-shims/src/animation/animate.ts",
+          "path": "scripts/react-parity/fixtures/motion/package.json",
           "role": "support",
-          "sha256": "9bf5f2624a5929182d95390f3f5c995f6a2a4e5a9a8a55a8e1fa4e4bba34a803"
-        },
-        {
-          "path": "packages/motion/tests/_pristine-shims/src/utils/use-motion-value-event.ts",
-          "role": "support",
-          "sha256": "29f99457e6180af7a876749d853905ab026f711b8c7c50600a8ae5697797c756"
-        },
-        {
-          "path": "packages/motion/tests/_pristine-shims/src/value/use-follow-value.ts",
-          "role": "support",
-          "sha256": "4d030a65199045f58967e402b494e5e7bb0455ee843107c5254e5aa1e3b4527e"
-        },
-        {
-          "path": "packages/motion/tests/_pristine-shims/src/value/use-motion-template.ts",
-          "role": "support",
-          "sha256": "1ed65bf25a642c61b4a153ad0ff23b41583a0f0551df8e315b3ab94eecf76629"
-        },
-        {
-          "path": "packages/motion/tests/_pristine-shims/src/value/use-scroll.ts",
-          "role": "support",
-          "sha256": "ab891f15a61a5adc4c4fb12bcbf9d35389b9151beecfeddf2297cccb5a5a2ad8"
-        },
-        {
-          "path": "packages/motion/tests/_pristine-shims/src/value/use-spring.ts",
-          "role": "support",
-          "sha256": "1f96c845bca7185f7b283157030ba092a54fafc577033e78d04e1dac57a9a79d"
-        },
-        {
-          "path": "packages/motion/tests/_pristine-shims/src/value/use-transform.ts",
-          "role": "support",
-          "sha256": "ba32df9c97b6cf68d42edaa957b6d9faea7514a470724e97e1df45862cc546f1"
-        },
-        {
-          "path": "packages/motion/tests/_pristine-shims/src/value/use-velocity.ts",
-          "role": "support",
-          "sha256": "28860a2f26c59b710dcb45d32f7d87c5d0331a82cb8b8c3dc9de7a1bdccfd0ba"
-        },
-        {
-          "path": "packages/motion/tests/upstream-jest.matcher-compat.cjs",
-          "role": "support",
-          "sha256": "fe354ae690d63e17e5e344e63deb22ddaebbceaab5e68a14100f23e6ce3dc28d"
+          "sha256": "79b7aadffb4520afadff9891dc1b8a83f23ba340701a94522432c1adddd9dad7"
         }
       ]
     },
@@ -164,7 +106,7 @@
       "environment": "workspace-node",
       "project": "motion-upstream",
       "evidenceOrigin": "upstream-suite",
-      "notes": "One-for-one Octane adaptation of the curated useMotionValue upstream cases.",
+      "notes": "Five one-for-one native useMotionValue cases regenerated from the immutable release, with a patch for Octane fixture mounting and the retained zero-transform serialization divergence.",
       "execution": {
         "kind": "vitest-full",
         "inventory": "packages/motion/audit/adapted-runtime.json"
@@ -173,17 +115,27 @@
         {
           "path": "packages/motion/audit/adapted-runtime.json",
           "role": "support",
-          "sha256": "88d92b799525defa937b9fd480ca2f3e554cf3574834e0a936d4ee9afb11e600"
+          "sha256": "e6af255c27d309c6a7c36b19f04edfdb74703b50270f9930ccf6892d6aeeadd4"
         },
         {
-          "path": "packages/motion/tests/upstream/use-motion-value.test.ts",
+          "path": "packages/motion/audit/upstream.lock.json",
           "role": "support",
-          "sha256": "c5c4d83e95b3f9bfb45635f11fe310003bb32053746d31becb9487bab5485d4e"
+          "sha256": "044785151676cab2b6c49d28dc188fd2a2e7abae7526f905fd713b5dc2707676"
+        },
+        {
+          "path": "packages/motion/tests/upstream/use-motion-value.test.tsx",
+          "role": "support",
+          "sha256": "43d62011a8459fcdc1a6bc3c4dfd34e83890614b5e2cfe2c9a99801c3cba44d5"
         },
         {
           "path": "packages/motion/tests/_fixtures/upstream-use-motion-value.tsrx",
           "role": "support",
           "sha256": "ce14faaedb16f41226fa3d60dadfd8ed07cec195ee08fd99bf3b50fb02c0336c"
+        },
+        {
+          "path": "packages/motion/audit/upstream-patches/tests/upstream/use-motion-value.test.tsx.patch",
+          "role": "support",
+          "sha256": "87be48ff56735b185e9f2e0f2ee0648837cfeb6ab07cbb370a6c1072ead3f3d5"
         }
       ]
     },
@@ -194,7 +146,7 @@
       "environment": "workspace-node",
       "project": "motion-pristine-types",
       "evidenceOrigin": "repo-authored",
-      "notes": "Repo-authored public surface probes with assertion-group inventory, permitted import-root transformation, compiler-program membership, and negative controls via scripts/react-parity/motion-types-lib.mjs.",
+      "notes": "Strict paired consumer contracts include five pinned registrations embedded in runtime types.test.tsx suites. The original runtime observations remain in the complete pristine oracle. Additional contracts authenticate npm declarations and the retained native component ABI.",
       "execution": {
         "kind": "typescript",
         "compiler": "tsc",
@@ -204,7 +156,7 @@
         {
           "path": "packages/motion/typetests/pristine/types.test-d.ts",
           "role": "test",
-          "sha256": "5239bb5a6ae177eb7227626194192293d4c34f310b3ac225b7cb24376a37aa0b",
+          "sha256": "fc5a841da039ebdc77ec96a96e8533c3ff5d1049bcf74d0dbca705729aff3d83",
           "cases": [
             {
               "id": "types:pristine:motion-div",
@@ -256,12 +208,68 @@
         {
           "path": "packages/motion/typetests/pristine/tsconfig.json",
           "role": "support",
-          "sha256": "9e2609fe8c7e8b7e2cf83e8f2dc88cec3991512f6a97c97976adf306af79257c"
+          "sha256": "f52090fb80e477aa7609e1940d08c4d30c1b05013d702a464aef19a1085fc255"
         },
         {
           "path": "packages/motion/typetests/assertions.md",
           "role": "support",
-          "sha256": "1c76ffad0f2d8eee4f88000bf4bb8aecaa0bdd88339ee3ac50f6cd26f3af98b6"
+          "sha256": "eb0797cd8f3ebc5e016ebf04d4f681cfda5f95ce498d3c22eebf90e300bfca16"
+        },
+        {
+          "path": "packages/motion/typetests/pristine/published-contract.ts",
+          "role": "test",
+          "sha256": "1f70e124dc077bba7849e2da61827e1d732ee1b2e878dd6828b5bc7ca8883383",
+          "cases": [
+            {
+              "id": "types:motion-pristine:published-contract",
+              "testName": "published-contract",
+              "fullName": "Motion pristine published-contract"
+            }
+          ]
+        },
+        {
+          "path": "packages/motion/typetests/pristine/values.test-d.ts",
+          "role": "test",
+          "sha256": "2ffc008d03a315f6266644c75da1731c6dfc424760faa419630a06f9ffb1f310",
+          "cases": [
+            {
+              "id": "types:motion-pristine:values.test-d",
+              "testName": "values.test-d",
+              "fullName": "Motion pristine values.test-d"
+            }
+          ]
+        },
+        {
+          "path": "packages/motion/typetests/pristine/upstream-registrations.ts",
+          "role": "test",
+          "sha256": "a2a60bbde8d570711e4b7543bc52133f8d91ff02f1bfa1adfb8b4ae7c2d825f6",
+          "cases": [
+            {
+              "id": "types:motion-pristine:react-case-v1:fc5e11e0c85a5fcb9423",
+              "testName": "should return nothing if there is no element available",
+              "fullName": "should return nothing if there is no element available"
+            },
+            {
+              "id": "types:motion-pristine:react-case-v1:851a189f86e7bcfe3b45",
+              "testName": "should use provided element",
+              "fullName": "should use provided element"
+            },
+            {
+              "id": "types:motion-pristine:react-case-v1:360bb7641a562fafda9a",
+              "testName": "should use element from document if id was provided",
+              "fullName": "should use element from document if id was provided"
+            },
+            {
+              "id": "types:motion-pristine:react-case-v1:deac27a39daeb110a1cc",
+              "testName": "renders",
+              "fullName": "renders"
+            },
+            {
+              "id": "types:motion-pristine:react-case-v1:1d37b168eaa5af0110d1",
+              "testName": "accepts expected values",
+              "fullName": "accepts expected values"
+            }
+          ]
         }
       ]
     },
@@ -272,7 +280,7 @@
       "environment": "workspace-node",
       "project": "motion-adapted-types",
       "evidenceOrigin": "repo-authored",
-      "notes": "Repo-authored public surface probes with assertion-group inventory, permitted import-root transformation, compiler-program membership, and negative controls via scripts/react-parity/motion-types-lib.mjs.",
+      "notes": "Strict paired consumer contracts include five pinned registrations embedded in runtime types.test.tsx suites. The original runtime observations remain in the complete pristine oracle. Additional contracts authenticate npm declarations and the retained native component ABI.",
       "execution": {
         "kind": "typescript",
         "compiler": "tsrx-tsc",
@@ -282,7 +290,7 @@
         {
           "path": "packages/motion/typetests/adapted/types.test-d.ts",
           "role": "test",
-          "sha256": "82650d97b14dc12aedb6767380f94473fb3451a1ced4364e2f6e056716c0c138",
+          "sha256": "8f001fb45c985afe6f67420805c7a8669f65509aca92c72fb86d14d1f1fe4846",
           "cases": [
             {
               "id": "types:adapted:motion-div",
@@ -334,12 +342,80 @@
         {
           "path": "packages/motion/typetests/adapted/tsconfig.json",
           "role": "support",
-          "sha256": "2844f6b3d81a8db42f39ed4eb089dd5c3fa04da59ca11a0874974cfed4beaf07"
+          "sha256": "ff89ce781ffe09ba7653ba43d4e03b945645fe2fe86794296804affe537a61c3"
         },
         {
           "path": "packages/motion/typetests/assertions.md",
           "role": "support",
-          "sha256": "1c76ffad0f2d8eee4f88000bf4bb8aecaa0bdd88339ee3ac50f6cd26f3af98b6"
+          "sha256": "eb0797cd8f3ebc5e016ebf04d4f681cfda5f95ce498d3c22eebf90e300bfca16"
+        },
+        {
+          "path": "packages/motion/tests/types/published-contract.ts",
+          "role": "test",
+          "sha256": "36235f8e3a825d72eec858fda31c1cbaeeae219c760ad1c06c971bce4b05e1e3",
+          "cases": [
+            {
+              "id": "types:motion-adapted:published-contract",
+              "testName": "published-contract",
+              "fullName": "Motion adapted published-contract"
+            }
+          ]
+        },
+        {
+          "path": "packages/motion/tests/types/public-api.ts",
+          "role": "test",
+          "sha256": "f4ca5356b8173032f2cfdfe04cf221e4a3ed9230c0d00059e60d0e73b8ed902f",
+          "cases": [
+            {
+              "id": "types:motion-adapted:public-api",
+              "testName": "public-api",
+              "fullName": "Motion adapted public-api"
+            }
+          ]
+        },
+        {
+          "path": "packages/motion/typetests/public-api.test-d.ts",
+          "role": "test",
+          "sha256": "7017cc29422f99adc37feb7fe9556630fca5d154798113194ef1f943241939c2",
+          "cases": [
+            {
+              "id": "types:motion-adapted:public-api.test-d",
+              "testName": "public-api.test-d",
+              "fullName": "Motion adapted public-api.test-d"
+            }
+          ]
+        },
+        {
+          "path": "packages/motion/typetests/adapted/upstream-registrations.ts",
+          "role": "test",
+          "sha256": "01746f0c212398f455fee69d85f13c04dc0c87874fc5d3adf1f37f658a86f502",
+          "cases": [
+            {
+              "id": "types:motion-adapted:react-case-v1:fc5e11e0c85a5fcb9423",
+              "testName": "should return nothing if there is no element available",
+              "fullName": "should return nothing if there is no element available"
+            },
+            {
+              "id": "types:motion-adapted:react-case-v1:851a189f86e7bcfe3b45",
+              "testName": "should use provided element",
+              "fullName": "should use provided element"
+            },
+            {
+              "id": "types:motion-adapted:react-case-v1:360bb7641a562fafda9a",
+              "testName": "should use element from document if id was provided",
+              "fullName": "should use element from document if id was provided"
+            },
+            {
+              "id": "types:motion-adapted:react-case-v1:deac27a39daeb110a1cc",
+              "testName": "renders",
+              "fullName": "renders"
+            },
+            {
+              "id": "types:motion-adapted:react-case-v1:1d37b168eaa5af0110d1",
+              "testName": "accepts expected values",
+              "fullName": "accepts expected values"
+            }
+          ]
         }
       ]
     },
@@ -350,17 +426,22 @@
       "environment": "workspace-node",
       "project": "motion-differential",
       "evidenceOrigin": "repo-authored",
-      "notes": "Runs exact host rendering, Motion-only prop filtering, and child update behavior against motion/react@12.42.2. Exit/layout/layoutId/initial-only contracts stay in the ordinary motion project and are cited as conformance: divergence evidence, not required React-parity lanes.",
+      "notes": "Shared React/Octane fixtures compare host rendering, Motion-only prop filtering, child updates, scoped isValidProp inheritance and replacement, survivor identity, and native click callbacks against motion/react 13.2.0.",
       "files": [
         {
           "path": "packages/motion/tests/differential/parity.test.ts",
           "role": "test",
-          "sha256": "76d3e46e5034ce79ff7ba442dc7615ed00549bd04689504aeaa37b0035f831b1",
+          "sha256": "b09dd95283d673bcc0f6ac555261e03ee4b308ff2a5a9f42917f4de51f71f2eb",
           "cases": [
             {
               "id": "differential:motion-render",
               "testName": "motion host rendering, filtered props, and child updates are byte-identical",
               "fullName": "differential: @octanejs/motion vs motion/react motion host rendering, filtered props, and child updates are byte-identical"
+            },
+            {
+              "id": "differential:motion-config-prop-filtering",
+              "testName": "nested provider filters and live updates preserve the same public DOM and clicks",
+              "fullName": "differential: @octanejs/motion vs motion/react nested provider filters and live updates preserve the same public DOM and clicks"
             }
           ]
         },
@@ -378,6 +459,85 @@
           "path": "packages/motion/tests/_fixtures/render-diff.tsrx",
           "role": "support",
           "sha256": "8ba1063957f73ac5383fc83ed4032a144d3f64fb6f70fb3afd58711eac0794fb"
+        },
+        {
+          "path": "packages/motion/tests/_fixtures/config.tsrx",
+          "role": "support",
+          "sha256": "dac044d586aefd4fad2656b9961fcabb709160b916643a92dfc070fc87c8f208"
+        }
+      ]
+    },
+    {
+      "id": "motion-browser-and-bundles",
+      "type": "browser",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "motion",
+      "notes": "Chromium checks scoped prop filters, native clicks, focus/survivor identity, real MotionValue animation, SSR hook output adoption, and unmount. Separate production-browser bundles execute in JSDOM and check tree shaking and development behavior without a process global.",
+      "files": [
+        {
+          "path": "packages/motion/tests/browser/motion.browser.test.ts",
+          "role": "test",
+          "sha256": "ebe22ac2801012454e7312595a00ac025c9f5ae8c33a1f3b7a593dbd9143f8e7",
+          "cases": [
+            {
+              "id": "browser:motion-chromium-0",
+              "testName": "hydrates deterministic hook values by adopting the server output and cleans up",
+              "fullName": "hydrates deterministic hook values by adopting the server output and cleans up"
+            },
+            {
+              "id": "browser:motion-chromium-1",
+              "testName": "preserves scoped filters, native clicks, focus, and live MotionValue animation in Chromium",
+              "fullName": "preserves scoped filters, native clicks, focus, and live MotionValue animation in Chromium"
+            }
+          ]
+        },
+        {
+          "path": "packages/motion/tests/production-bundle.test.ts",
+          "role": "test",
+          "sha256": "dbed43bdc75800fd4c8c6daeb2964253472c26c12a5bb817c7c9f564c161d520",
+          "cases": [
+            {
+              "id": "browser:motion-bundle-0",
+              "testName": "runs the selected animation without retaining unused Octane motion bindings",
+              "fullName": "@octanejs/motion public production imports runs the selected animation without retaining unused Octane motion bindings"
+            },
+            {
+              "id": "browser:motion-bundle-1",
+              "testName": "enforces strict LazyMotion in a development browser bundle without a process global",
+              "fullName": "@octanejs/motion public production imports enforces strict LazyMotion in a development browser bundle without a process global"
+            }
+          ]
+        },
+        {
+          "path": "packages/motion/tests/browser/harness/fixture.tsrx",
+          "role": "support",
+          "sha256": "997ff2556eb2a46d0f3a89cb61a1518f95d5a246e60d360356410ad712350c0a"
+        },
+        {
+          "path": "packages/motion/tests/browser/harness/index.html",
+          "role": "support",
+          "sha256": "59359c8de115524d57636a16cfd8cf0550064104c19fce876f58c1671e43834a"
+        },
+        {
+          "path": "packages/motion/tests/browser/harness/main.ts",
+          "role": "support",
+          "sha256": "17abc325e2505fa681642fa8729bd6a1c448fca4feda7e1600d1e348c77c5229"
+        },
+        {
+          "path": "packages/motion/tests/_fixtures/server-values.tsrx",
+          "role": "support",
+          "sha256": "a85e796e034005b99e2cde135d1457b523b33c8bdacffcaef0212b050d3332b7"
+        },
+        {
+          "path": "packages/octane/tests/_hydration-ssr.ts",
+          "role": "support",
+          "sha256": "2140e4ed078ad56e70a3449ff557b0450ee598cf523f5e0c9013a793ff07e48b"
+        },
+        {
+          "path": "packages/motion/tests/_fixtures/host-contracts.tsrx",
+          "role": "support",
+          "sha256": "9c99d7ed2842b1611833dc2a3eb38e5a642ae8b590c045c88aecb94eadbb252e"
         }
       ]
     }

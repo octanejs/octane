@@ -1,28 +1,42 @@
-/** Jest config for the curated Motion pristine useMotionValue suite. */
-const { join } = require('node:path');
-
-module.exports = {
-	// The wrapper runs this config against a scratch rootDir outside the
-	// repository, so dependency resolution (react/jsx-runtime, motion/react)
-	// must anchor to the repository's own module tree explicitly.
+/** Original Motion client/SSR suites, with the pinned upstream React/Jest environment. */
+const { createRequire } = require('node:module');
+const { join, resolve } = require('node:path');
+const repo = resolve(__dirname, '../../..');
+const oracle = createRequire(join(repo, 'scripts/react-parity/fixtures/motion/package.json'));
+const source = process.env.OCTANE_MOTION_PRISTINE_ROOT;
+if (!source) throw new Error('Motion pristine runner must supply its authenticated scratch root');
+const aliases = {
+	'^framer-motion$': join(source, 'src/index.ts'),
+	'^framer-motion/client$': join(source, 'src/client.ts'),
+};
+for (const name of [
+	'react',
+	'react/jsx-runtime',
+	'react/jsx-dev-runtime',
+	'react-dom',
+	'react-dom/client',
+	'react-dom/server',
+	'react-dom/test-utils',
+	'@testing-library/react',
+	'@testing-library/dom',
+	'@testing-library/jest-dom',
+])
+	aliases['^' + name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$'] = oracle.resolve(name);
+const common = {
+	rootDir: source,
+	roots: ['<rootDir>/src'],
 	modulePaths: [
-		join(__dirname, '..', 'node_modules'),
-		join(__dirname, '..', '..', '..', 'node_modules'),
-		// pnpm's hidden hoist store holds transitive dependencies (motion-utils,
-		// expect) that neither package tree exposes directly.
-		join(__dirname, '..', '..', '..', 'node_modules', '.pnpm', 'node_modules'),
+		join(__dirname, '../node_modules'),
+		join(repo, 'node_modules'),
+		join(repo, 'node_modules/.pnpm/node_modules'),
 	],
-	setupFilesAfterEnv: [join(__dirname, 'upstream-jest.matcher-compat.cjs')],
+	moduleNameMapper: aliases,
+	setupFilesAfterEnv: [join(source, 'src/jest.setup.tsx')],
 	clearMocks: true,
 	resetMocks: true,
 	restoreMocks: true,
-	roots: ['<rootDir>/src'],
-	testMatch: ['**/value/__tests__/*.test.ts', '**/value/__tests__/*.test.tsx'],
 	transform: {
 		'^.+\\.tsx?$': [
-			// Resolved absolutely: the pristine wrapper runs this config against a
-			// scratch rootDir outside the repository, where a bare module id
-			// cannot resolve.
 			require.resolve('@swc/jest'),
 			{
 				jsc: {
@@ -32,9 +46,22 @@ module.exports = {
 			},
 		],
 	},
-	testEnvironment: 'jest-fixed-jsdom',
-	testEnvironmentOptions: {
-		customExportConditions: [''],
-	},
 	moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json'],
+};
+module.exports = {
+	projects: [
+		{
+			...common,
+			displayName: 'motion-pristine-client',
+			testEnvironment: oracle.resolve('jest-environment-jsdom'),
+			testMatch: ['**/__tests__/**/*.test.ts', '**/__tests__/**/*.test.tsx'],
+			testPathIgnorePatterns: ['ssr.test.tsx'],
+		},
+		{
+			...common,
+			displayName: 'motion-pristine-ssr',
+			testEnvironment: 'node',
+			testMatch: ['**/__tests__/**/*ssr.test.tsx'],
+		},
+	],
 };

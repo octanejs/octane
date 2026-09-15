@@ -8,9 +8,18 @@
     "noEmitOnError": true,
     "noErrorTruncation": true,
     "verbatimModuleSyntax": true,
-    "types": ["node"],
-    "strict": true
+    "types": [],
+    "strict": true,
+    "skipLibCheck": false,
+    "paths": {
+      "react": ["./node_modules/@types/react/index.d.ts"],
+      "react/*": ["./node_modules/@types/react/*"]
+    },
+    "typeRoots": ["./node_modules/@types"]
   },
-  "include": ["./src/", "./typetests/"],
-  "exclude": ["node_modules", "dist", "tests"]
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist", "tests"],
+  "reactPortEvidence": {
+    "gate": "authored-source-types"
+  }
 }

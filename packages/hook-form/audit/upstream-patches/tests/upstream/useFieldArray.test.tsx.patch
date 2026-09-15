@@ -11,9 +11,9 @@ diff --git a/tests/upstream/useFieldArray.test.tsx b/tests/upstream/useFieldArra
 +  default: () => String(i++),
 +}));
  
- describe('useFieldArray', () => {
-   beforeEach(() => {
-@@ -127,7 +130,7 @@ describe('useFieldArray', () => {
+ // Activity is a React 19.2+ API. Only run Activity-dependent tests when the
+ // installed React actually provides it.
+@@ -136,7 +139,7 @@ describe('useFieldArray', () => {
      });
  
      it('should render with FormProvider', () => {
@@ -22,7 +22,7 @@ diff --git a/tests/upstream/useFieldArray.test.tsx b/tests/upstream/useFieldArra
          const methods = useForm();
          return <FormProvider {...methods}>{children}</FormProvider>;
        };
-@@ -3409,7 +3412,7 @@ describe('useFieldArray', () => {
+@@ -3472,7 +3475,7 @@ describe('useFieldArray', () => {
        );
      }
  

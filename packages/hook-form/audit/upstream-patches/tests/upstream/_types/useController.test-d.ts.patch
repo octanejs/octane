@@ -1,0 +1,9 @@
+diff --git a/tests/upstream/_types/useController.test-d.ts b/tests/upstream/_types/useController.test-d.ts
+--- a/tests/upstream/_types/useController.test-d.ts
++++ b/tests/upstream/_types/useController.test-d.ts
+@@ -1,4 +1,4 @@
+-import { useController } from '../../src/useController';
++import { useController } from '../../../src/useController';
+ 
+ import type { Equal, Expect, NotEqual } from './__fixtures__';
+ 

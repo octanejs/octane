@@ -1,4 +1,4 @@
-// Vendored from react-hook-form@7.81.0 src/logic/validateField.ts (octane port).
+// Adapted from react-hook-form@7.88.0 src/logic/validateField.ts for Octane.
 import { INPUT_VALIDATION_RULES } from '../constants';
 import type {
 	Field,
@@ -14,6 +14,7 @@ import type {
 import get from '../utils/get';
 import isBoolean from '../utils/isBoolean';
 import isCheckBoxInput from '../utils/isCheckBoxInput';
+import isDateObject from '../utils/isDateObject';
 import isEmptyObject from '../utils/isEmptyObject';
 import isFileInput from '../utils/isFileInput';
 import isFunction from '../utils/isFunction';
@@ -128,7 +129,11 @@ export default async <T extends FieldValues>(
 		const maxOutput = getValueAndMessage(max);
 		const minOutput = getValueAndMessage(min);
 
-		if (!isNullOrUndefined(inputValue) && !isNaN(inputValue as number)) {
+		if (
+			!isNullOrUndefined(inputValue) &&
+			!isDateObject(inputValue) &&
+			!isNaN(inputValue as number)
+		) {
 			const valueNumber =
 				(ref as HTMLInputElement).valueAsNumber || (inputValue ? +inputValue : inputValue);
 			if (!isNullOrUndefined(maxOutput.value)) {
@@ -248,7 +253,9 @@ export default async <T extends FieldValues>(
 						...appendErrorsCurry(key, validateError.message),
 					};
 
-					setCustomValidity(validateError.message);
+					if (!validateAllFieldCriteria) {
+						setCustomValidity(validateError.message);
+					}
 
 					if (validateAllFieldCriteria) {
 						error[name] = validationResult;
@@ -268,6 +275,9 @@ export default async <T extends FieldValues>(
 		}
 	}
 
-	setCustomValidity(true);
+	const fieldError = error[name];
+
+	setCustomValidity(fieldError ? fieldError.message : true);
+
 	return error;
 };

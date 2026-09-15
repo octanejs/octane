@@ -1,0 +1,11 @@
+diff --git a/tests/upstream/_types/watch.test-d.ts b/tests/upstream/_types/watch.test-d.ts
+--- a/tests/upstream/_types/watch.test-d.ts
++++ b/tests/upstream/_types/watch.test-d.ts
+@@ -1,5 +1,5 @@
+-import { useForm } from '../../src/useForm';
+-import { Watch } from '../../src/watch.tsrx';
++import { useForm } from '../../../src/useForm';
++import { Watch } from '../../../src/watch.tsrx';
+ 
+ import type { Equal, Expect } from './__fixtures__';
+ 

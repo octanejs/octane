@@ -4,7 +4,7 @@
     {
       "path": "packages/colorful/audit/type-probes/public-api.test.ts",
       "disposition": "paired-repo-authored-react-type-oracle",
-      "oracle": "Repo-authored pristine React declaration/type-oracle probes against pinned react-colorful 5.8.0, paired with packages/colorful/typetests/public-api.test.ts (pristine type-probe lane)."
+      "oracle": "Repo-authored pristine React declaration/type-oracle probes against pinned react-colorful 5.8.1, paired with packages/colorful/typetests/public-api.test.ts (pristine type-probe lane)."
     },
     {
       "path": "packages/colorful/tests/browser/parity.browser.test.ts",
@@ -14,7 +14,7 @@
     {
       "path": "packages/colorful/tests/differential/parity.test.ts",
       "disposition": "react-octane-differential",
-      "oracle": "Runs the controlled picker scenario against published react-colorful@5.8.0 on the exact React oracle catalog."
+      "oracle": "Runs the controlled picker scenario against published react-colorful@5.8.1 on the exact React oracle catalog."
     },
     {
       "path": "packages/colorful/tests/hydration/hydration.test.ts",
@@ -52,7 +52,7 @@
       "oracle": "One-for-one adapted title from tag/tests/shadowDom.test.js against the Octane binding."
     },
     {
-      "path": "packages/colorful/tests/upstream/utils.test.ts",
+      "path": "packages/colorful/tests/upstream/generated/utils.test.js",
       "disposition": "adapted-upstream-suite",
       "oracle": "One-for-one adapted titles from tag/tests/utils.test.js against the Octane binding."
     },
@@ -60,6 +60,21 @@
       "path": "packages/colorful/typetests/public-api.test.ts",
       "disposition": "adapted-upstream-suite",
       "oracle": "One-for-one adapted Octane public type probes paired with audit/type-probes/public-api.test.ts after permitted transformations."
+    },
+    {
+      "path": "packages/colorful/tests/runtime/lifecycle.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Proves focus, ref ownership and keyed picker identity through controlled updates, reordering and removal."
+    },
+    {
+      "path": "packages/colorful/tests/types/public.test-d.ts",
+      "disposition": "paired-repo-authored-type-probes",
+      "oracle": "Exact color models and input color shapes for every public export, paired with the pristine npm declaration program."
+    },
+    {
+      "path": "packages/colorful/tests/types/pristine.test-d.ts",
+      "disposition": "paired-repo-authored-react-type-oracle",
+      "oracle": "The same complete export assertions and invalid-input controls against the SRI-verified 5.8.1 npm declaration authority."
     }
   ]
 }

@@ -182,6 +182,275 @@ test('mixed cleanup binds type projects and crosswalks to the same pinned copied
 	assert.equal(report.status, 'blocked', 'Focused runtime/type/pack gates still require execution');
 });
 
+test('accumulates per-program upstream type coverage and mirrors a pinned compiler option', (t) => {
+	const context = createReadyBatch();
+	const workspaceRoot = realpathSync(context.workspaceRoot);
+	const workRoot = realpathSync(context.workRoot);
+	const batchDirectory = realpathSync(context.batchDirectory);
+	const initialPath = path.join(batchDirectory, 'manifest.json');
+	const initial = JSON.parse(readFileSync(initialPath, 'utf8'));
+	initial.workspaceRoot = workspaceRoot;
+	writeFileSync(initialPath, JSON.stringify(initial));
+	t.after(() => rmSync(workspaceRoot, { recursive: true, force: true }));
+	const common = ['--work-root', workRoot, '--batch', 'fixture-batch', '--node', 'pkg:widget'];
+	assert.equal(runEvidence(['init', ...common, '--category', 'thin-core']).status, 0);
+	const packageDirectory = createCompletePackage(workspaceRoot);
+	const write = (file, value) => {
+		mkdirSync(path.dirname(path.join(packageDirectory, file)), { recursive: true });
+		writeFileSync(
+			path.join(packageDirectory, file),
+			typeof value === 'string' ? value : JSON.stringify(value),
+		);
+	};
+	const pkg = JSON.parse(readFileSync(path.join(packageDirectory, 'package.json'), 'utf8'));
+	pkg.dependencies = { widget: '1.0.0' };
+	write('package.json', pkg);
+	const copied = 'export const copied = true;\n';
+	write('src/index.ts', "export * from 'widget';\nexport { copied } from './copied';\n");
+	write('src/copied.ts', copied);
+	write('audit/source-ledger.json', [
+		{
+			path: 'src/index.ts',
+			origin: 'authored',
+			sha256: sha256("export * from 'widget';\nexport { copied } from './copied';\n"),
+		},
+		{
+			path: 'src/copied.ts',
+			origin: 'adapted',
+			packageName: 'widget',
+			sha256: sha256(copied),
+		},
+	]);
+	const status = JSON.parse(readFileSync(path.join(packageDirectory, 'status.json'), 'utf8'));
+	status.surfaces = [
+		{
+			entrypoint: '.',
+			exports: ['*'],
+			ownership: 'imported',
+			files: ['src/index.ts'],
+			dependency: { package: 'widget', version: '1.0.0' },
+			evidence: ['tests/widget.test.ts'],
+		},
+		{
+			entrypoint: '.',
+			exports: ['copied'],
+			ownership: 'copied',
+			files: ['src/copied.ts'],
+			dependency: { package: 'widget', version: '1.0.0' },
+			upstreamPaths: ['src/copied.ts', 'tests', 'tsconfig.json'],
+			evidence: ['tests/widget.test.ts'],
+		},
+	];
+	write('status.json', status);
+	const typeSource = (label) =>
+		`declare const value: '${label}';\nvalue satisfies '${label}';\n// @ts-expect-error value is literal\nconst invalid: 'other' = value;\n`;
+	const sources = new Map([
+		['src/copied.ts', copied],
+		['tests/a.types.ts', typeSource('a')],
+		['tests/b.types.ts', typeSource('b')],
+		['tsconfig.json', JSON.stringify({ compilerOptions: { skipLibCheck: true } })],
+	]);
+	const lock = buildUpstreamLock({
+		identity: fixtureIdentity({ packageName: 'widget' }),
+		license: { spdx: 'MIT' },
+		treeEntries: fixtureTreeEntries(sources),
+	});
+	write('audit/upstream.lock.json', lock);
+	for (const [file, bytes] of sources) write(`upstream/${file}`, bytes);
+	const inventoryEntry = (file, id) => ({
+		path: file,
+		kind: 'type',
+		gitBlob: gitBlobSha1(Buffer.from(sources.get(file))),
+		size: Buffer.byteLength(sources.get(file)),
+		registrations: [
+			{
+				id,
+				source: `${file}:1`,
+				kind: 'type-assertion',
+				declarationId: id,
+				estimatedRegistrations: 1,
+				registrationIndex: 0,
+			},
+		],
+	});
+	const batchPath = path.join(batchDirectory, 'manifest.json');
+	const batch = JSON.parse(readFileSync(batchPath, 'utf8'));
+	const node = batch.nodes['pkg:widget'];
+	node.upstreamTestInventory = [
+		inventoryEntry('tests/a.types.ts', 'type-a'),
+		inventoryEntry('tests/b.types.ts', 'type-b'),
+	];
+	writeFileSync(batchPath, JSON.stringify(batch));
+	const writeProgram = (name, id, { mirror = true } = {}) =>
+		write(`tests/types/upstream/tsconfig.pristine-${name}.json`, {
+			compilerOptions: {
+				strict: true,
+				skipLibCheck: mirror,
+				noEmit: true,
+			},
+			files: [`../../../upstream/tests/${name}.types.ts`],
+			reactPortEvidence: {
+				gate: 'upstream-types-pristine',
+				upstreamMode: 'materialized',
+				upstreamProgram: `program-${name}`,
+				upstreamRegistrations: [id],
+				...(mirror ? { mirrorsUpstreamCompilerOptions: true } : {}),
+			},
+		});
+	writeProgram('a', 'type-a');
+	writeProgram('b', 'type-b');
+	const gateCommand = (name) => [
+		'pnpm',
+		'exec',
+		'tsc',
+		'--noEmit',
+		'-p',
+		`packages/widget/tests/types/upstream/tsconfig.pristine-${name}.json`,
+	];
+	const gateState = () =>
+		JSON.parse(readFileSync(batchPath, 'utf8')).nodes['pkg:widget'].evidenceMatrix.gates[
+			'upstream-types-pristine'
+		];
+
+	// A strict program needs no mirror marker even though the pinned upstream
+	// tsconfig disables library checking.
+	write('tests/types/upstream/tsconfig.pristine-strict.json', {
+		compilerOptions: { strict: true, skipLibCheck: false, noEmit: true },
+		files: ['../../../upstream/tests/a.types.ts'],
+		reactPortEvidence: {
+			gate: 'upstream-types-pristine',
+			upstreamMode: 'materialized',
+			upstreamProgram: 'program-strict',
+			upstreamRegistrations: ['type-a'],
+		},
+	});
+	assert.doesNotThrow(() =>
+		assertApprovedGateCommand(
+			['upstream-types-pristine'],
+			[
+				'pnpm',
+				'exec',
+				'tsc',
+				'--noEmit',
+				'-p',
+				'packages/widget/tests/types/upstream/tsconfig.pristine-strict.json',
+			],
+			node,
+			{ workspaceRoot },
+		),
+	);
+	// A foreign registration can never be claimed by any program.
+	write('tests/types/upstream/tsconfig.pristine-foreign.json', {
+		compilerOptions: { strict: true, skipLibCheck: true, noEmit: true },
+		files: ['../../../upstream/tests/a.types.ts'],
+		reactPortEvidence: {
+			gate: 'upstream-types-pristine',
+			upstreamMode: 'materialized',
+			upstreamProgram: 'program-foreign',
+			upstreamRegistrations: ['type-foreign'],
+			mirrorsUpstreamCompilerOptions: true,
+		},
+	});
+	assert.throws(
+		() =>
+			assertApprovedGateCommand(
+				['upstream-types-pristine'],
+				[
+					'pnpm',
+					'exec',
+					'tsc',
+					'--noEmit',
+					'-p',
+					'packages/widget/tests/types/upstream/tsconfig.pristine-foreign.json',
+				],
+				node,
+				{ workspaceRoot },
+			),
+		/not bound to the pinned immutable type inventory/,
+	);
+	// The mirror marker alone is not enough: skipLibCheck:true requires the flag.
+	write('tests/types/upstream/tsconfig.pristine-unmarked.json', {
+		compilerOptions: { strict: true, skipLibCheck: true, noEmit: true },
+		files: ['../../../upstream/tests/a.types.ts'],
+		reactPortEvidence: {
+			gate: 'upstream-types-pristine',
+			upstreamMode: 'materialized',
+			upstreamProgram: 'program-unmarked',
+			upstreamRegistrations: ['type-a'],
+		},
+	});
+	assert.throws(
+		() =>
+			assertApprovedGateCommand(
+				['upstream-types-pristine'],
+				[
+					'pnpm',
+					'exec',
+					'tsc',
+					'--noEmit',
+					'-p',
+					'packages/widget/tests/types/upstream/tsconfig.pristine-unmarked.json',
+				],
+				node,
+				{ workspaceRoot },
+			),
+		/disable skipLibCheck/,
+	);
+
+	write('closure.json', {
+		runtimeDependencies: ['widget'],
+		adaptedSources: [{ packageName: 'widget', paths: ['src/copied.ts'] }],
+		sourceLedger: JSON.parse(
+			readFileSync(path.join(packageDirectory, 'audit/source-ledger.json'), 'utf8'),
+		),
+	});
+	const migrated = runEvidence([
+		'migrate',
+		...common,
+		'--closure',
+		path.join(packageDirectory, 'closure.json'),
+	]);
+	assert.equal(migrated.status, 0, migrated.stderr);
+
+	const first = runEvidence([
+		'run',
+		...common,
+		'--gate',
+		'upstream-types-pristine',
+		'--',
+		...gateCommand('a'),
+	]);
+	assert.equal(first.status, 0, first.stderr);
+	assert.equal(gateState().status, 'blocked');
+	assert.equal(gateState().programs['program-a'].status, 'passed');
+	assert.deepEqual(gateState().programs['program-a'].registrations, ['type-a']);
+
+	const second = runEvidence([
+		'run',
+		...common,
+		'--gate',
+		'upstream-types-pristine',
+		'--',
+		...gateCommand('b'),
+	]);
+	assert.equal(second.status, 0, second.stderr);
+	assert.equal(gateState().status, 'passed');
+	assert.deepEqual(Object.keys(gateState().programs).sort(), ['program-a', 'program-b']);
+
+	// Re-running a program replaces its recorded slice without double counting.
+	const third = runEvidence([
+		'run',
+		...common,
+		'--gate',
+		'upstream-types-pristine',
+		'--',
+		...gateCommand('a'),
+	]);
+	assert.equal(third.status, 0, third.stderr);
+	assert.equal(gateState().status, 'passed');
+	assert.equal(Object.keys(gateState().programs).length, 2);
+});
+
 test('surface ownership requires an explicit scoped evidence migration and changing source invalidates the result', (t) => {
 	const { workspaceRoot, workRoot, batchDirectory } = createReadyBatch();
 	t.after(() => rmSync(workspaceRoot, { recursive: true, force: true }));
@@ -1320,6 +1589,38 @@ describe('evidence CLI', () => {
 			"import { list, load, safe } from '@octanejs/widget';\nsafe satisfies <T = string>(input: { value: T }) => { value: T };\nload satisfies () => Promise<{ value: string }>;\nlist satisfies () => Array<string>;\n// @ts-expect-error safe rejects a mismatched value\nsafe<string>({ value: 1 });\n",
 		);
 
+		assert.doesNotThrow(() =>
+			assertApprovedGateCommand(
+				['public-types'],
+				[
+					'pnpm',
+					'exec',
+					'tsrx-tsc',
+					'--noEmit',
+					'-p',
+					'packages/widget/tests/types/public/tsconfig.json',
+				],
+				{
+					binding: '@octanejs/widget',
+					bindingDirectory: 'packages/widget',
+					upstreamTestInventory: [],
+				},
+				{ workspaceRoot },
+			),
+		);
+	});
+
+	test('checks a named imported generic interface as a type rather than a value', () => {
+		const { workspaceRoot } = createReadyBatch();
+		const packageDirectory = createCompletePackage(workspaceRoot);
+		writeFileSync(
+			path.join(packageDirectory, 'src/index.ts'),
+			'export interface Readable<T> { (): T; }\n',
+		);
+		writeFileSync(
+			path.join(packageDirectory, 'tests/types/public/public.ts'),
+			"import type { Readable } from '@octanejs/widget';\nimport type { Assert, Equal } from '../../../../../scripts/react-port/type-assertions.js';\ntype Shape = Assert<Equal<ReturnType<Readable<string>>, string>>;\n// @ts-expect-error a string reader cannot return a number\nconst invalid: Readable<string> = () => 1;\n",
+		);
 		assert.doesNotThrow(() =>
 			assertApprovedGateCommand(
 				['public-types'],
@@ -3643,4 +3944,28 @@ describe('evidence CLI', () => {
 			path.join(workRoot, 'fixture-batch', 'manifest.json'),
 		);
 	});
+});
+
+test('counts workspace binary paths alongside a delegated pristine test runner', (t) => {
+	const { workspaceRoot } = createReadyBatch();
+	t.after(() => rmSync(workspaceRoot, { recursive: true, force: true }));
+	const directory = createCompletePackage(workspaceRoot);
+	const file = path.join(directory, 'package.json');
+	const manifest = JSON.parse(readFileSync(file, 'utf8'));
+	manifest.scripts.test =
+		'../../node_modules/.bin/vitest run --project adapted && pnpm test:pristine && ../../node_modules/.bin/vitest run --project browser';
+	manifest.scripts['test:pristine'] = 'vitest run --config pristine.config.ts';
+	writeFileSync(file, JSON.stringify(manifest));
+	const inspect = () =>
+		assertApprovedGateCommand(
+			['package-tests'],
+			['pnpm', '--dir', 'packages/widget', 'test'],
+			{ bindingDirectory: 'packages/widget' },
+			{ workspaceRoot },
+		).packageTestPlan;
+	assert.deepEqual(inspect().runners, ['vitest', 'vitest', 'vitest']);
+	manifest.scripts.test =
+		'../../node_modules/.bin/vitest list && pnpm test:pristine && ../../node_modules/.bin/vitest --help';
+	writeFileSync(file, JSON.stringify(manifest));
+	assert.deepEqual(inspect().runners, ['vitest']);
 });

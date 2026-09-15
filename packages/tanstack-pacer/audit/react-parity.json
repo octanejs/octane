@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "59b5197a457d62d05aa8866334bc41567581c414b30452a047b00c020d587883"
+      "lockfileSha256": "86e22c8a3652c4663ce8e347d3769f0572c09a1d66c39ed789bd914709b53946"
     }
   },
   "lanes": [
@@ -320,7 +320,7 @@
         {
           "path": "packages/octane/tests/_hydration-ssr.ts",
           "role": "support",
-          "sha256": "f6ec7d5cb3ca4786cda227ba6e518e707996b179e4be2bb9c8935ea4ef4cdfeb"
+          "sha256": "2140e4ed078ad56e70a3449ff557b0450ee598cf523f5e0c9013a793ff07e48b"
         }
       ]
     }

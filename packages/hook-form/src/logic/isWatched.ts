@@ -1,4 +1,4 @@
-// Vendored from react-hook-form@7.81.0 src/logic/isWatched.ts (octane port).
+// Adapted from react-hook-form@7.88.0 src/logic/isWatched.ts for Octane.
 import type { InternalFieldName, Names } from '../types';
 
 export default (name: InternalFieldName, _names: Names, isBlurEvent?: boolean) => {

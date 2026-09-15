@@ -462,6 +462,38 @@ declare namespace NodeJS { interface Process { env: { NODE_ENV?: string } } }
 		);
 	});
 
+	test('enrolls MobX authored TypeScript in packed source and browser checks', () => {
+		const name = '@octanejs/mobx';
+		const packages = [{ name, private: false, role: 'framework binding' }];
+		const files = new Map([[name, new Set(['src/index.ts', 'src/observer.ts'])]]);
+		assert.deepEqual(findPackedTsrxSourceConsumerPackages(packages, files), [name, 'octane']);
+		assert.ok(PACKED_STRICT_BROWSER_SOURCE_PACKAGES.includes(name));
+		for (const source of [
+			renderPackedTsrxConsumerTypeProbe(),
+			renderPackedStrictBrowserConsumerTypeProbe(),
+		]) {
+			assert.match(source, /PackedMobxCount = PackedMobxAssert/);
+			assert.match(source, /packedMobxLocal.set\('count', 'invalid'\)/);
+		}
+	});
+
+	test('enrolls Alien Signals source and precise contracts in both packed consumer contexts', () => {
+		const name = '@octanejs/alien-signals';
+		const packages = [{ name, private: false, role: 'framework binding' }];
+		const files = new Map([[name, new Set(['src/index.ts', 'src/internal.ts'])]]);
+		assert.deepEqual(findPackedTsrxSourceConsumerPackages(packages, files), [name, 'octane']);
+		assert.ok(PACKED_STRICT_BROWSER_SOURCE_PACKAGES.includes(name));
+		for (const source of [
+			renderPackedTsrxConsumerTypeProbe(),
+			renderPackedStrictBrowserConsumerTypeProbe(),
+		]) {
+			assert.match(source, /PackedAlienExports = PackedAlienAssert/);
+			assert.match(source, /PackedAlienSelection = PackedAlienAssert/);
+			assert.match(source, /PackedAlien\.useSetSignal\(packedAlienCount\)\('wrong'\)/);
+			assert.match(source, /packedAlienComputed\(1\)/);
+		}
+	});
+
 	test('installs the complete packed workspace dependency closure', () => {
 		const manifests = new Map([
 			['@octanejs/source', { dependencies: { '@octanejs/helper': '1.0.0' } }],

@@ -1,4 +1,5 @@
-// Vendored from react-hook-form@7.81.0 src/types/fieldArray.ts (octane port).
+import type { OctaneNode } from 'octane';
+// Adapted from react-hook-form@7.88.0 src/types/fieldArray.ts for Octane.
 import type { FieldValues } from './fields';
 import type { Control } from './form';
 import type { FieldArrayPath, FieldArrayPathValue } from './path';
@@ -282,5 +283,5 @@ export type FieldArrayProps<
 	TFieldArrayName extends FieldArrayPath<TFieldValues> = FieldArrayPath<TFieldValues>,
 	TKeyName extends string = 'id',
 > = {
-	render: (fieldArray: UseFieldArrayReturn<TFieldValues, TFieldArrayName, TKeyName>) => unknown; // octane: upstream's React.ReactElement — any octane renderable
+	render: (fieldArray: UseFieldArrayReturn<TFieldValues, TFieldArrayName, TKeyName>) => OctaneNode;
 } & UseFieldArrayProps<TFieldValues, TFieldArrayName, TKeyName>;

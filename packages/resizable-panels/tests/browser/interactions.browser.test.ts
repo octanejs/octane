@@ -1,9 +1,11 @@
 import { createServer as createNetServer } from 'node:net';
+import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createServer, type ViteDevServer } from 'vite';
 import { octane } from '../../../octane/src/compiler/vite.js';
+import { renderHydrationFixture } from '../../../octane/tests/_hydration-ssr';
 
 const testRoot = dirname(fileURLToPath(import.meta.url));
 const harnessRoot = resolve(testRoot, 'harness');
@@ -36,7 +38,59 @@ beforeAll(async () => {
 		root: harnessRoot,
 		logLevel: 'error',
 		server: { host: '127.0.0.1', port, strictPort: true },
-		plugins: [octane()],
+		plugins: [
+			{
+				name: 'resizable-layout-hydration',
+				configureServer(server) {
+					server.middlewares.use(async (request, response, next) => {
+						if (request.url?.split('?')[0] !== '/layout') return next();
+						try {
+							const cookie = request.headers.cookie
+								?.split('; ')
+								.find((value) => value.startsWith('rrp-layout='));
+							const storedLayout = cookie
+								? JSON.parse(decodeURIComponent(cookie.slice('rrp-layout='.length)))
+								: { 'layout-left': 40, 'layout-right': 60 };
+							const left = storedLayout['layout-left'];
+							const right = storedLayout['layout-right'];
+							if (
+								typeof left !== 'number' ||
+								typeof right !== 'number' ||
+								!Number.isFinite(left) ||
+								!Number.isFinite(right) ||
+								left < 0 ||
+								right < 0 ||
+								Math.abs(left + right - 100) > 0.01
+							)
+								throw new Error('Invalid persisted layout');
+							const initialLayout = { 'layout-left': left, 'layout-right': right };
+							const props = { initialLayout };
+							const ssr = request.url?.includes('ssr=1');
+							const rendered = ssr
+								? await renderHydrationFixture(
+										'react-resizable-panels',
+										'packages/resizable-panels/tests/_fixtures/layout-hydration.tsrx',
+										'LayoutHydrationFixture',
+										props,
+									)
+								: { html: '' };
+							const template = await readFile(resolve(harnessRoot, 'index.html'), 'utf8');
+							const html = template
+								.replace(
+									'<div id="root"></div>',
+									`<div id="root" data-props='${JSON.stringify(props)}'>${rendered.html}</div>`,
+								)
+								.replace('/main.tsrx', '/layout.tsrx');
+							response.setHeader('Content-Type', 'text/html');
+							response.end(await server.transformIndexHtml('/layout', html));
+						} catch (error) {
+							next(error);
+						}
+					});
+				},
+			},
+			octane(),
+		],
 		resolve: {
 			alias: [
 				{ find: /^@octanejs\/resizable-panels$/, replacement: bindingSource },
@@ -80,6 +134,46 @@ async function widths(groupId = 'primary') {
 }
 
 describe('@octanejs/resizable-panels real Chromium behavior', () => {
+	for (const ssr of [false, true]) {
+		it(`preserves saved layout without shifting on ${ssr ? 'SSR hydration' : 'client startup'}`, async () => {
+			await context.addInitScript(() => {
+				const observations = { shift: 0 };
+				Object.assign(window, { layoutObservations: observations });
+				new PerformanceObserver((list) => {
+					for (const entry of list.getEntries()) {
+						const shift = entry as PerformanceEntry & { hadRecentInput: boolean; value: number };
+						if (!shift.hadRecentInput) observations.shift += shift.value;
+					}
+				}).observe({ type: 'layout-shift', buffered: true });
+			});
+			await page.goto(`${origin}/layout?ssr=${ssr ? 1 : 0}`, { waitUntil: 'networkidle' });
+			await page.locator('#root[data-ready="true"]').waitFor();
+			if (ssr) expect(await page.locator('#root').getAttribute('data-adopted')).toBe('true');
+			const before = await widths('layout-group');
+			await page.locator('#layout-separator').focus();
+			await page.keyboard.press('ArrowRight');
+			await expect.poll(() => widths('layout-group')).not.toEqual(before);
+			await expect
+				.poll(() =>
+					context
+						.cookies()
+						.then((cookies) => cookies.some((cookie) => cookie.name === 'rrp-layout')),
+				)
+				.toBe(true);
+			const saved = await widths('layout-group');
+			await page.reload({ waitUntil: 'networkidle' });
+			await page.locator('#root[data-ready="true"]').waitFor();
+			await expect.poll(() => widths('layout-group')).toEqual(saved);
+			if (ssr) expect(await page.locator('#root').getAttribute('data-adopted')).toBe('true');
+			expect(
+				await page.evaluate(
+					() =>
+						(window as Window & { layoutObservations: { shift: number } }).layoutObservations.shift,
+				),
+			).toBe(0);
+		});
+	}
+
 	it('drags a geometry-derived pointer hit region', async () => {
 		const separator = await page.locator('#primary-separator').boundingBox();
 		if (!separator) throw new Error('separator has no bounds');

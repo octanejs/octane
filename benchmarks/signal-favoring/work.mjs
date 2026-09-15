@@ -1,8 +1,10 @@
 // Deterministic, untimed production-work gate for Octane's TSRX/TSX twins.
-// Run against the production previews; the normal Vite configs are already
-// unminified, and --jitless keeps precise-call-coverage attribution stable.
+// Rebuild the production previews without minification after the timed run so
+// --jitless precise call coverage can attribute the original function names.
 
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import { deterministicCount, deterministicStatForJson } from '../lib/dom-nodes.mjs';
 import { collectPreciseCalls } from '../lib/precise-work.mjs';
@@ -11,6 +13,15 @@ const TARGETS = [
 	{ name: 'octane-tsrx', url: 'http://localhost:5190/' },
 	{ name: 'octane-jsx', url: 'http://localhost:5194/' },
 ];
+
+// Normal benchmark builds stay minified. These diagnostic assets are used only
+// by this untimed work pass, matching the recursive-context work harness.
+for (const target of TARGETS) {
+	execFileSync('pnpm', ['exec', 'vite', 'build', '--minify', 'false'], {
+		cwd: fileURLToPath(new URL(`${target.name}/`, import.meta.url)),
+		stdio: 'inherit',
+	});
+}
 
 const METRICS = [
 	'renderBlock',

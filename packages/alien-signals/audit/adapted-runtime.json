@@ -5,6 +5,56 @@
   "files": ["packages/alien-signals/tests/upstream-adapted.test.ts"],
   "tests": [
     {
+      "id": "runtime:26a7b579cc6f35cb",
+      "file": "packages/alien-signals/tests/upstream-adapted.test.ts",
+      "fullName": "Alien React Library Alien Signals 3 and React 19.2 integration batches multiple writes into one propagation"
+    },
+    {
+      "id": "runtime:2be20c0d63a7acb5",
+      "file": "packages/alien-signals/tests/upstream-adapted.test.ts",
+      "fullName": "Alien React Library Alien Signals 3 and React 19.2 integration cleans a manually stopped React scope exactly once"
+    },
+    {
+      "id": "runtime:acfb38b4acba63a1",
+      "file": "packages/alien-signals/tests/upstream-adapted.test.ts",
+      "fullName": "Alien React Library Alien Signals 3 and React 19.2 integration does not create a signal scope during server rendering"
+    },
+    {
+      "id": "runtime:01a404d96d5f1877",
+      "file": "packages/alien-signals/tests/upstream-adapted.test.ts",
+      "fullName": "Alien React Library Alien Signals 3 and React 19.2 integration keeps snapshots consistent when a signal write occurs in a transition"
+    },
+    {
+      "id": "runtime:ad522f73b51319fb",
+      "file": "packages/alien-signals/tests/upstream-adapted.test.ts",
+      "fullName": "Alien React Library Alien Signals 3 and React 19.2 integration lets React automatically batch multiple signal notifications into one render"
+    },
+    {
+      "id": "runtime:037bd8cb7c0bb4f2",
+      "file": "packages/alien-signals/tests/upstream-adapted.test.ts",
+      "fullName": "Alien React Library Alien Signals 3 and React 19.2 integration manually triggers dependents after an in-place mutation"
+    },
+    {
+      "id": "runtime:431cbe704b8bca62",
+      "file": "packages/alien-signals/tests/upstream-adapted.test.ts",
+      "fullName": "Alien React Library Alien Signals 3 and React 19.2 integration offers a deferred snapshot without changing the source value"
+    },
+    {
+      "id": "runtime:acaeb1c38c18fcac",
+      "file": "packages/alien-signals/tests/upstream-adapted.test.ts",
+      "fullName": "Alien React Library Alien Signals 3 and React 19.2 integration runs insertion, layout, and passive signal effects in React order"
+    },
+    {
+      "id": "runtime:401ea00d686ab659",
+      "file": "packages/alien-signals/tests/upstream-adapted.test.ts",
+      "fullName": "Alien React Library Alien Signals 3 and React 19.2 integration shares a source safely across multiple React subscribers"
+    },
+    {
+      "id": "runtime:ab03f75de308dd7d",
+      "file": "packages/alien-signals/tests/upstream-adapted.test.ts",
+      "fullName": "Alien React Library Alien Signals 3 and React 19.2 integration skips React renders when a selected signal slice is unchanged"
+    },
+    {
       "id": "runtime:aff2452cdc441557",
       "file": "packages/alien-signals/tests/upstream-adapted.test.ts",
       "fullName": "Alien React Library should cleanup all subscriptions on unmount"

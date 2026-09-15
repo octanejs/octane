@@ -1,0 +1,400 @@
+diff --git a/tests/upstream/trans.render.spec.jsx b/tests/upstream/trans.render.spec.jsx
+--- a/tests/upstream/trans.render.spec.jsx
++++ b/tests/upstream/trans.render.spec.jsx
+@@ -1,3 +1,4 @@
++// OCTANE DIVERGENCE[inspectable-children]: Trans inspects explicit descriptor children; Translation receives its callback as a prop.
+ import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
+ import * as React from 'octane';
+ import { useRef, useEffect } from 'octane';
+@@ -18,9 +19,9 @@ describe('trans simple', () => {
+ 
+   function TestComponent({ parent }) {
+     return (
+-      <Trans i18nKey="transTest1" parent={parent}>
++      <Trans i18nKey="transTest1" parent={parent} children={<>
+         Open <Link to="/msgs">here</Link>.
+-      </Trans>
++      </>} />
+     );
+   }
+ 
+@@ -58,9 +59,9 @@ describe('trans simple', () => {
+ describe('trans simple using ns prop', () => {
+   function TestComponent({ parent }) {
+     return (
+-      <Trans i18nKey="transTest1" ns="other" parent={parent}>
++      <Trans i18nKey="transTest1" ns="other" parent={parent} children={<>
+         Open <Link to="/msgs">here</Link>.
+-      </Trans>
++      </>} />
+     );
+   }
+ 
+@@ -83,10 +84,10 @@ describe('trans simple using ns prop', () => {
+ describe('trans using translation prop', () => {
+   function TestComponent({ parent }) {
+     return (
+-      <Trans i18nKey="transTest3" parent={parent}>
++      <Trans i18nKey="transTest3" parent={parent} children={<>
+         {/* eslint-disable-next-line jsx-a11y/anchor-has-content */}
+         <a />
+-      </Trans>
++      </>} />
+     );
+   }
+ 
+@@ -108,10 +109,10 @@ describe('trans using translation prop', () => {
+ describe('trans overwrites translation prop', () => {
+   function TestComponent({ parent }) {
+     return (
+-      <Trans i18nKey="transTest3_overwrite" parent={parent}>
++      <Trans i18nKey="transTest3_overwrite" parent={parent} children={<>
+         {/* eslint-disable-next-line jsx-a11y/anchor-has-content, jsx-a11y/control-has-associated-label */}
+         <a href="https://www.bing.com" />
+-      </Trans>
++      </>} />
+     );
+   }
+ 
+@@ -133,9 +134,9 @@ describe('trans overwrites translation prop', () => {
+ describe('trans simple with custom html tag', () => {
+   function TestComponent({ parent }) {
+     return (
+-      <Trans i18nKey="transTest1_customHtml" parent={parent}>
++      <Trans i18nKey="transTest1_customHtml" parent={parent} children={<>
+         Open <Link to="/msgs">here</Link>.
+-      </Trans>
++      </>} />
+     );
+   }
+ 
+@@ -209,7 +210,7 @@ describe('trans keep-tag wrapping a non-keep React element (#1919)', () => {
+ 
+   it('preserves non-keep child elements (e.g. <a>) inside a kept <p>', () => {
+     const { container } = render(
+-      <Trans i18n={i18n}>
++      <Trans i18n={i18n} children={<>
+         <div>
+           <ul>
+             <li>PDF</li>
+@@ -218,7 +219,7 @@ describe('trans keep-tag wrapping a non-keep React element (#1919)', () => {
+             You can <a href="http://example.com">click here</a>.
+           </p>
+         </div>
+-      </Trans>,
++      </>} />,
+     );
+     expect(container.firstElementChild).toMatchInlineSnapshot(`
+       <div>
+@@ -279,9 +280,9 @@ describe('trans testTransKey1 singular', () => {
+   function TestComponent() {
+     const numOfItems = 1;
+     return (
+-      <Trans i18nKey="testTransKey1" count={numOfItems}>
++      <Trans i18nKey="testTransKey1" count={numOfItems} children={<>
+         {{ numOfItems }} items matched.
+-      </Trans>
++      </>} />
+     );
+   }
+ 
+@@ -300,9 +301,9 @@ describe('trans testTransKey1 plural', () => {
+   function TestComponent() {
+     const numOfItems = 10;
+     return (
+-      <Trans i18nKey="testTransKey1" count={numOfItems}>
++      <Trans i18nKey="testTransKey1" count={numOfItems} children={<>
+         {{ numOfItems }} items matched.
+-      </Trans>
++      </>} />
+     );
+   }
+ 
+@@ -321,9 +322,9 @@ describe('trans testTransKey2', () => {
+   function TestComponent() {
+     const numOfItems = 10;
+     return (
+-      <Trans i18nKey="testTransKey2" count={numOfItems}>
++      <Trans i18nKey="testTransKey2" count={numOfItems} children={<>
+         <span className="matchCount">{{ numOfItems }}</span> items matched.
+-      </Trans>
++      </>} />
+     );
+   }
+ 
+@@ -346,9 +347,9 @@ describe('trans testTransKey3', () => {
+   function TestComponent() {
+     const numOfItems = 10;
+     return (
+-      <Trans i18nKey="testTransKey3" count={numOfItems}>
++      <Trans i18nKey="testTransKey3" count={numOfItems} children={<>
+         Result: <span className="matchCount">{{ numOfItems }}</span> items matched.
+-      </Trans>
++      </>} />
+     );
+   }
+ 
+@@ -374,9 +375,9 @@ describe('trans complex', () => {
+     const name = 'Jan';
+     // prettier-ignore
+     return (
+-      <Trans i18nKey="transTest2" count={count}>
++      <Trans i18nKey="transTest2" count={count} children={<>
+         Hello <strong>{{ name }}</strong>, you have {{ count }} message. Open <Link to="/msgs">here</Link>.
+-      </Trans>
++      </>} />
+     );
+   }
+ 
+@@ -408,9 +409,9 @@ describe('trans complex - count only in props', () => {
+     const name = 'Jan';
+     // prettier-ignore
+     return (
+-      <Trans i18nKey="transTest2" count={count}>
++      <Trans i18nKey="transTest2" count={count} children={<>
+         Hello <strong>{{ name }}</strong>, you have {{ n: count }} message. Open <Link to="/msgs">here</Link>.
+-      </Trans>
++      </>} />
+     );
+   }
+ 
+@@ -442,9 +443,9 @@ describe('trans complex - count inferred from children', () => {
+     const name = 'Jan';
+     // prettier-ignore
+     return (
+-      <Trans i18nKey="transTest2">
++      <Trans i18nKey="transTest2" children={<>
+         Hello <strong>{{ name }}</strong>, you have {{ count }} message. Open <Link to="/msgs">here</Link>.
+-      </Trans>
++      </>} />
+     );
+   }
+ 
+@@ -475,11 +476,11 @@ describe('trans with count and stuff inferred', () => {
+     const count = 123;
+     const stuff = 'hey';
+     return (
+-      <Trans>
++      <Trans children={<>
+         <strong>
+           {{ count }} and {{ stuff }}
+         </strong>
+-      </Trans>
++      </>} />
+     );
+   }
+ 
+@@ -501,9 +502,9 @@ describe('trans complex v2 no extra pseudo elements for interpolation', () => {
+     const name = 'Jan';
+     // prettier-ignore
+     return (
+-      <Trans i18nKey="transTest2InV2" count={count}>
++      <Trans i18nKey="transTest2InV2" count={count} children={<>
+         Hello <strong>{{ name }}</strong>, you have {{ count }} message. Open <Link to="/msgs">here</Link>.
+-      </Trans>
++      </>} />
+     );
+   }
+ 
+@@ -534,9 +535,9 @@ describe('trans with t as prop', () => {
+       return t(...args);
+     };
+     return (
+-      <Trans i18nKey="transTest1" t={customT}>
++      <Trans i18nKey="transTest1" t={customT} children={<>
+         Open <Link to="/msgs">here</Link>.
+-      </Trans>
++      </>} />
+     );
+   }
+ 
+@@ -846,9 +847,9 @@ describe('trans should work with self closing elements with react components', (
+ describe('trans with null child', () => {
+   function TestComponent() {
+     return (
+-      <Trans i18nKey="transTest1">
++      <Trans i18nKey="transTest1" children={<>
+         Open <Link to="/msgs">here</Link>.{null}
+-      </Trans>
++      </>} />
+     );
+   }
+ 
+@@ -880,9 +881,9 @@ describe('trans with wrapTextNodes', () => {
+ 
+   function TestComponent() {
+     return (
+-      <Trans i18nKey="transTest1">
++      <Trans i18nKey="transTest1" children={<>
+         Open <Link to="/msgs">here</Link>.
+-      </Trans>
++      </>} />
+     );
+   }
+ 
+@@ -911,9 +912,9 @@ describe('trans with wrapTextNodes', () => {
+ describe('trans does ignore user defined values when parsing', () => {
+   function TestComponent({ value }) {
+     return (
+-      <Trans>
++      <Trans children={<>
+         This is <strong>just</strong> some {{ value }} text
+-      </Trans>
++      </>} />
+     );
+   }
+ 
+@@ -1005,9 +1006,9 @@ describe('trans with context via tOptions', () => {
+   const tOptions = { context: 'home' };
+   function TestComponent({ parent }) {
+     return (
+-      <Trans i18nKey="testTransWithCtx" tOptions={tOptions} parent={parent}>
++      <Trans i18nKey="testTransWithCtx" tOptions={tOptions} parent={parent} children={<>
+         Open <Link to="/msgs">here</Link>.
+-      </Trans>
++      </>} />
+     );
+   }
+ 
+@@ -1031,9 +1032,9 @@ describe('trans with context via tOptions', () => {
+ describe('trans with context property', () => {
+   function TestComponent({ parent }) {
+     return (
+-      <Trans i18nKey="testTransWithCtx" context="home" parent={parent}>
++      <Trans i18nKey="testTransWithCtx" context="home" parent={parent} children={<>
+         Open <Link to="/msgs">here</Link>.
+-      </Trans>
++      </>} />
+     );
+   }
+ 
+@@ -1059,26 +1060,27 @@ describe('trans with formatting', () => {
+       <>
+         <Trans parent={parent} i18nKey="trans-key-with-generic-var" values={{ foo: 1234 }} />
+         <Trans parent={parent} i18nKey="trans-key-with-number-var" values={{ foo: 1234 }} />
+-        <Trans parent={parent} i18nKey="trans-key-with-number-var">
++        <Trans parent={parent} i18nKey="trans-key-with-number-var" children={<>
+           {{ foo: 1234 }}
+-        </Trans>
++        </>} />
+       </>
+     );
+   }
+ 
+   it('should render correct content', () => {
+     const { container } = render(<TestComponent />);
+-    expect(container.childNodes[0]).toMatchInlineSnapshot(`
++    // OCTANE DIVERGENCE[dom-markers]: index elements; renderer comment markers are not counted.
++    expect(container.children[0]).toMatchInlineSnapshot(`
+       <div>
+         Value as is: 1234
+       </div>
+     `);
+-    expect(container.childNodes[1]).toMatchInlineSnapshot(`
++    expect(container.children[1]).toMatchInlineSnapshot(`
+       <div>
+         Treat value as number: 1,234
+       </div>
+     `);
+-    expect(container.childNodes[2]).toMatchInlineSnapshot(`
++    expect(container.children[2]).toMatchInlineSnapshot(`
+       <div>
+         Treat value as number: 1,234
+       </div>
+@@ -1108,11 +1110,11 @@ describe('trans with formatting with alwaysFormat', () => {
+   function TestComponent({ parent }) {
+     const name = 'Fritz';
+     return (
+-      <Trans parent={parent} i18n={newI18n} count={3}>
++      <Trans parent={parent} i18n={newI18n} count={3} children={<>
+         number: {'{{count, INTEGER}}'}
+         <br />
+         name: {{ name }}
+-      </Trans>
++      </>} />
+     );
+   }
+ 
+@@ -1131,9 +1133,9 @@ describe('trans with formatting with alwaysFormat', () => {
+ describe('trans with undefined context property', () => {
+   function TestComponent({ parent }) {
+     return (
+-      <Trans i18nKey="testTransWithCtx" context={undefined} parent={parent}>
++      <Trans i18nKey="testTransWithCtx" context={undefined} parent={parent} children={<>
+         Open <Link to="/msgs">here</Link>.
+-      </Trans>
++      </>} />
+     );
+   }
+ 
+@@ -1201,9 +1203,9 @@ describe('trans with different context property but no children', () => {
+ describe('trans with defaults property and children', () => {
+   function TestComponent() {
+     return (
+-      <Trans count={3} defaults="This property should not get used">
++      <Trans count={3} defaults="This property should not get used" children={<>
+         You have {{ count: 3 }} message
+-      </Trans>
++      </>} />
+     );
+   }
+ 
+@@ -1297,7 +1299,7 @@ describe('Trans edge cases', () => {
+ 
+   it('should handle missing i18n instance gracefully', () => {
+     const { container } = render(
+-      <TransWithoutContext i18n={null}>Fallback content</TransWithoutContext>,
++      <TransWithoutContext i18n={null} children={<>Fallback content</>} />,
+     );
+ 
+     expect(container).toHaveTextContent('Fallback content');
+@@ -1305,9 +1307,9 @@ describe('Trans edge cases', () => {
+ 
+   it('should handle invalid components prop type', () => {
+     const { container } = render(
+-      <Trans i18n={i18n} i18nKey="test.key" components={123} defaults="Hello <0>world</0>">
++      <Trans i18n={i18n} i18nKey="test.key" components={123} defaults="Hello <0>world</0>" children={<>
+         Fallback
+-      </Trans>,
++      </>} />,
+     );
+ 
+     // Should render something (component warning logged internally)
+@@ -1318,17 +1320,18 @@ describe('Trans edge cases', () => {
+   it('should render a Fragment child without invalid prop warnings', () => {
+     function TestComponent() {
+       return (
+-        <Trans>
++        <Trans children={<>
+           {/* eslint-disable-next-line react/jsx-no-useless-fragment */}
+           Some text <>and a fragment</>
+-        </Trans>
++        </>} />
+       );
+     }
+     const { container } = render(<TestComponent />);
++    // OCTANE DIVERGENCE[fragment-descriptors]: value-position fragments are positional
++    // arrays in octane, so adjacent text coalesces into one text node.
+     expect(container.firstElementChild).toMatchInlineSnapshot(`
+       <div>
+-        Some text 
+-        and a fragment
++        Some text and a fragment
+       </div>
+     `);
+   });
+@@ -1340,12 +1343,12 @@ describe('Trans edge cases', () => {
+         cb(ref.current);
+       }, [cb]);
+       return (
+-        <Trans>
++        <Trans children={<>
+           <div className="App">
+             <h1>Hello CodeSandbox</h1>
+             <h2 ref={ref}>Start editing to see some magic happen!</h2>
+           </div>
+-        </Trans>
++        </>} />
+       );
+     }
+ 

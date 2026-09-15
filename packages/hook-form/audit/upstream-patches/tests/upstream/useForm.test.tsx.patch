@@ -14,9 +14,9 @@ diff --git a/tests/upstream/useForm.test.tsx b/tests/upstream/useForm.test.tsx
 +// advance timers enable fake timers per-test and restore real timers at the
 +// end (repo fake-timer pattern).
  
- describe('useForm', () => {
-   describe('when component unMount', () => {
-@@ -80,7 +86,7 @@ describe('useForm', () => {
+ // Activity is a React 19.2+ API. Only run Activity-dependent tests when the
+ // installed React actually provides it.
+@@ -89,7 +95,7 @@ describe('useForm', () => {
          await result.current.handleSubmit(noop)({
            preventDefault: noop,
            persist: noop,
@@ -25,7 +25,7 @@ diff --git a/tests/upstream/useForm.test.tsx b/tests/upstream/useForm.test.tsx
        });
  
        expect(result.current.formState.errors.test).toBeDefined();
-@@ -104,7 +110,7 @@ describe('useForm', () => {
+@@ -113,7 +119,7 @@ describe('useForm', () => {
          await result.current.handleSubmit(noop)({
            preventDefault: noop,
            persist: noop,
@@ -34,7 +34,7 @@ diff --git a/tests/upstream/useForm.test.tsx b/tests/upstream/useForm.test.tsx
        });
  
        expect(result.current.formState.errors.test).toBeDefined();
-@@ -1546,6 +1552,8 @@ describe('useForm', () => {
+@@ -1555,6 +1561,8 @@ describe('useForm', () => {
  
        fireEvent.focus(input);
  
@@ -43,7 +43,7 @@ diff --git a/tests/upstream/useForm.test.tsx b/tests/upstream/useForm.test.tsx
        fireEvent.blur(input);
  
        expect(await screen.findByText('This is required.')).toBeVisible();
-@@ -1906,9 +1914,12 @@ describe('useForm', () => {
+@@ -1915,9 +1923,12 @@ describe('useForm', () => {
      expect(getFieldState('lastName').isValidating).toBe(false);
      expect(getFieldState('firstName').isValidating).toBe(false);
      screen.getByText('stateValidation: false');
@@ -56,7 +56,7 @@ diff --git a/tests/upstream/useForm.test.tsx b/tests/upstream/useForm.test.tsx
      const App = () => {
        const {
          register,
-@@ -1955,6 +1966,7 @@ describe('useForm', () => {
+@@ -1964,6 +1975,7 @@ describe('useForm', () => {
      await waitFor(() => {
        expect(screen.queryByText('is validating')).not.toBeInTheDocument();
      });
@@ -64,7 +64,7 @@ diff --git a/tests/upstream/useForm.test.tsx b/tests/upstream/useForm.test.tsx
    });
  
    it('should correctly handle multiple async validation triggers', async () => {
-@@ -2033,6 +2045,7 @@ describe('useForm', () => {
+@@ -2042,6 +2054,7 @@ describe('useForm', () => {
  
      expect(formState.validatingFields).toStrictEqual({});
      expect(getFieldState('lastName').isValidating).toBe(false);
@@ -72,7 +72,7 @@ diff --git a/tests/upstream/useForm.test.tsx b/tests/upstream/useForm.test.tsx
    });
  
    it('should update isValidating to true when using with resolver', async () => {
-@@ -2107,6 +2120,7 @@ describe('useForm', () => {
+@@ -2116,6 +2129,7 @@ describe('useForm', () => {
      expect(formState.validatingFields).toStrictEqual({});
      expect(getFieldState('lastName').isValidating).toBe(false);
      expect(getFieldState('firstName').isValidating).toBe(false);
@@ -80,7 +80,7 @@ diff --git a/tests/upstream/useForm.test.tsx b/tests/upstream/useForm.test.tsx
    });
  
    it('should remove field from validatingFields on unregister', async () => {
-@@ -2150,6 +2164,7 @@ describe('useForm', () => {
+@@ -2159,6 +2173,7 @@ describe('useForm', () => {
        vi.runAllTimers();
      });
      expect(formState.validatingFields).toEqual({});

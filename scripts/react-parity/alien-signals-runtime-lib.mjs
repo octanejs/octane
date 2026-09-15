@@ -117,6 +117,7 @@ function valueKey(value) {
 }
 
 function normalizeContract(matcher, evaluated) {
+	if (matcher === 'toBeUndefined') return 'toBe:undefined';
 	if (evaluated.kind === 'empty') return `${matcher}:`;
 	if (evaluated.kind === 'text') return `${matcher}:${evaluated.text}`;
 	return `${matcher}:${valueKey(evaluated.value)}`;
@@ -191,7 +192,8 @@ function normalizeReceiver(node, sourceFile) {
 	}
 	if (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) {
 		const text = node.getText(sourceFile).replace(/\s+/g, '');
-		if (text === 'result.current' || /^result\.current\[\d+\]$/.test(text)) return 'surface';
+		if (/^(?:[A-Za-z_$][\w$]*\.)?result\.current(?:\[\d+\]|\.[A-Za-z_$][\w$]*)?$/.test(text))
+			return 'surface';
 		if (text.endsWith('.textContent')) return 'surface';
 	}
 	if (ts.isIdentifier(node)) {

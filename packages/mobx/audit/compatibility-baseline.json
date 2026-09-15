@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "binding": "@octanejs/mobx",
+  "repository": "https://github.com/octanejs/octane.git",
+  "commit": "8e5ca22a6e17582b4293232406a2c0420509f4a4",
+  "sourceRoot": "upstream-artifact/previous-binding",
+  "files": [
+    {
+      "path": "package.json",
+      "sha256": "99185040aca5d9b111bb5a912e65340616505c148187f7bc213242a3cdc9c248"
+    },
+    {
+      "path": "src/ObserverComponent.ts",
+      "sha256": "7e5ca981f181cb42bad0561a418614fb550e1fc3402342783873bf5f4d83f1b8"
+    },
+    {
+      "path": "src/index.ts",
+      "sha256": "e8d1881efcc6a3de2fe1052c758404bd40fbe24b6b9efc00cf6e1333223ee07c"
+    },
+    {
+      "path": "src/internal.ts",
+      "sha256": "98ec22e8b98999f6a745a0d3d94b1fed438cb09fe29c12a4b740c350fe53b909"
+    },
+    {
+      "path": "src/observer.ts",
+      "sha256": "565ac0e93cbb469bcd88d9d10f788639d86d1ff0b928cbc0f68640382abe0427"
+    },
+    {
+      "path": "src/staticRendering.ts",
+      "sha256": "5d834be7df9436afa2dcb717c2ee2d70ea78c927b08ab75d97be342dd43f04e7"
+    },
+    {
+      "path": "src/useLocalObservable.ts",
+      "sha256": "a2b45a058086022e21cd4b341307fce1ef314a3ddd9b27dcaae62b227694db62"
+    },
+    {
+      "path": "src/useObserver.ts",
+      "sha256": "6953646d2ccbb521e04d1c5040874c4c7374a9fa150d752b6e9aa52d200d37ae"
+    }
+  ]
+}

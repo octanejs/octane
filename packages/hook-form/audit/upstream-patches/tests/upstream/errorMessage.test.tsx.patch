@@ -1,0 +1,187 @@
+diff --git a/tests/upstream/errorMessage.test.tsx b/tests/upstream/errorMessage.test.tsx
+--- a/tests/upstream/errorMessage.test.tsx
++++ b/tests/upstream/errorMessage.test.tsx
+@@ -11,6 +11,21 @@ import { ErrorMessage } from '../../src/errorMessage';
+ import { useForm } from '../../src/useForm';
+ import { FormProvider } from '../../src/useFormContext';
+ 
++// OCTANE DIVERGENCE[hook-form-dom-markers]: Compare the same public DOM snapshot
++// after omitting Octane's empty-hole and work-in-progress comment anchors.
++function publicFragment(fragment: DocumentFragment): DocumentFragment {
++  const clone = fragment.cloneNode(true) as DocumentFragment;
++  const walker = document.createTreeWalker(clone, NodeFilter.SHOW_COMMENT);
++  const markers: Node[] = [];
++  while (walker.nextNode()) {
++    if (['', 'wip', '/wip'].includes(walker.currentNode.nodeValue || '')) {
++      markers.push(walker.currentNode);
++    }
++  }
++  for (const marker of markers) marker.parentNode?.removeChild(marker);
++  return clone;
++}
++
+ type SimpleForm = { name: string; nested: { field: string } };
+ 
+ type AnyProps = Record<string, unknown>;
+@@ -248,7 +263,7 @@ describe('ErrorMessage', () => {
+         return <ErrorMessage control={control} name={'test' as any} />;
+       };
+       const { asFragment } = render(<Fixture />);
+-      expect(asFragment()).toMatchSnapshot();
++      expect(publicFragment(asFragment())).toMatchSnapshot();
+     });
+ 
+     it('should render correctly with flat errors', () => {
+@@ -256,7 +271,7 @@ describe('ErrorMessage', () => {
+         type: 'flat',
+         message: 'flat',
+       });
+-      expect(asFragment()).toMatchSnapshot();
++      expect(publicFragment(asFragment())).toMatchSnapshot();
+     });
+ 
+     it('should render correctly with flat errors and as with string', () => {
+@@ -265,7 +280,7 @@ describe('ErrorMessage', () => {
+         { type: 'flat', message: 'flat' },
+         { as: 'span' },
+       );
+-      expect(asFragment()).toMatchSnapshot();
++      expect(publicFragment(asFragment())).toMatchSnapshot();
+     });
+ 
+     it('should render correctly with flat errors and as with element and render', () => {
+@@ -274,7 +289,7 @@ describe('ErrorMessage', () => {
+         { type: 'flat', message: 'flat' },
+         { render: ({ message }: { message: string }) => message },
+       );
+-      expect(asFragment()).toMatchSnapshot();
++      expect(publicFragment(asFragment())).toMatchSnapshot();
+     });
+ 
+     it('should render correctly with flat errors and as with component', () => {
+@@ -286,7 +301,7 @@ describe('ErrorMessage', () => {
+         { type: 'flat', message: 'flat' },
+         { as: CustErrComp },
+       );
+-      expect(asFragment()).toMatchSnapshot();
++      expect(publicFragment(asFragment())).toMatchSnapshot();
+     });
+ 
+     it('should render correctly with flat errors and as with component and render', () => {
+@@ -301,7 +316,7 @@ describe('ErrorMessage', () => {
+           render: ({ message }: { message: string }) => message,
+         },
+       );
+-      expect(asFragment()).toMatchSnapshot();
++      expect(publicFragment(asFragment())).toMatchSnapshot();
+     });
+ 
+     it('should render correctly with flat multiple errors and render', () => {
+@@ -324,7 +339,7 @@ describe('ErrorMessage', () => {
+             )),
+         },
+       );
+-      expect(asFragment()).toMatchSnapshot();
++      expect(publicFragment(asFragment())).toMatchSnapshot();
+     });
+ 
+     it('should render correctly with flat multiple errors and as with element and render', () => {
+@@ -347,7 +362,7 @@ describe('ErrorMessage', () => {
+             )),
+         },
+       );
+-      expect(asFragment()).toMatchSnapshot();
++      expect(publicFragment(asFragment())).toMatchSnapshot();
+     });
+ 
+     it('should render correctly with nested errors object', () => {
+@@ -355,7 +370,7 @@ describe('ErrorMessage', () => {
+         type: 'object',
+         message: 'object',
+       });
+-      expect(asFragment()).toMatchSnapshot();
++      expect(publicFragment(asFragment())).toMatchSnapshot();
+     });
+ 
+     it('should render correctly with nested errors object and as with string', () => {
+@@ -364,7 +379,7 @@ describe('ErrorMessage', () => {
+         { type: 'object', message: 'object' },
+         { as: 'span' },
+       );
+-      expect(asFragment()).toMatchSnapshot();
++      expect(publicFragment(asFragment())).toMatchSnapshot();
+     });
+ 
+     it('should render correctly with nested errors and as with element and render', () => {
+@@ -373,7 +388,7 @@ describe('ErrorMessage', () => {
+         { type: 'object', message: 'object' },
+         { render: ({ message }: { message: string }) => message },
+       );
+-      expect(asFragment()).toMatchSnapshot();
++      expect(publicFragment(asFragment())).toMatchSnapshot();
+     });
+ 
+     it('should render correctly with nested multiple errors and render', () => {
+@@ -396,7 +411,7 @@ describe('ErrorMessage', () => {
+             )),
+         },
+       );
+-      expect(asFragment()).toMatchSnapshot();
++      expect(publicFragment(asFragment())).toMatchSnapshot();
+     });
+ 
+     it('should render correctly with nested multiple errors and as with element and render', () => {
+@@ -419,7 +434,7 @@ describe('ErrorMessage', () => {
+             )),
+         },
+       );
+-      expect(asFragment()).toMatchSnapshot();
++      expect(publicFragment(asFragment())).toMatchSnapshot();
+     });
+ 
+     it('should render correctly with nested errors array', () => {
+@@ -427,7 +442,7 @@ describe('ErrorMessage', () => {
+         type: 'array',
+         message: 'array',
+       });
+-      expect(asFragment()).toMatchSnapshot();
++      expect(publicFragment(asFragment())).toMatchSnapshot();
+     });
+ 
+     it('should render correctly with nested errors array and as with string', () => {
+@@ -436,7 +451,7 @@ describe('ErrorMessage', () => {
+         { type: 'array', message: 'array' },
+         { as: 'span' },
+       );
+-      expect(asFragment()).toMatchSnapshot();
++      expect(publicFragment(asFragment())).toMatchSnapshot();
+     });
+ 
+     it('should render correctly with nested errors array and as with element and render', () => {
+@@ -445,7 +460,7 @@ describe('ErrorMessage', () => {
+         { type: 'array', message: 'array' },
+         { render: ({ message }: { message: string }) => message },
+       );
+-      expect(asFragment()).toMatchSnapshot();
++      expect(publicFragment(asFragment())).toMatchSnapshot();
+     });
+ 
+     it('should render correctly with nested multiple errors array and render', () => {
+@@ -468,7 +483,7 @@ describe('ErrorMessage', () => {
+             )),
+         },
+       );
+-      expect(asFragment()).toMatchSnapshot();
++      expect(publicFragment(asFragment())).toMatchSnapshot();
+     });
+ 
+     it('should render correctly with nested multiple errors array and as with element and render', () => {
+@@ -491,7 +506,7 @@ describe('ErrorMessage', () => {
+             )),
+         },
+       );
+-      expect(asFragment()).toMatchSnapshot();
++      expect(publicFragment(asFragment())).toMatchSnapshot();
+     });
+   });
+ });

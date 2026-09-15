@@ -11,9 +11,16 @@
     "integrity": "sha256:180539218d55a844173d2f87a01cd92779238157b08e0e89be7108a998e8fa80",
     "verification": "verified"
   },
-  "upstreamSuites": { "runtime": "absent", "types": "absent" },
+  "upstreamSuites": {
+    "runtime": "absent",
+    "types": "absent"
+  },
   "adaptedRoots": {
-    "source": { "roots": ["packages/gsap/src"], "include": ["\\.(?:ts|tsrx)$"], "exclude": [] },
+    "source": {
+      "roots": ["packages/gsap/src"],
+      "include": ["\\.(?:ts|tsrx)$"],
+      "exclude": []
+    },
     "tests": {
       "roots": ["packages/gsap/tests/differential"],
       "include": ["\\.test\\.ts$"],
@@ -33,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "59b5197a457d62d05aa8866334bc41567581c414b30452a047b00c020d587883"
+      "lockfileSha256": "86e22c8a3652c4663ce8e347d3769f0572c09a1d66c39ed789bd914709b53946"
     }
   },
   "lanes": [

@@ -1,0 +1,18 @@
+diff --git a/tests/upstream/_types/form-state-subscribe.test-d.ts b/tests/upstream/_types/form-state-subscribe.test-d.ts
+--- a/tests/upstream/_types/form-state-subscribe.test-d.ts
++++ b/tests/upstream/_types/form-state-subscribe.test-d.ts
+@@ -1,9 +1,9 @@
+ // types/__tests__/formState.tsd.ts
+-import { FormStateSubscribe } from '../../src/formState';
+-import { FormState } from '../index';
+-import type { FieldValues } from '../../src/types';
+-import { type UseFormStateReturn } from '../../src/types';
+-import { useForm } from '../../src/useForm';
++import { FormStateSubscribe } from '../../../src/formState.tsrx';
++import { FormState } from '../../../src/index';
++import type { FieldValues } from '../../../src/types';
++import { type UseFormStateReturn } from '../../../src/types';
++import { useForm } from '../../../src/useForm';
+ 
+ import type { Equal, Expect, NotEqual } from './__fixtures__';
+ 

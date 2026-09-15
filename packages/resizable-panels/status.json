@@ -1,10 +1,14 @@
 {
-  "upstream": { "package": "react-resizable-panels", "version": "4.12.2" },
-  "surface": "Group, Panel, Separator, persistence hooks, refs, imperative APIs, layout constraints, pointer and keyboard interaction, ARIA, cursor handling, and ResizeObserver behavior are implemented against react-resizable-panels 4.12.2.",
+  "upstream": {
+    "package": "react-resizable-panels",
+    "version": "4.12.4"
+  },
+  "surface": "Group, Panel, Separator, persistence hooks, refs, imperative APIs, layout constraints, pointer and keyboard interaction, ARIA, cursor handling, and ResizeObserver behavior are implemented against react-resizable-panels 4.12.4.",
   "divergences": [
-    "useId(undefined) fallback cannot reproduce React's mocked ':r123:' seam; adapted upstream case asserts a non-empty Octane id and is recorded as react-resizable-panels-useId-fallback."
+    "useId(undefined) fallback cannot reproduce React's mocked ':r123:' seam; adapted upstream case asserts a non-empty Octane id and is recorded as react-resizable-panels-useId-fallback.",
+    "The upstream React Server Components demo scenario is inapplicable because Octane does not support RSC. Client startup and SSR hydration persistence have native conformance coverage."
   ],
   "ssr": "Deterministic server rendering and live hydration adoption are covered by dedicated executable projects.",
-  "verified": "2026-08-02",
+  "verified": "2026-09-13",
   "parityEvidence": "packages/resizable-panels/audit/react-parity.json"
 }

@@ -3,15 +3,18 @@
   "schemaVersion": 1,
   "provenance": {
     "repo": "https://github.com/mobxjs/mobx.git",
-    "version": "mobx-react-lite@4.1.1",
-    "commit": "989de2d198e7a15c1fc1b981e1a96e50083ff2a0",
+    "version": "5.0.3",
+    "commit": "5dbb04a15f7eb0ef6b844904c43955357a9bbdfc",
     "sourceRoot": "packages/mobx-react-lite/src",
     "testRoot": "packages/mobx-react-lite/__tests__",
     "license": "MIT",
-    "integrity": "sha256:5f399b15e821be8674d185fdb810357e1147af7e69171e0438fc6e48034fe24e",
-    "verification": "recorded-unverified"
+    "integrity": "sha256:52a871b8502ecb39e2014d7c76569eb4b656e68af32be8f9d66541de3ed53280",
+    "verification": "verified"
   },
-  "upstreamSuites": { "runtime": "present", "types": "present" },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "present"
+  },
   "adaptedRoots": {
     "source": {
       "roots": ["packages/mobx/src"],
@@ -19,15 +22,15 @@
       "exclude": []
     },
     "tests": {
-      "roots": ["packages/mobx/tests/differential"],
+      "roots": ["packages/mobx/tests/upstream"],
       "include": ["\\.(?:test|spec)\\.(?:[cm]?[jt]s|[jt]sx|tsrx)$"],
       "exclude": []
     }
   },
   "adaptedRuntimeSummary": {
-    "inventoryEntries": 0,
-    "uniqueIdentities": 0,
-    "duplicateEntriesWithinLanes": 0,
+    "inventoryEntries": 90,
+    "uniqueIdentities": 73,
+    "duplicateEntriesWithinLanes": 17,
     "identitiesSharedAcrossLanes": 0
   },
   "environments": {
@@ -37,10 +40,352 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "59b5197a457d62d05aa8866334bc41567581c414b30452a047b00c020d587883"
+      "lockfileSha256": "86e22c8a3652c4663ce8e347d3769f0572c09a1d66c39ed789bd914709b53946"
     }
   },
   "lanes": [
+    {
+      "id": "mobx-pristine-upstream",
+      "type": "pristine-upstream",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "mobx-pristine-runtime",
+      "notes": "Executes all 90 active immutable upstream cases and 11 snapshots; retains the two original skips.",
+      "files": [
+        {
+          "path": "packages/mobx/tests/upstream-original.test.ts",
+          "role": "support",
+          "sha256": "da71935e91a6c6b1e46e6e2e252f1381f0bb11e3d475490511ca2820a4b344bb"
+        },
+        {
+          "path": "packages/mobx/audit/pristine-runtime.json",
+          "role": "support",
+          "sha256": "a3dd57c95af9f91779136c5cf590cf407f3fa79e13c2c0d429e3d9121d13fdce"
+        },
+        {
+          "path": "packages/mobx/audit/pristine-wrapper-runtime.json",
+          "role": "support",
+          "sha256": "a6b5d1825249ee600b5f327dd61b2c99d4dc16e69ce5b5887576f969be74a5fd"
+        },
+        {
+          "path": "scripts/react-parity/mobx-pristine-runtime.mjs",
+          "role": "support",
+          "sha256": "81dc10e8c0cb942238867fc5598e1936df5b0c7949b90ed9322b3d074eef9946"
+        },
+        {
+          "path": "packages/mobx/tests/upstream-jest.config.cjs",
+          "role": "support",
+          "sha256": "d015ac682d7389729e908781b191124e937b7e36fa75ffc36723d9e8a3bd515c"
+        },
+        {
+          "path": "packages/mobx/tests/pristine.tsconfig.json",
+          "role": "support",
+          "sha256": "7c49c8dbcb859206e81c1d0bcfc9d1e631f23824edec462ae510e1ca461ead5e"
+        },
+        {
+          "path": "packages/mobx/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "873234eb71ed05722243123bc1b1df4f02d36f87b5cfae79dba57b7aad79ca49"
+        }
+      ],
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/mobx/audit/pristine-wrapper-runtime.json"
+      },
+      "evidenceOrigin": "upstream-suite"
+    },
+    {
+      "id": "mobx-adapted-upstream",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "mobx-adapted",
+      "notes": "Executes all 90 adapted cases and accounts explicitly for both unchanged upstream skips.",
+      "files": [
+        {
+          "path": "packages/mobx/audit/adapted-runtime.json",
+          "role": "support",
+          "sha256": "b6b949b978ddf3ecd398dc9d7707cc15ca1df4de93d099233358d01a09d05ec7"
+        },
+        {
+          "path": "packages/mobx/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "873234eb71ed05722243123bc1b1df4f02d36f87b5cfae79dba57b7aad79ca49"
+        },
+        {
+          "path": "packages/mobx/tests/vitest.adapted.config.ts",
+          "role": "support",
+          "sha256": "2e26de7e1311e6f44f059dfb26da034ec174eae3c8f8cc8687150f2a03f64a21"
+        },
+        {
+          "path": "packages/mobx/tests/adapted-setup.ts",
+          "role": "support",
+          "sha256": "4beebebb0e3361de2beabea1ad7ebda4a3c15e28bbdb2b21bf454cedbc01d80f"
+        },
+        {
+          "path": "packages/mobx/audit/upstream-patches/tests/upstream/ObserverComponent.test.tsx.patch",
+          "role": "support",
+          "sha256": "c1402d52e2cd46053ce87e7a50a5a8604fe9cc6b3ec32f491a7b66dcbe6d1e76"
+        },
+        {
+          "path": "packages/mobx/audit/upstream-patches/tests/upstream/api.test.tsx.patch",
+          "role": "support",
+          "sha256": "25b404d2df6a7331521207c9d0ef6f4ef2daedc3ad01f06ed3979084b802a6bb"
+        },
+        {
+          "path": "packages/mobx/audit/upstream-patches/tests/upstream/assertEnvironment.test.tsx.patch",
+          "role": "support",
+          "sha256": "63685f36bf3d91c963a145e6136daaf451c8089fa29b42792e3866007513c462"
+        },
+        {
+          "path": "packages/mobx/audit/upstream-patches/tests/upstream/observer.test.tsx.patch",
+          "role": "support",
+          "sha256": "447cbf5d75b8baa0ee01938200c22ffcabe38ef63f367581d119a9bbdda1ca11"
+        },
+        {
+          "path": "packages/mobx/audit/upstream-patches/tests/upstream/strictAndConcurrentMode.test.tsx.patch",
+          "role": "support",
+          "sha256": "9ef109175d2f5f470982f1d3df429e06842b513f14063949804db1f812ab0822"
+        },
+        {
+          "path": "packages/mobx/audit/upstream-patches/tests/upstream/transactions.test.tsx.patch",
+          "role": "support",
+          "sha256": "a0af4e360c7f801670c59fcb64fb3af7092ff0ffda66b7e630a7ee1c869588b9"
+        },
+        {
+          "path": "packages/mobx/audit/upstream-patches/tests/upstream/useLocalObservable.test.tsx.patch",
+          "role": "support",
+          "sha256": "6b5f191304f4404f0885b88761ce88090665674c0deeccecab7bd97d93f250d1"
+        }
+      ],
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/mobx/audit/adapted-runtime.json",
+        "fileParallelism": false
+      },
+      "evidenceOrigin": "upstream-suite"
+    },
+    {
+      "id": "mobx-pristine-types",
+      "type": "pristine-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "mobx-pristine-types",
+      "notes": "Compiles the complete immutable/adapted TSX test program and explicit published API contracts.",
+      "files": [
+        {
+          "path": "packages/mobx/typetests/tsconfig.pristine.json",
+          "role": "support",
+          "sha256": "addc8bec8c8865222208d651169c3ea8c9dcada4964d9973c7f55891e3e6dab5"
+        },
+        {
+          "path": "packages/mobx/typetests/core-contracts.ts",
+          "role": "support",
+          "sha256": "63c0134c3ba4f4502da78cb8749d9e77bfb1b7019307b0a3115b8b1ee3caf58c"
+        },
+        {
+          "path": "packages/mobx/typetests/pristine/public-contract.ts",
+          "role": "test",
+          "sha256": "11a92baef7cd6a2cfc4df82c0e2b0c797255a522f035ef816a0cf4b63174fbcf",
+          "cases": [
+            {
+              "id": "types:mobx-pristine",
+              "testName": "complete source tests and public declaration contracts",
+              "fullName": "complete source tests and public declaration contracts"
+            }
+          ]
+        },
+        {
+          "path": "packages/mobx/typetests/pristine-globals.d.ts",
+          "role": "support",
+          "sha256": "5e28f77a186dbcc1ee66691e5aa6200efb9b27173a68524565bc953dcca7e066"
+        },
+        {
+          "path": "packages/mobx/typetests/public.test-d.ts",
+          "role": "support",
+          "sha256": "ba7c9c7a02426621d8a715a581fab0c24ad3748561673548146d79e1be18ef32"
+        },
+        {
+          "path": "packages/mobx/typetests/test-tools.d.ts",
+          "role": "support",
+          "sha256": "46c5446ed85b850168dbcb316560d47b1710f7a560557993866bf817b1588d86"
+        },
+        {
+          "path": "packages/mobx/upstream/__tests__/ObserverComponent.test.tsx",
+          "role": "support",
+          "sha256": "7b89a16edac550b219d8ee18dcad20ac279fb5cf321eb37c7237df29c77e3210"
+        },
+        {
+          "path": "packages/mobx/upstream/__tests__/api.test.tsx",
+          "role": "support",
+          "sha256": "06f2046068959a61e96711b7585872c36be3bbc868e051e53cc4f9db208ea228"
+        },
+        {
+          "path": "packages/mobx/upstream/__tests__/assertEnvironment.test.tsx",
+          "role": "support",
+          "sha256": "b8f3caa724ecf3e9a8ef722b955b898de83fe4181d36c1f521199b41023100ab"
+        },
+        {
+          "path": "packages/mobx/upstream/__tests__/enforceActions.test.tsx",
+          "role": "support",
+          "sha256": "b9f60e4f48387c589b5a2af2548c204a1aef7176515a1f7b706b2f8a3f94557f"
+        },
+        {
+          "path": "packages/mobx/upstream/__tests__/observer.test.tsx",
+          "role": "support",
+          "sha256": "41992c2b34f43fe53a2a90323adea87c69f8f61f08d01a2b801e336a89833aff"
+        },
+        {
+          "path": "packages/mobx/upstream/__tests__/strictAndConcurrentMode.test.tsx",
+          "role": "support",
+          "sha256": "f18bed4422ad3f9d59498956020002e33672eae7cffe10516968b2b737f143bc"
+        },
+        {
+          "path": "packages/mobx/upstream/__tests__/strictAndConcurrentModeUsingFinalizationRegistry.test.tsx",
+          "role": "support",
+          "sha256": "aaa137ddb2fd0b21b99e8b337c0edcc45d4adb08a7f0197c72366b9bc12d95e6"
+        },
+        {
+          "path": "packages/mobx/upstream/__tests__/strictAndConcurrentModeUsingTimers.test.tsx",
+          "role": "support",
+          "sha256": "b26ad800e09001e4ea3ec0eff4f208392e03ba48bb2c486cdf6aafb06f941571"
+        },
+        {
+          "path": "packages/mobx/upstream/__tests__/transactions.test.tsx",
+          "role": "support",
+          "sha256": "6330d96395d69f3c73adac8203a613bb025d4cce66d86f4a6ff989d62bf93a86"
+        },
+        {
+          "path": "packages/mobx/upstream/__tests__/useLocalObservable.test.tsx",
+          "role": "support",
+          "sha256": "f3a36f0a57f49c32a3606d3722d7c303704d463d13bbd8eb5835605f8819069f"
+        },
+        {
+          "path": "packages/mobx/upstream/__tests__/useObserverRetention.test.tsx",
+          "role": "support",
+          "sha256": "a57eaaba7410a58d40a88eef3ed99cc9dc41e9668903998d369c94480fa04f3b"
+        }
+      ],
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsc",
+        "project": "packages/mobx/typetests/tsconfig.pristine.json"
+      },
+      "evidenceOrigin": "upstream-suite"
+    },
+    {
+      "id": "mobx-adapted-types",
+      "type": "adapted-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "mobx-adapted-types",
+      "notes": "Compiles the complete immutable/adapted TSX test program and explicit published API contracts.",
+      "files": [
+        {
+          "path": "packages/mobx/typetests/tsconfig.adapted.json",
+          "role": "support",
+          "sha256": "da9cf2b8e77d6d2af5282bc246f19fa4304fa5c1bf550aae758c62d8435314ac"
+        },
+        {
+          "path": "packages/mobx/typetests/core-contracts.ts",
+          "role": "support",
+          "sha256": "63c0134c3ba4f4502da78cb8749d9e77bfb1b7019307b0a3115b8b1ee3caf58c"
+        },
+        {
+          "path": "packages/mobx/typetests/pristine/public-contract.ts",
+          "role": "support",
+          "sha256": "11a92baef7cd6a2cfc4df82c0e2b0c797255a522f035ef816a0cf4b63174fbcf"
+        },
+        {
+          "path": "packages/mobx/typetests/pristine-globals.d.ts",
+          "role": "support",
+          "sha256": "5e28f77a186dbcc1ee66691e5aa6200efb9b27173a68524565bc953dcca7e066"
+        },
+        {
+          "path": "packages/mobx/typetests/public.test-d.ts",
+          "role": "support",
+          "sha256": "ba7c9c7a02426621d8a715a581fab0c24ad3748561673548146d79e1be18ef32"
+        },
+        {
+          "path": "packages/mobx/typetests/test-tools.d.ts",
+          "role": "support",
+          "sha256": "46c5446ed85b850168dbcb316560d47b1710f7a560557993866bf817b1588d86"
+        },
+        {
+          "path": "packages/mobx/tests/upstream/ObserverComponent.test.tsx",
+          "role": "support",
+          "sha256": "6bf953cefbbfed9ef9c69af8bf6156f38293714f6f5916c7ce6351aae646b211"
+        },
+        {
+          "path": "packages/mobx/tests/upstream/api.test.tsx",
+          "role": "support",
+          "sha256": "3aad919dfdf5bcbe227bbea509d5742d2bab73f1fc8f5d958a763772c8479cfd"
+        },
+        {
+          "path": "packages/mobx/tests/upstream/assertEnvironment.test.tsx",
+          "role": "support",
+          "sha256": "b06a491ed7463461169948b9af39aa5d40a8102d0e0e3fabe6481a152cbeb063"
+        },
+        {
+          "path": "packages/mobx/tests/upstream/enforceActions.test.tsx",
+          "role": "support",
+          "sha256": "125827e3c76d4dc1599cdc270da2c89b288e33b9511fdd102a0235e6ac844ba8"
+        },
+        {
+          "path": "packages/mobx/tests/upstream/observer.test.tsx",
+          "role": "support",
+          "sha256": "83a6f03aad0c1f887362d0cccf7873d01f53e11c91f65e9f7db23698a30f8617"
+        },
+        {
+          "path": "packages/mobx/tests/upstream/strictAndConcurrentMode.test.tsx",
+          "role": "support",
+          "sha256": "fc9074dac4cdd8040567a1612e9b73955ddfa17eb2daa3f316aa052b5bef42b2"
+        },
+        {
+          "path": "packages/mobx/tests/upstream/strictAndConcurrentModeUsingFinalizationRegistry.test.tsx",
+          "role": "support",
+          "sha256": "95fb3ea894dc6608fd0896f3a318162792461ff65db85c2685a60f95d9135ee4"
+        },
+        {
+          "path": "packages/mobx/tests/upstream/strictAndConcurrentModeUsingTimers.test.tsx",
+          "role": "support",
+          "sha256": "51d60ea3904d122d989c166983f116074f4ce5746642d6e63efe230ade8820e2"
+        },
+        {
+          "path": "packages/mobx/tests/upstream/transactions.test.tsx",
+          "role": "support",
+          "sha256": "558e86d1b57c7e82f9ff9e53caa6558b5255ef2464b4b21d5f16cd20f68a79eb"
+        },
+        {
+          "path": "packages/mobx/tests/upstream/useLocalObservable.test.tsx",
+          "role": "support",
+          "sha256": "374b5c2277a2bb86163679590346d4ba9cb9e5893a67e49993aac3ede5760260"
+        },
+        {
+          "path": "packages/mobx/tests/upstream/useObserverRetention.test.tsx",
+          "role": "support",
+          "sha256": "15474b87290a7997ca38de7a25eb27a4609dd45fc49714a84161dab78bb363c7"
+        },
+        {
+          "path": "packages/mobx/tests/types/public-api.ts",
+          "role": "test",
+          "sha256": "2546c918db6f20915c070e13b3a9f94b33217f6794d609cf0c9d7a6ce1d13962",
+          "cases": [
+            {
+              "id": "types:mobx-adapted",
+              "testName": "complete source tests and public declaration contracts",
+              "fullName": "complete source tests and public declaration contracts"
+            }
+          ]
+        }
+      ],
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsrx-tsc",
+        "project": "packages/mobx/typetests/tsconfig.adapted.json"
+      },
+      "evidenceOrigin": "upstream-suite"
+    },
     {
       "id": "mobx-local-observable-differential",
       "type": "differential",
@@ -65,7 +410,7 @@
         {
           "path": "packages/mobx/tests/_fixtures/store.tsrx",
           "role": "support",
-          "sha256": "d2ed1ef7226b7af56e3078aa14c9e14b1758aa2ef32c266beae750863cc598c3"
+          "sha256": "69c81706c11534862cfa2d41f3dd0e7179b64f875603ee09e0bdb1d671bd379b"
         },
         {
           "path": "packages/mobx/tests/differential/_setup.ts",
@@ -78,7 +423,328 @@
           "sha256": "364c0595b08b26343fa3cd9ff7ddbdaa5fd227cfcd390437aa67ae9a173ebe1b"
         }
       ]
+    },
+    {
+      "id": "mobx-native-lifecycle",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "mobx",
+      "notes": "Native observation, dependency replacement, static snapshots, hydration identity, and cleanup.",
+      "files": [
+        {
+          "path": "packages/mobx/tests/conformance/binding.test.ts",
+          "role": "test",
+          "sha256": "79f36d685aa5af0745f25702c729f729200c0277b2639703a65e945573c3abf7",
+          "cases": [
+            {
+              "id": "native:mobx-e6bb553f8290",
+              "testName": "tracks observables read by an observed component",
+              "fullName": "MobX observer binding tracks observables read by an observed component"
+            },
+            {
+              "id": "native:mobx-405b5d245cdc",
+              "testName": "does not rerender for observables that were not read",
+              "fullName": "MobX observer binding does not rerender for observables that were not read"
+            },
+            {
+              "id": "native:mobx-533352b3496b",
+              "testName": "switches tracked dependencies after a local-state update",
+              "fullName": "MobX observer binding switches tracked dependencies after a local-state update"
+            },
+            {
+              "id": "native:mobx-0ebcd8f4a8a2",
+              "testName": "tracks nested observable reads",
+              "fullName": "MobX observer binding tracks nested observable reads"
+            },
+            {
+              "id": "native:mobx-b41501881aa6",
+              "testName": "keeps multiple observed stores independent",
+              "fullName": "MobX observer binding keeps multiple observed stores independent"
+            },
+            {
+              "id": "native:mobx-4cb7657963b3",
+              "testName": "creates a stable auto-bound local observable",
+              "fullName": "MobX observer binding creates a stable auto-bound local observable"
+            },
+            {
+              "id": "native:mobx-e48dd9045c11",
+              "testName": "disposes the MobX reaction on unmount",
+              "fullName": "MobX observer binding disposes the MobX reaction on unmount"
+            }
+          ]
+        },
+        {
+          "path": "packages/mobx/tests/conformance/hydration.test.ts",
+          "role": "test",
+          "sha256": "42ec5bb45a7d546510b0db9fabe25928bd2afc4bc6f26281f4f4a5e0ff6145f0",
+          "cases": [
+            {
+              "id": "native:mobx-server-snapshot-hydration",
+              "testName": "hydrates static snapshots without server subscriptions and starts live client observations",
+              "fullName": "hydrates static snapshots without server subscriptions and starts live client observations"
+            }
+          ]
+        },
+        {
+          "path": "packages/mobx/tests/_helpers.ts",
+          "role": "support",
+          "sha256": "b4c4c9d9467556a5a86e1830188720b41033972b1c79859480819ae5dd19a89c"
+        },
+        {
+          "path": "packages/mobx/tests/_fixtures/store.tsrx",
+          "role": "support",
+          "sha256": "69c81706c11534862cfa2d41f3dd0e7179b64f875603ee09e0bdb1d671bd379b"
+        },
+        {
+          "path": "packages/mobx/tests/_fixtures/interaction.tsrx",
+          "role": "support",
+          "sha256": "04464f5651c5bab8f8671e54bcb128238e29eff69066c376c9287553dfea7f91"
+        }
+      ]
+    },
+    {
+      "id": "mobx-native-ssr",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "mobx-ssr",
+      "notes": "Deterministic SSR without retained reactions.",
+      "files": [
+        {
+          "path": "packages/mobx/tests/ssr/server.test.ts",
+          "role": "test",
+          "sha256": "82010264b95616326ba7d81957697dfeb9dc9c49b4a93ba15f1c4c412e514f22",
+          "cases": [
+            {
+              "id": "native:mobx-253a0c1cb521",
+              "testName": "renders deterministic markup without retaining an observer",
+              "fullName": "MobX static rendering renders deterministic markup without retaining an observer"
+            }
+          ]
+        },
+        {
+          "path": "packages/mobx/tests/_helpers.ts",
+          "role": "support",
+          "sha256": "b4c4c9d9467556a5a86e1830188720b41033972b1c79859480819ae5dd19a89c"
+        },
+        {
+          "path": "packages/mobx/tests/_fixtures/store.tsrx",
+          "role": "support",
+          "sha256": "69c81706c11534862cfa2d41f3dd0e7179b64f875603ee09e0bdb1d671bd379b"
+        },
+        {
+          "path": "packages/mobx/tests/_fixtures/interaction.tsrx",
+          "role": "support",
+          "sha256": "04464f5651c5bab8f8671e54bcb128238e29eff69066c376c9287553dfea7f91"
+        }
+      ]
+    },
+    {
+      "id": "mobx-native-browser",
+      "type": "browser",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "mobx-browser",
+      "notes": "Actual Chromium input events, focus, keyed survivors, refs, and unmount disposal.",
+      "files": [
+        {
+          "path": "packages/mobx/tests/browser/interaction.test.ts",
+          "role": "test",
+          "sha256": "c67a334d0957be52a70d7ce8c133ce73a7d61d89470eac2801030d1db8b094b0",
+          "cases": [
+            {
+              "id": "browser:mobx-focus-refs-keyed-cleanup",
+              "testName": "keeps focused keyed rows reactive and releases their refs and observations",
+              "fullName": "keeps focused keyed rows reactive and releases their refs and observations"
+            }
+          ]
+        },
+        {
+          "path": "packages/mobx/tests/_helpers.ts",
+          "role": "support",
+          "sha256": "b4c4c9d9467556a5a86e1830188720b41033972b1c79859480819ae5dd19a89c"
+        },
+        {
+          "path": "packages/mobx/tests/_fixtures/store.tsrx",
+          "role": "support",
+          "sha256": "69c81706c11534862cfa2d41f3dd0e7179b64f875603ee09e0bdb1d671bd379b"
+        },
+        {
+          "path": "packages/mobx/tests/_fixtures/interaction.tsrx",
+          "role": "support",
+          "sha256": "04464f5651c5bab8f8671e54bcb128238e29eff69066c376c9287553dfea7f91"
+        }
+      ]
     }
   ],
-  "divergences": []
+  "divergences": [
+    {
+      "id": "mobx-dom-markers",
+      "caseIds": [
+        "runtime:c4d27bcdc7395abc",
+        "runtime:05aee5d976f057ce",
+        "runtime:4270b6755461a292",
+        "runtime:b16bfbb9f85c9ae5"
+      ],
+      "upstreamResult": "React serializes empty output without Octane markers.",
+      "octaneResult": "Check the same empty rendered content while ignoring internal markers.",
+      "rationale": "Preserve the binding contract using the renderer and test-runner differences documented in UPSTREAM.md. Immutable upstream source and assertions remain available for direct comparison.",
+      "classification": "testing-runtime",
+      "consumerImpact": "No visible-content change; use DOM queries for assertions.",
+      "migrationGuidance": "No visible-content change; use DOM queries for assertions.",
+      "owner": "@octanejs/mobx",
+      "reviewCondition": "Review when upgrading the pinned MobX React Lite release or changing the corresponding native renderer contract."
+    },
+    {
+      "id": "mobx-exports",
+      "caseIds": ["runtime:90583d045077e3a2"],
+      "upstreamResult": "React Lite exports seven binding APIs.",
+      "octaneResult": "Also retain Octane MobX core re-exports and compatibility aliases.",
+      "rationale": "Preserve the binding contract using the renderer and test-runner differences documented in UPSTREAM.md. Immutable upstream source and assertions remain available for direct comparison.",
+      "classification": "renderer-contract",
+      "consumerImpact": "Existing Octane imports continue to work.",
+      "migrationGuidance": "Existing Octane imports continue to work.",
+      "owner": "@octanejs/mobx",
+      "reviewCondition": "Review when upgrading the pinned MobX React Lite release or changing the corresponding native renderer contract."
+    },
+    {
+      "id": "mobx-environment",
+      "caseIds": [
+        "runtime:53683ff277e30177",
+        "runtime:0e8dbaba5d4a2c34",
+        "runtime:f86ec5b4432813f2"
+      ],
+      "upstreamResult": "Jest isolates CommonJS modules and checks React peers.",
+      "octaneResult": "Vitest isolates ESM modules and checks Octane peers and MobX 7.",
+      "rationale": "Preserve the binding contract using the renderer and test-runner differences documented in UPSTREAM.md. Immutable upstream source and assertions remain available for direct comparison.",
+      "classification": "testing-runtime",
+      "consumerImpact": "Install Octane and a compatible MobX 7 core.",
+      "migrationGuidance": "Install Octane and a compatible MobX 7 core.",
+      "owner": "@octanejs/mobx",
+      "reviewCondition": "Review when upgrading the pinned MobX React Lite release or changing the corresponding native renderer contract."
+    },
+    {
+      "id": "mobx-renderer-contracts",
+      "caseIds": [
+        "runtime:5880b8f00541a6af",
+        "runtime:a8f97bb5b58e2db6",
+        "runtime:6cd62c66ba203b5e",
+        "runtime:e377d27707b0fe20",
+        "runtime:e377d27707b0fe20:2",
+        "runtime:2e9d09f66194b892",
+        "runtime:00578329fbc3d0a4",
+        "runtime:00578329fbc3d0a4:2",
+        "runtime:93ffd99af97bdb97",
+        "runtime:93ffd99af97bdb97:2",
+        "runtime:c8b5299a78ee0467",
+        "runtime:c8b5299a78ee0467:2",
+        "runtime:f1eaa0e07f0429fd",
+        "runtime:f1eaa0e07f0429fd:2",
+        "runtime:4e25bb7be49a0525",
+        "runtime:4e25bb7be49a0525:2",
+        "runtime:f775b9872113ba19",
+        "runtime:f775b9872113ba19:2",
+        "runtime:f0a7090434d27d3d",
+        "runtime:f0a7090434d27d3d:2",
+        "runtime:01b579e67f3bea03",
+        "runtime:01b579e67f3bea03:2",
+        "runtime:1dbc6434524e7a0b",
+        "runtime:1dbc6434524e7a0b:2",
+        "runtime:809fe4bf671a1cb4",
+        "runtime:809fe4bf671a1cb4:2",
+        "runtime:8a8adf3f66fabb71",
+        "runtime:8a8adf3f66fabb71:2",
+        "runtime:02a4a92543808bc8",
+        "runtime:401f9e21f0a8a2b3",
+        "runtime:cfce705ea08579ed",
+        "runtime:17195aeba6d93678",
+        "runtime:a8da48a08e1d2636",
+        "runtime:3c63ede0b27f6bc3",
+        "runtime:f1ee518e1067380d",
+        "runtime:8252026d597e85d6",
+        "runtime:913a541cbc0cde3b",
+        "runtime:71a4cb7a16a5f973",
+        "runtime:2854534ba5ec544a",
+        "runtime:63d1f133c510581d",
+        "runtime:3c00a6f442d7affa",
+        "runtime:04fe229fd414dd72",
+        "runtime:e5e55b901197da2c",
+        "runtime:44130a8ff259cb35",
+        "runtime:e9780b6ca14e25a4",
+        "runtime:e9780b6ca14e25a4:2",
+        "runtime:95756b2bf181f734",
+        "runtime:95756b2bf181f734:2",
+        "runtime:87528075491d6a54",
+        "runtime:b2ffadf66a0663a7",
+        "runtime:5d6480b4140b01bf",
+        "runtime:5d6480b4140b01bf:2",
+        "runtime:c7f2feba46ff67b6",
+        "runtime:c7f2feba46ff67b6:2",
+        "runtime:4397b825445406c7",
+        "runtime:4397b825445406c7:2",
+        "runtime:5f22659e0f9337bd"
+      ],
+      "upstreamResult": "React uses forwardRef, class boundaries, memo descriptor fields, and React DOM snapshots.",
+      "octaneResult": "Use native ref props and error boundaries, visible row assertions, and native memo statics; preserve generic props, focus, errors, render ordering, and the original legacy-context skip.",
+      "rationale": "Preserve the binding contract using the renderer and test-runner differences documented in UPSTREAM.md. Immutable upstream source and assertions remain available for direct comparison.",
+      "classification": "renderer-contract",
+      "consumerImpact": "Pass refs as props; use native error boundaries. React-only memo fields and legacy context are not public Octane contracts.",
+      "migrationGuidance": "Pass refs as props; use native error boundaries. React-only memo fields and legacy context are not public Octane contracts.",
+      "owner": "@octanejs/mobx",
+      "reviewCondition": "Review when upgrading the pinned MobX React Lite release or changing the corresponding native renderer contract."
+    },
+    {
+      "id": "mobx-local-errors",
+      "caseIds": [
+        "runtime:01ee9406420b1f26",
+        "runtime:51e787fa488de585",
+        "runtime:615db1b19f2f733b",
+        "runtime:a465aa81f27676cc",
+        "runtime:1825dcde3f2fbf86",
+        "runtime:651e8d3bd27930f6",
+        "runtime:45bdea7319b4c451",
+        "runtime:d6bb335c0a07002b",
+        "runtime:d204e75ab0e3b28c",
+        "runtime:5406c7657e0bdcd1",
+        "runtime:5d3ac8835f0e97ce",
+        "runtime:a9b80061ff4f0ea4",
+        "runtime:895040354552c169",
+        "runtime:495842b48b7748fa"
+      ],
+      "upstreamResult": "React class boundaries catch errors from local observable getters.",
+      "octaneResult": "Native Octane boundaries catch the same getter failures; explicit getter types preserve strict recursive inference.",
+      "rationale": "Preserve the binding contract using the renderer and test-runner differences documented in UPSTREAM.md. Immutable upstream source and assertions remain available for direct comparison.",
+      "classification": "renderer-contract",
+      "consumerImpact": "Use native error boundaries; local observable behavior is preserved.",
+      "migrationGuidance": "Use native error boundaries; local observable behavior is preserved.",
+      "owner": "@octanejs/mobx",
+      "reviewCondition": "Review when upgrading the pinned MobX React Lite release or changing the corresponding native renderer contract."
+    },
+    {
+      "id": "mobx-strict-mode",
+      "caseIds": ["runtime:d2a6425f2772ff74", "runtime:31e0d1769434b930"],
+      "upstreamResult": "React StrictMode double invocation exposes a mutation made inside the initial tracking callback.",
+      "octaneResult": "Octane renders once, so the case checks the initial value and an explicit rerender. A pinned React control without StrictMode also renders the initial value.",
+      "rationale": "Preserve the binding contract using the renderer and test-runner differences documented in UPSTREAM.md. Immutable upstream source and assertions remain available for direct comparison.",
+      "classification": "renderer-contract",
+      "consumerImpact": "Do not rely on development-only duplicate renders to observe a mutation made during first render.",
+      "migrationGuidance": "Do not rely on development-only duplicate renders to observe a mutation made during first render.",
+      "owner": "@octanejs/mobx",
+      "reviewCondition": "Review when upgrading the pinned MobX React Lite release or changing the corresponding native renderer contract."
+    },
+    {
+      "id": "mobx-async-completion",
+      "caseIds": ["runtime:9a9f1c4422717d1b", "runtime:51963ed9d642b8e7"],
+      "upstreamResult": "Jest completes the asynchronous scenario through done.",
+      "octaneResult": "Vitest awaits a returned promise while preserving the transactional assertions.",
+      "rationale": "Preserve the binding contract using the renderer and test-runner differences documented in UPSTREAM.md. Immutable upstream source and assertions remain available for direct comparison.",
+      "classification": "testing-runtime",
+      "consumerImpact": "No public behavior change.",
+      "migrationGuidance": "No public behavior change.",
+      "owner": "@octanejs/mobx",
+      "reviewCondition": "Review when upgrading the pinned MobX React Lite release or changing the corresponding native renderer contract."
+    }
+  ],
+  "materializedTests": "packages/mobx"
 }

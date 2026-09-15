@@ -34,6 +34,21 @@ Ordinary two-item destructures keep the allocation-free React shape.
 
 ## Strong mode reads render snapshots
 
+Strong modules use inferred dependencies and automatic memoization: omit effect
+dependency arguments, and replace `useMemo` / `useCallback` with normal const
+calculations / callbacks. Equivalent explicit arrays are hints; conflicting
+arrays and `null` are errors. Avoid fetch-to-state effects without cleanup and
+chains of effects linked by state. Use `useLinkedState` for prop-driven state;
+use a lazy `useState` initializer or an explicit third `useReducer` initializer
+for deliberate initial capture. In `.tsrx`, render lists
+with keyed `@for` and stable item IDs, never position keys. Strong `.tsx` keeps
+standard keyed JSX mapping. DOM suppression props
+and Octane compatibility imports (`flushSync`, `unstable_batchedUpdates`,
+`StrictMode`) are errors. Native text `onChange` warnings become errors.
+Strong DOM JSX requires `dangerouslySetInnerHTML={trustHTML(trustedString)}`;
+`trustHTML` marks trust and does not sanitize. Strong `.tsrx` selects branded JSX
+types automatically; plain TypeScript `.tsx` needs `jsxImportSource: octane/strong`.
+
 In a module with `"use strong"` or application-wide Strong enabled, reading a
 `useRef` object's `current` while rendering is a compiler error
 (`OCTANE_STRONG_RENDER_REF_READ`). Calling a known third-tuple state getter

@@ -1,0 +1,60 @@
+diff --git a/tests/upstream/typescript/misc/withTranslation.test.tsx b/tests/upstream/typescript/misc/withTranslation.test.tsx
+--- a/tests/upstream/typescript/misc/withTranslation.test.tsx
++++ b/tests/upstream/typescript/misc/withTranslation.test.tsx
+@@ -19,14 +19,15 @@ describe('withTranslation', () => {
+     return <h2>something {props.tReady}</h2>;
+   };
+ 
++  // OCTANE DIVERGENCE[component-signature]: Octane component bodies are
++  // (props, scope, extra), so each upstream toBeCallableWith assertion is
++  // rewritten to check the props parameter (Parameters<typeof C>[0]).
+   it('default usage', () => {
+     const ExtendedComponent = withTranslation()(MyComponent);
+     // <ExtendedComponent />
+-    expectTypeOf(ExtendedComponent).toBeCallableWith({});
++    expectTypeOf({}).toExtend<Parameters<typeof ExtendedComponent>[0]>();
+     // <ExtendedComponent bar="baz" />
+-    expectTypeOf(ExtendedComponent).toBeCallableWith({
+-      bar: 'baz',
+-    });
++    expectTypeOf({ bar: 'baz' } as const).toExtend<Parameters<typeof ExtendedComponent>[0]>();
+   });
+ 
+   /**
+@@ -37,22 +38,18 @@ describe('withTranslation', () => {
+       const ExtendedComponent = withTranslation('ns')(MyComponent);
+ 
+       // <ExtendedComponent />
+-      expectTypeOf(ExtendedComponent).toBeCallableWith({});
++      expectTypeOf({}).toExtend<Parameters<typeof ExtendedComponent>[0]>();
+       // <ExtendedComponent bar="baz" />
+-      expectTypeOf(ExtendedComponent).toBeCallableWith({
+-        bar: 'baz',
+-      });
++      expectTypeOf({ bar: 'baz' } as const).toExtend<Parameters<typeof ExtendedComponent>[0]>();
+     });
+ 
+     it('array', () => {
+       const ExtendedComponent = withTranslation(['ns', 'ns2'])(MyComponent);
+ 
+       // <ExtendedComponent />
+-      expectTypeOf(ExtendedComponent).toBeCallableWith({});
++      expectTypeOf({}).toExtend<Parameters<typeof ExtendedComponent>[0]>();
+       // <ExtendedComponent bar="baz" />
+-      expectTypeOf(ExtendedComponent).toBeCallableWith({
+-        bar: 'baz',
+-      });
++      expectTypeOf({ bar: 'baz' } as const).toExtend<Parameters<typeof ExtendedComponent>[0]>();
+     });
+   });
+ 
+@@ -90,8 +87,6 @@ describe('withTranslation', () => {
+       KeyPrefixComponent,
+     );
+ 
+-    expectTypeOf(ExtendedComponent).toBeCallableWith({
+-      bar: 'baz',
+-    });
++    expectTypeOf({ bar: 'baz' } as const).toExtend<Parameters<typeof ExtendedComponent>[0]>();
+   });
+ });

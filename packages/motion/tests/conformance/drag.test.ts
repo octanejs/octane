@@ -8,6 +8,32 @@ function pointer(type: string, target: EventTarget, clientX: number, clientY: nu
 }
 
 describe('drag', () => {
+	it('uses replacement callbacks during a drag and stops handling events after unmount', async () => {
+		const start = vi.fn();
+		const first = vi.fn();
+		const replacement = vi.fn();
+		const end = vi.fn();
+		const r = mount(DragBox, { onDragStart: start, onDrag: first, onDragEnd: end });
+		await nextPaint();
+		pointer('pointerdown', r.find('#drag-child'), 0, 0);
+		pointer('pointermove', window, 10, 5);
+		expect(start).toHaveBeenCalledOnce();
+		expect(first).toHaveBeenCalledOnce();
+		r.update(DragBox, { onDragStart: start, onDrag: replacement, onDragEnd: end });
+		pointer('pointermove', window, 20, 10);
+		expect(first).toHaveBeenCalledOnce();
+		expect(replacement).toHaveBeenCalledOnce();
+		pointer('pointerup', window, 20, 10);
+		expect(end).toHaveBeenCalledOnce();
+
+		pointer('pointerdown', r.find('#box'), 20, 10);
+		r.unmount();
+		pointer('pointermove', window, 30, 20);
+		pointer('pointerup', window, 30, 20);
+		expect(replacement).toHaveBeenCalledOnce();
+		expect(end).toHaveBeenCalledOnce();
+	});
+
 	it('drags the element by the pointer offset, clamped to dragConstraints', async () => {
 		const onDrag = vi.fn();
 		const r = mount(DragBox, { onDrag });

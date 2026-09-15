@@ -7,7 +7,7 @@ diff --git a/tests/upstream/InView.test.tsx b/tests/upstream/InView.test.tsx
  import { userEvent } from "vitest/browser";
  import { InView } from "../../src/InView.tsrx";
  import { defaultFallbackInView } from "../../src/observe";
-@@ -170,7 +170,7 @@ test("plain children should not catch bubbling onChange event", async () => {
+@@ -269,7 +269,7 @@ test("plain children should not catch bubbling onChange event", async () => {
    expect(onChange).not.toHaveBeenCalled();
  });
  
@@ -16,7 +16,7 @@ diff --git a/tests/upstream/InView.test.tsx b/tests/upstream/InView.test.tsx
    const cb = vi.fn();
    // @ts-expect-error
    window.IntersectionObserver = undefined;
-@@ -184,25 +184,39 @@ test("should render with fallback", () => {
+@@ -283,25 +283,39 @@ test("should render with fallback", () => {
      expect.objectContaining({ isIntersecting: true }),
    );
  
@@ -50,7 +50,7 @@ diff --git a/tests/upstream/InView.test.tsx b/tests/upstream/InView.test.tsx
 +    seen.push(arg);
 +  });
 +  try {
-+    // Public InView path (not observe()): Octane reports unsupported IO via effect
++    // Public InView path (not observe()): Octane reports unsupported IO during ref commit
 +    // console.error. Documented with intersection-observer-unsupported-mount-error-surface;
 +    // this case id is already bound to intersection-observer-initial-false-onchange above.
 +    await act(() => {
@@ -67,7 +67,7 @@ diff --git a/tests/upstream/InView.test.tsx b/tests/upstream/InView.test.tsx
    const cb = vi.fn();
    // @ts-expect-error
    window.IntersectionObserver = undefined;
-@@ -213,18 +227,30 @@ test("should render with global fallback", () => {
+@@ -312,18 +326,30 @@ test("should render with global fallback", () => {
      expect.objectContaining({ isIntersecting: true }),
    );
  
@@ -99,7 +99,7 @@ diff --git a/tests/upstream/InView.test.tsx b/tests/upstream/InView.test.tsx
 +    seen.push(arg);
 +  });
 +  try {
-+    // Public InView path: same effect-phase console.error surface as the prop fallback case.
++    // Public InView path: same commit-phase console.error surface as the prop fallback case.
 +    await act(() => {
 +      render(<InView onChange={cb}>Inner</InView>);
 +    });

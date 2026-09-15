@@ -1,0 +1,17 @@
+{
+  "package": "thinking-orbs",
+  "version": "0.3.1",
+  "commit": "bd204b73c9b6660fad7210b1ad48d9dc2adbb89d",
+  "nonTestFiles": [
+    {
+      "path": "scripts/extract-golden.ts",
+      "gitBlob": "5f2588464e7643cd1e6573f6f14e89dddb76c71f",
+      "reason": "Build-time generator for fixed-time geometry vectors in spec/orbs-golden.json. It writes JSON output and contains no test registrations or assertions; the npm spec script invokes it as a generator."
+    },
+    {
+      "path": "scripts/extract-spec.ts",
+      "gitBlob": "1b8e8cdba7c206a3a7c8f0d7e5637c53cc9f9d2d",
+      "reason": "Build-time generator for platform-neutral presets and rendering constants in spec/orbs-spec.json. It writes JSON output and contains no test registrations or assertions; the npm spec script invokes it as a generator."
+    }
+  ]
+}

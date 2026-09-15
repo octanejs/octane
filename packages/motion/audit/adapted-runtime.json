@@ -2,31 +2,31 @@
   "schemaVersion": 1,
   "project": "motion-upstream",
   "roots": ["packages/motion/tests/upstream"],
-  "files": ["packages/motion/tests/upstream/use-motion-value.test.ts"],
+  "files": ["packages/motion/tests/upstream/use-motion-value.test.tsx"],
   "tests": [
     {
       "id": "runtime:a6edd8704002ab6c",
-      "file": "packages/motion/tests/upstream/use-motion-value.test.ts",
+      "file": "packages/motion/tests/upstream/use-motion-value.test.tsx",
       "fullName": "useMotionValue accepts new motion values"
     },
     {
       "id": "runtime:08fef07a6feda30d",
-      "file": "packages/motion/tests/upstream/use-motion-value.test.ts",
+      "file": "packages/motion/tests/upstream/use-motion-value.test.tsx",
       "fullName": "useMotionValue can be set manually"
     },
     {
       "id": "runtime:36131e30e3528f63",
-      "file": "packages/motion/tests/upstream/use-motion-value.test.ts",
+      "file": "packages/motion/tests/upstream/use-motion-value.test.tsx",
       "fullName": "useMotionValue fires callbacks"
     },
     {
       "id": "runtime:261ccbb62ac2454e",
-      "file": "packages/motion/tests/upstream/use-motion-value.test.ts",
+      "file": "packages/motion/tests/upstream/use-motion-value.test.tsx",
       "fullName": "useMotionValue is typed"
     },
     {
       "id": "runtime:e70ea1daa6f416de",
-      "file": "packages/motion/tests/upstream/use-motion-value.test.ts",
+      "file": "packages/motion/tests/upstream/use-motion-value.test.tsx",
       "fullName": "useMotionValue sets initial value"
     }
   ]

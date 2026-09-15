@@ -1,0 +1,23 @@
+diff --git a/tests/upstream/withTranslation.keyPrefix.spec.jsx b/tests/upstream/withTranslation.keyPrefix.spec.jsx
+--- a/tests/upstream/withTranslation.keyPrefix.spec.jsx
++++ b/tests/upstream/withTranslation.keyPrefix.spec.jsx
+@@ -11,15 +11,14 @@ describe('withTranslation', () => {
+     cleanup();
+   });
+ 
+-  class TestComponentKeyPrefix extends React.Component {
+-    render() {
+-      const { t, i18n: instance } = this.props;
++  // OCTANE DIVERGENCE[function-components]: Preserve the HOC contract with a function component and a native element ref.
++  function TestComponentKeyPrefix(props) {
++      const { t, i18n: instance } = props;
+       expect(typeof t).toBe('function');
+       // expect(instance).toBe(i18n);
+       expect(instance.__original).toBe(i18n);
+ 
+-      return <div>{t('deepKey1')}</div>;
+-    }
++      return <div ref={props.ref}>{t('deepKey1')}</div>;
+   }
+ 
+   it('should render correct content', () => {

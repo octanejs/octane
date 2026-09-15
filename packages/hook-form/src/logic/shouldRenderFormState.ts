@@ -1,4 +1,4 @@
-// Vendored from react-hook-form@7.81.0 src/logic/shouldRenderFormState.ts (octane port).
+// Adapted from react-hook-form@7.88.0 src/logic/shouldRenderFormState.ts for Octane.
 import { VALIDATION_MODE } from '../constants';
 import type { FieldValues, FormState, InternalFieldName, ReadFormState } from '../types';
 
@@ -12,8 +12,7 @@ export default <T extends FieldValues, K extends ReadFormState>(
 	isRoot?: boolean,
 ) => {
 	updateFormState(formStateData);
-	const { name, ...formState } = formStateData;
-	const keys = Object.keys(formState);
+	const keys = Object.keys(formStateData).filter((key) => key !== 'name');
 
 	return (
 		!keys.length ||

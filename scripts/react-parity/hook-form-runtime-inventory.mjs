@@ -1,27 +1,38 @@
 #!/usr/bin/env node
-import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { compareTestIdentities, toPortablePath } from './harness-lib.mjs';
+import { collectVitestTests, compareTestIdentities, toPortablePath } from './harness-lib.mjs';
 
 const root = resolve(fileURLToPath(new URL('../..', import.meta.url)));
 const lanes = [
-	['hook-form', 'packages/hook-form/audit/adapted-runtime.json'],
-	['hook-form-server', 'packages/hook-form/audit/adapted-runtime-server.json'],
+	[
+		'hook-form-pristine-browser',
+		'packages/hook-form/audit/pristine-browser-wrapper-runtime.json',
+		false,
+	],
+	[
+		'hook-form-adapted-browser',
+		'packages/hook-form/audit/adapted-browser-wrapper-runtime.json',
+		false,
+	],
+	['hook-form', 'packages/hook-form/audit/adapted-runtime.json', true],
+	['hook-form-native', 'packages/hook-form/audit/native-runtime.json', false],
+	['hook-form-browser', 'packages/hook-form/audit/browser-runtime.json', false],
+	['hook-form-server', 'packages/hook-form/audit/adapted-runtime-server.json', true],
 ];
 
-for (const [project, destination] of lanes) {
+const collections = new Map();
+for (const [project, destination, upstream] of lanes) {
 	const idOccurrences = new Map();
-	const output = execFileSync(
-		process.execPath,
-		['node_modules/vitest/vitest.mjs', 'list', '--project', project, '--json'],
-		{ cwd: root, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 },
-	);
-	const tests = JSON.parse(output)
+	if (!collections.has(project)) collections.set(project, await collectVitestTests(project, root));
+	const tests = collections
+		.get(project)
 		.map((test) => ({ ...test, relativeFile: toPortablePath(relative(root, test.file)) }))
-		.filter((test) => test.relativeFile.startsWith('packages/hook-form/tests/upstream/'))
+		.filter(
+			(test) => test.relativeFile.startsWith('packages/hook-form/tests/upstream/') === upstream,
+		)
 		.map((test) => {
 			const baseId = `runtime:${createHash('sha256')
 				.update(`${test.relativeFile}\0${test.name.replaceAll(' > ', ' ')}`)
@@ -39,7 +50,7 @@ for (const [project, destination] of lanes) {
 	const inventory = {
 		schemaVersion: 1,
 		project,
-		roots: ['packages/hook-form/tests/upstream'],
+		roots: [upstream ? 'packages/hook-form/tests/upstream' : 'packages/hook-form/tests'],
 		files: [...new Set(tests.map((test) => test.file))],
 		tests,
 	};

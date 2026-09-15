@@ -6,7 +6,7 @@
   "engines": {
     "node": ">=22.22.2"
   },
-  "description": "React Hook Form for the octane renderer — the full react-hook-form 7.81.0 source ported onto octane's hooks: performant, flexible forms with native-event validation (onInput), field arrays, and schema resolvers.",
+  "description": "React Hook Form for the octane renderer \u2014 the full react-hook-form 7.88.0 source ported onto octane's hooks: performant, flexible forms with native-event validation (onInput), field arrays, and schema resolvers.",
   "author": {
     "name": "Dominic Gannaway",
     "email": "dg@domgan.com"
@@ -24,43 +24,63 @@
   "types": "src/index.ts",
   "files": [
     "src",
+    "LICENSE",
     "LICENSE.upstream",
     "README.md",
     "UPSTREAM.md"
   ],
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
   },
   "scripts": {
-    "test": "pnpm upstream:verify && pnpm test:type-parity && vitest run --root ../.. --project hook-form && vitest run --root ../.. --project hook-form-differential && vitest run --root ../.. --project hook-form-server && vitest run --root ../.. --project hook-form-pristine",
+    "test": "pnpm upstream:verify && pnpm test:type-parity && vitest run --root ../.. --project hook-form --project hook-form-native && vitest run --root ../.. --project hook-form-differential && vitest run --root ../.. --project hook-form-server && vitest run --root ../.. --project hook-form-pristine --project hook-form-browser --project hook-form-pristine-browser --project hook-form-adapted-browser",
     "test:upstream": "jest --config tests/upstream-jest.config.cjs --rootDir upstream --runInBand --no-watchman",
-    "upstream:verify": "node ../../scripts/react-parity/hook-form-upstream.mjs",
+    "upstream:verify": "node ../../scripts/react-parity/verify-provenance.mjs && node ../../scripts/react-parity/hook-form-upstream.mjs",
     "test:type-parity": "node ../../scripts/react-parity/hook-form-types.mjs",
-    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json && tsrx-tsc --noEmit -p typetests/tsconfig.json"
+    "typecheck": "node ../../scripts/react-port/materialize.mjs run --package-dir . && tsrx-tsc --noEmit -p tsconfig.json && tsrx-tsc --noEmit -p typetests/tsconfig.adapted.json && tsrx-tsc --noEmit -p tests/types/tsconfig.json && tsrx-tsc --noEmit -p tests/browser/tsconfig.json"
   },
   "peerDependencies": {
     "octane": "workspace:^0.1.51 || ^0.2.0"
   },
   "devDependencies": {
+    "@emotion/react": "11.14.0",
+    "@emotion/styled": "11.14.0",
+    "@hookform/resolvers": "3.9.0",
+    "@mui/material": "5.16.13",
+    "@octanejs/select": "workspace:*",
     "@octanejs/testing-library": "workspace:*",
+    "@playwright/test": "catalog:default",
     "@swc/core": "1.15.41",
     "@swc/jest": "0.2.39",
     "@testing-library/jest-dom": "catalog:default",
     "@testing-library/react": "16.3.2",
+    "@tsrx/react": "catalog:default",
+    "@types/jest": "30.0.0",
+    "@types/node": "catalog:default",
     "@types/react": "catalog:default",
     "@types/react-dom": "catalog:default",
-    "@tsrx/react": "catalog:default",
     "esbuild": "catalog:default",
+    "hook-form-pristine-react": "npm:react@19.0.0",
+    "hook-form-pristine-react-dom": "npm:react-dom@19.0.0",
+    "hook-form-pristine-vite": "npm:vite@6.4.3",
+    "hook-form-pristine-vite-react": "npm:@vitejs/plugin-react@4.3.4",
     "jest": "30.4.2",
     "jest-environment-jsdom": "30.4.1",
     "jest-environment-node": "30.4.1",
     "jest-fixed-jsdom": "0.0.10",
+    "joi": "18.2.5",
     "octane": "workspace:*",
+    "playwright": "catalog:default",
     "react": "catalog:default",
     "react-dom": "catalog:default",
-    "react-hook-form": "catalog:default",
+    "react-hook-form": "7.88.0",
+    "react-router-dom": "6.28.1",
+    "react-select": "5.10.2",
+    "vite": "catalog:default",
     "vitest": "catalog:default",
     "whatwg-fetch": "3.6.20",
+    "yup": "1.6.1",
     "zod": "catalog:default"
   }
 }

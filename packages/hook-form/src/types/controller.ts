@@ -1,7 +1,5 @@
-// Vendored from react-hook-form@7.81.0 src/types/controller.ts.
-// octane: upstream's React.ReactElement return becomes `unknown` (any octane
-// renderable), and `onChange` becomes `onInput` — octane events are native, so
-// the per-keystroke handler is the platform `input` event.
+import type { OctaneNode } from 'octane';
+// Adapted from react-hook-form@7.88.0 src/types/controller.ts for Octane.
 import type {
 	Control,
 	FieldError,
@@ -94,5 +92,5 @@ export type ControllerProps<
 		field: ControllerRenderProps<TFieldValues, TName>;
 		fieldState: ControllerFieldState;
 		formState: UseFormStateReturn<TFieldValues>;
-	}) => unknown;
+	}) => OctaneNode;
 } & UseControllerProps<TFieldValues, TName, TTransformedValues>;

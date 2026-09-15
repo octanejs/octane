@@ -1,4 +1,4 @@
-// Vendored from react-hook-form@7.81.0 src/utils/extractFormValues.ts (octane port).
+// Adapted from react-hook-form@7.88.0 src/utils/extractFormValues.ts for Octane.
 import isObject from './isObject';
 
 export default function extractFormValues<T extends object, K extends Record<string, unknown>>(

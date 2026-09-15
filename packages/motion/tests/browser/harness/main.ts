@@ -1,0 +1,10 @@
+import { createRoot, hydrateRoot } from 'octane';
+import { BrowserMotion } from './fixture.tsrx';
+import { ServerValues } from '../../_fixtures/server-values.tsrx';
+const container = document.querySelector<HTMLElement>('#root')!;
+const before = container.querySelector('output');
+const root = before ? hydrateRoot(container, ServerValues) : createRoot(container);
+if (!before) root.render(BrowserMotion);
+container.dataset.adopted = String(before !== null && before === container.querySelector('output'));
+document.querySelector('#unmount')!.addEventListener('click', () => root.unmount());
+container.dataset.ready = 'true';

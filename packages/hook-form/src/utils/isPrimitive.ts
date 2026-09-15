@@ -1,4 +1,4 @@
-// Vendored from react-hook-form@7.81.0 src/utils/isPrimitive.ts (octane port).
+// Adapted from react-hook-form@7.88.0 src/utils/isPrimitive.ts for Octane.
 import type { Primitive } from '../types';
 
 import isNullOrUndefined from './isNullOrUndefined';

@@ -1,4 +1,4 @@
-// Vendored from react-hook-form@7.81.0 src/utils/remove.ts (octane port).
+// Adapted from react-hook-form@7.88.0 src/utils/remove.ts for Octane.
 import compact from './compact';
 import convertToArrayPayload from './convertToArrayPayload';
 import isUndefined from './isUndefined';

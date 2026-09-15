@@ -6,5 +6,5 @@ diff --git a/tests/upstream/global/utils/objectsEqual.test.ts b/tests/upstream/g
 -import { objectsEqual } from "./objectsEqual";
 +import { objectsEqual } from "../../../../src/global/utils/objectsEqual";
  
- const EMPTY = {};
- const A = { a: 25, b: 75 };
+ describe("objectsEqual", () => {
+   test.each([

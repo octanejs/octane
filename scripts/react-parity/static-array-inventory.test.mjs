@@ -33,6 +33,71 @@ for (const [name, source, expected] of [
 	[
 		'unequal nested lengths',
 		`[[1], [1,2]].forEach(keys => { keys.forEach(key => { it('key', () => {}); }); });`,
+		3,
+	],
+	[
+		'destructured event tables with unequal lengths',
+		`const groups = [{type:'a',events:['click'],init:{key:1}},{type:'b',events:['focus','blur']}]; groups.forEach(({type, events, init}) => { describe(type, () => { events.forEach(event => { it(event, () => { dispatch(init); }); }); }); });`,
+		3,
+	],
+	[
+		'mutated destructured event table',
+		`const groups = [{events:['click']},{events:['focus','blur']}]; groups.forEach(({events}) => { events.push('input'); events.forEach(event => { it(event, () => {}); }); });`,
+		null,
+	],
+	[
+		'escaping destructured event table',
+		`const groups = [{events:['click']},{events:['focus','blur']}]; groups.forEach(({events}) => { modify(events); events.forEach(event => { it(event, () => {}); }); });`,
+		null,
+	],
+	[
+		'unknown nested event table',
+		`const groups = [{events:['click']},{events:unknownEvents}]; groups.forEach(({events}) => { events.forEach(event => { it(event, () => {}); }); });`,
+		null,
+	],
+	[
+		'early exit in nested iteration',
+		`[[1], [1,2]].forEach(keys => { if (condition) return; keys.forEach(key => { it('key', () => {}); }); });`,
+		null,
+	],
+	[
+		'mutation through another iteration',
+		`const groups = [{events:['click']},{events:['focus','blur']}]; groups.forEach(({events}) => { events.pop(); }); groups.forEach(({events}) => { events.forEach(event => { it(event, () => {}); }); });`,
+		null,
+	],
+	[
+		'escape through a nested array',
+		`const groups = [{events:['click']},{events:['focus','blur']}]; change([groups]); groups.forEach(({events}) => { events.forEach(event => { it(event, () => {}); }); });`,
+		null,
+	],
+	[
+		'empty rows in a nested table',
+		`[[], [1,2]].forEach(keys => { keys.forEach(key => { it('key', () => {}); }); });`,
+		2,
+	],
+	[
+		'three correlated levels',
+		`[[{values:[1]}], [{values:[1,2]}, {values:[3]}]].forEach(groups => { groups.forEach(({values}) => { values.forEach(value => { it('value', () => {}); }); }); });`,
+		4,
+	],
+	[
+		'early exit in an intervening suite',
+		`[[1], [1,2]].forEach(keys => { describe('scope', () => { if (condition) return; keys.forEach(key => { it('key', () => {}); }); }); });`,
+		null,
+	],
+	[
+		'conditional registration in a nested table',
+		`[[1], [1,2]].forEach(keys => { keys.forEach(key => { if (condition) it('key', () => {}); }); });`,
+		null,
+	],
+	[
+		'unknown callback registrar in a nested table',
+		`[[1], [1,2]].forEach(keys => { repeat(() => { keys.forEach(key => { it('key', () => {}); }); }); });`,
+		null,
+	],
+	[
+		'conditional outer table',
+		`if (condition) [[1], [1,2]].forEach(keys => { keys.forEach(key => { it('key', () => {}); }); });`,
 		null,
 	],
 	['runtime filter', `const rows = [1,2].filter(predicate); it.each(rows)('row', () => {});`, null],

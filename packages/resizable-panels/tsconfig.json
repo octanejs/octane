@@ -10,8 +10,12 @@
     "strict": true,
     "jsx": "react-jsx",
     "jsxImportSource": "octane",
-    "allowImportingTsExtensions": true
+    "allowImportingTsExtensions": true,
+    "skipLibCheck": false
   },
   "include": ["./src/"],
-  "exclude": ["node_modules", "dist", "tests", "upstream"]
+  "exclude": ["node_modules", "dist", "tests", "upstream"],
+  "reactPortEvidence": {
+    "gate": "authored-source-types"
+  }
 }

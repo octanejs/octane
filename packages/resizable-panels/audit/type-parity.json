@@ -10,7 +10,7 @@
     "pristine": {
       "compiler": "tsc",
       "project": "packages/resizable-panels/audit/type-probes/tsconfig.pristine.json",
-      "sourcePolicy": "repo-authored React declaration probes against published react-resizable-panels 4.12.2 .d.ts"
+      "sourcePolicy": "repo-authored React declaration probes against published react-resizable-panels 4.12.4 .d.ts"
     },
     "adapted": {
       "compiler": "tsrx-tsc",

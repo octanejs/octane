@@ -843,7 +843,11 @@ test('jotai exact selection fails closed when a declared case is renamed', async
 	await assert.doesNotReject(() => verifyManifestTestSelections(value, process.cwd()));
 
 	const renamed = structuredClone(value);
-	renamed.lanes[0].files[0].cases[0].fullName += ' renamed';
+	const lane = renamed.lanes.find((lane) => lane.id === 'jotai-runtime-differential');
+	assert.ok(lane, 'Jotai retains its differential lane');
+	const declaredCase = lane.files.flatMap((file) => file.cases ?? [])[0];
+	assert.ok(declaredCase, 'The differential lane declares a selectable case');
+	declaredCase.fullName += ' renamed';
 	await assert.rejects(
 		() => verifyManifestTestSelections(renamed, process.cwd()),
 		/fullName must match exactly one collected Vitest test/,

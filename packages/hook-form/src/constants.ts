@@ -1,4 +1,4 @@
-// Vendored from react-hook-form@7.81.0 src/constants.ts (octane port).
+// Adapted from react-hook-form@7.88.0 src/constants.ts for Octane.
 export const EVENTS = {
 	BLUR: 'blur',
 	FOCUS_OUT: 'focusout',

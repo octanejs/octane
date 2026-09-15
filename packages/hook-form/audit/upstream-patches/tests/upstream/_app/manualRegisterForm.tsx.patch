@@ -1,0 +1,84 @@
+diff --git a/tests/upstream/_app/manualRegisterForm.tsx b/tests/upstream/_app/manualRegisterForm.tsx
+--- a/tests/upstream/_app/manualRegisterForm.tsx
++++ b/tests/upstream/_app/manualRegisterForm.tsx
+@@ -47,7 +47,7 @@ const ManualRegisterForm: React.FC = () => {
+       <input
+         name="firstName"
+         placeholder="firstName"
+-        onChange={(e) =>
++        onInput={(e) =>
+           setValue('firstName', e.target.value, {
+             shouldValidate: true,
+             shouldDirty: true,
+@@ -58,7 +58,7 @@ const ManualRegisterForm: React.FC = () => {
+       <input
+         name="lastName"
+         placeholder="lastName"
+-        onChange={(e) =>
++        onInput={(e) =>
+           setValue('lastName', e.target.value, {
+             shouldValidate: true,
+             shouldDirty: true,
+@@ -70,7 +70,7 @@ const ManualRegisterForm: React.FC = () => {
+         type="number"
+         name="min"
+         placeholder="min"
+-        onChange={(e) =>
++        onInput={(e) =>
+           setValue('min', e.target.value, {
+             shouldValidate: true,
+             shouldDirty: true,
+@@ -82,7 +82,7 @@ const ManualRegisterForm: React.FC = () => {
+         type="number"
+         name="max"
+         placeholder="max"
+-        onChange={(e) =>
++        onInput={(e) =>
+           setValue('max', e.target.value, {
+             shouldValidate: true,
+             shouldDirty: true,
+@@ -94,7 +94,7 @@ const ManualRegisterForm: React.FC = () => {
+         type="date"
+         name="minDate"
+         placeholder="minDate"
+-        onChange={(e) =>
++        onInput={(e) =>
+           setValue('minDate', e.target.value, {
+             shouldValidate: true,
+             shouldDirty: true,
+@@ -106,7 +106,7 @@ const ManualRegisterForm: React.FC = () => {
+         type="date"
+         name="maxDate"
+         placeholder="maxDate"
+-        onChange={(e) =>
++        onInput={(e) =>
+           setValue('maxDate', e.target.value, {
+             shouldValidate: true,
+             shouldDirty: true,
+@@ -117,7 +117,7 @@ const ManualRegisterForm: React.FC = () => {
+       <input
+         name="minLength"
+         placeholder="minLength"
+-        onChange={(e) =>
++        onInput={(e) =>
+           setValue('minLength', e.target.value, {
+             shouldValidate: true,
+             shouldDirty: true,
+@@ -128,7 +128,7 @@ const ManualRegisterForm: React.FC = () => {
+       <input
+         name="minRequiredLength"
+         placeholder="minRequiredLength"
+-        onChange={(e) =>
++        onInput={(e) =>
+           setValue('minRequiredLength', e.target.value, {
+             shouldValidate: true,
+             shouldDirty: true,
+@@ -153,7 +153,7 @@ const ManualRegisterForm: React.FC = () => {
+       <input
+         name="pattern"
+         placeholder="pattern"
+-        onChange={(e) =>
++        onInput={(e) =>
+           setValue('pattern', e.target.value, {
+             shouldValidate: true,
+             shouldDirty: true,

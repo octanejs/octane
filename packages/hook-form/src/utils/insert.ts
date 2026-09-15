@@ -1,4 +1,4 @@
-// Vendored from react-hook-form@7.81.0 src/utils/insert.ts (octane port).
+// Adapted from react-hook-form@7.88.0 src/utils/insert.ts for Octane.
 import convertToArrayPayload from './convertToArrayPayload';
 
 export default function insert<T>(data: T[], index: number): (T | undefined)[];

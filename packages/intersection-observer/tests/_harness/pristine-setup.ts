@@ -1,3 +1,8 @@
+import * as matchers from '@testing-library/jest-dom/matchers';
+
+// Use the pristine runner's expect instance instead of a hoisted Vitest peer.
+expect.extend(matchers);
+
 /**
  * Ensure jsdom exposes a non-mock IntersectionObserver before upstream
  * test-utils captures `originalIntersectionObserver` at module load.

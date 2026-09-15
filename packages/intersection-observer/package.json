@@ -23,23 +23,25 @@
     "README.md",
     "UPSTREAM.md",
     "status.json",
-    "LICENSE.upstream"
+    "LICENSE.upstream",
+    "LICENSE"
   ],
   "exports": {
     ".": "./src/index.ts",
     "./test-utils": "./src/test-utils.ts"
   },
   "scripts": {
-    "test": "pnpm upstream:materialize && vitest run --root ../.. --config vitest.config.js --project intersection-observer",
+    "test": "pnpm upstream:materialize && vitest run --root ../.. --config vitest.config.js --project intersection-observer --project intersection-observer-adapted --project intersection-observer-adapted-ssr --maxWorkers=1",
     "typecheck": "tsrx-tsc --noEmit",
     "upstream:materialize": "node ../../scripts/react-port/materialize.mjs run --package-dir .",
-    "upstream:verify": "node ../../scripts/react-port/materialize.mjs run --check --package-dir ."
+    "upstream:verify": "node ../../scripts/react-parity/verify-provenance.mjs"
   },
   "peerDependencies": {
     "octane": "workspace:^0.1.51 || ^0.2.0"
   },
   "devDependencies": {
     "@octanejs/testing-library": "workspace:*",
+    "@testing-library/jest-dom": "catalog:default",
     "@testing-library/react": "16.3.2",
     "@types/react": "catalog:default",
     "@types/react-dom": "catalog:default",
@@ -47,7 +49,7 @@
     "octane": "workspace:*",
     "react": "catalog:default",
     "react-dom": "catalog:default",
-    "react-intersection-observer": "10.1.0",
+    "react-intersection-observer": "11.0.1",
     "vitest": "catalog:default"
   }
 }

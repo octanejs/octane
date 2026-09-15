@@ -13,8 +13,12 @@
     "allowSyntheticDefaultImports": true,
     "verbatimModuleSyntax": true,
     "types": ["node"],
-    "strict": true
+    "strict": true,
+    "skipLibCheck": false
   },
-  "include": ["./src/", "./tests/types/"],
-  "exclude": ["node_modules", "dist"]
+  "include": ["./src/"],
+  "exclude": ["node_modules", "dist", "tests"],
+  "reactPortEvidence": {
+    "gate": "authored-source-types"
+  }
 }

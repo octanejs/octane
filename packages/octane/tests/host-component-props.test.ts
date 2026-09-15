@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { flushEffects, mount } from './_helpers';
 import {
 	createElement,
+	createPortal,
 	flushSync,
 	hostComponent,
 	type ComponentBody,
@@ -23,6 +24,104 @@ const HostBody = (props: any, scope: any): void => {
 };
 
 describe('hostComponent — reused host and children', () => {
+	it('creates namespaced hosts, preserves attribute casing, and returns to HTML at integration points', () => {
+		const Host: ComponentBody<{
+			tag: string;
+			attrs?: Record<string, unknown>;
+			children?: OctaneNode;
+		}> = (props, scope) => {
+			hostComponent(scope, 0, props.tag, props.attrs ?? null, props.children);
+		};
+		const ref = { current: null as Element | null };
+		const tree = (props: { size: number }) =>
+			createElement(
+				'div',
+				null,
+				createElement(
+					Host,
+					{ tag: 'svg', attrs: { id: 'svg', ref, viewBox: `0 0 ${props.size} ${props.size}` } },
+					createElement(
+						Host,
+						{ tag: 'g', attrs: { id: 'group' } },
+						createElement(Host, { tag: 'circle', attrs: { id: 'circle', cx: props.size } }),
+					),
+					createElement(
+						Host,
+						{ tag: 'foreignObject', attrs: { id: 'foreign' } },
+						createElement(
+							Host,
+							{ tag: 'div', attrs: { id: 'html' } },
+							createElement(Host, { tag: 'svg', attrs: { id: 'nested-svg' } }),
+						),
+					),
+				),
+				createElement(
+					Host,
+					{ tag: 'math', attrs: { id: 'math' } },
+					createElement(Host, { tag: 'mrow', attrs: { id: 'row' } }),
+					createElement(
+						Host,
+						{ tag: 'annotation-xml', attrs: { encoding: 'text/html' } },
+						createElement(Host, { tag: 'div', attrs: { id: 'math-html' } }),
+					),
+					createElement(
+						'annotation-xml',
+						{ encoding: 'APPLICATION/XHTML+XML' },
+						createElement(Host, { tag: 'div', attrs: { id: 'math-xhtml' } }),
+					),
+					createElement(
+						Host,
+						{ tag: 'annotation-xml', attrs: { encoding: 'application/xml' } },
+						createElement(Host, { tag: 'mrow', attrs: { id: 'math-xml' } }),
+					),
+				),
+			);
+		const r = mount(tree, { size: 10 });
+		try {
+			const svg = r.find('#svg');
+			const circle = r.find('#circle');
+			for (const id of ['svg', 'group', 'circle', 'foreign', 'nested-svg']) {
+				expect(r.find('#' + id).namespaceURI, id).toBe('http://www.w3.org/2000/svg');
+			}
+			for (const id of ['math', 'row', 'math-xml']) {
+				expect(r.find('#' + id).namespaceURI, id).toBe('http://www.w3.org/1998/Math/MathML');
+			}
+			for (const id of ['html', 'math-html', 'math-xhtml']) {
+				expect(r.find('#' + id).namespaceURI, id).toBe('http://www.w3.org/1999/xhtml');
+			}
+			expect(ref.current).toBe(svg);
+			expect(svg.getAttribute('viewBox')).toBe('0 0 10 10');
+			expect(svg.getAttribute('viewbox')).toBeNull();
+			r.update(tree, { size: 20 });
+			expect(r.find('#svg')).toBe(svg);
+			expect(r.find('#circle')).toBe(circle);
+			expect(svg.getAttribute('viewBox')).toBe('0 0 20 20');
+			expect(circle.getAttribute('cx')).toBe('20');
+		} finally {
+			r.unmount();
+		}
+		expect(ref.current).toBeNull();
+	});
+
+	it('inherits a portal destination namespace for an ambiguous host tag', () => {
+		const destination = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+		document.body.appendChild(destination);
+		const host: ComponentBody = (_props, scope) => {
+			hostComponent(scope, 0, 'a', { id: 'svg-link', href: '#target' }, 'link');
+		};
+		const r = mount(() => createPortal(createElement(host, null), destination));
+		try {
+			const link = destination.querySelector('#svg-link');
+			expect(link?.namespaceURI).toBe('http://www.w3.org/2000/svg');
+			expect(link?.localName).toBe('a');
+			expect(link?.textContent).toBe('link');
+		} finally {
+			r.unmount();
+			expect(destination.childNodes).toHaveLength(0);
+			destination.remove();
+		}
+	});
+
 	it('accepts callable children after an empty mount and releases them when removed', () => {
 		const refs: string[] = [];
 		const hostRef = (element: Element | null) => {

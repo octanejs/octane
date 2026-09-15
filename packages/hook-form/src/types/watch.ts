@@ -1,6 +1,5 @@
-// Vendored from react-hook-form@7.81.0 src/types/watch.ts.
-// octane: upstream's ReactNode becomes `unknown` — any octane renderable.
-type ReactNode = unknown;
+// Adapted from react-hook-form@7.88.0 src/types/watch.ts for Octane.
+import type { OctaneNode } from 'octane';
 
 import type { FieldValues } from './fields';
 import type { Control } from './form';
@@ -30,7 +29,7 @@ export type WatchName<TFieldValues extends FieldValues> =
 export type WatchValue<
 	TFieldName,
 	TFieldValues extends FieldValues = FieldValues,
-> = TFieldName extends FieldPath<TFieldValues>[] | readonly FieldPath<TFieldValues>[]
+> = TFieldName extends readonly FieldPath<TFieldValues>[]
 	? FieldPathValues<TFieldValues, TFieldName>
 	: TFieldName extends FieldPath<TFieldValues>
 		? FieldPathValue<TFieldValues, TFieldName>
@@ -62,5 +61,5 @@ export type WatchProps<
 	compute?: (value: WatchValue<TFieldName, TFieldValues>) => TComputeValue;
 	render: (
 		value: WatchRenderValue<TFieldName, TFieldValues, TComputeValue>,
-	) => ReactNode | ReactNode[];
+	) => OctaneNode | OctaneNode[];
 };

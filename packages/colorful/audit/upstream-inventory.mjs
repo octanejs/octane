@@ -227,12 +227,12 @@ export async function buildInventory(root = packageRoot) {
 		schemaVersion: 1,
 		release: {
 			package: 'react-colorful',
-			version: '5.8.0',
-			tag: 'v5.8.0',
+			version: '5.8.1',
+			tag: 'v5.8.1',
 			npmIntegrity:
-				'sha512-Wy9OzPfjSN9bF12OB8N7UQvlsZ0I+7wHxpN+bV5BjNQGxOj6IiwkRjevJK9yOBjJWGQvAaf1OXtn8rUeEatAng==',
-			npmShasum: '9bc89aac3e8c847b503489614e2d28227b36641f',
-			commit: 'd914e7647c40a8bbdb286985176e769d76061732',
+				'sha512-oz68bhsnFWnpDf1ZR8daiQbYpXUnM2h2J6hl9Zg2rTpM/DU6vCqe1E+CpqmqLnJucMZetHZeifSAfJ+geN9lcA==',
+			npmShasum: 'a6ef2a3946e6903883b142720dda80c72f24267f',
+			commit: '8506e8c4b777e0056ce3567dc3a06ced143034bc',
 			license: 'MIT',
 		},
 		publicSurface: { runtimeExports, typeExports, subpaths: ['.'] },

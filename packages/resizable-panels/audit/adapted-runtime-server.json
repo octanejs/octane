@@ -5,9 +5,14 @@
   "files": ["packages/resizable-panels/tests/ssr/persistence.server.test.ts"],
   "tests": [
     {
-      "id": "runtime:react-resizable-panels-server:0001",
+      "id": "runtime:14d504168a6c463b",
       "file": "packages/resizable-panels/tests/ssr/persistence.server.test.ts",
-      "fullName": "react-resizable-panels persistence SSR renders deterministic defaults without resolving or reading browser storage"
+      "fullName": "react-resizable-panels persistence SSR renders deterministic defaults when no server-capable storage is provided"
+    },
+    {
+      "id": "runtime:935d373b0315557a",
+      "file": "packages/resizable-panels/tests/ssr/persistence.server.test.ts",
+      "fullName": "react-resizable-panels persistence SSR restores an injected server-capable storage layout during SSR"
     }
   ]
 }

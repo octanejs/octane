@@ -257,8 +257,8 @@ catalogs:
     '@sanity/icons': 5.2.1
     '@sanity/logos': 2.2.5
     '@sanity/client': 7.26.2
-    '@sanity/core-loader': 2.2.1
-    '@sanity/react-loader': 2.2.1
+    '@sanity/core-loader': 2.2.2
+    '@sanity/react-loader': 2.2.2
     '@ripple-ts/adapter': ^0.3.125
     '@ripple-ts/vite-plugin': ^0.3.125
     '@solidjs/web': '2.0.0-beta.20'
@@ -285,7 +285,7 @@ catalogs:
     '@wagmi/core': 3.6.4
     '@tauri-apps/api': 2.11.1
     '@tauri-apps/cli': 2.11.4
-    electron: 43.2.0
+    electron: 44.3.0
     '@testing-library/dom': ^10.4.1
     '@testing-library/jest-dom': ^6.9.1
     '@testing-library/react': ^16.3.2
@@ -359,11 +359,11 @@ catalogs:
     inferno-create-element: 9.1.0
     inferno-hydrate: 9.1.0
     inferno-server: 9.1.0
-    html-parse-stringify: ^3.0.1
-    i18next: 26.3.6
+    html-parse-stringify: 4.0.1
+    i18next: 26.4.0
     jsdom: ^30.0.1
-    jotai: ^2.20.2
-    mobx: 6.16.1
+    jotai: ^3.0.0
+    mobx: 7.0.3
     monaco-editor: 0.55.1
     lexical: 0.46.0
     lighthouse: 13.4.1
@@ -377,8 +377,8 @@ catalogs:
     # package ports, at the pinned release.
     '@vis.gl/react-mapbox': 8.1.2
     '@phosphor-icons/react': 2.1.10
-    motion: ^12.42.2
-    motion-dom: ^12.0.0
+    motion: ^13.2.0
+    motion-dom: ^13.2.0
     miniflare: 4.20260714.0
     nuqs: 2.9.1
     '@standard-schema/spec': 1.1.0
@@ -457,17 +457,17 @@ catalogs:
     react-stately: 3.49.0
     '@react-types/shared': ^3.36.1
     react-dom: 19.2.7
-    react-i18next: 17.0.9
+    react-i18next: 17.0.14
     '@react-email/components': 1.0.12
     '@react-email/render': 2.0.6
     react-error-boundary: 6.1.2
-    react-resizable-panels: 4.12.2
-    ripple: ^0.3.125
+    react-resizable-panels: 4.12.4
+    ripple: ^0.3.128
     rxjs: ^7.8.2
     rulesync: ^8.32.0
     solid-js: '2.0.0-beta.20'
     sonner: 2.0.7
-    thinking-orbs: 0.2.0
+    thinking-orbs: 0.3.1
     styled-components: 6.4.3
     stylis: ^4.4.0
     '@types/stylis': ^4.2.7
@@ -502,7 +502,7 @@ catalogs:
     "@zag-js/store": 1.42.0
     "@zag-js/types": 1.42.0
     "@zag-js/utils": 1.42.0
-    alien-signals: 1.0.4
+    alien-signals: 3.2.1
     react-transition-group: 4.4.5
     "@date-fns/tz": ^1.4.1
     date-fns: ^4.1.0
@@ -613,13 +613,14 @@ minimumReleaseAgeExclude:
   - '@tsrx/typescript-plugin@0.3.138'
   - '@tsrx/vite-plugin-react@0.0.104'
   - '@tsrx/vite-plugin-solid@0.0.101'
-  - ripple@0.3.125
+  - ripple@0.3.128
   - '@tsrx/runtime@0.1.7'
   - '@tsrx/react-runtime@0.1.7'
   - '@tsrx/solid-runtime@0.1.7'
   - cn@0.2.6
   - '@tanstack/react-virtual@3.14.12'
   - '@tanstack/virtual-core@3.17.10'
+  - react-i18next@17.0.14
 
 # Changesets 2.31.1 assumes npm's error shape and crashes on pnpm 11 duplicate
 # publish errors. Remove this backport once the fix ships on Changesets' stable line.

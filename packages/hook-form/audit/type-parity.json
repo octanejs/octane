@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "upstreamRoot": "packages/hook-form/upstream/src/__typetest__",
-  "adaptedRoot": "packages/hook-form/typetests",
+  "adaptedRoot": "packages/hook-form/tests/upstream/_types",
   "inventories": {
     "upstream": "packages/hook-form/audit/upstream-types.json",
     "adapted": "packages/hook-form/audit/adapted-types.json"
@@ -9,12 +9,12 @@
   "lanes": {
     "pristine": {
       "compiler": "tsc",
-      "project": "packages/hook-form/upstream/src/__typetest__/tsconfig.json",
+      "project": "packages/hook-form/typetests/tsconfig.pristine.json",
       "sourcePolicy": "byte-exact pinned upstream"
     },
     "adapted": {
       "compiler": "tsrx-tsc",
-      "project": "packages/hook-form/typetests/tsconfig.json",
+      "project": "packages/hook-form/typetests/tsconfig.adapted.json",
       "sourcePolicy": "structurally equivalent after permitted transformations"
     }
   },
@@ -32,5 +32,6 @@
       "rule": "ported component imports may gain the .tsrx extension when that exact adapted import exists"
     }
   ],
-  "divergences": []
+  "divergences": [],
+  "adaptedSourceRoot": "packages/hook-form/src"
 }

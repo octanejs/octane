@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { relative, resolve, sep } from 'node:path';
 
 import { extractTestCases } from './inventory-lib.mjs';
@@ -8,11 +8,47 @@ const UPSTREAM_TEST_ROOT = `${PACKAGE}/upstream/src/__tests__`;
 const PORTED_TEST_ROOT = `${PACKAGE}/tests/upstream`;
 const PRISTINE_RUNTIME = `${PACKAGE}/audit/pristine-runtime.json`;
 const ADAPTED_RUNTIME = `${PACKAGE}/audit/adapted-runtime.json`;
+const ADAPTED_SSR = `${PACKAGE}/audit/adapted-ssr-runtime.json`;
 const PRISTINE_BROWSER = `${PACKAGE}/audit/pristine-browser-runtime.json`;
 const ADAPTED_BROWSER = `${PACKAGE}/audit/adapted-browser-runtime.json`;
 
 const TITLE_REPLACEMENTS = new Map();
 const PORT_ONLY_CASES = new Map();
+
+// These exact 11 cases test a private React-version switch. Octane supports
+// callback-ref cleanup unconditionally; their original executions are retained.
+const REACT_VERSION_CASES = new Set(
+	[
+		'19.0.0',
+		'19.0.0-rc.1',
+		'19.0.0-experimental-abcdef',
+		'20.1.0',
+		'18.3.1',
+		'17.0.2',
+		'undefined',
+		'unknown',
+		'19unknown',
+		'19',
+		'v19.0.0',
+	].map((version) => `detects ref cleanup support for React version ${version}`),
+);
+
+function applicableCases(cases, fileOf, titleOf) {
+	const inapplicable = cases.filter(
+		(test) =>
+			fileOf(test).split('/').at(-1) === 'useOnInView.test.tsx' &&
+			REACT_VERSION_CASES.has(titleOf(test)),
+	);
+	if (
+		inapplicable.length &&
+		(inapplicable.length !== REACT_VERSION_CASES.size ||
+			new Set(inapplicable.map(titleOf)).size !== REACT_VERSION_CASES.size)
+	)
+		throw new Error(
+			'React-version detection evidence must retain every original parameterized case',
+		);
+	return cases.filter((test) => !inapplicable.includes(test));
+}
 
 function filesBelow(root) {
 	return readdirSync(root, { recursive: true, withFileTypes: true })
@@ -41,9 +77,16 @@ function testFiles(root) {
 	});
 }
 
-function fullNames(inventoryPath, repoRoot) {
+function fullNames(inventoryPath, repoRoot, omitReactVersionCases = false) {
 	const inventory = JSON.parse(readFileSync(resolve(repoRoot, inventoryPath), 'utf8'));
-	return inventory.tests
+	const tests = omitReactVersionCases
+		? applicableCases(
+				inventory.tests,
+				(test) => test.file,
+				(test) => test.fullName,
+			)
+		: inventory.tests;
+	return tests
 		.map(function nameOf(testCase) {
 			return testCase.fullName;
 		})
@@ -51,8 +94,12 @@ function fullNames(inventoryPath, repoRoot) {
 }
 
 export function verifyIntersectionObserverRuntimeCrosswalk(repoRoot) {
-	const unitPristine = fullNames(PRISTINE_RUNTIME, repoRoot);
+	const unitPristine = fullNames(PRISTINE_RUNTIME, repoRoot, true);
 	const unitAdapted = fullNames(ADAPTED_RUNTIME, repoRoot);
+	if (existsSync(resolve(repoRoot, ADAPTED_SSR))) {
+		unitAdapted.push(...fullNames(ADAPTED_SSR, repoRoot));
+		unitAdapted.sort();
+	}
 	if (JSON.stringify(unitPristine) !== JSON.stringify(unitAdapted)) {
 		throw new Error(
 			'intersection-observer unit pristine/adapted inventories must match one-for-one by fullName',
@@ -114,7 +161,12 @@ export function verifyIntersectionObserverUpstream(repoRoot) {
 		const observedExtras = ported.filter(function keepExtras(title) {
 			return allowedExtras.has(title);
 		});
-		if (JSON.stringify(portedUpstreamCases) !== JSON.stringify(upstream)) {
+		const applicable = applicableCases(
+			upstream,
+			() => file,
+			(title) => title,
+		);
+		if (JSON.stringify(portedUpstreamCases) !== JSON.stringify(applicable)) {
 			throw new Error(`${file}: adapted test registrations drifted from the pinned upstream suite`);
 		}
 		for (const title of allowedExtras) {

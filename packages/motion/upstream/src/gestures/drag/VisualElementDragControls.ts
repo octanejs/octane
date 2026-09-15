@@ -1,0 +1,854 @@
+import {
+    addValueToWillChange,
+    animateMotionValue,
+    calcLength,
+    convertBoundingBoxToBox,
+    convertBoxToBoundingBox,
+    createBox,
+    eachAxis,
+    frame,
+    isElementTextInput,
+    measurePageBox,
+    mixNumber,
+    PanInfo,
+    percent,
+    ResolvedConstraints,
+    resize,
+    setDragLock,
+    Transition,
+    type VisualElement,
+} from "motion-dom"
+import { Axis, Point, invariant } from "motion-utils"
+import { addDomEvent, type LayoutUpdateData } from "motion-dom"
+import { addPointerEvent } from "../../events/add-pointer-event"
+import { extractEventInfo } from "../../events/event-info"
+import { MotionProps } from "../../motion/types"
+import { getContextWindow } from "../../utils/get-context-window"
+import { isRefObject } from "../../utils/is-ref-object"
+import { PanSession } from "../pan/PanSession"
+import {
+    applyConstraints,
+    calcOrigin,
+    calcRelativeConstraints,
+    calcViewportConstraints,
+    defaultElastic,
+    rebaseAxisConstraints,
+    resolveDragElastic,
+} from "./utils/constraints"
+
+export const elementDragControls = new WeakMap<
+    VisualElement,
+    VisualElementDragControls
+>()
+
+export interface DragControlOptions {
+    /**
+     * This distance after which dragging starts and a direction is locked in.
+     *
+     * @public
+     */
+    distanceThreshold?: number
+
+    /**
+     * Whether to immediately snap to the cursor when dragging starts.
+     *
+     * @public
+     */
+    snapToCursor?: boolean
+}
+
+type DragDirection = "x" | "y"
+
+export class VisualElementDragControls {
+    private visualElement: VisualElement<HTMLElement>
+
+    private panSession?: PanSession
+
+    private openDragLock: VoidFunction | null = null
+
+    isDragging = false
+    private currentDirection: DragDirection | null = null
+
+    private originPoint: Point = { x: 0, y: 0 }
+
+    /**
+     * The permitted boundaries of travel, in pixels.
+     */
+    private constraints: ResolvedConstraints | false = false
+
+    private hasMutatedConstraints = false
+
+    /**
+     * The per-axis resolved elastic values.
+     */
+    private elastic = createBox()
+
+    /**
+     * The latest pointer event. Used as fallback when the `cancel` and `stop` functions are called without arguments.
+     */
+    private latestPointerEvent: PointerEvent | null = null
+
+    /**
+     * The latest pan info. Used as fallback when the `cancel` and `stop` functions are called without arguments.
+     */
+    private latestPanInfo: PanInfo | null = null
+
+    constructor(visualElement: VisualElement<HTMLElement>) {
+        this.visualElement = visualElement
+    }
+
+    start(
+        originEvent: PointerEvent,
+        { snapToCursor = false, distanceThreshold }: DragControlOptions = {}
+    ) {
+        /**
+         * Don't start dragging if this component is exiting
+         */
+        const { presenceContext } = this.visualElement
+        if (presenceContext && presenceContext.isPresent === false) return
+
+        const onSessionStart = (event: PointerEvent) => {
+            if (snapToCursor) {
+                this.snapToCursor(extractEventInfo(event).point)
+            }
+            this.stopAnimation()
+        }
+
+        const onStart = (event: PointerEvent, info: PanInfo) => {
+            // Attempt to grab the global drag gesture lock - maybe make this part of PanSession
+            const { drag, dragPropagation, onDragStart } = this.getProps()
+
+            if (drag && !dragPropagation) {
+                if (this.openDragLock) this.openDragLock()
+
+                this.openDragLock = setDragLock(drag)
+
+                // If we don 't have the lock, don't start dragging
+                if (!this.openDragLock) return
+            }
+
+            this.latestPointerEvent = event
+            this.latestPanInfo = info
+            this.isDragging = true
+
+            this.currentDirection = null
+
+            this.resolveConstraints()
+
+            if (this.visualElement.projection) {
+                this.visualElement.projection.isAnimationBlocked = true
+                this.visualElement.projection.target = undefined
+            }
+
+            /**
+             * Record gesture origin and pointer offset
+             */
+            eachAxis((axis) => {
+                let current = this.getAxisMotionValue(axis).get() || 0
+
+                /**
+                 * If the MotionValue is a percentage value convert to px
+                 */
+                if (percent.test(current)) {
+                    const { projection } = this.visualElement
+
+                    if (projection && projection.layout) {
+                        const measuredAxis = projection.layout.layoutBox[axis]
+
+                        if (measuredAxis) {
+                            const length = calcLength(measuredAxis)
+                            current = length * (parseFloat(current) / 100)
+                        }
+                    }
+                }
+
+                this.originPoint[axis] = current
+            })
+
+            // Fire onDragStart event
+            if (onDragStart) {
+                frame.update(() => onDragStart(event, info), false, true)
+            }
+
+            addValueToWillChange(this.visualElement, "transform")
+
+            const { animationState } = this.visualElement
+            animationState && animationState.setActive("whileDrag", true)
+        }
+
+        const onMove = (event: PointerEvent, info: PanInfo) => {
+            this.latestPointerEvent = event
+            this.latestPanInfo = info
+
+            const {
+                dragPropagation,
+                dragDirectionLock,
+                onDirectionLock,
+                onDrag,
+            } = this.getProps()
+
+            // If we didn't successfully receive the gesture lock, early return.
+            if (!dragPropagation && !this.openDragLock) return
+
+            const { offset } = info
+            // Attempt to detect drag direction if directionLock is true
+            if (dragDirectionLock && this.currentDirection === null) {
+                this.currentDirection = getCurrentDirection(offset)
+
+                // If we've successfully set a direction, notify listener
+                if (this.currentDirection !== null) {
+                    onDirectionLock && onDirectionLock(this.currentDirection)
+                }
+
+                return
+            }
+
+            // Update each point with the latest position
+            this.updateAxis("x", info.point, offset)
+            this.updateAxis("y", info.point, offset)
+
+            /**
+             * Ideally we would leave the renderer to fire naturally at the end of
+             * this frame but if the element is about to change layout as the result
+             * of a re-render we want to ensure the browser can read the latest
+             * bounding box to ensure the pointer and element don't fall out of sync.
+             */
+            this.visualElement.render()
+
+            /**
+             * This must fire after the render call as it might trigger a state
+             * change which itself might trigger a layout update.
+             */
+            if (onDrag) {
+                frame.update(() => onDrag(event, info), false, true)
+            }
+        }
+
+        const onSessionEnd = (event: PointerEvent, info: PanInfo) => {
+            this.latestPointerEvent = event
+            this.latestPanInfo = info
+
+            this.stop(event, info)
+
+            this.latestPointerEvent = null
+            this.latestPanInfo = null
+        }
+
+        const resumeAnimation = () => {
+            const { dragSnapToOrigin: snap } = this.getProps()
+            if (snap || this.constraints) {
+                this.startAnimation({ x: 0, y: 0 })
+            }
+        }
+
+        const { dragSnapToOrigin } = this.getProps()
+        this.panSession = new PanSession(
+            originEvent,
+            {
+                onSessionStart,
+                onStart,
+                onMove,
+                onSessionEnd,
+                resumeAnimation,
+            },
+            {
+                transformPagePoint: this.visualElement.getTransformPagePoint(),
+                dragSnapToOrigin,
+                distanceThreshold,
+                contextWindow: getContextWindow(this.visualElement),
+                element: this.visualElement.current,
+            }
+        )
+    }
+
+    /**
+     * @internal
+     */
+    stop(event?: PointerEvent, panInfo?: PanInfo) {
+        const finalEvent = event || this.latestPointerEvent
+        const finalPanInfo = panInfo || this.latestPanInfo
+
+        const isDragging = this.isDragging
+        this.cancel()
+        if (!isDragging || !finalPanInfo || !finalEvent) return
+
+        const { velocity } = finalPanInfo
+        this.startAnimation(velocity)
+
+        const { onDragEnd } = this.getProps()
+        if (onDragEnd) {
+            frame.postRender(() => onDragEnd(finalEvent, finalPanInfo))
+        }
+    }
+
+    /**
+     * @internal
+     */
+    cancel() {
+        this.isDragging = false
+
+        const { projection, animationState } = this.visualElement
+
+        if (projection) {
+            projection.isAnimationBlocked = false
+        }
+
+        this.endPanSession()
+
+        const { dragPropagation } = this.getProps()
+
+        if (!dragPropagation && this.openDragLock) {
+            this.openDragLock()
+            this.openDragLock = null
+        }
+
+        animationState && animationState.setActive("whileDrag", false)
+    }
+
+    /**
+     * Clean up the pan session without modifying other drag state.
+     * This is used during unmount to ensure event listeners are removed
+     * without affecting projection animations or drag locks.
+     * @internal
+     */
+    endPanSession() {
+        this.panSession && this.panSession.end()
+        this.panSession = undefined
+    }
+
+    private updateAxis(axis: DragDirection, _point: Point, offset?: Point) {
+        const { drag } = this.getProps()
+
+        // If we're not dragging this axis, do an early return.
+        if (!offset || !shouldDrag(axis, drag, this.currentDirection)) return
+
+        const axisValue = this.getAxisMotionValue(axis)
+        let next = this.originPoint[axis] + offset[axis]
+
+        // Apply constraints
+        if (this.constraints && this.constraints[axis]) {
+            next = applyConstraints(
+                next,
+                this.constraints[axis],
+                this.elastic[axis]
+            )
+        }
+
+        axisValue.set(next)
+    }
+
+    private resolveConstraints() {
+        const { dragConstraints, dragElastic } = this.getProps()
+
+        const layout =
+            this.visualElement.projection &&
+            !this.visualElement.projection.layout
+                ? this.visualElement.projection.measure(false)
+                : this.visualElement.projection?.layout
+
+        const prevConstraints = this.constraints
+
+        if (dragConstraints && isRefObject(dragConstraints)) {
+            if (!this.constraints) {
+                this.constraints = this.resolveRefConstraints()
+            }
+        } else {
+            if (dragConstraints && layout) {
+                this.constraints = calcRelativeConstraints(
+                    layout.layoutBox,
+                    dragConstraints
+                )
+            } else {
+                this.constraints = false
+            }
+        }
+
+        this.elastic = resolveDragElastic(dragElastic)
+
+        /**
+         * If we're outputting to external MotionValues, we want to rebase the measured constraints
+         * from viewport-relative to component-relative. This only applies to relative (non-ref)
+         * constraints, as ref-based constraints from calcViewportConstraints are already in the
+         * correct coordinate space for the motion value transform offset.
+         */
+        if (
+            prevConstraints !== this.constraints &&
+            !isRefObject(dragConstraints) &&
+            layout &&
+            this.constraints &&
+            !this.hasMutatedConstraints
+        ) {
+            eachAxis((axis) => {
+                if (
+                    this.constraints !== false &&
+                    this.getAxisMotionValue(axis)
+                ) {
+                    this.constraints[axis] = rebaseAxisConstraints(
+                        layout.layoutBox[axis],
+                        this.constraints[axis]
+                    )
+                }
+            })
+        }
+    }
+
+    private resolveRefConstraints() {
+        const { dragConstraints: constraints, onMeasureDragConstraints } =
+            this.getProps()
+        if (!constraints || !isRefObject(constraints)) return false
+
+        const constraintsElement = constraints.current as HTMLElement
+
+        invariant(
+            constraintsElement !== null,
+            "If `dragConstraints` is set as a React ref, that ref must be passed to another component's `ref` prop.",
+            "drag-constraints-ref"
+        )
+
+        const { projection } = this.visualElement
+
+        // TODO
+        if (!projection || !projection.layout) return false
+
+        /**
+         * Refresh the root scroll offset so the constraint's viewport box
+         * translates to correct page coordinates. The scroll captured at
+         * drag mount can be stale if the document was scrolled afterwards —
+         * e.g. via the browser restoring scroll on refresh, or an ancestor
+         * layout effect running after this element's mount (#2829).
+         *
+         * Clear the cached scroll first so `updateScroll` bypasses its
+         * per-animationId cache and re-reads the live value.
+         */
+        if (projection.root) {
+            projection.root.scroll = undefined
+            projection.root.updateScroll()
+        }
+
+        const constraintsBox = measurePageBox(
+            constraintsElement,
+            projection.root!,
+            this.visualElement.getTransformPagePoint()
+        )
+
+        let measuredConstraints = calcViewportConstraints(
+            projection.layout.layoutBox,
+            constraintsBox
+        )
+
+        /**
+         * If there's an onMeasureDragConstraints listener we call it and
+         * if different constraints are returned, set constraints to that
+         */
+        if (onMeasureDragConstraints) {
+            const userConstraints = onMeasureDragConstraints(
+                convertBoxToBoundingBox(measuredConstraints)
+            )
+
+            this.hasMutatedConstraints = !!userConstraints
+
+            if (userConstraints) {
+                measuredConstraints = convertBoundingBoxToBox(userConstraints)
+            }
+        }
+
+        return measuredConstraints
+    }
+
+    private startAnimation(velocity: Point) {
+        const {
+            drag,
+            dragMomentum,
+            dragElastic,
+            dragTransition,
+            dragSnapToOrigin,
+            onDragTransitionEnd,
+        } = this.getProps()
+
+        const constraints: Partial<ResolvedConstraints> = this.constraints || {}
+
+        const momentumAnimations = eachAxis((axis) => {
+            if (!shouldDrag(axis, drag, this.currentDirection)) {
+                return
+            }
+
+            let transition = (constraints && constraints[axis]) || {}
+
+            if (
+                dragSnapToOrigin === true ||
+                (dragSnapToOrigin as unknown) === axis
+            )
+                transition = { min: 0, max: 0 }
+
+            /**
+             * Overdamp the boundary spring if `dragElastic` is disabled. There's still a frame
+             * of spring animations so we should look into adding a disable spring option to `inertia`.
+             * We could do something here where we affect the `bounceStiffness` and `bounceDamping`
+             * using the value of `dragElastic`.
+             */
+            const bounceStiffness = dragElastic ? 200 : 1000000
+            const bounceDamping = dragElastic ? 40 : 10000000
+
+            const inertia: Transition = {
+                type: "inertia",
+                velocity: dragMomentum ? velocity[axis] : 0,
+                bounceStiffness,
+                bounceDamping,
+                timeConstant: 750,
+                restDelta: 1,
+                restSpeed: 10,
+                ...dragTransition,
+                ...transition,
+            }
+
+            // If we're not animating on an externally-provided `MotionValue` we can use the
+            // component's animation controls which will handle interactions with whileHover (etc),
+            // otherwise we just have to animate the `MotionValue` itself.
+            return this.startAxisValueAnimation(axis, inertia)
+        })
+
+        // Run all animations and then resolve the new drag constraints.
+        return Promise.all(momentumAnimations).then(onDragTransitionEnd)
+    }
+
+    private startAxisValueAnimation(
+        axis: DragDirection,
+        transition: Transition
+    ) {
+        const axisValue = this.getAxisMotionValue(axis)
+
+        addValueToWillChange(this.visualElement, axis)
+
+        return axisValue.start(
+            animateMotionValue(
+                axis,
+                axisValue,
+                0,
+                transition,
+                this.visualElement,
+                false
+            )
+        )
+    }
+
+    private stopAnimation() {
+        eachAxis((axis) => this.getAxisMotionValue(axis).stop())
+    }
+
+    /**
+     * Drag works differently depending on which props are provided.
+     *
+     * - If _dragX and _dragY are provided, we output the gesture delta directly to those motion values.
+     * - Otherwise, we apply the delta to the x/y motion values.
+     */
+    private getAxisMotionValue(axis: DragDirection) {
+        const dragKey =
+            `_drag${axis.toUpperCase()}` as `_drag${Uppercase<DragDirection>}`
+        const props = this.visualElement.getProps()
+        const externalMotionValue = props[dragKey]
+
+        return externalMotionValue
+            ? externalMotionValue
+            : this.visualElement.getValue(
+                  axis,
+                  this.visualElement.latestValues[axis] ?? 0
+              )
+    }
+
+    private snapToCursor(point: Point) {
+        eachAxis((axis) => {
+            const { drag } = this.getProps()
+
+            // If we're not dragging this axis, do an early return.
+            if (!shouldDrag(axis, drag, this.currentDirection)) return
+
+            const { projection } = this.visualElement
+            const axisValue = this.getAxisMotionValue(axis)
+
+            if (projection && projection.layout) {
+                const { min, max } = projection.layout.layoutBox[axis]
+
+                /**
+                 * The layout measurement includes the current transform value,
+                 * so we need to add it back to get the correct snap position.
+                 * This fixes an issue where elements with initial coordinates
+                 * would snap to the wrong position on the first drag.
+                 */
+                const current = axisValue.get() || 0
+
+                axisValue.set(point[axis] - mixNumber(min, max, 0.5) + current)
+            }
+        })
+    }
+
+    /**
+     * When the viewport resizes we want to check if the measured constraints
+     * have changed and, if so, reposition the element within those new constraints
+     * relative to where it was before the resize.
+     */
+    scalePositionWithinConstraints() {
+        if (!this.visualElement.current) return
+
+        const { drag, dragConstraints } = this.getProps()
+        const { projection } = this.visualElement
+        if (!isRefObject(dragConstraints) || !projection || !this.constraints)
+            return
+
+        /**
+         * Stop current animations as there can be visual glitching if we try to do
+         * this mid-animation
+         */
+        this.stopAnimation()
+
+        /**
+         * Record the relative position of the dragged element relative to the
+         * constraints box and save as a progress value.
+         */
+        const boxProgress = { x: 0, y: 0 }
+        eachAxis((axis) => {
+            const axisValue = this.getAxisMotionValue(axis)
+            if (axisValue && this.constraints !== false) {
+                const latest = axisValue.get()
+                boxProgress[axis] = calcOrigin(
+                    { min: latest, max: latest },
+                    this.constraints[axis] as Axis
+                )
+            }
+        })
+
+        /**
+         * Update the layout of this element and resolve the latest drag constraints
+         */
+        const { transformTemplate } = this.visualElement.getProps()
+        this.visualElement.current.style.transform = transformTemplate
+            ? transformTemplate({}, "")
+            : "none"
+        projection.root && projection.root.updateScroll()
+        projection.updateLayout()
+
+        /**
+         * Reset constraints so resolveConstraints() will recalculate them
+         * with the freshly measured layout rather than returning the cached value.
+         */
+        this.constraints = false
+        this.resolveConstraints()
+
+        /**
+         * For each axis, calculate the current progress of the layout axis
+         * within the new constraints.
+         */
+        eachAxis((axis) => {
+            if (!shouldDrag(axis, drag, null)) return
+
+            /**
+             * Calculate a new transform based on the previous box progress
+             */
+            const axisValue = this.getAxisMotionValue(axis)
+            const { min, max } = (this.constraints as ResolvedConstraints)[
+                axis
+            ] as Axis
+            axisValue.set(mixNumber(min, max, boxProgress[axis]))
+        })
+
+        /**
+         * Flush the updated transform to the DOM synchronously to prevent
+         * a visual flash at the element's CSS layout position (0,0) when
+         * the transform was stripped for measurement.
+         */
+        this.visualElement.render()
+    }
+
+    addListeners() {
+        if (!this.visualElement.current) return
+        elementDragControls.set(this.visualElement, this)
+        const element = this.visualElement.current
+
+        /**
+         * Attach a pointerdown event listener on this DOM element to initiate drag tracking.
+         */
+        const stopPointerListener = addPointerEvent(
+            element,
+            "pointerdown",
+            (event) => {
+                const { drag, dragListener = true } = this.getProps()
+                const target = event.target as Element
+
+                /**
+                 * Only block drag if clicking on a text input child element
+                 * (input, textarea, select, contenteditable) where users might
+                 * want to select text or interact with the control.
+                 *
+                 * Buttons and links don't block drag since they don't have
+                 * click-and-move actions of their own.
+                 */
+                const isClickingTextInputChild =
+                    target !== element && isElementTextInput(target)
+
+                if (drag && dragListener && !isClickingTextInputChild) {
+                    this.start(event)
+                }
+            }
+        )
+
+        /**
+         * If using ref-based constraints, observe both the draggable element
+         * and the constraint container for size changes via ResizeObserver.
+         * Setup is deferred because dragConstraints.current is null when
+         * addListeners first runs (React hasn't committed the ref yet).
+         */
+        let stopResizeObservers: VoidFunction | undefined
+
+        const measureDragConstraints = () => {
+            const { dragConstraints } = this.getProps()
+            if (isRefObject(dragConstraints) && dragConstraints.current) {
+                this.constraints = this.resolveRefConstraints()
+
+                if (!stopResizeObservers) {
+                    stopResizeObservers = startResizeObservers(
+                        element,
+                        dragConstraints.current as HTMLElement,
+                        () => this.scalePositionWithinConstraints()
+                    )
+                }
+            }
+        }
+
+        const { projection } = this.visualElement
+
+        const stopMeasureLayoutListener = projection!.addEventListener(
+            "measure",
+            measureDragConstraints
+        )
+
+        if (projection && !projection!.layout) {
+            projection.root && projection.root.updateScroll()
+            projection.updateLayout()
+        }
+
+        frame.read(measureDragConstraints)
+
+        /**
+         * Attach a window resize listener to scale the draggable target within its defined
+         * constraints as the window resizes.
+         */
+        const stopResizeListener = addDomEvent(window, "resize", () =>
+            this.scalePositionWithinConstraints()
+        )
+
+        /**
+         * If the element's layout changes, calculate the delta and apply that to
+         * the drag gesture's origin point.
+         */
+        const stopLayoutUpdateListener = projection!.addEventListener(
+            "didUpdate",
+            (({ delta, hasLayoutChanged }: LayoutUpdateData) => {
+                if (this.isDragging && hasLayoutChanged) {
+                    eachAxis((axis) => {
+                        const motionValue = this.getAxisMotionValue(axis)
+                        if (!motionValue) return
+
+                        this.originPoint[axis] += delta[axis].translate
+                        motionValue.set(
+                            motionValue.get() + delta[axis].translate
+                        )
+                    })
+
+                    this.visualElement.render()
+                }
+            }) as any
+        )
+
+        return () => {
+            stopResizeListener()
+            stopPointerListener()
+            stopMeasureLayoutListener()
+            stopLayoutUpdateListener && stopLayoutUpdateListener()
+            stopResizeObservers && stopResizeObservers()
+        }
+    }
+
+    getProps(): MotionProps {
+        const props = this.visualElement.getProps()
+        const {
+            drag = false,
+            dragDirectionLock = false,
+            dragPropagation = false,
+            dragConstraints = false,
+            dragElastic = defaultElastic,
+            dragMomentum = true,
+        } = props
+        return {
+            ...props,
+            drag,
+            dragDirectionLock,
+            dragPropagation,
+            dragConstraints,
+            dragElastic,
+            dragMomentum,
+        }
+    }
+}
+
+function skipFirstCall(callback: VoidFunction): VoidFunction {
+    let isFirst = true
+    return () => {
+        if (isFirst) {
+            isFirst = false
+            return
+        }
+        callback()
+    }
+}
+
+function startResizeObservers(
+    element: HTMLElement,
+    constraintsElement: HTMLElement,
+    onResize: VoidFunction
+): VoidFunction {
+    const stopElement = resize(element, skipFirstCall(onResize))
+    const stopContainer = resize(constraintsElement, skipFirstCall(onResize))
+    return () => {
+        stopElement()
+        stopContainer()
+    }
+}
+
+function shouldDrag(
+    direction: DragDirection,
+    drag: boolean | DragDirection | undefined,
+    currentDirection: null | DragDirection
+) {
+    return (
+        (drag === true || drag === direction) &&
+        (currentDirection === null || currentDirection === direction)
+    )
+}
+
+/**
+ * Based on an x/y offset determine the current drag direction. If both axis' offsets are lower
+ * than the provided threshold, return `null`.
+ *
+ * @param offset - The x/y offset from origin.
+ * @param lockThreshold - (Optional) - the minimum absolute offset before we can determine a drag direction.
+ */
+function getCurrentDirection(
+    offset: Point,
+    lockThreshold = 10
+): DragDirection | null {
+    let direction: DragDirection | null = null
+
+    if (Math.abs(offset.y) > lockThreshold) {
+        direction = "y"
+    } else if (Math.abs(offset.x) > lockThreshold) {
+        direction = "x"
+    }
+
+    return direction
+}
+
+export function expectsResolvedDragConstraints({
+    dragConstraints,
+    onMeasureDragConstraints,
+}: MotionProps) {
+    return isRefObject(dragConstraints) && !!onMeasureDragConstraints
+}

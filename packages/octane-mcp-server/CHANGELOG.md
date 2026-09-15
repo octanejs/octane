@@ -1,5 +1,26 @@
 # @octanejs/mcp-server
 
+## 0.2.29
+
+### Patch Changes
+
+- fdb790a: Keep nested scoped JSX responsive to context changes, isolate hooks and memo caches across independently compiled render bodies, and invalidate stale output when lazy bodies change. Preserve component ownership across mixed compilation modes. Expose the production body-ownership benchmark through MCP.
+- 8e5ca22: Preserve accepted scoped descriptor children when Providers change host/component child shapes. Reuse known descriptor event names and reduce delegation arrays, child traversal, redundant persistent host writes, repeated form source resolution, and select option reads while preserving live DOM, event, and form-control behavior. Expose the descriptor-renderer benchmark suite through the MCP server.
+- ade5be8: Reduce compiler-generated handler, branch capture, and server rendering overhead while preserving event, branch, and SSR evaluation semantics.
+
+  Expose the compiler-output benchmark suite through the MCP benchmark tool.
+
+- 1e12db7: Reduce hook path resolution, optional-argument handling, state getter lookups, and warm-plan bookkeeping. Reuse external-store subscription dependencies when the subscriber is unchanged. Add deterministic Hooks performance diagnostics to the benchmark catalog.
+- 6284156: Reduce scheduler batch bookkeeping and skip ref sorting for sibling-only attachment queues, preserving update ordering, effect lifecycle checks, and render-loop limits. Expose deterministic scheduling benchmarks through the MCP benchmark catalog.
+- 3c1cc55: Restore enumerable symbol values when a root render suspends and preserve keyed
+  row state when an urgent update shares a batch with a suspended removal. Reduce row
+  input and retirement bookkeeping, and reuse the live DOM value already read
+  when journaling descriptor text updates. Expose the root transaction benchmark
+  suite through the MCP server.
+- 8a45222: Reduce DOM attribute, spread-prop, template mounting, metadata, and delegated-event work while preserving hydration, rollback, native event descriptors, and custom-element connection behavior.
+
+  Expose the DOM attribute, template mount, and spread host benchmark suites through the MCP benchmark tool.
+
 ## 0.2.28
 
 ### Patch Changes

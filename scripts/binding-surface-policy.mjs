@@ -30,6 +30,11 @@ function targets(value) {
 	return value && typeof value === 'object' ? Object.values(value).flatMap(targets) : [];
 }
 
+function bindingNames(name) {
+	if (ts.isIdentifier(name)) return [name.text];
+	return name.elements.filter(ts.isBindingElement).flatMap((element) => bindingNames(element.name));
+}
+
 function sourceFacts(root, file, manifest, seen = new Set()) {
 	if (seen.has(file)) throw new Error(`Cyclic export coverage requires review: ${file}`);
 	seen = new Set([...seen, file]);
@@ -40,7 +45,7 @@ function sourceFacts(root, file, manifest, seen = new Set()) {
 		source,
 		ts.ScriptTarget.Latest,
 		true,
-		ts.ScriptKind.TSX,
+		/\.(?:tsx|jsx|tsrx)$/.test(file) ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
 	);
 	if (ast.parseDiagnostics.length)
 		throw new Error(`Unparsed source coverage requires review: ${file}`);
@@ -247,17 +252,15 @@ function sourceFacts(root, file, manifest, seen = new Set()) {
 				exports.push({ name: 'default', file, integration, erased });
 			else if (statement.name)
 				exports.push({ name: statement.name.text, file, integration, erased });
-			else if (
-				ts.isVariableStatement(statement) &&
-				statement.declarationList.declarations.every((item) => ts.isIdentifier(item.name))
-			) {
+			else if (ts.isVariableStatement(statement)) {
 				for (const item of statement.declarationList.declarations)
-					exports.push({
-						name: item.name.text,
-						file,
-						integration: usesRuntimeIntegration(item.initializer ?? item),
-						erased,
-					});
+					for (const name of bindingNames(item.name))
+						exports.push({
+							name,
+							file,
+							integration: usesRuntimeIntegration(item.initializer ?? item),
+							erased,
+						});
 			} else throw new Error(`Unresolved public declaration requires review: ${file}`);
 		}
 	}

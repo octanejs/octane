@@ -105,5 +105,5 @@ if (process.argv.includes('--negative-controls')) {
 }
 
 console.log(
-	`Verified ${JSON.parse(readFileSync(join(packageRoot, 'audit/upstream.lock.json'), 'utf8')).files.length} lock-pinned files, ${expectedRuntime.length} runtime exports, ${expectedTypes.length} public types, ${upstream.upstreamCases} upstream registrations, ${upstream.portedCases} adapted registrations (${upstream.assertionGroups} assertion groups after ${upstream.permittedTransformations} permitted transforms), and ${classifications.tests} classified port tests.`,
+	`Verified ${JSON.parse(readFileSync(join(packageRoot, 'audit/upstream.lock.json'), 'utf8')).files.length} lock-pinned files, ${expectedRuntime.length} runtime exports, ${expectedTypes.length} public types, ${upstream.runtimeIdentities} paired runtime identities, ${upstream.upstreamCases} upstream static test declarations, ${upstream.portedCases} adapted static test declarations (${upstream.assertionGroups} assertion groups after ${upstream.permittedTransformations} permitted transforms), and ${classifications.tests} classified port tests.`,
 );

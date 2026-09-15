@@ -4,7 +4,7 @@ import * as upstream from 'thinking-orbs';
 
 describe('@octanejs/thinking-orbs — exports', () => {
 	it('matches the upstream public surface', () => {
-		for (const name of ['ThinkingOrb', 'resolvePreset', 'MODE_DRAWS'] as const) {
+		for (const name of ['ThinkingOrb', 'resolvePreset', 'MODE_DRAWS', 'STATE_TO_MODE'] as const) {
 			expect(typeof binding[name]).toBe(typeof upstream[name]);
 		}
 	});

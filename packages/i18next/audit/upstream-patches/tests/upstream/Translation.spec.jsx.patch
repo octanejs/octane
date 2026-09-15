@@ -1,0 +1,17 @@
+diff --git a/tests/upstream/Translation.spec.jsx b/tests/upstream/Translation.spec.jsx
+--- a/tests/upstream/Translation.spec.jsx
++++ b/tests/upstream/Translation.spec.jsx
+@@ -1,3 +1,4 @@
++// OCTANE DIVERGENCE[inspectable-children]: Trans inspects explicit descriptor children; Translation receives its callback as a prop.
+ import { describe, it, vitest, expect, afterEach } from 'vitest';
+ import * as React from 'octane';
+ import { render, cleanup } from '@octanejs/testing-library';
+@@ -12,7 +13,7 @@ describe('Translation', () => {
+   });
+ 
+   function TestComponent() {
+-    return <Translation>{(t) => <div>{t('key1')}</div>}</Translation>;
++    return <Translation children={(t) => <div>{t('key1')}</div>} />;
+   }
+ 
+   it('should render correct content', () => {

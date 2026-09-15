@@ -1,0 +1,733 @@
+{
+  "schemaVersion": 1,
+  "identity": {
+    "packageName": "react-i18next",
+    "version": "17.0.14",
+    "repository": {
+      "owner": "i18next",
+      "repo": "react-i18next",
+      "subdirectory": null
+    },
+    "commit": "5f8c5f9e6c7cdabdc476111d0748c91e33bbaa30",
+    "integrity": "sha512-ZpMBfJL3BiXPuYHj5QMY1GwvKJNhE1vCxOJQ8BoMBdHP5XONTfi/Qss1nuRlnFdIl72PKo2jPmw+fxuLjRFgaQ=="
+  },
+  "license": {
+    "spdx": "MIT",
+    "evidence": [
+      {
+        "path": "LICENSE",
+        "sha256": "29b8ae456ef442e53a98df183ad088cf98c2ece73aa84c462330c43e665b8ab2"
+      }
+    ],
+    "notices": []
+  },
+  "scopes": [
+    ".babelrc",
+    ".prettierrc.json",
+    "LICENSE",
+    "TransWithoutContext.d.mts",
+    "TransWithoutContext.d.ts",
+    "helpers.d.ts",
+    "icu.macro.d.mts",
+    "icu.macro.d.ts",
+    "icu.macro.js",
+    "index.d.mts",
+    "index.d.ts",
+    "initReactI18next.d.mts",
+    "initReactI18next.d.ts",
+    "package-lock.json",
+    "package.json",
+    "src",
+    "test",
+    "tsconfig.json",
+    "vitest.config.mts",
+    "vitest.workspace.typescript.mts"
+  ],
+  "adaptedMappings": [
+    {
+      "fromRoot": "test",
+      "toRoot": "tests/upstream"
+    }
+  ],
+  "adaptedRewrites": [
+    {
+      "find": "import React, {",
+      "replace": "import * as React from 'octane';\nimport {"
+    },
+    {
+      "find": "import React from 'react'",
+      "replace": "import * as React from 'octane'"
+    },
+    {
+      "find": "from 'react'",
+      "replace": "from 'octane'"
+    },
+    {
+      "find": "from \"react\"",
+      "replace": "from \"octane\""
+    },
+    {
+      "find": "'@testing-library/react'",
+      "replace": "'@octanejs/testing-library'"
+    },
+    {
+      "find": "'react-dom/server'",
+      "replace": "'octane/server'"
+    },
+    {
+      "find": "../src/",
+      "replace": "../../src/"
+    },
+    {
+      "find": "from '../../../'",
+      "replace": "from '../../../../src/'"
+    },
+    {
+      "find": "from '../../..'",
+      "replace": "from '../../../../src/'"
+    },
+    {
+      "find": "from '../../../TransWithoutContext'",
+      "replace": "from '../../../../src/TransWithoutContext.js'"
+    },
+    {
+      "find": "from '../../../initReactI18next'",
+      "replace": "from '../../../../src/initReactI18next.js'"
+    },
+    {
+      "find": "'react-i18next'",
+      "replace": "'@octanejs/i18next'"
+    },
+    {
+      "find": "from '../src'",
+      "replace": "from '../../src/index.js'"
+    },
+    {
+      "find": "container.firstChild).toMatchInlineSnapshot",
+      "replace": "container.firstElementChild).toMatchInlineSnapshot"
+    }
+  ],
+  "files": [
+    {
+      "path": ".babelrc",
+      "gitBlob": "d34e072f2891447f61b8977e0d52170f45020fc1",
+      "size": 604
+    },
+    {
+      "path": ".prettierrc.json",
+      "gitBlob": "54806b53f6c6b39217d6e014f139a337d28de7c2",
+      "size": 204
+    },
+    {
+      "path": "helpers.d.ts",
+      "gitBlob": "35f865029a87733e60cbd69bf3b39d269cb66254",
+      "size": 125
+    },
+    {
+      "path": "icu.macro.d.mts",
+      "gitBlob": "8bf995d5896c073d8a077514c298a6e4748376b1",
+      "size": 32
+    },
+    {
+      "path": "icu.macro.d.ts",
+      "gitBlob": "722ddd01c5a3e617251544381b45fddb8b64b410",
+      "size": 3023
+    },
+    {
+      "path": "icu.macro.js",
+      "gitBlob": "2dc8073a1bc58aafd2937d89e1e634f695616a93",
+      "size": 31020
+    },
+    {
+      "path": "index.d.mts",
+      "gitBlob": "ee01cc9bd3233f5e67b050d48e22202b495a4a0a",
+      "size": 28
+    },
+    {
+      "path": "index.d.ts",
+      "gitBlob": "6b42a88094b0c52c1a7ab07856cbe447e8bbfec1",
+      "size": 10343
+    },
+    {
+      "path": "initReactI18next.d.mts",
+      "gitBlob": "ad0ae5ab6bfe6b8bce86368ab85bf8e1441b49a8",
+      "size": 39
+    },
+    {
+      "path": "initReactI18next.d.ts",
+      "gitBlob": "40ff85992385c704a5370c2e5b8ffa57803565f6",
+      "size": 99
+    },
+    {
+      "path": "LICENSE",
+      "gitBlob": "f7847409bfd7a019c0d51b598304b2926a0f50eb",
+      "size": 1083
+    },
+    {
+      "path": "package-lock.json",
+      "gitBlob": "f8725ed4cf6d2da3acdd55e03cd632dbc044cb2b",
+      "size": 396523
+    },
+    {
+      "path": "package.json",
+      "gitBlob": "5ea90e906f06d94cffac447e79aa13d5b1d5f2cd",
+      "size": 6037
+    },
+    {
+      "path": "src/context.js",
+      "gitBlob": "751678c04157352691f2ae10c19e086059203d80",
+      "size": 1555
+    },
+    {
+      "path": "src/defaults.js",
+      "gitBlob": "108658ff037d31dcea534c3548843f680aad4e41",
+      "size": 752
+    },
+    {
+      "path": "src/I18nextProvider.js",
+      "gitBlob": "bf27663cf245a4049e77e1bb0db830a42c728f31",
+      "size": 300
+    },
+    {
+      "path": "src/i18nInstance.js",
+      "gitBlob": "f48a16dec7428e177c027c3a487b343c97f20895",
+      "size": 132
+    },
+    {
+      "path": "src/IcuTrans.js",
+      "gitBlob": "73af11e4847f481a9489be6f01bf2eb8c66e8487",
+      "size": 3322
+    },
+    {
+      "path": "src/IcuTransUtils/htmlEntityDecoder.js",
+      "gitBlob": "92b30add93a2b66d86fd509624cfed17852edf0c",
+      "size": 5248
+    },
+    {
+      "path": "src/IcuTransUtils/index.js",
+      "gitBlob": "ef30299583779a1fffeb899f31252ebeba5646d2",
+      "size": 157
+    },
+    {
+      "path": "src/IcuTransUtils/renderTranslation.js",
+      "gitBlob": "5e7a2e24c4a333c84d71172aae1dd77d8ad37f88",
+      "size": 6799
+    },
+    {
+      "path": "src/IcuTransUtils/tokenizer.js",
+      "gitBlob": "9b5c3cc5c3397243a2a4d67bb914de0311d716df",
+      "size": 1846
+    },
+    {
+      "path": "src/IcuTransUtils/TranslationParserError.js",
+      "gitBlob": "466d8406339b5b23c949dce9cb3348e23773e926",
+      "size": 734
+    },
+    {
+      "path": "src/IcuTransWithoutContext.js",
+      "gitBlob": "44e6d0b1028afd5227932cccb4386f99033abebd",
+      "size": 5313
+    },
+    {
+      "path": "src/index.js",
+      "gitBlob": "8e0ab46970e6c135a13fbba5b4bab48179d30699",
+      "size": 1049
+    },
+    {
+      "path": "src/initReactI18next.js",
+      "gitBlob": "522943744c0ee5276ef847c44b0272cca4227053",
+      "size": 237
+    },
+    {
+      "path": "src/Trans.js",
+      "gitBlob": "7f10ebe811e568d686f5c1c60e94a1eabba0f320",
+      "size": 973
+    },
+    {
+      "path": "src/Translation.js",
+      "gitBlob": "743b63adc181e5d9ec6d482cbe6a46ff56c19c97",
+      "size": 272
+    },
+    {
+      "path": "src/TransWithoutContext.js",
+      "gitBlob": "edf955e42b3030950d6f0dd6861da88ba35a2eed",
+      "size": 21557
+    },
+    {
+      "path": "src/unescape.js",
+      "gitBlob": "17520863e7b35f9bd7e8acfa93e5ea2d73bfdb3a",
+      "size": 665
+    },
+    {
+      "path": "src/useSSR.js",
+      "gitBlob": "d1120c176fb0d29680d7e044be32e66818f1f6a5",
+      "size": 1932
+    },
+    {
+      "path": "src/useTranslation.js",
+      "gitBlob": "35eda49082def902f68ce2de826b6be8fb0b439f",
+      "size": 9031
+    },
+    {
+      "path": "src/utils.js",
+      "gitBlob": "826ee0b02c5fefe03d2d94ac4d1fba9d35ae84eb",
+      "size": 3009
+    },
+    {
+      "path": "src/withSSR.js",
+      "gitBlob": "dbad177cf7915d4556ec5a7c10c6b6219b631a39",
+      "size": 704
+    },
+    {
+      "path": "src/withTranslation.js",
+      "gitBlob": "cedf5f4c76fbb8d2ebf658be17979b3961fac5df",
+      "size": 1252
+    },
+    {
+      "path": "test/__snapshots__/icu.macro.spec.js.snap",
+      "gitBlob": "3034d71ce21b62b4136dae1ba967d9d12cc7c3f7",
+      "size": 27898
+    },
+    {
+      "path": "test/backendLngAwareMock.js",
+      "gitBlob": "a72ed5a8e5bd9e663bea3e23b9a7a29777707abd",
+      "size": 983
+    },
+    {
+      "path": "test/backendMock.js",
+      "gitBlob": "33c7d18fa62ffed8f968f9237ed08f0cd0fb8699",
+      "size": 489
+    },
+    {
+      "path": "test/hasLoadedNamespaceMock.js",
+      "gitBlob": "c1a53547415c3683d6ff2f2126ad997ba90b3e78",
+      "size": 1333
+    },
+    {
+      "path": "test/i18n.js",
+      "gitBlob": "d7a021db99d3acc300e1d2a3d098988951d174f1",
+      "size": 4110
+    },
+    {
+      "path": "test/I18nextProvider.spec.jsx",
+      "gitBlob": "8207e34b583895977fd1eeebcd96566491e7079a",
+      "size": 2014
+    },
+    {
+      "path": "test/i18nNoLng.js",
+      "gitBlob": "72a115557565c280cbfee59842ddf476d68053d2",
+      "size": 306
+    },
+    {
+      "path": "test/icu.macro.spec.js",
+      "gitBlob": "90140ab8644735ef05e0690e4601ea8bab45c198",
+      "size": 15818
+    },
+    {
+      "path": "test/IcuTrans/IcuTrans.spec.jsx",
+      "gitBlob": "c972607c584918de11b73907936a20b7420753f6",
+      "size": 28266
+    },
+    {
+      "path": "test/IcuTrans/IcuTransWithoutContext.spec.jsx",
+      "gitBlob": "3fb542332b8fa359337642fe2fc2e7d68d6c9665",
+      "size": 8237
+    },
+    {
+      "path": "test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "gitBlob": "09c00e809a18b0e58ddd4203ac26bc0e20cb9f11",
+      "size": 18769
+    },
+    {
+      "path": "test/IcuTrans/utils/renderTranslation.spec.js",
+      "gitBlob": "54f5ec7a350518849011936c4b5ef3788ee3e744",
+      "size": 19778
+    },
+    {
+      "path": "test/IcuTrans/utils/tokenizer.spec.js",
+      "gitBlob": "109f1c5fa73847f7f4fff3bf92f560a7dab0d1a0",
+      "size": 20498
+    },
+    {
+      "path": "test/initReactI18next.spec.js",
+      "gitBlob": "7922c7d9b8b8d278575be0d3ab4fe34debda069c",
+      "size": 1670
+    },
+    {
+      "path": "test/setup.js",
+      "gitBlob": "bb02c60cd055452852c33afe9078e35455935fb0",
+      "size": 43
+    },
+    {
+      "path": "test/trans.nodeToString.spec.jsx",
+      "gitBlob": "2f99d4a425cc6dcd50085129ba05ad33cd2f638a",
+      "size": 7375
+    },
+    {
+      "path": "test/trans.render.dynamic.spec.jsx",
+      "gitBlob": "9e223c50e4505dc967256c58749e7eaa9d5ce9ab",
+      "size": 4059
+    },
+    {
+      "path": "test/trans.render.icu.spec.jsx",
+      "gitBlob": "da610e68bc4453ebc27cded80020dfd98ec41ddf",
+      "size": 3201
+    },
+    {
+      "path": "test/trans.render.noLng.spec.jsx",
+      "gitBlob": "5110b8308ded704c41592dd856760196889bc6ee",
+      "size": 879
+    },
+    {
+      "path": "test/trans.render.object.spec.jsx",
+      "gitBlob": "3c62f287f91f1d7230080c70ef75934e09bb6b1a",
+      "size": 11332
+    },
+    {
+      "path": "test/trans.render.spec.jsx",
+      "gitBlob": "3cd2178f4bba68fba3fcd888d8d918e2b04f0838",
+      "size": 37453
+    },
+    {
+      "path": "test/Translation.spec.jsx",
+      "gitBlob": "a74769efaf9c0b0f7604b76ee814d74e367b504f",
+      "size": 648
+    },
+    {
+      "path": "test/typescript/_stub.js",
+      "gitBlob": "026747c6a6ac6e151ae4647ce7b5dc1b9e7879fa",
+      "size": 109
+    },
+    {
+      "path": "test/typescript/custom-types/i18next.d.ts",
+      "gitBlob": "b99d25fa9575279da21b0395cfcff33c44ea8d5b",
+      "size": 932
+    },
+    {
+      "path": "test/typescript/custom-types/IcuTrans.test.tsx",
+      "gitBlob": "3797d2a13a3ad457c591460b42db106eda6b1e45",
+      "size": 5394
+    },
+    {
+      "path": "test/typescript/custom-types/issue1913-jsx.test.tsx",
+      "gitBlob": "46e1ce4e3c305cebf3f2d6c6eb9d9ef8880b29e7",
+      "size": 1281
+    },
+    {
+      "path": "test/typescript/custom-types/Trans.test.tsx",
+      "gitBlob": "39f170826b896ff3e1a50e8e5def6823810c06f9",
+      "size": 4301
+    },
+    {
+      "path": "test/typescript/custom-types/Translation.test.ts",
+      "gitBlob": "701052d3d3af58134e0c75899e09e34dec0d3e6a",
+      "size": 1395
+    },
+    {
+      "path": "test/typescript/custom-types/TransWithoutContext.test.tsx",
+      "gitBlob": "cca0118d671b90753a9e2475fa218ff5db5541db",
+      "size": 6142
+    },
+    {
+      "path": "test/typescript/custom-types/tsconfig.json",
+      "gitBlob": "6c88073b9e5502efcccded03f9c826f0612d180d",
+      "size": 84
+    },
+    {
+      "path": "test/typescript/custom-types/useTranslation.test.ts",
+      "gitBlob": "76392d7da68266b2f7ab808ef96a315851669379",
+      "size": 3719
+    },
+    {
+      "path": "test/typescript/issue-1899/check-types.sh",
+      "gitBlob": "8875bda2df2103b2878f2e7dfed4ede43a20074c",
+      "size": 677
+    },
+    {
+      "path": "test/typescript/issue-1899/i18next.d.ts",
+      "gitBlob": "25ac3a742e4c607b4163fb18081a4099d348c5fe",
+      "size": 427
+    },
+    {
+      "path": "test/typescript/issue-1899/import-check.ts",
+      "gitBlob": "dd28c6cd9d25701043fdd641f311098373d40aea",
+      "size": 413
+    },
+    {
+      "path": "test/typescript/issue-1899/tsconfig.json",
+      "gitBlob": "7f724619e44ebef5d4a346a84860229a23ca2213",
+      "size": 138
+    },
+    {
+      "path": "test/typescript/misc/context.test.tsx",
+      "gitBlob": "0301f52d81b04c1dc76ddfccbc8f41bc4da68525",
+      "size": 269
+    },
+    {
+      "path": "test/typescript/misc/I18nextProvider.test.tsx",
+      "gitBlob": "12af21089933a6186291b3bef72904982f29153c",
+      "size": 501
+    },
+    {
+      "path": "test/typescript/misc/IcuTrans.test.tsx",
+      "gitBlob": "88030833d22635ceb76569893ee1b4beb081b89e",
+      "size": 5128
+    },
+    {
+      "path": "test/typescript/misc/IcuTransWithoutContext.test.tsx",
+      "gitBlob": "f98e9f7cefd2e9fbe07a8749e5aef99f588b0548",
+      "size": 3686
+    },
+    {
+      "path": "test/typescript/misc/Trans.test.tsx",
+      "gitBlob": "ed8f4bc5b8dc4f073608d42a0b5e9289ea934c0c",
+      "size": 3748
+    },
+    {
+      "path": "test/typescript/misc/Translation.test.tsx",
+      "gitBlob": "bda7b2fe93e34c4028ebe58a6261bf7a7b0906ca",
+      "size": 1277
+    },
+    {
+      "path": "test/typescript/misc/TransWithoutContext.test.tsx",
+      "gitBlob": "63176d2276e927fb5266e61e7a177268bf3648b7",
+      "size": 2845
+    },
+    {
+      "path": "test/typescript/misc/tsconfig.json",
+      "gitBlob": "6c88073b9e5502efcccded03f9c826f0612d180d",
+      "size": 84
+    },
+    {
+      "path": "test/typescript/misc/tsconfig.nonEsModuleInterop.json",
+      "gitBlob": "423bfdcec369bd6f434f5bf31508f1d1be6a2aea",
+      "size": 161
+    },
+    {
+      "path": "test/typescript/misc/useSSR.test.tsx",
+      "gitBlob": "2c44f11d57e29b491053be84a055f0b1d417dbcb",
+      "size": 313
+    },
+    {
+      "path": "test/typescript/misc/useTranslation.test.ts",
+      "gitBlob": "aabaf1cc10c7f25ef2319901952c1c69bc8a90bb",
+      "size": 2748
+    },
+    {
+      "path": "test/typescript/misc/withSSR.test.tsx",
+      "gitBlob": "4a12293c6d01441a5e2511dd73ffb57c57e4c324",
+      "size": 2286
+    },
+    {
+      "path": "test/typescript/misc/withTranslation.test.tsx",
+      "gitBlob": "c93d0365c24751144485f0c03c878d96f9c4c2b9",
+      "size": 3001
+    },
+    {
+      "path": "test/typescript/selector-custom-types/i18next.d.ts",
+      "gitBlob": "4d43482adff74ecbe42496fc39cc975e31f4405f",
+      "size": 958
+    },
+    {
+      "path": "test/typescript/selector-custom-types/IcuTrans.test.tsx",
+      "gitBlob": "314077fd14b0ce5ac7d6cf9a86c21cee4668ca30",
+      "size": 2180
+    },
+    {
+      "path": "test/typescript/selector-custom-types/IcuTransWithoutContext.test.tsx",
+      "gitBlob": "85efba6069cb153c8ef11162719f9858137e0fd7",
+      "size": 1338
+    },
+    {
+      "path": "test/typescript/selector-custom-types/Trans.test.tsx",
+      "gitBlob": "a9c9da525491655d6cf6330938bdfc00f41f4d20",
+      "size": 5394
+    },
+    {
+      "path": "test/typescript/selector-custom-types/Translation.test.tsx",
+      "gitBlob": "96657574c0a31e86126f44e66b75c120562d2f12",
+      "size": 1240
+    },
+    {
+      "path": "test/typescript/selector-custom-types/TransWithoutContext.test.tsx",
+      "gitBlob": "c99709df4afe0be2c0a266e220f7a38015308f70",
+      "size": 5262
+    },
+    {
+      "path": "test/typescript/selector-custom-types/tsconfig.json",
+      "gitBlob": "6c88073b9e5502efcccded03f9c826f0612d180d",
+      "size": 84
+    },
+    {
+      "path": "test/typescript/selector-custom-types/useTranslation.test.ts",
+      "gitBlob": "8ccf1aaf10027adb681df681d7ef232060a9cafb",
+      "size": 4658
+    },
+    {
+      "path": "test/typescript/selector-default-ns-false/i18next.d.ts",
+      "gitBlob": "e69702f58eef7fd6640de7999d35ff4b58e1c84e",
+      "size": 270
+    },
+    {
+      "path": "test/typescript/selector-default-ns-false/tsconfig.json",
+      "gitBlob": "6c88073b9e5502efcccded03f9c826f0612d180d",
+      "size": 84
+    },
+    {
+      "path": "test/typescript/selector-default-ns-false/useTranslation.test.ts",
+      "gitBlob": "ed73028646dc39f4ff61a9e73e90978b2bf7e946",
+      "size": 1283
+    },
+    {
+      "path": "test/typescript/selector-optimize/i18next.d.ts",
+      "gitBlob": "2e87bf8d0fd394aa80a6abcb05c30698e8785a37",
+      "size": 759
+    },
+    {
+      "path": "test/typescript/selector-optimize/IcuTrans.test.tsx",
+      "gitBlob": "314077fd14b0ce5ac7d6cf9a86c21cee4668ca30",
+      "size": 2180
+    },
+    {
+      "path": "test/typescript/selector-optimize/IcuTransWithoutContext.test.tsx",
+      "gitBlob": "85efba6069cb153c8ef11162719f9858137e0fd7",
+      "size": 1338
+    },
+    {
+      "path": "test/typescript/selector-optimize/Trans.test.tsx",
+      "gitBlob": "fdc8119edb74c3cef4d672ea85bc1d6ef646a982",
+      "size": 4046
+    },
+    {
+      "path": "test/typescript/selector-optimize/Translation.test.tsx",
+      "gitBlob": "96657574c0a31e86126f44e66b75c120562d2f12",
+      "size": 1240
+    },
+    {
+      "path": "test/typescript/selector-optimize/TransWithoutContext.test.tsx",
+      "gitBlob": "b21186fd37370afc1e3d15849c9a4dcb5ee3a998",
+      "size": 4397
+    },
+    {
+      "path": "test/typescript/selector-optimize/tsconfig.json",
+      "gitBlob": "6c88073b9e5502efcccded03f9c826f0612d180d",
+      "size": 84
+    },
+    {
+      "path": "test/typescript/selector-optimize/useTranslation.test.ts",
+      "gitBlob": "745cf2584afb062310cc3b038506bb5385278d69",
+      "size": 3494
+    },
+    {
+      "path": "test/typescript/selector-strict/i18next.d.ts",
+      "gitBlob": "b56acdc67a30de127d2786abe94c8615aff2f3e4",
+      "size": 474
+    },
+    {
+      "path": "test/typescript/selector-strict/Trans.test.tsx",
+      "gitBlob": "7dfae7bc424d504a71c70ebbb393e00c1ce2f478",
+      "size": 3368
+    },
+    {
+      "path": "test/typescript/selector-strict/tsconfig.json",
+      "gitBlob": "6c88073b9e5502efcccded03f9c826f0612d180d",
+      "size": 84
+    },
+    {
+      "path": "test/typescript/selector-strict/useTranslation.test.ts",
+      "gitBlob": "b311975a67a4cfc9b069f8265ba340aa1cf2e224",
+      "size": 2414
+    },
+    {
+      "path": "test/unescape.spec.js",
+      "gitBlob": "71e5aa306478a0f1a77bd9508195957dd073810d",
+      "size": 971
+    },
+    {
+      "path": "test/useSSR.spec.js",
+      "gitBlob": "f9e61d6887bf6b34603c77cd70f856ca6d2a56fa",
+      "size": 2156
+    },
+    {
+      "path": "test/useTranslation.advanced.spec.js",
+      "gitBlob": "da35ee9403a07538661378bfa471f37eaf4a5c97",
+      "size": 4398
+    },
+    {
+      "path": "test/useTranslation.bindI18nStore.spec.jsx",
+      "gitBlob": "51c5d8288b644bc4150ae3bc13f1dbcc33e6d11e",
+      "size": 1274
+    },
+    {
+      "path": "test/useTranslation.loading.spec.js",
+      "gitBlob": "f28f851ee353432aa5b1937c4deb176da7c6ff24",
+      "size": 1782
+    },
+    {
+      "path": "test/useTranslation.loadingLng.spec.js",
+      "gitBlob": "d0b5c698f19f9679f0deec38502f3cb91c813feb",
+      "size": 3265
+    },
+    {
+      "path": "test/useTranslation.ready.spec.jsx",
+      "gitBlob": "80ef5849882850fbb6255180d336b24ff20c8406",
+      "size": 5865
+    },
+    {
+      "path": "test/useTranslation.spec.jsx",
+      "gitBlob": "8b131c994bf96e7edbcb423aef4ffd30b20d59e4",
+      "size": 15580
+    },
+    {
+      "path": "test/useTranslation.usedNamespaces.spec.js",
+      "gitBlob": "c38a1d81d19dc2ac66cff5ac28361427a5a7e7d5",
+      "size": 1060
+    },
+    {
+      "path": "test/utils.spec.js",
+      "gitBlob": "4fb1ce0c5be8b329e8aaed7e6966e72d8e3859ce",
+      "size": 2437
+    },
+    {
+      "path": "test/withSSR.spec.jsx",
+      "gitBlob": "6b2e9706962dc4146d33a6b351b7425ed6bc5fa3",
+      "size": 2431
+    },
+    {
+      "path": "test/withTranslation.keyPrefix.spec.jsx",
+      "gitBlob": "4a58ee32aaaf501c1b94acfc804a8da45ade1c6f",
+      "size": 985
+    },
+    {
+      "path": "test/withTranslation.spec.jsx",
+      "gitBlob": "9a2059e006a6294437d2560094bb7910edb6d55f",
+      "size": 1418
+    },
+    {
+      "path": "TransWithoutContext.d.mts",
+      "gitBlob": "8bfc2f339c2a9c69ea6822783cb286e484ccfe16",
+      "size": 42
+    },
+    {
+      "path": "TransWithoutContext.d.ts",
+      "gitBlob": "d4b0c7b68ba55b5350dbc20cae23f175687d3f87",
+      "size": 4926
+    },
+    {
+      "path": "tsconfig.json",
+      "gitBlob": "623f6820901068303298b7c2a6f13e63f598f502",
+      "size": 431
+    },
+    {
+      "path": "vitest.config.mts",
+      "gitBlob": "f59d7c5e823da181f146780624f19bc4b6fa8cc8",
+      "size": 528
+    },
+    {
+      "path": "vitest.workspace.typescript.mts",
+      "gitBlob": "76d22eaa9a0c691d9cd8fa564b518890ad7ae0e9",
+      "size": 2160
+    }
+  ],
+  "fingerprint": "209fdb3d7c3f807f268d4d1cd870a0ab170b00aa815a09ef196d8204bffb4706"
+}

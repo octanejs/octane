@@ -2,37 +2,60 @@
   "schemaVersion": 1,
   "project": "resizable-panels-browser",
   "roots": ["packages/resizable-panels/tests"],
-  "files": ["packages/resizable-panels/tests/browser/interactions.browser.test.ts"],
+  "files": [
+    "packages/resizable-panels/tests/browser/interactions.browser.test.ts",
+    "packages/resizable-panels/tests/browser/upstream.browser.test.ts"
+  ],
   "tests": [
     {
-      "id": "runtime:react-resizable-panels-browser:0001",
+      "id": "runtime:fcfd4fb17068b7de",
       "file": "packages/resizable-panels/tests/browser/interactions.browser.test.ts",
       "fullName": "@octanejs/resizable-panels real Chromium behavior drags a geometry-derived pointer hit region"
     },
     {
-      "id": "runtime:react-resizable-panels-browser:0004",
+      "id": "runtime:487277e9da90c2a1",
       "file": "packages/resizable-panels/tests/browser/interactions.browser.test.ts",
       "fullName": "@octanejs/resizable-panels real Chromium behavior installs and cleans up document cursor state"
     },
     {
-      "id": "runtime:react-resizable-panels-browser:0005",
+      "id": "runtime:cfbbe825931de8ab",
       "file": "packages/resizable-panels/tests/browser/interactions.browser.test.ts",
       "fullName": "@octanejs/resizable-panels real Chromium behavior isolates sibling group layout state"
     },
     {
-      "id": "runtime:react-resizable-panels-browser:0006",
+      "id": "runtime:b13e3e1f07cbfbf9",
+      "file": "packages/resizable-panels/tests/browser/interactions.browser.test.ts",
+      "fullName": "@octanejs/resizable-panels real Chromium behavior preserves saved layout without shifting on SSR hydration"
+    },
+    {
+      "id": "runtime:d65461e84f445dcf",
+      "file": "packages/resizable-panels/tests/browser/interactions.browser.test.ts",
+      "fullName": "@octanejs/resizable-panels real Chromium behavior preserves saved layout without shifting on client startup"
+    },
+    {
+      "id": "runtime:4b9738c6fc269bd6",
       "file": "packages/resizable-panels/tests/browser/interactions.browser.test.ts",
       "fullName": "@octanejs/resizable-panels real Chromium behavior restores a user layout after a full page reload"
     },
     {
-      "id": "runtime:react-resizable-panels-browser:0003",
+      "id": "runtime:7be03366c0f34e90",
       "file": "packages/resizable-panels/tests/browser/interactions.browser.test.ts",
       "fullName": "@octanejs/resizable-panels real Chromium behavior revalidates percentages through a real ResizeObserver"
     },
     {
-      "id": "runtime:react-resizable-panels-browser:0002",
+      "id": "runtime:2632464918d175b8",
       "file": "packages/resizable-panels/tests/browser/interactions.browser.test.ts",
       "fullName": "@octanejs/resizable-panels real Chromium behavior supports keyboard focus and updates splitter ARIA"
+    },
+    {
+      "id": "runtime:71c4007d213efa04",
+      "file": "packages/resizable-panels/tests/browser/upstream.browser.test.ts",
+      "fullName": "pinned Resizable Panels browser scenarios pinned decoder scenarios and popup windows: octane"
+    },
+    {
+      "id": "runtime:7e9e9a7573cb15e0",
+      "file": "packages/resizable-panels/tests/browser/upstream.browser.test.ts",
+      "fullName": "pinned Resizable Panels browser scenarios pinned decoder scenarios and popup windows: react"
     }
   ]
 }

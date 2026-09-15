@@ -1,0 +1,602 @@
+{
+  "runtimeDependencies": ["octane"],
+  "adaptedSources": [
+    {
+      "packageName": "react-resizable-panels",
+      "paths": [
+        "src/components/group/Group.tsrx",
+        "src/components/group/GroupContext.ts",
+        "src/components/group/auto-save/getStorageKey.ts",
+        "src/components/group/sortByElementOffset.ts",
+        "src/components/group/types.ts",
+        "src/components/group/useDefaultLayout.ts",
+        "src/components/group/useGroupCallbackRef.ts",
+        "src/components/group/useGroupContext.ts",
+        "src/components/group/useGroupImperativeHandle.ts",
+        "src/components/group/useGroupRef.ts",
+        "src/components/panel/Panel.tsrx",
+        "src/components/panel/types.ts",
+        "src/components/panel/usePanelCallbackRef.ts",
+        "src/components/panel/usePanelImperativeHandle.ts",
+        "src/components/panel/usePanelRef.ts",
+        "src/components/separator/Separator.tsrx",
+        "src/components/separator/types.ts",
+        "src/constants.ts",
+        "src/global/cursor/getCursorStyle.ts",
+        "src/global/cursor/supportsAdvancedCursorStyles.ts",
+        "src/global/cursor/updateCursorStyle.ts",
+        "src/global/dom/calculateAvailableGroupSize.ts",
+        "src/global/dom/calculateHitRegions.ts",
+        "src/global/dom/calculatePanelConstraints.ts",
+        "src/global/event-handlers/onDocumentContextMenu.ts",
+        "src/global/event-handlers/onDocumentDoubleClick.ts",
+        "src/global/event-handlers/onDocumentKeyDown.ts",
+        "src/global/event-handlers/onDocumentPointerDown.ts",
+        "src/global/event-handlers/onDocumentPointerLeave.ts",
+        "src/global/event-handlers/onDocumentPointerMove.ts",
+        "src/global/event-handlers/onDocumentPointerOut.ts",
+        "src/global/event-handlers/onDocumentPointerUp.ts",
+        "src/global/mountGroup.ts",
+        "src/global/mutable-state/groups.ts",
+        "src/global/mutable-state/interactions.ts",
+        "src/global/mutable-state/types.ts",
+        "src/global/styles/convertEmToPixels.ts",
+        "src/global/styles/convertRemToPixels.ts",
+        "src/global/styles/convertVhToPixels.ts",
+        "src/global/styles/convertVwToPixels.ts",
+        "src/global/styles/parseSizeAndUnit.ts",
+        "src/global/styles/sizeStyleToPixels.ts",
+        "src/global/utils/adjustLayoutByDelta.ts",
+        "src/global/utils/adjustLayoutForSeparator.ts",
+        "src/global/utils/calculateDefaultLayout.ts",
+        "src/global/utils/calculateSeparatorAriaValues.ts",
+        "src/global/utils/compareLayoutNumbers.ts",
+        "src/global/utils/completeActivePointerResize.ts",
+        "src/global/utils/doRectsIntersect.ts",
+        "src/global/utils/findClosestHitRegion.ts",
+        "src/global/utils/findClosestRect.ts",
+        "src/global/utils/findMatchingHitRegions.ts",
+        "src/global/utils/findSeparatorGroup.ts",
+        "src/global/utils/formatLayoutNumber.ts",
+        "src/global/utils/getDistanceBetweenPointAndRect.ts",
+        "src/global/utils/getImperativeGroupMethods.ts",
+        "src/global/utils/getImperativePanelMethods.ts",
+        "src/global/utils/isCoarsePointer.ts",
+        "src/global/utils/isViableHitTarget.ts",
+        "src/global/utils/layoutNumbersEqual.ts",
+        "src/global/utils/layoutsEqual.ts",
+        "src/global/utils/notifyPanelOnResize.ts",
+        "src/global/utils/objectsEqual.ts",
+        "src/global/utils/panelConstraintsEqual.ts",
+        "src/global/utils/preserveFixedPanelSizes.ts",
+        "src/global/utils/updateActiveHitRegion.ts",
+        "src/global/utils/validateLayoutKeys.ts",
+        "src/global/utils/validatePanelGroupLayout.ts",
+        "src/global/utils/validatePanelSize.ts",
+        "src/hooks/useForceUpdate.ts",
+        "src/hooks/useId.ts",
+        "src/hooks/useIsomorphicLayoutEffect.ts",
+        "src/hooks/useMergedRefs.ts",
+        "src/hooks/useStableCallback.ts",
+        "src/hooks/useStableObject.ts",
+        "src/types.ts",
+        "src/utils/EventEmitter.ts",
+        "src/utils/assert.ts",
+        "src/utils/isArrayEqual.ts",
+        "src/utils/isHTMLElement.ts",
+        "src/utils/isShadowRoot.ts",
+        "src/vendor/stacking-order.ts"
+      ]
+    }
+  ],
+  "sourceLedger": [
+    {
+      "path": "src/components/group/Group.tsrx",
+      "origin": "adapted",
+      "sha256": "64fac5a2146c45e0a3008f55f6f75a43cbd8677620501092aa7545264ab874a9",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/components/group/GroupContext.ts",
+      "origin": "adapted",
+      "sha256": "a3418fb81acfa4fbeef114dda981f94cbe5b13a43e651f573024af782ee6af55",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/components/group/auto-save/getStorageKey.ts",
+      "origin": "adapted",
+      "sha256": "83786b4ace64594ee1ac8fdd2ce252f7172e1c15f480310761a1fa02f3d77e4e",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/components/group/auto-save/readLegacyLayout.ts",
+      "origin": "authored",
+      "sha256": "22786cd4493cdb1dbf72527f5db5be1f7979a9b5151b77a18e2ed3b32d60f5c5"
+    },
+    {
+      "path": "src/components/group/sortByElementOffset.ts",
+      "origin": "adapted",
+      "sha256": "e28f22c865bf48afa7d6c6d7a23eaf31f3c5ff904540138a860719a6e8ad7d08",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/components/group/types.ts",
+      "origin": "adapted",
+      "sha256": "8ee4eccf0533907ab7cd4a474a300473b958163bfb768eb0cd70901e5aaa4215",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/components/group/useDefaultLayout.ts",
+      "origin": "adapted",
+      "sha256": "997cdc2b457b675b24a6dc4dc31c842bed05833b48fa5a9e4c0ed1c5cab848a9",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/components/group/useGroupCallbackRef.ts",
+      "origin": "adapted",
+      "sha256": "605115f42f0d54647d306c61e1147ac7738671c135bf17eccb899be1bb3e3ee3",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/components/group/useGroupContext.ts",
+      "origin": "adapted",
+      "sha256": "615d68291ac944be019a2370fe640596bb65fd52c09dad9a10a53ee8c07061c8",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/components/group/useGroupImperativeHandle.ts",
+      "origin": "adapted",
+      "sha256": "6b53573a404b4b3d82b021f448c1d1838173b27673062bae2aab69084015a8bb",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/components/group/useGroupRef.ts",
+      "origin": "adapted",
+      "sha256": "0c15ea9a92bb00627929c281526d8d3ac6d1299578253d489ea33233abce793f",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/components/panel/Panel.tsrx",
+      "origin": "adapted",
+      "sha256": "3c230baa7a28b62bf7f60b077489e0553466fb8ef2f113550339475091539494",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/components/panel/types.ts",
+      "origin": "adapted",
+      "sha256": "61d9f3245e5c911763f7dd1c3618659bd5f324954c17e9100ea5f94d978022cc",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/components/panel/usePanelCallbackRef.ts",
+      "origin": "adapted",
+      "sha256": "18200e5f3376049cd946ef0024bb0a01b1065ec2f7ddd42f7d8f7597fe42637f",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/components/panel/usePanelImperativeHandle.ts",
+      "origin": "adapted",
+      "sha256": "b78654280538e7177394ef6d9a8e40466cf4f244444b2478a8a9f6ed3ebbcc3f",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/components/panel/usePanelRef.ts",
+      "origin": "adapted",
+      "sha256": "0301f77b6cfffad36e26edc7a031d0619b1718dd480cd910232d2ac85e0dcc4e",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/components/separator/Separator.tsrx",
+      "origin": "adapted",
+      "sha256": "3f3503e7a93527ce676db99218e3e83cbf932470ce77bf5cfeda848d302473da",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/components/separator/types.ts",
+      "origin": "adapted",
+      "sha256": "2fd9df7248d0713848eb0af93a58eea977cd72e003e7de720b591ed81bc2cb6b",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/constants.ts",
+      "origin": "adapted",
+      "sha256": "5ebaff3e3bab69838159d2291a3d1d2fd015622509eeefdc15d62e3194855246",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/global/cursor/getCursorStyle.ts",
+      "origin": "adapted",
+      "sha256": "8ceb0c8ca3a10d331fe946f131b7bda408326f02131d1715d69551b43bed8961",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/global/cursor/supportsAdvancedCursorStyles.ts",
+      "origin": "adapted",
+      "sha256": "30f7c89bb66b0e62b43e896701e8b981d7fbf35ffe728692ea939136cdd784ec",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/global/cursor/updateCursorStyle.ts",
+      "origin": "adapted",
+      "sha256": "754e9c5e9396d15c1830a1df252bd7b2156eb8ad5568503ff8d0f38607abe060",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/global/dom/calculateAvailableGroupSize.ts",
+      "origin": "adapted",
+      "sha256": "50c446af456e0e11e796265ca050e1fb7544e5d2b8b718b5b2e0f3aa76454982",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/global/dom/calculateHitRegions.ts",
+      "origin": "adapted",
+      "sha256": "dd7276c6c8be39b78bbea953dd2d21960350364158d13cc4f6dda434130f92db",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/global/dom/calculatePanelConstraints.ts",
+      "origin": "adapted",
+      "sha256": "8c048c0d2e020e5c289d233eda4714a5fd2e4cd050dac2db2332ad438c08030a",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/global/event-handlers/onDocumentContextMenu.ts",
+      "origin": "adapted",
+      "sha256": "d8a48566e582e5bb3df7e3a3ed5dbd955687154dbc70701c1150622d8194aadf",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/global/event-handlers/onDocumentDoubleClick.ts",
+      "origin": "adapted",
+      "sha256": "f47d1a138178dc69c762b32ebd955928e77587e57cc5e55e80569b16936fc286",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/global/event-handlers/onDocumentKeyDown.ts",
+      "origin": "adapted",
+      "sha256": "a8af1bec6946da3b7b1d2658be730ccc086a8aab4ab4a1a0a92d799ccaf0d383",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/global/event-handlers/onDocumentPointerDown.ts",
+      "origin": "adapted",
+      "sha256": "5c6dada285ec4101a2ad4826292683a9e7cefb71db6565e544051abc41182a56",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/global/event-handlers/onDocumentPointerLeave.ts",
+      "origin": "adapted",
+      "sha256": "2c9a0ee72f33e590ad135fdc081d49e5d905cf71a92f655f99562e71c35185c5",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/global/event-handlers/onDocumentPointerMove.ts",
+      "origin": "adapted",
+      "sha256": "b69adc76d0650cea7eb8f933278de5812306018eac5f371bbf031ac904faa727",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/global/event-handlers/onDocumentPointerOut.ts",
+      "origin": "adapted",
+      "sha256": "f789f9b4cba11d35f40ef015a60cec538cfa5dd840beb01079ce8649c651a132",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/global/event-handlers/onDocumentPointerUp.ts",
+      "origin": "adapted",
+      "sha256": "0eb55791e8ed2a0b84abc7926bf0107b2100c2332865a4e76ccdd579263e951d",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/global/mountGroup.ts",
+      "origin": "adapted",
+      "sha256": "106eae20b5240f3329943bdb4c8b6a6afa129db6e8c6df538e72ffb4b52b3d3c",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/global/mutable-state/groups.ts",
+      "origin": "adapted",
+      "sha256": "3f36872c187eb18b33200b0c27224a4a467aefff48c47325cbc4c58b7ec28916",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/global/mutable-state/interactions.ts",
+      "origin": "adapted",
+      "sha256": "4d4b08229b5dceb49115f14dee78ced19037967491230f6909850981a0bf3b56",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/global/mutable-state/types.ts",
+      "origin": "adapted",
+      "sha256": "6d5111491b96eca9cbf6bbfd94410965a34516560fe357be004e2e1e921a4f6f",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/global/styles/convertEmToPixels.ts",
+      "origin": "adapted",
+      "sha256": "6d7779dd2d34176e805337068d0bf0cb0bbb784ee9e62702cb893d0d2257d46a",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/global/styles/convertRemToPixels.ts",
+      "origin": "adapted",
+      "sha256": "7831d8a3453f96fb562ec45b065d97cc21538f55bb8ccff61f79641db981d880",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/global/styles/convertVhToPixels.ts",
+      "origin": "adapted",
+      "sha256": "dfb100f5557fd6cb70d6d0b13edda1a4ba03d20924ab670d4ffd9ce054393df3",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/global/styles/convertVwToPixels.ts",
+      "origin": "adapted",
+      "sha256": "7f99bd0aed85c5a0f209c289e9e6afa6461b48c4c5773c4ba79807282ddee917",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/global/styles/parseSizeAndUnit.ts",
+      "origin": "adapted",
+      "sha256": "dcfff46c838558897d5fb936b35bc3c95316a409d24e47c745c7f673f7b9424a",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/global/styles/sizeStyleToPixels.ts",
+      "origin": "adapted",
+      "sha256": "6ed84021f198cc0395a3cf0bb3dc717a3e0cf7d61131505056143a50a707e97f",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/global/utils/adjustLayoutByDelta.ts",
+      "origin": "adapted",
+      "sha256": "6eac5badfa3e3f743efce794825dc02a62dd97951cb58b897f2f7f39d83b7bb2",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/global/utils/adjustLayoutForSeparator.ts",
+      "origin": "adapted",
+      "sha256": "36e31cb53bb41b99d195f4216e49c9d9aa07c5c1bf14a23e108d66b9a1469a07",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/global/utils/calculateDefaultLayout.ts",
+      "origin": "adapted",
+      "sha256": "665afa6fc0d8b78ca49b0467e9341617b51bcca5e549d62803bb1609eee55a22",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/global/utils/calculateSeparatorAriaValues.ts",
+      "origin": "adapted",
+      "sha256": "4bf24f2e522fdc7fced3b7ee9e9c5041bc01982c1d1274ab6e0e65e50d99cf29",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/global/utils/compareLayoutNumbers.ts",
+      "origin": "adapted",
+      "sha256": "f7dde06d6b8554fd1f5f12c55a68156b4c1cb36fd4a05ce53b76f81cd28c1c90",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/global/utils/completeActivePointerResize.ts",
+      "origin": "adapted",
+      "sha256": "4339bf75655f69b05a98000a6aa61ebf57c52e19e8e8c1e158b65b4ec6c0295a",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/global/utils/doRectsIntersect.ts",
+      "origin": "adapted",
+      "sha256": "7f854f1231e157e31857bcba24543c949ded49e630a916b4001ea1db5c3079eb",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/global/utils/findClosestHitRegion.ts",
+      "origin": "adapted",
+      "sha256": "64916304e1d02dd6a966ded84ae079a7fc25f143f91caf45dd956871f9c758c4",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/global/utils/findClosestRect.ts",
+      "origin": "adapted",
+      "sha256": "381de2f6daca63b3d8463ca8060577ecc79736dc81e5ca8e7df9a3371d339e69",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/global/utils/findMatchingHitRegions.ts",
+      "origin": "adapted",
+      "sha256": "c51c42fbb6ae2fae39a14327b5c6a8c33f765506063dd8d4ba145dc3b93dd188",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/global/utils/findSeparatorGroup.ts",
+      "origin": "adapted",
+      "sha256": "8d547d7a5bfe6d3758cbad8663330a40bf6a0943b6ddb8f2954fa0f40ca0141d",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/global/utils/formatLayoutNumber.ts",
+      "origin": "adapted",
+      "sha256": "2948ed2117518c09663cddee520a2e6c0c4f8b37b6a5ce5377b7c17038269026",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/global/utils/getDistanceBetweenPointAndRect.ts",
+      "origin": "adapted",
+      "sha256": "8075c72e95ba6d0c4fa0b62f15ad278cb5641b003589c45d045f12ba43b587e2",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/global/utils/getImperativeGroupMethods.ts",
+      "origin": "adapted",
+      "sha256": "689f92da7cc5c94284b16c7220b7ea058e026caeb7f4fe11ff4bad71b9bbd2bc",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/global/utils/getImperativePanelMethods.ts",
+      "origin": "adapted",
+      "sha256": "c91992330c7f61ed418b8f8a228cfc7d7b9ffde2bd7dc5e000685e9cf6f5df0f",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/global/utils/isCoarsePointer.ts",
+      "origin": "adapted",
+      "sha256": "3b4b1c766cf31dc87ea76f9d00032de020855b647997209b73e3b77c85e1b7f0",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/global/utils/isViableHitTarget.ts",
+      "origin": "adapted",
+      "sha256": "14e9635d6487193afd3f5e6b2abd292eab3ae59e0d5e3dbd4c851927d62c04bc",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/global/utils/layoutNumbersEqual.ts",
+      "origin": "adapted",
+      "sha256": "e59f87ec25554fbf27b0a1cc64b66bb637b67a5a9ec51eb5369a147dd00a5fe7",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/global/utils/layoutsEqual.ts",
+      "origin": "adapted",
+      "sha256": "3abb389c826032fc894a338f6b32c1896a11671e255d4422bda09e2bc2ddd1e7",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/global/utils/notifyPanelOnResize.ts",
+      "origin": "adapted",
+      "sha256": "fa3f80d1ff46bae5d3d579dc4bddbfd65a38546c17c306f40d696453c9831127",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/global/utils/objectsEqual.ts",
+      "origin": "adapted",
+      "sha256": "8ecf18ad9c961ff60714ecbc685bb457848e8b249ca55ef858410f06fddcf2c5",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/global/utils/panelConstraintsEqual.ts",
+      "origin": "adapted",
+      "sha256": "23f7c98e3e52b02147183219a1a0b41265df8b125b9ca3c1af4f8a2204ed559b",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/global/utils/preserveFixedPanelSizes.ts",
+      "origin": "adapted",
+      "sha256": "0e7d310c8d221f86ac60b10eb14c5f334db7739d41ad9761d6b00d155a0d5bc1",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/global/utils/updateActiveHitRegion.ts",
+      "origin": "adapted",
+      "sha256": "92ee223a22f72436c265ae87f2f8b5e2be4066d0f593119e87ffcb8ec6952a7e",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/global/utils/validateLayoutKeys.ts",
+      "origin": "adapted",
+      "sha256": "e5548d8acff6956edd622885fa7a50755346b90e311f57c17deedbc23e4a5444",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/global/utils/validatePanelGroupLayout.ts",
+      "origin": "adapted",
+      "sha256": "aa56b9a15cc1f5ff338b457749690f5b03f3ef055b03154fcf6739d59bd71fff",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/global/utils/validatePanelSize.ts",
+      "origin": "adapted",
+      "sha256": "cf2857133154006b6627906d058bb9f2821490ead4b9ebad0ff72ac68a2ade7a",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/hooks/useForceUpdate.ts",
+      "origin": "adapted",
+      "sha256": "55514f164b1b39948f9a836ba63f4a5df198ebee1403f85cea9e786ce859fa50",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/hooks/useId.ts",
+      "origin": "adapted",
+      "sha256": "1061f2b5fef3e435fe546770ecab27af0365c2e29e603252a899d76b900ac881",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/hooks/useIsomorphicLayoutEffect.ts",
+      "origin": "adapted",
+      "sha256": "b1f1fad3f8fce6b802ddcf14865bed92b906472bc674598d11d170b987885231",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/hooks/useMergedRefs.ts",
+      "origin": "adapted",
+      "sha256": "471a5178388ec421e1bb4c3daff9c1727e38200937be882fb92c5b5783b42ae2",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/hooks/useStableCallback.ts",
+      "origin": "adapted",
+      "sha256": "851d1172abf137d917ac1f7c08b41b9f9c1a11372659271d469bdca661a5af45",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/hooks/useStableObject.ts",
+      "origin": "adapted",
+      "sha256": "1fcbff918e188cd65500a91c393a5466f8ae29c6544aa587d210266c17abd57b",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/index.tsrx",
+      "origin": "authored",
+      "sha256": "aefaef5958335c5fca941df26bc5a86fa166bde967c5f42d6e5c7839feeeb446"
+    },
+    {
+      "path": "src/internal.ts",
+      "origin": "authored",
+      "sha256": "0736609a5f628257cd2ad691fba5372eeaee3532a57d4a5cf04cebcdfcd988c1"
+    },
+    {
+      "path": "src/types.ts",
+      "origin": "adapted",
+      "sha256": "84b2711295dcfb0c025c54ac096ef614f00fa572a410a863426ca5e47cec647c",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/utils/EventEmitter.ts",
+      "origin": "adapted",
+      "sha256": "c26f1579f04004a6bdcf795d27628993b985ea4946a54e83ab07c48188020622",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/utils/assert.ts",
+      "origin": "adapted",
+      "sha256": "6c486da95eb6d13ca8c5193d8cb46430497b6515d41eef556620e68acc2cf422",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/utils/isArrayEqual.ts",
+      "origin": "adapted",
+      "sha256": "583b4f656cf74fd470571aa5fd33b2436cdf4fbee13b6d0bef50121cc2977b29",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/utils/isHTMLElement.ts",
+      "origin": "adapted",
+      "sha256": "827c72ac33871095b7df3bbe7a502c400a9b5ad5a9b227b2b821916d1cb9121d",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/utils/isShadowRoot.ts",
+      "origin": "adapted",
+      "sha256": "cd3dea70c35126eae9c9b1b1cf568542f59ebb42dd74c890927c4b01dc9b3879",
+      "packageName": "react-resizable-panels"
+    },
+    {
+      "path": "src/vendor/stacking-order.ts",
+      "origin": "adapted",
+      "sha256": "cb18de4ff58021285811617c3809e6abad7c311afbcd1758438962d8efe6fd6b",
+      "packageName": "react-resizable-panels"
+    }
+  ],
+  "reimplementedDependencies": []
+}

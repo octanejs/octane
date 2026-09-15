@@ -18,8 +18,8 @@ const clone = function clone(value) {
 
 test('the pinned upstream inventory validates through the always-on control plane', async function validatesLive() {
 	const result = await verifyReactColorfulUpstream(REPO);
-	assert.equal(result.artifacts, 72);
-	assert.equal(result.upstreamCases, 64);
+	assert.equal(result.artifacts, 73);
+	assert.equal(result.upstreamCases, 68);
 });
 
 test('fails closed when an upstream artifact is missing', async function rejectsMissingArtifact() {

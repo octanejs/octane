@@ -1,0 +1,2513 @@
+{
+  "schemaVersion": 1,
+  "project": "i18next-pristine",
+  "roots": ["packages/i18next/upstream/test"],
+  "files": [
+    "packages/i18next/upstream/test/I18nextProvider.spec.jsx",
+    "packages/i18next/upstream/test/IcuTrans/IcuTrans.spec.jsx",
+    "packages/i18next/upstream/test/IcuTrans/IcuTransWithoutContext.spec.jsx",
+    "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+    "packages/i18next/upstream/test/IcuTrans/utils/renderTranslation.spec.js",
+    "packages/i18next/upstream/test/IcuTrans/utils/tokenizer.spec.js",
+    "packages/i18next/upstream/test/Translation.spec.jsx",
+    "packages/i18next/upstream/test/icu.macro.spec.js",
+    "packages/i18next/upstream/test/initReactI18next.spec.js",
+    "packages/i18next/upstream/test/trans.nodeToString.spec.jsx",
+    "packages/i18next/upstream/test/trans.render.dynamic.spec.jsx",
+    "packages/i18next/upstream/test/trans.render.icu.spec.jsx",
+    "packages/i18next/upstream/test/trans.render.noLng.spec.jsx",
+    "packages/i18next/upstream/test/trans.render.object.spec.jsx",
+    "packages/i18next/upstream/test/trans.render.spec.jsx",
+    "packages/i18next/upstream/test/unescape.spec.js",
+    "packages/i18next/upstream/test/useSSR.spec.js",
+    "packages/i18next/upstream/test/useTranslation.advanced.spec.js",
+    "packages/i18next/upstream/test/useTranslation.bindI18nStore.spec.jsx",
+    "packages/i18next/upstream/test/useTranslation.loading.spec.js",
+    "packages/i18next/upstream/test/useTranslation.loadingLng.spec.js",
+    "packages/i18next/upstream/test/useTranslation.ready.spec.jsx",
+    "packages/i18next/upstream/test/useTranslation.spec.jsx",
+    "packages/i18next/upstream/test/useTranslation.usedNamespaces.spec.js",
+    "packages/i18next/upstream/test/utils.spec.js",
+    "packages/i18next/upstream/test/withSSR.spec.jsx",
+    "packages/i18next/upstream/test/withTranslation.keyPrefix.spec.jsx",
+    "packages/i18next/upstream/test/withTranslation.spec.jsx"
+  ],
+  "tests": [
+    {
+      "id": "runtime:16ed53464b01a21f",
+      "file": "packages/i18next/upstream/test/I18nextProvider.spec.jsx",
+      "fullName": "I18nextProvider should not rerender if value is not changed"
+    },
+    {
+      "id": "runtime:80d228dbcf8b4971",
+      "file": "packages/i18next/upstream/test/I18nextProvider.spec.jsx",
+      "fullName": "I18nextProvider should render correct content"
+    },
+    {
+      "id": "runtime:762c1b2946470738",
+      "file": "packages/i18next/upstream/test/IcuTrans/IcuTrans.spec.jsx",
+      "fullName": "IcuTrans HTML entities should decode HTML entities in translations"
+    },
+    {
+      "id": "runtime:f4fac9464d37bf93",
+      "file": "packages/i18next/upstream/test/IcuTrans/IcuTrans.spec.jsx",
+      "fullName": "IcuTrans HTML entities should decode entities in nested content"
+    },
+    {
+      "id": "runtime:b07dbfbf3fc0ff28",
+      "file": "packages/i18next/upstream/test/IcuTrans/IcuTrans.spec.jsx",
+      "fullName": "IcuTrans React components should render custom React components"
+    },
+    {
+      "id": "runtime:2634573e60c6aaa0",
+      "file": "packages/i18next/upstream/test/IcuTrans/IcuTrans.spec.jsx",
+      "fullName": "IcuTrans React components should render self-closing components"
+    },
+    {
+      "id": "runtime:2433c1819cfb6815",
+      "file": "packages/i18next/upstream/test/IcuTrans/IcuTrans.spec.jsx",
+      "fullName": "IcuTrans basic rendering should render nested tags"
+    },
+    {
+      "id": "runtime:1170c673a1b93411",
+      "file": "packages/i18next/upstream/test/IcuTrans/IcuTrans.spec.jsx",
+      "fullName": "IcuTrans basic rendering should render plain text without tags"
+    },
+    {
+      "id": "runtime:6bc0ac8b454ad07c",
+      "file": "packages/i18next/upstream/test/IcuTrans/IcuTrans.spec.jsx",
+      "fullName": "IcuTrans basic rendering should render text with a single tag"
+    },
+    {
+      "id": "runtime:ee78de10d3adad19",
+      "file": "packages/i18next/upstream/test/IcuTrans/IcuTrans.spec.jsx",
+      "fullName": "IcuTrans basic rendering should render text with multiple tags"
+    },
+    {
+      "id": "runtime:8d052c296ffc004a",
+      "file": "packages/i18next/upstream/test/IcuTrans/IcuTrans.spec.jsx",
+      "fullName": "IcuTrans complex scenarios should handle adjacent tags without text between"
+    },
+    {
+      "id": "runtime:28965ac380b5cf1a",
+      "file": "packages/i18next/upstream/test/IcuTrans/IcuTrans.spec.jsx",
+      "fullName": "IcuTrans complex scenarios should handle deeply nested structures"
+    },
+    {
+      "id": "runtime:307ec016135e7946",
+      "file": "packages/i18next/upstream/test/IcuTrans/IcuTrans.spec.jsx",
+      "fullName": "IcuTrans complex scenarios should handle mixed content with text and components"
+    },
+    {
+      "id": "runtime:bc4a417a083205d9",
+      "file": "packages/i18next/upstream/test/IcuTrans/IcuTrans.spec.jsx",
+      "fullName": "IcuTrans complex scenarios should handle multiple uses of the same tag number"
+    },
+    {
+      "id": "runtime:87d12bb08c9681dc",
+      "file": "packages/i18next/upstream/test/IcuTrans/IcuTrans.spec.jsx",
+      "fullName": "IcuTrans complex scenarios should handle tags with only whitespace"
+    },
+    {
+      "id": "runtime:311578e5a507436c",
+      "file": "packages/i18next/upstream/test/IcuTrans/IcuTrans.spec.jsx",
+      "fullName": "IcuTrans component props should preserve component props"
+    },
+    {
+      "id": "runtime:365ee0b3eca7f888",
+      "file": "packages/i18next/upstream/test/IcuTrans/IcuTrans.spec.jsx",
+      "fullName": "IcuTrans component props should support data attributes"
+    },
+    {
+      "id": "runtime:f22ca40fd8213e43",
+      "file": "packages/i18next/upstream/test/IcuTrans/IcuTrans.spec.jsx",
+      "fullName": "IcuTrans component props should support event handlers in props"
+    },
+    {
+      "id": "runtime:4a5cae1b851764ef",
+      "file": "packages/i18next/upstream/test/IcuTrans/IcuTrans.spec.jsx",
+      "fullName": "IcuTrans context handling should handle missing i18n instance gracefully"
+    },
+    {
+      "id": "runtime:8ca21d883a261c16",
+      "file": "packages/i18next/upstream/test/IcuTrans/IcuTrans.spec.jsx",
+      "fullName": "IcuTrans context handling should use context when available"
+    },
+    {
+      "id": "runtime:df106e9210d3401d",
+      "file": "packages/i18next/upstream/test/IcuTrans/IcuTrans.spec.jsx",
+      "fullName": "IcuTrans context handling should work without I18nextProvider (using global instance)"
+    },
+    {
+      "id": "runtime:e74680cb6954187c",
+      "file": "packages/i18next/upstream/test/IcuTrans/IcuTrans.spec.jsx",
+      "fullName": "IcuTrans deeply nested complex scenario with ICU MessageFormat should handle complex ICU translation - scenario 2: count=0 branch"
+    },
+    {
+      "id": "runtime:a2efe99a0692fdf8",
+      "file": "packages/i18next/upstream/test/IcuTrans/IcuTrans.spec.jsx",
+      "fullName": "IcuTrans deeply nested complex scenario with ICU MessageFormat should handle complex ICU translation - scenario 3: selectInput=\"thing\" branch"
+    },
+    {
+      "id": "runtime:1d9ef676a6b2fa8f",
+      "file": "packages/i18next/upstream/test/IcuTrans/IcuTrans.spec.jsx",
+      "fullName": "IcuTrans deeply nested complex scenario with ICU MessageFormat should handle complex ICU translation with plural, select, number, and date - scenario 1"
+    },
+    {
+      "id": "runtime:7ac2937f8f73d4a3",
+      "file": "packages/i18next/upstream/test/IcuTrans/IcuTrans.spec.jsx",
+      "fullName": "IcuTrans displayName should have correct displayName"
+    },
+    {
+      "id": "runtime:a4de8891acb5feab",
+      "file": "packages/i18next/upstream/test/IcuTrans/IcuTrans.spec.jsx",
+      "fullName": "IcuTrans edge cases should handle Unicode characters"
+    },
+    {
+      "id": "runtime:0413a3a3411463b0",
+      "file": "packages/i18next/upstream/test/IcuTrans/IcuTrans.spec.jsx",
+      "fullName": "IcuTrans edge cases should handle empty translation"
+    },
+    {
+      "id": "runtime:96fb91d6131607c1",
+      "file": "packages/i18next/upstream/test/IcuTrans/IcuTrans.spec.jsx",
+      "fullName": "IcuTrans edge cases should handle newlines"
+    },
+    {
+      "id": "runtime:8653eb1284dd0f61",
+      "file": "packages/i18next/upstream/test/IcuTrans/IcuTrans.spec.jsx",
+      "fullName": "IcuTrans edge cases should handle special characters"
+    },
+    {
+      "id": "runtime:b29ca46cce246e54",
+      "file": "packages/i18next/upstream/test/IcuTrans/IcuTrans.spec.jsx",
+      "fullName": "IcuTrans edge cases should handle translation with only tags"
+    },
+    {
+      "id": "runtime:bd11452b911924de",
+      "file": "packages/i18next/upstream/test/IcuTrans/IcuTrans.spec.jsx",
+      "fullName": "IcuTrans edge cases should preserve whitespace"
+    },
+    {
+      "id": "runtime:9d66791a7c88f3e0",
+      "file": "packages/i18next/upstream/test/IcuTrans/IcuTrans.spec.jsx",
+      "fullName": "IcuTrans error handling should handle empty content array"
+    },
+    {
+      "id": "runtime:82b34928a264fa1d",
+      "file": "packages/i18next/upstream/test/IcuTrans/IcuTrans.spec.jsx",
+      "fullName": "IcuTrans error handling should handle missing declarations for tags"
+    },
+    {
+      "id": "runtime:73ac4f9a496571d3",
+      "file": "packages/i18next/upstream/test/IcuTrans/IcuTrans.spec.jsx",
+      "fullName": "IcuTrans error handling should handle missing translation key"
+    },
+    {
+      "id": "runtime:e4845736b82d90b2",
+      "file": "packages/i18next/upstream/test/IcuTrans/IcuTrans.spec.jsx",
+      "fullName": "IcuTrans error handling should handle rendering errors gracefully with mismatched tags"
+    },
+    {
+      "id": "runtime:9904ba5cbfcfb678",
+      "file": "packages/i18next/upstream/test/IcuTrans/IcuTrans.spec.jsx",
+      "fullName": "IcuTrans interpolation values should pass values to i18n t function"
+    },
+    {
+      "id": "runtime:200ed0145003a120",
+      "file": "packages/i18next/upstream/test/IcuTrans/IcuTrans.spec.jsx",
+      "fullName": "IcuTrans interpolation values should support variable interpolation"
+    },
+    {
+      "id": "runtime:7968869b2db96d50",
+      "file": "packages/i18next/upstream/test/IcuTrans/IcuTrans.spec.jsx",
+      "fullName": "IcuTrans namespaces should support multiple namespaces"
+    },
+    {
+      "id": "runtime:fc8de12294fbdee4",
+      "file": "packages/i18next/upstream/test/IcuTrans/IcuTrans.spec.jsx",
+      "fullName": "IcuTrans namespaces should support single namespace"
+    },
+    {
+      "id": "runtime:713bf1a61976e7d8",
+      "file": "packages/i18next/upstream/test/IcuTrans/IcuTrans.spec.jsx",
+      "fullName": "IcuTrans nested children in declarations should handle nested children declarations"
+    },
+    {
+      "id": "runtime:5cae22f2b5261a05",
+      "file": "packages/i18next/upstream/test/IcuTrans/IcuTrans.spec.jsx",
+      "fullName": "IcuTrans nested children in declarations should handle nested declarations with different depths"
+    },
+    {
+      "id": "runtime:b471dcf54c7fb938",
+      "file": "packages/i18next/upstream/test/IcuTrans/IcuTrans.spec.jsx",
+      "fullName": "IcuTrans real-world examples should render a link with icon"
+    },
+    {
+      "id": "runtime:0e3497e8eeecef87",
+      "file": "packages/i18next/upstream/test/IcuTrans/IcuTrans.spec.jsx",
+      "fullName": "IcuTrans real-world examples should render call-to-action"
+    },
+    {
+      "id": "runtime:3c9da14e83d04767",
+      "file": "packages/i18next/upstream/test/IcuTrans/IcuTrans.spec.jsx",
+      "fullName": "IcuTrans real-world examples should render copyright notice"
+    },
+    {
+      "id": "runtime:7e3e0fa237fcf021",
+      "file": "packages/i18next/upstream/test/IcuTrans/IcuTrans.spec.jsx",
+      "fullName": "IcuTrans real-world examples should render formatted text"
+    },
+    {
+      "id": "runtime:5560304b19cfcbf4",
+      "file": "packages/i18next/upstream/test/IcuTrans/IcuTransWithoutContext.spec.jsx",
+      "fullName": "IcuTransWithoutContext basic rendering with i18n prop should render with components"
+    },
+    {
+      "id": "runtime:35c1d6e8cf55fda2",
+      "file": "packages/i18next/upstream/test/IcuTrans/IcuTransWithoutContext.spec.jsx",
+      "fullName": "IcuTransWithoutContext basic rendering with i18n prop should render with i18n instance passed as prop"
+    },
+    {
+      "id": "runtime:ee4c4e2db2e37a2c",
+      "file": "packages/i18next/upstream/test/IcuTrans/IcuTransWithoutContext.spec.jsx",
+      "fullName": "IcuTransWithoutContext basic rendering with i18n prop should use defaultTranslation as key when no i18nKey is given (icu.macro key-less nodes)"
+    },
+    {
+      "id": "runtime:f0f7e7daff7ce231",
+      "file": "packages/i18next/upstream/test/IcuTrans/IcuTransWithoutContext.spec.jsx",
+      "fullName": "IcuTransWithoutContext custom t function should use custom t function when provided"
+    },
+    {
+      "id": "runtime:4f38b1a67c051b38",
+      "file": "packages/i18next/upstream/test/IcuTrans/IcuTransWithoutContext.spec.jsx",
+      "fullName": "IcuTransWithoutContext custom t function should use fallback t function when i18n.t is not available"
+    },
+    {
+      "id": "runtime:c88bfe4edc7c9438",
+      "file": "packages/i18next/upstream/test/IcuTrans/IcuTransWithoutContext.spec.jsx",
+      "fullName": "IcuTransWithoutContext displayName should have correct displayName"
+    },
+    {
+      "id": "runtime:b9f20d7b628a234f",
+      "file": "packages/i18next/upstream/test/IcuTrans/IcuTransWithoutContext.spec.jsx",
+      "fullName": "IcuTransWithoutContext error handling should handle rendering errors gracefully with mismatched tags"
+    },
+    {
+      "id": "runtime:d797c99993bde96e",
+      "file": "packages/i18next/upstream/test/IcuTrans/IcuTransWithoutContext.spec.jsx",
+      "fullName": "IcuTransWithoutContext missing i18n instance should fallback to defaultTranslation when i18n is not available"
+    },
+    {
+      "id": "runtime:6926e09f3d8acaae",
+      "file": "packages/i18next/upstream/test/IcuTrans/IcuTransWithoutContext.spec.jsx",
+      "fullName": "IcuTransWithoutContext missing i18n instance should render defaultTranslation as plain text when no i18n"
+    },
+    {
+      "id": "runtime:6aa69262e1b97b7c",
+      "file": "packages/i18next/upstream/test/IcuTrans/IcuTransWithoutContext.spec.jsx",
+      "fullName": "IcuTransWithoutContext namespace handling should fall back to translation namespace when ns is null/undefined"
+    },
+    {
+      "id": "runtime:1d2d567330dbda7e",
+      "file": "packages/i18next/upstream/test/IcuTrans/IcuTransWithoutContext.spec.jsx",
+      "fullName": "IcuTransWithoutContext namespace handling should use namespace array when provided"
+    },
+    {
+      "id": "runtime:43857b4fa284177d",
+      "file": "packages/i18next/upstream/test/IcuTrans/IcuTransWithoutContext.spec.jsx",
+      "fullName": "IcuTransWithoutContext namespace handling should use provided namespace string"
+    },
+    {
+      "id": "runtime:a186dbce84856757",
+      "file": "packages/i18next/upstream/test/IcuTrans/IcuTransWithoutContext.spec.jsx",
+      "fullName": "IcuTransWithoutContext namespace handling should use t.ns when available and no ns prop provided"
+    },
+    {
+      "id": "runtime:5c74628cb489cd03",
+      "file": "packages/i18next/upstream/test/IcuTrans/IcuTransWithoutContext.spec.jsx",
+      "fullName": "IcuTransWithoutContext values and interpolation should merge default interpolation variables"
+    },
+    {
+      "id": "runtime:551c8eeea52e8aba",
+      "file": "packages/i18next/upstream/test/IcuTrans/IcuTransWithoutContext.spec.jsx",
+      "fullName": "IcuTransWithoutContext values and interpolation should pass values to translation"
+    },
+    {
+      "id": "runtime:58fdba412b5a2ccf",
+      "file": "packages/i18next/upstream/test/IcuTrans/IcuTransWithoutContext.spec.jsx",
+      "fullName": "IcuTransWithoutContext values and interpolation should use only default variables when no values provided"
+    },
+    {
+      "id": "runtime:dc011c7d9e57c2a9",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder Greek letters - lowercase should decode &epsilon; &zeta; &eta; &theta;"
+    },
+    {
+      "id": "runtime:a4d7e081032b3309",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder Greek letters - lowercase should decode &iota; &kappa; &lambda; &mu;"
+    },
+    {
+      "id": "runtime:9fea33e81f38aed6",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder Greek letters - lowercase should decode &nu; &xi; &omicron; &pi;"
+    },
+    {
+      "id": "runtime:0cf54fb48125b3c1",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder Greek letters - lowercase should decode &phi; &chi; &psi; &omega;"
+    },
+    {
+      "id": "runtime:a8d9929746fc947e",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder Greek letters - lowercase should decode &rho; &sigma; &tau; &upsilon;"
+    },
+    {
+      "id": "runtime:6430799b3960ee07",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder Greek letters - lowercase should decode common lowercase Greek letters"
+    },
+    {
+      "id": "runtime:e62d5e75c654f144",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder Greek letters - uppercase should decode &Epsilon; through &Theta;"
+    },
+    {
+      "id": "runtime:d8e0b2a9590fddf9",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder Greek letters - uppercase should decode &Sigma; &Phi; &Psi; &Omega;"
+    },
+    {
+      "id": "runtime:040625bfeba7376f",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder Greek letters - uppercase should decode common uppercase Greek letters"
+    },
+    {
+      "id": "runtime:da62e0b5bb75b051",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder Latin extended - lowercase should decode &aelig; and &ccedil;"
+    },
+    {
+      "id": "runtime:65d131e8c1ca27f7",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder Latin extended - lowercase should decode &eth; and &ntilde;"
+    },
+    {
+      "id": "runtime:4acda9cfb8d723f4",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder Latin extended - lowercase should decode &szlig;"
+    },
+    {
+      "id": "runtime:e3504b0d46b3b3f7",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder Latin extended - lowercase should decode &yacute;, &thorn; and &yuml;"
+    },
+    {
+      "id": "runtime:b8c72d8edb8af075",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder Latin extended - lowercase should decode accented a variants"
+    },
+    {
+      "id": "runtime:b461aab81997f61e",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder Latin extended - lowercase should decode accented e variants"
+    },
+    {
+      "id": "runtime:ffa622bdaae19b28",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder Latin extended - lowercase should decode accented i variants"
+    },
+    {
+      "id": "runtime:59d48ebb0b7d606c",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder Latin extended - lowercase should decode accented o variants"
+    },
+    {
+      "id": "runtime:e617d21b24540724",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder Latin extended - lowercase should decode accented u variants"
+    },
+    {
+      "id": "runtime:d6c2f258aacd182b",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder Latin extended - uppercase should decode &AElig; and &Ccedil;"
+    },
+    {
+      "id": "runtime:90d3461bc2c28d18",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder Latin extended - uppercase should decode &ETH; and &Ntilde;"
+    },
+    {
+      "id": "runtime:b249fd5e37e3483e",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder Latin extended - uppercase should decode &Yacute; and &THORN;"
+    },
+    {
+      "id": "runtime:5aff4658905cda45",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder Latin extended - uppercase should decode accented A variants"
+    },
+    {
+      "id": "runtime:df3c9193a2754e58",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder Latin extended - uppercase should decode accented E variants"
+    },
+    {
+      "id": "runtime:d879d142af4d5e88",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder Latin extended - uppercase should decode accented I variants"
+    },
+    {
+      "id": "runtime:8b3a6ab610b8c978",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder Latin extended - uppercase should decode accented O variants"
+    },
+    {
+      "id": "runtime:a6593cd27848dfcb",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder Latin extended - uppercase should decode accented U variants"
+    },
+    {
+      "id": "runtime:cb69ec6698de9230",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder arrow entities should decode &crarr; to carriage return arrow"
+    },
+    {
+      "id": "runtime:7b8d896c5c64e72a",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder arrow entities should decode &harr; to left-right arrow"
+    },
+    {
+      "id": "runtime:bb0d5f1faef1a694",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder arrow entities should decode basic arrows"
+    },
+    {
+      "id": "runtime:84a435924054230f",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder arrow entities should decode double arrows"
+    },
+    {
+      "id": "runtime:0d7ea437583cfde9",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder basic entities should decode &amp; to ampersand"
+    },
+    {
+      "id": "runtime:50e8e951cc80c034",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder basic entities should decode &apos; to single quote"
+    },
+    {
+      "id": "runtime:57fbf61be1ede762",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder basic entities should decode &gt; to greater than"
+    },
+    {
+      "id": "runtime:c768012a177b6a24",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder basic entities should decode &lt; to less than"
+    },
+    {
+      "id": "runtime:5b0fbcc974cd5620",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder basic entities should decode &nbsp; to non-breaking space"
+    },
+    {
+      "id": "runtime:afc1f51c1f2bfc1c",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder basic entities should decode &quot; to double quote"
+    },
+    {
+      "id": "runtime:2bf9df7a615bc86c",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder card suits should decode all card suit symbols"
+    },
+    {
+      "id": "runtime:a50f59b38bd1cdd8",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder combined entities should decode consecutive entities"
+    },
+    {
+      "id": "runtime:4d53b6a434c52c46",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder combined entities should decode mixed named and numeric entities"
+    },
+    {
+      "id": "runtime:e5a6d18a38ddcfdd",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder combined entities should decode multiple entities in one string"
+    },
+    {
+      "id": "runtime:68c789fb14b3a1df",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder combined entities should handle entities at start, middle, and end"
+    },
+    {
+      "id": "runtime:f8a3a5e0e584392c",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder copyright and trademark entities should decode &copy; to copyright symbol"
+    },
+    {
+      "id": "runtime:b4d62771bc99d0a7",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder copyright and trademark entities should decode &reg; to registered trademark"
+    },
+    {
+      "id": "runtime:bd569245270cbe90",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder copyright and trademark entities should decode &trade; to trademark symbol"
+    },
+    {
+      "id": "runtime:9b9d3bb266c214de",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder currency entities should decode &cent; to cent symbol"
+    },
+    {
+      "id": "runtime:39107b7dc5147ad8",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder currency entities should decode &curren; to currency symbol"
+    },
+    {
+      "id": "runtime:310e95cece5a4c5e",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder currency entities should decode &euro; to euro symbol"
+    },
+    {
+      "id": "runtime:43587ec17b2432b8",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder currency entities should decode &pound; to pound symbol"
+    },
+    {
+      "id": "runtime:6739ca80f6606529",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder currency entities should decode &yen; to yen symbol"
+    },
+    {
+      "id": "runtime:d68e31f43eeb7127",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder edge cases should handle Unicode characters mixed with entities"
+    },
+    {
+      "id": "runtime:56615933cad46f4f",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder edge cases should handle entities within words"
+    },
+    {
+      "id": "runtime:df69edf66861e896",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder edge cases should handle malformed numeric entities"
+    },
+    {
+      "id": "runtime:c6069384ca894fb6",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder edge cases should handle string with only entities"
+    },
+    {
+      "id": "runtime:8871e2e7bb4d45e3",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder edge cases should handle very long strings with many entities"
+    },
+    {
+      "id": "runtime:222778b94b2b9010",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder edge cases should not decode incomplete entities"
+    },
+    {
+      "id": "runtime:96d9944c00896aab",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder edge cases should not decode unknown entities"
+    },
+    {
+      "id": "runtime:30d59cd516922d15",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder edge cases should preserve non-entity ampersands"
+    },
+    {
+      "id": "runtime:8b708c1c1362fc8a",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder edge cases should return empty string for empty input"
+    },
+    {
+      "id": "runtime:8c06e1a806c128ab",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder edge cases should return unchanged string when no entities present"
+    },
+    {
+      "id": "runtime:3e703a8519f4fb36",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder math symbols should decode &asymp; to approximately equal"
+    },
+    {
+      "id": "runtime:5919eca1d6bea4aa",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder math symbols should decode &deg; to degree symbol"
+    },
+    {
+      "id": "runtime:20740a7aaa3c9cd7",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder math symbols should decode &divide; to division sign"
+    },
+    {
+      "id": "runtime:808ce55f315dac89",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder math symbols should decode &equiv; to equivalent"
+    },
+    {
+      "id": "runtime:7c83044b7933fca3",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder math symbols should decode &ge; to greater than or equal"
+    },
+    {
+      "id": "runtime:a0d2b16fe1deea2b",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder math symbols should decode &infin; to infinity"
+    },
+    {
+      "id": "runtime:157ae0d02fe48ac7",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder math symbols should decode &le; to less than or equal"
+    },
+    {
+      "id": "runtime:12c66a74a620e24c",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder math symbols should decode &micro; to micro symbol"
+    },
+    {
+      "id": "runtime:e7f19fd789838573",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder math symbols should decode &minus; to minus sign"
+    },
+    {
+      "id": "runtime:cf4c81514ff9663e",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder math symbols should decode &ne; to not equal"
+    },
+    {
+      "id": "runtime:67534b08334a2974",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder math symbols should decode &part; to partial derivative"
+    },
+    {
+      "id": "runtime:c08cfe5de29eaae7",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder math symbols should decode &permil; to per mille"
+    },
+    {
+      "id": "runtime:2c81ee42f73b6461",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder math symbols should decode &plusmn; to plus-minus sign"
+    },
+    {
+      "id": "runtime:e761a816c27a3c33",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder math symbols should decode &radic; to square root"
+    },
+    {
+      "id": "runtime:0ecb178f22d77888",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder math symbols should decode &times; to multiplication sign"
+    },
+    {
+      "id": "runtime:13ab284b5c0c084e",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder math symbols should decode integral and sum symbols"
+    },
+    {
+      "id": "runtime:191e2f8ee6bd87a3",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder miscellaneous symbols should decode &frasl; to fraction slash"
+    },
+    {
+      "id": "runtime:66cf866c6f7b97c4",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder miscellaneous symbols should decode &loz; to lozenge"
+    },
+    {
+      "id": "runtime:9e938e3b3d0bd07e",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder miscellaneous symbols should decode &oline; to overline"
+    },
+    {
+      "id": "runtime:d7fb07cd46e2912d",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder miscellaneous symbols should decode mathematical script letters"
+    },
+    {
+      "id": "runtime:c60e35814328b57c",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder numeric entities should decode decimal numeric entities"
+    },
+    {
+      "id": "runtime:9206d836e5de5d38",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder numeric entities should decode hexadecimal numeric entities"
+    },
+    {
+      "id": "runtime:9ba309309aaa9149",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder numeric entities should decode lowercase hex entities"
+    },
+    {
+      "id": "runtime:9af8dd3e86ffea17",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder numeric entities should decode uppercase hex entities"
+    },
+    {
+      "id": "runtime:269930d5461f7dae",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder punctuation entities should decode &bdquo; to double low quote"
+    },
+    {
+      "id": "runtime:79552f33262be227",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder punctuation entities should decode &bull; to bullet"
+    },
+    {
+      "id": "runtime:4b0b243ef631d186",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder punctuation entities should decode &dagger; and &Dagger; to dagger symbols"
+    },
+    {
+      "id": "runtime:6eeda8b55ac41842",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder punctuation entities should decode &hellip; to ellipsis"
+    },
+    {
+      "id": "runtime:f0a3dbe187dedacb",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder punctuation entities should decode &ldquo; and &rdquo; to curly double quotes"
+    },
+    {
+      "id": "runtime:db5fbaa3e81ca784",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder punctuation entities should decode &lsaquo; and &rsaquo; to angle quotes"
+    },
+    {
+      "id": "runtime:c1ac5e55f0492b69",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder punctuation entities should decode &lsquo; and &rsquo; to curly single quotes"
+    },
+    {
+      "id": "runtime:395d553d3c5df46a",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder punctuation entities should decode &mdash; to em dash"
+    },
+    {
+      "id": "runtime:06ee1e738206eaa8",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder punctuation entities should decode &middot; to middle dot"
+    },
+    {
+      "id": "runtime:26fa6c19e0038a25",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder punctuation entities should decode &ndash; to en dash"
+    },
+    {
+      "id": "runtime:75c1e2e8a43ec01e",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder punctuation entities should decode &para; to paragraph sign"
+    },
+    {
+      "id": "runtime:66800ef28e207a3f",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder punctuation entities should decode &prime; and &Prime; to prime symbols"
+    },
+    {
+      "id": "runtime:a23b04757f8a2380",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder punctuation entities should decode &sbquo; to single low quote"
+    },
+    {
+      "id": "runtime:755da45bbcbc3272",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder punctuation entities should decode &sect; to section sign"
+    },
+    {
+      "id": "runtime:39a0e9f19bfa3327",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder real-world examples should decode HTML snippet"
+    },
+    {
+      "id": "runtime:66e15319b9f7657d",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder real-world examples should decode a mathematical expression"
+    },
+    {
+      "id": "runtime:1694e534d585cf7b",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder real-world examples should decode a typical copyright notice"
+    },
+    {
+      "id": "runtime:b487b1e80b2345b2",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder real-world examples should decode currency with symbols"
+    },
+    {
+      "id": "runtime:e58a39d2b1431b69",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder real-world examples should decode formatted quotes"
+    },
+    {
+      "id": "runtime:1dd725ae33d84e12",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder real-world examples should decode temperature"
+    },
+    {
+      "id": "runtime:ebc6368b81158b7b",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder space entities should decode &emsp; to em space"
+    },
+    {
+      "id": "runtime:6a5651377a83b01b",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder space entities should decode &ensp; to en space"
+    },
+    {
+      "id": "runtime:8ce71382cc5a03ef",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder space entities should decode &thinsp; to thin space"
+    },
+    {
+      "id": "runtime:cb94fa8579d1047e",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder special characters should decode &OElig; and &oelig;"
+    },
+    {
+      "id": "runtime:4663ba13df954a37",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder special characters should decode &Scaron;, &scaron; and &Yuml;"
+    },
+    {
+      "id": "runtime:661a7c7487286595",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder special characters should decode &circ; and &tilde;"
+    },
+    {
+      "id": "runtime:33a011e6073d55bb",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder special characters should decode &fnof; to function symbol"
+    },
+    {
+      "id": "runtime:beb931aec8a8688f",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder special characters should decode &iexcl; and &iquest;"
+    },
+    {
+      "id": "runtime:a9abf246868097b8",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder special characters should decode diacritical marks"
+    },
+    {
+      "id": "runtime:8cc1cfc9f9713f39",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder special characters should decode fractions"
+    },
+    {
+      "id": "runtime:8ecebe0d30246faf",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder special characters should decode ordinal indicators"
+    },
+    {
+      "id": "runtime:ee651dd50c492cf3",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/htmlEntityDecoder.spec.js",
+      "fullName": "htmlEntityDecoder special characters should decode superscripts"
+    },
+    {
+      "id": "runtime:33a783d4de22116e",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/renderTranslation.spec.js",
+      "fullName": "translationParser should create TranslationParserError instances with all required properties"
+    },
+    {
+      "id": "runtime:d58ff9bea1283134",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/renderTranslation.spec.js",
+      "fullName": "translationParser should decode HTML entities in text content"
+    },
+    {
+      "id": "runtime:c00a0b79be41777c",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/renderTranslation.spec.js",
+      "fullName": "translationParser should decode non-breaking space entities correctly"
+    },
+    {
+      "id": "runtime:2dba5295fb0fe36c",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/renderTranslation.spec.js",
+      "fullName": "translationParser should decode numeric HTML entities in both decimal and hexadecimal formats"
+    },
+    {
+      "id": "runtime:4205d62f3111783d",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/renderTranslation.spec.js",
+      "fullName": "translationParser should handle complex translations with multiple interpolation types and nested structures"
+    },
+    {
+      "id": "runtime:ab7c5e5f4c7d1806",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/renderTranslation.spec.js",
+      "fullName": "translationParser should handle declarations with pre-defined children prop structure"
+    },
+    {
+      "id": "runtime:a33ca4231951e554",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/renderTranslation.spec.js",
+      "fullName": "translationParser should handle deeply nested tag structures"
+    },
+    {
+      "id": "runtime:fbd67d56d9d9d720",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/renderTranslation.spec.js",
+      "fullName": "translationParser should handle deeply nested tags interspersed with sibling text content"
+    },
+    {
+      "id": "runtime:b70472f5a3be0dd8",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/renderTranslation.spec.js",
+      "fullName": "translationParser should handle empty translation strings"
+    },
+    {
+      "id": "runtime:e24961642e955f14",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/renderTranslation.spec.js",
+      "fullName": "translationParser should handle list elements with nested list item children"
+    },
+    {
+      "id": "runtime:2d683439cd5e4006",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/renderTranslation.spec.js",
+      "fullName": "translationParser should handle literal tags nested inside valid components"
+    },
+    {
+      "id": "runtime:a49ff3255d42975d",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/renderTranslation.spec.js",
+      "fullName": "translationParser should handle multiple nested literal tags inside valid components"
+    },
+    {
+      "id": "runtime:07d058e6fcdf78f3",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/renderTranslation.spec.js",
+      "fullName": "translationParser should handle nested declarations containing children arrays for multi-level structures"
+    },
+    {
+      "id": "runtime:ea49cec690e1516b",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/renderTranslation.spec.js",
+      "fullName": "translationParser should handle real-world documentation link pattern with nested icon"
+    },
+    {
+      "id": "runtime:4fc02dc9fca28df8",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/renderTranslation.spec.js",
+      "fullName": "translationParser should handle real-world translation with custom styling"
+    },
+    {
+      "id": "runtime:efd3fb621b40e843",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/renderTranslation.spec.js",
+      "fullName": "translationParser should handle self-closing and empty tags"
+    },
+    {
+      "id": "runtime:a1b4c679297f25e1",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/renderTranslation.spec.js",
+      "fullName": "translationParser should pass through ICU variable placeholders without modification"
+    },
+    {
+      "id": "runtime:c9038c17d69d495a",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/renderTranslation.spec.js",
+      "fullName": "translationParser should pass through complex ICU message syntax without modification"
+    },
+    {
+      "id": "runtime:07a95a4efb665943",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/renderTranslation.spec.js",
+      "fullName": "translationParser should preserve all component props from declarations"
+    },
+    {
+      "id": "runtime:43493dabb0d13ca0",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/renderTranslation.spec.js",
+      "fullName": "translationParser should preserve whitespace-only translations"
+    },
+    {
+      "id": "runtime:b9cb500f6a275112",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/renderTranslation.spec.js",
+      "fullName": "translationParser should render custom React component types from declarations"
+    },
+    {
+      "id": "runtime:dc0c8974d541d0be",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/renderTranslation.spec.js",
+      "fullName": "translationParser should render multiple tags in sequence"
+    },
+    {
+      "id": "runtime:5ce45667332344b7",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/renderTranslation.spec.js",
+      "fullName": "translationParser should render nested tags with proper hierarchy"
+    },
+    {
+      "id": "runtime:7d740137e471b772",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/renderTranslation.spec.js",
+      "fullName": "translationParser should render plain text without any tags"
+    },
+    {
+      "id": "runtime:5895df64bf3a8f31",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/renderTranslation.spec.js",
+      "fullName": "translationParser should render tags with surrounding text content"
+    },
+    {
+      "id": "runtime:048eac8e5ff55da7",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/renderTranslation.spec.js",
+      "fullName": "translationParser should render text with a single tag"
+    },
+    {
+      "id": "runtime:ed7be1c234bd8b10",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/renderTranslation.spec.js",
+      "fullName": "translationParser should reuse the same declaration for multiple tags with identical numbers"
+    },
+    {
+      "id": "runtime:64af10c2c9777d24",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/renderTranslation.spec.js",
+      "fullName": "translationParser should throw TranslationParserError for mismatched opening and closing tags"
+    },
+    {
+      "id": "runtime:8cffe47612a120bc",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/renderTranslation.spec.js",
+      "fullName": "translationParser should throw TranslationParserError for unclosed tags"
+    },
+    {
+      "id": "runtime:0debbf743e4c08f8",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/renderTranslation.spec.js",
+      "fullName": "translationParser should throw TranslationParserError for unexpected closing tags"
+    },
+    {
+      "id": "runtime:b5735cf14a14b8bb",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/renderTranslation.spec.js",
+      "fullName": "translationParser should treat literal HTML tags as text, not component placeholders"
+    },
+    {
+      "id": "runtime:8b33c4e3f18a150c",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/renderTranslation.spec.js",
+      "fullName": "translationParser should treat numbered tags as literal text when no corresponding declaration exists"
+    },
+    {
+      "id": "runtime:0aafbd67edb05420",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/renderTranslation.spec.js",
+      "fullName": "translationParser should treat tags as literal text when declaration is missing"
+    },
+    {
+      "id": "runtime:3d5db49089163597",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/tokenizer.spec.js",
+      "fullName": "tokenizer ICU variable placeholders should handle complex ICU plurals"
+    },
+    {
+      "id": "runtime:13ad7824b7d15256",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/tokenizer.spec.js",
+      "fullName": "tokenizer ICU variable placeholders should handle tags with ICU variables"
+    },
+    {
+      "id": "runtime:eea483d1cf6b10ee",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/tokenizer.spec.js",
+      "fullName": "tokenizer ICU variable placeholders should treat ICU variables as text"
+    },
+    {
+      "id": "runtime:7f152bb6e2e14eeb",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/tokenizer.spec.js",
+      "fullName": "tokenizer edge cases should handle Unicode characters"
+    },
+    {
+      "id": "runtime:6a5aff7c081d8073",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/tokenizer.spec.js",
+      "fullName": "tokenizer edge cases should handle mismatched tag numbers (no validation)"
+    },
+    {
+      "id": "runtime:6459e40ec08443aa",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/tokenizer.spec.js",
+      "fullName": "tokenizer edge cases should handle only closing tags (no validation)"
+    },
+    {
+      "id": "runtime:3d4d82f45be1f643",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/tokenizer.spec.js",
+      "fullName": "tokenizer edge cases should handle only opening tags (no validation)"
+    },
+    {
+      "id": "runtime:fc84d7bf3aeaefdc",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/tokenizer.spec.js",
+      "fullName": "tokenizer edge cases should handle special characters inside tags"
+    },
+    {
+      "id": "runtime:e8a50ea9a2274a83",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/tokenizer.spec.js",
+      "fullName": "tokenizer edge cases should handle tag at the very beginning of string"
+    },
+    {
+      "id": "runtime:9d04b005c85a8404",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/tokenizer.spec.js",
+      "fullName": "tokenizer edge cases should handle tag at the very end of string"
+    },
+    {
+      "id": "runtime:44349dccaa5a4a2e",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/tokenizer.spec.js",
+      "fullName": "tokenizer multiple tags should handle the same tag number used multiple times"
+    },
+    {
+      "id": "runtime:67ac3e6bc60406aa",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/tokenizer.spec.js",
+      "fullName": "tokenizer multiple tags should tokenize multiple consecutive tags"
+    },
+    {
+      "id": "runtime:9a17111d539e1fa9",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/tokenizer.spec.js",
+      "fullName": "tokenizer multiple tags should tokenize multiple tags with text between them"
+    },
+    {
+      "id": "runtime:8ac5243cd801513a",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/tokenizer.spec.js",
+      "fullName": "tokenizer nested tags should tokenize deeply nested tags"
+    },
+    {
+      "id": "runtime:95c4915546ff0e02",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/tokenizer.spec.js",
+      "fullName": "tokenizer nested tags should tokenize nested tags"
+    },
+    {
+      "id": "runtime:f278c205c4b1df26",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/tokenizer.spec.js",
+      "fullName": "tokenizer non-tag angle brackets should handle mixed valid tags and non-tag brackets"
+    },
+    {
+      "id": "runtime:2ad2b39c662e072c",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/tokenizer.spec.js",
+      "fullName": "tokenizer non-tag angle brackets should handle text with < and > that aren't tags"
+    },
+    {
+      "id": "runtime:f3f85498e78eacb5",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/tokenizer.spec.js",
+      "fullName": "tokenizer non-tag angle brackets should treat < as text when not followed by digits"
+    },
+    {
+      "id": "runtime:5aed360a5a399161",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/tokenizer.spec.js",
+      "fullName": "tokenizer non-tag angle brackets should treat </ as text when not followed by digits and >"
+    },
+    {
+      "id": "runtime:8000231da6082ff6",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/tokenizer.spec.js",
+      "fullName": "tokenizer non-tag angle brackets should treat incomplete tags as text"
+    },
+    {
+      "id": "runtime:e1868984a08ebe80",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/tokenizer.spec.js",
+      "fullName": "tokenizer plain text should handle empty strings"
+    },
+    {
+      "id": "runtime:51a66b9920234780",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/tokenizer.spec.js",
+      "fullName": "tokenizer plain text should preserve newlines and tabs"
+    },
+    {
+      "id": "runtime:94c491dce2edeb5c",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/tokenizer.spec.js",
+      "fullName": "tokenizer plain text should preserve whitespace-only text"
+    },
+    {
+      "id": "runtime:dece5dc06dd79928",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/tokenizer.spec.js",
+      "fullName": "tokenizer plain text should tokenize plain text without any tags"
+    },
+    {
+      "id": "runtime:e27125d02ab90aac",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/tokenizer.spec.js",
+      "fullName": "tokenizer position tracking should track positions correctly for nested tags"
+    },
+    {
+      "id": "runtime:7712d32013e17a05",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/tokenizer.spec.js",
+      "fullName": "tokenizer position tracking should track positions correctly for single tag"
+    },
+    {
+      "id": "runtime:f04640383b631af6",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/tokenizer.spec.js",
+      "fullName": "tokenizer position tracking should track positions correctly with leading text"
+    },
+    {
+      "id": "runtime:7173f8186fbae482",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/tokenizer.spec.js",
+      "fullName": "tokenizer position tracking should track positions correctly with multi-digit tag numbers"
+    },
+    {
+      "id": "runtime:65a2082ab8942e75",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/tokenizer.spec.js",
+      "fullName": "tokenizer real-world examples should tokenize a complex sentence with multiple styled parts"
+    },
+    {
+      "id": "runtime:94e74ca127bf9882",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/tokenizer.spec.js",
+      "fullName": "tokenizer real-world examples should tokenize a link with an icon"
+    },
+    {
+      "id": "runtime:e5e41c386588511f",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/tokenizer.spec.js",
+      "fullName": "tokenizer real-world examples should tokenize nested list structure"
+    },
+    {
+      "id": "runtime:2b2bd17095300052",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/tokenizer.spec.js",
+      "fullName": "tokenizer single tag should handle empty tags"
+    },
+    {
+      "id": "runtime:5e3889dae12af597",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/tokenizer.spec.js",
+      "fullName": "tokenizer single tag should tokenize a simple opening and closing tag"
+    },
+    {
+      "id": "runtime:652a0f9cd0f841ba",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/tokenizer.spec.js",
+      "fullName": "tokenizer single tag should tokenize tag with multi-digit numbers"
+    },
+    {
+      "id": "runtime:eeee0307e40bbd66",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/tokenizer.spec.js",
+      "fullName": "tokenizer single tag should tokenize tag with single-digit numbers"
+    },
+    {
+      "id": "runtime:c5da25220f32a958",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/tokenizer.spec.js",
+      "fullName": "tokenizer text with tags should tokenize text after a tag"
+    },
+    {
+      "id": "runtime:d42b2fa1f51fc8cf",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/tokenizer.spec.js",
+      "fullName": "tokenizer text with tags should tokenize text before a tag"
+    },
+    {
+      "id": "runtime:1b487faf22dde6ed",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/tokenizer.spec.js",
+      "fullName": "tokenizer text with tags should tokenize text before, inside, and after tags"
+    },
+    {
+      "id": "runtime:968362e3a60a03b4",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/tokenizer.spec.js",
+      "fullName": "tokenizer type safety should always include position for all tokens"
+    },
+    {
+      "id": "runtime:ec39f888e6234fb7",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/tokenizer.spec.js",
+      "fullName": "tokenizer type safety should include tagNumber only for tag tokens"
+    },
+    {
+      "id": "runtime:79a3d0f8814135d4",
+      "file": "packages/i18next/upstream/test/IcuTrans/utils/tokenizer.spec.js",
+      "fullName": "tokenizer type safety should return tokens with correct types"
+    },
+    {
+      "id": "runtime:5af3e8764a2d23f6",
+      "file": "packages/i18next/upstream/test/Translation.spec.jsx",
+      "fullName": "Translation should render correct content"
+    },
+    {
+      "id": "runtime:69c9b26eac12e305",
+      "file": "packages/i18next/upstream/test/icu.macro.spec.js",
+      "fullName": "macros 1. macros"
+    },
+    {
+      "id": "runtime:d30433f97bdfee65",
+      "file": "packages/i18next/upstream/test/icu.macro.spec.js",
+      "fullName": "macros 10. macros"
+    },
+    {
+      "id": "runtime:cfe37fff2a879188",
+      "file": "packages/i18next/upstream/test/icu.macro.spec.js",
+      "fullName": "macros 11. macros"
+    },
+    {
+      "id": "runtime:decc836e8f0f1dd6",
+      "file": "packages/i18next/upstream/test/icu.macro.spec.js",
+      "fullName": "macros 12. macros"
+    },
+    {
+      "id": "runtime:a8e91125e2530b81",
+      "file": "packages/i18next/upstream/test/icu.macro.spec.js",
+      "fullName": "macros 13. macros"
+    },
+    {
+      "id": "runtime:1ed6998f737439eb",
+      "file": "packages/i18next/upstream/test/icu.macro.spec.js",
+      "fullName": "macros 14. macros"
+    },
+    {
+      "id": "runtime:bcc052ca36d8ed79",
+      "file": "packages/i18next/upstream/test/icu.macro.spec.js",
+      "fullName": "macros 15. macros"
+    },
+    {
+      "id": "runtime:5fe6620cb86f8219",
+      "file": "packages/i18next/upstream/test/icu.macro.spec.js",
+      "fullName": "macros 16. macros"
+    },
+    {
+      "id": "runtime:fbe5b61b75f3d09a",
+      "file": "packages/i18next/upstream/test/icu.macro.spec.js",
+      "fullName": "macros 17. macros"
+    },
+    {
+      "id": "runtime:9351e20eb6b2fffb",
+      "file": "packages/i18next/upstream/test/icu.macro.spec.js",
+      "fullName": "macros 18. macros"
+    },
+    {
+      "id": "runtime:d3cee5f7b1e62732",
+      "file": "packages/i18next/upstream/test/icu.macro.spec.js",
+      "fullName": "macros 19. macros"
+    },
+    {
+      "id": "runtime:43b745611fa344c8",
+      "file": "packages/i18next/upstream/test/icu.macro.spec.js",
+      "fullName": "macros 2. macros"
+    },
+    {
+      "id": "runtime:715f8b4235452321",
+      "file": "packages/i18next/upstream/test/icu.macro.spec.js",
+      "fullName": "macros 20. macros"
+    },
+    {
+      "id": "runtime:838daf107c3f9040",
+      "file": "packages/i18next/upstream/test/icu.macro.spec.js",
+      "fullName": "macros 21. macros"
+    },
+    {
+      "id": "runtime:2ea8e59163572f63",
+      "file": "packages/i18next/upstream/test/icu.macro.spec.js",
+      "fullName": "macros 22. macros"
+    },
+    {
+      "id": "runtime:bb45d55218602bef",
+      "file": "packages/i18next/upstream/test/icu.macro.spec.js",
+      "fullName": "macros 23. macros"
+    },
+    {
+      "id": "runtime:33a06f964a3566a8",
+      "file": "packages/i18next/upstream/test/icu.macro.spec.js",
+      "fullName": "macros 24. macros"
+    },
+    {
+      "id": "runtime:9fdb0e346565ab03",
+      "file": "packages/i18next/upstream/test/icu.macro.spec.js",
+      "fullName": "macros 25. macros"
+    },
+    {
+      "id": "runtime:6949de71a57d3146",
+      "file": "packages/i18next/upstream/test/icu.macro.spec.js",
+      "fullName": "macros 26. macros"
+    },
+    {
+      "id": "runtime:0e3a88e0afcb3c53",
+      "file": "packages/i18next/upstream/test/icu.macro.spec.js",
+      "fullName": "macros 27. macros"
+    },
+    {
+      "id": "runtime:1a63600fb5cbf9fe",
+      "file": "packages/i18next/upstream/test/icu.macro.spec.js",
+      "fullName": "macros 28. macros"
+    },
+    {
+      "id": "runtime:8f5759b9fc0dbed6",
+      "file": "packages/i18next/upstream/test/icu.macro.spec.js",
+      "fullName": "macros 29. macros"
+    },
+    {
+      "id": "runtime:472c28fb0cf51241",
+      "file": "packages/i18next/upstream/test/icu.macro.spec.js",
+      "fullName": "macros 3. macros"
+    },
+    {
+      "id": "runtime:a9248b30f381e35d",
+      "file": "packages/i18next/upstream/test/icu.macro.spec.js",
+      "fullName": "macros 30. macros"
+    },
+    {
+      "id": "runtime:9bb0abf819d35644",
+      "file": "packages/i18next/upstream/test/icu.macro.spec.js",
+      "fullName": "macros 31. macros"
+    },
+    {
+      "id": "runtime:91e14b71417225de",
+      "file": "packages/i18next/upstream/test/icu.macro.spec.js",
+      "fullName": "macros 32. macros"
+    },
+    {
+      "id": "runtime:b9ef1e64f4373cb6",
+      "file": "packages/i18next/upstream/test/icu.macro.spec.js",
+      "fullName": "macros 33. macros"
+    },
+    {
+      "id": "runtime:cee1900815ca51c1",
+      "file": "packages/i18next/upstream/test/icu.macro.spec.js",
+      "fullName": "macros 34. macros"
+    },
+    {
+      "id": "runtime:7368c7c31d29ba6f",
+      "file": "packages/i18next/upstream/test/icu.macro.spec.js",
+      "fullName": "macros 35. macros"
+    },
+    {
+      "id": "runtime:1361ac2554b1eaef",
+      "file": "packages/i18next/upstream/test/icu.macro.spec.js",
+      "fullName": "macros 36. macros"
+    },
+    {
+      "id": "runtime:c6b7ac865bc002a4",
+      "file": "packages/i18next/upstream/test/icu.macro.spec.js",
+      "fullName": "macros 37. macros"
+    },
+    {
+      "id": "runtime:921ef2a698538d3f",
+      "file": "packages/i18next/upstream/test/icu.macro.spec.js",
+      "fullName": "macros 4. macros"
+    },
+    {
+      "id": "runtime:788fc60031d55ebe",
+      "file": "packages/i18next/upstream/test/icu.macro.spec.js",
+      "fullName": "macros 5. macros"
+    },
+    {
+      "id": "runtime:6c00985a2a5e3614",
+      "file": "packages/i18next/upstream/test/icu.macro.spec.js",
+      "fullName": "macros 6. macros"
+    },
+    {
+      "id": "runtime:391e84710adc29b7",
+      "file": "packages/i18next/upstream/test/icu.macro.spec.js",
+      "fullName": "macros 7. macros"
+    },
+    {
+      "id": "runtime:621513a50ee2e8f3",
+      "file": "packages/i18next/upstream/test/icu.macro.spec.js",
+      "fullName": "macros 8. macros"
+    },
+    {
+      "id": "runtime:12cb7f7e655730ec",
+      "file": "packages/i18next/upstream/test/icu.macro.spec.js",
+      "fullName": "macros 9. macros"
+    },
+    {
+      "id": "runtime:d695fd78c083b7b4",
+      "file": "packages/i18next/upstream/test/initReactI18next.spec.js",
+      "fullName": "initReactI18next should handle setDefaults with empty options"
+    },
+    {
+      "id": "runtime:21e4073a4fadc78b",
+      "file": "packages/i18next/upstream/test/initReactI18next.spec.js",
+      "fullName": "initReactI18next should handle setDefaults with options"
+    },
+    {
+      "id": "runtime:bb85377d1f7af9a3",
+      "file": "packages/i18next/upstream/test/initReactI18next.spec.js",
+      "fullName": "initReactI18next should have correct type"
+    },
+    {
+      "id": "runtime:5affd05c8af8a80b",
+      "file": "packages/i18next/upstream/test/initReactI18next.spec.js",
+      "fullName": "initReactI18next should initialize with i18next instance"
+    },
+    {
+      "id": "runtime:de776fc5da536254",
+      "file": "packages/i18next/upstream/test/initReactI18next.spec.js",
+      "fullName": "initReactI18next should preserve existing defaults when setting new ones"
+    },
+    {
+      "id": "runtime:9bcc3518fbbee4dc",
+      "file": "packages/i18next/upstream/test/trans.nodeToString.spec.jsx",
+      "fullName": "trans nodeToString having dynamic list maps should create normal inner children if not set to ignore them"
+    },
+    {
+      "id": "runtime:c67b630cae76f4b5",
+      "file": "packages/i18next/upstream/test/trans.nodeToString.spec.jsx",
+      "fullName": "trans nodeToString having dynamic list maps should omit inner children if set"
+    },
+    {
+      "id": "runtime:4b99620c1d1507da",
+      "file": "packages/i18next/upstream/test/trans.nodeToString.spec.jsx",
+      "fullName": "trans nodeToString interpolation objects and invalid children should convert single-key object children to interpolation syntax"
+    },
+    {
+      "id": "runtime:c7d8c853bcb07693",
+      "file": "packages/i18next/upstream/test/trans.nodeToString.spec.jsx",
+      "fullName": "trans nodeToString interpolation objects and invalid children should ignore invalid primitive children (e.g. numbers)"
+    },
+    {
+      "id": "runtime:25731e0a78632cad",
+      "file": "packages/i18next/upstream/test/trans.nodeToString.spec.jsx",
+      "fullName": "trans nodeToString interpolation objects and invalid children should support format on interpolation object children"
+    },
+    {
+      "id": "runtime:d632e87e002e6bbc",
+      "file": "packages/i18next/upstream/test/trans.nodeToString.spec.jsx",
+      "fullName": "trans nodeToString treat like other components (legacy) should handle non voidElements eg. strong not having attributes and only one child typeof string"
+    },
+    {
+      "id": "runtime:730af246cff9e0cf",
+      "file": "packages/i18next/upstream/test/trans.nodeToString.spec.jsx",
+      "fullName": "trans nodeToString treat like other components (legacy) should handle voidElements eg. br"
+    },
+    {
+      "id": "runtime:240231ba07992bff",
+      "file": "packages/i18next/upstream/test/trans.nodeToString.spec.jsx",
+      "fullName": "trans nodeToString treat like other components if not simple (legacy) should handle non voidElements eg. strong not having attributes and only one child typeof string"
+    },
+    {
+      "id": "runtime:feef2adf3baf45ad",
+      "file": "packages/i18next/upstream/test/trans.nodeToString.spec.jsx",
+      "fullName": "trans nodeToString treat like other components if not simple (legacy) should handle voidElements eg. br"
+    },
+    {
+      "id": "runtime:a8f058fbc42e14f3",
+      "file": "packages/i18next/upstream/test/trans.nodeToString.spec.jsx",
+      "fullName": "trans nodeToString treat like other components if not simple (legacy) should keep the tag name when a keep-tag wraps a non-keep React element (#1919)"
+    },
+    {
+      "id": "runtime:ac5d073f95567b5c",
+      "file": "packages/i18next/upstream/test/trans.nodeToString.spec.jsx",
+      "fullName": "trans nodeToString treat simplified if simple components should handle non voidElements eg. strong not having attributes and only one child typeof string"
+    },
+    {
+      "id": "runtime:caf920127a493491",
+      "file": "packages/i18next/upstream/test/trans.nodeToString.spec.jsx",
+      "fullName": "trans nodeToString treat simplified if simple components should handle non voidElements with interpolation children"
+    },
+    {
+      "id": "runtime:e2a0ab00ddf54ef0",
+      "file": "packages/i18next/upstream/test/trans.nodeToString.spec.jsx",
+      "fullName": "trans nodeToString treat simplified if simple components should handle non voidElements with mixed text and interpolation children"
+    },
+    {
+      "id": "runtime:ef863d854b03bdfc",
+      "file": "packages/i18next/upstream/test/trans.nodeToString.spec.jsx",
+      "fullName": "trans nodeToString treat simplified if simple components should handle voidElements eg. br"
+    },
+    {
+      "id": "runtime:9eeccc6e4afd61f3",
+      "file": "packages/i18next/upstream/test/trans.render.dynamic.spec.jsx",
+      "fullName": "Trans should render nested components should not emit unknown-prop warnings for plain DOM components"
+    },
+    {
+      "id": "runtime:6fc6784502bc757d",
+      "file": "packages/i18next/upstream/test/trans.render.dynamic.spec.jsx",
+      "fullName": "Trans should render nested components should render dynamic Elements correctly"
+    },
+    {
+      "id": "runtime:4da18dde107911e6",
+      "file": "packages/i18next/upstream/test/trans.render.dynamic.spec.jsx",
+      "fullName": "Trans should render nested components should render dynamic strings correctly"
+    },
+    {
+      "id": "runtime:91570207d5bb48f7",
+      "file": "packages/i18next/upstream/test/trans.render.dynamic.spec.jsx",
+      "fullName": "Trans should render nested components should render dynamic ul as components property"
+    },
+    {
+      "id": "runtime:9fa39b63795b6dcc",
+      "file": "packages/i18next/upstream/test/trans.render.dynamic.spec.jsx",
+      "fullName": "Trans should render nested components should render dynamic ul as components property when pass as a children"
+    },
+    {
+      "id": "runtime:7529b5348a9d8721",
+      "file": "packages/i18next/upstream/test/trans.render.icu.spec.jsx",
+      "fullName": "Trans should use value from translation should use value from translation if dummy data provided in component"
+    },
+    {
+      "id": "runtime:806cde9daed26f04",
+      "file": "packages/i18next/upstream/test/trans.render.icu.spec.jsx",
+      "fullName": "Trans should use value from translation should use value from translation if no data provided in component"
+    },
+    {
+      "id": "runtime:af9ac182d0397fcb",
+      "file": "packages/i18next/upstream/test/trans.render.icu.spec.jsx",
+      "fullName": "trans using no children but props - icu case should render translated string"
+    },
+    {
+      "id": "runtime:c9f7d66062742b6a",
+      "file": "packages/i18next/upstream/test/trans.render.icu.spec.jsx",
+      "fullName": "trans using no children but props - nested case should render translated string"
+    },
+    {
+      "id": "runtime:358ccd55ea37e54b",
+      "file": "packages/i18next/upstream/test/trans.render.icu.spec.jsx",
+      "fullName": "trans using no children but props - self closing case should render translated string"
+    },
+    {
+      "id": "runtime:878ee2931386cb24",
+      "file": "packages/i18next/upstream/test/trans.render.noLng.spec.jsx",
+      "fullName": "trans simple does not throw when using the selector API with the component object and no lng set"
+    },
+    {
+      "id": "runtime:17edf6eb55956ab5",
+      "file": "packages/i18next/upstream/test/trans.render.object.spec.jsx",
+      "fullName": "trans using children and components (object) - should still allow for use of indexed basic html tags in children should render translated string"
+    },
+    {
+      "id": "runtime:3c4f22e91d327ffe",
+      "file": "packages/i18next/upstream/test/trans.render.object.spec.jsx",
+      "fullName": "trans using children but components (object) - self closing tag should render translated string"
+    },
+    {
+      "id": "runtime:7eb64acff5f2825f",
+      "file": "packages/i18next/upstream/test/trans.render.object.spec.jsx",
+      "fullName": "trans using no children but components (object) - base case using array not object should render translated string"
+    },
+    {
+      "id": "runtime:f0a6f5cf3c899299",
+      "file": "packages/i18next/upstream/test/trans.render.object.spec.jsx",
+      "fullName": "trans using no children but components (object) - empty content should render translated string"
+    },
+    {
+      "id": "runtime:ecf1a81ecb1b8774",
+      "file": "packages/i18next/upstream/test/trans.render.object.spec.jsx",
+      "fullName": "trans using no children but components (object) - interpolated component with children should render translated string"
+    },
+    {
+      "id": "runtime:57af063277b5a879",
+      "file": "packages/i18next/upstream/test/trans.render.object.spec.jsx",
+      "fullName": "trans using no children but components (object) - use more than once (empty) should render translated string"
+    },
+    {
+      "id": "runtime:8bee4d07c1be7437",
+      "file": "packages/i18next/upstream/test/trans.render.object.spec.jsx",
+      "fullName": "trans using no children but components (object) - use more than once should render translated string"
+    },
+    {
+      "id": "runtime:a914a21b8982c2dd",
+      "file": "packages/i18next/upstream/test/trans.render.object.spec.jsx",
+      "fullName": "trans using no children but components (object) - using index should render translated string"
+    },
+    {
+      "id": "runtime:db12b79bc3c63899",
+      "file": "packages/i18next/upstream/test/trans.render.object.spec.jsx",
+      "fullName": "trans using no children but components (object) - using names should render translated string"
+    },
+    {
+      "id": "runtime:cb7d175fc3688cc6",
+      "file": "packages/i18next/upstream/test/trans.render.object.spec.jsx",
+      "fullName": "trans using no children but components (object) - using names with less-than sign should render translated string"
+    },
+    {
+      "id": "runtime:eb1cb55819cba6d2",
+      "file": "packages/i18next/upstream/test/trans.render.object.spec.jsx",
+      "fullName": "trans using no children but components (object) - using names with no lowercase should render translated string"
+    },
+    {
+      "id": "runtime:cbecfd48c4a678ea",
+      "file": "packages/i18next/upstream/test/trans.render.object.spec.jsx",
+      "fullName": "trans using no children but components (object) - using self closing tag should render translated string"
+    },
+    {
+      "id": "runtime:86d41c4bf23d8a05",
+      "file": "packages/i18next/upstream/test/trans.render.object.spec.jsx",
+      "fullName": "trans with hyphenated component names should render hyphenated component names correctly"
+    },
+    {
+      "id": "runtime:38487f1f41b19978",
+      "file": "packages/i18next/upstream/test/trans.render.object.spec.jsx",
+      "fullName": "trans with less-than in mathematical expression should render with escaped less-than sign"
+    },
+    {
+      "id": "runtime:549fa2dc82201143",
+      "file": "packages/i18next/upstream/test/trans.render.object.spec.jsx",
+      "fullName": "trans with multiple less-than signs should render with escaped less-than signs"
+    },
+    {
+      "id": "runtime:202a7affa91bb43d",
+      "file": "packages/i18next/upstream/test/trans.render.object.spec.jsx",
+      "fullName": "trans with numbered tags with attributes should render tags with attributes correctly"
+    },
+    {
+      "id": "runtime:0efed7483f9cce9b",
+      "file": "packages/i18next/upstream/test/trans.render.object.spec.jsx",
+      "fullName": "trans with underscore component names should render underscore component names correctly"
+    },
+    {
+      "id": "runtime:a4a1c2452c41d9ac",
+      "file": "packages/i18next/upstream/test/trans.render.spec.jsx",
+      "fullName": "Trans edge cases Trans ref forwarding preserves a user ref placed on a nested element"
+    },
+    {
+      "id": "runtime:c3496931003b351a",
+      "file": "packages/i18next/upstream/test/trans.render.spec.jsx",
+      "fullName": "Trans edge cases should handle invalid components prop type"
+    },
+    {
+      "id": "runtime:eb08768e8f07ece4",
+      "file": "packages/i18next/upstream/test/trans.render.spec.jsx",
+      "fullName": "Trans edge cases should handle missing i18n instance gracefully"
+    },
+    {
+      "id": "runtime:050323a9799f2888",
+      "file": "packages/i18next/upstream/test/trans.render.spec.jsx",
+      "fullName": "Trans edge cases should render a Fragment child without invalid prop warnings"
+    },
+    {
+      "id": "runtime:615c8e7aa7aea09e",
+      "file": "packages/i18next/upstream/test/trans.render.spec.jsx",
+      "fullName": "trans bracketNotation should render correct content"
+    },
+    {
+      "id": "runtime:a9e4ce42ea95e47b",
+      "file": "packages/i18next/upstream/test/trans.render.spec.jsx",
+      "fullName": "trans complex - count inferred from children should render correct content"
+    },
+    {
+      "id": "runtime:eb385a1d0cd38e12",
+      "file": "packages/i18next/upstream/test/trans.render.spec.jsx",
+      "fullName": "trans complex - count only in props should render correct content"
+    },
+    {
+      "id": "runtime:229bcd77549cd5f9",
+      "file": "packages/i18next/upstream/test/trans.render.spec.jsx",
+      "fullName": "trans complex should render correct content"
+    },
+    {
+      "id": "runtime:cacb92693a04ac33",
+      "file": "packages/i18next/upstream/test/trans.render.spec.jsx",
+      "fullName": "trans complex v2 no extra pseudo elements for interpolation should render correct content"
+    },
+    {
+      "id": "runtime:06cf36b6ac61e96f",
+      "file": "packages/i18next/upstream/test/trans.render.spec.jsx",
+      "fullName": "trans does ignore user defined values when parsing should escape value with angle brackets"
+    },
+    {
+      "id": "runtime:0fe89d8215c75536",
+      "file": "packages/i18next/upstream/test/trans.render.spec.jsx",
+      "fullName": "trans issue 1893 - double escaping in props should render correctly with quotes in interpolation (case 1: escapeValue false)"
+    },
+    {
+      "id": "runtime:08ad837aa463ae46",
+      "file": "packages/i18next/upstream/test/trans.render.spec.jsx",
+      "fullName": "trans issue 1893 - double escaping in props should render correctly with quotes in interpolation (case 2: escapeValue true)"
+    },
+    {
+      "id": "runtime:03345e707d5442b4",
+      "file": "packages/i18next/upstream/test/trans.render.spec.jsx",
+      "fullName": "trans keep-tag wrapping a non-keep React element (#1919) preserves non-keep child elements (e.g. <a>) inside a kept <p>"
+    },
+    {
+      "id": "runtime:b6e64581af620e93",
+      "file": "packages/i18next/upstream/test/trans.render.spec.jsx",
+      "fullName": "trans otherNotation should render correct content"
+    },
+    {
+      "id": "runtime:e4da7f6dbce20ee4",
+      "file": "packages/i18next/upstream/test/trans.render.spec.jsx",
+      "fullName": "trans overwrites translation prop should render correct content"
+    },
+    {
+      "id": "runtime:08f05dcbdf943d71",
+      "file": "packages/i18next/upstream/test/trans.render.spec.jsx",
+      "fullName": "trans should allow escaped html should unescape &lt; &nbsp; &amp; &gt; to < SPACE & >"
+    },
+    {
+      "id": "runtime:b0830078041cce63",
+      "file": "packages/i18next/upstream/test/trans.render.spec.jsx",
+      "fullName": "trans should not break on invalid node from translations - part2 should render translated string"
+    },
+    {
+      "id": "runtime:366a3272d2b24453",
+      "file": "packages/i18next/upstream/test/trans.render.spec.jsx",
+      "fullName": "trans should not break on invalid node from translations should render translated string"
+    },
+    {
+      "id": "runtime:5f96759cd6f96af3",
+      "file": "packages/i18next/upstream/test/trans.render.spec.jsx",
+      "fullName": "trans should work with defaultVariables should render translated string"
+    },
+    {
+      "id": "runtime:b7150e372e9d41bf",
+      "file": "packages/i18next/upstream/test/trans.render.spec.jsx",
+      "fullName": "trans should work with lowercase elements in components should render translated string"
+    },
+    {
+      "id": "runtime:53bf01d9b335eb32",
+      "file": "packages/i18next/upstream/test/trans.render.spec.jsx",
+      "fullName": "trans should work with misleading overloaded empty elements in components should render translated string"
+    },
+    {
+      "id": "runtime:fd5a18d107eaa055",
+      "file": "packages/i18next/upstream/test/trans.render.spec.jsx",
+      "fullName": "trans should work with self closing elements with react components should override component props with translation props (issue #1902)"
+    },
+    {
+      "id": "runtime:42bed495b0a82d9b",
+      "file": "packages/i18next/upstream/test/trans.render.spec.jsx",
+      "fullName": "trans should work with self closing elements with react components should render Link component children"
+    },
+    {
+      "id": "runtime:0a29ad39eaee6403",
+      "file": "packages/i18next/upstream/test/trans.render.spec.jsx",
+      "fullName": "trans should work with self closing elements with react components should render anchor tag children"
+    },
+    {
+      "id": "runtime:fdd4a0ce1eaae207",
+      "file": "packages/i18next/upstream/test/trans.render.spec.jsx",
+      "fullName": "trans should work with self closing elements with react components should render component children"
+    },
+    {
+      "id": "runtime:58daf73576c8dd94",
+      "file": "packages/i18next/upstream/test/trans.render.spec.jsx",
+      "fullName": "trans should work with selfclosing elements in components should render translated string"
+    },
+    {
+      "id": "runtime:7d4933c8bed0b84c",
+      "file": "packages/i18next/upstream/test/trans.render.spec.jsx",
+      "fullName": "trans should work with uppercase elements in components should render translated string"
+    },
+    {
+      "id": "runtime:abab343797df375d",
+      "file": "packages/i18next/upstream/test/trans.render.spec.jsx",
+      "fullName": "trans simple can use a different parent element"
+    },
+    {
+      "id": "runtime:c7ea5bb5f54c6f8f",
+      "file": "packages/i18next/upstream/test/trans.render.spec.jsx",
+      "fullName": "trans simple should render correct content"
+    },
+    {
+      "id": "runtime:54576a4990467e62",
+      "file": "packages/i18next/upstream/test/trans.render.spec.jsx",
+      "fullName": "trans simple using ns prop should render correct content"
+    },
+    {
+      "id": "runtime:d05de0411843a234",
+      "file": "packages/i18next/upstream/test/trans.render.spec.jsx",
+      "fullName": "trans simple with custom html tag should not skip custom html tags"
+    },
+    {
+      "id": "runtime:91656e38129b8c07",
+      "file": "packages/i18next/upstream/test/trans.render.spec.jsx",
+      "fullName": "trans simple with custom html tag should not skip custom html tags - empty node"
+    },
+    {
+      "id": "runtime:2653c125f5528729",
+      "file": "packages/i18next/upstream/test/trans.render.spec.jsx",
+      "fullName": "trans simple with custom html tag should skip custom html tags not listed in transKeepBasicHtmlNodesFor"
+    },
+    {
+      "id": "runtime:0bb16a5376a9e72f",
+      "file": "packages/i18next/upstream/test/trans.render.spec.jsx",
+      "fullName": "trans testTransKey1 plural should render correct content"
+    },
+    {
+      "id": "runtime:c54c475bc37a8b6c",
+      "file": "packages/i18next/upstream/test/trans.render.spec.jsx",
+      "fullName": "trans testTransKey1 singular should render correct content"
+    },
+    {
+      "id": "runtime:b2bc808559a58000",
+      "file": "packages/i18next/upstream/test/trans.render.spec.jsx",
+      "fullName": "trans testTransKey2 should render correct content"
+    },
+    {
+      "id": "runtime:b08094a4e927cae4",
+      "file": "packages/i18next/upstream/test/trans.render.spec.jsx",
+      "fullName": "trans testTransKey3 should render correct content"
+    },
+    {
+      "id": "runtime:e4ca2a19ee1305e0",
+      "file": "packages/i18next/upstream/test/trans.render.spec.jsx",
+      "fullName": "trans using translation prop should render correct content"
+    },
+    {
+      "id": "runtime:900b3f027a2efecb",
+      "file": "packages/i18next/upstream/test/trans.render.spec.jsx",
+      "fullName": "trans with context property but no children should render correct content"
+    },
+    {
+      "id": "runtime:6ce7292dd2ca9cf8",
+      "file": "packages/i18next/upstream/test/trans.render.spec.jsx",
+      "fullName": "trans with context property should render correct content"
+    },
+    {
+      "id": "runtime:877ac7cff7850261",
+      "file": "packages/i18next/upstream/test/trans.render.spec.jsx",
+      "fullName": "trans with context via tOptions should render correct content"
+    },
+    {
+      "id": "runtime:ac0696a0330f22f6",
+      "file": "packages/i18next/upstream/test/trans.render.spec.jsx",
+      "fullName": "trans with count and stuff inferred should render correct content"
+    },
+    {
+      "id": "runtime:7fed70352e184fc6",
+      "file": "packages/i18next/upstream/test/trans.render.spec.jsx",
+      "fullName": "trans with custom unescape should allow unescape override"
+    },
+    {
+      "id": "runtime:671f32f0522522f1",
+      "file": "packages/i18next/upstream/test/trans.render.spec.jsx",
+      "fullName": "trans with custom unescape should allow unescape override again"
+    },
+    {
+      "id": "runtime:4a4bc6c3b639985c",
+      "file": "packages/i18next/upstream/test/trans.render.spec.jsx",
+      "fullName": "trans with default props should override transDefaultProps"
+    },
+    {
+      "id": "runtime:4442239e2e583fd9",
+      "file": "packages/i18next/upstream/test/trans.render.spec.jsx",
+      "fullName": "trans with default props should use transDefaultProps for components"
+    },
+    {
+      "id": "runtime:b153a6e65a19c64b",
+      "file": "packages/i18next/upstream/test/trans.render.spec.jsx",
+      "fullName": "trans with default props should use transDefaultProps for shouldUnescape"
+    },
+    {
+      "id": "runtime:e3cf814b073ade6b",
+      "file": "packages/i18next/upstream/test/trans.render.spec.jsx",
+      "fullName": "trans with default props should use transDefaultProps for tOptions"
+    },
+    {
+      "id": "runtime:24d731e0671c2671",
+      "file": "packages/i18next/upstream/test/trans.render.spec.jsx",
+      "fullName": "trans with default props should use transDefaultProps for values"
+    },
+    {
+      "id": "runtime:a02e2b4d6237115a",
+      "file": "packages/i18next/upstream/test/trans.render.spec.jsx",
+      "fullName": "trans with defaults (via tOptions) property and no children should render correct content"
+    },
+    {
+      "id": "runtime:60885428a79f2bf9",
+      "file": "packages/i18next/upstream/test/trans.render.spec.jsx",
+      "fullName": "trans with defaults property and children should render correct content"
+    },
+    {
+      "id": "runtime:75c95572793072d9",
+      "file": "packages/i18next/upstream/test/trans.render.spec.jsx",
+      "fullName": "trans with defaults property and no children should render correct content"
+    },
+    {
+      "id": "runtime:ec68a339c32b53bf",
+      "file": "packages/i18next/upstream/test/trans.render.spec.jsx",
+      "fullName": "trans with different context property but no children should render correct content"
+    },
+    {
+      "id": "runtime:55493bdaa9a153b7",
+      "file": "packages/i18next/upstream/test/trans.render.spec.jsx",
+      "fullName": "trans with empty content should render an empty string"
+    },
+    {
+      "id": "runtime:a9eea8097a6c883f",
+      "file": "packages/i18next/upstream/test/trans.render.spec.jsx",
+      "fullName": "trans with formatting should render correct content"
+    },
+    {
+      "id": "runtime:cf10ae090ae1b051",
+      "file": "packages/i18next/upstream/test/trans.render.spec.jsx",
+      "fullName": "trans with formatting with alwaysFormat should render correct content"
+    },
+    {
+      "id": "runtime:b4d7a7f2cf22f99f",
+      "file": "packages/i18next/upstream/test/trans.render.spec.jsx",
+      "fullName": "trans with nesting $t() and interpolation should render correct content"
+    },
+    {
+      "id": "runtime:8270d411de504169",
+      "file": "packages/i18next/upstream/test/trans.render.spec.jsx",
+      "fullName": "trans with nesting $t() should render correct content"
+    },
+    {
+      "id": "runtime:d8ab8031a581d407",
+      "file": "packages/i18next/upstream/test/trans.render.spec.jsx",
+      "fullName": "trans with null child should ignore the null child and render correct content"
+    },
+    {
+      "id": "runtime:4567896cd09cb434",
+      "file": "packages/i18next/upstream/test/trans.render.spec.jsx",
+      "fullName": "trans with only content from translation file - no children should render translated string"
+    },
+    {
+      "id": "runtime:09150c342d1d31a0",
+      "file": "packages/i18next/upstream/test/trans.render.spec.jsx",
+      "fullName": "trans with only html content from translation file - no children should render translated string"
+    },
+    {
+      "id": "runtime:6839b3706ce4ef34",
+      "file": "packages/i18next/upstream/test/trans.render.spec.jsx",
+      "fullName": "trans with t as prop should not pass t to HTML element"
+    },
+    {
+      "id": "runtime:00024ebb60b4c2fe",
+      "file": "packages/i18next/upstream/test/trans.render.spec.jsx",
+      "fullName": "trans with t as prop should use props t"
+    },
+    {
+      "id": "runtime:d65b0ec79fe9fe73",
+      "file": "packages/i18next/upstream/test/trans.render.spec.jsx",
+      "fullName": "trans with undefined context property but no children should render correct content"
+    },
+    {
+      "id": "runtime:62cf765389eb4d8e",
+      "file": "packages/i18next/upstream/test/trans.render.spec.jsx",
+      "fullName": "trans with undefined context property should render correct content"
+    },
+    {
+      "id": "runtime:ae38432fde957565",
+      "file": "packages/i18next/upstream/test/trans.render.spec.jsx",
+      "fullName": "trans with wrapTextNodes should wrap text nodes accordingly"
+    },
+    {
+      "id": "runtime:7d2a9b113c507385",
+      "file": "packages/i18next/upstream/test/unescape.spec.js",
+      "fullName": "unescape should unescape \"&#160;\" to \" \""
+    },
+    {
+      "id": "runtime:5e145fc22ad25b9f",
+      "file": "packages/i18next/upstream/test/unescape.spec.js",
+      "fullName": "unescape should unescape \"&#169;\" to \"©\""
+    },
+    {
+      "id": "runtime:738c0501fb504e19",
+      "file": "packages/i18next/upstream/test/unescape.spec.js",
+      "fullName": "unescape should unescape \"&#174;\" to \"®\""
+    },
+    {
+      "id": "runtime:00d866c343bf2099",
+      "file": "packages/i18next/upstream/test/unescape.spec.js",
+      "fullName": "unescape should unescape \"&#34;\" to \"\"\""
+    },
+    {
+      "id": "runtime:8d936bd940ed3521",
+      "file": "packages/i18next/upstream/test/unescape.spec.js",
+      "fullName": "unescape should unescape \"&#38;\" to \"&\""
+    },
+    {
+      "id": "runtime:8e26be6b49f7bbf7",
+      "file": "packages/i18next/upstream/test/unescape.spec.js",
+      "fullName": "unescape should unescape \"&#39;\" to \"'\""
+    },
+    {
+      "id": "runtime:4a0362e0605925ba",
+      "file": "packages/i18next/upstream/test/unescape.spec.js",
+      "fullName": "unescape should unescape \"&#47;\" to \"/\""
+    },
+    {
+      "id": "runtime:4117398cbf0c90d7",
+      "file": "packages/i18next/upstream/test/unescape.spec.js",
+      "fullName": "unescape should unescape \"&#60;\" to \"<\""
+    },
+    {
+      "id": "runtime:933d9ebbe706154a",
+      "file": "packages/i18next/upstream/test/unescape.spec.js",
+      "fullName": "unescape should unescape \"&#62;\" to \">\""
+    },
+    {
+      "id": "runtime:54c3940fd64d0155",
+      "file": "packages/i18next/upstream/test/unescape.spec.js",
+      "fullName": "unescape should unescape \"&#8230;\" to \"…\""
+    },
+    {
+      "id": "runtime:91b6409586bf430d",
+      "file": "packages/i18next/upstream/test/unescape.spec.js",
+      "fullName": "unescape should unescape \"&#x2F;\" to \"/\""
+    },
+    {
+      "id": "runtime:f1f5b328fe65fbb6",
+      "file": "packages/i18next/upstream/test/unescape.spec.js",
+      "fullName": "unescape should unescape \"&amp;\" to \"&\""
+    },
+    {
+      "id": "runtime:4282cbd29815fcaa",
+      "file": "packages/i18next/upstream/test/unescape.spec.js",
+      "fullName": "unescape should unescape \"&apos;\" to \"'\""
+    },
+    {
+      "id": "runtime:7933594878d65b18",
+      "file": "packages/i18next/upstream/test/unescape.spec.js",
+      "fullName": "unescape should unescape \"&copy;\" to \"©\""
+    },
+    {
+      "id": "runtime:d6865c6d04b5d48b",
+      "file": "packages/i18next/upstream/test/unescape.spec.js",
+      "fullName": "unescape should unescape \"&gt;\" to \">\""
+    },
+    {
+      "id": "runtime:371fdf4c8174c532",
+      "file": "packages/i18next/upstream/test/unescape.spec.js",
+      "fullName": "unescape should unescape \"&hellip;\" to \"…\""
+    },
+    {
+      "id": "runtime:567773556a2cfc2d",
+      "file": "packages/i18next/upstream/test/unescape.spec.js",
+      "fullName": "unescape should unescape \"&lt;\" to \"<\""
+    },
+    {
+      "id": "runtime:85e6cd4eed4b40f2",
+      "file": "packages/i18next/upstream/test/unescape.spec.js",
+      "fullName": "unescape should unescape \"&nbsp;\" to \" \""
+    },
+    {
+      "id": "runtime:f2d5ad5fbdebff01",
+      "file": "packages/i18next/upstream/test/unescape.spec.js",
+      "fullName": "unescape should unescape \"&quot;\" to \"\"\""
+    },
+    {
+      "id": "runtime:53fbf75dacc34730",
+      "file": "packages/i18next/upstream/test/unescape.spec.js",
+      "fullName": "unescape should unescape \"&reg;\" to \"®\""
+    },
+    {
+      "id": "runtime:a0c51fbe54b30b88",
+      "file": "packages/i18next/upstream/test/unescape.spec.js",
+      "fullName": "unescape should unescape long strings"
+    },
+    {
+      "id": "runtime:70bbce91abc799b0",
+      "file": "packages/i18next/upstream/test/useSSR.spec.js",
+      "fullName": "useSSR should not crash and warn when i18n exists but is not initialized"
+    },
+    {
+      "id": "runtime:ad19e918b33a8a4f",
+      "file": "packages/i18next/upstream/test/useSSR.spec.js",
+      "fullName": "useSSR should not crash and warn when i18n is not available"
+    },
+    {
+      "id": "runtime:739be1478e276b4f",
+      "file": "packages/i18next/upstream/test/useSSR.spec.js",
+      "fullName": "useSSR should set values"
+    },
+    {
+      "id": "runtime:0bfa10270c57bf24",
+      "file": "packages/i18next/upstream/test/useTranslation.advanced.spec.js",
+      "fullName": "useTranslation mounting and re-render should ensure t function is correct as soon as ready is true"
+    },
+    {
+      "id": "runtime:4cc3cdb71182c0ef",
+      "file": "packages/i18next/upstream/test/useTranslation.advanced.spec.js",
+      "fullName": "useTranslation mounting and re-render should handle i18n instance becoming available after initial mount"
+    },
+    {
+      "id": "runtime:998ddac5edd528b5",
+      "file": "packages/i18next/upstream/test/useTranslation.advanced.spec.js",
+      "fullName": "useTranslation mounting and re-render should return stable t function and result object across re-renders"
+    },
+    {
+      "id": "runtime:c50cacea6a69518e",
+      "file": "packages/i18next/upstream/test/useTranslation.bindI18nStore.spec.jsx",
+      "fullName": "useTranslation with bindI18nStore should correctly return the correct translation"
+    },
+    {
+      "id": "runtime:50c2ef5cf6909bcf",
+      "file": "packages/i18next/upstream/test/useTranslation.loading.spec.js",
+      "fullName": "useTranslation loading ns should return defaultValue if i18n instance not found"
+    },
+    {
+      "id": "runtime:5295c597453027cf",
+      "file": "packages/i18next/upstream/test/useTranslation.loading.spec.js",
+      "fullName": "useTranslation loading ns should wait for correct translation with suspense"
+    },
+    {
+      "id": "runtime:7605f7b3ce93a69e",
+      "file": "packages/i18next/upstream/test/useTranslation.loading.spec.js",
+      "fullName": "useTranslation loading ns should wait for correct translation without suspense"
+    },
+    {
+      "id": "runtime:720ce003c1179679",
+      "file": "packages/i18next/upstream/test/useTranslation.loadingLng.spec.js",
+      "fullName": "useTranslation loading ns with lng via props should correctly return and render correct translations in multiple useTranslation usages"
+    },
+    {
+      "id": "runtime:c05cc869a0ddc659",
+      "file": "packages/i18next/upstream/test/useTranslation.loadingLng.spec.js",
+      "fullName": "useTranslation loading ns with lng via props should return defaultValue if resources not yet loaded"
+    },
+    {
+      "id": "runtime:20f2318cf16822d6",
+      "file": "packages/i18next/upstream/test/useTranslation.loadingLng.spec.js",
+      "fullName": "useTranslation loading ns with lng via props should wait for correct translation with suspense"
+    },
+    {
+      "id": "runtime:636f230f5f5a6c20",
+      "file": "packages/i18next/upstream/test/useTranslation.loadingLng.spec.js",
+      "fullName": "useTranslation loading ns with lng via props should wait for correct translation without suspense"
+    },
+    {
+      "id": "runtime:bd09e3abfd39557e",
+      "file": "packages/i18next/upstream/test/useTranslation.ready.spec.jsx",
+      "fullName": "useTranslation should ignore suspense if failed loading ns and has fallback failing too"
+    },
+    {
+      "id": "runtime:2a292bc4ac7699fc",
+      "file": "packages/i18next/upstream/test/useTranslation.ready.spec.jsx",
+      "fullName": "useTranslation should ignore suspense if failed loading ns and no fallback lng is defined"
+    },
+    {
+      "id": "runtime:88e69c4e81092e35",
+      "file": "packages/i18next/upstream/test/useTranslation.ready.spec.jsx",
+      "fullName": "useTranslation should ignore suspense if failed loading ns but has fallback loaded"
+    },
+    {
+      "id": "runtime:5e0d5252b60178f2",
+      "file": "packages/i18next/upstream/test/useTranslation.ready.spec.jsx",
+      "fullName": "useTranslation should ignore suspense if no backend defined"
+    },
+    {
+      "id": "runtime:774439c1c358f9ae",
+      "file": "packages/i18next/upstream/test/useTranslation.ready.spec.jsx",
+      "fullName": "useTranslation should ignore suspense if set useSuspense to false"
+    },
+    {
+      "id": "runtime:39be7939cfdbc865",
+      "file": "packages/i18next/upstream/test/useTranslation.ready.spec.jsx",
+      "fullName": "useTranslation should not warn when t is called and ready is true"
+    },
+    {
+      "id": "runtime:63b6b07dd874ebd2",
+      "file": "packages/i18next/upstream/test/useTranslation.ready.spec.jsx",
+      "fullName": "useTranslation should not warn when using suspense (default)"
+    },
+    {
+      "id": "runtime:59c1eba0247c1285",
+      "file": "packages/i18next/upstream/test/useTranslation.ready.spec.jsx",
+      "fullName": "useTranslation should render correct content if ready (having all ns)"
+    },
+    {
+      "id": "runtime:d64db0c8b3fffcee",
+      "file": "packages/i18next/upstream/test/useTranslation.ready.spec.jsx",
+      "fullName": "useTranslation should render suspense if not ready (having not all ns)"
+    },
+    {
+      "id": "runtime:ce3beb211d4f9b4f",
+      "file": "packages/i18next/upstream/test/useTranslation.ready.spec.jsx",
+      "fullName": "useTranslation should warn when t is called before ready with useSuspense false"
+    },
+    {
+      "id": "runtime:201f5e308ca1d96f",
+      "file": "packages/i18next/upstream/test/useTranslation.spec.jsx",
+      "fullName": "useTranslation array should render correct content"
+    },
+    {
+      "id": "runtime:b108c72b890135a6",
+      "file": "packages/i18next/upstream/test/useTranslation.spec.jsx",
+      "fullName": "useTranslation default namespace from context should render content fallback"
+    },
+    {
+      "id": "runtime:81c3dfa02b916d6e",
+      "file": "packages/i18next/upstream/test/useTranslation.spec.jsx",
+      "fullName": "useTranslation deprecated wait option should warn when using deprecated wait option"
+    },
+    {
+      "id": "runtime:4320118fe63be5ff",
+      "file": "packages/i18next/upstream/test/useTranslation.spec.jsx",
+      "fullName": "useTranslation few namespaces fallback mode should render correct content"
+    },
+    {
+      "id": "runtime:d17f5aacf4c55305",
+      "file": "packages/i18next/upstream/test/useTranslation.spec.jsx",
+      "fullName": "useTranslation few namespaces hook destructured values are expected types"
+    },
+    {
+      "id": "runtime:1e55afeb796c03fb",
+      "file": "packages/i18next/upstream/test/useTranslation.spec.jsx",
+      "fullName": "useTranslation few namespaces selector with secondary namespace prefix (no nsMode: fallback) should keep non-selector resolution isolated to the primary ns"
+    },
+    {
+      "id": "runtime:ebb7ebf804a11fd5",
+      "file": "packages/i18next/upstream/test/useTranslation.spec.jsx",
+      "fullName": "useTranslation few namespaces selector with secondary namespace prefix (no nsMode: fallback) should resolve a selector path whose first segment is a secondary namespace"
+    },
+    {
+      "id": "runtime:382b0e789fd466b9",
+      "file": "packages/i18next/upstream/test/useTranslation.spec.jsx",
+      "fullName": "useTranslation few namespaces should render content fallback"
+    },
+    {
+      "id": "runtime:058543e03eb3579e",
+      "file": "packages/i18next/upstream/test/useTranslation.spec.jsx",
+      "fullName": "useTranslation key prefix should apply keyPrefix and reset it once changed"
+    },
+    {
+      "id": "runtime:55dbc111da926ac3",
+      "file": "packages/i18next/upstream/test/useTranslation.spec.jsx",
+      "fullName": "useTranslation object should render correct content"
+    },
+    {
+      "id": "runtime:0132784ce9f486ce",
+      "file": "packages/i18next/upstream/test/useTranslation.spec.jsx",
+      "fullName": "useTranslation proper object-equality of returned t function should refresh t upon i18n.changeLanguage"
+    },
+    {
+      "id": "runtime:c35ebd82a57ca42d",
+      "file": "packages/i18next/upstream/test/useTranslation.spec.jsx",
+      "fullName": "useTranslation replacing i18n instance in provider should render correct content"
+    },
+    {
+      "id": "runtime:f5ac806139811fe1",
+      "file": "packages/i18next/upstream/test/useTranslation.spec.jsx",
+      "fullName": "useTranslation should not trigger loadNamespaces on every render if namespaces array is unstable (inline)"
+    },
+    {
+      "id": "runtime:45364470a6ac5224",
+      "file": "packages/i18next/upstream/test/useTranslation.spec.jsx",
+      "fullName": "useTranslation useTranslation __original safety does not throw when the source i18n has a non-configurable __original property"
+    },
+    {
+      "id": "runtime:4f3f3fd2d53f86c7",
+      "file": "packages/i18next/upstream/test/useTranslation.spec.jsx",
+      "fullName": "useTranslation useTranslation language wrapper identity only replaces returned i18n wrapper when language actually changes"
+    },
+    {
+      "id": "runtime:ce7c2d5bc12f4f70",
+      "file": "packages/i18next/upstream/test/useTranslation.spec.jsx",
+      "fullName": "useTranslation useTranslation language wrapper identity replaces the wrapper when only resolvedLanguage changes"
+    },
+    {
+      "id": "runtime:be8e2b3880d44627",
+      "file": "packages/i18next/upstream/test/useTranslation.spec.jsx",
+      "fullName": "useTranslation with lng prop should not fail when passing bindI18n: false or undefined"
+    },
+    {
+      "id": "runtime:123ec8ef7e82d9d7",
+      "file": "packages/i18next/upstream/test/useTranslation.spec.jsx",
+      "fullName": "useTranslation with lng prop should render correct content"
+    },
+    {
+      "id": "runtime:1e1a1dbf4d9eb8e9",
+      "file": "packages/i18next/upstream/test/useTranslation.spec.jsx",
+      "fullName": "useTranslation without i18next instance handling gracefully should render content fallback"
+    },
+    {
+      "id": "runtime:f44807f3c5d50dd0",
+      "file": "packages/i18next/upstream/test/useTranslation.spec.jsx",
+      "fullName": "useTranslation without i18next instance handling gracefully should return empty string for a selector function when not ready"
+    },
+    {
+      "id": "runtime:060a43dcbbebc9dc",
+      "file": "packages/i18next/upstream/test/useTranslation.spec.jsx",
+      "fullName": "useTranslation without i18next instance handling gracefully should return empty string for an array of selector functions when not ready"
+    },
+    {
+      "id": "runtime:0b921f12ee22238b",
+      "file": "packages/i18next/upstream/test/useTranslation.spec.jsx",
+      "fullName": "useTranslation without i18next instance handling gracefully should still honour defaultValue with a selector when not ready"
+    },
+    {
+      "id": "runtime:78863a12f6a011c6",
+      "file": "packages/i18next/upstream/test/useTranslation.usedNamespaces.spec.js",
+      "fullName": "useTranslation should render correct content if ready (having all ns)"
+    },
+    {
+      "id": "runtime:c8352bcfff672b50",
+      "file": "packages/i18next/upstream/test/utils.spec.js",
+      "fullName": "hasLoadedNamespace should handle empty languages array"
+    },
+    {
+      "id": "runtime:56886ddae520fb15",
+      "file": "packages/i18next/upstream/test/utils.spec.js",
+      "fullName": "hasLoadedNamespace should handle language changing check"
+    },
+    {
+      "id": "runtime:67d958de0b667b0d",
+      "file": "packages/i18next/upstream/test/utils.spec.js",
+      "fullName": "hasLoadedNamespace should handle when languages is undefined"
+    },
+    {
+      "id": "runtime:031bc6297513077d",
+      "file": "packages/i18next/upstream/test/utils.spec.js",
+      "fullName": "isObject should return false for non-objects, testing 'string'"
+    },
+    {
+      "id": "runtime:9e0f88036fd50c84",
+      "file": "packages/i18next/upstream/test/utils.spec.js",
+      "fullName": "isObject should return false for non-objects, testing 1"
+    },
+    {
+      "id": "runtime:66bc9cd2239c06bc",
+      "file": "packages/i18next/upstream/test/utils.spec.js",
+      "fullName": "isObject should return false for non-objects, testing [Function]"
+    },
+    {
+      "id": "runtime:9871bfeb8b22c470",
+      "file": "packages/i18next/upstream/test/utils.spec.js",
+      "fullName": "isObject should return false for non-objects, testing null"
+    },
+    {
+      "id": "runtime:22e4ae6c1adb55cb",
+      "file": "packages/i18next/upstream/test/utils.spec.js",
+      "fullName": "isObject should return false for non-objects, testing undefined"
+    },
+    {
+      "id": "runtime:6242bcf03060dcb0",
+      "file": "packages/i18next/upstream/test/utils.spec.js",
+      "fullName": "isObject should return true for objects, testing []"
+    },
+    {
+      "id": "runtime:00ca1ca86d38d2d8",
+      "file": "packages/i18next/upstream/test/utils.spec.js",
+      "fullName": "isObject should return true for objects, testing { key: 'value' }"
+    },
+    {
+      "id": "runtime:12b7907a5a6ab950",
+      "file": "packages/i18next/upstream/test/utils.spec.js",
+      "fullName": "isObject should return true for objects, testing {}"
+    },
+    {
+      "id": "runtime:322aba741696e027",
+      "file": "packages/i18next/upstream/test/utils.spec.js",
+      "fullName": "isString should return false for non-strings, testing 1"
+    },
+    {
+      "id": "runtime:92d1c8e281ca6094",
+      "file": "packages/i18next/upstream/test/utils.spec.js",
+      "fullName": "isString should return false for non-strings, testing [Function]"
+    },
+    {
+      "id": "runtime:78032d0c3317b7a8",
+      "file": "packages/i18next/upstream/test/utils.spec.js",
+      "fullName": "isString should return false for non-strings, testing []"
+    },
+    {
+      "id": "runtime:cc040b550f6d391a",
+      "file": "packages/i18next/upstream/test/utils.spec.js",
+      "fullName": "isString should return false for non-strings, testing null"
+    },
+    {
+      "id": "runtime:5f9fc788a1e467fc",
+      "file": "packages/i18next/upstream/test/utils.spec.js",
+      "fullName": "isString should return false for non-strings, testing undefined"
+    },
+    {
+      "id": "runtime:28c4a8e6c50ed6bc",
+      "file": "packages/i18next/upstream/test/utils.spec.js",
+      "fullName": "isString should return false for non-strings, testing {}"
+    },
+    {
+      "id": "runtime:3dfb5bea7d1a0752",
+      "file": "packages/i18next/upstream/test/utils.spec.js",
+      "fullName": "isString should return true for strings"
+    },
+    {
+      "id": "runtime:40096a545a70a068",
+      "file": "packages/i18next/upstream/test/utils.spec.js",
+      "fullName": "warn should use console.warn when i18n logger is not available"
+    },
+    {
+      "id": "runtime:df842150c3c6908a",
+      "file": "packages/i18next/upstream/test/withSSR.spec.jsx",
+      "fullName": "withSSR should export wrapped component"
+    },
+    {
+      "id": "runtime:974bc9b3905447c8",
+      "file": "packages/i18next/upstream/test/withSSR.spec.jsx",
+      "fullName": "withSSR should get initialProps"
+    },
+    {
+      "id": "runtime:c2db0f17619fe23a",
+      "file": "packages/i18next/upstream/test/withSSR.spec.jsx",
+      "fullName": "withSSR should set values"
+    },
+    {
+      "id": "runtime:d8e11de4be5f0183",
+      "file": "packages/i18next/upstream/test/withTranslation.keyPrefix.spec.jsx",
+      "fullName": "withTranslation should render correct content"
+    },
+    {
+      "id": "runtime:5a7c1bfe5db7724a",
+      "file": "packages/i18next/upstream/test/withTranslation.spec.jsx",
+      "fullName": "withTranslation should export wrapped component"
+    },
+    {
+      "id": "runtime:890ea681eb796177",
+      "file": "packages/i18next/upstream/test/withTranslation.spec.jsx",
+      "fullName": "withTranslation should has ref"
+    },
+    {
+      "id": "runtime:c947b47e2148d807",
+      "file": "packages/i18next/upstream/test/withTranslation.spec.jsx",
+      "fullName": "withTranslation should render correct content"
+    }
+  ],
+  "snapshots": 116
+}

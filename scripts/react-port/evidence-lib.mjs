@@ -12,8 +12,11 @@ import { hasObservablePackageTests } from './package-tests-lib.mjs';
 import { octanePeerRangeFor } from '../workspace-packages.mjs';
 import {
 	assertBindingSurfacePolicy,
+	assertUpstreamLockScope,
 	requiresUpstreamEvidence,
 } from '../binding-surface-policy.mjs';
+import { confinedRepositoryPath } from '../repository-files.mjs';
+import { validateUpstreamLock, verifyPristineTree } from './materialize-lib.mjs';
 
 const EVIDENCE_STATUSES = new Set(['required', 'passed', 'failed', 'blocked', 'inapplicable']);
 const CROSSWALK_CLASSIFICATIONS = new Set([
@@ -510,6 +513,35 @@ function isConfinedExportTarget(packageDirectory, target) {
 	}
 }
 
+function hasPinnedCopiedIdentity(packageDirectory, policy, identity) {
+	if (
+		!policy?.valid ||
+		!policy.surfaces.some(
+			(surface) =>
+				surface.ownership === 'copied' &&
+				surface.dependency.package === identity.packageName &&
+				surface.dependency.version === identity.version,
+		)
+	)
+		return false;
+	try {
+		const lock = validateUpstreamLock(
+			JSON.parse(
+				readFileSync(confinedRepositoryPath(packageDirectory, 'audit/upstream.lock.json'), 'utf8'),
+			),
+		);
+		if (fingerprint(lock.identity) !== fingerprint(identity)) return false;
+		assertUpstreamLockScope(policy, lock);
+		const tree = verifyPristineTree(
+			lock,
+			confinedRepositoryPath(packageDirectory, 'upstream', 'directory'),
+		);
+		return Object.values(tree).every((files) => files.length === 0);
+	} catch {
+		return false;
+	}
+}
+
 export function inspectBindingPackage(
 	packageDirectory,
 	{
@@ -533,11 +565,10 @@ export function inspectBindingPackage(
 	const manifest = readJson(path.join(packageDirectory, 'package.json'), issues, 'package.json');
 	const status = readJson(path.join(packageDirectory, 'status.json'), issues, 'status.json');
 	let copiedEvidence = true;
+	let surfacePolicy;
 	try {
-		copiedEvidence = requiresUpstreamEvidence(
-			assertBindingSurfacePolicy(packageDirectory, { sourceLedger }),
-			identity.packageName,
-		);
+		surfacePolicy = assertBindingSurfacePolicy(packageDirectory, { sourceLedger });
+		copiedEvidence = requiresUpstreamEvidence(surfacePolicy, identity.packageName);
 	} catch (error) {
 		issues.push(error.message);
 	}
@@ -614,8 +645,9 @@ export function inspectBindingPackage(
 	}
 	if (status) {
 		if (
-			status.upstream?.package !== identity.packageName ||
-			status.upstream?.version !== identity.version
+			(status.upstream?.package !== identity.packageName ||
+				status.upstream?.version !== identity.version) &&
+			!hasPinnedCopiedIdentity(packageDirectory, surfacePolicy, identity)
 		) {
 			issues.push('status.json upstream identity does not match preflight');
 		}

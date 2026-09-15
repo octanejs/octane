@@ -1,0 +1,30 @@
+diff --git a/tests/upstream/_app/setValueWithSchema.tsx b/tests/upstream/_app/setValueWithSchema.tsx
+--- a/tests/upstream/_app/setValueWithSchema.tsx
++++ b/tests/upstream/_app/setValueWithSchema.tsx
+@@ -50,7 +50,7 @@ const SetValueWithSchema: React.FC = () => {
+       <input
+         name="firstName"
+         placeholder="firstName"
+-        onChange={(e) => {
++        onInput={(e) => {
+           setValue('firstName', e.target.value, {
+             shouldValidate: true,
+             shouldDirty: true,
+@@ -62,7 +62,7 @@ const SetValueWithSchema: React.FC = () => {
+       <input
+         name="lastName"
+         placeholder="lastName"
+-        onChange={(e) => {
++        onInput={(e) => {
+           setValue('lastName', e.target.value, {
+             shouldValidate: true,
+             shouldDirty: true,
+@@ -73,7 +73,7 @@ const SetValueWithSchema: React.FC = () => {
+ 
+       <input
+         {...register('age')}
+-        onChange={(e) => {
++        onInput={(e) => {
+           setValue('age', e.target.value, {
+             shouldValidate: true,
+             shouldDirty: true,

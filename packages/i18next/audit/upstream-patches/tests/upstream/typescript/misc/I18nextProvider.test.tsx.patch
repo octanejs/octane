@@ -1,0 +1,28 @@
+diff --git a/tests/upstream/typescript/misc/I18nextProvider.test.tsx b/tests/upstream/typescript/misc/I18nextProvider.test.tsx
+--- a/tests/upstream/typescript/misc/I18nextProvider.test.tsx
++++ b/tests/upstream/typescript/misc/I18nextProvider.test.tsx
+@@ -4,17 +4,18 @@ import { I18nextProvider } from '@octanejs/i18next';
+ 
+ describe('<I18nextProvider />', () => {
+   it('basic usage', () => {
+-    expectTypeOf(I18nextProvider).toBeCallableWith({
+-      i18n: i18next,
+-      children: 'Foo',
+-    });
++    // OCTANE DIVERGENCE[component-signature]: Octane component bodies are
++    // (props, scope, extra); assert the props parameter accepts the object.
++    expectTypeOf({ i18n: i18next, children: 'Foo' }).toExtend<
++      Parameters<typeof I18nextProvider>[0]
++    >();
+   });
+ 
+   it('should accept `defaultNS`', () => {
+-    expectTypeOf(I18nextProvider).toBeCallableWith({
++    expectTypeOf({
+       i18n: i18next,
+       defaultNS: 'defaultNS',
+       children: 'Foo',
+-    });
++    }).toExtend<Parameters<typeof I18nextProvider>[0]>();
+   });
+ });

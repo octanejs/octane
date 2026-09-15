@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "upstreamRoot": "packages/intersection-observer/audit/type-probes",
-  "adaptedRoot": "packages/intersection-observer/typetests",
+  "adaptedRoot": "packages/intersection-observer/typetests/paired",
   "inventories": {
     "upstream": "packages/intersection-observer/audit/pristine-types.json",
     "adapted": "packages/intersection-observer/audit/adapted-types.json"
@@ -9,13 +9,13 @@
   "lanes": {
     "pristine": {
       "compiler": "tsc",
-      "project": "packages/intersection-observer/audit/type-probes/tsconfig.pristine.json",
-      "sourcePolicy": "repo-authored React declaration probes against vendored react-intersection-observer 10.1.0"
+      "project": "packages/intersection-observer/typetests/tsconfig.pristine.json",
+      "sourcePolicy": "All byte-exact 11.0.1 source and test files, strict published declaration contracts, and paired repository-authored probes."
     },
     "adapted": {
       "compiler": "tsrx-tsc",
-      "project": "packages/intersection-observer/typetests/tsconfig.json",
-      "sourcePolicy": "structurally equivalent Octane public probes after permitted transformations"
+      "project": "packages/intersection-observer/typetests/tsconfig.adapted.json",
+      "sourcePolicy": "Strict authored source, public export contracts and paired repository-authored probes after permitted import transformations."
     }
   },
   "permittedTransformations": [

@@ -1,4 +1,4 @@
-// Vendored from react-hook-form@7.81.0 src/useWatch.ts (octane port).
+// Adapted from react-hook-form@7.88.0 src/useWatch.ts for Octane.
 import { useState, useRef, useEffect, useMemo, useCallback } from 'octane';
 
 import generateWatchOutput from './logic/generateWatchOutput';
@@ -15,28 +15,9 @@ import type {
 } from './types';
 import { useFormControlContext } from './useFormControlContext';
 import { useIsomorphicLayoutEffect } from './useIsomorphicLayoutEffect';
+import { useResyncOnReconnect } from './useResyncOnReconnect';
 
-/**
- * Subscribe to the entire form values change and re-render at the hook level.
- *
- * @remarks
- *
- * [API](https://react-hook-form.com/docs/usewatch) • [Demo](https://codesandbox.io/s/react-hook-form-v7-ts-usewatch-h9i5e)
- *
- * @param props - defaultValue, disable subscription and match exact name.
- *
- * @example
- * ```tsx
- * const { control } = useForm();
- * const values = useWatch({
- *   control,
- *   defaultValue: {
- *     name: "data"
- *   },
- *   exact: false,
- * })
- * ```
- */
+/** Watches the entire form; re-renders when any value changes. */
 export function useWatch<
 	TFieldValues extends FieldValues = FieldValues,
 	TTransformedValues = TFieldValues,
@@ -48,26 +29,7 @@ export function useWatch<
 	exact?: boolean;
 	compute?: undefined;
 }): DeepPartialSkipArrayKey<TFieldValues>;
-/**
- * Custom hook to subscribe to field change and isolate re-rendering at the component level.
- *
- * @remarks
- *
- * [API](https://react-hook-form.com/docs/usewatch) • [Demo](https://codesandbox.io/s/react-hook-form-v7-ts-usewatch-h9i5e)
- *
- * @param props - defaultValue, disable subscription and match exact name.
- *
- * @example
- * ```tsx
- * const { control } = useForm();
- * const values = useWatch({
- *   control,
- *   name: "fieldA",
- *   defaultValue: "default value",
- *   exact: false,
- * })
- * ```
- */
+/** Watches a single field by name. */
 export function useWatch<
 	TFieldValues extends FieldValues = FieldValues,
 	TFieldName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>,
@@ -80,24 +42,7 @@ export function useWatch<
 	exact?: boolean;
 	compute?: undefined;
 }): FieldPathValue<TFieldValues, TFieldName>;
-/**
- * Custom hook to subscribe to field change and compute function to produce state update
- *
- * @remarks
- *
- * [API](https://react-hook-form.com/docs/usewatch)
- *
- * @param props - defaultValue, disable subscription and match exact name.
- *
- * @example
- * ```tsx
- * const { control } = useForm();
- * const values = useWatch({
- *   control,
- *   compute: (formValues) => formValues.fieldA
- * })
- * ```
- */
+/** Watches the entire form and derives a value via `compute`. */
 export function useWatch<
 	TFieldValues extends FieldValues = FieldValues,
 	TTransformedValues = TFieldValues,
@@ -110,27 +55,7 @@ export function useWatch<
 	exact?: boolean;
 	compute: (formValues: TFieldValues) => TComputeValue;
 }): TComputeValue;
-/**
- * Custom hook to subscribe to field change and compute function to produce state update
- *
- * @remarks
- *
- * [API](https://react-hook-form.com/docs/usewatch)
- *
- * @param props - defaultValue, disable subscription and match exact name.
- *
- * @example
- * ```tsx
- * const { control } = useForm();
- * const values = useWatch({
- *   control,
- *   name: "fieldA",
- *   defaultValue: "default value",
- *   exact: false,
- *   compute: (fieldValue) => fieldValue === "data" ? fieldValue : null,
- * })
- * ```
- */
+/** Watches a single field and derives a value via `compute`. */
 export function useWatch<
 	TFieldValues extends FieldValues = FieldValues,
 	TFieldName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>,
@@ -144,29 +69,7 @@ export function useWatch<
 	exact?: boolean;
 	compute: (fieldValue: FieldPathValue<TFieldValues, TFieldName>) => TComputeValue;
 }): TComputeValue;
-/**
- * Custom hook to subscribe to field change and isolate re-rendering at the component level.
- *
- * @remarks
- *
- * [API](https://react-hook-form.com/docs/usewatch) • [Demo](https://codesandbox.io/s/react-hook-form-v7-ts-usewatch-h9i5e)
- *
- * @param props - defaultValue, disable subscription and match exact name.
- *
- * @example
- * ```tsx
- * const { control } = useForm();
- * const values = useWatch({
- *   control,
- *   name: ["fieldA", "fieldB"],
- *   defaultValue: {
- *     fieldA: "data",
- *     fieldB: "data"
- *   },
- *   exact: false,
- * })
- * ```
- */
+/** Watches multiple fields by name array. */
 export function useWatch<
 	TFieldValues extends FieldValues = FieldValues,
 	TFieldNames extends readonly FieldPath<TFieldValues>[] = readonly FieldPath<TFieldValues>[],
@@ -179,30 +82,7 @@ export function useWatch<
 	exact?: boolean;
 	compute?: undefined;
 }): FieldPathValues<TFieldValues, TFieldNames>;
-/**
- * Custom hook to subscribe to field change and compute function to produce state update
- *
- * @remarks
- *
- * [API](https://react-hook-form.com/docs/usewatch)
- *
- * @param props - defaultValue, disable subscription and match exact name.
- *
- * @example
- * ```tsx
- * const { control } = useForm();
- * const values = useWatch({
- *   control,
- *   name: ["fieldA", "fieldB"],
- *   defaultValue: {
- *     fieldA: "data",
- *     fieldB: 0
- *   },
- *   compute: ([fieldAValue, fieldBValue]) => fieldB === 2 ? fieldA : null,
- *   exact: false,
- * })
- * ```
- */
+/** Watches multiple fields and derives a value via `compute`. */
 export function useWatch<
 	TFieldValues extends FieldValues = FieldValues,
 	TFieldNames extends readonly FieldPath<TFieldValues>[] = readonly FieldPath<TFieldValues>[],
@@ -216,36 +96,20 @@ export function useWatch<
 	exact?: boolean;
 	compute: (fieldValue: FieldPathValues<TFieldValues, TFieldNames>) => TComputeValue;
 }): TComputeValue;
-/**
- * Custom hook to subscribe to field change and isolate re-rendering at the component level.
- *
- * @remarks
- *
- * [API](https://react-hook-form.com/docs/usewatch) • [Demo](https://codesandbox.io/s/react-hook-form-v7-ts-usewatch-h9i5e)
- *
- * @example
- * ```tsx
- * // can skip passing down the control into useWatch if the form is wrapped with the FormProvider
- * const values = useWatch()
- * ```
- */
+/** Watches the entire form; reads `control` from `FormProvider` context. */
 export function useWatch<
 	TFieldValues extends FieldValues = FieldValues,
 >(): DeepPartialSkipArrayKey<TFieldValues>;
 /**
- * Custom hook to subscribe to field change and isolate re-rendering at the component level.
+ * Subscribes to field value changes and isolates re-renders to the hook level.
  *
- * @remarks
- *
- * [API](https://react-hook-form.com/docs/usewatch) • [Demo](https://codesandbox.io/s/react-hook-form-v7-ts-usewatch-h9i5e)
+ * @see [API](https://react-hook-form.com/docs/usewatch)
  *
  * @example
  * ```tsx
- * const { control } = useForm();
- * const values = useWatch({
- *   name: "fieldName"
- *   control,
- * })
+ * const email = useWatch({ control, name: "email" });
+ * const all   = useWatch({ control });
+ * const adult = useWatch({ control, name: "age", compute: (v) => v >= 18 });
  * ```
  */
 export function useWatch<TFieldValues extends FieldValues>(props?: UseWatchProps<TFieldValues>) {
@@ -253,21 +117,23 @@ export function useWatch<TFieldValues extends FieldValues>(props?: UseWatchProps
 	const { control = formControl, name, defaultValue, disabled, exact, compute } = props || {};
 	const _defaultValue = useRef(defaultValue);
 	const _compute = useRef(compute);
-	const _computeFormValues = useRef<undefined | unknown>(undefined);
 
 	const _prevControl = useRef(control);
 	const _prevName = useRef(name);
 
 	_compute.current = compute;
 
-	const [value, updateValue] = useState(() => {
+	const getInitialOutput = () => {
 		const defaultValue = control._getWatch(
 			name as InternalFieldName,
 			_defaultValue.current as DeepPartialSkipArrayKey<TFieldValues>,
 		);
 
 		return _compute.current ? _compute.current(defaultValue) : defaultValue;
-	});
+	};
+
+	const [value, updateValue] = useState(getInitialOutput);
+	const _computeFormValues = useRef<unknown>(value);
 
 	const getCurrentOutput = useCallback(
 		(values?: TFieldValues) => {
@@ -310,24 +176,45 @@ export function useWatch<TFieldValues extends FieldValues>(props?: UseWatchProps
 		[control._formValues, control._names, disabled, name],
 	);
 
+	const { resyncIfNeeded, snapshot } = useResyncOnReconnect<unknown>(getInitialOutput);
+
+	const _refreshValue = useRef(refreshValue);
+	_refreshValue.current = refreshValue;
+	const _getCurrentOutput = useRef(getCurrentOutput);
+	_getCurrentOutput.current = getCurrentOutput;
+
 	useIsomorphicLayoutEffect(() => {
 		if (_prevControl.current !== control || !deepEqual(_prevName.current, name)) {
 			_prevControl.current = control;
 			_prevName.current = name;
-			refreshValue();
+			_refreshValue.current();
+		} else {
+			resyncIfNeeded(
+				!disabled,
+				() => _getCurrentOutput.current(),
+				(currentValue) => {
+					updateValue(currentValue);
+					_computeFormValues.current = currentValue;
+				},
+			);
 		}
 
-		return control._subscribe({
+		const unsubscribe = control._subscribe({
 			name,
 			formState: {
 				values: true,
 			},
 			exact,
 			callback: (formState) => {
-				refreshValue(formState.values);
+				_refreshValue.current(formState.values);
 			},
 		});
-	}, [control, exact, name, refreshValue]);
+
+		return () => {
+			unsubscribe();
+			snapshot(!disabled, () => _getCurrentOutput.current());
+		};
+	}, [control, exact, name, disabled, resyncIfNeeded, snapshot]);
 
 	useEffect(() => control._removeUnmounted(), null);
 
@@ -339,18 +226,17 @@ export function useWatch<TFieldValues extends FieldValues>(props?: UseWatchProps
 	const controlChanged = _prevControl.current !== control;
 	const prevName = _prevName.current;
 
-	// Cache the computed output to avoid duplicate calls within the same render
-	// We include shouldReturnImmediate in deps to ensure proper recomputation
-	const computedOutput = useMemo(() => {
+	// `null`/`undefined` are valid watched values, so a boolean flag (rather
+	// than a sentinel return value) decides whether to return the freshly
+	// computed output instead of the possibly-stale state value.
+	const shouldReturnImmediate = useMemo(() => {
 		if (disabled) {
-			return null;
+			return false;
 		}
 
 		const nameChanged = !controlChanged && !deepEqual(prevName, name);
-		const shouldReturnImmediate = controlChanged || nameChanged;
+		return controlChanged || nameChanged;
+	}, [disabled, controlChanged, name, prevName]);
 
-		return shouldReturnImmediate ? getCurrentOutput() : null;
-	}, [disabled, controlChanged, name, prevName, getCurrentOutput]);
-
-	return computedOutput !== null ? computedOutput : value;
+	return shouldReturnImmediate ? getCurrentOutput() : value;
 }

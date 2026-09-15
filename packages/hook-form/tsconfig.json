@@ -13,8 +13,12 @@
     "strict": true,
     "jsx": "react-jsx",
     "jsxImportSource": "octane",
-    "allowImportingTsExtensions": true
+    "allowImportingTsExtensions": true,
+    "skipLibCheck": false
   },
   "include": ["./src/"],
-  "exclude": ["node_modules", "dist", "tests"]
+  "exclude": ["node_modules", "dist", "tests"],
+  "reactPortEvidence": {
+    "gate": "authored-source-types"
+  }
 }

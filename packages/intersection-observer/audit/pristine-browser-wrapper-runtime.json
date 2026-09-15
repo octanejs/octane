@@ -5,9 +5,9 @@
   "files": ["packages/intersection-observer/tests/upstream-browser-original.test.ts"],
   "tests": [
     {
-      "id": "runtime:e9dd4a88cd1a4a3c",
+      "id": "runtime:22dcb6ebafe52959",
       "file": "packages/intersection-observer/tests/upstream-browser-original.test.ts",
-      "fullName": "runs the pinned react-intersection-observer 10.1.0 browser suite unchanged"
+      "fullName": "runs the pinned react-intersection-observer 11.0.1 browser suite unchanged"
     }
   ],
   "snapshots": 0

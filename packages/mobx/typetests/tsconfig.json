@@ -1,15 +1,3 @@
 {
-  "compilerOptions": {
-    "strict": true,
-    "module": "esnext",
-    "target": "esnext",
-    "moduleResolution": "bundler",
-    "lib": ["dom", "dom.iterable", "esnext"],
-    "types": ["node"],
-    "noEmit": true,
-    "noErrorTruncation": true,
-    "noUnusedLocals": false,
-    "noUnusedParameters": false
-  },
-  "include": ["./**/*.test-d.ts"]
+  "extends": "./tsconfig.adapted.json"
 }

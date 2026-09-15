@@ -13,7 +13,7 @@ diff --git a/tests/upstream/useFieldArray/replace.test.tsx b/tests/upstream/useF
  
  describe('replace', () => {
    beforeEach(() => {
-@@ -322,7 +325,7 @@ describe('replace', () => {
+@@ -421,7 +424,7 @@ describe('replace', () => {
  
    describe('with resolver', () => {
      it('should not invoke resolver per register during replace, but run after replace completes', async () => {

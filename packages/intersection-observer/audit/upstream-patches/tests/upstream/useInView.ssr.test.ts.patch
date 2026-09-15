@@ -1,0 +1,13 @@
+diff --git a/tests/upstream/useInView.ssr.test.ts b/tests/upstream/useInView.ssr.test.ts
+--- a/tests/upstream/useInView.ssr.test.ts
++++ b/tests/upstream/useInView.ssr.test.ts
+@@ -11,7 +11,8 @@ test("useInView renders on the server without diagnostics", () => {
+       return createElement("div", { ref }, String(inView));
+     }
+ 
+-    expect(renderToString(createElement(CompatibilityFixture))).toContain(
++    // OCTANE DIVERGENCE[intersection-observer-ssr-result]: Octane exposes the rendered string as RenderResult.html.
++    expect(renderToString(createElement(CompatibilityFixture)).html).toContain(
+       ">false</div>",
+     );
+     expect(consoleError).not.toHaveBeenCalled();

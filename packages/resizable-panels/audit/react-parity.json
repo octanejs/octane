@@ -2,15 +2,18 @@
   "schemaVersion": 1,
   "provenance": {
     "repo": "https://github.com/bvaughn/react-resizable-panels.git",
-    "version": "4.12.2",
-    "commit": "a1eeb7aefdb024bb5879a323218e0ac05f77f28e",
+    "version": "4.12.4",
+    "commit": "152b1a8f856438c432b360a77a5afbdeb78782fb",
     "sourceRoot": "lib",
     "testRoot": "lib",
     "license": "MIT",
-    "integrity": "sha256:099742808fafbe3a0288d758271aaf1c35dc9b66ec85077e60f0861e58e89e61",
+    "integrity": "sha256:d6374b89cbce9a0f224f0f776642362de515a308df75bd23eb33e6fef23d2ab7",
     "verification": "verified"
   },
-  "upstreamSuites": { "runtime": "present", "types": "absent" },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "absent"
+  },
   "adaptedRoots": {
     "source": {
       "roots": ["packages/resizable-panels/src"],
@@ -24,8 +27,8 @@
     }
   },
   "adaptedRuntimeSummary": {
-    "inventoryEntries": 426,
-    "uniqueIdentities": 321,
+    "inventoryEntries": 439,
+    "uniqueIdentities": 334,
     "duplicateEntriesWithinLanes": 105,
     "identitiesSharedAcrossLanes": 0
   },
@@ -36,7 +39,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "59b5197a457d62d05aa8866334bc41567581c414b30452a047b00c020d587883"
+      "lockfileSha256": "86e22c8a3652c4663ce8e347d3769f0572c09a1d66c39ed789bd914709b53946"
     }
   },
   "lanes": [
@@ -56,17 +59,17 @@
         {
           "path": "packages/resizable-panels/audit/pristine-wrapper-runtime.json",
           "role": "support",
-          "sha256": "a890531ce4b2ef154e00c737ea5b391b050e419d397beb5ff95329d11d227460"
+          "sha256": "0aa3906de5cddd4b2ceb86741d6a732df1512107a362b8c56f6c0b4bd89ed810"
         },
         {
           "path": "packages/resizable-panels/audit/pristine-runtime.json",
           "role": "support",
-          "sha256": "8a8a18d3c833584f751e3b9409a526f88de0e6ed254a13fd1ac2e2598e40baca"
+          "sha256": "e6e8cb5435d51a442d5b0921ffe4eda3f54fd949cf66bb68d8e14f16df2f4da1"
         },
         {
           "path": "packages/resizable-panels/tests/upstream-original.test.ts",
           "role": "support",
-          "sha256": "f981eb2ba39b5317df5976d053fd1343d9e8e978410712c25397a2df01154252"
+          "sha256": "32a2051073feb335814865433c781016bb7146fd91dcbe4e1d81dfa4d910c793"
         },
         {
           "path": "packages/resizable-panels/vitest.pristine.config.ts",
@@ -81,7 +84,7 @@
         {
           "path": "packages/resizable-panels/audit/upstream.lock.json",
           "role": "support",
-          "sha256": "bfa1599818cbec9935885c99e761e6046cab000f0bef1b3bcef23ead3ed6c336"
+          "sha256": "1fefbced02dd198364673f72401a1e6ea709b377fd596ddc540921590b303aa9"
         }
       ]
     },
@@ -101,17 +104,17 @@
         {
           "path": "packages/resizable-panels/audit/adapted-runtime.json",
           "role": "support",
-          "sha256": "48645e0c48a70c39efebfb862c6b4574b8daf33e9993cc349047487957f6a132"
+          "sha256": "f4e550a127b2c5cc0bdfaa0b98950b75c284857f7cea8f92ea74b4f518075554"
         },
         {
           "path": "scripts/react-parity/react-resizable-panels-upstream-lib.mjs",
           "role": "support",
-          "sha256": "bae76fd4e3395e0ef59438312cd2e33e574891a31fca5a68564d2e447ef0481e"
+          "sha256": "b1ae5f763dc2e63e846d305535df2f9f9450c0a71415fbe8aa12bf11bb5ed2ff"
         },
         {
           "path": "packages/resizable-panels/audit/test-classifications.json",
           "role": "support",
-          "sha256": "038cf680c72dd6a796196b572bdc71ca93d2354f11fbef4c2dd0b68ac1a6a5a9"
+          "sha256": "b41ab33b1c36ec25b35cbbf723776c80d915fef4ce1ed52f6ab8041b82704872"
         },
         {
           "path": "packages/resizable-panels/audit/runtime-parity.json",
@@ -147,11 +150,11 @@
       "environment": "workspace-node",
       "project": "react-resizable-panels-pristine-types",
       "evidenceOrigin": "repo-authored",
-      "notes": "Pinned published React declaration probes with assertion-group inventory and negative controls.",
+      "notes": "Strict complete public contract against the authenticated npm declarations, with positive assertions for all 22 exports and negative controls. The pinned source has no separate upstream type-test registrations.",
       "execution": {
         "kind": "typescript",
         "compiler": "tsc",
-        "project": "packages/resizable-panels/audit/type-probes/tsconfig.pristine.json"
+        "project": "packages/resizable-panels/tsconfig.pristine.json"
       },
       "files": [
         {
@@ -179,7 +182,22 @@
         {
           "path": "packages/resizable-panels/audit/type-parity.json",
           "role": "support",
-          "sha256": "e8cb999a36d8c4116cbba0c6687edb521019691b8007902b6b69d2d9ad6398fd"
+          "sha256": "827b29f7f2e9d444a9b89e4f6e421b5265962dfabaaa415cb283d4a8778eba02"
+        },
+        {
+          "path": "packages/resizable-panels/tsconfig.pristine.json",
+          "role": "support",
+          "sha256": "a414a69802591e6a94ee8134f684c0666c276ef202b7a983a19b5ea39caf95ab"
+        },
+        {
+          "path": "packages/resizable-panels/tests/types/pristine.test-d.ts",
+          "role": "support",
+          "sha256": "337ebab2988433023d80ce2e92bdba956e5ae13e7df4659617d100174ec92eb2"
+        },
+        {
+          "path": "packages/resizable-panels/tests/types/published-pristine-contract.ts",
+          "role": "support",
+          "sha256": "6529173a43ada0bdcad0b1278ece1778eaf8fe4afa70c9d5a6d2926acd2ee53b"
         }
       ]
     },
@@ -190,11 +208,11 @@
       "environment": "workspace-node",
       "project": "resizable-panels-public-types",
       "evidenceOrigin": "repo-authored",
-      "notes": "Strict Octane public type probes with structural verification against pristine probes after permitted import-root transforms.",
+      "notes": "Strict complete public contract against the authenticated npm declarations, with positive assertions for all 22 exports and negative controls. The pinned source has no separate upstream type-test registrations.",
       "execution": {
         "kind": "typescript",
         "compiler": "tsrx-tsc",
-        "project": "packages/resizable-panels/typetests/tsconfig.json"
+        "project": "packages/resizable-panels/tsconfig.adapted.json"
       },
       "files": [
         {
@@ -222,12 +240,77 @@
         {
           "path": "packages/resizable-panels/audit/type-parity.json",
           "role": "support",
-          "sha256": "e8cb999a36d8c4116cbba0c6687edb521019691b8007902b6b69d2d9ad6398fd"
+          "sha256": "827b29f7f2e9d444a9b89e4f6e421b5265962dfabaaa415cb283d4a8778eba02"
         },
         {
           "path": "scripts/react-parity/react-resizable-panels-types-lib.mjs",
           "role": "support",
           "sha256": "b1ec9bf0f5bcb1e268ce676633a0651099c3accc0b1a745115955751e4552fc8"
+        },
+        {
+          "path": "packages/resizable-panels/tsconfig.adapted.json",
+          "role": "support",
+          "sha256": "e4a2563ff8d555dc1a4918fb2fb8c59e0efd042df6dad1c663f503e1e73a0f82"
+        },
+        {
+          "path": "packages/resizable-panels/tests/types/public.test-d.ts",
+          "role": "support",
+          "sha256": "ddf56b755bf17f26e7c86f3848497d76d0ceb7b633e3c9c7e40e107f650d9b74"
+        },
+        {
+          "path": "packages/resizable-panels/tests/types/published-contract.ts",
+          "role": "support",
+          "sha256": "1384002d709bc615d41f35857d8259aafdfa293f86769978bfa7f41a84710a3c"
+        }
+      ]
+    },
+    {
+      "id": "react-resizable-panels-browser",
+      "type": "browser",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "resizable-panels-browser",
+      "notes": "63 pinned upstream browser cases run against React and Octane in both normal and popup windows (126 checks per runtime), plus eight Octane integration contracts including focus, pointer resizing, persisted layout, SSR hydration adoption, and zero layout shift. Three upstream application-host cases are accounted for in browser-dispositions.json.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/resizable-panels/audit/adapted-runtime-browser.json",
+        "fileParallelism": false
+      },
+      "files": [
+        {
+          "path": "packages/resizable-panels/audit/adapted-runtime-browser.json",
+          "role": "support",
+          "sha256": "1f1b79eb1f25b6941434cae490841d0649b7969edff95f5a0045507a69314c98"
+        },
+        {
+          "path": "packages/resizable-panels/audit/browser-dispositions.json",
+          "role": "support",
+          "sha256": "c9e475e1a52ee1f0c28dfacce3ab847bcba30c6286be25b80ebaaf3300967899"
+        },
+        {
+          "path": "packages/resizable-panels/tests/browser/upstream-runner.mjs",
+          "role": "support",
+          "sha256": "b5b7ea36ea7062a81ce1b2f910c4da0701942371238348a26b1725ea4c24bf27"
+        },
+        {
+          "path": "packages/resizable-panels/tests/browser/upstream.browser.test.ts",
+          "role": "support",
+          "sha256": "3520d83a89abee6d0cd029aa4bba3e6788a6cf1d22a39c82194b8dc9404000f4"
+        },
+        {
+          "path": "packages/resizable-panels/tests/browser/interactions.browser.test.ts",
+          "role": "support",
+          "sha256": "0c9a6f3b3d6f90184cc6f14c6092657375e0f94bee4cbee34d58bcc95e0450fa"
+        },
+        {
+          "path": "packages/resizable-panels/tests/_fixtures/layout-hydration.tsrx",
+          "role": "support",
+          "sha256": "6d83ae1348becdedd2d448beab26f5cdc4d705cccafb9f10b663d00f40556b34"
+        },
+        {
+          "path": "packages/resizable-panels/tests/browser/harness/layout.tsrx",
+          "role": "support",
+          "sha256": "fe01bcdc3ead536d4cecb53dacc949b148a2531ea6caef8dd8815fd1d444b51d"
         }
       ]
     }

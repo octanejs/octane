@@ -484,7 +484,7 @@ async function validatePackedConsumer(tempRoot, archives) {
 		`import { ApolloClient, InMemoryCache } from '@octanejs/apollo-client';
 import { ApolloProvider, useApolloClient } from '@octanejs/apollo-client/react';
 import { createComputed, createSignal, useSignalValue } from '@octanejs/alien-signals';
-import { useForm } from '@octanejs/hook-form';
+import { ErrorMessage, FieldArray, FormState, FormStateSubscribe, useForm } from '@octanejs/hook-form';
 import { useDropzone } from '@octanejs/dropzone';
 import { Light, Prism, PrismAsync } from '@octanejs/syntax-highlighter';
 import javascript from '@octanejs/syntax-highlighter/dist/esm/languages/hljs/javascript';
@@ -512,13 +512,17 @@ function PackedCell({ ariaAttributes, columnIndex, rowIndex, style }: CellCompon
 }
 
 export function App() @{
-	const form = useForm({ defaultValues: { name: 'Ada' } });
+	const form = useForm({ defaultValues: { name: 'Ada', items: [{ value: 'packed' }] }, errors: { name: { type: 'manual', message: 'Packed form error' } } });
 	const signalValue = useSignalValue(doubled);
 	const dropzone = useDropzone({ noClick: true });
 	<div data-probe="bindings-ran">
 		<span data-alien-signals={signalValue as string}>Alien Signals</span>
 		<form>
 			<input {...form.register('name')} />
+			<ErrorMessage control={form.control} name="name" as="span" />
+			<FormState control={form.control} render={(state) => <span data-hook-form-state={state.isDirty ? 'dirty' : 'pristine'} />} />
+			<FieldArray control={form.control} name="items" render={({ fields }) => <span data-hook-form-fields={fields.length as string} />} />
+			<span data-hook-form-alias={FormStateSubscribe === FormState ? 'retained' : 'missing'} data-hook-form-error={form.getErrors('name')?.message} />
 		</form>
 		<div {...dropzone.getRootProps()}>
 			<input {...dropzone.getInputProps()} />
@@ -1071,6 +1075,11 @@ process.stdout.write(output, () => process.exit(0));
 		!html.includes('data-probe="bindings-ran"') ||
 		!html.includes('data-alien-signals="4"') ||
 		!html.includes('name="name"') ||
+		!html.includes('Packed form error') ||
+		!html.includes('data-hook-form-state="pristine"') ||
+		!html.includes('data-hook-form-fields="1"') ||
+		!html.includes('data-hook-form-alias="retained"') ||
+		!html.includes('data-hook-form-error="Packed form error"') ||
 		!html.includes('data-apollo="connected"') ||
 		!html.includes('data-packed-syntax="light"') ||
 		!html.includes('data-packed-syntax="prism"') ||

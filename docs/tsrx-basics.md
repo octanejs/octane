@@ -701,6 +701,10 @@ resource, or on a `<style>` inside `<head>`, is an error
 
 ## Strong mode
 
+See the [Strong compiler check reference](./strong-compiler-checks.md) for
+effect data flow, dependency inference, automatic memoization, keyed lists,
+compatibility APIs, and trusted HTML.
+
 Strong mode is an optional immutable render-snapshot contract with compiler
 checks for state, refs, Effect Events, and detectable impure render calls. It is
 also an author assertion that rendering is pure, which production memoization
@@ -937,12 +941,12 @@ forwarded through component props, or imported from another module can retain
 their named bindings. These placement checks apply only to modules that opt into
 Strong mode; ordinary modules keep their existing behavior.
 
-The checks follow provable synchronous calls through local helpers,
-`useCallback` and `useEffectEvent` results, and functions returned by analyzable
-`useMemo` factories. These hooks remain supported; creating a callback is not
-itself an error. Effect Events are non-reactive and should be omitted from hook
-dependencies. Other explicit dependency arrays keep their existing meaning and
-are never rewritten.
+The checks follow provable synchronous calls through local helpers and
+`useEffectEvent` results. Creating a callback remains valid. Effect Events are
+non-reactive and should be omitted from hook dependencies. Strong uses automatic
+declaration caching and inferred dependencies: manual memo hooks and conflicting
+dependency arrays are errors. Equivalent arrays preserve their behavior and
+produce a redundancy hint.
 
 The analysis is deliberately bounded. Factories with unknown return values or
 complex control flow remain opaque. Dependency checks follow literal arrays,

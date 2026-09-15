@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "types": [],
+    "skipLibCheck": false,
+    "strict": true
+  },
+  "include": ["./public-api.ts", "../../typetests/public-api.test-d.ts", "./published-contract.ts"],
+  "exclude": [],
+  "reactPortEvidence": {
+    "gate": "public-types",
+    "publicMode": "pinned"
+  }
+}

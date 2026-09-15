@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "artifacts": [
+    {
+      "path": "upstream-artifact/LICENSE",
+      "sha256": "2782e3bdc0ea2a7333995da1008cb34934d4cabb2195c4713251601040b02bbd"
+    },
+    {
+      "path": "upstream-artifact/dist/index.d.ts",
+      "sha256": "254571004977d929be5d62c7cf4f45eba7ef41ee90d377a623d42e2b6162ed98"
+    },
+    {
+      "path": "upstream-artifact/package.json",
+      "sha256": "7881303b560feda2a3f7b88f28c31796759df00891b76ce74be66e98e1f303cb"
+    },
+    {
+      "path": "upstream-artifact/react-alien-signals-0.4.0.tgz",
+      "sha256": "c6e035f0c9c353ab35d6fa8f76724082d9699283d04e716539e5b960ca969db2"
+    }
+  ],
+  "packageIdentity": {
+    "path": "upstream-artifact/package.json",
+    "name": "react-alien-signals",
+    "version": "0.4.0",
+    "license": "MIT"
+  },
+  "unpublishedDirs": ["audit", "tests", "typetests", "upstream", "upstream-artifact"],
+  "filesEqual": [
+    {
+      "path": "LICENSE.upstream",
+      "equalsPath": "upstream/LICENSE"
+    },
+    {
+      "path": "LICENSE.upstream",
+      "equalsPath": "upstream-artifact/LICENSE"
+    }
+  ]
+}

@@ -11,7 +11,7 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 type Identity = { file: string; fullName: string; status?: string };
 
 // @parity-case pristine:intersection-observer-original-suite
-it('runs the pinned react-intersection-observer 10.1.0 suite unchanged', function runsPinnedIntersectionObserverSuite() {
+it('runs the pinned react-intersection-observer 11.0.1 suite unchanged', function runsPinnedIntersectionObserverSuite() {
 	const expected = JSON.parse(
 		readFileSync(
 			resolve(repoRoot, 'packages/intersection-observer/audit/pristine-runtime.json'),

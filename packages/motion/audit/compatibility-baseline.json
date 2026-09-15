@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "binding": "@octanejs/motion",
+  "repository": "https://github.com/octanejs/octane.git",
+  "commit": "72d570be1619a0d5b8e94c4b5e4031543396eee1",
+  "sourceRoot": "upstream-artifact/previous-binding",
+  "files": [
+    {
+      "path": "package.json",
+      "sha256": "8cdaa387d15c7537accd593deba24530c139b0720945ae443e6480dacb3c4aa8"
+    },
+    {
+      "path": "src/context.ts",
+      "sha256": "ef1e2dee0289436684d15e7222d7d0d4a06a5d4b6c887e3c372af4a10e56d5c1"
+    },
+    {
+      "path": "src/index.ts",
+      "sha256": "7e8d3ce9d38132f926c8ba68a23bc51f369999a6c22dbbb5ff4d61fc115c6a26"
+    },
+    {
+      "path": "src/layout.ts",
+      "sha256": "66694334dd73516d0baa44e72496c0993512a0983a36cb4ea57933e32c5aa9c1"
+    },
+    {
+      "path": "src/react-m.ts",
+      "sha256": "47451b550cd26ab7a8694209fff994ca8acb5cd03f2df34e5ff2abe8481ac889"
+    },
+    {
+      "path": "src/useAnimate.ts",
+      "sha256": "f21e6019575bb1a6c0c7fab1f65e6c1be1d26f77a98b44e7679a82952eb64d56"
+    },
+    {
+      "path": "src/useMotionValue.ts",
+      "sha256": "568cd6d46b328a9ab23321dfa7a801dd779d753e341db0a1db4e3ce20a58fbda"
+    },
+    {
+      "path": "src/useMotionValueEvent.ts",
+      "sha256": "4aa4bbe66ddc06848d217428df9b632868d1ef9ece3dcf1976f9e932d8941740"
+    },
+    {
+      "path": "src/useReducedMotion.ts",
+      "sha256": "814e4eb8f662ccb9c44efe93ed176738242b195a328b9f1c7af8a64c98d8590b"
+    },
+    {
+      "path": "src/useScroll.ts",
+      "sha256": "5ad5cce814cb9f248d80a6f2470b6951f9e98f3bc9ffd874da7bd794f3b19d0d"
+    },
+    {
+      "path": "src/useSpring.ts",
+      "sha256": "6d0dfb8bfacca14b4fc774143f9d128f9a6fb98d1a130cbc48df47d3519dba46"
+    },
+    {
+      "path": "src/useTransform.ts",
+      "sha256": "88995e2334e4b28d50cda3f9ea895330a623537141b458ad27ec7e59e26bf50b"
+    }
+  ]
+}

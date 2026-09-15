@@ -1,6 +1,7 @@
 import React from 'react';
 
 import getEventValue from './logic/getEventValue';
+import getNullAncestorValue from './logic/getNullAncestorValue';
 import isNameInFieldArray from './logic/isNameInFieldArray';
 import cloneObject from './utils/cloneObject';
 import get from './utils/get';
@@ -24,27 +25,15 @@ import { useFormState } from './useFormState';
 import { useWatch } from './useWatch';
 
 /**
- * Custom hook to work with controlled component, this function provide you with both form and field level state. Re-render is isolated at the hook level.
+ * Hook for controlled inputs. Returns `field`, `fieldState`, and `formState`.
+ * Re-renders are isolated to the hook level.
  *
- * @remarks
- * [API](https://react-hook-form.com/docs/usecontroller) • [Demo](https://codesandbox.io/s/usecontroller-0o8px)
- *
- * @param props - the path name to the form field value, and validation rules.
- *
- * @returns field properties, field and form state. {@link UseControllerReturn}
+ * @see [API](https://react-hook-form.com/docs/usecontroller)
  *
  * @example
  * ```tsx
- * function Input(props) {
- *   const { field, fieldState, formState } = useController(props);
- *   return (
- *     <div>
- *       <input {...field} placeholder={props.name} />
- *       <p>{fieldState.isTouched && "Touched"}</p>
- *       <p>{formState.isSubmitted ? "submitted" : ""}</p>
- *     </div>
- *   );
- * }
+ * const { field, fieldState } = useController({ control, name: "email" });
+ * return <input {...field} />;
  * ```
  */
 export function useController<
@@ -56,7 +45,7 @@ export function useController<
 ): UseControllerReturn<TFieldValues, TName> {
   const formControl = useFormControlContext<
     TFieldValues,
-    any,
+    unknown,
     TTransformedValues
   >();
   const {
@@ -69,15 +58,17 @@ export function useController<
   } = props;
   const isArrayField = isNameInFieldArray(control._names.array, name);
 
-  const defaultValueMemo = React.useMemo(
-    () =>
-      get(
-        control._formValues,
-        name,
-        get(control._defaultValues, name, defaultValue),
-      ),
-    [control, name, defaultValue],
-  );
+  const defaultValueMemo = React.useMemo(() => {
+    const resolved = get(
+      control._formValues,
+      name,
+      get(control._defaultValues, name, defaultValue),
+    );
+
+    return isUndefined(resolved)
+      ? getNullAncestorValue(control, name)
+      : resolved;
+  }, [control, name, defaultValue]);
 
   const value = useWatch({
     control,
@@ -136,7 +127,7 @@ export function useController<
   );
 
   const onChange = React.useCallback(
-    (event: any) => {
+    (event: unknown) => {
       const value = getEventValue(event);
 
       if (!get(control._fields, name)) {
@@ -209,7 +200,7 @@ export function useController<
     const _shouldUnregisterField =
       control._options.shouldUnregister || shouldUnregister;
 
-    control.register(name, {
+    _registerProps.current = control.register(name, {
       ..._props.current.rules,
       ...(isBoolean(_props.current.disabled)
         ? { disabled: _props.current.disabled }

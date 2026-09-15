@@ -21,6 +21,7 @@ const { JSDOM } = createRequire(import.meta.url)('jsdom') as {
 const packageDirectory = resolve(import.meta.dirname, '..');
 
 describe('@octanejs/motion public production imports', () => {
+	// @parity-case browser:motion-bundle-0
 	it('runs the selected animation without retaining unused Octane motion bindings', async () => {
 		const result = await build({
 			stdin: {
@@ -84,6 +85,7 @@ globalThis.animationCompleted = new Promise((resolve) => {
 		expect(unusedBindings).toEqual([]);
 	});
 
+	// @parity-case browser:motion-bundle-1
 	it('enforces strict LazyMotion in a development browser bundle without a process global', async () => {
 		const result = await build({
 			stdin: {

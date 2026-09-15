@@ -11,9 +11,16 @@
     "integrity": "sha256:c766aa76100632cccb49c2943a786da9b3bada35836275e5b0e149770616b689",
     "verification": "recorded-unverified"
   },
-  "upstreamSuites": { "runtime": "insufficient", "types": "insufficient" },
+  "upstreamSuites": {
+    "runtime": "insufficient",
+    "types": "insufficient"
+  },
   "adaptedRoots": {
-    "source": { "roots": ["packages/better-auth/src"], "include": ["\\.ts$"], "exclude": [] },
+    "source": {
+      "roots": ["packages/better-auth/src"],
+      "include": ["\\.ts$"],
+      "exclude": []
+    },
     "tests": {
       "roots": ["packages/better-auth/tests/differential"],
       "include": ["parity\\.test\\.ts$"],
@@ -33,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "59b5197a457d62d05aa8866334bc41567581c414b30452a047b00c020d587883"
+      "lockfileSha256": "86e22c8a3652c4663ce8e347d3769f0572c09a1d66c39ed789bd914709b53946"
     }
   },
   "lanes": [

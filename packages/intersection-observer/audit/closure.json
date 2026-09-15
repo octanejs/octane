@@ -1,0 +1,69 @@
+{
+  "runtimeDependencies": ["octane"],
+  "adaptedSources": [
+    {
+      "packageName": "react-intersection-observer",
+      "paths": [
+        "src/InView.tsrx",
+        "src/index.ts",
+        "src/observe.ts",
+        "src/test-utils.ts",
+        "src/types.ts",
+        "src/useInView.tsrx",
+        "src/useIntersectionObserverRef.tsrx",
+        "src/useOnInView.tsrx"
+      ]
+    }
+  ],
+  "sourceLedger": [
+    {
+      "path": "src/InView.tsrx",
+      "origin": "adapted",
+      "packageName": "react-intersection-observer",
+      "sha256": "666fda9abe1038f61af193ee62c0f1e1774129cf87687c601cdf7fb5f6b4118a"
+    },
+    {
+      "path": "src/index.ts",
+      "origin": "adapted",
+      "packageName": "react-intersection-observer",
+      "sha256": "678c4cb73358bfac5412ba7c745d2afbf7c7c77d74ca2fbf3080e18b7298c642"
+    },
+    {
+      "path": "src/observe.ts",
+      "origin": "adapted",
+      "packageName": "react-intersection-observer",
+      "sha256": "893bb9084d7c31ce3906dd87af97183ae4c273217b2a0525e20df0a24c647d07"
+    },
+    {
+      "path": "src/test-utils.ts",
+      "origin": "adapted",
+      "packageName": "react-intersection-observer",
+      "sha256": "8e8d784ac4853fa63c058907df435b8322bbb54e18eba850aa8e3d7bc83c3aed"
+    },
+    {
+      "path": "src/types.ts",
+      "origin": "adapted",
+      "packageName": "react-intersection-observer",
+      "sha256": "504765337b6c89a02ec20f87dff0228ad1a0bef8a2d2dbc73f907b42cc45e9e9"
+    },
+    {
+      "path": "src/useInView.tsrx",
+      "origin": "adapted",
+      "packageName": "react-intersection-observer",
+      "sha256": "9b41fdcb1ddf5a6ef402e12282fc6db80fbdf5235f279c4b94ee3a6b2749a637"
+    },
+    {
+      "path": "src/useIntersectionObserverRef.tsrx",
+      "origin": "adapted",
+      "packageName": "react-intersection-observer",
+      "sha256": "2dfb2e383faa877ff8c3f189fee1522a420fa2aafd22a6d00eb81d558719ae6b"
+    },
+    {
+      "path": "src/useOnInView.tsrx",
+      "origin": "adapted",
+      "packageName": "react-intersection-observer",
+      "sha256": "96ecda949101fe42eee14b36e6c2c99e2ffdab53a5aa1fc406cda115ab927560"
+    }
+  ],
+  "reimplementedDependencies": []
+}

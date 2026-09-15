@@ -1,0 +1,18 @@
+diff --git a/tests/upstream/typescript/misc/Trans.test.tsx b/tests/upstream/typescript/misc/Trans.test.tsx
+--- a/tests/upstream/typescript/misc/Trans.test.tsx
++++ b/tests/upstream/typescript/misc/Trans.test.tsx
+@@ -126,9 +126,13 @@ describe('<Trans />', () => {
+   it('should not work with object child', () => {
+     assertType<React.ReactElement>(
+       <Trans>
+-        {/* @ts-expect-error */}
++        {/* OCTANE DIVERGENCE[children-typing]: Octane types JSX children as `unknown`, so the
++            object literal is statically accepted here; Trans rejects it at runtime
++            (TRANS_INVALID_OBJ). */}
+         <span>This {{ var: '' }} is an error since `allowObjectInHTMLChildren` is disabled</span>
+       </Trans>,
+     );
++    // @ts-expect-error object literals are not valid element descriptors
++    assertType<React.ReactElement>({ var: '' });
+   });
+ });

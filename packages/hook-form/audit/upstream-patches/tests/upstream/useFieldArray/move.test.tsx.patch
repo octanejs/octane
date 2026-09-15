@@ -1,7 +1,7 @@
 diff --git a/tests/upstream/useFieldArray/move.test.tsx b/tests/upstream/useFieldArray/move.test.tsx
 --- a/tests/upstream/useFieldArray/move.test.tsx
 +++ b/tests/upstream/useFieldArray/move.test.tsx
-@@ -15,7 +15,10 @@ import noop from '../../../src/utils/noop';
+@@ -18,7 +18,10 @@ import noop from '../../../src/utils/noop';
  
  let i = 0;
  

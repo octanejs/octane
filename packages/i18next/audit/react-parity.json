@@ -3,26 +3,33 @@
   "schemaVersion": 1,
   "provenance": {
     "repo": "https://github.com/i18next/react-i18next.git",
-    "version": "17.0.9",
-    "commit": "8b4a9ea139b73309471737e5ba9c423f82d5c0cc",
+    "version": "17.0.14",
+    "commit": "5f8c5f9e6c7cdabdc476111d0748c91e33bbaa30",
     "sourceRoot": "src",
     "testRoot": "test",
     "license": "MIT",
-    "integrity": "sha256:3c306a9b58244804feb98b80951b9c1b9963e525bb6dc77e67ec766c2b702301",
-    "verification": "recorded-unverified"
+    "integrity": "sha256:ff6684f1e130a688f6d68e67f80bb43279c2daf46f0af8abe96c4793d6d532ec",
+    "verification": "verified"
   },
-  "upstreamSuites": { "runtime": "present", "types": "present" },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "present"
+  },
   "adaptedRoots": {
-    "source": { "roots": ["packages/i18next/src"], "include": ["\\.(?:ts|tsrx)$"], "exclude": [] },
-    "tests": {
-      "roots": ["packages/i18next/tests/differential"],
-      "include": ["parity\\.test\\.ts$"],
+    "source": {
+      "roots": ["packages/i18next/src"],
+      "include": ["\\.(?:[cm]?[jt]s|[jt]sx|tsrx)$"],
       "exclude": []
+    },
+    "tests": {
+      "roots": ["packages/i18next/tests/upstream"],
+      "include": ["\\.spec\\.[jt]sx?$"],
+      "exclude": ["typescript/"]
     }
   },
   "adaptedRuntimeSummary": {
-    "inventoryEntries": 0,
-    "uniqueIdentities": 0,
+    "inventoryEntries": 458,
+    "uniqueIdentities": 458,
     "duplicateEntriesWithinLanes": 0,
     "identitiesSharedAcrossLanes": 0
   },
@@ -33,10 +40,712 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "59b5197a457d62d05aa8866334bc41567581c414b30452a047b00c020d587883"
+      "lockfileSha256": "86e22c8a3652c4663ce8e347d3769f0572c09a1d66c39ed789bd914709b53946"
     }
   },
   "lanes": [
+    {
+      "id": "i18next-pristine-upstream",
+      "type": "pristine-upstream",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "i18next-pristine-runtime",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Runs the pinned react-i18next 17.0.14 suite unchanged via the wrapper identity; 495 tests in the pristine runtime inventory, zero skips.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/i18next/audit/pristine-wrapper-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/i18next/audit/pristine-wrapper-runtime.json",
+          "role": "support",
+          "sha256": "a1399a6c9497c534b2e10e8cebd4712758a0e8e9cbe8f5b4f40a731bbb43961b"
+        },
+        {
+          "path": "packages/i18next/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "94ef18c705e84f6f3cb767b949c5b12ab25ada22fb2a560d2c09dbd0532c6eaf"
+        },
+        {
+          "path": "packages/i18next/audit/provenance.json",
+          "role": "support",
+          "sha256": "7c4ab115138568e9195caf1b8ef9264a180e3a45a65fe0fc3832c36b34259a2b"
+        },
+        {
+          "path": "packages/i18next/audit/registrations.json",
+          "role": "support",
+          "sha256": "c6cf62cb42421b33950e761d5b79a359db3e597ecc1c0f880e16300c12b350b2"
+        },
+        {
+          "path": "packages/i18next/audit/crosswalk.json",
+          "role": "support",
+          "sha256": "425721fc7a8d8a885308b83e651bd62b79db90005483147b1b8248974a946dc7"
+        },
+        {
+          "path": "packages/i18next/audit/pristine-runtime.json",
+          "role": "support",
+          "sha256": "7318c4780574b151157b679d490bcf5b674b88620fbce8a4dfab80edb97dba59"
+        },
+        {
+          "path": "packages/i18next/audit/pristine-suite.json",
+          "role": "support",
+          "sha256": "59a2dcea8d9e5ca0049f2aef01efb60ace1b3623e37b00ee6930dacc8755e6fe"
+        },
+        {
+          "path": "packages/i18next/tests/upstream-original.test.ts",
+          "role": "support",
+          "sha256": "9efdf120afc923f83433eb3adef8c70a4be66441a7ad5b5878a9f83b33350e2e"
+        },
+        {
+          "path": "packages/i18next/tests/upstream-vitest.config.ts",
+          "role": "support",
+          "sha256": "f62b8ded5ba9e8ef4ea837298768bfc63383a9ec43d7d4aa129caecc57ece0e6"
+        },
+        {
+          "path": "scripts/react-parity/pristine-suite-lib.mjs",
+          "role": "support",
+          "sha256": "d34ffc2dca00e6eef7dcaf5bc002024cc511f32dd20c681547555af520438bbb"
+        },
+        {
+          "path": "scripts/react-parity/run-pristine.mjs",
+          "role": "support",
+          "sha256": "b22925d67cfa0bed1b0b7fbcdd1a4e924b588d9724dd5b33ac4072df8f317a62"
+        }
+      ]
+    },
+    {
+      "id": "i18next-adapted-upstream",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "i18next-adapted",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Runs all 458 adapted upstream tests under the Octane renderer; 89 snapshots, zero skips.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/i18next/audit/adapted-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/i18next/audit/adapted-runtime.json",
+          "role": "support",
+          "sha256": "5b9b73b9bc93e15eb110c90c55403aed86f87975f61ebeb1be39cbb613373081"
+        },
+        {
+          "path": "packages/i18next/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "94ef18c705e84f6f3cb767b949c5b12ab25ada22fb2a560d2c09dbd0532c6eaf"
+        },
+        {
+          "path": "packages/i18next/audit/provenance.json",
+          "role": "support",
+          "sha256": "7c4ab115138568e9195caf1b8ef9264a180e3a45a65fe0fc3832c36b34259a2b"
+        },
+        {
+          "path": "packages/i18next/audit/registrations.json",
+          "role": "support",
+          "sha256": "c6cf62cb42421b33950e761d5b79a359db3e597ecc1c0f880e16300c12b350b2"
+        },
+        {
+          "path": "packages/i18next/audit/crosswalk.json",
+          "role": "support",
+          "sha256": "425721fc7a8d8a885308b83e651bd62b79db90005483147b1b8248974a946dc7"
+        },
+        {
+          "path": "packages/i18next/tests/vitest.adapted.config.ts",
+          "role": "support",
+          "sha256": "1a59d5e603ecee9ff7bbdf35ec88c9fbc091ee8ac544223923710ea2571a0a96"
+        },
+        {
+          "path": "packages/i18next/tests/_setup.adapted.ts",
+          "role": "support",
+          "sha256": "89f215d457d5462b88ae8192023782e67280508a06c3700524c00d8c7abd0aa4"
+        },
+        {
+          "path": "packages/i18next/audit/upstream-patches/tests/upstream/IcuTrans/IcuTransWithoutContext.spec.jsx.patch",
+          "role": "support",
+          "sha256": "05a32b7eef939c298dd15a8e7252941a5e95f67e9bfc83278129406915c1296f"
+        },
+        {
+          "path": "packages/i18next/audit/upstream-patches/tests/upstream/Translation.spec.jsx.patch",
+          "role": "support",
+          "sha256": "92e4996aaf9d8c29b2faf306fd4cdde9864d41caed77fa4386de53bfbc6ffa92"
+        },
+        {
+          "path": "packages/i18next/audit/upstream-patches/tests/upstream/icu.macro.spec.js.skip",
+          "role": "support",
+          "sha256": "e5ca9e19d9eeb3785761774658db9cd3632419ca02f65fc0d2b873ed130fa4ae"
+        },
+        {
+          "path": "packages/i18next/audit/upstream-patches/tests/upstream/trans.nodeToString.spec.jsx.patch",
+          "role": "support",
+          "sha256": "bf12417b717b33f297ebfe753ee623a444796b2aee825a7729869dc3fab6e7ef"
+        },
+        {
+          "path": "packages/i18next/audit/upstream-patches/tests/upstream/trans.render.dynamic.spec.jsx.patch",
+          "role": "support",
+          "sha256": "385e56c21afaa1d9901e0533d1c261c8b35ed19ef15616eb0c2cfaf068ace14a"
+        },
+        {
+          "path": "packages/i18next/audit/upstream-patches/tests/upstream/trans.render.object.spec.jsx.patch",
+          "role": "support",
+          "sha256": "89ac1cfa079d2655e86e8e6c36b0225b377a272c5406882d894493280728b34b"
+        },
+        {
+          "path": "packages/i18next/audit/upstream-patches/tests/upstream/trans.render.spec.jsx.patch",
+          "role": "support",
+          "sha256": "975001e7f3ab5a0217cbe0f5d45d35e10c4230c6658fa1794279ea8eab06591f"
+        },
+        {
+          "path": "packages/i18next/audit/upstream-patches/tests/upstream/typescript/misc/I18nextProvider.test.tsx.patch",
+          "role": "support",
+          "sha256": "dde759047779a9cb2484539ef3e2b12d554db4aeb1b318e49744cca1e9f452c0"
+        },
+        {
+          "path": "packages/i18next/audit/upstream-patches/tests/upstream/typescript/misc/Trans.test.tsx.patch",
+          "role": "support",
+          "sha256": "7fc09f00eaaaf6c051f4b29ca02495d94345b9995da69020e7cfb75bfbaa79eb"
+        },
+        {
+          "path": "packages/i18next/audit/upstream-patches/tests/upstream/typescript/misc/withSSR.test.tsx.patch",
+          "role": "support",
+          "sha256": "707f600a5fb1b0c8e204291e154c1e051f0bd231d40bd8e22457f9f7bd6809e4"
+        },
+        {
+          "path": "packages/i18next/audit/upstream-patches/tests/upstream/typescript/misc/withTranslation.test.tsx.patch",
+          "role": "support",
+          "sha256": "255492a3e8429bedb1fc7a2d20f4b5759260b1965b4ca1290f9ab2807fb612fd"
+        },
+        {
+          "path": "packages/i18next/audit/upstream-patches/tests/upstream/withTranslation.keyPrefix.spec.jsx.patch",
+          "role": "support",
+          "sha256": "e0cb1059ce99c1649fb567a5999787da0aebc312d5f344632515bb3b5f4fdd83"
+        },
+        {
+          "path": "packages/i18next/audit/upstream-patches/tests/upstream/withTranslation.spec.jsx.patch",
+          "role": "support",
+          "sha256": "fe219057466897d2ecadb73d6029bbf345349b4e19e90492593f1df05bfb5506"
+        }
+      ]
+    },
+    {
+      "id": "i18next-pristine-types-custom-types",
+      "type": "pristine-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "i18next-pristine-types-custom-types",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Compiles the pinned upstream `custom-types` type program under upstream-mirrored compiler options.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsc",
+        "project": "packages/i18next/typetests/pristine/custom-types/tsconfig.json"
+      },
+      "files": [
+        {
+          "path": "packages/i18next/typetests/pristine/custom-types/tsconfig.json",
+          "role": "test",
+          "sha256": "89525a631656a894f8bc05c9d28e00da1d0e1397039d532e39558cd7d1be8c84",
+          "cases": [
+            {
+              "id": "types:i18next-pristine-custom-types",
+              "testName": "react-i18next 17.0.14 pristine type program `custom-types`",
+              "fullName": "react-i18next 17.0.14 pristine type program `custom-types`"
+            }
+          ]
+        },
+        {
+          "path": "packages/i18next/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "94ef18c705e84f6f3cb767b949c5b12ab25ada22fb2a560d2c09dbd0532c6eaf"
+        }
+      ]
+    },
+    {
+      "id": "i18next-pristine-types-misc",
+      "type": "pristine-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "i18next-pristine-types-misc",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Compiles the pinned upstream `misc` type program under upstream-mirrored compiler options.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsc",
+        "project": "packages/i18next/typetests/pristine/misc/tsconfig.json"
+      },
+      "files": [
+        {
+          "path": "packages/i18next/typetests/pristine/misc/tsconfig.json",
+          "role": "test",
+          "sha256": "5ddf7a41bf0969a2048790872bbd474cc09d2609ffba20e14867b1ac57ffc278",
+          "cases": [
+            {
+              "id": "types:i18next-pristine-misc",
+              "testName": "react-i18next 17.0.14 pristine type program `misc`",
+              "fullName": "react-i18next 17.0.14 pristine type program `misc`"
+            }
+          ]
+        },
+        {
+          "path": "packages/i18next/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "94ef18c705e84f6f3cb767b949c5b12ab25ada22fb2a560d2c09dbd0532c6eaf"
+        }
+      ]
+    },
+    {
+      "id": "i18next-pristine-types-misc-non-interop",
+      "type": "pristine-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "i18next-pristine-types-misc-non-interop",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Compiles the pinned upstream `misc` type program under upstream-mirrored compiler options.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsc",
+        "project": "packages/i18next/typetests/pristine/misc-non-interop/tsconfig.json"
+      },
+      "files": [
+        {
+          "path": "packages/i18next/typetests/pristine/misc-non-interop/tsconfig.json",
+          "role": "test",
+          "sha256": "3fc013e683b8d071a922100c253eed908673bc9bb64a2cce66f0303bab665c4b",
+          "cases": [
+            {
+              "id": "types:i18next-pristine-misc-non-interop",
+              "testName": "react-i18next 17.0.14 pristine type program `misc-non-interop`",
+              "fullName": "react-i18next 17.0.14 pristine type program `misc-non-interop`"
+            }
+          ]
+        },
+        {
+          "path": "packages/i18next/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "94ef18c705e84f6f3cb767b949c5b12ab25ada22fb2a560d2c09dbd0532c6eaf"
+        }
+      ]
+    },
+    {
+      "id": "i18next-pristine-types-selector-custom-types",
+      "type": "pristine-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "i18next-pristine-types-selector-custom-types",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Compiles the pinned upstream `selector-custom-types` type program under upstream-mirrored compiler options.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsc",
+        "project": "packages/i18next/typetests/pristine/selector-custom-types/tsconfig.json"
+      },
+      "files": [
+        {
+          "path": "packages/i18next/typetests/pristine/selector-custom-types/tsconfig.json",
+          "role": "test",
+          "sha256": "b3e153ccb5e00af1adad0a9b096eb1563a375bec63b0efac0199988f458b77a1",
+          "cases": [
+            {
+              "id": "types:i18next-pristine-selector-custom-types",
+              "testName": "react-i18next 17.0.14 pristine type program `selector-custom-types`",
+              "fullName": "react-i18next 17.0.14 pristine type program `selector-custom-types`"
+            }
+          ]
+        },
+        {
+          "path": "packages/i18next/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "94ef18c705e84f6f3cb767b949c5b12ab25ada22fb2a560d2c09dbd0532c6eaf"
+        }
+      ]
+    },
+    {
+      "id": "i18next-pristine-types-selector-default-ns-false",
+      "type": "pristine-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "i18next-pristine-types-selector-default-ns-false",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Compiles the pinned upstream `selector-default-ns-false` type program under upstream-mirrored compiler options.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsc",
+        "project": "packages/i18next/typetests/pristine/selector-default-ns-false/tsconfig.json"
+      },
+      "files": [
+        {
+          "path": "packages/i18next/typetests/pristine/selector-default-ns-false/tsconfig.json",
+          "role": "test",
+          "sha256": "7860200d0e8a5bf9a2691da57d4c8e7352e07a2d72f5fa636be81c3adf2f6282",
+          "cases": [
+            {
+              "id": "types:i18next-pristine-selector-default-ns-false",
+              "testName": "react-i18next 17.0.14 pristine type program `selector-default-ns-false`",
+              "fullName": "react-i18next 17.0.14 pristine type program `selector-default-ns-false`"
+            }
+          ]
+        },
+        {
+          "path": "packages/i18next/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "94ef18c705e84f6f3cb767b949c5b12ab25ada22fb2a560d2c09dbd0532c6eaf"
+        }
+      ]
+    },
+    {
+      "id": "i18next-pristine-types-selector-optimize",
+      "type": "pristine-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "i18next-pristine-types-selector-optimize",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Compiles the pinned upstream `selector-optimize` type program under upstream-mirrored compiler options.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsc",
+        "project": "packages/i18next/typetests/pristine/selector-optimize/tsconfig.json"
+      },
+      "files": [
+        {
+          "path": "packages/i18next/typetests/pristine/selector-optimize/tsconfig.json",
+          "role": "test",
+          "sha256": "6460461b93ae00aa6cca63c49843ea619d489bd8c27e9fce0882888b40637097",
+          "cases": [
+            {
+              "id": "types:i18next-pristine-selector-optimize",
+              "testName": "react-i18next 17.0.14 pristine type program `selector-optimize`",
+              "fullName": "react-i18next 17.0.14 pristine type program `selector-optimize`"
+            }
+          ]
+        },
+        {
+          "path": "packages/i18next/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "94ef18c705e84f6f3cb767b949c5b12ab25ada22fb2a560d2c09dbd0532c6eaf"
+        }
+      ]
+    },
+    {
+      "id": "i18next-pristine-types-selector-strict",
+      "type": "pristine-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "i18next-pristine-types-selector-strict",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Compiles the pinned upstream `selector-strict` type program under upstream-mirrored compiler options.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsc",
+        "project": "packages/i18next/typetests/pristine/selector-strict/tsconfig.json"
+      },
+      "files": [
+        {
+          "path": "packages/i18next/typetests/pristine/selector-strict/tsconfig.json",
+          "role": "test",
+          "sha256": "31216535f72996f69fdfc44521bd4c3201ce90f07fcd8b17eb6d2f6a60d6ad62",
+          "cases": [
+            {
+              "id": "types:i18next-pristine-selector-strict",
+              "testName": "react-i18next 17.0.14 pristine type program `selector-strict`",
+              "fullName": "react-i18next 17.0.14 pristine type program `selector-strict`"
+            }
+          ]
+        },
+        {
+          "path": "packages/i18next/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "94ef18c705e84f6f3cb767b949c5b12ab25ada22fb2a560d2c09dbd0532c6eaf"
+        }
+      ]
+    },
+    {
+      "id": "i18next-adapted-types-custom-types",
+      "type": "adapted-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "i18next-adapted-types-custom-types",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Compiles the adapted `custom-types` type program under tsrx-tsc with the Octane divergence patches applied.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsrx-tsc",
+        "project": "packages/i18next/typetests/adapted/custom-types/tsconfig.json"
+      },
+      "files": [
+        {
+          "path": "packages/i18next/typetests/adapted/custom-types/tsconfig.json",
+          "role": "test",
+          "sha256": "c59c3d626a91c466f0392c54a3e30f1d0442b5dab3eeaccb62df5eb34ca6af92",
+          "cases": [
+            {
+              "id": "types:i18next-adapted-custom-types",
+              "testName": "react-i18next 17.0.14 adapted type program `custom-types`",
+              "fullName": "react-i18next 17.0.14 adapted type program `custom-types`"
+            }
+          ]
+        },
+        {
+          "path": "packages/i18next/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "94ef18c705e84f6f3cb767b949c5b12ab25ada22fb2a560d2c09dbd0532c6eaf"
+        }
+      ]
+    },
+    {
+      "id": "i18next-adapted-types-misc",
+      "type": "adapted-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "i18next-adapted-types-misc",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Compiles the adapted `misc` type program under tsrx-tsc with the Octane divergence patches applied.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsrx-tsc",
+        "project": "packages/i18next/typetests/adapted/misc/tsconfig.json"
+      },
+      "files": [
+        {
+          "path": "packages/i18next/typetests/adapted/misc/tsconfig.json",
+          "role": "test",
+          "sha256": "a9de69a44503967d62cbcede7e6d16dc4404c5aa77a4bdb107a7ae1e63886e64",
+          "cases": [
+            {
+              "id": "types:i18next-adapted-misc",
+              "testName": "react-i18next 17.0.14 adapted type program `misc`",
+              "fullName": "react-i18next 17.0.14 adapted type program `misc`"
+            },
+            {
+              "id": "types:i18next-adapted-misc/provider-signature",
+              "testName": "adapted misc provider/HOC component-signature assertions",
+              "fullName": "adapted misc provider/HOC component-signature assertions"
+            },
+            {
+              "id": "types:i18next-adapted-misc/class-rejection",
+              "testName": "adapted misc class-component rejection controls",
+              "fullName": "adapted misc class-component rejection controls"
+            },
+            {
+              "id": "types:i18next-adapted-misc/trans-children",
+              "testName": "adapted misc Trans children-typing assertions",
+              "fullName": "adapted misc Trans children-typing assertions"
+            }
+          ]
+        },
+        {
+          "path": "packages/i18next/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "94ef18c705e84f6f3cb767b949c5b12ab25ada22fb2a560d2c09dbd0532c6eaf"
+        },
+        {
+          "path": "packages/i18next/audit/upstream-patches/tests/upstream/typescript/misc/I18nextProvider.test.tsx.patch",
+          "role": "support",
+          "sha256": "dde759047779a9cb2484539ef3e2b12d554db4aeb1b318e49744cca1e9f452c0"
+        },
+        {
+          "path": "packages/i18next/audit/upstream-patches/tests/upstream/typescript/misc/Trans.test.tsx.patch",
+          "role": "support",
+          "sha256": "7fc09f00eaaaf6c051f4b29ca02495d94345b9995da69020e7cfb75bfbaa79eb"
+        },
+        {
+          "path": "packages/i18next/audit/upstream-patches/tests/upstream/typescript/misc/withSSR.test.tsx.patch",
+          "role": "support",
+          "sha256": "707f600a5fb1b0c8e204291e154c1e051f0bd231d40bd8e22457f9f7bd6809e4"
+        },
+        {
+          "path": "packages/i18next/audit/upstream-patches/tests/upstream/typescript/misc/withTranslation.test.tsx.patch",
+          "role": "support",
+          "sha256": "255492a3e8429bedb1fc7a2d20f4b5759260b1965b4ca1290f9ab2807fb612fd"
+        }
+      ]
+    },
+    {
+      "id": "i18next-adapted-types-misc-non-interop",
+      "type": "adapted-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "i18next-adapted-types-misc-non-interop",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Compiles the adapted `misc` type program under tsrx-tsc with the Octane divergence patches applied.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsrx-tsc",
+        "project": "packages/i18next/typetests/adapted/misc-non-interop/tsconfig.json"
+      },
+      "files": [
+        {
+          "path": "packages/i18next/typetests/adapted/misc-non-interop/tsconfig.json",
+          "role": "test",
+          "sha256": "b3bc3d7397d5180ac2c5fc892af68ff377ff633d7c977d76d6fba92ac75e6a34",
+          "cases": [
+            {
+              "id": "types:i18next-adapted-misc-non-interop",
+              "testName": "react-i18next 17.0.14 adapted type program `misc-non-interop`",
+              "fullName": "react-i18next 17.0.14 adapted type program `misc-non-interop`"
+            }
+          ]
+        },
+        {
+          "path": "packages/i18next/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "94ef18c705e84f6f3cb767b949c5b12ab25ada22fb2a560d2c09dbd0532c6eaf"
+        },
+        {
+          "path": "packages/i18next/audit/upstream-patches/tests/upstream/typescript/misc/I18nextProvider.test.tsx.patch",
+          "role": "support",
+          "sha256": "dde759047779a9cb2484539ef3e2b12d554db4aeb1b318e49744cca1e9f452c0"
+        },
+        {
+          "path": "packages/i18next/audit/upstream-patches/tests/upstream/typescript/misc/Trans.test.tsx.patch",
+          "role": "support",
+          "sha256": "7fc09f00eaaaf6c051f4b29ca02495d94345b9995da69020e7cfb75bfbaa79eb"
+        },
+        {
+          "path": "packages/i18next/audit/upstream-patches/tests/upstream/typescript/misc/withSSR.test.tsx.patch",
+          "role": "support",
+          "sha256": "707f600a5fb1b0c8e204291e154c1e051f0bd231d40bd8e22457f9f7bd6809e4"
+        },
+        {
+          "path": "packages/i18next/audit/upstream-patches/tests/upstream/typescript/misc/withTranslation.test.tsx.patch",
+          "role": "support",
+          "sha256": "255492a3e8429bedb1fc7a2d20f4b5759260b1965b4ca1290f9ab2807fb612fd"
+        }
+      ]
+    },
+    {
+      "id": "i18next-adapted-types-selector-custom-types",
+      "type": "adapted-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "i18next-adapted-types-selector-custom-types",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Compiles the adapted `selector-custom-types` type program under tsrx-tsc with the Octane divergence patches applied.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsrx-tsc",
+        "project": "packages/i18next/typetests/adapted/selector-custom-types/tsconfig.json"
+      },
+      "files": [
+        {
+          "path": "packages/i18next/typetests/adapted/selector-custom-types/tsconfig.json",
+          "role": "test",
+          "sha256": "aad4937cf1c0c63853b44ed7823ca8fdb58bb1e76728385236e2ac2187178a83",
+          "cases": [
+            {
+              "id": "types:i18next-adapted-selector-custom-types",
+              "testName": "react-i18next 17.0.14 adapted type program `selector-custom-types`",
+              "fullName": "react-i18next 17.0.14 adapted type program `selector-custom-types`"
+            }
+          ]
+        },
+        {
+          "path": "packages/i18next/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "94ef18c705e84f6f3cb767b949c5b12ab25ada22fb2a560d2c09dbd0532c6eaf"
+        }
+      ]
+    },
+    {
+      "id": "i18next-adapted-types-selector-default-ns-false",
+      "type": "adapted-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "i18next-adapted-types-selector-default-ns-false",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Compiles the adapted `selector-default-ns-false` type program under tsrx-tsc with the Octane divergence patches applied.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsrx-tsc",
+        "project": "packages/i18next/typetests/adapted/selector-default-ns-false/tsconfig.json"
+      },
+      "files": [
+        {
+          "path": "packages/i18next/typetests/adapted/selector-default-ns-false/tsconfig.json",
+          "role": "test",
+          "sha256": "bb91ea8d81c5f82383d657d3b0f253d3af6aee54a2ed284649e371d5c45a92f9",
+          "cases": [
+            {
+              "id": "types:i18next-adapted-selector-default-ns-false",
+              "testName": "react-i18next 17.0.14 adapted type program `selector-default-ns-false`",
+              "fullName": "react-i18next 17.0.14 adapted type program `selector-default-ns-false`"
+            }
+          ]
+        },
+        {
+          "path": "packages/i18next/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "94ef18c705e84f6f3cb767b949c5b12ab25ada22fb2a560d2c09dbd0532c6eaf"
+        }
+      ]
+    },
+    {
+      "id": "i18next-adapted-types-selector-optimize",
+      "type": "adapted-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "i18next-adapted-types-selector-optimize",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Compiles the adapted `selector-optimize` type program under tsrx-tsc with the Octane divergence patches applied.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsrx-tsc",
+        "project": "packages/i18next/typetests/adapted/selector-optimize/tsconfig.json"
+      },
+      "files": [
+        {
+          "path": "packages/i18next/typetests/adapted/selector-optimize/tsconfig.json",
+          "role": "test",
+          "sha256": "4efaf3e76d666eb273daae4ad8b462b80c4ca36a28d9d80e9e508ea9c8960d8c",
+          "cases": [
+            {
+              "id": "types:i18next-adapted-selector-optimize",
+              "testName": "react-i18next 17.0.14 adapted type program `selector-optimize`",
+              "fullName": "react-i18next 17.0.14 adapted type program `selector-optimize`"
+            }
+          ]
+        },
+        {
+          "path": "packages/i18next/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "94ef18c705e84f6f3cb767b949c5b12ab25ada22fb2a560d2c09dbd0532c6eaf"
+        }
+      ]
+    },
+    {
+      "id": "i18next-adapted-types-selector-strict",
+      "type": "adapted-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "i18next-adapted-types-selector-strict",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Compiles the adapted `selector-strict` type program under tsrx-tsc with the Octane divergence patches applied.",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsrx-tsc",
+        "project": "packages/i18next/typetests/adapted/selector-strict/tsconfig.json"
+      },
+      "files": [
+        {
+          "path": "packages/i18next/typetests/adapted/selector-strict/tsconfig.json",
+          "role": "test",
+          "sha256": "6df2c17a684faecd6b3f4d62b37d527012a57d39a1f2c6ff99ec07eee1a48dcb",
+          "cases": [
+            {
+              "id": "types:i18next-adapted-selector-strict",
+              "testName": "react-i18next 17.0.14 adapted type program `selector-strict`",
+              "fullName": "react-i18next 17.0.14 adapted type program `selector-strict`"
+            }
+          ]
+        },
+        {
+          "path": "packages/i18next/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "94ef18c705e84f6f3cb767b949c5b12ab25ada22fb2a560d2c09dbd0532c6eaf"
+        }
+      ]
+    },
     {
       "id": "i18next-runtime-differential",
       "type": "differential",
@@ -44,7 +753,7 @@
       "environment": "workspace-node",
       "project": "i18next-differential",
       "evidenceOrigin": "repo-authored",
-      "notes": "Runs the same .tsrx fixture against react-i18next 17.0.9 on React and @octanejs/i18next on Octane, comparing provider, hook, Trans, and language-subscription output at mount and across language changes.",
+      "notes": "Mounts the same .tsrx fixture under @octanejs/i18next on Octane and react-i18next 17.0.14 on React and compares normalized DOM across mount and language-change steps.",
       "files": [
         {
           "path": "packages/i18next/tests/differential/parity.test.ts",
@@ -74,7 +783,229 @@
           "sha256": "364c0595b08b26343fa3cd9ff7ddbdaa5fd227cfcd390437aa67ae9a173ebe1b"
         }
       ]
+    },
+    {
+      "id": "i18next-ssr",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "i18next-ssr",
+      "notes": "Server-renders the preloaded binding surface and reports used namespaces under octane/server.",
+      "files": [
+        {
+          "path": "packages/i18next/tests/ssr/render.test.ts",
+          "role": "test",
+          "sha256": "c16fce08df167458dc2edd75f9c88daf6e69bc148a0e575c3ea2eef5d75285a7",
+          "cases": [
+            {
+              "id": "ssr:i18next-render",
+              "testName": "renders preloaded hook and Trans output and reports used namespaces",
+              "fullName": "@octanejs/i18next server rendering renders preloaded hook and Trans output and reports used namespaces"
+            }
+          ]
+        },
+        {
+          "path": "packages/i18next/tests/_fixtures/ssr.tsrx",
+          "role": "support",
+          "sha256": "cc72e48acf6b7c60c558da4abcaba3f086ca6c982530081e8b546409cd2cacac"
+        }
+      ]
     }
   ],
-  "divergences": []
+  "divergences": [
+    {
+      "id": "inspectable-children",
+      "caseIds": [
+        "runtime:00ceab16751e9866",
+        "runtime:02179933d50e2814",
+        "runtime:04a897e5682ffe0d",
+        "runtime:06247fb877909a01",
+        "runtime:073d18bd95ab83bd",
+        "runtime:073e3494de55cd6c",
+        "runtime:080710dd4e29993b",
+        "runtime:0a820314d9f6657c",
+        "runtime:0c231f92a59f2463",
+        "runtime:0fa0583d42e77dc7",
+        "runtime:14a02b9d793c8151",
+        "runtime:15e75ff3f8c01ebf",
+        "runtime:169fd1832d975a36",
+        "runtime:18b3773af46ad85c",
+        "runtime:1bbe582379661130",
+        "runtime:1e1120d9f7e93f01",
+        "runtime:206af9c21002625c",
+        "runtime:217028711ad3bedc",
+        "runtime:23faef1f22033618",
+        "runtime:24dab0f29d4c9d51",
+        "runtime:2511cf79071ddd27",
+        "runtime:291b0e209ea3bf73",
+        "runtime:2b9d3e5cfbff1691",
+        "runtime:2cd76df466c86b62",
+        "runtime:2eddb5ac1395cf9c",
+        "runtime:313cac75a2458ecd",
+        "runtime:34632a5b6e1fb955",
+        "runtime:39670312f15f1e7e",
+        "runtime:476474fbc079a31c",
+        "runtime:57378fbb3db183cb",
+        "runtime:608b2a9a9c526e6d",
+        "runtime:638fa2c34622b50f",
+        "runtime:643cf0cceecef2f6",
+        "runtime:67a34e628e96084f",
+        "runtime:6c1546b965ea703e",
+        "runtime:6c8a909e7983826e",
+        "runtime:6f8d099c9cb4d313",
+        "runtime:70c0183f5c35fc2f",
+        "runtime:73780273062b160e",
+        "runtime:7443d2df13ece4ab",
+        "runtime:74ed8a1d1258fa00",
+        "runtime:7512883d53ec5a8a",
+        "runtime:7a8ba0492be569c8",
+        "runtime:87e49c05225ca10d",
+        "runtime:895588c725b870a5",
+        "runtime:8e3ac18165e16c9b",
+        "runtime:92b5cb8166b18916",
+        "runtime:94d08073e33a6942",
+        "runtime:94d3f04b06164c1c",
+        "runtime:95c850ff3e945aa3",
+        "runtime:97a5bfc6d6fe5cf9",
+        "runtime:989ce1243ad68726",
+        "runtime:9dde1d803b78f620",
+        "runtime:a47c0f6f512eac6f",
+        "runtime:a52722d726166b60",
+        "runtime:ab3664a14a76f3e2",
+        "runtime:aece5c5153733051",
+        "runtime:b25bd1c8ff6563c9",
+        "runtime:b56e3c5004171567",
+        "runtime:b7bb620fcc9ade4f",
+        "runtime:be84e5c89bcfc978",
+        "runtime:bf252563b47fa762",
+        "runtime:c520fe4d106df650",
+        "runtime:cd57c80bb8524563",
+        "runtime:d33ba20a2b81c0d8",
+        "runtime:d41ff7477ae427cd",
+        "runtime:d7d27397fc1292a3",
+        "runtime:d9cdc1196495af6a",
+        "runtime:dbf45f0d94563f0f",
+        "runtime:dc3da7dac56cbe50",
+        "runtime:e030018866a7c3c1",
+        "runtime:e19bad63de7551e8",
+        "runtime:e1a61ad8bbca9af2",
+        "runtime:e44db549efaacc85",
+        "runtime:e70d92e81979019e",
+        "runtime:ea5f8721e6fc0ef3",
+        "runtime:eb498101c7c90ab9",
+        "runtime:efb3f93ae961e2c1",
+        "runtime:eff414ee3358bbac",
+        "runtime:f1f42e1bd98098b0",
+        "runtime:f26e7e00022f45cc",
+        "runtime:f328776094719185",
+        "runtime:f947a23076fb23e3",
+        "runtime:f9a35fa8916e12a0",
+        "runtime:fb3d34e5777f3001",
+        "runtime:fc56293936c47b92",
+        "runtime:ff394ad7ebe1bee0"
+      ],
+      "upstreamResult": "React `Trans` inspects JSX children elements directly and `Translation` passes its render callback through the children position.",
+      "octaneResult": "Octane `Trans` inspects explicit descriptor children and `Translation` receives its render callback as a prop.",
+      "rationale": "Octane compiles JSX to descriptors ahead of time; children are descriptor objects rather than React elements, so child inspection reads the compiled shape.",
+      "classification": "react-to-octane-element-model",
+      "consumerImpact": "Public `Trans`/`Translation` behavior is preserved; only the internal child-inspection shape differs.",
+      "migrationGuidance": "None required for consumers; descriptor children are the authored Octane contract.",
+      "owner": "@octanejs/i18next",
+      "reviewCondition": "Review if Octane element descriptors change shape or expose a React-compatible element view."
+    },
+    {
+      "id": "dom-markers",
+      "caseIds": ["runtime:d3d828119fce8d0a", "runtime:fecc4ed47f84975c"],
+      "upstreamResult": "React renders component interpolation boundaries without extra markers; serialized output indexes elements directly.",
+      "octaneResult": "Octane's renderer emits comment markers around interpolated islands; serialized comparisons ignore only those markers.",
+      "rationale": "Octane anchors dynamic content with comment markers in the DOM. Visible content is identical; only marker comments are stripped before comparison.",
+      "classification": "renderer-dom-markers",
+      "consumerImpact": "None for consumers; affects only serialized-DOM test comparisons.",
+      "migrationGuidance": "None required.",
+      "owner": "@octanejs/i18next",
+      "reviewCondition": "Review if Octane stops emitting comment markers or changes marker syntax."
+    },
+    {
+      "id": "fragment-descriptors",
+      "caseIds": [
+        "runtime:15fbb6cecb14cc6f",
+        "runtime:2852909bcb44bac5",
+        "runtime:2c14077772f2f5da",
+        "runtime:49a9c38e25c24472",
+        "runtime:4f0648b25cd0d15b",
+        "runtime:75453c5481e20615",
+        "runtime:77c7c9cbbea0a4b5",
+        "runtime:7af92dcc8ca57ffe",
+        "runtime:89f8b5fc85d33ec5",
+        "runtime:bdb155e3ca0500c9",
+        "runtime:c2ff26d95dcb6aad",
+        "runtime:c5c31c739a3cd8de",
+        "runtime:d0c3f7cd7af2c735",
+        "runtime:e38392f47b683c82",
+        "runtime:e3fcc4297e4987e6"
+      ],
+      "upstreamResult": "React literal fragments keep element identity, so adjacent text nodes remain distinct children.",
+      "octaneResult": "Octane literal fragments are positional descriptor arrays; adjacent text coalesces into one text node.",
+      "rationale": "Octane compiles <>...</> to a positional descriptor array, so text children merge differently than React elements at runtime.",
+      "classification": "react-to-octane-element-model",
+      "consumerImpact": "Rendered text content is identical; child node counts can differ inside literal fragments.",
+      "migrationGuidance": "None required; affects only child-node-count assertions on fragment output.",
+      "owner": "@octanejs/i18next",
+      "reviewCondition": "Review if Octane fragments gain element identity."
+    },
+    {
+      "id": "function-components",
+      "caseIds": [
+        "runtime:4d516f1447a62681",
+        "runtime:a0c29b78e4f63e15",
+        "runtime:c8901b67e46c4a8e",
+        "runtime:f201b52933f09ced"
+      ],
+      "upstreamResult": "React HOC tests use class components and createRef forwarding.",
+      "octaneResult": "Octane preserves the HOC contract with function components and plain-object refs; there is no createRef.",
+      "rationale": "Octane has no class components and no createRef; refs are plain objects passed as props.",
+      "classification": "component-model",
+      "consumerImpact": "`withTranslation` ref forwarding works via plain ref props instead of createRef instances.",
+      "migrationGuidance": "Pass a plain `{ current }` object or callback as the ref prop; do not use React.createRef().",
+      "owner": "@octanejs/i18next",
+      "reviewCondition": "Review if Octane adds a createRef-compatible API."
+    },
+    {
+      "id": "component-signature",
+      "caseIds": ["types:i18next-adapted-misc/provider-signature"],
+      "upstreamResult": "React component types expose a single-argument callable signature usable with toBeCallableWith.",
+      "octaneResult": "Octane component bodies carry the internal (props, scope, extra) signature; OctaneComponentType-typed exports assert on parameter(0) instead of full-callable arity.",
+      "rationale": "Octane components compile to bodies with extra internal parameters, so the public callable surface is expressed through the first (props) parameter.",
+      "classification": "component-model",
+      "consumerImpact": "Type-level assertion helpers see a wider signature; runtime behavior and prop typing are unchanged.",
+      "migrationGuidance": "Assert props through the first parameter (parameter(0)/toExtend) instead of full callable arity.",
+      "owner": "@octanejs/i18next",
+      "reviewCondition": "Review if Octane component types expose a public single-argument callable alias."
+    },
+    {
+      "id": "class-components",
+      "caseIds": ["types:i18next-adapted-misc/class-rejection"],
+      "upstreamResult": "React supports class components in JSX positions.",
+      "octaneResult": "Octane has no class components; React.Component usage is a compile error and rejection cases assert that.",
+      "rationale": "Octane deliberately ships no class component model.",
+      "classification": "component-model",
+      "consumerImpact": "Class-based upstream usages must be rewritten as function components.",
+      "migrationGuidance": "Convert class components to function components with hooks.",
+      "owner": "@octanejs/i18next",
+      "reviewCondition": "Never expected to change; revisit only if Octane adds class support."
+    },
+    {
+      "id": "children-typing",
+      "caseIds": ["types:i18next-adapted-misc/trans-children"],
+      "upstreamResult": "React JSX children have the ReactNode type and produce an error at the Trans children hole.",
+      "octaneResult": "Octane types JSX children as unknown through the descriptor contract, so the upstream @ts-expect-error control is relocated to the props-level assertion.",
+      "rationale": "Octane JSX children are typed unknown under the compiled descriptor model rather than ReactNode.",
+      "classification": "react-to-octane-element-model",
+      "consumerImpact": "Child-content type errors surface at different assertion points than upstream React.",
+      "migrationGuidance": "None required; type diagnostics still reject invalid children through the adapted assertion sites.",
+      "owner": "@octanejs/i18next",
+      "reviewCondition": "Review if Octane JSX children typing converges on a ReactNode-shaped contract."
+    }
+  ],
+  "materializedTests": "packages/i18next"
 }

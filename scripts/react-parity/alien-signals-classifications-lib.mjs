@@ -22,7 +22,7 @@ const DISCOVERY_ROOTS = [
 	},
 	{
 		root: 'scripts/react-parity',
-		match: /^alien-signals-(?:classifications|runtime|types)-lib\.test\.mjs$/,
+		match: /^alien-signals-(?:(?:classifications|runtime|types)-lib|oracle)\.test\.mjs$/,
 	},
 ];
 const DISPOSITIONS = new Set([

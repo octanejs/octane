@@ -1,0 +1,35 @@
+{
+  "runtimeDependencies": ["octane", "thinking-orbs"],
+  "adaptedSources": [
+    {
+      "packageName": "thinking-orbs",
+      "paths": ["src/ThinkingOrb.tsrx", "src/theme.ts", "src/types.ts"]
+    }
+  ],
+  "sourceLedger": [
+    {
+      "path": "src/ThinkingOrb.tsrx",
+      "origin": "adapted",
+      "packageName": "thinking-orbs",
+      "sha256": "670786667fddce68ff9d1485f5cb0053551226fe29a9daba2c29ce124a762576"
+    },
+    {
+      "path": "src/index.ts",
+      "origin": "authored",
+      "sha256": "d1688b2f57b0f28db72e729eb5be2c517638405162dad9ce34571d6b2b7aa936"
+    },
+    {
+      "path": "src/theme.ts",
+      "origin": "adapted",
+      "packageName": "thinking-orbs",
+      "sha256": "840b185b035c9c934bf01d6c67e4a768b86b5d255186ee2c83e993d5e3549722"
+    },
+    {
+      "path": "src/types.ts",
+      "origin": "adapted",
+      "packageName": "thinking-orbs",
+      "sha256": "2317b72116b1fc76ebb643d371fb755f12e245c221ab73eeb6687043ddc502b6"
+    }
+  ],
+  "reimplementedDependencies": []
+}

@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { createInstance } from 'i18next';
 import { renderToString } from 'octane/server';
+import type { ReportNamespaces } from '@octanejs/i18next';
 import { ServerApp } from '../_fixtures/ssr.tsrx';
 
 describe('@octanejs/i18next server rendering', () => {
+	// @parity-case ssr:i18next-render
 	it('renders preloaded hook and Trans output and reports used namespaces', async () => {
 		const instance = createInstance();
 		await instance.init({
@@ -24,6 +26,7 @@ describe('@octanejs/i18next server rendering', () => {
 		expect(html).toContain('<h1>Server greeting</h1>');
 		expect(html).toContain('<p id="ready">true</p>');
 		expect(html).toContain('<strong>Ada</strong>');
-		expect(instance.reportNamespaces?.getUsedNamespaces()).toContain('translation');
+		const namespaces = (instance as { reportNamespaces?: ReportNamespaces }).reportNamespaces;
+		expect(namespaces?.getUsedNamespaces()).toContain('translation');
 	});
 });

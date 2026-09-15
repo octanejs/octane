@@ -36,8 +36,8 @@ async function fixture() {
 
 test('accepts the pinned port-authored and adapted upstream sets', function acceptsPinned() {
 	const result = verifyReactResizablePanelsTestClassifications(repo);
-	assert.equal(result.tests, 11);
-	assert.equal(result.adaptedUpstreamSuites, 29);
+	assert.equal(result.tests, 12);
+	assert.equal(result.adaptedUpstreamSuites, 31);
 });
 
 test('rejects an extra adapted upstream file absent from inventory adaptedPath', async function rejectsExtra(t) {

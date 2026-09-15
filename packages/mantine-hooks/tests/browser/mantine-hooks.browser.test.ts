@@ -57,6 +57,15 @@ beforeAll(async () => {
 	const address = server.httpServer!.address();
 	if (!address || typeof address === 'string') throw new Error('Missing HTTP address');
 	origin = `http://127.0.0.1:${address.port}`;
+	// Prepare the cold Vite module graph within the setup budget. Each test still
+	// starts in a fresh page and retains its five-second interaction deadlines.
+	const warmup = await browser.newPage();
+	try {
+		await warmup.goto(`${origin}/fixture?ssr=0`, { waitUntil: 'networkidle', timeout: 45_000 });
+		await warmup.locator('#root[data-ready="true"]').waitFor({ timeout: 5000 });
+	} finally {
+		await warmup.close();
+	}
 }, 60_000);
 afterAll(async () => {
 	await browser?.close();
@@ -71,7 +80,10 @@ describe('Mantine hooks browser compatibility', () => {
 			const errors: string[] = [];
 			page.on('pageerror', (error) => errors.push(error.message));
 			try {
-				await page.goto(`${origin}/fixture?ssr=${ssr ? 1 : 0}`, { waitUntil: 'networkidle' });
+				await page.goto(`${origin}/fixture?ssr=${ssr ? 1 : 0}`, {
+					waitUntil: 'networkidle',
+					timeout: 30_000,
+				});
 				await page.locator('#root[data-ready="true"]').waitFor();
 				if (ssr) expect(await page.locator('#root').getAttribute('data-adopted')).toBe('true');
 				const events = async (): Promise<Array<{ kind: string; value: string | number }>> =>

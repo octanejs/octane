@@ -78,7 +78,7 @@ diff --git a/tests/upstream/useForm/setValue.test.tsx b/tests/upstream/useForm/s
      });
    });
  
-@@ -961,6 +966,7 @@ describe('setValue', () => {
+@@ -1049,6 +1054,7 @@ describe('setValue', () => {
  
    describe('with strict mode', () => {
      it('should be able to set input value async', async () => {
@@ -86,7 +86,7 @@ diff --git a/tests/upstream/useForm/setValue.test.tsx b/tests/upstream/useForm/s
        function App() {
          const { control, setValue } = useForm();
  
-@@ -990,11 +996,14 @@ describe('setValue', () => {
+@@ -1078,11 +1084,14 @@ describe('setValue', () => {
          );
        }
  
@@ -103,7 +103,7 @@ diff --git a/tests/upstream/useForm/setValue.test.tsx b/tests/upstream/useForm/s
      });
    });
  
-@@ -1040,6 +1049,14 @@ describe('setValue', () => {
+@@ -1128,6 +1137,14 @@ describe('setValue', () => {
      );
    });
  
@@ -118,7 +118,7 @@ diff --git a/tests/upstream/useForm/setValue.test.tsx b/tests/upstream/useForm/s
    it('should validate the input and return correct isValid formState', async () => {
      const { result } = renderHook(() =>
        useForm<{ test: { data: string; data1: string } }>({
-@@ -1069,6 +1086,9 @@ describe('setValue', () => {
+@@ -1157,6 +1174,9 @@ describe('setValue', () => {
          shouldValidate: true,
        });
      });

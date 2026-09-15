@@ -1,0 +1,57 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "strict": true,
+    "skipLibCheck": false,
+    "noEmit": true,
+    "types": ["vitest/globals", "node"]
+  },
+  "include": [
+    "../tests/upstream/_types/**/*.test-d.ts",
+    "../tests/upstream/_types/__fixtures__/**/*.ts",
+    "../src/**/*.ts",
+    "../src/**/*.tsrx"
+  ],
+  "exclude": ["./pristine"],
+  "reactPortEvidence": {
+    "gate": "upstream-types-adapted",
+    "upstreamMode": "materialized",
+    "upstreamRegistrations": [
+      "react-case-v1:04189f1243bbbe402acd",
+      "react-case-v1:24c809fdd9977fb4a404",
+      "react-case-v1:2e375719c8f4db2a1bdb",
+      "react-case-v1:2f4dc123d6676ee20bf1",
+      "react-case-v1:421ea1d517d84d4bf6be",
+      "react-case-v1:46654a30289a9ef103b5",
+      "react-case-v1:4baf0a6e307764aa47a6",
+      "react-case-v1:4cb1da090f528ee01629",
+      "react-case-v1:4fa8c9b1969015f28fec",
+      "react-case-v1:59877a762b98c41f7333",
+      "react-case-v1:65d067e47946a79acc50",
+      "react-case-v1:68905de392c2bffe003f",
+      "react-case-v1:6bac80cfa792bc109ae5",
+      "react-case-v1:76d93ba49745d03fc895",
+      "react-case-v1:795c77205962a18867bc",
+      "react-case-v1:7a233bffd095e653c574",
+      "react-case-v1:89d48dbcc7f41e36fbd3",
+      "react-case-v1:8e174c50dc560e38570b",
+      "react-case-v1:95d5202de95b3dfac4b7",
+      "react-case-v1:97634774de5b10d32935",
+      "react-case-v1:97c0876c9deee77f9c3a",
+      "react-case-v1:b3d99a1ec270323086cf",
+      "react-case-v1:b646280028bfee31cd50",
+      "react-case-v1:b8a53f1db7ff037044c1",
+      "react-case-v1:c3f630f38eb384ec55b1",
+      "react-case-v1:c5c3b4214f5764ca3efd",
+      "react-case-v1:cc992d16bfabd10ba204",
+      "react-case-v1:ce9aed414dc93443a181",
+      "react-case-v1:dbb26acf7db61eb7e145",
+      "react-case-v1:e1b6875c5db4f36f05fd",
+      "react-case-v1:e3f17156ea632dc6d6ce",
+      "react-case-v1:e77495c31139469a95da",
+      "react-case-v1:ebc41970f7db3d478ecc",
+      "react-case-v1:fd0837a8ee25b81176d6"
+    ]
+  },
+  "files": ["../tests/upstream/type.test.tsx"]
+}

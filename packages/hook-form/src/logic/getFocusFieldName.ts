@@ -1,4 +1,4 @@
-// Vendored from react-hook-form@7.81.0 src/logic/getFocusFieldName.ts (octane port).
+// Adapted from react-hook-form@7.88.0 src/logic/getFocusFieldName.ts for Octane.
 import type { FieldArrayMethodProps, InternalFieldName } from '../types';
 import isUndefined from '../utils/isUndefined';
 

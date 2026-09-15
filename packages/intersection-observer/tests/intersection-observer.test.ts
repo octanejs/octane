@@ -26,6 +26,24 @@ afterEach(() => {
 });
 
 describe('observe', () => {
+	// @parity-case native:intersection-observer-3cdbe69d7e17772a
+	it('keeps a duplicate callback registration active after another is cleaned twice', () => {
+		const target = document.createElement('div');
+		const callback = vi.fn();
+		const stopFirst = observe(target, callback);
+		const stopSecond = observe(target, callback);
+		try {
+			stopFirst();
+			stopFirst();
+			mockIsIntersecting(target, true);
+			expect(callback).toHaveBeenCalledExactlyOnceWith(true, expect.objectContaining({ target }));
+		} finally {
+			stopFirst();
+			stopSecond();
+		}
+	});
+
+	// @parity-case native:intersection-observer-76d5510c9975101f
 	it('pools matching options and disconnects after the final subscriber', () => {
 		const first = document.createElement('div');
 		const second = document.createElement('div');
@@ -40,6 +58,7 @@ describe('observe', () => {
 		expect(observer.disconnect).toHaveBeenCalledOnce();
 	});
 
+	// @parity-case native:intersection-observer-624d06902c07c723
 	it('keeps distinct observers registered for the same element', () => {
 		const target = document.createElement('div');
 		const first = vi.fn();
@@ -58,6 +77,7 @@ describe('observe', () => {
 		stopSecond();
 	});
 
+	// @parity-case native:intersection-observer-d139442a8d7ea142
 	it('derives mock intersection state from each observer threshold', () => {
 		const target = document.createElement('div');
 		const callback = vi.fn();
@@ -78,6 +98,7 @@ describe('observe', () => {
 });
 
 describe('Octane binding', () => {
+	// @parity-case native:intersection-observer-f9322d26f1d415ec
 	it('updates useInView and skips the initial false notification', () => {
 		const onChange = vi.fn();
 		const result = mount(HookProbe, { onChange });
@@ -96,6 +117,7 @@ describe('Octane binding', () => {
 		result.unmount();
 	});
 
+	// @parity-case native:intersection-observer-8ae64f75046bf056
 	it('stops observing after triggerOnce enters', () => {
 		const result = mount(HookProbe, { triggerOnce: true });
 		flushEffects();
@@ -107,6 +129,7 @@ describe('Octane binding', () => {
 		result.unmount();
 	});
 
+	// @parity-case native:intersection-observer-6b770c283183edce
 	it('runs useOnInView without a visibility rerender contract', () => {
 		const onChange = vi.fn();
 		const result = mount(EffectProbe, { onChange });
@@ -116,6 +139,7 @@ describe('Octane binding', () => {
 		result.unmount();
 	});
 
+	// @parity-case native:intersection-observer-d7ee2370c318a4f7
 	it('only suppresses the first false useOnInView notification', () => {
 		const onChange = vi.fn();
 		const result = mount(EffectProbe, { onChange });
@@ -127,6 +151,7 @@ describe('Octane binding', () => {
 		result.unmount();
 	});
 
+	// @parity-case native:intersection-observer-dc6b7585d0089ba5
 	it('resets useOnInView initial-false suppression when the target changes', () => {
 		const onChange = vi.fn();
 		const result = mount(EffectSwapProbe, { alternate: false, onChange });
@@ -141,6 +166,7 @@ describe('Octane binding', () => {
 		result.unmount();
 	});
 
+	// @parity-case native:intersection-observer-1776a2ad2a789e8f
 	it('keeps triggerOnce observing until the threshold-aware inView state is true', () => {
 		const result = mount(EffectProbe, {
 			onChange: vi.fn(),
@@ -156,6 +182,27 @@ describe('Octane binding', () => {
 		result.unmount();
 	});
 
+	// @parity-case native:intersection-observer-latest-initial-visibility
+	it('uses the latest initial visibility when a stable hook ref changes target', () => {
+		const onChange = vi.fn();
+		const result = mount(HookSwapProbe, { alternate: false, initialInView: true, onChange });
+		try {
+			const initial = result.find('[data-testid="hook-swap"]');
+			mockIsIntersecting(initial, true);
+			result.update(HookSwapProbe, { alternate: false, initialInView: undefined, onChange });
+			result.update(HookSwapProbe, { alternate: true, initialInView: undefined, onChange });
+			onChange.mockClear();
+			const target = result.find('[data-testid="hook-swap"]');
+			mockIsIntersecting(target, false);
+			expect(onChange).not.toHaveBeenCalled();
+			mockIsIntersecting(target, true);
+			expect(onChange).toHaveBeenCalledExactlyOnceWith(true, expect.objectContaining({ target }));
+		} finally {
+			result.unmount();
+		}
+	});
+
+	// @parity-case native:intersection-observer-f3d7ca0842a53c31
 	it('resets useInView initial-false suppression when the target changes', () => {
 		const onChange = vi.fn();
 		const result = mount(HookSwapProbe, { alternate: false, onChange });
@@ -172,6 +219,7 @@ describe('Octane binding', () => {
 		result.unmount();
 	});
 
+	// @parity-case native:intersection-observer-92503995363ad90c
 	it('uses the latest useOnInView callback immediately after a render', () => {
 		const first = vi.fn();
 		const second = vi.fn();
@@ -184,6 +232,7 @@ describe('Octane binding', () => {
 		result.unmount();
 	});
 
+	// @parity-case native:intersection-observer-49bf4ed589568312
 	it('pools useOnInView observers regardless of library-only flags', () => {
 		const result = mount(EffectPoolProbe);
 		const first = result.find('[data-testid="effect-first"]');
@@ -192,6 +241,7 @@ describe('Octane binding', () => {
 		result.unmount();
 	});
 
+	// @parity-case native:intersection-observer-d438f15588e8c538
 	it('notifies each pooled observer subscriber once in mockAllIsIntersecting', () => {
 		const onFirst = vi.fn();
 		const onSecond = vi.fn();
@@ -204,6 +254,7 @@ describe('Octane binding', () => {
 		result.unmount();
 	});
 
+	// @parity-case native:intersection-observer-a529caf5cdce32bf
 	it('supports the InView render-prop form and ref', () => {
 		const result = mount(ComponentProbe);
 		flushEffects();
@@ -215,6 +266,7 @@ describe('Octane binding', () => {
 		result.unmount();
 	});
 
+	// @parity-case native:intersection-observer-bb9cec9f0615feb3
 	it('keeps a stable composed host ref across InView visibility updates', () => {
 		const onChange = vi.fn();
 		const hostRef = vi.fn();
@@ -242,6 +294,7 @@ describe('Octane binding', () => {
 		result.unmount();
 	});
 
+	// @parity-case native:intersection-observer-aeee5cb6d717f700
 	it('keeps useOnInView observation when a stale cleanup runs after re-attach', () => {
 		const onChange = vi.fn();
 		let attach: ((node: Element | null) => void | (() => void)) | undefined;
@@ -264,6 +317,7 @@ describe('Octane binding', () => {
 		result.unmount();
 	});
 
+	// @parity-case native:intersection-observer-34a64d067d250548
 	it('does not re-arm useOnInView initial-false skip on same-target reattach', () => {
 		const onChange = vi.fn();
 		let attach: ((node: Element | null) => void | (() => void)) | undefined;
@@ -287,6 +341,7 @@ describe('Octane binding', () => {
 		result.unmount();
 	});
 
+	// @parity-case native:intersection-observer-1af91074fcea6f09
 	it('survives sync defaultFallbackInView with triggerOnce without TDZ', () => {
 		const original = window.IntersectionObserver;
 		// @ts-expect-error intentional unsupported environment

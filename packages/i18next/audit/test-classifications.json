@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "tests": [
+    {
+      "path": "packages/i18next/tests/conformance/runtime.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Exercises the Octane hook-slot, descriptor, and rendering contract of the binding against Octane fixtures; it is not same-scenario React execution."
+    },
+    {
+      "path": "packages/i18next/tests/conformance/ssr-apis.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks the binding's legacy SSR adapter surface (withSSR, getInitialProps, composeInitialProps) on Octane; it is not counted as React parity evidence."
+    },
+    {
+      "path": "packages/i18next/tests/conformance/surface.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Compares the @octanejs/i18next export surface and pure helpers (renderTranslation numbering) against the installed react-i18next@17.0.14 package in the same process."
+    },
+    {
+      "path": "packages/i18next/tests/differential/parity.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Runs every declared scenario through the shared differential rig, mounting react-i18next on React and @octanejs/i18next on Octane and comparing normalized DOM after mount and language changes."
+    },
+    {
+      "path": "packages/i18next/tests/ssr/render.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Verifies Octane server rendering of hook and Trans output plus reported namespaces; Octane-only SSR contract, not a React comparison."
+    },
+    {
+      "path": "packages/i18next/tests/types/public.test-d.ts",
+      "disposition": "octane-only-type-conformance",
+      "reason": "Asserts the adapted public declaration surface (typed t() inference, props, withTranslation parameter shape) compiled with tsrx-tsc; binding-specific type conformance, not an upstream suite."
+    },
+    {
+      "path": "packages/i18next/tests/upstream-original.test.ts",
+      "disposition": "unmodified-upstream-suite-wrapper",
+      "oracle": "Runs all 495 runtime registrations from the immutable react-i18next 17.0.14 source on React, checking exact discovered identities and pass results."
+    }
+  ]
+}

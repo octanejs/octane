@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "59b5197a457d62d05aa8866334bc41567581c414b30452a047b00c020d587883"
+      "lockfileSha256": "86e22c8a3652c4663ce8e347d3769f0572c09a1d66c39ed789bd914709b53946"
     }
   },
   "lanes": [
@@ -80,7 +80,7 @@
         {
           "path": "scripts/react-parity/run-pristine.mjs",
           "role": "support",
-          "sha256": "336ac656ce6283a7199c56b3dd7f8ad73b60a3add26feb65bdb973224f3d405e"
+          "sha256": "b22925d67cfa0bed1b0b7fbcdd1a4e924b588d9724dd5b33ac4072df8f317a62"
         },
         {
           "path": "packages/monaco-editor/tests/upstream-pristine.vitest.config.ts",
@@ -205,7 +205,7 @@
       "environment": "workspace-node",
       "project": "monaco-editor-pristine-types",
       "evidenceOrigin": "repo-authored",
-      "notes": "Port-authored React-oracle type probes (groups 1\u20136); upstream ships no typetests.",
+      "notes": "Port-authored React-oracle type probes (groups 1–6); upstream ships no typetests.",
       "execution": {
         "kind": "typescript",
         "compiler": "tsc",
@@ -261,7 +261,7 @@
       "environment": "workspace-node",
       "project": "monaco-editor-adapted-types",
       "evidenceOrigin": "repo-authored",
-      "notes": "Shared groups 1\u20136 plus adapted-only groups 7\u20139 against @octanejs/monaco-editor with tsrx-tsc.",
+      "notes": "Shared groups 1–6 plus adapted-only groups 7–9 against @octanejs/monaco-editor with tsrx-tsc.",
       "execution": {
         "kind": "typescript",
         "compiler": "tsrx-tsc",
@@ -370,7 +370,7 @@
       "octaneResult": "Internal MonacoContainer accepts Octane ref",
       "rationale": "Octane has no forwardRef; refs are ordinary props.",
       "classification": "intentional-divergence",
-      "consumerImpact": "None \u2014 _ref was never public.",
+      "consumerImpact": "None — _ref was never public.",
       "migrationGuidance": "No consumer change.",
       "owner": "bindings",
       "reviewCondition": "If upstream exports MonacoContainer publicly with _ref."

@@ -1,0 +1,16 @@
+diff --git a/tests/upstream/react/useAtomValueRaw.test.tsx b/tests/upstream/react/useAtomValueRaw.test.tsx
+--- a/tests/upstream/react/useAtomValueRaw.test.tsx
++++ b/tests/upstream/react/useAtomValueRaw.test.tsx
+@@ -112,9 +112,11 @@ it('useAtomValueRaw renders once on initial mount', () => {
+ 
+   const Counter = () => {
+     const count = useAtomValueRaw(countAtom)
++    // OCTANE DIVERGENCE[component-commit-observation]: observe the owning component commit, outside the child template scope.
++    const commitCount = useCommitCount()
+     return (
+       <div>
+-        commits: {useCommitCount()}, count: {count}
++        commits: {commitCount}, count: {count}
+       </div>
+     )
+   }

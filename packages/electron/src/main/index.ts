@@ -52,8 +52,8 @@ export interface ShellLike {
 }
 
 export interface ClipboardLike {
-	readText(): string;
-	writeText(text: string): void;
+	readText(): string | Promise<string>;
+	writeText(text: string): void | Promise<void>;
 }
 
 export interface NativeThemeLike {
@@ -199,9 +199,7 @@ export function registerOctaneElectronMain(options: RegisterOctaneElectronMainOp
 	handle(C.shellOpenPath, (_event, fullPath: string) => shell.openPath(fullPath));
 
 	handle(C.clipboardReadText, () => clipboard.readText());
-	handle(C.clipboardWriteText, (_event, text: string) => {
-		clipboard.writeText(text);
-	});
+	handle(C.clipboardWriteText, (_event, text: string) => clipboard.writeText(text));
 
 	handle(C.nativeThemeShouldUseDarkColors, () => nativeTheme.shouldUseDarkColors);
 

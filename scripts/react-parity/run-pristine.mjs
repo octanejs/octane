@@ -8,6 +8,9 @@ import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 export const runners = new Map([
+	['i18next', { packagePath: 'packages/i18next', label: 'react-i18next' }],
+	['mobx', { module: './mobx-pristine-runtime.mjs', label: 'MobX React Lite' }],
+	['motion', { module: './motion-pristine-runtime.mjs', label: 'Motion' }],
 	['tanstack-ai', { module: './tanstack-ai-pristine-runtime.mjs', label: 'TanStack AI' }],
 	['tanstack-db', { module: './tanstack-db-pristine-runtime.mjs', label: 'TanStack DB' }],
 	['tanstack-table', { module: './tanstack-table-pristine-runtime.mjs', label: 'TanStack Table' }],
@@ -18,6 +21,7 @@ export const runners = new Map([
 	['draggable', { module: './react-draggable-pristine-runtime.mjs', label: 'react-draggable' }],
 	['floating-ui', { module: './floating-ui-pristine-runtime.mjs', label: '@floating-ui/react' }],
 	['livestore', { module: './livestore-pristine-runtime.mjs', label: 'LiveStore' }],
+	['jotai', { module: './jotai-pristine-runtime.mjs', label: 'Jotai' }],
 	[
 		'monaco-editor',
 		{ module: './monaco-editor-pristine-runtime.mjs', label: '@monaco-editor/react' },
@@ -44,8 +48,12 @@ if (isMain) {
 		);
 		process.exit(2);
 	}
-	const { runPristineUpstreamSuite } = await import(runner.module);
-	const result = runPristineUpstreamSuite();
+	const result = runner.packagePath
+		? (await import('./pristine-suite-lib.mjs')).runConfiguredPristineSuite(
+				resolve(import.meta.dirname, '../..'),
+				runner.packagePath,
+			)
+		: (await import(runner.module)).runPristineUpstreamSuite();
 	if (result.stdout) process.stdout.write(result.stdout);
 	if (result.stderr) process.stderr.write(result.stderr);
 	const passed = result.identities.filter(function isPassed(test) {

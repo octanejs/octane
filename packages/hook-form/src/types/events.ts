@@ -1,4 +1,4 @@
-// Vendored from react-hook-form@7.81.0 src/types/events.ts (octane port).
+// Adapted from react-hook-form@7.88.0 src/types/events.ts for Octane.
 export type EventType =
 	| 'focus'
 	| 'blur'

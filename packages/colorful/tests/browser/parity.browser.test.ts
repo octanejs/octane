@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Page } from 'playwright';
 import { createServer, type ViteDevServer } from 'vite';
-import { browserName, launchBrowser } from '../../../../test-utils/playwright-browser.js';
+import { launchBrowser } from '../../../../test-utils/playwright-browser.js';
 import { octane } from '../../../octane/src/compiler/vite.js';
 
 const browserTestRoot = dirname(fileURLToPath(import.meta.url));
@@ -211,9 +211,5 @@ async function runBrowserCase() {
 
 describe('@octanejs/colorful real-browser parity', () => {
 	// @parity-case browser:react-colorful-selected
-	it(
-		`${browserName}: drives native interaction and closest-root styles`,
-		() => runBrowserCase(),
-		60_000,
-	);
+	it('drives native interaction and closest-root styles', () => runBrowserCase(), 60_000);
 });

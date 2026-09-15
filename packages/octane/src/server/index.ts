@@ -1,3 +1,4 @@
+export { trustHTML, type TrustedHTML } from '../trusted-html.js';
 /**
  * `octane/server` — server-rendering entry.
  *
@@ -180,6 +181,7 @@ export {
 	mapSlot,
 	ssrControl,
 	ssrArm,
+	ssrForItem,
 	ssrTry,
 	ssrPortal,
 	injectStyle,
