@@ -514,8 +514,10 @@ export function App(props) @{
   useEffect(() => props.observe(outer, shared));
   useEffect(() => props.observe(inner, shared));
   <div>@if (props.show) {
-    <output>{outer as string}</output>
-    @if (props.nested) { <output>{inner as string}</output> }
+    <>
+      <output>{outer as string}</output>
+      @if (props.nested) { <output>{inner as string}</output> }
+    </>
   }</div>
 }`;
 		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();

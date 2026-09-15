@@ -8,7 +8,7 @@ through a Vite-compatible transform context.
 
 The parse-count control runs in a fresh Node process with a benchmark-local ESM
 loader. The loader wraps only the `parseModule` exports of `@tsrx/core` (adapter
-preflight) and `oxc-tsrx/tsrx-core-compat` (authoritative compilation), and
+preflight) and `@tsrx/oxc/tsrx-core-compat` (authoritative compilation), and
 counts only calls whose source and raw/canonical IDs exactly match the generated
 root. Recursive dependency analysis therefore cannot inflate the root count.
 The expected valid-source totals are:
