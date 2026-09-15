@@ -119,7 +119,7 @@ describe('direct signal child bindings', () => {
 	)(
 		'preserves text and siblings when switching scalar and signal values (%j)',
 		async ({ dev, hydrate, onlyChild, initial }) => {
-			const source = `export function App(props) @{ <div>${onlyChild ? '' : '<span>A</span>'}{props.value as string}${onlyChild ? '' : '<span>B</span>'}</div> }`;
+			const source = `export function App(props) @{ <section><div>${onlyChild ? '' : '<span>A</span>'}{props.value as string}${onlyChild ? '' : '<span>B</span>'}</div><footer>{props.finish?.() as string}</footer></section> }`;
 			const id = `/src/text-value-transitions-${dev}-${hydrate}-${onlyChild}-${initial}.tsrx`;
 			const client = loadCompiledFixtureSource(source, {
 				id,
@@ -161,6 +161,29 @@ describe('direct signal child bindings', () => {
 			a$.set('obsolete');
 			await Promise.resolve();
 			expect(host.textContent).toBe(expected('final'));
+			flushSync(() => root!.render(client.App, { value: undefined }));
+			expect(host.textContent).toBe(expected(''));
+			flushSync(() => root!.render(client.App, { value: undefined }));
+			flushSync(() => root!.render(client.App, { value: '' }));
+			b$.set('detached');
+			await Promise.resolve();
+			expect(host.textContent).toBe(expected(''));
+			flushSync(() => root!.render(client.App, { value: 'before' }));
+			const pending = new Promise(() => {});
+			flushSync(() =>
+				root!.render(client.App, {
+					value: 'abandoned',
+					finish: () => {
+						throw pending;
+					},
+				}),
+			);
+			expect(container.querySelector('div')).toBe(host);
+			expect(host.textContent).toBe(expected('before'));
+			// Retrying the same raw value must publish it: the abandoned attempt's
+			// compiler cache is rolled back along with its native text write.
+			flushSync(() => root!.render(client.App, { value: 'abandoned' }));
+			expect(host.textContent).toBe(expected('abandoned'));
 			expect([...host.childNodes].find((node) => node.nodeType === 3)).toBe(text);
 			expect([...host.querySelectorAll('span')]).toEqual(siblings);
 			root.unmount();
@@ -174,7 +197,14 @@ describe('direct signal child bindings', () => {
 		async (dev) => {
 			const id = `/src/initial-signal-text-${dev}.tsrx`;
 			const client = loadCompiledFixtureSource(
-				'export function App(props) @{ <div>{props.value as string}</div> }',
+				`export function App(props) @{ <div>{props.value as string}</div> }
+export function Guarded(props) @{
+  <section>
+    @try { <App {...props} /> }
+    @pending { <p>pending</p> }
+    @catch (error) { <p>{error.message as string}</p> }
+  </section>
+}`,
 				{ id, mode: 'client', compileOptions: { dev } },
 			);
 			const owner = createScope({ scopeKey: id });
@@ -196,6 +226,32 @@ describe('direct signal child bindings', () => {
 			flushSync(() => root!.render(client.App, { value: value$ }));
 			expect(host.textContent).toBe('updated');
 			expect(host.firstChild).toBe(text);
+			root.unmount();
+			root = undefined;
+			const phase$ = owner.signal$('phase', 'ready');
+			const pending = new Promise(() => {});
+			const state$ = owner.derived$('state', () => {
+				const phase = phase$.get();
+				if (phase === 'pending') throw pending;
+				if (phase === 'error') throw new Error('binding failed');
+				return phase;
+			});
+			root = createRoot(container, { signalOwner: owner });
+			root.render(client.Guarded, { value: state$ });
+			expect(container.textContent).toBe('ready');
+			const primary = container.querySelector('div')!;
+			const primaryText = primary.firstChild;
+			phase$.set('pending');
+			await vi.waitFor(() => expect(container.querySelector('p')?.textContent).toBe('pending'));
+			expect(primary.style.display).toBe('none');
+			phase$.set('recovered');
+			await vi.waitFor(() => expect(container.textContent).toBe('recovered'));
+			expect(container.querySelector('div')).toBe(primary);
+			expect(primary.firstChild).toBe(primaryText);
+			phase$.set('error');
+			await vi.waitFor(() =>
+				expect(container.querySelector('p')?.textContent).toBe('binding failed'),
+			);
 			root.unmount();
 			root = undefined;
 			owner.dispose();

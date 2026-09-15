@@ -18507,7 +18507,18 @@ export function bindSignalText(
 	onlyChild = false,
 	seededText: 1 | undefined = undefined,
 	bindingMarker?: string,
+	previousValue?: unknown,
 ): unknown {
+	// Keep the ordinary text cache in the compiler's existing binding bag. A
+	// signal token must still re-enter the read path even when its handle is
+	// unchanged, so pending/error recovery is not hidden by this scalar guard.
+	if (
+		previous instanceof Text &&
+		arguments.length > 8 &&
+		previousValue === value &&
+		!isSignalHandle(value)
+	)
+		return previous;
 	if (previous === undefined && bindingMarker !== undefined) {
 		const existing = activeHydration() !== null ? getNextSibling(position) : null;
 		previous = bindingText(

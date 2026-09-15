@@ -25613,19 +25613,25 @@ function directSignalBindingHelper(bind) {
 	return 'bindSignalAttribute';
 }
 
-function directSignalBindingArgs(bind, host, previous) {
+function directSignalBindingArgs(bind, host, previous, value = bind.expr, previousValue) {
 	const common = [b.id('__s'), previous, host];
 	if (bind.kind === 'text' || bind.kind === 'textOnlyChild') {
 		return [
 			...common,
-			bind.expr,
+			value,
 			b.literal(bind.signalSite, JSON.stringify(bind.signalSite)),
 			b.literal(bind.kind === 'textOnlyChild'),
-			...(bind.bindingMarker
-				? [bind.seededText ? b.literal(1) : undefinedNode(), b.literal(bind.bindingMarker)]
-				: bind.seededText
-					? [b.literal(1)]
-					: []),
+			...(previousValue !== undefined
+				? [
+						bind.seededText ? b.literal(1) : undefinedNode(),
+						bind.bindingMarker ? b.literal(bind.bindingMarker) : undefinedNode(),
+						previousValue,
+					]
+				: bind.bindingMarker
+					? [bind.seededText ? b.literal(1) : undefinedNode(), b.literal(bind.bindingMarker)]
+					: bind.seededText
+						? [b.literal(1)]
+						: []),
 		];
 	}
 	if (
@@ -25665,19 +25671,22 @@ function emitBindingMount(bind, elVar, bag) {
 	const nameLit = () => attrLoweringToken(b.literal(bind.name), bind);
 	const signalHelper = directSignalBindingHelper(bind);
 	if (signalHelper !== null) {
+		const text = bind.kind === 'text' || bind.kind === 'textOnlyChild';
 		return st(
 			b.block([
 				...mountHost(),
+				...(text ? [b.const('_v', bind.expr)] : []),
 				b.stmt(
 					b.assignment(
 						'=',
 						local(`_sig$${bind.id}`),
 						b.call(
 							attrLoweringToken(b.id(`_$${signalHelper}`), bind),
-							...directSignalBindingArgs(bind, el(), undefinedNode()),
+							...directSignalBindingArgs(bind, el(), undefinedNode(), text ? V() : bind.expr),
 						),
 					),
 				),
+				...(text ? [b.stmt(b.assignment('=', local(`_prev$${bind.id}`), V()))] : []),
 			]),
 		);
 	}
@@ -26150,6 +26159,24 @@ function emitBindingUpdate(bind, bag, inlineBindingGuards = false) {
 	const nameLit = () => attrLoweringToken(b.literal(bind.name), bind);
 	const signalHelper = directSignalBindingHelper(bind);
 	if (signalHelper !== null) {
+		if (bind.kind === 'text' || bind.kind === 'textOnlyChild') {
+			return st(
+				b.block([
+					b.const('_v', bind.expr),
+					b.stmt(
+						b.assignment(
+							'=',
+							F('_sig'),
+							b.call(
+								b.id(`_$${signalHelper}`),
+								...directSignalBindingArgs(bind, F('_el'), F('_sig'), V(), F('_prev')),
+							),
+						),
+					),
+					b.stmt(b.assignment('=', F('_prev'), V())),
+				]),
+			);
+		}
 		return st(
 			b.stmt(
 				b.assignment(
