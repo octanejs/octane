@@ -1,5 +1,12 @@
 # @octanejs/lexical
 
+## 0.1.53
+
+### Patch Changes
+
+- Updated dependencies [ede01de]
+  - @octanejs/floating-ui@0.1.53
+
 ## 0.1.52
 
 ### Patch Changes
