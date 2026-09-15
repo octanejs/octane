@@ -1,6 +1,6 @@
 # Async signals: implementation and acceptance
 
-This guide explains how the [accepted RFC](./async-signals-streaming-ssr.md)
+This guide explains how the [RFC under review](./async-signals-streaming-ssr.md)
 maps to Octane's implementation. It separates supported behavior, implementation
 choices, measured results, and unfinished acceptance work.
 
@@ -139,9 +139,7 @@ the latest control state. The queue keeps the existing owner and target fences.
 
 ### Streams settle independently and stay bounded
 
-HTML visibility and signal-result delivery are separate. A slow stylesheet or
-one pending region must not block unrelated results. Each result channel validates
-its identity and sequence and has limits on queued frames, bytes, and lifetime.
+HTML visibility and signal-result delivery have separate receivers. A slow stylesheet or one pending region must not block unrelated results, but this requirement is not fully met: a parser-inserted late stylesheet can still delay later result scripts on the same response. Independent receiver settlement does not bypass that browser parser dependency. Each result channel validates its identity and sequence and has limits on queued frames, bytes, and lifetime.
 
 Failed producers still emit an opening frame before their terminal error.
 Malformed input, missing completion, timeout, and disposal settle affected
@@ -209,6 +207,17 @@ The WebKit result is a specific open-stream observation, not an explanation for
 all Safari loading problems. See the [Safari investigation](./safari-esm-investigation.md).
 
 ## Validation and remaining limits
+
+### New core-team review remains open
+
+The September 15 [Jon review](https://github.com/octanejs/RFCs/discussions/3#discussioncomment-18450583) and [Dominic review](https://github.com/octanejs/RFCs/discussions/3#discussioncomment-18450790) are newer than the earlier three-item feedback follow-up. Passing the authored-presentation tests below does not close these reviews or establish readiness for final integration.
+
+- **Signal transitions:** staging renderer-owned DOM writes is not proof that signal writes are transactional. Ordinary shell-retention coverage passes, but direct signal leaves and superseded pending selections still need the maintainer's exact acceptance case.
+- **Late CSS and result frames:** an actual WebKit probe with a compiled streaming fixture delivered three value frames plus opening/completion frames after a late stylesheet carrier. All response chunks arrived, but the receiver saw zero frames until the held stylesheet loaded, then all five. The matched before-carrier control received all five while CSS was held. Receiver independence alone does not bypass this parser dependency; moving only already-queued results ahead of one carrier would not protect later results behind an earlier stylesheet.
+- **No-signal SSR overhead:** ordinary typed member text can still enable server signal ownership without importing `octane/signals`. This is broader than a `$` naming issue. The per-consumer native `.get()` opt-in correction does not resolve the separate server binding activation path; direct branded-handle behavior must also be preserved by any fix.
+- **Independent query starts:** public-compiler probes reproduce a same-boundary waterfall for both `query$` and async `derived$`, on client and server: declaration starts neither loader, the first strict read starts A, and B starts only after A resolves. Existing `use()` parallel-start tests exercise a different path.
+
+The RFC now corrects snapshot status terminology, text/query selection wording, branch-versus-mainline implementation claims, bootstrap option placement, and uncompiled host continuation requirements. Paging already uses `derived$`. Codec decoding already preserves `__proto__` as inert own data, and compiled URL sinks already use the native sanitizer; those review observations did not require new security behavior. Remaining API and first-delivery scope questions are decisions, not silently accepted changes.
 
 ### Renderer-free controls and styles follow-up
 

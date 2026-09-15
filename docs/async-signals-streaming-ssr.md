@@ -11,7 +11,7 @@ This RFC connects Octane's signals, streaming SSR, and deferred hydration around
 that contract. It supports both native Octane rendering and hosts that keep
 ownership of their HTML.
 
-Status: accepted design, updated September 15, 2026 after core-team feedback. The
+Status: design and implementation under review, updated September 15, 2026 after core-team feedback. Implementation claims below refer to the [PR #1069 branch](https://github.com/octanejs/octane/pull/1069), not released or mainline APIs. The
 [implementation guide and acceptance checklist](./async-signals-implementation.md)
 distinguish implemented APIs from remaining work. The longer host examples below
 are design sketches, not a list of published exports. For executable examples,
@@ -64,11 +64,11 @@ split production graph, and fetched/evaluated assets before and after activation
 
 The early path has two deliberately separate costs:
 
-- `earlySignalBootstrapScript({ nonce })` from `octane/server` emits the existing
+- `earlySignalBootstrapScript({ nonce })` from `octane/server` emits the branch's
   inline input/result capture without importing any client module. An envelope
   owner places it before exposing bound controls or result frames and passes
   `earlySignalBootstrap: 'external'` to its fragment renderers to omit duplicates.
-  `independentHydration: true` additionally captures independent-island intent.
+  Passing `independentHydration: true` to `earlySignalBootstrapScript` additionally captures independent-island intent.
   The host remains responsible for arranging that parser order and CSP policy.
 - Live `get`, `set`, subscriptions, derivations, and async computations require
   the renderer-free signal engine. A host needing synchronous reactive behavior
@@ -76,6 +76,7 @@ The early path has two deliberately separate costs:
   handler early. The tiny capture script alone is **not** a complete reactive
   runtime. Report both byte costs and the time each becomes usable. All later
   consumers must share the same engine/owner, not separately bundled copies.
+  Uncompiled host computations use the explicit attempt-bound `read(handle)` continuation after `await`; raw `get()` there has no implicit dependency tracking or compiler diagnostics. The [continuation contract](#core-and-signals-work) applies to hosts as well as compiled views.
 
 Before evaluating behavior modules that read state, the host upgrades the early
 mailboxes with `bootstrapStreamedSignalResults` from
@@ -152,6 +153,7 @@ must have an explicit owner and reason. Do not remove a readback observer until
 every producer publishes the required state synchronously. These capabilities
 must preserve early controls and streaming authority without pulling the general
 client renderer into a renderer-free route or silently increasing its budget.
+Compiled renderer-free attribute writes preserve Octane's existing URL-sink sanitization, including rejection of unsafe `javascript:` navigation URLs. This is not a general sanitizer for raw HTML, CSS, or external host writers.
 
 Fine-grained native bindings should reuse the existing signal graph. A direct
 signal-valued class or fixed CSS property subscribes to that handle and updates
@@ -358,7 +360,7 @@ The compiler does not need to know whether an imported producer is an `async` fu
 
 Reads and controls keep their existing strict semantics:
 
-- `get()` returns a ready value, suspends an initial pending read in a rendering boundary, or throws a source error. `snapshot()` names idle, pending, ready, refreshing, partial stream, complete, and error states.
+- `get()` returns a ready value, suspends an initial pending read in a rendering boundary, or throws a source error. `snapshot()` reports `idle`, `pending`, `ready`, or `error` status; a `ready` snapshot carries `refreshing` and `complete` flags for quiet refetches and open streams.
 - `latest(fallback)` retains one **whole previous successful calculation with its owner and request provenance**, never old fields mixed with new controls. `refetch()` starts a quiet same-selection attempt when a usable result exists; `reset()` deliberately asks for pending presentation. A renderer error-boundary reset is separate.
 - The shipped `scope.isPending(() => handle$.get())` reports an initial strict pending read as pending. This proposal preserves that behavior; it does not redefine `isPending` as “only a transition is pending.”
 
@@ -559,7 +561,7 @@ HTML segment + matching read-frame identity + placement instruction
 The example abbreviates a versioned tagged codec, not raw object interpolation into a script:
 
 - The receiver checks identity and sequence, accepts each complete frame once, and turns a malformed, missing-terminal, cross-owner, or incompatible stream into a recoverable error. It never exposes an exception stack as a public error value.
-- The codec accepts defined JSON-shaped values plus explicit `undefined` and negative zero, with canonical plain-object keys. Unsupported prototypes, cycles, functions, DOM nodes, and accessors fail. Host validation and authorization still govern request arguments and private results.
+- The codec accepts defined JSON-shaped values plus explicit `undefined` and negative zero, with canonical plain-object keys. Unsupported prototypes, cycles, functions, DOM nodes, and accessors fail. Decoding defines inert own data properties, including `__proto__`, without changing the object's prototype. Host validation and authorization still govern request arguments and private results.
 
 Custom-class reducers/revivers and a switch to devalue are deferred. The existing RPC transport's use of devalue does not expand the streamed-signal codec contract; applications explicitly project domain objects into supported wire data.
 
@@ -624,9 +626,9 @@ Flow control covers the **entire** path:
 
 ## Early interaction and independent hydration
 
-Before hydration, the DOM carries text, focus, caret, selection, and IME composition:
+Before hydration, the DOM carries text, focus, caret, text selection, and IME composition:
 
-- A small receiver starts before streamed placement, records an edit revision for **every** input including clear, and observes selection and discrete intent. An IndexedDB or other restoration candidate applies only under the same owner and unchanged revision; a late read cannot overwrite a new edit.
+- A small receiver starts before streamed placement, records an edit revision for **every** input including clear, and observes text selection and discrete intent. An IndexedDB or other restoration candidate applies only under the same owner and unchanged revision; a late read cannot overwrite a new edit.
 - At handoff, the island reads the actual DOM value and revision, installs subscriptions, checks the revision again, and retires the early listener. It preserves the node and does not synthesize an input event.
 - The server's historical frame explains the HTML; it never rewinds the live draft.
 
@@ -642,7 +644,7 @@ Octane has useful starting points, but independent activation needs more proof:
 
 The receiver hands off an event only to its matching widget:
 
-- An event contract maps the HTML target to a stable handler, owner, and widget. The receiver queues supported discrete intent, prioritizes **that widget's** code, and delivers it once if target, owner, and selection still match.
+- An event contract maps the HTML target to a stable handler, owner, and widget. The receiver queues supported discrete intent, prioritizes **that widget's** code, and delivers it once if target, owner, and query selection still match.
 - The behavior-root path can retain the original `Event` in the same document while deferred. Queued replay cannot restore expired transient user activation. Handlers needing synchronous `preventDefault`, navigation policy, or trusted activation must be available early; native links and text keep native behavior.
 - A compiler-proven tiny descriptor may perform simple local selection before the widget loads; arbitrary closures cannot. For command payloads, an eagerly registered behavior's synchronous `captureEvent(event, element)` returns detached immutable input, delivered as the fourth `handleEvent` argument after readiness/adoption. Capture runs only after registration, not retroactively for events recorded by the default inline script. The queue remains owner-fenced and FIFO; it does not freeze arbitrary objects or infer which signals an action will read. See the [working behavior contract](./deferred-hydration.md#capturing-command-input-before-deferred-work).
 - Measure first-click delay on a real slow connection. Use selective prefetch or a tiny eager handler if an urgent import is too slow. Optional controllers and transitive code remain unevaluated until needed.
@@ -752,7 +754,7 @@ The target is faster useful output and interaction at acceptable total cost, not
 ## Edge case handling
 
 - **Connection loss or moving networks.** A complete ready region remains usable. An incomplete frame is discarded, its channel terminates once, and a new idempotent read may restart from a validated cursor/checkpoint. The original Promise and server iterator do not survive the connection. A write with no authoritative receipt stays uncertain; reconciliation checks its operation ID before any retry.
-- **Concurrent early input and hydration.** The current DOM value, edit revision, owner, focus, caret, selection, and IME state outrank a stale server seed or storage result. A late server segment is checked before placement. Handoff is atomic with respect to input events; it never sends an extra write or replays a cleared draft.
+- **Concurrent early input and hydration.** The current DOM value, edit revision, owner, focus, caret, text selection, and IME state outrank a stale server seed or storage result. A late server segment is checked before placement. Handoff is atomic with respect to input events; it never sends an extra write or replays a cleared draft.
 - **Navigation, BFCache, and account change.** Persisted pages freeze work and revalidate identity and pending channels on `pageshow`; ordinary navigation retires the document owner. An account or feature-owner change invalidates frames, subscriptions, caches, and optimistic receipts associated with the old authority. A late source that ignores `AbortSignal` is fenced by attempt generation.
 - **Deployment and model version change.** HTML, read frame, serialized model, codec, styles, and client code carry a compatible version envelope. A retained document can adopt unchanged content, migrate a supported schema, keep compatible old assets, or re-render an owned widget while preserving recoverable local intent. It must not combine a new handler with incompatible old markup or silently recompute all previously rendered content. A follow-up while older history is streaming starts under the retained compatible owner or an explicitly reconciled upgraded one.
 - **Truncation, overflow, and security.** A frame is accepted only when complete and escaped. Unexpected EOF, invalid sequence, unavailable style, mailbox limit, timeout, or stream error leaves coherent content and a retry path. The server sends public error metadata, not raw exceptions; authorization precedes private HTML or data and repeats for later RPCs. Never treat cancellation as proof a mutation was rejected.
@@ -770,7 +772,7 @@ The acceptance bar is observable:
 1. A result arriving before widget code is adopted once, without a duplicate initial fetch. A changed key, refetch, or retry starts exactly its selected attempt; old-owner and ignored-abort results never publish.
 2. A dependency first read after `await` is tracked in compiled and explicit-reader paths. On invalidation, no mixed-version result or yield publishes. Synchronous derived reads keep their immediate fast path. Initial `isPending`, whole `latest`, stream `complete`, and cross-owner provenance preserve their established meaning.
 3. Fast and independent regions reach the parser before a slow sibling. Each placed HTML segment has its exact historical frame, styles, and selection; a superseded segment fails **before DOM mutation**. Fetched later regions can progress without an await-all barrier.
-4. Typing, clearing, selection, composition, and focus before hydration survive storage restore, late HTML, and handoff. With an eager command capture policy, A → Save → B → Save submits A and B while the editor retains B; A → Save → clear submits A and retains the empty editor. Each command executes once in its matching owner; activating it does not evaluate unrelated widgets. Native link behavior, capture-registration timing, and synchronous activation limits remain explicit.
+4. Typing, clearing, text selection, composition, and focus before hydration survive storage restore, late HTML, and handoff. With an eager command capture policy, A → Save → B → Save submits A and B while the editor retains B; A → Save → clear submits A and retains the empty editor. Each command executes once in its matching owner; activating it does not evaluate unrelated widgets. Native link behavior, capture-registration timing, and synchronous activation limits remain explicit.
 5. Concurrent optimistic writes remain pinned to their selections. With authoritative revision comparison, receipts 2 → 1 settle both operations while authority remains at revision 2. A definitive rejection removes only its overlay; uncertain acknowledgement remains identifiable across reconnect and does not trigger a second POST. Action-like GET parameters create no mutation, a POST failing CSRF validation never dispatches, and accepted POST receipts survive navigation/hydration without redispatch.
 6. A slow batch member does not delay a ready member. Large and aborted streams respect producer/receiver bounds, release a terminal error or completion once, and show no accidental quadratic callbacks or unchanged CSS/head copying.
 7. Comparable production builds and browser traces show eager/deferred bytes and import closures, first useful paint, first native input, first-click latency, server work, and result latency. A disabled optional feature emits no feature-specific eager HTML, JS, or CSS; CSS is present before each enabled region reveals.
@@ -784,7 +786,7 @@ The acceptance bar is observable:
 9. Source-faithful composer, standalone login, auth dialog, attachment, and safety
    views share authored SSR/live presentation and delete their redundant DOM
    builders, selectors, repair observers, and row maps. Existing controls retain
-   identity, selection, composition, and synchronous Send/Stop behavior. Keyed
+   identity, text selection, composition, and synchronous Send/Stop behavior. Keyed
    survivors retain per-item lifetime; removing and re-adopting a view cannot
    revive stale subscriptions or retire shared document state. Independently
    owned tokens, styles, and opaque descendants survive updates and cleanup.
@@ -794,6 +796,8 @@ The acceptance bar is observable:
    downstream deletion or native-device acceptance.
 
 ## Engineering decisions to verify
+
+The September 15 [Jon review](https://github.com/octanejs/RFCs/discussions/3#discussioncomment-18450583) and [Dominic review](https://github.com/octanejs/RFCs/discussions/3#discussioncomment-18450790) remain open beyond the earlier three-item follow-up. In particular, signal transition semantics, parser-level independence from late CSS, signal-free SSR overhead, and parallel independent query starts need explicit qualification before the RFC can be called ready. The [implementation guide](./async-signals-implementation.md#new-core-team-review-remains-open) records the current gaps; passing existing tests does not settle the remaining API or delivery-scope choices.
 
 1. How much local, imported, and effectful Strong-mode code can the compiler prove safe for implicit post-`await` reads? Which unsupported paths receive an explicit-reader requirement, and how do we explain this boundary to authors without implying ambient async tracking?
 2. What is the smallest independent widget manifest and model ABI that proves code, CSS, stable IDs/hook seeds, captures, historical reads, and version compatibility? Which native vs opaque HTML ranges can avoid duplicating large serialized data?
