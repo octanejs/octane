@@ -869,7 +869,7 @@ describe('production SSR build', { timeout: 30_000 }, () => {
 		}, 60_000);
 	}
 
-	it('places fetched SSR, adopts URL receipts, and pages completed history in webkit', async () => {
+	it('accepts protected POSTs, adopts read-only URL receipts, and pages fetched SSR in webkit', async () => {
 		const { webkit } = await import('playwright');
 		const browser = await webkit.launch({ headless: true });
 		const viewer = 'fetched-history-webkit';
@@ -888,8 +888,12 @@ describe('production SSR build', { timeout: 30_000 }, () => {
 			page.on('request', (request) => {
 				if (request.method() === 'POST') posts.push(request.url());
 			});
-			const warmDocument = await page.request.get(productionOrigin + '/conversation-history');
-			const warmData = JSON.parse(dataScriptOf(await warmDocument.text()));
+			// Merely opening an action-shaped URL must not accept a mutation.
+			const warmDocument = await page.request.get(
+				productionOrigin + '/conversation-history?q=prefill-only&operation=unaccepted-get',
+			);
+			const warmHtml = await warmDocument.text();
+			const warmData = JSON.parse(dataScriptOf(warmHtml));
 			const warmQuery = new URLSearchParams({
 				build: warmData.clientBuild.buildId,
 				document: warmData.streamedSignals.documentId,
@@ -925,19 +929,84 @@ describe('production SSR build', { timeout: 30_000 }, () => {
 					(frame) => frame.channel === 'placement' && frame.html.includes('data-history="A"'),
 				),
 			).toBe(true);
-			for (let index = 1; index <= 3; index++) {
-				const response = await page.request.get(
-					productionOrigin + `/conversation-history?q=history-${index}&operation=history-${index}`,
-				);
-				expect(response.status()).toBe(200);
-				await response.body();
+			for (const frame of warmFrames.filter((frame) => frame.channel === 'placement')) {
+				expect(frame.html).toContain('No turns yet.');
+				expect(frame.html).not.toContain('data-turn=');
 			}
+			const prefill = new JSDOM(warmHtml);
+			try {
+				expect(prefill.window.document.querySelector('textarea')?.value).toBe('prefill-only');
+			} finally {
+				prefill.window.close();
+			}
+			const acceptUrl = productionOrigin + '/conversation-history/accept';
+			const attemptedInput = { operationId: 'unaccepted-post', prompt: 'not authorized' };
+			for (const origin of [undefined, hostileBrowserOrigin, 'null']) {
+				const response = await page.request.post(acceptUrl, {
+					headers: origin === undefined ? undefined : { Origin: origin },
+					data: attemptedInput,
+					maxRedirects: 0,
+				});
+				expect(response.status()).toBe(403);
+			}
+			const deniedAction = await page.request.post(acceptUrl, {
+				headers: { Origin: productionOrigin, 'x-fixture-rpc-authorization': 'deny' },
+				data: attemptedInput,
+				maxRedirects: 0,
+			});
+			expect(deniedAction.status()).toBe(401);
+			const formAction = await page.request.post(acceptUrl, {
+				headers: { Origin: productionOrigin },
+				form: attemptedInput,
+				maxRedirects: 0,
+			});
+			expect(formAction.status()).toBe(415);
+			const getAction = await page.request.get(
+				acceptUrl + '?q=not-authorized&operation=wrong-method',
+			);
+			expect(getAction.status()).toBe(404); // No GET route can dispatch this action.
+			const rejectedHistory = await page.request.get(
+				productionOrigin +
+					'/conversation-history/frames?' +
+					warmQuery +
+					'&operation=unaccepted-post',
+			);
+			for (const line of (await rejectedHistory.text()).trim().split('\n')) {
+				const frame = JSON.parse(line);
+				if (frame.channel === 'placement') {
+					expect(frame.html).toContain('No turns yet.');
+					expect(frame.html).not.toContain('data-receipt=');
+				}
+			}
+			let receiptUrl = '';
+			for (let index = 1; index <= 4; index++) {
+				const response = await page.request.post(acceptUrl, {
+					headers: { Origin: productionOrigin },
+					data: { operationId: `history-${index}`, prompt: `history-${index}` },
+					maxRedirects: 0,
+				});
+				expect(response.status()).toBe(303);
+				receiptUrl = response.headers().location;
+				expect(receiptUrl).toBe(`/conversation-history?operation=history-${index}`);
+			}
+			const duplicate = await page.request.post(acceptUrl, {
+				headers: { Origin: productionOrigin },
+				data: { operationId: 'history-4', prompt: 'history-4' },
+				maxRedirects: 0,
+			});
+			expect(duplicate.status()).toBe(303);
+			expect(duplicate.headers().location).toBe(receiptUrl);
 			// Cached visibility is a causal gate, not a race against origin latency.
 			const held = await page.request.post(
 				productionOrigin + '/conversation-history/revalidation?action=hold',
 			);
 			expect(held.status()).toBe(204);
-			await page.goto(productionOrigin + '/conversation-history?q=history-4&operation=history-4');
+			// Reloading the receipt, even with different action-like input, is read-only.
+			const receiptDocument = await page.request.get(
+				productionOrigin + receiptUrl + '&q=another-draft',
+			);
+			expect(receiptDocument.status()).toBe(200);
+			await page.goto(productionOrigin + receiptUrl);
 			const input = page.getByRole('textbox', { name: 'History draft' });
 			await page.locator('[data-history="A"][data-source="cached"][data-revision="0"]').waitFor();
 			expect(
@@ -982,8 +1051,8 @@ describe('production SSR build', { timeout: 30_000 }, () => {
 			await page.getByRole('button', { name: 'Older page', exact: true }).click();
 			expect(await page.locator('[data-turn]').count()).toBe(4);
 			expect(await input.inputValue()).toBe('draft A survives server history');
-			// The one POST is the explicit finite page read. URL acceptance was
-			// server-side and hydration did not resubmit any generation action.
+			// The browser's one POST is the explicit finite page read. Acceptance
+			// already happened; receipt navigation and hydration never resubmit it.
 			const pageHash = createHash('sha256')
 				.update('/src/conversation/Calls.tsrx#readConversationPage')
 				.digest('hex')

@@ -11,7 +11,7 @@ This RFC connects Octane's signals, streaming SSR, and deferred hydration around
 that contract. It supports both native Octane rendering and hosts that keep
 ownership of their HTML.
 
-Status: accepted design, September 11, 2026. The
+Status: accepted design, updated September 15, 2026 after core-team feedback. The
 [implementation guide and acceptance checklist](./async-signals-implementation.md)
 distinguish implemented APIs from remaining work. The longer host examples below
 are design sketches, not a list of published exports. For executable examples,
@@ -47,9 +47,7 @@ Trusted Types integration and enforcement tests remain out of scope.
 - Explicit independent activation fails with a targeted diagnostic if extraction
   cannot preserve ownership/captures. Lexical nesting alone is not a dependency;
   a parent-created lifecycle resource is. Ordinary parent-first hydration stays.
-- Replaceable selection intents retain the latest selection. Distinct actions
-  deliver once each unless explicitly deduplicated. Immediate feedback requires
-  a proven descriptor/eager handler; queued events cannot restore user activation.
+- Replaceable selection intents retain the latest selection. Distinct actions retain their own immutable event-time inputs and deliver once each unless explicitly deduplicated. Capturing a command payload requires an eager handler; the default input mailbox only preserves the latest editor state. Immediate feedback requires a proven descriptor/eager handler; queued events cannot restore user activation.
 - Server-owned HTML with behavior-only activation is a first-class target.
   Global signals, initial SSR values, async/streamed results, early controls, and
   document lifetime must work without importing or starting the client renderer.
@@ -209,11 +207,11 @@ export function createTodos(initialId: string) {
     const preview = await getPreview(id, { signal });
     return { ...preview, selectedId: selectedId$.get() }; // Tracked after await.
   });
-  const visibleTodo$ = optimistic$(todo$);
+  const visibleTodo$ = optimistic$(todo$, {
+    compareAuthority: (incoming, current) => incoming.revision - current.revision,
+  });
 
-  const save = action$("todo.save", async (op) => {
-    const id = selectedId$.get();
-    const text = draft$.get();
+  const save = action$("todo.save", async (op, { id, text }: Readonly<{ id: string; text: string }>) => {
     const base = todo$.snapshot();
     if (base.status !== "ready" || base.value.id !== id)
       throw new Error("The selected Todo is not ready");
@@ -236,6 +234,8 @@ The author API separates writable state from read-only computation:
 - **`signal$(initial)`** is writable state; functions are data. Existing setter updater semantics remain: `set(() => fn)` stores a function. **`derived$(compute)`** is read-only and returns `T`, `Promise<T>`, or `AsyncIterable<T>`. Synchronous computation stays immediate, without an unconditional Promise or microtask. Explicit keyed forms are supported but not required.
 - **`query$(select, load)`**, with an optional explicit key, is read-only. Its synchronous tracked selector must succeed before `load(selected, { signal, previous })` starts. Pending or failed upstream reads propagate without starting the downstream loader. A dedicated `skip` sentinel means no selection; `undefined` remains a valid encoded key.
 - **Streaming and identity.** A stream loader opts in with `{ kind: "stream" }`, publishes complete yields, then terminates. Keys are stable within a feature instance; canonical argument encoding distinguishes selections. Neither a key nor browser-supplied arguments grant authority.
+
+The compiler does not need to know whether an imported producer is an `async` function. On demand, the general `derived$` path invokes the producer normally and inspects its returned value for a thenable or async iterable; a plain function returning `Promise.resolve(...)` works too. Immediate results stay immediate. Only compiler-proven synchronous computations use the smaller synchronous implementation. There is no `AsyncFunction` constructor test, forced `async` declaration, or eager execution solely to classify producers. Post-`await` dependency tracking remains a separate compiler/explicit-reader contract.
 
 Reads and controls keep their existing strict semantics:
 
@@ -271,7 +271,9 @@ export function TodoWidget({ todos }: { todos: ReturnType<typeof createTodos> })
     @try {
       <>
         <h2>{todos.heading$.get()}</h2>
-        <button type="button" onClick={() => todos.save()}>Save</button>
+        <button type="button" onClick={() => todos.save({
+          id: todos.selectedId$.get(), text: todos.draft$.get(),
+        })}>Save</button>
       </>
     } @pending {
       <p role="status">Loading Todo…</p>
@@ -290,6 +292,8 @@ export function TodoWidget({ todos }: { todos: ReturnType<typeof createTodos> })
   </section>
 }
 ```
+
+The button above illustrates an already-running handler. If Save is usable before that handler loads, its inputs must instead be captured at the original event and passed to `save(payload)`; deferred replay of a closure reading the current draft is not equivalent. The eager capture contract below covers that case.
 
 The host authorizes a private document **before emitting private bytes**. It creates one graph per request/document owner; the renderer emits a useful frame and streams independently ready regions. The early receiver initializes the live cells before widget code; the widget later joins them. The explicit `prepare`/`adopt.input` example below is an optional host integration, not required normal authoring. Direct bindings generate equivalent descriptors.
 
@@ -339,7 +343,7 @@ The compiler and receiver split rendering from activation:
 Direct writable bindings perform an atomic handoff; explicit `adopt.input("draft", todos.draft$)` follows the same contract:
 
 - The server emits a compiler-owned binding identity. Early listeners already publish edits into the live cell. Before queued handlers run, handoff validates current DOM value/revision, installs the full binding, and retires the early listener without a duplicate write. It preserves node, focus, caret, and composition.
-- A queued Save therefore sees what the user typed, rather than the factory's empty initial value. Save only renders in a ready arm and rechecks the selected authoritative base at dispatch. A pending base cannot become an optimistic Todo. Other early actions need a tiny explicit descriptor and their own receipt policy.
+- The live draft adopts the latest edit, independently of queued commands. With eager capture, type A → Save → type B → Save submits A then B while the editor stays B; type A → Save → clear submits A while the editor stays empty. Each Save carries detached, immutable draft and selected-item values. Dispatch rechecks its selected authoritative base; a pending or superseded base cannot become an optimistic Todo. Neither replay nor acknowledgement rewinds the editor.
 
 The host sketches above are not copy-and-paste APIs. The contextual server-call
 boundary, however, is implemented:
@@ -356,7 +360,7 @@ boundary, however, is implemented:
 See the [implementation map](./async-signals-implementation.md#core-implementation-map)
 for the compiler, server adapter, and transport owners.
 
-### A dependent request and a URL action
+### A dependent request and safe action entry
 
 Read dependencies are ordinary JavaScript reads. If a second request needs the first result, express the dependency; independent siblings should start without waiting for it.
 
@@ -366,11 +370,13 @@ const items$ = query$("items", () => user$.get().id, loadItems);
 const help$ = query$("help", () => locale$.get(), loadHelp); // Independent sibling.
 ```
 
-A host can accept an initial URL action such as `?q=<text>`:
+A GET URL may prefill a draft with `?q=<text>` or identify an existing receipt with `?operation=<id>`. It must not initiate a mutation. Viewer authorization alone does not establish write intent.
 
-- Validate and authorize it, assign a stable operation ID, and perform required prerequisites on the server. Dispatch the action **once outside speculative rendering** while unrelated reads start in parallel.
-- Acceptance, subsequent output, and HTML can stream independently. The browser adopts the receipt; hydration never replays the URL action.
+- Accept mutations through authenticated, CSRF-protected POSTs. The host validates input and operation identity before dispatching **once outside speculative rendering**, while unrelated reads may start in parallel. Its CSRF policy must cover the actual credential and request transport.
+- After acceptance, the host may redirect to a receipt-only GET URL. Acceptance, subsequent output, and HTML can stream independently; navigation and hydration read/adopt the existing receipt and never redispatch the mutation. Receipt lookup still checks the viewer's authority.
 - Reconcile a lost acknowledgement by operation ID rather than guessing from a canceled fetch. This needs neither a Promise as an RPC argument nor an implicit mutation during render.
+
+The maintained conversation fixture requires an exact same-origin `Origin` and JSON content type on its authenticated POST endpoint, rejecting missing, `null`, and foreign origins before dispatch. This is that host's explicit CSRF policy, not a universal substitute for a host security review.
 
 ### Actions and optimistic acknowledgment
 
@@ -379,6 +385,10 @@ Optimistic writes are pinned to the owner and selected query key at their first 
 - The projection observes a read-only source. A network action has a stable operation ID. Purely local same-turn writes may batch, but unrelated POSTs do not share an implicit transaction.
 - Definitive rejection removes only that operation's overlay. Definitive success adopts an authoritative response or waits until the pinned source covers the write. An uncertain outcome retains its intent and ID for explicit reconciliation.
 - A refetch for another selection cannot move an old overlay there. The host provides idempotency and durable receipts when reload or offline continuity matters.
+
+For concurrent server writes, configure `optimistic$(source$, { compareAuthority })` before dispatch with the source's authoritative revision ordering. It compares the incoming receipt with current authority, never tentative overlays. A finite positive result permits publication; zero or a negative result confirms that operation and removes only its overlay without replacing authority. Receiving revision 2 and then revision 1 therefore settles both operations while authority remains at revision 2. Operation IDs, client dispatch order, selection generations, and transport sequence numbers are not server commit revisions.
+
+The policy is shared by handles for the same source and owner; a different explicit comparator is a configuration error. Unversioned local uses may omit it and retain arrival-order adoption, but that mode does not guarantee freshness for concurrent server receipts. The host must also enforce freshness when installing independently fetched or streamed source values; the action comparator is not a global cache/stream merge policy.
 
 If added, `op.until(() => source$.get())` has a narrow contract:
 
@@ -431,6 +441,8 @@ The example abbreviates a versioned tagged codec, not raw object interpolation i
 
 - The receiver checks identity and sequence, accepts each complete frame once, and turns a malformed, missing-terminal, cross-owner, or incompatible stream into a recoverable error. It never exposes an exception stack as a public error value.
 - The codec accepts defined JSON-shaped values plus explicit `undefined` and negative zero, with canonical plain-object keys. Unsupported prototypes, cycles, functions, DOM nodes, and accessors fail. Host validation and authorization still govern request arguments and private results.
+
+Custom-class reducers/revivers and a switch to devalue are deferred. The existing RPC transport's use of devalue does not expand the streamed-signal codec contract; applications explicitly project domain objects into supported wire data.
 
 **Wire mechanism.** A bootstrap runs before any placement or result script. A CSP-nonced inline result call to a tiny `resolveFrame(encodedFrame)` receiver writes a frame to the browser's local mailbox or resolves its waiting Promise.
 
@@ -513,7 +525,7 @@ The receiver hands off an event only to its matching widget:
 
 - An event contract maps the HTML target to a stable handler, owner, and widget. The receiver queues supported discrete intent, prioritizes **that widget's** code, and delivers it once if target, owner, and selection still match.
 - The behavior-root path can retain the original `Event` in the same document while deferred. Queued replay cannot restore expired transient user activation. Handlers needing synchronous `preventDefault`, navigation policy, or trusted activation must be available early; native links and text keep native behavior.
-- A compiler-proven tiny descriptor may perform simple local selection or essential action before the widget loads; arbitrary closures cannot. The host dispatches a URL action rather than reconstructing one from queued events.
+- A compiler-proven tiny descriptor may perform simple local selection before the widget loads; arbitrary closures cannot. For command payloads, an eagerly registered behavior's synchronous `captureEvent(event, element)` returns detached immutable input, delivered as the fourth `handleEvent` argument after readiness/adoption. Capture runs only after registration, not retroactively for events recorded by the default inline script. The queue remains owner-fenced and FIFO; it does not freeze arbitrary objects or infer which signals an action will read. See the [working behavior contract](./deferred-hydration.md#capturing-command-input-before-deferred-work).
 - Measure first-click delay on a real slow connection. Use selective prefetch or a tiny eager handler if an urgent import is too slow. Optional controllers and transitive code remain unevaluated until needed.
 
 After activation, a signal changing one attribute or style property should update its owned DOM slot without component-wide reconciliation or a duplicated stylesheet:
@@ -639,8 +651,8 @@ The acceptance bar is observable:
 1. A result arriving before widget code is adopted once, without a duplicate initial fetch. A changed key, refetch, or retry starts exactly its selected attempt; old-owner and ignored-abort results never publish.
 2. A dependency first read after `await` is tracked in compiled and explicit-reader paths. On invalidation, no mixed-version result or yield publishes. Synchronous derived reads keep their immediate fast path. Initial `isPending`, whole `latest`, stream `complete`, and cross-owner provenance preserve their established meaning.
 3. Fast and independent regions reach the parser before a slow sibling. Each placed HTML segment has its exact historical frame, styles, and selection; a superseded segment fails **before DOM mutation**. Fetched later regions can progress without an await-all barrier.
-4. Typing, clearing, selection, composition, and focus before hydration survive storage restore, late HTML, and handoff. A captured discrete event executes once in its matching widget; activating it does not evaluate unrelated widgets. Native link behavior and synchronous activation limits remain explicit.
-5. Concurrent optimistic writes remain pinned to their selections. A definitive rejection removes only its overlay; uncertain acknowledgement remains identifiable across reconnect and does not trigger a second POST. A URL action dispatches once, even when its prerequisites and document rendering overlap.
+4. Typing, clearing, selection, composition, and focus before hydration survive storage restore, late HTML, and handoff. With an eager command capture policy, A → Save → B → Save submits A and B while the editor retains B; A → Save → clear submits A and retains the empty editor. Each command executes once in its matching owner; activating it does not evaluate unrelated widgets. Native link behavior, capture-registration timing, and synchronous activation limits remain explicit.
+5. Concurrent optimistic writes remain pinned to their selections. With authoritative revision comparison, receipts 2 → 1 settle both operations while authority remains at revision 2. A definitive rejection removes only its overlay; uncertain acknowledgement remains identifiable across reconnect and does not trigger a second POST. Action-like GET parameters create no mutation, a POST failing CSRF validation never dispatches, and accepted POST receipts survive navigation/hydration without redispatch.
 6. A slow batch member does not delay a ready member. Large and aborted streams respect producer/receiver bounds, release a terminal error or completion once, and show no accidental quadratic callbacks or unchanged CSS/head copying.
 7. Comparable production builds and browser traces show eager/deferred bytes and import closures, first useful paint, first native input, first-click latency, server work, and result latency. A disabled optional feature emits no feature-specific eager HTML, JS, or CSS; CSS is present before each enabled region reveals.
 8. A production behavior-only shell adopts initial SSR state, early edits and
@@ -663,12 +675,15 @@ The acceptance bar is observable:
 
 ## Previous considerations
 
+**2026-09-15:** Jon's review separates immutable command snapshots from live editor handoff, requires revision-aware adoption for concurrent server receipts, and limits GET entry to initialization or existing receipts. Leonid's concern is addressed by separating writable `signal$` from `derived$` and inspecting actual results on the general computation path; compile-time specialization is only an optimization. Custom serialization is deferred.
+
 **2026-09-11:** This version separates upstream Octane contracts from proposed additions and treats independent widget activation, post-`await` reads, streamed result transport, and actions as one design target. Earlier alternatives are summarized below.
 
 **2026-09-09:** An earlier design exposed a `scope` argument in every renderer author call and introduced a dedicated cached shell/`Slot` API. The engine still needs precise owner lifetime; normal renderer code can inherit its document/instance owner, and caching remains a policy of ordinary phases. Another draft split `asyncSignal$` and `query` from the author-facing read model and deferred general async computations; the unified model here is a proposal, not an assertion about existing exports.
 
 ## References
 
+- Core-team feedback: [Jon's action and acknowledgement contracts](https://github.com/octanejs/RFCs/discussions/3#discussioncomment-18407529) and [Leonid's computation and serialization concerns](https://github.com/octanejs/RFCs/discussions/3#discussioncomment-18418626).
 - [Original Octane signals RFC](https://github.com/octanejs/RFCs/discussions/2), [current signals guide](https://github.com/octanejs/octane/blob/main/docs/signals.md), [deferred hydration](https://github.com/octanejs/octane/blob/main/docs/deferred-hydration.md), and [independent islands plan](https://github.com/octanejs/octane/blob/main/docs/hydration-islands-plan.md).
 - [Solid 2 RC discussion](https://github.com/solidjs/solid/discussions/2995), [Solid actions and optimistic RFC](https://github.com/solidjs/solid/blob/next/documentation/solid-2.0/06-actions-optimistic.md), [Angular resource contract](https://angular.dev/guide/signals/resource), [Angular event-dispatch pattern](https://blog.angular.dev/event-dispatch-in-angular-89d868d2351c), and [Cap'n Web](https://github.com/cloudflare/capnweb).
 - Relevant Octane changes and investigations: [native import activation](https://github.com/octanejs/octane/pull/1039), [Strong-mode diagnostics](https://github.com/octanejs/octane/issues/1027), [lazy module syntax](https://github.com/octanejs/octane/pull/1050), [style specialization](https://github.com/octanejs/octane/pull/1051), [direct binding design](https://github.com/octanejs/octane/issues/1049), [streaming pressure](https://github.com/octanejs/octane/issues/967), and [per-wave work](https://github.com/octanejs/octane/issues/981).

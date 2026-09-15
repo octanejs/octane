@@ -43,12 +43,19 @@ export interface BehaviorContext {
 
 export type BehaviorCleanup = () => void;
 
-export interface BehaviorEntry {
+export interface BehaviorEntry<Payload = unknown> {
 	id?: string;
 	target: string | Element;
 	/** Restrict adoption to the closest range belonging to this exact owner. */
 	owner?: unknown;
 	events?: readonly string[];
+	/**
+	 * Synchronously capture detached, immutable command arguments on the original
+	 * native event, before readiness or adoption. Register eagerly; this cannot
+	 * recover values from interactions that happened before registration.
+	 * May preventDefault(), but must not return live DOM/state or a promise.
+	 */
+	captureEvent?(event: Event, element: Element): Payload;
 	ready?: PromiseLike<unknown>;
 	dependencies?: readonly string[];
 	conflicts?: readonly string[];
@@ -57,7 +64,7 @@ export interface BehaviorEntry {
 		element: Element,
 		context: BehaviorContext,
 	): void | BehaviorCleanup | PromiseLike<void | BehaviorCleanup>;
-	handleEvent?(event: Event, element: Element, context: BehaviorContext): void;
+	handleEvent?(event: Event, element: Element, context: BehaviorContext, payload: Payload): void;
 }
 
 export interface BehaviorRegistration {
@@ -73,7 +80,7 @@ export interface BehaviorRoot {
 	/** A snapshot of currently active ranges, registrations, and asynchronous adoptions. */
 	readonly ready: Promise<void>;
 	registerExternalRange(element: Element, options: ExternalRangeOptions): ExternalRange;
-	registerBehavior(entry: BehaviorEntry): BehaviorRegistration;
+	registerBehavior<Payload = unknown>(entry: BehaviorEntry<Payload>): BehaviorRegistration;
 	dispose(options?: BehaviorDisposeOptions): void;
 }
 
@@ -124,9 +131,15 @@ type EntryRecord = {
 	adoptions: Map<Element, AdoptionRecord>;
 	pendingAdoptionCount: number;
 	waitingRanges: Set<RangeRecord>;
-	queuedEvents: Array<{ event: Event; element: Element; range: RangeRecord | undefined }>;
+	queuedEvents: Array<{
+		event: Event;
+		element: Element;
+		range: RangeRecord | undefined;
+		payload?: unknown;
+	}>;
 	queuedEventHead: number;
 	queuedEventFlushDepth: number;
+	captureDepth?: number;
 	unlinks: Array<() => void>;
 	initialScanComplete: boolean;
 };
@@ -337,7 +350,7 @@ function disposeAdoption(adoption: AdoptionRecord): void {
 }
 
 function flushQueuedEvents(record: EntryRecord): void {
-	if (record.status !== 'active') return;
+	if (record.status !== 'active' || record.captureDepth) return;
 	const queue = record.queuedEvents;
 	// Recursive native dispatch shares the cursor and defers compaction to the
 	// outermost flush so an in-flight item remains stable across callbacks.
@@ -346,7 +359,7 @@ function flushQueuedEvents(record: EntryRecord): void {
 		while (record.queuedEventHead < queue.length) {
 			const index = record.queuedEventHead;
 			const queued = queue[index];
-			if (!contains(record.root, queued.element)) {
+			if (queued.payload === CANCELED || !contains(record.root, queued.element)) {
 				record.queuedEventHead = index + 1;
 				continue;
 			}
@@ -368,6 +381,7 @@ function flushQueuedEvents(record: EntryRecord): void {
 				queued.event,
 				queued.element,
 				adoptionContext(adoption, queued.event),
+				queued.payload,
 			);
 		}
 	} finally {
@@ -569,6 +583,33 @@ function handleDelegatedEvent(root: RootRecord, event: Event): void {
 		if (matched === null || !contains(root, matched)) continue;
 		const range = nearestRange(root, matched);
 		if (!rangeMatches(record, range)) continue;
+		if (record.entry.captureEvent !== undefined) {
+			// Reserve native order before application capture: FormData can invoke
+			// a formdata listener which synchronously dispatches another command.
+			const queued = { event, element: matched, range, payload: CANCELED as unknown };
+			record.queuedEvents.push(queued);
+			if (range?.status === 'pending') record.waitingRanges.add(range);
+			record.captureDepth = (record.captureDepth ?? 0) + 1;
+			try {
+				const payload = record.entry.captureEvent(event, matched);
+				// Capture must not authorize delivery after disposal, node removal,
+				// or external-owner handoff. The reserved entry is otherwise dropped.
+				if (
+					!record.controller.signal.aborted &&
+					contains(root, matched) &&
+					matchesTarget(record, matched) &&
+					nearestRange(root, matched) === range
+				)
+					queued.payload = payload;
+			} catch (error) {
+				failBehavior(record, error);
+				throw error;
+			} finally {
+				record.captureDepth--;
+			}
+			flushQueuedEvents(record);
+			continue;
+		}
 		if (record.status !== 'active' || range?.status === 'pending') {
 			record.queuedEvents.push({ event, element: matched, range });
 			if (range?.status === 'pending') record.waitingRanges.add(range);
@@ -580,7 +621,7 @@ function handleDelegatedEvent(root: RootRecord, event: Event): void {
 			flushQueuedEvents(record);
 			continue;
 		}
-		record.entry.handleEvent?.(event, matched, adoptionContext(adoption, event));
+		record.entry.handleEvent?.(event, matched, adoptionContext(adoption, event), undefined);
 	}
 }
 

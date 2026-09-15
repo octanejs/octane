@@ -24,6 +24,7 @@ import {
 	SIGNAL_OWNER_RESOLVE,
 	type ActionOperation,
 	type ActionUncertain,
+	type OptimisticOptions,
 	type OptimisticSignal,
 	type OwnerBoundSignal,
 	type Scope,
@@ -34,6 +35,7 @@ import {
 } from './types.js';
 
 const uncertainReceipts = new WeakSet<object>();
+const noAuthority = Symbol();
 let activeOperation: Operation | undefined;
 let excludedOperation: Operation | undefined;
 
@@ -47,6 +49,7 @@ interface Overlay<T> {
 const managers = new WeakMap<ScopedNode, OptimisticManager<unknown>>();
 
 class OptimisticManager<T> {
+	compareAuthority: OptimisticOptions<T>['compareAuthority'];
 	readonly owner: Scope;
 	readonly version$: OptimisticSignal<number>;
 	readonly view$: SignalHandle<T>;
@@ -161,6 +164,7 @@ class OptimisticManager<T> {
 	}
 
 	adopt(overlay: Overlay<T>, value: T): void {
+		assertWritable();
 		const snapshot = this.source.snapshot();
 		if (
 			snapshot.requestKey !== overlay.requestKey ||
@@ -168,14 +172,31 @@ class OptimisticManager<T> {
 		) {
 			throw new Error('An action cannot adopt authority for a different query selection.');
 		}
+		if (this.source.kind !== 'async' && this.source.kind !== 'signal') {
+			throw new TypeError('Only a writable or query source can adopt an authoritative value.');
+		}
+		if (this.compareAuthority) {
+			// Read accepted authority, including an initial seed or a newer watch value.
+			// Tentative overlays and client dispatch order cannot establish server freshness.
+			const current = this.source.latest(noAuthority);
+			if (current === noAuthority) {
+				throw new Error('An action needs current authority to compare receipt revisions.');
+			}
+			const order = untrack(() => pure(() => this.compareAuthority!(value, current)));
+			if (!Number.isFinite(order)) {
+				throw new TypeError('An authority revision comparator must return a finite number.');
+			}
+			if (order <= 0) {
+				this.remove(overlay.operation);
+				return;
+			}
+		}
 		if (this.source.kind === 'async') {
 			if (!adoptResourceValue(this.source, overlay.requestKey, value)) {
 				throw new Error('The pinned query selection is no longer current.');
 			}
-		} else if (this.source.kind === 'signal') {
-			this.source.set(value);
 		} else {
-			throw new TypeError('Only a writable or query source can adopt an authoritative value.');
+			this.source.set(value);
 		}
 		this.remove(overlay.operation);
 	}
@@ -185,7 +206,11 @@ class OptimisticManager<T> {
 	}
 }
 
-function managerFor<T>(source$: SignalHandle<T>, owner?: SignalOwner): OptimisticManager<T> {
+function managerFor<T>(
+	source$: SignalHandle<T>,
+	owner?: SignalOwner,
+	compareAuthority?: OptimisticOptions<T>['compareAuthority'],
+): OptimisticManager<T> {
 	const resolved = owner
 		? resolveSignalHandleForOwner(source$, owner)
 		: resolveCurrentSignalHandle(source$);
@@ -197,6 +222,12 @@ function managerFor<T>(source$: SignalHandle<T>, owner?: SignalOwner): Optimisti
 		manager = new OptimisticManager(resolved);
 		managers.set(resolved, manager as OptimisticManager<unknown>);
 	}
+	if (compareAuthority && manager.compareAuthority !== compareAuthority) {
+		if (manager.compareAuthority) {
+			throw new Error('An optimistic source cannot use conflicting authority revision policies.');
+		}
+		manager.compareAuthority = compareAuthority;
+	}
 	return manager;
 }
 
@@ -205,16 +236,19 @@ class OptimisticDescriptor<T> implements OptimisticSignal<T>, OwnerBoundSignal<T
 	readonly kind = 'signal' as const;
 	readonly key: string;
 
-	constructor(private readonly source$: SignalHandle<T>) {
+	constructor(
+		private readonly source$: SignalHandle<T>,
+		private readonly compareAuthority?: OptimisticOptions<T>['compareAuthority'],
+	) {
 		this.key = `optimistic:${source$.key}`;
 	}
 
 	[SIGNAL_OWNER_RESOLVE](owner: Scope): SignalHandle<T> {
-		return managerFor(this.source$, owner).view$;
+		return this.manager(owner).view$;
 	}
 
 	private manager(owner?: SignalOwner): OptimisticManager<T> {
-		return managerFor(this.source$, owner);
+		return managerFor(this.source$, owner, this.compareAuthority);
 	}
 
 	get(): T {
@@ -340,6 +374,7 @@ class Operation implements ActionOperation {
 		const [manager, overlay] = this.targets.entries().next().value!;
 		(manager as OptimisticManager<T>).adopt(overlay as Overlay<T>, value);
 		this.targets.delete(manager);
+		this.descriptors.clear();
 		this.status = 'confirmed';
 		this.notifyWaits();
 	}
@@ -443,14 +478,21 @@ class Operation implements ActionOperation {
 	private clear(): void {
 		for (const manager of this.targets.keys()) manager.remove(this);
 		this.targets.clear();
+		this.descriptors.clear();
 	}
 }
 
-export function optimistic$<T>(source$: SignalHandle<T>): OptimisticSignal<T> {
+export function optimistic$<T>(
+	source$: SignalHandle<T>,
+	options?: OptimisticOptions<T>,
+): OptimisticSignal<T> {
 	if (!source$ || typeof source$.get !== 'function') {
 		throw new TypeError('optimistic$ requires a signal source.');
 	}
-	return new OptimisticDescriptor(source$);
+	if (options?.compareAuthority !== undefined && typeof options.compareAuthority !== 'function') {
+		throw new TypeError('An authority revision policy must be a comparator function.');
+	}
+	return new OptimisticDescriptor(source$, options?.compareAuthority);
 }
 
 export function action$<F extends (operation: ActionOperation, ...args: any[]) => any>(

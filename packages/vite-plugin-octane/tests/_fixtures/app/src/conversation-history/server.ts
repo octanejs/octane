@@ -11,7 +11,7 @@ import type { StreamFrameIdentity, StreamedRendererFrame } from 'octane/hydratio
 import { conversations } from '../conversation/host.ts';
 import type { ConversationPage, ConversationTurn } from '../conversation/operations.ts';
 import { History } from './History.tsrx';
-import { history$, type HistoryModel } from './State.tsrx';
+import { draftA$, history$, type HistoryModel } from './State.tsrx';
 
 // Example host policy, not an Octane cache: bounded authorized input snapshots.
 // Never retain rendered HTML, a document token, a nonce, or an adoption lease.
@@ -48,16 +48,60 @@ export function controlHistoryRevalidation(context: Context): Response {
 	return new Response(null, { status: 204 });
 }
 
-export const acceptUrlAction: Middleware = async (context, next) => {
-	const prompt = context.url.searchParams.get('q');
-	if (prompt !== null) {
-		const operationId = context.url.searchParams.get('operation');
-		if (!operationId) return new Response('A stable operation ID is required', { status: 400 });
-		// Acceptance is a request action. Rendering and hydration never submit it.
-		conversations.start({ operationId, conversationId: 'A', prompt }, authorized(context));
-	}
+export const initializeHistoryDraft: Middleware = (context, next) => {
+	// Seed only this request's editable state before render. Hydration adopts
+	// the seed and any newer early edit; URL input never starts an operation.
+	draftA$.set(context.url.searchParams.get('q') ?? '');
 	return next();
 };
+
+export async function acceptHistoryAction(context: Context): Promise<Response> {
+	const authority = authorized(context);
+	const request = context.request;
+	if (request.method !== 'POST')
+		return new Response(null, { status: 405, headers: { Allow: 'POST' } });
+	// This fixture accepts only same-origin browser JSON requests. Requiring
+	// Origin (including for non-browser clients) rejects cross-site form/fetch
+	// submissions before dispatch; authentication alone is not CSRF protection.
+	if (request.headers.get('origin') !== context.url.origin)
+		return new Response('Same-origin action required', { status: 403 });
+	if (
+		request.headers.get('content-type')?.split(';')[0]?.trim().toLowerCase() !== 'application/json'
+	)
+		return new Response('JSON action required', { status: 415 });
+	let input: unknown;
+	try {
+		input = await request.json();
+	} catch {
+		return new Response('Invalid action', { status: 400 });
+	}
+	if (
+		input === null ||
+		typeof input !== 'object' ||
+		!('operationId' in input) ||
+		typeof input.operationId !== 'string' ||
+		!input.operationId ||
+		input.operationId.length > 128 ||
+		!('prompt' in input) ||
+		typeof input.prompt !== 'string' ||
+		!input.prompt ||
+		input.prompt.length > 4_000
+	)
+		return new Response('Invalid action', { status: 400 });
+	conversations.start(
+		{ operationId: input.operationId, conversationId: 'A', prompt: input.prompt },
+		authority,
+	);
+	// Only the accepted receipt is navigable. Repeating this GET, rendering it,
+	// or hydrating its streamed history cannot submit the action again.
+	return new Response(null, {
+		status: 303,
+		headers: {
+			Location: '/conversation-history?' + new URLSearchParams({ operation: input.operationId }),
+			'Cache-Control': 'private, no-store',
+		},
+	});
+}
 
 export function fetchHistory(context: Context): Response {
 	const authority = authorized(context);

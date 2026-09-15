@@ -124,6 +124,13 @@ Replaceable selections keep the latest choice. Distinct actions retain one
 delivery each. Replayed events cannot recreate trusted user activation or
 synchronously cancel an earlier browser action; those cases need an early handler.
 
+Command inputs are separate from live editor state. An eagerly registered
+behavior may use `captureEvent` to snapshot detached immutable input and receive it
+as the fourth `handleEvent` argument after readiness. Two Saves preserve A and B
+even if the editor has already changed to B or been cleared. This hook cannot
+recover inputs from before registration; the default inline mailbox only preserves
+the latest control state. The queue keeps the existing owner and target fences.
+
 ### Streams settle independently and stay bounded
 
 HTML visibility and signal-result delivery are separate. A slow stylesheet or
@@ -142,6 +149,17 @@ remove an optimistic overlay; a lost acknowledgement remains uncertain.
 Navigation can detach a view without canceling already accepted server work.
 The host owns authorization, durable receipts, idempotency, and explicit Stop.
 
+Concurrent server receipts need `optimistic$(source$, { compareAuthority })`.
+The comparator uses real source authority, excluding overlays: an older or equal
+receipt settles only its own operation without replacing a newer value. Owners
+and selection generations still fence adoption. Unversioned arrival-order adoption
+remains available for local uses, not as a server-freshness guarantee.
+
+GET parameters only initialize read-only state, prefill input, or select an
+already accepted receipt. The conversation fixture accepts writes through an
+authenticated POST with strict same-origin `Origin` and JSON checks before
+dispatch; its receipt-only redirect and later hydration do not repeat the write.
+
 Finite read batching uses `batchServerCalls({ kind: 'independent-reads', ... })`.
 Each member is authorized separately and can finish independently. Writes and
 multi-yield subscriptions do not silently join that finite batch.
@@ -156,6 +174,12 @@ The compiler can select a smaller scalar derivation only when its proof permits
 it. `'use strong'` alone does not prove that a result is synchronous or remove
 publicly reachable methods. Unused declarations can be discarded only while
 preserving argument effects, getters, and invalid-call diagnostics.
+
+The general `derived$` path inspects the result when a computation runs, not the
+producer's constructor. Imported functions returning promises remain valid,
+without forced `async` syntax, eager classification, or a microtask for immediate
+values. Writable `signal$` stores functions as data. Custom-class serialization
+and a devalue migration remain outside the streamed-signal codec contract.
 
 The results-only receiver and dependency-free class-normalization helper remove
 unneeded eager dependencies. These are static module boundaries, not runtime
@@ -179,6 +203,10 @@ The WebKit result is a specific open-stream observation, not an explanation for
 all Safari loading problems. See the [Safari investigation](./safari-esm-investigation.md).
 
 ## Validation and remaining limits
+
+The September 15 core-feedback follow-up adds controlled regressions for event-time command snapshots, reverse-order authoritative receipts, and safe GET/POST entry. The previous implementations reproduced missing payloads, revision rollback, and GET-triggered mutation respectively. The fixes pass 238 existing signal test cases, 52 behavior/bundle cases in each of development and production, six existing browser lifecycle cases, and four existing production integration scenarios. Production-built Chromium 149 and Playwright WebKit 26.5 both preserve A/B submissions and Save-then-clear through delayed real signal binding; 21 additional measured WebKit streaming scenarios plus warmups pass. These lanes overlap and are not summed into a unique-test count. Scoped source/public types, formatting, repository sync, and existing shell-fragmentation/bundle-boundary checks also pass. The root local Vitest configuration remains blocked by missing unrelated dependencies; these are scoped genuine-toolchain runs, not a full-workspace local pass. Installed Chrome automation was blocked by managed DevTools policy; Playwright engine results do not establish installed Safari/iOS qualification.
+
+Matched production full-query and receipt streaming fixtures retain byte-identical inline, client, and server output relative to `aff08430c`; neither imports these optional action/behavior APIs. Separate minified esbuild API closures measure the changed code: behavior capture adds 403 raw / 125 gzip / 101 Brotli bytes; action authority ordering adds 857 / 211 / 181 bytes; the combined closure adds 1,263 / 331 / 308 bytes. Both variants retain the same renderer-free module boundary. The default inline capture remains 811 raw / 457 gzip / 367 Brotli bytes including its script tag. These are incremental bundle measurements, not a latency improvement or application startup-budget qualification.
 
 At runtime checkpoint `61e51dd8b`:
 
@@ -247,6 +275,9 @@ acceptance work, not an invitation to weaken the contract.
   superseding HTML, restoration, and concurrent handoff.
 - [x] D6: Discrete actions deliver once to the matching widget; replaceable
   selections coalesce to latest without coalescing unrelated actions.
+- [x] D6a: An eager command capture policy preserves A → Save → B → Save as A/B
+  submissions while the editor stays B, and A → Save → clear as A/empty. Inputs
+  captured before readiness survive once-only delivery; retired owners drop them.
 - [ ] D7: Native navigation stays native; synchronous preventDefault/trusted
   activation requires early code. Mobile first-click delay is measured.
 
@@ -292,10 +323,14 @@ acceptance work, not an invitation to weaken the contract.
   injected by the server for both remote RPC and in-process SSR calls.
 - [x] A2: Browser cancellation options are local only; each call reauthorizes
   before private work/bytes. Trusted context is immutable and member-specific.
-- [x] A3: URL action dispatches once outside speculative rendering while unrelated
-  work proceeds; browser adopts its receipt without replaying the mutation.
+- [x] A3: Action-like GET parameters dispatch no write. An authenticated POST
+  failing CSRF validation dispatches nothing; an accepted POST dispatches once
+  outside speculative rendering, with receipt-only navigation/hydration afterward.
 - [x] A4: Optimistic overlays pin owner/selection/operation ID; concurrent rejection
   removes only its overlay, and confirmation reads authority without self-confirming.
+- [x] A4a: With authoritative revision comparison, receipts 2 → 1 settle both
+  operations without rolling authority back from revision 2. Equal receipts settle
+  without replacement; source refresh, selection changes, and retirement stay fenced.
 - [x] A5: Ambiguous acknowledgement remains uncertain/identifiable and never
   automatically repeats a POST; host idempotency/receipt reconciliation is explicit.
 - [x] A6: Leaving a view cancels its subscription, not accepted server work; server

@@ -234,6 +234,17 @@ export type SignalOwner = Scope | SignalOwnerIdentity | SignalRendererOwnerIdent
 
 export interface OptimisticSignal<T> extends WritableSignal<T> {}
 
+export interface OptimisticOptions<T> {
+	/**
+	 * Compare authoritative revisions, not client invocation order or optimistic values.
+	 * Return a finite positive number only when incoming is newer than current.
+	 * Equal or older receipts settle their operation without replacing the source.
+	 * The callback must be pure. Omitted policies reuse an existing source policy;
+	 * otherwise adoption is unversioned and cannot order concurrent server receipts.
+	 */
+	readonly compareAuthority?: (incoming: T, current: T) => number;
+}
+
 export interface ActionUncertain {
 	readonly status: 'uncertain';
 	readonly operationId: string;

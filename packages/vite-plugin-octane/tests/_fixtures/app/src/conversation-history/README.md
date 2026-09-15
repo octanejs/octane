@@ -2,13 +2,24 @@
 
 This companion to `/conversations` exercises later fetched SSR in the same
 document. Run the fixture and open `/conversation-history`, or use
-`/conversation-history?q=hello&operation=stable-operation-id` to accept a URL
-action. The operation ID is idempotent within the authorized viewer; changing
-its input is an error. A real host must persist that receipt and schedule work
-durably. The shared fixture host is deliberately in-memory.
+`/conversation-history?q=hello` to prefill a draft without starting work. An
+action-shaped GET remains read-only, even if it includes an operation ID.
 
-The route's `before` middleware accepts the URL action. Rendering, hydration,
-and history refresh only read its receipt; they never submit a second mutation.
+Explicit acceptance uses `POST /conversation-history/accept` with JSON
+`{ "operationId": "stable-operation-id", "prompt": "hello" }`. The fixture's
+authorization middleware runs first; the handler then requires an exact
+same-origin `Origin` header and `application/json` before dispatch. Missing,
+opaque, and cross-origin requests fail closed. This is the fixture's CSRF
+policy, not a production authentication implementation. A real host must check
+its trusted public origin and authorization policy (and use a session-bound
+CSRF token when its host policy requires one).
+
+The POST returns a 303 redirect to
+`/conversation-history?operation=stable-operation-id`. The operation ID is
+idempotent within the authorized viewer; changing its input is an error. A real
+host must persist that receipt and schedule work durably. The shared fixture
+host is deliberately in-memory. Rendering, hydration, and history refresh only
+read an existing receipt; they never submit a second mutation.
 Each later request passes the same authorization middleware. Its document token,
 conversation selection, and generation route the response; they do not grant
 access. The server checks the requested build against `Context.clientBuild`
@@ -58,8 +69,9 @@ Evidence is deliberately separated:
 - Deterministic controller tests use real compiled SSR/placement and mock only
   network/RPC delivery to exercise watch/paging races and persisted events.
 - The production WebKit test builds both bundles and exercises authorized
-  cached-to-fresh SSR, A→B→A draft isolation, URL receipt adoption, stable-node
-  activation, and completed-page navigation.
+  cached-to-fresh SSR, A→B→A draft isolation, rejected GET/CSRF submissions,
+  protected POST acceptance, read-only receipt adoption, stable-node activation,
+  and completed-page navigation.
 
 Synthetic persisted events are not proof that a browser entered BFCache. Native
 BFCache entry, OS IME, and mobile-device performance need their own evidence.

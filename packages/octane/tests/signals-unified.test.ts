@@ -579,6 +579,28 @@ describe('optimistic actions', () => {
 		expect(runWithSignalOwner(scope, () => visible$.get())).toBe('tentative');
 		operation.reject();
 		expect(runWithSignalOwner(scope, () => visible$.get())).toBe('fresh');
+
+		const revision$ = __signalAt('g:pure-adoption', 2);
+		const versioned$ = optimistic$(revision$, {
+			compareAuthority: (incoming, current) => incoming - current,
+		});
+		runWithSignalOwner(scope, () =>
+			action$((op) => {
+				operation = op;
+				versioned$.set(3);
+				return op.uncertain();
+			})(),
+		);
+		const adopted$ = __derivedAt('g:adopt-in-read', () => {
+			operation.adopt(1);
+			return true;
+		});
+		expect(() => runWithSignalOwner(scope, () => adopted$.get())).toThrow(/write|pure|comput/i);
+		expect(operation.status).toBe('uncertain');
+		expect(runWithSignalOwner(scope, () => versioned$.get())).toBe(3);
+		operation.adopt(1);
+		expect(operation.status).toBe('confirmed');
+		expect(runWithSignalOwner(scope, () => versioned$.get())).toBe(2);
 	});
 
 	it('does not confirm an A operation from B authority', async () => {
@@ -635,6 +657,33 @@ describe('optimistic actions', () => {
 			);
 			expect(calls).toBe(1);
 			expect(() => operation.adopt('late')).toThrow(/settled/);
+
+			const revision$ = __signalAt('g:versioned-reconcile', { revision: 10, text: 'SSR' });
+			const versioned$ = optimistic$(revision$, {
+				compareAuthority: (incoming, current) => incoming.revision - current.revision,
+			});
+			const accept = action$((op) => {
+				operation = op;
+				versioned$.set({ revision: 0, text: 'tentative' });
+				return op.uncertain();
+			});
+			runWithSignalOwner(scope, () => accept());
+			// The initial source is authority even before any action has adopted.
+			operation.adopt({ revision: 9, text: 'older than SSR' });
+			expect(operation.status).toBe('confirmed');
+			expect(runWithSignalOwner(scope, () => versioned$.get())).toEqual({
+				revision: 10,
+				text: 'SSR',
+			});
+			runWithSignalOwner(scope, () => accept());
+			runWithSignalOwner(scope, () => revision$.set({ revision: 12, text: 'refreshed' }));
+			if (outcome === 'adopt') operation.adopt({ revision: 11, text: 'older receipt' });
+			else operation.reject();
+			expect(operation.status).toBe(outcome === 'adopt' ? 'confirmed' : 'rejected');
+			expect(runWithSignalOwner(scope, () => versioned$.get())).toEqual({
+				revision: 12,
+				text: 'refreshed',
+			});
 		},
 	);
 
@@ -667,7 +716,7 @@ describe('optimistic actions', () => {
 				() => selected$.get(),
 				async (key) => `server-${key}`,
 			);
-			const visible$ = optimistic$(source$);
+			const visible$ = optimistic$(source$, { compareAuthority: () => 0 });
 			let operation!: ActionOperation;
 			const save = action$('fenced-receipt', (op) => {
 				operation = op;
@@ -697,7 +746,8 @@ describe('optimistic actions', () => {
 	);
 
 	it('keeps a selected watch live after adopting an action receipt', async () => {
-		const stream = controlledStream<string>();
+		type Saved = { revision: number; text: string };
+		const stream = controlledStream<Saved>();
 		const scope = owner('document:action-watch');
 		const source$ = __queryAt(
 			'g:action-watch',
@@ -705,20 +755,48 @@ describe('optimistic actions', () => {
 			() => stream.iterable,
 			{ kind: 'stream' },
 		);
-		const visible$ = optimistic$(source$);
+		const visible$ = optimistic$(source$, {
+			compareAuthority: (incoming, current) => incoming.revision - current.revision,
+		});
+		let operation!: ActionOperation;
 		const save = action$('watch-adopt', (operation) => {
-			visible$.set('optimistic');
-			operation.adopt('accepted');
+			visible$.set({ revision: 0, text: 'optimistic' });
+			operation.adopt({ revision: 1, text: 'accepted' });
+		});
+		const pendingSave = action$('watch-uncertain', (op) => {
+			operation = op;
+			visible$.set({ revision: 0, text: 'tentative' });
+			return op.uncertain();
 		});
 		runWithSignalOwner(scope, () => source$.snapshot());
-		stream.emit('before');
+		stream.emit({ revision: 0, text: 'before' });
 		await drainProducers();
 		runWithSignalOwner(scope, () => save());
-		expect(runWithSignalOwner(scope, () => visible$.get())).toBe('accepted');
+		expect(runWithSignalOwner(scope, () => visible$.get()).text).toBe('accepted');
 		expect(stream.cancellations).toBe(0);
-		stream.emit('completed');
+		runWithSignalOwner(scope, () => pendingSave());
+		stream.emit({ revision: 3, text: 'newer watch value' });
 		await drainProducers();
-		expect(runWithSignalOwner(scope, () => visible$.get())).toBe('completed');
+		operation.adopt({ revision: 2, text: 'late receipt' });
+		expect(operation.status).toBe('confirmed');
+		expect(runWithSignalOwner(scope, () => visible$.get()).text).toBe('newer watch value');
+		expect(stream.cancellations).toBe(0);
+		stream.emit({ revision: 4, text: 'completed' });
+		await drainProducers();
+		expect(runWithSignalOwner(scope, () => visible$.get()).text).toBe('completed');
+		stream.end();
+		await drainProducers();
+		expect(runWithSignalOwner(scope, () => source$.snapshot()).complete).toBe(true);
+
+		runWithSignalOwner(scope, () => pendingSave());
+		runWithSignalOwner(scope, () => source$.reset());
+		expect(runWithSignalOwner(scope, () => source$.snapshot()).status).toBe('pending');
+		operation.adopt({ revision: 3, text: 'older than retained authority' });
+		expect(operation.status).toBe('confirmed');
+		expect(runWithSignalOwner(scope, () => visible$.latest())?.text).toBe('completed');
+		stream.emit({ revision: 5, text: 'resumed watch' });
+		await drainProducers();
+		expect(runWithSignalOwner(scope, () => visible$.get()).text).toBe('resumed watch');
 		stream.end();
 		await drainProducers();
 		expect(runWithSignalOwner(scope, () => source$.snapshot()).complete).toBe(true);
@@ -770,30 +848,121 @@ describe('optimistic actions', () => {
 	});
 
 	it('adopts authority only into the pinned query selection', async () => {
-		const initial = deferred<string>();
+		type Saved = { revision: number; text: string };
+		const initial = deferred<Saved>();
 		const selected$ = __signalAt('g:action-selected', 'one');
 		const source$ = __queryAt(
 			'g:action-query',
 			() => selected$.get(),
 			() => initial.promise,
 		);
-		const visible$ = optimistic$(source$);
-		const response = deferred<string>();
-		const save = action$('adopt', async (operation) => {
-			visible$.set('draft');
-			operation.adopt(await response.promise);
+		const compareAuthority = (incoming: Saved, current: Saved) =>
+			incoming.revision - current.revision;
+		const visible$ = optimistic$(source$, { compareAuthority });
+		const shared$ = optimistic$(source$);
+		const operations: ActionOperation[] = [];
+		const save = action$('adopt', async (operation, text: string, response: Promise<Saved>) => {
+			operations.push(operation);
+			visible$.set({ revision: 0, text });
+			operation.adopt(await response);
 		});
 		const scope = owner('document:action-adopt');
 
 		runWithSignalOwner(scope, () => source$.snapshot());
-		initial.resolve('old');
+		initial.resolve({ revision: 0, text: 'old' });
 		await drainProducers();
-		const pending = runWithSignalOwner(scope, () => save());
-		expect(runWithSignalOwner(scope, () => visible$.get())).toBe('draft');
-		response.resolve('authoritative');
-		await pending;
-		expect(runWithSignalOwner(scope, () => source$.get())).toBe('authoritative');
-		expect(runWithSignalOwner(scope, () => visible$.get())).toBe('authoritative');
+		expect(runWithSignalOwner(scope, () => shared$.get()).text).toBe('old');
+		const first = deferred<Saved>();
+		const second = deferred<Saved>();
+		const firstSave = runWithSignalOwner(scope, () => save('A', first.promise));
+		const secondSave = runWithSignalOwner(scope, () => save('B', second.promise));
+		expect(runWithSignalOwner(scope, () => shared$.get()).text).toBe('B');
+		second.resolve({ revision: 2, text: 'accepted B' });
+		await secondSave;
+		expect(runWithSignalOwner(scope, () => source$.get())).toEqual({
+			revision: 2,
+			text: 'accepted B',
+		});
+		first.resolve({ revision: 1, text: 'accepted A' });
+		await firstSave;
+		expect(operations.map((operation) => operation.status)).toEqual(['confirmed', 'confirmed']);
+		expect(runWithSignalOwner(scope, () => source$.get())).toEqual({
+			revision: 2,
+			text: 'accepted B',
+		});
+		expect(runWithSignalOwner(scope, () => visible$.get())).toEqual({
+			revision: 2,
+			text: 'accepted B',
+		});
+
+		await runWithSignalOwner(scope, () =>
+			save('C', Promise.resolve({ revision: 2, text: 'duplicate revision' })),
+		);
+		expect(operations[2].status).toBe('confirmed');
+		expect(runWithSignalOwner(scope, () => shared$.get()).text).toBe('accepted B');
+		expect(() =>
+			runWithSignalOwner(scope, () => optimistic$(source$, { compareAuthority: () => 1 }).get()),
+		).toThrow(/authority.*polic/i);
+		expect(
+			runWithSignalOwner(scope, () => optimistic$(source$, { compareAuthority }).get()).text,
+		).toBe('accepted B');
+
+		const other = owner('document:action-adopt-other');
+		runWithSignalOwner(other, () => source$.snapshot());
+		await drainProducers();
+		await runWithSignalOwner(other, () =>
+			save('other draft', Promise.resolve({ revision: 1, text: 'other accepted' })),
+		);
+		expect(runWithSignalOwner(other, () => source$.get()).text).toBe('other accepted');
+		expect(runWithSignalOwner(scope, () => source$.get()).text).toBe('accepted B');
+
+		for (const comparison of [NaN, Infinity, '1']) {
+			const checked$ = __signalAt(`g:invalid-authority-${comparison}`, 2);
+			const tentative$ = optimistic$(checked$, {
+				compareAuthority: () => comparison as number,
+			});
+			let operation!: ActionOperation;
+			runWithSignalOwner(scope, () =>
+				action$((op) => {
+					operation = op;
+					tentative$.set(3);
+					return op.uncertain();
+				})(),
+			);
+			expect(() => operation.adopt(4)).toThrow(/finite number/);
+			expect(operation.status).toBe('uncertain');
+			expect(runWithSignalOwner(scope, () => checked$.get())).toBe(2);
+			expect(runWithSignalOwner(scope, () => tentative$.get())).toBe(3);
+			operation.reject();
+			expect(runWithSignalOwner(scope, () => tentative$.get())).toBe(2);
+		}
+
+		const guarded$ = __signalAt('g:authority-purity', 1);
+		const invalid$ = optimistic$(guarded$, {
+			compareAuthority: () => {
+				guarded$.set(99);
+				return 1;
+			},
+		});
+		const invalidSave = action$((operation) => {
+			invalid$.set(2);
+			operation.adopt(3);
+		});
+		expect(() => runWithSignalOwner(scope, () => invalidSave())).toThrow(/write|pure|comput/i);
+		expect(runWithSignalOwner(scope, () => guarded$.get())).toBe(1);
+		expect(runWithSignalOwner(scope, () => invalid$.get())).toBe(1);
+
+		const readonly$ = __derivedAt('g:readonly-authority', () => guarded$.get());
+		const readonlyIntent$ = optimistic$(readonly$, { compareAuthority: () => 0 });
+		expect(() =>
+			runWithSignalOwner(scope, () =>
+				action$((operation) => {
+					readonlyIntent$.set(2);
+					operation.adopt(1);
+				})(),
+			),
+		).toThrow(/writable or query/);
+		expect(runWithSignalOwner(scope, () => readonlyIntent$.get())).toBe(1);
 	});
 
 	it('lets an explicit operation pin its first optimistic write after await', async () => {

@@ -172,7 +172,9 @@ Renderer integrations attach an already-validated early result channel with `att
 ```ts
 import { action$, optimistic$ } from 'octane/signals';
 
-const visibleUser$ = optimistic$(user$);
+const visibleUser$ = optimistic$(user$, {
+	compareAuthority: (incoming, current) => incoming.revision - current.revision,
+});
 const save = action$('user.save', async (operation, name: string) => {
 	const id = user$.get().id;
 	visibleUser$.set((user) => ({ ...user, name }));
@@ -191,6 +193,12 @@ const save = action$('user.save', async (operation, name: string) => {
 ```
 
 The action's synchronous prefix is batched. After `await`, opaque helpers use `operation.set(visibleUser$, update)` because ambient operation state is deliberately not carried across arbitrary async code. A definitive rejection removes only that operation's overlay. `operation.adopt(value)` updates only the still-matching pinned source selection; it cannot overwrite a later selection. `operation.until(read, { timeout })` observes pinned authority with its own overlay excluded.
+
+For concurrent server writes, configure `compareAuthority(incoming, current)` before dispatch. It must be pure and return a finite number: positive means strictly newer; zero or negative settles the successful operation and removes only its overlay without replacing authority. Comparison uses the current source value, not an optimistic overlay. Thus receipts for revisions 2 then 1 leave authority at revision 2 while both operations settle. Operation IDs and client request order do not establish server freshness.
+
+Handles for the same owner/source share that policy. Omitted options reuse an existing comparator; a different explicit comparator function is a configuration error. Without a comparator, adoption retains arrival-order behavior for unversioned/local uses and cannot guarantee monotonic server revisions. Independently fetched or streamed authority still needs its own freshness policy; this option governs action receipts, not every source update.
+
+An action only receives the arguments supplied when it is invoked. If its handler is deferred, snapshot the command's inputs in an eager handler and pass them through [behavior capture](./deferred-hydration.md#capturing-command-input-before-deferred-work). Live input handoff preserves the newest editor state, not each earlier Save's payload. A captured submission must not reread the latest draft or rewind the editor when it runs.
 
 `operation.uncertain()` returns an identifiable `{ status: 'uncertain', operationId }` receipt and keeps the overlay for explicit reconciliation. A thrown transport error with code `OCTANE_RPC_UNCERTAIN` is wrapped as `ActionUncertainError` with the operation ID and original cause. Neither path retries a mutation. Use `isActionUncertain(value)` to distinguish both forms. The operation ID is ordinary serializable input for an application server call; the transport does not invent durable idempotency or receipt storage.
 

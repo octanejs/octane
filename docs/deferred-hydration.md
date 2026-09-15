@@ -530,6 +530,52 @@ or restore transient user activation that expired during asynchronous loading.
 Code requiring transient activation must run synchronously while the original
 event is being dispatched.
 
+### Capturing command input before deferred work
+
+Retaining an event does not snapshot other controls or signals. A Save queued
+while a module loads must not later read whichever draft happens to be current.
+Use an eagerly registered `captureEvent` to produce a detached immutable payload:
+
+```ts
+const behavior = import('./save-behavior');
+root.registerBehavior({
+	target: form,
+	events: ['submit'],
+	ready: behavior,
+	captureEvent(event, element) {
+		event.preventDefault();
+		const fields = new FormData(element as HTMLFormElement);
+		return Object.freeze({
+			id: String(fields.get('selectedId')),
+			text: String(fields.get('draft')),
+		});
+	},
+	adopt() {},
+	handleEvent(_event, _element, _context, payload) {
+		void behavior.then(({ save }) => save(payload));
+	},
+});
+```
+
+Here `form` is an existing server-owned form and `root` its behavior root; the
+Save button submits that form. Capture runs synchronously during each matching
+native event, before readiness or adoption can delay delivery. The return type
+is inferred for the fourth `handleEvent` argument. The queued payload is retained
+once, in FIFO order, under the same target/owner lifetime as the event; replacement
+or disposal invalidates it. Octane does not clone or freeze arbitrary values for
+you: copy the primitive fields you need, not live DOM, mutable signal objects, or
+a shared object that later edits can change.
+
+With that policy, A → Save → B → Save delivers A and B while the editor stays B;
+A → Save → clear delivers A and leaves the editor empty. The handler passes the
+payload to `action$`, which still validates the selected owner/base before writing.
+Live control adoption remains independent and always keeps the latest user edit.
+
+The capture registration must be running before these commands are offered. It
+cannot reconstruct commands captured earlier by the default inline bootstrap.
+Neither this hook nor deferred delivery restores transient activation; cancellation
+such as `preventDefault()` must happen in the actual early capture handler.
+
 Root identity is scoped to its document and container. A second root for the
 same live container requires `{ replace: true }`, which disposes the old root
 without removing markup; creating a root for a replacement document never adopts

@@ -782,6 +782,9 @@ describe('behavior-only roots', () => {
 			target: '[data-action]',
 			events: ['click'],
 			ready: moduleReady.promise,
+			captureEvent(_event, element) {
+				return element.textContent;
+			},
 			adopt() {},
 			handleEvent: handled,
 		});
@@ -798,6 +801,10 @@ describe('behavior-only roots', () => {
 		expect(replacement.signal.aborted).toBe(false);
 		expect(handled).not.toHaveBeenCalled();
 		expect(rangeElement.firstElementChild).toBe(button);
+		button.textContent = 'Current owner';
+		button.click();
+		expect(handled).toHaveBeenCalledOnce();
+		expect(handled.mock.calls[0][3]).toBe('Current owner');
 	});
 
 	it('passes the exact queued interaction to a late behavior without redispatching it', async () => {
@@ -833,6 +840,63 @@ describe('behavior-only roots', () => {
 		expect(handled.mock.calls[0][2].signal.aborted).toBe(false);
 		expect(nativeListener).toHaveBeenCalledOnce();
 		expect(original.defaultPrevented).toBe(false);
+
+		behavior.dispose();
+		for (const finalValue of ['B', '']) {
+			container.innerHTML =
+				'<form><input name="selectedId" value="first"><textarea name="text">server</textarea><button>Save</button></form>';
+			const form = container.querySelector('form')!;
+			const selected = form.elements.namedItem('selectedId') as HTMLInputElement;
+			const editor = form.elements.namedItem('text') as HTMLTextAreaElement;
+			const ready = deferred<void>();
+			const submitted: Array<{ selectedId: string; text: string }> = [];
+			const nativeEvents: Event[] = [];
+			const deliveredEvents: Event[] = [];
+			form.addEventListener('submit', (event) => {
+				nativeEvents.push(event);
+				event.preventDefault();
+			});
+			const save = root.registerBehavior({
+				target: form,
+				events: ['submit'],
+				ready: ready.promise,
+				captureEvent(event, element) {
+					event.preventDefault();
+					const data = new FormData(element as HTMLFormElement);
+					return Object.freeze({
+						selectedId: String(data.get('selectedId')),
+						text: String(data.get('text')),
+					});
+				},
+				adopt() {},
+				handleEvent(event, _element, _context, payload) {
+					deliveredEvents.push(event);
+					submitted.push(payload);
+				},
+			});
+			editor.value = 'A';
+			form.dispatchEvent(new SubmitEvent('submit', { bubbles: true, cancelable: true }));
+			editor.value = finalValue;
+			selected.value = 'second';
+			if (finalValue === 'B') {
+				form.dispatchEvent(new SubmitEvent('submit', { bubbles: true, cancelable: true }));
+			}
+			expect(submitted).toEqual([]);
+			ready.resolve(undefined);
+			await save.ready;
+			expect(submitted).toEqual(
+				finalValue === 'B'
+					? [
+							{ selectedId: 'first', text: 'A' },
+							{ selectedId: 'second', text: 'B' },
+						]
+					: [{ selectedId: 'first', text: 'A' }],
+			);
+			expect(editor.value).toBe(finalValue);
+			expect(selected.value).toBe('second');
+			expect(deliveredEvents).toEqual(nativeEvents);
+			save.dispose();
+		}
 	});
 
 	it('preserves synchronous FIFO delivery when a queued handler dispatches another event', async () => {
@@ -871,6 +935,38 @@ describe('behavior-only roots', () => {
 			'after:nested-dispatch',
 			'end:first',
 		]);
+
+		behavior.dispose();
+		const captures: string[] = [];
+		const deliveries: string[] = [];
+		for (const delay of [true, false]) {
+			captures.length = deliveries.length = 0;
+			const ready = deferred<void>();
+			const captured = root.registerBehavior({
+				target: button,
+				events: ['probe'],
+				...(delay ? { ready: ready.promise } : {}),
+				captureEvent(event) {
+					const payload = (event as CustomEvent<string>).detail;
+					captures.push(payload);
+					if (payload === 'A') {
+						button.dispatchEvent(new CustomEvent('probe', { bubbles: true, detail: 'B' }));
+					}
+					return payload;
+				},
+				adopt() {},
+				handleEvent(_event, _element, _context, payload) {
+					deliveries.push(payload);
+				},
+			});
+			button.dispatchEvent(new CustomEvent('probe', { bubbles: true, detail: 'A' }));
+			expect(captures).toEqual(['A', 'B']);
+			if (delay) expect(deliveries).toEqual([]);
+			ready.resolve(undefined);
+			await captured.ready;
+			expect(deliveries).toEqual(['A', 'B']);
+			captured.dispose();
+		}
 	});
 
 	it('preserves FIFO delivery while asynchronous adoptions resume the queue', async () => {
@@ -1329,6 +1425,47 @@ describe('behavior-only roots', () => {
 
 		expect(adopted).not.toHaveBeenCalled();
 		expect(container.querySelector('[data-action]')).not.toBeNull();
+
+		const captureFailure = new Error('cannot capture this command');
+		const nativeErrors: unknown[] = [];
+		const report = (event: ErrorEvent) => {
+			if (event.error === captureFailure) {
+				nativeErrors.push(event.error);
+				event.preventDefault();
+			}
+		};
+		const handled = vi.fn();
+		const button = container.querySelector('button')!;
+		const pending = deferred<void>();
+		const captured = root.registerBehavior({
+			target: button,
+			events: ['click'],
+			ready: pending.promise,
+			captureEvent(_event, element) {
+				if (element.textContent === 'Fail') throw captureFailure;
+				return element.textContent;
+			},
+			adopt: adopted,
+			handleEvent: handled,
+		});
+		const rejected = expect(captured.ready).rejects.toBe(captureFailure);
+		window.addEventListener('error', report);
+		try {
+			button.click();
+			button.textContent = 'Fail';
+			button.click();
+			await rejected;
+			await root.ready;
+			expect(nativeErrors).toEqual([captureFailure]);
+			expect(captured.signal.aborted).toBe(true);
+			pending.resolve(undefined);
+			await Promise.resolve();
+			button.click();
+			expect(adopted).not.toHaveBeenCalled();
+			expect(handled).not.toHaveBeenCalled();
+		} finally {
+			window.removeEventListener('error', report);
+		}
 	});
 
 	it('aborts adopted behavior and keeps preserved DOM when its source signal is canceled', async () => {

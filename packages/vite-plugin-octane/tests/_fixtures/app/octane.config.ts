@@ -5,9 +5,10 @@ import {
 	OCTANE_NONCE_STATE_KEY,
 } from '@octanejs/vite-plugin';
 import {
-	acceptUrlAction,
+	acceptHistoryAction,
 	controlHistoryRevalidation,
 	fetchHistory,
+	initializeHistoryDraft,
 } from './src/conversation-history/server.ts';
 
 export default defineConfig({
@@ -75,7 +76,12 @@ export default defineConfig({
 			new RenderRoute({
 				path: '/conversation-history',
 				entry: ['HistoryApp', '/src/conversation-history/App.tsrx'],
-				before: [acceptUrlAction],
+				before: [initializeHistoryDraft],
+			}),
+			new ServerRoute({
+				path: '/conversation-history/accept',
+				methods: ['POST'],
+				handler: acceptHistoryAction,
 			}),
 			new ServerRoute({ path: '/conversation-history/frames', handler: fetchHistory }),
 			new ServerRoute({

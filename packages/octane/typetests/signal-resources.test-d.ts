@@ -1,4 +1,11 @@
-import { createResource, createScope, query, skip, type Resource } from 'octane/signals';
+import {
+	createResource,
+	createScope,
+	optimistic$,
+	query,
+	skip,
+	type Resource,
+} from 'octane/signals';
 
 const scope = createScope({ scopeKey: 'resource-types' });
 const selected$ = scope.signal$('selected', 1);
@@ -15,6 +22,17 @@ const optional$ = createResource(scope, 'optional', () =>
 const optionalUser: { id: number; name: string } = optional$.get();
 const idle$ = createResource<string>(scope, 'idle', () => skip);
 const idleFallback: string = idle$.latest('waiting');
+
+const saved$ = scope.signal$('saved', { revision: 1, name: 'Saved' });
+const optimisticSaved$ = optimistic$(saved$, {
+	compareAuthority: (incoming, current) => incoming.revision - current.revision,
+});
+const optimisticName: string = optimisticSaved$.get().name;
+
+// @ts-expect-error — authority comparators return ordering numbers, not labels.
+optimistic$(saved$, { compareAuthority: () => 'newer' });
+// @ts-expect-error — both authority values retain the source payload type.
+optimistic$(saved$, { compareAuthority: (incoming: string, current: string) => 0 });
 
 // @ts-expect-error — resource values retain the query result type.
 const wrongValue: string = user$.get();

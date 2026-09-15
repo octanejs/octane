@@ -59,6 +59,7 @@ export type {
 	QueryRequest,
 	QuerySignal,
 	Resource,
+	OptimisticOptions,
 	OptimisticSignal,
 	Scope,
 	ScopeInspection,
