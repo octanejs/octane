@@ -36,3 +36,8 @@ waapi.animate(target, { opacity: 1 });
 scoped.scope.current?.refresh();
 void threeAdapter;
 void delay;
+
+// @ts-expect-error The lifecycle setup must be callable.
+useAnimeScope(42);
+// @ts-expect-error Animation instances retain their upstream type.
+animation satisfies number;

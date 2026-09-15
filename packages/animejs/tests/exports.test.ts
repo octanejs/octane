@@ -10,10 +10,16 @@ describe('@octanejs/animejs exports', () => {
 		const bindingExports = Object.keys(binding).sort();
 
 		expect(bindingExports.filter((name) => name !== 'useAnimeScope')).toEqual(upstreamExports);
+		for (const name of upstreamExports)
+			expect(binding[name as keyof typeof upstream]).toBe(upstream[name as keyof typeof upstream]);
 		expect(binding.useAnimeScope).toBeTypeOf('function');
 	});
 
 	it('preserves every official Three adapter runtime export', () => {
 		expect(Object.keys(bindingThree).sort()).toEqual(Object.keys(upstreamThree).sort());
+		for (const name of Object.keys(upstreamThree))
+			expect(bindingThree[name as keyof typeof upstreamThree]).toBe(
+				upstreamThree[name as keyof typeof upstreamThree],
+			);
 	});
 });

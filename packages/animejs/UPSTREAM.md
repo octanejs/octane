@@ -20,28 +20,32 @@ published core unchanged, those sources are not vendored or shipped here.
 
 ## Public entry-point crosswalk
 
+Prefer direct `animejs` imports for vanilla APIs and `@octanejs/animejs` for
+`useAnimeScope`. The existing root and Three convenience exports remain supported.
+Additional upstream subpaths work directly without adding Octane wrapper files.
+
 | Upstream entry point | Octane disposition | Evidence |
 |---|---|---|
 | `animejs` | Reused unchanged and re-exported from the package root; `useAnimeScope` is the sole additional runtime export | `tests/exports.test.ts`, `tests/types/public-api.test-d.ts` |
 | `animejs/adapters/three` | Reused unchanged at `@octanejs/animejs/adapters/three` | `tests/exports.test.ts`, `tests/three-adapter.test.ts` |
 | `animejs/package.json` | Not re-exported; consumers may inspect the direct dependency when needed | package manifest |
-| `animejs/timer` | Explicit gap; the same APIs remain available through the supported root export | root export inventory |
-| `animejs/animation` | Explicit gap; the same APIs remain available through the supported root export | root export inventory |
-| `animejs/timeline` | Explicit gap; the same APIs remain available through the supported root export | root export inventory |
-| `animejs/animatable` | Explicit gap; the same APIs remain available through the supported root export | root export inventory |
-| `animejs/draggable` | Explicit gap; the same APIs remain available through the supported root export | root export inventory |
-| `animejs/scope` | Explicit gap; the upstream scope API is available through the root and complemented by `useAnimeScope` | `tests/scope.test.ts` |
-| `animejs/engine` | Explicit gap; the same APIs remain available through the supported root export | root export inventory |
-| `animejs/events` | Explicit gap; the same APIs remain available through the supported root export | root export inventory |
-| `animejs/layout` | Explicit gap; the same APIs remain available through the supported root export | root export inventory |
-| `animejs/easings` and its six nested entry points | Explicit gap; easings are available through the supported root export | root export inventory |
-| `animejs/utils` | Explicit gap; utilities are available through the supported root export | root export inventory |
-| `animejs/svg` | Explicit gap; SVG helpers are available through the supported root export | root export inventory |
-| `animejs/text` | Explicit gap; text helpers are available through the supported root export | root export inventory |
-| `animejs/waapi` | Explicit gap; WAAPI helpers are available through the supported root export | root export inventory |
-| `animejs/adapters` | Explicit gap; only the verified Three adapter receives an Octane subpath | adapter export inventory |
+| `animejs/timer` | Direct upstream import; the same APIs remain available through the supported root export | root export inventory |
+| `animejs/animation` | Direct upstream import; the same APIs remain available through the supported root export | root export inventory |
+| `animejs/timeline` | Direct upstream import; the same APIs remain available through the supported root export | root export inventory |
+| `animejs/animatable` | Direct upstream import; the same APIs remain available through the supported root export | root export inventory |
+| `animejs/draggable` | Direct upstream import; the same APIs remain available through the supported root export | root export inventory |
+| `animejs/scope` | Direct upstream import; the upstream scope API is available through the root and complemented by `useAnimeScope` | `tests/scope.test.ts` |
+| `animejs/engine` | Direct upstream import; the same APIs remain available through the supported root export | root export inventory |
+| `animejs/events` | Direct upstream import; the same APIs remain available through the supported root export | root export inventory |
+| `animejs/layout` | Direct upstream import; the same APIs remain available through the supported root export | root export inventory |
+| `animejs/easings` and its six nested entry points | Direct upstream import; easings are available through the supported root export | root export inventory |
+| `animejs/utils` | Direct upstream import; utilities are available through the supported root export | root export inventory |
+| `animejs/svg` | Direct upstream import; SVG helpers are available through the supported root export | root export inventory |
+| `animejs/text` | Direct upstream import; text helpers are available through the supported root export | root export inventory |
+| `animejs/waapi` | Direct upstream import; WAAPI helpers are available through the supported root export | root export inventory |
+| `animejs/adapters` | Direct upstream import; the existing Three convenience path remains supported | adapter export inventory |
 
-`tests/exports.test.ts` compares the binding namespaces with the installed
+`tests/exports.test.ts` compares export names and value identity with the installed
 4.5.0 namespaces in both directions. Removing, renaming, or adding an upstream
 runtime export therefore fails the test. The TypeScript fixture compiles
 representative animation, timeline, scope, engine, utility, SVG/text, WAAPI,
