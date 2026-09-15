@@ -104,8 +104,6 @@ allowBuilds:
 esrap_common: &esrap_common ^2.3.2
 
 overrides:
-  # The 0.4.0 TypeScript plugin still declares the pre-removal Ripple compiler peer.
-  '@tsrx/typescript-plugin@0.4.0>@tsrx/ripple': 0.2.0
   # Browser parity tooling and its transitive consumers must share one runner
   # and Chromium revision. Direct dependencies reference the same catalog.
   '@playwright/test': ^1.61.1
@@ -296,8 +294,8 @@ catalogs:
     '@volar/language-core': 2.4.28
     '@volar/typescript': 2.4.28
     '@tsrx/core': ^0.2.0
-    '@tsrx/prettier-plugin': ^0.4.0
-    '@tsrx/typescript-plugin': ^0.4.0
+    '@tsrx/prettier-plugin': ^0.4.1
+    '@tsrx/typescript-plugin': ^0.4.1
     '@tsrx/ripple': ^0.2.0
     '@tsrx/react': ^0.3.0
     '@tsrx/solid': ^0.2.0
@@ -608,11 +606,11 @@ minimumReleaseAgeExclude:
   - '@ripple-ts/adapter@0.4.0'
   - '@ripple-ts/vite-plugin@0.4.0'
   - '@tsrx/core@0.2.0'
-  - '@tsrx/prettier-plugin@0.4.0'
+  - '@tsrx/prettier-plugin@0.4.1'
   - '@tsrx/react@0.3.0'
   - '@tsrx/ripple@0.2.0'
   - '@tsrx/solid@0.2.0'
-  - '@tsrx/typescript-plugin@0.4.0'
+  - '@tsrx/typescript-plugin@0.4.1'
   - '@tsrx/vite-plugin-react@0.0.105'
   - '@tsrx/vite-plugin-solid@0.0.102'
   - ripple@0.4.0
