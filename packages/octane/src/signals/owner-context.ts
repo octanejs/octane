@@ -5,6 +5,12 @@ let synchronousOwner: SignalOwner | null = null;
 let defaultOwner: (() => SignalOwner | null) | undefined;
 let retireOwner: ((owner: SignalOwner) => void) | undefined;
 
+/** @internal Live capability guards; reading them never installs a default owner. */
+export {
+	installedEnvironment as activeSignalOwnerEnvironment,
+	synchronousOwner as activeSynchronousSignalOwner,
+};
+
 /** Install a concurrency-safe owner carrier without importing the signal engine. */
 export function installSignalOwnerEnvironment(environment: SignalOwnerEnvironment): () => void {
 	if (
@@ -26,6 +32,11 @@ export function currentSignalOwner(): SignalOwner | null {
 	// A server carrier returning no request must not acquire browser authority.
 	if (installedEnvironment !== undefined) return installedEnvironment.current() ?? synchronousOwner;
 	return synchronousOwner ?? defaultOwner?.() ?? null;
+}
+
+/** @internal Distinguish an active owner frame from the lazy document fallback. */
+export function currentExplicitSignalOwner(): SignalOwner | null {
+	return installedEnvironment?.current() ?? synchronousOwner;
 }
 
 /** @internal Client renderer installs its lazy document owner, never a last-root owner. */

@@ -184,6 +184,9 @@ import {
 	type NativeSignalManifest,
 } from './signals/native-read-seeds.js';
 import {
+	currentExplicitSignalOwner,
+	activeSignalOwnerEnvironment,
+	activeSynchronousSignalOwner,
 	currentSignalOwner,
 	retireSignalOwnerIdentity,
 	runWithSignalOwner,
@@ -191,6 +194,7 @@ import {
 import {
 	documentSignalOwner,
 	enableSignalDocument,
+	signalDocumentEnabled,
 	streamedSignalOwnerActivator as STREAMED_SIGNAL_OWNER_ACTIVATOR,
 } from './signals/document-owner.js';
 export {
@@ -451,18 +455,273 @@ let NATIVE_READ_DRIVER: NativeReadDriver | null = null;
 let NATIVE_BLOCK_RETRIES: WeakMap<Block, NativeReadRetry> | null = null;
 let NATIVE_ADOPTION_RELEASES: NativeAdoptionState[] | null = null;
 
-// Module/global signals are a document capability, not root state. The compiler
-// enables it only for modules that use the facade/direct-binding ABI; unrelated
-// applications retain neither a document identity nor any signal-engine cells.
+// Potential bindings retain invocation identities before a late signal module
+// arrives. They do not create document/instance owners until a genuine facade or
+// handle enables the shared document capability.
 let SIGNAL_BINDINGS_ENABLED = false;
-const SCOPE_SIGNAL_OWNERS = /* @__PURE__ */ new WeakMap<Scope, SignalRendererOwnerIdentity>();
-const SCOPE_SIGNAL_INSTANCE_KEYS = /* @__PURE__ */ new WeakMap<Scope, string>();
+const SCOPE_SIGNAL_OWNERS = /* @__PURE__ */ new WeakMap<
+	Scope,
+	SignalRendererOwnerIdentity | false | null
+>();
+type SignalInstanceKey =
+	| string
+	| { parentScope: Scope; invocationSite: string | undefined; key: unknown; hasKey: boolean };
+// Parent links, root namespaces, and keyed item identities are lifetime-stable.
+// Keep their recipe until a real owner is needed: scalar-only components avoid
+// ancestor walks, visited sets, key coercion, and JSON strings altogether.
+const SCOPE_SIGNAL_INSTANCE_KEYS = /* @__PURE__ */ new WeakMap<Scope, SignalInstanceKey>();
+interface SignalRetryNode {
+	children?: Map<unknown, SignalRetryNode>;
+	owner?: SignalRendererOwnerIdentity;
+}
+interface SignalRetryOwners {
+	paths: SignalRetryNode;
+	owners: Set<SignalRendererOwnerIdentity>;
+}
+// Only resource authority crosses an abandoned initial render, never its hooks,
+// scopes or DOM. The root/boundary's existing retry episode owns this cold cache.
+let RETAINED_SIGNAL_OWNERS: SignalRetryOwners | undefined;
+interface SignalRetryLocation {
+	parent: Scope;
+	slot: number;
+	kind: string;
+	branch: unknown;
+	component: unknown;
+	key: unknown;
+}
+// A replacement renders before the live slot may publish it. Only signal-owned
+// WIPs need this prospective location; the weak metadata never owns their life.
+const SIGNAL_RETRY_LOCATIONS = /* @__PURE__ */ new WeakMap<Scope, SignalRetryLocation>();
+
+function signalRetryBoundary(block: Block): TrySlot | undefined {
+	let current: Block | null = block;
+	while (current !== null) {
+		const state = (current as any).__trySlot as TrySlot | undefined;
+		if (state !== undefined && !state.propagateSuspense) return state;
+		current = current.parentBlock;
+	}
+}
+
+function retireRendererSignalOwner(owner: SignalOwner): void {
+	// Renderer deletion is lifecycle work, even when an enclosing native render
+	// discovered it. Keep authored writes guarded; pause only this disposal.
+	EFFECT_EVENT_LIFECYCLE_DEPTH++;
+	const frame = NATIVE_READ_DRIVER?.pauseLifecycle() ?? -1;
+	try {
+		retireSignalOwnerIdentity(owner);
+	} finally {
+		if (frame >= 0) NATIVE_READ_DRIVER!.resumeLifecycle(frame);
+		EFFECT_EVENT_LIFECYCLE_DEPTH--;
+	}
+}
+
+function signalRetrySlot(scope: Scope, target: Scope): unknown[] | null {
+	const children = scope.children;
+	if (children !== null) {
+		for (const child of children) {
+			if (child.scope === target) return ['scope', child.key];
+			const nested = signalRetrySlot(child.scope, target);
+			if (nested !== null) return ['scope', child.key, ...nested];
+		}
+	}
+	const block = target.block;
+	for (let index = 0; index < scope.slots.length; index++) {
+		const slot = scope.slots[index];
+		if (slot === null || typeof slot !== 'object') continue;
+		if (block.forSlot !== null && (slot === block.forSlot || slot.forSlot === block.forSlot))
+			return ['slot', index, 'item', block.key];
+		if (slot.block === block || slot.tryBlock === block || slot.emptyBlock === block) {
+			// Slot indices and branch tags are compiler/reconciler identities. Do
+			// not retain a generated render-body closure as a retry-path token.
+			return [
+				'slot',
+				index,
+				slot.__kind,
+				slot.tryBlock === block ? 'primary' : slot.branch,
+				slot.emptyBlock === block ? 'empty' : slot.currentIsBodyFn ? undefined : slot.currentComp,
+				slot.prevKey,
+			];
+		}
+	}
+	return null;
+}
+
+function signalRetryPath(scope: Scope, root: Scope): unknown[] | null {
+	if (scope === root) return [];
+	const location = SIGNAL_RETRY_LOCATIONS.get(scope);
+	const parent = location?.parent ?? scope.parent ?? scope.block.parentBlock;
+	if (parent === null) return null;
+	const segment =
+		location === undefined
+			? signalRetrySlot(parent, scope)
+			: ['slot', location.slot, location.kind, location.branch, location.component, location.key];
+	if (segment === null) return null;
+	const path = signalRetryPath(parent, root);
+	return path === null ? null : path.concat(segment);
+}
+
+function signalRetryNode(
+	cache: SignalRetryOwners,
+	path: unknown[],
+	create: boolean,
+): SignalRetryNode | undefined {
+	let node = cache.paths;
+	for (const key of path) {
+		let next = node.children?.get(key);
+		if (next === undefined) {
+			if (!create) return;
+			next = {};
+			(node.children ??= new Map()).set(key, next);
+		}
+		node = next;
+	}
+	return node;
+}
+
+function retainSignalRetryScope(
+	scope: Scope,
+	root: Scope,
+	holder: { retrySignalOwners?: SignalRetryOwners },
+	subtree = false,
+): void {
+	const owner = SCOPE_SIGNAL_OWNERS.get(scope);
+	if (owner) {
+		const path = signalRetryPath(scope, root);
+		if (path !== null) {
+			const cache = (holder.retrySignalOwners ??= { paths: {}, owners: new Set() });
+			const node = signalRetryNode(cache, path, true)!;
+			const previous = node.owner;
+			node.owner = owner;
+			cache.owners.add(owner);
+			if (previous !== undefined && previous !== owner) {
+				cache.owners.delete(previous);
+				retireRendererSignalOwner(previous);
+			}
+		}
+	}
+	if (subtree)
+		forEachSubtreeChild(scope, (child) => retainSignalRetryScope(child, root, holder, true));
+	else if (scope.children !== null)
+		for (const child of scope.children) retainSignalRetryScope(child.scope, root, holder);
+}
+
+function clearSignalRetryOwners(holder: { retrySignalOwners?: SignalRetryOwners }): void {
+	const cache = holder.retrySignalOwners;
+	if (cache === undefined) return;
+	holder.retrySignalOwners = undefined;
+	for (const owner of cache.owners) retireRendererSignalOwner(owner);
+}
+
+function discardSignalRetryItem(block: Block, error: unknown): void {
+	const previous = RETAINED_SIGNAL_OWNERS;
+	if (isSuspenseException(error)) {
+		const owner = block.idState.renderOwner;
+		const boundary = signalRetryBoundary(block);
+		const root = boundary?.tryBlock ?? owner?.current;
+		const holder = boundary ?? owner;
+		if (holder !== undefined && root != null) {
+			retainSignalRetryScope(block, root, holder, true);
+			RETAINED_SIGNAL_OWNERS = holder.retrySignalOwners;
+		}
+	}
+	try {
+		unmountBlock(
+			block,
+			activeHydration() === null &&
+				!ROOT_RENDER_TRANSACTION?.hydrating &&
+				!ROOT_RENDER_TRANSACTION?.retainedCreated?.has(block),
+		);
+	} finally {
+		RETAINED_SIGNAL_OWNERS = previous;
+	}
+}
+
+function signalRetryListPath(scope: Scope, state: ForSlot, root: Scope): unknown[] | null {
+	for (let index = 0; index < scope.slots.length; index++) {
+		const slot = scope.slots[index];
+		if (slot === state || slot?.forSlot === state) {
+			const path = signalRetryPath(scope, root);
+			return path === null ? null : path.concat('slot', index, 'item');
+		}
+	}
+	if (scope.children !== null) {
+		for (const child of scope.children) {
+			const path = signalRetryListPath(child.scope, state, root);
+			if (path !== null) return path;
+		}
+	}
+	return null;
+}
+
+function collectRetiredSignalRetryOwners(
+	node: SignalRetryNode,
+	cache: SignalRetryOwners,
+	retired: SignalRendererOwnerIdentity[],
+): void {
+	if (node.owner !== undefined) {
+		cache.owners.delete(node.owner);
+		retired.push(node.owner);
+		node.owner = undefined;
+	}
+	if (node.children !== undefined)
+		for (const child of node.children.values())
+			collectRetiredSignalRetryOwners(child, cache, retired);
+}
+
+function trackSignalRetryListKeys<T>(
+	parent: Block,
+	state: ForSlot,
+	length: number,
+	source: ListKeySource<T>,
+): ((index: number, key: unknown) => void) | undefined {
+	const boundary = signalRetryBoundary(parent);
+	const owner = parent.idState.renderOwner;
+	const cache = boundary?.retrySignalOwners ?? owner?.retrySignalOwners;
+	const root = boundary?.retrySignalOwners !== undefined ? boundary.tryBlock : owner?.current;
+	if (cache === undefined || root == null) return;
+	const path = signalRetryListPath(parent, state, root);
+	const node = path === null ? undefined : signalRetryNode(cache, path, false);
+	if (node?.children === undefined) return;
+	const prune = (keys: Iterable<unknown>) => {
+		const present = new Set(keys);
+		const retired: SignalRendererOwnerIdentity[] = [];
+		for (const [key, child] of node.children!) {
+			if (present.has(key)) continue;
+			node.children!.delete(key);
+			collectRetiredSignalRetryOwners(child, cache, retired);
+		}
+		// Remove every path/claim before abort callbacks can reenter rendering.
+		for (const owner of retired) retireRendererSignalOwner(owner);
+	};
+	if (typeof source !== 'function') {
+		prune(source);
+		return;
+	}
+	if (length === 0) {
+		prune([]);
+		return;
+	}
+	const observed = new Map<number, unknown>();
+	let complete = false;
+	// Observe accepted reads only, never prefix/suffix mismatch probes. A body
+	// may suspend before the remaining keys are read: those unknown suffixes
+	// cannot prove removal, so retain them without invoking authored keys early.
+	return (index, key) => {
+		if (!complete) {
+			observed.set(index, key);
+			if (observed.size === length) {
+				complete = true;
+				prune(observed.values());
+			}
+		}
+	};
+}
 
 /** @internal Compiler/runtime module-signal capability version 1. */
-export function enableSignalBindings(abi = 1): void {
+export function enableSignalBindings(abi = 1, potentialOnly = false): void {
 	if (abi !== 1) throw new TypeError(formatClientError(65));
 	SIGNAL_BINDINGS_ENABLED = true;
-	enableSignalDocument(abi);
+	if (!potentialOnly) enableSignalDocument(abi);
 }
 
 function signalIdentityKey(value: unknown): string {
@@ -479,13 +738,26 @@ function rootSignalInstanceKey(ids: RootIdState): string {
 	return JSON.stringify([ids.signalState?.prefix ?? ids.prefix, 'root']);
 }
 
+function resolveSignalInstanceKey(scope: Scope): string | undefined {
+	const identity = SCOPE_SIGNAL_INSTANCE_KEYS.get(scope);
+	if (identity === undefined || typeof identity === 'string') return identity;
+	const key = structuralSignalInstanceKey(
+		identity.parentScope,
+		identity.invocationSite,
+		identity.key,
+		identity.hasKey,
+	);
+	SCOPE_SIGNAL_INSTANCE_KEYS.set(scope, key);
+	return key;
+}
+
 function structuralSignalInstanceKey(
 	parentScope: Scope,
 	invocationSite: string | undefined,
 	key: unknown,
 	hasKey: boolean,
 ): string {
-	let base = SCOPE_SIGNAL_INSTANCE_KEYS.get(parentScope);
+	let base = resolveSignalInstanceKey(parentScope);
 	const itemKeys: string[] = [];
 	const visited = new Set<Block>();
 	let scope: Scope | null = parentScope;
@@ -494,10 +766,10 @@ function structuralSignalInstanceKey(
 		if (!visited.has(block)) {
 			visited.add(block);
 			if (block.forSlot !== null) itemKeys.push(signalIdentityKey(block.key));
-			base = SCOPE_SIGNAL_INSTANCE_KEYS.get(block);
+			base = resolveSignalInstanceKey(block);
 		}
 		scope = scope.parent;
-		if (base === undefined && scope !== null) base = SCOPE_SIGNAL_INSTANCE_KEYS.get(scope);
+		if (base === undefined && scope !== null) base = resolveSignalInstanceKey(scope);
 	}
 	let block: Block | null = parentScope.block;
 	while (base === undefined && block !== null) {
@@ -505,7 +777,7 @@ function structuralSignalInstanceKey(
 			visited.add(block);
 			if (block.forSlot !== null) itemKeys.push(signalIdentityKey(block.key));
 		}
-		base = SCOPE_SIGNAL_INSTANCE_KEYS.get(block);
+		base = resolveSignalInstanceKey(block);
 		block = block.parentBlock;
 	}
 	base ??= rootSignalInstanceKey(parentScope.block.idState);
@@ -525,11 +797,8 @@ function stampSignalInstance(
 	key: unknown,
 	hasKey: boolean,
 ): void {
-	if (SIGNAL_BINDINGS_ENABLED) {
-		SCOPE_SIGNAL_INSTANCE_KEYS.set(
-			scope,
-			structuralSignalInstanceKey(parentScope, invocationSite, key, hasKey),
-		);
+	if (SIGNAL_BINDINGS_ENABLED || signalDocumentEnabled) {
+		SCOPE_SIGNAL_INSTANCE_KEYS.set(scope, { parentScope, invocationSite, key, hasKey });
 	}
 }
 
@@ -537,22 +806,45 @@ function scopeSignalOwner(scope: Scope | null): SignalOwner | undefined {
 	if (scope === null) return;
 	const root = scope.block.idState.renderOwner;
 	let documentOwner = root?.signalOwner;
-	if (documentOwner === undefined && SIGNAL_BINDINGS_ENABLED) {
+	if (documentOwner === undefined && signalDocumentEnabled) {
 		documentOwner = documentSignalOwner(scope.block.parentNode);
 		if (root !== undefined) root.signalOwner = documentOwner;
 	}
 	if (documentOwner === undefined) return;
 	let owner = SCOPE_SIGNAL_OWNERS.get(scope);
-	if (owner === undefined || owner.documentOwner !== documentOwner) {
+	const retired = owner === null;
+	if (!owner || owner.documentOwner !== documentOwner) {
 		const ids = scope.block.idState;
-		const instanceKey = SCOPE_SIGNAL_INSTANCE_KEYS.get(scope) ?? rootSignalInstanceKey(ids);
-		owner = Object.freeze({
-			scopeKey: documentOwner.scopeKey,
-			documentOwner,
-			instanceOwner: scope,
-			instanceKey,
-		});
+		owner = undefined;
+		const boundary = signalRetryBoundary(scope.block);
+		const cache = boundary?.retrySignalOwners ?? root?.retrySignalOwners;
+		const retryRoot = boundary?.retrySignalOwners !== undefined ? boundary.tryBlock : root?.current;
+		if (cache !== undefined && !retired && !scope.block.disposed && retryRoot != null) {
+			const path = signalRetryPath(scope, retryRoot);
+			const node = path === null ? undefined : signalRetryNode(cache, path, false);
+			if (node?.owner !== undefined) {
+				owner = node.owner;
+				node.owner = undefined;
+				cache.owners.delete(owner);
+			}
+		}
+		if (owner === undefined || owner.documentOwner !== documentOwner) {
+			const identity = {
+				scopeKey: documentOwner.scopeKey,
+				documentOwner,
+				instanceOwner: scope as object,
+				instanceKey: resolveSignalInstanceKey(scope) ?? rootSignalInstanceKey(ids),
+			};
+			// A retry owner must not keep an abandoned renderer tree alive. This
+			// existing opaque identity object is also its own facade-state token.
+			identity.instanceOwner = identity;
+			owner = Object.freeze(identity);
+		}
 		SCOPE_SIGNAL_OWNERS.set(scope, owner);
+		// A queued native bubble handler may outlive deletion and first enable
+		// signals afterwards. Its invocation must remain retired, not fall back
+		// to a document owner or create fresh instance state.
+		if (retired) retireRendererSignalOwner(owner);
 	}
 	registerSignalOwnerDocument(owner, scope.block.parentNode.ownerDocument!);
 	return owner;
@@ -1475,7 +1767,9 @@ function runEffectLifecycleCallback(callback: Cleanup, scope: Scope | null = nul
 	EFFECT_EVENT_LIFECYCLE_DEPTH++;
 	const nativeFrame = NATIVE_READ_DRIVER?.pauseLifecycle() ?? -1;
 	try {
-		runWithBlockSignalOwner(scope, callback);
+		if (signalDocumentEnabled || scope?.block.idState.renderOwner?.signalOwner !== undefined)
+			runWithBlockSignalOwner(scope, callback);
+		else callback();
 	} finally {
 		if (nativeFrame >= 0) NATIVE_READ_DRIVER!.resumeLifecycle(nativeFrame);
 		EFFECT_EVENT_LIFECYCLE_DEPTH--;
@@ -2703,6 +2997,8 @@ interface RootRenderOwner {
 	wakeable: PromiseLike<unknown> | null;
 	/** Lazily allocated only by adapters carrying metadata across fresh retry scopes. */
 	retryKey: object | null;
+	/** Actual first-mount signal state retained only for the current retry episode. */
+	retrySignalOwners?: SignalRetryOwners;
 	/** Only native suspended readers allocate a retry lease outside their discarded Scopes. */
 	nativeRetry?: NativeReadRetry;
 	transaction: RootRenderTransaction | null;
@@ -3085,6 +3381,11 @@ function preserveRootCreatedDom(block: Block): void {
 function rollbackRootRender(transaction: RootRenderTransaction): void {
 	if (transaction.aborted) return;
 	transaction.aborted = true;
+	if (
+		transaction.owner.retrySignalOwners !== undefined &&
+		transaction.owner.retrySignalOwners !== RETAINED_SIGNAL_OWNERS
+	)
+		clearSignalRetryOwners(transaction.owner);
 	const frame = beginRootRender(transaction.owner);
 	const previousRollback = ROOT_RENDER_ROLLBACK;
 	ROOT_RENDER_ROLLBACK = true;
@@ -3151,6 +3452,9 @@ function commitRootRenders(): void {
 			if (owner.wakeable === null) {
 				owner.retryKey = null;
 				owner.nativeRetry?.clear();
+				// Claimed owners belong to accepted scopes. Unvisited branches from
+				// an earlier pending attempt have no continuing consumer.
+				if (owner.retrySignalOwners !== undefined) clearSignalRetryOwners(owner);
 			}
 			acceptNativeCapture(transaction.capture, owner, true);
 			const acceptedGeneration = owner.generation;
@@ -3215,7 +3519,19 @@ function suspendRootRender(
 					retainDiscardedWarmMemos(created);
 			}
 		}
-		rollbackRootRender(transaction);
+		const previousRetainedOwners = RETAINED_SIGNAL_OWNERS;
+		const rootBlock = owner.current;
+		if (rootBlock !== null && transaction.created !== null && owner.signalOwner !== undefined) {
+			for (const created of transaction.created) {
+				if (!created.disposed) retainSignalRetryScope(created, rootBlock, owner);
+			}
+			RETAINED_SIGNAL_OWNERS = owner.retrySignalOwners;
+		}
+		try {
+			rollbackRootRender(transaction);
+		} finally {
+			RETAINED_SIGNAL_OWNERS = previousRetainedOwners;
+		}
 	}
 	owner.wakeable = wakeable;
 	const generation = ++owner.generation;
@@ -5589,6 +5905,7 @@ let EFFECT_EVENT_ACTION_TARGET = effectEventCommitActions;
 // A subtree rendered off-screen by `renderOffscreen` (its DOM sits between owned
 // `start`/`end` markers, outside the committed slot range, with its effects captured).
 interface OffscreenWip {
+	retrySignalOwners?: SignalRetryOwners;
 	block: Block;
 	start: Comment;
 	end: Comment;
@@ -8903,7 +9220,10 @@ function runEffectBody(e: PendingEffect): void {
 			// Spread deps as positional args (see PendingEffect.args). A no-deps
 			// effect has args === undefined, which apply accepts as zero arguments.
 			// eslint-disable-next-line prefer-spread
-			cleanup = runWithBlockSignalOwner(e.scope, () => e.fn!.apply(null, e.args as []));
+			cleanup =
+				signalDocumentEnabled || e.scope.block.idState.renderOwner?.signalOwner !== undefined
+					? runWithBlockSignalOwner(e.scope, () => e.fn!.apply(null, e.args as []))
+					: e.fn.apply(null, e.args as []);
 		} finally {
 			EFFECT_BODY_DEPTH--;
 			CURRENT_EFFECT_PHASE = previousPhase;
@@ -9513,16 +9833,14 @@ function captureRenderPhaseUpdate(cell: RenderPhaseCell, key: RenderPhaseSnapsho
 }
 
 export function renderBlock(block: Block): void {
-	const owner = scopeSignalOwner(block);
-	if (owner !== undefined) STREAMED_SIGNAL_OWNER_ACTIVATOR?.(owner);
-	if (owner !== undefined && currentSignalOwner() !== owner) {
-		runWithSignalOwner(owner, () => renderBlockOwned(block));
-		return;
+	if (signalDocumentEnabled || block.idState.renderOwner?.signalOwner !== undefined) {
+		const owner = scopeSignalOwner(block);
+		if (owner !== undefined) STREAMED_SIGNAL_OWNER_ACTIVATOR?.(owner);
+		if (owner !== undefined && currentSignalOwner() !== owner) {
+			runWithSignalOwner(owner, () => renderBlock(block));
+			return;
+		}
 	}
-	renderBlockOwned(block);
-}
-
-function renderBlockOwned(block: Block): void {
 	const hydration = activeHydration();
 	if (hydration !== null && !hydration.owns(block)) {
 		hydration.suspend(() => renderBlock(block));
@@ -9541,6 +9859,12 @@ function renderBlockOwned(block: Block): void {
 			}
 			if (++retries > RENDER_PHASE_UPDATE_LIMIT) throw new Error(formatClientError(9));
 		}
+		if (
+			signalDocumentEnabled &&
+			(block as any).__trySlot?.tryBlock === block &&
+			(block as any).__trySlot.retrySignalOwners !== undefined
+		)
+			clearSignalRetryOwners((block as any).__trySlot);
 		// Completed descendants still belong to their enclosing render attempt.
 		// A nested independent root commits separately and does not transfer state.
 		const updates = renderPhaseUpdates as Map<RenderPhaseCell, RenderPhaseSnapshot> | null;
@@ -9559,6 +9883,17 @@ function renderBlockOwned(block: Block): void {
 			}
 			if (!block.crossRenderUpdate) block.pending = false;
 		}
+		// A fresh item is linked only after its body succeeds. A boundary can
+		// catch this throw and commit fallback without rolling back the root, so
+		// the creation journal alone cannot clean up this otherwise-orphaned item.
+		// Preserve only its signal authority for retry, never its failed DOM/scope.
+		if (
+			block.idState.renderOwner?.signalOwner !== undefined &&
+			!block.mounted &&
+			block.forSlot !== null &&
+			block.forSlot.items.get(block.key) !== block
+		)
+			discardSignalRetryItem(block, error);
 		throw error;
 	} finally {
 		renderPhaseOwner = previousOwner;
@@ -10350,7 +10685,9 @@ export function componentSlotLite<P>(
 	let profileThrown: unknown;
 	const nativeToken = NATIVE_READ_DRIVER === null ? -1 : beginActiveNativeReadScope(scope);
 	try {
-		runWithBlockSignalOwner(scope, () => comp(props, scope, undefined));
+		if (signalDocumentEnabled || scope.block.idState.renderOwner?.signalOwner !== undefined)
+			runWithBlockSignalOwner(scope, () => comp(props, scope, undefined));
+		else comp(props, scope, undefined);
 		if (!scope.mounted) scope.mounted = true;
 	} catch (error) {
 		profileDidThrow = true;
@@ -10608,7 +10945,7 @@ function unmountScope(scope: Scope, detachDom: boolean = true): void {
 // recursive teardown. A child may have finished rendering and queued an attach
 // before a later sibling aborts its parent; that child's attach never commits,
 // so its recursive cleanup must not manufacture a matching detach.
-function runScopeCleanups(scope: Scope): void {
+function runScopeCleanups(scope: Scope, retireUnowned: boolean): void {
 	const c = scope.cleanups;
 	if (c !== null)
 		for (let i = c.length - 1; i >= 0; i--) {
@@ -10628,24 +10965,49 @@ function runScopeCleanups(scope: Scope): void {
 			}
 		}
 	const signalOwner = SCOPE_SIGNAL_OWNERS.get(scope);
-	if (signalOwner !== undefined) {
+	if (signalOwner) {
+		if (RETAINED_SIGNAL_OWNERS?.owners.has(signalOwner)) return;
 		// Deferred cleanups must still resolve facade reads in this exact owner.
 		// Retirement follows those callbacks at the same publication boundary.
 		if (
 			STAGED_COMMIT_CAPTURE !== null &&
 			DEFERRED_LAYOUT_DRIVER!.stageAction(() => {
-				SCOPE_SIGNAL_OWNERS.delete(scope);
-				retireSignalOwnerIdentity(signalOwner);
+				if (retireUnowned) SCOPE_SIGNAL_OWNERS.set(scope, null);
+				else SCOPE_SIGNAL_OWNERS.delete(scope);
+				retireRendererSignalOwner(signalOwner);
 			}, true)
 		)
 			return;
-		SCOPE_SIGNAL_OWNERS.delete(scope);
-		retireSignalOwnerIdentity(signalOwner);
+		if (retireUnowned) SCOPE_SIGNAL_OWNERS.set(scope, null);
+		else SCOPE_SIGNAL_OWNERS.delete(scope);
+		retireRendererSignalOwner(signalOwner);
+	} else if (retireUnowned && signalOwner === false) {
+		if (
+			STAGED_COMMIT_CAPTURE !== null &&
+			DEFERRED_LAYOUT_DRIVER!.stageAction(() => retireUnownedSignalScope(scope), true)
+		)
+			return;
+		retireUnownedSignalScope(scope);
 	}
 }
 
-function unmountScopeChildrenAndSlots(scope: Scope, detachDom: boolean): void {
-	runScopeCleanups(scope);
+function retireUnownedSignalScope(scope: Scope): void {
+	// Resolve at publication, after deferred cleanups which may read the first
+	// handle. Null records retirement without allocating speculative authority.
+	const owner = SCOPE_SIGNAL_OWNERS.get(scope);
+	if (owner === false) SCOPE_SIGNAL_OWNERS.set(scope, null);
+	else if (owner) {
+		SCOPE_SIGNAL_OWNERS.set(scope, null);
+		retireRendererSignalOwner(owner);
+	}
+}
+
+function unmountScopeChildrenAndSlots(
+	scope: Scope,
+	detachDom: boolean,
+	retireUnowned = true,
+): void {
+	runScopeCleanups(scope, retireUnowned);
 	unmountScopeChildrenAndSlotsOnly(scope, detachDom);
 }
 
@@ -13035,7 +13397,9 @@ function resetScopeChildren(scope: Scope): void {
 	// that while the scope is half torn down would have the handler walk a scope whose DOM range
 	// and slot arrays disagree, so the scope is left consistent first.
 	try {
-		unmountScopeChildrenAndSlots(scope, true);
+		// The same Scope is reused by the new dialect/adoption attempt. Preserve
+		// the existing owner cleanup but do not tombstone an unowned invocation.
+		unmountScopeChildrenAndSlots(scope, true, false);
 
 		// Child scopes and slots detach their own DOM above, but a compiled body also creates host
 		// nodes directly in the Block's range. Clear whatever is left of it. `removeRange` stops
@@ -18425,6 +18789,18 @@ function bindDirectSignal(
 			? (previous as DirectSignalBinding)
 			: null;
 	const handle = isSignalHandle(value) ? value : null;
+	if (
+		handle !== null &&
+		(!signalDocumentEnabled || currentSignalOwner() !== SCOPE_SIGNAL_OWNERS.get(scope))
+	) {
+		// A prop/callback can reveal the first handle midway through a render.
+		// Enter its already-stamped scope for both the initial read and subscribe;
+		// the ambient render frame may have started before document activation.
+		if (!signalDocumentEnabled) enableSignalBindings();
+		return runWithBlockSignalOwner(scope, () =>
+			bindDirectSignal(scope, previous, target, value, site, kind, name, attributeKind),
+		);
+	}
 	if (handle === null && prior === null) {
 		if (kind === 'attribute' && previous === value) return previous;
 		if (TRANSITION_JOURNAL !== null) journalBag();
@@ -22045,7 +22421,7 @@ function isUsableEventSlot(slot: EventSlot): boolean {
 // ---------------------------------------------------------------------------
 
 const EMPTY_ARGS: any[] = [];
-let SIGNAL_EVENT_OWNERS: WeakMap<Element, SignalOwner> | null = null;
+let SIGNAL_EVENT_OWNERS: WeakMap<Element, SignalOwner | ScopeImpl | BlockImpl> | null = null;
 
 /** Publish a native delegated handler with the same rollback ownership as its bindings. */
 export function setEventHandler(el: Element, key: string, handler: any): void {
@@ -22059,9 +22435,28 @@ export function setEventHandler(el: Element, key: string, handler: any): void {
 		journalBag();
 	}
 	(STAGED_DOM?.view(el as any) ?? (el as any))[key] = handler;
-	if (SIGNAL_BINDINGS_ENABLED) {
-		const owner = currentSignalOwner();
+	if (SIGNAL_BINDINGS_ENABLED || signalDocumentEnabled) {
+		// Retain the precise invocation for an event-only reader whose signal
+		// module may arrive later. No owner or wrapper is allocated speculatively.
+		const owner =
+			(activeSynchronousSignalOwner !== null || activeSignalOwnerEnvironment !== undefined
+				? currentExplicitSignalOwner()
+				: null) ??
+			(signalDocumentEnabled || CURRENT_SCOPE?.block.idState.renderOwner?.signalOwner !== undefined
+				? CURRENT_SCOPE === null
+					? currentSignalOwner()
+					: SCOPE_SIGNAL_OWNERS.get(CURRENT_SCOPE) || CURRENT_SCOPE
+				: CURRENT_SCOPE);
 		if (owner !== null) {
+			// Mark that a scope token escaped before queuing publication. A staged
+			// event may be followed by deletion in the same preparation; recording
+			// only at publication would miss that retirement. Discard leaves only
+			// conservative weak metadata, never an owner or signal state.
+			if (
+				(owner instanceof ScopeImpl || owner instanceof BlockImpl) &&
+				SCOPE_SIGNAL_OWNERS.get(owner) === undefined
+			)
+				SCOPE_SIGNAL_OWNERS.set(owner, false);
 			if (STAGED_COMMIT_CAPTURE !== null)
 				DEFERRED_LAYOUT_DRIVER!.stageAction(() =>
 					(SIGNAL_EVENT_OWNERS ??= new WeakMap()).set(el, owner),
@@ -23037,7 +23432,11 @@ function fireEventSlot(slot: EventSlot, event: Event, currentTarget: Element): v
 		invokeInvalidEventListener(`${event.type} event`, slot, event);
 	};
 	try {
-		const owner = SIGNAL_EVENT_OWNERS?.get(currentTarget);
+		const recorded = SIGNAL_EVENT_OWNERS?.get(currentTarget);
+		const owner =
+			recorded instanceof ScopeImpl || recorded instanceof BlockImpl
+				? scopeSignalOwner(recorded)
+				: recorded;
 		if (owner === undefined || currentSignalOwner() === owner) invoke();
 		else runWithSignalOwner(owner, invoke);
 	} catch (err) {
@@ -26022,7 +26421,7 @@ export function createElement<P>(
 	props?: P,
 	...children: any[]
 ): ElementDescriptor<P> {
-	return createElementInternal(undefined, type, props, children);
+	return createElementFromConfig(undefined, type, props, children);
 }
 
 /** @internal Compiler-authored element descriptor with stable invocation identity. */
@@ -26032,14 +26431,15 @@ export function createElementAt<P>(
 	props?: P,
 	...children: any[]
 ): ElementDescriptor<P> {
-	return createElementInternal(invocationSite, type, props, children);
+	return createElementFromConfig(invocationSite, type, props, children);
 }
 
-function createElementInternal<P>(
+/** @internal Compiler-owned positional children; omitted children allocate no rest array. */
+export function createElementFromConfig<P>(
 	invocationSite: string | undefined,
 	type: ComponentBody<P> | string | typeof Fragment,
 	props: P | undefined,
-	children: any[],
+	children: any[] = EMPTY_ARGS,
 ): ElementDescriptor<P> {
 	if (typeof type === 'function' && isRendererContext(type)) {
 		registerClientRendererBridge(renderClientContextProvider, flushSync);
@@ -26679,9 +27079,6 @@ function componentSlotImpl(
 	// setup checkpoint. Skip their discarded child before it owns any state.
 	if (CURRENT_BLOCK?.pending && !CURRENT_BLOCK.crossRenderUpdate) return;
 	const parentBlock = parentScope.block;
-	const signalInstanceKey = SIGNAL_BINDINGS_ENABLED
-		? structuralSignalInstanceKey(parentScope, invocationSite, key, key != null)
-		: undefined;
 	const hydration = activeHydration();
 	// A component nested inside a client-built replacement range must mount as
 	// ordinary client DOM. Its fresh anchor is not server output to adopt; keep
@@ -26911,6 +27308,25 @@ function componentSlotImpl(
 		journalRootProperty(state, 'prevKey', state.prevKey);
 	state.prevKey = nextKey;
 	if (replacing) {
+		// Retained instances already carry their original invocation stamp. Only
+		// replacement/new Blocks need a recipe for later owner activation.
+		const signalInstanceKey =
+			SIGNAL_BINDINGS_ENABLED || signalDocumentEnabled
+				? { parentScope, invocationSite, key, hasKey: key != null }
+				: undefined;
+		const retryLocation =
+			state.block === null ||
+			!state.block.mounted ||
+			parentBlock.idState.renderOwner?.signalOwner === undefined
+				? undefined
+				: {
+						parent: parentScope,
+						slot: slotKey,
+						kind: state.__kind,
+						branch: undefined,
+						component: identity,
+						key: nextKey,
+					};
 		const swapDriver = TRANSITION_SWAP_DRIVER;
 		const transitionMode = parentBlock.currentRenderMode === 'transition';
 		const canSwapOffscreen =
@@ -26971,6 +27387,7 @@ function componentSlotImpl(
 					undefined,
 					false,
 					signalInstanceKey,
+					retryLocation,
 				);
 				if (r.suspended || r.failed) {
 					disposeWip(r.wip);
@@ -27019,6 +27436,7 @@ function componentSlotImpl(
 					undefined,
 					false,
 					signalInstanceKey,
+					retryLocation,
 				);
 				if (r.suspended || r.failed) {
 					transitionSwap.dispose(r.wip);
@@ -27064,6 +27482,7 @@ function componentSlotImpl(
 					undefined,
 					false,
 					signalInstanceKey,
+					retryLocation,
 				);
 				transitionSwap.dispose(r.wip);
 				if (r.failed) throw r.error;
@@ -27339,7 +27758,8 @@ function renderOffscreen(
 	// must carry the construct's env or that destructure throws off-screen.
 	env?: any[],
 	implicitBail = false,
-	signalInstanceKey?: string,
+	signalInstanceKey?: SignalInstanceKey,
+	retryLocation?: SignalRetryLocation,
 ): { wip: OffscreenWip; suspended: any; error: any; failed: boolean } {
 	const start = (STAGED_DOM?.view(document) ?? document).createComment('wip');
 	const end = (STAGED_DOM?.view(document) ?? document).createComment('/wip');
@@ -27362,6 +27782,7 @@ function renderOffscreen(
 		outputHandler,
 	);
 	if (signalInstanceKey !== undefined) SCOPE_SIGNAL_INSTANCE_KEYS.set(block, signalInstanceKey);
+	if (retryLocation !== undefined) SIGNAL_RETRY_LOCATIONS.set(block, retryLocation);
 	if (implicitBail) {
 		block.$$implicitBail = true;
 		block.memoInChain = true;
@@ -27388,8 +27809,22 @@ function renderOffscreen(
 	} finally {
 		WIP_CAPTURE = prev;
 	}
+	const wip: OffscreenWip = { block, start, end, capture, domParent, refDetachCheckpoint };
+	if (suspended !== null && retryLocation !== undefined) {
+		const owner = parentBlock.idState.renderOwner;
+		const boundary = signalRetryBoundary(parentBlock);
+		const retryRoot = boundary?.tryBlock ?? owner?.current;
+		const holder = boundary ?? owner;
+		if (holder !== undefined && retryRoot != null) {
+			retainSignalRetryScope(block, retryRoot, holder, true);
+			for (const created of ROOT_RENDER_TRANSACTION?.created ?? [])
+				if (!created.disposed && blockIsAncestorOf(block, created))
+					retainSignalRetryScope(created, retryRoot, holder);
+			wip.retrySignalOwners = holder.retrySignalOwners;
+		}
+	}
 	return {
-		wip: { block, start, end, capture, domParent, refDetachCheckpoint },
+		wip,
 		suspended,
 		error,
 		failed,
@@ -27502,10 +27937,13 @@ function commitOffscreen(wip: OffscreenWip, beforeNode: Node): void {
 // partial cleanups. Captured effects/refs are dropped (they never ran).
 function disposeWip(wip: OffscreenWip): void {
 	const previousCapture = WIP_CAPTURE;
+	const previousRetained = RETAINED_SIGNAL_OWNERS;
+	if (wip.retrySignalOwners !== undefined) RETAINED_SIGNAL_OWNERS = wip.retrySignalOwners;
 	WIP_CAPTURE = wip.capture;
 	try {
 		unmountBlock(wip.block, true);
 	} finally {
+		RETAINED_SIGNAL_OWNERS = previousRetained;
 		WIP_CAPTURE = previousCapture;
 		// A completed descendant in an ultimately discarded WIP is marked mounted,
 		// so its teardown can enqueue ref(null). Its attach is still only in the
@@ -30895,9 +31333,6 @@ export function childSlot(
 		componentHasKey = value.key != null;
 	}
 	if (comp !== null) {
-		const signalInstanceKey = SIGNAL_BINDINGS_ENABLED
-			? structuralSignalInstanceKey(parentScope, invocationSite, componentKey, componentHasKey)
-			: undefined;
 		// A bare render-FUNCTION child (a `.tsrx` `{children}` body forwarded onto a `.ts`
 		// component's host element via createElement) is re-created every render, so its
 		// identity always differs — but it is the SAME slot child. Reconcile by SLOT like
@@ -30957,6 +31392,22 @@ export function childSlot(
 			renderBlock(state.block);
 			return;
 		}
+		const signalInstanceKey =
+			SIGNAL_BINDINGS_ENABLED || signalDocumentEnabled
+				? { parentScope, invocationSite, key: componentKey, hasKey: componentHasKey }
+				: undefined;
+		const retryLocation =
+			(state.block === null && state.hostNode === null && state.text === null) ||
+			parentBlock.idState.renderOwner?.signalOwner === undefined
+				? undefined
+				: {
+						parent: parentScope,
+						slot: slotKey,
+						kind: state.__kind,
+						branch: undefined,
+						component: isBodyFn ? undefined : comp,
+						key: undefined,
+					};
 		// Off-screen swap (React WIP model): a transition or fallback-capable
 		// committed Suspense primary replacing content with a DIFFERENT component
 		// renders the new one off-screen and HOLDS the old until it is ready. Urgent
@@ -31001,6 +31452,7 @@ export function childSlot(
 								undefined,
 								false,
 								signalInstanceKey,
+								retryLocation,
 							),
 						)
 					: transitionSwap.render(
@@ -31014,6 +31466,7 @@ export function childSlot(
 							undefined,
 							false,
 							signalInstanceKey,
+							retryLocation,
 						);
 			if (r.suspended || r.failed) {
 				// Discard the partial; the OLD content was never touched, so it stays live.
@@ -31140,6 +31593,7 @@ export function childSlot(
 									undefined,
 									implicitBail,
 									signalInstanceKey,
+									retryLocation,
 								),
 							)
 						: renderOffscreen(
@@ -31153,6 +31607,7 @@ export function childSlot(
 								undefined,
 								implicitBail,
 								signalInstanceKey,
+								retryLocation,
 							);
 				if (r.suspended || r.failed) {
 					disposeWip(r.wip);
@@ -32459,6 +32914,7 @@ function releaseHiddenText(text: Text, restore = true): void {
 // Keep Suspense-specific teardown out of the always-live generic slot walk.
 // The visible arm must still unmount before its preserved hidden primary.
 function teardownTrySlot(state: TrySlot, detachDom: boolean): void {
+	if (state.retrySignalOwners !== undefined) clearSignalRetryOwners(state);
 	initialSuspenseHydrations?.delete(state);
 	cancelSuspenseRetry(state);
 	HIDDEN_REVEAL_ACTIONS?.delete(state);
@@ -32490,6 +32946,8 @@ function teardownTrySlot(state: TrySlot, detachDom: boolean): void {
 }
 
 interface TrySlot {
+	/** Only an initial hydrated primary discarded by suspension needs transfer. */
+	retrySignalOwners?: SignalRetryOwners;
 	__kind: 'trySlotSlot';
 	__flags: typeof SLOT_FLAG_TEARDOWN;
 	__teardown: typeof teardownTrySlot;
@@ -33133,6 +33591,11 @@ export function tryBlock(
 		registerSlot(parentScope, newState);
 		state = newState;
 	} else {
+		if (
+			state.retrySignalOwners !== undefined &&
+			(state.tryBody !== tryBody || (state.env !== env && depsChanged(state.env, env)))
+		)
+			clearSignalRetryOwners(state);
 		state.tryBody = tryBody;
 		state.catchBody = catchBody;
 		state.pendingBody = pendingBody;
@@ -33290,6 +33753,7 @@ function createTryBody(state: TrySlot, start: Node, end: Node): Block {
 
 /** New inputs abandon an initial primary that has never committed, not its fallback. */
 function restartUncommittedTry(state: TrySlot): Block | null {
+	if (state.retrySignalOwners !== undefined) clearSignalRetryOwners(state);
 	HIDDEN_REVEAL_ACTIONS?.delete(state);
 	const old = state.tryBlock!;
 	const refs: SuspenseRefEntry[] = [];
@@ -33485,7 +33949,21 @@ function renderInitialSuspenseHydration(state: TrySlot, initial: InitialSuspense
 		// without detaching the actual server nodes that the next attempt adopts.
 		const refs: SuspenseRefEntry[] = [];
 		collectVisibleSubtreeRefs(block, refs);
-		withRefDetachSuppression(refs, () => unmountBlock(block, false));
+		const previousRetained = RETAINED_SIGNAL_OWNERS;
+		if (suspended !== null && state.parentBlock.idState.renderOwner?.signalOwner !== undefined) {
+			retainSignalRetryScope(block, block, state, true);
+			// An item which threw before linking itself into the list still lives
+			// in the root creation journal, not yet in the reconciler's item chain.
+			for (const created of ROOT_RENDER_TRANSACTION?.created ?? [])
+				if (!created.disposed && blockIsAncestorOf(block, created))
+					retainSignalRetryScope(created, block, state);
+			RETAINED_SIGNAL_OWNERS = state.retrySignalOwners;
+		} else if (state.retrySignalOwners !== undefined) clearSignalRetryOwners(state);
+		try {
+			withRefDetachSuppression(refs, () => unmountBlock(block, false));
+		} finally {
+			RETAINED_SIGNAL_OWNERS = previousRetained;
+		}
 		state.block = null;
 		state.tryBlock = null;
 		discardOffscreenCapture(capture);
@@ -33496,6 +33974,7 @@ function renderInitialSuspenseHydration(state: TrySlot, initial: InitialSuspense
 		if (previousHydration !== null) previousHydration.node = state.end;
 	}
 	if (!failed) {
+		if (state.retrySignalOwners !== undefined) clearSignalRetryOwners(state);
 		initialSuspenseHydrations?.delete(state);
 		// An enclosing boundary may still suspend after this arm rendered. Leave
 		// its server metadata and ranges replayable until that capture commits.
@@ -33549,6 +34028,7 @@ function renderInitialSuspenseHydration(state: TrySlot, initial: InitialSuspense
 }
 
 function mountTry(state: TrySlot): void {
+	if (state.retrySignalOwners !== undefined) clearSignalRetryOwners(state);
 	cancelSuspenseRetry(state);
 	HIDDEN_REVEAL_ACTIONS?.delete(state);
 	const wasPending = state.branch === 2;
@@ -35873,6 +36353,7 @@ function switchToCatchInner(
 	adoptedStart?: Node,
 	adoptedEnd?: Node,
 ): void {
+	if (state.retrySignalOwners !== undefined) clearSignalRetryOwners(state);
 	cancelSuspenseRetry(state);
 	HIDDEN_REVEAL_ACTIONS?.delete(state);
 	const hydration = activeHydration();
@@ -36437,6 +36918,18 @@ function renderBranchSlot(
 					null,
 					'control-flow',
 					env,
+					false,
+					undefined,
+					parentBlock.idState.renderOwner?.signalOwner === undefined
+						? undefined
+						: {
+								parent: parentScope,
+								slot: slotKey,
+								kind: state.__kind,
+								branch: next,
+								component: undefined,
+								key: undefined,
+							},
 				);
 				if (r.suspended || r.failed) {
 					disposeWip(r.wip);
@@ -36500,6 +36993,18 @@ function renderBranchSlot(
 					null,
 					'control-flow',
 					env,
+					false,
+					undefined,
+					parentBlock.idState.renderOwner?.signalOwner === undefined
+						? undefined
+						: {
+								parent: parentScope,
+								slot: slotKey,
+								kind: state.__kind,
+								branch: next,
+								component: undefined,
+								key: undefined,
+							},
 				);
 				if (r.suspended || r.failed) {
 					transitionSwap.dispose(r.wip);
@@ -38213,6 +38718,7 @@ function mountFastHostItems<T>(
 			);
 			current = block;
 			block.forSlot = state;
+			block.key = key;
 			block.itemIndex = index;
 			block.currentRenderMode = renderMode;
 			block.currentRenderDeferred = deferred;
@@ -38227,7 +38733,6 @@ function mountFastHostItems<T>(
 			block.startMarker = root;
 			block.endMarker = root;
 			state.items.set(key, block);
-			block.key = key;
 			block.prevSibling = previous;
 			if (previous !== null) previous.nextSibling = block;
 			else state.head = block;
@@ -38692,6 +39197,10 @@ function mountItemsLinear<T>(
 	normalizeKey: boolean = false,
 ): void {
 	const newLen = items.length;
+	const observeKey =
+		parentBlock.idState.renderOwner?.signalOwner !== undefined
+			? trackSignalRetryListKeys(parentBlock, state, newLen, keySource)
+			: undefined;
 	if (newLen === 0) return;
 	if (process.env.NODE_ENV !== 'production') {
 		keySource = checkedListKey(keySource, normalizeKey);
@@ -38725,6 +39234,7 @@ function mountItemsLinear<T>(
 		for (let i = 0; i < newLen; i++) {
 			const item = items[i];
 			const key = readListKey(keySource, item, i, normalizeKey);
+			if (observeKey !== undefined) observeKey(i, key);
 			let adoptNode: Node | null = null;
 			let anchor: Node = state.end;
 			if (adoptByKey !== null) {
@@ -38748,6 +39258,7 @@ function mountItemsLinear<T>(
 				anchor,
 				item,
 				i,
+				key,
 				itemBody,
 				state,
 				singleRoot,
@@ -38755,7 +39266,6 @@ function mountItemsLinear<T>(
 				adoptNode,
 			);
 			oldItems.set(key, block);
-			block.key = key;
 			block.prevSibling = prev;
 			block.nextSibling = null;
 			if (prev) prev.nextSibling = block;
@@ -38778,7 +39288,9 @@ function mountItemsLinear<T>(
 			prev = block.prevSibling;
 			oldItems.delete(block.key);
 			if (isSuspenseException(error)) retainDiscardedWarmMemos(block);
-			unmountBlock(block, !ROOT_RENDER_TRANSACTION?.retainedCreated?.has(block));
+			if (block.idState.renderOwner?.signalOwner !== undefined)
+				discardSignalRetryItem(block, error);
+			else unmountBlock(block, !ROOT_RENDER_TRANSACTION?.retainedCreated?.has(block));
 		}
 		state.head = null;
 		state.tail = null;
@@ -38837,6 +39349,10 @@ function reconcileKeyed<T>(
 		);
 		return;
 	}
+	const observeKey =
+		parentBlock.idState.renderOwner?.signalOwner !== undefined
+			? trackSignalRetryListKeys(parentBlock, state, newLen, keySource)
+			: undefined;
 	if (process.env.NODE_ENV !== 'production') {
 		keySource = checkedListKey(keySource, normalizeKey);
 		normalizeKey = false;
@@ -38864,6 +39380,7 @@ function reconcileKeyed<T>(
 		const newItem = items[prefixLen];
 		const newKey = readListKey(keySource, newItem, prefixLen, normalizeKey);
 		if (oldFirst.key !== newKey) break;
+		if (observeKey !== undefined) observeKey(prefixLen, newKey);
 		const block = oldFirst;
 		// Stable-survivor skip: updateSurvivor writes itemIndex/body only when
 		// they differ, journals only on a difference, and renders only when the
@@ -38895,6 +39412,7 @@ function reconcileKeyed<T>(
 		const newItem = items[newEnd];
 		const newKey = readListKey(keySource, newItem, newEnd, normalizeKey);
 		if (oldLast.key !== newKey) break;
+		if (observeKey !== undefined) observeKey(newEnd, newKey);
 		const block = oldLast;
 		// Same stable-survivor skip as the prefix walk (see above).
 		if (!pure || block.props !== newItem || block.body !== itemBody || block.itemIndex !== newEnd)
@@ -38927,19 +39445,20 @@ function reconcileKeyed<T>(
 		for (let i = prefixLen; i <= newEnd; i++) {
 			const item = items[i];
 			const key = readListKey(keySource, item, i, normalizeKey);
+			if (observeKey !== undefined) observeKey(i, key);
 			const block = mountItem(
 				parentBlock,
 				parentNode,
 				anchor,
 				item,
 				i,
+				key,
 				itemBody,
 				state,
 				singleRoot,
 				ssrMarkerless,
 			);
 			oldItems.set(key, block);
-			block.key = key;
 			block.prevSibling = prev;
 			block.nextSibling = afterMiddle;
 			if (prev) prev.nextSibling = block;
@@ -38981,6 +39500,7 @@ function reconcileKeyed<T>(
 		const key = readListKey(keySource, items[prefixLen + i], prefixLen + i, normalizeKey);
 		newKeys[i] = key;
 		newKeysToIdx.set(key, i);
+		if (observeKey !== undefined) observeKey(prefixLen + i, key);
 	}
 
 	// Full-replace fast path — when prefix/suffix are empty AND no old items
@@ -39014,13 +39534,13 @@ function reconcileKeyed<T>(
 					state.end,
 					item,
 					i,
+					key,
 					itemBody,
 					state,
 					singleRoot,
 					ssrMarkerless,
 				);
 				oldItems.set(key, block);
-				block.key = key;
 				block.prevSibling = prev;
 				block.nextSibling = null;
 				if (prev) prev.nextSibling = block;
@@ -39260,13 +39780,13 @@ function reconcileKeyed<T>(
 					anchor,
 					items[targetIdx],
 					targetIdx,
+					key,
 					itemBody,
 					state,
 					singleRoot,
 					ssrMarkerless,
 				);
 				oldItems.set(key, block);
-				block.key = key;
 				state.size++;
 			} else block = oldItems.get(key)!;
 			block.prevSibling = previous;
@@ -39500,6 +40020,7 @@ function mountItem<T>(
 	anchor: Node,
 	item: T,
 	index: number,
+	key: unknown,
 	body: (item: T, s: Scope) => void,
 	forSlot: ForSlot,
 	// true = compiler-proven single-element item body (compiled @for). 2 = the
@@ -39551,6 +40072,7 @@ function mountItem<T>(
 					forSlot.env,
 				);
 				block.forSlot = forSlot;
+				block.key = key;
 				block.itemIndex = index;
 				if (singleRoot === 2 && forSlot.plainDeopt === true) block.deoptNode = root;
 				renderBlock(block);
@@ -39569,6 +40091,7 @@ function mountItem<T>(
 					anchor,
 					item,
 					index,
+					key,
 					body,
 					forSlot,
 					singleRoot,
@@ -39598,6 +40121,7 @@ function mountItem<T>(
 					anchor,
 					item,
 					index,
+					key,
 					body,
 					forSlot,
 					singleRoot,
@@ -39619,6 +40143,7 @@ function mountItem<T>(
 			forSlot.env,
 		);
 		block.forSlot = forSlot;
+		block.key = key;
 		block.itemIndex = index;
 		renderBlock(block);
 		hydration.node = getNextSibling(itemEnd);
@@ -39652,6 +40177,7 @@ function mountItem<T>(
 				forSlot.env,
 			);
 			block.forSlot = forSlot;
+			block.key = key;
 			block.itemIndex = index;
 			block.deoptNode = adoptNode;
 			preserveRootCreatedDom(block);
@@ -39669,6 +40195,7 @@ function mountItem<T>(
 			forSlot.env,
 		);
 		block.forSlot = forSlot;
+		block.key = key;
 		block.itemIndex = index;
 		renderBlock(block);
 		// Body inserted ONE node right before `anchor` via
@@ -39704,6 +40231,7 @@ function mountItem<T>(
 		forSlot.env,
 	);
 	block.forSlot = forSlot;
+	block.key = key;
 	block.itemIndex = index;
 	if (adoptNode !== null) {
 		block.deoptNode = adoptNode;
@@ -41133,6 +41661,7 @@ function makeRoot(
 				else VIEW_TRANSITION_DRIVER?.refreshPendingOwner(renderOwner);
 			}
 			renderOwner.nativeRetry?.clear();
+			if (renderOwner.retrySignalOwners !== undefined) clearSignalRetryOwners(renderOwner);
 			renderOwner.retryKey = null;
 			renderOwner.request = null;
 			if (renderOwner.transaction?.aborted === true) renderOwner.transaction = null;
@@ -41177,6 +41706,7 @@ function makeRoot(
 			unmounted = true;
 			renderOwner.disposed = true;
 			renderOwner.nativeRetry?.clear();
+			if (renderOwner.retrySignalOwners !== undefined) clearSignalRetryOwners(renderOwner);
 			renderOwner.retry = noop;
 			if (renderOwner.transition !== undefined) TRANSITION_SWAP_DRIVER!.discardRoot(renderOwner);
 			renderOwner.generation++;
@@ -41264,7 +41794,7 @@ function createRootWithOutputHandler(
 		},
 		outputHandler,
 		ownerToken,
-		options?.signalOwner ?? (SIGNAL_BINDINGS_ENABLED ? documentSignalOwner(container) : undefined),
+		options?.signalOwner ?? (signalDocumentEnabled ? documentSignalOwner(container) : undefined),
 		options,
 	);
 }
@@ -41412,7 +41942,7 @@ export function hydrateRoot(
 		renderReturnedValue,
 		ownerToken,
 		rootOptions?.signalOwner ??
-			(SIGNAL_BINDINGS_ENABLED ? documentSignalOwner(container) : undefined),
+			(signalDocumentEnabled ? documentSignalOwner(container) : undefined),
 		rootOptions,
 	);
 	const owner = idState.renderOwner!;

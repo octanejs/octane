@@ -103,6 +103,7 @@ import {
 import { createTextTypeFactsLookup, normalizeTextTypeFilename } from './text-type-facts.js';
 import { lowerSignalDeclarations } from './signal-declarations.js';
 import { lowerSignalAttemptReads } from './signal-attempt-reads.js';
+import { startIndependentSignalReads } from './signal-start-reads.js';
 import { domBindingExportFromId, prepareDomBindings } from './dom-bindings.js';
 import {
 	createTemplateIr,
@@ -646,16 +647,19 @@ function directSignalSite(ctx, componentName, node, kind = 'binding') {
 	)}`;
 }
 
-function componentInvocationSite(ctx, componentName, node) {
+function componentInvocationSite(ctx, node) {
 	const position = node?.start ?? `${node?.loc?.start?.line ?? 0}:${node?.loc?.start?.column ?? 0}`;
+	// Authored positions identify call sites independently of the server/client
+	// helper names introduced for loops, branches, and value-position fragments.
 	return `c:${strongHash(
-		`octane:component-invocation-site:1\0${normalizeTextTypeFilename(ctx.filename) ?? ctx.filename}\0${componentName}\0${position}`,
+		`octane:component-invocation-site:1\0${normalizeTextTypeFilename(ctx.filename) ?? ctx.filename}\0${position}`,
 	)}`;
 }
 
 function markDirectSignalBinding(binding, ctx, componentName, origin, kind) {
 	if (!canCarryDirectSignalHandle(binding.expr)) return binding;
 	ctx.signalBindingsUsed = true;
+	if (binding.kind !== 'text' && binding.kind !== 'textOnlyChild') ctx.signalBindingsEager = true;
 	return {
 		...binding,
 		signalDirect: true,
@@ -1404,6 +1408,7 @@ const INTERNAL_CLIENT_RUNTIME_HELPERS = new Set([
 	'setBindingClassIfChanged',
 	'enableSignalBindings',
 	'createElementAt',
+	'createElementFromConfig',
 	'bindSignalText',
 	'bindSignalChild',
 	'bindSignalAttribute',
@@ -1440,6 +1445,7 @@ const INTERNAL_SERVER_RUNTIME_HELPERS = new Set([
 	'ssrBindingClass',
 	'enableServerSignalBindings',
 	'createElementAt',
+	'createElementFromConfig',
 	'ssrSignalValue',
 	'ssrSignalControlValue',
 	'ssrSignalControlAttrs',
@@ -9327,7 +9333,7 @@ function compileAuthored(source, filename, options, bundlerMetadata) {
 			)
 		: analyzedAst;
 	const attemptAst = lowerSignalAttemptReads(bindingAst);
-	const signalAst = lowerSignalDeclarations(attemptAst, cleanFilename);
+	const signalAst = lowerSignalDeclarations(startIndependentSignalReads(attemptAst), cleanFilename);
 	if (bundlerMetadata !== null) bundlerMetadata.hydrateAst = signalAst;
 	const memoizedAst = strongModeEnabled
 		? applyStrongAutomaticMemo(signalAst, {
@@ -9814,6 +9820,7 @@ function compileInternal(
 		componentOwners: [],
 		currentComponentOwner: null,
 		signalBindingsUsed: ast._octaneSignalDeclarations === true,
+		signalBindingsEager: ast._octaneSignalDeclarations === true,
 		currentComponentLocals: null, // Set<string> while compiling a component body; null otherwise
 		currentMapTemps: null, // expression temps (map receiver/method, folded condition) owned by this function
 		currentAutoMemoOffset: 0, // flat compiler-cache cell offset for the body being emitted
@@ -10919,7 +10926,16 @@ function compileInternal(
 	if (ctx.signalBindingsUsed) {
 		ctx.runtimeNeeded.add('enableSignalBindings');
 		signalBindingNodes.push(
-			inheritOriginLoc(b.stmt(b.call('_$enableSignalBindings', b.literal(1))), moduleOrigin),
+			inheritOriginLoc(
+				b.stmt(
+					b.call(
+						'_$enableSignalBindings',
+						b.literal(1),
+						...(ctx.signalBindingsEager ? [] : [b.literal(true)]),
+					),
+				),
+				moduleOrigin,
+			),
 		);
 	}
 
@@ -11110,6 +11126,7 @@ function compileServer(
 		hmr: false, // SSR never hot-swaps in place; client/server production slot shapes stay aligned
 		dev: !!(options && options.dev),
 		signalBindingsUsed: ast._octaneSignalDeclarations === true,
+		signalBindingsEager: ast._octaneSignalDeclarations === true || options?.nativeReads === true,
 		// SSR MIRROR of the parallel-`use()` pipeline (docs/suspense-parallel-use-
 		// plan.md Phase 5): the same memoize (Pass A) + hoist/batch (Pass B)
 		// transforms run on server bodies, emitting `_$puMemo`/`_$puBatch` — the
@@ -11289,11 +11306,17 @@ function compileServer(
 	flushTailHookSymbols(ctx);
 	const nativeActivation = nativeReadActivationNodes(ctx, ctx._moduleOrigin);
 	const signalActivation = [];
-	if (ctx.signalBindingsUsed) {
+	if (ctx.signalBindingsUsed || ctx.signalBindingsEager) {
 		ctx.runtimeNeeded.add('enableServerSignalBindings');
 		signalActivation.push(
 			inheritOriginLoc(
-				b.stmt(b.call('_$enableServerSignalBindings', b.literal(1))),
+				b.stmt(
+					b.call(
+						'_$enableServerSignalBindings',
+						b.literal(1),
+						...(ctx.signalBindingsEager ? [] : [b.literal(true)]),
+					),
+				),
 				ctx._moduleOrigin,
 			),
 		);
@@ -13436,7 +13459,7 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 
 function ssrEmitComponent(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs) {
 	registerOriginAlias(ctx, node.closingElement?.name, node.id || node.openingElement?.name);
-	const invocationSite = componentInvocationSite(ctx, name, node);
+	const invocationSite = componentInvocationSite(ctx, node);
 	// M3 inherit-range: consume the body-root flag ONCE, before this component's
 	// props/children compile below (they recurse into ssrEmitNodes/ssrCompileSub
 	// and must not inherit it). Set by ssrCompileBody only for the sole
@@ -13596,10 +13619,10 @@ function ssrEmitComponent(node, ctx, name, inlinedSubs, parentNs, cssHash, compo
 		// The direct mode-only Activity was lowered to ActivityStatement. Richer
 		// Activity configs and generic explicit-key + spread sites keep one ordered
 		// element config, matching createElement without changing simple call sites.
-		ctx.runtimeNeeded.add('createElementAt');
+		ctx.runtimeNeeded.add('createElementFromConfig');
 		ctx.runtimeNeeded.add('ssrChild');
 		const descriptor = ssrCall(
-			'createElementAt',
+			'createElementFromConfig',
 			[b.literal(invocationSite), compExpr, inheritOriginLoc(b.object(propNodes), node)],
 			node,
 		);
@@ -14058,6 +14081,7 @@ function ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs
 					node.index ? b.id('__i') : ssrVoid(node),
 					b.id('__s'),
 					b.literal(!sharedItemRange && !bindingSite),
+					...(mapCall === null ? [] : [b.literal(true)]),
 				],
 				node,
 			)
@@ -14404,7 +14428,7 @@ function ssrEmitTsrxExpression(node, ctx, name, inlinedSubs, parentNs, cssHash, 
 				b.literal(false),
 				undefinedNode(),
 				undefinedNode(),
-				b.literal(componentInvocationSite(ctx, name, node)),
+				b.literal(componentInvocationSite(ctx, node)),
 			],
 			node,
 		);
@@ -20169,12 +20193,12 @@ function lowerHostFragment(
 	} else {
 		ctx.hoistedHelpers.push(renderer);
 	}
-	ctx.runtimeNeeded.add('createElementAt');
+	ctx.runtimeNeeded.add('createElementFromConfig');
 	// The fragment-renderer call maps to the authored fragment root.
 	return inheritOriginLoc(
 		b.call(
-			'_$createElementAt',
-			b.literal(componentInvocationSite(ctx, '<fragment>', node)),
+			'_$createElementFromConfig',
+			b.literal(componentInvocationSite(ctx, node)),
 			b.id(fragName),
 			b.object(holeProps),
 		),
@@ -20484,7 +20508,7 @@ function serverValueDirectiveFold(
 				directive,
 			),
 		);
-		ctx.runtimeNeeded.add('createElementAt');
+		ctx.runtimeNeeded.add('createElementFromConfig');
 		// The wrapper call stands where the directive was authored, and every printed
 		// node needs an origin (assertNodeLocs). Inside a component body the enclosing
 		// statement supplied one; a module-level statement does not.
@@ -20497,8 +20521,8 @@ function serverValueDirectiveFold(
 		}
 		return inheritOriginLoc(
 			b.call(
-				'_$createElementAt',
-				b.literal(componentInvocationSite(ctx, '<fragment>', directive)),
+				'_$createElementFromConfig',
+				b.literal(componentInvocationSite(ctx, directive)),
 				b.id(wrapperName),
 				b.object(descriptorProps),
 			),
@@ -21042,7 +21066,7 @@ function jsxElementToCreateElement(node, ctx, eagerRoot = false) {
 	const nameNode = node.openingElement?.name || node.id;
 	const activity = isActivityLongForm(node, ctx);
 	const componentTag = activity || isComponentTag(node);
-	const invocationSite = componentTag ? componentInvocationSite(ctx, '<value>', node) : null;
+	const invocationSite = componentTag ? componentInvocationSite(ctx, node) : null;
 	// Host (lowercase) tag → string literal (`'li'`) for the de-opt renderer;
 	// component (capitalized / member / dynamic) → the identifier/member ref.
 	const compNode = activity
@@ -21268,17 +21292,17 @@ function jsxElementToCreateElement(node, ctx, eagerRoot = false) {
 			node,
 		);
 	} else {
-		ctx.runtimeNeeded.add(componentTag ? 'createElementAt' : 'createElement');
+		ctx.runtimeNeeded.add(componentTag ? 'createElementFromConfig' : 'createElement');
 		// Remaining scaffolding (callee, props object, spread/diagnostic wrappers,
 		// static-content literals) maps to the authored JSX element.
 		descriptor = inheritOriginLoc(
 			componentTag
 				? b.call(
-						'_$createElementAt',
+						'_$createElementFromConfig',
 						b.literal(invocationSite),
 						compNode,
 						propsNode,
-						...loweredChildren,
+						...(loweredChildren.length ? [b.array(loweredChildren)] : []),
 					)
 				: b.call('_$createElement', compNode, propsNode, ...loweredChildren),
 			node,
@@ -24033,9 +24057,8 @@ function planJsx(
 		if (!b.signalDirect && (b.kind === 'text' || b.kind === 'textOnlyChild')) {
 			ctx.runtimeNeeded.add('setText');
 		}
-		if (!b.signalDirect && b.kind === 'text')
-			ctx.runtimeNeeded.add(b.bindingMarker ? 'bindingText' : 'htextSwap');
-		if (!b.signalDirect && b.kind === 'textOnlyChild') ctx.runtimeNeeded.add('htext');
+		if (b.kind === 'text') ctx.runtimeNeeded.add(b.bindingMarker ? 'bindingText' : 'htextSwap');
+		if (b.kind === 'textOnlyChild') ctx.runtimeNeeded.add('htext');
 		// Mounts use the unconditional writer; reactive scalar bindings use either
 		// that writer behind an inline guard or its compact comparison helper.
 		// Claim both authored-name tokens when both paths exist, and do not retain
@@ -24783,6 +24806,7 @@ function planJsx(
 			}
 			if (!noTemplate && cc.signalSite != null && (ctx.signalBindingsUsed || ctx.nativeReads)) {
 				ctx.signalBindingsUsed = true;
+				ctx.signalBindingsEager = true;
 				ctx.runtimeNeeded.add('bindSignalChild');
 				const tokenKey = `_sigch$${cc.id}`;
 				bag.constField(tokenKey, b.literal(null));
@@ -25672,20 +25696,39 @@ function emitBindingMount(bind, elVar, bag) {
 	const signalHelper = directSignalBindingHelper(bind);
 	if (signalHelper !== null) {
 		const text = bind.kind === 'text' || bind.kind === 'textOnlyChild';
+		let mount = b.call(
+			attrLoweringToken(b.id(`_$${signalHelper}`), bind),
+			...directSignalBindingArgs(bind, el(), undefinedNode(), text ? V() : bind.expr),
+		);
+		if (text) {
+			// A possible handle is not a subscription. Primitive text mounts through
+			// the canonical hydration/seeded-placeholder writer, without journaling
+			// a freshly cloned Text as though it were an existing update target.
+			const scalarMount =
+				bind.kind === 'textOnlyChild'
+					? b.call('_$htext', el(), V(), ...(bind.seededText ? [b.literal(1)] : []))
+					: bind.bindingMarker
+						? b.call('_$bindingText', el(), V(), b.literal(bind.bindingMarker))
+						: b.call('_$htextSwap', el(), V());
+			mount = b.conditional(
+				b.logical(
+					'||',
+					b.binary('===', V(), b.literal(null)),
+					b.logical(
+						'&&',
+						b.binary('!==', b.unary('typeof', V()), b.literal('object')),
+						b.binary('!==', b.unary('typeof', V()), b.literal('function')),
+					),
+				),
+				scalarMount,
+				mount,
+			);
+		}
 		return st(
 			b.block([
 				...mountHost(),
 				...(text ? [b.const('_v', bind.expr)] : []),
-				b.stmt(
-					b.assignment(
-						'=',
-						local(`_sig$${bind.id}`),
-						b.call(
-							attrLoweringToken(b.id(`_$${signalHelper}`), bind),
-							...directSignalBindingArgs(bind, el(), undefinedNode(), text ? V() : bind.expr),
-						),
-					),
-				),
+				b.stmt(b.assignment('=', local(`_sig$${bind.id}`), mount)),
 				...(text ? [b.stmt(b.assignment('=', local(`_prev$${bind.id}`), V()))] : []),
 			]),
 		);
@@ -26163,17 +26206,37 @@ function emitBindingUpdate(bind, bag, inlineBindingGuards = false) {
 			return st(
 				b.block([
 					b.const('_v', bind.expr),
-					b.stmt(
-						b.assignment(
-							'=',
-							F('_sig'),
-							b.call(
-								b.id(`_$${signalHelper}`),
-								...directSignalBindingArgs(bind, F('_el'), F('_sig'), V(), F('_prev')),
+					// Repeated primitives need neither a binding read nor a bag write.
+					// Objects/functions still re-enter: an unchanged handle can have
+					// changed value, pending, or error state since the last render.
+					b.if(
+						b.logical(
+							'||',
+							b.binary('!==', F('_prev'), V()),
+							b.logical(
+								'&&',
+								b.binary('!==', V(), b.literal(null)),
+								b.logical(
+									'||',
+									b.binary('===', b.unary('typeof', V()), b.literal('object')),
+									b.binary('===', b.unary('typeof', V()), b.literal('function')),
+								),
 							),
 						),
+						b.block([
+							b.stmt(
+								b.assignment(
+									'=',
+									F('_sig'),
+									b.call(
+										b.id(`_$${signalHelper}`),
+										...directSignalBindingArgs(bind, F('_el'), F('_sig'), V(), F('_prev')),
+									),
+								),
+							),
+							b.stmt(b.assignment('=', F('_prev'), V())),
+						]),
 					),
-					b.stmt(b.assignment('=', F('_prev'), V())),
 				]),
 			);
 		}
@@ -27231,6 +27294,7 @@ function emitElementHtml(
 		const site = directSignalSite(ctx, componentName, node, 'input');
 		ensureDirectControlSite(site);
 		ctx.signalBindingsUsed = true;
+		ctx.signalBindingsEager = true;
 		return { ...binding, signalDirect: true, signalSite: site };
 	};
 	const hostSignalSite = directSignalSite(ctx, componentName, node, 'binding');
@@ -27998,7 +28062,10 @@ function emitElementHtml(
 			hostClientSources.some(
 				(source) => !source.spread && canCarryDirectSignalHandle(source.binding.expr),
 			);
-		if (signalHostSources) ctx.signalBindingsUsed = true;
+		if (signalHostSources) {
+			ctx.signalBindingsUsed = true;
+			ctx.signalBindingsEager = true;
+		}
 		hostCommitClientBinding = {
 			id: bindings.length,
 			kind: 'hostCommit',
@@ -29419,7 +29486,7 @@ function makeCompCall(
 	cssHash = null,
 ) {
 	const id = ctx.nextHelperId++;
-	const invocationSite = componentInvocationSite(ctx, componentName, node);
+	const invocationSite = componentInvocationSite(ctx, node);
 	const compName = tagBindingName(node);
 	const staticFragmentRenderer = node.openingElement?.metadata?.staticFragmentRenderer;
 	const activityDescriptor = isActivityLongForm(node, ctx);
@@ -29568,7 +29635,7 @@ function makeCompCall(
 	// The props object as a node; the call-site emit embeds it directly.
 	const propsExpr = staticFragmentRenderer?.props ?? inheritOriginLoc(b.object(propNodes), node);
 	if (descriptorConfig) {
-		ctx.runtimeNeeded.add('createElementAt');
+		ctx.runtimeNeeded.add('createElementFromConfig');
 		return {
 			id,
 			loc: devLoc(ctx, node),
@@ -29576,7 +29643,7 @@ function makeCompCall(
 			isChild: true,
 			anchorlessAppendSafe: true,
 			valueExpr: inheritOriginLoc(
-				b.call('_$createElementAt', b.literal(invocationSite), compNode, propsExpr),
+				b.call('_$createElementFromConfig', b.literal(invocationSite), compNode, propsExpr),
 				node,
 			),
 		};

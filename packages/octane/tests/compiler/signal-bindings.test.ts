@@ -281,7 +281,7 @@ export function App() @{ <input value={draft$.get()} /> }`,
 					/^b:/.test(args[1].value),
 			),
 		).toBe(true);
-		expect(server).toContain('enableServerSignalBindings(1)');
+		expect(server).toContain('enableServerSignalBindings(1, true)');
 	});
 
 	it('keeps signal-free server modules on the cold path', () => {
@@ -290,6 +290,15 @@ export function App() @{ <input value={draft$.get()} /> }`,
 			hmr: false,
 		}).code;
 		expect(server).not.toContain('enableServerSignalBindings');
+		const scalar = `export function App(props) @{ <p>{props.label as string}</p> }`;
+		expect(compile(scalar, '/src/potential-signal.tsrx', { mode: 'server' }).code).toContain(
+			'enableServerSignalBindings(1, true)',
+		);
+		const native = compile(`import 'octane/signals';\n${scalar}`, '/src/native-signal.tsrx', {
+			mode: 'server',
+		}).code;
+		expect(native).toContain('enableServerSignalBindings(1)');
+		expect(native).not.toContain('enableServerSignalBindings(1, true)');
 	});
 
 	it('keeps the adopted parser tree immutable', () => {

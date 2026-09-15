@@ -39,10 +39,11 @@ function authoredPresentation<Props extends object>(
 	dev = false,
 	source = presentationSource,
 	modules: Readonly<Record<string, Record<string, unknown>>> = {},
+	compileOptions: Record<string, unknown> = {},
 ) {
 	const id = '/src/dom-presentation.tsrx';
 	const options = {
-		compileOptions: { dev, hmr: false },
+		compileOptions: { dev, hmr: false, ...compileOptions },
 		runtimeModules: {
 			'octane/behavior': DomBindings,
 			'octane/dom-bindings': DomBindings,
@@ -3227,6 +3228,130 @@ export function NumericPresentation(props) @{ 'use dom bindings';
 			expect(spreadNode.style.left).toBe('15px');
 			expect(spreadNode.style.top).toBe('3px');
 			spreadHandle.dispose();
+			for (const reversed of [false, true]) {
+				const projected = authoredPresentation(
+					'DynamicStyles',
+					{ inlineStart: '20px', blockStart: '30px', message: 'Uploading' },
+					dev,
+					`import * as styles from 'binding-styles';
+export function DynamicStyles(props) @{ 'use dom bindings'; <section {...styles.attrs(${reversed ? 'noticeStyles.position(props.inlineStart, props.blockStart), noticeStyles.notice' : 'noticeStyles.notice, noticeStyles.position(props.inlineStart, props.blockStart)'})}>{props.message as string}</section> }
+const noticeStyles = styles.create({
+  notice: { class: 'notice', style: 'left:1px;top:2px' },
+  position: (inlineStart, blockStart) => ({ class: 'position', style: 'left:' + inlineStart + ';top:' + blockStart }),
+});`,
+					{
+						'binding-styles': {
+							create: (config: unknown) => config,
+							attrs: (...values: Array<{ class: string; style: string }>) => ({
+								class: values.map((value) => value.class).join(' '),
+								style: values.map((value) => value.style).join(';'),
+							}),
+						},
+					},
+					{
+						knownAttributeSpreads: [
+							{
+								source: 'binding-styles',
+								imported: '*',
+								members: ['attrs'],
+								fields: ['class', 'style'],
+							},
+						],
+					},
+				);
+				for (const mount of [false, true]) {
+					const projectedHost = document.createElement('div');
+					container.append(projectedHost);
+					projected.publish({ inlineStart: '20px', blockStart: '30px', message: 'Uploading' });
+					if (!mount) projectedHost.innerHTML = projected.html;
+					const serverNode = projectedHost.firstElementChild;
+					const projectedHandle = mount
+						? projected.mount({ parent: projectedHost }, projected.state)
+						: projected.attach(serverNode!, projected.state);
+					const projectedNode = projectedHost.querySelector('section')!;
+					if (!mount) expect(projectedNode).toBe(serverNode);
+					expect(projectedNode.className).toBe(reversed ? 'position notice' : 'notice position');
+					expect(projectedNode.style.left).toBe(reversed ? '1px' : '20px');
+					expect(projectedNode.style.top).toBe(reversed ? '2px' : '30px');
+					projected.publish({ inlineStart: '40px', blockStart: '50px', message: 'Done' });
+					expect(projectedNode.textContent).toBe('Done');
+					expect(projectedNode.style.left).toBe(reversed ? '1px' : '40px');
+					expect(projectedNode.style.top).toBe(reversed ? '2px' : '50px');
+					expect(projectedHost.firstElementChild).toBe(projectedNode);
+					projectedHandle.dispose();
+					projected.publish({ inlineStart: '60px', blockStart: '70px', message: 'Disposed' });
+					expect(projectedNode.textContent).toBe('Done');
+				}
+			}
+			const viewport = authoredPresentation<{ height: string | undefined; message: string }>(
+				'ViewportProperties',
+				{ height: '20px', message: 'Initial' },
+				dev,
+				`import { viewportProperties } from 'binding-tokens';
+export function ViewportProperties(props) @{ 'use dom bindings'; <section style={{ [viewportProperties.height.slice(4, -1)]: props.height }}>{props.message as string}</section> }`,
+				{ 'binding-tokens': { viewportProperties: { height: 'var(--viewport-height)' } } },
+			);
+			for (const mount of [false, true]) {
+				const viewportHost = document.createElement('div');
+				container.append(viewportHost);
+				viewport.publish({ height: '20px', message: 'Initial' });
+				if (!mount) viewportHost.innerHTML = viewport.html;
+				const serverNode = viewportHost.querySelector('section');
+				serverNode?.style.setProperty('--external', 'preserved');
+				const viewportHandle = mount
+					? viewport.mount({ parent: viewportHost }, viewport.state)
+					: viewport.attach(serverNode!, viewport.state);
+				const viewportNode = viewportHost.querySelector('section')!;
+				if (!mount) expect(viewportNode).toBe(serverNode);
+				expect(viewportNode.style.getPropertyValue('--viewport-height')).toBe('20px');
+				viewportNode.style.setProperty('--external', 'preserved');
+				viewport.publish({ height: '40px', message: 'Updated' });
+				expect(viewportNode.style.getPropertyValue('--viewport-height')).toBe('40px');
+				expect(viewportNode.style.getPropertyValue('--external')).toBe('preserved');
+				expect(viewportNode.textContent).toBe('Updated');
+				viewport.publish({ height: undefined });
+				expect(viewportNode.style.getPropertyValue('--viewport-height')).toBe('');
+				expect(viewportNode.style.getPropertyValue('--external')).toBe('preserved');
+				viewportHandle.dispose();
+				viewport.publish({ height: '60px', message: 'Disposed' });
+				expect(viewportNode.style.getPropertyValue('--viewport-height')).toBe('');
+				expect(viewportNode.textContent).toBe('Updated');
+			}
+			for (const configuration of [
+				'position: async (value) => ({ left: value })',
+				'position: (value) => { return { left: value }; }',
+				'position: (value) => ({ left: value++ })',
+				'position: (value) => ({ left: (value.left = 1) })',
+				'position: () => ({ left: document.title })',
+				'position: () => ({ left: this.value })',
+				'position: () => ({ left: import.meta.url })',
+				"position: () => import('never-load-this-module')",
+				'position: () => ({ left: useMemo(() => 1) })',
+				'position: (value) => ({ left: value.save() })',
+				'position: (value) => ({ get left() { return value; } })',
+				'get position() { return (value) => ({ left: value }); }',
+				'position: (value = 1) => ({ left: value })',
+				'position: (...values) => ({ left: values[0] })',
+				'position: styles.wrap((value) => ({ left: value }))',
+				'__proto__: (value) => ({ left: value })',
+				'position: { left: 1 }',
+				'other: (value) => ({ left: value })',
+			]) {
+				for (const mode of ['client', 'server'] as const) {
+					expect(() =>
+						loadCompiledFixtureSource(
+							`import * as styles from 'binding-styles'; import { useMemo } from 'octane';
+const noticeStyles = styles.create({ ${configuration} });
+export function Invalid(props) @{ 'use dom bindings'; <section style={noticeStyles.${configuration.startsWith('__proto__:') ? '__proto__' : 'position'}(props.value)} /> }`,
+							{
+								id: '/src/invalid-projection-factory.tsrx',
+								mode,
+								compileOptions: { dev, hmr: false },
+							},
+						),
+					).toThrow(/Octane DOM bindings/);
+				}
+			}
 			const aliases = { marginLeft: '2px', margin: '1px', 'margin-left': '3px' };
 			const canonicalStyle = document.createElement('section');
 			const margins = (element: HTMLElement) => [

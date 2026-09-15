@@ -254,6 +254,49 @@ function importedBindings(ast) {
 	return imports;
 }
 
+function importedProjectionCall(node, imports, lexical, parameterScope) {
+	const callee = unwrap(node?.callee);
+	let importedRoot = callee;
+	while (importedRoot?.type === 'MemberExpression' && !importedRoot.computed)
+		importedRoot = importedRoot.object;
+	const namespace =
+		importedRoot !== callee &&
+		importedRoot?.type === 'Identifier' &&
+		imports.get(importedRoot.name)?.specifier.type === 'ImportNamespaceSpecifier'
+			? importedRoot
+			: null;
+	const reference = namespace ?? callee;
+	const imported = reference?.type === 'Identifier' ? imports.get(reference.name) : null;
+	return (
+		imported != null &&
+		lexical.resolveBinding(lexical.nodeScopes.get(reference) ?? parameterScope, reference.name)
+			?.scope === lexical.rootScope &&
+		!/^use(?:[A-Z]|$)/.test(namespace ? callee.property.name : (imported.imported ?? '')) &&
+		imported.source !== 'octane' &&
+		!imported.source.startsWith('octane/')
+	);
+}
+
+function projectionFactoryConfiguration(expression, imports, lexical, parameterScope) {
+	const value = unwrap(expression);
+	return value?.type === 'CallExpression' &&
+		!value.optional &&
+		value.arguments.length === 1 &&
+		unwrap(value.arguments[0])?.type === 'ObjectExpression' &&
+		importedProjectionCall(value, imports, lexical, parameterScope)
+		? unwrap(value.arguments[0])
+		: null;
+}
+
+function expressionProjection(node) {
+	return (
+		node?.type === 'ArrowFunctionExpression' &&
+		!node.async &&
+		node.body.type !== 'BlockStatement' &&
+		node.params.every((param) => param.type === 'Identifier')
+	);
+}
+
 // The directive asserts imported projections are pure. Obvious writes, ambient
 // reads, hooks and arbitrary calls remain diagnostics instead of silent one-shot work.
 function assertProjection(
@@ -264,12 +307,72 @@ function assertProjection(
 	parameterScope,
 	constants = new Set(),
 ) {
+	const configuration =
+		constants.size > 0
+			? projectionFactoryConfiguration(expression, imports, lexical, parameterScope)
+			: null;
+	const configurationArrows = configuration ? new Set() : null;
+	const collectConfiguration = (object) => {
+		for (const property of object.properties) {
+			if (
+				property.type !== 'Property' ||
+				property.kind !== 'init' ||
+				property.method ||
+				property.computed
+			)
+				continue;
+			const value = unwrap(property.value);
+			if (expressionProjection(value)) configurationArrows.add(value);
+			else if (value?.type === 'ObjectExpression') collectConfiguration(value);
+		}
+	};
+	if (configuration) collectConfiguration(configuration);
+	const factoryProjection = (callee) => {
+		const path = [];
+		let receiver = callee;
+		while (receiver?.type === 'MemberExpression' && !receiver.computed && !receiver.optional) {
+			path.unshift(receiver.property.name);
+			receiver = unwrap(receiver.object);
+		}
+		if (
+			path.length === 0 ||
+			/^use(?:[A-Z]|$)/.test(path.at(-1)) ||
+			receiver?.type !== 'Identifier' ||
+			lexical.resolveBinding(lexical.nodeScopes.get(receiver) ?? parameterScope, receiver.name)
+				?.scope !== lexical.rootScope
+		)
+			return false;
+		let value = projectionFactoryConfiguration(
+			lexical.domBindingConstants?.get(receiver.name)?.init,
+			imports,
+			lexical,
+			parameterScope,
+		);
+		for (const name of path) {
+			if (
+				name === '__proto__' ||
+				value?.type !== 'ObjectExpression' ||
+				value.properties.some((property) => property.type !== 'Property' || property.computed)
+			)
+				return false;
+			const members = value.properties.filter(
+				(property) => (property.key.name ?? property.key.value) === name,
+			);
+			if (members.length !== 1 || members[0].kind !== 'init' || members[0].method) return false;
+			value = unwrap(members[0].value);
+		}
+		// The directive requires the provider to preserve its pure projections;
+		// this is an author/provider assertion, not an analysis of imported code.
+		// A result grants no arbitrary methods: the exact static member must come
+		// from a checked projection in the immutable literal configuration.
+		return expressionProjection(value);
+	};
 	// Like imported projections, these native reads rely on the directive's
-	// immutable-props contract. A string result cast does not admit arbitrary
+	// immutable-props/import contract. A string result cast does not admit arbitrary
 	// methods: every call in a chain must independently satisfy this boundary.
-	const readReceiver = (input, sampled = false) => {
+	const readReceiver = (input) => {
 		let receiver = unwrap(input);
-		if (receiver?.type === 'ChainExpression') return readReceiver(receiver.expression, sampled);
+		if (receiver?.type === 'ChainExpression') return readReceiver(receiver.expression);
 		if (receiver?.type === 'LogicalExpression')
 			return readReceiver(receiver.left) && readReceiver(receiver.right);
 		if (receiver?.type === 'ConditionalExpression')
@@ -284,10 +387,7 @@ function assertProjection(
 			lexical.nodeScopes.get(receiver) ?? parameterScope,
 			receiver.name,
 		);
-		return (
-			binding != null &&
-			(binding.scope !== lexical.rootScope || (sampled && imports.has(receiver.name)))
-		);
+		return binding != null && (binding.scope !== lexical.rootScope || imports.has(receiver.name));
 	};
 	const readMethod = (node) => {
 		const callee = unwrap(node?.callee);
@@ -302,7 +402,7 @@ function assertProjection(
 					!['includes', 'find', 'trim', 'slice', 'toUpperCase'].includes(callee.property.name)))
 		)
 			return false;
-		return readReceiver(callee.object, sampled);
+		return readReceiver(callee.object);
 	};
 	walk(expression, (node, parent, key) => {
 		if (node.type.startsWith('TS') && !UNWRAP.has(node.type)) return false;
@@ -315,7 +415,10 @@ function assertProjection(
 				'NewExpression',
 				'TaggedTemplateExpression',
 			].includes(node.type) ||
+			(configurationArrows !== null &&
+				['ThisExpression', 'Super', 'MetaProperty', 'ImportExpression'].includes(node.type)) ||
 			(['FunctionExpression', 'ArrowFunctionExpression'].includes(node.type) &&
+				!configurationArrows?.has(node) &&
 				!(
 					key === 'arguments' &&
 					readMethod(parent) &&
@@ -362,34 +465,17 @@ function assertProjection(
 		}
 		if (node.type === 'CallExpression' || node.type === 'OptionalCallExpression') {
 			const callee = unwrap(node.callee);
-			if (readMethod(node)) return;
-			let importedRoot = callee;
-			while (importedRoot?.type === 'MemberExpression' && !importedRoot.computed)
-				importedRoot = importedRoot.object;
-			const namespace =
-				importedRoot !== callee &&
-				importedRoot?.type === 'Identifier' &&
-				imports.get(importedRoot.name)?.specifier.type === 'ImportNamespaceSpecifier'
-					? importedRoot
-					: null;
-			const reference = namespace ?? callee;
-			const imported = reference?.type === 'Identifier' ? imports.get(reference.name) : null;
-			const binding =
-				callee &&
-				lexical.resolveBinding(lexical.nodeScopes.get(reference) ?? parameterScope, reference.name);
 			if (
-				!imported ||
-				binding?.scope !== lexical.rootScope ||
-				/^use(?:[A-Z]|$)/.test(namespace ? callee.property.name : (imported.imported ?? '')) ||
-				imported.source === 'octane' ||
-				imported.source.startsWith('octane/')
-			) {
-				error(
-					filename,
-					node,
-					'calls in bindings must be imported pure projections, not hooks or live accessors',
-				);
-			}
+				readMethod(node) ||
+				importedProjectionCall(node, imports, lexical, parameterScope) ||
+				factoryProjection(callee)
+			)
+				return;
+			error(
+				filename,
+				node,
+				'calls in bindings must be imported pure projections, not hooks or live accessors',
+			);
 		}
 	});
 }

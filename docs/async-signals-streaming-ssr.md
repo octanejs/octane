@@ -195,6 +195,10 @@ ordinary signal derivations; the integration must not create a parallel state
 graph. Compiler work, initial subscriptions, emitted bytes, and update work are
 all part of the performance accounting.
 
+Within the explicit pure-projection contract, an immutable imported-factory configuration may expose checked expression-bodied dynamic functions, such as `styles.position(inlineStart, blockStart)`. The compiler verifies the exact static member and its expression rather than trusting a method name. Imported immutable string tokens may also use the supported native string operations, including computed CSS property names. Ordered attribute merging still runs once per source projection; this acceptance does not turn a sampled `.get()` projection into a fine-grained derived subscription.
+
+Known attribute spreads currently own the entire declared class/style attribute; they do not create managed class contributions alongside an external writer. For an intentionally external static root, `...unbound(stylex.attrs(...))` preserves its SSR attributes without adopting those channels. It must precede nonoverlapping owned attributes, does not update reactively, and does not count as migrating the retained external presentation work. Dynamic shared-host merges need a separate contribution contract; manual restoration or repeated attribute-factory calls are not substitutes.
+
 Integration should replace the host's bespoke state carrier, early-control
 handoff, and stream receiver where these primitives cover the same responsibility,
 not mirror state through old and new stores. Storage keys, draft recovery policy,
@@ -211,6 +215,14 @@ Switching A to B may immediately display eligible cached B while fetching
 progressive SSR HTML/data. Fresh server revisions reconcile by stable item IDs,
 without duplicating history or resetting the composer. The host owns cache,
 authority, source revisions, and supersession policy.
+
+Title, body, history, and widgets may reveal independently. An already-available
+cached title can appear immediately; if an asynchronous cache read is still
+pending, the host may show a placeholder instead. Neither choice waits for the
+other regions or for a fresh server title. Each result must still belong to the
+current conversation and presentation generation and pass the host's freshness
+policy. Navigation does not require a global atomic reveal; an explicitly chosen
+transition retention policy is a separate contract.
 
 Client selection generation authorizes presentation; server content revision
 proves freshness; attempt/sequence orders transport; the historical frame explains
@@ -797,7 +809,9 @@ The acceptance bar is observable:
 
 ## Engineering decisions to verify
 
-The September 15 [Jon review](https://github.com/octanejs/RFCs/discussions/3#discussioncomment-18450583) and [Dominic review](https://github.com/octanejs/RFCs/discussions/3#discussioncomment-18450790) remain open beyond the earlier three-item follow-up. In particular, signal transition semantics, parser-level independence from late CSS, signal-free SSR overhead, and parallel independent query starts need explicit qualification before the RFC can be called ready. The [implementation guide](./async-signals-implementation.md#new-core-team-review-remains-open) records the current gaps; passing existing tests does not settle the remaining API or delivery-scope choices.
+The September 15 [Jon review](https://github.com/octanejs/RFCs/discussions/3#discussioncomment-18450583) and [Dominic review](https://github.com/octanejs/RFCs/discussions/3#discussioncomment-18450790) remain open beyond the earlier three-item follow-up. The current candidate addresses speculative signal ownership on signal-free SSR paths and starts compiler-proven adjacent independent `query$` and `derived$` reads together. Declaration laziness, true dependencies, strict read ordering, and cancellation remain part of that contract; arbitrary imported or property-based reads are not covered by this optimization. Explicit signal-transition semantics and parser-level independence from late CSS remain separate open work. The [implementation guide](./async-signals-implementation.md#new-core-team-review-remains-open) records the scoped implementation and qualification limits; passing existing tests does not settle every API or delivery requirement.
+
+An initial integration may use immediate selection changes, cached-first or placeholder presentation, and independent result reveal without opting into explicit signal-transition retention. Such an integration must preserve strict pending/error behavior and reject obsolete results, but need not wait for the separate `useTransition` pending/retention work. This scoped adoption does not declare that broader RFC contract implemented. Parallel query starts, runtime performance, and final build/browser validation remain priorities for this delivery.
 
 1. How much local, imported, and effectful Strong-mode code can the compiler prove safe for implicit post-`await` reads? Which unsupported paths receive an explicit-reader requirement, and how do we explain this boundary to authors without implying ambient async tracking?
 2. What is the smallest independent widget manifest and model ABI that proves code, CSS, stable IDs/hook seeds, captures, historical reads, and version compatibility? Which native vs opaque HTML ranges can avoid duplicating large serialized data?

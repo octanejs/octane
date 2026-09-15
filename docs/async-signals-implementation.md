@@ -75,7 +75,7 @@ These are the main source owners, not extra layers an application must construct
 | Declaration identity and live ownership | [facade.ts](../packages/octane/src/signals/facade.ts), [owner-context.ts](../packages/octane/src/signals/owner-context.ts), [document-owner.ts](../packages/octane/src/signals/document-owner.ts) | One declaration can resolve to separate request or instance values without process-global mutable state |
 | Dependency graph and historical reads | [graph.ts](../packages/octane/src/signals/graph.ts), [engine.ts](../packages/octane/src/signals/engine.ts) | Track invalidation, retain complete results, and read the values that produced existing HTML during adoption |
 | Async derivations and queries | [computations.ts](../packages/octane/src/signals/computations.ts), [requests.ts](../packages/octane/src/signals/requests.ts) | Reject obsolete results, close iterators, and distinguish partial values from completed streams |
-| Compiler identity and async reads | [signal-declarations.js](../packages/octane/src/compiler/signal-declarations.js), [signal-attempt-reads.js](../packages/octane/src/compiler/signal-attempt-reads.js) | Generate matching server/client IDs and bind proven post-`await` reads to the producing attempt |
+| Compiler identity and async reads | [signal-declarations.js](../packages/octane/src/compiler/signal-declarations.js), [signal-attempt-reads.js](../packages/octane/src/compiler/signal-attempt-reads.js), [signal-start-reads.js](../packages/octane/src/compiler/signal-start-reads.js) | Generate matching server/client IDs, bind proven post-`await` reads to their attempt, and start proven independent reads together |
 | Native bindings and early input | [control-binding.ts](../packages/octane/src/signals/control-binding.ts), [early-values.ts](../packages/octane/src/signals/early-values.ts), [runtime.ts](../packages/octane/src/runtime.ts) | Preserve native edits and update only the properties a binding owns |
 | Server frames and observation | [runtime.server.ts](../packages/octane/src/runtime.server.ts), [server/streamed-signals.ts](../packages/octane/src/server/streamed-signals.ts) | Capture rendered values and independently deliver query results with matching identities |
 | Browser transport and placement | [streamed-signals.ts](../packages/octane/src/hydration/streamed-signals.ts), [stream-delivery.ts](../packages/octane/src/hydration/stream-delivery.ts), [stream-receiver.ts](../packages/octane/src/hydration/stream-receiver.ts) | Validate and bound incoming work before updating data or replacing an authorized DOM range |
@@ -108,6 +108,26 @@ Before publication, dependency versions and retirement state are checked.
 Cancellation alone is insufficient: a producer may ignore its abort signal.
 Late values and iterator yields must still be rejected.
 
+### Independent starts do not require a transaction
+
+Adjacent strict reads of same-module immutable `query$` or `derived$` declarations can start together in compiled component bodies and entered directive arms. Declarations remain lazy; an unused declaration or an unentered branch starts nothing. Each original read remains the suspension, error, and observation point. The compiler does not insert an await-all barrier or delay native input.
+
+For example, both selectors below depend on the same authentication query. Authentication starts once; after it succeeds, conversation and history loading can start together:
+
+```ts
+const auth$ = query$(() => 'viewer', loadViewer);
+const conversation$ = query$(() => auth$.get().id, loadConversation);
+const history$ = query$(() => auth$.get().id, loadHistory);
+
+// Inside a compiled component or entered directive arm:
+const conversation = conversation$.get();
+const history = history$.get();
+```
+
+This is a bounded compiler optimization, not universal parallelization. Imported handles, property receivers, opaque aliases, direct JSX holes, and uncompiled helpers are not covered. Dependencies on an earlier local result preserve sequencing, including captures through local closures. Separate boundaries still determine independent reveal; starting both requests does not make one boundary display a partially evaluated result.
+
+Pending component-local work belongs to a retry episode. Retrying the same logical instance reuses its work rather than starting duplicate loaders; replacement, cancellation, and unmount retire obsolete work. The cache retains signal owners and logical identity tokens, not discarded DOM or scope trees. Ordinary signal-free renders do not allocate this retry state.
+
 ### Historical HTML and live state are different
 
 Hydration first reads the historical values that produced its existing HTML.
@@ -119,6 +139,12 @@ For navigation, selection generation controls whether content may be shown;
 source revision controls freshness; attempt and sequence order transport.
 Returning A → B → A creates a new selection generation. A cached segment cannot
 replace the current view merely because its bytes arrived last.
+
+An eligible cached title or a placeholder may appear as soon as selection changes,
+while body, history, and widgets reveal independently. An asynchronous storage read
+does not hold those regions back. Different arrival times are valid; stale results
+from another conversation or visit are not. This navigation policy does not require
+transactional publication across every region.
 
 ### Input handoff preserves native behavior
 
@@ -212,12 +238,14 @@ all Safari loading problems. See the [Safari investigation](./safari-esm-investi
 
 The September 15 [Jon review](https://github.com/octanejs/RFCs/discussions/3#discussioncomment-18450583) and [Dominic review](https://github.com/octanejs/RFCs/discussions/3#discussioncomment-18450790) are newer than the earlier three-item feedback follow-up. Passing the authored-presentation tests below does not close these reviews or establish readiness for final integration.
 
-- **Signal transitions:** compiled client probes show a direct selected-value binding changing to 43 while Todo 42 remains visible; renderer-free bindings also publish immediately. An actual `useTransition` case exposes the pending fallback and returns its pending indicator to idle before the query settles. Ordinary shell-retention coverage and superseded-attempt rejection pass, but neither proves transactional signal publication. This remains a separate scheduler/graph integration gap, not a claim that the held-DOM regression covers it.
+- **Explicit signal transitions:** different title/body arrival times are not themselves a defect, and cached-first navigation does not require a global atomic reveal. The unresolved contract is an explicitly requested transition's pending/retention behavior: an actual `useTransition` probe exposes the pending fallback and returns its pending indicator to idle before the query settles, while direct renderer and renderer-free bindings publish immediately. Ordinary shell-retention coverage and superseded-attempt rejection pass, but neither proves transactional signal publication. The scope of scheduler/graph integration remains a separate decision, not a claim that the held-DOM regression covers it.
 - **Late CSS and result frames:** an actual WebKit probe with a compiled streaming fixture emitted three value frames plus opening/completion frames after a late stylesheet carrier. The server wrote all response chunks, but the receiver saw zero frames until the held stylesheet loaded, then all five. The matched before-carrier control received all five while CSS was held. Receiver independence alone does not bypass this parser dependency; moving only already-queued results ahead of one carrier would not protect later results behind an earlier stylesheet.
-- **No-signal SSR overhead:** ordinary typed member text can still enable server signal ownership without importing `octane/signals`. This is broader than a `$` naming issue. The per-consumer native `.get()` opt-in correction does not resolve the separate server binding activation path; direct branded-handle behavior must also be preserved by any fix.
-- **Independent query starts:** public-compiler probes reproduce a same-boundary waterfall for both `query$` and async `derived$`, on client and server: declaration starts neither loader, the first strict read starts A, and B starts only after A resolves. Existing `use()` parallel-start tests exercise a different path.
+- **No-signal SSR overhead:** the current candidate separates potential binding metadata from actual signal ownership. Ordinary typed member text no longer creates request or component signal owners or serializes ancestor identities. An actual branded handle still activates its proper owner. The controlled 800-card diagnostic preserves 1,431,520 bytes and two chunks while reducing speculative component owners from 1,601 to zero; timing and final-build qualification are separate gates.
+- **Independent query starts:** the current candidate starts compiler-proven adjacent `query$` and `derived$` reads together on client and server, with the bounded syntax and dependency guarantees described above. This is distinct from existing `use()` prefetching. Retry, cancellation, and final-build validation remain part of acceptance; it is not a claim that arbitrary imported or property-based reads parallelize.
 
 The RFC now corrects snapshot status terminology, text/query selection wording, branch-versus-mainline implementation claims, bootstrap option placement, and uncompiled host continuation requirements. Paging already uses `derived$`. Codec decoding already preserves `__proto__` as inert own data, and compiled URL sinks already use the native sanitizer; those review observations did not require new security behavior. Remaining API and first-delivery scope questions are decisions, not silently accepted changes.
+
+An initial host integration need not use explicit signal transitions. It may retire the previous view, show cached content or a placeholder immediately, and independently reveal current-generation results. That contract still requires strict pending/error behavior, request cancellation, and selection/account fencing; `useTransition` is not a substitute for those checks. Expanding its pending/retention semantics is a separate follow-up, not a prerequisite for an integration that does not use it. Parallel independent starts, measured runtime costs, and current-build correctness remain delivery gates. A host that introduces late parser-blocking stylesheets must also qualify that delivery path; upfront extracted CSS does not establish a general solution for other hosts.
 
 ### Renderer-free controls and styles follow-up
 
@@ -225,9 +253,13 @@ The candidate now builds with the normally installed, frozen dependency lockfile
 
 The upstream ViewTransition integration preserves committed control sources and listeners until native publication, stages authored text and structural changes, and runs deferred cleanup under the exact retiring signal owner. Regression faults reproduce early text publication and cleanup reading the wrong owner. An already-committed signal update drains only its own development diagnostic so that diagnostic cannot accidentally interrupt an unrelated held transition. Ordinary asynchronous server components can still compose cached markup after `await` when no render pass is active; that path does not invent a request owner.
 
+### Published scalar-cache checkpoint
+
+The following measurements describe `f3eccc2fc`, before the newer parallel-start, demand-driven ownership, and dynamic projection changes. They must not be used as final-candidate qualification.
+
 The Chromium CI follow-up restores the compiler-owned raw-value cache for ordinary text that can also accept a signal handle. Unchanged scalar text no longer resets contenteditable selection or activates an unchanged nested ViewTransition scope. One slot in the existing binding bag retains the raw value; no per-text wrapper or subscription is added, and signal handles still enter the pending/error read path. Both neighboring Chromium suites pass 68 development/production cases; removing the scalar guard reproduces the four original failures. Hydration and transition staging pass 202 cases, including repeated undefined values, abandoned-render rollback, same-handle recovery, and retained node identity. This correction does not implement transactional signal publication from the newer review above.
 
-The final full-core development/production run passes 19,907 cases across 1,097 test-file runs with eight workers. A preceding run overlapped other builds and exceeded the existing time limit in one cleanup case; its file passed unchanged in isolation, and the final broad run retains the same assertions and timeout limits. All five signal test modes pass 635 cases. Renderer-free behavior passes 49 cases in each of development and production; public control handoff passes six; native-read compiler/collection/plain-module coverage passes 75 in each mode. Public/core source types, distribution build/import checks, 178 workflow self-tests, and all 17 bundle boundary/load checks pass. These overlapping lanes are not added together. Current-head CI remains a separate gate, and a full-workspace local typecheck is not claimed.
+At the published `f3eccc2fc` checkpoint, the full-core development/production run passed 19,907 cases across 1,097 test-file runs with eight workers. A preceding run overlapped other builds and exceeded the existing time limit in one cleanup case; its file passed unchanged in isolation, and the broad run retained the same assertions and timeout limits. All five signal test modes passed 635 cases. Renderer-free behavior passed 49 cases in each of development and production; public control handoff passed six; native-read compiler/collection/plain-module coverage passed 75 in each mode. Public/core source types, distribution build/import checks, 178 workflow self-tests, and all 17 bundle boundary/load checks passed. These overlapping lanes are not added together or applied to the newer parallel-start and ownership changes. Current-head CI remains a separate gate, and a full-workspace local typecheck is not claimed.
 
 Production-compiled controls pass in Chromium and Playwright WebKit 26.5 using actual server control receipts and the inline bootstrap. Early typing, original node identity, focus and selection survive adoption; writable and sampled controls, nested styles, and the chained-string example behave as declared. Composition events exercise the guard but do not establish operating-system IME behavior. The matched rich streaming workload passes six measured WebKit cases plus two warmups per mode, including A → B → A navigation and retained map selection. The authored mode imports no renderer.
 

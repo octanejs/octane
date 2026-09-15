@@ -9,6 +9,7 @@ export { __queryAt, query$ } from './query-facade.js';
 export {
 	__derivedScalarAt,
 	__signalAt,
+	__startSignalReads,
 	acceptStreamedSignalResult,
 	attachStreamedSignalResult,
 	bindStreamedSignalSelection,

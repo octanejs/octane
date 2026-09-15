@@ -141,7 +141,19 @@ node benchmarks/bench.mjs --quick streaming-ssr   # via the unified runner
 node benchmarks/streaming-ssr/run.mjs             # 30 renders/scenario
 node benchmarks/streaming-ssr/run.mjs 5 --no-build  # fast re-run, reuse dist/
 TARGETS=octane,react node benchmarks/streaming-ssr/run.mjs 10 --no-build
+# Matched Octane package/compiler comparison with the same fixture and toolchain:
+TARGETS=octane BENCH_JSON=/tmp/ssr-baseline.json node benchmarks/streaming-ssr/run.mjs 30 --octane-revision=<commit>
+TARGETS=octane BENCH_JSON=/tmp/ssr-candidate.json node benchmarks/streaming-ssr/run.mjs 30
 ```
+
+Revision comparisons use the established complete-package snapshot helper, not
+an isolated runtime-file replacement. Both variants retain the same production
+compiler options and all existing output/chunk gates. Fresh Octane builds record
+source, fixture, harness, lockfile and entry hashes plus toolchain versions, and
+reject changes during measurement. `--no-build` retains its existing behavior
+but makes no current-source provenance claim; it cannot select a revision.
+Alternate baseline and candidate runs on a quiet machine. Work counters are a
+separate diagnostic and must not be reported as CPU-time percentages.
 
 `BENCH_JSON` ops per target: `shell_staggered`, `total_staggered`,
 `shell_allfast`, `total_allfast` (the latter carries `opsPerSec`); chunk

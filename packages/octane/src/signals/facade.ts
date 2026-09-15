@@ -8,7 +8,7 @@ import {
 } from './engine.js';
 import { createDeclaredScalarCell } from './scalar-computations.js';
 import { ScopeDisposedError, SignalStreamError } from './errors.js';
-import { readSignalBinding as readBinding } from './graph.js';
+import { isThenable, readSignalBinding as readBinding, untrack } from './graph.js';
 import { readEarlySignalValue } from './early-values.js';
 import { NATIVE_DOM_VALUE } from './read-protocol.js';
 import { isSignalHandle } from './handle-protocol.js';
@@ -466,6 +466,22 @@ export function __derivedScalarAt<T>(
 export function readSignalBinding<T>(handle$: SignalHandle<T>): T {
 	if (!isSignalHandle(handle$)) throw new TypeError('A signal binding requires a signal handle.');
 	return handle$[SIGNAL_BINDING_READ]();
+}
+
+/** @internal Start compiler-proven independent reads without consuming their results. */
+export function __startSignalReads(handles: readonly SignalHandle<unknown>[]): void {
+	untrack(() => {
+		for (const handle of handles) {
+			try {
+				handle[SIGNAL_BINDING_READ]();
+			} catch (error) {
+				// A pending predecessor must not hide later independent work. A real
+				// error ends the reachable stratum; the original read throws it in
+				// source order, with its normal tracking and boundary semantics.
+				if (!isThenable(error)) break;
+			}
+		}
+	});
 }
 
 /** Bind receiver-owned selection authority, optionally before the query descriptor resolves. */

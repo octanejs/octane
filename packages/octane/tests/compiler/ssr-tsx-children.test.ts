@@ -45,7 +45,9 @@ function descriptorFactories(code: string): Map<string, number> {
 		...[...runtimeImports(code, ['createElement', 'createScopedElement'])].map(
 			(name) => [name, 0] as const,
 		),
-		...[...runtimeImports(code, ['createElementAt'])].map((name) => [name, 1] as const),
+		...[...runtimeImports(code, ['createElementAt', 'createElementFromConfig'])].map(
+			(name) => [name, 1] as const,
+		),
 	]);
 }
 

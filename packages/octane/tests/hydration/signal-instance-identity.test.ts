@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { componentSlot, createRoot, enableSignalBindings, type Scope } from '../../src/runtime.js';
 import {
@@ -89,11 +89,71 @@ describe('signal component instance identity', () => {
 		},
 	);
 
-	it('strict-reads a generic child handle without compiler signal classification', () => {
+	it('strict-reads a generic child handle without compiler signal classification', async () => {
 		const value$ = __signalAt('g:server-child', 'server-child', 'server value');
 		const ServerRoot = (_props: unknown, scope: any) => ssrChild(value$, scope);
 
 		expect(renderToString(ServerRoot).html).toContain('server value');
+
+		// A real cold module graph matters: another fixture's declaration must
+		// not eagerly install owners and hide a missing lazy identity/read path.
+		vi.resetModules();
+		const server = await import('../../src/runtime.server.js');
+		const signals = await import('../../src/signals/index.js');
+		const { loadCompiledFixtureSource } = await import('../_server-fixture.js');
+		const source = `function Row(props) @{
+  <section><output>{props.value as string}</output><input value={props.value}/><div style={{ color: props.value }}/></section>
+}
+export function App(props) @{ <main>@for (const item of props.items; key item) { <Row value={props.produce(item)}/> }</main> }`;
+		const options = { id: '/src/cold-server-handle.tsrx', mode: 'server' as const };
+		const { App } = loadCompiledFixtureSource(source, options);
+		const items = ['red', 'blue'];
+		expect(server.renderToString(App, { items, produce: (item: string) => item }).html).toContain(
+			'color:red',
+		);
+		const produce = (item: string) => signals.__signalAt('i:cold-server-handle', item);
+		const fragment = document.createElement('template');
+		for (let request = 0; request < 2; request++) {
+			fragment.innerHTML = server.renderToString(App, { items, produce }).html;
+			expect(
+				[...fragment.content.querySelectorAll('output')].map((node) => node.textContent),
+			).toEqual(items);
+			expect([...fragment.content.querySelectorAll('input')].map((node) => node.value)).toEqual(
+				items,
+			);
+			const identities = [...fragment.content.querySelectorAll('input')].map((node) =>
+				node.getAttribute('data-octane-signal-control'),
+			);
+			expect(identities[0]).not.toBeNull();
+			expect(identities[0]).not.toBe(identities[1]);
+		}
+		const client = await import('../../src/runtime.js');
+		const clientModule = loadCompiledFixtureSource(source, { ...options, mode: 'client' });
+		const container = document.createElement('div');
+		container.append(fragment.content.cloneNode(true));
+		document.body.append(container);
+		const controls = [...container.querySelectorAll('input')];
+		const errors: unknown[] = [];
+		const root = client.hydrateRoot(
+			container,
+			clientModule.App,
+			{ items, produce },
+			{ onRecoverableError: (error) => errors.push(error) },
+		);
+		try {
+			expect([...container.querySelectorAll('input')]).toEqual(controls);
+			expect(controls.map((node) => node.value)).toEqual(items);
+			expect(errors).toEqual([]);
+			controls[0]!.value = 'green';
+			client.flushSync(() => controls[0]!.dispatchEvent(new Event('input', { bubbles: true })));
+			expect([...container.querySelectorAll('output')].map((node) => node.textContent)).toEqual([
+				'green',
+				'blue',
+			]);
+		} finally {
+			root.unmount();
+			container.remove();
+		}
 	});
 
 	it('serializes only the winning writable control identity', () => {

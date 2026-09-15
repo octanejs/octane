@@ -8,6 +8,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { compile } from '../../src/compiler/compile.js';
 import { createOctaneCompiler } from '../../src/compiler/bundler.js';
 import { slotHooks } from '../../src/compiler/slot-hooks.js';
+import * as signals from 'octane/signals';
+import { loadCompiledFixtureSource } from '../_server-fixture.js';
 
 const FILENAME = '/src/signals/site.tsrx';
 
@@ -232,7 +234,7 @@ describe('compiler-owned signal declaration sites', () => {
 		}
 	});
 
-	it('assigns distinct stable sites to named and namespace facade calls', () => {
+	it('assigns distinct stable sites to named and namespace facade calls', async () => {
 		const source = `import { signal$, derived$ as derive$ } from 'octane/signals';
 import * as signals from 'octane/signals';
 const count$ = signal$(0);
@@ -244,6 +246,42 @@ export function App() @{ const selected$ = signals.query$(() => count$.get(), lo
 		expect(first).toHaveLength(3);
 		expect(new Set(first.map((call) => call.site)).size).toBe(3);
 		expect(first.map((call) => String(call.site).slice(0, 2))).toEqual(['g:', 'g:', 'i:']);
+		for (const mode of ['client', 'server'] as const) {
+			const parallel = `import { query$ as request$, derived$ as derive$ } from 'octane/signals';
+import * as signals from 'octane/signals';
+export const first$ = request$(() => 1, load);
+const second$ = derive$(async () => load(2));
+export function App() @{ const first = first$.get(); const second = second$.get(); <p>{first + second as string}</p> }`;
+			const output = compile(parallel, FILENAME, { mode }).code;
+			expect(output).toContain('__startSignalReads');
+			expect(output).toContain('_$startSignalReads([first$, second$])');
+			expect(output.indexOf('_$startSignalReads([first$, second$])')).toBeLessThan(
+				output.indexOf('first$.get()'),
+			);
+			expect(compiledCalls(parallel, mode)).toHaveLength(2);
+			const namespace = `import * as signals from 'octane/signals';
+const first$ = signals.query$(() => 1, load);
+const second$ = signals.derived$(async () => load(2));
+export function App() @{ const first = first$.get(); const second = second$.get(); <p>{first + second as string}</p> }`;
+			const namespaceOutput = compile(namespace, FILENAME, { mode }).code;
+			expect(() => parseModule(namespaceOutput, FILENAME)).not.toThrow();
+			expect(namespaceOutput).toContain('_$startSignalReads([first$, second$])');
+		}
+		const early = loadCompiledFixtureSource(
+			`
+import { query$ } from 'octane/signals';
+import { renderToString } from 'octane/server';
+const first$ = query$(() => 1, () => new Promise(() => {}));
+function Values() @{ const first = first$.get(); const second = second$.get(); <p>{first + second as string}</p> }
+function Shell() @{ <section>@try { <Values/> } @pending { <i>pending-first</i> } @catch(error) { <b>{String(error)}</b> }</section> }
+const html = renderToString(Shell).html;
+const second$ = query$(() => 2, async () => 'second');
+export function exercise() { return html; }
+`,
+			{ id: FILENAME, mode: 'server', runtimeModules: { 'octane/signals': signals } },
+		);
+		expect(early.exercise()).toContain('pending-first');
+		expect(early.exercise()).not.toContain('ReferenceError');
 	});
 
 	it('uses the same authored sites for client and server compilation', () => {
@@ -382,6 +420,23 @@ function local(signal$) { return signal$(2); }
 const foreign = { signal$(value) { return value; } };
 export function App() @{ const localValue = local((value) => value); const plain = foreign.signal$(3); <p>{String(explicit$.get() + localValue + plain)}</p> }`;
 		expect(compiledCalls(source)).toHaveLength(0);
+		for (const mode of ['client', 'server'] as const) {
+			for (const source of [
+				`import { query$ } from 'foreign'; export function App() @{ const a$ = query$(); const b$ = query$(); const a = a$.get(); const b = b$.get(); <p/> }`,
+				`import { query$ } from 'octane/signals'; export function App(query$) @{ const a$ = query$(); const b$ = query$(); const a = a$.get(); const b = b$.get(); <p/> }`,
+				`import 'octane/signals'; import { a$, b$ } from './model'; export function App() @{ const a = a$.get(); const b = b$.get(); <p/> }`,
+				`import 'octane/signals'; export function App(props) @{ const a = props.a$.get(); const b = props.b$.get(); <p/> }`,
+				`import { query$ } from 'octane/signals'; export function App() @{ const a$ = query$(() => 1, load); const b$ = query$(() => a, load); const a = a$.get(); const b = b$.get(); <p/> }`,
+				`import { query$ } from 'octane/signals'; export function App() @{ const a$ = query$(() => 1, load); function selection() { return a; } const b$ = query$(selection, load); const a = a$.get(); const b = b$.get(); <p/> }`,
+				`import { query$ } from 'octane/signals'; export function App() @{ const a$ = query$(() => 1, load); let selection = () => 0; selection = () => a; const b$ = query$(selection, load); const a = a$.get(); const b = b$.get(); <p/> }`,
+				`import { query$ } from 'octane/signals'; export function App() @{ const a$ = query$(() => 1, load); const options = { select: () => 0 }; options.select = () => a; const b$ = query$(() => options.select(), load); const a = a$.get(); const b = b$.get(); <p/> }`,
+				`import { query$ } from 'octane/signals'; export function App() @{ const a$ = query$(() => 1, load); const { select } = { select: () => a }; const b$ = query$(select, load); const a = a$.get(); const b = b$.get(); <p/> }`,
+				`import { query$ } from 'octane/signals'; export function App() @{ const a$ = query$(() => 1, load); class Options { value = a; } const b$ = query$(() => new Options().value, load); const a = a$.get(); const b = b$.get(); <p/> }`,
+				`import { query$ } from 'octane/signals'; export function App() @{ const a$ = query$(() => 1, load); const b$ = query$(() => eval('a'), load); const a = a$.get(); const b = b$.get(); <p/> }`,
+				`import { query$, derived$ } from 'octane/signals'; const a$ = query$(() => 1, load); const b$ = query$(() => 2, load); const combined$ = derived$(() => { const a = a$.get(); const b = b$.get(); return a + b; }); export function App() @{ <p>{combined$.get() as string}</p> }`,
+			])
+				expect(compile(source, FILENAME, { mode }).code).not.toContain('__startSignalReads');
+		}
 	});
 
 	it('applies capability naming diagnostics to the owner facade', () => {

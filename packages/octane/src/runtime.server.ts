@@ -174,7 +174,26 @@ function isSignalHandle(value: unknown): value is SignalHandle<unknown> {
 function readSignalBinding(handle: SignalHandle<unknown>): unknown {
 	// Server bindings must contribute their historical value to the hydration
 	// snapshot. Only client bindings bypass the component-wide read collector.
+	if (RESOLVED !== null && !SERVER_SIGNAL_OWNER_ACTIVE) {
+		return withServerSignalBinding(() => handle.get());
+	}
 	return handle.get();
+}
+
+function withServerSignalBinding<T>(read: () => T): T {
+	ensureServerSignalOwner();
+	const owner = serverSignalOwner(FRAME)!;
+	const injection = (RESOLVED!.resourceOptions as StreamOptions | undefined)?.injection;
+	return runWithSignalOwner(owner, () =>
+		injection?.observeSignalAttempt === undefined
+			? read()
+			: runWithServerSignalQueryAttemptObserver(
+					owner,
+					(attempt) => injection.observeSignalAttempt!(attempt, captureSignalOwner(owner)),
+					injection.createSignalAttemptObservations!,
+					read,
+				),
+	);
 }
 
 function isWritableSignal(value: unknown): value is SignalHandle<unknown> & {
@@ -216,12 +235,19 @@ function unwrapSsrSignalControlValue(value: unknown): unknown {
 /** @internal Preserve a writable control's identity until the final JSX winner is known. */
 export function ssrSignalControlValue(value: unknown, site: string): unknown {
 	if (!isWritableSignal(value)) return ssrSignalValue(value);
+	if (RESOLVED !== null && !SERVER_SIGNAL_OWNER_ACTIVE) {
+		return withServerSignalBinding(() => serverSignalControlValue(value, site));
+	}
+	return serverSignalControlValue(value, site);
+}
+
+function serverSignalControlValue(value: SignalHandle<unknown>, site: string): unknown {
 	const owner = currentSignalOwner();
-	if (owner === null || !('documentOwner' in owner)) return readSignalBinding(value);
+	if (owner === null || !('documentOwner' in owner)) return value.get();
 	if (RESOLVED !== null) RESOLVED.hasSignalControls = true;
 	return {
 		[SSR_SIGNAL_CONTROL]: true,
-		value: readSignalBinding(value),
+		value: value.get(),
 		site,
 		owner,
 		binding: value[SIGNAL_BINDING_IDENTITY](),
@@ -412,7 +438,9 @@ let CURRENT_PU_WARM_CLAIMS: Set<object> | null = null;
 let ID_COUNTER = 0;
 let ID_PREFIX = '';
 let SIGNAL_INSTANCE_PREFIX = '';
-let SIGNAL_COMPONENT_INSTANCE_KEY = '';
+type ServerSignalInstanceKey = string | Frame;
+let SIGNAL_COMPONENT_INSTANCE_KEY: ServerSignalInstanceKey = '';
+let SERVER_SIGNAL_OWNER_ACTIVE = false;
 let SIGNAL_CONTROL_SITE = '';
 // List arms extend this value by copying; resets need no per-component array.
 const EMPTY_SIGNAL_LIST_KEYS: readonly string[] = [];
@@ -575,13 +603,20 @@ interface Frame {
 	asyncScope: string;
 	/** Parser context supplied by, or inherited through, the component call site. */
 	namespace: 'html' | 'svg' | 'mathml' | undefined;
+	// Potential bindings retain identity on the existing invocation frame, not
+	// an owner or serialized ancestor path. Discovery jobs retain this same node.
+	signalParentKey?: ServerSignalInstanceKey;
+	signalInvocationSite?: string;
+	signalListKeys?: readonly string[];
+	signalKey?: string;
+	signalInstanceKey?: string;
 }
 interface Job {
 	comp: ServerComponent;
 	props: any;
 	parentScope: SSRScope | null;
 	frame: Frame;
-	signalInstanceKey: string;
+	signalInstanceKey: ServerSignalInstanceKey;
 }
 let SUSPENDED: { promise: PromiseLike<unknown>; key: string }[] | null = null;
 let RESOLVED: ResolvedMap | null = null;
@@ -1229,7 +1264,7 @@ export function createElement(
 	props?: any,
 	...children: any[]
 ): ElementDescriptor {
-	return createElementInternal(undefined, type, props, children);
+	return createElementFromConfig(undefined, type, props, children);
 }
 
 /** @internal Compiler-authored element descriptor with stable invocation identity. */
@@ -1239,28 +1274,32 @@ export function createElementAt(
 	props?: any,
 	...children: any[]
 ): ElementDescriptor {
-	return createElementInternal(invocationSite, type, props, children);
+	return createElementFromConfig(invocationSite, type, props, children);
 }
 
-function createElementInternal(
+/** @internal Compiler-owned positional children; omitted children allocate no rest array. */
+export function createElementFromConfig(
 	invocationSite: string | undefined,
 	type: ServerEntryComponent | string | typeof Fragment | typeof Activity,
 	props: any,
-	children: any[],
+	children?: any[],
 ): ElementDescriptor {
 	if (typeof type === 'function' && isRendererContext(type)) {
 		registerServerRendererContextProvider(renderServerContextProvider);
 	}
 	const src = (props ?? null) as any;
 	const key = hasElementConfigKey(src) ? '' + src.key : null;
-	let kids = children.length > 0 ? (children.length === 1 ? children[0] : children) : src?.children;
-	if (children.length > 1) POSITIONAL_CHILDREN.add(children);
-	if (children.length > 1 && process.env.NODE_ENV !== 'production') Object.freeze(children);
+	const hasPositional = children !== undefined && children.length > 0;
+	let kids = hasPositional ? (children.length === 1 ? children[0] : children) : src?.children;
+	if (children !== undefined && children.length > 1) {
+		POSITIONAL_CHILDREN.add(children);
+		if (process.env.NODE_ENV !== 'production') Object.freeze(children);
+	}
 	// Lift `key` OUT of props (React semantics — key is never a real prop), and mirror
 	// positional children into `props.children` for the same React element shape as the
 	// client runtime. Positional children override an explicit `props.children`.
 	const p = copyElementConfig(src);
-	if (children.length > 0) p.children = kids;
+	if (hasPositional) p.children = kids;
 	applyElementDefaultProps(type, p);
 	kids = p.children;
 	const descriptor: ElementDescriptor = {
@@ -2041,10 +2080,7 @@ function ssrComponentDescriptor(d: ElementDescriptor, scope: SSRScope): string {
  */
 export function ssrChild(v: unknown, scope: SSRScope): string {
 	if (isSignalHandle(v)) {
-		SERVER_SIGNAL_BINDINGS_ENABLED = true;
-		ensureServerSignalOwner();
-		const owner = serverSignalOwner(null)!;
-		v = runWithSignalOwner(owner, () => readSignalBinding(v as SignalHandle<unknown>));
+		v = readSignalBinding(v);
 	}
 	if (probingDangerHtmlChild(v)) return '';
 	return ssrChildValue(v, scope, true);
@@ -2694,7 +2730,7 @@ export function ssrControl<T>(siteKey: string, fn: () => T): T {
 	}
 }
 
-function enterAsyncArm(armKey: unknown): void {
+function enterAsyncArm(armKey: unknown, mapped = false): void {
 	const previous = ASYNC_SCOPE;
 	const frame = FRAME;
 	const occurrence = frame === null ? 0 : nextFrameOccurrence(frame, '@arm-position:' + previous);
@@ -2703,8 +2739,11 @@ function enterAsyncArm(armKey: unknown): void {
 	// keyed solely by armKey, so a stable primitive/object key keeps its identity
 	// when an @for reorders between streaming passes.
 	const fallbackPosition = previous + '|@arm-position:' + occurrence;
-	if (SERVER_SIGNAL_BINDINGS_ENABLED && SIGNAL_CONTROL_SITE.charCodeAt(0) === 102) {
-		SIGNAL_LIST_KEYS = [...SIGNAL_LIST_KEYS, signalIdentityKey(armKey)];
+	if (SERVER_SIGNAL_BINDINGS_POTENTIAL && SIGNAL_CONTROL_SITE.charCodeAt(0) === 102) {
+		SIGNAL_LIST_KEYS = [
+			...SIGNAL_LIST_KEYS,
+			signalIdentityKey(mapped ? 'k' + String(armKey) : armKey),
+		];
 	}
 	ASYNC_SCOPE = previous + '|@arm:' + asyncIdentityKey(armKey, false, fallbackPosition);
 }
@@ -2730,11 +2769,12 @@ export function ssrForItem(
 	index: number | undefined,
 	scope: SSRScope,
 	block: boolean,
+	mapped = false,
 ): string {
 	const previous = ASYNC_SCOPE;
 	const previousSignalKeys = SIGNAL_LIST_KEYS;
 	try {
-		enterAsyncArm(armKey);
+		enterAsyncArm(armKey, mapped);
 		// Preserve the authored body's parameter/default evaluation and exact
 		// argument count, including an @for that declares no index binding.
 		const html = index === undefined ? fn(item, scope) : fn(item, index, scope);
@@ -4480,7 +4520,7 @@ function serverStructuralSignalInstanceKey(
 	// Match the client's concatenated JSON segments without re-escaping the
 	// complete ancestor path at every component invocation.
 	return (
-		SIGNAL_COMPONENT_INSTANCE_KEY +
+		resolveServerSignalInstanceKey(SIGNAL_COMPONENT_INSTANCE_KEY) +
 		JSON.stringify([
 			invocationSite ?? 'legacy',
 			SIGNAL_LIST_KEYS,
@@ -4489,10 +4529,39 @@ function serverStructuralSignalInstanceKey(
 	);
 }
 
+function resolveServerSignalInstanceKey(identity: ServerSignalInstanceKey): string {
+	if (typeof identity === 'string') return identity;
+	if (identity.signalInstanceKey !== undefined) return identity.signalInstanceKey;
+	// A first read can occur at the bottom of an already-deep component stack.
+	// Materialize ancestors iteratively, without adding another recursive stack.
+	const pending: Frame[] = [];
+	while (typeof identity !== 'string') {
+		if (identity.signalInstanceKey !== undefined) {
+			identity = identity.signalInstanceKey;
+			break;
+		}
+		pending.push(identity);
+		identity = identity.signalParentKey!;
+	}
+	for (let index = pending.length - 1; index >= 0; index--) {
+		const frame = pending[index]!;
+		identity += JSON.stringify([
+			frame.signalInvocationSite ?? 'legacy',
+			frame.signalListKeys,
+			frame.signalKey,
+		]);
+		frame.signalInstanceKey = identity;
+	}
+	return identity;
+}
+
 function serverSignalOwner(_frame: Frame | null): SignalRendererOwnerIdentity | undefined {
 	// An async continuation can compose cached compiled HTML outside a render pass.
 	// Only an active pass may assign a request-owned signal instance.
 	const resolved = RESOLVED;
+	if (resolved !== null && SERVER_SIGNAL_BINDINGS_ENABLED && resolved.signalOwner === undefined) {
+		ensureServerSignalOwner();
+	}
 	if (
 		resolved === null ||
 		resolved.signalOwner === undefined ||
@@ -4500,7 +4569,8 @@ function serverSignalOwner(_frame: Frame | null): SignalRendererOwnerIdentity | 
 	)
 		return;
 	const instanceKey =
-		SIGNAL_COMPONENT_INSTANCE_KEY || JSON.stringify([SIGNAL_INSTANCE_PREFIX, 'root']);
+		resolveServerSignalInstanceKey(SIGNAL_COMPONENT_INSTANCE_KEY) ||
+		JSON.stringify([SIGNAL_INSTANCE_PREFIX, 'root']);
 	let owner = resolved.signalInstances.get(instanceKey);
 	if (owner === undefined) {
 		owner = Object.freeze({
@@ -4536,7 +4606,15 @@ function invokeServerSignalComponent(
 ): unknown {
 	const owner = serverSignalOwner(frame);
 	if (owner === undefined) return comp(props ?? {}, scope, undefined);
-	const invoke = () => comp(props ?? {}, scope, undefined);
+	const invoke = () => {
+		const previous = SERVER_SIGNAL_OWNER_ACTIVE;
+		SERVER_SIGNAL_OWNER_ACTIVE = true;
+		try {
+			return comp(props ?? {}, scope, undefined);
+		} finally {
+			SERVER_SIGNAL_OWNER_ACTIVE = previous;
+		}
+	};
 	const injection = (RESOLVED?.resourceOptions as StreamOptions | undefined)?.injection;
 	const observe = injection?.observeSignalAttempt;
 	return runWithSignalOwner(owner, () =>
@@ -4588,6 +4666,7 @@ function captureServerComponentContext() {
 		parent: CURRENT_PARENT_SCOPE,
 		asyncScope: ASYNC_SCOPE,
 		signalInstance: SIGNAL_COMPONENT_INSTANCE_KEY,
+		signalOwnerActive: SERVER_SIGNAL_OWNER_ACTIVE,
 		signalControl: SIGNAL_CONTROL_SITE,
 		signalListKeys: SIGNAL_LIST_KEYS,
 		owner: undefined as SignalRendererOwnerIdentity | undefined,
@@ -4610,7 +4689,7 @@ function renderComponentFramed(
 	// is still created (use() path keys / seed order unchanged); the client's
 	// componentSlot(inherit) borrows the parent range instead of adopting.
 	inherit?: boolean,
-	instanceKey?: string,
+	instanceKey?: ServerSignalInstanceKey,
 	bindingMarker?: string,
 ): string {
 	const previous = captureServerComponentContext();
@@ -4659,8 +4738,10 @@ function renderComponentFramed(
 				out = invokeServerSignalComponent(comp, props, scope, frame);
 			} else {
 				try {
+					SERVER_SIGNAL_OWNER_ACTIVE = true;
 					out = comp(props ?? {}, scope, undefined);
 				} finally {
+					SERVER_SIGNAL_OWNER_ACTIVE = previous.signalOwnerActive;
 					restoreSynchronousSignalOwner(previous.previousOwner);
 				}
 			}
@@ -4705,6 +4786,7 @@ function renderComponentFramed(
 		CURRENT_PARENT_SCOPE = previous.parent;
 		ASYNC_SCOPE = previous.asyncScope;
 		SIGNAL_COMPONENT_INSTANCE_KEY = previous.signalInstance;
+		SERVER_SIGNAL_OWNER_ACTIVE = previous.signalOwnerActive;
 		SIGNAL_CONTROL_SITE = previous.signalControl;
 		SIGNAL_LIST_KEYS = previous.signalListKeys;
 	}
@@ -4736,7 +4818,7 @@ export function ssrComponent(
 	// this small string-rendering wrapper does not retain the client Activity engine.
 	const activity = comp === Activity;
 	if (activity && key === undefined) key = props?.key;
-	const signalInstanceKey = SERVER_SIGNAL_BINDINGS_ENABLED
+	let signalInstanceKey: ServerSignalInstanceKey | undefined = SERVER_SIGNAL_BINDINGS_ENABLED
 		? serverStructuralSignalInstanceKey(invocationSite, key)
 		: undefined;
 	// Component recursion is one of SSR's hottest and deepest paths. Install the
@@ -4833,6 +4915,13 @@ export function ssrComponent(
 						asyncScope: ASYNC_SCOPE,
 						namespace: explicitNamespace ?? pf.namespace,
 					};
+		if (signalInstanceKey === undefined && SERVER_SIGNAL_BINDINGS_POTENTIAL) {
+			frame.signalParentKey = SIGNAL_COMPONENT_INSTANCE_KEY;
+			frame.signalInvocationSite = invocationSite;
+			frame.signalListKeys = SIGNAL_LIST_KEYS;
+			frame.signalKey = key != null ? signalIdentityKey(key) : '';
+			signalInstanceKey = frame;
+		}
 		// Function components are transparent to the HTML parser. Carry the active
 		// namespace through arbitrary wrapper chains; an explicitly compiled host
 		// transition (`<svg>`, `<math>`, or `<foreignObject>`) overrides it for the
@@ -7893,11 +7982,13 @@ type ResolvedMap = Map<string, SuspenseOutcome> & {
 // Server signal ownership is compiler-selected. Signal-free programs avoid
 // consulting the host async context and allocate no owner or instance map.
 let SERVER_SIGNAL_BINDINGS_ENABLED = false;
+let SERVER_SIGNAL_BINDINGS_POTENTIAL = false;
 
 /** @internal Compiler/runtime server signal capability version 1. */
-export function enableServerSignalBindings(abi = 1): void {
+export function enableServerSignalBindings(abi = 1, potentialOnly = false): void {
 	if (abi !== 1) throw new TypeError(formatServerError(71));
-	SERVER_SIGNAL_BINDINGS_ENABLED = true;
+	SERVER_SIGNAL_BINDINGS_POTENTIAL = true;
+	if (!potentialOnly) SERVER_SIGNAL_BINDINGS_ENABLED = true;
 }
 
 function isRendererSignalOwner(owner: SignalOwner): owner is SignalRendererOwnerIdentity {
@@ -8050,7 +8141,8 @@ interface Ambient {
 	id: number;
 	idPrefix: string;
 	signalInstancePrefix: string;
-	signalComponentInstanceKey: string;
+	signalComponentInstanceKey: ServerSignalInstanceKey;
+	signalOwnerActive: boolean;
 	signalControlSite: string;
 	signalListKeys: readonly string[];
 	css: StyleCollector | null;
@@ -8088,6 +8180,7 @@ function saveAmbient(): Ambient {
 		idPrefix: ID_PREFIX,
 		signalInstancePrefix: SIGNAL_INSTANCE_PREFIX,
 		signalComponentInstanceKey: SIGNAL_COMPONENT_INSTANCE_KEY,
+		signalOwnerActive: SERVER_SIGNAL_OWNER_ACTIVE,
 		signalControlSite: SIGNAL_CONTROL_SITE,
 		signalListKeys: SIGNAL_LIST_KEYS,
 		css: CSS,
@@ -8145,6 +8238,7 @@ function restoreAmbient(a: Ambient): void {
 	ID_PREFIX = a.idPrefix;
 	SIGNAL_INSTANCE_PREFIX = a.signalInstancePrefix;
 	SIGNAL_COMPONENT_INSTANCE_KEY = a.signalComponentInstanceKey;
+	SERVER_SIGNAL_OWNER_ACTIVE = a.signalOwnerActive;
 	SIGNAL_CONTROL_SITE = a.signalControlSite;
 	SIGNAL_LIST_KEYS = a.signalListKeys;
 	CSS = a.css;
@@ -8203,6 +8297,7 @@ function runFullFramedPass(
 	ID_PREFIX = identifierPrefix;
 	SIGNAL_INSTANCE_PREFIX = identifierPrefix;
 	SIGNAL_COMPONENT_INSTANCE_KEY = JSON.stringify([identifierPrefix, 'root']);
+	SERVER_SIGNAL_OWNER_ACTIVE = false;
 	SIGNAL_CONTROL_SITE = '';
 	SIGNAL_LIST_KEYS = EMPTY_SIGNAL_LIST_KEYS;
 	NONCE_ATTR = nonceAttr;
@@ -8353,6 +8448,7 @@ function runDiscoveryRound(
 	ID_PREFIX = identifierPrefix;
 	SIGNAL_INSTANCE_PREFIX = identifierPrefix;
 	SIGNAL_COMPONENT_INSTANCE_KEY = JSON.stringify([identifierPrefix, 'root']);
+	SERVER_SIGNAL_OWNER_ACTIVE = false;
 	SIGNAL_CONTROL_SITE = '';
 	SIGNAL_LIST_KEYS = EMPTY_SIGNAL_LIST_KEYS;
 	NONCE_ATTR = '';

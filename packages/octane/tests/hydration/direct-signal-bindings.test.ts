@@ -9,15 +9,21 @@ import {
 	bindSignalChild,
 	bindSignalValue,
 	childSlot,
+	createElementAt,
+	createElementFromConfig,
 	createRoot,
 	enableSignalBindings,
 	flushSync,
 	hydrateRoot,
 	type Root,
 } from '../../src/runtime.js';
-import { renderToString } from '../../src/runtime.server.js';
+import {
+	createElementAt as createServerElementAt,
+	createElementFromConfig as createServerElementFromConfig,
+	renderToString,
+} from '../../src/runtime.server.js';
 import * as Signals from '../../src/signals/index.js';
-import { loadCompiledFixtureSource } from '../_server-fixture.js';
+import { loadCompiledFixtureSource, loadPlainHookFixtureSource } from '../_server-fixture.js';
 import {
 	__signalAt,
 	createScope,
@@ -37,6 +43,268 @@ describe('direct signal child bindings', () => {
 	});
 
 	it('discovers a signal passed through an unmarked renderable prop at runtime', async () => {
+		// Explicit authority must survive even before any optional signal module
+		// activates the document capability.
+		const custom = createScope({ scopeKey: 'explicit-handler-installation' });
+		const observer = loadCompiledFixtureSource(
+			`export function Observer(props) @{ <button onClick={props.invoke}>{props.value as string}</button> }`,
+			{ id: '/src/custom-handler-owner.tsrx', mode: 'client' },
+		);
+		const customContainer = document.createElement('div');
+		document.body.append(customContainer);
+		let clickedOwner: SignalOwner | null = null;
+		root = createRoot(customContainer);
+		root.render(
+			(props, scope) => runWithSignalOwner(custom, () => observer.Observer(props, scope)),
+			{
+				value: 'custom owner',
+				invoke() {
+					clickedOwner = currentSignalOwner();
+				},
+			},
+		);
+		customContainer.querySelector('button')!.click();
+		expect(clickedOwner).toBe(custom);
+		root.unmount();
+		root = undefined;
+		custom.dispose();
+		customContainer.remove();
+		const bubbleClient = loadCompiledFixtureSource(
+			`export function App(props) @{ <main onClick={props.bubble}><button onClick={props.remove}>remove</button><output>{props.value as string}</output></main> }`,
+			{ id: '/src/late-signal-bubble.tsrx', mode: 'client' },
+		);
+		const bubbleContainer = document.createElement('div');
+		document.body.append(bubbleContainer);
+		const bubbled: string[] = [];
+		let lateState: { state$: (initial: string) => Signals.WritableSignal<string> };
+		root = createRoot(bubbleContainer);
+		root.render(bubbleClient.App, {
+			value: 'scalar',
+			remove() {
+				root!.unmount();
+				root = undefined;
+				lateState = loadPlainHookFixtureSource(
+					`import {signal$} from 'octane/signals';
+export function state$(initial) { return signal$(initial); }`,
+					{
+						id: '/src/late-bubble-state.ts',
+						inlineHookMemo: false,
+						runtimeModules: { 'octane/signals': Signals },
+					},
+				);
+				bubbled.push('removed');
+			},
+			bubble() {
+				bubbled.push('bubbled');
+				// The native bubble callback still runs, but deletion cannot grant
+				// new instance state merely because its module arrived afterwards.
+				try {
+					bubbled.push(lateState.state$('must not appear').get());
+				} catch (error) {
+					bubbled.push(error instanceof Signals.ScopeDisposedError ? 'disposed' : String(error));
+				}
+			},
+		});
+		bubbleContainer.querySelector('button')!.click();
+		expect(bubbled).toEqual(['removed', 'bubbled', 'disposed']);
+		expect(bubbleContainer.textContent).toBe('');
+		bubbleContainer.remove();
+		// The consumer mounts before its optional state module arrives. Neither
+		// its earlier native handlers nor its invocation identities may depend on
+		// a handle already being present during the first render.
+		for (const dev of [false, true]) {
+			for (const hydrate of [false, true]) {
+				const source = `function Row(props) @{
+  <section><button onClick={() => props.invoke(props.initial)}>change</button><output>{props.produce(props.initial) as string}</output><button onClick={() => props.invoke(props.initial)}>change after text</button></section>
+}
+export function App(props) @{ <main>@for (const item of props.items; key item) { <Row initial={item} {...props}/> }</main> }`;
+				const id = `/src/late-signal-owner-${dev}-${hydrate}.tsrx`;
+				const client = loadCompiledFixtureSource(source, {
+					id,
+					mode: 'client',
+					compileOptions: { dev },
+				});
+				const container = document.createElement('div');
+				document.body.append(container);
+				let state: { state$: (initial: string) => Signals.WritableSignal<string> } | undefined;
+				const seen: string[] = [];
+				const props = {
+					items: ['left', 'right'],
+					produce(initial: string) {
+						return state ? state.state$(initial) : initial;
+					},
+					invoke(initial: string) {
+						if (!state) {
+							seen.push('cold:' + initial);
+							return;
+						}
+						const value = state.state$(initial);
+						seen.push(value.get());
+						value.set(initial + ' edited');
+					},
+				};
+				let serverTexts: ChildNode[] | undefined;
+				if (hydrate) {
+					const server = loadCompiledFixtureSource(source, {
+						id,
+						mode: 'server',
+						compileOptions: { dev },
+					});
+					container.innerHTML = renderToString(server.App, props).html;
+					serverTexts = [...container.querySelectorAll('output')].map((node) => node.firstChild!);
+					root = hydrateRoot(container, client.App, props);
+				} else {
+					root = createRoot(container);
+					root.render(client.App, props);
+				}
+				const buttons = [...container.querySelectorAll('button')];
+				const texts = [...container.querySelectorAll('output')].map((node) => node.firstChild);
+				if (serverTexts) expect(texts).toEqual(serverTexts);
+				buttons[1].click();
+				buttons[2].click();
+				expect(seen).toEqual(['cold:left', 'cold:right']);
+				state = loadPlainHookFixtureSource(
+					`import {signal$} from 'octane/signals';
+export function state$(initial) { return signal$(initial); }`,
+					{
+						id: `/src/late-signal-state-${dev}-${hydrate}.ts`,
+						inlineHookMemo: false,
+						hmr: dev,
+						runtimeModules: { 'octane/signals': Signals },
+					},
+				);
+				// No intervening render can repair the already-published handlers.
+				buttons[1].click();
+				buttons[2].click();
+				expect(seen).toEqual(['cold:left', 'cold:right', 'left', 'right']);
+				flushSync(() => root!.render(client.App, props));
+				expect([...container.querySelectorAll('output')].map((node) => node.textContent)).toEqual([
+					'left edited',
+					'right edited',
+				]);
+				expect([...container.querySelectorAll('output')].map((node) => node.firstChild)).toEqual(
+					texts,
+				);
+				expect([...container.querySelectorAll('button')]).toEqual(buttons);
+				flushSync(() => root!.render(client.App, { ...props, items: ['right', 'left'] }));
+				expect([...container.querySelectorAll('output')].map((node) => node.firstChild)).toEqual(
+					[...texts].reverse(),
+				);
+				buttons[1].click();
+				buttons[2].click();
+				expect(seen.slice(-2)).toEqual(['left edited', 'right edited']);
+				root.unmount();
+				root = undefined;
+				container.remove();
+			}
+		}
+		for (const dev of [false, true]) {
+			for (const mapped of [false, true]) {
+				const source = `import { signal$ } from 'octane/signals';
+function Row(props) @{
+  const draft$ = signal$(props.id);
+  props.remember();
+  <section><input value={draft$}/><button onClick={() => draft$.set(draft$.get() + '!')}>edit</button><output>{draft$ as string}</output></section>
+}
+export function App(props) @{ <main>${mapped ? '{props.ids.map((id) => <Row key={id} id={id} remember={props.remember}/>)}' : '@for (const id of props.ids; key id) { <Row id={id} remember={props.remember}/> }'}</main> }`;
+				const id = `/src/keyed-historical-owner-${dev}-${mapped}.tsrx`;
+				const options = {
+					id,
+					compileOptions: { dev },
+					runtimeModules: { 'octane/signals': Signals },
+				};
+				const server = loadCompiledFixtureSource(source, { ...options, mode: 'server' });
+				const client = loadCompiledFixtureSource(source, { ...options, mode: 'client' });
+				const container = document.createElement('div');
+				document.body.append(container);
+				const owner = Object.freeze({ scopeKey: id });
+				const ids = mapped ? [42, 'right'] : ['left', 'right'];
+				const edited = String(ids[0]) + '!';
+				const serverOwners: SignalOwner[] = [];
+				const clientOwners: SignalOwner[] = [];
+				const remember = () => clientOwners.push(currentSignalOwner()!);
+				container.innerHTML = renderToString(
+					server.App,
+					{
+						ids,
+						remember() {
+							serverOwners.push(currentSignalOwner()!);
+						},
+					},
+					{ signalOwner: owner },
+				).html;
+				const inputs = [...container.querySelectorAll('input')];
+				const outputs = [...container.querySelectorAll('output')];
+				const buttons = [...container.querySelectorAll('button')];
+				root = hydrateRoot(container, client.App, { ids, remember }, { signalOwner: owner });
+				expect([...container.querySelectorAll('input')]).toEqual(inputs);
+				expect([...container.querySelectorAll('output')]).toEqual(outputs);
+				expect(
+					clientOwners.map((owner) => ('instanceKey' in owner ? owner.instanceKey : null)),
+				).toEqual(serverOwners.map((owner) => ('instanceKey' in owner ? owner.instanceKey : null)));
+				buttons[0].click();
+				await Promise.resolve();
+				expect(inputs.map((input) => input.value)).toEqual([edited, 'right']);
+				expect(outputs.map((output) => output.textContent)).toEqual([edited, 'right']);
+				if (mapped) {
+					// Mapped descriptor keys coerce numbers to strings; changing only
+					// that representation retains the native row and its edited state.
+					flushSync(() => root!.render(client.App, { ids: ids.map(String), remember }));
+					expect([...container.querySelectorAll('input')]).toEqual(inputs);
+					expect(inputs[0].value).toBe(edited);
+				}
+				flushSync(() => root!.render(client.App, { ids: [...ids].reverse(), remember }));
+				expect([...container.querySelectorAll('input')]).toEqual([...inputs].reverse());
+				buttons[1].click();
+				await Promise.resolve();
+				expect(inputs.map((input) => input.value)).toEqual([edited, 'right!']);
+				root.unmount();
+				root = undefined;
+				container.remove();
+			}
+		}
+		// Compiler-authored descriptor construction keeps the public config and
+		// positional-children contract, including calls made outside a render.
+		for (const mode of ['client', 'server'] as const) {
+			const descriptors = loadCompiledFixtureSource(
+				`export function Pass(props) @{ <section data-label={props.label}>{props.children}</section> }
+Pass.defaultProps = { label: 'default' };`,
+				{ id: '/src/compiler-descriptor-config.tsrx', mode },
+			);
+			for (const positional of [undefined, ['one'], ['one', 'two']]) {
+				const ref = { current: null };
+				const config = {
+					key: 42,
+					ref,
+					children: 'configured',
+					label: undefined as string | undefined,
+				};
+				const factory = mode === 'client' ? createElementFromConfig : createServerElementFromConfig;
+				const legacy = mode === 'client' ? createElementAt : createServerElementAt;
+				const descriptor = factory('descriptor-config', descriptors.Pass, config, positional);
+				expect(descriptor.props).toEqual(
+					legacy('descriptor-config', descriptors.Pass, config, ...(positional ?? [])).props,
+				);
+				const children =
+					positional === undefined ? 'configured' : positional.length === 1 ? 'one' : positional;
+				config.children = 'mutated';
+				config.label = 'mutated';
+				expect(descriptor.key).toBe('42');
+				expect(descriptor.props).toEqual({ ref, children, label: 'default' });
+				expect(descriptor.children).toEqual(children);
+				const container = document.createElement('div');
+				if (mode === 'server') {
+					container.innerHTML = renderToString(() => descriptor).html;
+				} else {
+					root = createRoot(container);
+					root.render(() => descriptor);
+				}
+				expect(container.querySelector('section')?.getAttribute('data-label')).toBe('default');
+				expect(container.textContent).toBe(Array.isArray(children) ? children.join('') : children);
+				root?.unmount();
+				root = undefined;
+			}
+		}
 		const container = document.createElement('div');
 		document.body.appendChild(container);
 		const value$ = __signalAt('g:prop-child', 'prop-child', 'one');
