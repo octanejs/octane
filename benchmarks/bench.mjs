@@ -676,6 +676,16 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n, quick) => (quick ? ['--quick'] : [String(n)]) }],
 	},
 	{
+		// Node-only (no servers, no browser). Bundles the server runtime from
+		// source and renders a deep component tree against a component-free host
+		// tree of the same element shape — the scoped-counter keying ratio guard.
+		name: 'ssr-scope-keys',
+		cwd: 'ssr-scope-keys',
+		servers: [],
+		iter: { normal: 9, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
 		// Node-only streaming SSR (no servers, no browser): shell TTFB, stream-end
 		// total, chunk framing + all-fast throughput for octane
 		// renderToPipeableStream vs React/Preact pipeable streams, Solid

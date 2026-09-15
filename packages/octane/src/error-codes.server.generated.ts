@@ -38,6 +38,7 @@ type ServerErrorArguments = {
 	58: [];
 	59: [unknown];
 	60: [];
+	65: [];
 };
 
 export function formatServerError<Code extends keyof ServerErrorArguments>(
@@ -168,6 +169,11 @@ export function formatServerError<Code extends keyof ServerErrorArguments>(
 			case 60:
 				return formatDevErrorMessage(
 					'A component suspended without a Suspense boundary during synchronous server rendering. Use prerender() or a streaming renderer to await it.',
+					args,
+				);
+			case 65:
+				return formatDevErrorMessage(
+					"Internal SSR invariant violated: ASYNC_SCOPE is not an extension of the active frame's async scope. Please file an Octane issue.",
 					args,
 				);
 			default:
