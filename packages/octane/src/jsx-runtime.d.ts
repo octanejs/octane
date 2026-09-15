@@ -56,6 +56,8 @@ export interface OctaneElement<P = any> extends ElementDescriptor<P> {}
 
 export interface CSSProperties extends React.CSSProperties {
 	cssFloat?: React.CSSProperties['float'];
+	/** Element-scoped View Transition isolation, including authored `!important` values. */
+	viewTransitionScope?: 'none' | 'all' | (string & {});
 }
 
 /** Native DOM style values; plain CSSProperties remains usable by CSS-consuming libraries. */

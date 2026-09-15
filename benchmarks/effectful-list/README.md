@@ -259,3 +259,10 @@ development and production. Replacing the call with `Reflect.apply` made all
 again. A scratch extraction using `effectSlots[entry.order]` with both key and
 revision guards failed the membership control. The final guard passed for both
 the baseline and candidate; their extracted dispatch-helper hashes are equal.
+
+The operation definitions and exact lifecycle snapshot checker live in
+`contract.mjs`, shared by this timing harness and the ViewTransition
+[`effect-cleanup.mjs`](../view-transitions/effect-cleanup.mjs) work guard. That
+runner executes these same authored Octane fixtures after cold setup and after
+a completed native transition, measuring ordinary cleanup work with the optional
+driver installed and idle.

@@ -1622,6 +1622,17 @@ Hook slot ids are numbered per module in source order, so inserting or reorderin
 a hook call shifts every later hook's key in that file and remaps its state. That
 is a known limitation, not a supported edit.
 
+## Element-scoped View Transitions
+
+Octane adds `scope="element"` to `ViewTransition`. A persistent direct host owns
+its native capture, descendant names, and pseudo-element handles. Independent
+scopes can animate concurrently after capture, while a batch spanning scopes
+still publishes one DOM commit. Omitted scopes inherit their nearest declaration
+or use the document. This extension falls back to a normal commit when
+`Element.startViewTransition` is unavailable; it is not a React 19.3 API.
+See [View Transitions](view-transitions.md#element-scopes) for host constraints,
+scheduling, and browser support.
+
 ## Not implemented (by design)
 
 Octane does not implement:

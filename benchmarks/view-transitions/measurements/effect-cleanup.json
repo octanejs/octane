@@ -1,0 +1,1679 @@
+{
+  "description": "Exact function-entry work in the unchanged authored effectful-list fixtures. Both modes share minified assets; idle completes and unmounts a real native ViewTransition before fixture setup. No timing comparison.",
+  "matchingInputs": [
+    "compiler source",
+    "fixture source",
+    "compiled fixture inputs",
+    "primer",
+    "lockfile",
+    "harness including budgets",
+    "Node/toolchain/Chromium",
+    "build options"
+  ],
+  "setupNote": "Both final reports were produced after an interrupted pnpm automatic dependency verification/install. No dependency changes occurred between final before and after runs. The completed canonical semantic smoke is recorded separately.",
+  "reports": {
+    "before": {
+      "rawReportSha256": "19e618264d4e24a2064517afe06ee69449aeff59034f66f42f70cf2e3c6dfcb2",
+      "rawReportBytes": 3848995,
+      "meta": {
+        "revision": "ead781345500f7245d9efbb076cdfc2313b474eb",
+        "workingTree": false,
+        "sourceSha256": "3e71576364f46f7cf7cc54ff6ce3bf9e9e83457a54bbfdb058eeb0615d7472cf",
+        "compilerSourceSha256": "653236f83b565c844df63c54156ece40bf02cfb4ba40fa6dd66a561b915455be",
+        "lockfileSha256": "51648462c4e126c7b945cb99c5390b8a77243538c3bc86fbf784021d16e0cace",
+        "harnessSha256": "bb019f0fc3d7b7e7d4533160d23aa1bfa40afc95f0f7c2edf9657e2e58e8513a",
+        "node": "v24.20.0",
+        "platform": "darwin",
+        "arch": "arm64",
+        "osRelease": "25.6.0",
+        "cpu": "Apple M5 Max",
+        "toolchain": {
+          "vite": "8.1.5",
+          "esbuild": "0.28.1",
+          "tsrxCore": "0.2.0",
+          "tsrxOxc": "0.13.0",
+          "playwright": "1.61.1"
+        },
+        "build": {
+          "target": "esnext",
+          "minify": "esbuild",
+          "hmr": false,
+          "profile": false
+        },
+        "chromeArgs": ["--js-flags=--jitless"],
+        "countDefinition": "Sum of outermost function-range counts for all emitted JavaScript assets; nested basic-block ranges are not summed.",
+        "coverageWindow": "After primer, fixture mount/pre and resetFx, through one original operation and its original 50ms effect-gate yield.",
+        "exclusions": "Primer, setup/pre, resetFx, readiness checks, semantic snapshots, and final context teardown.",
+        "limitations": "Function entries are work counts, not CPU times, instructions, allocations, or native DOM work. Unreported functions receive zero only from their verified initial/pre-operation coverage inventory. Total calls and nonnegative idle-minus-cold calls have calibrated per-operation budgets; neither requires zero idle overhead.",
+        "chromium": "149.0.7827.55"
+      },
+      "builds": [
+        {
+          "name": "octane-tsrx",
+          "fixtureSourceSha256": "abcc85aa1624c461bb2bb7de59f2dc22ba6e14bcb1177fdb6f14ba9e59daa8f8",
+          "primer": {
+            "fixtureEntry": "/Users/domgan/.codex/worktrees/octane-react-view-transition-parity/benchmarks/effectful-list/octane-tsrx/src/main.js",
+            "fixtureEntrySha256": "c135e9fffa56b0a7431aa05105e287c0c3959b5a5eba5d6aed4adc0340f3cc86",
+            "primerSourceSha256": "b6fbb2adf9a61ca8e82101c76fba967daa1085a58082dbe991c36c328dad8245",
+            "bootstrapSourceSha256": "af5620497167f1f6dce91a89dc1a093fb89eb415815bc69f16ad66608094cca4",
+            "modes": ["cold", "idle"],
+            "query": "vt-primer",
+            "observation": "window.__vtIdlePrimer"
+          },
+          "compiledInputSha256": {
+            "src/App.tsrx": "00b93513418dbbc08fbd7c8cec8786919fe7c9e0c6c69f7938812f55cd2cc0dc",
+            "src/Row.tsrx": "3dd343e30c9ca2cf9d4cc0efc1562a6f5a9e8a31b415d1666dfb1b1908b45327",
+            "src/data.js": "627abe6da352d3fc2781ca754846a8d89b346dc81441f854e8564d0d19e725a7",
+            "src/fx.js": "e511c265206f3ac32bb435a040213fcb582b8eb389c37367fc8858d2ab4488de",
+            "src/main.js": "c135e9fffa56b0a7431aa05105e287c0c3959b5a5eba5d6aed4adc0340f3cc86",
+            "src/ops.js": "e2b3b8ca2e7a4fcfa7e216d31eaa77cf3c71c5307d8e560b3f52952eb44a3339"
+          },
+          "assets": [
+            {
+              "file": "assets/index-BSvl_RwT.js",
+              "sha256": "83c9ef3fff50ebbfeeca8a983e63144f3f59a0083abf9060a623d13b31143df0",
+              "rawBytes": 5234,
+              "gzipBytes": 2417
+            },
+            {
+              "file": "assets/main-D_12oIuF.js",
+              "sha256": "6b58b4c7151f11684a5c87cde662b1ee7ad746f488f501dc0b360e97703a0b02",
+              "rawBytes": 3811,
+              "gzipBytes": 1979
+            },
+            {
+              "file": "assets/runtime-AmVVT9GS.js",
+              "sha256": "ade3c51126585637b6ce697183112a33a451a48f69ed5d0fabaedb9f8dc1643b",
+              "rawBytes": 239199,
+              "gzipBytes": 74923
+            },
+            {
+              "file": "index.html",
+              "sha256": "0147c32886f6dc4aa4980296d8e045a4c478c0b6f731edaa490107cc1d5537b1",
+              "rawBytes": 326,
+              "gzipBytes": 246
+            }
+          ],
+          "javascriptBytes": 248244,
+          "javascriptGzipBytes": 79319
+        },
+        {
+          "name": "octane-jsx",
+          "fixtureSourceSha256": "f5eea1589e3412909ac966270fc3486b31788636b87b3437492c0b3820315df9",
+          "primer": {
+            "fixtureEntry": "/Users/domgan/.codex/worktrees/octane-react-view-transition-parity/benchmarks/effectful-list/octane-jsx/src/main.js",
+            "fixtureEntrySha256": "c8c6247ce0a6abdf360bf9aaf8d80dda06a9b59e3ba4662ca5861dcea4bb3c10",
+            "primerSourceSha256": "b6fbb2adf9a61ca8e82101c76fba967daa1085a58082dbe991c36c328dad8245",
+            "bootstrapSourceSha256": "af5620497167f1f6dce91a89dc1a093fb89eb415815bc69f16ad66608094cca4",
+            "modes": ["cold", "idle"],
+            "query": "vt-primer",
+            "observation": "window.__vtIdlePrimer"
+          },
+          "compiledInputSha256": {
+            "src/App.tsx": "3860cba26aeeddfeeb76db283c60b28007c964c59118159a6446333a26e17438",
+            "src/Row.tsx": "ed47f0eaab849cf3519a58a337ccf7897ecbd68af8c9e47529bb93aa2ce58af9",
+            "src/data.js": "627abe6da352d3fc2781ca754846a8d89b346dc81441f854e8564d0d19e725a7",
+            "src/fx.js": "e511c265206f3ac32bb435a040213fcb582b8eb389c37367fc8858d2ab4488de",
+            "src/main.js": "c8c6247ce0a6abdf360bf9aaf8d80dda06a9b59e3ba4662ca5861dcea4bb3c10",
+            "src/ops.js": "e2b3b8ca2e7a4fcfa7e216d31eaa77cf3c71c5307d8e560b3f52952eb44a3339"
+          },
+          "assets": [
+            {
+              "file": "assets/index-siiOP7NE.js",
+              "sha256": "a58d7518e6520cc45095c4baa12b99940bc3844579a5236a6d424f14c8f2569f",
+              "rawBytes": 5234,
+              "gzipBytes": 2417
+            },
+            {
+              "file": "assets/main-BJRLgPvo.js",
+              "sha256": "ca1a24d00ab7c4340de099a93c3dd0a36cbb90b82fa37df0cb7a9259cd13da98",
+              "rawBytes": 3932,
+              "gzipBytes": 2013
+            },
+            {
+              "file": "assets/runtime-BUMwAXzy.js",
+              "sha256": "df6dd20cf437a6a4576e157bfb3b5052bdd3150accbfb25f5d48093b3527e415",
+              "rawBytes": 238956,
+              "gzipBytes": 74910
+            },
+            {
+              "file": "index.html",
+              "sha256": "4c4ac5934e7a473c5aa77c0a5ec6461530faa53963e8a018ad209a9c34e132f4",
+              "rawBytes": 325,
+              "gzipBytes": 247
+            }
+          ],
+          "javascriptBytes": 248122,
+          "javascriptGzipBytes": 79340
+        }
+      ],
+      "comparison": [
+        {
+          "dialect": "tsrx",
+          "operation": "clear",
+          "coldTotalCalls": 47089,
+          "idleTotalCalls": 51101,
+          "idleMinusColdCalls": 4012
+        },
+        {
+          "dialect": "tsrx",
+          "operation": "remount",
+          "coldTotalCalls": 155085,
+          "idleTotalCalls": 159097,
+          "idleMinusColdCalls": 4012
+        },
+        {
+          "dialect": "tsrx",
+          "operation": "remove_100_scattered",
+          "coldTotalCalls": 42780,
+          "idleTotalCalls": 43192,
+          "idleMinusColdCalls": 412
+        },
+        {
+          "dialect": "jsx",
+          "operation": "clear",
+          "coldTotalCalls": 57115,
+          "idleTotalCalls": 62127,
+          "idleMinusColdCalls": 5012
+        },
+        {
+          "dialect": "jsx",
+          "operation": "remount",
+          "coldTotalCalls": 198111,
+          "idleTotalCalls": 203123,
+          "idleMinusColdCalls": 5012
+        },
+        {
+          "dialect": "jsx",
+          "operation": "remove_100_scattered",
+          "coldTotalCalls": 64506,
+          "idleTotalCalls": 65018,
+          "idleMinusColdCalls": 512
+        }
+      ],
+      "expectedExitCode": 1
+    },
+    "after": {
+      "rawReportSha256": "0fa800e3d1680b9f67b68e487755a76fbd16502f1711887c875c9020a3508c08",
+      "rawReportBytes": 3842086,
+      "meta": {
+        "revision": "ead781345500f7245d9efbb076cdfc2313b474eb",
+        "workingTree": true,
+        "sourceSha256": "0b260f33c6959b912ad8ada620d50b86058707e0c47a028bcbf24dc0f3becf76",
+        "compilerSourceSha256": "653236f83b565c844df63c54156ece40bf02cfb4ba40fa6dd66a561b915455be",
+        "lockfileSha256": "51648462c4e126c7b945cb99c5390b8a77243538c3bc86fbf784021d16e0cace",
+        "harnessSha256": "bb019f0fc3d7b7e7d4533160d23aa1bfa40afc95f0f7c2edf9657e2e58e8513a",
+        "node": "v24.20.0",
+        "platform": "darwin",
+        "arch": "arm64",
+        "osRelease": "25.6.0",
+        "cpu": "Apple M5 Max",
+        "toolchain": {
+          "vite": "8.1.5",
+          "esbuild": "0.28.1",
+          "tsrxCore": "0.2.0",
+          "tsrxOxc": "0.13.0",
+          "playwright": "1.61.1"
+        },
+        "build": {
+          "target": "esnext",
+          "minify": "esbuild",
+          "hmr": false,
+          "profile": false
+        },
+        "chromeArgs": ["--js-flags=--jitless"],
+        "countDefinition": "Sum of outermost function-range counts for all emitted JavaScript assets; nested basic-block ranges are not summed.",
+        "coverageWindow": "After primer, fixture mount/pre and resetFx, through one original operation and its original 50ms effect-gate yield.",
+        "exclusions": "Primer, setup/pre, resetFx, readiness checks, semantic snapshots, and final context teardown.",
+        "limitations": "Function entries are work counts, not CPU times, instructions, allocations, or native DOM work. Unreported functions receive zero only from their verified initial/pre-operation coverage inventory. Total calls and nonnegative idle-minus-cold calls have calibrated per-operation budgets; neither requires zero idle overhead.",
+        "chromium": "149.0.7827.55"
+      },
+      "builds": [
+        {
+          "name": "octane-tsrx",
+          "fixtureSourceSha256": "abcc85aa1624c461bb2bb7de59f2dc22ba6e14bcb1177fdb6f14ba9e59daa8f8",
+          "primer": {
+            "fixtureEntry": "/Users/domgan/.codex/worktrees/octane-react-view-transition-parity/benchmarks/effectful-list/octane-tsrx/src/main.js",
+            "fixtureEntrySha256": "c135e9fffa56b0a7431aa05105e287c0c3959b5a5eba5d6aed4adc0340f3cc86",
+            "primerSourceSha256": "b6fbb2adf9a61ca8e82101c76fba967daa1085a58082dbe991c36c328dad8245",
+            "bootstrapSourceSha256": "af5620497167f1f6dce91a89dc1a093fb89eb415815bc69f16ad66608094cca4",
+            "modes": ["cold", "idle"],
+            "query": "vt-primer",
+            "observation": "window.__vtIdlePrimer"
+          },
+          "compiledInputSha256": {
+            "src/App.tsrx": "00b93513418dbbc08fbd7c8cec8786919fe7c9e0c6c69f7938812f55cd2cc0dc",
+            "src/Row.tsrx": "3dd343e30c9ca2cf9d4cc0efc1562a6f5a9e8a31b415d1666dfb1b1908b45327",
+            "src/data.js": "627abe6da352d3fc2781ca754846a8d89b346dc81441f854e8564d0d19e725a7",
+            "src/fx.js": "e511c265206f3ac32bb435a040213fcb582b8eb389c37367fc8858d2ab4488de",
+            "src/main.js": "c135e9fffa56b0a7431aa05105e287c0c3959b5a5eba5d6aed4adc0340f3cc86",
+            "src/ops.js": "e2b3b8ca2e7a4fcfa7e216d31eaa77cf3c71c5307d8e560b3f52952eb44a3339"
+          },
+          "assets": [
+            {
+              "file": "assets/index-DLT4XOnY.js",
+              "sha256": "19ad1d0b8c0867943a636e94d03076097df204ed466e506cc79313d9d2005a05",
+              "rawBytes": 5234,
+              "gzipBytes": 2418
+            },
+            {
+              "file": "assets/main-C7ggd9NJ.js",
+              "sha256": "543ee9fccae7bd2bbf253fae9973307859c41c3251e099f2acb5be29b34158f9",
+              "rawBytes": 3811,
+              "gzipBytes": 1979
+            },
+            {
+              "file": "assets/runtime-DY7Tiy5z.js",
+              "sha256": "b3a7114cbd1052a09231a9f66ce35edf1cd6d693dfd341e791c6fb5aedfdaab1",
+              "rawBytes": 239222,
+              "gzipBytes": 74925
+            },
+            {
+              "file": "index.html",
+              "sha256": "31353dc98236c3a404e3bd774fc058010965f9747f33c17d1806e91852f128b9",
+              "rawBytes": 326,
+              "gzipBytes": 248
+            }
+          ],
+          "javascriptBytes": 248267,
+          "javascriptGzipBytes": 79322
+        },
+        {
+          "name": "octane-jsx",
+          "fixtureSourceSha256": "f5eea1589e3412909ac966270fc3486b31788636b87b3437492c0b3820315df9",
+          "primer": {
+            "fixtureEntry": "/Users/domgan/.codex/worktrees/octane-react-view-transition-parity/benchmarks/effectful-list/octane-jsx/src/main.js",
+            "fixtureEntrySha256": "c8c6247ce0a6abdf360bf9aaf8d80dda06a9b59e3ba4662ca5861dcea4bb3c10",
+            "primerSourceSha256": "b6fbb2adf9a61ca8e82101c76fba967daa1085a58082dbe991c36c328dad8245",
+            "bootstrapSourceSha256": "af5620497167f1f6dce91a89dc1a093fb89eb415815bc69f16ad66608094cca4",
+            "modes": ["cold", "idle"],
+            "query": "vt-primer",
+            "observation": "window.__vtIdlePrimer"
+          },
+          "compiledInputSha256": {
+            "src/App.tsx": "3860cba26aeeddfeeb76db283c60b28007c964c59118159a6446333a26e17438",
+            "src/Row.tsx": "ed47f0eaab849cf3519a58a337ccf7897ecbd68af8c9e47529bb93aa2ce58af9",
+            "src/data.js": "627abe6da352d3fc2781ca754846a8d89b346dc81441f854e8564d0d19e725a7",
+            "src/fx.js": "e511c265206f3ac32bb435a040213fcb582b8eb389c37367fc8858d2ab4488de",
+            "src/main.js": "c8c6247ce0a6abdf360bf9aaf8d80dda06a9b59e3ba4662ca5861dcea4bb3c10",
+            "src/ops.js": "e2b3b8ca2e7a4fcfa7e216d31eaa77cf3c71c5307d8e560b3f52952eb44a3339"
+          },
+          "assets": [
+            {
+              "file": "assets/index-DzfTb0YT.js",
+              "sha256": "426999458a4a64c7f3b68172756f59501a7593f094af50672bbae846b8409725",
+              "rawBytes": 5234,
+              "gzipBytes": 2419
+            },
+            {
+              "file": "assets/main-l7DY3Meq.js",
+              "sha256": "4c259fd02480c155e9dd894931c92f0daa8ec2ef5c462c9ef30abb766bdd6e8d",
+              "rawBytes": 3932,
+              "gzipBytes": 2013
+            },
+            {
+              "file": "assets/runtime-CkIQVzyX.js",
+              "sha256": "25f1b7a63734d38ab201f07abe76e33c5b7ad0932adf1e970125f4a8335fde46",
+              "rawBytes": 238979,
+              "gzipBytes": 74913
+            },
+            {
+              "file": "index.html",
+              "sha256": "577311291308054d2fa0478663bf18ea20173506cef41d610650b1d977b952f7",
+              "rawBytes": 325,
+              "gzipBytes": 246
+            }
+          ],
+          "javascriptBytes": 248145,
+          "javascriptGzipBytes": 79345
+        }
+      ],
+      "comparison": [
+        {
+          "dialect": "tsrx",
+          "operation": "clear",
+          "coldTotalCalls": 47089,
+          "idleTotalCalls": 49101,
+          "idleMinusColdCalls": 2012
+        },
+        {
+          "dialect": "tsrx",
+          "operation": "remount",
+          "coldTotalCalls": 155085,
+          "idleTotalCalls": 157097,
+          "idleMinusColdCalls": 2012
+        },
+        {
+          "dialect": "tsrx",
+          "operation": "remove_100_scattered",
+          "coldTotalCalls": 42780,
+          "idleTotalCalls": 42992,
+          "idleMinusColdCalls": 212
+        },
+        {
+          "dialect": "jsx",
+          "operation": "clear",
+          "coldTotalCalls": 57115,
+          "idleTotalCalls": 60127,
+          "idleMinusColdCalls": 3012
+        },
+        {
+          "dialect": "jsx",
+          "operation": "remount",
+          "coldTotalCalls": 198111,
+          "idleTotalCalls": 201123,
+          "idleMinusColdCalls": 3012
+        },
+        {
+          "dialect": "jsx",
+          "operation": "remove_100_scattered",
+          "coldTotalCalls": 64506,
+          "idleTotalCalls": 64818,
+          "idleMinusColdCalls": 312
+        }
+      ],
+      "expectedExitCode": 0
+    }
+  },
+  "cases": [
+    {
+      "target": "vt-effect-cleanup-tsrx-cold-clear",
+      "operation": "clear",
+      "mode": "cold",
+      "semantic": {
+        "fx": {
+          "mounts": 0,
+          "cleanups": 1000,
+          "refs": 0,
+          "refCleanups": 1000,
+          "layouts": 0,
+          "h": 0
+        },
+        "rows": 0
+      },
+      "expected": {
+        "mounts": 0,
+        "cleanups": 1000,
+        "refs": 0,
+        "refCleanups": 1000,
+        "layouts": 0,
+        "hPositive": false,
+        "rows": 0
+      },
+      "primer": {
+        "mode": "cold",
+        "ready": true,
+        "nativeCalls": 0,
+        "updateCallbacks": 0,
+        "outcomes": [],
+        "removed": true,
+        "remainingTransitionAnimations": 0,
+        "error": null
+      },
+      "before": {
+        "totalCalls": 47089,
+        "stageTeardown": 0,
+        "stageDeactivation": 0
+      },
+      "after": {
+        "totalCalls": 47089,
+        "stageTeardown": 0,
+        "stageDeactivation": 0
+      },
+      "removedCalls": 0
+    },
+    {
+      "target": "vt-effect-cleanup-tsrx-cold-remount",
+      "operation": "remount",
+      "mode": "cold",
+      "semantic": {
+        "fx": {
+          "mounts": 1000,
+          "cleanups": 1000,
+          "refs": 1000,
+          "refCleanups": 1000,
+          "layouts": 100,
+          "h": 2000
+        },
+        "rows": 1000
+      },
+      "expected": {
+        "mounts": 1000,
+        "cleanups": 1000,
+        "refs": 1000,
+        "refCleanups": 1000,
+        "layouts": 100,
+        "hPositive": true,
+        "rows": 1000
+      },
+      "primer": {
+        "mode": "cold",
+        "ready": true,
+        "nativeCalls": 0,
+        "updateCallbacks": 0,
+        "outcomes": [],
+        "removed": true,
+        "remainingTransitionAnimations": 0,
+        "error": null
+      },
+      "before": {
+        "totalCalls": 155085,
+        "stageTeardown": 0,
+        "stageDeactivation": 0
+      },
+      "after": {
+        "totalCalls": 155085,
+        "stageTeardown": 0,
+        "stageDeactivation": 0
+      },
+      "removedCalls": 0
+    },
+    {
+      "target": "vt-effect-cleanup-tsrx-cold-remove_100_scattered",
+      "operation": "remove_100_scattered",
+      "mode": "cold",
+      "semantic": {
+        "fx": {
+          "mounts": 0,
+          "cleanups": 100,
+          "refs": 0,
+          "refCleanups": 100,
+          "layouts": 0,
+          "h": 0
+        },
+        "rows": 900
+      },
+      "expected": {
+        "mounts": 0,
+        "cleanups": 100,
+        "refs": 0,
+        "refCleanups": 100,
+        "layouts": 0,
+        "hPositive": false,
+        "rows": 900
+      },
+      "primer": {
+        "mode": "cold",
+        "ready": true,
+        "nativeCalls": 0,
+        "updateCallbacks": 0,
+        "outcomes": [],
+        "removed": true,
+        "remainingTransitionAnimations": 0,
+        "error": null
+      },
+      "before": {
+        "totalCalls": 42780,
+        "stageTeardown": 0,
+        "stageDeactivation": 0
+      },
+      "after": {
+        "totalCalls": 42780,
+        "stageTeardown": 0,
+        "stageDeactivation": 0
+      },
+      "removedCalls": 0
+    },
+    {
+      "target": "vt-effect-cleanup-tsrx-idle-clear",
+      "operation": "clear",
+      "mode": "idle",
+      "semantic": {
+        "fx": {
+          "mounts": 0,
+          "cleanups": 1000,
+          "refs": 0,
+          "refCleanups": 1000,
+          "layouts": 0,
+          "h": 0
+        },
+        "rows": 0
+      },
+      "expected": {
+        "mounts": 0,
+        "cleanups": 1000,
+        "refs": 0,
+        "refCleanups": 1000,
+        "layouts": 0,
+        "hPositive": false,
+        "rows": 0
+      },
+      "primer": {
+        "mode": "idle",
+        "ready": true,
+        "nativeCalls": 1,
+        "updateCallbacks": 1,
+        "outcomes": ["fulfilled", "fulfilled", "fulfilled"],
+        "removed": true,
+        "remainingTransitionAnimations": 0,
+        "error": null
+      },
+      "before": {
+        "totalCalls": 51101,
+        "stageTeardown": 2000,
+        "stageDeactivation": 0
+      },
+      "after": {
+        "totalCalls": 49101,
+        "stageTeardown": 0,
+        "stageDeactivation": 0
+      },
+      "removedCalls": 2000
+    },
+    {
+      "target": "vt-effect-cleanup-tsrx-idle-remount",
+      "operation": "remount",
+      "mode": "idle",
+      "semantic": {
+        "fx": {
+          "mounts": 1000,
+          "cleanups": 1000,
+          "refs": 1000,
+          "refCleanups": 1000,
+          "layouts": 100,
+          "h": 2000
+        },
+        "rows": 1000
+      },
+      "expected": {
+        "mounts": 1000,
+        "cleanups": 1000,
+        "refs": 1000,
+        "refCleanups": 1000,
+        "layouts": 100,
+        "hPositive": true,
+        "rows": 1000
+      },
+      "primer": {
+        "mode": "idle",
+        "ready": true,
+        "nativeCalls": 1,
+        "updateCallbacks": 1,
+        "outcomes": ["fulfilled", "fulfilled", "fulfilled"],
+        "removed": true,
+        "remainingTransitionAnimations": 0,
+        "error": null
+      },
+      "before": {
+        "totalCalls": 159097,
+        "stageTeardown": 2000,
+        "stageDeactivation": 0
+      },
+      "after": {
+        "totalCalls": 157097,
+        "stageTeardown": 0,
+        "stageDeactivation": 0
+      },
+      "removedCalls": 2000
+    },
+    {
+      "target": "vt-effect-cleanup-tsrx-idle-remove_100_scattered",
+      "operation": "remove_100_scattered",
+      "mode": "idle",
+      "semantic": {
+        "fx": {
+          "mounts": 0,
+          "cleanups": 100,
+          "refs": 0,
+          "refCleanups": 100,
+          "layouts": 0,
+          "h": 0
+        },
+        "rows": 900
+      },
+      "expected": {
+        "mounts": 0,
+        "cleanups": 100,
+        "refs": 0,
+        "refCleanups": 100,
+        "layouts": 0,
+        "hPositive": false,
+        "rows": 900
+      },
+      "primer": {
+        "mode": "idle",
+        "ready": true,
+        "nativeCalls": 1,
+        "updateCallbacks": 1,
+        "outcomes": ["fulfilled", "fulfilled", "fulfilled"],
+        "removed": true,
+        "remainingTransitionAnimations": 0,
+        "error": null
+      },
+      "before": {
+        "totalCalls": 43192,
+        "stageTeardown": 200,
+        "stageDeactivation": 0
+      },
+      "after": {
+        "totalCalls": 42992,
+        "stageTeardown": 0,
+        "stageDeactivation": 0
+      },
+      "removedCalls": 200
+    },
+    {
+      "target": "vt-effect-cleanup-jsx-cold-clear",
+      "operation": "clear",
+      "mode": "cold",
+      "semantic": {
+        "fx": {
+          "mounts": 0,
+          "cleanups": 1000,
+          "refs": 0,
+          "refCleanups": 1000,
+          "layouts": 0,
+          "h": 0
+        },
+        "rows": 0
+      },
+      "expected": {
+        "mounts": 0,
+        "cleanups": 1000,
+        "refs": 0,
+        "refCleanups": 1000,
+        "layouts": 0,
+        "hPositive": false,
+        "rows": 0
+      },
+      "primer": {
+        "mode": "cold",
+        "ready": true,
+        "nativeCalls": 0,
+        "updateCallbacks": 0,
+        "outcomes": [],
+        "removed": true,
+        "remainingTransitionAnimations": 0,
+        "error": null
+      },
+      "before": {
+        "totalCalls": 57115,
+        "stageTeardown": 0,
+        "stageDeactivation": 0
+      },
+      "after": {
+        "totalCalls": 57115,
+        "stageTeardown": 0,
+        "stageDeactivation": 0
+      },
+      "removedCalls": 0
+    },
+    {
+      "target": "vt-effect-cleanup-jsx-cold-remount",
+      "operation": "remount",
+      "mode": "cold",
+      "semantic": {
+        "fx": {
+          "mounts": 1000,
+          "cleanups": 1000,
+          "refs": 1000,
+          "refCleanups": 1000,
+          "layouts": 100,
+          "h": 2000
+        },
+        "rows": 1000
+      },
+      "expected": {
+        "mounts": 1000,
+        "cleanups": 1000,
+        "refs": 1000,
+        "refCleanups": 1000,
+        "layouts": 100,
+        "hPositive": true,
+        "rows": 1000
+      },
+      "primer": {
+        "mode": "cold",
+        "ready": true,
+        "nativeCalls": 0,
+        "updateCallbacks": 0,
+        "outcomes": [],
+        "removed": true,
+        "remainingTransitionAnimations": 0,
+        "error": null
+      },
+      "before": {
+        "totalCalls": 198111,
+        "stageTeardown": 0,
+        "stageDeactivation": 0
+      },
+      "after": {
+        "totalCalls": 198111,
+        "stageTeardown": 0,
+        "stageDeactivation": 0
+      },
+      "removedCalls": 0
+    },
+    {
+      "target": "vt-effect-cleanup-jsx-cold-remove_100_scattered",
+      "operation": "remove_100_scattered",
+      "mode": "cold",
+      "semantic": {
+        "fx": {
+          "mounts": 0,
+          "cleanups": 100,
+          "refs": 0,
+          "refCleanups": 100,
+          "layouts": 0,
+          "h": 0
+        },
+        "rows": 900
+      },
+      "expected": {
+        "mounts": 0,
+        "cleanups": 100,
+        "refs": 0,
+        "refCleanups": 100,
+        "layouts": 0,
+        "hPositive": false,
+        "rows": 900
+      },
+      "primer": {
+        "mode": "cold",
+        "ready": true,
+        "nativeCalls": 0,
+        "updateCallbacks": 0,
+        "outcomes": [],
+        "removed": true,
+        "remainingTransitionAnimations": 0,
+        "error": null
+      },
+      "before": {
+        "totalCalls": 64506,
+        "stageTeardown": 0,
+        "stageDeactivation": 0
+      },
+      "after": {
+        "totalCalls": 64506,
+        "stageTeardown": 0,
+        "stageDeactivation": 0
+      },
+      "removedCalls": 0
+    },
+    {
+      "target": "vt-effect-cleanup-jsx-idle-clear",
+      "operation": "clear",
+      "mode": "idle",
+      "semantic": {
+        "fx": {
+          "mounts": 0,
+          "cleanups": 1000,
+          "refs": 0,
+          "refCleanups": 1000,
+          "layouts": 0,
+          "h": 0
+        },
+        "rows": 0
+      },
+      "expected": {
+        "mounts": 0,
+        "cleanups": 1000,
+        "refs": 0,
+        "refCleanups": 1000,
+        "layouts": 0,
+        "hPositive": false,
+        "rows": 0
+      },
+      "primer": {
+        "mode": "idle",
+        "ready": true,
+        "nativeCalls": 1,
+        "updateCallbacks": 1,
+        "outcomes": ["fulfilled", "fulfilled", "fulfilled"],
+        "removed": true,
+        "remainingTransitionAnimations": 0,
+        "error": null
+      },
+      "before": {
+        "totalCalls": 62127,
+        "stageTeardown": 2000,
+        "stageDeactivation": 0
+      },
+      "after": {
+        "totalCalls": 60127,
+        "stageTeardown": 0,
+        "stageDeactivation": 0
+      },
+      "removedCalls": 2000
+    },
+    {
+      "target": "vt-effect-cleanup-jsx-idle-remount",
+      "operation": "remount",
+      "mode": "idle",
+      "semantic": {
+        "fx": {
+          "mounts": 1000,
+          "cleanups": 1000,
+          "refs": 1000,
+          "refCleanups": 1000,
+          "layouts": 100,
+          "h": 2000
+        },
+        "rows": 1000
+      },
+      "expected": {
+        "mounts": 1000,
+        "cleanups": 1000,
+        "refs": 1000,
+        "refCleanups": 1000,
+        "layouts": 100,
+        "hPositive": true,
+        "rows": 1000
+      },
+      "primer": {
+        "mode": "idle",
+        "ready": true,
+        "nativeCalls": 1,
+        "updateCallbacks": 1,
+        "outcomes": ["fulfilled", "fulfilled", "fulfilled"],
+        "removed": true,
+        "remainingTransitionAnimations": 0,
+        "error": null
+      },
+      "before": {
+        "totalCalls": 203123,
+        "stageTeardown": 2000,
+        "stageDeactivation": 0
+      },
+      "after": {
+        "totalCalls": 201123,
+        "stageTeardown": 0,
+        "stageDeactivation": 0
+      },
+      "removedCalls": 2000
+    },
+    {
+      "target": "vt-effect-cleanup-jsx-idle-remove_100_scattered",
+      "operation": "remove_100_scattered",
+      "mode": "idle",
+      "semantic": {
+        "fx": {
+          "mounts": 0,
+          "cleanups": 100,
+          "refs": 0,
+          "refCleanups": 100,
+          "layouts": 0,
+          "h": 0
+        },
+        "rows": 900
+      },
+      "expected": {
+        "mounts": 0,
+        "cleanups": 100,
+        "refs": 0,
+        "refCleanups": 100,
+        "layouts": 0,
+        "hPositive": false,
+        "rows": 900
+      },
+      "primer": {
+        "mode": "idle",
+        "ready": true,
+        "nativeCalls": 1,
+        "updateCallbacks": 1,
+        "outcomes": ["fulfilled", "fulfilled", "fulfilled"],
+        "removed": true,
+        "remainingTransitionAnimations": 0,
+        "error": null
+      },
+      "before": {
+        "totalCalls": 65018,
+        "stageTeardown": 200,
+        "stageDeactivation": 0
+      },
+      "after": {
+        "totalCalls": 64818,
+        "stageTeardown": 0,
+        "stageDeactivation": 0
+      },
+      "removedCalls": 200
+    }
+  ],
+  "ratioValidation": {
+    "checkerSha256": "2295382cf15c724a000da0ba1e168e6c5d68df4e158c8a7af8c4e9a85c4a5a99",
+    "guardCount": 30,
+    "beforeBreaches": [
+      {
+        "target": "vt-effect-cleanup-tsrx-idle-clear",
+        "op": "stage_teardown_calls",
+        "ratio": 2000
+      },
+      {
+        "target": "vt-effect-cleanup-tsrx-idle-remount",
+        "op": "stage_teardown_calls",
+        "ratio": 2000
+      },
+      {
+        "target": "vt-effect-cleanup-tsrx-idle-remove_100_scattered",
+        "op": "stage_teardown_calls",
+        "ratio": 200
+      },
+      {
+        "target": "vt-effect-cleanup-jsx-idle-clear",
+        "op": "stage_teardown_calls",
+        "ratio": 2000
+      },
+      {
+        "target": "vt-effect-cleanup-jsx-idle-remount",
+        "op": "stage_teardown_calls",
+        "ratio": 2000
+      },
+      {
+        "target": "vt-effect-cleanup-jsx-idle-remove_100_scattered",
+        "op": "stage_teardown_calls",
+        "ratio": 200
+      },
+      {
+        "target": "vt-effect-cleanup-tsrx-idle-clear",
+        "op": "total_calls",
+        "ratio": 1.0400545458245984
+      },
+      {
+        "target": "vt-effect-cleanup-tsrx-idle-clear",
+        "op": "idle_extra_calls",
+        "ratio": 1.9628180039138943
+      },
+      {
+        "target": "vt-effect-cleanup-tsrx-idle-remount",
+        "op": "total_calls",
+        "ratio": 1.012524740818054
+      },
+      {
+        "target": "vt-effect-cleanup-tsrx-idle-remount",
+        "op": "idle_extra_calls",
+        "ratio": 1.9628180039138943
+      },
+      {
+        "target": "vt-effect-cleanup-tsrx-idle-remove_100_scattered",
+        "op": "total_calls",
+        "ratio": 1.0039047973224247
+      },
+      {
+        "target": "vt-effect-cleanup-tsrx-idle-remove_100_scattered",
+        "op": "idle_extra_calls",
+        "ratio": 1.6885245901639345
+      },
+      {
+        "target": "vt-effect-cleanup-jsx-idle-clear",
+        "op": "total_calls",
+        "ratio": 1.0327133097292176
+      },
+      {
+        "target": "vt-effect-cleanup-jsx-idle-clear",
+        "op": "idle_extra_calls",
+        "ratio": 1.6465177398160316
+      },
+      {
+        "target": "vt-effect-cleanup-jsx-idle-remount",
+        "op": "total_calls",
+        "ratio": 1.0097835002858493
+      },
+      {
+        "target": "vt-effect-cleanup-jsx-idle-remount",
+        "op": "idle_extra_calls",
+        "ratio": 1.6465177398160316
+      },
+      {
+        "target": "vt-effect-cleanup-jsx-idle-remove_100_scattered",
+        "op": "total_calls",
+        "ratio": 1.0025905936777177
+      },
+      {
+        "target": "vt-effect-cleanup-jsx-idle-remove_100_scattered",
+        "op": "idle_extra_calls",
+        "ratio": 1.4883720930232558
+      }
+    ],
+    "afterBreaches": []
+  },
+  "canonicalSmoke": {
+    "description": "Original effectful-list/run.mjs, both canonical Octane target names, one measured sample and two warmups. All six original lifecycle gates pass; timing values are not used as performance evidence.",
+    "rawReportSha256": "e6702f66c15b12a1ac07c346ccedab5e9caa2b54d706b34ae28086090b2ebe5c",
+    "targets": [
+      {
+        "name": "octane-tsrx",
+        "meta": {
+          "fixtureSourceSha256": "abcc85aa1624c461bb2bb7de59f2dc22ba6e14bcb1177fdb6f14ba9e59daa8f8",
+          "compiledInputSha256": {
+            "src/App.tsrx": "00b93513418dbbc08fbd7c8cec8786919fe7c9e0c6c69f7938812f55cd2cc0dc",
+            "src/Row.tsrx": "3dd343e30c9ca2cf9d4cc0efc1562a6f5a9e8a31b415d1666dfb1b1908b45327",
+            "src/data.js": "627abe6da352d3fc2781ca754846a8d89b346dc81441f854e8564d0d19e725a7",
+            "src/fx.js": "e511c265206f3ac32bb435a040213fcb582b8eb389c37367fc8858d2ab4488de",
+            "src/main.js": "c135e9fffa56b0a7431aa05105e287c0c3959b5a5eba5d6aed4adc0340f3cc86",
+            "src/ops.js": "e2b3b8ca2e7a4fcfa7e216d31eaa77cf3c71c5307d8e560b3f52952eb44a3339"
+          },
+          "assets": [
+            {
+              "file": "assets/index-T9jkVPLs.js",
+              "sha256": "19a1eba6b7ad2becb6595cabb893989458f0f60753555733158a806f3583d945",
+              "rawBytes": 188300,
+              "gzipBytes": 59919
+            },
+            {
+              "file": "index.html",
+              "sha256": "be65e7c901ba5cf6adc71439367e6048047cca0b7faaaeed8a86a0ce501d6549",
+              "rawBytes": 250,
+              "gzipBytes": 210
+            }
+          ],
+          "javascriptBytes": 188300,
+          "javascriptGzipBytes": 59919
+        },
+        "exitCode": 0,
+        "fxGate": "pass",
+        "operations": [
+          "mount_1k",
+          "update_nodeps",
+          "update_deps",
+          "clear",
+          "remount",
+          "remove_100_scattered"
+        ]
+      },
+      {
+        "name": "octane-jsx",
+        "meta": {
+          "fixtureSourceSha256": "f5eea1589e3412909ac966270fc3486b31788636b87b3437492c0b3820315df9",
+          "compiledInputSha256": {
+            "src/App.tsx": "3860cba26aeeddfeeb76db283c60b28007c964c59118159a6446333a26e17438",
+            "src/Row.tsx": "ed47f0eaab849cf3519a58a337ccf7897ecbd68af8c9e47529bb93aa2ce58af9",
+            "src/data.js": "627abe6da352d3fc2781ca754846a8d89b346dc81441f854e8564d0d19e725a7",
+            "src/fx.js": "e511c265206f3ac32bb435a040213fcb582b8eb389c37367fc8858d2ab4488de",
+            "src/main.js": "c8c6247ce0a6abdf360bf9aaf8d80dda06a9b59e3ba4662ca5861dcea4bb3c10",
+            "src/ops.js": "e2b3b8ca2e7a4fcfa7e216d31eaa77cf3c71c5307d8e560b3f52952eb44a3339"
+          },
+          "assets": [
+            {
+              "file": "assets/index-BF0k1tct.js",
+              "sha256": "015d245fc5bc2fada12eae59681bbd32263fb65a00550bc04d3debcaa00309ec",
+              "rawBytes": 190243,
+              "gzipBytes": 60708
+            },
+            {
+              "file": "index.html",
+              "sha256": "6de49f89e1f24787849d007aed1807b3e26c29b1ab6a96656b1959bd57b9d412",
+              "rawBytes": 249,
+              "gzipBytes": 208
+            }
+          ],
+          "javascriptBytes": 190243,
+          "javascriptGzipBytes": 60708
+        },
+        "exitCode": 0,
+        "fxGate": "pass",
+        "operations": [
+          "mount_1k",
+          "update_nodeps",
+          "update_deps",
+          "clear",
+          "remount",
+          "remove_100_scattered"
+        ]
+      }
+    ]
+  },
+  "mergeVerification": {
+    "description": "Verification after merging main native signal styles. Preserve the historical optimization comparison above. This merged source and compiler have new hashes, while both authored cleanup fixtures compile to exactly the same emitted assets and measured function entries as the prior candidate. Budgets are unchanged; no timing comparison.",
+    "revision": "b6d95390bc4158573636eced11ae0a661585b49c",
+    "previousImplementationRevision": "c19852c379b2806351b53edfe225b4da312d0971",
+    "mergedMainRevision": "ede01deec8beb0e096fce09b4fb8aa3ca686beee",
+    "previousRawReportSha256": "0fa800e3d1680b9f67b68e487755a76fbd16502f1711887c875c9020a3508c08",
+    "rawReportSha256": "fe24de9fad316350a431c13fa168e3b89573a1a3e4b9cfa18d374bc1ae486ef2",
+    "rawReportBytes": 3842087,
+    "meta": {
+      "revision": "b6d95390bc4158573636eced11ae0a661585b49c",
+      "workingTree": true,
+      "sourceSha256": "9217bde20f3efbd0d1df03c241368a9511a73190dd2bfd2a7ead571625ad590e",
+      "compilerSourceSha256": "e8a494c7b5c4fe53420632f5f7677f81962808791ebe58c56daa8a2fdbece8b1",
+      "lockfileSha256": "51648462c4e126c7b945cb99c5390b8a77243538c3bc86fbf784021d16e0cace",
+      "harnessSha256": "bb019f0fc3d7b7e7d4533160d23aa1bfa40afc95f0f7c2edf9657e2e58e8513a",
+      "node": "v24.20.0",
+      "platform": "darwin",
+      "arch": "arm64",
+      "osRelease": "25.6.0",
+      "cpu": "Apple M5 Max",
+      "toolchain": {
+        "vite": "8.1.5",
+        "esbuild": "0.28.1",
+        "tsrxCore": "0.2.0",
+        "tsrxOxc": "0.13.0",
+        "playwright": "1.61.1"
+      },
+      "build": {
+        "target": "esnext",
+        "minify": "esbuild",
+        "hmr": false,
+        "profile": false
+      },
+      "chromeArgs": ["--js-flags=--jitless"],
+      "countDefinition": "Sum of outermost function-range counts for all emitted JavaScript assets; nested basic-block ranges are not summed.",
+      "coverageWindow": "After primer, fixture mount/pre and resetFx, through one original operation and its original 50ms effect-gate yield.",
+      "exclusions": "Primer, setup/pre, resetFx, readiness checks, semantic snapshots, and final context teardown.",
+      "limitations": "Function entries are work counts, not CPU times, instructions, allocations, or native DOM work. Unreported functions receive zero only from their verified initial/pre-operation coverage inventory. Total calls and nonnegative idle-minus-cold calls have calibrated per-operation budgets; neither requires zero idle overhead.",
+      "chromium": "149.0.7827.55"
+    },
+    "builds": [
+      {
+        "name": "octane-tsrx",
+        "fixtureSourceSha256": "abcc85aa1624c461bb2bb7de59f2dc22ba6e14bcb1177fdb6f14ba9e59daa8f8",
+        "primer": {
+          "fixtureEntry": "/Users/domgan/.codex/worktrees/octane-react-view-transition-parity/benchmarks/effectful-list/octane-tsrx/src/main.js",
+          "fixtureEntrySha256": "c135e9fffa56b0a7431aa05105e287c0c3959b5a5eba5d6aed4adc0340f3cc86",
+          "primerSourceSha256": "b6fbb2adf9a61ca8e82101c76fba967daa1085a58082dbe991c36c328dad8245",
+          "bootstrapSourceSha256": "af5620497167f1f6dce91a89dc1a093fb89eb415815bc69f16ad66608094cca4",
+          "modes": ["cold", "idle"],
+          "query": "vt-primer",
+          "observation": "window.__vtIdlePrimer"
+        },
+        "compiledInputSha256": {
+          "src/App.tsrx": "00b93513418dbbc08fbd7c8cec8786919fe7c9e0c6c69f7938812f55cd2cc0dc",
+          "src/Row.tsrx": "3dd343e30c9ca2cf9d4cc0efc1562a6f5a9e8a31b415d1666dfb1b1908b45327",
+          "src/data.js": "627abe6da352d3fc2781ca754846a8d89b346dc81441f854e8564d0d19e725a7",
+          "src/fx.js": "e511c265206f3ac32bb435a040213fcb582b8eb389c37367fc8858d2ab4488de",
+          "src/main.js": "c135e9fffa56b0a7431aa05105e287c0c3959b5a5eba5d6aed4adc0340f3cc86",
+          "src/ops.js": "e2b3b8ca2e7a4fcfa7e216d31eaa77cf3c71c5307d8e560b3f52952eb44a3339"
+        },
+        "assets": [
+          {
+            "file": "assets/index-DLT4XOnY.js",
+            "sha256": "19ad1d0b8c0867943a636e94d03076097df204ed466e506cc79313d9d2005a05",
+            "rawBytes": 5234,
+            "gzipBytes": 2418
+          },
+          {
+            "file": "assets/main-C7ggd9NJ.js",
+            "sha256": "543ee9fccae7bd2bbf253fae9973307859c41c3251e099f2acb5be29b34158f9",
+            "rawBytes": 3811,
+            "gzipBytes": 1979
+          },
+          {
+            "file": "assets/runtime-DY7Tiy5z.js",
+            "sha256": "b3a7114cbd1052a09231a9f66ce35edf1cd6d693dfd341e791c6fb5aedfdaab1",
+            "rawBytes": 239222,
+            "gzipBytes": 74925
+          },
+          {
+            "file": "index.html",
+            "sha256": "31353dc98236c3a404e3bd774fc058010965f9747f33c17d1806e91852f128b9",
+            "rawBytes": 326,
+            "gzipBytes": 248
+          }
+        ],
+        "javascriptBytes": 248267,
+        "javascriptGzipBytes": 79322
+      },
+      {
+        "name": "octane-jsx",
+        "fixtureSourceSha256": "f5eea1589e3412909ac966270fc3486b31788636b87b3437492c0b3820315df9",
+        "primer": {
+          "fixtureEntry": "/Users/domgan/.codex/worktrees/octane-react-view-transition-parity/benchmarks/effectful-list/octane-jsx/src/main.js",
+          "fixtureEntrySha256": "c8c6247ce0a6abdf360bf9aaf8d80dda06a9b59e3ba4662ca5861dcea4bb3c10",
+          "primerSourceSha256": "b6fbb2adf9a61ca8e82101c76fba967daa1085a58082dbe991c36c328dad8245",
+          "bootstrapSourceSha256": "af5620497167f1f6dce91a89dc1a093fb89eb415815bc69f16ad66608094cca4",
+          "modes": ["cold", "idle"],
+          "query": "vt-primer",
+          "observation": "window.__vtIdlePrimer"
+        },
+        "compiledInputSha256": {
+          "src/App.tsx": "3860cba26aeeddfeeb76db283c60b28007c964c59118159a6446333a26e17438",
+          "src/Row.tsx": "ed47f0eaab849cf3519a58a337ccf7897ecbd68af8c9e47529bb93aa2ce58af9",
+          "src/data.js": "627abe6da352d3fc2781ca754846a8d89b346dc81441f854e8564d0d19e725a7",
+          "src/fx.js": "e511c265206f3ac32bb435a040213fcb582b8eb389c37367fc8858d2ab4488de",
+          "src/main.js": "c8c6247ce0a6abdf360bf9aaf8d80dda06a9b59e3ba4662ca5861dcea4bb3c10",
+          "src/ops.js": "e2b3b8ca2e7a4fcfa7e216d31eaa77cf3c71c5307d8e560b3f52952eb44a3339"
+        },
+        "assets": [
+          {
+            "file": "assets/index-DzfTb0YT.js",
+            "sha256": "426999458a4a64c7f3b68172756f59501a7593f094af50672bbae846b8409725",
+            "rawBytes": 5234,
+            "gzipBytes": 2419
+          },
+          {
+            "file": "assets/main-l7DY3Meq.js",
+            "sha256": "4c259fd02480c155e9dd894931c92f0daa8ec2ef5c462c9ef30abb766bdd6e8d",
+            "rawBytes": 3932,
+            "gzipBytes": 2013
+          },
+          {
+            "file": "assets/runtime-CkIQVzyX.js",
+            "sha256": "25f1b7a63734d38ab201f07abe76e33c5b7ad0932adf1e970125f4a8335fde46",
+            "rawBytes": 238979,
+            "gzipBytes": 74913
+          },
+          {
+            "file": "index.html",
+            "sha256": "577311291308054d2fa0478663bf18ea20173506cef41d610650b1d977b952f7",
+            "rawBytes": 325,
+            "gzipBytes": 246
+          }
+        ],
+        "javascriptBytes": 248145,
+        "javascriptGzipBytes": 79345
+      }
+    ],
+    "comparison": {
+      "meta": {
+        "revision": {
+          "prior": "ead781345500f7245d9efbb076cdfc2313b474eb",
+          "current": "b6d95390bc4158573636eced11ae0a661585b49c",
+          "equal": false
+        },
+        "workingTree": {
+          "prior": true,
+          "current": true,
+          "equal": true
+        },
+        "sourceSha256": {
+          "prior": "0b260f33c6959b912ad8ada620d50b86058707e0c47a028bcbf24dc0f3becf76",
+          "current": "9217bde20f3efbd0d1df03c241368a9511a73190dd2bfd2a7ead571625ad590e",
+          "equal": false
+        },
+        "compilerSourceSha256": {
+          "prior": "653236f83b565c844df63c54156ece40bf02cfb4ba40fa6dd66a561b915455be",
+          "current": "e8a494c7b5c4fe53420632f5f7677f81962808791ebe58c56daa8a2fdbece8b1",
+          "equal": false
+        },
+        "harnessSha256": {
+          "prior": "bb019f0fc3d7b7e7d4533160d23aa1bfa40afc95f0f7c2edf9657e2e58e8513a",
+          "current": "bb019f0fc3d7b7e7d4533160d23aa1bfa40afc95f0f7c2edf9657e2e58e8513a",
+          "equal": true
+        },
+        "lockfileSha256": {
+          "prior": "51648462c4e126c7b945cb99c5390b8a77243538c3bc86fbf784021d16e0cace",
+          "current": "51648462c4e126c7b945cb99c5390b8a77243538c3bc86fbf784021d16e0cace",
+          "equal": true
+        }
+      },
+      "builds": [
+        {
+          "name": "octane-tsrx",
+          "fixtureEqual": true,
+          "compiledInputsEqual": true,
+          "assetsEqual": true,
+          "priorBytes": 248267,
+          "currentBytes": 248267,
+          "priorGzip": 79322,
+          "currentGzip": 79322
+        },
+        {
+          "name": "octane-jsx",
+          "fixtureEqual": true,
+          "compiledInputsEqual": true,
+          "assetsEqual": true,
+          "priorBytes": 248145,
+          "currentBytes": 248145,
+          "priorGzip": 79345,
+          "currentGzip": 79345
+        }
+      ],
+      "caseCountsEqual": true,
+      "semanticEqual": true
+    },
+    "cases": [
+      {
+        "target": "vt-effect-cleanup-tsrx-cold-clear",
+        "ops": {
+          "stage_teardown_calls": 0,
+          "total_calls": 47089
+        },
+        "fxGate": "pass",
+        "semantic": {
+          "fx": {
+            "mounts": 0,
+            "cleanups": 1000,
+            "refs": 0,
+            "refCleanups": 1000,
+            "layouts": 0,
+            "h": 0
+          },
+          "rows": 0
+        },
+        "primer": {
+          "mode": "cold",
+          "ready": true,
+          "nativeCalls": 0,
+          "updateCallbacks": 0,
+          "outcomes": [],
+          "removed": true,
+          "remainingTransitionAnimations": 0,
+          "error": null
+        }
+      },
+      {
+        "target": "vt-effect-cleanup-tsrx-cold-remount",
+        "ops": {
+          "stage_teardown_calls": 0,
+          "total_calls": 155085
+        },
+        "fxGate": "pass",
+        "semantic": {
+          "fx": {
+            "mounts": 1000,
+            "cleanups": 1000,
+            "refs": 1000,
+            "refCleanups": 1000,
+            "layouts": 100,
+            "h": 2000
+          },
+          "rows": 1000
+        },
+        "primer": {
+          "mode": "cold",
+          "ready": true,
+          "nativeCalls": 0,
+          "updateCallbacks": 0,
+          "outcomes": [],
+          "removed": true,
+          "remainingTransitionAnimations": 0,
+          "error": null
+        }
+      },
+      {
+        "target": "vt-effect-cleanup-tsrx-cold-remove_100_scattered",
+        "ops": {
+          "stage_teardown_calls": 0,
+          "total_calls": 42780
+        },
+        "fxGate": "pass",
+        "semantic": {
+          "fx": {
+            "mounts": 0,
+            "cleanups": 100,
+            "refs": 0,
+            "refCleanups": 100,
+            "layouts": 0,
+            "h": 0
+          },
+          "rows": 900
+        },
+        "primer": {
+          "mode": "cold",
+          "ready": true,
+          "nativeCalls": 0,
+          "updateCallbacks": 0,
+          "outcomes": [],
+          "removed": true,
+          "remainingTransitionAnimations": 0,
+          "error": null
+        }
+      },
+      {
+        "target": "vt-effect-cleanup-tsrx-idle-clear",
+        "ops": {
+          "stage_teardown_calls": 0,
+          "total_calls": 49101,
+          "idle_extra_calls": 2012
+        },
+        "fxGate": "pass",
+        "semantic": {
+          "fx": {
+            "mounts": 0,
+            "cleanups": 1000,
+            "refs": 0,
+            "refCleanups": 1000,
+            "layouts": 0,
+            "h": 0
+          },
+          "rows": 0
+        },
+        "primer": {
+          "mode": "idle",
+          "ready": true,
+          "nativeCalls": 1,
+          "updateCallbacks": 1,
+          "outcomes": ["fulfilled", "fulfilled", "fulfilled"],
+          "removed": true,
+          "remainingTransitionAnimations": 0,
+          "error": null
+        }
+      },
+      {
+        "target": "vt-effect-cleanup-tsrx-idle-remount",
+        "ops": {
+          "stage_teardown_calls": 0,
+          "total_calls": 157097,
+          "idle_extra_calls": 2012
+        },
+        "fxGate": "pass",
+        "semantic": {
+          "fx": {
+            "mounts": 1000,
+            "cleanups": 1000,
+            "refs": 1000,
+            "refCleanups": 1000,
+            "layouts": 100,
+            "h": 2000
+          },
+          "rows": 1000
+        },
+        "primer": {
+          "mode": "idle",
+          "ready": true,
+          "nativeCalls": 1,
+          "updateCallbacks": 1,
+          "outcomes": ["fulfilled", "fulfilled", "fulfilled"],
+          "removed": true,
+          "remainingTransitionAnimations": 0,
+          "error": null
+        }
+      },
+      {
+        "target": "vt-effect-cleanup-tsrx-idle-remove_100_scattered",
+        "ops": {
+          "stage_teardown_calls": 0,
+          "total_calls": 42992,
+          "idle_extra_calls": 212
+        },
+        "fxGate": "pass",
+        "semantic": {
+          "fx": {
+            "mounts": 0,
+            "cleanups": 100,
+            "refs": 0,
+            "refCleanups": 100,
+            "layouts": 0,
+            "h": 0
+          },
+          "rows": 900
+        },
+        "primer": {
+          "mode": "idle",
+          "ready": true,
+          "nativeCalls": 1,
+          "updateCallbacks": 1,
+          "outcomes": ["fulfilled", "fulfilled", "fulfilled"],
+          "removed": true,
+          "remainingTransitionAnimations": 0,
+          "error": null
+        }
+      },
+      {
+        "target": "vt-effect-cleanup-jsx-cold-clear",
+        "ops": {
+          "stage_teardown_calls": 0,
+          "total_calls": 57115
+        },
+        "fxGate": "pass",
+        "semantic": {
+          "fx": {
+            "mounts": 0,
+            "cleanups": 1000,
+            "refs": 0,
+            "refCleanups": 1000,
+            "layouts": 0,
+            "h": 0
+          },
+          "rows": 0
+        },
+        "primer": {
+          "mode": "cold",
+          "ready": true,
+          "nativeCalls": 0,
+          "updateCallbacks": 0,
+          "outcomes": [],
+          "removed": true,
+          "remainingTransitionAnimations": 0,
+          "error": null
+        }
+      },
+      {
+        "target": "vt-effect-cleanup-jsx-cold-remount",
+        "ops": {
+          "stage_teardown_calls": 0,
+          "total_calls": 198111
+        },
+        "fxGate": "pass",
+        "semantic": {
+          "fx": {
+            "mounts": 1000,
+            "cleanups": 1000,
+            "refs": 1000,
+            "refCleanups": 1000,
+            "layouts": 100,
+            "h": 2000
+          },
+          "rows": 1000
+        },
+        "primer": {
+          "mode": "cold",
+          "ready": true,
+          "nativeCalls": 0,
+          "updateCallbacks": 0,
+          "outcomes": [],
+          "removed": true,
+          "remainingTransitionAnimations": 0,
+          "error": null
+        }
+      },
+      {
+        "target": "vt-effect-cleanup-jsx-cold-remove_100_scattered",
+        "ops": {
+          "stage_teardown_calls": 0,
+          "total_calls": 64506
+        },
+        "fxGate": "pass",
+        "semantic": {
+          "fx": {
+            "mounts": 0,
+            "cleanups": 100,
+            "refs": 0,
+            "refCleanups": 100,
+            "layouts": 0,
+            "h": 0
+          },
+          "rows": 900
+        },
+        "primer": {
+          "mode": "cold",
+          "ready": true,
+          "nativeCalls": 0,
+          "updateCallbacks": 0,
+          "outcomes": [],
+          "removed": true,
+          "remainingTransitionAnimations": 0,
+          "error": null
+        }
+      },
+      {
+        "target": "vt-effect-cleanup-jsx-idle-clear",
+        "ops": {
+          "stage_teardown_calls": 0,
+          "total_calls": 60127,
+          "idle_extra_calls": 3012
+        },
+        "fxGate": "pass",
+        "semantic": {
+          "fx": {
+            "mounts": 0,
+            "cleanups": 1000,
+            "refs": 0,
+            "refCleanups": 1000,
+            "layouts": 0,
+            "h": 0
+          },
+          "rows": 0
+        },
+        "primer": {
+          "mode": "idle",
+          "ready": true,
+          "nativeCalls": 1,
+          "updateCallbacks": 1,
+          "outcomes": ["fulfilled", "fulfilled", "fulfilled"],
+          "removed": true,
+          "remainingTransitionAnimations": 0,
+          "error": null
+        }
+      },
+      {
+        "target": "vt-effect-cleanup-jsx-idle-remount",
+        "ops": {
+          "stage_teardown_calls": 0,
+          "total_calls": 201123,
+          "idle_extra_calls": 3012
+        },
+        "fxGate": "pass",
+        "semantic": {
+          "fx": {
+            "mounts": 1000,
+            "cleanups": 1000,
+            "refs": 1000,
+            "refCleanups": 1000,
+            "layouts": 100,
+            "h": 2000
+          },
+          "rows": 1000
+        },
+        "primer": {
+          "mode": "idle",
+          "ready": true,
+          "nativeCalls": 1,
+          "updateCallbacks": 1,
+          "outcomes": ["fulfilled", "fulfilled", "fulfilled"],
+          "removed": true,
+          "remainingTransitionAnimations": 0,
+          "error": null
+        }
+      },
+      {
+        "target": "vt-effect-cleanup-jsx-idle-remove_100_scattered",
+        "ops": {
+          "stage_teardown_calls": 0,
+          "total_calls": 64818,
+          "idle_extra_calls": 312
+        },
+        "fxGate": "pass",
+        "semantic": {
+          "fx": {
+            "mounts": 0,
+            "cleanups": 100,
+            "refs": 0,
+            "refCleanups": 100,
+            "layouts": 0,
+            "h": 0
+          },
+          "rows": 900
+        },
+        "primer": {
+          "mode": "idle",
+          "ready": true,
+          "nativeCalls": 1,
+          "updateCallbacks": 1,
+          "outcomes": ["fulfilled", "fulfilled", "fulfilled"],
+          "removed": true,
+          "remainingTransitionAnimations": 0,
+          "error": null
+        }
+      }
+    ],
+    "registeredRatioSuite": {
+      "rawReportSha256": "12c3f6ef349dc36c40c5236b62b4ef3d1a652ca6d033d850f6a970e1772a6876",
+      "rawReportBytes": 3844854,
+      "ratiosSha256": "e57b99faee85e81a6b0ffa94ef2ae589836b86d8219ff021b9863f4a1975d5db",
+      "checkerSha256": "2295382cf15c724a000da0ba1e168e6c5d68df4e158c8a7af8c4e9a85c4a5a99",
+      "harnessExit": 0,
+      "checked": 43,
+      "breaches": []
+    }
+  }
+}

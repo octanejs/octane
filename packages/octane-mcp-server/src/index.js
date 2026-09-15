@@ -101,6 +101,7 @@ export const BENCHMARK_SUITES = [
 	'ssr-final-metadata',
 	'ssr-final-replay',
 	'audit-981-coverage',
+	'view-transitions',
 	'ssr-http',
 	'streaming-backpressure',
 	'ssr-workerd',

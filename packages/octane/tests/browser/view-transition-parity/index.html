@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Octane native View Transition parity</title>
+		<style>
+			#panel {
+				width: 300px;
+				height: 80px;
+				background: white;
+			}
+			#draft {
+				display: block;
+			}
+			::view-transition-group(*) {
+				animation-duration: 0.35s;
+			}
+			::view-transition-old(*),
+			::view-transition-new(*) {
+				animation-duration: 0.35s;
+			}
+			::view-transition-old(.update-class) {
+				animation-name: update-old;
+			}
+			::view-transition-new(.update-class) {
+				animation-name: update-new;
+			}
+			::view-transition-old(.exit-class) {
+				animation-name: exit-old;
+			}
+			::view-transition-new(.enter-class) {
+				animation-name: enter-new;
+			}
+			::view-transition-new(.fade-class) {
+				--resolved-default: yes;
+			}
+			::view-transition-new(.first-class) {
+				--first-type: yes;
+			}
+			::view-transition-new(.second-class) {
+				--second-type: yes;
+			}
+			:root:active-view-transition-type(next)::view-transition-new(*) {
+				--native-type: yes;
+			}
+			@keyframes update-old {
+				from {
+					opacity: 1;
+				}
+				to {
+					opacity: 0;
+				}
+			}
+			@keyframes update-new {
+				from {
+					opacity: 0;
+				}
+				to {
+					opacity: 1;
+				}
+			}
+			@keyframes exit-old {
+				from {
+					opacity: 1;
+				}
+				to {
+					opacity: 0;
+				}
+			}
+			@keyframes enter-new {
+				from {
+					opacity: 0;
+				}
+				to {
+					opacity: 1;
+				}
+			}
+		</style>
+	</head>
+	<body>
+		<div id="root"></div>
+		<script type="module" src="/main.ts"></script>
+	</body>
+</html>

@@ -81,14 +81,14 @@ server functions.
 These APIs improve behavior when available, but their absence does not by itself
 raise the ordinary rendering requirement:
 
-| API or feature                                 | Fallback                                                                                      |
-| ---------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| `document.startViewTransition()`               | Rendering still updates the DOM without a browser view-transition animation.                  |
-| `Element.moveBefore()`                         | The reconciler uses ordinary DOM insertion when state-preserving moves are unavailable.       |
-| `requestIdleCallback()`                        | The `idle()` hydration strategy uses a timer.                                                 |
-| `IntersectionObserver`                         | The `visible()` hydration strategy activates immediately when observation is unavailable.     |
-| `MediaQueryList.addEventListener()`            | The `media()` strategy accepts legacy `addListener()`; `matchMedia()` itself is still needed. |
-| `MessageChannel` and `requestAnimationFrame()` | Scheduling has timer-based fallbacks.                                                         |
+| API or feature                                    | Fallback                                                                                           |
+| ------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `document.startViewTransition({ update, types })` | Missing API or unsupported options overload: rendering still updates the DOM without an animation. |
+| `Element.moveBefore()`                            | The reconciler uses ordinary DOM insertion when state-preserving moves are unavailable.            |
+| `requestIdleCallback()`                           | The `idle()` hydration strategy uses a timer.                                                      |
+| `IntersectionObserver`                            | The `visible()` hydration strategy activates immediately when observation is unavailable.          |
+| `MediaQueryList.addEventListener()`               | The `media()` strategy accepts legacy `addListener()`; `matchMedia()` itself is still needed.      |
+| `MessageChannel` and `requestAnimationFrame()`    | Scheduling has timer-based fallbacks.                                                              |
 
 Do not add all of these to an application-wide browser gate. Test whether a
 missing optional feature changes the experience you intend to provide.
