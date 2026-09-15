@@ -100,7 +100,7 @@ export function ForOfCompositeIndexKey(props) @{
 
 export function ForOfDestructuredIndexKey(props) @{
 	<ul>
-		@for (const &{ id, label } of props.items; index i; key id + ':' + i) {
+		@for (const { id, label } of props.items; index i; key id + ':' + i) {
 			<li data-id={id} data-index={i}>{i + ':' + label as string}</li>
 		}
 	</ul>
@@ -145,33 +145,30 @@ export function KeyedFragmentItems(props) @{
 }
 
 // ---------------------------------------------------------------------------
-// Lazy destructuring `&{}` / `&[]` — TSRX-specific syntax preserved across
-// the migration. Our model re-runs whole bodies on every render, so the
-// lazy flag has no semantic effect — we accept the syntax (parser tracks it
-// via metadata) and let @tsrx/core's applyLazyTransforms lower it.
+// Ordinary destructuring re-evaluates props on each component render.
 // ---------------------------------------------------------------------------
 
-export function LazyObjectDestructure(props) @{
-	const &{ first, last } = props.user;
-	<div id="lazy-obj">{first + ' ' + last as string}</div>
+export function ObjectDestructure(props) @{
+	const { first, last } = props.user;
+	<div id="destructure-obj">{first + ' ' + last as string}</div>
 }
 
-export function LazyArrayDestructure(props) @{
-	const &[head, ...tail] = props.items;
-	<div id="lazy-arr">{'head=' + head + ' rest=' + tail.length as string}</div>
+export function ArrayDestructure(props) @{
+	const [head, ...tail] = props.items;
+	<div id="destructure-arr">{'head=' + head + ' rest=' + tail.length as string}</div>
 }
 
-// Lazy destructuring as a COMPONENT PARAMETER — the body sees fields
+// Destructuring as a COMPONENT PARAMETER — the body sees fields
 // destructured directly from the props object.
-export function LazyParamDestructure(&{ greeting, name }) @{
-	<div id="lazy-param">{greeting + ', ' + name as string}</div>
+export function ParamDestructure({ greeting, name }) @{
+	<div id="destructure-param">{greeting + ', ' + name as string}</div>
 }
 
-// Lazy destructuring inside a FOR-OF HEAD — keyFn picks up the same
+// Destructuring inside a FOR-OF HEAD — keyFn picks up the same
 // destructure pattern so `key id` resolves the destructured field.
-export function LazyForOfHead(props) @{
+export function DestructuredForOfHead(props) @{
 	<ul>
-		@for (const &{ id, label } of props.items; key id) {
+		@for (const { id, label } of props.items; key id) {
 			<li class={'item-' + id}>{label as string}</li>
 		}
 	</ul>

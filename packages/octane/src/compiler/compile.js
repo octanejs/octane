@@ -4,7 +4,7 @@
  *
  * Architecture:
  *   1. Parse TSRX through the environment-selected @tsrx/core-compatible
- *      parser (native oxc-tsrx in Node, pure JavaScript elsewhere), then run
+ *      parser (native @tsrx/oxc in Node, pure JavaScript elsewhere), then run
  *      @tsrx/core's target-neutral semantic analysis on the authored module.
  *   2. For each top-level node:
  *        - Component (`@{ … }` body or a return-JSX function) → compile to a
@@ -28799,7 +28799,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 				'`use(promise)` first.',
 		);
 	}
-	// node.left = const x  OR  const &{x,y} / const [a,b]  (destructured)
+	// node.left = const x  OR  const {x,y} / const [a,b]  (destructured)
 	// node.right = expr, node.body = BlockStatement,
 	// node.key = optional `key …` expression, node.index = optional `index <id>`.
 	// `@for (...) { ... } @empty { ... }` — hoist the empty branch as its own
@@ -28815,7 +28815,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 	const leftDeclId = node.left.declarations[0].id;
 	const isDestructured = leftDeclId.type !== 'Identifier';
 	// `itemName` is the identifier used in the body signature + keyFn. For a
-	// plain `const x of …`, that's `x`. For a destructured `const &{id} of …`,
+	// plain `const x of …`, that's `x`. For a destructured `const {id} of …`,
 	// we synthesize a fresh name and emit the destructuring inside the body so
 	// the keyFn still gets the whole item and the body still sees the fields.
 	const itemName = isDestructured ? '_item' : leftDeclId.name;
@@ -28922,7 +28922,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 			]
 		: [];
 
-	// Destructured header `const &{x,y} of …` — synthesize a destructure stmt
+	// Destructured header `const {x,y} of …` — synthesize a destructure stmt
 	// at the top of the body so the user fields bind from the synthetic item.
 	const destructureInjection = isDestructured
 		? [

@@ -5,17 +5,17 @@ import { track } from 'ripple';
 // reactive local — vs octane's `useState` / Solid's `createSignal`). Same
 // markup as the other targets. The theme toggle is the post-hydration interactivity proof.
 export function Header() @{
-	let &[dark] = track(false);
-	<header class={dark ? 'masthead dark' : 'masthead'}>
+	const dark = track(false);
+	<header class={dark.value ? 'masthead dark' : 'masthead'}>
 		<h1 class="logo">{'The Octane Times'}</h1>
 		<button
 			id="theme"
 			class="theme"
 			onClick={() => {
-				dark = !dark;
+				dark.value = !dark.value;
 			}}
 		>
-			{dark ? 'Light mode' : 'Dark mode'}
+			{dark.value ? 'Light mode' : 'Dark mode'}
 		</button>
 	</header>
 }

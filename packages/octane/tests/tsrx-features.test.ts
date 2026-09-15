@@ -27,10 +27,10 @@ import {
 	TernaryFragmentChild,
 	HtmlOnlyChild,
 	KeyedFragmentItems,
-	LazyObjectDestructure,
-	LazyArrayDestructure,
-	LazyParamDestructure,
-	LazyForOfHead,
+	ObjectDestructure,
+	ArrayDestructure,
+	ParamDestructure,
+	DestructuredForOfHead,
 	ShorthandComponentProp,
 } from './_fixtures/tsrx-features.tsrx';
 import {
@@ -429,38 +429,38 @@ describe('TSRX features — keyed fragment items in for-of', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Lazy destructuring — TSRX `&{ }` and `&[ ]`
+// Destructuring — `{ }` and `[ ]`
 // ---------------------------------------------------------------------------
 
-describe('TSRX features — lazy destructuring (accepted as syntax)', () => {
-	it('accepts &{ } object pattern and binds the props as expected', () => {
-		const r = mount(LazyObjectDestructure, {
+describe('TSRX features — destructuring', () => {
+	it('accepts { } object pattern and binds the props as expected', () => {
+		const r = mount(ObjectDestructure, {
 			user: { first: 'Ada', last: 'Lovelace' },
 		});
-		expect(r.find('#lazy-obj').textContent).toBe('Ada Lovelace');
-		r.update(LazyObjectDestructure, { user: { first: 'Grace', last: 'Hopper' } });
-		expect(r.find('#lazy-obj').textContent).toBe('Grace Hopper');
+		expect(r.find('#destructure-obj').textContent).toBe('Ada Lovelace');
+		r.update(ObjectDestructure, { user: { first: 'Grace', last: 'Hopper' } });
+		expect(r.find('#destructure-obj').textContent).toBe('Grace Hopper');
 		r.unmount();
 	});
 
-	it('accepts &[ ] array pattern with rest element', () => {
-		const r = mount(LazyArrayDestructure, { items: ['a', 'b', 'c', 'd'] });
-		expect(r.find('#lazy-arr').textContent).toBe('head=a rest=3');
-		r.update(LazyArrayDestructure, { items: ['z'] });
-		expect(r.find('#lazy-arr').textContent).toBe('head=z rest=0');
+	it('accepts [ ] array pattern with rest element', () => {
+		const r = mount(ArrayDestructure, { items: ['a', 'b', 'c', 'd'] });
+		expect(r.find('#destructure-arr').textContent).toBe('head=a rest=3');
+		r.update(ArrayDestructure, { items: ['z'] });
+		expect(r.find('#destructure-arr').textContent).toBe('head=z rest=0');
 		r.unmount();
 	});
 
-	it('accepts &{ } as a component parameter (destructures props at the signature)', () => {
-		const r = mount(LazyParamDestructure, { greeting: 'Hi', name: 'World' });
-		expect(r.find('#lazy-param').textContent).toBe('Hi, World');
-		r.update(LazyParamDestructure, { greeting: 'Hola', name: 'Ripple' });
-		expect(r.find('#lazy-param').textContent).toBe('Hola, Ripple');
+	it('accepts { } as a component parameter (destructures props at the signature)', () => {
+		const r = mount(ParamDestructure, { greeting: 'Hi', name: 'World' });
+		expect(r.find('#destructure-param').textContent).toBe('Hi, World');
+		r.update(ParamDestructure, { greeting: 'Hola', name: 'Ripple' });
+		expect(r.find('#destructure-param').textContent).toBe('Hola, Ripple');
 		r.unmount();
 	});
 
-	it('accepts &{ } inside a for-of head — key resolves the destructured field', () => {
-		const r = mount(LazyForOfHead, {
+	it('accepts { } inside a for-of head — key resolves the destructured field', () => {
+		const r = mount(DestructuredForOfHead, {
 			items: [
 				{ id: 'a', label: 'A' },
 				{ id: 'b', label: 'B' },
@@ -471,7 +471,7 @@ describe('TSRX features — lazy destructuring (accepted as syntax)', () => {
 		expect(r.findAll('li').map((li) => li.className)).toEqual(['item-a', 'item-b', 'item-c']);
 
 		// Reorder by key — items move by their destructured-field key.
-		r.update(LazyForOfHead, {
+		r.update(DestructuredForOfHead, {
 			items: [
 				{ id: 'c', label: 'C' },
 				{ id: 'a', label: 'A' },

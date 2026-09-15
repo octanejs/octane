@@ -1,7 +1,7 @@
 /** @import { ParseOptions } from '@tsrx/core/types' */
 /** @import { Program } from 'estree' */
 
-import { parseModule as parseNativeModule } from 'oxc-tsrx/tsrx-core-compat';
+import { parseModule as parseNativeModule } from '@tsrx/oxc/tsrx-core-compat';
 import { parseModule as parseJavaScriptModule } from './parser.browser.js';
 
 import { isolateOutputOptions, publishOutput } from './parser-output.js';

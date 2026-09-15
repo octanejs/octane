@@ -222,7 +222,7 @@
     "entities": "7.0.1",
     "es-module-lexer": "catalog:default",
     "esrap": "catalog:default",
-    "oxc-tsrx": "catalog:default"
+    "@tsrx/oxc": "catalog:default"
   },
   "peerDependencies": {
     "react": "^19.0.0",

@@ -1,6 +1,6 @@
 const COUNTER_TARGETS = new Map([
 	['@tsrx/core', 'adapter'],
-	['oxc-tsrx/tsrx-core-compat', 'authoritative'],
+	['@tsrx/oxc/tsrx-core-compat', 'authoritative'],
 ]);
 
 const COUNTER_KEY = 'octane.tsrx-vite-preflight-parsing.parse-counts';

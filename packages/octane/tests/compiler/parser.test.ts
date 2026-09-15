@@ -2,12 +2,13 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { CompileError, ParseOptions } from '@tsrx/core/types';
-import { parseModule as parseNativeModule } from 'oxc-tsrx/tsrx-core-compat';
+import { parseModule as parseNativeModule } from '@tsrx/oxc/tsrx-core-compat';
 import { parseModule as parseJavaScriptModule } from '../../src/compiler/parser.browser.js';
 import { parseModule } from '../../src/compiler/parser.node.js';
+import { compile, compileToVolarMappings } from '../../src/compiler/index.js';
 
-vi.mock('oxc-tsrx/tsrx-core-compat', async (importOriginal) => {
-	const actual = await importOriginal<typeof import('oxc-tsrx/tsrx-core-compat')>();
+vi.mock('@tsrx/oxc/tsrx-core-compat', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('@tsrx/oxc/tsrx-core-compat')>();
 	return { ...actual, parseModule: vi.fn(actual.parseModule) };
 });
 
@@ -147,5 +148,46 @@ describe('Node parser compatibility', () => {
 		expect(() => parseModule('/* native */ const value = 1;', 'valid.ts', { comments })).toThrow(
 			failure,
 		);
+	});
+});
+
+describe('TSRX destructuring syntax', () => {
+	const removed = [
+		'const &{ value } = source;',
+		'const &[value, ...rest] = source;',
+		'function App(&{ value }) @{ <p>{value as string}</p> }',
+		'const read = (&[value]) => value;',
+		'let value; (&{ value } = source);',
+		'for (const &{ value } of source) { console.log(value); }',
+		'function App(props) @{ <ul>@for (const &{ id } of props.items; key id) { <li>{id as string}</li> }</ul> }',
+	];
+
+	it.each(removed)('rejects removed lazy patterns in native and editor parsing: %s', (source) => {
+		expect(() => parseModule(source, 'removed.tsrx')).toThrow(SyntaxError);
+		expect(() => parseJavaScriptModule(source, 'removed.tsrx')).toThrow(SyntaxError);
+		expect(() => compileToVolarMappings(source, 'removed.tsrx')).toThrow(SyntaxError);
+	});
+
+	it.each([
+		{ mode: 'client' as const, dev: true, hmr: true },
+		{ mode: 'client' as const, dev: false, hmr: false },
+		{ mode: 'server' as const, dev: false, hmr: false },
+	])('rejects removed patterns when compiling with %j', (options) => {
+		for (const source of removed) {
+			expect(() => compile(source, 'removed.tsrx', options)).toThrow(SyntaxError);
+		}
+	});
+
+	it.each([
+		'const { value = 1, ...rest } = source;',
+		'const [value = 1, ...rest] = source;',
+		'const mask = value & [1, 2][0];',
+		'const mask = value & { bit: 1 }.bit;',
+		'type Value = Base & { value: string };',
+		'const text = "&{value} &[value]"; /* &{value} */',
+	])('preserves ordinary patterns and unrelated ampersands: %s', (source) => {
+		expect(parseModule(source, 'ordinary.tsrx').body).not.toHaveLength(0);
+		expect(parseJavaScriptModule(source, 'ordinary.tsrx').body).not.toHaveLength(0);
+		expect(compileToVolarMappings(source, 'ordinary.tsrx').errors).toEqual([]);
 	});
 });
