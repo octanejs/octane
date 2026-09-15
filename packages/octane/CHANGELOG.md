@@ -1,5 +1,57 @@
 # octane
 
+## 0.2.12
+
+### Patch Changes
+
+- ede01de: Accept native signal handles in DOM styles, including individual CSS properties and whole style values. Direct template styles update without rerunning component setup, and preserve signal cleanup, Suspense, server rendering, and hydration. Export `SignalCSSProperties` for signal-aware style objects while keeping `CSSProperties` compatible with ordinary CSS consumers.
+
+  Keep binding CSS compatibility aliases pointed at plain `CSSProperties` when their layout helpers consume ordinary CSS values.
+
+  Expose the signal style regression benchmark through the MCP benchmark tool.
+
+- 248af4e: Avoid redundant hydration lookups when updating existing conditional and switch branches.
+- cece195: Reuse unchanged populated SSR replay snapshots and pending streaming settlement
+  recorders across retry waves. Preserve metadata rollback, promise identity,
+  cancellation, and request cleanup. Add the SSR replay and streaming benchmark
+  suite to repository automation.
+- 03dacb7: Stamp each block's context-dependency maps with the context epoch they were recorded or verified at, so memo and implicit bailouts skip per-entry version scans whenever no provider has committed a change; stale restamps and pending propagations still force the scans, preserving refresh behavior.
+- 7d4dc4f: Reduce universal renderer prop-shape churn, materialization allocations, repeated feature scans, and unnecessary compact-list traversal while preserving keyed identity, transactional callbacks, and transport contracts. Expose the universal measurement suites through MCP.
+- 277c10c: Compile fixed trailing style properties after leading object spreads into guarded per-property updates. Preserve spread evaluation, overrides, removals, and hydration, with complete object diffing when a spread preinserts a trailing key.
+- 1198cdc: Skip the per-row `updateSurvivor` call in keyed reconciliation when a compiler-pure list row is provably unchanged — same item reference, same body, same position — so a stable keyed update no longer pays the survivor-update machinery for every no-op row. Moved, added, removed, index-shifted, non-pure, and de-opt rows still take the full survivor path, preserving render, journal, and rollback behavior.
+- fe1b2b7: Avoid rebuilding complete style objects on repeated spread-key collisions. Preserve inherited setters, read-only properties, and transitions back to per-property updates.
+- 733c98d: Key SSR scoped child-segment and occurrence counters by the frame-relative scope suffix instead of the full `ASYNC_SCOPE` path. Every component child re-scanned the shared path prefix during counter lookup, so SSR render cost grew with tree depth — measured ~53% faster on an arm-heavy SSR workload and ~16% faster on a plain nested-component tree, with byte-identical rendered output. Async identity, arm segment numbering, `use()` occurrence keys, replay, streaming, and hydration seed behavior are unchanged.
+- 13604b9: Avoid temporary boundary-collection copies during streaming SSR completion,
+  error and abort scans, and reuse immutable CSS/head snapshots for completed
+  boundaries. Extend the benchmark catalog with the final SSR and client coverage
+  investigations from the runtime performance audit.
+- 527358c: Complete the remaining Strong compiler checks for fetch-driven effects, effect chains, prop-derived initial state, explicit and null dependencies, manual memo hooks, JSX list mapping, index keys, suppression props, trusted HTML, and compatibility imports. Preserve equivalent dependency arrays as hints and report them without failing strict CLI analysis. Add compiler-owned declaration caching for Strong authoring, the `trustHTML`/`TrustedHTML` API, and nominal Strong JSX types while preserving compatibility modules.
+
+  Strong opt-in intentionally changes generated code for eligible hook-input declarations: their identities are cached in development and production until inferred inputs change. It also normalizes proven built-in hook aliases and infers dependencies for unshadowed `undefined` placeholders. This applies to both the directive and the global `strong: true` option. Ordinary callbacks and mutable values retain their authored evaluation and lifetime. The keyed `@for` migration applies to `.tsrx`; keyed JSX mapping remains supported in `.tsx`.
+
+  CLI JSON reports include the hint count even when it is zero, and MDX diagnostic types represent errors, warnings, and hints.
+
+  The eager prop-state check covers both `useState(value)` and `useReducer(reducer, value)`. A lazy state initializer or explicit third reducer initializer declares a deliberate initial capture. Subscription and timer callbacks keep their event-driven semantics and are excluded from effect-chain writes.
+
+- bb11d0b: Upgrade to TSRX core 0.2 and the renamed native parser, @tsrx/oxc 0.13. Lazy destructuring (`&{ ... }` and `&[ ... ]`) is no longer accepted by the compiler or editor tooling. Use ordinary object and array destructuring instead.
+- 777cef3: Align ViewTransition with React 19.3: fix activation classes, type maps, authored
+  style restoration, mutation and layout detection, nested sharing, instance refs,
+  and callback cleanup at animation finish. Forward native transition types, keep
+  unanimated controls interactive, and wait for relevant resources and navigation.
+  Animate streamed Suspense reveals with coordinated hydration and client updates.
+
+  Prepare ViewTransition renders with staged DOM commits so snapshot activation uses the finished boundary props while preserving existing node identity and committed lifecycle visibility.
+
+  Keep ordinary DOM operations on an inline native receiver path to avoid per-node staging helper calls when no ViewTransition is active.
+
+  Skip inactive staging calls during effect and scope cleanup, including Activity and Suspense deactivation after a ViewTransition has completed.
+
+  Add opt-in `scope="element"` boundaries with local names and pseudo-element handles,
+  independent sibling and nested animations, coordinated streamed reveals, and
+  normal DOM commits when native element transitions are unavailable.
+
+  Expose the ViewTransition bundle and native-work benchmark through the MCP benchmark tools.
+
 ## 0.2.11
 
 ### Patch Changes
