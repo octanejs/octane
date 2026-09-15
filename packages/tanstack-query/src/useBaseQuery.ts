@@ -1,3 +1,5 @@
+// Bundlers replace this expression; no Node ambient types are required.
+declare const process: { env: { NODE_ENV?: string } };
 // `useBaseQuery` — the shared core of `useQuery` (and friends), reimplemented on
 // octane's hooks. Mirrors @tanstack/react-query's useBaseQuery: it creates a
 // query Observer, subscribes to it via useSyncExternalStore, and pushes option
@@ -5,7 +7,7 @@
 // distinct sub-slots for each internal base hook, the same way the zustand
 // `traditional` binding does.
 import { useState, useCallback, useSyncExternalStore, useEffect } from 'octane';
-import { environmentManager, noop, notifyManager } from '@tanstack/query-core';
+import { noop, notifyManager } from '@tanstack/query-core';
 import { resolveClient } from './context';
 import { useIsRestoring } from './isRestoring';
 import { useQueryErrorResetBoundary } from './errorResetBoundary';
@@ -17,7 +19,6 @@ import {
 	shouldSuspend,
 	subSlot,
 	useSuspensePromise,
-	willFetch,
 } from './internal';
 
 export function useBaseQuery(
@@ -39,8 +40,6 @@ export function useBaseQuery(
 	const isRestoring = useIsRestoring();
 	const errorResetBoundary = useQueryErrorResetBoundary();
 	const defaultedOptions = client.defaultQueryOptions(options);
-
-	(client.getDefaultOptions().queries as any)?._experimental_beforeQuery?.(defaultedOptions);
 
 	const query = client.getQueryCache().get(defaultedOptions.queryHash);
 
@@ -71,9 +70,6 @@ export function useBaseQuery(
 		[errorResetBoundary],
 		oq('clr'),
 	);
-
-	// Probed BEFORE creating the Observer — the constructor can create the entry.
-	const isNewCacheEntry = !client.getQueryCache().get(defaultedOptions.queryHash);
 
 	const [observer] = useState(() => new Observer(client, defaultedOptions), oq('obs'));
 
@@ -129,28 +125,6 @@ export function useBaseQuery(
 		})
 	) {
 		throw result.error;
-	}
-
-	(client.getDefaultOptions().queries as any)?._experimental_afterQuery?.(defaultedOptions, result);
-
-	// Query core before 5.102 supports experimental_prefetchInRender. Start the
-	// fetch during render so `result.promise` settles even if the component
-	// unmounts, then finalize the observer's thenable when the data lands.
-	if (
-		'experimental_prefetchInRender' in defaultedOptions &&
-		defaultedOptions.experimental_prefetchInRender &&
-		!environmentManager.isServer() &&
-		willFetch(result, isRestoring)
-	) {
-		const promise = isNewCacheEntry
-			? // Fetch immediately on render so `.promise` resolves even on unmount.
-				fetchOptimistic(defaultedOptions, observer, errorResetBoundary)
-			: // Subscribe to the cache promise to finalize the current thenable.
-				query?.promise;
-
-		promise?.catch(noop).finally(() => {
-			observer.updateResult();
-		});
 	}
 
 	return !defaultedOptions.notifyOnChangeProps ? observer.trackResult(result) : result;

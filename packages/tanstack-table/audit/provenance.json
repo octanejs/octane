@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "artifacts": [
+    {
+      "path": "LICENSE.upstream",
+      "sha256": "9db3f8ddd7031ab264b99bec49c221155d0c8649b53dd4aa007f2041d36cdf5f"
+    },
+    {
+      "path": "upstream-artifact/tanstack-react-table-9.2.4.tgz",
+      "sha256": "c9e40b73d195b76f81e1602513e96d7ab03eac0e0611da86e05cc144f629b8ab"
+    }
+  ],
+  "requiredFiles": ["audit/upstream.lock.json"],
+  "packageIdentity": {
+    "path": "upstream/package.json",
+    "name": "@tanstack/react-table",
+    "version": "9.2.4",
+    "license": "MIT"
+  },
+  "unpublishedDirs": ["audit", "tests", "typetests", "upstream", "upstream-artifact"]
+}

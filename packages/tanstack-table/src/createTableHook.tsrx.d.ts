@@ -1,8 +1,4 @@
-// Declaration companion for createTableHook.tsrx.
-//
-// A SPECIFIC module declaration (resolved by relative path), not an ambient
-// `declare module '*.tsrx'` — so it types only this module and doesn't pollute a
-// consumer's own .tsrx imports. The runtime resolves the real compiled .tsrx.
+// Declaration companion for this module only.
 import type { TableFeatures } from '@tanstack/table-core';
 import type { CreateTableHookOptions, CreateTableHookResult, TableComponentType } from './types';
 

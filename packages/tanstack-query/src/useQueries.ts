@@ -14,7 +14,11 @@ import {
 	subSlot,
 	useSuspensePromise,
 } from './internal';
-import type { QueriesOptions, QueriesResults } from './queries-types';
+import type {
+	QueriesOptions,
+	QueriesResults,
+	GetUseQueryOptionsForUseQueries,
+} from './queries-types';
 
 // Signature matches @tanstack/react-query's useQueries.ts — per-entry tuple
 // inference via QueriesOptions/QueriesResults, with `combine` re-typing the
@@ -22,7 +26,9 @@ import type { QueriesOptions, QueriesResults } from './queries-types';
 // compiler-injected trailing slot symbol.
 export function useQueries<T extends Array<any>, TCombinedResult = QueriesResults<T>>(
 	options: {
-		queries: readonly [...QueriesOptions<T>];
+		queries:
+			| readonly [...QueriesOptions<T>]
+			| readonly [...{ [K in keyof T]: GetUseQueryOptionsForUseQueries<T[K]> }];
 		combine?: (result: QueriesResults<T>) => TCombinedResult;
 		subscribed?: boolean;
 	},
@@ -35,16 +41,21 @@ export function useQueries(options: any, ...rest: any[]): any {
 	const isRestoring = useIsRestoring();
 	const errorResetBoundary = useQueryErrorResetBoundary();
 	const { queries, ...restOptions } = options;
+	const subscribed = options.subscribed !== false;
 	const qs = (tag: string) => subSlot(slot, 'qs:' + tag);
 
 	const defaultedQueries = useMemo(
 		() =>
 			queries.map((opts: any) => {
 				const defaulted = client.defaultQueryOptions(opts);
-				defaulted._optimisticResults = isRestoring ? 'isRestoring' : 'optimistic';
+				defaulted._optimisticResults = isRestoring
+					? 'isRestoring'
+					: subscribed
+						? 'optimistic'
+						: undefined;
 				return defaulted;
 			}),
-		[queries, client, isRestoring],
+		[queries, client, isRestoring, subscribed],
 		qs('memo'),
 	);
 	defaultedQueries.forEach((queryOptions: any) => {
@@ -73,7 +84,7 @@ export function useQueries(options: any, ...rest: any[]): any {
 		restOptions.combine,
 	);
 
-	const shouldSubscribe = !isRestoring && restOptions.subscribed !== false;
+	const shouldSubscribe = !isRestoring && subscribed;
 	useSyncExternalStore(
 		useCallback(
 			(onStoreChange: () => void) =>
@@ -131,7 +142,7 @@ export function useQueries(options: any, ...rest: any[]): any {
 			})
 		);
 	});
-	if (firstError?.error) {
+	if (firstError) {
 		throw firstError.error;
 	}
 

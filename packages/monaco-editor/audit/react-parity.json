@@ -11,7 +11,10 @@
     "integrity": "sha256:46abb7e2335209e445163886b7cd9570d976a5873595e30961f0bee2d28f4974",
     "verification": "verified"
   },
-  "upstreamSuites": { "runtime": "present", "types": "absent" },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "absent"
+  },
   "adaptedRoots": {
     "source": {
       "roots": ["packages/monaco-editor/src"],
@@ -37,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@11.15.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "51648462c4e126c7b945cb99c5390b8a77243538c3bc86fbf784021d16e0cace"
+      "lockfileSha256": "b6e65e48154571accca212b2400e70f0b1dee9499979f0b7ab2febaa4de93c58"
     }
   },
   "lanes": [
@@ -77,7 +80,7 @@
         {
           "path": "scripts/react-parity/run-pristine.mjs",
           "role": "support",
-          "sha256": "ff2202a9e829641b6e53b9965588c1bcfc4afd2ce53ec89caf2c4ef3467fb9c5"
+          "sha256": "ce5c2fc3c13e7f405456323a94fe67dcabeabf2fe8f48f5526d915d196cec501"
         },
         {
           "path": "packages/monaco-editor/tests/upstream-pristine.vitest.config.ts",
