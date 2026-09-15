@@ -40,8 +40,10 @@ the next tree necessary. A changed `name` keeps the previous name for the old
 capture and the next name for the new capture, matching React’s
 [`commitBeforeUpdateViewTransition`](https://github.com/facebook/react/blob/1d34f91dfde6bba84d08b683aaba164c7194dacb/packages/react-reconciler/src/ReactFiberCommitViewTransitions.js#L670).
 
-The compatibility request was explicitly expanded to staged DOM commits after
-this conflict was demonstrated. Preparation now evaluates the next tree and
+After this conflict was demonstrated in the task conversation, the requester
+selected **“Expand into staged DOM commits”** and then requested element scopes.
+That instruction expanded this task beyond the earlier eager-rendering plan.
+Preparation now evaluates the next tree and
 boundary props before native capture, with connected host mutations withheld
 until the native update callback. The own-prop regressions in the native parity
 suite exercise both cases. This is a deliberate performance trade-off: active
@@ -72,6 +74,8 @@ mutation tests run in the existing CI workflow tests. Committed geometry,
 resource readiness, imperative public handles, and eager event registration are
 explicit native exceptions. This is static enforcement for typed or traceable
 host receivers, not a proof about arbitrary untyped application code.
+Unchecked `any`, reflective writes such as `Reflect.set`, and destructured
+members can escape that analysis and still require manual review.
 
 `initDomOperations` previously initialized only the two traversal getters. It
 was not a complete read/write operations table. Replacing projected form,

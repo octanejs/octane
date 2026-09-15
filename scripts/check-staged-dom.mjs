@@ -25,8 +25,9 @@ const NATIVE_READS = new Set(
  createTreeWalker createNodeIterator createRange`.split(/\s+/),
 );
 
-// Exact native-only operations, grouped by the reason they bypass preparation.
-// Adding a method to an existing function still fails unless listed here.
+// Exact native-only operations in module-level declarations, grouped by the
+// reason they bypass preparation. Nested declarations cannot borrow an exemption
+// by reusing a reviewed name. New operations still fail unless listed here.
 const NATIVE_OPERATIONS = new Map(
 	Object.entries({
 		// Transition handles inspect the current animation tree and committed resources.
@@ -76,10 +77,14 @@ function unwrap(node) {
 
 function owner(node) {
 	for (let current = node.parent; current !== undefined; current = current.parent) {
-		if (ts.isFunctionDeclaration(current) && current.name) return current.name.text;
+		if (ts.isFunctionDeclaration(current) && current.name)
+			return ts.isSourceFile(current.parent) ? current.name.text : `<nested>.${current.name.text}`;
 		if (ts.isMethodDeclaration(current) && current.name) {
 			const parent = current.parent;
-			return `${parent.name?.text ?? '<class>'}.${current.name.getText()}`;
+			const name = `${parent.name?.text ?? '<class>'}.${current.name.getText()}`;
+			return ts.isClassDeclaration(parent) && ts.isSourceFile(parent.parent)
+				? name
+				: `<nested>.${name}`;
 		}
 	}
 	return '<top-level>';

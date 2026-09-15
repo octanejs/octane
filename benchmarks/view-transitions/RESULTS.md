@@ -1,6 +1,88 @@
 # View Transition parity performance evidence
 
-## Review-feedback performance comparison
+## Second review: large-page SSR and scope fixes
+
+The final runtime comparison uses reviewed head `759330f3`; the client baseline
+`c7b523571` merges that runtime with main `bb11d0b3e` so both client builds use
+the same updated compiler. All final source, fixture, dependency and asset hashes,
+raw timing samples, semantic observations, and rejected intermediate SSR runs
+are in [review-round-two.json](measurements/review-round-two.json).
+
+Environment: Node 24.20.0, Chromium 149.0.7827.55, Vite 8.1.5, esbuild 0.28.1,
+@tsrx/core 0.2.0, @tsrx/oxc 0.13.0, Playwright 1.61.1, macOS arm64. SSR timings
+were serialized with other agent-owned workloads. Both variants use the same
+compiled fixture, production options, warmup policy and alternating paired runs.
+
+### SSR scaling
+
+The old two-host fixture missed the whole-document tag walk. New controls have
+200 or 1,600 unrelated four-host rows around one tiny boundary, with matching
+plain pages and a separate trusted-HTML page. Their emitted page bytes agree
+exactly between revisions, including the final row link and authored text.
+
+| Scenario | Reviewed median µs | Final median µs | Final / reviewed |
+| --- | ---: | ---: | ---: |
+| Plain | 0.362 | 0.351 | 0.971× |
+| View | 2.458 | 1.992 | 0.810× |
+| PlainStream | 26.016 | 27.282 | 1.049× |
+| ViewStream | 28.840 | 30.586 | 1.061× |
+| ScopedView | 5.111 | 3.832 | 0.750× |
+| ScopedViewStream | 37.006 | 34.600 | 0.935× |
+| PlainPage | 8.642 | 8.184 | 0.947× |
+| ViewPage | 139.350 | 22.108 | 0.159× |
+| PlainLargePage | 201.935 | 197.192 | 0.977× |
+| ViewLargePage | 1220.954 | 310.027 | 0.254× |
+| ViewRawPage | 133.401 | 82.955 | 0.622× |
+
+The 24.6 KB page improves by 84%; the 197 KB page improves by 75%. Cached native
+suffix searches restrict replacement to segments containing candidates and skip
+opaque script/comment bodies. Ordinary pages avoid the tag parser, including
+`overflow-x-auto` false positives. The stream median difference tracks the plain
+stream control and overlapping distributions; no stream speedup is claimed.
+
+A second paired run against the earlier implementation `e36dec2b4` verifies that
+the large-page regression is removed: 24.6 KB is 20.707 → 19.718 µs, and 197 KB is
+298.967 → 285.458 µs. Document streaming is 27.201 → 27.287 µs while its plain
+control is 19.597 → 19.689 µs. These small differences do not establish a speedup
+over that earlier implementation.
+
+There is a deliberate remaining cost for trusted HTML: its 24.6 KB control is
+15.070 → 80.078 µs versus the earlier unsafe regex. The quote-aware parser preserves
+adjacent attributes, raw-text bodies, duplicate names, and attribute-looking
+strings. It is faster than the reviewed parser (133.401 → 82.955 µs), but this
+does not remove its traversal cost. The tiny document case remains 1.181 → 1.764 µs
+versus `e36dec2b4`. Raw-only branded values preserve parsing provenance across
+memoized and async retries; ordinary values retain their existing representation
+and consumption path, with one added branch when creating a branded value.
+
+The combined server fixture bundle grows 611,336 → 612,914 raw bytes and
+37,486 → 38,286 gzip bytes versus `759330f3` (+800 gzip bytes). That asset includes
+all page fixtures; it is not a minimal server import size.
+
+### Client and adapter controls
+
+| Fixture | Reviewed raw → final | Reviewed gzip → final |
+| --- | ---: | ---: |
+| Ordinary static root | 166,474 → 166,474 | 53,663 → 53,663 |
+| Ordinary stateful root | 174,676 → 174,676 | 56,565 → 56,565 |
+| Document transition | 323,694 → 323,705 | 90,391 → 90,415 |
+| Element scopes | 320,522 → 320,533 | 89,337 → 89,380 |
+
+Ordinary fixtures still exclude the optional driver and adapter, with zero
+capture, rectangle and computed-style reads. All positive native observations
+and read/capture counts agree. Adapter operation counts remain identical; its
+new fresh-insert guard adds one `Map.has` without new retained state or allocation.
+These counters and bytes do not measure whole-application latency or GC.
+
+Reproduce with the README commands: use `--octane-revision=759330f3` for SSR,
+`--octane-revision=e36dec2b4` for the earlier SSR reference, and
+`--octane-revision=c7b523571` for client/scopes. Omit the revision for candidate
+client/scopes; the SSR runner always pairs its selected baseline with the checkout.
+The SSR report records each fixture's repetitions and five warmup batches followed
+by 11 alternating samples. Concurrency, backpressure, allocation/GC, browser paint
+and active large-tree client latency remain outside these measurements.
+
+## First review feedback (historical)
 
 Compared the reviewed head `e36dec2b41d61bf5c0ea118b98565fc30f7b94ce` with the
 feedback implementation. Raw reports identify exact source revisions and package

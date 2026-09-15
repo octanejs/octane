@@ -8,6 +8,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { join } from 'node:path';
 import { interaction } from 'octane/hydration';
+import { prerender } from 'octane/static';
 import { loadServerFixture } from './_server-fixture.js';
 import {
 	deferred,
@@ -793,6 +794,143 @@ describe('ReactDOMFizzViewTransition (ported)', () => {
 			}
 		},
 	);
+
+	it.each(['ready', 'streamed'])(
+		'preserves adjacent trusted HTML attributes when removing unused transition annotations (%s)',
+		async (mode) => {
+			const props = { markup: '<p id="raw-adjacent" a="1"vt-exit-x="b"c="2">Ready</p>' };
+			if (mode === 'ready')
+				container.innerHTML = ServerRT.renderToString(server.RawMarkupApp, props).html;
+			else {
+				const chunks = collector();
+				ServerRT.renderToPipeableStream(server.RawMarkupApp, props).pipe(chunks.dest);
+				await chunks.ended;
+				container.innerHTML = chunks.chunks.join('');
+			}
+			const element = container.querySelector('#raw-adjacent')!;
+			expect(element.getAttribute('a')).toBe('1');
+			expect(element.getAttribute('c')).toBe('2');
+			expect(element.hasAttribute('vt-exit-x')).toBe(false);
+			expect(element.textContent).toBe('Ready');
+		},
+	);
+
+	it.each(['ready', 'streamed'])(
+		'preserves trusted raw text with uppercase closing tags (%s)',
+		async (mode) => {
+			const text = `<i vt-exit-x="literal">Raw text</i>`;
+			const props = { markup: `<SCRIPT id="raw-script" type="application/json">${text}</SCRIPT>` };
+			if (mode === 'ready')
+				container.innerHTML = ServerRT.renderToString(server.RawMarkupApp, props).html;
+			else {
+				const chunks = collector();
+				ServerRT.renderToPipeableStream(server.RawMarkupApp, props).pipe(chunks.dest);
+				await chunks.ended;
+				container.innerHTML = chunks.chunks.join('');
+			}
+			expect(container.querySelector('#raw-script')!.textContent).toBe(text);
+			expect(container.querySelector('[vt-name="raw-neighbor"]')!.textContent).toBe('Neighbor');
+		},
+	);
+
+	it.each(['ready', 'streamed'])(
+		'preserves transition-looking text and raw-tag lookalikes in authored attributes (%s)',
+		async (mode) => {
+			for (const title of ['', '<script>not a real script']) {
+				const props = { text: ' vt-exit-x="literal"', title };
+				if (mode === 'ready')
+					container.innerHTML = ServerRT.renderToString(server.LiteralAnnotationsApp, props).html;
+				else {
+					const chunks = collector();
+					ServerRT.renderToPipeableStream(server.LiteralAnnotationsApp, props).pipe(chunks.dest);
+					await chunks.ended;
+					container.innerHTML = chunks.chunks.join('');
+				}
+				const element = container.querySelector('#literal-annotations')!;
+				expect(element.textContent).toBe(props.text);
+				expect(element.getAttribute('title')).toBe(props.title);
+				expect(vt(container.querySelector('[vt-name="literal-neighbor"]'))).toEqual({
+					'vt-name': 'literal-neighbor',
+					'vt-update': 'auto',
+					'vt-share': 'auto',
+				});
+			}
+		},
+	);
+
+	it('preserves quoted trusted HTML supplied by an ordinary host spread', () => {
+		const title = ' vt-exit-x="authored title"';
+		container.innerHTML = ServerRT.renderToString(server.SpreadRawMarkupApp, {
+			markup: `<p id="spread-raw" title='${title}'>Ready</p>`,
+		}).html;
+		expect(container.querySelector('#spread-raw')!.getAttribute('title')).toBe(title);
+	});
+
+	it('preserves memoized trusted HTML across a render-phase state retry', () => {
+		const title = ' vt-exit-x="authored title"';
+		container.innerHTML = ServerRT.renderToString(server.RetriedRawMarkupApp, {
+			markup: `<p id="retried-raw" title='${title}'>Ready</p>`,
+		}).html;
+		expect(container.querySelector('#retried-raw')!.getAttribute('title')).toBe(title);
+	});
+
+	it.each(['prerender', 'streamed'])(
+		'preserves cached trusted HTML returned by an asynchronous component (%s)',
+		async (mode) => {
+			const title = ' vt-exit-x="authored title"';
+			const props = {
+				markup: `<p id="async-raw" title='${title}'>Ready</p>`,
+				promise: Promise.resolve(),
+			};
+			if (mode === 'prerender')
+				container.innerHTML = (await prerender(server.AsyncRawMarkupApp, props)).html;
+			else {
+				const chunks = collector();
+				ServerRT.renderToPipeableStream(server.AsyncRawMarkupApp, props).pipe(chunks.dest);
+				await chunks.ended;
+				container.innerHTML = chunks.chunks.join('');
+				activate(container);
+				await Promise.resolve();
+			}
+			expect(container.querySelector('#async-raw')!.getAttribute('title')).toBe(title);
+		},
+	);
+
+	it('preserves trusted HTML while another server render completes or throws', () => {
+		const title = ' vt-exit-x="authored title"';
+		const markup = `<p id="reentrant-raw" title='${title}'>Ready</p>`;
+		const rendered = ServerRT.renderToString(server.ReentrantRawMarkupApp, {
+			markup,
+			render() {
+				ServerRT.renderToString(server.AnnotationsApp, {});
+				expect(() =>
+					ServerRT.renderToString(() => {
+						throw new Error('Nested render');
+					}, {}),
+				).toThrow('Nested render');
+			},
+		});
+		container.innerHTML = rendered.html;
+		expect(container.querySelector('#reentrant-raw')!.getAttribute('title')).toBe(title);
+	});
+
+	it('preserves trusted HTML in a reveal after an independent stream finishes', async () => {
+		const title = ' vt-exit-x="authored title"';
+		const value = deferred<string>();
+		const chunks = collector();
+		ServerRT.renderToPipeableStream(server.RawMarkupStreamApp, { promise: value.promise }).pipe(
+			chunks.dest,
+		);
+		const other = collector();
+		ServerRT.renderToPipeableStream(server.AnnotationsApp, {}).pipe(other.dest);
+		await other.ended;
+		value.resolve(`<p id="streamed-raw" title='${title}'>Ready</p>`);
+		await chunks.ended;
+		container.innerHTML = chunks.chunks.join('');
+		activate(container);
+		await Promise.resolve();
+		expect(container.querySelector('#streamed-raw')!.getAttribute('title')).toBe(title);
+	});
 
 	it('preserves authored inline scope styles while emitting the shared scope rule', () => {
 		const props = {

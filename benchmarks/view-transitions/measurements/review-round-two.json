@@ -1,0 +1,4174 @@
+{
+  "description": "PR 1095 second review: final paired results and rejected intermediate SSR measurements.",
+  "baseline": "759330f349960a95d48ddff5115c91f6291054ce",
+  "clientBaseline": "c7b523571345ebf0acc3fddc62742b859adb626c",
+  "clientBaselineNote": "Reviewed runtime merged with main bb11d0b3e; both client variants use the updated compiler and dependency graph.",
+  "finalFiles": {
+    "packages/octane/src/runtime.ts": "1e0a1c4273b2ea1c152b8197b73e69be213bab87b313fefadef5ee7dc8690be4",
+    "packages/octane/src/runtime.server.ts": "5bb525da95f8fd6298dc01f83b455718df11cd8c94f65364406f3e455961f3c0",
+    "packages/octane/src/dom-stage.ts": "4431364b5f367318b2f7bd3c7804ef1a6636194da136aedc904af098e3b1d331"
+  },
+  "ssr": {
+    "node": "v24.20.0",
+    "platform": "darwin",
+    "arch": "arm64",
+    "verifyOnly": false,
+    "baselineRevision": "759330f349960a95d48ddff5115c91f6291054ce",
+    "candidateRevision": "c7b523571345ebf0acc3fddc62742b859adb626c",
+    "compiledHash": "a3d2ce70f5355b1df7554618e8c1698e38a841f607bf6c4cbb37b0a4050173f7",
+    "lockfileHash": "51648462c4e126c7b945cb99c5390b8a77243538c3bc86fbf784021d16e0cace",
+    "method": "Identical compiled fixture; production minified bundles; five warmup batches per side; 11 paired alternating batches; same process/dependencies; per-operation batch times in milliseconds. Ready small:50000 warmup/10000 per sample; streamed and 200-row pages:5000 warmup/1000 per sample; 1600-row pages:1250 warmup/250 per sample.",
+    "limitations": [
+      "Synthetic server-only scenarios include tiny boundaries surrounded by 200/1600 unrelated four-host rows. Browser capture/animation/resource waits, backpressure, concurrency, and allocation/GC behavior are not measured.",
+      "Ready response bytes include RenderResult.css followed by RenderResult.html; timing still measures renderToString itself. Streamed CSS is already included in the response.",
+      "Batch timings and observed spread limit conclusions about individual latency; distributions are descriptive, not a performance guarantee."
+    ],
+    "meta": {
+      "baseline": {
+        "sourceSha256": "a00ac687f2bc505d5cca78d67b108776999ecec53b6afb1312947597e98c3ccc",
+        "serverSourceHash": "559abbf8a5e080c246198bc67b00c0adbd06ed222e259f7c4d4c5f132fb5942b",
+        "bundleHash": "643a5ea1ca71a450461d4e9844f8ed2c1f52627f612754ce694a58f680315473",
+        "bundleBytes": 611336,
+        "bundleGzip": 37486
+      },
+      "candidate": {
+        "sourceSha256": "3c860af261dfb3cf023141d353750620473844cfe363cb03db50e53aa7021d12",
+        "serverSourceHash": "5bb525da95f8fd6298dc01f83b455718df11cd8c94f65364406f3e455961f3c0",
+        "bundleHash": "d29b44577cf29022a59503080350cb0dc41a6325a8e8b6ec8f195afcb44be040",
+        "bundleBytes": 612914,
+        "bundleGzip": 38286
+      }
+    },
+    "samples": {
+      "Plain": {
+        "repetitions": 10000,
+        "warmupRepetitions": 50000,
+        "baseline": [
+          0.0003788166000000047, 0.00039035000000001217, 0.00035154170000000704,
+          0.000401825000000008, 0.000344337500000006, 0.00033771249999999783, 0.0003495166000000154,
+          0.00036924169999999777, 0.00032012499999998454, 0.0003617541999999958,
+          0.00036578340000000936
+        ],
+        "candidate": [
+          0.0004316542000000027, 0.00037345410000000356, 0.00037914999999998143,
+          0.0004058082999999897, 0.0003511167000000114, 0.00031414170000000467,
+          0.00033474160000000665, 0.0003416167000000087, 0.0003389582999999902,
+          0.0003356999999999971, 0.000353666700000008
+        ],
+        "wire": {
+          "baseline": {
+            "bytes": 31,
+            "separateCssBytes": 0,
+            "gzip": 45,
+            "hasAnimationDriver": false,
+            "hasElementScope": false,
+            "scopeHosts": 0,
+            "scriptBytes": 0
+          },
+          "candidate": {
+            "bytes": 31,
+            "separateCssBytes": 0,
+            "gzip": 45,
+            "hasAnimationDriver": false,
+            "hasElementScope": false,
+            "scopeHosts": 0,
+            "scriptBytes": 0
+          }
+        },
+        "unrelatedPageRows": 0,
+        "trustedRawHtml": false,
+        "baselineMedianMs": 0.0003617541999999958,
+        "baselineDistributionMs": {
+          "min": 0.00032012499999998454,
+          "p25": 0.000344337500000006,
+          "median": 0.0003617541999999958,
+          "p75": 0.0003788166000000047,
+          "max": 0.000401825000000008
+        },
+        "baselineMedianOpsPerSecond": 2764307.919576363,
+        "candidateMedianMs": 0.0003511167000000114,
+        "candidateDistributionMs": {
+          "min": 0.00031414170000000467,
+          "p25": 0.0003356999999999971,
+          "median": 0.0003511167000000114,
+          "p75": 0.00037914999999998143,
+          "max": 0.0004316542000000027
+        },
+        "candidateMedianOpsPerSecond": 2848055.931261508,
+        "pairedCandidateBaselineRatios": [
+          1.1394806880163049, 0.9567160240809323, 1.0785349220305125, 1.009913021837819,
+          1.0196876610883372, 0.9302045378835746, 0.9577273296890388, 0.9251845065170341,
+          1.0588310816087672, 0.9279781686017772, 0.9668746586094364
+        ]
+      },
+      "View": {
+        "repetitions": 10000,
+        "warmupRepetitions": 50000,
+        "baseline": [
+          0.0024691542000000026, 0.0023503584000000048, 0.002901133299999992, 0.002551020900000003,
+          0.0025555499999999937, 0.002359566700000005, 0.0025533709000000043, 0.0023092458000000078,
+          0.002341904199999999, 0.002458333300000004, 0.0022881459000000178
+        ],
+        "candidate": [
+          0.002017320900000004, 0.0019198874999999816, 0.0021269917000000076, 0.0020465542000000143,
+          0.002035870799999998, 0.0019597291999999926, 0.0019543125000000146, 0.0018916042000000062,
+          0.0019079125000000204, 0.001991516700000011, 0.002551429199999984
+        ],
+        "wire": {
+          "baseline": {
+            "bytes": 113,
+            "separateCssBytes": 0,
+            "gzip": 105,
+            "hasAnimationDriver": false,
+            "hasElementScope": false,
+            "scopeHosts": 0,
+            "scriptBytes": 0
+          },
+          "candidate": {
+            "bytes": 113,
+            "separateCssBytes": 0,
+            "gzip": 105,
+            "hasAnimationDriver": false,
+            "hasElementScope": false,
+            "scopeHosts": 0,
+            "scriptBytes": 0
+          }
+        },
+        "unrelatedPageRows": 0,
+        "trustedRawHtml": false,
+        "baselineMedianMs": 0.002458333300000004,
+        "baselineDistributionMs": {
+          "min": 0.0022881459000000178,
+          "p25": 0.002341904199999999,
+          "median": 0.002458333300000004,
+          "p75": 0.0025533709000000043,
+          "max": 0.002901133299999992
+        },
+        "baselineMedianOpsPerSecond": 406779.66653260496,
+        "candidateMedianMs": 0.001991516700000011,
+        "candidateDistributionMs": {
+          "min": 0.0018916042000000062,
+          "p25": 0.0019198874999999816,
+          "median": 0.001991516700000011,
+          "p75": 0.0020465542000000143,
+          "max": 0.002551429199999984
+        },
+        "candidateMedianOpsPerSecond": 502129.8591169205,
+        "pairedCandidateBaselineRatios": [
+          0.8170088769668585, 0.8168488261194453, 0.7331589003511191, 0.8022490917263797,
+          0.7966468274931044, 0.8305462185069777, 0.7653852795142341, 0.8191437221624479,
+          0.8146842641983483, 0.8101084991201184, 1.1150640350337644
+        ]
+      },
+      "PlainStream": {
+        "repetitions": 1000,
+        "warmupRepetitions": 5000,
+        "baseline": [
+          0.030528584000000136, 0.025824416000000384, 0.02658137500000021, 0.03562954200000013,
+          0.026016000000000077, 0.03109420799999998, 0.02823174999999992, 0.02419420799999989,
+          0.023423707999999807, 0.020182416999999987, 0.02032612500000005
+        ],
+        "candidate": [
+          0.04022550000000001, 0.030951624999999695, 0.02713462500000014, 0.03313266700000031,
+          0.027281582999999957, 0.03797704199999998, 0.026623000000000046, 0.024626541999999974,
+          0.022408707999999933, 0.021983124999999746, 0.033394416999999975
+        ],
+        "wire": {
+          "baseline": {
+            "bytes": 2830,
+            "separateCssBytes": 0,
+            "gzip": 1177,
+            "hasAnimationDriver": false,
+            "hasElementScope": false,
+            "scopeHosts": 0,
+            "scriptBytes": 2496
+          },
+          "candidate": {
+            "bytes": 2830,
+            "separateCssBytes": 0,
+            "gzip": 1174,
+            "hasAnimationDriver": false,
+            "hasElementScope": false,
+            "scopeHosts": 0,
+            "scriptBytes": 2496
+          }
+        },
+        "unrelatedPageRows": 0,
+        "trustedRawHtml": false,
+        "baselineMedianMs": 0.026016000000000077,
+        "baselineDistributionMs": {
+          "min": 0.020182416999999987,
+          "p25": 0.023423707999999807,
+          "median": 0.026016000000000077,
+          "p75": 0.030528584000000136,
+          "max": 0.03562954200000013
+        },
+        "baselineMedianOpsPerSecond": 38437.88437884367,
+        "candidateMedianMs": 0.027281582999999957,
+        "candidateDistributionMs": {
+          "min": 0.021983124999999746,
+          "p25": 0.024626541999999974,
+          "median": 0.027281582999999957,
+          "p75": 0.033394416999999975,
+          "max": 0.04022550000000001
+        },
+        "candidateMedianOpsPerSecond": 36654.76449808655,
+        "pairedCandidateBaselineRatios": [
+          1.3176339918025621, 1.1985411402913906, 1.0208134455046034, 0.9299212153779632,
+          1.0486463330258255, 1.2213542149071623, 0.9430162848565931, 1.0178693181442469,
+          0.9566678341447954, 1.0892216229602114, 1.6429308094877846
+        ]
+      },
+      "ViewStream": {
+        "repetitions": 1000,
+        "warmupRepetitions": 5000,
+        "baseline": [
+          0.031175791000000116, 0.03667470800000001, 0.02723666699999967, 0.028839917000000242,
+          0.028259542000000238, 0.030974416999999903, 0.02772262499999988, 0.02661204099999941,
+          0.028838917000000037, 0.03128549999999996, 0.03369366700000046
+        ],
+        "candidate": [
+          0.03269962499999974, 0.03278899999999976, 0.03185587499999974, 0.02911504100000002,
+          0.028948416000000178, 0.029656208999999763, 0.037077041000000005, 0.027720416999999997,
+          0.030585957999999663, 0.02856945799999994, 0.03370087499999954
+        ],
+        "wire": {
+          "baseline": {
+            "bytes": 13118,
+            "separateCssBytes": 0,
+            "gzip": 4133,
+            "hasAnimationDriver": true,
+            "hasElementScope": false,
+            "scopeHosts": 0,
+            "scriptBytes": 12696
+          },
+          "candidate": {
+            "bytes": 13118,
+            "separateCssBytes": 0,
+            "gzip": 4131,
+            "hasAnimationDriver": true,
+            "hasElementScope": false,
+            "scopeHosts": 0,
+            "scriptBytes": 12696
+          }
+        },
+        "unrelatedPageRows": 0,
+        "trustedRawHtml": false,
+        "baselineMedianMs": 0.028839917000000242,
+        "baselineDistributionMs": {
+          "min": 0.02661204099999941,
+          "p25": 0.02772262499999988,
+          "median": 0.028839917000000242,
+          "p75": 0.03128549999999996,
+          "max": 0.03667470800000001
+        },
+        "baselineMedianOpsPerSecond": 34674.16359069243,
+        "candidateMedianMs": 0.030585957999999663,
+        "candidateDistributionMs": {
+          "min": 0.027720416999999997,
+          "p25": 0.028948416000000178,
+          "median": 0.030585957999999663,
+          "p75": 0.03278899999999976,
+          "max": 0.037077041000000005
+        },
+        "candidateMedianOpsPerSecond": 32694.74181583624,
+        "pairedCandidateBaselineRatios": [
+          1.04887875980435, 0.8940493813883877, 1.169595200470018, 1.0095396945837178,
+          1.02437668664269, 0.9574420399906108, 1.3374289411626845, 1.0416494172694464,
+          1.0605792859697063, 0.9131852775247312, 1.000213927442183
+        ]
+      },
+      "ScopedView": {
+        "repetitions": 10000,
+        "warmupRepetitions": 50000,
+        "baseline": [
+          0.005242691699999978, 0.005257820899999933, 0.005369499999999971, 0.0048768332999999985,
+          0.004861704199999986, 0.005085945900000024, 0.005107870800000001, 0.005220341600000029,
+          0.0051490208000000166, 0.0049204625000000305, 0.005111204199999974
+        ],
+        "candidate": [
+          0.003962199999999939, 0.00376773749999993, 0.0039027750000000198, 0.0037336333999999625,
+          0.0036098791999999774, 0.003832495900000049, 0.0038768458999999893, 0.0038608207999999648,
+          0.0037142125000000307, 0.0036526749999999993, 0.003975766599999952
+        ],
+        "wire": {
+          "baseline": {
+            "bytes": 266,
+            "separateCssBytes": 115,
+            "gzip": 176,
+            "hasAnimationDriver": false,
+            "hasElementScope": true,
+            "scopeHosts": 1,
+            "scriptBytes": 0
+          },
+          "candidate": {
+            "bytes": 266,
+            "separateCssBytes": 115,
+            "gzip": 176,
+            "hasAnimationDriver": false,
+            "hasElementScope": true,
+            "scopeHosts": 1,
+            "scriptBytes": 0
+          }
+        },
+        "unrelatedPageRows": 0,
+        "trustedRawHtml": false,
+        "baselineMedianMs": 0.005111204199999974,
+        "baselineDistributionMs": {
+          "min": 0.004861704199999986,
+          "p25": 0.0049204625000000305,
+          "median": 0.005111204199999974,
+          "p75": 0.005242691699999978,
+          "max": 0.005369499999999971
+        },
+        "baselineMedianOpsPerSecond": 195648.61055639395,
+        "candidateMedianMs": 0.003832495900000049,
+        "candidateDistributionMs": {
+          "min": 0.0036098791999999774,
+          "p25": 0.0037142125000000307,
+          "median": 0.003832495900000049,
+          "p75": 0.0039027750000000198,
+          "max": 0.003975766599999952
+        },
+        "candidateMedianOpsPerSecond": 260926.56746220845,
+        "pairedCandidateBaselineRatios": [
+          0.755756818582324, 0.7165967749110621, 0.7268414191265558, 0.7655856106461469,
+          0.7425131294495432, 0.7535463363855347, 0.7589945109809725, 0.7395724448376987,
+          0.7213434639844568, 0.7423438345480687, 0.7778532111865091
+        ]
+      },
+      "ScopedViewStream": {
+        "repetitions": 1000,
+        "warmupRepetitions": 5000,
+        "baseline": [
+          0.03700604099999964, 0.03930537499999991, 0.03887412500000027, 0.03777891700000055,
+          0.03778666599999997, 0.03859916599999997, 0.03504675000000043, 0.03617066599999998,
+          0.0354170409999997, 0.034430708999999296, 0.033586291999999955
+        ],
+        "candidate": [
+          0.03530666699999983, 0.03426104200000009, 0.04500358400000005, 0.04155162500000006,
+          0.033967208000000026, 0.03496549999999934, 0.03459950000000026, 0.03346904199999972,
+          0.033474208000000547, 0.03319750000000022, 0.03504845800000021
+        ],
+        "wire": {
+          "baseline": {
+            "bytes": 13213,
+            "separateCssBytes": 0,
+            "gzip": 4164,
+            "hasAnimationDriver": true,
+            "hasElementScope": true,
+            "scopeHosts": 1,
+            "scriptBytes": 12638
+          },
+          "candidate": {
+            "bytes": 13213,
+            "separateCssBytes": 0,
+            "gzip": 4161,
+            "hasAnimationDriver": true,
+            "hasElementScope": true,
+            "scopeHosts": 1,
+            "scriptBytes": 12638
+          }
+        },
+        "unrelatedPageRows": 0,
+        "trustedRawHtml": false,
+        "baselineMedianMs": 0.03700604099999964,
+        "baselineDistributionMs": {
+          "min": 0.033586291999999955,
+          "p25": 0.03504675000000043,
+          "median": 0.03700604099999964,
+          "p75": 0.03859916599999997,
+          "max": 0.03930537499999991
+        },
+        "baselineMedianOpsPerSecond": 27022.615037366726,
+        "candidateMedianMs": 0.03459950000000026,
+        "candidateDistributionMs": {
+          "min": 0.03319750000000022,
+          "p25": 0.033474208000000547,
+          "median": 0.03459950000000026,
+          "p75": 0.03530666699999983,
+          "max": 0.04500358400000005
+        },
+        "candidateMedianOpsPerSecond": 28902.1517651987,
+        "pairedCandidateBaselineRatios": [
+          0.9540784705934952, 0.8716630231870365, 1.1576745200052665, 1.0998627885494825,
+          0.8989204816323317, 0.9058615411534893, 0.9872384743235774, 0.925308978275372,
+          0.945144118617951, 0.964182875235038, 1.0435346063209436
+        ]
+      },
+      "PlainPage": {
+        "repetitions": 1000,
+        "warmupRepetitions": 5000,
+        "baseline": [
+          0.00844041599999946, 0.009000958000000538, 0.007874832999999854, 0.008744208000000071,
+          0.007864749999999731, 0.008641959000000497, 0.008650958000000174, 0.009050457999999708,
+          0.008680333000000246, 0.008004625000000487, 0.007750500000000102
+        ],
+        "candidate": [
+          0.008324250000000574, 0.008055999999999586, 0.007873334000000795, 0.007935709000000315,
+          0.008317791999999827, 0.00818408399999953, 0.008576124999999593, 0.00926508399999966,
+          0.008587750000000597, 0.0076351660000000265, 0.008111541999999645
+        ],
+        "wire": {
+          "baseline": {
+            "bytes": 24521,
+            "separateCssBytes": 0,
+            "gzip": 711,
+            "hasAnimationDriver": false,
+            "hasElementScope": false,
+            "scopeHosts": 0,
+            "scriptBytes": 0
+          },
+          "candidate": {
+            "bytes": 24521,
+            "separateCssBytes": 0,
+            "gzip": 711,
+            "hasAnimationDriver": false,
+            "hasElementScope": false,
+            "scopeHosts": 0,
+            "scriptBytes": 0
+          }
+        },
+        "unrelatedPageRows": 200,
+        "trustedRawHtml": false,
+        "baselineMedianMs": 0.008641959000000497,
+        "baselineDistributionMs": {
+          "min": 0.007750500000000102,
+          "p25": 0.007874832999999854,
+          "median": 0.008641959000000497,
+          "p75": 0.008744208000000071,
+          "max": 0.009050457999999708
+        },
+        "baselineMedianOpsPerSecond": 115714.5040840789,
+        "candidateMedianMs": 0.00818408399999953,
+        "candidateDistributionMs": {
+          "min": 0.0076351660000000265,
+          "p25": 0.007935709000000315,
+          "median": 0.00818408399999953,
+          "p75": 0.008576124999999593,
+          "max": 0.00926508399999966
+        },
+        "candidateMedianOpsPerSecond": 122188.38418570209,
+        "pairedCandidateBaselineRatios": [
+          0.9862369342934172, 0.8950158416469786, 0.9998096467570731, 0.9075389103278708,
+          1.0576041196478096, 0.9470172214423904, 0.9913497441554358, 1.0237143799794397,
+          0.9893341649450952, 0.953844308758944, 1.0465830591574141
+        ]
+      },
+      "ViewPage": {
+        "repetitions": 1000,
+        "warmupRepetitions": 5000,
+        "baseline": [
+          0.13893945900000018, 0.137378917, 0.1391762089999993, 0.1372873330000002,
+          0.13902224999999999, 0.14197533300000031, 0.13995166599999903, 0.14036887500000012,
+          0.14062225000000034, 0.13935012499999902, 0.14192608300000029
+        ],
+        "candidate": [
+          0.0221112090000006, 0.021753625000001192, 0.022855750000000626, 0.024711750000000393,
+          0.022107833000000028, 0.022955332999999883, 0.023839791000000332, 0.021910916000000724,
+          0.021283208999999262, 0.020137957999999345, 0.021403416999999536
+        ],
+        "wire": {
+          "baseline": {
+            "bytes": 24603,
+            "separateCssBytes": 0,
+            "gzip": 771,
+            "hasAnimationDriver": false,
+            "hasElementScope": false,
+            "scopeHosts": 0,
+            "scriptBytes": 0
+          },
+          "candidate": {
+            "bytes": 24603,
+            "separateCssBytes": 0,
+            "gzip": 771,
+            "hasAnimationDriver": false,
+            "hasElementScope": false,
+            "scopeHosts": 0,
+            "scriptBytes": 0
+          }
+        },
+        "unrelatedPageRows": 200,
+        "trustedRawHtml": false,
+        "baselineMedianMs": 0.13935012499999902,
+        "baselineDistributionMs": {
+          "min": 0.1372873330000002,
+          "p25": 0.13893945900000018,
+          "median": 0.13935012499999902,
+          "p75": 0.14062225000000034,
+          "max": 0.14197533300000031
+        },
+        "baselineMedianOpsPerSecond": 7176.168661492102,
+        "candidateMedianMs": 0.022107833000000028,
+        "candidateDistributionMs": {
+          "min": 0.020137957999999345,
+          "p25": 0.021403416999999536,
+          "median": 0.022107833000000028,
+          "p75": 0.022955332999999883,
+          "max": 0.024711750000000393
+        },
+        "candidateMedianOpsPerSecond": 45232.836705433714,
+        "pairedCandidateBaselineRatios": [
+          0.15914276015714565, 0.1583476233110878, 0.16422167383507866, 0.18000021895683818,
+          0.15902370304034089, 0.1616853612169364, 0.1703430311433413, 0.15609525972193414,
+          0.15135022373770304, 0.14451338310603945, 0.15080679003872385
+        ]
+      },
+      "PlainLargePage": {
+        "repetitions": 250,
+        "warmupRepetitions": 1250,
+        "baseline": [
+          0.23183533599999645, 0.20796416399999726, 0.2124011679999967, 0.21266883199999576,
+          0.20193483600000037, 0.21030666799999745, 0.18803683199999796, 0.19562983199999873,
+          0.18970016800000303, 0.1883741680000021, 0.1906284999999989
+        ],
+        "candidate": [
+          0.23628066400000536, 0.21795383199999924, 0.22091233199999988, 0.20705466400000297,
+          0.1971916679999995, 0.19677000000000408, 0.19449616800000513, 0.1924846680000046,
+          0.19873649999999907, 0.185343664, 0.19485516799999458
+        ],
+        "wire": {
+          "baseline": {
+            "bytes": 197321,
+            "separateCssBytes": 0,
+            "gzip": 4651,
+            "hasAnimationDriver": false,
+            "hasElementScope": false,
+            "scopeHosts": 0,
+            "scriptBytes": 0
+          },
+          "candidate": {
+            "bytes": 197321,
+            "separateCssBytes": 0,
+            "gzip": 4651,
+            "hasAnimationDriver": false,
+            "hasElementScope": false,
+            "scopeHosts": 0,
+            "scriptBytes": 0
+          }
+        },
+        "unrelatedPageRows": 1600,
+        "trustedRawHtml": false,
+        "baselineMedianMs": 0.20193483600000037,
+        "baselineDistributionMs": {
+          "min": 0.18803683199999796,
+          "p25": 0.18970016800000303,
+          "median": 0.20193483600000037,
+          "p75": 0.2124011679999967,
+          "max": 0.23183533599999645
+        },
+        "baselineMedianOpsPerSecond": 4952.092565148087,
+        "candidateMedianMs": 0.1971916679999995,
+        "candidateDistributionMs": {
+          "min": 0.185343664,
+          "p25": 0.19449616800000513,
+          "median": 0.1971916679999995,
+          "p75": 0.21795383199999924,
+          "max": 0.23628066400000536
+        },
+        "candidateMedianOpsPerSecond": 5071.2081810677855,
+        "pairedCandidateBaselineRatios": [
+          1.0191745058225679, 1.048035525966878, 1.0400711732432815, 0.9736013596952802,
+          0.9765113930119473, 0.935633671872004, 1.0343514402540415, 0.9839228814550424,
+          1.047634812848431, 0.9839123164700477, 1.0221722774925874
+        ]
+      },
+      "ViewLargePage": {
+        "repetitions": 250,
+        "warmupRepetitions": 1250,
+        "baseline": [
+          1.2596606639999954, 1.1951873359999954, 1.1960579999999972, 1.228971835999997,
+          1.2598450000000012, 1.2206156679999987, 1.2540501680000016, 1.2056768359999988,
+          1.2209535000000034, 1.1869386680000025, 1.612600999999995
+        ],
+        "candidate": [
+          0.3100269999999946, 0.29987083200000053, 0.34224899999999614, 0.3202678319999977,
+          0.3645161640000006, 0.29183466799999586, 0.3143205000000016, 0.2939753320000018,
+          0.31008116800000424, 0.29053149999999733, 0.2967866639999993
+        ],
+        "wire": {
+          "baseline": {
+            "bytes": 197403,
+            "separateCssBytes": 0,
+            "gzip": 4727,
+            "hasAnimationDriver": false,
+            "hasElementScope": false,
+            "scopeHosts": 0,
+            "scriptBytes": 0
+          },
+          "candidate": {
+            "bytes": 197403,
+            "separateCssBytes": 0,
+            "gzip": 4727,
+            "hasAnimationDriver": false,
+            "hasElementScope": false,
+            "scopeHosts": 0,
+            "scriptBytes": 0
+          }
+        },
+        "unrelatedPageRows": 1600,
+        "trustedRawHtml": false,
+        "baselineMedianMs": 1.2209535000000034,
+        "baselineDistributionMs": {
+          "min": 1.1869386680000025,
+          "p25": 1.1960579999999972,
+          "median": 1.2209535000000034,
+          "p75": 1.2596606639999954,
+          "max": 1.612600999999995
+        },
+        "baselineMedianOpsPerSecond": 819.0320106375855,
+        "candidateMedianMs": 0.3100269999999946,
+        "candidateDistributionMs": {
+          "min": 0.29053149999999733,
+          "p25": 0.2939753320000018,
+          "median": 0.3100269999999946,
+          "p75": 0.3202678319999977,
+          "max": 0.3645161640000006
+        },
+        "candidateMedianOpsPerSecond": 3225.5255187451976,
+        "pairedCandidateBaselineRatios": [
+          0.24611945808922692, 0.2508986022254855, 0.286147494519494, 0.26059818672687507,
+          0.2893341355484208, 0.23908808943782636, 0.2506442788499361, 0.2438259765985934,
+          0.2539664024878944, 0.24477380999773504, 0.18404221751071728
+        ]
+      },
+      "ViewRawPage": {
+        "repetitions": 1000,
+        "warmupRepetitions": 5000,
+        "baseline": [
+          0.13946062500000334, 0.1334006249999984, 0.14150429200000145, 0.12515583300000072,
+          0.12982804199999737, 0.1314727500000008, 0.12784045799999877, 0.13180316699999822,
+          0.1386009589999994, 0.13785329099999943, 0.13395366699999794
+        ],
+        "candidate": [
+          0.08476933300000018, 0.08580395900000076, 0.08317783300000156, 0.08276962499999718,
+          0.08209050000000206, 0.08247770899999887, 0.08017062499999883, 0.08083345800000097,
+          0.09271541700000308, 0.0900647919999974, 0.08295491699999911
+        ],
+        "wire": {
+          "baseline": {
+            "bytes": 24614,
+            "separateCssBytes": 0,
+            "gzip": 778,
+            "hasAnimationDriver": false,
+            "hasElementScope": false,
+            "scopeHosts": 0,
+            "scriptBytes": 0
+          },
+          "candidate": {
+            "bytes": 24614,
+            "separateCssBytes": 0,
+            "gzip": 778,
+            "hasAnimationDriver": false,
+            "hasElementScope": false,
+            "scopeHosts": 0,
+            "scriptBytes": 0
+          }
+        },
+        "unrelatedPageRows": 200,
+        "trustedRawHtml": true,
+        "baselineMedianMs": 0.1334006249999984,
+        "baselineDistributionMs": {
+          "min": 0.12515583300000072,
+          "p25": 0.12982804199999737,
+          "median": 0.1334006249999984,
+          "p75": 0.1386009589999994,
+          "max": 0.14150429200000145
+        },
+        "baselineMedianOpsPerSecond": 7496.216753107506,
+        "candidateMedianMs": 0.08295491699999911,
+        "candidateDistributionMs": {
+          "min": 0.08017062499999883,
+          "p25": 0.08209050000000206,
+          "median": 0.08295491699999911,
+          "p75": 0.08580395900000076,
+          "max": 0.09271541700000308
+        },
+        "candidateMedianOpsPerSecond": 12054.74052852118,
+        "pairedCandidateBaselineRatios": [
+          0.6078370364394836, 0.6432050749387552, 0.5878113788944346, 0.6613325405296668,
+          0.6323017642059465, 0.6273369120216803, 0.6271146572394132, 0.6132891935745524,
+          0.6689377740885867, 0.6533379895877696, 0.6192806726224254
+        ]
+      }
+    }
+  },
+  "ssrBeforeParser": {
+    "node": "v24.20.0",
+    "platform": "darwin",
+    "arch": "arm64",
+    "verifyOnly": false,
+    "baselineRevision": "e36dec2b41d61bf5c0ea118b98565fc30f7b94ce",
+    "candidateRevision": "c7b523571345ebf0acc3fddc62742b859adb626c",
+    "compiledHash": "a3d2ce70f5355b1df7554618e8c1698e38a841f607bf6c4cbb37b0a4050173f7",
+    "lockfileHash": "51648462c4e126c7b945cb99c5390b8a77243538c3bc86fbf784021d16e0cace",
+    "method": "Identical compiled fixture; production minified bundles; five warmup batches per side; 11 paired alternating batches; same process/dependencies; per-operation batch times in milliseconds. Ready small:50000 warmup/10000 per sample; streamed and 200-row pages:5000 warmup/1000 per sample; 1600-row pages:1250 warmup/250 per sample.",
+    "limitations": [
+      "Synthetic server-only scenarios include tiny boundaries surrounded by 200/1600 unrelated four-host rows. Browser capture/animation/resource waits, backpressure, concurrency, and allocation/GC behavior are not measured.",
+      "Ready response bytes include RenderResult.css followed by RenderResult.html; timing still measures renderToString itself. Streamed CSS is already included in the response.",
+      "Batch timings and observed spread limit conclusions about individual latency; distributions are descriptive, not a performance guarantee."
+    ],
+    "meta": {
+      "baseline": {
+        "sourceSha256": "9cc1672785c39df29e1c45088216263703e725e3d1605b975ffba6278ac62471",
+        "serverSourceHash": "68e52cba39185acd69416749ad3af5412e5def5b711748ebb8b3f696d26cf619",
+        "bundleHash": "fbf37d59cc6da6a823a7cd84053bac11b3d660cd4070f57227d2c4c3ce4f1545",
+        "bundleBytes": 610594,
+        "bundleGzip": 37130
+      },
+      "candidate": {
+        "sourceSha256": "3c860af261dfb3cf023141d353750620473844cfe363cb03db50e53aa7021d12",
+        "serverSourceHash": "5bb525da95f8fd6298dc01f83b455718df11cd8c94f65364406f3e455961f3c0",
+        "bundleHash": "d29b44577cf29022a59503080350cb0dc41a6325a8e8b6ec8f195afcb44be040",
+        "bundleBytes": 612914,
+        "bundleGzip": 38286
+      }
+    },
+    "samples": {
+      "Plain": {
+        "repetitions": 10000,
+        "warmupRepetitions": 50000,
+        "baseline": [
+          0.000341395799999998, 0.00032388329999999996, 0.0003249541000000022,
+          0.00031309159999999564, 0.0003268333999999982, 0.00030654590000000326,
+          0.0003118791999999985, 0.00030158330000000435, 0.00031232909999999946,
+          0.0003096584000000007, 0.00030403330000000324
+        ],
+        "candidate": [
+          0.0003202832999999941, 0.00033276670000000194, 0.0003170208000000002,
+          0.00032756670000001124, 0.0003078415999999947, 0.00032427079999999933,
+          0.0003053083000000015, 0.00031932909999999313, 0.0003037832999999978,
+          0.0003062000000000012, 0.0003150707999999895
+        ],
+        "wire": {
+          "baseline": {
+            "bytes": 31,
+            "separateCssBytes": 0,
+            "gzip": 45,
+            "hasAnimationDriver": false,
+            "hasElementScope": false,
+            "scopeHosts": 0,
+            "scriptBytes": 0
+          },
+          "candidate": {
+            "bytes": 31,
+            "separateCssBytes": 0,
+            "gzip": 45,
+            "hasAnimationDriver": false,
+            "hasElementScope": false,
+            "scopeHosts": 0,
+            "scriptBytes": 0
+          }
+        },
+        "unrelatedPageRows": 0,
+        "trustedRawHtml": false,
+        "baselineMedianMs": 0.00031232909999999946,
+        "baselineDistributionMs": {
+          "min": 0.00030158330000000435,
+          "p25": 0.00030654590000000326,
+          "median": 0.00031232909999999946,
+          "p75": 0.0003249541000000022,
+          "max": 0.000341395799999998
+        },
+        "baselineMedianOpsPerSecond": 3201750.973572433,
+        "candidateMedianMs": 0.0003170208000000002,
+        "candidateDistributionMs": {
+          "min": 0.0003037832999999978,
+          "p25": 0.0003062000000000012,
+          "median": 0.0003170208000000002,
+          "p75": 0.00032427079999999933,
+          "max": 0.00033276670000000194
+        },
+        "candidateMedianOpsPerSecond": 3154367.1582432427,
+        "pairedCandidateBaselineRatios": [
+          0.9381582901722751, 1.0274277803147058, 0.9755863982020785, 1.046232795769723,
+          0.9418914957895871, 1.0578213572583939, 0.9789312656951891, 1.058842117584059,
+          0.9726384765300393, 0.988831564071895, 1.0363035891133838
+        ]
+      },
+      "View": {
+        "repetitions": 10000,
+        "warmupRepetitions": 50000,
+        "baseline": [
+          0.001142754100000002, 0.0011948624999999992, 0.001175937500000009, 0.0012830249999999978,
+          0.0014412833999999976, 0.0012578334000000041, 0.001163774999999987, 0.0012024541,
+          0.0011714249999999994, 0.001180837500000007, 0.0011570166999999856
+        ],
+        "candidate": [
+          0.0017638165999999955, 0.0017594249999999874, 0.0018090541000000031,
+          0.0017954208999999993, 0.0018844083000000183, 0.0018177916999999979,
+          0.0017803458000000092, 0.0017535292000000027, 0.0017340083000000049,
+          0.0017498041999999942, 0.0017327833000000054
+        ],
+        "wire": {
+          "baseline": {
+            "bytes": 113,
+            "separateCssBytes": 0,
+            "gzip": 105,
+            "hasAnimationDriver": false,
+            "hasElementScope": false,
+            "scopeHosts": 0,
+            "scriptBytes": 0
+          },
+          "candidate": {
+            "bytes": 113,
+            "separateCssBytes": 0,
+            "gzip": 105,
+            "hasAnimationDriver": false,
+            "hasElementScope": false,
+            "scopeHosts": 0,
+            "scriptBytes": 0
+          }
+        },
+        "unrelatedPageRows": 0,
+        "trustedRawHtml": false,
+        "baselineMedianMs": 0.001180837500000007,
+        "baselineDistributionMs": {
+          "min": 0.001142754100000002,
+          "p25": 0.001163774999999987,
+          "median": 0.001180837500000007,
+          "p75": 0.0012578334000000041,
+          "max": 0.0014412833999999976
+        },
+        "baselineMedianOpsPerSecond": 846856.5742534379,
+        "candidateMedianMs": 0.0017638165999999955,
+        "candidateDistributionMs": {
+          "min": 0.0017327833000000054,
+          "p25": 0.0017498041999999942,
+          "median": 0.0017638165999999955,
+          "p75": 0.0018090541000000031,
+          "max": 0.0018844083000000183
+        },
+        "candidateMedianOpsPerSecond": 566952.3690841795,
+        "pairedCandidateBaselineRatios": [
+          1.5434786888972811, 1.4724916046825376, 1.5383930693595445, 1.3993654839149685,
+          1.3074516087537131, 1.445176841384552, 1.5298024102597403, 1.4582920046594732,
+          1.4802555007789708, 1.4818331904262727, 1.4976303280670253
+        ]
+      },
+      "PlainStream": {
+        "repetitions": 1000,
+        "warmupRepetitions": 5000,
+        "baseline": [
+          0.022393082999999932, 0.01996025000000009, 0.019529415999999855, 0.019773500000000013,
+          0.01900904199999991, 0.021492792000000007, 0.019208167, 0.019761875000000144,
+          0.01959733300000016, 0.018811584000000037, 0.01895987500000001
+        ],
+        "candidate": [
+          0.021421458999999914, 0.01960287500000004, 0.02080904200000009, 0.020721708000000037,
+          0.019582167000000025, 0.02044120799999996, 0.019689166999999997, 0.020238582999999834,
+          0.018649417000000085, 0.018850875000000086, 0.019269209000000048
+        ],
+        "wire": {
+          "baseline": {
+            "bytes": 2443,
+            "separateCssBytes": 0,
+            "gzip": 1038,
+            "hasAnimationDriver": false,
+            "hasElementScope": false,
+            "scopeHosts": 0,
+            "scriptBytes": 2109
+          },
+          "candidate": {
+            "bytes": 2830,
+            "separateCssBytes": 0,
+            "gzip": 1176,
+            "hasAnimationDriver": false,
+            "hasElementScope": false,
+            "scopeHosts": 0,
+            "scriptBytes": 2496
+          }
+        },
+        "unrelatedPageRows": 0,
+        "trustedRawHtml": false,
+        "baselineMedianMs": 0.01959733300000016,
+        "baselineDistributionMs": {
+          "min": 0.018811584000000037,
+          "p25": 0.01900904199999991,
+          "median": 0.01959733300000016,
+          "p75": 0.01996025000000009,
+          "max": 0.022393082999999932
+        },
+        "baselineMedianOpsPerSecond": 51027.351527883504,
+        "candidateMedianMs": 0.019689166999999997,
+        "candidateDistributionMs": {
+          "min": 0.018649417000000085,
+          "p25": 0.019269209000000048,
+          "median": 0.019689166999999997,
+          "p75": 0.020721708000000037,
+          "max": 0.021421458999999914
+        },
+        "candidateMedianOpsPerSecond": 50789.35030618615,
+        "pairedCandidateBaselineRatios": [
+          0.9566105301355771, 0.9820956651344523, 1.0655230038624937, 1.0479534730826623,
+          1.0301501253982246, 0.9510727131216807, 1.0250414315952165, 1.0241226098231917,
+          0.9516303570490909, 1.0020886598385361, 1.0163151919514257
+        ]
+      },
+      "ViewStream": {
+        "repetitions": 1000,
+        "warmupRepetitions": 5000,
+        "baseline": [
+          0.028909250000000157, 0.027922791999999846, 0.027035875000000032, 0.027315291999999772,
+          0.02702687500000002, 0.02724091700000008, 0.027020250000000034, 0.02710900000000038,
+          0.02687933299999986, 0.027236583999999765, 0.027201042000000144
+        ],
+        "candidate": [
+          0.028320624999999836, 0.027254042000000027, 0.02744108300000016, 0.027262167000000316,
+          0.02718604099999993, 0.027209332999999787, 0.027287249999999857, 0.027233791999999993,
+          0.027374624999999923, 0.027511625000000095, 0.028886375000000044
+        ],
+        "wire": {
+          "baseline": {
+            "bytes": 12621,
+            "separateCssBytes": 0,
+            "gzip": 3924,
+            "hasAnimationDriver": true,
+            "hasElementScope": false,
+            "scopeHosts": 0,
+            "scriptBytes": 12199
+          },
+          "candidate": {
+            "bytes": 13118,
+            "separateCssBytes": 0,
+            "gzip": 4132,
+            "hasAnimationDriver": true,
+            "hasElementScope": false,
+            "scopeHosts": 0,
+            "scriptBytes": 12696
+          }
+        },
+        "unrelatedPageRows": 0,
+        "trustedRawHtml": false,
+        "baselineMedianMs": 0.027201042000000144,
+        "baselineDistributionMs": {
+          "min": 0.02687933299999986,
+          "p25": 0.02702687500000002,
+          "median": 0.027201042000000144,
+          "p75": 0.027315291999999772,
+          "max": 0.028909250000000157
+        },
+        "baselineMedianOpsPerSecond": 36763.29752367555,
+        "candidateMedianMs": 0.027287249999999857,
+        "candidateDistributionMs": {
+          "min": 0.02718604099999993,
+          "p25": 0.027233791999999993,
+          "median": 0.027287249999999857,
+          "p75": 0.027511625000000095,
+          "max": 0.028886375000000044
+        },
+        "candidateMedianOpsPerSecond": 36647.15205819587,
+        "pairedCandidateBaselineRatios": [
+          0.9796388699118684, 0.9760500311000482, 1.014987789372459, 0.9980551187225288,
+          1.0058891751266068, 0.9988405676651674, 1.009881477780547, 1.004603342063507,
+          1.0184264989015934, 1.0100982193655539, 1.061958398505465
+        ]
+      },
+      "ScopedView": {
+        "repetitions": 10000,
+        "warmupRepetitions": 50000,
+        "baseline": [
+          0.0056633000000000265, 0.005618854099999998, 0.005637779199999977, 0.00594962089999999,
+          0.0056508290999999645, 0.006347925000000032, 0.005774983400000019, 0.006014870899999914,
+          0.0056832042, 0.005808570899999995, 0.005594558299999971
+        ],
+        "candidate": [
+          0.003379975000000013, 0.003323999999999978, 0.003487829099999999, 0.003748783300000014,
+          0.0034003749999999854, 0.003433879100000013, 0.0035376374999999825, 0.0038280499999999848,
+          0.003645433299999968, 0.003618700000000081, 0.003437133400000039
+        ],
+        "wire": {
+          "baseline": {
+            "bytes": 213,
+            "separateCssBytes": 0,
+            "gzip": 155,
+            "hasAnimationDriver": false,
+            "hasElementScope": true,
+            "scopeHosts": 1,
+            "scriptBytes": 0
+          },
+          "candidate": {
+            "bytes": 266,
+            "separateCssBytes": 115,
+            "gzip": 176,
+            "hasAnimationDriver": false,
+            "hasElementScope": true,
+            "scopeHosts": 1,
+            "scriptBytes": 0
+          }
+        },
+        "unrelatedPageRows": 0,
+        "trustedRawHtml": false,
+        "baselineMedianMs": 0.0056832042,
+        "baselineDistributionMs": {
+          "min": 0.005594558299999971,
+          "p25": 0.005637779199999977,
+          "median": 0.0056832042,
+          "p75": 0.00594962089999999,
+          "max": 0.006347925000000032
+        },
+        "baselineMedianOpsPerSecond": 175957.0771713605,
+        "candidateMedianMs": 0.003487829099999999,
+        "candidateDistributionMs": {
+          "min": 0.003323999999999978,
+          "p25": 0.0034003749999999854,
+          "median": 0.003487829099999999,
+          "p75": 0.003645433299999968,
+          "max": 0.0038280499999999848
+        },
+        "candidateMedianOpsPerSecond": 286711.29557351314,
+        "pairedCandidateBaselineRatios": [
+          0.5968207582151744, 0.5915796959383549, 0.6186530150027892, 0.6300877590368859,
+          0.601747980663582, 0.540945127738591, 0.6125796829130229, 0.6364309498313654,
+          0.6414397884911417, 0.622993170316658, 0.6143708253071661
+        ]
+      },
+      "ScopedViewStream": {
+        "repetitions": 1000,
+        "warmupRepetitions": 5000,
+        "baseline": [
+          0.03768995900000027, 0.03723991600000045, 0.037496916999999484, 0.03884729099999913,
+          0.03698504199999934, 0.038464457999999466, 0.03690683300000001, 0.037336083999999575,
+          0.03751416699999936, 0.037147875000000566, 0.03761312499999985
+        ],
+        "candidate": [
+          0.03242945899999995, 0.03217979199999991, 0.03325812499999938, 0.03318737500000043,
+          0.03220087500000045, 0.03289450000000033, 0.03249566700000014, 0.03213337500000034,
+          0.03250841599999967, 0.032051542000000155, 0.03251133300000038
+        ],
+        "wire": {
+          "baseline": {
+            "bytes": 12663,
+            "separateCssBytes": 0,
+            "gzip": 3938,
+            "hasAnimationDriver": true,
+            "hasElementScope": true,
+            "scopeHosts": 1,
+            "scriptBytes": 12141
+          },
+          "candidate": {
+            "bytes": 13213,
+            "separateCssBytes": 0,
+            "gzip": 4163,
+            "hasAnimationDriver": true,
+            "hasElementScope": true,
+            "scopeHosts": 1,
+            "scriptBytes": 12638
+          }
+        },
+        "unrelatedPageRows": 0,
+        "trustedRawHtml": false,
+        "baselineMedianMs": 0.037496916999999484,
+        "baselineDistributionMs": {
+          "min": 0.03690683300000001,
+          "p25": 0.037147875000000566,
+          "median": 0.037496916999999484,
+          "p75": 0.03768995900000027,
+          "max": 0.03884729099999913
+        },
+        "baselineMedianOpsPerSecond": 26668.859202478267,
+        "candidateMedianMs": 0.03249566700000014,
+        "candidateDistributionMs": {
+          "min": 0.032051542000000155,
+          "p25": 0.03217979199999991,
+          "median": 0.03249566700000014,
+          "p75": 0.03289450000000033,
+          "max": 0.03325812499999938
+        },
+        "candidateMedianOpsPerSecond": 30773.33356474867,
+        "pairedCandidateBaselineRatios": [
+          0.8604270171798202, 0.8641209609602643, 0.886956252963406, 0.8543034570930872,
+          0.8706458951702968, 0.8551920840793023, 0.8804783385233875, 0.8606519901765998,
+          0.8665637171151961, 0.8628095685150138, 0.8643613898074277
+        ]
+      },
+      "PlainPage": {
+        "repetitions": 1000,
+        "warmupRepetitions": 5000,
+        "baseline": [
+          0.007160499999999956, 0.0075831249999992, 0.007167707999999948, 0.0073541669999995065,
+          0.007310124999999971, 0.007440167000000656, 0.007282959000000119, 0.007176667000000634,
+          0.006819459000000279, 0.00703216699999939, 0.006717375000000175
+        ],
+        "candidate": [
+          0.007233292000000802, 0.0074025420000007214, 0.007072959000000083, 0.006945040999999946,
+          0.007439000000000306, 0.007324082999999518, 0.007554707999999664, 0.008634000000000015,
+          0.006763500000000022, 0.00708587499999976, 0.006909041999999317
+        ],
+        "wire": {
+          "baseline": {
+            "bytes": 24521,
+            "separateCssBytes": 0,
+            "gzip": 711,
+            "hasAnimationDriver": false,
+            "hasElementScope": false,
+            "scopeHosts": 0,
+            "scriptBytes": 0
+          },
+          "candidate": {
+            "bytes": 24521,
+            "separateCssBytes": 0,
+            "gzip": 711,
+            "hasAnimationDriver": false,
+            "hasElementScope": false,
+            "scopeHosts": 0,
+            "scriptBytes": 0
+          }
+        },
+        "unrelatedPageRows": 200,
+        "trustedRawHtml": false,
+        "baselineMedianMs": 0.007176667000000634,
+        "baselineDistributionMs": {
+          "min": 0.006717375000000175,
+          "p25": 0.00703216699999939,
+          "median": 0.007176667000000634,
+          "p75": 0.0073541669999995065,
+          "max": 0.0075831249999992
+        },
+        "baselineMedianOpsPerSecond": 139340.44870688743,
+        "candidateMedianMs": 0.007233292000000802,
+        "candidateDistributionMs": {
+          "min": 0.006763500000000022,
+          "p25": 0.006945040999999946,
+          "median": 0.007233292000000802,
+          "p75": 0.007439000000000306,
+          "max": 0.008634000000000015
+        },
+        "candidateMedianOpsPerSecond": 138249.63792418296,
+        "pairedCandidateBaselineRatios": [
+          1.0101657705468678, 0.9761862029178607, 0.9867811300348918, 0.9443681384989506,
+          1.0176296574956427, 0.9843976620415741, 1.037312993248972, 1.203065434135268,
+          0.991794217107214, 1.0076374750486408, 1.028533020711087
+        ]
+      },
+      "ViewPage": {
+        "repetitions": 1000,
+        "warmupRepetitions": 5000,
+        "baseline": [
+          0.02087908299999981, 0.020807041999999457, 0.020706874999999854, 0.020430750000000445,
+          0.02065929099999994, 0.02101499999999942, 0.021241500000000087, 0.020692041999999675,
+          0.020428249999999936, 0.020716957999999976, 0.020607332999999926
+        ],
+        "candidate": [
+          0.02, 0.019658667000000605, 0.019689792000000126, 0.019528375000000778,
+          0.02005754100000013, 0.019713957999999365, 0.020216959000000315, 0.019597999999999956,
+          0.020060375000000023, 0.019718124999999417, 0.01978991599999972
+        ],
+        "wire": {
+          "baseline": {
+            "bytes": 24603,
+            "separateCssBytes": 0,
+            "gzip": 771,
+            "hasAnimationDriver": false,
+            "hasElementScope": false,
+            "scopeHosts": 0,
+            "scriptBytes": 0
+          },
+          "candidate": {
+            "bytes": 24603,
+            "separateCssBytes": 0,
+            "gzip": 771,
+            "hasAnimationDriver": false,
+            "hasElementScope": false,
+            "scopeHosts": 0,
+            "scriptBytes": 0
+          }
+        },
+        "unrelatedPageRows": 200,
+        "trustedRawHtml": false,
+        "baselineMedianMs": 0.020706874999999854,
+        "baselineDistributionMs": {
+          "min": 0.020428249999999936,
+          "p25": 0.020607332999999926,
+          "median": 0.020706874999999854,
+          "p75": 0.02087908299999981,
+          "max": 0.021241500000000087
+        },
+        "baselineMedianOpsPerSecond": 48293.13935589059,
+        "candidateMedianMs": 0.019718124999999417,
+        "candidateDistributionMs": {
+          "min": 0.019528375000000778,
+          "p25": 0.019658667000000605,
+          "median": 0.019718124999999417,
+          "p75": 0.02005754100000013,
+          "max": 0.020216959000000315
+        },
+        "candidateMedianOpsPerSecond": 50714.761165173135,
+        "pairedCandidateBaselineRatios": [
+          0.9578964746679816, 0.9448083490195828, 0.9508818689445059, 0.9558325073724828,
+          0.9708726693476648, 0.9380898405900504, 0.9517670126874389, 0.9471274028923904,
+          0.981991849522112, 0.9517866957108008, 0.9603336831602514
+        ]
+      },
+      "PlainLargePage": {
+        "repetitions": 250,
+        "warmupRepetitions": 1250,
+        "baseline": [
+          0.20074166799999876, 0.18124583200000052, 0.18840783200000077, 0.19635299999999917,
+          0.19879849999999716, 0.19431600000000254, 0.1957161640000013, 0.19707483599999978,
+          0.19518983599999773, 0.19958433199999853, 0.18756816800000162
+        ],
+        "candidate": [
+          0.19274849999999788, 0.1870284999999967, 0.18830266800000026, 0.20408183199999985,
+          0.19840783600000214, 0.19940599999999903, 0.19952383599999665, 0.19146883199999865,
+          0.18505916799999977, 0.18763983200000076, 0.1900570000000007
+        ],
+        "wire": {
+          "baseline": {
+            "bytes": 197321,
+            "separateCssBytes": 0,
+            "gzip": 4651,
+            "hasAnimationDriver": false,
+            "hasElementScope": false,
+            "scopeHosts": 0,
+            "scriptBytes": 0
+          },
+          "candidate": {
+            "bytes": 197321,
+            "separateCssBytes": 0,
+            "gzip": 4651,
+            "hasAnimationDriver": false,
+            "hasElementScope": false,
+            "scopeHosts": 0,
+            "scriptBytes": 0
+          }
+        },
+        "unrelatedPageRows": 1600,
+        "trustedRawHtml": false,
+        "baselineMedianMs": 0.1957161640000013,
+        "baselineDistributionMs": {
+          "min": 0.18124583200000052,
+          "p25": 0.18840783200000077,
+          "median": 0.1957161640000013,
+          "p75": 0.19879849999999716,
+          "max": 0.20074166799999876
+        },
+        "baselineMedianOpsPerSecond": 5109.440015388782,
+        "candidateMedianMs": 0.19146883199999865,
+        "candidateDistributionMs": {
+          "min": 0.18505916799999977,
+          "p25": 0.18763983200000076,
+          "median": 0.19146883199999865,
+          "p75": 0.19940599999999903,
+          "max": 0.20408183199999985
+        },
+        "candidateMedianOpsPerSecond": 5222.782160179507,
+        "pairedCandidateBaselineRatios": [
+          0.9601818193520195, 1.0319051088578752, 0.9994418278747536, 1.0393619246968506,
+          0.9980348745086355, 1.026194446159845, 1.0194550716822517, 0.9715539329435182,
+          0.9480983835654329, 0.9401531178309234, 1.0132689465730618
+        ]
+      },
+      "ViewLargePage": {
+        "repetitions": 250,
+        "warmupRepetitions": 1250,
+        "baseline": [
+          0.29896666800000093, 0.3006998320000057, 0.31063500000000205, 0.3019459999999963,
+          0.2943826680000057, 0.29078416399999696, 0.3181915000000008, 0.30894033599999965,
+          0.28700966800000605, 0.2874883320000008, 0.2885268359999973
+        ],
+        "candidate": [
+          0.28722466800000257, 0.2894751680000045, 0.28071549999999845, 0.2836319999999978,
+          0.27182233599999744, 0.28808699999999954, 0.28753883200000563, 0.28634066800000435,
+          0.2799578320000001, 0.2759933319999982, 0.2854578360000014
+        ],
+        "wire": {
+          "baseline": {
+            "bytes": 197403,
+            "separateCssBytes": 0,
+            "gzip": 4727,
+            "hasAnimationDriver": false,
+            "hasElementScope": false,
+            "scopeHosts": 0,
+            "scriptBytes": 0
+          },
+          "candidate": {
+            "bytes": 197403,
+            "separateCssBytes": 0,
+            "gzip": 4727,
+            "hasAnimationDriver": false,
+            "hasElementScope": false,
+            "scopeHosts": 0,
+            "scriptBytes": 0
+          }
+        },
+        "unrelatedPageRows": 1600,
+        "trustedRawHtml": false,
+        "baselineMedianMs": 0.29896666800000093,
+        "baselineDistributionMs": {
+          "min": 0.28700966800000605,
+          "p25": 0.2885268359999973,
+          "median": 0.29896666800000093,
+          "p75": 0.30894033599999965,
+          "max": 0.3181915000000008
+        },
+        "baselineMedianOpsPerSecond": 3344.8544839118886,
+        "candidateMedianMs": 0.2854578360000014,
+        "candidateDistributionMs": {
+          "min": 0.27182233599999744,
+          "p25": 0.2799578320000001,
+          "median": 0.2854578360000014,
+          "p75": 0.28753883200000563,
+          "max": 0.2894751680000045
+        },
+        "candidateMedianOpsPerSecond": 3503.144331269978,
+        "pairedCandidateBaselineRatios": [
+          0.960724718649912, 0.9626715321876169, 0.9036827788240108, 0.9393467706146175,
+          0.9233639257593528, 0.990724515520737, 0.9036659747353556, 0.92684779108936,
+          0.9754299705332371, 0.9600157685703831, 0.9893632077953542
+        ]
+      },
+      "ViewRawPage": {
+        "repetitions": 1000,
+        "warmupRepetitions": 5000,
+        "baseline": [
+          0.014643459000000802, 0.015036874999999781, 0.014666583999998694, 0.015070292000000336,
+          0.015358500000000276, 0.015055707999999867, 0.015078708000000916, 0.018962416999998823,
+          0.021102750000000014, 0.014880332999999154, 0.01606866699999955
+        ],
+        "candidate": [
+          0.07902141699999993, 0.07929079199999978, 0.07853354200000104, 0.07967583299999934,
+          0.08007849999999962, 0.08149029200000041, 0.07984204200000022, 0.08182966699999997,
+          0.09031187500000123, 0.08614887500000078, 0.08027395799999977
+        ],
+        "wire": {
+          "baseline": {
+            "bytes": 24614,
+            "separateCssBytes": 0,
+            "gzip": 778,
+            "hasAnimationDriver": false,
+            "hasElementScope": false,
+            "scopeHosts": 0,
+            "scriptBytes": 0
+          },
+          "candidate": {
+            "bytes": 24614,
+            "separateCssBytes": 0,
+            "gzip": 778,
+            "hasAnimationDriver": false,
+            "hasElementScope": false,
+            "scopeHosts": 0,
+            "scriptBytes": 0
+          }
+        },
+        "unrelatedPageRows": 200,
+        "trustedRawHtml": true,
+        "baselineMedianMs": 0.015070292000000336,
+        "baselineDistributionMs": {
+          "min": 0.014643459000000802,
+          "p25": 0.014880332999999154,
+          "median": 0.015070292000000336,
+          "p75": 0.01606866699999955,
+          "max": 0.021102750000000014
+        },
+        "baselineMedianOpsPerSecond": 66355.71493903222,
+        "candidateMedianMs": 0.08007849999999962,
+        "candidateDistributionMs": {
+          "min": 0.07853354200000104,
+          "p25": 0.07929079199999978,
+          "median": 0.08007849999999962,
+          "p75": 0.08182966699999997,
+          "max": 0.09031187500000123
+        },
+        "candidateMedianOpsPerSecond": 12487.746398846191,
+        "pairedCandidateBaselineRatios": [
+          5.396362771937668, 5.273089787605532, 5.354589862234317, 5.286946862077892,
+          5.213953185532323, 5.41258451611848, 5.295018777470548, 4.315360589317546,
+          4.279625878143899, 5.789445370611375, 4.995682467002522
+        ]
+      }
+    }
+  },
+  "client": {
+    "baseline": {
+      "suite": "view-transitions",
+      "targets": [
+        {
+          "name": "vt-bundle-root-static",
+          "ops": {
+            "raw": {
+              "score": 166474,
+              "median": 166474,
+              "min": 166474,
+              "samples": 1
+            },
+            "gzip": {
+              "score": 53663,
+              "median": 53663,
+              "min": 53663,
+              "samples": 1
+            },
+            "driver_reachable": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            },
+            "staging_reachable": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            }
+          },
+          "meta": {
+            "revision": "c7b523571345ebf0acc3fddc62742b859adb626c",
+            "sourceSha256": "bd1f11ebf39fd8f077bf4d5abdd571e1216d383289cbcccf491277ade9c736b9",
+            "fixtureSourceSha256": "bbb786f2c180fe8dba7e276ce1d3ef52731a0e172c8bb0b3fde349a06a3ec851",
+            "node": "v24.20.0",
+            "platform": "darwin",
+            "arch": "arm64",
+            "lockfileSha256": "51648462c4e126c7b945cb99c5390b8a77243538c3bc86fbf784021d16e0cace",
+            "toolchain": {
+              "vite": "8.1.5",
+              "esbuild": "0.28.1",
+              "tsrxCore": "0.2.0",
+              "playwright": "1.61.1"
+            },
+            "snapshot": {
+              "text": "Octane",
+              "cleaned": true
+            },
+            "bundleSha256": "25e59d097f5e4bb1ca7bd6d2ee82682438e12f3aad923edf9cbe7df2421e2fa7"
+          }
+        },
+        {
+          "name": "vt-bundle-hooks-state",
+          "ops": {
+            "raw": {
+              "score": 174676,
+              "median": 174676,
+              "min": 174676,
+              "samples": 1
+            },
+            "gzip": {
+              "score": 56565,
+              "median": 56565,
+              "min": 56565,
+              "samples": 1
+            },
+            "driver_reachable": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            },
+            "staging_reachable": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            }
+          },
+          "meta": {
+            "revision": "c7b523571345ebf0acc3fddc62742b859adb626c",
+            "sourceSha256": "bd1f11ebf39fd8f077bf4d5abdd571e1216d383289cbcccf491277ade9c736b9",
+            "fixtureSourceSha256": "bbb786f2c180fe8dba7e276ce1d3ef52731a0e172c8bb0b3fde349a06a3ec851",
+            "node": "v24.20.0",
+            "platform": "darwin",
+            "arch": "arm64",
+            "lockfileSha256": "51648462c4e126c7b945cb99c5390b8a77243538c3bc86fbf784021d16e0cace",
+            "toolchain": {
+              "vite": "8.1.5",
+              "esbuild": "0.28.1",
+              "tsrxCore": "0.2.0",
+              "playwright": "1.61.1"
+            },
+            "snapshot": {
+              "before": "0",
+              "after": "1",
+              "clicks": 1,
+              "effects": 1,
+              "cleanups": 1,
+              "cleaned": true
+            },
+            "bundleSha256": "ddedf77f8bcf4018cf5fa8ee03420b0a78a06794608b49bbca1456faa171571f"
+          }
+        },
+        {
+          "name": "vt-work-root-static",
+          "ops": {
+            "rect_reads": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            },
+            "computed_style_reads": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            },
+            "native_transitions": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            }
+          },
+          "meta": {
+            "revision": "c7b523571345ebf0acc3fddc62742b859adb626c",
+            "sourceSha256": "bd1f11ebf39fd8f077bf4d5abdd571e1216d383289cbcccf491277ade9c736b9",
+            "fixtureSourceSha256": "bbb786f2c180fe8dba7e276ce1d3ef52731a0e172c8bb0b3fde349a06a3ec851",
+            "node": "v24.20.0",
+            "platform": "darwin",
+            "arch": "arm64",
+            "lockfileSha256": "51648462c4e126c7b945cb99c5390b8a77243538c3bc86fbf784021d16e0cace",
+            "toolchain": {
+              "vite": "8.1.5",
+              "esbuild": "0.28.1",
+              "tsrxCore": "0.2.0",
+              "playwright": "1.61.1"
+            },
+            "browser": "149.0.7827.55",
+            "snapshot": {
+              "text": "Octane",
+              "cleaned": true
+            }
+          }
+        },
+        {
+          "name": "vt-work-hooks-state",
+          "ops": {
+            "rect_reads": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            },
+            "computed_style_reads": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            },
+            "native_transitions": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            }
+          },
+          "meta": {
+            "revision": "c7b523571345ebf0acc3fddc62742b859adb626c",
+            "sourceSha256": "bd1f11ebf39fd8f077bf4d5abdd571e1216d383289cbcccf491277ade9c736b9",
+            "fixtureSourceSha256": "bbb786f2c180fe8dba7e276ce1d3ef52731a0e172c8bb0b3fde349a06a3ec851",
+            "node": "v24.20.0",
+            "platform": "darwin",
+            "arch": "arm64",
+            "lockfileSha256": "51648462c4e126c7b945cb99c5390b8a77243538c3bc86fbf784021d16e0cace",
+            "toolchain": {
+              "vite": "8.1.5",
+              "esbuild": "0.28.1",
+              "tsrxCore": "0.2.0",
+              "playwright": "1.61.1"
+            },
+            "browser": "149.0.7827.55",
+            "snapshot": {
+              "before": "0",
+              "after": "1",
+              "clicks": 1,
+              "effects": 1,
+              "cleanups": 1,
+              "cleaned": true
+            }
+          }
+        },
+        {
+          "name": "vt-bundle-active",
+          "ops": {
+            "raw": {
+              "score": 323694,
+              "median": 323694,
+              "min": 323694,
+              "samples": 1
+            },
+            "gzip": {
+              "score": 90391,
+              "median": 90391,
+              "min": 90391,
+              "samples": 1
+            },
+            "driver_reachable": {
+              "score": 1,
+              "median": 1,
+              "min": 1,
+              "samples": 1
+            },
+            "staging_reachable": {
+              "score": 1,
+              "median": 1,
+              "min": 1,
+              "samples": 1
+            }
+          },
+          "meta": {
+            "revision": "c7b523571345ebf0acc3fddc62742b859adb626c",
+            "sourceSha256": "bd1f11ebf39fd8f077bf4d5abdd571e1216d383289cbcccf491277ade9c736b9",
+            "fixtureSourceSha256": "bbb786f2c180fe8dba7e276ce1d3ef52731a0e172c8bb0b3fde349a06a3ec851",
+            "node": "v24.20.0",
+            "platform": "darwin",
+            "arch": "arm64",
+            "lockfileSha256": "51648462c4e126c7b945cb99c5390b8a77243538c3bc86fbf784021d16e0cace",
+            "toolchain": {
+              "vite": "8.1.5",
+              "esbuild": "0.28.1",
+              "tsrxCore": "0.2.0",
+              "playwright": "1.61.1"
+            },
+            "browser": "149.0.7827.55",
+            "snapshot": [
+              {
+                "text": "generation 1",
+                "inputIdentity": true,
+                "inputValue": "retained draft",
+                "kinds": ["update"],
+                "animated": true
+              },
+              {
+                "text": "generation 2",
+                "inputIdentity": true,
+                "inputValue": "retained draft",
+                "kinds": ["update"],
+                "animated": true
+              },
+              {
+                "text": "generation 3",
+                "inputIdentity": true,
+                "inputValue": "retained draft",
+                "kinds": ["update"],
+                "animated": true
+              },
+              {
+                "text": "generation 4",
+                "inputIdentity": true,
+                "inputValue": "retained draft",
+                "kinds": ["update"],
+                "animated": true
+              }
+            ],
+            "bundleSha256": "02fdb8a0f35fc52814bdc0cc74c90c321cce8baf95c1b9104641a880958b6342"
+          }
+        },
+        {
+          "name": "vt-work-four-updates",
+          "ops": {
+            "rect_reads": {
+              "score": 8,
+              "median": 8,
+              "min": 8,
+              "samples": 1
+            },
+            "computed_style_reads": {
+              "score": 24,
+              "median": 24,
+              "min": 24,
+              "samples": 1
+            },
+            "native_transitions": {
+              "score": 4,
+              "median": 4,
+              "min": 4,
+              "samples": 1
+            }
+          },
+          "meta": {
+            "revision": "c7b523571345ebf0acc3fddc62742b859adb626c",
+            "sourceSha256": "bd1f11ebf39fd8f077bf4d5abdd571e1216d383289cbcccf491277ade9c736b9",
+            "fixtureSourceSha256": "bbb786f2c180fe8dba7e276ce1d3ef52731a0e172c8bb0b3fde349a06a3ec851",
+            "node": "v24.20.0",
+            "platform": "darwin",
+            "arch": "arm64",
+            "lockfileSha256": "51648462c4e126c7b945cb99c5390b8a77243538c3bc86fbf784021d16e0cace",
+            "toolchain": {
+              "vite": "8.1.5",
+              "esbuild": "0.28.1",
+              "tsrxCore": "0.2.0",
+              "playwright": "1.61.1"
+            },
+            "browser": "149.0.7827.55",
+            "snapshot": [
+              {
+                "text": "generation 1",
+                "inputIdentity": true,
+                "inputValue": "retained draft",
+                "kinds": ["update"],
+                "animated": true
+              },
+              {
+                "text": "generation 2",
+                "inputIdentity": true,
+                "inputValue": "retained draft",
+                "kinds": ["update"],
+                "animated": true
+              },
+              {
+                "text": "generation 3",
+                "inputIdentity": true,
+                "inputValue": "retained draft",
+                "kinds": ["update"],
+                "animated": true
+              },
+              {
+                "text": "generation 4",
+                "inputIdentity": true,
+                "inputValue": "retained draft",
+                "kinds": ["update"],
+                "animated": true
+              }
+            ]
+          }
+        },
+        {
+          "name": "vt-work-model",
+          "ops": {
+            "updates": {
+              "score": 4,
+              "median": 4,
+              "min": 4,
+              "samples": 1
+            },
+            "rect_reads": {
+              "score": 4,
+              "median": 4,
+              "min": 4,
+              "samples": 1
+            },
+            "computed_style_reads": {
+              "score": 4,
+              "median": 4,
+              "min": 4,
+              "samples": 1
+            },
+            "native_transitions": {
+              "score": 4,
+              "median": 4,
+              "min": 4,
+              "samples": 1
+            },
+            "driver_reachable": {
+              "score": 1,
+              "median": 1,
+              "min": 1,
+              "samples": 1
+            },
+            "staging_reachable": {
+              "score": 1,
+              "median": 1,
+              "min": 1,
+              "samples": 1
+            }
+          },
+          "meta": {
+            "revision": "c7b523571345ebf0acc3fddc62742b859adb626c",
+            "sourceSha256": "bd1f11ebf39fd8f077bf4d5abdd571e1216d383289cbcccf491277ade9c736b9",
+            "fixtureSourceSha256": "bbb786f2c180fe8dba7e276ce1d3ef52731a0e172c8bb0b3fde349a06a3ec851",
+            "node": "v24.20.0",
+            "platform": "darwin",
+            "arch": "arm64",
+            "lockfileSha256": "51648462c4e126c7b945cb99c5390b8a77243538c3bc86fbf784021d16e0cace",
+            "toolchain": {
+              "vite": "8.1.5",
+              "esbuild": "0.28.1",
+              "tsrxCore": "0.2.0",
+              "playwright": "1.61.1"
+            },
+            "semanticControl": "four completed native animations preserve the input and final text"
+          }
+        }
+      ]
+    },
+    "candidate": {
+      "suite": "view-transitions",
+      "targets": [
+        {
+          "name": "vt-bundle-root-static",
+          "ops": {
+            "raw": {
+              "score": 166474,
+              "median": 166474,
+              "min": 166474,
+              "samples": 1
+            },
+            "gzip": {
+              "score": 53663,
+              "median": 53663,
+              "min": 53663,
+              "samples": 1
+            },
+            "driver_reachable": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            },
+            "staging_reachable": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            }
+          },
+          "meta": {
+            "revision": "c7b523571345ebf0acc3fddc62742b859adb626c",
+            "sourceSha256": "3c860af261dfb3cf023141d353750620473844cfe363cb03db50e53aa7021d12",
+            "fixtureSourceSha256": "bbb786f2c180fe8dba7e276ce1d3ef52731a0e172c8bb0b3fde349a06a3ec851",
+            "node": "v24.20.0",
+            "platform": "darwin",
+            "arch": "arm64",
+            "lockfileSha256": "51648462c4e126c7b945cb99c5390b8a77243538c3bc86fbf784021d16e0cace",
+            "toolchain": {
+              "vite": "8.1.5",
+              "esbuild": "0.28.1",
+              "tsrxCore": "0.2.0",
+              "playwright": "1.61.1"
+            },
+            "snapshot": {
+              "text": "Octane",
+              "cleaned": true
+            },
+            "bundleSha256": "25e59d097f5e4bb1ca7bd6d2ee82682438e12f3aad923edf9cbe7df2421e2fa7"
+          }
+        },
+        {
+          "name": "vt-bundle-hooks-state",
+          "ops": {
+            "raw": {
+              "score": 174676,
+              "median": 174676,
+              "min": 174676,
+              "samples": 1
+            },
+            "gzip": {
+              "score": 56565,
+              "median": 56565,
+              "min": 56565,
+              "samples": 1
+            },
+            "driver_reachable": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            },
+            "staging_reachable": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            }
+          },
+          "meta": {
+            "revision": "c7b523571345ebf0acc3fddc62742b859adb626c",
+            "sourceSha256": "3c860af261dfb3cf023141d353750620473844cfe363cb03db50e53aa7021d12",
+            "fixtureSourceSha256": "bbb786f2c180fe8dba7e276ce1d3ef52731a0e172c8bb0b3fde349a06a3ec851",
+            "node": "v24.20.0",
+            "platform": "darwin",
+            "arch": "arm64",
+            "lockfileSha256": "51648462c4e126c7b945cb99c5390b8a77243538c3bc86fbf784021d16e0cace",
+            "toolchain": {
+              "vite": "8.1.5",
+              "esbuild": "0.28.1",
+              "tsrxCore": "0.2.0",
+              "playwright": "1.61.1"
+            },
+            "snapshot": {
+              "before": "0",
+              "after": "1",
+              "clicks": 1,
+              "effects": 1,
+              "cleanups": 1,
+              "cleaned": true
+            },
+            "bundleSha256": "ddedf77f8bcf4018cf5fa8ee03420b0a78a06794608b49bbca1456faa171571f"
+          }
+        },
+        {
+          "name": "vt-work-root-static",
+          "ops": {
+            "rect_reads": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            },
+            "computed_style_reads": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            },
+            "native_transitions": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            }
+          },
+          "meta": {
+            "revision": "c7b523571345ebf0acc3fddc62742b859adb626c",
+            "sourceSha256": "3c860af261dfb3cf023141d353750620473844cfe363cb03db50e53aa7021d12",
+            "fixtureSourceSha256": "bbb786f2c180fe8dba7e276ce1d3ef52731a0e172c8bb0b3fde349a06a3ec851",
+            "node": "v24.20.0",
+            "platform": "darwin",
+            "arch": "arm64",
+            "lockfileSha256": "51648462c4e126c7b945cb99c5390b8a77243538c3bc86fbf784021d16e0cace",
+            "toolchain": {
+              "vite": "8.1.5",
+              "esbuild": "0.28.1",
+              "tsrxCore": "0.2.0",
+              "playwright": "1.61.1"
+            },
+            "browser": "149.0.7827.55",
+            "snapshot": {
+              "text": "Octane",
+              "cleaned": true
+            }
+          }
+        },
+        {
+          "name": "vt-work-hooks-state",
+          "ops": {
+            "rect_reads": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            },
+            "computed_style_reads": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            },
+            "native_transitions": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            }
+          },
+          "meta": {
+            "revision": "c7b523571345ebf0acc3fddc62742b859adb626c",
+            "sourceSha256": "3c860af261dfb3cf023141d353750620473844cfe363cb03db50e53aa7021d12",
+            "fixtureSourceSha256": "bbb786f2c180fe8dba7e276ce1d3ef52731a0e172c8bb0b3fde349a06a3ec851",
+            "node": "v24.20.0",
+            "platform": "darwin",
+            "arch": "arm64",
+            "lockfileSha256": "51648462c4e126c7b945cb99c5390b8a77243538c3bc86fbf784021d16e0cace",
+            "toolchain": {
+              "vite": "8.1.5",
+              "esbuild": "0.28.1",
+              "tsrxCore": "0.2.0",
+              "playwright": "1.61.1"
+            },
+            "browser": "149.0.7827.55",
+            "snapshot": {
+              "before": "0",
+              "after": "1",
+              "clicks": 1,
+              "effects": 1,
+              "cleanups": 1,
+              "cleaned": true
+            }
+          }
+        },
+        {
+          "name": "vt-bundle-active",
+          "ops": {
+            "raw": {
+              "score": 323705,
+              "median": 323705,
+              "min": 323705,
+              "samples": 1
+            },
+            "gzip": {
+              "score": 90415,
+              "median": 90415,
+              "min": 90415,
+              "samples": 1
+            },
+            "driver_reachable": {
+              "score": 1,
+              "median": 1,
+              "min": 1,
+              "samples": 1
+            },
+            "staging_reachable": {
+              "score": 1,
+              "median": 1,
+              "min": 1,
+              "samples": 1
+            }
+          },
+          "meta": {
+            "revision": "c7b523571345ebf0acc3fddc62742b859adb626c",
+            "sourceSha256": "3c860af261dfb3cf023141d353750620473844cfe363cb03db50e53aa7021d12",
+            "fixtureSourceSha256": "bbb786f2c180fe8dba7e276ce1d3ef52731a0e172c8bb0b3fde349a06a3ec851",
+            "node": "v24.20.0",
+            "platform": "darwin",
+            "arch": "arm64",
+            "lockfileSha256": "51648462c4e126c7b945cb99c5390b8a77243538c3bc86fbf784021d16e0cace",
+            "toolchain": {
+              "vite": "8.1.5",
+              "esbuild": "0.28.1",
+              "tsrxCore": "0.2.0",
+              "playwright": "1.61.1"
+            },
+            "browser": "149.0.7827.55",
+            "snapshot": [
+              {
+                "text": "generation 1",
+                "inputIdentity": true,
+                "inputValue": "retained draft",
+                "kinds": ["update"],
+                "animated": true
+              },
+              {
+                "text": "generation 2",
+                "inputIdentity": true,
+                "inputValue": "retained draft",
+                "kinds": ["update"],
+                "animated": true
+              },
+              {
+                "text": "generation 3",
+                "inputIdentity": true,
+                "inputValue": "retained draft",
+                "kinds": ["update"],
+                "animated": true
+              },
+              {
+                "text": "generation 4",
+                "inputIdentity": true,
+                "inputValue": "retained draft",
+                "kinds": ["update"],
+                "animated": true
+              }
+            ],
+            "bundleSha256": "34ee2bba4732eaee00c738932e3b94c2882a18ce84d95979dba63542a7293f53"
+          }
+        },
+        {
+          "name": "vt-work-four-updates",
+          "ops": {
+            "rect_reads": {
+              "score": 8,
+              "median": 8,
+              "min": 8,
+              "samples": 1
+            },
+            "computed_style_reads": {
+              "score": 24,
+              "median": 24,
+              "min": 24,
+              "samples": 1
+            },
+            "native_transitions": {
+              "score": 4,
+              "median": 4,
+              "min": 4,
+              "samples": 1
+            }
+          },
+          "meta": {
+            "revision": "c7b523571345ebf0acc3fddc62742b859adb626c",
+            "sourceSha256": "3c860af261dfb3cf023141d353750620473844cfe363cb03db50e53aa7021d12",
+            "fixtureSourceSha256": "bbb786f2c180fe8dba7e276ce1d3ef52731a0e172c8bb0b3fde349a06a3ec851",
+            "node": "v24.20.0",
+            "platform": "darwin",
+            "arch": "arm64",
+            "lockfileSha256": "51648462c4e126c7b945cb99c5390b8a77243538c3bc86fbf784021d16e0cace",
+            "toolchain": {
+              "vite": "8.1.5",
+              "esbuild": "0.28.1",
+              "tsrxCore": "0.2.0",
+              "playwright": "1.61.1"
+            },
+            "browser": "149.0.7827.55",
+            "snapshot": [
+              {
+                "text": "generation 1",
+                "inputIdentity": true,
+                "inputValue": "retained draft",
+                "kinds": ["update"],
+                "animated": true
+              },
+              {
+                "text": "generation 2",
+                "inputIdentity": true,
+                "inputValue": "retained draft",
+                "kinds": ["update"],
+                "animated": true
+              },
+              {
+                "text": "generation 3",
+                "inputIdentity": true,
+                "inputValue": "retained draft",
+                "kinds": ["update"],
+                "animated": true
+              },
+              {
+                "text": "generation 4",
+                "inputIdentity": true,
+                "inputValue": "retained draft",
+                "kinds": ["update"],
+                "animated": true
+              }
+            ]
+          }
+        },
+        {
+          "name": "vt-work-model",
+          "ops": {
+            "updates": {
+              "score": 4,
+              "median": 4,
+              "min": 4,
+              "samples": 1
+            },
+            "rect_reads": {
+              "score": 4,
+              "median": 4,
+              "min": 4,
+              "samples": 1
+            },
+            "computed_style_reads": {
+              "score": 4,
+              "median": 4,
+              "min": 4,
+              "samples": 1
+            },
+            "native_transitions": {
+              "score": 4,
+              "median": 4,
+              "min": 4,
+              "samples": 1
+            },
+            "driver_reachable": {
+              "score": 1,
+              "median": 1,
+              "min": 1,
+              "samples": 1
+            },
+            "staging_reachable": {
+              "score": 1,
+              "median": 1,
+              "min": 1,
+              "samples": 1
+            }
+          },
+          "meta": {
+            "revision": "c7b523571345ebf0acc3fddc62742b859adb626c",
+            "sourceSha256": "3c860af261dfb3cf023141d353750620473844cfe363cb03db50e53aa7021d12",
+            "fixtureSourceSha256": "bbb786f2c180fe8dba7e276ce1d3ef52731a0e172c8bb0b3fde349a06a3ec851",
+            "node": "v24.20.0",
+            "platform": "darwin",
+            "arch": "arm64",
+            "lockfileSha256": "51648462c4e126c7b945cb99c5390b8a77243538c3bc86fbf784021d16e0cace",
+            "toolchain": {
+              "vite": "8.1.5",
+              "esbuild": "0.28.1",
+              "tsrxCore": "0.2.0",
+              "playwright": "1.61.1"
+            },
+            "semanticControl": "four completed native animations preserve the input and final text"
+          }
+        }
+      ]
+    }
+  },
+  "scopes": {
+    "baseline": {
+      "suite": "view-transition-scopes",
+      "bytesOnly": false,
+      "metadata": {
+        "revision": "c7b523571345ebf0acc3fddc62742b859adb626c",
+        "sourceSha256": "bd1f11ebf39fd8f077bf4d5abdd571e1216d383289cbcccf491277ade9c736b9",
+        "fixtureSha256": "504d1c57ae9686322f5b95b1822db49b41993f869a739acfa08236d3286847f6",
+        "lockfileSha256": "51648462c4e126c7b945cb99c5390b8a77243538c3bc86fbf784021d16e0cace",
+        "node": "v24.20.0",
+        "platform": "darwin",
+        "arch": "arm64",
+        "toolchain": {
+          "vite": "8.1.5",
+          "esbuild": "0.28.1",
+          "tsrxCore": "0.2.0",
+          "playwright": "1.61.1"
+        },
+        "chromium": "149.0.7827.55"
+      },
+      "bundle": {
+        "rawBytes": 320522,
+        "gzipBytes": 89337,
+        "sha256": "dff4ecd448f330553074fd1647e2c999f9d5d1a202489ead9013c8f97300be31",
+        "driverReachable": 1,
+        "stagingReachable": 1
+      },
+      "cases": {
+        "single": {
+          "counts": {
+            "rectReads": 4,
+            "styleReads": 20,
+            "elementCaptures": 1,
+            "documentCaptures": 0
+          },
+          "semantic": {
+            "owners": ["left"],
+            "ready": [["fulfilled", "fulfilled", null]],
+            "finished": ["fulfilled"],
+            "hostsRetained": true,
+            "roots": [
+              {
+                "id": "left",
+                "scope": "all"
+              }
+            ],
+            "text": [["left", "left-after"]],
+            "events": [
+              {
+                "id": "left-root",
+                "targets": ["left", "left"],
+                "animatedTarget": "left",
+                "styleOwner": "left"
+              },
+              {
+                "id": "left",
+                "targets": ["left", "left"],
+                "animatedTarget": "left",
+                "styleOwner": "left"
+              }
+            ]
+          }
+        },
+        "siblings": {
+          "counts": {
+            "rectReads": 8,
+            "styleReads": 40,
+            "elementCaptures": 2,
+            "documentCaptures": 0
+          },
+          "semantic": {
+            "owners": ["left", "right"],
+            "ready": [
+              ["fulfilled", "fulfilled", null],
+              ["fulfilled", "fulfilled", null]
+            ],
+            "finished": ["fulfilled", "fulfilled"],
+            "hostsRetained": true,
+            "roots": [
+              {
+                "id": "left",
+                "scope": "all"
+              },
+              {
+                "id": "right",
+                "scope": "all"
+              }
+            ],
+            "text": [
+              ["left", "left-after"],
+              ["right", "right-after"]
+            ],
+            "events": [
+              {
+                "id": "left-root",
+                "targets": ["left", "left"],
+                "animatedTarget": "left",
+                "styleOwner": "left"
+              },
+              {
+                "id": "left",
+                "targets": ["left", "left"],
+                "animatedTarget": "left",
+                "styleOwner": "left"
+              },
+              {
+                "id": "right-root",
+                "targets": ["right", "right"],
+                "animatedTarget": "right",
+                "styleOwner": "right"
+              },
+              {
+                "id": "right",
+                "targets": ["right", "right"],
+                "animatedTarget": "right",
+                "styleOwner": "right"
+              }
+            ]
+          }
+        },
+        "nested": {
+          "counts": {
+            "rectReads": 8,
+            "styleReads": 40,
+            "elementCaptures": 2,
+            "documentCaptures": 0
+          },
+          "semantic": {
+            "owners": ["inner", "left"],
+            "ready": [
+              ["fulfilled", "fulfilled", null],
+              ["fulfilled", "fulfilled", null]
+            ],
+            "finished": ["fulfilled", "fulfilled"],
+            "hostsRetained": true,
+            "roots": [
+              {
+                "id": "left",
+                "scope": "all"
+              },
+              {
+                "id": "inner",
+                "scope": "all"
+              }
+            ],
+            "text": [
+              ["left", "left-after"],
+              ["inner", "inner-after"]
+            ],
+            "events": [
+              {
+                "id": "left-root",
+                "targets": ["left", "left"],
+                "animatedTarget": "left",
+                "styleOwner": "left"
+              },
+              {
+                "id": "left",
+                "targets": ["left", "left"],
+                "animatedTarget": "left",
+                "styleOwner": "left"
+              },
+              {
+                "id": "inner-root",
+                "targets": ["inner", "inner"],
+                "animatedTarget": "inner",
+                "styleOwner": "inner"
+              },
+              {
+                "id": "inner",
+                "targets": ["inner", "inner"],
+                "animatedTarget": "inner",
+                "styleOwner": "inner"
+              }
+            ]
+          }
+        },
+        "mixed": {
+          "counts": {
+            "rectReads": 14,
+            "styleReads": 64,
+            "elementCaptures": 3,
+            "documentCaptures": 1
+          },
+          "semantic": {
+            "owners": ["document", "inner", "left", "right"],
+            "ready": [
+              ["fulfilled", "fulfilled", null],
+              ["fulfilled", "fulfilled", null],
+              ["fulfilled", "fulfilled", null],
+              ["fulfilled", "fulfilled", null]
+            ],
+            "finished": ["fulfilled", "fulfilled", "fulfilled", "fulfilled"],
+            "hostsRetained": true,
+            "roots": [
+              {
+                "id": "left",
+                "scope": "all"
+              },
+              {
+                "id": "inner",
+                "scope": "all"
+              },
+              {
+                "id": "right",
+                "scope": "all"
+              }
+            ],
+            "text": [
+              ["page", "page-after"],
+              ["left", "left-after"],
+              ["inner", "inner-after"],
+              ["right", "right-after"]
+            ],
+            "events": [
+              {
+                "id": "left-root",
+                "targets": ["left", "left"],
+                "animatedTarget": "left",
+                "styleOwner": "left"
+              },
+              {
+                "id": "left",
+                "targets": ["left", "left"],
+                "animatedTarget": "left",
+                "styleOwner": "left"
+              },
+              {
+                "id": "inner-root",
+                "targets": ["inner", "inner"],
+                "animatedTarget": "inner",
+                "styleOwner": "inner"
+              },
+              {
+                "id": "inner",
+                "targets": ["inner", "inner"],
+                "animatedTarget": "inner",
+                "styleOwner": "inner"
+              },
+              {
+                "id": "right-root",
+                "targets": ["right", "right"],
+                "animatedTarget": "right",
+                "styleOwner": "right"
+              },
+              {
+                "id": "right",
+                "targets": ["right", "right"],
+                "animatedTarget": "right",
+                "styleOwner": "right"
+              },
+              {
+                "id": "page",
+                "targets": ["document", "document"],
+                "animatedTarget": "document",
+                "styleOwner": "document"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "candidate": {
+      "suite": "view-transition-scopes",
+      "bytesOnly": false,
+      "metadata": {
+        "revision": "c7b523571345ebf0acc3fddc62742b859adb626c",
+        "sourceSha256": "3c860af261dfb3cf023141d353750620473844cfe363cb03db50e53aa7021d12",
+        "fixtureSha256": "504d1c57ae9686322f5b95b1822db49b41993f869a739acfa08236d3286847f6",
+        "lockfileSha256": "51648462c4e126c7b945cb99c5390b8a77243538c3bc86fbf784021d16e0cace",
+        "node": "v24.20.0",
+        "platform": "darwin",
+        "arch": "arm64",
+        "toolchain": {
+          "vite": "8.1.5",
+          "esbuild": "0.28.1",
+          "tsrxCore": "0.2.0",
+          "playwright": "1.61.1"
+        },
+        "chromium": "149.0.7827.55"
+      },
+      "bundle": {
+        "rawBytes": 320533,
+        "gzipBytes": 89380,
+        "sha256": "a485e6919494b8d24a9e1b0173f68ce0b485a17658cb94e2a92564ac80064c46",
+        "driverReachable": 1,
+        "stagingReachable": 1
+      },
+      "cases": {
+        "single": {
+          "counts": {
+            "rectReads": 4,
+            "styleReads": 20,
+            "elementCaptures": 1,
+            "documentCaptures": 0
+          },
+          "semantic": {
+            "owners": ["left"],
+            "ready": [["fulfilled", "fulfilled", null]],
+            "finished": ["fulfilled"],
+            "hostsRetained": true,
+            "roots": [
+              {
+                "id": "left",
+                "scope": "all"
+              }
+            ],
+            "text": [["left", "left-after"]],
+            "events": [
+              {
+                "id": "left-root",
+                "targets": ["left", "left"],
+                "animatedTarget": "left",
+                "styleOwner": "left"
+              },
+              {
+                "id": "left",
+                "targets": ["left", "left"],
+                "animatedTarget": "left",
+                "styleOwner": "left"
+              }
+            ]
+          }
+        },
+        "siblings": {
+          "counts": {
+            "rectReads": 8,
+            "styleReads": 40,
+            "elementCaptures": 2,
+            "documentCaptures": 0
+          },
+          "semantic": {
+            "owners": ["left", "right"],
+            "ready": [
+              ["fulfilled", "fulfilled", null],
+              ["fulfilled", "fulfilled", null]
+            ],
+            "finished": ["fulfilled", "fulfilled"],
+            "hostsRetained": true,
+            "roots": [
+              {
+                "id": "left",
+                "scope": "all"
+              },
+              {
+                "id": "right",
+                "scope": "all"
+              }
+            ],
+            "text": [
+              ["left", "left-after"],
+              ["right", "right-after"]
+            ],
+            "events": [
+              {
+                "id": "left-root",
+                "targets": ["left", "left"],
+                "animatedTarget": "left",
+                "styleOwner": "left"
+              },
+              {
+                "id": "left",
+                "targets": ["left", "left"],
+                "animatedTarget": "left",
+                "styleOwner": "left"
+              },
+              {
+                "id": "right-root",
+                "targets": ["right", "right"],
+                "animatedTarget": "right",
+                "styleOwner": "right"
+              },
+              {
+                "id": "right",
+                "targets": ["right", "right"],
+                "animatedTarget": "right",
+                "styleOwner": "right"
+              }
+            ]
+          }
+        },
+        "nested": {
+          "counts": {
+            "rectReads": 8,
+            "styleReads": 40,
+            "elementCaptures": 2,
+            "documentCaptures": 0
+          },
+          "semantic": {
+            "owners": ["inner", "left"],
+            "ready": [
+              ["fulfilled", "fulfilled", null],
+              ["fulfilled", "fulfilled", null]
+            ],
+            "finished": ["fulfilled", "fulfilled"],
+            "hostsRetained": true,
+            "roots": [
+              {
+                "id": "left",
+                "scope": "all"
+              },
+              {
+                "id": "inner",
+                "scope": "all"
+              }
+            ],
+            "text": [
+              ["left", "left-after"],
+              ["inner", "inner-after"]
+            ],
+            "events": [
+              {
+                "id": "left-root",
+                "targets": ["left", "left"],
+                "animatedTarget": "left",
+                "styleOwner": "left"
+              },
+              {
+                "id": "left",
+                "targets": ["left", "left"],
+                "animatedTarget": "left",
+                "styleOwner": "left"
+              },
+              {
+                "id": "inner-root",
+                "targets": ["inner", "inner"],
+                "animatedTarget": "inner",
+                "styleOwner": "inner"
+              },
+              {
+                "id": "inner",
+                "targets": ["inner", "inner"],
+                "animatedTarget": "inner",
+                "styleOwner": "inner"
+              }
+            ]
+          }
+        },
+        "mixed": {
+          "counts": {
+            "rectReads": 14,
+            "styleReads": 64,
+            "elementCaptures": 3,
+            "documentCaptures": 1
+          },
+          "semantic": {
+            "owners": ["document", "inner", "left", "right"],
+            "ready": [
+              ["fulfilled", "fulfilled", null],
+              ["fulfilled", "fulfilled", null],
+              ["fulfilled", "fulfilled", null],
+              ["fulfilled", "fulfilled", null]
+            ],
+            "finished": ["fulfilled", "fulfilled", "fulfilled", "fulfilled"],
+            "hostsRetained": true,
+            "roots": [
+              {
+                "id": "left",
+                "scope": "all"
+              },
+              {
+                "id": "inner",
+                "scope": "all"
+              },
+              {
+                "id": "right",
+                "scope": "all"
+              }
+            ],
+            "text": [
+              ["page", "page-after"],
+              ["left", "left-after"],
+              ["inner", "inner-after"],
+              ["right", "right-after"]
+            ],
+            "events": [
+              {
+                "id": "left-root",
+                "targets": ["left", "left"],
+                "animatedTarget": "left",
+                "styleOwner": "left"
+              },
+              {
+                "id": "left",
+                "targets": ["left", "left"],
+                "animatedTarget": "left",
+                "styleOwner": "left"
+              },
+              {
+                "id": "inner-root",
+                "targets": ["inner", "inner"],
+                "animatedTarget": "inner",
+                "styleOwner": "inner"
+              },
+              {
+                "id": "inner",
+                "targets": ["inner", "inner"],
+                "animatedTarget": "inner",
+                "styleOwner": "inner"
+              },
+              {
+                "id": "right-root",
+                "targets": ["right", "right"],
+                "animatedTarget": "right",
+                "styleOwner": "right"
+              },
+              {
+                "id": "right",
+                "targets": ["right", "right"],
+                "animatedTarget": "right",
+                "styleOwner": "right"
+              },
+              {
+                "id": "page",
+                "targets": ["document", "document"],
+                "animatedTarget": "document",
+                "styleOwner": "document"
+              }
+            ]
+          }
+        }
+      }
+    }
+  },
+  "adapter": {
+    "baseline": {
+      "suite": "view-transition-dom-stage-work",
+      "metadata": {
+        "revision": "759330f349960a95d48ddff5115c91f6291054ce",
+        "workingTree": false,
+        "adapterSha256": "5468e10995cdf7853ef6cb7fad252121fee78187fa4550dfebf9adf35e6e3ac6",
+        "fixtureSha256": "d70be48d64e4a7dbd05c08b0f6f2cc5244b8b1377c0fd13054479c89657e37cf",
+        "node": "v24.20.0",
+        "chromium": "149.0.7827.55"
+      },
+      "cases": {
+        "structure-256": {
+          "valid": true,
+          "retainedHosts": 256,
+          "insertedHosts": 256,
+          "copiedNodeSlots": 0,
+          "searchedNodeSlots": 0,
+          "removedHosts": 0,
+          "clearedParents": 1
+        },
+        "structure-1024": {
+          "valid": true,
+          "retainedHosts": 1024,
+          "insertedHosts": 1024,
+          "copiedNodeSlots": 0,
+          "searchedNodeSlots": 0,
+          "removedHosts": 0,
+          "clearedParents": 1
+        },
+        "radio-projection": {
+          "valid": true,
+          "controls": 24,
+          "associationReads": 48,
+          "backgroundElements": 1024,
+          "importedNodes": 1102,
+          "createdElements": 1030
+        },
+        "created-template": {
+          "valid": true,
+          "ordinaryElements": 2049,
+          "templateElements": 2,
+          "childCollectionReads": 0
+        }
+      }
+    },
+    "candidate": {
+      "suite": "view-transition-dom-stage-work",
+      "metadata": {
+        "revision": "c7b523571345ebf0acc3fddc62742b859adb626c",
+        "workingTree": true,
+        "adapterSha256": "4431364b5f367318b2f7bd3c7804ef1a6636194da136aedc904af098e3b1d331",
+        "fixtureSha256": "d70be48d64e4a7dbd05c08b0f6f2cc5244b8b1377c0fd13054479c89657e37cf",
+        "node": "v24.20.0",
+        "chromium": "149.0.7827.55"
+      },
+      "cases": {
+        "structure-256": {
+          "valid": true,
+          "retainedHosts": 256,
+          "insertedHosts": 256,
+          "copiedNodeSlots": 0,
+          "searchedNodeSlots": 0,
+          "removedHosts": 0,
+          "clearedParents": 1
+        },
+        "structure-1024": {
+          "valid": true,
+          "retainedHosts": 1024,
+          "insertedHosts": 1024,
+          "copiedNodeSlots": 0,
+          "searchedNodeSlots": 0,
+          "removedHosts": 0,
+          "clearedParents": 1
+        },
+        "radio-projection": {
+          "valid": true,
+          "controls": 24,
+          "associationReads": 48,
+          "backgroundElements": 1024,
+          "importedNodes": 1102,
+          "createdElements": 1030
+        },
+        "created-template": {
+          "valid": true,
+          "ordinaryElements": 2049,
+          "templateElements": 2,
+          "childCollectionReads": 0
+        }
+      }
+    }
+  },
+  "rejectedSsr": [
+    {
+      "node": "v24.20.0",
+      "platform": "darwin",
+      "arch": "arm64",
+      "verifyOnly": false,
+      "baselineRevision": "759330f349960a95d48ddff5115c91f6291054ce",
+      "candidateRevision": "c7b523571345ebf0acc3fddc62742b859adb626c",
+      "compiledHash": "a3d2ce70f5355b1df7554618e8c1698e38a841f607bf6c4cbb37b0a4050173f7",
+      "lockfileHash": "51648462c4e126c7b945cb99c5390b8a77243538c3bc86fbf784021d16e0cace",
+      "method": "Identical compiled fixture; production minified bundles; five warmup batches per side; 11 paired alternating batches; same process/dependencies; per-operation batch times in milliseconds. Ready small:50000 warmup/10000 per sample; streamed and 200-row pages:5000 warmup/1000 per sample; 1600-row pages:1250 warmup/250 per sample.",
+      "limitations": [
+        "Synthetic server-only scenarios include tiny boundaries surrounded by 200/1600 unrelated four-host rows. Browser capture/animation/resource waits, backpressure, concurrency, and allocation/GC behavior are not measured.",
+        "Ready response bytes include RenderResult.css followed by RenderResult.html; timing still measures renderToString itself. Streamed CSS is already included in the response.",
+        "Batch timings and observed spread limit conclusions about individual latency; distributions are descriptive, not a performance guarantee."
+      ],
+      "meta": {
+        "baseline": {
+          "sourceSha256": "a00ac687f2bc505d5cca78d67b108776999ecec53b6afb1312947597e98c3ccc",
+          "serverSourceHash": "559abbf8a5e080c246198bc67b00c0adbd06ed222e259f7c4d4c5f132fb5942b",
+          "bundleHash": "643a5ea1ca71a450461d4e9844f8ed2c1f52627f612754ce694a58f680315473",
+          "bundleBytes": 611336,
+          "bundleGzip": 37486
+        },
+        "candidate": {
+          "sourceSha256": "507dc65772baaa15b915c04eb40c71db97feaad63aa3d1f9f5df031da1924c4a",
+          "serverSourceHash": "62f7181d478fd22175fdf9d8cf45e7c72507481149604145fa269c2cd3750f64",
+          "bundleHash": "38c070459359c8b1fe20cc39d38a8b6449ab2caee1ee2bded9df5bbd6053225b",
+          "bundleBytes": 612198,
+          "bundleGzip": 37993
+        }
+      },
+      "samples": {
+        "Plain": {
+          "repetitions": 10000,
+          "warmupRepetitions": 50000,
+          "baseline": [
+            0.0003115999999999985, 0.00033088750000000573, 0.000309212500000001,
+            0.000314266699999996, 0.00032655000000000883, 0.00031073330000000395,
+            0.00030554590000000416, 0.000299633300000005, 0.0003047084000000041,
+            0.0002994667000000049, 0.00030207919999999147
+          ],
+          "candidate": [
+            0.00034144999999999754, 0.0003205332999999996, 0.00032034999999999627,
+            0.00031007919999999557, 0.0003113916000000017, 0.0003062332999999967,
+            0.00030224170000000183, 0.00030979170000000524, 0.000306837500000006,
+            0.0003131917000000044, 0.00031009579999999917
+          ],
+          "wire": {
+            "baseline": {
+              "bytes": 31,
+              "separateCssBytes": 0,
+              "gzip": 45,
+              "hasAnimationDriver": false,
+              "hasElementScope": false,
+              "scopeHosts": 0,
+              "scriptBytes": 0
+            },
+            "candidate": {
+              "bytes": 31,
+              "separateCssBytes": 0,
+              "gzip": 45,
+              "hasAnimationDriver": false,
+              "hasElementScope": false,
+              "scopeHosts": 0,
+              "scriptBytes": 0
+            }
+          },
+          "unrelatedPageRows": 0,
+          "trustedRawHtml": false,
+          "baselineMedianMs": 0.000309212500000001,
+          "baselineDistributionMs": {
+            "min": 0.0002994667000000049,
+            "p25": 0.00030207919999999147,
+            "median": 0.000309212500000001,
+            "p75": 0.000314266699999996,
+            "max": 0.00033088750000000573
+          },
+          "baselineMedianOpsPerSecond": 3234021.9104984333,
+          "candidateMedianMs": 0.00031009579999999917,
+          "candidateDistributionMs": {
+            "min": 0.00030224170000000183,
+            "p25": 0.000306837500000006,
+            "median": 0.00031009579999999917,
+            "p75": 0.00032034999999999627,
+            "max": 0.00034144999999999754
+          },
+          "candidateMedianOpsPerSecond": 3224809.8813334545,
+          "pairedCandidateBaselineRatios": [
+            1.0957958921694453, 0.9687077934343062, 1.036018919028161, 0.9866753302211132,
+            0.9535801561782064, 0.9855181276032945, 0.9891859128202922, 1.033902773823871,
+            1.0069873360891983, 1.0458314730819795, 1.0265380734589071
+          ]
+        },
+        "View": {
+          "repetitions": 10000,
+          "warmupRepetitions": 50000,
+          "baseline": [
+            0.0021044291000000158, 0.00206764169999999, 0.0020649417000000083, 0.002056499999999983,
+            0.002099675000000002, 0.0020702208000000157, 0.0020642916000000013,
+            0.002031370900000002, 0.0020527333, 0.0020171416000000137, 0.002047412499999996
+          ],
+          "candidate": [
+            0.0017673125000000028, 0.0017516166999999995, 0.001797745800000007,
+            0.0017928791000000046, 0.0018111208000000034, 0.0017805000000000065,
+            0.001736895800000002, 0.0017342791999999919, 0.0017439082999999983,
+            0.0017515207999999802, 0.0017753292000000102
+          ],
+          "wire": {
+            "baseline": {
+              "bytes": 113,
+              "separateCssBytes": 0,
+              "gzip": 105,
+              "hasAnimationDriver": false,
+              "hasElementScope": false,
+              "scopeHosts": 0,
+              "scriptBytes": 0
+            },
+            "candidate": {
+              "bytes": 113,
+              "separateCssBytes": 0,
+              "gzip": 105,
+              "hasAnimationDriver": false,
+              "hasElementScope": false,
+              "scopeHosts": 0,
+              "scriptBytes": 0
+            }
+          },
+          "unrelatedPageRows": 0,
+          "trustedRawHtml": false,
+          "baselineMedianMs": 0.0020642916000000013,
+          "baselineDistributionMs": {
+            "min": 0.0020171416000000137,
+            "p25": 0.002047412499999996,
+            "median": 0.0020642916000000013,
+            "p75": 0.0020702208000000157,
+            "max": 0.0021044291000000158
+          },
+          "baselineMedianOpsPerSecond": 484427.6845383663,
+          "candidateMedianMs": 0.0017673125000000028,
+          "candidateDistributionMs": {
+            "min": 0.0017342791999999919,
+            "p25": 0.0017439082999999983,
+            "median": 0.0017673125000000028,
+            "p75": 0.0017928791000000046,
+            "max": 0.0018111208000000034
+          },
+          "candidateMedianOpsPerSecond": 565830.8872935593,
+          "pairedCandidateBaselineRatios": [
+            0.8398061498009078, 0.8471567873679506, 0.8706036591735252, 0.8718108922927399,
+            0.8625719694714666, 0.860053188529452, 0.8414004106784143, 0.8537481756778097,
+            0.8495542504230815, 0.8683182182153044, 0.8671087042791883
+          ]
+        },
+        "PlainStream": {
+          "repetitions": 1000,
+          "warmupRepetitions": 5000,
+          "baseline": [
+            0.021577207999999928, 0.020893332999999983, 0.020985124999999924, 0.019945167000000083,
+            0.019374207999999952, 0.020362375000000158, 0.019084249999999883, 0.019918916999999967,
+            0.019319082999999865, 0.019788583000000016, 0.020069750000000112
+          ],
+          "candidate": [
+            0.02074029100000007, 0.021352833000000147, 0.02123241599999983, 0.019650875000000043,
+            0.019714167000000088, 0.02129925000000003, 0.019181957999999895, 0.01948904100000027,
+            0.019767374999999903, 0.020285375000000386, 0.01927737500000012
+          ],
+          "wire": {
+            "baseline": {
+              "bytes": 2830,
+              "separateCssBytes": 0,
+              "gzip": 1175,
+              "hasAnimationDriver": false,
+              "hasElementScope": false,
+              "scopeHosts": 0,
+              "scriptBytes": 2496
+            },
+            "candidate": {
+              "bytes": 2830,
+              "separateCssBytes": 0,
+              "gzip": 1174,
+              "hasAnimationDriver": false,
+              "hasElementScope": false,
+              "scopeHosts": 0,
+              "scriptBytes": 2496
+            }
+          },
+          "unrelatedPageRows": 0,
+          "trustedRawHtml": false,
+          "baselineMedianMs": 0.019945167000000083,
+          "baselineDistributionMs": {
+            "min": 0.019084249999999883,
+            "p25": 0.019374207999999952,
+            "median": 0.019945167000000083,
+            "p75": 0.020893332999999983,
+            "max": 0.021577207999999928
+          },
+          "baselineMedianOpsPerSecond": 50137.45936546913,
+          "candidateMedianMs": 0.019767374999999903,
+          "candidateDistributionMs": {
+            "min": 0.019181957999999895,
+            "p25": 0.01948904100000027,
+            "median": 0.019767374999999903,
+            "p75": 0.02123241599999983,
+            "max": 0.021352833000000147
+          },
+          "candidateMedianOpsPerSecond": 50588.406401963075,
+          "pairedCandidateBaselineRatios": [
+            0.9612129150351677, 1.0219926614868085, 1.011784108981953, 0.9852449468084153,
+            1.0175469882433459, 1.046010104420524, 1.0051198239385888, 0.9784187061977467,
+            1.0232046210474919, 1.0251049809882986, 0.9605189401960669
+          ]
+        },
+        "ViewStream": {
+          "repetitions": 1000,
+          "warmupRepetitions": 5000,
+          "baseline": [
+            0.028970582999999807, 0.02794374999999991, 0.02774745800000028, 0.027610291999999845,
+            0.027375917000000298, 0.027802667000000385, 0.027471457999999983, 0.02703716600000007,
+            0.02692141700000002, 0.027121458000000074, 0.026705041000000165
+          ],
+          "candidate": [
+            0.03794787499999984, 0.036493791999999754, 0.037780667, 0.035965832999999746,
+            0.03721604200000002, 0.036612750000000235, 0.037852000000000316, 0.037567665999999916,
+            0.036409040999999885, 0.03571100000000024, 0.036449791
+          ],
+          "wire": {
+            "baseline": {
+              "bytes": 13118,
+              "separateCssBytes": 0,
+              "gzip": 4132,
+              "hasAnimationDriver": true,
+              "hasElementScope": false,
+              "scopeHosts": 0,
+              "scriptBytes": 12696
+            },
+            "candidate": {
+              "bytes": 13118,
+              "separateCssBytes": 0,
+              "gzip": 4130,
+              "hasAnimationDriver": true,
+              "hasElementScope": false,
+              "scopeHosts": 0,
+              "scriptBytes": 12696
+            }
+          },
+          "unrelatedPageRows": 0,
+          "trustedRawHtml": false,
+          "baselineMedianMs": 0.027471457999999983,
+          "baselineDistributionMs": {
+            "min": 0.026705041000000165,
+            "p25": 0.02703716600000007,
+            "median": 0.027471457999999983,
+            "p75": 0.027802667000000385,
+            "max": 0.028970582999999807
+          },
+          "baselineMedianOpsPerSecond": 36401.4170634846,
+          "candidateMedianMs": 0.036612750000000235,
+          "candidateDistributionMs": {
+            "min": 0.03571100000000024,
+            "p25": 0.036409040999999885,
+            "median": 0.036612750000000235,
+            "p75": 0.037780667,
+            "max": 0.03794787499999984
+          },
+          "candidateMedianOpsPerSecond": 27312.88963544103,
+          "pairedCandidateBaselineRatios": [
+            1.3098761250334552, 1.305973321404603, 1.3615902040467858, 1.3026241446486675,
+            1.3594445804317574, 1.3168790605591805, 1.3778664386870307, 1.3894823887976948,
+            1.3524191910106313, 1.3167064985960617, 1.3649030158762825
+          ]
+        },
+        "ScopedView": {
+          "repetitions": 10000,
+          "warmupRepetitions": 50000,
+          "baseline": [
+            0.004604870800000026, 0.004636808299999984, 0.004716495899999972, 0.004617037499999969,
+            0.004615766699999995, 0.004519487500000014, 0.004633858299999975, 0.004628150000000005,
+            0.0049445292000000335, 0.0051865499999999886, 0.006284945799999968
+          ],
+          "candidate": [
+            0.003501908299999968, 0.003475274999999965, 0.0035268625000000157, 0.003568708400000014,
+            0.003503129200000012, 0.003500475000000006, 0.0034588666999999986, 0.00353067089999995,
+            0.0036909999999999855, 0.003649816699999974, 0.004024662499999976
+          ],
+          "wire": {
+            "baseline": {
+              "bytes": 266,
+              "separateCssBytes": 115,
+              "gzip": 176,
+              "hasAnimationDriver": false,
+              "hasElementScope": true,
+              "scopeHosts": 1,
+              "scriptBytes": 0
+            },
+            "candidate": {
+              "bytes": 266,
+              "separateCssBytes": 115,
+              "gzip": 176,
+              "hasAnimationDriver": false,
+              "hasElementScope": true,
+              "scopeHosts": 1,
+              "scriptBytes": 0
+            }
+          },
+          "unrelatedPageRows": 0,
+          "trustedRawHtml": false,
+          "baselineMedianMs": 0.004633858299999975,
+          "baselineDistributionMs": {
+            "min": 0.004519487500000014,
+            "p25": 0.004615766699999995,
+            "median": 0.004633858299999975,
+            "p75": 0.0049445292000000335,
+            "max": 0.006284945799999968
+          },
+          "baselineMedianOpsPerSecond": 215802.88719661656,
+          "candidateMedianMs": 0.0035268625000000157,
+          "candidateDistributionMs": {
+            "min": 0.0034588666999999986,
+            "p25": 0.003500475000000006,
+            "median": 0.0035268625000000157,
+            "p75": 0.003649816699999974,
+            "max": 0.004024662499999976
+          },
+          "candidateMedianOpsPerSecond": 283538.1305622194,
+          "pairedCandidateBaselineRatios": [
+            0.7604791648008775, 0.7494972349838093, 0.7477717726840463, 0.7729433429986301,
+            0.7589484971153364, 0.7745291916395377, 0.7464334202882331, 0.7628687272452159,
+            0.7464815861538365, 0.7037079947171013, 0.6403655064137541
+          ]
+        },
+        "ScopedViewStream": {
+          "repetitions": 1000,
+          "warmupRepetitions": 5000,
+          "baseline": [
+            0.03285933300000033, 0.03217866700000013, 0.03237916700000005, 0.0321610840000003,
+            0.03185329199999978, 0.03281329199999982, 0.03270995800000037, 0.033774708000000826,
+            0.035718792000000575, 0.03974970800000028, 0.03837633300000016
+          ],
+          "candidate": [
+            0.04060683300000073, 0.04051166699999976, 0.04058304200000021, 0.04040270799999962,
+            0.040077540999999654, 0.039895167000000585, 0.040281667000000194, 0.03965745799999968,
+            0.04380804199999966, 0.0440219590000006, 0.0472514999999994
+          ],
+          "wire": {
+            "baseline": {
+              "bytes": 13213,
+              "separateCssBytes": 0,
+              "gzip": 4163,
+              "hasAnimationDriver": true,
+              "hasElementScope": true,
+              "scopeHosts": 1,
+              "scriptBytes": 12638
+            },
+            "candidate": {
+              "bytes": 13213,
+              "separateCssBytes": 0,
+              "gzip": 4164,
+              "hasAnimationDriver": true,
+              "hasElementScope": true,
+              "scopeHosts": 1,
+              "scriptBytes": 12638
+            }
+          },
+          "unrelatedPageRows": 0,
+          "trustedRawHtml": false,
+          "baselineMedianMs": 0.03281329199999982,
+          "baselineDistributionMs": {
+            "min": 0.03185329199999978,
+            "p25": 0.03217866700000013,
+            "median": 0.03281329199999982,
+            "p75": 0.035718792000000575,
+            "max": 0.03974970800000028
+          },
+          "baselineMedianOpsPerSecond": 30475.45488578243,
+          "candidateMedianMs": 0.04051166699999976,
+          "candidateDistributionMs": {
+            "min": 0.03965745799999968,
+            "p25": 0.040077540999999654,
+            "median": 0.04051166699999976,
+            "p75": 0.04380804199999966,
+            "max": 0.0472514999999994
+          },
+          "candidateMedianOpsPerSecond": 24684.247133054436,
+          "pairedCandidateBaselineRatios": [
+            1.235777762135352, 1.258960385152051, 1.2533689331785511, 1.2562607653398512,
+            1.258191492420938, 1.2158233620692738, 1.2314802421941273, 1.174176191249343,
+            1.2264704248676426, 1.1074788021084405, 1.2312666767822555
+          ]
+        },
+        "PlainPage": {
+          "repetitions": 1000,
+          "warmupRepetitions": 5000,
+          "baseline": [
+            0.007813124999999673, 0.008002542000000177, 0.007807082999999693, 0.007583583000000544,
+            0.007703459000000293, 0.007615708999999697, 0.007973708999999872, 0.007830167000000074,
+            0.0066982500000003714, 0.007151959000000716, 0.006657249999999294
+          ],
+          "candidate": [
+            0.007805292000000009, 0.007315209000000323, 0.007841792000000168, 0.00802479200000016,
+            0.007096292000000176, 0.007975999999999659, 0.007719833000000108, 0.00845641699999942,
+            0.006851708000000145, 0.0068203749999993304, 0.006424665999999888
+          ],
+          "wire": {
+            "baseline": {
+              "bytes": 24521,
+              "separateCssBytes": 0,
+              "gzip": 711,
+              "hasAnimationDriver": false,
+              "hasElementScope": false,
+              "scopeHosts": 0,
+              "scriptBytes": 0
+            },
+            "candidate": {
+              "bytes": 24521,
+              "separateCssBytes": 0,
+              "gzip": 711,
+              "hasAnimationDriver": false,
+              "hasElementScope": false,
+              "scopeHosts": 0,
+              "scriptBytes": 0
+            }
+          },
+          "unrelatedPageRows": 200,
+          "trustedRawHtml": false,
+          "baselineMedianMs": 0.007703459000000293,
+          "baselineDistributionMs": {
+            "min": 0.006657249999999294,
+            "p25": 0.007151959000000716,
+            "median": 0.007703459000000293,
+            "p75": 0.007830167000000074,
+            "max": 0.008002542000000177
+          },
+          "baselineMedianOpsPerSecond": 129811.8157051218,
+          "candidateMedianMs": 0.007719833000000108,
+          "candidateDistributionMs": {
+            "min": 0.006424665999999888,
+            "p25": 0.006851708000000145,
+            "median": 0.007719833000000108,
+            "p75": 0.007975999999999659,
+            "max": 0.00845641699999942
+          },
+          "candidateMedianOpsPerSecond": 129536.48090573799,
+          "pairedCandidateBaselineRatios": [
+            0.9989974562035467, 0.914110666335792, 1.0044458346350968, 1.0581794911454896,
+            0.9211825492937531, 1.0473089242249114, 0.9681608646616313, 1.0799791370987797,
+            1.0229101631022677, 0.9536373181108347, 0.9650630515604145
+          ]
+        },
+        "ViewPage": {
+          "repetitions": 1000,
+          "warmupRepetitions": 5000,
+          "baseline": [
+            0.13677879099999973, 0.15944087500000023, 0.14915091699999994, 0.12787995800000043,
+            0.12648762499999974, 0.12924083400000017, 0.15571591700000134, 0.14406195800000024,
+            0.13583412499999942, 0.12914620800000012, 0.12861795899999925
+          ],
+          "candidate": [
+            0.06675120800000059, 0.07227949999999965, 0.0682130419999994, 0.06626774999999997,
+            0.06499766699999963, 0.06556066699999974, 0.06905462499999886, 0.07222887500000069,
+            0.06672800000000098, 0.06680974999999853, 0.0650367499999993
+          ],
+          "wire": {
+            "baseline": {
+              "bytes": 24603,
+              "separateCssBytes": 0,
+              "gzip": 771,
+              "hasAnimationDriver": false,
+              "hasElementScope": false,
+              "scopeHosts": 0,
+              "scriptBytes": 0
+            },
+            "candidate": {
+              "bytes": 24603,
+              "separateCssBytes": 0,
+              "gzip": 771,
+              "hasAnimationDriver": false,
+              "hasElementScope": false,
+              "scopeHosts": 0,
+              "scriptBytes": 0
+            }
+          },
+          "unrelatedPageRows": 200,
+          "trustedRawHtml": false,
+          "baselineMedianMs": 0.13583412499999942,
+          "baselineDistributionMs": {
+            "min": 0.12648762499999974,
+            "p25": 0.12861795899999925,
+            "median": 0.13583412499999942,
+            "p75": 0.14915091699999994,
+            "max": 0.15944087500000023
+          },
+          "baselineMedianOpsPerSecond": 7361.920283286724,
+          "candidateMedianMs": 0.06675120800000059,
+          "candidateDistributionMs": {
+            "min": 0.06499766699999963,
+            "p25": 0.06556066699999974,
+            "median": 0.06675120800000059,
+            "p75": 0.06905462499999886,
+            "max": 0.07227949999999965
+          },
+          "candidateMedianOpsPerSecond": 14981.00229137413,
+          "pairedCandidateBaselineRatios": [
+            0.48802308831638025, 0.453331054536671, 0.4573424245189148, 0.5182027820184282,
+            0.5138658188893954, 0.5072751774412076, 0.4434654229984611, 0.5013736867299872,
+            0.49124621666316376, 0.5173187121374749, 0.5056583894322229
+          ]
+        },
+        "PlainLargePage": {
+          "repetitions": 250,
+          "warmupRepetitions": 1250,
+          "baseline": [
+            0.2169368319999994, 0.20550966799999879, 0.21515066400000069, 0.20692483599999834,
+            0.19600183199999446, 0.1932459999999992, 0.19084599999999774, 0.2019528319999954,
+            0.2028194999999978, 0.20205216400000062, 0.1975665000000008
+          ],
+          "candidate": [
+            0.20126383599999825, 0.2058351679999978, 0.2007581680000003, 0.19485166399999435,
+            0.19583683200000088, 0.20603600000000005, 0.19040466799999559, 0.1953908320000046,
+            0.2401875, 0.250067836000002, 0.19721666399999957
+          ],
+          "wire": {
+            "baseline": {
+              "bytes": 197321,
+              "separateCssBytes": 0,
+              "gzip": 4651,
+              "hasAnimationDriver": false,
+              "hasElementScope": false,
+              "scopeHosts": 0,
+              "scriptBytes": 0
+            },
+            "candidate": {
+              "bytes": 197321,
+              "separateCssBytes": 0,
+              "gzip": 4651,
+              "hasAnimationDriver": false,
+              "hasElementScope": false,
+              "scopeHosts": 0,
+              "scriptBytes": 0
+            }
+          },
+          "unrelatedPageRows": 1600,
+          "trustedRawHtml": false,
+          "baselineMedianMs": 0.20205216400000062,
+          "baselineDistributionMs": {
+            "min": 0.19084599999999774,
+            "p25": 0.19600183199999446,
+            "median": 0.20205216400000062,
+            "p75": 0.20692483599999834,
+            "max": 0.2169368319999994
+          },
+          "baselineMedianOpsPerSecond": 4949.216975473704,
+          "candidateMedianMs": 0.2007581680000003,
+          "candidateDistributionMs": {
+            "min": 0.19040466799999559,
+            "p25": 0.1953908320000046,
+            "median": 0.2007581680000003,
+            "p75": 0.20603600000000005,
+            "max": 0.250067836000002
+          },
+          "candidateMedianOpsPerSecond": 4981.11738098745,
+          "pairedCandidateBaselineRatios": [
+            0.9277531811656529, 1.0015838670908612, 0.9331050356414408, 0.9416543116167839,
+            0.9991581711338617, 1.0661850698074005, 0.9976874967250969, 0.9675072642705453,
+            1.1842426393911958, 1.2376399789511843, 0.9982292746999049
+          ]
+        },
+        "ViewLargePage": {
+          "repetitions": 250,
+          "warmupRepetitions": 1250,
+          "baseline": [
+            1.138566663999998, 1.172182667999994, 1.1577059999999983, 1.1104036639999977,
+            1.129928835999999, 1.1295393320000002, 1.1324153359999982, 1.1258128320000105,
+            1.1236088319999982, 1.1315296680000029, 1.1186195000000008
+          ],
+          "candidate": [
+            0.665622663999995, 0.7010168320000012, 0.6822975000000006, 0.6796478320000023,
+            0.7102644999999975, 0.6798625000000029, 0.6729531639999914, 0.657835500000001,
+            0.676531667999996, 0.66022516799999, 0.6840136679999996
+          ],
+          "wire": {
+            "baseline": {
+              "bytes": 197403,
+              "separateCssBytes": 0,
+              "gzip": 4727,
+              "hasAnimationDriver": false,
+              "hasElementScope": false,
+              "scopeHosts": 0,
+              "scriptBytes": 0
+            },
+            "candidate": {
+              "bytes": 197403,
+              "separateCssBytes": 0,
+              "gzip": 4727,
+              "hasAnimationDriver": false,
+              "hasElementScope": false,
+              "scopeHosts": 0,
+              "scriptBytes": 0
+            }
+          },
+          "unrelatedPageRows": 1600,
+          "trustedRawHtml": false,
+          "baselineMedianMs": 1.129928835999999,
+          "baselineDistributionMs": {
+            "min": 1.1104036639999977,
+            "p25": 1.1236088319999982,
+            "median": 1.129928835999999,
+            "p75": 1.138566663999998,
+            "max": 1.172182667999994
+          },
+          "baselineMedianOpsPerSecond": 885.0114875730111,
+          "candidateMedianMs": 0.6796478320000023,
+          "candidateDistributionMs": {
+            "min": 0.657835500000001,
+            "p25": 0.665622663999995,
+            "median": 0.6796478320000023,
+            "p75": 0.6840136679999996,
+            "max": 0.7102644999999975
+          },
+          "candidateMedianOpsPerSecond": 1471.350238927852,
+          "pairedCandidateBaselineRatios": [
+            0.5846145729065506, 0.5980440174875583, 0.5893529963565892, 0.6120727569933556,
+            0.6285922417152987, 0.6018936045336426, 0.5942635556111829, 0.5843204849880366,
+            0.6021060432533135, 0.583480209729674, 0.6114801932203033
+          ]
+        },
+        "ViewRawPage": {
+          "repetitions": 1000,
+          "warmupRepetitions": 5000,
+          "baseline": [
+            0.1196147920000003, 0.1253057919999992, 0.12644320800000058, 0.1609604580000014,
+            0.19507695800000147, 0.1915186250000006, 0.1956024159999979, 0.22147529199999919,
+            0.19283862499999668, 0.18880770800000027, 0.18952445899999656
+          ],
+          "candidate": [
+            0.10513254099999904, 0.10570670899999823, 0.11377441700000054, 0.11091508299999987,
+            0.15953120800000034, 0.14277458399999887, 0.15831974999999876, 0.16892987499999798,
+            0.15632500000000074, 0.1568352500000001, 0.15421850000000267
+          ],
+          "wire": {
+            "baseline": {
+              "bytes": 24614,
+              "separateCssBytes": 0,
+              "gzip": 778,
+              "hasAnimationDriver": false,
+              "hasElementScope": false,
+              "scopeHosts": 0,
+              "scriptBytes": 0
+            },
+            "candidate": {
+              "bytes": 24614,
+              "separateCssBytes": 0,
+              "gzip": 778,
+              "hasAnimationDriver": false,
+              "hasElementScope": false,
+              "scopeHosts": 0,
+              "scriptBytes": 0
+            }
+          },
+          "unrelatedPageRows": 200,
+          "trustedRawHtml": true,
+          "baselineMedianMs": 0.18952445899999656,
+          "baselineDistributionMs": {
+            "min": 0.1196147920000003,
+            "p25": 0.12644320800000058,
+            "median": 0.18952445899999656,
+            "p75": 0.19507695800000147,
+            "max": 0.22147529199999919
+          },
+          "baselineMedianOpsPerSecond": 5276.363828058827,
+          "candidateMedianMs": 0.15421850000000267,
+          "candidateDistributionMs": {
+            "min": 0.10513254099999904,
+            "p25": 0.11091508299999987,
+            "median": 0.15421850000000267,
+            "p75": 0.15831974999999876,
+            "max": 0.16892987499999798
+          },
+          "candidateMedianOpsPerSecond": 6484.306357538056,
+          "pairedCandidateBaselineRatios": [
+            0.8789259191287878, 0.8435899674932736, 0.8998064728000259, 0.6890827994537573,
+            0.8177860144815214, 0.7454866804729745, 0.8093956774030873, 0.762748175990659,
+            0.8106519116696846, 0.8306612672825829, 0.8137129150175042
+          ]
+        }
+      }
+    },
+    {
+      "node": "v24.20.0",
+      "platform": "darwin",
+      "arch": "arm64",
+      "verifyOnly": false,
+      "baselineRevision": "759330f349960a95d48ddff5115c91f6291054ce",
+      "candidateRevision": "c7b523571345ebf0acc3fddc62742b859adb626c",
+      "compiledHash": "a3d2ce70f5355b1df7554618e8c1698e38a841f607bf6c4cbb37b0a4050173f7",
+      "lockfileHash": "51648462c4e126c7b945cb99c5390b8a77243538c3bc86fbf784021d16e0cace",
+      "method": "Identical compiled fixture; production minified bundles; five warmup batches per side; 11 paired alternating batches; same process/dependencies; per-operation batch times in milliseconds. Ready small:50000 warmup/10000 per sample; streamed and 200-row pages:5000 warmup/1000 per sample; 1600-row pages:1250 warmup/250 per sample.",
+      "limitations": [
+        "Synthetic server-only scenarios include tiny boundaries surrounded by 200/1600 unrelated four-host rows. Browser capture/animation/resource waits, backpressure, concurrency, and allocation/GC behavior are not measured.",
+        "Ready response bytes include RenderResult.css followed by RenderResult.html; timing still measures renderToString itself. Streamed CSS is already included in the response.",
+        "Batch timings and observed spread limit conclusions about individual latency; distributions are descriptive, not a performance guarantee."
+      ],
+      "meta": {
+        "baseline": {
+          "sourceSha256": "a00ac687f2bc505d5cca78d67b108776999ecec53b6afb1312947597e98c3ccc",
+          "serverSourceHash": "559abbf8a5e080c246198bc67b00c0adbd06ed222e259f7c4d4c5f132fb5942b",
+          "bundleHash": "643a5ea1ca71a450461d4e9844f8ed2c1f52627f612754ce694a58f680315473",
+          "bundleBytes": 611336,
+          "bundleGzip": 37486
+        },
+        "candidate": {
+          "sourceSha256": "3c860af261dfb3cf023141d353750620473844cfe363cb03db50e53aa7021d12",
+          "serverSourceHash": "5bb525da95f8fd6298dc01f83b455718df11cd8c94f65364406f3e455961f3c0",
+          "bundleHash": "d29b44577cf29022a59503080350cb0dc41a6325a8e8b6ec8f195afcb44be040",
+          "bundleBytes": 612914,
+          "bundleGzip": 38286
+        }
+      },
+      "samples": {
+        "Plain": {
+          "repetitions": 10000,
+          "warmupRepetitions": 50000,
+          "baseline": [
+            0.0003788166000000047, 0.00039035000000001217, 0.00035154170000000704,
+            0.000401825000000008, 0.000344337500000006, 0.00033771249999999783,
+            0.0003495166000000154, 0.00036924169999999777, 0.00032012499999998454,
+            0.0003617541999999958, 0.00036578340000000936
+          ],
+          "candidate": [
+            0.0004316542000000027, 0.00037345410000000356, 0.00037914999999998143,
+            0.0004058082999999897, 0.0003511167000000114, 0.00031414170000000467,
+            0.00033474160000000665, 0.0003416167000000087, 0.0003389582999999902,
+            0.0003356999999999971, 0.000353666700000008
+          ],
+          "wire": {
+            "baseline": {
+              "bytes": 31,
+              "separateCssBytes": 0,
+              "gzip": 45,
+              "hasAnimationDriver": false,
+              "hasElementScope": false,
+              "scopeHosts": 0,
+              "scriptBytes": 0
+            },
+            "candidate": {
+              "bytes": 31,
+              "separateCssBytes": 0,
+              "gzip": 45,
+              "hasAnimationDriver": false,
+              "hasElementScope": false,
+              "scopeHosts": 0,
+              "scriptBytes": 0
+            }
+          },
+          "unrelatedPageRows": 0,
+          "trustedRawHtml": false,
+          "baselineMedianMs": 0.0003617541999999958,
+          "baselineDistributionMs": {
+            "min": 0.00032012499999998454,
+            "p25": 0.000344337500000006,
+            "median": 0.0003617541999999958,
+            "p75": 0.0003788166000000047,
+            "max": 0.000401825000000008
+          },
+          "baselineMedianOpsPerSecond": 2764307.919576363,
+          "candidateMedianMs": 0.0003511167000000114,
+          "candidateDistributionMs": {
+            "min": 0.00031414170000000467,
+            "p25": 0.0003356999999999971,
+            "median": 0.0003511167000000114,
+            "p75": 0.00037914999999998143,
+            "max": 0.0004316542000000027
+          },
+          "candidateMedianOpsPerSecond": 2848055.931261508,
+          "pairedCandidateBaselineRatios": [
+            1.1394806880163049, 0.9567160240809323, 1.0785349220305125, 1.009913021837819,
+            1.0196876610883372, 0.9302045378835746, 0.9577273296890388, 0.9251845065170341,
+            1.0588310816087672, 0.9279781686017772, 0.9668746586094364
+          ]
+        },
+        "View": {
+          "repetitions": 10000,
+          "warmupRepetitions": 50000,
+          "baseline": [
+            0.0024691542000000026, 0.0023503584000000048, 0.002901133299999992,
+            0.002551020900000003, 0.0025555499999999937, 0.002359566700000005,
+            0.0025533709000000043, 0.0023092458000000078, 0.002341904199999999,
+            0.002458333300000004, 0.0022881459000000178
+          ],
+          "candidate": [
+            0.002017320900000004, 0.0019198874999999816, 0.0021269917000000076,
+            0.0020465542000000143, 0.002035870799999998, 0.0019597291999999926,
+            0.0019543125000000146, 0.0018916042000000062, 0.0019079125000000204,
+            0.001991516700000011, 0.002551429199999984
+          ],
+          "wire": {
+            "baseline": {
+              "bytes": 113,
+              "separateCssBytes": 0,
+              "gzip": 105,
+              "hasAnimationDriver": false,
+              "hasElementScope": false,
+              "scopeHosts": 0,
+              "scriptBytes": 0
+            },
+            "candidate": {
+              "bytes": 113,
+              "separateCssBytes": 0,
+              "gzip": 105,
+              "hasAnimationDriver": false,
+              "hasElementScope": false,
+              "scopeHosts": 0,
+              "scriptBytes": 0
+            }
+          },
+          "unrelatedPageRows": 0,
+          "trustedRawHtml": false,
+          "baselineMedianMs": 0.002458333300000004,
+          "baselineDistributionMs": {
+            "min": 0.0022881459000000178,
+            "p25": 0.002341904199999999,
+            "median": 0.002458333300000004,
+            "p75": 0.0025533709000000043,
+            "max": 0.002901133299999992
+          },
+          "baselineMedianOpsPerSecond": 406779.66653260496,
+          "candidateMedianMs": 0.001991516700000011,
+          "candidateDistributionMs": {
+            "min": 0.0018916042000000062,
+            "p25": 0.0019198874999999816,
+            "median": 0.001991516700000011,
+            "p75": 0.0020465542000000143,
+            "max": 0.002551429199999984
+          },
+          "candidateMedianOpsPerSecond": 502129.8591169205,
+          "pairedCandidateBaselineRatios": [
+            0.8170088769668585, 0.8168488261194453, 0.7331589003511191, 0.8022490917263797,
+            0.7966468274931044, 0.8305462185069777, 0.7653852795142341, 0.8191437221624479,
+            0.8146842641983483, 0.8101084991201184, 1.1150640350337644
+          ]
+        },
+        "PlainStream": {
+          "repetitions": 1000,
+          "warmupRepetitions": 5000,
+          "baseline": [
+            0.030528584000000136, 0.025824416000000384, 0.02658137500000021, 0.03562954200000013,
+            0.026016000000000077, 0.03109420799999998, 0.02823174999999992, 0.02419420799999989,
+            0.023423707999999807, 0.020182416999999987, 0.02032612500000005
+          ],
+          "candidate": [
+            0.04022550000000001, 0.030951624999999695, 0.02713462500000014, 0.03313266700000031,
+            0.027281582999999957, 0.03797704199999998, 0.026623000000000046, 0.024626541999999974,
+            0.022408707999999933, 0.021983124999999746, 0.033394416999999975
+          ],
+          "wire": {
+            "baseline": {
+              "bytes": 2830,
+              "separateCssBytes": 0,
+              "gzip": 1177,
+              "hasAnimationDriver": false,
+              "hasElementScope": false,
+              "scopeHosts": 0,
+              "scriptBytes": 2496
+            },
+            "candidate": {
+              "bytes": 2830,
+              "separateCssBytes": 0,
+              "gzip": 1174,
+              "hasAnimationDriver": false,
+              "hasElementScope": false,
+              "scopeHosts": 0,
+              "scriptBytes": 2496
+            }
+          },
+          "unrelatedPageRows": 0,
+          "trustedRawHtml": false,
+          "baselineMedianMs": 0.026016000000000077,
+          "baselineDistributionMs": {
+            "min": 0.020182416999999987,
+            "p25": 0.023423707999999807,
+            "median": 0.026016000000000077,
+            "p75": 0.030528584000000136,
+            "max": 0.03562954200000013
+          },
+          "baselineMedianOpsPerSecond": 38437.88437884367,
+          "candidateMedianMs": 0.027281582999999957,
+          "candidateDistributionMs": {
+            "min": 0.021983124999999746,
+            "p25": 0.024626541999999974,
+            "median": 0.027281582999999957,
+            "p75": 0.033394416999999975,
+            "max": 0.04022550000000001
+          },
+          "candidateMedianOpsPerSecond": 36654.76449808655,
+          "pairedCandidateBaselineRatios": [
+            1.3176339918025621, 1.1985411402913906, 1.0208134455046034, 0.9299212153779632,
+            1.0486463330258255, 1.2213542149071623, 0.9430162848565931, 1.0178693181442469,
+            0.9566678341447954, 1.0892216229602114, 1.6429308094877846
+          ]
+        },
+        "ViewStream": {
+          "repetitions": 1000,
+          "warmupRepetitions": 5000,
+          "baseline": [
+            0.031175791000000116, 0.03667470800000001, 0.02723666699999967, 0.028839917000000242,
+            0.028259542000000238, 0.030974416999999903, 0.02772262499999988, 0.02661204099999941,
+            0.028838917000000037, 0.03128549999999996, 0.03369366700000046
+          ],
+          "candidate": [
+            0.03269962499999974, 0.03278899999999976, 0.03185587499999974, 0.02911504100000002,
+            0.028948416000000178, 0.029656208999999763, 0.037077041000000005, 0.027720416999999997,
+            0.030585957999999663, 0.02856945799999994, 0.03370087499999954
+          ],
+          "wire": {
+            "baseline": {
+              "bytes": 13118,
+              "separateCssBytes": 0,
+              "gzip": 4133,
+              "hasAnimationDriver": true,
+              "hasElementScope": false,
+              "scopeHosts": 0,
+              "scriptBytes": 12696
+            },
+            "candidate": {
+              "bytes": 13118,
+              "separateCssBytes": 0,
+              "gzip": 4131,
+              "hasAnimationDriver": true,
+              "hasElementScope": false,
+              "scopeHosts": 0,
+              "scriptBytes": 12696
+            }
+          },
+          "unrelatedPageRows": 0,
+          "trustedRawHtml": false,
+          "baselineMedianMs": 0.028839917000000242,
+          "baselineDistributionMs": {
+            "min": 0.02661204099999941,
+            "p25": 0.02772262499999988,
+            "median": 0.028839917000000242,
+            "p75": 0.03128549999999996,
+            "max": 0.03667470800000001
+          },
+          "baselineMedianOpsPerSecond": 34674.16359069243,
+          "candidateMedianMs": 0.030585957999999663,
+          "candidateDistributionMs": {
+            "min": 0.027720416999999997,
+            "p25": 0.028948416000000178,
+            "median": 0.030585957999999663,
+            "p75": 0.03278899999999976,
+            "max": 0.037077041000000005
+          },
+          "candidateMedianOpsPerSecond": 32694.74181583624,
+          "pairedCandidateBaselineRatios": [
+            1.04887875980435, 0.8940493813883877, 1.169595200470018, 1.0095396945837178,
+            1.02437668664269, 0.9574420399906108, 1.3374289411626845, 1.0416494172694464,
+            1.0605792859697063, 0.9131852775247312, 1.000213927442183
+          ]
+        },
+        "ScopedView": {
+          "repetitions": 10000,
+          "warmupRepetitions": 50000,
+          "baseline": [
+            0.005242691699999978, 0.005257820899999933, 0.005369499999999971, 0.0048768332999999985,
+            0.004861704199999986, 0.005085945900000024, 0.005107870800000001, 0.005220341600000029,
+            0.0051490208000000166, 0.0049204625000000305, 0.005111204199999974
+          ],
+          "candidate": [
+            0.003962199999999939, 0.00376773749999993, 0.0039027750000000198, 0.0037336333999999625,
+            0.0036098791999999774, 0.003832495900000049, 0.0038768458999999893,
+            0.0038608207999999648, 0.0037142125000000307, 0.0036526749999999993,
+            0.003975766599999952
+          ],
+          "wire": {
+            "baseline": {
+              "bytes": 266,
+              "separateCssBytes": 115,
+              "gzip": 176,
+              "hasAnimationDriver": false,
+              "hasElementScope": true,
+              "scopeHosts": 1,
+              "scriptBytes": 0
+            },
+            "candidate": {
+              "bytes": 266,
+              "separateCssBytes": 115,
+              "gzip": 176,
+              "hasAnimationDriver": false,
+              "hasElementScope": true,
+              "scopeHosts": 1,
+              "scriptBytes": 0
+            }
+          },
+          "unrelatedPageRows": 0,
+          "trustedRawHtml": false,
+          "baselineMedianMs": 0.005111204199999974,
+          "baselineDistributionMs": {
+            "min": 0.004861704199999986,
+            "p25": 0.0049204625000000305,
+            "median": 0.005111204199999974,
+            "p75": 0.005242691699999978,
+            "max": 0.005369499999999971
+          },
+          "baselineMedianOpsPerSecond": 195648.61055639395,
+          "candidateMedianMs": 0.003832495900000049,
+          "candidateDistributionMs": {
+            "min": 0.0036098791999999774,
+            "p25": 0.0037142125000000307,
+            "median": 0.003832495900000049,
+            "p75": 0.0039027750000000198,
+            "max": 0.003975766599999952
+          },
+          "candidateMedianOpsPerSecond": 260926.56746220845,
+          "pairedCandidateBaselineRatios": [
+            0.755756818582324, 0.7165967749110621, 0.7268414191265558, 0.7655856106461469,
+            0.7425131294495432, 0.7535463363855347, 0.7589945109809725, 0.7395724448376987,
+            0.7213434639844568, 0.7423438345480687, 0.7778532111865091
+          ]
+        },
+        "ScopedViewStream": {
+          "repetitions": 1000,
+          "warmupRepetitions": 5000,
+          "baseline": [
+            0.03700604099999964, 0.03930537499999991, 0.03887412500000027, 0.03777891700000055,
+            0.03778666599999997, 0.03859916599999997, 0.03504675000000043, 0.03617066599999998,
+            0.0354170409999997, 0.034430708999999296, 0.033586291999999955
+          ],
+          "candidate": [
+            0.03530666699999983, 0.03426104200000009, 0.04500358400000005, 0.04155162500000006,
+            0.033967208000000026, 0.03496549999999934, 0.03459950000000026, 0.03346904199999972,
+            0.033474208000000547, 0.03319750000000022, 0.03504845800000021
+          ],
+          "wire": {
+            "baseline": {
+              "bytes": 13213,
+              "separateCssBytes": 0,
+              "gzip": 4164,
+              "hasAnimationDriver": true,
+              "hasElementScope": true,
+              "scopeHosts": 1,
+              "scriptBytes": 12638
+            },
+            "candidate": {
+              "bytes": 13213,
+              "separateCssBytes": 0,
+              "gzip": 4161,
+              "hasAnimationDriver": true,
+              "hasElementScope": true,
+              "scopeHosts": 1,
+              "scriptBytes": 12638
+            }
+          },
+          "unrelatedPageRows": 0,
+          "trustedRawHtml": false,
+          "baselineMedianMs": 0.03700604099999964,
+          "baselineDistributionMs": {
+            "min": 0.033586291999999955,
+            "p25": 0.03504675000000043,
+            "median": 0.03700604099999964,
+            "p75": 0.03859916599999997,
+            "max": 0.03930537499999991
+          },
+          "baselineMedianOpsPerSecond": 27022.615037366726,
+          "candidateMedianMs": 0.03459950000000026,
+          "candidateDistributionMs": {
+            "min": 0.03319750000000022,
+            "p25": 0.033474208000000547,
+            "median": 0.03459950000000026,
+            "p75": 0.03530666699999983,
+            "max": 0.04500358400000005
+          },
+          "candidateMedianOpsPerSecond": 28902.1517651987,
+          "pairedCandidateBaselineRatios": [
+            0.9540784705934952, 0.8716630231870365, 1.1576745200052665, 1.0998627885494825,
+            0.8989204816323317, 0.9058615411534893, 0.9872384743235774, 0.925308978275372,
+            0.945144118617951, 0.964182875235038, 1.0435346063209436
+          ]
+        },
+        "PlainPage": {
+          "repetitions": 1000,
+          "warmupRepetitions": 5000,
+          "baseline": [
+            0.00844041599999946, 0.009000958000000538, 0.007874832999999854, 0.008744208000000071,
+            0.007864749999999731, 0.008641959000000497, 0.008650958000000174, 0.009050457999999708,
+            0.008680333000000246, 0.008004625000000487, 0.007750500000000102
+          ],
+          "candidate": [
+            0.008324250000000574, 0.008055999999999586, 0.007873334000000795, 0.007935709000000315,
+            0.008317791999999827, 0.00818408399999953, 0.008576124999999593, 0.00926508399999966,
+            0.008587750000000597, 0.0076351660000000265, 0.008111541999999645
+          ],
+          "wire": {
+            "baseline": {
+              "bytes": 24521,
+              "separateCssBytes": 0,
+              "gzip": 711,
+              "hasAnimationDriver": false,
+              "hasElementScope": false,
+              "scopeHosts": 0,
+              "scriptBytes": 0
+            },
+            "candidate": {
+              "bytes": 24521,
+              "separateCssBytes": 0,
+              "gzip": 711,
+              "hasAnimationDriver": false,
+              "hasElementScope": false,
+              "scopeHosts": 0,
+              "scriptBytes": 0
+            }
+          },
+          "unrelatedPageRows": 200,
+          "trustedRawHtml": false,
+          "baselineMedianMs": 0.008641959000000497,
+          "baselineDistributionMs": {
+            "min": 0.007750500000000102,
+            "p25": 0.007874832999999854,
+            "median": 0.008641959000000497,
+            "p75": 0.008744208000000071,
+            "max": 0.009050457999999708
+          },
+          "baselineMedianOpsPerSecond": 115714.5040840789,
+          "candidateMedianMs": 0.00818408399999953,
+          "candidateDistributionMs": {
+            "min": 0.0076351660000000265,
+            "p25": 0.007935709000000315,
+            "median": 0.00818408399999953,
+            "p75": 0.008576124999999593,
+            "max": 0.00926508399999966
+          },
+          "candidateMedianOpsPerSecond": 122188.38418570209,
+          "pairedCandidateBaselineRatios": [
+            0.9862369342934172, 0.8950158416469786, 0.9998096467570731, 0.9075389103278708,
+            1.0576041196478096, 0.9470172214423904, 0.9913497441554358, 1.0237143799794397,
+            0.9893341649450952, 0.953844308758944, 1.0465830591574141
+          ]
+        },
+        "ViewPage": {
+          "repetitions": 1000,
+          "warmupRepetitions": 5000,
+          "baseline": [
+            0.13893945900000018, 0.137378917, 0.1391762089999993, 0.1372873330000002,
+            0.13902224999999999, 0.14197533300000031, 0.13995166599999903, 0.14036887500000012,
+            0.14062225000000034, 0.13935012499999902, 0.14192608300000029
+          ],
+          "candidate": [
+            0.0221112090000006, 0.021753625000001192, 0.022855750000000626, 0.024711750000000393,
+            0.022107833000000028, 0.022955332999999883, 0.023839791000000332, 0.021910916000000724,
+            0.021283208999999262, 0.020137957999999345, 0.021403416999999536
+          ],
+          "wire": {
+            "baseline": {
+              "bytes": 24603,
+              "separateCssBytes": 0,
+              "gzip": 771,
+              "hasAnimationDriver": false,
+              "hasElementScope": false,
+              "scopeHosts": 0,
+              "scriptBytes": 0
+            },
+            "candidate": {
+              "bytes": 24603,
+              "separateCssBytes": 0,
+              "gzip": 771,
+              "hasAnimationDriver": false,
+              "hasElementScope": false,
+              "scopeHosts": 0,
+              "scriptBytes": 0
+            }
+          },
+          "unrelatedPageRows": 200,
+          "trustedRawHtml": false,
+          "baselineMedianMs": 0.13935012499999902,
+          "baselineDistributionMs": {
+            "min": 0.1372873330000002,
+            "p25": 0.13893945900000018,
+            "median": 0.13935012499999902,
+            "p75": 0.14062225000000034,
+            "max": 0.14197533300000031
+          },
+          "baselineMedianOpsPerSecond": 7176.168661492102,
+          "candidateMedianMs": 0.022107833000000028,
+          "candidateDistributionMs": {
+            "min": 0.020137957999999345,
+            "p25": 0.021403416999999536,
+            "median": 0.022107833000000028,
+            "p75": 0.022955332999999883,
+            "max": 0.024711750000000393
+          },
+          "candidateMedianOpsPerSecond": 45232.836705433714,
+          "pairedCandidateBaselineRatios": [
+            0.15914276015714565, 0.1583476233110878, 0.16422167383507866, 0.18000021895683818,
+            0.15902370304034089, 0.1616853612169364, 0.1703430311433413, 0.15609525972193414,
+            0.15135022373770304, 0.14451338310603945, 0.15080679003872385
+          ]
+        },
+        "PlainLargePage": {
+          "repetitions": 250,
+          "warmupRepetitions": 1250,
+          "baseline": [
+            0.23183533599999645, 0.20796416399999726, 0.2124011679999967, 0.21266883199999576,
+            0.20193483600000037, 0.21030666799999745, 0.18803683199999796, 0.19562983199999873,
+            0.18970016800000303, 0.1883741680000021, 0.1906284999999989
+          ],
+          "candidate": [
+            0.23628066400000536, 0.21795383199999924, 0.22091233199999988, 0.20705466400000297,
+            0.1971916679999995, 0.19677000000000408, 0.19449616800000513, 0.1924846680000046,
+            0.19873649999999907, 0.185343664, 0.19485516799999458
+          ],
+          "wire": {
+            "baseline": {
+              "bytes": 197321,
+              "separateCssBytes": 0,
+              "gzip": 4651,
+              "hasAnimationDriver": false,
+              "hasElementScope": false,
+              "scopeHosts": 0,
+              "scriptBytes": 0
+            },
+            "candidate": {
+              "bytes": 197321,
+              "separateCssBytes": 0,
+              "gzip": 4651,
+              "hasAnimationDriver": false,
+              "hasElementScope": false,
+              "scopeHosts": 0,
+              "scriptBytes": 0
+            }
+          },
+          "unrelatedPageRows": 1600,
+          "trustedRawHtml": false,
+          "baselineMedianMs": 0.20193483600000037,
+          "baselineDistributionMs": {
+            "min": 0.18803683199999796,
+            "p25": 0.18970016800000303,
+            "median": 0.20193483600000037,
+            "p75": 0.2124011679999967,
+            "max": 0.23183533599999645
+          },
+          "baselineMedianOpsPerSecond": 4952.092565148087,
+          "candidateMedianMs": 0.1971916679999995,
+          "candidateDistributionMs": {
+            "min": 0.185343664,
+            "p25": 0.19449616800000513,
+            "median": 0.1971916679999995,
+            "p75": 0.21795383199999924,
+            "max": 0.23628066400000536
+          },
+          "candidateMedianOpsPerSecond": 5071.2081810677855,
+          "pairedCandidateBaselineRatios": [
+            1.0191745058225679, 1.048035525966878, 1.0400711732432815, 0.9736013596952802,
+            0.9765113930119473, 0.935633671872004, 1.0343514402540415, 0.9839228814550424,
+            1.047634812848431, 0.9839123164700477, 1.0221722774925874
+          ]
+        },
+        "ViewLargePage": {
+          "repetitions": 250,
+          "warmupRepetitions": 1250,
+          "baseline": [
+            1.2596606639999954, 1.1951873359999954, 1.1960579999999972, 1.228971835999997,
+            1.2598450000000012, 1.2206156679999987, 1.2540501680000016, 1.2056768359999988,
+            1.2209535000000034, 1.1869386680000025, 1.612600999999995
+          ],
+          "candidate": [
+            0.3100269999999946, 0.29987083200000053, 0.34224899999999614, 0.3202678319999977,
+            0.3645161640000006, 0.29183466799999586, 0.3143205000000016, 0.2939753320000018,
+            0.31008116800000424, 0.29053149999999733, 0.2967866639999993
+          ],
+          "wire": {
+            "baseline": {
+              "bytes": 197403,
+              "separateCssBytes": 0,
+              "gzip": 4727,
+              "hasAnimationDriver": false,
+              "hasElementScope": false,
+              "scopeHosts": 0,
+              "scriptBytes": 0
+            },
+            "candidate": {
+              "bytes": 197403,
+              "separateCssBytes": 0,
+              "gzip": 4727,
+              "hasAnimationDriver": false,
+              "hasElementScope": false,
+              "scopeHosts": 0,
+              "scriptBytes": 0
+            }
+          },
+          "unrelatedPageRows": 1600,
+          "trustedRawHtml": false,
+          "baselineMedianMs": 1.2209535000000034,
+          "baselineDistributionMs": {
+            "min": 1.1869386680000025,
+            "p25": 1.1960579999999972,
+            "median": 1.2209535000000034,
+            "p75": 1.2596606639999954,
+            "max": 1.612600999999995
+          },
+          "baselineMedianOpsPerSecond": 819.0320106375855,
+          "candidateMedianMs": 0.3100269999999946,
+          "candidateDistributionMs": {
+            "min": 0.29053149999999733,
+            "p25": 0.2939753320000018,
+            "median": 0.3100269999999946,
+            "p75": 0.3202678319999977,
+            "max": 0.3645161640000006
+          },
+          "candidateMedianOpsPerSecond": 3225.5255187451976,
+          "pairedCandidateBaselineRatios": [
+            0.24611945808922692, 0.2508986022254855, 0.286147494519494, 0.26059818672687507,
+            0.2893341355484208, 0.23908808943782636, 0.2506442788499361, 0.2438259765985934,
+            0.2539664024878944, 0.24477380999773504, 0.18404221751071728
+          ]
+        },
+        "ViewRawPage": {
+          "repetitions": 1000,
+          "warmupRepetitions": 5000,
+          "baseline": [
+            0.13946062500000334, 0.1334006249999984, 0.14150429200000145, 0.12515583300000072,
+            0.12982804199999737, 0.1314727500000008, 0.12784045799999877, 0.13180316699999822,
+            0.1386009589999994, 0.13785329099999943, 0.13395366699999794
+          ],
+          "candidate": [
+            0.08476933300000018, 0.08580395900000076, 0.08317783300000156, 0.08276962499999718,
+            0.08209050000000206, 0.08247770899999887, 0.08017062499999883, 0.08083345800000097,
+            0.09271541700000308, 0.0900647919999974, 0.08295491699999911
+          ],
+          "wire": {
+            "baseline": {
+              "bytes": 24614,
+              "separateCssBytes": 0,
+              "gzip": 778,
+              "hasAnimationDriver": false,
+              "hasElementScope": false,
+              "scopeHosts": 0,
+              "scriptBytes": 0
+            },
+            "candidate": {
+              "bytes": 24614,
+              "separateCssBytes": 0,
+              "gzip": 778,
+              "hasAnimationDriver": false,
+              "hasElementScope": false,
+              "scopeHosts": 0,
+              "scriptBytes": 0
+            }
+          },
+          "unrelatedPageRows": 200,
+          "trustedRawHtml": true,
+          "baselineMedianMs": 0.1334006249999984,
+          "baselineDistributionMs": {
+            "min": 0.12515583300000072,
+            "p25": 0.12982804199999737,
+            "median": 0.1334006249999984,
+            "p75": 0.1386009589999994,
+            "max": 0.14150429200000145
+          },
+          "baselineMedianOpsPerSecond": 7496.216753107506,
+          "candidateMedianMs": 0.08295491699999911,
+          "candidateDistributionMs": {
+            "min": 0.08017062499999883,
+            "p25": 0.08209050000000206,
+            "median": 0.08295491699999911,
+            "p75": 0.08580395900000076,
+            "max": 0.09271541700000308
+          },
+          "candidateMedianOpsPerSecond": 12054.74052852118,
+          "pairedCandidateBaselineRatios": [
+            0.6078370364394836, 0.6432050749387552, 0.5878113788944346, 0.6613325405296668,
+            0.6323017642059465, 0.6273369120216803, 0.6271146572394132, 0.6132891935745524,
+            0.6689377740885867, 0.6533379895877696, 0.6192806726224254
+          ]
+        }
+      }
+    }
+  ]
+}

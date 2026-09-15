@@ -765,6 +765,7 @@ export class DOMStage {
 		const eager =
 			this.isFresh(parent) &&
 			this.isFresh(child) &&
+			!this.parents.has(child) &&
 			!this.children.has(parent) &&
 			(oldParent === null || !this.children.has(oldParent)) &&
 			(anchor === null || anchor.parentNode === parent);

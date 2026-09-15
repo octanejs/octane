@@ -9,7 +9,8 @@ import { createHash } from 'node:crypto';
 import path from 'node:path';
 // Compare the selected baseline to the current checkout, using the same fixture
 // and candidate compiler. Compilation/stream semantics are verified separately
-// by the conformance and native browser suites; these are small server scenarios.
+// by the conformance and native browser suites; page controls also measure how
+// one small boundary scales with unrelated HTML.
 const repo = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '../..');
 const verifyOnly = process.argv.includes('--verify-only');
 const options = parseOptions(process.argv.slice(2).filter((arg) => arg !== '--verify-only'));
@@ -29,6 +30,24 @@ function hash(data) {
 	return createHash('sha256').update(data).digest('hex');
 }
 
+const page = (rows) =>
+	Array.from(
+		{ length: rows },
+		(_, index) =>
+			`<article class="overflow-x-auto"><h2>{props.text as string}</h2><p>Some descriptive page content</p><a href="/item/${index}">Open</a></article>`,
+	).join('');
+const pageRows = { PlainPage: 200, ViewPage: 200, PlainLargePage: 1600, ViewLargePage: 1600 };
+const pages = Object.entries(pageRows)
+	.map(
+		([name, rows]) =>
+			`export function ${name}(props) @{ <main>${page(rows)}${
+				name.startsWith('View')
+					? '<ViewTransition name="hero" update="resize"><div>{props.text as string}</div></ViewTransition>'
+					: '<div>{props.text as string}</div>'
+			}</main> }`,
+	)
+	.join('\n');
+const rawPage = page(200).replaceAll('{props.text as string}', 'Content');
 const source = `import {ViewTransition,use} from 'octane';
 export function Plain(props) @{ <main><div>{props.text as string}</div></main> }
 export function View(props) @{ <main><ViewTransition name="hero" update="resize"><div>{props.text as string}</div></ViewTransition></main> }
@@ -37,6 +56,8 @@ export function PlainStream(props) @{ <main>@try { <Content promise={props.promi
 export function ViewStream(props) @{ <main><ViewTransition name="hero" update="resize"><>@try { <Content promise={props.promise} /> } @pending { <p>{'Loading'}</p> }</></ViewTransition></main> }
 export function ScopedView(props) @{ <main><ViewTransition scope="element" name="hero" update="resize"><section><div>{props.text as string}</div></section></ViewTransition></main> }
 export function ScopedViewStream(props) @{ <main><ViewTransition scope="element" name="hero" update="resize"><section>@try { <Content promise={props.promise} /> } @pending { <p>{'Loading'}</p> }</section></ViewTransition></main> }
+${pages}
+export function ViewRawPage(props) @{ <main><div dangerouslySetInnerHTML={{__html: props.markup}}/><ViewTransition name="hero" update="resize"><div>{props.text as string}</div></ViewTransition></main> }
 `;
 const compiled = compile(source, path.join(repo, 'benchmarks/view-transitions/ssr-control.tsrx'), {
 	mode: 'server',
@@ -109,23 +130,38 @@ try {
 		'ViewStream',
 		'ScopedView',
 		'ScopedViewStream',
+		...Object.keys(pageRows),
+		'ViewRawPage',
 	]) {
 		const isStream = name.endsWith('Stream');
-		const reps = isStream ? 1000 : 10000;
+		const rows = name === 'ViewRawPage' ? 200 : (pageRows[name] ?? 0);
+		const props = { text: 'Content', markup: rawPage };
+		const reps = rows === 1600 ? 250 : rows > 0 || isStream ? 1000 : 10000;
 		samples[name] = {
 			repetitions: reps,
 			warmupRepetitions: reps * 5,
 			baseline: [],
 			candidate: [],
 			wire: {},
+			unrelatedPageRows: rows,
+			trustedRawHtml: name === 'ViewRawPage',
 		};
+		let baselineHtml;
 		for (const label of ['baseline', 'candidate']) {
 			const rt = mods[label];
-			const rendered = isStream ? null : rt.renderToString(rt[name], { text: 'Content' });
+			const rendered = isStream ? null : rt.renderToString(rt[name], props);
 			const html = isStream ? await stream(rt, name) : rendered.css + rendered.html;
 			const scripts = [...html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g)].map((x) => x[1]);
 			if (!html.includes('Content') || (isStream && !html.includes('Loading')))
 				throw new Error('Missing authored output in ' + label + '/' + name);
+			if (rows > 0) {
+				assert.equal([...html.matchAll(/<article\b/g)].length, rows);
+				assert.equal([...html.matchAll(/<h2>Content<\/h2>/g)].length, rows);
+				assert.ok(html.includes('href="/item/' + (rows - 1) + '"'));
+				assert.ok(!/vt-(?:parent-)?(?:enter|exit)-x=/.test(html));
+				if (label === 'baseline') baselineHtml = html;
+				else assert.equal(html, baselineHtml, 'Page output must stay byte-identical');
+			}
 			const scopeRoots = [...html.matchAll(/<section\b[^>]*>/g)];
 			if (label === 'candidate' && name.startsWith('Scoped')) {
 				assert.equal(
@@ -147,7 +183,7 @@ try {
 			};
 			for (let i = 0; !verifyOnly && i < reps * 5; i++)
 				if (isStream) await stream(rt, name);
-				else rt.renderToString(rt[name], { text: 'Content' });
+				else rt.renderToString(rt[name], props);
 		}
 		if (verifyOnly) continue;
 		for (let round = 0; round < 11; round++)
@@ -156,7 +192,7 @@ try {
 				const start = performance.now();
 				for (let i = 0; i < reps; i++)
 					if (isStream) await stream(rt, name);
-					else rt.renderToString(rt[name], { text: 'Content' });
+					else rt.renderToString(rt[name], props);
 				samples[name][label].push((performance.now() - start) / reps);
 			}
 		for (const label of ['baseline', 'candidate']) {
@@ -189,9 +225,9 @@ try {
 		lockfileHash: hash(readFileSync(path.join(repo, 'pnpm-lock.yaml'))),
 		method: verifyOnly
 			? 'Build and verify authored output once per scenario; no timing samples. Stream IDs differ from a full run, so wire compression may differ.'
-			: 'Identical compiled fixture; production minified bundles; five warmup batches per side; 11 paired alternating batches; same process/dependencies; per-operation batch times in milliseconds. Ready:50000 warmup/10000 per sample; streamed:5000 warmup/1000 per sample.',
+			: 'Identical compiled fixture; production minified bundles; five warmup batches per side; 11 paired alternating batches; same process/dependencies; per-operation batch times in milliseconds. Ready small:50000 warmup/10000 per sample; streamed and 200-row pages:5000 warmup/1000 per sample; 1600-row pages:1250 warmup/250 per sample.',
 		limitations: [
-			'Small synthetic server-only scenarios; browser capture/animation/resource waits, backpressure, concurrency, and allocation/GC behavior are not measured.',
+			'Synthetic server-only scenarios include tiny boundaries surrounded by 200/1600 unrelated four-host rows. Browser capture/animation/resource waits, backpressure, concurrency, and allocation/GC behavior are not measured.',
 			'Ready response bytes include RenderResult.css followed by RenderResult.html; timing still measures renderToString itself. Streamed CSS is already included in the response.',
 			...(samples.ViewStream.wire.baseline.hasAnimationDriver
 				? []

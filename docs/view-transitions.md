@@ -109,14 +109,17 @@ nested scope can begin after its ancestor finishes capture while the ancestor's
 animation continues. Updates to an ancestor that might remove an active child
 scope wait for that child. `flushSync` interrupts all active scopes; ordinary
 urgent work interrupts the scopes it touches.
+If draining pending passive effects introduces urgent work into a transition
+batch, the whole batch commits without animation.
 
 The scope host retains native self-participation and clipping. Its default name
 is `root`; authored `view-transition-name` overrides that default, and an explicit
 boundary `name` takes precedence during capture. Authored `view-transition-name:
 none` excludes the host's own group and callback, while named descendants can
-still animate. Octane owns `view-transition-scope: all !important` for the
-declaration's lifetime and restores the authored property when the declaration
-is removed.
+still animate. A shared stylesheet rule applies `view-transition-scope: all
+!important` to the host's `vt-scope="element"` marker in its own document. An
+authored inline `view-transition-scope: none !important` overrides that rule.
+Removing the declaration removes its marker and leaves authored styles intact.
 
 Pseudo-element handles address the scope host. Outside controls stay interactive.
 Several scopes participating in one update share one DOM publication and one

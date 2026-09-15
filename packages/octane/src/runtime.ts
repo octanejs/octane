@@ -4050,11 +4050,25 @@ const VT_INVALID_SCOPE_WARNED = /* @__PURE__ */ new WeakSet<Block>();
 const VT_SCOPE_STYLE_ID = 'octane-view-transition-scope';
 const VT_SCOPE_CSS = '[vt-scope="element"]{view-transition-scope:all!important}';
 
-function vtInjectScopeStyle(): void {
-	if (_injectedStyles.has(VT_SCOPE_STYLE_ID)) return;
-	// Do not publish injectStyle's eager dedupe state for a rolled-back append.
-	if (DEFERRED_LAYOUT_DRIVER?.stageAction(vtInjectScopeStyle, true) === true) return;
-	injectStyle(VT_SCOPE_STYLE_ID, VT_SCOPE_CSS);
+const VT_SCOPE_STYLED_DOCUMENTS = /* @__PURE__ */ new WeakSet<Document>();
+
+function vtInjectScopeStyle(host: Element): void {
+	// Staged insertion may adopt the host into another document. Choose its
+	// stylesheet owner and publish dedupe state only after that insertion commits.
+	if (DEFERRED_LAYOUT_DRIVER?.stageAction(() => vtInjectScopeStyle(host), true) === true) return;
+	const owner = host.ownerDocument;
+	if (VT_SCOPE_STYLED_DOCUMENTS.has(owner)) return;
+	if (
+		domNode(owner).querySelector(
+			`style[data-octane="${VT_SCOPE_STYLE_ID}"],style[data-href~="octane-${VT_SCOPE_STYLE_ID}"]`,
+		) === null
+	) {
+		const style = domNode(owner).createElement('style');
+		domNode(style).setAttribute('data-octane', VT_SCOPE_STYLE_ID);
+		domNode(style).textContent = VT_SCOPE_CSS;
+		domNode(owner.head).appendChild(style);
+	}
+	VT_SCOPE_STYLED_DOCUMENTS.add(owner);
 }
 
 function vtReleaseScopeBoundary(block: Block): void {
@@ -4111,7 +4125,7 @@ function vtPrepareScopeBoundary(block: Block): void {
 		if (TRANSITION_JOURNAL !== null) journalAttr(host, 'vt-scope');
 		domNode(host).setAttribute('vt-scope', 'element');
 	}
-	vtInjectScopeStyle();
+	vtInjectScopeStyle(host);
 }
 
 interface ViewTransitionScopeRef {
@@ -4927,6 +4941,19 @@ function vtWouldWrap(): boolean {
 	return vtNativeAvailable(owners) && vtActiveHandles(owners).size === 0;
 }
 
+/** Settle passives from nested sync commits before choosing capture priority and owners. */
+function vtDrainPassivesBeforeCapture(): boolean {
+	let passes = 0;
+	while (effectQueues[PASSIVE].length > 0 || pendingPassiveUnmounts.length > 0) {
+		if (DEFERRED_LAYOUT_DRIVER?.holdPassivesBeforeRender() === true) return true;
+		// A long cascade keeps normal commit scheduling without retaining a stale
+		// animation batch. Ordinary passive effects still retain their yield policy.
+		if (passes++ === LAYOUT_CASCADE_LIMIT) return false;
+		drainPassiveEffects();
+	}
+	return true;
+}
+
 /** Install the concrete driver only when a ViewTransition-facing API survives. */
 function ensureViewTransitionDriver(): ViewTransitionDriver {
 	if (VIEW_TRANSITION_DRIVER !== null) return VIEW_TRANSITION_DRIVER;
@@ -4937,7 +4964,10 @@ function ensureViewTransitionDriver(): ViewTransitionDriver {
 		routeFlush() {
 			// A previous commit's passives can add urgent work or another owner.
 			// Choose priority and affected native handles only after they run.
-			if (VT_CAPTURE === null && QUEUE.length > 0) drainPassivesBeforeRender();
+			if (VT_CAPTURE === null && QUEUE.length > 0 && !vtDrainPassivesBeforeCapture()) {
+				vtInterrupt();
+				return false;
+			}
 			if (VT_CAPTURE !== null) {
 				if (DEFERRED_LAYOUT_DRIVER?.holdsPendingQueue() === true || queueAllTransition())
 					return true;
@@ -4983,15 +5013,16 @@ function ensureViewTransitionDriver(): ViewTransitionDriver {
 			// A resume commits pending render work in its layout drain too. Flush
 			// the previous commit's passives before choosing either owners or waits,
 			// then include every sibling update those passives scheduled.
-			drainPassivesBeforeRender();
+			const passivesSettled = vtDrainPassivesBeforeCapture();
 			const capture = VT_CAPTURE;
 			const resumed = getBlocks?.() ?? [];
 			const blocks = QUEUE.length === 0 ? resumed : [...new Set([...resumed, ...QUEUE])];
 			const owners = vtQueuedOwners(blocks);
-			if (QUEUE.length > 0 && !queueAllTransition()) {
-				// An urgent sibling joins this commit without being promoted to
-				// animation priority. Only its affected scopes are interrupted.
-				vtInterruptOwners(owners);
+			if (!passivesSettled || (QUEUE.length > 0 && !queueAllTransition())) {
+				// An urgent sibling keeps its priority. A still-open passive cascade
+				// can touch further owners, so only that fallback interrupts all scopes.
+				if (passivesSettled) vtInterruptOwners(owners);
+				else vtInterrupt();
 				work();
 				flushWork();
 				return true;
@@ -6509,11 +6540,10 @@ function vtFlush(
 	queuedOwners?: Set<VTOwner> | null,
 	queuedBlocks?: readonly Block[],
 ): void {
-	// Pending passives run first and may schedule more transition work into this
-	// same commit, so the batch is snapshotted after them: a scope they touch
-	// must be captured too. (`vtQueuedOwners` returns null for an unknown
-	// owner, so only an omitted argument takes the default.)
-	if (QUEUE.length > 0) drainPassivesBeforeRender();
+	// Both callers settle prior passives before choosing priority and owners.
+	// Do not drain again after an explicit resume batch has been snapshotted.
+	// `vtQueuedOwners` returns null for an unknown owner, so only an omitted
+	// argument takes the default.
 	if (queuedOwners === undefined) queuedOwners = vtQueuedOwners();
 	if (queuedBlocks === undefined) queuedBlocks = QUEUE.slice();
 	const parent = QUEUE[0]?.parentNode;

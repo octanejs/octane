@@ -99,6 +99,13 @@ server bundle. The baseline and current checkout use the same compiled fixture
 and dependencies. It is a focused server comparison rather than a browser,
 backpressure or concurrent-request benchmark; see [the recorded limits](./RESULTS.md).
 
+The page controls surround one tiny boundary with 200 or 1,600 unrelated
+four-host rows (about 25 KB or 200 KB). Matching plain pages isolate ordinary
+serialization cost; their `overflow-x-auto` classes also exercise annotation
+precheck false positives. A 200-row trusted-HTML control measures the parser
+fallback separately. All controls verify the complete row count, final row link,
+authored content, and absence of residual transition candidates before timing.
+
 ## Ordinary inline-style control
 
 Element scopes use a shared stylesheet rule; they add no declaration-ownership

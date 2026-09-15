@@ -67,3 +67,22 @@ test('native exceptions are specific operations, not blanket function exemptions
 		['call:setAttribute'],
 	);
 });
+
+test('nested declarations cannot reuse a reviewed native-operation exemption', () => {
+	const findings = inspectStagedDOM(`
+	function renderHost(el: HTMLElement) {
+	 function vtFlush() { return el.getAttribute('title'); }
+	 return vtFlush();
+	}
+	const renderAnotherHost = (el: HTMLElement) => {
+	 function vtFlush() { return el.getAttribute('title'); }
+	 class ViewTransitionPseudoElement {
+	  animate() { return el.animate({ opacity: [0, 1] }); }
+	 }
+	 return vtFlush();
+	};`);
+	assert.deepEqual(
+		findings.map((finding) => finding.operation),
+		['call:getAttribute', 'call:getAttribute', 'call:animate'],
+	);
+});

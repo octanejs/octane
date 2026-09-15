@@ -131,7 +131,7 @@ describe('element-scoped ViewTransition commit lifetimes', () => {
 		let capture: Capture | undefined;
 		await vi.waitFor(() => {
 			capture = captures.slice(after).find((entry) => entry.owner === owner(id));
-			expect(capture).toBeDefined();
+			expect(capture, `Missing capture for ${id}`).toBeDefined();
 		});
 		return capture!;
 	};
@@ -225,6 +225,116 @@ describe('element-scoped ViewTransition commit lifetimes', () => {
 		right.ready.resolve();
 		expect(text('left')).toBe('left changed');
 		expect(text('right')).toBe('from-effect');
+	});
+
+	it.each([false, true])(
+		'includes sibling work from a nested sync commit passive before a reveal (urgent=%s)',
+		async (urgent) => {
+			const warning = vi.spyOn(console, 'error').mockImplementation(() => {});
+			const clock = vi.spyOn(performance, 'now').mockReturnValue(0);
+			let resolve!: (value: string) => void;
+			const promise = new Promise<string>((done) => {
+				resolve = done;
+			});
+			await act(() =>
+				root.render(ScopedEffectsApp, {
+					controls,
+					events,
+					promise,
+					onEffect: (id: string, value: string) => onEffect?.(id, value),
+				}),
+			);
+			onEffect = (id, value) => {
+				if (id !== 'outside') return;
+				if (value === 'trigger') {
+					flushSync(() => controls.outside('nested'));
+					startTransition(() => controls.outside('queued'));
+				} else if (value === 'nested') {
+					if (urgent) controls.left('from nested effect');
+					else startTransition(() => controls.left('from nested effect'));
+				}
+			};
+			const waiting = container.querySelector('[data-value="right"]')!;
+			flushSync(() => controls.outside('trigger'));
+			clock.mockReturnValue(1000);
+			resolve('revealed');
+			if (urgent) {
+				await vi.waitFor(() => expect(text('right')).toBe('revealed'));
+				expect(captures).toEqual([]);
+			} else {
+				const right = await nextCapture('right');
+				const left = await nextCapture('left');
+				expect(text('left')).toBe('initial');
+				expect(waiting.isConnected).toBe(true);
+				expect(waiting.textContent).toBe('waiting');
+				await Promise.all([left.update(), right.update()]);
+				left.ready.resolve();
+				right.ready.resolve();
+			}
+			expect(text('left')).toBe('from nested effect');
+			expect(text('right')).toBe('revealed');
+			expect(text('outside')).toBe('queued');
+			expect(warning.mock.calls).toEqual(
+				process.env.NODE_ENV === 'production'
+					? []
+					: [[expect.stringContaining('flushSync was called')]],
+			);
+		},
+	);
+
+	it('finishes a long finite passive cascade while revealing suspended content', async () => {
+		const warning = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const clock = vi.spyOn(performance, 'now').mockReturnValue(0);
+		let resolve!: (value: string) => void;
+		const promise = new Promise<string>((done) => {
+			resolve = done;
+		});
+		await act(() =>
+			root.render(ScopedEffectsApp, {
+				controls,
+				events,
+				promise,
+				onEffect: (id: string, value: string) => onEffect?.(id, value),
+			}),
+		);
+		// Independent widgets can hand a finite initialization sequence to each
+		// other. The whole sequence must finish if animation preparation yields.
+		onEffect = (id, value) => {
+			if ((id !== 'left' && id !== 'outside') || !value.startsWith('step:')) return;
+			const step = Number(value.slice(5));
+			if (step < 64) {
+				const next = id === 'left' ? 'outside' : 'left';
+				flushSync(() => controls[next]('step:' + (step + 1)));
+			} else {
+				events.push('cascade complete');
+			}
+		};
+		const waiting = container.querySelector('[data-value="right"]')!;
+		flushSync(() => controls.outside('step:0'));
+		clock.mockReturnValue(1000);
+		resolve('revealed');
+		const advanced = new Set<Capture>();
+		await vi.waitFor(async () => {
+			// Let the native callbacks proceed if a valid capture strategy chooses
+			// to animate part of the sequence; only the eventual public result matters.
+			const pending = captures.filter((capture) => !advanced.has(capture));
+			for (const capture of pending) advanced.add(capture);
+			await Promise.all(pending.map((capture) => capture.update()));
+			for (const capture of pending) {
+				capture.ready.resolve();
+				capture.finished.resolve();
+			}
+			expect(events).toContain('cascade complete');
+			expect(waiting.isConnected).toBe(false);
+		});
+		expect(text('left')).toBe('step:63');
+		expect(text('outside')).toBe('step:64');
+		expect(text('right')).toBe('revealed');
+		expect(
+			warning.mock.calls.every(
+				([message]) => typeof message === 'string' && message.includes('flushSync was called'),
+			),
+		).toBe(true);
 	});
 
 	it('commits without animation when a pre-render passive adds urgent sibling work', async () => {

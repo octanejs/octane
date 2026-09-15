@@ -1,5 +1,14 @@
 import type { HydrationStrategy } from 'octane/hydration';
-import { Hydrate, ViewTransition, use, type ViewTransitionProps } from 'octane';
+import {
+	Hydrate,
+	ViewTransition,
+	use,
+	useMemo,
+	useState,
+	createElement,
+	type ViewTransitionProps,
+	type OctaneNode,
+} from 'octane';
 
 interface StreamProps {
 	promise: Promise<string>;
@@ -486,4 +495,91 @@ export function RawAttributeRelayApp(props: StreamProps & { markup: string }) @{
 			</ViewTransition>
 		}
 	</section>
+}
+
+export function RawMarkupApp(props: { markup: string }) @{
+	<main>
+		<div dangerouslySetInnerHTML={{ __html: props.markup }} />
+		<ViewTransition name="raw-neighbor">
+			<span>{'Neighbor'}</span>
+		</ViewTransition>
+	</main>
+}
+
+function RawMarkupContent(props: { promise: Promise<string> }) @{
+	const markup = use(props.promise) as string;
+	<RawMarkupApp markup={markup} />
+}
+
+export function RawMarkupStreamApp(props: { promise: Promise<string> }) @{
+	<main>
+		@try {
+			<RawMarkupContent promise={props.promise} />
+		} @pending {
+			<p>{'Loading raw HTML'}</p>
+		}
+	</main>
+}
+
+function ServerCallback(props: { render: () => void }) @{
+	props.render();
+	<></>
+}
+
+export function ReentrantRawMarkupApp(props: { markup: string; render: () => void }) @{
+	<main>
+		<RawMarkupApp markup={props.markup} />
+		<ServerCallback render={props.render} />
+	</main>
+}
+
+export function LiteralAnnotationsApp(props: { text: string; title: string }) @{
+	<main>
+		<p id="literal-annotations" title={props.title}>{props.text as string}</p>
+		{createElement('script-box', null, 'Custom element')}
+		<ViewTransition name="literal-neighbor">
+			<span>{'Neighbor'}</span>
+		</ViewTransition>
+	</main>
+}
+
+export function SpreadRawMarkupApp(props: { markup: string }) @{
+	const attributes = { dangerouslySetInnerHTML: { __html: props.markup } };
+	<main>
+		<div {...attributes} />
+		<ViewTransition name="spread-neighbor">
+			<span>{'Neighbor'}</span>
+		</ViewTransition>
+	</main>
+}
+
+function MemoRawMarkup(props: { markup: string }) {
+	const [updated, setUpdated] = useState(false);
+	const output = useMemo(() => RawMarkupApp(props), []);
+	if (!updated) setUpdated(true);
+	return output;
+}
+
+export function RetriedRawMarkupApp(props: { markup: string }) @{
+	<ViewTransition>
+		<MemoRawMarkup {...props} />
+	</ViewTransition>
+}
+
+async function DeferredRawMarkup(props: {
+	markup: string;
+	promise: Promise<void>;
+}): Promise<OctaneNode> {
+	await props.promise;
+	return RawMarkupApp(props) as OctaneNode;
+}
+
+export function AsyncRawMarkupApp(props: { markup: string; promise: Promise<void> }) @{
+	<ViewTransition>
+		@try {
+			<DeferredRawMarkup {...props} />
+		} @pending {
+			<p>{'Loading raw HTML'}</p>
+		}
+	</ViewTransition>
 }

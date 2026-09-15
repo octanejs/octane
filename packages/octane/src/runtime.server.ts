@@ -1747,9 +1747,28 @@ class ServerHtml {
 	}
 }
 
+// Async component results and memoized output can outlive their rendering pass.
+// Restore raw provenance through the existing branded read, keeping ordinary
+// ServerHtml values and their consumption path unchanged.
+class RawServerHtml {
+	constructor(private readonly html: string) {}
+	get [SERVER_HTML](): string {
+		VT_SSR_HAS_RAW_HTML = true;
+		return this.html;
+	}
+	toString(): string {
+		return this[SERVER_HTML];
+	}
+}
+
 /** @internal Brand the final serialized output of a compiled server body. */
 export function ssrHtml(html: string): string {
-	return typeof html === 'string' ? (new ServerHtml(html) as unknown as string) : html;
+	if (typeof html !== 'string') return html;
+	if (!VT_SSR_HAS_RAW_HTML) return new ServerHtml(html) as unknown as string;
+	// An async continuation runs outside a synchronous pass. Its wrapper now
+	// owns this provenance; do not leave it behind for an unrelated continuation.
+	if (CURRENT_SCOPE === null) VT_SSR_HAS_RAW_HTML = false;
+	return new RawServerHtml(html) as unknown as string;
 }
 
 function serverComponentOutput(out: unknown, scope: SSRScope): string {
@@ -2069,6 +2088,7 @@ function ssrHostElement(
 		}
 		let inner = '';
 		if (hasDangerHTML) {
+			VT_SSR_HAS_RAW_HTML = true;
 			const html = (innerHTMLValue as { __html?: unknown }).__html;
 			const raw = html == null ? '' : String(html);
 			// HTML tag names are ASCII case-insensitive on the public descriptor path
@@ -3238,6 +3258,7 @@ export function ssrInnerHtml(
 			}
 		}
 		const html = (value as { __html?: unknown }).__html;
+		VT_SSR_HAS_RAW_HTML = true;
 		return html == null ? '' : String(html);
 	}
 	return undefined;
@@ -3329,6 +3350,7 @@ export function ssrSpreadContent(
 		}
 		if (child != null) throw new Error(formatServerError(5));
 		const value = (html as { __html?: unknown }).__html;
+		VT_SSR_HAS_RAW_HTML = true;
 		return value == null ? '' : String(value);
 	}
 	return child === undefined ? '' : ssrChildText(child, scope);
@@ -4058,6 +4080,8 @@ function rewindComponentReplayState(
 	if (snapshot.jobs !== null) snapshot.jobs.length = snapshot.jobsLength;
 	VT_SSR_TRY_SEQ = snapshot.vtTrySeq;
 	VT_SSR_HAS_CANDIDATES = snapshot.vtHasCandidates;
+	// Memoized HTML can survive a render-phase retry. Retain the conservative
+	// raw-HTML requirement for this pass even when other output is discarded.
 	VT_SSR_STACK.length = 0;
 	for (const entry of snapshot.vtStack) {
 		entry.candidate.consumed = entry.consumed;
@@ -4694,6 +4718,10 @@ let VT_SSR_TRY_SEQ = 0;
 // contain residual vt-enter-x / vt-exit-x attributes. Threaded into the pass
 // result so ordinary SSR can skip scanning the entire emitted HTML string.
 let VT_SSR_HAS_CANDIDATES = false;
+// Compiler-emitted attributes escape quotes, so their candidates can be stripped
+// by a native regex. Trusted raw HTML needs the quote-aware tag/attribute walk.
+// Keep this alongside candidate state through render retries and reentrancy.
+let VT_SSR_HAS_RAW_HTML = false;
 const VT_SSR_STACK: VtSsrCandidate[] = [];
 
 /** Resolve a class-prop value server-side (no types → maps use `default`). */
@@ -4755,7 +4783,18 @@ function vtSsrMapTags(
 			continue;
 		}
 		let nameEnd = nameStart + 1;
-		while (nameEnd < html.length && /[a-zA-Z0-9:-]/.test(html[nameEnd])) nameEnd++;
+		while (nameEnd < html.length) {
+			const code = html.charCodeAt(nameEnd);
+			if (!(
+				(code >= 65 && code <= 90) ||
+				(code >= 97 && code <= 122) ||
+				(code >= 48 && code <= 57) ||
+				code === 58 ||
+				code === 45
+			))
+				break;
+			nameEnd++;
+		}
 		const tag = html.slice(nameStart, nameEnd).toLowerCase();
 		const end = vtSsrOpenTagEnd(html, nameStart + tag.length);
 		if (end < 0) break;
@@ -4781,8 +4820,9 @@ function vtSsrMapTags(
 		// Resource tags are not visual hosts. Templates hold inert transport markup;
 		// scope validation alone visits every direct element, including stream sentinels.
 		if (inert) {
-			const close = html.indexOf('</' + tag + '>', from);
-			if (close >= 0) from = close + tag.length + 3;
+			const close = new RegExp('</' + tag + '[\\t\\n\\f\\r ]*>', 'gi');
+			close.lastIndex = from;
+			from = close.exec(html) === null ? html.length : close.lastIndex;
 			continue;
 		}
 		if (!isVoid) depth++;
@@ -4940,38 +4980,120 @@ function vtSsrClaimArm(html: string, kind: 'enter' | 'exit'): string {
 	if (!VT_SSR_HAS_CANDIDATES) return html;
 	const active: boolean[] = [];
 	const eventName = 'vt-' + kind;
-	const parentName = 'vt-parent-' + kind;
+	const candidateName = eventName + '-x';
+	const relayName = 'vt-parent-' + kind + '-x';
 	return vtSsrMapTags(html, (open, depth) => {
-		const read = (name: string): string | undefined => {
-			const attribute = vtSsrAttribute(open, name);
-			return attribute === null ? undefined : open.slice(attribute.start, attribute.end);
-		};
-		const claim = (name: string) => {
-			const attribute = vtSsrAttribute(open, name + '-x');
-			if (attribute !== null)
-				open = open.slice(0, attribute.nameEnd - 2) + open.slice(attribute.nameEnd);
-		};
-		const candidate = read(eventName + '-x');
-		if (depth === 0 && candidate !== undefined && candidate !== 'none') claim(eventName);
-		const event = read(eventName);
-		const relay = read(parentName + '-x');
+		let candidate: string | undefined;
+		let candidateEnd = -1;
+		let event: string | undefined;
+		let eventStart = Infinity;
+		let relay: string | undefined;
+		let relayEnd = -1;
+		if (/vt-/i.test(open))
+			vtSsrAttributes(open, (name, start, end, _quote, nameStart, nameEnd) => {
+				if (name === candidateName && candidate === undefined) {
+					candidate = open.slice(start, end);
+					candidateEnd = nameEnd;
+				} else if (name === eventName && event === undefined) {
+					event = open.slice(start, end);
+					eventStart = nameStart;
+				} else if (name === relayName && relay === undefined) {
+					relay = open.slice(start, end);
+					relayEnd = nameEnd;
+				}
+			});
+		let claimEnd = -1;
+		if (depth === 0 && candidate !== undefined && candidate !== 'none') {
+			claimEnd = candidateEnd;
+			// Browser duplicate-attribute semantics choose the first occurrence,
+			// including an authored event preceding the newly claimed candidate.
+			if (candidateEnd < eventStart) event = candidate;
+		}
 		const parentActive = depth > 0 && active[depth - 1];
 		if (parentActive && relay !== undefined && relay !== 'none' && relay !== 'auto') {
-			// The candidate is already escaped HTML; rename it without double escaping.
-			claim(parentName);
+			claimEnd = relayEnd;
 		}
 		active[depth] =
 			(event !== undefined && event !== 'none') ||
 			(parentActive && (relay === undefined || relay !== 'none'));
-		return open;
+		// Root hosts claim their event; descendants claim only a parent relay.
+		// Values are already escaped and are never serialized a second time.
+		return claimEnd < 0 ? open : open.slice(0, claimEnd - 2) + open.slice(claimEnd);
 	});
 }
 
+// Keep the candidate prefix separate from opaque markup. A mixed alternation
+// makes the native matcher inspect every ordinary tag in a large document.
+const VT_SSR_STRIP = / vt-(?:parent-)?(?:enter|exit)-x="[^"]*"(?=[^<>"]*(?:"[^"]*"[^<>"]*)*>)/gi;
+const VT_SSR_OPAQUE = /<!--|<(script|style|title|template)(?=[\t\n\f\r />])/gi;
+const VT_SSR_CANDIDATE = /vt-(?:parent-)?(?:enter|exit)-x/i;
+
 /** Strip staging attributes, including blocked and unclaimed relay candidates. */
-function vtSsrStrip(html: string): string {
-	if (!/-x/i.test(html)) return html;
+function vtSsrStrip(html: string, rawHtml: boolean): string {
+	if (!rawHtml) {
+		let lower = html.indexOf('-x="');
+		let upper = html.indexOf('-X="');
+		if (lower < 0 && upper < 0) return html;
+		// Cache each spelling's next match, including its absent state, so many
+		// candidates never repeatedly search the suffix for the other spelling.
+		const advance = (from: number): number => {
+			if (lower >= 0 && lower < from) lower = html.indexOf('-x="', from);
+			if (upper >= 0 && upper < from) upper = html.indexOf('-X="', from);
+			return lower < 0 ? upper : upper < 0 ? lower : Math.min(lower, upper);
+		};
+		let candidate = advance(0);
+		let from = 0;
+		let copied = 0;
+		let out = '';
+		VT_SSR_OPAQUE.lastIndex = 0;
+		let opaque: RegExpExecArray | null;
+		while ((opaque = VT_SSR_OPAQUE.exec(html)) !== null) {
+			const start = opaque.index;
+			// Compiler attributes escape quotes but may contain literal '<'. Check
+			// only opaque openers and bound the search to fresh input, so adjacent
+			// component markers never repeatedly scan an attribute-free prefix.
+			const attr = html.slice(from, start).lastIndexOf('="');
+			if (attr >= 0 && html.indexOf('"', from + attr + 2) > start) {
+				rawHtml = true;
+				break;
+			}
+			if (candidate < start) {
+				const part = html.slice(from, start);
+				const next = part.replace(VT_SSR_STRIP, '');
+				if (next !== part) {
+					out += html.slice(copied, from) + next;
+					copied = start;
+				}
+				candidate = advance(start);
+				if (candidate < 0) return copied === 0 ? html : out + html.slice(copied);
+			}
+			const tag = opaque[1];
+			let end: number;
+			if (tag === undefined) {
+				const close = html.indexOf('-->', start + 4);
+				end = close < 0 ? html.length : close + 3;
+			} else {
+				const openingEnd = vtSsrOpenTagEnd(html, start + tag.length + 1) + 1;
+				const close = html.indexOf('</' + tag + '>', openingEnd);
+				if (close >= 0) end = close + tag.length + 3;
+				else {
+					const closing = new RegExp('</' + tag + '[\\t\\n\\f\\r ]*>', 'gi');
+					closing.lastIndex = openingEnd;
+					end = closing.exec(html) === null ? html.length : closing.lastIndex;
+				}
+			}
+			if (candidate < end) {
+				candidate = advance(end);
+				if (candidate < 0) return copied === 0 ? html : out + html.slice(copied);
+			}
+			from = VT_SSR_OPAQUE.lastIndex = end;
+		}
+		if (!rawHtml)
+			return out + html.slice(copied, from) + html.slice(from).replace(VT_SSR_STRIP, '');
+	}
+	if (!VT_SSR_CANDIDATE.test(html)) return html;
 	return vtSsrMapTags(html, (open) => {
-		if (!/-x/i.test(open)) return open;
+		if (!VT_SSR_CANDIDATE.test(open)) return open;
 		let out = '';
 		let copied = 0;
 		vtSsrAttributes(open, (name, _start, end, quote, nameStart) => {
@@ -4981,7 +5103,10 @@ function vtSsrStrip(html: string): string {
 				name === 'vt-parent-enter-x' ||
 				name === 'vt-parent-exit-x'
 			) {
-				out += open.slice(copied, nameStart - 1);
+				// HTML accepts an attribute immediately after a quoted value. Only
+				// consume the preceding byte when it actually separates attributes.
+				const start = vtSsrSpace(open.charCodeAt(nameStart - 1)) ? nameStart - 1 : nameStart;
+				out += open.slice(copied, start);
 				copied = end + (quote ? 1 : 0);
 			}
 		});
@@ -7280,6 +7405,8 @@ interface FullPassResult {
 	/** Whether this pass rendered ViewTransition candidate attributes that need
 	 *  the final residual-candidate cleanup scan. */
 	vtCandidates: boolean;
+	/** Whether emitted HTML may contain unescaped trusted attribute syntax. */
+	rawHtml: boolean;
 	/** Per-hash scoped stylesheets from this pass — the streaming renderer diffs
 	 *  these against what it already flushed to emit late boundaries' styles. */
 	cssEntries: Map<string, InjectedStyle>;
@@ -7322,6 +7449,7 @@ interface Ambient {
 	nestingWarnings: Set<string> | null | undefined;
 	vtTrySeq: number;
 	vtHasCandidates: boolean;
+	vtHasRawHtml: boolean;
 	vtStack: Array<{ candidate: VtSsrCandidate; consumed: boolean }>;
 }
 function saveAmbient(): Ambient {
@@ -7354,6 +7482,7 @@ function saveAmbient(): Ambient {
 		nestingWarnings: SSR_NESTING_WARNINGS,
 		vtTrySeq: VT_SSR_TRY_SEQ,
 		vtHasCandidates: VT_SSR_HAS_CANDIDATES,
+		vtHasRawHtml: VT_SSR_HAS_RAW_HTML,
 		vtStack: snapshotVtStack(),
 	};
 }
@@ -7406,6 +7535,7 @@ function restoreAmbient(a: Ambient): void {
 	SSR_NESTING_WARNINGS = a.nestingWarnings;
 	VT_SSR_TRY_SEQ = a.vtTrySeq;
 	VT_SSR_HAS_CANDIDATES = a.vtHasCandidates;
+	VT_SSR_HAS_RAW_HTML = a.vtHasRawHtml;
 	VT_SSR_STACK.length = 0;
 	for (const snapshot of a.vtStack) {
 		snapshot.candidate.consumed = snapshot.consumed;
@@ -7446,6 +7576,7 @@ function runFullFramedPass(
 	PERMANENT_STATIC_HYDRATE_DEPTH = 0;
 	VT_SSR_TRY_SEQ = 0;
 	VT_SSR_HAS_CANDIDATES = false;
+	VT_SSR_HAS_RAW_HTML = false;
 	VT_SSR_STACK.length = 0;
 	const cssMap = (CSS = newStyleCollector());
 	const headBuf = (HEAD = {
@@ -7486,6 +7617,7 @@ function runFullFramedPass(
 	CURRENT_PARENT_SCOPE = null;
 	let body = '';
 	let vtCandidates = false;
+	let rawHtml = false;
 	let rootSuspended = false;
 	let signals: NativeSignalManifest | undefined;
 	let nativePassCompleted = false;
@@ -7507,6 +7639,7 @@ function runFullFramedPass(
 		rootSuspended = true;
 	} finally {
 		vtCandidates = VT_SSR_HAS_CANDIDATES;
+		rawHtml = VT_SSR_HAS_RAW_HTML;
 		try {
 			if (nativeToken >= 0) NATIVE_READ_COLLECTOR!.endScope(nativeToken, nativePassCompleted);
 			if (markers && nativePassCompleted)
@@ -7550,6 +7683,7 @@ function runFullFramedPass(
 		deferred,
 		rootSuspended,
 		vtCandidates,
+		rawHtml,
 		cssEntries: cssMap,
 		sheets: headBuf.sheets,
 	};
@@ -7583,6 +7717,7 @@ function runDiscoveryRound(
 	PERMANENT_STATIC_HYDRATE_DEPTH = 0;
 	VT_SSR_TRY_SEQ = 0;
 	VT_SSR_HAS_CANDIDATES = false;
+	VT_SSR_HAS_RAW_HTML = false;
 	VT_SSR_STACK.length = 0;
 	CSS = newStyleCollector();
 	HEAD = {
@@ -8045,13 +8180,13 @@ function passToResult(
 	let result: RenderResult;
 	if (separateHead) {
 		result = {
-			html: pass.vtCandidates ? vtSsrStrip(body) : body,
+			html: pass.vtCandidates ? vtSsrStrip(body, pass.rawHtml) : body,
 			css: pass.css,
-			head: pass.vtCandidates ? vtSsrStrip(pass.head) : pass.head,
+			head: pass.vtCandidates ? vtSsrStrip(pass.head, pass.rawHtml) : pass.head,
 		};
 	} else {
 		const html = spliceHead(body, pass.head);
-		result = { html: pass.vtCandidates ? vtSsrStrip(html) : html, css: pass.css };
+		result = { html: pass.vtCandidates ? vtSsrStrip(html, pass.rawHtml) : html, css: pass.css };
 	}
 	if (pass.signals !== undefined) result.signals = pass.signals;
 	return result;
@@ -8267,7 +8402,7 @@ export function renderHostedAttempt(
 	let body = pass.body;
 	if (pass.serial.length > 0) body += serializeSuspenseSeeds(pass.serial, nonceAttr);
 	if (pass.signals !== undefined) body += serializeNativeSignalSeeds(pass.signals, nonceAttr);
-	if (pass.vtCandidates) body = vtSsrStrip(body);
+	if (pass.vtCandidates) body = vtSsrStrip(body, pass.rawHtml);
 	return { status: 'complete', html: body, head: pass.head, cssEntries: pass.cssEntries };
 }
 
@@ -8349,13 +8484,13 @@ export function renderToStaticMarkup(
 	// handed over on its own under `headChannel: 'separate'`.
 	if (options?.headChannel === 'separate') {
 		return {
-			html: pass.vtCandidates ? vtSsrStrip(pass.body) : pass.body,
+			html: pass.vtCandidates ? vtSsrStrip(pass.body, pass.rawHtml) : pass.body,
 			css: pass.css,
-			head: pass.vtCandidates ? vtSsrStrip(pass.head) : pass.head,
+			head: pass.vtCandidates ? vtSsrStrip(pass.head, pass.rawHtml) : pass.head,
 		};
 	}
 	const html = spliceHead(pass.body, pass.head);
-	return { html: pass.vtCandidates ? vtSsrStrip(html) : html, css: pass.css };
+	return { html: pass.vtCandidates ? vtSsrStrip(html, pass.rawHtml) : html, css: pass.css };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -8427,6 +8562,8 @@ interface StreamBoundary {
 	serverOwnedStatic: boolean;
 	/** Inner branch-range html (`<!--[-->…<!--]-->`) from the resolving pass. */
 	html: string;
+	/** Whether the accepted segment requires quote-aware candidate stripping. */
+	rawHtml: boolean;
 	/** This boundary's `use()` seed slice from the resolving pass. */
 	seeds: unknown[];
 	/** Ready native values captured with this exact accepted segment. */
@@ -8845,6 +8982,8 @@ export function ssrTry(
 				}
 				VT_SSR_TRY_SEQ = vtTrySeq;
 				VT_SSR_HAS_CANDIDATES = vtHasCandidates;
+				// The fallback HTML still supplies the transport placeholder, so its
+				// raw-HTML requirement survives even though its side effects do not.
 				VT_SSR_STACK.length = 0;
 				for (const snapshot of vtStack) {
 					snapshot.candidate.consumed = snapshot.consumed;
@@ -8883,6 +9022,7 @@ export function ssrTry(
 					if (!entry.serverOwnedStatic)
 						entry.signals = NATIVE_READ_COLLECTOR?.serialize(nativeReads);
 					entry.state = 'done';
+					entry.rawHtml = VT_SSR_HAS_RAW_HTML;
 					entry.html =
 						vtOuter !== null
 							? vtSsrAnnotate(inner, [
@@ -8944,6 +9084,7 @@ export function ssrTry(
 							state: 'pending',
 							serverOwnedStatic: PERMANENT_STATIC_HYDRATE_DEPTH !== 0,
 							html: '',
+							rawHtml: false,
 							seeds: [],
 							pendingIdOffset,
 							namespace,
@@ -8993,6 +9134,7 @@ export function ssrTry(
 						}
 						entry.state = 'done';
 						entry.html = inner;
+						entry.rawHtml = VT_SSR_HAS_RAW_HTML;
 						entry.seeds = nativeFresh ? [] : caughtSeeds;
 						pruneUnrepresentedStreamDescendants(stream!, key, entry.html);
 					} else if (SERIAL !== null) {
@@ -9021,6 +9163,7 @@ export function ssrTry(
 						serverOwnedStatic: false,
 						error: e,
 						html: '',
+						rawHtml: false,
 						seeds: [],
 						pendingIdOffset,
 						namespace,
@@ -9584,7 +9727,7 @@ function segmentChunk(b: StreamBoundary, nonceAttr: string): string {
 	// them while this is still markup: once the parsing-safe carrier below turns
 	// the segment into a JSON string, vtSsrStrip can no longer recognize quoted
 	// HTML attributes inside it.
-	const html = vtSsrStrip(b.html);
+	const html = vtSsrStrip(b.html, b.rawHtml);
 	const content =
 		b.namespace === 'svg'
 			? seedScript + '<svg>' + html + '</svg>'
@@ -9994,7 +10137,7 @@ async function runStream(
 	const separateHead = options?.headChannel === 'separate';
 	if (separateHead) {
 		try {
-			options?.onHeadReady?.(pass.vtCandidates ? vtSsrStrip(pass.head) : pass.head);
+			options?.onHeadReady?.(pass.vtCandidates ? vtSsrStrip(pass.head, pass.rawHtml) : pass.head);
 		} catch (err) {
 			try {
 				completeInjection();
@@ -10043,7 +10186,7 @@ async function runStream(
 			(sentViewTransitions ? streamViewTransitionRuntimeJs() : '') +
 			'</script>';
 	try {
-		const shellWrite = write(pass.vtCandidates ? vtSsrStrip(shell) : shell);
+		const shellWrite = write(pass.vtCandidates ? vtSsrStrip(shell, pass.rawHtml) : shell);
 		if (shellWrite !== undefined) await shellWrite;
 	} catch (err) {
 		try {
@@ -10095,7 +10238,7 @@ async function runStream(
 		if (initiallyDone.length > 0) {
 			let chunk = '';
 			for (const boundary of initiallyDone) chunk += segmentChunk(boundary, nonceAttr);
-			const segmentWrite = write(pass.vtCandidates ? vtSsrStrip(chunk) : chunk);
+			const segmentWrite = write(pass.vtCandidates ? vtSsrStrip(chunk, pass.rawHtml) : chunk);
 			if (segmentWrite !== undefined) await segmentWrite;
 			for (const boundary of initiallyDone) {
 				flushedSegments.add(boundary.id);
@@ -10181,7 +10324,7 @@ async function runStream(
 			}
 			for (const b of done) chunk += segmentChunk(b, nonceAttr);
 			if (chunk !== '') {
-				const segmentWrite = write(pass.vtCandidates ? vtSsrStrip(chunk) : chunk);
+				const segmentWrite = write(pass.vtCandidates ? vtSsrStrip(chunk, pass.rawHtml) : chunk);
 				if (segmentWrite !== undefined) await segmentWrite;
 				// A boundary isn't considered flushed until the transport accepted its
 				// chunk through any active backpressure gate.

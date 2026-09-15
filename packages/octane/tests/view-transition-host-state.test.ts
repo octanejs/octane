@@ -105,6 +105,22 @@ describe('prepared host state', () => {
 		expect(retained.parentNode).toBe(null);
 	});
 
+	it('preserves a new host reparented after removal in the same commit', () => {
+		const parent = document.createElement('div');
+		const stage = new DOMStage();
+		const child = stage.created(document.createElement('span'));
+		child.textContent = 'reparented';
+		const section = stage.created(document.createElement('section'));
+		stage.view(parent).appendChild(child);
+		stage.view(parent).removeChild(child);
+		stage.view(section).appendChild(child);
+		stage.view(parent).appendChild(section);
+		expect(parent.innerHTML).toBe('');
+		stage.commit();
+		expect(parent.innerHTML).toBe('<section><span>reparented</span></section>');
+		expect(section.firstChild).toBe(child);
+	});
+
 	it('clears a shared range once without changing its anchors or neighboring hosts', () => {
 		const parent = document.createElement('div');
 		parent.innerHTML =

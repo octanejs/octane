@@ -163,6 +163,29 @@ describe.sequential.each(['dev', 'prod'] as const)(
 			}
 		});
 
+		it.each([false, true])(
+			'isolates iframe roots and adopts their existing scope stylesheet (adopt=%s)',
+			async (adopt) => {
+				const fixture = await openPage(mode);
+				try {
+					expect(
+						await fixture.page.evaluate(
+							(adopt) => window.__viewTransitionScopes.foreignScope(adopt),
+							adopt,
+						),
+					).toEqual({
+						mounted: 'all',
+						updated: { scope: 'all', text: 'foreign-after' },
+						disabled: adopt ? 'none' : null,
+						released: 'none',
+					});
+					expect(fixture.errors).toEqual([]);
+				} finally {
+					await fixture.close();
+				}
+			},
+		);
+
 		it('attaches native animation handles and transition types to the element while outside controls remain interactive', async () => {
 			const fixture = await openPage(mode);
 			try {

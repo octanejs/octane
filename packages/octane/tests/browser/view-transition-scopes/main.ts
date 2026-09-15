@@ -1,6 +1,8 @@
 import {
 	addTransitionType,
 	createRoot,
+	createElement,
+	ViewTransition,
 	flushSync,
 	startTransition,
 	type ViewTransitionInstance,
@@ -236,9 +238,55 @@ async function finish() {
 	return snapshot();
 }
 
+async function foreignScope(adoptStyle: boolean) {
+	const frame = document.createElement('iframe');
+	document.body.append(frame);
+	const owner = frame.contentDocument!;
+	const container = owner.createElement('div');
+	owner.body.append(container);
+	const existing = adoptStyle
+		? (document
+				.querySelector<HTMLStyleElement>('style[data-octane="octane-view-transition-scope"]')!
+				.cloneNode(true) as HTMLStyleElement)
+		: null;
+	if (existing !== null) owner.head.append(existing);
+	const foreignRoot = createRoot(container);
+	const output = (text: string, scoped = true, onMount?: () => void) =>
+		createElement(
+			ViewTransition,
+			{ scope: scoped ? 'element' : undefined },
+			createElement('section', { ref: onMount }, text),
+		);
+	const scope = () =>
+		frame
+			.contentWindow!.getComputedStyle(container.firstElementChild!)
+			.getPropertyValue('view-transition-scope');
+	try {
+		foreignRoot.render(createElement('span', null, 'before scope'));
+		await new Promise<void>((resolve) => {
+			startTransition(() => foreignRoot.render(output('foreign-before', true, resolve)));
+		});
+		const mounted = scope();
+		flushSync(() => foreignRoot.render(output('foreign-after')));
+		const updated = { scope: scope(), text: container.textContent };
+		let disabled: string | null = null;
+		if (existing !== null) {
+			existing.disabled = true;
+			disabled = scope();
+			existing.disabled = false;
+		}
+		flushSync(() => foreignRoot.render(output('unscoped', false)));
+		return { mounted, updated, disabled, released: scope() };
+	} finally {
+		flushSync(() => foreignRoot.unmount());
+		frame.remove();
+	}
+}
+
 window.__viewTransitionScopes = {
 	render,
 	renderLocal,
+	foreignScope,
 	ready,
 	snapshot,
 	finish,
@@ -257,6 +305,7 @@ declare global {
 		__viewTransitionScopes: {
 			render: typeof render;
 			renderLocal: typeof renderLocal;
+			foreignScope: typeof foreignScope;
 			ready: typeof ready;
 			snapshot: typeof snapshot;
 			finish: typeof finish;
