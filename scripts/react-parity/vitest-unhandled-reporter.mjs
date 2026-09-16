@@ -1,6 +1,15 @@
 import { ensureStackContainsMessage } from './vitest-json-reporter.mjs';
 
-function formatUnhandledError(error) {
+function formatUnhandledError(error, seen = new Set()) {
+	if (seen.has(error)) return '[circular error cause]';
+	seen.add(error);
+	const message = formatError(error);
+	return error?.cause == null
+		? message
+		: `${message}\nCaused by: ${formatUnhandledError(error.cause, seen)}`;
+}
+
+function formatError(error) {
 	ensureStackContainsMessage(error);
 	if (typeof error?.stack === 'string') return error.stack;
 	if (typeof error?.message === 'string') return error.message;

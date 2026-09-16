@@ -1,5 +1,13 @@
 import { spawn } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+	copyFileSync,
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 
@@ -45,7 +53,10 @@ export async function runRequiredVitestLanes({
 	const runDirectory = mkdtempSync(join(tmpdir(), 'octane-react-parity-vitest-'));
 	const runReportPath = join(runDirectory, 'report.json');
 	try {
-		if (reportPath) rmSync(reportPath, { force: true });
+		if (reportPath) {
+			rmSync(reportPath, { force: true });
+			rmSync(`${reportPath}.failed`, { force: true });
+		}
 		const { code, signal } = await new Promise((resolve, reject) => {
 			const child = spawnProcess(
 				process.execPath,
@@ -80,6 +91,15 @@ export async function runRequiredVitestLanes({
 		console.log(
 			`completed parity-wide Vitest shard ${shard.value} in ${((Date.now() - startedAt) / 1000).toFixed(1)}s`,
 		);
+	} catch (error) {
+		// Keep failed evidence separate from the verified report consumed by the
+		// aggregate gate. Runner-level errors can occur even when all recorded
+		// assertions passed, and the fresh raw report is needed to diagnose them.
+		if (reportPath && existsSync(runReportPath)) {
+			mkdirSync(dirname(reportPath), { recursive: true });
+			copyFileSync(runReportPath, `${reportPath}.failed`);
+		}
+		throw error;
 	} finally {
 		rmSync(runDirectory, { recursive: true, force: true });
 	}
