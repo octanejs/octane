@@ -5,11 +5,16 @@ import { promisify } from 'node:util';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createFixture, runCli } from './helpers/fixture.js';
 
+// Transform the real compiler graph during suite collection. The subprocess
+// assertion below still exercises a cold CLI startup without Vitest transforms.
+import 'octane/compiler';
+
 // `analyze` deliberately compiles with the project's own octane, so the fixture
 // borrows a real installed one from this workspace rather than stubbing it: a
 // stub would prove nothing about the diagnostics people actually get.
 const WORKSPACE = path.resolve(fileURLToPath(new URL('../../..', import.meta.url)));
 const OCTANE = path.join(WORKSPACE, 'packages/octane');
+const BIN = path.join(WORKSPACE, 'packages/cli/src/bin/octane.js');
 
 /** @type {{ cleanup: () => void }[]} */
 const fixtures = [];
@@ -50,21 +55,28 @@ async function analyze(files, extra = []) {
 
 describe('octane analyze', () => {
 	it('reports redundant Strong dependencies as hints without failing --strict', async () => {
-		const result = await analyze(
-			{
-				'src/Hint.tsrx': `"use strong";
+		const { root } = project({
+			'src/Hint.tsrx': `"use strong";
 import { useEffect } from 'octane';
 import { observe } from './external';
 export function Hint({ value }) @{
   useEffect(() => { observe(value); }, [value]);
   <div />
 }`,
-			},
-			['--strict'],
-		);
-		expect(result.exitCode).toBe(0);
-		expect(result.json().summary).toEqual({ errors: 0, warnings: 0, hints: 1 });
-		expect(result.json().findings).toEqual([
+		});
+		// execFile rejects a nonzero exit, so this checks --strict's exit status too.
+		const { stdout } = await promisify(execFile)(process.execPath, [
+			BIN,
+			'analyze',
+			'--cwd',
+			OCTANE,
+			path.join(root, 'src/Hint.tsrx'),
+			'--strict',
+			'--json',
+		]);
+		const report = JSON.parse(stdout);
+		expect(report.summary).toEqual({ errors: 0, warnings: 0, hints: 1 });
+		expect(report.findings).toEqual([
 			expect.objectContaining({
 				code: 'OCTANE_STRONG_EXPLICIT_DEPENDENCIES',
 				severity: 'hint',
@@ -175,10 +187,9 @@ export function Hint({ value }) @{
 		// a naively spawned one resolve the compiler from there no matter what the
 		// fixture declares, and this path would never be reached.
 		const { root } = project({ 'src/A.tsrx': 'export function A() @{ <div /> }\n' });
-		const bin = path.join(WORKSPACE, 'packages/cli/src/bin/octane.js');
 
 		const { NODE_PATH: _ignored, ...env } = process.env;
-		const result = await promisify(execFile)(process.execPath, [bin, 'analyze', '--cwd', root], {
+		const result = await promisify(execFile)(process.execPath, [BIN, 'analyze', '--cwd', root], {
 			env,
 		})
 			.then(() => ({ code: 0, stderr: '' }))
