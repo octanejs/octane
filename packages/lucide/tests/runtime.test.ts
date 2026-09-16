@@ -25,7 +25,7 @@ describe('@octanejs/lucide — runtime behavior', () => {
 		expect(search.getAttribute('width')).toBe('18');
 		expect(search.getAttribute('stroke')).toBe('tomato');
 		expect(search.getAttribute('stroke-width')).toBe('4');
-		expect(search.getAttribute('class')).toBe('lucide provided lucide-search local');
+		expect(search.getAttribute('class')).toBe('lucide lucide-search provided local');
 		expect(search.hasAttribute('aria-hidden')).toBe(false);
 
 		expect(mounted.find('#alert title').textContent).toBe('Warning');
@@ -48,13 +48,11 @@ describe('@octanejs/lucide — runtime behavior', () => {
 		warn.mockRestore();
 	});
 
-	it('normalizes custom icon names like lucide-react', () => {
+	it('preserves legacy icon classes and the component display name', () => {
 		const CustomIcon = createLucideIcon('my_icon', []);
 		expect(CustomIcon.displayName).toBe('MyIcon');
 		const mounted = mount(CustomIcon, { id: 'custom-name' });
-		expect(mounted.find('#custom-name').getAttribute('class')).toBe(
-			'lucide lucide-my-icon lucide-my_icon',
-		);
+		expect(mounted.find('#custom-name').getAttribute('class')).toBe('lucide lucide-my_icon');
 		mounted.unmount();
 	});
 });

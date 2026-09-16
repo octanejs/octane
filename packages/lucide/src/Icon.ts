@@ -1,49 +1,51 @@
-import { createElement } from 'octane';
+import { buildLucideIconNode } from '@lucide/icons/build';
+import { createElement, type ElementDescriptor } from 'octane';
 import { useLucideContext } from './context';
-import defaultAttributes from './defaultAttributes';
 import { hasA11yProp, mergeClasses } from './shared';
-import type { IconNode, LucideProps } from './types';
+import type { IconNode, LucideIconData, LucideIconNode, LucideProps } from './types';
 
-export interface IconComponentProps extends LucideProps {
-	iconNode: IconNode;
+export type IconComponentProps = LucideProps &
+	({ icon: LucideIconData; iconNode?: never } | { icon?: never; iconNode: IconNode });
+
+function renderNode([tag, attributes, children]: LucideIconNode): ElementDescriptor {
+	return createElement(tag, { ...attributes, children: children?.map(renderNode) });
 }
 
 export function Icon(props: IconComponentProps) {
 	const {
-		color,
+		icon,
+		iconNode = [],
 		size,
+		width,
+		height,
+		color,
 		strokeWidth,
 		absoluteStrokeWidth,
-		className = '',
+		nonScalingStroke,
+		className,
 		children,
-		iconNode,
 		ref,
-		...rest
+		...attributes
 	} = props;
-	const {
-		size: contextSize = 24,
-		strokeWidth: contextStrokeWidth = 2,
-		absoluteStrokeWidth: contextAbsoluteStrokeWidth = false,
-		color: contextColor = 'currentColor',
-		className: contextClass = '',
-	} = useLucideContext() ?? {};
-	const calculatedStrokeWidth =
-		(absoluteStrokeWidth ?? contextAbsoluteStrokeWidth)
-			? (Number(strokeWidth ?? contextStrokeWidth) * 24) / Number(size ?? contextSize)
-			: (strokeWidth ?? contextStrokeWidth);
+	const context = useLucideContext();
+	const [tag, svgAttributes, nodes] = buildLucideIconNode(icon ?? { node: iconNode }, {
+		width: width ?? size ?? context.size ?? 24,
+		height: height ?? size ?? context.size ?? 24,
+		color: color ?? context.color,
+		strokeWidth: strokeWidth ?? context.strokeWidth,
+		absoluteStrokeWidth: absoluteStrokeWidth ?? context.absoluteStrokeWidth,
+		nonScalingStroke: nonScalingStroke ?? context.nonScalingStroke,
+		className: mergeClasses(context.className, className),
+		hasA11yProp: Boolean(children) || hasA11yProp(attributes),
+		attributeNames: { class: 'className' },
+		attributes,
+	});
 
-	return createElement('svg', {
+	return createElement(tag, {
+		...svgAttributes,
 		ref,
-		...defaultAttributes,
-		width: size ?? contextSize ?? defaultAttributes.width,
-		height: size ?? contextSize ?? defaultAttributes.height,
-		stroke: color ?? contextColor,
-		strokeWidth: calculatedStrokeWidth,
-		className: mergeClasses('lucide', contextClass as string, className as string),
-		...(!children && !hasA11yProp(rest) ? { 'aria-hidden': 'true' } : {}),
-		...rest,
 		children: [
-			...iconNode.map(([tag, attrs]) => createElement(tag, attrs)),
+			...(nodes?.map(renderNode) ?? []),
 			...(Array.isArray(children) ? children : [children]),
 		],
 	});
