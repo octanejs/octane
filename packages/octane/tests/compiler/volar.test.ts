@@ -849,7 +849,13 @@ declare module '@fixture/object-intrinsics/jsx-runtime' {
 			);
 			const imports = `import * as stylex from '@octanejs/stylex';
 import type { SignalHandle } from 'octane/signals';
-const styles = stylex.create({ height: (height: number | null) => ({ height }), root: { color: 'red' } });
+const tokens = stylex.defineVars({ border: 'black' });
+const styles = stylex.create({
+  height: (height: number | null) => ({ height }),
+  root: { color: 'red' },
+  forcedColors: { '::before': { borderColor: { default: tokens.border, '@media (forced-colors: active)': 'GrayText' } } },
+});
+declare const compiledStyle: stylex.CompiledStyles;
 declare const height$: SignalHandle<number | null>;
 declare const wrong$: SignalHandle<boolean>;
 declare const appearance$: SignalHandle<typeof styles.root>;
@@ -867,6 +873,7 @@ export function Panel() @{
     <span sx={(styles[dynamicStyle$])(height$)} />
     <span sx={styles.height((height$).get())} />
     <span sx={payload$.get().selected} />
+    <span sx={[styles.forcedColors, [false, null, undefined, compiledStyle]]} />
     <Custom sx={height$} />
   </div>
 }`;
@@ -893,6 +900,12 @@ export function Invalid() @{
   <div sx={styles.height(wrong$)}>
     <span sx={styles.height('invalid-length')} />
     <Custom sx={42} />
+    <span sx={true} />
+    <span sx={[[true]]} />
+    <span sx={{ color: 'red' }} />
+    <span sx={{ '::before': { borderColor: { default: 'black', '@media (forced-colors: active)': 'GrayText' } } }} />
+    <span sx={styles.height} />
+    <span sx={[styles.root, { '--fake': 'red' }]} />
   </div>
 }`;
 			const invalidFile = join(stylexRoot, 'Invalid.tsx');
@@ -919,7 +932,9 @@ export function Invalid() @{
 					.map((error) => ts.flattenDiagnosticMessageText(error.messageText, ' ')),
 			).toEqual([]);
 			const invalidDiagnostics = program.getSemanticDiagnostics(program.getSourceFile(invalidFile));
-			expect(invalidDiagnostics.map(({ code }) => code)).toEqual([2345, 2345, 2345, 2322]);
+			expect(invalidDiagnostics.map(({ code }) => code)).toEqual([
+				2345, 2345, 2345, 2322, 2322, 2322, 2322, 2322, 2322, 2322,
+			]);
 			expect(() =>
 				compileStylexToVolarMappings(
 					`${imports} export function Invalid() @{<div sx={payload$.selected}/>} `,

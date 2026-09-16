@@ -21,13 +21,15 @@
 // `class` to the `class` attribute and applies a `style` object — so
 // `<div {...stylex.props(styles.root)}>` just works.
 import * as stylex from '@stylexjs/stylex';
-import type { StyleXStyles } from '@stylexjs/stylex';
+import type { CompiledStyles, InlineStyles, StyleXArray } from '@stylexjs/stylex';
 import type {} from 'octane/jsx-runtime';
 
 declare module 'octane/jsx-runtime' {
 	interface NativeAttributeExtensions {
 		/** Requires the StyleX `sx` compiler contract; component props are unaffected. */
-		sx?: StyleXStyles;
+		sx?: StyleXArray<
+			false | null | undefined | CompiledStyles | Readonly<[CompiledStyles, InlineStyles]>
+		>;
 	}
 }
 
