@@ -546,144 +546,167 @@ describe('behavior-only roots', () => {
 			}
 		}
 		for (const dev of [false, true]) {
-			for (const tag of ['button', 'svg']) {
-				for (const classes of [
-					"['base', props.active && 'active']",
-					'{ base: true, active: props.active }',
-				]) {
-					const fixture = authoredPresentation(
-						'FreshClass',
-						{ title: 'server', active: false },
-						dev,
-						`export function FreshClass(props) @{ 'use dom bindings';
- const title = props.title;
- <${tag} title={title} className={${classes}} ref={props.onReady}/>
+			for (const destructured of [false, true]) {
+				for (const tag of ['button', 'svg']) {
+					for (const classes of [
+						"['base', props.active && 'active']",
+						'{ base: true, active: props.active }',
+					]) {
+						const fixture = authoredPresentation(
+							'FreshClass',
+							{ title: 'server', active: false },
+							dev,
+							`export function FreshClass(${destructured ? '{ title: header = "default title", ...props }' : 'props'}) @{ 'use dom bindings';
+ const title = ${destructured ? 'header' : 'props.title'};
+ <${tag} title={title} className={${classes}} ref={props.onReady} onClick={() => props.onAction?.(title)}/>
 }`,
+						);
+						article.innerHTML = fixture.html;
+						const element = article.querySelector(tag)!;
+						fixture.publish({ title: 'early', active: true });
+						const binding = fixture.attach(element, fixture.state);
+						const readyViews: Array<[string | null, string | null]> = [];
+						const onAction = vi.fn();
+						const onReady = vi.fn((node: Element | null) => {
+							if (node) readyViews.push([node.getAttribute('class'), node.getAttribute('title')]);
+						});
+						try {
+							expect(element.getAttribute('class')).toBe('base active');
+							const client = fixture.loadClient();
+							hydratedRoot = hydrateRoot(
+								article,
+								client.FreshClass,
+								{ title: 'early', active: true, onReady, onAction },
+								{ bindingLeases: [binding] },
+							);
+							flushSync(() => {});
+							flushEffects();
+							expect(article.querySelector(tag)).toBe(element);
+							expect(onReady).toHaveBeenCalledExactlyOnceWith(element);
+							expect(readyViews).toEqual([['base active', 'early']]);
+							element.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+							expect(onAction).toHaveBeenCalledExactlyOnceWith('early');
+							expect(fixture.cleanup).toHaveBeenCalledOnce();
+							fixture.publish({ title: 'stale', active: false });
+							binding.refresh();
+							expect(element.getAttribute('class')).toBe('base active');
+							expect(element.getAttribute('title')).toBe('early');
+							hydratedRoot.render(client.FreshClass, {
+								title: 'live',
+								active: false,
+								onReady,
+								onAction,
+							});
+							flushSync(() => {});
+							expect(element.getAttribute('class')).toBe('base');
+							expect(element.getAttribute('title')).toBe('live');
+							onAction.mockClear();
+							element.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+							expect(onAction).toHaveBeenCalledExactlyOnceWith('live');
+							if (destructured) {
+								hydratedRoot.render(client.FreshClass, { active: false, onReady, onAction });
+								flushSync(() => {});
+								expect(element.getAttribute('title')).toBe('default title');
+								onAction.mockClear();
+								element.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+								expect(onAction).toHaveBeenCalledExactlyOnceWith('default title');
+							}
+						} finally {
+							hydratedRoot?.unmount();
+							hydratedRoot = undefined;
+							binding.dispose();
+						}
+						expect(fixture.cleanup).toHaveBeenCalledOnce();
+					}
+				}
+				for (const failure of [null, 'read', 'coercion']) {
+					const scope = createScope({ scopeKey: `projected-handoff-${dev}-${failure}` });
+					const height$ = scope.signal$<unknown>('height', 2);
+					const projected = authoredPresentation(
+						'ProjectedAction',
+						{ height$, title: 'early', onReady: (_element: Element | null) => {} },
+						dev,
+						`import 'octane/signals'; import * as stylex from 'binding-styles';
+const styles = stylex.create({ height: height => ({ className: 'sized', style: { height } }) });
+export function ProjectedAction(${destructured ? '{ title: header = "default title", ...props }' : 'props'}) @{ 'use dom bindings';
+ <button aria-label="Action" title={${destructured ? 'header' : 'props.title'}} sx={styles.height(props.height$)} ref={props.onReady}/>
+}`,
+						{
+							'binding-styles': {
+								create: (config: unknown) => config,
+								props: (value: unknown) => value,
+							},
+						},
+						{
+							knownAttributeSpreads: [
+								{
+									source: 'binding-styles',
+									imported: '*',
+									members: ['props'],
+									fields: ['className', 'style'],
+									style: 'object',
+									jsxAttribute: 'sx',
+								},
+							],
+						},
 					);
-					article.innerHTML = fixture.html;
-					const element = article.querySelector(tag)!;
-					fixture.publish({ title: 'early', active: true });
-					const binding = fixture.attach(element, fixture.state);
-					const readyViews: Array<[string | null, string | null]> = [];
-					const onReady = vi.fn((node: Element | null) => {
-						if (node) readyViews.push([node.getAttribute('class'), node.getAttribute('title')]);
-					});
+					article.innerHTML = projected.html;
+					const action = article.querySelector('button')!;
+					const binding = runWithSignalOwner(scope, () =>
+						projected.attach(action, projected.state),
+					);
 					try {
-						expect(element.getAttribute('class')).toBe('base active');
-						const client = fixture.loadClient();
+						height$.set(3);
+						expect(action.style.height).toBe('3px');
+						const error = new Error(`Failed ${failure} during presentation preparation`);
+						const onUncaughtError = vi.fn();
+						const readyViews: string[][] = [];
+						const onReady = vi.fn((element: Element | null) => {
+							if (element instanceof HTMLButtonElement)
+								readyViews.push([element.title, element.className, element.style.height]);
+						});
 						hydratedRoot = hydrateRoot(
 							article,
-							client.FreshClass,
-							{ title: 'early', active: true, onReady },
-							{ bindingLeases: [binding] },
+							projected.loadClient().ProjectedAction,
+							{
+								title: 'prepared',
+								onReady,
+								height$:
+									failure === 'read'
+										? scope.derived$<unknown>('failure', () => {
+												throw error;
+											})
+										: failure === 'coercion'
+											? scope.signal$('failure', {
+													toString() {
+														throw error;
+													},
+												})
+											: height$,
+							},
+							{ signalOwner: scope, bindingLeases: [binding], onUncaughtError },
 						);
 						flushSync(() => {});
 						flushEffects();
-						expect(article.querySelector(tag)).toBe(element);
-						expect(onReady).toHaveBeenCalledExactlyOnceWith(element);
-						expect(readyViews).toEqual([['base active', 'early']]);
-						expect(fixture.cleanup).toHaveBeenCalledOnce();
-						fixture.publish({ title: 'stale', active: false });
-						binding.refresh();
-						expect(element.getAttribute('class')).toBe('base active');
-						expect(element.getAttribute('title')).toBe('early');
-						hydratedRoot.render(client.FreshClass, { title: 'live', active: false, onReady });
-						flushSync(() => {});
-						expect(element.getAttribute('class')).toBe('base');
-						expect(element.getAttribute('title')).toBe('live');
+						if (failure === null) {
+							expect(onUncaughtError).not.toHaveBeenCalled();
+							expect(onReady).toHaveBeenCalledOnce();
+							expect(onReady).toHaveBeenCalledWith(action);
+							expect(readyViews).toEqual([['prepared', 'sized', '3px']]);
+							height$.set(4);
+							flushSync(() => {});
+							expect(action.style.height).toBe('4px');
+						} else {
+							expect(onUncaughtError).toHaveBeenCalledExactlyOnceWith(error);
+							expect(onReady).not.toHaveBeenCalled();
+							expect(action.title).toBe('early');
+						}
 					} finally {
 						hydratedRoot?.unmount();
 						hydratedRoot = undefined;
 						binding.dispose();
+						scope.dispose();
 					}
-					expect(fixture.cleanup).toHaveBeenCalledOnce();
-				}
-			}
-			for (const failure of [null, 'read', 'coercion']) {
-				const scope = createScope({ scopeKey: `projected-handoff-${dev}-${failure}` });
-				const height$ = scope.signal$<unknown>('height', 2);
-				const projected = authoredPresentation(
-					'ProjectedAction',
-					{ height$, title: 'early', onReady: (_element: Element | null) => {} },
-					dev,
-					`import 'octane/signals'; import * as stylex from 'binding-styles';
-const styles = stylex.create({ height: height => ({ className: 'sized', style: { height } }) });
-export function ProjectedAction(props) @{ 'use dom bindings';
- <button aria-label="Action" title={props.title} sx={styles.height(props.height$)} ref={props.onReady}/>
-}`,
-					{
-						'binding-styles': {
-							create: (config: unknown) => config,
-							props: (value: unknown) => value,
-						},
-					},
-					{
-						knownAttributeSpreads: [
-							{
-								source: 'binding-styles',
-								imported: '*',
-								members: ['props'],
-								fields: ['className', 'style'],
-								style: 'object',
-								jsxAttribute: 'sx',
-							},
-						],
-					},
-				);
-				article.innerHTML = projected.html;
-				const action = article.querySelector('button')!;
-				const binding = runWithSignalOwner(scope, () => projected.attach(action, projected.state));
-				try {
-					height$.set(3);
-					expect(action.style.height).toBe('3px');
-					const error = new Error(`Failed ${failure} during presentation preparation`);
-					const onUncaughtError = vi.fn();
-					const readyViews: string[][] = [];
-					const onReady = vi.fn((element: Element | null) => {
-						if (element instanceof HTMLButtonElement)
-							readyViews.push([element.title, element.className, element.style.height]);
-					});
-					hydratedRoot = hydrateRoot(
-						article,
-						projected.loadClient().ProjectedAction,
-						{
-							title: 'prepared',
-							onReady,
-							height$:
-								failure === 'read'
-									? scope.derived$<unknown>('failure', () => {
-											throw error;
-										})
-									: failure === 'coercion'
-										? scope.signal$('failure', {
-												toString() {
-													throw error;
-												},
-											})
-										: height$,
-						},
-						{ signalOwner: scope, bindingLeases: [binding], onUncaughtError },
-					);
-					flushSync(() => {});
-					flushEffects();
-					if (failure === null) {
-						expect(onUncaughtError).not.toHaveBeenCalled();
-						expect(onReady).toHaveBeenCalledOnce();
-						expect(onReady).toHaveBeenCalledWith(action);
-						expect(readyViews).toEqual([['prepared', 'sized', '3px']]);
-						height$.set(4);
-						flushSync(() => {});
-						expect(action.style.height).toBe('4px');
-					} else {
-						expect(onUncaughtError).toHaveBeenCalledExactlyOnceWith(error);
-						expect(onReady).not.toHaveBeenCalled();
-						expect(action.title).toBe('early');
-					}
-				} finally {
-					hydratedRoot?.unmount();
-					hydratedRoot = undefined;
-					binding.dispose();
-					scope.dispose();
 				}
 			}
 			for (const outcome of [
@@ -3156,6 +3179,212 @@ export function ProjectedAction(props) @{ 'use dom bindings';
 		expect(container.querySelector('[data-action]')).not.toBeNull();
 		for (const dev of [false, true]) {
 			const refA = { current: null as HTMLInputElement | null };
+			for (const adopt of [false, true]) {
+				const reads: string[] = [];
+				const events: unknown[] = [];
+				const symbol = Symbol('enumerable rest');
+				let label: string | null | undefined;
+				let extra = 'initial';
+				let onRead = () => {};
+				let attachedRest: unknown;
+				const snapshot = Object.create({ inherited: 'excluded' }) as Record<PropertyKey, unknown>;
+				Object.defineProperties(snapshot, {
+					label: {
+						enumerable: true,
+						get() {
+							reads.push('label');
+							const value = label;
+							onRead();
+							return value;
+						},
+					},
+					'data-kind': {
+						enumerable: true,
+						get() {
+							reads.push('kind');
+							return 'primary';
+						},
+					},
+					onAction: {
+						enumerable: true,
+						value: (value: unknown, rest: unknown) => {
+							events.push([value, rest === attachedRest, rest]);
+						},
+					},
+					onRef: {
+						enumerable: true,
+						value: (node: Element | null, rest: unknown) => {
+							if (node) attachedRest = rest;
+						},
+					},
+					extra: {
+						enumerable: true,
+						get() {
+							reads.push('extra');
+							return extra;
+						},
+					},
+					hidden: { value: 'excluded' },
+					[symbol]: { enumerable: true, value: 'symbol value' },
+				});
+				const destructured = authoredPresentation(
+					'Destructured',
+					snapshot,
+					dev,
+					`export function Destructured({ label: text = 'Fallback', 'data-kind': kind = 'base', onAction, onRef, ...rest }) @{
+ 'use dom bindings';
+ <section title={text} data-kind={kind}>
+  <button type="button" onClick={() => onAction(text, rest)} ref={(node) => onRef(node, rest)}>{text as string}</button>
+  <span title={rest.extra}>{text as string}</span>
+ </section>
+}`,
+				);
+				const host = document.createElement('div');
+				container.append(host);
+				host.innerHTML = destructured.html;
+				expect(host.querySelector('button')!.textContent).toBe('Fallback');
+				expect(host.querySelector('section')!.getAttribute('data-kind')).toBe('primary');
+				const serverButton = host.querySelector('button');
+				if (!adopt) host.replaceChildren();
+				const subscriptions = new Set<() => void>();
+				const state = {
+					getSnapshot: () => snapshot,
+					subscribe(notify: () => void) {
+						subscriptions.add(notify);
+						return () => {
+							subscriptions.delete(notify);
+						};
+					},
+				};
+				const publish = () => {
+					for (const notify of subscriptions) notify();
+				};
+				const abort = new AbortController();
+				reads.length = 0;
+				const handle = adopt
+					? destructured.attach(host.firstElementChild!, state, { signal: abort.signal })
+					: destructured.mount({ parent: host }, state, { signal: abort.signal });
+				const button = host.querySelector('button')!;
+				if (adopt) expect(button).toBe(serverButton);
+				expect(reads).toEqual(['label', 'kind', 'extra']);
+				button.click();
+				expect(events).toEqual([
+					['Fallback', true, { extra: 'initial', [symbol]: 'symbol value' }],
+				]);
+				expect(reads).toEqual(['label', 'kind', 'extra']);
+				label = null;
+				extra = 'changed';
+				publish();
+				expect(button.textContent).toBe('');
+				expect(host.querySelector('section')!.getAttribute('title')).toBeNull();
+				expect(host.querySelector('span')!.title).toBe('changed');
+				button.click();
+				expect(events.at(-1)).toEqual([null, true, { extra: 'changed', [symbol]: 'symbol value' }]);
+				label = 'discarded';
+				onRead = () => {
+					onRead = () => {};
+					button.click();
+					label = 'committed';
+					publish();
+				};
+				publish();
+				expect(events.at(-1)).toEqual([null, true, { extra: 'changed', [symbol]: 'symbol value' }]);
+				expect(button.textContent).toBe('committed');
+				button.click();
+				expect(events.at(-1)).toEqual([
+					'committed',
+					true,
+					{ extra: 'changed', [symbol]: 'symbol value' },
+				]);
+				label = 'aborted';
+				onRead = () => abort.abort();
+				publish();
+				expect(button.textContent).toBe('committed');
+				events.length = 0;
+				button.click();
+				expect(events).toEqual([]);
+				handle.dispose();
+				label = 'recovered';
+				onRead = () => {};
+				const recovered = destructured.attach(host.firstElementChild!, state);
+				expect(button.textContent).toBe('recovered');
+				onRead = () => {
+					throw new Error('props getter failed');
+				};
+				expect(publish).toThrow('props getter failed');
+				expect(button.textContent).toBe('recovered');
+				button.click();
+				expect(events).toEqual([]);
+				recovered.dispose();
+			}
+			for (const restChildren of [false, true]) {
+				const slotted = authoredPresentation(
+					'Slotted',
+					{ label: undefined as string | undefined, rows: ['first'], kind: 'nested' },
+					dev,
+					`function Child({ ${restChildren ? '' : 'children: content,'} label: caption = 'Default child', rows, ...rest }) @{
+ <article title={caption} data-kind={rest.kind}>
+  {${restChildren ? 'rest.children' : 'content'}}
+  @for (const content of rows; key content) { <span>{content}</span> }
+ </article>
+}
+export function Slotted({ label, rows, kind }) @{ 'use dom bindings';
+ <section><Child label={label} rows={rows} kind={kind}><button type="button">{label as string}</button></Child></section>
+}`,
+				);
+				for (const adopt of [false, true]) {
+					const host = document.createElement('div');
+					container.append(host);
+					slotted.publish({ label: undefined, rows: ['first'], kind: 'nested' });
+					host.innerHTML = slotted.html;
+					expect(host.querySelector('article')!.title).toBe('Default child');
+					expect(host.querySelector('span')!.textContent).toBe('first');
+					const serverButton = host.querySelector('button');
+					if (!adopt) host.replaceChildren();
+					const handle = adopt
+						? slotted.attach(host.firstElementChild!, slotted.state)
+						: slotted.mount({ parent: host }, slotted.state);
+					const button = host.querySelector('button')!;
+					if (adopt) expect(button).toBe(serverButton);
+					slotted.publish({ label: 'Updated child', rows: ['second', 'first'], kind: 'updated' });
+					expect(host.querySelector('article')!.title).toBe('Updated child');
+					expect(host.querySelector('article')!.getAttribute('data-kind')).toBe('updated');
+					expect(button.textContent).toBe('Updated child');
+					expect(host.querySelector('button')).toBe(button);
+					expect([...host.querySelectorAll('span')].map((node) => node.textContent)).toEqual([
+						'second',
+						'first',
+					]);
+					handle.dispose();
+				}
+			}
+			for (const fallback of ['false', '0', '"fallback"']) {
+				expect(() =>
+					authoredPresentation(
+						'UnsupportedChildren',
+						{},
+						dev,
+						`export function UnsupportedChildren({ children: content = ${fallback} }) @{ 'use dom bindings'; <section>{content}</section> }`,
+					),
+				).toThrow(/child slot defaults/);
+			}
+			for (const parameter of [
+				'{ label: { text } }',
+				'{ ["label"]: label }',
+				'{ label = globalThis.name }',
+				'{ label = [] }',
+				'[label]',
+				'props = {}',
+			]) {
+				expect(() =>
+					authoredPresentation(
+						'Unsupported',
+						{},
+						dev,
+						`export function Unsupported(${parameter}) @{ 'use dom bindings'; <section /> }`,
+					),
+				).toThrow(/binding props support only|ordinary props parameter/);
+			}
 			const refB = { current: null as HTMLInputElement | null };
 			const order: string[] = [];
 			const callbackA = vi.fn((element: Element | null) => {

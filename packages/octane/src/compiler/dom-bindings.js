@@ -481,6 +481,38 @@ function assertProjection(
 	});
 }
 
+function bindingParameterNames(parameter, filename) {
+	if (parameter?.type !== 'ObjectPattern') return [parameter?.name ?? null];
+	return parameter.properties.map((property, index) => {
+		if (
+			property.type === 'RestElement' &&
+			property.argument.type === 'Identifier' &&
+			index === parameter.properties.length - 1
+		)
+			return property.argument.name;
+		const value = property.value;
+		const binding = value?.type === 'AssignmentPattern' ? value.left : value;
+		if (
+			property.type !== 'Property' ||
+			property.kind !== 'init' ||
+			property.method ||
+			property.computed ||
+			!['Identifier', 'Literal'].includes(property.key.type) ||
+			binding?.type !== 'Identifier' ||
+			(value.type === 'AssignmentPattern' &&
+				(value.right.type !== 'Literal' ||
+					(value.right.value !== null &&
+						!['string', 'number', 'boolean'].includes(typeof value.right.value))))
+		)
+			error(
+				filename,
+				property,
+				'binding props support only flat static names, literal defaults, and rest',
+			);
+		return binding.name;
+	});
+}
+
 function bindingRender(fn, filename, required = true) {
 	const body = statements(fn);
 	const offset = isDirective(body[0]) ? 1 : 0;
@@ -507,7 +539,7 @@ function bindingRender(fn, filename, required = true) {
 		fn.generator ||
 		fn.params.length > 1 ||
 		(required && fn.params.length !== 1) ||
-		(fn.params.length === 1 && fn.params[0].type !== 'Identifier')
+		(fn.params.length === 1 && !['Identifier', 'ObjectPattern'].includes(fn.params[0].type))
 	) {
 		error(
 			filename,
@@ -515,6 +547,7 @@ function bindingRender(fn, filename, required = true) {
 			'a binding view needs an ordinary props parameter and one template output, without early returns',
 		);
 	}
+	bindingParameterNames(fn.params[0], filename);
 	return render;
 }
 
@@ -1222,6 +1255,9 @@ function projectProgram(ast, plan, filename, lexical) {
 						b.object([
 							b.prop('init', b.id('id'), b.literal(plan.id)),
 							b.prop('init', b.id('root'), root ?? plan.root),
+							...(plan.prepareProps
+								? [b.prop('init', b.id('prepareProps'), plan.prepareProps)]
+								: []),
 							b.prop('init', b.id('adopt'), b.id(adopt)),
 							b.prop('init', b.id('mount'), b.id(mount)),
 							...(scalar ? [b.prop('init', b.id('scalar'), scalar)] : []),
@@ -1612,19 +1648,46 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 			lexical,
 			allocateProgramName,
 			projectionBody,
+			parameterNames: bindingParameterNames(fn.params[0], filename),
 			refDependencies: (expression) => refDependencies.get(unwrap(expression)) ?? null,
 			isChildSlot: (expression) => {
 				const value = unwrap(expression);
 				const parameter = fn.params[0];
-				return (
+				const member =
 					value?.type === 'MemberExpression' &&
 					!value.optional &&
-					(value.computed ? value.property.value : value.property.name) === 'children' &&
-					value.object.type === 'Identifier' &&
-					value.object.name === parameter?.name &&
-					lexical.resolveBinding(lexical.nodeScopes.get(value.object), value.object.name)?.scope ===
-						lexical.resolveBinding(lexical.nodeScopes.get(parameter), parameter.name)?.scope
-				);
+					(value.computed ? value.property.value : value.property.name) === 'children';
+				let reference = member ? value.object : null;
+				let binding = parameter;
+				if (parameter?.type === 'ObjectPattern') {
+					const children = parameter.properties.find(
+						(property) =>
+							property.type === 'Property' &&
+							(property.key.name ?? property.key.value) === 'children' &&
+							(member ||
+								(property.value.type === 'AssignmentPattern' ? property.value.left : property.value)
+									.name === value?.name),
+					);
+					if (member) {
+						if (children) return false;
+						binding = parameter.properties.find(
+							(property) => property.type === 'RestElement',
+						)?.argument;
+					} else {
+						reference = value;
+						binding = children?.value;
+					}
+				}
+				const fallback = binding?.type === 'AssignmentPattern' ? binding.right : null;
+				if (fallback) binding = binding.left;
+				const matches =
+					reference?.type === 'Identifier' &&
+					reference.name === binding?.name &&
+					lexical.resolveBinding(lexical.nodeScopes.get(reference), reference.name)?.scope ===
+						lexical.resolveBinding(lexical.nodeScopes.get(binding), binding.name)?.scope;
+				if (matches && fallback && fallback.value !== null)
+					error(filename, fallback, 'binding child slot defaults must be null');
+				return matches;
 			},
 			canCarryValue: (expression) => {
 				if (!helpers.canCarryDirectSignalHandle(expression)) return false;
@@ -1705,6 +1768,7 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 		}
 		const render = bindingRender(node, filename);
 		const structural =
+			node.params[0]?.type === 'ObjectPattern' ||
 			needsBindingProgram(render, isUnbound) ||
 			statements(node).some((statement) => statement.type === 'VariableDeclaration');
 		if (structural || (helpers.mount && selectedExport === node.id.name)) {

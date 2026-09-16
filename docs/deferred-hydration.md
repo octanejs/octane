@@ -485,6 +485,8 @@ HTML produce a diagnostic, not a renderer fallback. Structural programs own
 only their declared regions; fixed programs update properties without replacing
 nodes.
 
+Binding views may use flat destructured props, including aliases, primitive literal defaults, and a final rest binding: `function Action({ label: text = 'Send', ...props }) @{ ... }`. Destructuring runs once for each prepared snapshot, so projections and event handlers share the same captured values and rest object. Defaults apply only to `undefined`, not `null`. Nested or computed patterns and nonliteral defaults fail extraction. A rendered `children` slot may be aliased or read through rest when it was not excluded; a non-null default for that slot is unsupported. A rest binding does not authorize an arbitrary native JSX spread: the existing spread restrictions still apply.
+
 Pass the exact element emitted by the matching server build. Adoption validates
 template compatibility, native topology, and conflicting binding ownership
 before modifying it. Only declared dynamic properties and structural regions

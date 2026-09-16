@@ -308,7 +308,7 @@ export type BindingRegion = { readonly node: number } & (
 	  }
 	| {
 			readonly kind: 'view';
-			readonly view: Pick<CompiledBindingProgram<unknown>, 'id' | 'root'>;
+			readonly view: Pick<CompiledBindingProgram<unknown>, 'id' | 'root' | 'prepareProps'>;
 			props(environment: readonly unknown[]): unknown;
 	  }
 	| { readonly kind: 'slot'; read(environment: readonly unknown[]): unknown }
@@ -325,6 +325,7 @@ export type BindingRegion = { readonly node: number } & (
 export interface CompiledBindingProgram<Props> {
 	readonly id: string;
 	readonly root: BindingFragment;
+	prepareProps?(props: Props): readonly unknown[];
 	readonly scalar?: CompiledBindings<Props>;
 	readonly adoptScalar?: typeof __adoptBindings;
 	readonly connectSignal?: typeof __createBindingSignals;
@@ -1021,7 +1022,9 @@ function prepareFragment(
 			candidate.child = prepareFragment(
 				region.child ??
 					createFragment(descriptor.view.root, descriptor.view.id, document, transaction),
-				[descriptor.props(environment)],
+				descriptor.view.prepareProps
+					? descriptor.view.prepareProps(descriptor.props(environment))
+					: [descriptor.props(environment)],
 				transaction,
 			);
 		} else if (descriptor.kind === 'slot') {
@@ -1464,7 +1467,11 @@ function bindProgram<Props>(
 					throw new TypeError('DOM presentation requires a synchronous snapshot, not a thenable.');
 				transaction.preparing = true;
 				transaction.frame++;
-				const plan = prepareFragment(instance!, [snapshot], transaction);
+				const plan = prepareFragment(
+					instance!,
+					descriptor.prepareProps ? descriptor.prepareProps(snapshot) : [snapshot],
+					transaction,
+				);
 				if (!dirty && !transaction.disposed && transaction.controls)
 					publishControls(plan, transaction);
 				while (signalUpdates?.size && !dirty && !transaction.disposed) {

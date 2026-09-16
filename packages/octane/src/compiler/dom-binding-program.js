@@ -106,6 +106,7 @@ export function planBindingProgram(fn, render, context) {
 		localProgram,
 		allocateProgramName,
 		projectionBody,
+		parameterNames,
 		refDependencies,
 		canCarryValue,
 		isChildSlot,
@@ -484,7 +485,13 @@ export function planBindingProgram(fn, render, context) {
 					object({
 						node: b.literal(index),
 						kind: b.literal('view'),
-						view: child ? object({ id: b.literal(child.id), root: child.root }) : b.id(local),
+						view: child
+							? object({
+									id: b.literal(child.id),
+									root: child.root,
+									...(child.prepareProps ? { prepareProps: child.prepareProps } : {}),
+								})
+							: b.id(local),
 						props: project(names, b.object(props), node),
 					}),
 				);
@@ -799,7 +806,7 @@ export function planBindingProgram(fn, render, context) {
 		}
 		return object(properties);
 	};
-	const root = compileFragment([annotated], [fn.params[0]?.name ?? null]);
+	const root = compileFragment([annotated], parameterNames);
 	for (const [call, value] of unbound) replacements.set(call, value);
 	const finalRender = mapCow(annotated, new Map([...unbound, ...classAttributes]));
 	replacements.set(render, finalRender);
@@ -808,6 +815,13 @@ export function planBindingProgram(fn, render, context) {
 		render: finalRender,
 		id,
 		root,
+		// Native destructuring runs once at component preparation, shared by every
+		// projection and committed adapter. Replaying it in each projector would
+		// repeat getters and create different rest objects within one preparation.
+		prepareProps:
+			fn.params[0]?.type === 'ObjectPattern'
+				? origin(b.arrow(fn.params, b.array(parameterNames.map((name) => b.id(name)))), fn)
+				: null,
 		expressions,
 		dependencies,
 		hoists,
