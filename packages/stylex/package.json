@@ -35,6 +35,8 @@
   ],
   "exports": {
     ".": "./src/index.ts",
+    "./compiler": "./src/compiler.js",
+    "./compiler/contract": "./src/compiler-contract.js",
     "./vite": "./src/vite.js"
   },
   "scripts": {

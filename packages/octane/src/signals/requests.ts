@@ -1,10 +1,14 @@
 import { decodeSignalValue, encodeSignalValue } from './encoding.js';
+import { createResourceCellWith } from './engine.js';
+import { SignalStreamError } from './errors.js';
 import {
 	ScopedNode,
 	assertAlive,
 	assertWritable,
 	errorState,
+	idleState,
 	invalidateNode,
+	isThenable,
 	pendingState,
 	publishNode,
 	pure,
@@ -16,7 +20,26 @@ import {
 	type GraphOwner,
 	type NodeState,
 } from './graph.js';
-import type { QUERY_REQUEST, Query, QueryContext, QueryRequest, SignalSeedEntry } from './types.js';
+import {
+	QUERY_REQUEST,
+	skip,
+	type Query,
+	type QueryContext,
+	type QueryRequest,
+	type Resource,
+	type Scope,
+	type SignalSeedEntry,
+} from './types.js';
+import type {
+	StreamFrameIdentity,
+	StreamedSignalResultFrame,
+} from '../streamed-signals-protocol.js';
+import {
+	captureCurrentServerSignalQueryAttemptObserver,
+	hasServerSignalQueryAttemptObserver,
+	serverSignalQueryAttemptObserver,
+	type ServerSignalQueryAttemptObservations,
+} from './query-attempt-observer.js';
 
 export interface QueryDefinition {
 	readonly key: string;
@@ -33,10 +56,15 @@ interface RetainedRequestIdentity {
 interface RequestOwner extends GraphOwner {
 	readonly requests: Map<string, RequestEntry>;
 	readonly queryDefinitions: Map<string, QueryDefinition>;
+	readonly streamedSelections?: Map<string, StreamFrameIdentity>;
+	streamedSelectionReady?(binding: ResourceBinding): void;
+	discardCompletedStreamedSelection?(identity: StreamFrameIdentity): void;
 }
 
 class Request<T> implements QueryRequest<T> {
-	declare readonly [QUERY_REQUEST]: T;
+	get [QUERY_REQUEST](): T {
+		return undefined as T;
+	}
 	readonly queryKey: string;
 	readonly identity: string;
 	readonly argument: unknown;
@@ -82,25 +110,48 @@ export function query<A, T>(
 	return Object.freeze(describe);
 }
 
+/**
+ * Create an eagerly selected, explicitly owned query resource. Keys are unique
+ * within the scope; separate resources may share one canonical query request.
+ * Native query$ declarations are the owner-optional authoring API.
+ */
+export function createResource<T>(
+	owner: Scope,
+	key: string,
+	describe: () => QueryRequest<T> | typeof skip,
+): Resource<T> {
+	return createResourceCellWith(owner, key, describe, initializeResource, true);
+}
+
 interface Attempt {
 	entry: RequestEntry | undefined;
 	controller: AbortController | undefined;
 	iterator: AsyncIterator<unknown> | undefined;
 	readonly settled: Promise<void>;
+	readonly generation: number;
+	readonly streamed: boolean;
+	result: unknown;
+	observations: ServerSignalQueryAttemptObservations | undefined;
+	sequence: number;
 	resolve(): void;
 	hasYielded: boolean;
 }
 
-function makeAttempt(entry: RequestEntry): Attempt {
+function makeAttempt(entry: RequestEntry, generation: number, streamed = false): Attempt {
 	let resolve!: () => void;
 	const settled = new Promise<void>((done) => {
 		resolve = done;
 	});
 	return {
 		entry,
-		controller: new AbortController(),
+		controller: streamed ? undefined : new AbortController(),
 		iterator: undefined,
 		settled,
+		generation,
+		streamed,
+		result: undefined,
+		observations: undefined,
+		sequence: 0,
 		resolve,
 		hasYielded: false,
 	};
@@ -130,20 +181,43 @@ export class RequestEntry {
 		return this.attempt !== undefined;
 	}
 
+	get attemptGeneration(): number {
+		return this.generation;
+	}
+
+	observe(nodeKey: string): Attempt | undefined {
+		const attempt = this.attempt;
+		if (!attempt || attempt.streamed) return;
+		const context = serverSignalQueryAttemptObserver(this.owner.scopeKey);
+		if (context === undefined) return;
+		const observations = (attempt.observations ??= context.createObservations());
+		observations.observe(context, {
+			nodeKey,
+			selectionKey: this.request.identity,
+			attempt: attempt.generation,
+			kind: this.request.definition.kind,
+			result: attempt.result,
+			isCurrent: () => currentEntry(attempt) === this,
+		});
+		return attempt;
+	}
+
 	start(pending: boolean): void {
+		if (this.owner.readBarrier !== undefined) return;
 		const generation = ++this.generation;
 		this.stopAttempt();
 		// Abort and iterator cleanup run producer code. A nested retry can finish
 		// synchronously, so an empty attempt alone does not grant this call a lease.
 		if (
 			generation !== this.generation ||
+			this.owner.readBarrier !== undefined ||
 			this.owner.retired ||
 			this.owner.requests.get(this.request.identity) !== this ||
 			!this.consumers.size
 		)
 			return;
 		const previous = this.state.snapshot;
-		const attempt = (this.attempt = makeAttempt(this));
+		const attempt = (this.attempt = makeAttempt(this, generation));
 		const connection = this.request.definition.kind === 'stream' ? 'connecting' : 'none';
 		this.state =
 			!pending && previous.status === 'ready'
@@ -161,6 +235,7 @@ export class RequestEntry {
 				signalBatch(() =>
 					this.request.definition.load(this.request.argument, {
 						signal: attempt.controller!.signal,
+						...(previous.status === 'ready' ? { previous: previous.value } : {}),
 					}),
 				),
 			);
@@ -171,7 +246,97 @@ export class RequestEntry {
 		// Promise continuations capture only the revocable attempt record, never
 		// this entry, its consumers, or the owning scope.
 		if (this.request.definition.kind === 'stream') observeStream(attempt, result);
-		else observePromise(attempt, result);
+		else {
+			// Only promise observers need the original result; stream observers use
+			// a mirror. Producer code may already have retired this attempt.
+			if (currentEntry(attempt)) attempt.result = result;
+			observePromise(attempt, result);
+		}
+	}
+
+	startStreamed(identity: StreamFrameIdentity): boolean {
+		if (
+			this.owner.readBarrier !== undefined ||
+			identity.selectionKey !== this.request.identity ||
+			identity.attempt < this.generation ||
+			(this.attempt === undefined &&
+				identity.attempt === this.generation &&
+				this.state.snapshot.status !== 'pending') ||
+			this.owner.retired ||
+			!this.consumers.size
+		) {
+			return false;
+		}
+		if (this.attempt?.streamed && this.attempt.generation === identity.attempt) {
+			return true;
+		}
+		this.generation = identity.attempt;
+		this.stopAttempt();
+		if (
+			this.generation !== identity.attempt ||
+			this.owner.readBarrier !== undefined ||
+			this.owner.retired ||
+			this.owner.requests.get(this.request.identity) !== this ||
+			!this.consumers.size
+		) {
+			return false;
+		}
+		this.attempt = makeAttempt(this, identity.attempt, true);
+		return true;
+	}
+
+	acceptStreamed(frame: StreamedSignalResultFrame): boolean {
+		const attempt = this.attempt;
+		if (
+			!attempt?.streamed ||
+			attempt.generation !== frame.identity.attempt ||
+			frame.sequence !== attempt.sequence ||
+			currentEntry(attempt) !== this
+		) {
+			return false;
+		}
+		attempt.sequence++;
+		signalBatch(() => {
+			if (frame.kind === 'open') return;
+			if (frame.kind === 'value') {
+				attempt.hasYielded = true;
+				this.state = readyState(decodeSignalValue(frame.value), {
+					requestKey: this.request.identity,
+					connection: this.request.definition.kind === 'stream' ? 'open' : 'none',
+					complete: false,
+				});
+				this.deliver();
+				return;
+			}
+			if (frame.kind === 'error') {
+				this.state = errorState(
+					new SignalStreamError(frame.code),
+					this.request.definition.kind === 'stream' ? 'closed' : 'none',
+					this.request.identity,
+				);
+				completeAttempt(attempt);
+				this.deliver();
+				return;
+			}
+			if (!attempt.hasYielded || this.state.snapshot.status !== 'ready') {
+				this.state = errorState(
+					new Error('The streamed signal completed without yielding a value.'),
+					this.request.definition.kind === 'stream' ? 'closed' : 'none',
+					this.request.identity,
+				);
+				completeAttempt(attempt);
+				this.deliver();
+				return;
+			}
+			this.state = readyState(this.state.snapshot.value, {
+				requestKey: this.request.identity,
+				connection: this.request.definition.kind === 'stream' ? 'closed' : 'none',
+				complete: true,
+			});
+			completeAttempt(attempt);
+			this.deliver();
+		});
+		return true;
 	}
 
 	deliver(): void {
@@ -187,6 +352,8 @@ export class RequestEntry {
 		const iterator = attempt.iterator;
 		attempt.controller = undefined;
 		attempt.iterator = undefined;
+		attempt.result = undefined;
+		attempt.observations?.retire();
 		attempt.resolve();
 		// Revoke publication and release owner references before user cancellation
 		// callbacks run; those callbacks may synchronously select another request.
@@ -210,11 +377,13 @@ function currentEntry(attempt: Attempt): RequestEntry | undefined {
 }
 
 function completeAttempt(attempt: Attempt): void {
+	attempt.observations?.complete();
 	const entry = attempt.entry;
 	if (entry?.attempt === attempt) entry.attempt = undefined;
 	attempt.entry = undefined;
 	attempt.controller = undefined;
 	attempt.iterator = undefined;
+	attempt.result = undefined;
 	attempt.resolve();
 }
 
@@ -236,6 +405,7 @@ function observePromise(attempt: Attempt, result: unknown): void {
 function failAttempt(attempt: Attempt, error: unknown): void {
 	const entry = currentEntry(attempt);
 	if (!entry) return;
+	attempt.observations?.fail(error);
 	signalBatch(() => {
 		const iterator = attempt.iterator;
 		entry.state = errorState(
@@ -365,7 +535,9 @@ function receiveStreamStep(attempt: Attempt, result: IteratorResult<unknown>): v
 		});
 		accepted.deliver();
 	});
-	nextStreamStep(attempt);
+	const observed = attempt.observations?.publish(value);
+	if (observed === undefined) nextStreamStep(attempt);
+	else observed.then(() => nextStreamStep(attempt));
 }
 
 export class ResourceBinding<T = any> {
@@ -374,13 +546,17 @@ export class ResourceBinding<T = any> {
 	private retainedRequest: RetainedRequestIdentity | undefined;
 	private seeded: { entry: SignalSeedEntry; value: unknown } | undefined;
 	private describedAttempt: Attempt | undefined;
+	private observedAttempt: Attempt | undefined;
+	private pendingObserver: (<V>(callback: () => V) => V) | undefined;
 	private pendingPromise: PromiseLike<unknown> | undefined;
 	private resolvePending: (() => void) | undefined;
+	private streamedSelection: StreamFrameIdentity | undefined;
+	private selectionAuthority: object = {};
 
 	constructor(
 		readonly owner: RequestOwner,
 		readonly node: ScopedNode<T>,
-		private describe: (() => QueryRequest<T>) | undefined,
+		private describe: (() => QueryRequest<T> | typeof skip) | undefined,
 		seed?: { entry: SignalSeedEntry; value: unknown },
 		retained = seed,
 	) {
@@ -393,21 +569,37 @@ export class ResourceBinding<T = any> {
 					argument: decodeSignalValue(identity.argument),
 				}
 			: undefined;
-		node.compute = () => this.compute();
+		node.compute = () => {
+			const pending = this.pendingObserver;
+			this.pendingObserver = undefined;
+			// Dependency settlement can refresh the graph outside a render pass.
+			// Re-enter only the observer captured by this pending description;
+			// a current renderer already supplies its own observation context.
+			return pending === undefined || hasServerSignalQueryAttemptObserver(this.owner.scopeKey)
+				? this.compute()
+				: pending(() => this.compute());
+		};
 		node.retry = (options) => this.retry(options);
 	}
 
-	private request(): Request<T> {
+	private request(): Request<T> | typeof skip {
 		const request = pure(() => this.describe!());
+		if (request === skip) return request;
 		if (!(request instanceof Request))
-			throw new TypeError('asyncSignal$ must describe a query request.');
+			throw new TypeError('A resource must describe a query request.');
 		return request;
 	}
 
 	private compute(): NodeState<T> {
 		let request: Request<T>;
 		try {
-			request = this.request();
+			const described = this.request();
+			if (described === skip) {
+				this.detach();
+				this.seeded = undefined;
+				return idleState();
+			}
+			request = described;
 			const previousDefinition = this.owner.queryDefinitions.get(request.queryKey);
 			if (
 				previousDefinition &&
@@ -420,6 +612,9 @@ export class ResourceBinding<T = any> {
 			}
 			this.owner.queryDefinitions.set(request.queryKey, request.definition);
 		} catch (error) {
+			if (isThenable(error)) {
+				this.pendingObserver = captureCurrentServerSignalQueryAttemptObserver(this.owner.scopeKey);
+			}
 			this.detach();
 			throw error;
 		}
@@ -452,8 +647,21 @@ export class ResourceBinding<T = any> {
 			this.selected = entry;
 			entry.consumers.add(this);
 			this.owner.trace('select', this.node);
-			if (start) entry.start(entry.state.snapshot.status !== 'ready');
+			const streamed = this.owner.streamedSelections?.get(this.node.key);
+			if (streamed && streamed.selectionKey !== request.identity) {
+				// A completed historical request cannot become live if restoration
+				// selects another key, nor if that old key is visited again later.
+				this.owner.discardCompletedStreamedSelection?.(streamed);
+			}
+			if (streamed?.selectionKey === request.identity && entry.startStreamed(streamed)) {
+				this.streamedSelection = streamed;
+				this.owner.streamedSelectionReady?.(this);
+				entry.deliver();
+			} else if (start) {
+				entry.start(entry.state.snapshot.status !== 'ready');
+			}
 		}
+		this.observeSelectedAttempt();
 		assertAlive(this.owner);
 		return this.state();
 	}
@@ -494,18 +702,97 @@ export class ResourceBinding<T = any> {
 
 	private detach(): void {
 		const entry = this.selected;
+		// The initial SSR channel belongs to this selection lease. Returning to
+		// the same key later starts a browser attempt, not the abandoned channel.
+		if (this.streamedSelection === this.owner.streamedSelections?.get(this.node.key)) {
+			this.owner.streamedSelections?.delete(this.node.key);
+		}
 		this.selected = undefined;
 		this.selectedIdentity = undefined;
 		this.describedAttempt = undefined;
+		this.observedAttempt = undefined;
 		this.resolvePending?.();
 		this.resolvePending = undefined;
 		this.pendingPromise = undefined;
+		this.streamedSelection = undefined;
+		this.selectionAuthority = {};
 		entry?.remove(this);
+	}
+
+	private observeSelectedAttempt(): void {
+		const attempt = this.selected?.attempt;
+		if (!attempt || attempt === this.observedAttempt) return;
+		if (this.selected!.observe(this.node.key) === attempt) this.observedAttempt = attempt;
+	}
+
+	get authority(): object | undefined {
+		return this.selected ? this.selectionAuthority : undefined;
+	}
+
+	isStreamedSelectionReady(identity: StreamFrameIdentity): boolean {
+		return (
+			this.streamedSelection === identity &&
+			this.selected?.request.identity === identity.selectionKey
+		);
+	}
+
+	bindStreamedSelection(identity: StreamFrameIdentity): boolean {
+		assertAlive(this.owner);
+		const entry = this.selected;
+		if (identity.nodeKey !== this.node.key) return false;
+		if (!entry || entry.request.identity !== identity.selectionKey) {
+			// The receiver may publish the new generation immediately before the
+			// source write that makes its selection current. compute() consumes the
+			// owner registration after that synchronous selection transition.
+			this.streamedSelection = undefined;
+			return true;
+		}
+		if (!entry.startStreamed(identity)) return false;
+		this.streamedSelection = identity;
+		entry.deliver();
+		return true;
+	}
+
+	acceptStreamed(frame: StreamedSignalResultFrame): boolean {
+		const identity = this.streamedSelection;
+		const entry = this.selected;
+		if (
+			!identity ||
+			!entry ||
+			identity.nodeKey !== frame.identity.nodeKey ||
+			identity.selectionKey !== frame.identity.selectionKey ||
+			identity.selectionGeneration !== frame.identity.selectionGeneration ||
+			identity.attempt !== frame.identity.attempt ||
+			(frame.kind === 'open' && frame.resource !== entry.request.definition.kind)
+		) {
+			return false;
+		}
+		return entry.acceptStreamed(frame);
+	}
+
+	failStreamed(identity: StreamFrameIdentity, error: Error): boolean {
+		const streamed = this.streamedSelection;
+		const entry = this.selected;
+		if (
+			!streamed ||
+			!entry ||
+			streamed.nodeKey !== identity.nodeKey ||
+			streamed.selectionKey !== identity.selectionKey ||
+			streamed.selectionGeneration !== identity.selectionGeneration ||
+			streamed.attempt !== identity.attempt ||
+			entry.attempt?.generation !== identity.attempt ||
+			!entry.attempt.streamed
+		) {
+			return false;
+		}
+		failAttempt(entry.attempt, error);
+		return true;
 	}
 
 	retry(options?: { pending?: boolean }): void {
 		assertAlive(this.owner);
 		assertWritable();
+		if (!this.selected && this.node.state?.snapshot.status === 'idle') return;
 		signalBatch(() => {
 			const previous = this.selected;
 			if (!previous) invalidateNode(this.node);
@@ -521,7 +808,26 @@ export class ResourceBinding<T = any> {
 			// Recovery or a changed selection has already acquired its attempt in
 			// compute(). Do not immediately cancel and start that work twice.
 			if (this.selected === previous) this.selected.start(options?.pending === true);
+			this.observeSelectedAttempt();
 		});
+	}
+
+	adopt(requestKey: string | undefined, value: T): boolean {
+		assertAlive(this.owner);
+		assertWritable();
+		const entry = this.selected;
+		if (!entry || entry.request.identity !== requestKey) return false;
+		const streaming = entry.request.definition.kind === 'stream';
+		// A receipt reconciles the selected value, not the lifetime of its watch.
+		// Later server yields still own authoritative progress and completion.
+		if (!streaming) entry.stopAttempt();
+		entry.state = readyState(value, {
+			requestKey: entry.request.identity,
+			connection: streaming ? entry.state.snapshot.connection : 'none',
+			complete: streaming ? entry.state.snapshot.complete : true,
+		});
+		entry.deliver();
+		return true;
 	}
 
 	seedRequest(retained = false): SignalSeedEntry['request'] {
@@ -537,14 +843,17 @@ export class ResourceBinding<T = any> {
 	acceptsSeed(seed: SignalSeedEntry): boolean {
 		// In a frame this description reads historical arguments. It neither
 		// reselects a live entry nor starts a loader or populates a live cache.
-		return matchesSeed(this.request(), seed);
+		const request = this.request();
+		return request !== skip && matchesSeed(request, seed);
 	}
 
 	dispose(): void {
 		this.detach();
+		this.pendingObserver = undefined;
 		this.describe = undefined;
 		this.seeded = undefined;
 		this.retainedRequest = undefined;
+		this.streamedSelection = undefined;
 	}
 }
 
@@ -560,7 +869,7 @@ function matchesSeed(request: Request<unknown>, seed: SignalSeedEntry): boolean 
 export function initializeResource<T>(
 	owner: RequestOwner,
 	node: ScopedNode<T>,
-	describe: () => QueryRequest<T>,
+	describe: () => QueryRequest<T> | typeof skip,
 	seed?: { entry: SignalSeedEntry; value: unknown },
 	retained = seed,
 ): ResourceBinding<T> {

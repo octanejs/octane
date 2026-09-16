@@ -74,6 +74,48 @@ import { invoke } from 'server';
 		).toThrow(/reference local functions/);
 	});
 
+	it('registers trusted final ServerCallContext and keeps it out of browser arguments', () => {
+		const contextual = `
+module server {
+	import type { ServerCallContext } from 'octane/server';
+	export async function save(value: string, context: ServerCallContext) {
+		return context.viewer ? value : 'anonymous';
+	}
+}
+import { save } from 'server';
+export function App() @{ <button onClick={() => save('draft')}>Save</button> }
+`;
+		const client = compile(contextual, filename, { mode: 'client' }).code;
+		const server = compile(contextual, filename, { mode: 'server' }).code;
+		expect(client).toContain('args.slice(0, 1)');
+		expect(client).toContain('args[1], true');
+		expect(client).not.toContain('context.viewer');
+		expect(server).toContain('__registerServerFunction');
+		expect(server).toContain(`id: "${hash('save')}"`);
+		expect(server).toContain(`module: "${filename}"`);
+		expect(server).toContain('export: "save"');
+	});
+
+	it('only recognizes the trusted context type in final position', () => {
+		const untrusted = `module server {
+		interface ServerCallContext { viewer: unknown }
+		export function inspect(context: ServerCallContext) { return context.viewer; }
+	}`;
+		expect(compile(untrusted, filename, { mode: 'server' }).code).not.toContain(
+			'__registerServerFunction',
+		);
+		expect(() =>
+			compile(
+				`module server {
+					import type { ServerCallContext } from 'octane/server';
+					export function invalid(context: ServerCallContext, value: string) { return value; }
+				}`,
+				filename,
+				{ mode: 'server' },
+			),
+		).toThrow(/final parameter/);
+	});
+
 	it('rejects invalid local server imports and duplicate submodules', () => {
 		expect(() =>
 			compile(`import { nope } from 'server'; export function App() @{ <p /> }`, filename),

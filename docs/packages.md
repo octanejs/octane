@@ -94,7 +94,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/stick-to-bottom` | [`packages/stick-to-bottom`](../packages/stick-to-bottom) | framework binding | `0.0.8` | 2 |
 | `@octanejs/streamdown` | [`packages/streamdown`](../packages/streamdown) | framework binding | `0.1.31` | 6 |
 | `@octanejs/styled-components` | [`packages/styled-components`](../packages/styled-components) | framework binding | `0.1.44` | 1 |
-| `@octanejs/stylex` | [`packages/stylex`](../packages/stylex) | framework binding | `0.1.51` | 2 |
+| `@octanejs/stylex` | [`packages/stylex`](../packages/stylex) | framework binding | `0.1.51` | 4 |
 | `@octanejs/swr` | [`packages/swr`](../packages/swr) | framework binding | `0.0.18` | 7 |
 | `@octanejs/syntax-highlighter` | [`packages/syntax-highlighter`](../packages/syntax-highlighter) | framework binding | `0.0.18` | 2634 |
 | `@octanejs/tanstack-ai` | [`packages/tanstack-ai`](../packages/tanstack-ai) | framework binding | `0.0.46` | 1 |
@@ -133,7 +133,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/zag` | [`packages/zag`](../packages/zag) | framework binding | `0.0.18` | 1 |
 | `@octanejs/zustand` | [`packages/zustand`](../packages/zustand) | framework binding | `0.1.52` | 6 |
 | `create-octane` | [`packages/create-octane`](../packages/create-octane) | project scaffolder | `0.0.9` | 1 |
-| `octane` | [`packages/octane`](../packages/octane) | core runtime + compiler | `0.2.11` | 30 |
+| `octane` | [`packages/octane`](../packages/octane) | core runtime + compiler | `0.2.11` | 39 |
 
 ## Private packages
 

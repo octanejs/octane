@@ -245,6 +245,51 @@ for (const name of ['Chromium'] as const) {
 				'submit-action',
 				'submit-action',
 			]);
+
+			for (const finalValue of ['B', '']) {
+				await page.evaluate(() => window.__behaviorRootBrowser.mountCommandCapture());
+				await page.getByLabel('Draft', { exact: true }).fill('A');
+				await page.getByRole('button', { name: 'Save draft', exact: true }).click();
+				await page.getByLabel('Selected item', { exact: true }).selectOption('second');
+				await page.getByLabel('Draft', { exact: true }).fill(finalValue);
+				if (finalValue === 'B') {
+					await page.getByRole('button', { name: 'Save draft', exact: true }).click();
+				}
+				const pendingCommands = await page.evaluate(
+					() => window.__behaviorRootBrowser.state().commands,
+				);
+				expect(pendingCommands.saved).toEqual([]);
+				expect(pendingCommands.value).toBe(finalValue);
+				expect(pendingCommands.draft).toBeUndefined();
+				await page.evaluate(() => window.__behaviorRootBrowser.resolvePending());
+				await page.waitForFunction(
+					() => window.__behaviorRootBrowser.state().commands.saved.length > 0,
+				);
+				const commands = await page.evaluate(() => window.__behaviorRootBrowser.state().commands);
+				expect(commands.saved).toEqual(
+					finalValue === 'B'
+						? [
+								{ selectedId: 'first', text: 'A' },
+								{ selectedId: 'second', text: 'B' },
+							]
+						: [{ selectedId: 'first', text: 'A' }],
+				);
+				expect(commands).toMatchObject({
+					draft: finalValue,
+					value: finalValue,
+					identity: true,
+					nativeSubmissions: finalValue === 'B' ? 2 : 1,
+					trusted: true,
+					original: true,
+					errors: [],
+				});
+				await page.getByLabel('Draft', { exact: true }).fill('C');
+				await page.getByRole('button', { name: 'Save draft', exact: true }).click();
+				const live = await page.evaluate(() => window.__behaviorRootBrowser.state().commands);
+				expect(live.saved.at(-1)).toEqual({ selectedId: 'second', text: 'C' });
+				expect(live.draft).toBe('C');
+				expect(live.identity).toBe(true);
+			}
 		});
 
 		it('updates existing owned widgets as element and ancestor attributes change', async () => {

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, flushSync, hydrateRoot, type Root } from 'octane';
 import { condition } from 'octane/hydration';
 import { renderToString } from 'octane/server';
-import { createScope, query, type Scope } from 'octane/signals';
+import { createResource, createScope, query, type Scope } from 'octane/signals';
 import { flushEffects } from './_helpers.js';
 import { loadServerFixture } from './_server-fixture.js';
 import {
@@ -74,6 +74,7 @@ describe('native signal server output and adoption', () => {
 	for (const deferredIsland of [false, true]) {
 		it(`preserves an early controlled-input edit during ${deferredIsland ? 'island' : 'root'} adoption`, async () => {
 			const model = state$('native-controlled-' + deferredIsland, 'server value');
+			const length$ = model.scope.derived$('length', () => String(model.value$.get().length));
 			const when = condition(false);
 			const Server = deferredIsland
 				? server.DeferredControlledSignalHydration
@@ -81,21 +82,30 @@ describe('native signal server output and adoption', () => {
 			const Client = deferredIsland
 				? client.DeferredControlledSignalHydration
 				: client.ControlledSignalHydration;
-			const props = { ...model, when };
-			container.innerHTML = renderToString(Server, props).html;
+			const props = { ...model, length$, when };
+			container.innerHTML = renderToString(Server, props, { signalOwner: model.scope }).html;
 			const input = container.querySelector('input')!;
+			const output = container.querySelector('output')!;
+			expect(output.textContent).toBe('Characters: 12');
+			expect(output.title).toBe('12');
 			input.value = 'entered before hydration';
 			input.focus();
 			input.setSelectionRange(4, 11);
 			model.scope.set(model.value$, input.value);
 			await act(() => {
-				root = hydrateRoot(container, Client, props);
+				root = hydrateRoot(container, Client, props, { signalOwner: model.scope });
 			});
-			if (deferredIsland)
+			if (deferredIsland) {
+				expect(output.textContent).toBe('Characters: 12');
+				expect(output.title).toBe('12');
 				await act(() => root!.render(Client, { ...props, when: condition(true) }));
+			}
 			expect(container.querySelector('input')).toBe(input);
+			expect(container.querySelector('output')).toBe(output);
 			expect(input.value).toBe('entered before hydration');
 			expect(model.scope.get(model.value$)).toBe('entered before hydration');
+			expect(output.textContent).toBe('Characters: 24');
+			expect(output.title).toBe('24');
 			expect(document.activeElement).toBe(input);
 			expect([input.selectionStart, input.selectionEnd]).toEqual([4, 11]);
 			await act(() => {
@@ -104,6 +114,8 @@ describe('native signal server output and adoption', () => {
 			});
 			expect(model.scope.get(model.value$)).toBe('typed after adoption');
 			expect(input.value).toBe('typed after adoption');
+			expect(output.textContent).toBe('Characters: 20');
+			expect(output.title).toBe('20');
 		});
 	}
 
@@ -146,7 +158,7 @@ describe('native signal server output and adoption', () => {
 		const load = query('native-hydration-latest-query', (key: string) =>
 			key === 'a' ? Promise.resolve('ready-a') : pending.promise,
 		);
-		const resource$ = model.scope.asyncSignal$('resource', () =>
+		const resource$ = createResource(model.scope, 'resource', () =>
 			load(model.scope.get(model.value$)),
 		);
 		await act(() => {});
@@ -167,7 +179,7 @@ describe('native signal server output and adoption', () => {
 		const model = state$('native-hydration-empty-latest');
 		const pending = deferred<string>();
 		const load = query('native-hydration-empty-latest-query', () => pending.promise);
-		const resource$ = model.scope.asyncSignal$('resource', () => load(undefined));
+		const resource$ = createResource(model.scope, 'resource', () => load(undefined));
 		const props = { resource$, fallback: 'empty' };
 		container.innerHTML = renderToString(server.LatestHydration, props).html;
 		await act(() => pending.resolve('ready'));
@@ -184,7 +196,7 @@ describe('native signal server output and adoption', () => {
 			'native-hydration-pending-snapshot-query',
 			() => new Promise<string>(() => {}),
 		);
-		const resource$ = model.scope.asyncSignal$('resource', () => load(undefined));
+		const resource$ = createResource(model.scope, 'resource', () => load(undefined));
 		expect(() => renderToString(server.SnapshotHydration, { resource$ })).toThrow(
 			'no serializable ready value',
 		);
@@ -196,7 +208,7 @@ describe('native signal server output and adoption', () => {
 		const load = query('native-hydration-pending-arm-query', (key: string) =>
 			key === 'a' ? old.promise : Promise.resolve('ready-b'),
 		);
-		const resource$ = model.scope.asyncSignal$('resource', () =>
+		const resource$ = createResource(model.scope, 'resource', () =>
 			load(model.scope.get(model.value$)),
 		);
 		const props = { ...model, resource$ };
@@ -245,7 +257,7 @@ describe('native signal server output and adoption', () => {
 		const load = query('native-hydration-stream-query', (key: string) =>
 			key === 'a' ? first.promise : next.promise,
 		);
-		const resource$ = model.scope.asyncSignal$('resource', () =>
+		const resource$ = createResource(model.scope, 'resource', () =>
 			load(model.scope.get(model.value$)),
 		);
 		const props = { ...model, resource$ };

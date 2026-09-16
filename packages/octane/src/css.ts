@@ -2,33 +2,8 @@
 // client runtime and the server serializer — the differential/hydration suites
 // compare their outputs byte-for-byte — so they live in one module both import.
 
-/**
- * clsx-style class composition (strings, numbers, arrays, objects, nesting;
- * falsy drops out). Octane's `class`/`className` semantics at every apply site.
- */
-export function normalizeClass(value: unknown): string {
-	if (typeof value === 'string') return value;
-	if (typeof value !== 'object') {
-		// number → its decimal form; `0` (and any other falsy primitive) drops out.
-		return typeof value === 'number' && value ? '' + value : '';
-	}
-	if (value === null) return '';
-	let str = '';
-	if (Array.isArray(value)) {
-		for (let i = 0; i < value.length; i++) {
-			const item = value[i];
-			if (item) {
-				const inner = normalizeClass(item);
-				if (inner) str = str ? str + ' ' + inner : inner;
-			}
-		}
-	} else {
-		for (const k in value as Record<string, unknown>) {
-			if ((value as Record<string, unknown>)[k]) str = str ? str + ' ' + k : k;
-		}
-	}
-	return str;
-}
+import { normalizeClass } from './class-names.js';
+export { normalizeClass };
 
 /**
  * Append a later class source onto an earlier one. Used when a synthesized

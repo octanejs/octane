@@ -24,6 +24,11 @@ The generator currently scans those two core DOM runtime files exhaustively. A
 future runtime surface must opt in deliberately, with its own bundle and behavior
 coverage, rather than relying on this catalog's guarantees implicitly.
 
+The renderer-free document signal capability reuses the client signal ABI code
+because it is also reachable through the core runtime. This shared diagnostic
+does not enroll other signal-engine errors in the catalog. Its formatter import
+must remain renderer-free and its production bundle cost is measured separately.
+
 The website imports this committed catalog directly and decodes the same revision
 at `/errors/<code>`; it must not fetch a mutable external error map. Consequently,
 published numbers and their argument shapes are a compatibility contract even

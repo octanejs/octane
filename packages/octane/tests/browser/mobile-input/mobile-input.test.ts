@@ -64,6 +64,16 @@ async function openCase(mobile: boolean, legacyMovement = false): Promise<Page> 
 }
 
 const compositionCases = [
+	...([1, 2, 3, 4] as const).flatMap((id) =>
+		[false, true].map((legacy) => ({
+			kind: 'presentation' as const,
+			id,
+			mobile: true,
+			legacy,
+			shadow: false,
+		})),
+	),
+	{ kind: 'presentation' as const, id: 2, mobile: true, legacy: true, shadow: true },
 	...([1, 2, 3, 4] as const).map((id) => ({
 		kind: 'compiled' as const,
 		id,
@@ -102,61 +112,69 @@ describe.sequential('real-browser mobile input continuity', () => {
 	it.each(compositionCases)(
 		'preserves active Korean composition through $kind row $id reorder (mobile=$mobile, legacy=$legacy, shadow=$shadow)',
 		async ({ kind, id, mobile, legacy, shadow }) => {
-			const current = await openCase(mobile, legacy);
-			await current.evaluate(
-				({ listKind, focusedId, insideShadow }) => {
-					window.__mobileInput.mount(listKind, focusedId, insideShadow);
-				},
-				{ listKind: kind, focusedId: id, insideShadow: shadow },
-			);
-			const input = current.locator(
-				kind === 'compiled' ? '.nested-conditional-editor' : `[data-row="${id}"]`,
-			);
-			await input.fill('');
-			await input.focus();
-			const cdp = await current.context().newCDPSession(current);
-			await cdp.send('Input.imeSetComposition', {
-				text: '한',
-				selectionStart: 1,
-				selectionEnd: 1,
-			});
-			const composing = await current.evaluate(() => window.__mobileInput.snapshot());
-			expect(composing).toMatchObject({
-				focused: true,
-				connected: true,
-				same: true,
-				value: '한',
-				interruptions: [],
-			});
-			expect(composing.compositions).toContain('compositionstart:');
+			for (const shadowEditor of kind === 'presentation' ? [false, true] : [false]) {
+				const current = await openCase(mobile, legacy);
+				await current.evaluate(
+					({ listKind, focusedId, insideShadow, shadowEditor }) => {
+						window.__mobileInput.mount(listKind, focusedId, insideShadow, shadowEditor);
+					},
+					{ listKind: kind, focusedId: id, insideShadow: shadow, shadowEditor },
+				);
+				const input = current.locator(
+					kind === 'compiled'
+						? '.nested-conditional-editor'
+						: kind === 'presentation'
+							? `input[name="${id}"]`
+							: `[data-row="${id}"]`,
+				);
+				await input.fill('');
+				await input.focus();
+				const cdp = await current.context().newCDPSession(current);
+				await cdp.send('Input.imeSetComposition', {
+					text: '한',
+					selectionStart: 1,
+					selectionEnd: 1,
+				});
+				const composing = await current.evaluate(() => window.__mobileInput.snapshot());
+				expect(composing).toMatchObject({
+					focused: true,
+					connected: true,
+					same: true,
+					value: '한',
+					interruptions: [],
+				});
+				expect(composing.compositions).toContain('compositionstart:');
 
-			const moved = await current.evaluate(() => window.__mobileInput.reverse());
-			expect(moved).toMatchObject({
-				order: [4, 3, 2, 1],
-				focused: true,
-				connected: true,
-				same: true,
-				value: '한',
-				interruptions: [],
-			});
+				const moved = await current.evaluate(() => window.__mobileInput.reverse());
+				expect(moved).toMatchObject({
+					order: [4, 3, 2, 1],
+					focused: true,
+					connected: true,
+					same: true,
+					value: '한',
+					interruptions: [],
+				});
 
-			await cdp.send('Input.imeSetComposition', {
-				text: '한국',
-				selectionStart: 2,
-				selectionEnd: 2,
-			});
-			const updated = await current.evaluate(() => window.__mobileInput.snapshot());
-			expect(updated.value).toBe('한국');
-			expect(updated.compositions.filter((event) => event.startsWith('compositionstart:'))).toEqual(
-				['compositionstart:'],
-			);
-			expect(updated.interruptions).toEqual([]);
+				await cdp.send('Input.imeSetComposition', {
+					text: '한국',
+					selectionStart: 2,
+					selectionEnd: 2,
+				});
+				const updated = await current.evaluate(() => window.__mobileInput.snapshot());
+				expect(updated.value).toBe('한국');
+				expect(
+					updated.compositions.filter((event) => event.startsWith('compositionstart:')),
+				).toEqual(['compositionstart:']);
+				expect(updated.interruptions).toEqual([]);
 
-			await cdp.send('Input.insertText', { text: '한국' });
-			const committed = await current.evaluate(() => window.__mobileInput.snapshot());
-			expect(committed.value).toBe('한국');
-			expect(committed.compositions).toContain('compositionend:한국');
-			expect(committed.interruptions).toEqual([]);
+				await cdp.send('Input.insertText', { text: '한국' });
+				const committed = await current.evaluate(() => window.__mobileInput.snapshot());
+				expect(committed.value).toBe('한국');
+				expect(committed.compositions).toContain('compositionend:한국');
+				expect(committed.interruptions).toEqual([]);
+				expect(failures).toEqual([]);
+				await current.close();
+			}
 		},
 	);
 

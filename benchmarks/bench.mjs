@@ -698,6 +698,16 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
+		// Real compiled application: a public shell and independently streamed
+		// conversation/history behind one authorization dependency. Browser
+		// partial-hydration observations are an explicit companion invocation.
+		name: 'conversation-streaming',
+		cwd: 'conversation-streaming',
+		servers: [],
+		iter: { normal: 30, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
 		// Populated replay collection copies and promise subscriptions across
 		// consumer-driven streaming waves, with unchanged/one-wave controls.
 		name: 'ssr-replay-streaming',

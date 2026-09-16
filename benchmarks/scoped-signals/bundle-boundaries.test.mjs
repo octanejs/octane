@@ -1,8 +1,11 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import test from 'node:test';
+import { compile } from '../../packages/octane/src/compiler/compile.js';
+import { slotHooks } from '../../packages/octane/src/compiler/slot-hooks.js';
 import {
 	BUNDLE_CASES,
+	baselineUnavailableReason,
 	entrySource,
 	gitBlobHash,
 	verifyBundleInputs,
@@ -25,7 +28,31 @@ test('entry fixtures retain precisely the named public functions', () => {
 		entrySource(scenario('engine')),
 		'export { createScope, query } from "octane/signals";\n',
 	);
-	assert.equal(BUNDLE_CASES.filter((entry) => entry.baseline).length, 2);
+	assert.equal(BUNDLE_CASES.filter((entry) => entry.baseline).length, 4);
+	for (const id of ['binding-scalar', 'binding-structural']) {
+		assert.equal(scenario(id).baseline, 'if-exported');
+		assert.equal(
+			baselineUnavailableReason(scenario(id), { '.': './src/index.ts' }),
+			`Archived baseline does not export ${scenario(id).request}.`,
+		);
+		assert.equal(
+			baselineUnavailableReason(scenario(id), {
+				[`.${scenario(id).request.slice('octane'.length)}`]: './src/bindings.ts',
+			}),
+			null,
+		);
+	}
+	for (const id of ['ordinary-client', 'ordinary-server']) {
+		// A malformed ordinary baseline must still fail, not silently skip its comparison.
+		assert.equal(scenario(id).baseline, true);
+		assert.equal(baselineUnavailableReason(scenario(id), {}), null);
+	}
+	assert.equal(
+		entrySource(scenario('binding-scalar-controls-style')),
+		'export { __adoptBindings } from "octane/dom-bindings";\n' +
+			'export { __createBindingControls } from "octane/dom-binding-controls";\n' +
+			'export { __createBindingStyles } from "octane/dom-binding-styles";\n',
+	);
 });
 
 test('baseline blob evidence agrees with Git for exact UTF-8 source bytes', () => {
@@ -115,4 +142,112 @@ test('native entries require their actual runtime and pinned engine', () => {
 		() => verifyBundleInputs(scenario('native-server'), [source('runtime.server.ts')]),
 		/dependency is missing/,
 	);
+});
+
+test('scalar and result-only entries do not retain their optional implementations', () => {
+	for (const binding of BUNDLE_CASES.filter((entry) => entry.graphFree)) {
+		const selected = binding.bindingCapabilities.map((name) => source(`dom-binding-${name}.ts`));
+		verifyBundleInputs(binding, selected);
+		for (const filename of ['signals/engine.ts', 'signals/graph.ts', 'signals/facade.ts']) {
+			assert.throws(
+				() => verifyBundleInputs(binding, [...selected, source(filename)]),
+				/binding entry reached the signal graph/,
+			);
+		}
+		assert.throws(
+			() => verifyBundleInputs(binding, [...selected, alien()]),
+			/reached Alien Signals/,
+		);
+		for (const filename of ['runtime.ts', 'signals/native-read-client.ts', 'internal/client.ts']) {
+			assert.throws(
+				() => verifyBundleInputs(binding, [...selected, source(filename)]),
+				/renderer or DevTools/,
+			);
+		}
+		for (const capability of ['program', 'controls', 'styles', 'classes', 'signals']) {
+			if (binding.bindingCapabilities.includes(capability)) continue;
+			assert.throws(
+				() => verifyBundleInputs(binding, [...selected, source(`dom-binding-${capability}.ts`)]),
+				/unselected binding capability/,
+			);
+		}
+		if (!binding.bindingCapabilities.includes('controls')) {
+			assert.throws(
+				() => verifyBundleInputs(binding, [...selected, source('signals/control-binding.ts')]),
+				/unselected canonical control implementation/,
+			);
+		}
+	}
+	const inputs = [source('signals/engine.ts'), source('signals/graph.ts'), alien()];
+	verifyBundleInputs(scenario('compiled-plain-signals'), inputs);
+	verifyBundleInputs(scenario('compiled-plain-signals'), [
+		...inputs,
+		{ ...source('signals/computations.ts'), bytesInOutput: 0 },
+	]);
+	for (const bytesInOutput of [undefined, 1]) {
+		assert.throws(
+			() =>
+				verifyBundleInputs(scenario('compiled-plain-signals'), [
+					...inputs,
+					{ ...source('signals/computations.ts'), bytesInOutput },
+				]),
+			/scalar caller retained general derived computation/,
+		);
+	}
+	verifyBundleInputs(scenario('streamed-signal-results-bootstrap'), inputs);
+	verifyBundleInputs(scenario('streamed-signal-results-bootstrap'), [
+		...inputs,
+		{ ...source('hydration/stream-receiver.ts'), bytesInOutput: 0 },
+	]);
+	for (const bytesInOutput of [undefined, 1]) {
+		assert.throws(
+			() =>
+				verifyBundleInputs(scenario('streamed-signal-results-bootstrap'), [
+					...inputs,
+					{ ...source('hydration/stream-receiver.ts'), bytesInOutput },
+				]),
+			/result-only bootstrap retained DOM placement/,
+		);
+	}
+});
+
+// Evaluated declaration effects, diagnostics, and Promise/stream semantics stay
+// in compiler/signal-declarations.test.ts; helper activation is a codegen metric.
+test('scalar declarations select the bounded implementation only with a static proof', () => {
+	for (const [callback, options, scalar] of [
+		['() => null', '', true],
+		['() => /pattern/', '', false],
+		['() => -value()', '', true],
+		['() => value() === other()', '', true],
+		['() => `value:${value()}`', '', true],
+		['() => value() ? 1 : 2', '', true],
+		['() => value() ? 1 : other()', '', false],
+		['() => value() + other()', '', false],
+		['() => String(value())', '', false],
+		['() => (value() as string)', '', false],
+		['async () => 1', '', false],
+		['() => { "use strong"; return value(); }', '', false],
+		['(context = undefined) => 1', '', false],
+		['() => value()', ', {sync: true}', true],
+		['() => 1', ', options', false],
+		['() => 1', ', {get sync() { return true; }}', false],
+		['({signal}) => 1', ', {sync: true}', false],
+		['function* () { return 1; }', '', false],
+	]) {
+		for (const factory of ['derive$', 'signals.derived$']) {
+			const candidate = `import {derived$ as derive$} from 'octane/signals';
+import * as signals from 'octane/signals';
+export const result$ = ${factory}(${callback}${options});`;
+			for (const environment of ['client', 'server']) {
+				for (const [extension, code] of [
+					['tsrx', compile(candidate, '/src/proof.tsrx', { mode: environment }).code],
+					['ts', slotHooks(candidate, '/src/proof.ts', { environment }).code],
+				]) {
+					const label = `${extension}/${environment}: ${factory}(${callback}${options})`;
+					assert.match(code, /__derived(?:Scalar)?At/, label);
+					assert.equal(code.includes('__derivedScalarAt'), scalar, label);
+				}
+			}
+		}
+	}
 });

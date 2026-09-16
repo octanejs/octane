@@ -355,6 +355,7 @@ describe('octane Rspack loader', () => {
 		});
 		expect(output.module.buildInfo.octane).toEqual({
 			canonicalId: '/src/App.tsrx',
+			resourceQuery: '?cache=1',
 			transformKind: 'compile',
 			serverRpc: true,
 			universalRuntime: { runtime: 'lynx', thread: 'background' },
@@ -463,10 +464,19 @@ describe('octane Rspack loader', () => {
 
 	it.each([true, false])('forwards strong: %s to the neutral compiler', (strong) => {
 		mocks.transform.mockReturnValue(null);
-		runLoader({ options: { strong } });
+		const knownAttributeSpreads = [
+			{ source: '@stylexjs/stylex', imported: 'attrs', fields: ['class', 'style'] },
+			{
+				source: '@stylexjs/stylex',
+				imported: 'props',
+				fields: ['className', 'style'],
+				style: 'object' as const,
+			},
+		];
+		runLoader({ options: { strong, knownAttributeSpreads } });
 
 		expect(mocks.createOctaneCompiler).toHaveBeenCalledWith(
-			expect.objectContaining({ root: '/project', strong }),
+			expect.objectContaining({ root: '/project', strong, knownAttributeSpreads }),
 		);
 	});
 
@@ -565,6 +575,7 @@ describe('octane Rspack loader', () => {
 		expect(output.module.layer).toBe('octane:main-thread');
 		expect(output.module.buildInfo.octane).toEqual({
 			canonicalId: '/src/App.tsrx',
+			resourceQuery: '?cache=1',
 			transformKind: 'compile',
 			serverRpc: false,
 			universalRuntime: { runtime: 'object', thread: 'main-thread' },

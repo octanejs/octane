@@ -53,6 +53,9 @@ const NATIVE_OPERATIONS = new Map(
 		captureFocusSelection: ['read:contentEditable'],
 		// Public imperative handles and notifications act on the currently visible DOM.
 		notifyHydrateBoundary: ['call:dispatchEvent'],
+		// Parent-free island activation replays captured native intent against the
+		// surviving, already-adopted target, never against projected replacement DOM.
+		createIndependentHydrateActivator: ['call:contains', 'call:dispatchEvent'],
 		'FragmentInstance.dispatchEvent': ['call:dispatchEvent'],
 		'FragmentInstance.scrollIntoView': ['call:scrollIntoView'],
 		focusFragmentElement: ['read:focus'],

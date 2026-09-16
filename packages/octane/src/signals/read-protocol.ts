@@ -1,4 +1,4 @@
-import type { AdoptionFrame, ConnectionState, ScopeSeed } from './types.js';
+import type { AdoptionFrame, ConnectionState, ScopeSeed, SignalHandle } from './types.js';
 
 /** Detached DevTools metadata. Reading it must never evaluate or expose a value. */
 export interface NativeReadInspection {
@@ -6,7 +6,7 @@ export interface NativeReadInspection {
 	readonly key: string;
 	readonly read: 'value' | 'latest' | 'snapshot';
 	readonly kind: 'signal' | 'derived' | 'async';
-	readonly status: 'ready' | 'pending' | 'error' | 'unevaluated';
+	readonly status: 'idle' | 'ready' | 'pending' | 'error' | 'unevaluated';
 	readonly revision: number;
 	readonly generation?: number;
 	readonly epoch: number;
@@ -47,6 +47,7 @@ let nativeWriteGuarded = false;
 /** Private protocol implemented on native handles, never inferred from a get method. */
 export const NATIVE_DOM_VALUE: unique symbol = Symbol('octane.nativeDomValue');
 
+export function readNativeDomValue<T>(value: T): T extends SignalHandle<infer V> ? V : T;
 export function readNativeDomValue(value: any): any {
 	return value !== null && typeof value === 'object' && NATIVE_DOM_VALUE in value
 		? value[NATIVE_DOM_VALUE]()

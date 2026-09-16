@@ -1,5 +1,41 @@
 # Scoped signal graph experiment
 
+## Compiled native presentation channels
+
+`run-native-presentation.mjs` compiles the authored `native-presentation/View.tsrx`
+and its real `adoptBindings` activation, uses authentic SSR output, and compares
+coarse immutable snapshots with direct signal/derived-signal channels on the same
+view. The fixture deliberately passes unsuffixed aliases for classes, two CSS
+custom properties, text, and an unrelated title. StyleX atoms come from its Babel
+compiler, and the runtime calls the actual `@octanejs/stylex` `attrs` merge so
+competing variants keep their normal precedence. There are no copied class hashes.
+
+```bash
+BENCH_JSON=/absolute/path/new-native-presentation.json node benchmarks/scoped-signals/run-native-presentation.mjs --samples=7 --updates=5000
+```
+
+If this checkout has no StyleX dependencies, select an existing approved
+installation with `--stylex-tooling-root=/absolute/path/to/package`. The runner
+does not install or copy dependencies. Both lanes use that same installation and
+the real workspace `@octanejs/stylex` source wrapper; the report identifies the
+selected runtime and hashes all loaded source inputs.
+
+Every run checks identical native classes/styles/text, preserved host identity,
+no equal-SSR adoption rewrite, variant precedence, replaced-source detachment,
+and disposal. Deterministic counters distinguish source snapshots, projected
+field reads, and StyleX merge calls. Direct progress/title notifications must not
+run the whole projection or StyleX selector; changing the variant must run it once.
+Two warmups precede samples, and lane order alternates. All timing samples are
+retained. These are synchronous happy-dom measurements, not browser layout,
+paint, Safari, or application latency evidence; timing has no hard pass threshold.
+
+Byte accounting separates the complete renderer-free activation, the isolated
+optional signal connector, and the fixture plus real graph/StyleX. Isolated
+connector bytes are not an incremental application delta because dependencies
+can be shared. Resolved client graphs must exclude the renderer, and activation
+alone must exclude the signal graph/facade. `BENCH_JSON` must be a new absolute
+filename; source drift during a run fails instead of publishing mixed evidence.
+
 ## Signal-valued DOM styles
 
 `run-dom-bindings.mjs` compiles and bundles two production components through the
@@ -18,6 +54,8 @@ the sampled control must execute setup for every update. The fault command
 deliberately adds component reads and must fail that guard. JSON records source,
 compiler-output, bundle and input hashes. Synchronous happy-dom timings are
 supplemental: they exclude browser layout/paint and have no hard speed threshold.
+
+## Graph engine comparison
 
 This suite compares the experimental `octane/signals` engine with the exact
 Alien Signals 3.2.0 dependency selected by `packages/octane`. It never resolves
@@ -69,10 +107,11 @@ dependency-resolution override, not a substitute engine or an installation step.
 
 ### Bounded trace retention
 
-The renderer-free trace workload measures the production scope's trace-event retention
-with tracing disabled, before a maximum-size trace fills, and after small and
-maximum-size traces wrap. Setup, inspection, and exact retained-sequence checks stay
-outside timed intervals so unrelated signal graph work does not hide retention cost.
+The renderer-free trace workload checks disabled tracing without timing it, then
+measures the production scope's trace-event retention before a maximum-size trace
+fills and after small and maximum-size traces wrap. Setup, inspection, and exact
+retained-sequence checks stay outside timed intervals so unrelated signal graph
+work does not hide retention cost.
 
 ```bash
 node benchmarks/scoped-signals/run-trace.mjs 8
@@ -83,6 +122,41 @@ node benchmarks/bench.mjs --quick --ratios scoped-signals-trace
 The timing is normalized to nanoseconds per retained event. Same-run ratios compare the
 wrapped maximum budget with the unfilled maximum-budget control; they do not claim
 renderer or application-wide gains.
+
+## Baseline versus candidate owner reads
+
+`run-owner-reads.mjs` bundles the actual archived and current `octane/signals`
+public exports, without source overlays or compiler specialization. Prepare the
+same baseline archive topology described under public-entry bundle comparison.
+Every consumed baseline source must match its Git blob. Both variants use the
+same authored `signal$('g:…', value)` / `signal$('i:…', value)` declarations,
+production esbuild options, and explicitly pinned dependency versions.
+
+```bash
+BENCH_JSON=/private/tmp/owner-reads-prepare-01.json node benchmarks/scoped-signals/run-owner-reads.mjs \
+  --baseline-root=/absolute/path/to/extracted-baseline --baseline-ref=<git-commit> --prepare
+BENCH_JSON=/private/tmp/owner-reads-measured-01.json node benchmarks/scoped-signals/run-owner-reads.mjs \
+  --baseline-root=/absolute/path/to/extracted-baseline --baseline-ref=<git-commit> \
+  --samples=15 --reads=200000
+```
+
+An existing installation may be selected with `--tooling-root`. The runner never
+installs dependencies and requires a new absolute `BENCH_JSON` filename. Prepare
+mode compiles and checks semantics without collecting timing. Measurement mode
+rebuilds and verifies actual sources; run it in a quiet process after other tests,
+builds and browsers finish. Reports retain bundle and exact loaded-source hashes,
+manifests, lockfiles, toolchain, authored entry and runner provenance, and reject
+source drift during the run.
+
+Cached global, instance-local and cross-owner reads use `runWithSignalOwner`.
+The separate implicit-read case uses an installed public owner carrier; it does
+not simulate the browser's default document owner. Setup and five warmup blocks
+are excluded from timing. Seeded rounds shuffle cases and alternate paired ABBA
+and BAAB blocks. Every sample is retained, with arithmetic mean uncertainty and
+the paired ratio distribution/geometric 95% interval. Subscription ownership,
+unsubscribe, shared globals, isolated locals and retirement are checked outside
+timing. This is Node descriptor-loop evidence, not Safari, streaming, hydration
+or application latency evidence, and there is no wall-time pass threshold.
 
 ## Graphs and timing
 
@@ -153,8 +227,19 @@ browser and async-specific experiments described in the implementation plan.
 `run-bundles.mjs` compares `createRoot` exported from `octane` and
 `renderToString` exported from `octane/server` with an archived baseline. It
 also measures the current `createScope`/`query` engine export and the optional
-`useSignal$` client/server exports independently. These are source-entry export
+`useSignal$` client/server exports independently. A plain state-module case
+declares `signal$`, `derived$`, and `query$`, transforms it through the public
+`octane/compiler/bundler` hook-slot path, and bundles the actual compiler output.
+A separate case retains the automatic streamed-signal bootstrap and document
+lifecycle exports. Both must remain renderer-free. These are entry/compiled-state
 costs, not compiled `.tsrx` applications or incremental hook costs in an app.
+
+Scalar and structural DOM-binding entries are compared when the archived package
+exports them. Older, pre-RFC baselines report those comparisons as `unavailable`
+with a reason and no numeric delta; ordinary client/server comparisons remain
+mandatory. Optional control and whole-style leaves are measured separately and
+together with the scalar runner. Use the combined closure for their shared cost:
+independently compressed gzip/Brotli byte counts must not be added together.
 
 Prepare an archive containing `packages/octane/src`,
 `packages/octane/package.json`, and the root `package.json`,
@@ -166,7 +251,8 @@ package directory and the same revision:
 ```bash
 BENCH_JSON=/private/tmp/scoped-signals-bundles.json node benchmarks/scoped-signals/run-bundles.mjs \
   --baseline-ref=<git-commit> \
-  --baseline-package=/absolute/path/to/baseline/packages/octane
+  --baseline-package=/absolute/path/to/baseline/packages/octane \
+  --tooling-root=/absolute/path/to/current/packages/octane
 node --test benchmarks/scoped-signals/bundle-boundaries.test.mjs
 ```
 
@@ -179,18 +265,29 @@ gzip-9, and Brotli-11 bytes; exact loaded-source and bundle hashes; each input's
 retained bytes; and the command, toolchain, package manifests, and lockfile
 hashes. Baseline source bytes must match their Git blobs. If the archive root
 also contains `source.tar`, its hash is recorded.
+The compiled state case additionally records its exact authored/transformed
+sources, compiler options, and hashes of the local compiler implementation.
 
 Boundary assertions inspect the complete resolved graph, including inputs
 removed by tree shaking: ordinary entries must not import Alien or the scoped
 engine; the independent engine must not import a renderer, compiler, React,
-or DevTools; native hook entries must include the correct runtime and Alien
+or DevTools. The compiled plain-state and automatic stream-bootstrap entries
+have the same resolved-graph prohibition, including renderer imports that emit
+zero bytes after tree shaking. This prevents an apparently small export-only
+measurement from hiding a renderer dependency introduced by compilation or
+automatic owner initialization. Native hook entries must include the correct runtime and Alien
 3.2.0. Ordinary runtime exports can resolve their optional native adapters, but
 the emitted-byte check requires all client/server adapter, collector, inspection,
-and retry implementations to tree-shake to zero bytes. The read/event protocol
-and empty server seed map remain separate, measured seams. All exported
-functions must load, the empty server render must agree,
-and a small engine write/subscription/disposal smoke must pass. These checks do
-not establish DOM or native rendering behavior. The runner reuses exact input
+and retry implementations, plus server query-observation mirrors, to tree-shake
+to zero bytes. The read/event protocol
+and empty server seed map remain separate, measured seams. Renderer-free
+binding entries also reject the renderer, signal graph/facade, Alien Signals, and
+unselected control/style/class/signal/structural leaves in their resolved graph.
+All exported functions must load, the empty server render must agree,
+and a small engine write/subscription/disposal smoke must pass. The compiled
+state case also checks derived updates, async query completion, and fresh values
+after retiring an owner. These checks do not establish browser capture, streamed
+handoff, or native rendering behavior. The runner reuses exact input
 bytes across builds and fails if those files change during the run.
 
 Historical reports retain the status recorded at their measured revision.
@@ -213,6 +310,8 @@ BENCH_JSON=/private/tmp/scoped-signals-async-retention.json node benchmarks/scop
   --tooling-root=/absolute/path/to/tooling-package \
   --snapshots=/private/tmp/new-scoped-signals-retention-directory \
   --cycles=1000
+BENCH_JSON=/private/tmp/scoped-signals-derived-retention.json node benchmarks/scoped-signals/run-async-retention.mjs \
+  --tooling-root=/absolute/path/to/tooling-package --api=derived --cycles=1000
 node --test benchmarks/scoped-signals/inspect-async-retainers.test.mjs
 ```
 
@@ -221,12 +320,17 @@ creates a fresh local temporary directory. The runner starts a separate worker
 with `--expose-gc`, so the measured process does not retain the bundler or the
 offline heap scanner. It snapshots after event-loop turns and three explicit
 collections at cycle 0, 100, and 1,000. One live scope with two requests is a
-positive control. Later checkpoints retire and drop that scope while all
+positive control. `--api=derived` runs the same producers through public unified
+`derived$` declarations and `runWithSignalOwner`, instead of the default
+`query`/`createResource` path. Its positive control has the same four nodes
+and one iterator but no query request records. Later checkpoints retire and drop that scope while all
 producer promises remain reachable, then release the external promise array.
 
 The scanner records strong paths, excluding weak edges, and verifies that it
 can identify the positive-control scope, four signal nodes, two requests, two
-active attempts, and every marked external promise. Counts of revoked attempt
+active attempts for the query path, and every marked external promise. The
+derived path requires zero query records and retains the same owner/node/iterator
+checks. Counts of revoked attempt
 records deliberately exclude V8 object-allocation templates by requiring a
 real `settled` Promise and resolver closure. Their separate template count
 remains in the report. Primitive heap size changes are diagnostic only: the

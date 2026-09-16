@@ -673,9 +673,11 @@ describe('CI workflow aggregation', () => {
 		assert.equal([...combined.matchAll(/pnpm install --prod false --frozen-lockfile/g)].length, 1);
 		assert.equal([...combined.matchAll(/oven-sh\/setup-bun/g)].length, 1);
 		assert.equal([...combined.matchAll(/playwright install --with-deps chromium/g)].length, 1);
+		assert.match(combined, /playwright install --with-deps chromium webkit(?:\n|$)/);
 		for (const spec of [
 			'website-mcp/tests/built-handler.e2e.test.ts',
 			'packages/rspeedy-plugin-octane/tests/packed-consumer.test.ts',
+			'packages/vite-plugin-octane/tests/production.test.ts',
 			'packages/octane-evals/tests/user-app-corpus.test.ts',
 			'packages/octane/tests/register-hook.test.ts',
 			'packages/octane/tests/register-hook-bun.integration.test.mjs',

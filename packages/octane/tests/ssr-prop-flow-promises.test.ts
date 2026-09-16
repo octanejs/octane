@@ -1,3 +1,4 @@
+import { evaluateCompiledFixtureCode } from './_server-fixture.js';
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -16,32 +17,7 @@ import { SeedPage } from './_fixtures/ssr-prop-flow-hydrate.tsrx';
 // completes, and the render burns MAX_SUSPENSE_PASSES before erroring.
 
 function evalModule(code: string, file: string): Record<string, any> {
-	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]octane(?:\/server)?['"];?/g,
-		(_m: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
-	);
-	// Keep declarations as declarations (a function-expression rewrite would
-	// unbind the name for sibling components that reference it) and attach the
-	// exports at the end.
-	const exported: string[] = [];
-	code = code.replace(
-		/export\s+(async\s+)?function\s+(\w+)/g,
-		(_m: string, asyncKeyword: string | undefined, name: string) => {
-			exported.push(name);
-			return `${asyncKeyword ?? ''}function ${name}`;
-		},
-	);
-	code = code.replace(/export const (\w+) =/g, (_m: string, name: string) => {
-		exported.push(name);
-		return `const ${name} =`;
-	});
-	const footer = exported.map((name) => `__exports.${name} = ${name};`).join('\n');
-	const fn = new Function(
-		'__rt',
-		'__exports',
-		code + `\n${footer}\nreturn __exports;\n//# sourceURL=${file}`,
-	);
-	return fn(RT, {});
+	return evaluateCompiledFixtureCode(code, file, 'server', undefined);
 }
 
 function evalServer(source: string, file: string): Record<string, any> {

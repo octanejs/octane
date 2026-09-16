@@ -143,6 +143,19 @@ type ExistingButtonAttribute<
 	Fallback,
 > = K extends keyof React.ButtonHTMLAttributes<T> ? React.ButtonHTMLAttributes<T>[K] : Fallback;
 
+/** Uncontrolled initialization and framework instructions are not live bindings. */
+type UnboundProps =
+	| 'defaultValue'
+	| 'defaultChecked'
+	| 'dangerouslySetInnerHTML'
+	| 'suppressContentEditableWarning'
+	| 'suppressHydrationWarning'
+	| 'suppressNativeChangeWarning'
+	| '__octaneNativeChangeDiagnostic'
+	| 'ref'
+	| 'key'
+	| 'children';
+
 /** Octane's attribute transform over one React attribute interface. */
 type Transformed<P, T> = Omit<P, ReactSyntheticProps | 'className' | 'style' | 'children'> &
 	NativeEventHandlers<P, T & EventTarget> & {
@@ -150,13 +163,31 @@ type Transformed<P, T> = Omit<P, ReactSyntheticProps | 'className' | 'style' | '
 		className?: ClassValue;
 		for?: string;
 		xmlns?: string;
-		style?:
-			| string
-			| CSSProperties
-			| SignalCSSProperties
-			| SignalHandle<string | CSSProperties | SignalCSSProperties | null | undefined>;
+		style?: string | CSSProperties;
 		children?: unknown;
 	};
+
+type BoundStyle<S> = S | SignalCSSProperties | null | SignalHandle<S | SignalCSSProperties | null>;
+
+/** Provider-owned compiler attributes. Augment without widening component props or signal types. */
+export interface NativeAttributeExtensions {}
+
+/**
+ * Only a host JSX site installs direct bindings. Keep reusable attribute and
+ * component-prop types scalar: their consumers may read values imperatively.
+ * A component can explicitly opt in with SignalHandle or this JSX namespace.
+ */
+type BoundIntrinsicProps<P> = {
+	[K in keyof P]: K extends UnboundProps | ReactSyntheticProps
+		? P[K]
+		: K extends 'style'
+			? BoundStyle<P[K]>
+			: P[K] | SignalHandle<P[K]>;
+} & NativeAttributeExtensions;
+
+type BoundIntrinsicElements = {
+	[K in keyof Octane.JSX.IntrinsicElements]: BoundIntrinsicProps<Octane.JSX.IntrinsicElements[K]>;
+};
 
 declare namespace Octane {
 	type Key = string | number | bigint;
@@ -614,7 +645,15 @@ declare namespace Octane {
 	}
 }
 
-export import JSX = Octane.JSX;
+/** Automatic JSX runtime types include the host's direct signal bindings. */
+export namespace JSX {
+	type ElementType = Octane.JSX.ElementType;
+	interface Element extends Octane.JSX.Element {}
+	interface ElementChildrenAttribute extends Octane.JSX.ElementChildrenAttribute {}
+	interface IntrinsicAttributes extends Octane.JSX.IntrinsicAttributes {}
+	interface IntrinsicClassAttributes<T> extends Octane.JSX.IntrinsicClassAttributes<T> {}
+	interface IntrinsicElements extends BoundIntrinsicElements {}
+}
 export { Octane };
 
 // The automatic-runtime entry points, for type resolution only — octane's

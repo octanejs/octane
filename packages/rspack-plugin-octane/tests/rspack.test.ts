@@ -81,6 +81,52 @@ async function compile(config: Record<string, unknown>, capture?: (stats: any) =
 describe('programmatic Rspack integration', () => {
 	let root: string;
 
+	it('publishes the executing client compilation identity even without widgets', async () => {
+		write(
+			root,
+			'src/build-entry.cjs',
+			'globalThis.clientBuild = { id: __webpack_hash__, value: "first" };',
+		);
+		const outputPath = join(root, 'dist-build-identity');
+		const build = async () => {
+			const stats = await compile({
+				context: root,
+				mode: 'production',
+				target: 'web',
+				entry: './src/build-entry.cjs',
+				output: { path: outputPath, filename: 'entry.js' },
+				plugins: [new OctaneRspackPlugin({ parallel: false })],
+			});
+			const dom = new JSDOM('', { runScripts: 'outside-only' });
+			try {
+				dom.window.eval(readFileSync(join(outputPath, 'entry.js'), 'utf8'));
+				const metadata = JSON.parse(
+					readFileSync(join(outputPath, 'octane-client-build.json'), 'utf8'),
+				);
+				expect(metadata).toEqual({
+					version: 1,
+					buildId: stats.hash,
+					mode: 'production',
+					capabilities: { independentHydration: false },
+				});
+				expect(metadata.buildId).toBe((dom.window as any).clientBuild.id);
+				return { metadata, value: (dom.window as any).clientBuild.value };
+			} finally {
+				dom.window.close();
+			}
+		};
+		const first = await build();
+		write(
+			root,
+			'src/build-entry.cjs',
+			'globalThis.clientBuild = { id: __webpack_hash__, value: "second" };',
+		);
+		const second = await build();
+		expect(first.value).toBe('first');
+		expect(second.value).toBe('second');
+		expect(second.metadata.buildId).not.toBe(first.metadata.buildId);
+	});
+
 	beforeEach(() => {
 		root = mkdtempSync(join(tmpdir(), 'octane-rspack-build-'));
 		write(
@@ -100,6 +146,8 @@ describe('programmatic Rspack integration', () => {
 				exports: {
 					'.': './client.cjs',
 					'./server': './server.cjs',
+					'./internal/client': './client.cjs',
+					'./internal/server': './server.cjs',
 					'./profiling': './profiling.cjs',
 				},
 			}) + '\n',

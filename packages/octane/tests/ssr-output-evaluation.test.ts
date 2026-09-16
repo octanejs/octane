@@ -2,7 +2,8 @@ import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { prerender } from 'octane/static';
 import { renderToString } from 'octane/server';
-import { hydrateRoot } from '../src/index.js';
+import { flushSync, hydrateRoot } from '../src/index.js';
+import * as Signals from 'octane/signals';
 import { loadCompiledFixtureSource, loadServerFixture } from './_server-fixture';
 
 const fixture = 'packages/octane/tests/_fixtures/ssr-output-evaluation.tsrx';
@@ -216,6 +217,66 @@ for (const dev of [true, false]) {
 			expect(visibleHtml(result.html)).toMatch(
 				/data-id="b"[^>]*>B<\/li><li data-id="a"[^>]*>A<\/li>/,
 			);
+		});
+
+		it('keeps separately compiled signal children distinct in a keyed list through hydration', async () => {
+			const childId = 'packages/octane/tests/_fixtures/ssr-signal-row.tsrx';
+			const parentId = 'packages/octane/tests/_fixtures/ssr-signal-rows.tsrx';
+			const childSource = readFileSync(childId, 'utf8');
+			const parentSource = readFileSync(parentId, 'utf8');
+			function load(mode: 'client' | 'server') {
+				const child = loadCompiledFixtureSource(childSource, {
+					id: childId,
+					mode,
+					compileOptions: { dev, hmr: false },
+					runtimeModules: { 'octane/signals': Signals },
+				});
+				return loadCompiledFixtureSource(parentSource, {
+					id: parentId,
+					mode,
+					compileOptions: { dev, hmr: false },
+					runtimeModules: { './ssr-signal-row.tsrx': child },
+				});
+			}
+			const serverRows = load('server');
+			const clientRows = load('client');
+			const props = {
+				rows: [
+					{ id: 'a', initial: 'A' },
+					{ id: 'b', initial: 'B' },
+				],
+			};
+			const container = document.createElement('div');
+			document.body.append(container);
+			let root: ReturnType<typeof hydrateRoot> | undefined;
+			const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+			try {
+				container.innerHTML = renderToString(serverRows.SignalRows, props).html;
+				const hosts = [...container.querySelectorAll('li')];
+				const inputs = [...container.querySelectorAll('input')];
+				expect(inputs.map((input) => input.value)).toEqual(['A', 'B']);
+				root = hydrateRoot(container, clientRows.SignalRows, props);
+				await Promise.resolve();
+				const adoptedHosts = [...container.querySelectorAll('li')];
+				const adoptedInputs = [...container.querySelectorAll('input')];
+				hosts.forEach((host, index) => expect(adoptedHosts[index]).toBe(host));
+				inputs.forEach((input, index) => expect(adoptedInputs[index]).toBe(input));
+				flushSync(() => hosts[1]!.querySelector('button')!.click());
+				expect(inputs.map((input) => input.value)).toEqual(['A', 'B!']);
+				flushSync(() => root!.render(clientRows.SignalRows, { rows: [...props.rows].reverse() }));
+				const reorderedHosts = [...container.querySelectorAll('li')];
+				[...hosts].reverse().forEach((host, index) => expect(reorderedHosts[index]).toBe(host));
+				expect([...container.querySelectorAll('input')].map((input) => input.value)).toEqual([
+					'B!',
+					'A',
+				]);
+				expect(
+					errors.mock.calls.filter((call) => /hydration mismatch/i.test(String(call[0]))),
+				).toEqual([]);
+			} finally {
+				root?.unmount();
+				container.remove();
+			}
 		});
 
 		it('hydrates keyed row hosts by adoption', async () => {

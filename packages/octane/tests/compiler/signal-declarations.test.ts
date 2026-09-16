@@ -1,0 +1,448 @@
+// @vitest-environment node
+
+import { parseModule } from '@tsrx/core';
+import { build } from 'esbuild';
+import { JSDOM } from 'jsdom';
+import { resolve } from 'node:path';
+import { describe, expect, it, vi } from 'vitest';
+import { compile } from '../../src/compiler/compile.js';
+import { createOctaneCompiler } from '../../src/compiler/bundler.js';
+import { slotHooks } from '../../src/compiler/slot-hooks.js';
+import * as signals from 'octane/signals';
+import { loadCompiledFixtureSource } from '../_server-fixture.js';
+
+const FILENAME = '/src/signals/site.tsrx';
+
+async function evaluateDeclarations(
+	source: string,
+	extension: 'ts' | 'tsrx',
+	environment: 'client' | 'server',
+	dev: boolean,
+) {
+	const root = resolve(import.meta.dirname, '../..');
+	const filename = resolve(root, `signal-declarations.${extension}`);
+	const compiler = createOctaneCompiler({ root, environment, dev, hmr: false });
+	const compiled = compiler.transform(source, filename)!;
+	const bundled = await build({
+		stdin: {
+			contents: `export { exercise } from 'fixture:declarations';`,
+			loader: 'js',
+			resolveDir: root,
+		},
+		bundle: true,
+		format: 'esm',
+		platform: environment === 'client' ? 'browser' : 'node',
+		minify: true,
+		treeShaking: true,
+		write: false,
+		define: {
+			'process.env.NODE_ENV': JSON.stringify('production'),
+			__OCTANE_PROFILE_ENABLED__: 'false',
+		},
+		plugins: [
+			{
+				name: 'compiled-signal-declarations',
+				setup(builder) {
+					builder.onResolve({ filter: /^fixture:declarations$/ }, () => ({
+						path: filename,
+						namespace: 'fixture',
+					}));
+					builder.onLoad({ filter: /.*/, namespace: 'fixture' }, () => ({
+						contents: compiled.code,
+						loader: 'ts',
+						resolveDir: root,
+					}));
+				},
+			},
+		],
+	});
+	return import(
+		`data:text/javascript;base64,${Buffer.from(bundled.outputFiles[0].contents).toString('base64')}`
+	);
+}
+
+function compiledCalls(source: string, mode: 'client' | 'server' = 'client') {
+	const ast = parseModule(compile(source, FILENAME, { mode }).code, FILENAME);
+	const calls: Array<{ callee: string; site: unknown }> = [];
+	const visit = (node: any) => {
+		if (node === null || typeof node !== 'object') return;
+		if (Array.isArray(node)) {
+			for (const child of node) visit(child);
+			return;
+		}
+		if (node.type === 'CallExpression') {
+			const callee =
+				node.callee?.type === 'Identifier'
+					? node.callee.name
+					: node.callee?.type === 'MemberExpression' && node.callee.property?.name;
+			if (
+				typeof callee === 'string' &&
+				/^_?\$?__(?:signal|derived(?:Scalar)?|query)At/.test(callee)
+			) {
+				calls.push({ callee, site: node.arguments?.[0]?.value });
+			}
+		}
+		for (const [key, child] of Object.entries(node)) {
+			if (key !== 'loc' && key !== 'start' && key !== 'end') visit(child);
+		}
+	};
+	visit(ast);
+	return calls;
+}
+
+async function verifySelectiveDeclarationBehavior() {
+	for (const extension of ['ts', 'tsrx'] as const) {
+		for (const environment of ['client', 'server'] as const) {
+			for (const dev of [false, true]) {
+				const mode = `${extension}/${environment}/${dev ? 'dev' : 'prod'}`;
+				{
+					const module = await evaluateDeclarations(
+						`
+import { signal$ as state$, derived$ as derive$, query$, runWithSignalOwner } from 'octane/signals';
+import * as signals from 'octane/signals';
+const effects = [];
+const count$ = state$(3);
+const doubled$ = derive$((() => count$.get() * 2) as () => number);
+export const unused$ = signals.derived$(async () => { effects.push('computed'); return 1; });
+export const unusedQuery$ = signals['query$']((() => 1) as () => number, async () => { effects.push('loaded'); return 1; }, {kind: 'promise'} as const);
+const initial$ = state$((effects.push('initial'), 1));
+const options$ = derive$(async () => 1, (effects.push('options'), {}));
+const accessor$ = query$(() => 1, async () => 1, { get kind() { effects.push('getter'); return 'promise'; } });
+const unknownOptions = { get kind() { effects.push('unknown'); return 'promise'; } };
+const unknown$ = query$(() => 1, async () => 1, unknownOptions);
+const spread$ = query$(() => 1, async () => 1, {...unknownOptions});
+const lazyOptions$ = derive$(async () => 1, { get sync() { effects.push('sync'); return true; } });
+function makeCompute() { effects.push('callback'); return () => 1; }
+const opaque$ = derive$(makeCompute());
+function shadowed(state$) { state$('shadowed'); }
+shadowed((value) => effects.push(value));
+function shadowedNamespace(signals) { signals.derived$(() => 1); }
+shadowedNamespace({ derived$() { effects.push('namespace'); } });
+const foreign = { signal$() { effects.push('foreign'); } };
+foreign.signal$(1);
+const nested$ = state$(signals.signal$(2));
+const parenthesized$ = (state$)<number> /* (comment) */ ((effects.push('parenthesized'), 4));
+const optional$ = signals.signal$?.(5);
+export function exercise() {
+  return runWithSignalOwner({scopeKey: 'selective-declarations'}, () => ({
+    value: doubled$.get(), nested: nested$.get().get(), parenthesized: parenthesized$.get(), optional: optional$.get(), effects,
+  }));
+}`,
+						extension,
+						environment,
+						dev,
+					);
+					expect(module.exercise(), mode).toEqual({
+						value: 6,
+						nested: 2,
+						parenthesized: 4,
+						optional: 5,
+						effects: [
+							'initial',
+							'options',
+							'getter',
+							'unknown',
+							'unknown',
+							'callback',
+							'shadowed',
+							'namespace',
+							'foreign',
+							'parenthesized',
+						],
+					});
+				}
+				{
+					const module = await evaluateDeclarations(
+						`
+import { signal$, derived$, query$, runWithSignalOwner, retireSignalOwnerIdentity } from 'octane/signals';
+const count$ = signal$(3);
+const doubled$ = derived$(async () => count$.get() * 2);
+const queried$ = query$(() => count$.get(), async value => value * 3);
+export async function exercise() {
+  const owner = {scopeKey: 'used-declarations'};
+  const read = callback => runWithSignalOwner(owner, callback);
+  try {
+    read(() => { doubled$.snapshot(); queried$.snapshot(); });
+    for (let index = 0; index < 8; index++) await Promise.resolve();
+    return read(() => [doubled$.get(), queried$.get()]);
+  } finally { retireSignalOwnerIdentity(owner); }
+}`,
+						extension,
+						environment,
+						dev,
+					);
+					expect(await module.exercise(), mode).toEqual([6, 9]);
+				}
+				{
+					for (const [declaration, message] of [
+						[`derived$('')`, 'derived$ requires a function.'],
+						[`derived$('key', null)`, 'derived$ requires a function.'],
+						[
+							`query$('', () => 1, async () => 1)`,
+							'query$ requires selector and loader functions.',
+						],
+						[`query$(() => 1, async () => 1, {kind: 'invalid'})`, 'Unsupported signal query kind.'],
+						[
+							`query$(...([() => 1, async () => 1, {kind: 'invalid'}] as any))`,
+							'Unsupported signal query kind.',
+						],
+						[`signal$((() => { throw new Error('initializer'); })())`, 'initializer'],
+					] as const) {
+						await expect(
+							evaluateDeclarations(
+								`
+import { signal$, derived$, query$ } from 'octane/signals';
+const unused$ = ${declaration};
+export function exercise() { return 1; }
+`,
+								extension,
+								environment,
+								dev,
+							),
+						).rejects.toThrow(message);
+					}
+				}
+			}
+		}
+	}
+}
+
+describe('compiler-owned signal declaration sites', () => {
+	it('reports signal usage as metadata without marking ordinary or shadowed code', () => {
+		const signal = `import { signal$ } from 'octane/signals'; export const draft$ = signal$(''); export function App() @{ <p /> }`;
+		const ordinary = `export function App() @{ <p>ordinary</p> }`;
+		const shadowed = `function signal$(value) { return value; } export function App() @{ const result = signal$('plain'); <p>{result as string}</p> }`;
+		for (const mode of ['client', 'server'] as const) {
+			expect(compile(signal, FILENAME, { mode }).streamedSignals).toBe(true);
+			expect(compile(ordinary, FILENAME, { mode }).streamedSignals).toBeUndefined();
+			expect(compile(shadowed, FILENAME, { mode }).streamedSignals).toBeUndefined();
+			expect(
+				compile('export function App(props) @{ <input value={props.value} /> }', FILENAME, { mode })
+					.streamedSignals,
+			).toBeUndefined();
+			expect(
+				compile('export function App(props) @{ <div {...props} /> }', FILENAME, { mode })
+					.streamedSignals,
+			).toBeUndefined();
+			expect(
+				slotHooks(
+					`import { signal$ } from 'octane/signals'; export const draft$ = signal$('');`,
+					'/src/state.ts',
+					{ environment: mode },
+				)?.streamedSignals,
+			).toBe(true);
+		}
+	});
+
+	it('assigns distinct stable sites to named and namespace facade calls', async () => {
+		const source = `import { signal$, derived$ as derive$ } from 'octane/signals';
+import * as signals from 'octane/signals';
+const count$ = signal$(0);
+const doubled$ = derive$(() => count$.get() * 2);
+export function App() @{ const selected$ = signals.query$(() => count$.get(), load); <p /> }`;
+		const first = compiledCalls(source);
+		const second = compiledCalls(source);
+		expect(first).toEqual(second);
+		expect(first).toHaveLength(3);
+		expect(new Set(first.map((call) => call.site)).size).toBe(3);
+		expect(first.map((call) => String(call.site).slice(0, 2))).toEqual(['g:', 'g:', 'i:']);
+		for (const mode of ['client', 'server'] as const) {
+			const parallel = `import { query$ as request$, derived$ as derive$ } from 'octane/signals';
+import * as signals from 'octane/signals';
+export const first$ = request$(() => 1, load);
+const second$ = derive$(async () => load(2));
+export function App() @{ const first = first$.get(); const second = second$.get(); <p>{first + second as string}</p> }`;
+			const output = compile(parallel, FILENAME, { mode }).code;
+			expect(output).toContain('__startSignalReads');
+			expect(output).toContain('_$startSignalReads([first$, second$])');
+			expect(output.indexOf('_$startSignalReads([first$, second$])')).toBeLessThan(
+				output.indexOf('first$.get()'),
+			);
+			expect(compiledCalls(parallel, mode)).toHaveLength(2);
+			const namespace = `import * as signals from 'octane/signals';
+const first$ = signals.query$(() => 1, load);
+const second$ = signals.derived$(async () => load(2));
+export function App() @{ const first = first$.get(); const second = second$.get(); <p>{first + second as string}</p> }`;
+			const namespaceOutput = compile(namespace, FILENAME, { mode }).code;
+			expect(() => parseModule(namespaceOutput, FILENAME)).not.toThrow();
+			expect(namespaceOutput).toContain('_$startSignalReads([first$, second$])');
+		}
+		const early = loadCompiledFixtureSource(
+			`
+import { query$ } from 'octane/signals';
+import { renderToString } from 'octane/server';
+const first$ = query$(() => 1, () => new Promise(() => {}));
+function Values() @{ const first = first$.get(); const second = second$.get(); <p>{first + second as string}</p> }
+function Shell() @{ <section>@try { <Values/> } @pending { <i>pending-first</i> } @catch(error) { <b>{String(error)}</b> }</section> }
+const html = renderToString(Shell).html;
+const second$ = query$(() => 2, async () => 'second');
+export function exercise() { return html; }
+`,
+			{ id: FILENAME, mode: 'server', runtimeModules: { 'octane/signals': signals } },
+		);
+		expect(early.exercise()).toContain('pending-first');
+		expect(early.exercise()).not.toContain('ReferenceError');
+	});
+
+	it('uses the same authored sites for client and server compilation', () => {
+		const source = `import { signal$, derived$ } from 'octane/signals';
+const count$ = signal$(0);
+export function App() @{ const doubled$ = derived$(() => count$.get() * 2); <p>{String(doubled$.get())}</p> }`;
+		expect(compiledCalls(source, 'client').map((call) => call.site)).toEqual(
+			compiledCalls(source, 'server').map((call) => call.site),
+		);
+	});
+
+	it('assigns the same stable sites in ordinary TypeScript modules', async () => {
+		const source = `import { signal$, derived$ } from 'octane/signals';
+export const count$ = signal$(0);
+export const initial = count$.get();
+export function makeDouble$() { return derived$(() => count$.get() * 2); }
+export const source$ = signal$(1 as any);
+export const dynamic$ = derived$(() => source$.get());
+export const asserted$ = derived$(() => source$.get(), {sync: true});
+export const primitive$ = derived$(() => source$.get() * 2);
+export function makeShadowed$(String) { return derived$(() => String(source$.get())); }`;
+		const client = slotHooks(source, '/src/state.ts', { environment: 'client' })!.code;
+		const server = slotHooks(source, '/src/state.ts', { environment: 'server' })!.code;
+		const sites = (code: string) =>
+			[...code.matchAll(/"([gi]:[a-f0-9]+)"/g)].map((match) => match[1]);
+		expect(sites(client)).toEqual(sites(server));
+		expect(sites(client).map((site) => site.slice(0, 2))).toEqual([
+			'g:',
+			'i:',
+			'g:',
+			'g:',
+			'g:',
+			'g:',
+			'i:',
+		]);
+		expect(client).toContain('__signalAt as');
+		expect(
+			parseModule(client, '/src/state.ts')
+				.body.filter((node: any) => node.type === 'ImportDeclaration')
+				.map((node: any) => node.source.value),
+		).not.toContain('octane/internal/client');
+		expect(server).toContain('enableServerSignalBindings as');
+		const bundled = await build({
+			stdin: {
+				contents: client,
+				loader: 'ts',
+				resolveDir: resolve(import.meta.dirname, '../..'),
+				sourcefile: 'state.ts',
+			},
+			bundle: true,
+			format: 'esm',
+			platform: 'browser',
+			write: false,
+			define: { 'process.env.NODE_ENV': JSON.stringify('production') },
+		});
+		vi.stubGlobal('document', new JSDOM('<main></main>').window.document);
+		try {
+			const module = await import(
+				`data:text/javascript;base64,${Buffer.from(bundled.outputFiles[0].contents).toString('base64')}`
+			);
+			expect(module.initial).toBe(0);
+			module.count$.set(3);
+			expect(module.count$.get()).toBe(3);
+			expect(module.makeDouble$().get()).toBe(6);
+			expect(module.primitive$.get()).toBe(2);
+			expect(module.dynamic$.get()).toBe(1);
+			const promised = Promise.resolve(7);
+			module.source$.set(promised);
+			expect(module.asserted$.get()).toBe(promised);
+			expect(module.dynamic$.snapshot().status).toBe('pending');
+			await promised;
+			expect(module.dynamic$.get()).toBe(7);
+			let release!: () => void;
+			const yielded = new Promise<void>((resolve) => {
+				release = resolve;
+			});
+			module.source$.set(
+				(async function* () {
+					yield 9;
+					await yielded;
+				})(),
+			);
+			expect(module.dynamic$.snapshot().status).toBe('pending');
+			for (let i = 0; i < 8; i++) await Promise.resolve();
+			expect(module.dynamic$.snapshot()).toMatchObject({ value: 9, connection: 'open' });
+			release();
+			for (let i = 0; i < 8; i++) await Promise.resolve();
+			expect(module.dynamic$.snapshot()).toMatchObject({ value: 9, complete: true });
+			const shadowed$ = module.makeShadowed$(() => Promise.resolve('shadowed'));
+			expect(shadowed$.snapshot().status).toBe('pending');
+			for (let i = 0; i < 8; i++) await Promise.resolve();
+			expect(shadowed$.get()).toBe('shadowed');
+		} finally {
+			vi.unstubAllGlobals();
+		}
+		await verifySelectiveDeclarationBehavior();
+	});
+
+	it('assigns compiler-owned sites in ordinary JavaScript modules', () => {
+		const source = `import * as signals from 'octane/signals';
+export const selected$ = signals.signal$('first');`;
+		const client = slotHooks(source, '/src/state.js', { environment: 'client' })!.code;
+		const server = slotHooks(source, '/src/state.js', { environment: 'server' })!.code;
+		const site = (code: string) => code.match(/"(g:[a-f0-9]+)"/)?.[1];
+		expect(site(client)).toBeDefined();
+		expect(site(client)).toBe(site(server));
+		expect(client).toContain('signals.__signalAt');
+		expect(
+			parseModule(client, '/src/state.js')
+				.body.filter((node: any) => node.type === 'ImportDeclaration')
+				.map((node: any) => node.source.value),
+		).not.toContain('octane/internal/client');
+		expect(server).toContain('enableServerSignalBindings as');
+		// A sibling memo may select a different production printer, but must not
+		// drop the declaration identity shared with SSR or its activation metadata.
+		const withMemo = `${source}\nimport { useMemo } from 'octane';
+export function useLabel(label) { return useMemo(() => label + '!', [label]); }`;
+		for (const inlineHookMemo of [false, true]) {
+			const client = slotHooks(withMemo, '/src/state.js', {
+				environment: 'client',
+				inlineHookMemo,
+			})!;
+			const server = slotHooks(withMemo, '/src/state.js', { environment: 'server' })!;
+			expect(site(client.code)).toBeDefined();
+			expect(site(client.code)).toBe(site(server.code));
+			expect(client.streamedSignals).toBe(true);
+			expect(server.streamedSignals).toBe(true);
+		}
+	});
+
+	it('does not rewrite explicit scopes, foreign factories, or shadowed imports', () => {
+		const source = `import { createScope, signal$ } from 'octane/signals';
+const scope = createScope({ scopeKey: 'explicit' });
+const explicit$ = scope.signal$('value', 1);
+function local(signal$) { return signal$(2); }
+const foreign = { signal$(value) { return value; } };
+export function App() @{ const localValue = local((value) => value); const plain = foreign.signal$(3); <p>{String(explicit$.get() + localValue + plain)}</p> }`;
+		expect(compiledCalls(source)).toHaveLength(0);
+		for (const mode of ['client', 'server'] as const) {
+			for (const source of [
+				`import { query$ } from 'foreign'; export function App() @{ const a$ = query$(); const b$ = query$(); const a = a$.get(); const b = b$.get(); <p/> }`,
+				`import { query$ } from 'octane/signals'; export function App(query$) @{ const a$ = query$(); const b$ = query$(); const a = a$.get(); const b = b$.get(); <p/> }`,
+				`import 'octane/signals'; import { a$, b$ } from './model'; export function App() @{ const a = a$.get(); const b = b$.get(); <p/> }`,
+				`import 'octane/signals'; export function App(props) @{ const a = props.a$.get(); const b = props.b$.get(); <p/> }`,
+				`import { query$ } from 'octane/signals'; export function App() @{ const a$ = query$(() => 1, load); const b$ = query$(() => a, load); const a = a$.get(); const b = b$.get(); <p/> }`,
+				`import { query$ } from 'octane/signals'; export function App() @{ const a$ = query$(() => 1, load); function selection() { return a; } const b$ = query$(selection, load); const a = a$.get(); const b = b$.get(); <p/> }`,
+				`import { query$ } from 'octane/signals'; export function App() @{ const a$ = query$(() => 1, load); let selection = () => 0; selection = () => a; const b$ = query$(selection, load); const a = a$.get(); const b = b$.get(); <p/> }`,
+				`import { query$ } from 'octane/signals'; export function App() @{ const a$ = query$(() => 1, load); const options = { select: () => 0 }; options.select = () => a; const b$ = query$(() => options.select(), load); const a = a$.get(); const b = b$.get(); <p/> }`,
+				`import { query$ } from 'octane/signals'; export function App() @{ const a$ = query$(() => 1, load); const { select } = { select: () => a }; const b$ = query$(select, load); const a = a$.get(); const b = b$.get(); <p/> }`,
+				`import { query$ } from 'octane/signals'; export function App() @{ const a$ = query$(() => 1, load); class Options { value = a; } const b$ = query$(() => new Options().value, load); const a = a$.get(); const b = b$.get(); <p/> }`,
+				`import { query$ } from 'octane/signals'; export function App() @{ const a$ = query$(() => 1, load); const b$ = query$(() => eval('a'), load); const a = a$.get(); const b = b$.get(); <p/> }`,
+				`import { query$, derived$ } from 'octane/signals'; const a$ = query$(() => 1, load); const b$ = query$(() => 2, load); const combined$ = derived$(() => { const a = a$.get(); const b = b$.get(); return a + b; }); export function App() @{ <p>{combined$.get() as string}</p> }`,
+			])
+				expect(compile(source, FILENAME, { mode }).code).not.toContain('__startSignalReads');
+		}
+	});
+
+	it('applies capability naming diagnostics to the owner facade', () => {
+		const source = `import { signal$ } from 'octane/signals';
+const count = signal$(0);
+export function App() @{ <p /> }`;
+		expect(() => compile(source, FILENAME, {})).toThrow('OCTANE_NATIVE_SIGNAL_NAME');
+	});
+});
