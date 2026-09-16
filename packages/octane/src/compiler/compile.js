@@ -1373,6 +1373,7 @@ const INTERNAL_CLIENT_RUNTIME_HELPERS = new Set([
 	'beginPresentationHydration',
 	'endPresentationHydration',
 	'presentationWrite',
+	'presentationHostWrite',
 	'presentationStructure',
 	'presentationFailure',
 	'markBindingChildren',
@@ -15297,9 +15298,8 @@ function preparePresentationHydration(body, node, ctx) {
 			while (args.length < 7) args.push(undefinedNode());
 			return inheritOriginLoc(
 				b.call(
-					requireRuntimeForContext(ctx, 'presentationWrite'),
+					requireRuntimeForContext(ctx, 'presentationHostWrite'),
 					result.callee,
-					b.literal(helper),
 					...args,
 					receipt,
 				),

@@ -18914,6 +18914,53 @@ function preparePresentationSignalAttribute(
 	});
 }
 
+/** @internal Only authored host spreads retain generic host preparation. */
+export function presentationHostWrite<T>(writer: (...args: any[]) => T, ...args: any[]): T {
+	const frame = PRESENTATION_HYDRATION;
+	if (frame === null) return writer(...args);
+	const [scope, previous, element, sources, site, hasNestedChildren, readStyle, proofs] = args as [
+		Scope,
+		unknown,
+		Element,
+		readonly HostPropSource[],
+		string,
+		boolean,
+		((value: unknown) => unknown) | undefined,
+		readonly { id: string; site: number; node: number; spread: number; source: number }[],
+	];
+	if (frame.revision === undefined || !Array.isArray(proofs) || proofs.length === 0)
+		presentationMiss(false);
+	const proven = new Set<number>();
+	for (const proof of proofs) {
+		const receipt = frame.lease.rest?.(element, proof.site);
+		const row = sources[proof.source];
+		if (
+			receipt === undefined ||
+			receipt.id !== proof.id ||
+			receipt.node !== proof.node ||
+			receipt.spread !== proof.spread ||
+			row?.[0] !== true ||
+			proven.has(proof.source) ||
+			!matchesClosedPresentationKeys(row[1], receipt.keys)
+		)
+			presentationMiss(false);
+		proven.add(proof.source);
+	}
+	for (let index = 0; index < sources.length; index++)
+		if (sources[index]![0] && !proven.has(index)) presentationMiss(false);
+	const prepared = prepareSignalHostPropSources(
+		scope,
+		previous,
+		element,
+		sources,
+		site,
+		hasNestedChildren,
+		readStyle,
+	);
+	preparePresentationOperation(frame, element, 'hostProps', prepared.publish);
+	return prepared.binding as T;
+}
+
 /** @internal Compiler-selected writer seam; ordinary renderer setters stay unchanged. */
 export function presentationWrite<T>(
 	writer: (...args: any[]) => T,
@@ -18922,50 +18969,6 @@ export function presentationWrite<T>(
 ): T {
 	const frame = PRESENTATION_HYDRATION;
 	if (frame === null) return writer(...args);
-	if (kind === 'bindSignalHostPropSources') {
-		const [scope, previous, element, sources, site, hasNestedChildren, readStyle, proofs] =
-			args as [
-				Scope,
-				unknown,
-				Element,
-				readonly HostPropSource[],
-				string,
-				boolean,
-				((value: unknown) => unknown) | undefined,
-				readonly { id: string; site: number; node: number; spread: number; source: number }[],
-			];
-		if (frame.revision === undefined || !Array.isArray(proofs) || proofs.length === 0)
-			presentationMiss(false);
-		const proven = new Set<number>();
-		for (const proof of proofs) {
-			const receipt = frame.lease.rest?.(element, proof.site);
-			const row = sources[proof.source];
-			if (
-				receipt === undefined ||
-				receipt.id !== proof.id ||
-				receipt.node !== proof.node ||
-				receipt.spread !== proof.spread ||
-				row?.[0] !== true ||
-				proven.has(proof.source) ||
-				!matchesClosedPresentationKeys(row[1], receipt.keys)
-			)
-				presentationMiss(false);
-			proven.add(proof.source);
-		}
-		for (let index = 0; index < sources.length; index++)
-			if (sources[index]![0] && !proven.has(index)) presentationMiss(false);
-		const prepared = prepareSignalHostPropSources(
-			scope,
-			previous,
-			element,
-			sources,
-			site,
-			hasNestedChildren,
-			readStyle,
-		);
-		preparePresentationOperation(frame, element, 'hostProps', prepared.publish);
-		return prepared.binding as T;
-	}
 	if (kind === 'markDangerouslySetInnerHTMLChildren') {
 		const element = args[0] as Element;
 		if (

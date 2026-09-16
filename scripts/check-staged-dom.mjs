@@ -61,6 +61,24 @@ const NATIVE_OPERATIONS = new Map(
 		// retire detached anchors only after a root replacement has been accepted.
 		hydrateRoot: ['call:contains'],
 		beginPresentationHydration: ['read:nextSibling'],
+		// These proofs and rollback guards compare the early owner's live range,
+		// not the renderer's projected tree. A stale candidate cannot authorize
+		// restoring or publishing over newer early DOM.
+		journalRootRange: ['read:parentNode', 'read:nextSibling'],
+		currentPresentation: ['read:parentNode'],
+		presentationRange: ['read:data', 'read:parentNode'],
+		// Allocates detached text during preparation; insertion and nodeValue
+		// writes run only through accepted preparePresentationOperation callbacks.
+		bindingText: [
+			'call:createTextNode',
+			'call:insertBefore',
+			'read:parentNode',
+			'read:nodeValue',
+			'write:nodeValue',
+		],
+		// The native `is` attribute describes construction identity. A projected
+		// attribute cannot make an existing custom element safe to adopt.
+		prepareSignalHostPropSources: ['call:hasAttribute'],
 		retireDetachedBindingLeases: ['call:contains'],
 		'FragmentInstance.dispatchEvent': ['call:dispatchEvent'],
 		'FragmentInstance.scrollIntoView': ['call:scrollIntoView'],
@@ -143,6 +161,22 @@ export function inspectStagedDOM(text, file = runtimeFile) {
 		ts.isIdentifier(node)
 			? checker.getSymbolAtLocation(node)?.valueDeclaration?.initializer
 			: undefined;
+	function literalKey(expression) {
+		const node = unwrap(expression);
+		if (ts.isStringLiteralLike(node)) return node.text;
+		if (!ts.isIdentifier(node)) return null;
+		const declaration = checker.getSymbolAtLocation(node)?.valueDeclaration;
+		if (
+			!declaration ||
+			!ts.isVariableDeclaration(declaration) ||
+			!ts.isVariableDeclarationList(declaration.parent) ||
+			!(declaration.parent.flags & ts.NodeFlags.Const) ||
+			!declaration.initializer
+		)
+			return null;
+		const value = unwrap(declaration.initializer);
+		return ts.isStringLiteralLike(value) ? value.text : null;
+	}
 	function nodeReceiver(expression, depth = 0) {
 		if (depth > 12) return false;
 		const type = checker.getNonNullableType(checker.getTypeAtLocation(expression));
@@ -228,16 +262,14 @@ export function inspectStagedDOM(text, file = runtimeFile) {
 			nodeReceiver(node.expression) &&
 			!preparedReceiver(node.expression)
 		) {
-			const key = ts.isPropertyAccessExpression(node)
-				? node.name.text
-				: ts.isStringLiteralLike(node.argumentExpression)
-					? node.argumentExpression.text
-					: null;
-			// Renderer-owned symbols/expandos aren't native operations. Their lifecycle
-			// publication is checked in the effect/event suites, not inferred from names.
 			const argumentType = ts.isElementAccessExpression(node)
 				? checker.getTypeAtLocation(node.argumentExpression)
 				: undefined;
+			const key = ts.isPropertyAccessExpression(node)
+				? node.name.text
+				: literalKey(node.argumentExpression);
+			// Renderer-owned symbols/expandos aren't native operations. Their lifecycle
+			// publication is checked in the effect/event suites, not inferred from names.
 			const symbolKey = argumentType && (argumentType.flags & ts.TypeFlags.ESSymbolLike) !== 0;
 			const dynamic = key === null && !symbolKey;
 			// Resolve through any casts/aliases so they cannot bypass native checks.
