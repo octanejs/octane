@@ -77,7 +77,7 @@
         {
           "path": "packages/base-ui/scripts/build-react-parity-manifest.mjs",
           "role": "support",
-          "sha256": "841fb257ec405c5fad53f4332f9185d61a2aef77199f82be77d9c0de70cfbc9c"
+          "sha256": "59821bb0b0688a560d05ccd433a291bcb137486c8d12869cdd8213842533207d"
         },
         {
           "path": "packages/base-ui/scripts/build-runtime-inventories.mjs",
@@ -147,7 +147,7 @@
         {
           "path": "packages/base-ui/scripts/build-react-parity-manifest.mjs",
           "role": "support",
-          "sha256": "841fb257ec405c5fad53f4332f9185d61a2aef77199f82be77d9c0de70cfbc9c"
+          "sha256": "59821bb0b0688a560d05ccd433a291bcb137486c8d12869cdd8213842533207d"
         },
         {
           "path": "packages/base-ui/scripts/build-runtime-inventories.mjs",
@@ -216,7 +216,7 @@
         {
           "path": "packages/base-ui/scripts/build-react-parity-manifest.mjs",
           "role": "support",
-          "sha256": "841fb257ec405c5fad53f4332f9185d61a2aef77199f82be77d9c0de70cfbc9c"
+          "sha256": "59821bb0b0688a560d05ccd433a291bcb137486c8d12869cdd8213842533207d"
         }
       ]
     },
@@ -254,7 +254,7 @@
         {
           "path": "packages/base-ui/scripts/build-react-parity-manifest.mjs",
           "role": "support",
-          "sha256": "841fb257ec405c5fad53f4332f9185d61a2aef77199f82be77d9c0de70cfbc9c"
+          "sha256": "59821bb0b0688a560d05ccd433a291bcb137486c8d12869cdd8213842533207d"
         }
       ]
     }

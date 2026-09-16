@@ -27,6 +27,11 @@ in CI and none otherwise. The byte-exact configuration is retained under
 `audit/repository-fixtures/`. Test identities, assertions, skips, and todos remain
 subject to the same strict report validation after retries.
 
+The adapted `#test-utils` facade scopes the unchanged upstream `waitSingleFrame`
+helper in Octane `act()`, so frame-driven transition updates commit before focus
+and DOM assertions. The pristine helper, test identities, assertions, and warning
+checks remain unchanged.
+
 Native source and adapted type tests pass strict `tsrx-tsc` checks with declaration
 checking enabled. The formal public type gate also passes. All 79 Base UI public entries and 2,073 entry/export pairs have consumer assertions, including 31 retained Octane compatibility exports.
 The gate verifies the npm tarball integrity and installed declaration bytes before

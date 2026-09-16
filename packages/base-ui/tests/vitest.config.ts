@@ -45,7 +45,7 @@ export default defineConfig({
 	],
 	resolve: {
 		alias: [
-			{ find: /^#test-utils$/, replacement: resolve(packageRoot, 'tests/upstream/test/index.ts') },
+			{ find: /^#test-utils$/, replacement: resolve(packageRoot, 'tests/support/test-utils.ts') },
 			{ find: /^@base-ui\/react\/(.*)$/, replacement: resolve(packageRoot, 'src') + '/$1' },
 			{
 				find: /^@octanejs\/testing-library(?:\/pure)?$/,
