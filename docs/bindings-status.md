@@ -1455,7 +1455,7 @@ Scope/evidence last checked: 2026-08-02.
 
 ## @octanejs/stylex
 
-[`packages/stylex`](../packages/stylex) `0.1.51` — ports `@stylexjs/stylex@0.19.0`. Status data: [`packages/stylex/status.json`](../packages/stylex/status.json).
+[`packages/stylex`](../packages/stylex) `0.1.52` — ports `@stylexjs/stylex@0.19.0`. Status data: [`packages/stylex/status.json`](../packages/stylex/status.json).
 
 Full compile-time integration: re-exports the StyleX runtime API (`create`, `props`, `attrs`, `keyframes`, `defineVars`, `createTheme`) and registers as an import source; the `/vite` plugin runs the StyleX compiler over octane's compiled output and emits one static atomic stylesheet (`virtual:stylex.css`) with zero StyleX runtime in the bundle.
 
@@ -1855,7 +1855,7 @@ Scope/evidence last checked: 2026-08-02.
 
 ## @octanejs/to-print
 
-[`packages/to-print`](../packages/to-print) `0.0.8` — ports `react-to-print@3.3.0`. Status data: [`packages/to-print/status.json`](../packages/to-print/status.json).
+[`packages/to-print`](../packages/to-print) `0.0.9` — ports `react-to-print@3.3.0`. Status data: [`packages/to-print/status.json`](../packages/to-print/status.json).
 
 Public runtime surface at react-to-print 3.3.0: useReactToPrint and its option/content/fn types. Print pipeline utilities are ported unchanged aside from Octane ref and event types.
 
@@ -2077,7 +2077,7 @@ Scope/evidence last checked: 2026-08-07.
 
 ## @octanejs/zag
 
-[`packages/zag`](../packages/zag) `0.0.18` — ports `@zag-js/react@1.42.0`. Status data: [`packages/zag/status.json`](../packages/zag/status.json).
+[`packages/zag`](../packages/zag) `0.0.19` — ports `@zag-js/react@1.42.0`. Status data: [`packages/zag/status.json`](../packages/zag/status.json).
 
 Complete port of the @zag-js/react@1.42.0 public adapter surface: useMachine, normalizeProps, Portal, the @zag-js/core mergeProps re-export, and the framework useSyncExternalStore re-export. The framework-agnostic @zag-js/core, @zag-js/store, @zag-js/types, and @zag-js/utils packages are reused unchanged.
 
