@@ -19,12 +19,12 @@ export function mergeClass(left: unknown, right: unknown): string {
 	return a + ' ' + b;
 }
 
-import { hyphenateStyleName } from './dom-tables.js';
+import { hyphenateStyleName } from './style-values.js';
 
 /**
  * Normalize a style-object key to a CSS property name CSSOM accepts. Supports
  * BOTH kebab-case (`font-size`) and React-style camelCase (`fontSize`) keys —
- * the latter is converted to kebab by `hyphenateStyleName` (dom-tables.js —
+ * the latter is converted to kebab by `hyphenateStyleName` (style-values.js —
  * shared with the compiler's static-object bake so a baked style produces the
  * same CSS a dynamic one would).
  *

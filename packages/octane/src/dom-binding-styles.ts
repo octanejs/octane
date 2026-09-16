@@ -1,4 +1,4 @@
-import { cssStyleValue, hyphenateStyleName } from './dom-tables.js';
+import { cssStyleValue, hyphenateStyleName } from './style-values.js';
 import { __writeBinding, type BindingValue } from './dom-bindings.js';
 import type { BindingSignalConnection } from './dom-binding-signals.js';
 import { captureSignalOwner, currentSignalOwner } from './signals/owner-context.js';

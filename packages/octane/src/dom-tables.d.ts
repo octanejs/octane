@@ -11,6 +11,4 @@ export const HTML_ONLY_TAGS: Set<string>;
 export const MATHML_ONLY_TAGS: Set<string>;
 export const ATTRIBUTE_ALIASES: Map<string, string>;
 export function isEnumeratedBooleanAttr(name: string): boolean;
-export function isUnitlessStyleProp(name: string): boolean;
-export function cssStyleValue(name: string, value: unknown): string;
-export function hyphenateStyleName(name: string): string;
+export { isUnitlessStyleProp, cssStyleValue, hyphenateStyleName } from './style-values.js';

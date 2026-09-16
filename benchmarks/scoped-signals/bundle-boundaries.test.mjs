@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { pathToFileURL } from 'node:url';
 import { gzipSync } from 'node:zlib';
 import { build } from 'esbuild';
 import { Window } from 'happy-dom';
@@ -646,6 +649,154 @@ export function mount(root, source, options) { return view.mount(root, view, sou
 				);
 			}
 		}
+});
+
+test('early whole-style bindings exclude later renderer attribute tables', async (t) => {
+	const directory = await mkdtemp(path.join(tmpdir(), 'octane-style-boundary-'));
+	t.after(() => rm(directory, { recursive: true, force: true }));
+	const entries = {
+		early: `export { __createBindingStyles, __normalizeBindingStyle } from 'octane/dom-binding-styles';`,
+		renderer: `export { createRoot, createElement, flushSync } from 'octane';`,
+	};
+	const bundle = async (broad) => {
+		const outdir = path.join(directory, broad ? 'broad' : 'selected');
+		const result = await build({
+			entryPoints: Object.fromEntries(
+				Object.keys(entries).map((name) => [name, `style-boundary:${name}`]),
+			),
+			outdir,
+			outExtension: { '.js': '.mjs' },
+			bundle: true,
+			splitting: true,
+			write: true,
+			minify: true,
+			metafile: true,
+			format: 'esm',
+			platform: 'browser',
+			target: 'es2022',
+			legalComments: 'none',
+			tsconfigRaw: { compilerOptions: {} },
+			define: { 'process.env.NODE_ENV': '"production"', __OCTANE_PROFILE_ENABLED__: 'false' },
+			plugins: [
+				{
+					name: 'style-boundary',
+					setup(plugin) {
+						plugin.onResolve({ filter: /^style-boundary:/ }, ({ path: id }) => ({
+							path: id.slice('style-boundary:'.length),
+							namespace: 'style-boundary',
+						}));
+						plugin.onLoad({ filter: /.*/, namespace: 'style-boundary' }, ({ path: name }) => ({
+							contents: entries[name],
+							loader: 'js',
+							resolveDir: path.resolve('packages/octane'),
+						}));
+						// The control restores the broad import edge without copying or
+						// changing either helper implementation or any DOM semantics.
+						if (broad)
+							plugin.onResolve({ filter: /style-values\.js$/ }, (args) => {
+								if (args.importer.endsWith('/dom-binding-styles.ts'))
+									return { path: path.resolve('packages/octane/src/dom-tables.js') };
+							});
+					},
+				},
+			],
+		});
+		const earlyFiles = new Set();
+		const earlyInputs = new Set();
+		const visit = (id) => {
+			if (earlyFiles.has(id)) return;
+			earlyFiles.add(id);
+			const output = result.metafile.outputs[id];
+			assert.ok(output, 'An emitted style dependency must resolve.');
+			for (const [input, metadata] of Object.entries(output.inputs))
+				if (metadata.bytesInOutput > 0) earlyInputs.add(input);
+			for (const dependency of output.imports) {
+				assert.equal(dependency.external, undefined);
+				visit(dependency.path);
+			}
+		};
+		for (const [id, output] of Object.entries(result.metafile.outputs))
+			if (output.entryPoint === 'style-boundary:early') visit(id);
+		assert.ok(earlyFiles.size > 0);
+		let earlyGzip = 0;
+		let combinedGzip = 0;
+		for (const id of Object.keys(result.metafile.outputs)) {
+			const bytes = gzipSync(await readFile(path.resolve(id)), { level: 9 }).length;
+			combinedGzip += bytes;
+			if (earlyFiles.has(id)) earlyGzip += bytes;
+		}
+		return { outdir, earlyInputs, earlyGzip, combinedGzip };
+	};
+	const baseline = await bundle(true);
+	const selected = await bundle(false);
+	const window = new Window();
+	const globals = new Map();
+	for (const name of ['window', 'document', 'Node', 'Element', 'HTMLElement', 'Comment', 'Text']) {
+		globals.set(name, Object.getOwnPropertyDescriptor(globalThis, name));
+		Object.defineProperty(globalThis, name, {
+			configurable: true,
+			value: name === 'window' ? window : window[name],
+		});
+	}
+	t.after(() => {
+		for (const [name, descriptor] of globals) {
+			if (descriptor) Object.defineProperty(globalThis, name, descriptor);
+			else delete globalThis[name];
+		}
+		window.close();
+	});
+	for (const result of [baseline, selected]) {
+		const early = await import(pathToFileURL(path.join(result.outdir, 'early.mjs')).href);
+		const renderer = await import(pathToFileURL(path.join(result.outdir, 'renderer.mjs')).href);
+		const bound = window.document.createElement('div');
+		const child = bound.appendChild(window.document.createElement('span'));
+		const rendered = window.document.createElement('section');
+		const root = renderer.createRoot(rendered);
+		const binding = early.__createBindingStyles().connect(bound, () => {});
+		try {
+			for (const value of [
+				{ width: 12, height: 0, opacity: 0.4, lineHeight: 1.5, '--tone': 13 },
+				{ width: 0, marginLeft: -2, opacity: null, lineHeight: 2, '--tone': ' blue ' },
+				null,
+			]) {
+				binding.write(binding.read(value));
+				renderer.flushSync(() => root.render(renderer.createElement('div', { style: value })));
+				assert.equal(bound.style.cssText, rendered.firstElementChild.style.cssText);
+				assert.equal(bound.firstChild, child);
+				if (value?.width === 12) {
+					assert.equal(bound.style.width, '12px');
+					assert.equal(bound.style.lineHeight, '1.5');
+					assert.equal(bound.style.getPropertyValue('--tone'), '13');
+				}
+			}
+			assert.deepEqual(
+				{ ...early.__normalizeBindingStyle({ WebkitBoxFlex: 2, msFlex: 3, '--Tone': 4 }) },
+				{ WebkitBoxFlex: '2', msFlex: '3', '--Tone': '4' },
+			);
+		} finally {
+			binding.dispose();
+			root.unmount();
+		}
+	}
+	assert.ok([...baseline.earlyInputs].some((id) => id.endsWith('/dom-tables.js')));
+	assert.ok(
+		![...selected.earlyInputs].some((id) =>
+			/(?:\/dom-tables\.js|\/runtime(?:\.server)?\.ts|\/signals\/(?:engine|graph|facade)\.ts)$/.test(
+				id,
+			),
+		),
+		'The early style closure retained unrelated renderer tables or implementations.',
+	);
+	t.diagnostic(
+		JSON.stringify({
+			baselineEarlyGzip: baseline.earlyGzip,
+			selectedEarlyGzip: selected.earlyGzip,
+			baselineCombinedGzip: baseline.combinedGzip,
+			selectedCombinedGzip: selected.combinedGzip,
+		}),
+	);
+	assert.ok(selected.earlyGzip / baseline.earlyGzip < 0.8);
+	assert.ok(selected.combinedGzip / baseline.combinedGzip < 1.01);
 });
 
 test('production StyleX recipes are shared by renderer and extracted binding entries', async (t) => {

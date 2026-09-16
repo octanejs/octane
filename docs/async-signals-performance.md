@@ -61,6 +61,21 @@ The benchmark compares normal and renderer-free DOM behavior with sharing off an
 
 A production fixture also passes SSR adoption and computed-style parity in bundled Chromium 149 and Playwright WebKit 26.5, preserving the server node through updates and releasing its subscription once. The fixture's server and client use the same canonical compiler module ID. This is local browser evidence, not physical iOS Safari or application qualification. Eight ordinary client/server development/HMR controls retain byte-identical output and source maps against `c1f60f058`.
 
+## Narrow CSS helper module boundary
+
+Whole-style bindings now import CSS value and property-name helpers from a narrow canonical module. Existing DOM-table imports re-export those same functions and share the same unitless-property cache. The implementations are unchanged. This keeps renderer-only attribute and namespace tables out of the early style chunk when a later renderer entry also uses the broader table module.
+
+The permanent bundle-boundary benchmark builds the early style capability alongside `createRoot`, `createElement`, and `flushSync`, using Node 24.21.0, esbuild 0.28.1, production browser ESM splitting, target `es2022`, and gzip level 9. Its control restores only the broad import edge, with identical helper implementations and dependencies:
+
+| Complete delivery | Broad import, gzip bytes | Narrow import, gzip bytes | Difference |
+| --- | ---: | ---: | ---: |
+| Early entry and its shared imports | 4,602 | 2,970 | −1,632 |
+| Both entries and all shared chunks | 62,154 | 62,233 | +79 |
+
+This moves unrelated table delivery out of the early path; it does not remove those tables from the later renderer or shrink the complete program. A separate frozen comparison against `8f230e95b` records standalone renderer gzip changing by +17 bytes with identical raw length, and standalone styles by +1 byte. These controls confirm that the benefit concerns split-entry delivery rather than standalone tree shaking. Application chunk grouping and route budgets require their own measurement; no browser latency improvement is claimed.
+
+Both benchmark variants execute the emitted early and renderer modules, comparing numeric and zero units, unitless and vendor properties, custom-property casing, resets, and child preservation. A deliberate broad-import fault passes those semantic controls and then fails the early dependency guard. Existing development/production CSS, static-bake, and server serialization cases remain unchanged.
+
 ## Independent reads in static native output
 
 The compiler can start same-module immutable query/derived reads together in complete static native JSX output with homogeneous text/renderable holes. Public client and SSR regressions start both eligible loaders in one round instead of waiting for the first to settle. Declarations and unentered branches stay lazy; original reads retain errors and suspension. Components, resource-loading/custom hosts, dynamic attributes and opaque values remain ordering barriers. Review added resource-host exclusions and a case-insensitive attribute barrier after a customized built-in constructor probe exposed changed execution order.
