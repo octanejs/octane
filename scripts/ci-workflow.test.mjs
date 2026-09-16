@@ -919,6 +919,13 @@ describe('CI workflow aggregation', () => {
 });
 
 describe('Publish workflow validation', () => {
+	test('normalizes generated changelogs before validating and committing a release', () => {
+		assert.match(
+			packageJson.scripts['changeset:version'],
+			/changeset version && node scripts\/normalize-changelogs\.mjs &&/,
+		);
+	});
+
 	test('owns GitHub tag and release reconciliation outside changesets/action', () => {
 		assert.match(publishWorkflow, /create-github-releases:\s*false/);
 		assert.match(publishWorkflow, /push-git-tags:\s*false/);

@@ -94,6 +94,35 @@ async function inspectPackage(pkg, fetchImpl, registry) {
 		return { ...pkg, state: 'published' };
 	}
 
+	// The package index can remain cached after a successful publish. The
+	// exact-version endpoint independently confirms the immutable release before
+	// we classify it as missing (or attempt to publish that version again).
+	try {
+		const exact = await fetchImpl(
+			`${registryPackageUrl(registry, pkg.name)}/${encodeURIComponent(pkg.version)}`,
+			{
+				headers: { accept: 'application/json', 'cache-control': 'no-cache' },
+				signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+			},
+		);
+		if (exact.ok) {
+			const version = await exact.json();
+			if (version?.name !== pkg.name || version?.version !== pkg.version) {
+				throw new Error('exact-version response does not match the requested package version');
+			}
+			return { ...pkg, state: 'published' };
+		}
+		if (exact.status !== 404) {
+			throw new Error(`exact-version registry returned HTTP ${exact.status}`);
+		}
+	} catch (error) {
+		return {
+			...pkg,
+			state: 'unreachable',
+			reason: error instanceof Error ? error.message : String(error),
+		};
+	}
+
 	const latest = metadata['dist-tags']?.latest;
 	if (typeof latest !== 'string') {
 		return { ...pkg, state: 'invalid', reason: 'registry metadata has no latest dist-tag' };
