@@ -151,8 +151,8 @@ tests. CLI options override the config.
 For binding parity test setup, follow `docs/react-parity-testing.md` and the
 `octane-react-library-port` skill.
 
-Add changesets for user-facing changes. 0.x uses `patch`; coordinated core beta
-bumps may use `minor`, and `major` waits for 1.0. See `CONTRIBUTING.md`. Engine
+Add changesets for user-facing changes. All 0.x packages allow `patch` and
+`minor` releases; `major` waits for 1.0. See `CONTRIBUTING.md`. Engine
 changes follow `.rulesync/rules/core-engineering.md`.
 
 Never mutate a parsed AST during compilation: rewrites are copy-on-write. Tests

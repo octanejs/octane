@@ -92,9 +92,13 @@ if (process.argv[2] === '--version') {
 	console.log('11.15.1');
 	process.exit(0);
 }
+if (process.argv[2] === 'info') {
+	console.log(JSON.stringify({ error: { code: 'ERR_PNPM_PACKAGE_NOT_FOUND', message: 'Package not found' } }));
+	process.exit(1);
+}
 if (process.argv[2] === 'publish') {
 	appendFileSync(process.env.PUBLISH_MARKER, 'publish\\n');
-	console.error(JSON.stringify({
+	console.log(JSON.stringify({
 		error: {
 			code: 'E403',
 			message: 'You cannot publish over the previously published version 1.0.0.',
@@ -119,13 +123,13 @@ process.exit(2);
 			stdio: ['ignore', 'pipe', 'pipe'],
 		});
 
-		assert.equal(await readFile(markerPath, 'utf8'), 'publish\n');
 		assert.equal(result.signal, null);
 		assert.equal(
 			result.status,
 			0,
 			`changeset publish failed\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`,
 		);
+		assert.equal(await readFile(markerPath, 'utf8'), 'publish\n');
 		assert.doesNotMatch(`${result.stdout}\n${result.stderr}`, /TypeError/);
 	} finally {
 		await rm(root, { force: true, recursive: true });

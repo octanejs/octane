@@ -45,10 +45,21 @@ jobs:
       - name: Validate changeset bump types
         run: pnpm changeset:check
 
+      # Changesets v3 exits with an error when versioning an empty release plan.
+      - name: Check for pending releases
+        id: release_plan
+        run: |
+          node --input-type=module <<'NODE' >> "$GITHUB_OUTPUT"
+          import { getReleasePlan } from '@changesets/get-release-plan';
+          const plan = await getReleasePlan(process.cwd());
+          console.log(`has_releases=${plan.releases.some((release) => release.type !== 'none')}`);
+          NODE
+
       # Prove the repository-owned release plan before making the GitHub API
       # boundary best-effort. A malformed changeset, generator regression, or
       # formatting failure remains a hard workflow failure during an API outage.
       - name: Validate generated release plan
+        if: steps.release_plan.outputs.has_releases == 'true'
         run: |
           pnpm changeset:version
           git diff --check
@@ -71,15 +82,15 @@ jobs:
       - name: Create or update release pull request
         id: release_pr_first
         continue-on-error: true
-        uses: changesets/action@a45c4d594aa4e2c509dc14a9f2b3b67ba3780d0d # v1
+        uses: changesets/action@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2.1.2
         with:
-          branch: main
+          pr-base-branch: main
           github-token: ${{ github.token }}
-          version: pnpm changeset:version
-          commit: Version Packages
-          title: Version Packages
+          version-script: pnpm changeset:version
+          push-with-git-cli: true
+          commit-message: Version Packages
+          pr-title: Version Packages
         env:
-          GITHUB_TOKEN: ${{ github.token }}
           GIT_AUTHOR_DATE: ${{ steps.release_commit.outputs.date }}
           GIT_COMMITTER_DATE: ${{ steps.release_commit.outputs.date }}
 
@@ -103,15 +114,15 @@ jobs:
         id: release_pr_retry
         if: steps.release_pr_first.outcome == 'failure'
         continue-on-error: true
-        uses: changesets/action@a45c4d594aa4e2c509dc14a9f2b3b67ba3780d0d # v1
+        uses: changesets/action@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2.1.2
         with:
-          branch: main
+          pr-base-branch: main
           github-token: ${{ github.token }}
-          version: pnpm changeset:version
-          commit: Version Packages
-          title: Version Packages
+          version-script: pnpm changeset:version
+          push-with-git-cli: true
+          commit-message: Version Packages
+          pr-title: Version Packages
         env:
-          GITHUB_TOKEN: ${{ github.token }}
           GIT_AUTHOR_DATE: ${{ steps.release_commit.outputs.date }}
           GIT_COMMITTER_DATE: ${{ steps.release_commit.outputs.date }}
 

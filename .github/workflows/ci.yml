@@ -825,9 +825,8 @@ jobs:
           pnpm rules:check
           git diff --exit-code
 
-      # 0.x beta releases stay on the patch track by default. The core package
-      # may use minor for a coordinated beta-line bump; bindings stay patch-only
-      # and major remains reserved for 1.0. Check this on PRs as well as release.
+      # All 0.x packages allow patch and minor releases; major is reserved for
+      # 1.0. Check declared bumps and the computed plan on PRs and releases.
       - name: Validate changeset bump types
         run: pnpm changeset:check
 
