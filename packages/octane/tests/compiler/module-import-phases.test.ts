@@ -16,6 +16,29 @@ describe('compiled module imports', () => {
 		['server development', { mode: 'server', dev: true }],
 		['server production', { mode: 'server', dev: false }],
 	] as const) {
+		for (const strong of [false, true]) {
+			it(`preserves meta-property syntax in memoized creations in ${label} (strong=${strong})`, () => {
+				const { code } = compile(
+					`import { use } from 'octane';
+					function Form(props) @{ <form {...props.attributes} /> }
+					export function App(props) @{
+						const value = use(Promise.resolve(import.meta.url + props.suffix));
+						<Form attributes={{
+							...Object.assign({}, props.attributes),
+							...(import.meta.env.SSR ? { action: props.action } : {}),
+							'data-value': value,
+							'data-target': props.read(function () { return new.target; }),
+						}} />
+					}`,
+					'meta-property-creations.tsrx',
+					{ ...options, strong },
+				);
+				// The generated module must remain valid ESM, including dependencies
+				// synthesized for both use() and server component-prop creations.
+				expect(() => parseModule(code, 'meta-property-creations.js')).not.toThrow();
+			});
+		}
+
 		it(`preserves deferred imports in ${label}`, () => {
 			const { code } = compile(source, 'deferred-module-imports.tsrx', options);
 			const statements = parseModule(code, 'deferred-module-imports.js').body;
