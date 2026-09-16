@@ -473,7 +473,7 @@ describe('CI workflow aggregation', () => {
 		assert.match(parity, /actions\/upload-artifact@/);
 		assert.match(
 			parity,
-			/name: Upload failed React parity diagnostics\s+if: failure\(\)[\s\S]*?name: react-parity-diagnostics-\$\{\{ matrix\.shard \}\}[\s\S]*?\.json\.failed\.txt/,
+			/name: Upload failed React parity diagnostics\s+if: failure\(\)[\s\S]*?name: react-parity-diagnostics-\$\{\{ matrix\.shard \}\}[\s\S]*?\.json\.failed/,
 		);
 		assert.doesNotMatch(parity, /pnpm react-parity:(?:test|validate)/);
 		assert.match(parityAggregate, /^    name: React parity checks$/m);
@@ -927,6 +927,13 @@ describe('CI workflow aggregation', () => {
 });
 
 describe('Publish workflow validation', () => {
+	test('normalizes generated changelogs before validating and committing a release', () => {
+		assert.match(
+			packageJson.scripts['changeset:version'],
+			/changeset version && node scripts\/normalize-changelogs\.mjs &&/,
+		);
+	});
+
 	test('owns GitHub tag and release reconciliation outside changesets/action', () => {
 		assert.match(publishWorkflow, /create-github-releases:\s*false/);
 		assert.match(publishWorkflow, /push-git-tags:\s*false/);

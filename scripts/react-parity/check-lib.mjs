@@ -1,5 +1,13 @@
 import { spawn } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+	copyFileSync,
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 
@@ -48,7 +56,7 @@ export async function runRequiredVitestLanes({
 	try {
 		if (reportPath) {
 			rmSync(reportPath, { force: true });
-			rmSync(`${reportPath}.failed.txt`, { force: true });
+			rmSync(`${reportPath}.failed`, { force: true });
 		}
 		const { code, signal } = await new Promise((resolve, reject) => {
 			const child = spawnProcess(
@@ -84,12 +92,13 @@ export async function runRequiredVitestLanes({
 			`completed parity-wide Vitest shard ${shard.value} in ${((Date.now() - startedAt) / 1000).toFixed(1)}s`,
 		);
 	} catch (error) {
-		// Preserve this attempt's raw failure evidence separately. Only a verified,
-		// successful run may populate reportPath for aggregate coverage checks.
-		if (reportPath && report !== undefined) {
+		// Keep failed evidence separate from the verified report consumed by the
+		// aggregate gate. Runner-level errors can occur even when all recorded
+		// assertions passed, and the fresh raw report is needed to diagnose them.
+		if (reportPath && existsSync(runReportPath)) {
 			try {
 				mkdirSync(dirname(reportPath), { recursive: true });
-				writeFileSync(`${reportPath}.failed.txt`, report);
+				copyFileSync(runReportPath, `${reportPath}.failed`);
 			} catch {
 				console.warn('Could not archive the failed Vitest report; the original failure follows.');
 			}

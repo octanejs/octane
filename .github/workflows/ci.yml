@@ -516,19 +516,20 @@ jobs:
           done
           dmesg --ctime --level=err,warn | tail -80 || true
 
-      - name: Upload React parity Vitest shard report
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: react-parity-vitest-${{ matrix.shard }}
-          path: ${{ runner.temp }}/react-parity-vitest/shard-${{ matrix.shard }}.json
-          retention-days: 1
-
       - name: Upload failed React parity diagnostics
         if: failure()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: react-parity-diagnostics-${{ matrix.shard }}
-          path: ${{ runner.temp }}/react-parity-vitest/shard-${{ matrix.shard }}.json.failed.txt
+          path: ${{ runner.temp }}/react-parity-vitest/shard-${{ matrix.shard }}.json.failed
+          retention-days: 1
+          overwrite: true
+
+      - name: Upload React parity Vitest shard report
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: react-parity-vitest-${{ matrix.shard }}
+          path: ${{ runner.temp }}/react-parity-vitest/shard-${{ matrix.shard }}.json
           retention-days: 1
 
   react_parity_checks:

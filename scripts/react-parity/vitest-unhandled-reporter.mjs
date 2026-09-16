@@ -18,7 +18,7 @@ function formatUnhandledError(error, seen = new Set()) {
 		seen.add(error);
 	}
 	const summary = formatErrorSummary(error);
-	return error?.cause === undefined
+	return error?.cause == null
 		? summary
 		: `${summary}\nCaused by: ${formatUnhandledError(error.cause, seen)}`;
 }

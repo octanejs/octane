@@ -61,7 +61,7 @@
     "evals:test": "pnpm --filter @octanejs/evals test",
     "changeset": "changeset && pnpm changeset:check",
     "changeset:check": "node scripts/check-changesets.js && node scripts/check-release-plan.mjs",
-    "changeset:version": "pnpm changeset:check && changeset version && pnpm sync && pnpm shadcn:registry",
+    "changeset:version": "pnpm changeset:check && changeset version && node scripts/normalize-changelogs.mjs && pnpm sync && pnpm shadcn:registry",
     "changeset:publish": "pnpm changeset:check && changeset publish",
     "release:preflight": "node scripts/npm-release-preflight.mjs",
     "release:preflight:test": "node --test scripts/npm-release-preflight.test.mjs scripts/changesets-publish.test.mjs scripts/reconcile-github-releases.test.mjs",
