@@ -62,10 +62,19 @@ describe('bundler-neutral compiler integration', () => {
 		'(external satisfies typeof external)((stylex.attrs(styles) as object))',
 		'external((stylex.attrs as typeof stylex.attrs)(styles))',
 		'external(stylex.attrs!(styles))',
+		'external((stylex as typeof stylex).attrs(styles))',
+		'external(stylex!.attrs(styles))',
+		'external((stylex satisfies typeof stylex).attrs(styles))',
+		'external((((stylex as typeof stylex)!) satisfies typeof stylex).attrs(styles))',
+		'external(((stylex as typeof stylex).nested as typeof stylex.nested).attrs(styles))',
+		'external(((stylex!.nested)! satisfies typeof stylex.nested).attrs(styles))',
 	])('preserves typed unbound provider spreads: %s', (spread) => {
 		const styles = { class: 'styled', style: { color: 'red' } };
 		const runtimeModules = {
-			'@stylexjs/stylex': { attrs: (value: unknown) => value },
+			'@stylexjs/stylex': {
+				attrs: (value: unknown) => value,
+				nested: { attrs: (value: unknown) => value },
+			},
 			'octane/behavior': Behavior,
 		};
 		for (const dev of [false, true]) {
@@ -83,7 +92,7 @@ ${extension === 'tsrx' ? '}' : '); }'}`;
 						{
 							source: '@stylexjs/stylex',
 							imported: '*',
-							members: ['attrs'],
+							members: spread.includes('.nested') ? ['nested', 'attrs'] : ['attrs'],
 							fields: ['class', 'style'],
 							style: 'object' as const,
 						},
@@ -106,10 +115,25 @@ ${extension === 'tsrx' ? '}' : '); }'}`;
 							'TypedSpread.js',
 						),
 					).not.toThrow();
+				// Transparent receiver syntax must retain the fixed-field contract
+				// even without the unbound escape hatch for generic spreads.
+				if (spread.startsWith('external(')) {
+					const owned = source.replace(spread, spread.slice('external('.length, -1));
+					for (const mode of ['client', 'server'] as const)
+						expect(() => compile(owned, id, { ...compileOptions, mode })).not.toThrow();
+				}
 				for (const rejected of [
 					source.replace('{ styles, label }', '{ styles, label, external }'),
 					source.replace('{ styles, label }', '{ styles, label, stylex }'),
 					source.replace(spread, 'external?.(stylex.attrs(styles))'),
+					...[
+						'(stylex as typeof stylex)["attrs"](styles)',
+						'(stylex as typeof stylex)?.attrs(styles)',
+						'(stylex as typeof stylex).attrs?.(styles)',
+						'((stylex as typeof stylex)["nested"]).attrs(styles)',
+						'((stylex as typeof stylex)?.nested).attrs(styles)',
+						'(stylex as typeof stylex).other(styles)',
+					].map((call) => source.replace(spread, call)),
 				])
 					expect(() => compile(rejected, id, { ...compileOptions, mode: 'client' })).toThrow(
 						/explicitly unbound|pure projections|unbound requires/,

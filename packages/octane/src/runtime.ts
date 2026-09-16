@@ -19321,9 +19321,10 @@ function preparePresentationSignalValue(args: any[], frame: PresentationHydratio
 		if (typeof value !== 'string') presentationMiss(false);
 		const owner = scope.block.idState.renderOwner!;
 		const lease = owner.controlLeases?.get(element);
-		const valid = () =>
+		const valid = (retired = false) =>
 			owner.bindingContainer!.contains(element) &&
-			(lease !== undefined
+			(!retired || frame.lease.valid?.() !== false) &&
+			(lease !== undefined && !retired
 				? lease.owner === owner &&
 					lease.active() &&
 					runWithBlockSignalOwner(scope, () => lease.matches(handle))
@@ -19410,9 +19411,20 @@ function preparePresentationSignalValue(args: any[], frame: PresentationHydratio
 						failure = error;
 					} finally {
 						lease.owner = undefined;
-						owner.controlLeases!.delete(element);
 					}
 				}
+				// Retirement is user code: revalidate the captured presentation before
+				// installing its input writer. Keep a revoked offer guarded against
+				// ordinary writes until root cleanup.
+				if (lease !== undefined && !binding.disposed && !scope.block.disposed && !valid(true)) {
+					try {
+						disposeDirectSignalBinding(binding);
+					} catch (error) {
+						if (!failed) throw error;
+					}
+					throw failed ? failure : new Error(formatClientError(77));
+				}
+				if (lease !== undefined) owner.controlLeases!.delete(element);
 				if (!binding.disposed && !scope.block.disposed) {
 					// User cleanup may dispatch input or end composition. Sample again;
 					// the renderer's composition listeners were armed before cleanup.

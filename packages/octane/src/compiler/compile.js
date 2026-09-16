@@ -9313,7 +9313,7 @@ function markKnownAttributeSpreads(ast, contracts) {
 		const members = [];
 		while (callee?.type === 'MemberExpression' && !callee.computed && !callee.optional) {
 			members.unshift(callee.property.name);
-			callee = callee.object;
+			callee = unwrapTsExpr(callee.object);
 		}
 		if (callee?.type !== 'Identifier') return null;
 		const matches = imports.get(callee.name);

@@ -248,7 +248,7 @@ function importedProjectionCall(node, imports, lexical, parameterScope) {
 	const callee = unwrap(node?.callee);
 	let importedRoot = callee;
 	while (importedRoot?.type === 'MemberExpression' && !importedRoot.computed)
-		importedRoot = importedRoot.object;
+		importedRoot = unwrap(importedRoot.object);
 	const namespace =
 		importedRoot !== callee &&
 		importedRoot?.type === 'Identifier' &&
