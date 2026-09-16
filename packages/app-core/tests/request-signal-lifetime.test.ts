@@ -53,7 +53,7 @@ describe('request-owned module signals', () => {
 			},
 			retire: retireSignalOwnerIdentity,
 		};
-		const draft$ = signal$('request-draft', '');
+		const draft$ = signal$('', { key: 'request-draft' });
 		let lateRead!: () => string;
 		const request = async (name: string) => {
 			const context = createContext(new Request('https://octane.test/'), {});
@@ -97,7 +97,7 @@ describe('request-owned module signals', () => {
 			},
 			retire: retireSignalOwnerIdentity,
 		};
-		const state$ = signal$('canceled-request', 'ready');
+		const state$ = signal$('ready', { key: 'canceled-request' });
 		const cancellation = new AbortController();
 		const context = createContext(
 			new Request('https://octane.test/', { signal: cancellation.signal }),

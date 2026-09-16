@@ -66,6 +66,7 @@ export type {
 	ScopeOptions,
 	ScopeSeed,
 	SignalHandle,
+	SignalOptions,
 	SignalBindingIdentity,
 	SignalAction,
 	SignalOwner,

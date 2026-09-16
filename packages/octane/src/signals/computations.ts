@@ -1,7 +1,9 @@
 import { createDerivedCellWith } from './engine.js';
 import {
 	ScopedNode,
+	CandidateUnsupportedError,
 	assertAlive,
+	attachObserver,
 	derivedValueState,
 	errorState,
 	invalidateNode,
@@ -14,9 +16,13 @@ import {
 	signalBatch,
 	subscribeNode,
 	untrack,
+	untrackCommitted,
 	type NodeState,
 	type GraphOwner,
+	type CandidateProducer,
+	type SignalCandidateFrame,
 } from './graph.js';
+import { SIGNAL_DEPENDENT_NODE, type SignalDependencyNotify } from './read-protocol.js';
 import {
 	SIGNAL_OWNER_RESOLVE,
 	type DerivedCompute,
@@ -38,9 +44,9 @@ export function createDeclaredDerivedCell<T>(
 }
 
 interface AttemptDependency {
-	readonly node: ScopedNode;
-	readonly revision: number;
-	readonly unsubscribe: () => void;
+	node: ScopedNode;
+	revision: number;
+	unsubscribe: () => void;
 }
 
 interface DerivedAttempt<T> {
@@ -83,7 +89,7 @@ function ignoreRetiredCloseFailure(): void {}
 
 function closeIterator(iterator: AsyncIterator<unknown>): void {
 	try {
-		Promise.resolve(untrack(() => iterator.return?.())).catch(ignoreRetiredCloseFailure);
+		Promise.resolve(untrackCommitted(() => iterator.return?.())).catch(ignoreRetiredCloseFailure);
 	} catch {}
 }
 
@@ -108,6 +114,7 @@ export class DerivedBinding<T> {
 	private current: DerivedAttempt<T> | undefined;
 	private compute: DerivedCompute<T> | undefined;
 	private frozen = false;
+	private candidate: SignalCandidateFrame | undefined;
 
 	constructor(
 		readonly owner: Scope & GraphOwner,
@@ -117,6 +124,75 @@ export class DerivedBinding<T> {
 	) {
 		this.compute = compute;
 		node.compute = () => this.evaluate();
+	}
+
+	forkCandidate(target: ScopedNode<T>, frame: SignalCandidateFrame): CandidateProducer {
+		if (this.frozen || this.owner.readBarrier || !this.compute) {
+			throw new CandidateUnsupportedError('Frozen derived candidates are not supported.');
+		}
+		const fork = new DerivedBinding(this.owner, target, this.compute, this.options);
+		fork.candidate = frame;
+		return {
+			dispose: () => fork.dispose(),
+			dependencies: () => fork.current?.dependencies.keys() ?? [],
+			prepare: () => {
+				const state = target.state;
+				// A caught error is an authoritative presentation, just like a ready
+				// value. Unhandled reads still report the authored error to the frame.
+				if (state?.snapshot.status !== 'ready' && state?.snapshot.status !== 'error')
+					return state?.waiting
+						? { status: 'pending', waiting: state.waiting }
+						: { status: 'invalid' };
+				const current = fork.current;
+				const previous = this.current;
+				return {
+					status: 'ready',
+					receipt: {
+						validate: () =>
+							!this.owner.retired &&
+							this.owner.readBarrier === undefined &&
+							this.compute !== undefined &&
+							this.current === previous &&
+							fork.current === current &&
+							target.state === state &&
+							(!current || (current.binding === fork && fork.validDependencies(current))),
+						publish: () => {
+							// Transfer producer authority without aborting the old attempt or
+							// invoking authored code while canonical graph state is installing.
+							this.current = current;
+							if (current) current.binding = this;
+							this.node.invalidateAttempt = current ? () => this.invalidateGraph() : undefined;
+							fork.current = undefined;
+							fork.candidate = undefined;
+							target.invalidateAttempt = undefined;
+							return () => {
+								if (previous !== this.current) this.stop(previous);
+							};
+						},
+						accept: () => {
+							if (!current) return;
+							const dependencies = [...current.dependencies.values()];
+							const releases: (() => void)[] = [];
+							current.dependencies.clear();
+							for (const dependency of dependencies) {
+								releases.push(dependency.unsubscribe);
+								dependency.node = frame.canonical(dependency.node);
+								dependency.revision = dependency.node.revision;
+								// Canonical states and revisions are installed. Subscribe without
+								// refresh/evaluation, and acquire every lease before releasing any.
+								dependency.unsubscribe = attachObserver(
+									dependency.node,
+									DerivedBinding.notify(current),
+									true,
+								);
+								current.dependencies.set(dependency.node, dependency);
+							}
+							for (const release of releases) release();
+						},
+					},
+				};
+			},
+		};
 	}
 
 	private static context<T>(current: DerivedAttempt<T>): DerivedContext {
@@ -133,35 +209,70 @@ export class DerivedBinding<T> {
 		};
 	}
 
-	private static subscribe<T>(current: DerivedAttempt<T>, dependency: ScopedNode): () => void {
-		return subscribeNode(dependency, () => current.binding?.invalidate(current));
+	private static notify<T>(current: DerivedAttempt<T>): SignalDependencyNotify {
+		const notify: SignalDependencyNotify = () => current.binding?.invalidate(current);
+		// Explicit reads are graph leases too. Discovery follows their dependent
+		// identity without evaluating the computation or replaying this callback.
+		notify[SIGNAL_DEPENDENT_NODE] = current.binding!.node;
+		return notify;
 	}
 
-	private async read<V>(current: DerivedAttempt<T>, handle$: SignalHandle<V>): Promise<V> {
-		if (!current.active) throw new Error('The derived attempt is no longer active.');
-		const dependency = resolveHandle(handle$, this.owner);
+	private read<V>(current: DerivedAttempt<T>, handle$: SignalHandle<V>): Promise<V> {
+		if (!current.active)
+			return Promise.reject(new Error('The derived attempt is no longer active.'));
+		try {
+			return DerivedBinding.readValue<T, V>(current, this.readDependency(current, handle$));
+		} catch (error) {
+			return Promise.reject(error);
+		}
+	}
+
+	private readDependency<V>(
+		current: DerivedAttempt<T>,
+		handle$: SignalHandle<V>,
+	): AttemptDependency {
+		const dependency = this.candidate
+			? this.candidate.run(() => this.candidate!.resolve(resolveHandle(handle$, this.owner)))
+			: resolveHandle(handle$, this.owner);
 		if ((dependency as ScopedNode) === this.node) {
 			throw new TypeError('A derived signal cannot read itself.');
 		}
 		assertAlive(dependency.owner);
-		if (!current.dependencies.has(dependency)) {
-			const unsubscribe = DerivedBinding.subscribe(current, dependency);
+		let lease = current.dependencies.get(dependency);
+		if (!lease) {
+			const unsubscribe = subscribeNode(dependency, DerivedBinding.notify(current));
 			const revision = dependency.revision;
-			current.dependencies.set(dependency, { node: dependency, revision, unsubscribe });
+			lease = { node: dependency, revision, unsubscribe };
+			current.dependencies.set(dependency, lease);
 		}
+		return lease;
+	}
+
+	private static async readValue<T, V>(
+		current: DerivedAttempt<T>,
+		dependency: AttemptDependency,
+	): Promise<V> {
 		while (current.active) {
-			const state = untrack(() => readNode(dependency));
+			// The mutable lease, not a shadow node or fork binding, crosses awaits.
+			// An accepted stream can continue reading from its canonical owner.
+			const state = untrack(() =>
+				current.binding!.candidate
+					? current.binding!.candidate.run(() => readNode(dependency.node as ScopedNode<V>))
+					: readNode(dependency.node as ScopedNode<V>),
+			);
 			if (!current.active) break;
 			if (state.snapshot.status === 'ready') {
-				if (dependency.owner !== this.owner) current.owners!.add(dependency.owner);
+				if (dependency.node.owner !== current.binding!.owner)
+					current.owners!.add(dependency.node.owner);
 				if (state.owners) {
-					for (const owner of state.owners) if (owner !== this.owner) current.owners!.add(owner);
+					for (const owner of state.owners)
+						if (owner !== current.binding!.owner) current.owners!.add(owner);
 				}
 				return state.snapshot.value;
 			}
 			if (state.snapshot.status === 'error') throw state.snapshot.error;
 			if (state.snapshot.status === 'idle') {
-				throw new Error(`Signal "${dependency.key}" has no selected value.`);
+				throw new Error(`Signal "${dependency.node.key}" has no selected value.`);
 			}
 			// The foreign producer need not settle when this owner retires. Wake
 			// only this read so its suspended stack releases the binding/dependency.
@@ -181,6 +292,10 @@ export class DerivedBinding<T> {
 			this.owner.readBarrier !== undefined
 		)
 			return false;
+		return this.validDependencies(current);
+	}
+
+	private validDependencies(current: DerivedAttempt<T>): boolean {
 		for (const dependency of current.dependencies.values()) {
 			if (dependency.node.owner.retired || dependency.node.revision !== dependency.revision) {
 				return false;
@@ -433,7 +548,7 @@ export class DerivedBinding<T> {
 		current.cancelRead = undefined;
 		current.resolve();
 		if (!cancel || !active) return;
-		controller?.abort();
+		if (controller) untrackCommitted(() => controller.abort());
 		if (iterator) closeIterator(iterator);
 	}
 
@@ -464,6 +579,7 @@ export class DerivedBinding<T> {
 		this.stop(this.current);
 		this.current = undefined;
 		this.compute = undefined;
+		this.candidate = undefined;
 		this.node.invalidateAttempt = undefined;
 	}
 }

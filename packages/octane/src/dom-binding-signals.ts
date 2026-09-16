@@ -1,5 +1,9 @@
 import { captureSignalOwner, currentSignalOwner } from './signals/owner-context.js';
 import {
+	forwardNativeTransitionConsumer,
+	type NativeTransitionPresentation,
+} from './signals/read-protocol.js';
+import {
 	SIGNAL_HANDLE,
 	SIGNAL_BINDING_READ,
 	SIGNAL_BINDING_SUBSCRIBE,
@@ -11,9 +15,15 @@ export interface BindingSignalConnection {
 	read(value: unknown): unknown;
 	/** Read only the already connected channel; never reevaluate the authored projection. */
 	get(): unknown;
+	/** Prepare a different projection without replacing the currently published lease. */
+	preview(value: unknown): BindingPreparedValue;
 	/** Optional whole-style writer, present only on the selected style capability. */
 	write?(value: unknown): void;
 	dispose(preservePresentation?: boolean): void;
+}
+
+export interface BindingPreparedValue<T = unknown> extends NativeTransitionPresentation {
+	readonly value: T;
 }
 
 /** @internal Query-selected capability; captures the existing owner, never creates a graph. */
@@ -46,6 +56,47 @@ export function __createBindingSignals() {
 			return {
 				get,
 				dispose,
+				preview(next): BindingPreparedValue {
+					const nextHandle = isSignal(next) ? next : undefined;
+					const ticket = generation;
+					const projected = nextHandle ? run(() => nextHandle[SIGNAL_BINDING_READ]()) : next;
+					let accepted = false;
+					let retired = false;
+					let invalid = false;
+					let acceptedGeneration = ticket;
+					const stopNext =
+						nextHandle && nextHandle !== handle
+							? run(() =>
+									nextHandle[SIGNAL_BINDING_SUBSCRIBE](
+										forwardNativeTransitionConsumer(notify, () => {
+											if (retired || disposed) return;
+											if (!accepted) invalid = true;
+											else if (generation === acceptedGeneration) notify();
+										}),
+									),
+								)
+							: undefined;
+					return {
+						value: projected,
+						validate: () => !retired && !invalid && !disposed && generation === ticket,
+						commit() {
+							if (retired || accepted || disposed) return;
+							accepted = true;
+							value = next;
+							if (nextHandle === handle) return;
+							const stop = unsubscribe;
+							acceptedGeneration = ++generation;
+							handle = nextHandle;
+							unsubscribe = stopNext;
+							stop?.();
+						},
+						discard() {
+							if (accepted || retired) return;
+							retired = true;
+							stopNext?.();
+						},
+					};
+				},
 				read(next): unknown {
 					if (disposed) return undefined;
 					const nextHandle = isSignal(next) ? next : undefined;
@@ -64,9 +115,11 @@ export function __createBindingSignals() {
 							)
 								throw new TypeError('A DOM binding signal requires the native binding protocol.');
 							const stopNext = run(() =>
-								handle![SIGNAL_BINDING_SUBSCRIBE](() => {
-									if (!disposed && ticket === generation) notify();
-								}),
+								handle![SIGNAL_BINDING_SUBSCRIBE](
+									forwardNativeTransitionConsumer(notify, () => {
+										if (!disposed && ticket === generation) notify();
+									}),
+								),
 							);
 							if (typeof stopNext !== 'function')
 								throw new TypeError('A DOM binding signal subscription must return cleanup.');

@@ -70,12 +70,9 @@ it('automatically publishes a rendered query attempt after the pre-module receiv
 	enableServerSignalBindings();
 	const result = deferred<string>();
 	const load = vi.fn(() => result.promise);
-	const value$ = __queryAt(
-		'g:auto-stream-query-site',
-		'authored-auto-query',
-		() => 'conversation-a',
-		load,
-	);
+	const value$ = __queryAt('g:auto-stream-query-site', () => 'conversation-a', load, {
+		key: 'authored-auto-query',
+	});
 	function App(_props: unknown, _scope: SSRScope): string {
 		const snapshot = value$.snapshot();
 		return `<p>${snapshot.status}</p>`;
@@ -215,18 +212,15 @@ it('joins pending server queries from the initial shell without starting a brows
 	enableServerSignalBindings();
 	const result = deferred<string>();
 	const load = vi.fn(() => result.promise);
-	const value$ = __queryAt('g:early-query', 'early-query', () => 'a', load);
+	const value$ = __queryAt('g:early-query', () => 'a', load, { key: 'early-query' });
 	const loadBody = vi.fn(async function* () {
 		yield 'first server turn';
 		yield 'second server turn';
 	});
-	const body$ = __queryAt(
-		'g:early-dependent-query',
-		'early-dependent-query',
-		() => value$.get(),
-		loadBody,
-		{ kind: 'stream' },
-	);
+	const body$ = __queryAt('g:early-dependent-query', () => value$.get(), loadBody, {
+		kind: 'stream',
+		key: 'early-dependent-query',
+	});
 	const ready = vi.fn();
 	const stream = await renderToReadableStream(
 		() => `<p>${value$.snapshot().status}:${body$.snapshot().status}</p>`,
@@ -353,12 +347,9 @@ it.each(['open', 'missing', 'complete'])(
 	async (delivery) => {
 		enableServerSignalBindings();
 		const load = vi.fn(async () => 'server');
-		const value$ = __queryAt(
-			`g:truncated-early-query-${delivery}`,
-			`truncated-early-query-${delivery}`,
-			() => 'a',
-			load,
-		);
+		const value$ = __queryAt(`g:truncated-early-query-${delivery}`, () => 'a', load, {
+			key: `truncated-early-query-${delivery}`,
+		});
 		const html = await text(
 			await renderToReadableStream(() => `<p>${value$.snapshot().status}</p>`, undefined, {
 				streamedSignals: { buildId: 'truncated-build', documentId: 'truncated-document' },
@@ -399,12 +390,9 @@ it('buffers prerendered query results into the same pre-module receiver', async 
 	enableServerSignalBindings();
 	const result = deferred<string>();
 	const load = vi.fn(() => result.promise);
-	const value$ = __queryAt(
-		'g:auto-prerender-query-site',
-		'authored-auto-prerender-query',
-		() => 'conversation-buffered',
-		load,
-	);
+	const value$ = __queryAt('g:auto-prerender-query-site', () => 'conversation-buffered', load, {
+		key: 'authored-auto-prerender-query',
+	});
 	function App(): string {
 		return ssrHtml(ssrBlock(`<html><body><p>${value$.get()}</p></body></html>`));
 	}
@@ -452,12 +440,12 @@ it('observes buffered transport failure while rendering is still suspended', asy
 	process.on('unhandledRejection', onUnhandled);
 	const value$ = __queryAt(
 		'g:buffered-timeout',
-		'buffered-timeout',
 		() => 'a',
 		() => {
 			started.resolve();
 			return result.promise;
 		},
+		{ key: 'buffered-timeout' },
 	);
 	try {
 		const rendering = prerender(() => `<p>${value$.get()}</p>`, undefined, {
@@ -481,12 +469,12 @@ it('cancels buffered result collection with the request rather than waiting for 
 	const started = deferred<void>();
 	const value$ = __queryAt(
 		'g:buffered-abort',
-		'buffered-abort',
 		() => 'a',
 		() => {
 			started.resolve();
 			return result.promise;
 		},
+		{ key: 'buffered-abort' },
 	);
 	const controller = new AbortController();
 	const reason = new Error('request disconnected');
@@ -509,9 +497,9 @@ it('propagates a buffered transport deadline through a permanently suspended ren
 	enableServerSignalBindings();
 	const value$ = __queryAt(
 		'g:buffered-never',
-		'buffered-never',
 		() => 'a',
 		() => new Promise<string>(() => {}),
+		{ key: 'buffered-never' },
 	);
 	await expect(
 		prerender(() => `<p>${value$.get()}</p>`, undefined, {
@@ -548,9 +536,9 @@ it('settles an automatic deadline and releases all observations when external cl
 	enableServerSignalBindings();
 	const value$ = __queryAt(
 		'g:buffered-cleanup',
-		'buffered-cleanup',
 		() => 'a',
 		() => new Promise<string>(() => {}),
+		{ key: 'buffered-cleanup' },
 	);
 	const unsubscribe = vi.fn(() => {
 		throw new Error('unsubscribe failed');
@@ -581,12 +569,9 @@ it('announces a query first discovered after the readable shell', async () => {
 	const reveal = deferred<string>();
 	const result = deferred<string>();
 	const load = vi.fn(() => result.promise);
-	const value$ = __queryAt(
-		'g:auto-late-query-site',
-		'authored-auto-late-query',
-		() => 'conversation-late',
-		load,
-	);
+	const value$ = __queryAt('g:auto-late-query-site', () => 'conversation-late', load, {
+		key: 'authored-auto-late-query',
+	});
 	function App(props: { reveal: Promise<string> }, scope: SSRScope): string {
 		return ssrHtml(
 			ssrTry(
@@ -639,12 +624,9 @@ it('publishes automatic query results through the pipeable transport', async () 
 	enableServerSignalBindings();
 	const result = deferred<string>();
 	const load = vi.fn(() => result.promise);
-	const value$ = __queryAt(
-		'g:auto-pipe-query-site',
-		'authored-auto-pipe-query',
-		() => 'conversation-pipe',
-		load,
-	);
+	const value$ = __queryAt('g:auto-pipe-query-site', () => 'conversation-pipe', load, {
+		key: 'authored-auto-pipe-query',
+	});
 	function App(): string {
 		return `<p>${value$.snapshot().status}</p>`;
 	}

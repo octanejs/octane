@@ -37,8 +37,17 @@ test('entry fixtures retain precisely the named public functions', () => {
 		entrySource(scenario('engine')),
 		'export { createScope, query } from "octane/signals";\n',
 	);
-	assert.equal(BUNDLE_CASES.filter((entry) => entry.baseline).length, 4);
-	for (const id of ['binding-scalar', 'binding-structural']) {
+	assert.equal(BUNDLE_CASES.filter((entry) => entry.baseline).length, 10);
+	for (const id of [
+		'binding-scalar',
+		'binding-structural',
+		'engine',
+		'native-client',
+		'native-server',
+		'compiled-plain-signals',
+		'streamed-signals-bootstrap',
+		'streamed-signal-results-bootstrap',
+	]) {
 		assert.equal(scenario(id).baseline, 'if-exported');
 		assert.equal(
 			baselineUnavailableReason(scenario(id), { '.': './src/index.ts' }),
@@ -108,13 +117,25 @@ for (const id of ['ordinary-client', 'ordinary-server']) {
 			/missing emitted-byte evidence/,
 		);
 		// The event/read protocol and the server's empty seed-map seam are not
-		// the optional driver factory; their costs remain visible in the report.
+		// the optional driver factory. A mount-only client must not pull in hydration.
 		verifyBundleInputs(scenario(id), [
 			...ordinary,
 			{ ...source('signals/read-protocol.ts'), bytesInOutput: 1 },
 			{ ...source('signals/native-read-events.ts'), bytesInOutput: 1 },
-			{ ...source('signals/native-read-seeds.ts'), bytesInOutput: 36 },
+			{
+				...source('signals/native-read-seeds.ts'),
+				bytesInOutput: id === 'ordinary-client' ? 0 : 36,
+			},
 		]);
+		if (id === 'ordinary-client')
+			assert.throws(
+				() =>
+					verifyBundleInputs(scenario(id), [
+						...ordinary,
+						{ ...source('signals/native-read-seeds.ts'), bytesInOutput: 1 },
+					]),
+				/mount-only root retained seed hydration/,
+			);
 	});
 }
 
@@ -238,6 +259,10 @@ test('scalar declarations select the bounded implementation only with a static p
 		['() => { "use strong"; return value(); }', '', false],
 		['(context = undefined) => 1', '', false],
 		['() => value()', ', {sync: true}', true],
+		['() => value()', ', {key: "value", sync: true}', true],
+		['() => 1', ', {key: "value"}', true],
+		['async () => 1', ', {key: "value"}', false],
+		['() => 1', ', {get key() { return "value"; }}', false],
 		['() => 1', ', options', false],
 		['() => 1', ', {get sync() { return true; }}', false],
 		['({signal}) => 1', ', {sync: true}', false],

@@ -26,9 +26,9 @@ function emittedBootstrap(): Promise<string> {
 		enableServerSignalBindings();
 		const query$ = __queryAt(
 			'g:early-intent-bootstrap',
-			'early-intent-bootstrap',
 			() => 'key',
 			async () => 'ready',
+			{ key: 'early-intent-bootstrap' },
 		);
 		const stream = await renderToReadableStream(
 			() => {
@@ -409,9 +409,9 @@ export function App() @{
 		enableServerSignalBindings();
 		const query$ = __queryAt(
 			'g:signal-only-bootstrap',
-			'signal-only-bootstrap',
 			() => 'key',
 			async () => 'ready',
+			{ key: 'signal-only-bootstrap' },
 		);
 		const stream = await renderToReadableStream(
 			() => {

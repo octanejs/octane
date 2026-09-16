@@ -129,8 +129,10 @@ renderer or application-wide gains.
 public exports, without source overlays or compiler specialization. Prepare the
 same baseline archive topology described under public-entry bundle comparison.
 Every consumed baseline source must match its Git blob. Both variants use the
-same authored `signal$('g:…', value)` / `signal$('i:…', value)` declarations,
-production esbuild options, and explicitly pinned dependency versions.
+same compiler-owned `__signalAt('g:…', value)` / `__signalAt('i:…', value)` declarations,
+production esbuild options, and explicitly pinned dependency versions. This fixed
+site entry preserves the same owner-read workload across the authored `{ key }`
+API migration; it does not benchmark declaration syntax or compiler cost.
 
 ```bash
 BENCH_JSON=/private/tmp/owner-reads-prepare-01.json node benchmarks/scoped-signals/run-owner-reads.mjs \
@@ -234,10 +236,12 @@ A separate case retains the automatic streamed-signal bootstrap and document
 lifecycle exports. Both must remain renderer-free. These are entry/compiled-state
 costs, not compiled `.tsrx` applications or incremental hook costs in an app.
 
-Scalar and structural DOM-binding entries are compared when the archived package
-exports them. Older, pre-RFC baselines report those comparisons as `unavailable`
-with a reason and no numeric delta; ordinary client/server comparisons remain
-mandatory. Optional control and whole-style leaves are measured separately and
+Signal engine, native hook, compiled state, stream bootstrap, and scalar/structural
+DOM-binding entries are compared when the archived package exports them. Older,
+pre-RFC baselines report absent entries as `unavailable` with a reason and no numeric
+delta; ordinary client/server comparisons remain mandatory. This measures the
+entire retained change from the selected commit, not only the latest edits to an
+unpublished prototype. Optional control and whole-style leaves are measured separately and
 together with the scalar runner. Use the combined closure for their shared cost:
 independently compressed gzip/Brotli byte counts must not be added together.
 

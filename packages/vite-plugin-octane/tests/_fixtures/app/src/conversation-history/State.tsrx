@@ -10,7 +10,6 @@ export interface HistoryModel extends ConversationPage {
 }
 
 export const history$ = signal$(
-	'fetched-history',
 	{
 		conversationId: 'A',
 		revision: 0,
@@ -20,6 +19,7 @@ export const history$ = signal$(
 		source: 'fresh',
 		receipt: null,
 	} as HistoryModel,
+	{ key: 'fetched-history' },
 );
 export const selected$ = signal$('A');
 export const draftA$ = signal$('');

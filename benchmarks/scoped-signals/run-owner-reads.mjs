@@ -116,12 +116,12 @@ assert.deepEqual(
 const { build } = requireTool('esbuild');
 const entry = `
 import assert from 'node:assert/strict';
-import {signal$,runWithSignalOwner,currentSignalOwner,retireSignalOwnerIdentity,installSignalOwnerEnvironment} from 'octane/signals';
+import {__signalAt,runWithSignalOwner,currentSignalOwner,retireSignalOwnerIdentity,installSignalOwnerEnvironment} from 'octane/signals';
 export function setup() {
   const documentOwner={scopeKey:'reads:document'};
   const one={scopeKey:'reads:one',documentOwner,instanceOwner:{},instanceKey:'one'};
   const two={scopeKey:'reads:two',documentOwner,instanceOwner:{},instanceKey:'two'};
-  const global$=signal$('g:reads',7),local$=signal$('i:reads',3);
+  const global$=__signalAt('g:reads',7),local$=__signalAt('i:reads',3);
   runWithSignalOwner(one,()=>{global$.get();local$.get()});
   runWithSignalOwner(two,()=>local$.set(4));
   return {documentOwner,one,two,global$,local$};

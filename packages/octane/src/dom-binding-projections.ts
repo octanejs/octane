@@ -1,10 +1,11 @@
 import { __normalizeBinding, type BindingOperation, type BindingValue } from './dom-bindings.js';
-import { __createBindingStyles } from './dom-binding-styles.js';
-import type { BindingSignalConnection } from './dom-binding-signals.js';
+import { __createBindingStyles, __prepareBindingSources } from './dom-binding-styles.js';
+import type { BindingPreparedValue, BindingSignalConnection } from './dom-binding-signals.js';
 import { captureSignalOwner, currentSignalOwner } from './signals/owner-context.js';
 import {
 	beginNativeWriteGuard,
 	endNativeWriteGuard,
+	forwardNativeTransitionConsumer,
 	setNativeReadObserver,
 	type NativeReadSource,
 } from './signals/read-protocol.js';
@@ -15,6 +16,7 @@ export interface BindingProjectionConnection {
 	readonly group: BindingProjectionGroup;
 	read(compute: unknown): BindingValue[];
 	get(): BindingValue[];
+	preview(compute: unknown): BindingPreparedValue<BindingValue[]>;
 	writeStyle(index: number, value: BindingValue): void;
 	dispose(preservePresentation?: boolean): void;
 }
@@ -77,9 +79,11 @@ export function __createBindingProjections() {
 					if (!subscriptions.has(source)) {
 						let active = true;
 						const stop = run(() =>
-							source.subscribe(() => {
-								if (active && !disposed) notify();
-							}),
+							source.subscribe(
+								forwardNativeTransitionConsumer(notify, () => {
+									if (active && !disposed) notify();
+								}),
+							),
 						);
 						if (typeof stop !== 'function')
 							throw new TypeError('A DOM projection subscription must return cleanup.');
@@ -97,6 +101,72 @@ export function __createBindingProjections() {
 			return {
 				group,
 				get,
+				preview(next): BindingPreparedValue<BindingValue[]> {
+					if (typeof next !== 'function')
+						throw new TypeError('A DOM binding projection group requires a computation.');
+					const reads = new Map<NativeReadSource, number>();
+					const preparedStyles: BindingPreparedValue[] = [];
+					const createdStyles = new Map<number, BindingSignalConnection>();
+					const values: BindingValue[] = [];
+					const previousObserver = setNativeReadObserver((source, version) => {
+						if (!reads.has(source)) reads.set(source, version);
+						previousObserver?.(source, version);
+					});
+					const guard = beginNativeWriteGuard();
+					try {
+						run(() => {
+							const result = next();
+							for (const [index, field] of group) {
+								const binding = bindings[index]!;
+								const value = result?.[field];
+								if (binding[1] === 'styleObject') {
+									let style = styleConnections.get(index);
+									if (!style) {
+										style = styles.connect(nodes[binding[0]] as Element, notify, restoreStyles);
+										createdStyles.set(index, style);
+									}
+									const prepared = style.preview(value);
+									preparedStyles.push(prepared);
+									values[index] = prepared.value as BindingValue;
+								} else values[index] = __normalizeBinding(binding, value);
+							}
+						});
+					} catch (error) {
+						for (const prepared of preparedStyles) prepared.discard();
+						for (const style of createdStyles.values()) style.dispose(true);
+						throw error;
+					} finally {
+						endNativeWriteGuard(guard);
+						setNativeReadObserver(previousObserver);
+					}
+					let prepared;
+					try {
+						prepared = __prepareBindingSources(reads, subscriptions, notify, () => !disposed, run);
+					} catch (error) {
+						for (const style of preparedStyles) style.discard();
+						for (const style of createdStyles.values()) style.dispose(true);
+						throw error;
+					}
+					let accepted = false;
+					return {
+						value: values,
+						validate: () =>
+							prepared.validate() && preparedStyles.every((style) => style.validate()),
+						commit() {
+							accepted = true;
+							compute = next as typeof compute;
+							for (const [index, style] of createdStyles) styleConnections.set(index, style);
+							for (const style of preparedStyles) style.commit();
+							prepared.commit();
+						},
+						discard() {
+							if (accepted) return;
+							prepared.discard();
+							for (const style of preparedStyles) style.discard();
+							for (const style of createdStyles.values()) style.dispose(true);
+						},
+					};
+				},
 				read(next) {
 					if (typeof next !== 'function')
 						throw new TypeError('A DOM binding projection group requires a computation.');

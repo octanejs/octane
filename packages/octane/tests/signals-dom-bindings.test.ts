@@ -115,7 +115,8 @@ describe('signal-valued DOM styles', () => {
 				);
 				expect(hosts.map((host) => host.style.left)).toEqual(['0px', '10px']);
 				await act(() => left$.set(2));
-				expect(hosts.map((host) => host.style.left)).toEqual(['0px', '10px']);
+				expect(hosts.map((host) => host.style.left)).toEqual(['2px', '10px']);
+				expect(key$.get()).toBe('first');
 				await act(() => resolve(20));
 				const current = rendered.findAll('section > div');
 				expect(current).toHaveLength(2);

@@ -1,14 +1,40 @@
 import {
 	createResource,
 	createScope,
+	derived$,
 	optimistic$,
 	query,
+	query$,
+	signal$,
 	skip,
 	type Resource,
 } from 'octane/signals';
 
 const scope = createScope({ scopeKey: 'resource-types' });
 const selected$ = scope.signal$('selected', 1);
+const draft$ = signal$('', { key: 'draft' });
+const draft: string = draft$.get();
+const length$ = derived$(() => draft$.get().length, { key: 'length', sync: true });
+const length: number = length$.get();
+const keyedUser$ = query$(
+	() => selected$.get(),
+	async (id) => ({ id }),
+	{
+		key: 'selected-user',
+		kind: 'promise',
+	},
+);
+const keyedUserId: number = keyedUser$.get().id;
+// @ts-expect-error — keys belong to the trailing options, not the initial-value position.
+signal$('draft', '');
+// @ts-expect-error — a derived declaration starts with its computation.
+derived$('length', () => draft$.get().length);
+query$(
+	// @ts-expect-error — a query declaration starts with its selector and loader.
+	'user',
+	() => selected$.get(),
+	async (id: number) => ({ id }),
+);
 const userQuery = query('user', async (id: number) => ({ id, name: `User ${id}` }));
 
 const user$ = createResource(scope, 'user', () => userQuery(selected$.get()));

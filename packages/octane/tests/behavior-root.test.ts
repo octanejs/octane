@@ -1923,7 +1923,8 @@ export function TreeHydration(props) @{
 				structuralBinding.dispose();
 			}
 		}
-	});
+		// This dev/prod matrix compiles and exercises hundreds of fresh fixtures.
+	}, 15_000);
 
 	it('preserves externally owned DOM when disposed by default', async () => {
 		container.innerHTML = '<section data-owner="stream"><button>Action</button></section>';

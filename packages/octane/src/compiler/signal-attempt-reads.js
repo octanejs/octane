@@ -428,12 +428,7 @@ export function lowerSignalAttemptReads(ast) {
 			const bindingName = named ?? namespace;
 			const scope = lexical.nodeScopes.get(callee) ?? lexical.rootScope;
 			const binding = bindingName === null ? undefined : lexical.resolveBinding(scope, bindingName);
-			const callbackIndex =
-				node.arguments?.[0]?.type === 'ArrowFunctionExpression' ||
-				node.arguments?.[0]?.type === 'FunctionExpression'
-					? 0
-					: 1;
-			const callback = node.arguments?.[callbackIndex];
+			const callback = node.arguments?.[0];
 			if (
 				source !== undefined &&
 				binding?.scope === lexical.rootScope &&
@@ -458,7 +453,7 @@ export function lowerSignalAttemptReads(ast) {
 						return {
 							...node,
 							arguments: node.arguments.map((argument, index) =>
-								index === callbackIndex ? transformed : visit(argument),
+								index === 0 ? transformed : visit(argument),
 							),
 						};
 					}

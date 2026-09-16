@@ -14,7 +14,7 @@ describe('attempt-bound signal reads', () => {
 			`
 			import { signal$, derived$ } from 'octane/signals';
 			export const count$ = signal$(7);
-			export const result$ = derived$('expression', async () => (await Promise.resolve(), count$.get()));
+			export const result$ = derived$(async () => (await Promise.resolve(), count$.get()), { key: 'expression' });
 		`,
 			{
 				id: '/src/expression-attempt.tsrx',
@@ -44,13 +44,13 @@ describe('attempt-bound signal reads', () => {
 
 	for (const hmr of [false, true]) {
 		it.each([
-			['keyed', "'answer', async () => { await Promise.resolve();"],
-			['conditional statement', 'async () => { if (true) await Promise.resolve();'],
-			['conditional expression', 'async () => { true ? await Promise.resolve() : null;'],
-			['untaken await', 'async () => { if (false) await Promise.resolve();'],
+			['keyed', 'async () => { await Promise.resolve();', ", {key: 'answer'}"],
+			['conditional statement', 'async () => { if (true) await Promise.resolve();', ''],
+			['conditional expression', 'async () => { true ? await Promise.resolve() : null;', ''],
+			['untaken await', 'async () => { if (false) await Promise.resolve();', ''],
 		])(
 			`keeps %s reads owned and invalidates stale attempts (hmr=${hmr})`,
-			async (_name, callback) => {
+			async (_name, callback, options) => {
 				const gate = deferred<void>();
 				const fixture = loadCompiledFixtureSource(
 					`
@@ -59,7 +59,7 @@ describe('attempt-bound signal reads', () => {
 				export const count$ = signal$(1);
 				export const result$ = derived$(${callback}
 					const value = count$.get(); await gate; return value;
-				});
+				}${options});
 			`,
 					{
 						id: '/src/attempt-owner.tsrx',

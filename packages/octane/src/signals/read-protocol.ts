@@ -1,4 +1,64 @@
 import type { AdoptionFrame, ConnectionState, ScopeSeed, SignalHandle } from './types.js';
+import type { SignalCandidateFrame } from './transition-candidate.js';
+import type { ScopedNode } from './graph.js';
+
+/** Explicit async reads own an observer edge instead of a synchronous graph edge. */
+export const SIGNAL_DEPENDENT_NODE: unique symbol = Symbol('octane.signalDependent');
+export type SignalDependencyNotify = (() => void) & { [SIGNAL_DEPENDENT_NODE]?: ScopedNode };
+
+/** Only presentation subscriptions participate; public subscribers are never replayed. */
+export const NATIVE_TRANSITION_CONSUMER: unique symbol = Symbol('octane.transitionConsumer');
+
+export interface NativeTransitionConsumer {
+	active(): boolean;
+	prepare(): void | NativeTransitionPresentation;
+}
+
+/** Prepared host work stays private until every participating presentation is ready. */
+export interface NativeTransitionPresentation {
+	validate(): boolean;
+	commit(): void;
+	discard(): void;
+}
+
+export type NativeTransitionNotify = (() => void) & {
+	[NATIVE_TRANSITION_CONSUMER]?: NativeTransitionConsumer;
+};
+
+/** Preserve presentation identity when an owner or lifetime wraps a subscription. */
+export function forwardNativeTransitionConsumer<T extends () => void>(
+	notify: NativeTransitionNotify,
+	wrapped: T,
+): T {
+	const consumer = notify[NATIVE_TRANSITION_CONSUMER];
+	if (consumer) (wrapped as NativeTransitionNotify)[NATIVE_TRANSITION_CONSUMER] = consumer;
+	return wrapped;
+}
+
+let nativeActionResolver: (() => SignalCandidateFrame | undefined) | undefined;
+let nativeCandidateResolver: (() => SignalCandidateFrame | undefined) | null | undefined;
+
+/** Lazy renderer registration survives a reentrant synchronous input scope. */
+export function registerNativeActionResolver(
+	resolver: () => SignalCandidateFrame | undefined,
+): void {
+	nativeActionResolver = resolver;
+}
+
+export function getNativeCandidate(): SignalCandidateFrame | undefined {
+	return nativeCandidateResolver === undefined
+		? nativeActionResolver?.()
+		: nativeCandidateResolver?.();
+}
+
+/** Restore before yielding; null suppresses even a newly registered Action resolver. */
+export function setNativeCandidateResolver(
+	resolver: (() => SignalCandidateFrame | undefined) | null | undefined,
+): typeof resolver {
+	const previous = nativeCandidateResolver;
+	nativeCandidateResolver = resolver;
+	return previous;
+}
 
 /** Detached DevTools metadata. Reading it must never evaluate or expose a value. */
 export interface NativeReadInspection {
@@ -37,6 +97,78 @@ export interface NativeReadSource {
 	serialize?(observedVersion: number): readonly NativeSerializedScope[] | undefined;
 	/** On-demand metadata for a currently referenced source, with no global graph registry. */
 	inspect?(): NativeReadInspection;
+}
+
+/**
+ * A candidate-only source keeps existing consumer and memo witnesses alive when
+ * its graph is released. Acceptance is restricted to graph-native sources whose
+ * revisions are monotonic and whose subscription operations run no user code.
+ * The caller installs canonical state before accepting, and accepts all sources
+ * before releasing the candidate graph or invoking public callbacks.
+ */
+export function createNativeReadCandidateSource(candidate: NativeReadSource) {
+	let target: NativeReadSource | undefined = candidate;
+	let accepted = false;
+	let acceptedVersion = NaN;
+	let canonicalVersion = NaN;
+	const subscriptions = new Set<{ notify: () => void; dispose: () => void }>();
+	const source: NativeReadSource = {
+		getVersion: () =>
+			target === undefined
+				? NaN
+				: !accepted
+					? target.getVersion()
+					: target.getVersion() === canonicalVersion
+						? acceptedVersion
+						: NaN,
+		subscribe(notify) {
+			if (target === undefined) throw new TypeError('The native read candidate has retired.');
+			const subscription = { notify, dispose: target.subscribe(notify) };
+			subscriptions.add(subscription);
+			return () => {
+				if (subscriptions.delete(subscription)) subscription.dispose();
+			};
+		},
+		serialize(version) {
+			return source.getVersion() === version
+				? target?.serialize?.(accepted ? canonicalVersion : version)
+				: undefined;
+		},
+	};
+	if (candidate.inspect) source.inspect = () => target!.inspect!();
+	return {
+		source,
+		accept(canonical: NativeReadSource, observedVersion: number): boolean {
+			if (accepted || target === undefined || target.getVersion() !== observedVersion) return false;
+			const version = canonical.getVersion();
+			const acquired = new Map<{ notify: () => void; dispose: () => void }, () => void>();
+			try {
+				for (const subscription of subscriptions)
+					acquired.set(subscription, canonical.subscribe(subscription.notify));
+			} catch (error) {
+				for (const dispose of acquired.values()) dispose();
+				throw error;
+			}
+			// Every canonical lease precedes any candidate lease release.
+			acceptedVersion = observedVersion;
+			canonicalVersion = version;
+			target = canonical;
+			accepted = true;
+			if (!canonical.inspect) delete source.inspect;
+			for (const [subscription, dispose] of acquired) {
+				subscription.dispose();
+				subscription.dispose = dispose;
+			}
+			return true;
+		},
+		discard(): void {
+			if (accepted || target === undefined) return;
+			target = undefined;
+			delete source.inspect;
+			for (const subscription of subscriptions) subscription.dispose();
+			subscriptions.clear();
+		},
+	};
 }
 
 export type NativeReadObserver = (source: NativeReadSource, version: number) => void;

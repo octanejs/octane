@@ -1,5 +1,6 @@
 import { createDerivedCellWith, type DerivedBindingLifecycle, type ScopeImpl } from './engine.js';
 import {
+	CandidateUnsupportedError,
 	derivedValueState,
 	errorState,
 	invalidateNode,
@@ -27,11 +28,11 @@ class ScalarBinding<T> implements DerivedBindingLifecycle {
 		compute: DerivedCompute<T>,
 	) {
 		this.compute = compute;
-		node.compute = () => {
+		node.compute = (target) => {
 			if (owner.readBarrier !== undefined) {
 				this.frozen = true;
-				return node.state?.snapshot.status === 'ready'
-					? node.state
+				return target.state?.snapshot.status === 'ready'
+					? target.state
 					: pendingState(owner.readBarrier);
 			}
 			let result: T;
@@ -44,8 +45,15 @@ class ScalarBinding<T> implements DerivedBindingLifecycle {
 				return errorState(error);
 			}
 			// sync:true retains its existing thenable-as-value assertion semantics.
-			return derivedValueState(node, result);
+			return derivedValueState(target, result);
 		};
+	}
+
+	forkCandidate(target: ScopedNode): undefined {
+		if (this.frozen || this.owner.readBarrier || !this.compute) {
+			throw new CandidateUnsupportedError('Frozen scalar candidates are not supported.');
+		}
+		target.compute = this.node.compute;
 	}
 
 	suspend(): boolean {
