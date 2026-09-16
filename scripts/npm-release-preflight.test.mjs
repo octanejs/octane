@@ -52,6 +52,48 @@ describe('npm release preflight', () => {
 		assert.deepEqual(releaseStateErrors(state), []);
 	});
 
+	for (const name of ['octane', '@octanejs/base-ui']) {
+		test(`recognizes ${name} when the package index lags behind the exact version`, async () => {
+			const pkg = { name, version: '0.2.12' };
+			const state = await inspectNpmReleaseState([pkg], {
+				fetchImpl: registryFixture({
+					[name]: metadata('0.2.11', ['0.2.11']),
+					[`${name}/0.2.12`]: pkg,
+				}),
+			});
+			assert.deepEqual(
+				state.published.map(({ name, version }) => ({ name, version })),
+				[pkg],
+			);
+			assert.deepEqual(state.pending, []);
+			assert.deepEqual(releaseStateErrors(state), []);
+		});
+	}
+
+	for (const response of [
+		{ ok: false, status: 503 },
+		{
+			ok: true,
+			status: 200,
+			json: async () => {
+				throw new Error('invalid JSON');
+			},
+		},
+		{ ok: true, status: 200, json: async () => ({ name: 'octane', version: '0.2.11' }) },
+	]) {
+		test(`fails closed for an unavailable or mismatched exact version (${response.status})`, async () => {
+			const state = await inspectNpmReleaseState([{ name: 'octane', version: '0.2.12' }], {
+				fetchImpl: async (url) =>
+					new URL(url).pathname.endsWith('/0.2.12')
+						? response
+						: { ok: true, status: 200, json: async () => metadata('0.2.11', ['0.2.11']) },
+			});
+			assert.deepEqual(state.pending, []);
+			assert.deepEqual(state.published, []);
+			assert.equal(releaseStateErrors(state).length, 1);
+		});
+	}
+
 	test('reconciles unpublished versions after a later successful main build', async () => {
 		const state = await inspectNpmReleaseState(
 			[
