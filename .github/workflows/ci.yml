@@ -495,8 +495,21 @@ jobs:
       # file shards before proving complete lane coverage.
       - name: Check React parity inventories and execute required lanes
         env:
+          # Retain Chromium stderr and process exit reasons when its websocket
+          # disappears; the RPC disconnect alone cannot distinguish a crash.
+          DEBUG: pw:browser
           REACT_PARITY_VITEST_REPORT: ${{ runner.temp }}/react-parity-vitest/shard-${{ matrix.shard }}.json
         run: pnpm react-parity:check --shard ${{ matrix.shard }}/4
+
+      - name: Collect browser failure resource diagnostics
+        if: ${{ failure() }}
+        run: |
+          free -m
+          df -h /tmp /dev/shm
+          if [ -r /sys/fs/cgroup/memory.events ]; then
+            cat /sys/fs/cgroup/memory.events
+          fi
+          sudo -n dmesg --ctime | tail -100 || true
 
       - name: Upload failed React parity diagnostics
         if: ${{ failure() }}
