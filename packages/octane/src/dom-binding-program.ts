@@ -624,15 +624,29 @@ function rangeAt(node: Node | null, end: Node | null): BindingRange {
 }
 
 function rootRange(root: Element | BindingRange, id: string): BindingRange {
-	let range: BindingRange;
 	if ((root as Node).nodeType === 1) {
-		const element = root as Element;
-		range = rangeAt(element.previousSibling, null);
-		if (range.start.nextSibling !== element || element.nextSibling !== range.end) mismatch();
-	} else {
-		range = root as BindingRange;
-		if (range?.start?.nodeType !== 8 || range?.end?.nodeType !== 8) mismatch();
+		let start: Node = root as Element;
+		let end: Node = start;
+		let match: BindingRange | undefined;
+		// A composite may return only another view. Cross its adjacent wrappers,
+		// never siblings, DOM parents, or conditional/slot/list ownership boundaries.
+		while (start.previousSibling?.nodeType === 8) {
+			const open = start.previousSibling as Comment;
+			const marker = parseBindingMarker(open.data);
+			if (marker?.kind !== 'root' && marker?.kind !== 'view') break;
+			const close = rendererRangeClose(open);
+			if (close === null || close.previousSibling !== end) break;
+			if (marker.kind === 'root' && marker.id === id) {
+				if (match !== undefined) mismatch();
+				match = { start: open, end: close };
+			}
+			start = open;
+			end = close;
+		}
+		return match ?? mismatch();
 	}
+	const range = root as BindingRange;
+	if (range?.start?.nodeType !== 8 || range?.end?.nodeType !== 8) mismatch();
 	const marker = parseBindingMarker(range.start.data);
 	if (marker?.kind !== 'root' || marker.id !== id || rendererRangeClose(range.start) !== range.end)
 		mismatch();

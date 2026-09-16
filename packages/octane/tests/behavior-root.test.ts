@@ -4116,10 +4116,6 @@ function Contents(props) @{
 export function NativeRest({ label, showLabel, children, ...rest }) @{ 'use dom bindings';
  <button type="button" title={label} {...rest}><Contents label={label} showLabel={showLabel}>{children}</Contents></button>
 }`;
-			const nestedParent = `import { NativeRest } from './nested-rest.tsrx';
-export function NestedParent(props) @{ 'use dom bindings';
- <section><NativeRest label={props.label} showLabel={props.showLabel} onClick={props.onAction} ref={props.onReady} /></section>
-}`;
 			const nestedQuery = `?octane-bindings=NativeRest&octane-mount=1&octane-props=${encodeURIComponent(JSON.stringify([1, ['label', 'showLabel', 'onClick', 'ref']]))}`;
 			const nestedOptions = { compileOptions: { dev, hmr: false } };
 			const nestedServer = loadCompiledFixtureSource(nestedSource, {
@@ -4136,75 +4132,172 @@ export function NestedParent(props) @{ 'use dom bindings';
 					'octane/dom-binding-signals': DomBindingSignals,
 				},
 			});
-			const nestedClient = loadCompiledFixtureSource(nestedParent, {
-				...nestedOptions,
-				id: '/src/dom-presentation.tsrx',
-				mode: 'client',
-				runtimeModules: {
-					'./nested-rest.tsrx': loadCompiledFixtureSource(nestedSource, {
-						...nestedOptions,
-						id: '/src/nested-rest.tsrx',
-						mode: 'client',
-					}),
-				},
-			});
-			for (const showLabel of [true, false]) {
-				const onAction = vi.fn();
-				const onReady = vi.fn();
-				const nested = authoredPresentation(
-					'NestedParent',
-					{
-						label: 'Server',
-						showLabel,
-						onAction,
-						onReady,
+			for (const nativeRoot of [true, false]) {
+				const nestedParent = `import { NativeRest } from './nested-rest.tsrx';
+export function NestedParent(props) @{ 'use dom bindings';
+ ${nativeRoot ? '<section>' : ''}<NativeRest label={props.label} showLabel={props.showLabel} onClick={props.onAction} ref={props.onReady} />${nativeRoot ? '</section>' : ''}
+}`;
+				const nestedClient = loadCompiledFixtureSource(nestedParent, {
+					...nestedOptions,
+					id: '/src/dom-presentation.tsrx',
+					mode: 'client',
+					runtimeModules: {
+						'./nested-rest.tsrx': loadCompiledFixtureSource(nestedSource, {
+							...nestedOptions,
+							id: '/src/nested-rest.tsrx',
+							mode: 'client',
+						}),
 					},
-					dev,
-					nestedParent,
-					{
-						'./nested-rest.tsrx': nestedServer,
-						['./nested-rest.tsrx' + nestedQuery]: nestedArtifact,
-					},
-				);
-				const host = document.createElement('div');
-				container.append(host);
-				host.innerHTML = nested.html;
-				const button = host.querySelector('button')!;
-				const child = button.firstElementChild;
-				const binding = nested.attach(host.firstElementChild!, nested.state);
-				let hydrated: ReturnType<typeof hydrateRoot> | undefined;
-				try {
-					nested.publish({ label: 'Early' });
-					const takeOver = () =>
-						hydrateRoot(host, nestedClient.NestedParent as never, nested.state.getSnapshot(), {
-							bindingLeases: [binding],
-						});
-					if (showLabel) {
-						expect(takeOver).toThrow(/supported child view|primitive text/);
-						expect(nested.cleanup).not.toHaveBeenCalled();
-					} else {
-						hydrated = takeOver();
-						flushSync(() => {});
-						flushEffects();
-						expect(nested.cleanup).toHaveBeenCalledOnce();
+				});
+				for (const showLabel of [true, false]) {
+					const onAction = vi.fn();
+					const onReady = vi.fn();
+					const nested = authoredPresentation(
+						'NestedParent',
+						{
+							label: 'Server',
+							showLabel,
+							onAction,
+							onReady,
+						},
+						dev,
+						nestedParent,
+						{
+							'./nested-rest.tsrx': nestedServer,
+							['./nested-rest.tsrx' + nestedQuery]: nestedArtifact,
+						},
+					);
+					const host = document.createElement('div');
+					container.append(host);
+					host.innerHTML = nested.html;
+					const button = host.querySelector('button')!;
+					const child = button.firstElementChild;
+					const binding = nested.attach(host.firstElementChild!, nested.state);
+					let hydrated: ReturnType<typeof hydrateRoot> | undefined;
+					try {
+						nested.publish({ label: 'Early' });
+						const takeOver = () =>
+							hydrateRoot(host, nestedClient.NestedParent as never, nested.state.getSnapshot(), {
+								bindingLeases: [binding],
+							});
+						if (showLabel) {
+							expect(takeOver).toThrow(/supported child view|primitive text/);
+							expect(nested.cleanup).not.toHaveBeenCalled();
+						} else {
+							hydrated = takeOver();
+							flushSync(() => {});
+							flushEffects();
+							expect(nested.cleanup).toHaveBeenCalledOnce();
+						}
+						expect(host.querySelector('button')).toBe(button);
+						expect(button.firstElementChild).toBe(child);
+						expect(button.title).toBe('Early');
+						expect(button.textContent).toBe(showLabel ? 'IconEarly' : 'Icon');
+						expect(onReady.mock.calls).toEqual(
+							showLabel ? [[button]] : [[button], [null], [button]],
+						);
+						button.click();
+						expect(onAction).toHaveBeenCalledOnce();
+					} finally {
+						hydrated?.unmount();
+						binding.dispose();
 					}
-					expect(host.querySelector('button')).toBe(button);
-					expect(button.firstElementChild).toBe(child);
-					expect(button.title).toBe('Early');
-					expect(button.textContent).toBe(showLabel ? 'IconEarly' : 'Icon');
-					expect(onReady.mock.calls).toEqual(showLabel ? [[button]] : [[button], [null], [button]]);
+					expect(nested.cleanup).toHaveBeenCalledOnce();
+					expect(onReady.mock.calls).toEqual(
+						showLabel ? [[button], [null]] : [[button], [null], [button], [null]],
+					);
 					button.click();
 					expect(onAction).toHaveBeenCalledOnce();
-				} finally {
-					hydrated?.unmount();
-					binding.dispose();
 				}
-				expect(nested.cleanup).toHaveBeenCalledOnce();
-				expect(onReady.mock.calls).toEqual(
-					showLabel ? [[button], [null]] : [[button], [null], [button], [null]],
-				);
-				button.click();
-				expect(onAction).toHaveBeenCalledOnce();
+				if (!nativeRoot) {
+					for (const mode of [
+						'element',
+						'range',
+						'missing-close',
+						'duplicate',
+						'sibling-before',
+						'sibling-after',
+						'mismatched',
+					]) {
+						const onAction = vi.fn();
+						const onReady = vi.fn();
+						const nested = authoredPresentation(
+							'NestedParent',
+							{
+								label: 'Server',
+								showLabel: false,
+								onAction,
+								onReady,
+							},
+							dev,
+							nestedParent,
+							{
+								'./nested-rest.tsrx': nestedServer,
+								['./nested-rest.tsrx' + nestedQuery]: nestedArtifact,
+							},
+						);
+						const host = document.createElement('div');
+						container.append(host);
+						host.innerHTML = nested.html;
+						const button = host.querySelector('button')!;
+						const child = button.firstElementChild;
+						const range = { start: host.firstChild as Comment, end: host.lastChild as Comment };
+						if (mode === 'missing-close') range.end.remove();
+						else if (mode === 'duplicate') {
+							host.prepend(range.start.cloneNode());
+							host.append(range.end.cloneNode());
+						} else if (mode === 'sibling-before')
+							range.start.after(document.createTextNode('outside'));
+						else if (mode === 'sibling-after') range.end.before(document.createElement('span'));
+						else if (mode === 'mismatched')
+							range.start.replaceWith(button.previousSibling!.cloneNode());
+						if (mode !== 'element' && mode !== 'range') {
+							const before = host.innerHTML;
+							expect(() => nested.attach(button, nested.state)).toThrow(
+								/mismatched compiler-owned/,
+							);
+							nested.publish({ label: 'Rejected' });
+							button.click();
+							expect(onAction).not.toHaveBeenCalled();
+							expect(onReady).not.toHaveBeenCalled();
+							expect(nested.cleanup).not.toHaveBeenCalled();
+							expect(host.innerHTML).toBe(before);
+							continue;
+						}
+						// Neighbors outside the selected view are not part of its ownership.
+						const sibling = document.createElement('button');
+						sibling.textContent = 'Sibling';
+						host.append(sibling);
+						const controller = new AbortController();
+						const binding = nested.attach(mode === 'range' ? range : button, nested.state, {
+							signal: controller.signal,
+						});
+						nested.publish({ label: 'Early' });
+						button.click();
+						expect(onAction).toHaveBeenCalledOnce();
+						expect(button.title).toBe('Early');
+						controller.abort();
+						binding.dispose();
+						nested.publish({ label: 'After abort' });
+						button.click();
+						expect(button.title).toBe('Early');
+						expect(onAction).toHaveBeenCalledOnce();
+						expect(onReady.mock.calls).toEqual([[button], [null]]);
+						expect(nested.cleanup).toHaveBeenCalledOnce();
+						const again = nested.attach(button, nested.state);
+						expect(button.title).toBe('After abort');
+						expect(host.querySelector('button')).toBe(button);
+						expect(button.firstElementChild).toBe(child);
+						button.click();
+						expect(onAction).toHaveBeenCalledTimes(2);
+						again.dispose();
+						again.dispose();
+						expect(nested.cleanup).toHaveBeenCalledTimes(2);
+						expect(onReady.mock.calls).toEqual([[button], [null], [button], [null]]);
+						expect(sibling.textContent).toBe('Sibling');
+						expect(sibling.parentNode).toBe(host);
+					}
+				}
 			}
 			const refA = { current: null as HTMLInputElement | null };
 			for (const reversed of [false, true]) {

@@ -491,6 +491,8 @@ Binding views may use flat destructured props, including aliases, primitive lite
 
 For a child binding view called with explicit props, the compiler can specialize a native spread of that child's destructured rest parameter to the caller's known prop names. Authors keep normal component imports and JSX; the ordered prop-shape request is compiler-owned. This does not permit arbitrary object spreads, aliases of rest, conflicting native writers, or unsupported property channels. A generic `adoptBindings` call on a rest-spreading component without a proven caller shape still fails clearly. Normal SSR keeps the authored spread and shares its structural and class-group annotation allocation with the extracted view; it does not acquire the extracted artifact's narrower prop API.
 
+When an eligible view returns only another view, `adoptBindings(element, View, source)` can resolve its enclosing compiler-owned range from the existing native element. Resolution follows only adjacent, single-content view/root wrappers and requires one exact `View` match; it does not search DOM ancestors, skip siblings, or cross conditional, slot, or list boundaries. Views with multiple root nodes still require an explicit range. Adopt the enclosing view whose explicit child props establish a closed spread shape, not the generic rest-spreading child itself.
+
 Pass the exact element emitted by the matching server build. Adoption validates
 template compatibility, native topology, and conflicting binding ownership
 before modifying it. Only declared dynamic properties and structural regions
