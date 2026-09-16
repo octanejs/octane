@@ -833,7 +833,7 @@ declare module '@fixture/object-intrinsics/jsx-runtime' {
 		}
 	});
 
-	it('type-checks native attributes without weakening ordinary function and component props', () => {
+	it('type-checks StyleX attributes and the consumer-selected compiler', () => {
 		const stylexRoot = mkdtempSync(join(tmpdir(), 'octane-volar-stylex-types-'));
 		try {
 			mkdirSync(join(stylexRoot, 'node_modules/@octanejs'), { recursive: true });
@@ -949,6 +949,7 @@ export function Invalid() @{
 			).toThrow(/\.get\(\)/);
 			// Exercise the consumer-selected provider, not just a manually compiled TSX file.
 			writeFileSync(join(stylexRoot, 'Panel.tsrx'), valid);
+			writeFileSync(join(stylexRoot, 'Invalid.tsrx'), invalid);
 			writeFileSync(join(stylexRoot, 'package.json'), JSON.stringify({ type: 'module' }));
 			writeFileSync(
 				join(stylexRoot, 'config.mts'),
@@ -977,7 +978,7 @@ const invalid: number = knownAttributeSpreads[0].fields[0];
 						types: [],
 					},
 					tsrx: { compiler: '@octanejs/stylex/compiler' },
-					include: ['Panel.tsrx', 'config.mts'],
+					include: ['Panel.tsrx', 'Invalid.tsrx', 'config.mts'],
 				}),
 			);
 			const checkConsumer = () => {
@@ -1001,22 +1002,32 @@ const invalid: number = knownAttributeSpreads[0].fields[0];
 					throw new Error(String((error as { stdout?: string }).stdout ?? error));
 				}
 			};
-			expect(checkConsumer).not.toThrow();
-			writeFileSync(join(stylexRoot, 'Panel.tsrx'), invalid);
 			let consumerDiagnostics = '';
 			try {
 				checkConsumer();
 			} catch (error) {
 				consumerDiagnostics = String((error as { stdout?: string }).stdout ?? error);
 			}
+			// One compiler invocation checks both fixtures and the provider's public
+			// types. Every error must belong to the deliberately invalid fixture.
+			const errorLines = consumerDiagnostics
+				.split('\n')
+				.filter((line) => line.includes('error TS'));
+			expect(errorLines.map((line) => Number(/error TS(\d+):/.exec(line)?.[1]))).toEqual([
+				2345, 2345, 2345, 2322, 2322, 2322, 2322, 2322, 2322, 2322,
+			]);
+			for (const line of errorLines) expect(line).toMatch(/Invalid\.tsrx\(\d+,\d+\): error TS/);
 			expect(consumerDiagnostics).toContain("Argument of type 'boolean'");
 			const wrongLine = invalid
 				.slice(0, invalid.indexOf('styles.height(wrong$)'))
 				.split('\n').length;
-			expect(consumerDiagnostics).toContain(`Panel.tsrx(${wrongLine},`);
+			expect(consumerDiagnostics).toContain(`Invalid.tsrx(${wrongLine},`);
 		} finally {
 			rmSync(stylexRoot, { recursive: true, force: true });
 		}
+	}, 15_000);
+
+	it('type-checks native refs and spreads without weakening component props', () => {
 		const root = mkdtempSync(join(tmpdir(), 'octane-volar-spread-types-'));
 		try {
 			mkdirSync(join(root, 'node_modules'));
