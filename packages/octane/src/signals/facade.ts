@@ -472,11 +472,22 @@ export function readSignalBinding<T>(handle$: SignalHandle<T>): T {
 }
 
 /** @internal Start compiler-proven independent reads without consuming their results. */
-export function __startSignalReads(handles: readonly SignalHandle<unknown>[]): void {
+export function __startSignalReads(
+	handles: readonly SignalHandle<unknown>[],
+	primitive = false,
+): void {
 	untrack(() => {
 		for (const handle of handles) {
 			try {
-				handle[SIGNAL_BINDING_READ]();
+				const value = handle[SIGNAL_BINDING_READ]();
+				// JSX consumes each value before its next hole. Do not move a later
+				// start ahead of user coercion or interpretation of an opaque child.
+				if (
+					primitive &&
+					value != null &&
+					(typeof value === 'object' || typeof value === 'function' || typeof value === 'symbol')
+				)
+					break;
 			} catch (error) {
 				// A pending predecessor must not hide later independent work. A real
 				// error ends the reachable stratum; the original read throws it in

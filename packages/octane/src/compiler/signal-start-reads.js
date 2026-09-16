@@ -61,12 +61,13 @@ function hasRender(node) {
 }
 
 /**
- * Start only adjacent strict reads of lexically proven immutable descriptors.
+ * Start adjacent strict reads or complete static native output reads of
+ * lexically proven immutable descriptors.
  * Original reads remain the suspension/error/observation points. In particular,
  * this does not hoist declarations, evaluate member receivers, cross statements,
  * or enter a conditional arm before its authored control-flow boundary.
  */
-export function startIndependentSignalReads(ast) {
+export function startIndependentSignalReads(ast, isText = null) {
 	if (
 		!(ast.body ?? []).some(
 			(node) => node.type === 'ImportDeclaration' && SIGNAL_MODULES.has(node.source?.value),
@@ -200,16 +201,8 @@ export function startIndependentSignalReads(ast) {
 					: null;
 		return factory === 'query$' || factory === 'derived$' ? record : null;
 	}
-	function strictRead(statement) {
-		if (
-			statement.type !== 'VariableDeclaration' ||
-			statement.kind !== 'const' ||
-			statement.declarations.length !== 1
-		)
-			return null;
-		const declaration = statement.declarations[0];
-		if (declaration.id.type !== 'Identifier') return null;
-		const call = unwrap(declaration.init);
+	function strictExpression(expression) {
+		const call = unwrap(expression);
 		if (call?.type !== 'CallExpression' || call.optional || call.arguments.length !== 0)
 			return null;
 		const member = unwrap(call.callee);
@@ -224,7 +217,65 @@ export function startIndependentSignalReads(ast) {
 		const descriptor = recordFor(member.object);
 		if (descriptor?.kind !== 'const') return null;
 		const factory = factoryOf(descriptor.init);
-		return factory ? { handle: member.object, descriptor, result: declaration.id, factory } : null;
+		return factory ? { handle: member.object, descriptor, factory } : null;
+	}
+	function strictRead(statement) {
+		if (
+			statement.type !== 'VariableDeclaration' ||
+			statement.kind !== 'const' ||
+			statement.declarations.length !== 1
+		)
+			return null;
+		const declaration = statement.declarations[0];
+		if (declaration.id.type !== 'Identifier') return null;
+		const read = strictExpression(declaration.init);
+		return read ? { ...read, result: declaration.id } : null;
+	}
+	// Only complete static native output is traversed. Mount phases can evaluate
+	// an attribute or typed text before an earlier generic child, so a lexical
+	// prefix before an opaque node (or a mix of hole kinds) is not sufficient.
+	function outputReads(output) {
+		if (isText === null) return [];
+		const reads = [];
+		let text;
+		function visit(node) {
+			if (node.type === 'JSXText') return true;
+			if (node.type === 'JSXExpressionContainer') {
+				if (node.expression.type === 'JSXEmptyExpression') return true;
+				const read = strictExpression(node.expression);
+				if (read === null) return false;
+				const kind = isText(node.expression);
+				if (text !== undefined && text !== kind) return false;
+				text = kind;
+				reads.push(read);
+				return true;
+			}
+			if (node.type === 'JSXElement') {
+				const opening = node.openingElement;
+				const tag = opening.name;
+				if (
+					tag.type !== 'JSXIdentifier' ||
+					!/^[a-z][a-z0-9]*$/.test(tag.name) ||
+					/^(?:html|head|body|base|meta|link|title|style|script|template|noscript|svg|math|input|select|textarea|option|optgroup|iframe|object|embed|img|image|audio|video|source|track)$/.test(
+						tag.name,
+					)
+				)
+					return false;
+				for (const attribute of opening.attributes ?? []) {
+					if (
+						attribute.type !== 'JSXAttribute' ||
+						attribute.name.type !== 'JSXIdentifier' ||
+						/^(?:ref|key|is|style|children|innerHTML|dangerouslySetInnerHTML|on.*)$/i.test(
+							attribute.name.name,
+						) ||
+						(attribute.value !== null && attribute.value.type !== 'Literal')
+					)
+						return false;
+				}
+			} else if (node.type !== 'JSXFragment') return false;
+			return (node.children ?? []).every(visit);
+		}
+		return output && visit(output) ? reads : [];
 	}
 	// Follow local aliases/helpers as well as direct captures: a later selector
 	// closing over an earlier read's result must run after that result is assigned.
@@ -250,11 +301,36 @@ export function startIndependentSignalReads(ast) {
 	let helperName = '_$startSignalReads';
 	while (names.has(helperName)) helperName += '$';
 	let helperImport = null;
+	function start(reads, origin, primitive = false) {
+		helperImport ??= reads[0].factory.declaration;
+		return inheritHookMemoOrigin(
+			// Guard only speculative receiver evaluation (including module TDZ).
+			// The original reads retain their normal observation/error boundary.
+			b.try(
+				b.block([
+					b.stmt(
+						b.call(
+							b.id(helperName),
+							b.array(reads.map((read) => b.id(read.handle.name))),
+							...(primitive ? [b.literal(true)] : []),
+						),
+					),
+				]),
+				b.catch_clause(null, null, b.block([])),
+			),
+			origin,
+		);
+	}
 	function statements(body) {
 		let out = null;
 		for (let i = 0; i < body.length;) {
 			const first = strictRead(body[i]);
 			if (!first) {
+				const reads = outputReads(body[i]);
+				if (reads.length > 1) {
+					out ??= body.slice(0, i);
+					out.push(start(reads, body[i], true));
+				}
 				if (out) out.push(body[i]);
 				i++;
 				continue;
@@ -276,30 +352,14 @@ export function startIndependentSignalReads(ast) {
 			}
 			if (run.length > 1) {
 				out ??= body.slice(0, i);
-				helperImport ??= first.factory.declaration;
-				out.push(
-					inheritHookMemoOrigin(
-						// A module may invoke a component before a later descriptor has
-						// initialized. Receiver evaluation must not expose its TDZ before
-						// the original first read; only the speculative start is guarded.
-						b.try(
-							b.block([
-								b.stmt(
-									b.call(b.id(helperName), b.array(run.map((read) => b.id(read.handle.name)))),
-								),
-							]),
-							b.catch_clause(null, null, b.block([])),
-						),
-						body[i],
-					),
-				);
+				out.push(start(run, body[i]));
 			}
 			if (out) out.push(...body.slice(i, end));
 			i = end;
 		}
 		return out ?? body;
 	}
-	function transform(node, rendering = false) {
+	function transform(node, rendering = false, functionBody = false) {
 		if (node === null || typeof node !== 'object') return node;
 		if (Array.isArray(node)) {
 			const mapped = node.map((child) => transform(child, rendering));
@@ -309,7 +369,7 @@ export function startIndependentSignalReads(ast) {
 		let out = node;
 		for (const key in node) {
 			if (METADATA.has(key) || key.startsWith('_octane')) continue;
-			const mapped = transform(node[key], rendering);
+			const mapped = transform(node[key], rendering, isFunction(node) && key === 'body');
 			if (mapped !== node[key]) {
 				if (out === node) out = { ...node };
 				out[key] = mapped;
@@ -325,6 +385,12 @@ export function startIndependentSignalReads(ast) {
 			if (body !== node.body) {
 				const mapped = new Map(node.body.map((statement, index) => [statement, out.body[index]]));
 				out = { ...out, body: body.map((statement) => mapped.get(statement) ?? statement) };
+			}
+			// Do not turn a transparent render-only child block into a new scope.
+			if (node.type === 'JSXCodeBlock' && (functionBody || node.body.length > 0)) {
+				const reads = outputReads(node.render);
+				if (reads.length > 1)
+					out = { ...out, body: [...out.body, start(reads, node.render, true)] };
 			}
 		}
 		return out;

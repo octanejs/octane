@@ -124,7 +124,20 @@ const conversation = conversation$.get();
 const history = history$.get();
 ```
 
-This is a bounded compiler optimization, not universal parallelization. Imported handles, property receivers, opaque aliases, direct JSX holes, and uncompiled helpers are not covered. Dependencies on an earlier local result preserve sequencing, including captures through local closures. Separate boundaries still determine independent reveal; starting both requests does not make one boundary display a partially evaluated result.
+Complete static native JSX output can also start proven independent reads together, without introducing temporary variables:
+
+```tsrx
+export function Summary() @{
+	<>
+		<h2>{title$.get() as string}</h2>
+		<p>{summary$.get() as string}</p>
+	</>
+}
+```
+
+Here `title$` and `summary$` must be immutable `query$` or `derived$` declarations in the same module. The compiler proves the complete output, not just the text before an opaque child. All read holes must use the same text/renderable classification; components, dynamic props, spreads, refs, events, resource-loading hosts, and control-flow boundaries stop this output proof. Each entered arm may qualify separately. A ready opaque value stops speculative later starts so its coercion or child interpretation still happens in order. Declarations and unentered arms remain lazy.
+
+This is a bounded compiler optimization, not universal parallelization. Imported handles, property receivers, opaque aliases, and uncompiled helpers are not covered. The JSX extension is disabled for non-DOM renderers and externally supplied text-type facts; adjacent strict reads retain their existing optimization. Dependencies on an earlier local result preserve sequencing, including captures through local closures. Separate boundaries still determine independent reveal; starting both requests does not make one boundary display a partially evaluated result.
 
 Pending component-local work belongs to a retry episode. Retrying the same logical instance reuses its work rather than starting duplicate loaders; replacement, cancellation, and unmount retire obsolete work. The cache retains signal owners and logical identity tokens, not discarded DOM or scope trees. Ordinary signal-free renders do not allocate this retry state. Removed keyed entries retire once ordinary reconciliation establishes complete incoming membership. If a row suspends before later keys are read, those unknown keys remain retained until membership is known or the episode ends; arbitrary authored key functions are not evaluated early to force cancellation.
 
@@ -241,7 +254,7 @@ The September 15 [Jon review](https://github.com/octanejs/RFCs/discussions/3#dis
 - **Explicit signal transitions:** different title/body arrival times are not themselves a defect, and cached-first navigation does not require a global atomic reveal. The unresolved contract is an explicitly requested transition's pending/retention behavior: an actual `useTransition` probe exposes the pending fallback and returns its pending indicator to idle before the query settles, while direct renderer and renderer-free bindings publish immediately. Ordinary shell-retention coverage and superseded-attempt rejection pass, but neither proves transactional signal publication. The scope of scheduler/graph integration remains a separate decision, not a claim that the held-DOM regression covers it.
 - **Late CSS and result frames:** an actual WebKit probe with a compiled streaming fixture emitted three value frames plus opening/completion frames after a late stylesheet carrier. The server wrote all response chunks, but the receiver saw zero frames until the held stylesheet loaded, then all five. The matched before-carrier control received all five while CSS was held. Receiver independence alone does not bypass this parser dependency; moving only already-queued results ahead of one carrier would not protect later results behind an earlier stylesheet.
 - **No-signal SSR overhead:** the current candidate separates potential binding metadata from actual signal ownership. Ordinary typed member text no longer creates request or component signal owners or serializes ancestor identities. An actual branded handle still activates its proper owner. The controlled 800-card diagnostic preserves 1,431,520 bytes and two chunks while reducing speculative component owners from 1,601 to zero; timing and final-build qualification are separate gates.
-- **Independent query starts:** the current candidate starts compiler-proven adjacent `query$` and `derived$` reads together on client and server, with the bounded syntax and dependency guarantees described above. This is distinct from existing `use()` prefetching. Retry, cancellation, and final-build validation remain part of acceptance; it is not a claim that arbitrary imported or property-based reads parallelize.
+- **Independent query starts:** the current candidate starts compiler-proven adjacent `query$` and `derived$` reads and complete static native JSX reads together on client and server, with the bounded syntax and dependency guarantees described above. This is distinct from existing `use()` prefetching. Retry, cancellation, and final-build validation remain part of acceptance; it is not a claim that arbitrary imported or property-based reads parallelize.
 
 The RFC now corrects snapshot status terminology, text/query selection wording, branch-versus-mainline implementation claims, bootstrap option placement, and uncompiled host continuation requirements. Paging already uses `derived$`. Codec decoding already preserves `__proto__` as inert own data, and compiled URL sinks already use the native sanitizer; those review observations did not require new security behavior. Remaining API and first-delivery scope questions are decisions, not silently accepted changes.
 

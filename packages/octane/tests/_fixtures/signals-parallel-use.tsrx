@@ -14,6 +14,105 @@ export function ParallelQueries(props: ParallelReadProps) @{
 	<p class="parallel-values">{first + ':' + second}</p>
 }
 
+export function ParallelJsxQueries(props: ParallelReadProps & { before?: () => void }) @{
+	const first$ = query$(() => 'first', props.load);
+	const second$ = query$(() => 'second', props.load);
+	const unused$ = query$(() => 'unused', props.load);
+	props.before?.();
+	<section class="parallel-values">
+		<h2>{first$.get()}</h2>:<p>{second$.get()}</p>
+	</section>
+}
+
+export function ParallelJsxText(props: ParallelReadProps) @{
+	const first$ = query$(() => 'first', props.load);
+	const second$ = query$(() => 'second', props.load);
+	<section class="parallel-values">
+		<h2>{first$.get() as string}</h2>:<p>{second$.get() as string}</p>
+	</section>
+}
+
+export function ParallelJsxDerived(props: ParallelReadProps) @{
+	const first$ = derived$(async () => props.load('first'));
+	const second$ = derived$(async () => props.load('second'));
+	<section class="parallel-values">
+		<h2>{first$.get()}</h2>:<p>{second$.get()}</p>
+	</section>
+}
+
+export function ParallelJsxConditional(props: ParallelReadProps & { show?: boolean }) @{
+	const first$ = query$(() => 'first', props.load);
+	const second$ = query$(() => 'second', props.load);
+	<section>
+		@if (props.show !== false) {
+			<div class="parallel-values">
+				<h2>{first$.get()}</h2>:<p>{second$.get()}</p>
+			</div>
+		} @else {
+			<p class="hidden">hidden</p>
+		}
+	</section>
+}
+
+export function ParallelJsxDeferred(props: ParallelReadProps) @{
+	const first$ = query$(() => 'first', props.load);
+	const second$ = query$(() => 'second', props.load);
+	const unused = <>
+		<h2>{first$.get()}</h2>
+		<p>{second$.get()}</p>
+	</>;
+	<p class="hidden">hidden</p>
+}
+
+export function ParallelJsxAttribute(props: ParallelReadProps & { read: () => string }) @{
+	const first$ = query$(() => 'first', props.load);
+	const second$ = query$(() => 'second', props.load);
+	<section>
+		<h2>{first$.get()}</h2>
+		<p>{second$.get()}</p>
+		<i title={props.read()} />
+	</section>
+}
+
+export function ParallelJsxCoercion(props: ParallelReadProps & { value: unknown }) @{
+	const first$ = derived$(() => props.value, { sync: true });
+	const second$ = query$(() => 'second', props.load);
+	<section>
+		<h2>{first$.get() as string}</h2>
+		<p>{second$.get() as string}</p>
+	</section>
+}
+
+export function ParallelJsxMixed(props: ParallelReadProps) @{
+	const first$ = query$(() => 'first', props.load);
+	const second$ = query$(() => 'second', props.load);
+	<section>
+		<h2>{first$.get()}</h2>
+		<p>{second$.get() as string}</p>
+	</section>
+}
+
+export function ParallelJsxAuth(props: ParallelReadProps) @{
+	const auth$ = query$(() => 'auth', props.load);
+	const conversation$ = query$(() => auth$.get() + ':conversation', props.load);
+	const history$ = query$(() => auth$.get() + ':history', props.load);
+	<section class="parallel-values">
+		<h2>{conversation$.get()}</h2>:<p>{history$.get()}</p>
+	</section>
+}
+
+export function ParallelJsxErrors(props: ParallelReadProps) @{
+	<section>
+		@try {
+			<ParallelJsxQueries load={props.load} />
+		} @pending {
+			<p class="pending">loading</p>
+		} @catch (error) {
+			<p class="error">{(error as Error).message}</p>
+		}
+	</section>
+}
+
 export function ParallelDerived(props: ParallelReadProps) @{
 	const first$ = derived$(async () => props.load('first'));
 	const second$ = derived$(async () => props.load('second'));

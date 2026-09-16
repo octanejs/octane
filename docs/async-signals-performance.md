@@ -7,6 +7,14 @@ interchangeable results.
 
 Each section identifies its measured source or historical checkpoint. Results from different checkpoints must not be treated as current bundle sizes or added together.
 
+## Independent reads in static native output
+
+The compiler can start same-module immutable query/derived reads together in complete static native JSX output with homogeneous text/renderable holes. Public client and SSR regressions start both eligible loaders in one round instead of waiting for the first to settle. Declarations and unentered branches stay lazy; original reads retain errors and suspension. Components, resource-loading/custom hosts, dynamic attributes and opaque values remain ordering barriers. Review added resource-host exclusions and a case-insensitive attribute barrier after a customized built-in constructor probe exposed changed execution order.
+
+A frozen comparison against `1dd77e178` isolates this compiler pass and its shared signal helper from other runtime changes. Node 24.21.0 and esbuild 0.28.1 produce minified ESM with gzip level 9. The classifier SHA-256 is `4e4b795c84908c30a3cf8c11d303d10d3a35a1e1387398bfbc474cbf3d684282`, the facade is `992e5db0938b6f5a13ebf2f180ea4d74b2a6235930235587be6bcabb25a76fcf`, and the compiler is `67add7d6d5f73185b5f69cc5a72c70a5b22b9151c8fd0738e82ac35b31d86c14`. Ordinary and declaration-only controls are byte-identical. Adjacent-local-read compiler output is unchanged; its shared helper adds 95 raw / 37 client gzip bytes and 95 / 36 server bytes. The two-hole JSX fixture adds 106 emitted bytes in each mode; its complete closure adds 197 raw / 84 client gzip bytes and 194 / 67 server bytes. Cached eligible renders pay for one array and helper traversal; no IIFE is introduced.
+
+The focused compiler, frozen-AST, parallel-read and neighboring async suites pass 144 cases across their development, production and Strong-mode projects, including hydration and cancellation. Start-order evidence does not establish a browser, route, CPU or latency speedup. The full codegen-size benchmark was attempted before this change and failed its existing rspack CSS-module assertion (`main.cjs` versus `main.cjs` plus `679.main.cjs`); the isolated measurements are not a passing full-benchmark claim.
+
 ## First-client undefined attributes during hydration
 
 The first client `undefined` for an explicitly owned attribute must remove the SSR value, not compare equal to an uninitialized client cache. The fix reuses existing hydration-aware setters for direct attributes and native prop spreads. It preserves native node identity, unrelated server attributes, refs, controlled-input adoption, and the absent-handler event fast path. No per-node state, extra prop enumeration, or getter evaluation is added.

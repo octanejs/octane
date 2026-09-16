@@ -267,21 +267,26 @@ export function App() @{ const first = first$.get(); const second = second$.get(
 			expect(() => parseModule(namespaceOutput, FILENAME)).not.toThrow();
 			expect(namespaceOutput).toContain('_$startSignalReads([first$, second$])');
 		}
-		const early = loadCompiledFixtureSource(
-			`
+		for (const output of [
+			'const first = first$.get(); const second = second$.get(); <p>{first + second as string}</p>',
+			'<><h2>{first$.get()}</h2><p>{second$.get()}</p></>',
+		]) {
+			const early = loadCompiledFixtureSource(
+				`
 import { query$ } from 'octane/signals';
 import { renderToString } from 'octane/server';
 const first$ = query$(() => 1, () => new Promise(() => {}));
-function Values() @{ const first = first$.get(); const second = second$.get(); <p>{first + second as string}</p> }
+function Values() @{ ${output} }
 function Shell() @{ <section>@try { <Values/> } @pending { <i>pending-first</i> } @catch(error) { <b>{String(error)}</b> }</section> }
 const html = renderToString(Shell).html;
 const second$ = query$(() => 2, async () => 'second');
 export function exercise() { return html; }
 `,
-			{ id: FILENAME, mode: 'server', runtimeModules: { 'octane/signals': signals } },
-		);
-		expect(early.exercise()).toContain('pending-first');
-		expect(early.exercise()).not.toContain('ReferenceError');
+				{ id: FILENAME, mode: 'server', runtimeModules: { 'octane/signals': signals } },
+			);
+			expect(early.exercise()).toContain('pending-first');
+			expect(early.exercise()).not.toContain('ReferenceError');
+		}
 	});
 
 	it('uses the same authored sites for client and server compilation', () => {

@@ -9494,7 +9494,15 @@ function compileAuthored(source, filename, options, bundlerMetadata) {
 			)
 		: analyzedAst;
 	const attemptAst = lowerSignalAttemptReads(bindingAst);
-	const signalAst = lowerSignalDeclarations(startIndependentSignalReads(attemptAst), cleanFilename);
+	const signalAst = lowerSignalDeclarations(
+		startIndependentSignalReads(
+			attemptAst,
+			options?.textTypeFacts || (options?.renderer?.target && options.renderer.target !== 'dom')
+				? null
+				: isKnownTextChildExpression,
+		),
+		cleanFilename,
+	);
 	if (bundlerMetadata !== null) bundlerMetadata.hydrateAst = signalAst;
 	const memoizedAst = strongModeEnabled
 		? applyStrongAutomaticMemo(signalAst, {

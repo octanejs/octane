@@ -5,7 +5,8 @@ import { createScope } from 'octane/signals';
 import * as signals from 'octane/signals';
 import { prerender } from 'octane/static';
 import { act, mount } from './_helpers.js';
-import { loadServerFixture } from './_server-fixture.js';
+import { loadCompiledFixtureSource, loadServerFixture } from './_server-fixture.js';
+import { textTypeSourceVersion } from '../src/compiler/text-type-facts.js';
 import * as client from './_fixtures/signals-parallel-use.tsrx';
 
 const server = loadServerFixture<typeof client>(
@@ -86,6 +87,11 @@ describe('native reads in use() creations', () => {
 			scope.dispose();
 		}
 		for (const View of [
+			client.ParallelJsxQueries,
+			client.ParallelJsxText,
+			client.ParallelJsxDerived,
+			client.ParallelJsxConditional,
+			client.ParallelJsxErrors,
 			client.ParallelModule,
 			client.ParallelQueries,
 			client.ParallelDerived,
@@ -118,7 +124,117 @@ describe('native reads in use() creations', () => {
 				second.resolve('B');
 			}
 		}
+		for (const View of [client.ParallelJsxConditional, client.ParallelJsxDeferred]) {
+			const load = vi.fn(async (key: string) => key);
+			const hidden = mount(View, { load, show: false });
+			try {
+				expect(hidden.find('.hidden').textContent).toBe('hidden');
+				expect(load).not.toHaveBeenCalled();
+			} finally {
+				hidden.unmount();
+			}
+		}
+		{
+			const load = vi.fn(async (key: string) => key);
+			const failure = new Error('setup failed');
+			expect(() =>
+				mount(client.ParallelJsxQueries, {
+					load,
+					before() {
+						throw failure;
+					},
+				}),
+			).toThrow(failure);
+			expect(load).not.toHaveBeenCalled();
+			const source = `import { query$ } from 'octane/signals'; export function Values(props) @{ const first$ = query$(() => 'first', props.load); const second$ = query$(() => 'second', props.load); <section><h2>{first$.get()}</h2><p>{second$.get()}</p></section> }`;
+			const id = '/src/parallel-typed.tsrx';
+			const second = source.indexOf('second$.get()');
+			const typed = loadCompiledFixtureSource<{ Values: typeof client.ParallelJsxQueries }>(
+				source,
+				{
+					id,
+					mode: 'client',
+					runtimeModules: { 'octane/signals': signals },
+					compileOptions: {
+						textTypeFacts: {
+							version: 1,
+							filename: id,
+							sourceVersion: textTypeSourceVersion(source),
+							projectVersion: 'parallel-test',
+							stringChildRanges: [[second, second + 'second$.get()'.length]],
+						},
+					},
+				},
+			);
+			const reached: string[] = [];
+			expect(() =>
+				mount(typed.Values, {
+					load(key: string) {
+						reached.push(key);
+						throw failure;
+					},
+				}),
+			).toThrow(failure);
+			expect(reached).toEqual(['second']);
+			const constructed: string[] = [];
+			customElements.define(
+				'octane-parallel-button',
+				class extends HTMLButtonElement {
+					constructor() {
+						super();
+						constructed.push('construct');
+					}
+				},
+				{ extends: 'button' },
+			);
+			const customized = loadCompiledFixtureSource<{ Values: typeof client.ParallelJsxQueries }>(
+				`import { query$ } from 'octane/signals'; export function Values(props) @{ const first$ = query$(() => 'first', props.load); const second$ = query$(() => 'second', props.load); <button IS="octane-parallel-button"><i>{first$.get()}</i><b>{second$.get()}</b></button> }`,
+				{
+					id: '/src/parallel-customized.tsrx',
+					mode: 'client',
+					runtimeModules: { 'octane/signals': signals },
+				},
+			);
+			expect(() =>
+				mount(customized.Values, {
+					load(key: string) {
+						constructed.push(key);
+						throw failure;
+					},
+				}),
+			).toThrow(failure);
+			expect(constructed).toEqual(['construct', 'first']);
+		}
+		for (const View of [
+			client.ParallelJsxAttribute,
+			client.ParallelJsxCoercion,
+			client.ParallelJsxMixed,
+		]) {
+			for (const callable of [false, true]) {
+				const failure = new Error('first reachable failure');
+				const reached: string[] = [];
+				const read = () => {
+					reached.push('coercion');
+					throw failure;
+				};
+				const value = Object.assign(callable ? () => {} : {}, { toString: read });
+				expect(() =>
+					mount(View, {
+						read,
+						value,
+						load: (key: string) => {
+							reached.push(key);
+							throw failure;
+						},
+					}),
+				).toThrow(failure);
+				expect(reached).toEqual([View === client.ParallelJsxMixed ? 'second' : 'coercion']);
+			}
+		}
 		for (const [View, ServerView] of [
+			[client.ParallelJsxQueries, server.ParallelJsxQueries],
+			[client.ParallelJsxText, server.ParallelJsxText],
+			[client.ParallelJsxConditional, server.ParallelJsxConditional],
 			[client.ParallelQueries, server.ParallelQueries],
 			[client.ParallelErrors, server.ParallelErrors],
 		] as const) {
@@ -175,7 +291,11 @@ describe('native reads in use() creations', () => {
 				}
 			}
 		}
-		for (const View of [client.ParallelAuthSelectors, client.ParallelAuthLocal]) {
+		for (const View of [
+			client.ParallelAuthSelectors,
+			client.ParallelAuthLocal,
+			client.ParallelJsxAuth,
+		]) {
 			const auth = deferred<string>();
 			const conversation = deferred<string>();
 			const history = deferred<string>();
@@ -470,18 +590,33 @@ describe('native reads in use() creations', () => {
 		} finally {
 			diagnosticSpy.mockRestore();
 		}
-		const firstError = deferred<string>();
-		const secondError = deferred<string>();
-		const errors = mount(client.ParallelErrors, {
-			load: (key: string) => (key === 'first' ? firstError.promise : secondError.promise),
-		});
-		try {
-			await act(() => secondError.reject(new Error('later error')));
-			expect(errors.find('.pending').textContent).toBe('loading');
-			await act(() => firstError.reject(new Error('first error')));
-			expect(errors.find('.error').textContent).toBe('first error');
-		} finally {
-			errors.unmount();
+		for (const View of [client.ParallelErrors, client.ParallelJsxErrors]) {
+			const firstError = deferred<string>();
+			const secondError = deferred<string>();
+			const errors = mount(View, {
+				load: (key: string) => (key === 'first' ? firstError.promise : secondError.promise),
+			});
+			try {
+				await act(() => secondError.reject(new Error('later error')));
+				expect(errors.find('.pending').textContent).toBe('loading');
+				await act(() => firstError.reject(new Error('first error')));
+				expect(errors.find('.error').textContent).toBe('first error');
+			} finally {
+				errors.unmount();
+			}
+			const failedStarts: string[] = [];
+			const failed = mount(View, {
+				load(key: string) {
+					failedStarts.push(key);
+					throw new Error('synchronous first error');
+				},
+			});
+			try {
+				expect(failedStarts).toEqual(['first']);
+				expect(failed.find('.error').textContent).toBe('synchronous first error');
+			} finally {
+				failed.unmount();
+			}
 		}
 		const cancellationStarts: string[] = [];
 		const aborted: string[] = [];
@@ -546,6 +681,10 @@ describe('native reads in use() creations', () => {
 			scope.dispose();
 		}
 		for (const [kind, View] of [
+			['jsx-query', server.ParallelJsxQueries],
+			['jsx-text', server.ParallelJsxText],
+			['jsx-derived', server.ParallelJsxDerived],
+			['jsx-conditional', server.ParallelJsxConditional],
 			['query', server.ParallelQueries],
 			['derived', server.ParallelDerived],
 			['module', server.ParallelModule],
@@ -576,10 +715,16 @@ describe('native reads in use() creations', () => {
 					owner.dispose();
 				}
 			}
-			expect((await done).html).toContain('A:B');
+			const markup = document.createElement('div');
+			markup.innerHTML = (await done).html;
+			expect(markup.querySelector('.parallel-values')?.textContent).toBe('A:B');
 			expect(started).toEqual(['first', 'second']);
 		}
-		for (const View of [server.ParallelAuthSelectors, server.ParallelAuthLocal]) {
+		for (const View of [
+			server.ParallelAuthSelectors,
+			server.ParallelAuthLocal,
+			server.ParallelJsxAuth,
+		]) {
 			const auth = deferred<string>();
 			const conversation = deferred<string>();
 			const history = deferred<string>();
@@ -612,7 +757,59 @@ describe('native reads in use() creations', () => {
 				history.resolve('history');
 				await done;
 			}
-			expect((await done).html).toContain('conversation:history');
+			const markup = document.createElement('div');
+			markup.innerHTML = (await done).html;
+			expect(markup.querySelector('.parallel-values')?.textContent).toBe('conversation:history');
+		}
+		for (const View of [server.ParallelJsxConditional, server.ParallelJsxDeferred]) {
+			const load = vi.fn(async (key: string) => key);
+			expect((await prerender(View, { load, show: false })).html).toContain('hidden');
+			expect(load).not.toHaveBeenCalled();
+		}
+		{
+			const load = vi.fn(async (key: string) => key);
+			const failure = new Error('setup failed');
+			await expect(
+				prerender(server.ParallelJsxQueries, {
+					load,
+					before() {
+						throw failure;
+					},
+				}),
+			).rejects.toBe(failure);
+			expect(load).not.toHaveBeenCalled();
+		}
+		for (const View of [
+			server.ParallelJsxAttribute,
+			server.ParallelJsxCoercion,
+			server.ParallelJsxMixed,
+		]) {
+			for (const callable of [false, true]) {
+				const failure = new Error('first reachable failure');
+				const reached: string[] = [];
+				const read = () => {
+					reached.push('coercion');
+					throw failure;
+				};
+				const value = Object.assign(callable ? () => {} : {}, { toString: read });
+				await expect(
+					prerender(View, {
+						read,
+						value,
+						load: (key: string) => {
+							reached.push(key);
+							throw failure;
+						},
+					}),
+				).rejects.toBe(failure);
+				expect(reached).toEqual([
+					View === server.ParallelJsxAttribute
+						? 'first'
+						: View === server.ParallelJsxMixed
+							? 'first'
+							: 'coercion',
+				]);
+			}
 		}
 		const conditionalStarts: string[] = [];
 		const conditional = await prerender(server.ParallelConditional, {
@@ -624,31 +821,33 @@ describe('native reads in use() creations', () => {
 		});
 		expect(conditionalStarts).toEqual([]);
 		expect(conditional.html).toContain('hidden');
-		const firstError = deferred<string>();
-		const secondError = deferred<string>();
-		let completed = false;
-		const errors = prerender(server.ParallelErrors, {
-			load: (key: string) => (key === 'first' ? firstError.promise : secondError.promise),
-		});
-		void errors.then(() => {
-			completed = true;
-		});
-		await drain();
-		secondError.reject(new Error('later error'));
-		await drain();
-		expect(completed).toBe(false);
-		firstError.reject(new Error('first error'));
-		expect((await errors).html).toContain('first error');
-		expect((await errors).html).not.toContain('later error');
-		const failedStarts: string[] = [];
-		const failed = await prerender(server.ParallelErrors, {
-			load: (key: string) => {
-				failedStarts.push(key);
-				throw new Error('synchronous first error');
-			},
-		});
-		expect(failedStarts).toEqual(['first']);
-		expect(failed.html).toContain('synchronous first error');
+		for (const View of [server.ParallelErrors, server.ParallelJsxErrors]) {
+			const firstError = deferred<string>();
+			const secondError = deferred<string>();
+			let completed = false;
+			const errors = prerender(View, {
+				load: (key: string) => (key === 'first' ? firstError.promise : secondError.promise),
+			});
+			void errors.then(() => {
+				completed = true;
+			});
+			await drain();
+			secondError.reject(new Error('later error'));
+			await drain();
+			expect(completed).toBe(false);
+			firstError.reject(new Error('first error'));
+			expect((await errors).html).toContain('first error');
+			expect((await errors).html).not.toContain('later error');
+			const failedStarts: string[] = [];
+			const failed = await prerender(View, {
+				load: (key: string) => {
+					failedStarts.push(key);
+					throw new Error('synchronous first error');
+				},
+			});
+			expect(failedStarts).toEqual(['first']);
+			expect(failed.html).toContain('synchronous first error');
+		}
 	});
 
 	it('rechecks a warmed descendant before adopting it into final server markup', async () => {
