@@ -1,0 +1,73 @@
+name: Chromium diagnostics
+
+on:
+  workflow_dispatch:
+    inputs:
+      shard:
+        description: Parity shard (same native sharding as CI)
+        type: choice
+        default: "4/4"
+        options: ["1/4", "2/4", "3/4", "4/4"]
+      trials:
+        description: Independent attempts (each keeps its own result)
+        type: choice
+        default: "1"
+        options: ["1", "2", "3"]
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    name: Chromium diagnostics (${{ inputs.shard }}, trial ${{ matrix.trial }})
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    # Step budgets total 56 minutes, leaving room for post-job cleanup.
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        trial: ${{ fromJSON(inputs.trials == '3' && '[1,2,3]' || inputs.trials == '2' && '[1,2]' || '[1]') }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        timeout-minutes: 2
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
+        timeout-minutes: 2
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        timeout-minutes: 2
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install dependencies
+        timeout-minutes: 10
+        run: pnpm install --prod false --frozen-lockfile
+      - name: Install Chromium
+        timeout-minutes: 10
+        run: |
+          bash scripts/ci-apt-https.sh
+          pnpm exec playwright install --with-deps chromium
+      - name: Run parity audit with diagnostics
+        # Leave a bounded window for resource collection and artifact upload.
+        timeout-minutes: 25
+        env:
+          CI: "true"
+          DEBUG: pw:browser*,vitest:browser:api,vitest:browser:pool,vitest:browser:playwright
+          VITEST_PW_DEBUG: "1"
+          PARITY_SHARD: ${{ inputs.shard }}
+          DIAGNOSTICS_DIR: ${{ runner.temp }}/chromium-diagnostics
+        run: node scripts/react-parity/browser-diagnostics.mjs --shard "$PARITY_SHARD" --output-dir "$DIAGNOSTICS_DIR"
+      - name: Runner resources after audit
+        timeout-minutes: 2
+        if: ${{ always() }}
+        run: |
+          free -m
+          df -h /tmp /dev/shm
+          if [ -r /sys/fs/cgroup/memory.events ]; then cat /sys/fs/cgroup/memory.events; fi
+          sudo -n dmesg --ctime | tail -120 || true
+      - name: Upload diagnostics
+        timeout-minutes: 3
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: chromium-diagnostics-${{ matrix.trial }}-attempt-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/chromium-diagnostics/
+          retention-days: 7

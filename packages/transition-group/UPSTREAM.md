@@ -10,6 +10,8 @@ The upstream project and this adapted package are licensed under BSD-3-Clause. T
 
 The vendored JavaScript is not published. The maintained implementation is under `src`. Adapted Octane tests are under `tests`. The strongest runtime oracle is the pristine Jest lane: `pnpm test:upstream` runs the pinned suite unchanged against React through the manifest `jest-full` executor and checks every identity against `audit/pristine-runtime.json`.
 
+The Jest render bridge flushes React state updates from renderer-created timers when those timers are delivered. This preserves the upstream timeout-order assertions when the event loop stalls: an earlier transition timer must commit its completion before a later guard timer runs. Timer delays, native handles, and upstream assertions remain unchanged. Harness controls inject a 40 ms stall, reproduce the failure with flushing disabled, and verify that an incorrect 100 ms appear delay still fails the original 15 ms guard.
+
 ## DefinitelyTyped type-suite provenance
 
 The React type oracle is [`@types/react-transition-group` 4.4.12](https://www.npmjs.com/package/@types/react-transition-group/v/4.4.12). Its canonical source is DefinitelyTyped repository path `types/react-transition-group`, pinned at commit `cccd2a9ffecb708ac0606faa7f81f0b7ec535bf9`; `typesPublisherContentHash` is `28d8cc9bfe6b15e0291a07b916505b49e5cf57cfd1f331db1d9ad49fd36bfd41`. The npm tarball omits its executable type test, so `upstream-types/react-transition-group-tests.tsx` and `upstream-types/tsconfig.definitelytyped.json` are byte-exact vendored copies from that commit. The pristine runner `upstream-types/tsconfig.json` retains DT's compiler options while resolving declarations from npm rather than vendored `.d.ts` files.
