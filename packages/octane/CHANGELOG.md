@@ -9,7 +9,6 @@
   Keep binding CSS compatibility aliases pointed at plain `CSSProperties` when their layout helpers consume ordinary CSS values.
 
   Expose the signal style regression benchmark through the MCP benchmark tool.
-
 - 248af4e: Avoid redundant hydration lookups when updating existing conditional and switch branches.
 - cece195: Reuse unchanged populated SSR replay snapshots and pending streaming settlement
   recorders across retry waves. Preserve metadata rollback, promise identity,
@@ -19,6 +18,13 @@
 - 7d4dc4f: Reduce universal renderer prop-shape churn, materialization allocations, repeated feature scans, and unnecessary compact-list traversal while preserving keyed identity, transactional callbacks, and transport contracts. Expose the universal measurement suites through MCP.
 - 277c10c: Compile fixed trailing style properties after leading object spreads into guarded per-property updates. Preserve spread evaluation, overrides, removals, and hydration, with complete object diffing when a spread preinserts a trailing key.
 - 1198cdc: Skip the per-row `updateSurvivor` call in keyed reconciliation when a compiler-pure list row is provably unchanged — same item reference, same body, same position — so a stable keyed update no longer pays the survivor-update machinery for every no-op row. Moved, added, removed, index-shifted, non-pure, and de-opt rows still take the full survivor path, preserving render, journal, and rollback behavior.
+- Preserve `import.meta` and `new.target` syntax when collecting dependencies for memoized `use()` arguments and server-rendered component props.
+- Reduce repeated runtime work on the client and server. Empty descriptor hosts skip
+  child-list scratch arrays, passive-effect batches reuse their scheduling callback,
+  and identical server styles reuse their records and replay snapshots.
+
+  Expose the runtime-style-dedup, empty-host-children, and passive-scheduling
+  benchmark suites through the MCP benchmark tool.
 - fe1b2b7: Avoid rebuilding complete style objects on repeated spread-key collisions. Preserve inherited setters, read-only properties, and transitions back to per-property updates.
 - 733c98d: Key SSR scoped child-segment and occurrence counters by the frame-relative scope suffix instead of the full `ASYNC_SCOPE` path. Every component child re-scanned the shared path prefix during counter lookup, so SSR render cost grew with tree depth — measured ~53% faster on an arm-heavy SSR workload and ~16% faster on a plain nested-component tree, with byte-identical rendered output. Async identity, arm segment numbering, `use()` occurrence keys, replay, streaming, and hydration seed behavior are unchanged.
 - 13604b9: Avoid temporary boundary-collection copies during streaming SSR completion,
@@ -32,8 +38,8 @@
   CLI JSON reports include the hint count even when it is zero, and MDX diagnostic types represent errors, warnings, and hints.
 
   The eager prop-state check covers both `useState(value)` and `useReducer(reducer, value)`. A lazy state initializer or explicit third reducer initializer declares a deliberate initial capture. Subscription and timer callbacks keep their event-driven semantics and are excluded from effect-chain writes.
-
 - bb11d0b: Upgrade to TSRX core 0.2 and the renamed native parser, @tsrx/oxc 0.13. Lazy destructuring (`&{ ... }` and `&[ ... ]`) is no longer accepted by the compiler or editor tooling. Use ordinary object and array destructuring instead.
+- Support property-specific kebab-case CSS names in `CSSProperties`, including signal-backed HTML and SVG styles. Preserve Octane's numeric length support: `width: 400` still means `400px`. Runtime style handling is unchanged.
 - 777cef3: Align ViewTransition with React 19.3: fix activation classes, type maps, authored
   style restoration, mutation and layout detection, nested sharing, instance refs,
   and callback cleanup at animation finish. Forward native transition types, keep

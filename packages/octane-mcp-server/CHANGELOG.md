@@ -9,7 +9,6 @@
   Keep binding CSS compatibility aliases pointed at plain `CSSProperties` when their layout helpers consume ordinary CSS values.
 
   Expose the signal style regression benchmark through the MCP benchmark tool.
-
 - cece195: Reuse unchanged populated SSR replay snapshots and pending streaming settlement
   recorders across retry waves. Preserve metadata rollback, promise identity,
   cancellation, and request cleanup. Add the SSR replay and streaming benchmark
@@ -17,6 +16,12 @@
 - 248af4e: Expose the client hot-path benchmark suite through repository automation, with
   deterministic branch hydration-lookup and descriptor-key work guards.
 - 7d4dc4f: Reduce universal renderer prop-shape churn, materialization allocations, repeated feature scans, and unnecessary compact-list traversal while preserving keyed identity, transactional callbacks, and transport contracts. Expose the universal measurement suites through MCP.
+- Reduce repeated runtime work on the client and server. Empty descriptor hosts skip
+  child-list scratch arrays, passive-effect batches reuse their scheduling callback,
+  and identical server styles reuse their records and replay snapshots.
+
+  Expose the runtime-style-dedup, empty-host-children, and passive-scheduling
+  benchmark suites through the MCP benchmark tool.
 - 13604b9: Avoid temporary boundary-collection copies during streaming SSR completion,
   error and abort scans, and reuse immutable CSS/head snapshots for completed
   boundaries. Extend the benchmark catalog with the final SSR and client coverage
@@ -28,7 +33,6 @@
   CLI JSON reports include the hint count even when it is zero, and MDX diagnostic types represent errors, warnings, and hints.
 
   The eager prop-state check covers both `useState(value)` and `useReducer(reducer, value)`. A lazy state initializer or explicit third reducer initializer declares a deliberate initial capture. Subscription and timer callbacks keep their event-driven semantics and are excluded from effect-chain writes.
-
 - 777cef3: Align ViewTransition with React 19.3: fix activation classes, type maps, authored
   style restoration, mutation and layout detection, nested sharing, instance refs,
   and callback cleanup at animation finish. Forward native transition types, keep

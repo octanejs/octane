@@ -9,7 +9,7 @@
   Keep binding CSS compatibility aliases pointed at plain `CSSProperties` when their layout helpers consume ordinary CSS values.
 
   Expose the signal style regression benchmark through the MCP benchmark tool.
-  - @octanejs/redux@0.1.50
+- @octanejs/redux@0.1.50
 
 ## 0.1.50
 
