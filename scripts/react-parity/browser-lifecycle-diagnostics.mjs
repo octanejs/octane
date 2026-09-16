@@ -4,21 +4,66 @@ import { errorMonitor } from 'node:events';
 // after its initial navigation; never inject into tests or retry a failed session.
 let observedServers;
 
+function reportDiagnostic(details) {
+	try {
+		process.stderr.write(
+			`${JSON.stringify({ diagnostic: 'parity-browser', at: new Date().toISOString(), ...details })}\n`,
+		);
+	} catch {
+		// Observation must not change the provider or socket's original outcome.
+	}
+}
+
 function diagnosticErrorCode(error) {
-	return typeof error?.code === 'string' && /^(?:E|WS_ERR_)[A-Z0-9_]{1,39}$/.test(error.code)
-		? error.code
-		: undefined;
+	try {
+		const code = error?.code;
+		return typeof code === 'string' &&
+			/^(?:E(?:CONNRESET|CONNABORTED|CONNREFUSED|PIPE|TIMEDOUT|HOSTUNREACH|NETUNREACH|NOTFOUND|AI_AGAIN)|WS_ERR_(?:EXPECTED_FIN|EXPECTED_MASK|INVALID_CLOSE_CODE|INVALID_CONTROL_PAYLOAD_LENGTH|INVALID_OPCODE|INVALID_UTF8|TOO_MANY_BUFFERED_PARTS|UNEXPECTED_MASK|UNEXPECTED_RSV_[123]|UNSUPPORTED_DATA_PAYLOAD_LENGTH|UNSUPPORTED_MESSAGE_LENGTH))$/.test(
+				code,
+			)
+			? code
+			: undefined;
+	} catch {
+		return undefined;
+	}
+}
+
+function diagnosticTransportCategory(message) {
+	switch (message) {
+		case 'net::ERR_CONNECTION_RESET':
+			return 'connection-reset';
+		case 'net::ERR_CONNECTION_CLOSED':
+		case 'Connection closed':
+			return 'connection-closed';
+		case 'Insufficient resources':
+			return 'resource-exhausted';
+		case 'net::ERR_CONNECTION_REFUSED':
+			return 'connection-refused';
+		case 'net::ERR_CONNECTION_TIMED_OUT':
+		case 'net::ERR_TIMED_OUT':
+			return 'timeout';
+		case 'net::ERR_NETWORK_CHANGED':
+			return 'network-changed';
+		case 'net::ERR_INTERNET_DISCONNECTED':
+			return 'offline';
+		case 'net::ERR_ABORTED':
+			return 'aborted';
+		case 'Invalid frame header':
+		case 'Received unexpected continuation frame.':
+			return 'protocol-error';
+		case 'Connection closed before receiving a handshake response':
+			return 'handshake-closed';
+		default:
+			return 'other';
+	}
 }
 
 function observeServer(project) {
 	const server = project.browser.vite;
 	if (observedServers?.has(server)) return;
 	(observedServers ??= new WeakSet()).add(server);
-	const report = (event, details = {}) => {
-		process.stderr.write(
-			`${JSON.stringify({ diagnostic: 'parity-browser', at: new Date().toISOString(), project: project.name, event, ...details })}\n`,
-		);
-	};
+	const report = (event, details = {}) =>
+		reportDiagnostic({ project: project.name, event, ...details });
 	for (const method of ['close', 'restart']) {
 		const original = server[method];
 		server[method] = function (...args) {
@@ -42,6 +87,30 @@ function observeServer(project) {
 	server.httpServer?.on('close', () => report('http-server-close'));
 	server.httpServer?.on(errorMonitor, (error) => {
 		report('http-server-error', { code: diagnosticErrorCode(error) });
+	});
+	let rpcConnectionId = 0;
+	// Vitest's RPC WebSocketServer is private. The HTTP upgrade exposes its TCP
+	// socket without wrapping ws internals or reading frames. Only classify the
+	// known endpoint/role; do not retain the URL, session IDs, or API token.
+	server.httpServer?.on('upgrade', (request, socket) => {
+		try {
+			if (typeof request.url !== 'string') return;
+			const url = new URL(request.url, 'http://localhost');
+			if (url.pathname !== '/__vitest_browser_api__') return;
+			const role = url.searchParams.get('type');
+			if (role !== 'tester' && role !== 'orchestrator') return;
+			const details = { connectionId: ++rpcConnectionId, role };
+			socket.on('end', () => report('rpc-tcp-end', details));
+			socket.on('close', (hadError) => {
+				report('rpc-tcp-close', { ...details, hadError: hadError === true });
+			});
+			socket.on(errorMonitor, (error) => {
+				report('rpc-tcp-error', { ...details, code: diagnosticErrorCode(error) });
+			});
+			report('rpc-tcp-upgrade', details);
+		} catch {
+			report('server-observation-failed');
+		}
 	});
 	let connectionId = 0;
 	// Vite's WebSocket transport is separate from the browser RPC server.
@@ -75,11 +144,8 @@ function diagnosticUrl(url) {
 
 async function observePage(provider, sessionId, project) {
 	const page = provider.getPage(sessionId);
-	const report = (event, details = {}) => {
-		process.stderr.write(
-			`${JSON.stringify({ diagnostic: 'parity-browser', at: new Date().toISOString(), project, sessionId, event, ...details })}\n`,
-		);
-	};
+	const report = (event, details = {}) =>
+		reportDiagnostic({ project, sessionId, event, ...details });
 	page.on('close', () => report('page-close'));
 	page.on('crash', () => report('page-crash'));
 	page.on('framenavigated', (frame) => {
@@ -115,8 +181,12 @@ async function observePage(provider, sessionId, project) {
 		report('websocket-closed', { requestId, url: sockets.get(requestId) });
 		sockets.delete(requestId);
 	});
-	cdp.on('Network.webSocketFrameError', ({ requestId }) => {
-		report('websocket-frame-error', { requestId, url: sockets.get(requestId) });
+	cdp.on('Network.webSocketFrameError', ({ requestId, errorMessage }) => {
+		report('websocket-frame-error', {
+			requestId,
+			url: sockets.get(requestId),
+			category: diagnosticTransportCategory(errorMessage),
+		});
 	});
 	cdp.on('Page.frameNavigated', ({ frame }) => {
 		if (!frame.parentId) topFrameId = frame.id;
@@ -166,9 +236,7 @@ export function withBrowserLifecycleDiagnostics(project) {
 						try {
 							observeServer(args[0]);
 						} catch {
-							process.stderr.write(
-								`${JSON.stringify({ diagnostic: 'parity-browser', at: new Date().toISOString(), project: args[0].name, event: 'server-observation-failed' })}\n`,
-							);
+							reportDiagnostic({ project: args[0].name, event: 'server-observation-failed' });
 						}
 						const openPage = provider.openPage;
 						provider.openPage = async function (...pageArgs) {
@@ -177,17 +245,17 @@ export function withBrowserLifecycleDiagnostics(project) {
 								await observePage(this, pageArgs[0], args[0].name);
 							} catch {
 								// Diagnostic setup cannot replace the original provider outcome.
-								process.stderr.write(
-									`${JSON.stringify({ diagnostic: 'parity-browser', at: new Date().toISOString(), project: args[0].name, sessionId: pageArgs[0], event: 'observation-failed' })}\n`,
-								);
+								reportDiagnostic({
+									project: args[0].name,
+									sessionId: pageArgs[0],
+									event: 'observation-failed',
+								});
 							}
 							return result;
 						};
 						const close = provider.close;
 						provider.close = function (...closeArgs) {
-							process.stderr.write(
-								`${JSON.stringify({ diagnostic: 'parity-browser', at: new Date().toISOString(), project: args[0].name, event: 'provider-close-start' })}\n`,
-							);
+							reportDiagnostic({ project: args[0].name, event: 'provider-close-start' });
 							return close.apply(this, closeArgs);
 						};
 						return provider;
