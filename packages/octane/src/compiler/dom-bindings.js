@@ -918,7 +918,9 @@ function planView(fn, filename, source, imports, lexical, native = null) {
 		const externalNames = new Set();
 		const knownFields = new Set();
 		for (const attr of element.openingElement?.attributes ?? element.attributes ?? []) {
-			if (attr._octaneKnownAttributeSpread) {
+			// A provider proves normal-renderer fields, not early ownership. External
+			// spreads retain the ordinary unbound checks and are stripped below.
+			if (attr._octaneKnownAttributeSpread && !attr._octaneKnownAttributeSpread.unbound) {
 				const argument = attr.argument ?? attr.value.expression;
 				// The compiler verified the exact imported factory against its
 				// provider contract. Its arguments still need the ordinary proof.
@@ -2132,6 +2134,9 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 			_octanePresentationHydration: {
 				id: plan.id,
 				supported: fixedPresentation || structuralPresentation,
+				...(field('nodes').elements.some((node) => node.elements[5]?.value === 'value')
+					? { nativeControl: true }
+					: {}),
 				...(structuralPresentation || conditionalRest ? { structural: true } : {}),
 				...(conditionalRest ? { conditionalRest: true } : {}),
 			},

@@ -115,7 +115,8 @@ import { bindSignalControl } from 'octane/signals';
 import { draft$ } from './state';
 
 const stop = bindSignalControl(document.querySelector('textarea')!, 'value', draft$);
-// Dispose before replacing the node or transferring ownership to an island.
+// Dispose before replacing the node. For an accepted hydration handoff, offer
+// this cleanup in controlLeases instead of calling it early.
 // stop();
 ```
 
@@ -127,6 +128,13 @@ Readonly handles only project their value; neither mode sets HTML `readOnly`.
 The host retains structural ownership. No synthetic input, form-reset manager,
 radio-group manager or renderer root is installed. Initial pending/error reads
 throw and release the adapter's resources. Retain and call the returned cleanup.
+
+The cleanup remains callable and also carries an explicit handoff capability.
+A fixed textarea presentation using `value={unbound(draft$)}` can pass it in
+`hydrateRoot`'s `controlLeases`, alongside its `bindingLeases`. A suspended or
+declined attempt leaves the early owner active; only an accepted matching
+takeover retires it. See [presentation handoff](./deferred-hydration.md#optional-handoff-to-normal-hydration)
+for the supported shape and ownership requirements.
 
 Use the same bundled engine instance for early and later consumers. Loading an
 independently bundled second copy is not a state handoff. For synchronous native

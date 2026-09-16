@@ -590,8 +590,35 @@ content while takeover is pending causes a clear refusal. A native rest spread
 also requires the same compiler-proven caller prop shape; proof from another
 instance or call site cannot authorize it.
 
-Views with writable controls or unsupported normal-renderer writers do not
-qualify for structural handoff. Neither do entered keyed-list, opaque, or generic
+An externally bound textarea value can transfer alongside a fixed presentation.
+Keep `value={unbound(draft$)}` in the authored view and explicitly offer the
+callable cleanup returned by `bindSignalControl`:
+
+```ts
+const control = bindSignalControl(textarea, 'value', draft$);
+// Later, in the renderer entry, using the same textarea, handle and signal owner:
+const root = hydrateRoot(container, Composer, props, {
+	bindingLeases: [earlyBinding],
+	controlLeases: [control],
+});
+```
+
+Do not call `control()` before hydration. Preparation leaves both early owners
+active; accepted publication retires the offered control and installs its direct
+signal successor before refs. The textarea, draft, selection and active
+composition survive takeover. A later call to the old cleanup cannot dispose the
+successor. Normal controlled-value semantics apply after takeover, including an
+explicit changed model value winning during composition.
+
+This path requires a writable string signal, the same concrete handle and data
+owner, and compiler-proven textarea value content without authored children.
+Disposed, already-claimed, foreign or unoffered control ownership fails closed.
+Known-provider style spreads such as `unbound(stylex.attrs(sx))` can use their
+existing closed-field compiler contract; arbitrary spreads remain unsupported.
+No control lease or renderer is needed for a textarea that stays renderer-free.
+
+Other writable controls and unsupported normal-renderer writers do not
+qualify for handoff. Neither do entered keyed-list, opaque, or generic
 renderable regions.
 Unsupported handoffs fail explicitly while preserving the early presentation;
 they do not silently replace its DOM or load a different renderer path. Keep
