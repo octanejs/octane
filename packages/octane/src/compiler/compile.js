@@ -25935,11 +25935,13 @@ function propertyIsEnumerableCall(objNode, name) {
 	);
 }
 
-// `(__s.cleanups ??= []).push(<fn>)` — the scope's cleanup array is lazily allocated (most
-// scopes never register one), so the registration site owns creating it.
+// Ref teardown reads the live bag because updates replace refs. An interrupted
+// mount has no committed bag and never attached its refs, so its cleanup is inert.
 function cleanupsPush(fnNode) {
 	const lazyArray = b.assignment('??=', b.member(b.id('__s'), 'cleanups'), b.array([]));
-	return b.stmt(b.call(b.member(lazyArray, 'push'), fnNode));
+	return b.stmt(
+		b.call(b.member(lazyArray, 'push'), b.arrow([], b.logical('&&', b.id('_b'), fnNode.body))),
+	);
 }
 
 /**
@@ -26338,9 +26340,8 @@ function emitBindingMount(bind, elVar, bag) {
 					]),
 				);
 			}
-			// The cleanup closure reads the bag through the captured `_b` — the bag
-			// exists by the time any cleanup runs (committed at mount end), and the
-			// `_host$` field is re-written by updates, so the read must be live.
+			// The `_host$` field is re-written by updates, so cleanup reads the live
+			// bag. cleanupsPush skips that read when mount never committed it.
 			const cleanup = b.arrow(
 				[],
 				b.call(
@@ -26517,9 +26518,8 @@ function emitBindingMount(bind, elVar, bag) {
 			// (queueRefDetach: unmount cleanups run mid-render, and a state-setter
 			// ref firing null synchronously can render before a replacement
 			// element's deferred attach — commit-phase detach batches the two).
-			// The cleanup closure reads the bag through the captured `_b` — the bag
-			// exists by the time any cleanup runs (committed at mount end), and the
-			// `_sp$` field is re-written by updates, so the read must be live.
+			// The `_sp$` field is re-written by updates, so cleanup reads the live
+			// bag. cleanupsPush skips that read when mount never committed it.
 			const flags = bind.skipFormControls
 				? [b.literal(bind.skipDangerouslySetInnerHTML === true), b.literal(true)]
 				: bind.skipDangerouslySetInnerHTML

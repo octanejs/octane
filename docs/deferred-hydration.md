@@ -610,6 +610,12 @@ composition survive takeover. A later call to the old cleanup cannot dispose the
 successor. Normal controlled-value semantics apply after takeover, including an
 explicit changed model value winning during composition.
 
+The successor's value subscription is prepared before either early owner
+retires. If acquiring it fails, the early presentation and control remain
+usable and hydration reports the error. Retirement cleanup must not dispose
+the shared signal owner: doing so intentionally ends that data's lifetime,
+rather than transferring it to hydration.
+
 This path requires a writable string signal, the same concrete handle and data
 owner, and compiler-proven textarea value content without authored children.
 Disposed, already-claimed, foreign or unoffered control ownership fails closed.

@@ -1,6 +1,7 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { mount, act } from './_helpers';
 import { createRoot, flushSync } from '../src/index.js';
+import { loadCompiledFixtureSource } from './_server-fixture.js';
 import {
 	SetterRefSwap,
 	LoggedRefSwap,
@@ -15,6 +16,57 @@ import {
 // then saw its null-update render before the replacement element's attach, and
 // a fixture like SetterRefSwap flip-flopped between its arms forever.
 describe('compiled ref teardown detaches at commit', () => {
+	for (const dev of [true, false]) {
+		for (const [name, id, source] of [
+			[
+				'direct ref',
+				'/src/interrupted-ref.tsx',
+				`export function View(props) {
+					return <section ref={props.onReady}><textarea value={props.value} /></section>;
+				}`,
+			],
+			[
+				'merged props ref',
+				'/src/interrupted-ref.tsrx',
+				`export function View(props) @{
+					<section id="first" id="second" ref={element => props.onReady(element)}>
+						<textarea value={props.value} />
+					</section>
+				}`,
+			],
+		]) {
+			it(`preserves the original error when a mount stops after preparing a ${name} (${dev ? 'dev' : 'prod'})`, () => {
+				const { View } = loadCompiledFixtureSource(source, {
+					id,
+					mode: 'client',
+					compileOptions: { dev, hmr: false },
+				});
+				const failure = new Error('value coercion failed');
+				const onReady = vi.fn();
+				const onUncaughtError = vi.fn();
+				const container = document.createElement('div');
+				const root = createRoot(container, { onUncaughtError });
+				try {
+					expect(() =>
+						root.render(View, {
+							onReady,
+							value: {
+								toString() {
+									throw failure;
+								},
+							},
+						}),
+					).not.toThrow();
+					expect(onUncaughtError).toHaveBeenCalledExactlyOnceWith(failure);
+					expect(onReady).not.toHaveBeenCalled();
+					expect(container.childElementCount).toBe(0);
+				} finally {
+					root.unmount();
+				}
+			});
+		}
+	}
+
 	it('a state-setter ref on an element rebuilt by its own state converges', async () => {
 		const observed: any[] = [];
 		const m = mount(SetterRefSwap as any, { observe: (t: any) => observed.push(t) });

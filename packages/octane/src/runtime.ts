@@ -19177,14 +19177,18 @@ export function beginPresentationHydration(
 		releaseBindingHandoff(lease);
 		// Only prepared native writes publish here, before refs. Retiring early
 		// ownership does not restore old styles/classes or retire shared signals.
+		let publicationStarted = false;
 		let published = false;
 		try {
 			lease.retire(() => {
+				// The early presentation is already retired on callback entry, even
+				// when a later prepared writer fails before publication completes.
+				publicationStarted = true;
 				for (const writes of frame.writes.values()) for (const write of writes.values()) write();
 				published = true;
 			});
 		} catch (error) {
-			if (!published) throw error;
+			if (!publicationStarted) throw error;
 			reportRendererOwnerError(scope, error);
 		} finally {
 			frame.writes.clear();
@@ -19332,7 +19336,7 @@ function preparePresentationSignalValue(args: any[], frame: PresentationHydratio
 		const reusable =
 			prior?.[DIRECT_SIGNAL_BINDING] === true &&
 			!prior.disposed &&
-			prior.unsubscribe === undefined &&
+			prior.input === undefined &&
 			prior.handle === handle &&
 			prior.target === element &&
 			prior.kind === 'value' &&
@@ -19350,6 +19354,33 @@ function preparePresentationSignalValue(args: any[], frame: PresentationHydratio
 					disposed: false,
 				};
 		if (!reusable) registerHookCleanup(scope, () => disposeDirectSignalBinding(binding));
+		if (binding.unsubscribe === undefined) {
+			// Acquire the fallible subscription before either early lease retires.
+			// It cannot write or join a transition until input ownership is installed.
+			const notify = Object.assign(
+				() => {
+					if (binding.controlWriterCleanup !== undefined) updateDirectSignalBinding(binding);
+				},
+				{
+					[NATIVE_TRANSITION_CONSUMER]: {
+						active: () =>
+							binding.controlWriterCleanup !== undefined &&
+							!binding.disposed &&
+							!scope.block.disposed,
+						prepare: () => prepareNativeTransitionBlock(scope.block),
+					},
+				},
+			);
+			const stop = handle[SIGNAL_BINDING_SUBSCRIBE](notify, () =>
+				disposeDirectSignalBinding(binding),
+			);
+			if (typeof stop !== 'function') throw new TypeError(formatClientError(74));
+			if (binding.disposed || scope.block.disposed) {
+				stop();
+				presentationMiss(false);
+			}
+			binding.unsubscribe = stop;
+		}
 		preparePresentationOperation(frame, element, 'value', () => {
 			if (binding.disposed || scope.block.disposed) return;
 			runWithBlockSignalOwner(scope, () => {
@@ -19368,7 +19399,7 @@ function preparePresentationSignalValue(args: any[], frame: PresentationHydratio
 				// an old controlled value over a native edit dispatched by cleanup.
 				ctrl.v = UNCONTROLLED;
 				// The old owner is offered explicitly. Revoke it only once the matching
-				// presentation commits, before enabling the successor's subscription.
+				// presentation commits, before enabling the successor's input writer.
 				let failed = false;
 				let failure: unknown;
 				if (lease !== undefined) {
@@ -19391,7 +19422,8 @@ function preparePresentationSignalValue(args: any[], frame: PresentationHydratio
 					// Only a new retirement edit can supersede its final model write.
 					binding.pendingControl =
 						snapshot.editRevision > (lease === undefined ? 0 : before.editRevision);
-					activateDirectSignalBinding(binding, snapshot.revision);
+					installDirectSignalControl(binding);
+					if (!binding.pendingControl) consumeHydrationControl(element, snapshot.revision);
 					if (binding.pendingControl) queueDirectSignalControlAdoption(binding);
 					else {
 						const current = readSignalBinding(handle);
@@ -19916,11 +19948,14 @@ function disposeDirectSignalBinding(binding: DirectSignalBinding): void {
 	if (DEFERRED_LAYOUT_DRIVER?.stageAction(() => disposeDirectSignalBinding(binding)) === true)
 		return;
 	binding.disposed = true;
-	binding.unsubscribe?.();
-	retireNativeTransitionBlock(binding.scope.block);
-	binding.controlWriterCleanup?.();
-	if (binding.input !== undefined) {
-		domNode(binding.target as Element).removeEventListener('input', binding.input);
+	try {
+		binding.unsubscribe?.();
+	} finally {
+		retireNativeTransitionBlock(binding.scope.block);
+		binding.controlWriterCleanup?.();
+		if (binding.input !== undefined) {
+			domNode(binding.target as Element).removeEventListener('input', binding.input);
+		}
 	}
 }
 
