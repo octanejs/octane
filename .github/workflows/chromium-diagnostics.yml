@@ -68,6 +68,6 @@ jobs:
         if: ${{ always() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: chromium-diagnostics-${{ matrix.trial }}
+          name: chromium-diagnostics-${{ matrix.trial }}-attempt-${{ github.run_attempt }}
           path: ${{ runner.temp }}/chromium-diagnostics/
           retention-days: 7
