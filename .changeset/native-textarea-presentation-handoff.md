@@ -6,4 +6,6 @@ Support explicit handoff of a standalone textarea signal value alongside an adop
 
 Keep early ownership intact when preparing a successor subscription fails, and avoid masking interrupted mounts with a secondary ref-cleanup error.
 
+Release all prepared value successors when a later control invalidates presentation publication, preserving the original error and preventing stale input or model writers from being reclaimed by that root.
+
 Reject competing presentation bindings for fields supplied by an unbound known-provider spread, including `class`/`className` aliases.

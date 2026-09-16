@@ -616,9 +616,11 @@ usable and hydration reports the error. Retirement cleanup must not dispose
 the shared signal owner: doing so intentionally ends that data's lifetime,
 rather than transferring it to hydration. Cleanup must also leave the textarea
 in its accepted position. If it moves or replaces the node, hydration reports
-the invalid transfer and does not install a stale value writer. Retirement has
-already begun at that point; it does not roll back user cleanup or revive the
-retired early presentation.
+the invalid transfer and releases every prepared value successor in that
+presentation, including controls published before the failure. Later renders
+cannot reclaim those revoked channels; independent controls can bind them.
+Retirement has already begun at that point; it does not roll back user cleanup
+or revive the retired early presentation.
 
 This path requires a writable string signal, the same concrete handle and data
 owner, and compiler-proven textarea value content without authored children.

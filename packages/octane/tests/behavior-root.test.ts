@@ -971,7 +971,7 @@ export function NativeStylexControlPresentation({
 						firstTextarea,
 						secondTextarea,
 					]);
-					expect(firstTextarea.value).toBe('first hydrated');
+					expect(firstTextarea.value).toBe('first draft');
 					expect(secondTextarea.value).toBe(replacement ? 'replacement draft' : 'second draft');
 					if (replacement) {
 						await act(() => successor.set('replacement model update'));
@@ -1015,121 +1015,170 @@ export function NativeStylexControlPresentation({
 			'throwing replacement',
 		] as const) {
 			it(`does not claim a textarea ${mutation} by its own retirement cleanup (${dev ? 'dev' : 'prod'})`, async () => {
-				const scope = createScope({
-					scopeKey: `native-textarea-own-retirement-${mutation}-${dev}`,
-				});
-				const draft = scope.signal$('draft', 'server draft');
-				const props = {
-					draft,
-					first: draft,
-					second: scope.signal$('second', 'second draft'),
-					readOnly: scope.signal$('readonly', false),
-					disabled: scope.signal$('disabled', false),
-					required: scope.signal$('required', true),
-					placeholder: scope.signal$('placeholder', 'Search'),
-				};
-				const view =
-					mutation === 'ancestor reparented'
-						? 'NativeControlPairPresentation'
-						: 'NativeControlPresentation';
-				const fixture = authoredPresentation(view, props, dev);
-				container.innerHTML = fixture.html;
-				const textarea = container.querySelector('textarea')!;
-				const destination = document.createElement('div');
-				const replacement = document.createElement('textarea');
-				const failure = new Error('retirement moved the control');
-				const cleanup = vi.fn(() => {
-					if (mutation === 'removed') textarea.remove();
-					else if (mutation === 'reparented' || mutation === 'ancestor reparented') {
-						container.append(destination);
-						destination.append(mutation === 'reparented' ? textarea : textarea.parentElement!);
-					} else textarea.replaceWith(replacement);
-					if (mutation === 'throwing replacement') throw failure;
-				});
-				const subscribe = draft[SIGNAL_BINDING_SUBSCRIBE].bind(draft);
-				const subscription = vi
-					.spyOn(draft, SIGNAL_BINDING_SUBSCRIBE)
-					.mockImplementationOnce((notify, onRetire) => {
+				for (const retirement of ['own', 'later', 'mixed', 'owner disposed'] as const) {
+					const laterRetirement = retirement !== 'own';
+					const scope = createScope({
+						scopeKey: `native-textarea-own-retirement-${mutation}-${dev}-${retirement}`,
+					});
+					const draft = scope.signal$('draft', 'server draft');
+					const secondScope =
+						retirement === 'owner disposed' ? createScope({ scopeKey: 'retiring-second' }) : scope;
+					const props = {
+						draft,
+						first: draft,
+						second: secondScope.signal$('second', 'second draft'),
+						readOnly: scope.signal$('readonly', false),
+						disabled: scope.signal$('disabled', false),
+						required: scope.signal$('required', true),
+						placeholder: scope.signal$('placeholder', 'Search'),
+					};
+					const view =
+						laterRetirement || mutation === 'ancestor reparented'
+							? 'NativeControlPairPresentation'
+							: 'NativeControlPresentation';
+					const fixture = authoredPresentation(view, props, dev);
+					container.innerHTML = fixture.html;
+					const textarea = container.querySelector('textarea')!;
+					const destination = document.createElement('div');
+					const replacement = document.createElement('textarea');
+					const failure = new Error('retirement moved the control');
+					const cleanup = vi.fn(() => {
+						if (secondScope !== scope) secondScope.dispose();
+						if (mutation === 'removed') textarea.remove();
+						else if (mutation === 'reparented' || mutation === 'ancestor reparented') {
+							container.append(destination);
+							destination.append(mutation === 'reparented' ? textarea : textarea.parentElement!);
+						} else textarea.replaceWith(replacement);
+						if (mutation === 'throwing replacement') throw failure;
+					});
+					const retiringSignal = laterRetirement ? props.second : draft;
+					const subscribe = retiringSignal[SIGNAL_BINDING_SUBSCRIBE].bind(retiringSignal);
+					const subscription = vi
+						.spyOn(retiringSignal, SIGNAL_BINDING_SUBSCRIBE)
+						.mockImplementationOnce((notify, onRetire) => {
+							const stop = subscribe(notify, onRetire);
+							return () => {
+								stop();
+								cleanup();
+							};
+						});
+					const control =
+						retirement === 'mixed'
+							? undefined
+							: runWithSignalOwner(scope, () => bindSignalControl(textarea, 'value', draft));
+					const laterControl = laterRetirement
+						? runWithSignalOwner(scope, () =>
+								bindSignalControl(container.querySelectorAll('textarea')[1], 'value', props.second),
+							)
+						: undefined;
+					const binding = runWithSignalOwner(scope, () =>
+						fixture.attach(container.firstElementChild!, fixture.state),
+					);
+					const successorCleanup = vi.fn();
+					subscription.mockImplementation((notify, onRetire) => {
 						const stop = subscribe(notify, onRetire);
 						return () => {
 							stop();
-							cleanup();
+							successorCleanup();
 						};
 					});
-				const control = runWithSignalOwner(scope, () =>
-					bindSignalControl(textarea, 'value', draft),
-				);
-				const binding = runWithSignalOwner(scope, () =>
-					fixture.attach(container.firstElementChild!, fixture.state),
-				);
-				const successorCleanup = vi.fn();
-				subscription.mockImplementation((notify, onRetire) => {
-					const stop = subscribe(notify, onRetire);
-					return () => {
-						stop();
-						successorCleanup();
-					};
-				});
-				const onUncaughtError = vi.fn();
-				const next = scope.signal$('next', 'independent draft');
-				let nextControl: ReturnType<typeof bindSignalControl> | undefined;
-				let replacementControl: ReturnType<typeof bindSignalControl> | undefined;
-				try {
-					hydratedRoot = hydrateRoot(container, fixture.loadClient()[view], props, {
-						signalOwner: scope,
-						bindingLeases: [binding],
-						controlLeases: [control],
-						onUncaughtError,
+					const earlierCleanup = vi.fn(() => {
+						if (mutation === 'throwing replacement') throw new Error('earlier successor cleanup');
 					});
-					expect(cleanup).toHaveBeenCalledOnce();
-					expect(fixture.cleanup).toHaveBeenCalledOnce();
-					expect(successorCleanup).toHaveBeenCalledOnce();
-					expect(onUncaughtError).toHaveBeenCalledOnce();
-					if (mutation === 'throwing replacement')
-						expect(onUncaughtError).toHaveBeenCalledWith(failure);
-					else
-						expect(onUncaughtError.mock.calls[0][0].message).toMatch(
-							/active fixed native views|errors\/77/,
+					const earlierSubscribe = draft[SIGNAL_BINDING_SUBSCRIBE].bind(draft);
+					const earlierSubscription = laterRetirement
+						? vi.spyOn(draft, SIGNAL_BINDING_SUBSCRIBE).mockImplementation((notify, onRetire) => {
+								const stop = earlierSubscribe(notify, onRetire);
+								return () => {
+									stop();
+									earlierCleanup();
+								};
+							})
+						: undefined;
+					const onUncaughtError = vi.fn();
+					const next = scope.signal$('next', 'independent draft');
+					let nextControl: ReturnType<typeof bindSignalControl> | undefined;
+					let replacementControl: ReturnType<typeof bindSignalControl> | undefined;
+					try {
+						hydratedRoot = hydrateRoot(container, fixture.loadClient()[view], props, {
+							signalOwner: scope,
+							bindingLeases: [binding],
+							controlLeases:
+								control === undefined
+									? [laterControl!]
+									: laterControl === undefined
+										? [control]
+										: [control, laterControl],
+							onUncaughtError,
+						});
+						expect(cleanup).toHaveBeenCalledOnce();
+						expect(fixture.cleanup).toHaveBeenCalledOnce();
+						expect(successorCleanup).toHaveBeenCalledOnce();
+						expect(onUncaughtError).toHaveBeenCalledOnce();
+						if (mutation === 'throwing replacement')
+							expect(onUncaughtError).toHaveBeenCalledWith(failure);
+						else
+							expect(onUncaughtError.mock.calls[0][0].message).toMatch(
+								/active fixed native views|errors\/77/,
+							);
+						if (mutation === 'ancestor reparented')
+							expect(textarea.parentElement!.parentNode).toBe(destination);
+						else expect(textarea.parentNode).toBe(mutation === 'reparented' ? destination : null);
+						await act(() => draft.set('stale model update'));
+						expect(textarea.value).toBe('server draft');
+						textarea.value = 'unowned native edit';
+						await act(() => textarea.dispatchEvent(new InputEvent('input', { bubbles: true })));
+						expect(draft.get()).toBe('stale model update');
+						expect(textarea.value).toBe('unowned native edit');
+						if (laterRetirement) expect(earlierCleanup).toHaveBeenCalledOnce();
+						for (let retry = 0; retry < 2; retry++) {
+							try {
+								await act(() => hydratedRoot!.render(fixture.loadClient()[view], props));
+							} catch (error) {
+								expect((error as Error).message).toMatch(/unmounted root|errors\/29/);
+							}
+							expect(textarea.value).toBe('unowned native edit');
+							expect(draft.get()).toBe('stale model update');
+						}
+						for (const [error] of onUncaughtError.mock.calls.slice(1))
+							expect(error.message).toMatch(
+								/supported fixed native view|active fixed native views|errors\/(75|77)/,
+							);
+						const reports = onUncaughtError.mock.calls.length;
+						nextControl = runWithSignalOwner(scope, () =>
+							bindSignalControl(textarea, 'value', next),
 						);
-					if (mutation === 'ancestor reparented')
-						expect(textarea.parentElement!.parentNode).toBe(destination);
-					else expect(textarea.parentNode).toBe(mutation === 'reparented' ? destination : null);
-					await act(() => draft.set('stale model update'));
-					expect(textarea.value).toBe('server draft');
-					textarea.value = 'unowned native edit';
-					await act(() => textarea.dispatchEvent(new InputEvent('input', { bubbles: true })));
-					expect(draft.get()).toBe('stale model update');
-					for (const [error] of onUncaughtError.mock.calls.slice(1))
-						expect(error.message).toMatch(
-							/supported fixed native view|active fixed native views|errors\/(75|77)/,
-						);
-					const reports = onUncaughtError.mock.calls.length;
-					nextControl = runWithSignalOwner(scope, () => bindSignalControl(textarea, 'value', next));
-					if (replacement.parentNode !== null)
-						replacementControl = runWithSignalOwner(scope, () =>
-							bindSignalControl(replacement, 'value', next),
-						);
-					textarea.value = 'independent native edit';
-					await act(() => textarea.dispatchEvent(new InputEvent('input', { bubbles: true })));
-					expect(next.get()).toBe('independent native edit');
-					expect(draft.get()).toBe('stale model update');
-					expect(onUncaughtError).toHaveBeenCalledTimes(reports);
-					hydratedRoot.unmount();
-					hydratedRoot = undefined;
-					next.set('independent after unmount');
-					expect(textarea.value).toBe('independent after unmount');
-					if (replacementControl !== undefined)
-						expect(replacement.value).toBe('independent after unmount');
-					expect(successorCleanup).toHaveBeenCalledOnce();
-				} finally {
-					hydratedRoot?.unmount();
-					hydratedRoot = undefined;
-					binding.dispose();
-					control();
-					nextControl?.();
-					replacementControl?.();
-					subscription.mockRestore();
-					scope.dispose();
+						if (replacement.parentNode !== null)
+							replacementControl = runWithSignalOwner(scope, () =>
+								bindSignalControl(replacement, 'value', next),
+							);
+						textarea.value = 'independent native edit';
+						await act(() => textarea.dispatchEvent(new InputEvent('input', { bubbles: true })));
+						expect(next.get()).toBe('independent native edit');
+						expect(draft.get()).toBe('stale model update');
+						await act(() => textarea.dispatchEvent(new FocusEvent('blur', { bubbles: true })));
+						expect(textarea.value).toBe('independent native edit');
+						expect(onUncaughtError).toHaveBeenCalledTimes(reports);
+						hydratedRoot.unmount();
+						hydratedRoot = undefined;
+						next.set('independent after unmount');
+						expect(textarea.value).toBe('independent after unmount');
+						if (replacementControl !== undefined)
+							expect(replacement.value).toBe('independent after unmount');
+						expect(successorCleanup).toHaveBeenCalledOnce();
+					} finally {
+						hydratedRoot?.unmount();
+						hydratedRoot = undefined;
+						binding.dispose();
+						control?.();
+						laterControl?.();
+						nextControl?.();
+						replacementControl?.();
+						earlierSubscription?.mockRestore();
+						subscription.mockRestore();
+						if (secondScope !== scope) secondScope.dispose();
+						scope.dispose();
+					}
 				}
 			});
 		}

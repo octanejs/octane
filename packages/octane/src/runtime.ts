@@ -3493,7 +3493,7 @@ interface RootRenderOwner {
 	/** Shared document/account data owner; distinct from this root's presentation owner. */
 	signalOwner?: SignalOwner;
 	bindingLeases?: Set<BindingHandoff>;
-	controlLeases?: Map<Element, ControlHandoff>;
+	controlLeases?: Map<Element, ControlHandoff | undefined>;
 	preservePresentation?: boolean;
 	bindingContainer?: Node;
 	adopt?: (block: Block) => void;
@@ -18962,7 +18962,15 @@ interface PresentationHydrationFrame {
 	readToken: number;
 	witnessToken: number;
 	witnesses: Map<object, NativeReadWitness | null>;
-	controls?: Map<Element, () => boolean>;
+	controls?: Map<
+		Element,
+		{
+			valid: (retired?: boolean) => boolean;
+			binding: DirectSignalBinding;
+			lease: ControlHandoff | undefined;
+			stop?: () => void;
+		}
+	>;
 	completed: boolean;
 	lease: BindingHandoff;
 	revision?: number;
@@ -19016,7 +19024,7 @@ function presentationMiss(retry = true): never {
 }
 
 function currentPresentation(frame: PresentationHydrationFrame): boolean {
-	if (frame.controls !== undefined && [...frame.controls.values()].some((valid) => !valid()))
+	if (frame.controls !== undefined && [...frame.controls.values()].some(({ valid }) => !valid()))
 		return false;
 	if (frame.revision === undefined && frame.controls === undefined) return true;
 	const lease = frame.lease;
@@ -19184,7 +19192,33 @@ export function beginPresentationHydration(
 				// The early presentation is already retired on callback entry, even
 				// when a later prepared writer fails before publication completes.
 				publicationStarted = true;
-				for (const writes of frame.writes.values()) for (const write of writes.values()) write();
+				try {
+					for (const writes of frame.writes.values()) for (const write of writes.values()) write();
+				} catch (error) {
+					// Publication is irreversible. Revoke every captured successor before
+					// arbitrary unsubscribe or presentation cleanup can dispatch input.
+					for (const [element, control] of frame.controls ?? []) {
+						const binding = control.binding;
+						// An already-released, intact and unclaimed channel needs no new
+						// guard that would mask its data owner's original read failure.
+						if (binding.disposed && control.valid(true)) continue;
+						// Undefined guards a channel without an offered early owner too.
+						(owner.controlLeases ??= new Map()).set(element, control.lease);
+						if (binding.disposed) continue;
+						if (binding.input !== undefined) renderControlledState(element)!.v = UNCONTROLLED;
+						control.stop = binding.unsubscribe;
+						binding.unsubscribe = undefined;
+						disposeDirectSignalBinding(binding);
+					}
+					for (const control of frame.controls?.values() ?? []) {
+						try {
+							control.stop?.();
+						} catch {
+							// Preserve the publication failure, but attempt every cleanup.
+						}
+					}
+					throw error;
+				}
 				published = true;
 			});
 		} catch (error) {
@@ -19331,8 +19365,6 @@ function preparePresentationSignalValue(args: any[], frame: PresentationHydratio
 				: !hasSignalControlBinding(element, 'value') &&
 					!hasHydrationControlSignalWriter(element, 'value'));
 		if (!valid()) presentationMiss(false);
-		(frame.controls ??= new Map()).set(element, valid);
-		trackPresentationFrame(frame);
 		const prior = previous as DirectSignalBinding | undefined;
 		const reusable =
 			prior?.[DIRECT_SIGNAL_BINDING] === true &&
@@ -19354,6 +19386,8 @@ function preparePresentationSignalValue(args: any[], frame: PresentationHydratio
 					value,
 					disposed: false,
 				};
+		(frame.controls ??= new Map()).set(element, { valid, binding, lease });
+		trackPresentationFrame(frame);
 		if (!reusable) registerHookCleanup(scope, () => disposeDirectSignalBinding(binding));
 		if (binding.unsubscribe === undefined) {
 			// Acquire the fallible subscription before either early lease retires.
@@ -19387,11 +19421,7 @@ function preparePresentationSignalValue(args: any[], frame: PresentationHydratio
 			runWithBlockSignalOwner(scope, () => {
 				// An earlier control's retirement can synchronously replace this
 				// captured owner. Never publish a stale writer over its successor.
-				if (!valid()) {
-					disposeDirectSignalBinding(binding);
-					reportRendererOwnerError(scope, new Error(formatClientError(77)));
-					return;
-				}
+				if (!valid()) throw new Error(formatClientError(77));
 				const before = snapshotHydrationControl(element)!;
 				const ctrl = armControlled(element);
 				ctrl.composing = before.composing || lease?.composing() === true;
@@ -19416,14 +19446,8 @@ function preparePresentationSignalValue(args: any[], frame: PresentationHydratio
 				// Retirement is user code: revalidate the captured presentation before
 				// installing its input writer. Keep a revoked offer guarded against
 				// ordinary writes until root cleanup.
-				if (lease !== undefined && !binding.disposed && !scope.block.disposed && !valid(true)) {
-					try {
-						disposeDirectSignalBinding(binding);
-					} catch (error) {
-						if (!failed) throw error;
-					}
+				if (lease !== undefined && !scope.block.disposed && !valid(true))
 					throw failed ? failure : new Error(formatClientError(77));
-				}
 				if (lease !== undefined) owner.controlLeases!.delete(element);
 				if (!binding.disposed && !scope.block.disposed) {
 					// User cleanup may dispatch input or end composition. Sample again;
@@ -43383,7 +43407,8 @@ function makeRoot(
 			unmounted = true;
 			renderOwner.disposed = true;
 			if (renderOwner.controlLeases !== undefined) {
-				for (const lease of renderOwner.controlLeases.values()) lease.owner = undefined;
+				for (const lease of renderOwner.controlLeases.values())
+					if (lease !== undefined) lease.owner = undefined;
 				renderOwner.controlLeases.clear();
 			}
 			if (renderOwner.bindingLeases !== undefined) {
