@@ -1,10 +1,17 @@
 import { errorMonitor } from 'node:events';
+import { join } from 'node:path';
+import { createDiagnosticWriter } from './browser-diagnostics-lib.mjs';
+
+const writeDiagnostic = process.env.OCTANE_BROWSER_DIAGNOSTICS_DIR
+	? createDiagnosticWriter(join(process.env.OCTANE_BROWSER_DIAGNOSTICS_DIR, 'browser-events.jsonl'))
+	: undefined;
 
 // Temporary, opt-in evidence for browser parity disconnects. Observe the provider
 // after its initial navigation; never inject into tests or retry a failed session.
 let observedServers;
 
 function reportDiagnostic(details) {
+	writeDiagnostic?.(details.event, details);
 	try {
 		process.stderr.write(
 			`${JSON.stringify({ diagnostic: 'parity-browser', at: new Date().toISOString(), ...details })}\n`,
