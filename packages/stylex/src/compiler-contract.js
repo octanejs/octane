@@ -11,4 +11,11 @@ export const knownAttributeSpreads = [
 		style: 'object',
 		jsxAttribute: 'sx',
 	},
+	{
+		source: '@octanejs/stylex',
+		imported: '*',
+		members: ['props'],
+		fields: ['className', 'style', 'data-style-src'],
+		style: 'object',
+	},
 ];

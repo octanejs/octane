@@ -77,6 +77,13 @@ attribute and applies a `style` object — so there's no octane-specific `props(
 variant to learn. `stylex.attrs()` (which returns `{ class, style }` as a string) is
 also re-exported for raw-attribute contexts.
 
+The compiler contract specializes `props()` and native `sx`, not `attrs()`.
+If an application already specializes `@stylexjs/stylex.attrs`, keep that
+runtime import and contract when adopting `sx` in the same file. An adapter
+type import supplies the native JSX extension without replacing the runtime
+namespace. A blanket import replacement can turn those existing spreads into
+generic host-prop work.
+
 ### Native `sx` and signals
 
 With the compiler contract above, a native `sx` expression accepts StyleX styles
@@ -151,6 +158,10 @@ contains every rule regardless of module/transform order.
   class/style writers, and scoped classes on that same host report a compiler
   error. Keyed `@for` rows are supported. Signal reads inside callbacks,
   constructors, or tagged templates are not lifted.
+- Renderer-free views require statically named dynamic style functions. Select
+  between recipes with `sx={wide$ ? styles.width(size$) : styles.height(size$)}`;
+  computed calls such as `styles[recipe$](size$)` cannot yet be proved safe by
+  the renderer-free compiler, even though normal rendering supports them.
 - The plugin runs the StyleX compiler on octane's _output_, so StyleX's own
   source-scanning tools (the PostCSS plugin) are not used and not needed.
 

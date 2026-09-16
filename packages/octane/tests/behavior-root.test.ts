@@ -5647,7 +5647,7 @@ export function SignalStyleProps(props) @{ 'use dom bindings';
 				expect(projectedNode.className).toBe('scaled');
 				expect(projected.cleanup).toHaveBeenCalledOnce();
 			}
-			for (const structural of [false, true]) {
+			for (const structural of [false, true, 'local-child'] as const) {
 				for (const adopt of [false, true]) {
 					const height$ = controlScope.signal$<unknown>(`projection-${structural}-${adopt}`, 2);
 					const variant$ = controlScope.signal$(`projection-variant-${structural}-${adopt}`, 'dy');
@@ -5669,8 +5669,14 @@ const styles = stylex.create({ dy: (height) => ({
  style: { height },
  'data-style-src': height == null ? null : 'sized-source'
 }), doubled: height => ({ className: 'double', style: { height: height * 2 } }) });
+function ProjectionLeaf(props) @{
+ <div sx={props.variant$ === "dy" ? styles.dy(props.height$) : styles.doubled(props.height$)}><input /></div>
+}
+function ProjectionRow(props) @{
+ <ProjectionLeaf height$={props.height$} variant$={props.variant$} />
+}
 export function Projection(props) @{ 'use dom bindings';
- ${structural ? '<section>@for (const row of props.rows; key row.id) { <div sx={props.variant$ === "dy" ? styles.dy(row.height$) : styles.doubled(row.height$)}><input /></div> }</section>' : '<div sx={props.variant$ === "dy" ? styles.dy(props.height$) : styles.doubled(props.height$)}><input /></div>'}
+ ${structural === 'local-child' ? '<section>@for (const row of props.rows; key row.id) { <ProjectionRow height$={row.height$} variant$={props.variant$} /> }</section>' : structural ? '<section>@for (const row of props.rows; key row.id) { <div sx={props.variant$ === "dy" ? styles.dy(row.height$) : styles.doubled(row.height$)}><input /></div> }</section>' : '<div sx={props.variant$ === "dy" ? styles.dy(props.height$) : styles.doubled(props.height$)}><input /></div>'}
 }`,
 						{
 							'binding-styles': {

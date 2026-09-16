@@ -490,6 +490,7 @@ export function planBindingProgram(fn, render, context) {
 					controls ||= child.controls;
 					hostOperations ||= child.hostOperations;
 					styles ||= child.styles;
+					projectionsEnabled ||= child.projectionsEnabled;
 					for (const program of child.childPrograms) childPrograms.add(program);
 					lists ||= child.lists;
 					for (const dependency of child.dependencies)
