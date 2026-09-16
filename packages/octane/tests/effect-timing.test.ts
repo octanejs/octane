@@ -10,6 +10,7 @@ import {
 	PassiveBeforeCascadeRender,
 	LayoutBeforeObserver,
 	openLayoutPanel,
+	ReentrantPassiveEffect,
 } from './_fixtures/effect-timing.tsrx';
 
 describe('effect timing', () => {
@@ -143,6 +144,85 @@ describe('effect timing', () => {
 			expect(log).toEqual(['layout']);
 		} finally {
 			rendered?.unmount();
+			drainPassiveEffects();
+			visibility.mockRestore();
+			vi.unstubAllGlobals();
+			vi.useRealTimers();
+		}
+	});
+
+	it('delivers later passive updates after an inline drain cancels an earlier delivery', async () => {
+		vi.useFakeTimers();
+		vi.stubGlobal('requestAnimationFrame', () => 0);
+		const visibility = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
+		let rendered: MountResult | undefined;
+		const log: string[] = [];
+		try {
+			rendered = mount(CoalescedPassiveArtifact, { label: 'a', log });
+			drainPassiveEffects();
+			rendered.update(CoalescedPassiveArtifact, { label: 'b', log });
+			await vi.advanceTimersByTimeAsync(1_000);
+			expect(log).toEqual(['render:a', 'body:a', 'render:b', 'cleanup:a', 'body:b']);
+
+			rendered.update(CoalescedPassiveArtifact, { label: 'c', log });
+			await vi.advanceTimersByTimeAsync(1_000);
+			expect(log).toEqual([
+				'render:a',
+				'body:a',
+				'render:b',
+				'cleanup:a',
+				'body:b',
+				'render:c',
+				'cleanup:b',
+				'body:c',
+			]);
+			expect(rendered.container.querySelector('[data-label="c"]')).not.toBeNull();
+			rendered.unmount();
+			await vi.advanceTimersByTimeAsync(1_000);
+			expect(log.filter((entry) => entry === 'cleanup:c')).toEqual(['cleanup:c']);
+		} finally {
+			rendered?.unmount();
+			drainPassiveEffects();
+			visibility.mockRestore();
+			vi.unstubAllGlobals();
+			vi.useRealTimers();
+		}
+	});
+
+	it('delivers passive work scheduled by an effect that synchronously updates another root', async () => {
+		vi.useFakeTimers();
+		vi.stubGlobal('requestAnimationFrame', () => 0);
+		const visibility = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
+		let first: MountResult | undefined;
+		let second: MountResult | undefined;
+		const firstLog: string[] = [];
+		const secondLog: string[] = [];
+		try {
+			second = mount(CoalescedPassiveArtifact, { label: 'before', log: secondLog });
+			drainPassiveEffects();
+			first = mount(ReentrantPassiveEffect, {
+				tick: 0,
+				log: firstLog,
+				onEffect: () =>
+					second!.update(CoalescedPassiveArtifact, { label: 'after', log: secondLog }),
+			});
+			await vi.advanceTimersByTimeAsync(1_000);
+			expect(firstLog).toEqual(['body:0']);
+			expect(secondLog).toEqual([
+				'render:before',
+				'body:before',
+				'render:after',
+				'cleanup:before',
+				'body:after',
+			]);
+			expect(second.container.querySelector('[data-label="after"]')).not.toBeNull();
+			first.unmount();
+			second.unmount();
+			expect(firstLog).toEqual(['body:0', 'cleanup:0']);
+			expect(secondLog.at(-1)).toBe('cleanup:after');
+		} finally {
+			first?.unmount();
+			second?.unmount();
 			drainPassiveEffects();
 			visibility.mockRestore();
 			vi.unstubAllGlobals();

@@ -1332,6 +1332,27 @@ const SUITES = [
 		],
 	},
 	{
+		name: 'runtime-style-dedup',
+		cwd: 'runtime-style-dedup',
+		servers: [],
+		iter: { normal: 1, quick: 1 },
+		runs: [{ script: 'run.mjs', args: () => [] }],
+	},
+	{
+		name: 'empty-host-children',
+		cwd: 'empty-host-children',
+		servers: [],
+		iter: { normal: 1, quick: 1 },
+		runs: [{ script: 'run.mjs', args: () => [] }],
+	},
+	{
+		name: 'passive-scheduling',
+		cwd: 'passive-scheduling',
+		servers: [],
+		iter: { normal: 1, quick: 1 },
+		runs: [{ script: 'run.mjs', args: () => [] }],
+	},
+	{
 		// Deterministic branch hydration lookups and descriptor-key work, with
 		// output, identity, event/effect, coercion, and hydration controls.
 		name: 'client-hot-paths',

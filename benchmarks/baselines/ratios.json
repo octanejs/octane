@@ -8658,5 +8658,221 @@
     "reference": "sampled",
     "maxRatio": 0,
     "note": "Direct signal-valued styles update through their DOM binding without re-running component setup. The sampled-read control must display the same styles and preserve the same host and child identities."
+  },
+  {
+    "suite": "runtime-style-dedup",
+    "op": "style_records",
+    "target": "repeated",
+    "reference": "single",
+    "maxRatio": 1,
+    "note": "Repeated identical component CSS creates no additional style records; clean and observed renders must preserve complete HTML/CSS and changed CSS/nonce controls."
+  },
+  {
+    "suite": "runtime-style-dedup",
+    "op": "style_records",
+    "target": "compiled-repeated",
+    "reference": "compiled-single",
+    "maxRatio": 1,
+    "note": "Repeated identical component CSS creates no additional style records; clean and observed renders must preserve complete HTML/CSS and changed CSS/nonce controls."
+  },
+  {
+    "suite": "passive-scheduling",
+    "op": "changed_callback_identities",
+    "target": "runtime",
+    "reference": "budget",
+    "maxRatio": 1,
+    "note": "Repeated passive batches reuse one callback identity with the same scheduling count; unchanged dependencies schedule no work. Public effect and cleanup logs match the clean runtime after inline drains."
+  },
+  {
+    "suite": "passive-scheduling",
+    "op": "changed_schedules",
+    "target": "runtime",
+    "reference": "budget",
+    "maxRatio": 1,
+    "note": "Repeated passive batches reuse one callback identity with the same scheduling count; unchanged dependencies schedule no work. Public effect and cleanup logs match the clean runtime after inline drains."
+  },
+  {
+    "suite": "passive-scheduling",
+    "op": "unchanged_schedules",
+    "target": "runtime",
+    "reference": "budget",
+    "maxRatio": 0,
+    "note": "Repeated passive batches reuse one callback identity with the same scheduling count; unchanged dependencies schedule no work. Public effect and cleanup logs match the clean runtime after inline drains."
+  },
+  {
+    "suite": "passive-scheduling",
+    "op": "unchanged_callback_identities",
+    "target": "runtime",
+    "reference": "budget",
+    "maxRatio": 0,
+    "note": "Repeated passive batches reuse one callback identity with the same scheduling count; unchanged dependencies schedule no work. Public effect and cleanup logs match the clean runtime after inline drains."
+  },
+  {
+    "suite": "empty-host-children",
+    "op": "array_expressions",
+    "target": "empty-128-mount",
+    "reference": "hosts-128",
+    "maxRatio": 0,
+    "note": "Executed child-reconciler array expressions per selected host, with clean production DOM, survivor identity, events and ref-lifetime controls. Empty hosts skip arrays; populated controls retain their existing budgets."
+  },
+  {
+    "suite": "empty-host-children",
+    "op": "array_expressions",
+    "target": "empty-128-update",
+    "reference": "hosts-128",
+    "maxRatio": 0,
+    "note": "Executed child-reconciler array expressions per selected host, with clean production DOM, survivor identity, events and ref-lifetime controls. Empty hosts skip arrays; populated controls retain their existing budgets."
+  },
+  {
+    "suite": "empty-host-children",
+    "op": "array_expressions",
+    "target": "empty-128-unchanged",
+    "reference": "hosts-128",
+    "maxRatio": 0,
+    "note": "Executed child-reconciler array expressions per selected host, with clean production DOM, survivor identity, events and ref-lifetime controls. Empty hosts skip arrays; populated controls retain their existing budgets."
+  },
+  {
+    "suite": "empty-host-children",
+    "op": "array_expressions",
+    "target": "text-128-mount",
+    "reference": "hosts-128",
+    "maxRatio": 2,
+    "note": "Executed child-reconciler array expressions per selected host, with clean production DOM, survivor identity, events and ref-lifetime controls. Empty hosts skip arrays; populated controls retain their existing budgets."
+  },
+  {
+    "suite": "empty-host-children",
+    "op": "array_expressions",
+    "target": "text-128-update",
+    "reference": "hosts-128",
+    "maxRatio": 0,
+    "note": "Executed child-reconciler array expressions per selected host, with clean production DOM, survivor identity, events and ref-lifetime controls. Empty hosts skip arrays; populated controls retain their existing budgets."
+  },
+  {
+    "suite": "empty-host-children",
+    "op": "array_expressions",
+    "target": "text-128-unchanged",
+    "reference": "hosts-128",
+    "maxRatio": 0,
+    "note": "Executed child-reconciler array expressions per selected host, with clean production DOM, survivor identity, events and ref-lifetime controls. Empty hosts skip arrays; populated controls retain their existing budgets."
+  },
+  {
+    "suite": "empty-host-children",
+    "op": "array_expressions",
+    "target": "nested-128-mount",
+    "reference": "hosts-128",
+    "maxRatio": 2,
+    "note": "Executed child-reconciler array expressions per selected host, with clean production DOM, survivor identity, events and ref-lifetime controls. Empty hosts skip arrays; populated controls retain their existing budgets."
+  },
+  {
+    "suite": "empty-host-children",
+    "op": "array_expressions",
+    "target": "nested-128-update",
+    "reference": "hosts-128",
+    "maxRatio": 5,
+    "note": "Executed child-reconciler array expressions per selected host, with clean production DOM, survivor identity, events and ref-lifetime controls. Empty hosts skip arrays; populated controls retain their existing budgets."
+  },
+  {
+    "suite": "empty-host-children",
+    "op": "array_expressions",
+    "target": "nested-128-unchanged",
+    "reference": "hosts-128",
+    "maxRatio": 5,
+    "note": "Executed child-reconciler array expressions per selected host, with clean production DOM, survivor identity, events and ref-lifetime controls. Empty hosts skip arrays; populated controls retain their existing budgets."
+  },
+  {
+    "suite": "empty-host-children",
+    "op": "array_expressions",
+    "target": "empty-512-mount",
+    "reference": "hosts-512",
+    "maxRatio": 0,
+    "note": "Executed child-reconciler array expressions per selected host, with clean production DOM, survivor identity, events and ref-lifetime controls. Empty hosts skip arrays; populated controls retain their existing budgets."
+  },
+  {
+    "suite": "empty-host-children",
+    "op": "array_expressions",
+    "target": "empty-512-update",
+    "reference": "hosts-512",
+    "maxRatio": 0,
+    "note": "Executed child-reconciler array expressions per selected host, with clean production DOM, survivor identity, events and ref-lifetime controls. Empty hosts skip arrays; populated controls retain their existing budgets."
+  },
+  {
+    "suite": "empty-host-children",
+    "op": "array_expressions",
+    "target": "empty-512-unchanged",
+    "reference": "hosts-512",
+    "maxRatio": 0,
+    "note": "Executed child-reconciler array expressions per selected host, with clean production DOM, survivor identity, events and ref-lifetime controls. Empty hosts skip arrays; populated controls retain their existing budgets."
+  },
+  {
+    "suite": "empty-host-children",
+    "op": "array_expressions",
+    "target": "text-512-mount",
+    "reference": "hosts-512",
+    "maxRatio": 2,
+    "note": "Executed child-reconciler array expressions per selected host, with clean production DOM, survivor identity, events and ref-lifetime controls. Empty hosts skip arrays; populated controls retain their existing budgets."
+  },
+  {
+    "suite": "empty-host-children",
+    "op": "array_expressions",
+    "target": "text-512-update",
+    "reference": "hosts-512",
+    "maxRatio": 0,
+    "note": "Executed child-reconciler array expressions per selected host, with clean production DOM, survivor identity, events and ref-lifetime controls. Empty hosts skip arrays; populated controls retain their existing budgets."
+  },
+  {
+    "suite": "empty-host-children",
+    "op": "array_expressions",
+    "target": "text-512-unchanged",
+    "reference": "hosts-512",
+    "maxRatio": 0,
+    "note": "Executed child-reconciler array expressions per selected host, with clean production DOM, survivor identity, events and ref-lifetime controls. Empty hosts skip arrays; populated controls retain their existing budgets."
+  },
+  {
+    "suite": "empty-host-children",
+    "op": "array_expressions",
+    "target": "nested-512-mount",
+    "reference": "hosts-512",
+    "maxRatio": 2,
+    "note": "Executed child-reconciler array expressions per selected host, with clean production DOM, survivor identity, events and ref-lifetime controls. Empty hosts skip arrays; populated controls retain their existing budgets."
+  },
+  {
+    "suite": "empty-host-children",
+    "op": "array_expressions",
+    "target": "nested-512-update",
+    "reference": "hosts-512",
+    "maxRatio": 5,
+    "note": "Executed child-reconciler array expressions per selected host, with clean production DOM, survivor identity, events and ref-lifetime controls. Empty hosts skip arrays; populated controls retain their existing budgets."
+  },
+  {
+    "suite": "empty-host-children",
+    "op": "array_expressions",
+    "target": "nested-512-unchanged",
+    "reference": "hosts-512",
+    "maxRatio": 5,
+    "note": "Executed child-reconciler array expressions per selected host, with clean production DOM, survivor identity, events and ref-lifetime controls. Empty hosts skip arrays; populated controls retain their existing budgets."
+  },
+  {
+    "suite": "runtime-style-dedup",
+    "op": "collection_copies",
+    "target": "seeded-repeated",
+    "reference": "seeded-single",
+    "maxRatio": 2,
+    "note": "Repeated styles after a 32-sheet prefix reuse immutable replay snapshots. The clean render retains complete output and changed CSS/nonce controls. Counts describe source collection copies and copied entries, not heap bytes."
+  },
+  {
+    "suite": "runtime-style-dedup",
+    "op": "copied_entries",
+    "target": "seeded-repeated",
+    "reference": "seeded-single",
+    "maxRatio": 2.04,
+    "note": "Repeated styles after a 32-sheet prefix reuse immutable replay snapshots. The clean render retains complete output and changed CSS/nonce controls. Counts describe source collection copies and copied entries, not heap bytes."
+  },
+  {
+    "suite": "runtime-style-dedup",
+    "op": "collection_copies",
+    "target": "repeated",
+    "reference": "changed",
+    "maxRatio": 0.01,
+    "note": "Identical styles reuse the replay generation, while changing CSS must still replace it. The 128-row fixture preserves complete HTML/CSS and request isolation."
   }
 ]

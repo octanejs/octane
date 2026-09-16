@@ -1,0 +1,347 @@
+{
+  "node": "v26.4.0",
+  "v8": "14.6.202.34-node.21",
+  "platform": "darwin",
+  "arch": "arm64",
+  "cpu": "Apple M5 Max",
+  "order": "A-B-B-A; awaited process completion between every run",
+  "reports": [
+    {
+      "label": "baseline-a",
+      "suite": "passive-scheduling",
+      "targets": [
+        {
+          "name": "runtime",
+          "ops": {
+            "changed_schedules": {
+              "score": 128,
+              "median": 128,
+              "min": 128,
+              "samples": 1
+            },
+            "changed_callback_identities": {
+              "score": 128,
+              "median": 128,
+              "min": 128,
+              "samples": 1
+            },
+            "unchanged_schedules": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            },
+            "unchanged_callback_identities": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            }
+          },
+          "meta": {
+            "cycles": 128,
+            "source": "baseline:733c98d57b76fcfbc8f1272cc1e202582f4bedfd",
+            "runtimeSha256": "c64bfe6b812f76f2acc64d686005d87b5d61e9146a24440141da5a33918836d8",
+            "bundleSha256": "916812374bc8b44560ac7da1090ab55f994a7a147ac60f917152f86512f742fe",
+            "bytes": 406735,
+            "gzip": 125892,
+            "timingMicroseconds": {
+              "median": 1.9103330000000085,
+              "min": 1.272291999999993,
+              "max": 2.4942289999999905,
+              "samples": [
+                2.2329999999999752, 2.3897084999999834, 1.8390834999999868, 2.4942289999999905,
+                1.3398124999999936, 1.9103330000000085, 1.272291999999993, 2.4815210000000154,
+                1.496416499999981
+              ]
+            }
+          }
+        },
+        {
+          "name": "budget",
+          "ops": {
+            "changed_callback_identities": {
+              "score": 1,
+              "median": 1,
+              "min": 1,
+              "samples": 1
+            },
+            "changed_schedules": {
+              "score": 128,
+              "median": 128,
+              "min": 128,
+              "samples": 1
+            },
+            "unchanged_schedules": {
+              "score": 1,
+              "median": 1,
+              "min": 1,
+              "samples": 1
+            },
+            "unchanged_callback_identities": {
+              "score": 1,
+              "median": 1,
+              "min": 1,
+              "samples": 1
+            }
+          }
+        }
+      ]
+    },
+    {
+      "label": "candidate-a",
+      "suite": "passive-scheduling",
+      "targets": [
+        {
+          "name": "runtime",
+          "ops": {
+            "changed_schedules": {
+              "score": 128,
+              "median": 128,
+              "min": 128,
+              "samples": 1
+            },
+            "changed_callback_identities": {
+              "score": 1,
+              "median": 1,
+              "min": 1,
+              "samples": 1
+            },
+            "unchanged_schedules": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            },
+            "unchanged_callback_identities": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            }
+          },
+          "meta": {
+            "cycles": 128,
+            "source": "candidate",
+            "runtimeSha256": "953cc116f254b317d4bf97dd0bf51802a304c992495f6d072da7bedc32a43017",
+            "bundleSha256": "7c70461d686d0a97df48e4b631f9a891baa0768d9fffb89bca2215b33a8750cc",
+            "bytes": 406802,
+            "gzip": 125903,
+            "timingMicroseconds": {
+              "median": 2.0065204999999935,
+              "min": 1.463916499999982,
+              "max": 2.959333499999985,
+              "samples": [
+                1.9667709999999943, 2.274812499999996, 2.0700835000000097, 2.959333499999985,
+                1.8020625000000052, 2.0065204999999935, 1.4691665, 2.4807500000000005,
+                1.463916499999982
+              ]
+            }
+          }
+        },
+        {
+          "name": "budget",
+          "ops": {
+            "changed_callback_identities": {
+              "score": 1,
+              "median": 1,
+              "min": 1,
+              "samples": 1
+            },
+            "changed_schedules": {
+              "score": 128,
+              "median": 128,
+              "min": 128,
+              "samples": 1
+            },
+            "unchanged_schedules": {
+              "score": 1,
+              "median": 1,
+              "min": 1,
+              "samples": 1
+            },
+            "unchanged_callback_identities": {
+              "score": 1,
+              "median": 1,
+              "min": 1,
+              "samples": 1
+            }
+          }
+        }
+      ]
+    },
+    {
+      "label": "candidate-b",
+      "suite": "passive-scheduling",
+      "targets": [
+        {
+          "name": "runtime",
+          "ops": {
+            "changed_schedules": {
+              "score": 128,
+              "median": 128,
+              "min": 128,
+              "samples": 1
+            },
+            "changed_callback_identities": {
+              "score": 1,
+              "median": 1,
+              "min": 1,
+              "samples": 1
+            },
+            "unchanged_schedules": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            },
+            "unchanged_callback_identities": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            }
+          },
+          "meta": {
+            "cycles": 128,
+            "source": "candidate",
+            "runtimeSha256": "953cc116f254b317d4bf97dd0bf51802a304c992495f6d072da7bedc32a43017",
+            "bundleSha256": "7c70461d686d0a97df48e4b631f9a891baa0768d9fffb89bca2215b33a8750cc",
+            "bytes": 406802,
+            "gzip": 125903,
+            "timingMicroseconds": {
+              "median": 2.3745420000000195,
+              "min": 1.561000000000007,
+              "max": 3.273395999999991,
+              "samples": [
+                2.73456250000001, 2.836979000000014, 2.293395500000002, 3.273395999999991,
+                1.6449790000000064, 2.3745420000000195, 1.743832999999995, 2.603687500000006,
+                1.561000000000007
+              ]
+            }
+          }
+        },
+        {
+          "name": "budget",
+          "ops": {
+            "changed_callback_identities": {
+              "score": 1,
+              "median": 1,
+              "min": 1,
+              "samples": 1
+            },
+            "changed_schedules": {
+              "score": 128,
+              "median": 128,
+              "min": 128,
+              "samples": 1
+            },
+            "unchanged_schedules": {
+              "score": 1,
+              "median": 1,
+              "min": 1,
+              "samples": 1
+            },
+            "unchanged_callback_identities": {
+              "score": 1,
+              "median": 1,
+              "min": 1,
+              "samples": 1
+            }
+          }
+        }
+      ]
+    },
+    {
+      "label": "baseline-b",
+      "suite": "passive-scheduling",
+      "targets": [
+        {
+          "name": "runtime",
+          "ops": {
+            "changed_schedules": {
+              "score": 128,
+              "median": 128,
+              "min": 128,
+              "samples": 1
+            },
+            "changed_callback_identities": {
+              "score": 128,
+              "median": 128,
+              "min": 128,
+              "samples": 1
+            },
+            "unchanged_schedules": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            },
+            "unchanged_callback_identities": {
+              "score": 0,
+              "median": 0,
+              "min": 0,
+              "samples": 1
+            }
+          },
+          "meta": {
+            "cycles": 128,
+            "source": "baseline:733c98d57b76fcfbc8f1272cc1e202582f4bedfd",
+            "runtimeSha256": "c64bfe6b812f76f2acc64d686005d87b5d61e9146a24440141da5a33918836d8",
+            "bundleSha256": "916812374bc8b44560ac7da1090ab55f994a7a147ac60f917152f86512f742fe",
+            "bytes": 406735,
+            "gzip": 125892,
+            "timingMicroseconds": {
+              "median": 2.8199375000000093,
+              "min": 1.883791500000001,
+              "max": 3.88606249999998,
+              "samples": [
+                2.8199375000000093, 2.8939584999999965, 2.91304150000002, 3.88606249999998,
+                1.883791500000001, 2.4876669999999876, 2.7320624999999836, 3.8020625000000057,
+                2.0698545000000195
+              ]
+            }
+          }
+        },
+        {
+          "name": "budget",
+          "ops": {
+            "changed_callback_identities": {
+              "score": 1,
+              "median": 1,
+              "min": 1,
+              "samples": 1
+            },
+            "changed_schedules": {
+              "score": 128,
+              "median": 128,
+              "min": 128,
+              "samples": 1
+            },
+            "unchanged_schedules": {
+              "score": 1,
+              "median": 1,
+              "min": 1,
+              "samples": 1
+            },
+            "unchanged_callback_identities": {
+              "score": 1,
+              "median": 1,
+              "min": 1,
+              "samples": 1
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "finalVerification": {
+    "runtimeSha256": "bd66924940fc3bb94ccdf1f3cb0fdffe2bc2c49a20d2e90db99920148ad1f471",
+    "bundleSha256": "7c70461d686d0a97df48e4b631f9a891baa0768d9fffb89bca2215b33a8750cc",
+    "bytes": 406802,
+    "gzip": 125903,
+    "matchesMeasuredCandidateBundle": true,
+    "note": "Formatting changed the runtime source hash; the final production bundle is byte-identical to both valid timed candidate bundles."
+  },
+  "baselineCommit": "733c98d57b76fcfbc8f1272cc1e202582f4bedfd"
+}
