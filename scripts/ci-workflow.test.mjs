@@ -928,7 +928,9 @@ describe('CI workflow aggregation', () => {
 
 describe('Publish workflow validation', () => {
 	test('owns GitHub tag and release reconciliation outside changesets/action', () => {
-		assert.match(publishWorkflow, /createGithubReleases:\s*false/);
+		assert.match(publishWorkflow, /create-github-releases:\s*false/);
+		assert.match(publishWorkflow, /push-git-tags:\s*false/);
+		assert.match(publishWorkflow, /publish-script: pnpm changeset:publish/);
 		assert.match(
 			publishWorkflow,
 			/- name: Reconcile GitHub tags and releases[\s\S]*?if: always\(\) && steps\.npm_release\.outcome == 'success'[\s\S]*?run: pnpm release:reconcile/,

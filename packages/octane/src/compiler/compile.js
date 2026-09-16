@@ -16581,6 +16581,10 @@ function collectDepPaths(expr) {
 			return;
 		}
 		switch (n.type) {
+			case 'MetaProperty':
+				// `import.meta` and `new.target` contain syntax tokens, not free
+				// bindings. Visiting their Identifier children creates invalid deps.
+				return;
 			case 'Identifier':
 				if (!bound.has(n.name)) push(b.id(n.name), n.name);
 				return;

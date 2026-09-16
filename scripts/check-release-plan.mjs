@@ -1,6 +1,6 @@
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import getReleasePlan from '@changesets/get-release-plan';
+import { getReleasePlan } from '@changesets/get-release-plan';
 
 export function majorReleaseNames(releases) {
 	return releases.filter((release) => release.type === 'major').map((release) => release.name);
@@ -22,7 +22,7 @@ async function checkReleasePlan() {
 		for (const name of majors) console.error(`- ${name}`);
 		console.error('');
 		console.error(
-			'For a core beta-line minor bump, expand compatible Octane peer ranges and patch-release those dependents.',
+			'Use patch or minor changesets while packages are 0.x; major releases are reserved for 1.0.',
 		);
 		process.exitCode = 1;
 	}

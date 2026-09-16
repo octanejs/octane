@@ -9139,13 +9139,15 @@ function commitEffects(): void {
 /** Arm the post-paint passive drain. Callers check `passiveScheduled` first. */
 function schedulePassiveFlush(): void {
 	passiveScheduled = true;
-	schedulePostPaint(() => {
-		// Passives owed to an animating ViewTransition are held on that capture's
-		// own deferred-layout receipt (see captureDeferredPassives); global queues
-		// may belong to an unrelated, already-committed scope and drain normally.
-		passiveScheduled = false;
-		drainPassivePhase();
-	});
+	schedulePostPaint(flushPassivePostPaint);
+}
+
+function flushPassivePostPaint(): void {
+	// Passives owed to an animating ViewTransition are held on that capture's
+	// own deferred-layout receipt (see captureDeferredPassives); global queues
+	// may belong to an unrelated, already-committed scope and drain normally.
+	passiveScheduled = false;
+	drainPassivePhase();
 }
 
 /**
@@ -30118,6 +30120,10 @@ function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): 
 			return;
 		}
 	}
+	// Empty scalar children on an already empty host need no reconciliation
+	// scratch arrays. Existing DOM must still take the ownership/clearing path.
+	if ((children == null || type === 'boolean' || children === '') && getFirstChild(el) === null)
+		return;
 	// The element that owns these children is authoritative. This matters when a
 	// component or dynamic tag made the lexical namespace unknowable, and when an
 	// SVG foreignObject resets its descendants to HTML.
