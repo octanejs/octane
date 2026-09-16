@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import { existsSync, writeFileSync } from 'node:fs';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
 import test from 'node:test';
@@ -273,6 +273,8 @@ test('runs one native Vitest file shard and writes its verified report', async (
 	t.after(() => rm(root, { recursive: true, force: true }));
 	const reportPath = join(root, 'reports', 'shard-2.json');
 	const child = fakeVitestRun();
+	await mkdir(dirname(reportPath), { recursive: true });
+	await writeFile(`${reportPath}.failed.txt`, 'stale failure');
 
 	await runRequiredVitestLanes({
 		lanes: exampleVitestLanes,
@@ -292,6 +294,7 @@ test('runs one native Vitest file shard and writes its verified report', async (
 	assert.equal(calls[0][2].stdio, 'inherit');
 	assert.equal(calls[0][2].env, process.env);
 	assert.equal(await readFile(reportPath, 'utf8'), passingVitestReport);
+	assert.equal(existsSync(`${reportPath}.failed.txt`), false);
 	assert.equal(existsSync(dirname(child.outputFile)), false);
 });
 
@@ -326,6 +329,7 @@ test('rejects missing, malformed, failed and interrupted reports without reusing
 		await t.test(name, async () => {
 			const reportPath = join(root, `${name}.json`);
 			await writeFile(reportPath, passingVitestReport);
+			await writeFile(`${reportPath}.failed.txt`, 'stale failure');
 			const child = fakeVitestRun(options);
 			await assert.rejects(
 				runRequiredVitestLanes({
@@ -337,6 +341,14 @@ test('rejects missing, malformed, failed and interrupted reports without reusing
 				expected,
 			);
 			assert.equal(existsSync(reportPath), false);
+			if (options.report === null || options.error) {
+				assert.equal(existsSync(`${reportPath}.failed.txt`), false);
+			} else {
+				assert.equal(
+					await readFile(`${reportPath}.failed.txt`, 'utf8'),
+					options.report ?? passingVitestReport,
+				);
+			}
 			assert.equal(existsSync(dirname(child.outputFile)), false);
 		});
 	}

@@ -471,6 +471,10 @@ describe('CI workflow aggregation', () => {
 			/REACT_PARITY_VITEST_REPORT: \$\{\{ runner\.temp \}\}\/react-parity-vitest\/shard-\$\{\{ matrix\.shard \}\}\.json/,
 		);
 		assert.match(parity, /actions\/upload-artifact@/);
+		assert.match(
+			parity,
+			/name: Upload failed React parity diagnostics\s+if: failure\(\)[\s\S]*?name: react-parity-diagnostics-\$\{\{ matrix\.shard \}\}[\s\S]*?\.json\.failed\.txt/,
+		);
 		assert.doesNotMatch(parity, /pnpm react-parity:(?:test|validate)/);
 		assert.match(parityAggregate, /^    name: React parity checks$/m);
 		assert.match(parityAggregate, /needs: \[release_change, react_parity_shard\]/);
@@ -480,6 +484,8 @@ describe('CI workflow aggregation', () => {
 		);
 		assert.match(parityAggregate, /actions\/checkout@/);
 		assert.match(parityAggregate, /actions\/download-artifact@/);
+		assert.match(parityAggregate, /pattern: react-parity-vitest-\*/);
+		assert.doesNotMatch(parityAggregate, /react-parity-diagnostics-/);
 		assert.match(
 			parityAggregate,
 			/node scripts\/react-parity\/verify-vitest-shards\.mjs\s+--reports-directory/,

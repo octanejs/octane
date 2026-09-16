@@ -44,8 +44,12 @@ export async function runRequiredVitestLanes({
 	// only the reporter's fresh file, never a previous run's archived result.
 	const runDirectory = mkdtempSync(join(tmpdir(), 'octane-react-parity-vitest-'));
 	const runReportPath = join(runDirectory, 'report.json');
+	let report;
 	try {
-		if (reportPath) rmSync(reportPath, { force: true });
+		if (reportPath) {
+			rmSync(reportPath, { force: true });
+			rmSync(`${reportPath}.failed.txt`, { force: true });
+		}
 		const { code, signal } = await new Promise((resolve, reject) => {
 			const child = spawnProcess(
 				process.execPath,
@@ -55,7 +59,6 @@ export async function runRequiredVitestLanes({
 			child.once('error', reject);
 			child.once('close', (code, signal) => resolve({ code, signal }));
 		});
-		let report;
 		try {
 			try {
 				report = readFileSync(runReportPath, 'utf8');
@@ -80,6 +83,18 @@ export async function runRequiredVitestLanes({
 		console.log(
 			`completed parity-wide Vitest shard ${shard.value} in ${((Date.now() - startedAt) / 1000).toFixed(1)}s`,
 		);
+	} catch (error) {
+		// Preserve this attempt's raw failure evidence separately. Only a verified,
+		// successful run may populate reportPath for aggregate coverage checks.
+		if (reportPath && report !== undefined) {
+			try {
+				mkdirSync(dirname(reportPath), { recursive: true });
+				writeFileSync(`${reportPath}.failed.txt`, report);
+			} catch {
+				console.warn('Could not archive the failed Vitest report; the original failure follows.');
+			}
+		}
+		throw error;
 	} finally {
 		rmSync(runDirectory, { recursive: true, force: true });
 	}
