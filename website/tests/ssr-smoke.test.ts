@@ -11,6 +11,7 @@
 // markup- and asset-level, so they hold against either preset's output. See the
 // setup file for the coverage that consolidating on `vercel` gave up.
 import { beforeAll, describe, it, expect, inject } from 'vitest';
+import { version } from 'octane';
 import fs from 'node:fs';
 import path from 'node:path';
 import { waitForReadyState } from './support/server-process.ts';
@@ -96,6 +97,9 @@ describe('built Start server', () => {
 		});
 		expect(html).toContain('<main');
 		expect(classCount(html, 'home')).toBeGreaterThan(0);
+		// The hero version pill must carry octane's real version — a pipeline that
+		// drops the export renders 'vundefined' instead.
+		expect(html).toContain('v' + version);
 		// The complete explorer is deterministic server markup: no-JS, hydration,
 		// crawlers, and the interactive client all start from the same geometry.
 		expect(classCount(html, 'bx-fallback-table')).toBe(0);
