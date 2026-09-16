@@ -19432,8 +19432,7 @@ function preparePresentationSignalValue(args: any[], frame: PresentationHydratio
 						// changed value must still win during inherited composition.
 						ctrl.v = value;
 						binding.value = current;
-						if (!ctrl.composing || !Object.is(current, value))
-							writeDirectSignalBinding(binding, current);
+						writeDirectSignalBinding(binding, current);
 					}
 				}
 				if (failed) reportRendererOwnerError(scope, failure);

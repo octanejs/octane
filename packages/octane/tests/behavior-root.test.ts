@@ -1287,8 +1287,10 @@ export function NativeStylexControlPresentation({
 					placeholder: scope.signal$('placeholder', 'Search'),
 				};
 				const fixture = authoredPresentation('NativeControlPresentation', props, dev);
-				container.innerHTML = fixture.html;
-				const textarea = container.querySelector('textarea')!;
+				const form = document.createElement('form');
+				container.append(form);
+				form.innerHTML = fixture.html;
+				const textarea = form.querySelector('textarea')!;
 				const failure = new Error('early control cleanup failed');
 				const onUncaughtError = vi.fn();
 				const cleanup = vi.fn(() => {
@@ -1339,17 +1341,12 @@ export function NativeStylexControlPresentation({
 						textarea.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
 						textarea.value = 'in-progress composition';
 					}
-					hydratedRoot = hydrateRoot(
-						container,
-						fixture.loadClient().NativeControlPresentation,
-						props,
-						{
-							signalOwner: scope,
-							bindingLeases: [binding],
-							controlLeases: [control],
-							onUncaughtError,
-						},
-					);
+					hydratedRoot = hydrateRoot(form, fixture.loadClient().NativeControlPresentation, props, {
+						signalOwner: scope,
+						bindingLeases: [binding],
+						controlLeases: [control],
+						onUncaughtError,
+					});
 					if (retirement.endsWith('model')) {
 						expect(cleanup).toHaveBeenCalledOnce();
 						expect(textarea.value).toBe(expectedValue);
@@ -1368,6 +1365,12 @@ export function NativeStylexControlPresentation({
 					expect(container.querySelector('textarea')).toBe(textarea);
 					expect(textarea.value).toBe(expectedValue);
 					expect(draft.get()).toBe(expectedModel);
+					if (retirement.endsWith('model')) {
+						const resetDefault = textarea.defaultValue;
+						form.reset();
+						expect([resetDefault, textarea.value]).toEqual([expectedModel, expectedModel]);
+						expect(draft.get()).toBe(expectedModel);
+					}
 					if (retirement.endsWith('input'))
 						expect([
 							textarea.selectionStart,
