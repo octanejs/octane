@@ -20,6 +20,9 @@ import {
 	registerBindingEvent,
 	markBindingEvent,
 	type BindingHandoff,
+	type BindingHandoffRange,
+	type BindingHandoffView,
+	type BindingHandoffRest,
 } from './dom-binding-handoff.js';
 import type { createBindingClassGroup, BindingClassGroup } from './dom-binding-classes.js';
 import type { __createBindingSignals, BindingSignalConnection } from './dom-binding-signals.js';
@@ -251,8 +254,17 @@ export type BindingInitializer =
 
 /** @internal Generated expressions take the lexical environment, never a renderer scope. */
 export interface BindingFragment {
+	readonly createHandoff?: typeof __createStructuralBindingHandoff;
 	/** Compiler proof that the authored scoped view has a fixed native hydration boundary. */
-	readonly handoff?: boolean;
+	readonly handoff?: boolean | 'structural';
+	readonly closedProps?: readonly string[];
+	readonly conditionalRest?: true;
+	readonly restSites?: readonly {
+		readonly site: number;
+		readonly node: number;
+		readonly spread: number;
+		readonly keys: readonly string[];
+	}[];
 	readonly html: string;
 	readonly ns?: 0 | 1;
 	readonly nodes: readonly BindingProgramNode[];
@@ -281,6 +293,7 @@ export interface BindingSlot {
 	readonly id: string;
 	readonly fragment: BindingFragment;
 	readonly environment: readonly unknown[];
+	readonly site?: number;
 }
 
 /** @internal A child presentation slot is data, never an application render callback. */
@@ -288,8 +301,15 @@ export function __bindingSlot(
 	id: string,
 	fragment: BindingFragment,
 	environment: readonly unknown[],
+	site?: number,
 ): BindingSlot {
-	return { [bindingSlot]: true, id, fragment, environment };
+	return {
+		[bindingSlot]: true,
+		id,
+		fragment,
+		environment,
+		...(site === undefined ? {} : { site }),
+	};
 }
 
 export type BindingRegion = { readonly node: number } & (
@@ -348,6 +368,7 @@ interface RegionInstance {
 	signalPlan?: RegionPlan;
 	signalFrame?: number;
 	unresolvedSlot?: boolean;
+	slot?: string;
 }
 
 interface FragmentInstance {
@@ -391,6 +412,7 @@ interface RegionPlan {
 	child: FragmentPlan | null;
 	items: Map<string, FragmentPlan> | null;
 	text: string | null;
+	slot?: string;
 }
 
 interface Transaction {
@@ -408,6 +430,175 @@ interface Transaction {
 	notifySignal?(prepare: () => () => void): void;
 	preparing?: boolean;
 	frame: number;
+	published?: () => void;
+}
+
+/** @internal Imported only by an artifact carrying the structural takeover proof. */
+export function __createStructuralBindingHandoff(
+	instance: FragmentInstance,
+	transaction: Transaction,
+	dispose: (disposal?: { preserveDOM?: boolean }, publish?: () => void) => void,
+	ready: () => boolean,
+): BindingHandoff {
+	let revision = 0;
+	let rangeRevision = -1;
+	let ranges: Map<Node, BindingHandoffRange> | undefined;
+	let views: Map<Node, BindingHandoffView> | undefined;
+	let rest: Map<Element, Map<number, BindingHandoffRest>> | undefined;
+	let retries: Set<() => void> | undefined;
+	const currentRanges = (): ReadonlyMap<Node, BindingHandoffRange> => {
+		if (rangeRevision === revision && ranges !== undefined) return ranges;
+		const next = new Map<Node, BindingHandoffRange>();
+		let nextViews: Map<Node, BindingHandoffView> | undefined;
+		let nextRest: Map<Element, Map<number, BindingHandoffRest>> | undefined;
+		const collect = (current: FragmentInstance, closed = false): void => {
+			if (current.definition.conditionalRest === true) {
+				if (current.definition.closedProps === undefined)
+					throw new Error('Conditional hydration requires a compiler-proven caller shape.');
+				(nextViews ??= new Map()).set(current.range.start, {
+					id: current.id,
+					closedProps: current.definition.closedProps,
+				});
+				closed = true;
+			}
+			if (
+				current.definition.constructible === false ||
+				current.definition.bindings.some((binding) => binding[1] === 'control') ||
+				current.definition.nodes.some((node) => node[1] === 'element' && node[4] === null)
+			)
+				throw new Error('Structural hydration leases require compiler-owned native nodes.');
+			for (const site of current.definition.restSites ?? []) {
+				const element = current.nodes[site.node];
+				if (!closed || element?.nodeType !== 1)
+					throw new Error('Native rest hydration requires an eligible closed child view.');
+				const sites = (nextRest ??= new Map()).get(element as Element) ?? new Map();
+				sites.set(site.site, {
+					id: current.id,
+					node: site.node,
+					spread: site.spread,
+					keys: site.keys,
+				});
+				nextRest.set(element as Element, sites);
+			}
+			for (const region of current.regions) {
+				const definition = region.definition;
+				if (definition.kind === 'for' || definition.kind === 'opaque')
+					throw new Error('Structural hydration leases do not support lists or opaque regions.');
+				if (definition.kind === 'text' && definition.generic)
+					throw new Error('Structural hydration leases require primitive text.');
+				if (
+					definition.kind === 'view' &&
+					definition.view.root.handoff !== true &&
+					definition.view.root.handoff !== 'structural' &&
+					definition.view.root.conditionalRest !== true
+				)
+					throw new Error('Structural hydration leases require a supported child view.');
+				next.set(region.range.start, {
+					kind: definition.kind,
+					end: region.range.end,
+					...(definition.kind === 'if' ? { arm: region.arm } : {}),
+					...(definition.kind === 'view' ? { view: definition.view.id } : {}),
+					...(definition.kind === 'slot' ? { slot: region.slot } : {}),
+				});
+				if (region.child !== null)
+					collect(
+						region.child,
+						definition.kind !== 'view' && region.child.id === current.id && closed,
+					);
+			}
+		};
+		collect(instance);
+		ranges = next;
+		views = nextViews;
+		rest = nextRest;
+		rangeRevision = revision;
+		return next;
+	};
+	currentRanges();
+	transaction.published = () => {
+		revision++;
+		if (retries?.size) {
+			const pending = [...retries];
+			retries.clear();
+			for (const retry of pending)
+				queueMicrotask(() => {
+					if (!transaction.disposed) retry();
+				});
+		}
+	};
+	const valid = (current: FragmentInstance): boolean => {
+		const parent = current.range.start.parentNode;
+		if (parent === null || current.range.end.parentNode !== parent) return false;
+		const cursors = new Map<number, Node | null>([[-1, current.range.start.nextSibling]]);
+		for (let index = 0; index < current.definition.nodes.length; index++) {
+			const proof = current.definition.nodes[index]!;
+			const node = current.nodes[index]!;
+			if (
+				cursors.get(proof[0]) !== node ||
+				node.parentNode !== (proof[0] === -1 ? parent : current.nodes[proof[0]])
+			)
+				return false;
+			let next = node.nextSibling;
+			if (proof[1] === 'element') cursors.set(index, node.firstChild);
+			else if (proof[1] === 'text') {
+				if (node.nodeValue !== proof[2]) return false;
+			} else {
+				const region = current.regions.find((item) => item.range.start === node)!;
+				if (
+					region.range.end.parentNode !== node.parentNode ||
+					(region.child !== null && !valid(region.child))
+				)
+					return false;
+				if (
+					region.definition.kind === 'text' &&
+					(node.nextSibling !== (region.text ?? region.range.end) ||
+						(region.text !== null && region.text.nextSibling !== region.range.end))
+				)
+					return false;
+				next = region.range.end.nextSibling;
+			}
+			cursors.set(proof[0], next);
+		}
+		for (const [index, cursor] of cursors)
+			if (cursor !== (index === -1 ? current.range.end : null)) return false;
+		return true;
+	};
+	return {
+		id: instance.id,
+		root: instance.range.start,
+		anchor: instance.range.start,
+		end: instance.range.end,
+		revision: () => (ready() ? revision : -1),
+		ranges: currentRanges,
+		view: (root) => {
+			currentRanges();
+			return views?.get(root);
+		},
+		rest: (element, site) => {
+			currentRanges();
+			return rest?.get(element)?.get(site);
+		},
+		valid: () => {
+			if (!ready()) return false;
+			try {
+				currentRanges();
+			} catch {
+				return false;
+			}
+			return valid(instance);
+		},
+		afterPublication: (callback) => {
+			(retries ??= new Set()).add(callback);
+			return () => retries!.delete(callback);
+		},
+		active: () => !transaction.disposed,
+		retire: (publish) => {
+			retries?.clear();
+			transaction.published = undefined;
+			transaction.preservePresentation = true;
+			dispose(undefined, publish);
+		},
+	};
 }
 
 const stopped = {};
@@ -1035,6 +1226,7 @@ function prepareFragment(
 			)
 				throw new TypeError('A DOM presentation child slot requires a compiler-owned fragment.');
 			const slot = value as BindingSlot | null | undefined;
+			if (slot?.site !== undefined) candidate.slot = slot.id + ';' + slot.site;
 			if (region.unresolvedSlot) {
 				if (slot)
 					region.child = resolveFragment(slot.fragment, slot.id, region.range, false, transaction);
@@ -1205,6 +1397,7 @@ function commitRegion(plan: RegionPlan, id: string, transaction: Transaction): v
 	const child = plan.child?.instance ?? null;
 	region.child = child;
 	region.arm = plan.arm;
+	if (definition.kind === 'slot') region.slot = plan.slot;
 	if (oldChild !== child) {
 		if (oldChild) releaseInstance(oldChild, transaction);
 		if (transaction.disposed) return;
@@ -1446,13 +1639,19 @@ function bindProgram<Props>(
 							signalUpdates!.clear();
 							for (const prepare of pending) writes.set(prepare, prepare());
 						}
-						if (!dirty && !transaction.disposed) for (const write of writes.values()) write();
+						if (!dirty && !transaction.disposed) {
+							for (const write of writes.values()) write();
+							transaction.published?.();
+						}
 						continue;
 					}
 					const pending = [...signalUpdates!];
 					signalUpdates!.clear();
 					const writes = pending.map((prepare) => prepare());
-					if (!dirty && !transaction.disposed) for (const write of writes) write();
+					if (!dirty && !transaction.disposed) {
+						for (const write of writes) write();
+						transaction.published?.();
+					}
 					continue;
 				}
 				dirty = false;
@@ -1501,6 +1700,7 @@ function bindProgram<Props>(
 					?.isContentEditable;
 				commitFragment(plan, transaction);
 				if (transaction.disposed) break;
+				transaction.published?.();
 				if (!mounted) {
 					moveRange(instance!.range, target!.parent, target!.before ?? null, transaction);
 					mounted = true;
@@ -1538,6 +1738,15 @@ function bindProgram<Props>(
 		refresh,
 		dispose,
 		[BINDING_HANDOFF](): BindingHandoff {
+			const structural =
+				descriptor.root.handoff === 'structural' || descriptor.root.conditionalRest === true;
+			if (structural && !mount && instance && descriptor.root.createHandoff)
+				return (handoff ??= descriptor.root.createHandoff(
+					instance,
+					transaction,
+					dispose,
+					() => !busy,
+				));
 			if (
 				mount ||
 				descriptor.root.handoff !== true ||

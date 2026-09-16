@@ -80,6 +80,87 @@ export function View(props) @{ 'use dom bindings'; <p>{props.label as string}</p
 				},
 			],
 		});
+		const bindingSource = `export function View(props) @{ 'use dom bindings'; <p>{props.label as string}</p> }`;
+		for (const query of [
+			'octane-props=%5B1%2C%5B%5D%5D',
+			'octane-bindings=View&octane-props=not-json',
+			'octane-bindings=View&octane-props=%5B2%2C%5B%5D%5D',
+			'octane-bindings=View&octane-props=%5B1%2Cnull%5D',
+			'octane-bindings=View&octane-props=%5B1%2C%5B1%5D%5D',
+			'octane-bindings=View&octane-props=%5B1%2C%5B%5D%2Cnull%5D',
+			'octane-bindings=View&octane-props=%5B1%2C%5B%22label%22%2C%22label%22%5D%5D',
+			'octane-bindings=View&octane-props=%5B1%2C%5B%5D%5D&octane-props=%5B1%2C%5B%5D%5D',
+		]) {
+			const id = `/project/src/View.tsrx?${query}`;
+			expect(() => compile(bindingSource, id, { mode: 'client', hmr: false })).toThrowError(
+				/octane-props/,
+			);
+			expect(() => compiler.transform(bindingSource, id, { environment: 'client' })).toThrowError(
+				/octane-props/,
+			);
+		}
+		const childSource = `export function ClosedChild({ ...rest }) @{ 'use dom bindings'; <button {...rest} /> }`;
+		const pairSource = `import { ClosedChild } from './ClosedChild.tsrx';
+export function Pair(props) @{
+ 'use dom bindings';
+ <section>
+  <ClosedChild title={props.title} data-second={props.second} />
+  <ClosedChild data-second={props.second} title={props.title} />
+  <ClosedChild title={props.title} data-second={props.second} />
+ </section>
+}`;
+		for (const dev of [false, true]) {
+			const pair = compiler.transform(pairSource, '/project/src/Pair.tsrx?octane-bindings=Pair', {
+				environment: 'client',
+				dev,
+				hmr: false,
+			})!;
+			const requests: string[] = [];
+			for (const node of parseModule(pair.code, 'Pair.js').body) {
+				if (
+					node.type === 'ImportDeclaration' &&
+					node.source.value.startsWith('./ClosedChild.tsrx?')
+				)
+					requests.push(node.source.value);
+			}
+			expect(requests).toEqual(
+				[
+					['title', 'data-second'],
+					['data-second', 'title'],
+				].map(
+					(keys) =>
+						`./ClosedChild.tsrx?octane-bindings=ClosedChild&octane-mount=1&octane-props=${encodeURIComponent(JSON.stringify([1, keys]))}`,
+				),
+			);
+			// The bundler canonicalizes the file before compiling it. Extraction
+			// must still receive each request's complete closed caller shape.
+			for (const request of [
+				...requests,
+				`./ClosedChild.tsrx?octane-bindings=ClosedChild&octane-props=${encodeURIComponent(JSON.stringify([1, []]))}`,
+			]) {
+				const id = `/project/src/${request.slice(2)}`;
+				const selected = compiler.transform(childSource, id, {
+					environment: 'client',
+					dev,
+					hmr: false,
+				})!;
+				expect(() => parseModule(selected.code, 'ClosedChild.js')).not.toThrow();
+				expect(() => compiler.transform(childSource, id, { environment: 'server' })).toThrow(
+					/client DOM target/,
+				);
+			}
+			expect(() =>
+				compiler.transform(
+					childSource,
+					'/project/src/ClosedChild.tsrx?octane-bindings=ClosedChild',
+					{
+						environment: 'client',
+						dev,
+						hmr: false,
+					},
+				),
+			).toThrow(/spread/);
+		}
 		for (const environment of ['client', 'server'] as const) {
 			for (const extension of ['ts', 'js', 'tsrx']) {
 				const result = compiler.transform(

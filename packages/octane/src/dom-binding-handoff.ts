@@ -1,10 +1,41 @@
 /** Renderer-independent capability carried by an adopted, compiler-proven view. */
 export const BINDING_HANDOFF = /* @__PURE__ */ Symbol.for('octane.binding-handoff');
 
+/** Current early-owned range, not a license to render a different shape. */
+export interface BindingHandoffRange {
+	readonly kind: 'if' | 'view' | 'slot' | 'text';
+	readonly end: Node;
+	readonly arm?: number;
+	readonly view?: string;
+	readonly slot?: string;
+}
+
+/** A closed caller shape proven for this actual child range, never for its module globally. */
+export interface BindingHandoffView {
+	readonly id: string;
+	readonly closedProps: readonly string[];
+}
+
+export interface BindingHandoffRest {
+	readonly id: string;
+	readonly node: number;
+	readonly spread: number;
+	readonly keys: readonly string[];
+}
+
 export interface BindingHandoff {
 	readonly id: string;
 	readonly root: Node;
 	readonly anchor: Node;
+	readonly end?: Node;
+	/** Allocated only for a claimed structural presentation. -1 means publication is in progress. */
+	revision?(): number;
+	ranges?(): ReadonlyMap<Node, BindingHandoffRange>;
+	view?(root: Node): BindingHandoffView | undefined;
+	rest?(element: Element, site: number): BindingHandoffRest | undefined;
+	valid?(): boolean;
+	/** One deferred retry; only structural leases allocate publication listeners. */
+	afterPublication?(callback: () => void): () => void;
 	active(): boolean;
 	retire(publish?: () => void): void;
 	owner?: object;

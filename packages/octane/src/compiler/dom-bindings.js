@@ -18,9 +18,13 @@ import {
 } from '../html-tree-validation.js';
 import { shouldSanitizeURLAttribute } from '../sanitize-url.js';
 import { needsBindingProgram, planBindingProgram } from './dom-binding-program.js';
+import {
+	parseDomBindingRequest,
+	DOM_BINDINGS_QUERY,
+	DOM_BINDINGS_MOUNT_QUERY,
+} from './dom-binding-request.js';
 
-export const DOM_BINDINGS_QUERY = 'octane-bindings';
-export const DOM_BINDINGS_MOUNT_QUERY = 'octane-mount';
+export { DOM_BINDINGS_QUERY, DOM_BINDINGS_MOUNT_QUERY } from './dom-binding-request.js';
 export const DOM_BINDING_COMPILER_ABI_VERSION = 1;
 const DIRECTIVE = 'use dom bindings';
 const MARKER = 'data-octane-bindings';
@@ -157,21 +161,7 @@ function error(filename, node, message) {
 }
 
 export function domBindingExportFromId(id) {
-	const question = id.indexOf('?');
-	if (question === -1) return null;
-	const query = new URLSearchParams(id.slice(question + 1).split('#')[0]);
-	const values = query.getAll(DOM_BINDINGS_QUERY);
-	const mounting = query.getAll(DOM_BINDINGS_MOUNT_QUERY);
-	if (
-		mounting.length > 1 ||
-		(mounting.length === 1 && (mounting[0] !== '1' || values.length !== 1))
-	)
-		error(id, null, 'octane-mount=1 requires one selected binding export');
-	if (values.length === 0) return null;
-	if (values.length !== 1 || !/^[A-Za-z_$][\w$]*$/.test(values[0])) {
-		error(id, null, `invalid ${DOM_BINDINGS_QUERY} export query`);
-	}
-	return values[0];
+	return parseDomBindingRequest(id)?.exportName ?? null;
 }
 
 function walk(node, visit, parent = null, key = null) {
@@ -286,7 +276,7 @@ function nativeProjectionReference(node, imports, lexical, parameterScope) {
 		return null;
 	const callee = unwrap(node.callee);
 	const member = callee?.type === 'MemberExpression' && !callee.computed && !callee.optional;
-	const reference = member ? callee.object : callee;
+	const reference = member ? unwrap(callee.object) : callee;
 	if (reference?.type !== 'Identifier') return null;
 	const binding = lexical.resolveBinding(
 		lexical.nodeScopes.get(reference) ?? parameterScope,
@@ -592,6 +582,107 @@ function bindingRender(fn, filename, required = true) {
 	}
 	bindingParameterNames(fn.params[0], filename);
 	return render;
+}
+
+function bindingRestSpreads(fn, render, props, lexical, filename) {
+	const parameter = fn.params[0];
+	const rest =
+		parameter?.type === 'ObjectPattern'
+			? parameter.properties.find((property) => property.type === 'RestElement')?.argument
+			: null;
+	if (!rest) return { render, hasRest: false };
+	const scope = lexical.resolveBinding(lexical.nodeScopes.get(rest), rest.name)?.scope;
+	const consumed = new Set(
+		parameter.properties
+			.filter((property) => property.type === 'Property')
+			.map((property) => String(property.key.name ?? property.key.value)),
+	);
+	const keys = props?.filter((name) => !consumed.has(name));
+	const replacements = new Map();
+	const sites = new Map();
+	let nextSite = 0;
+	let conditional = keys?.every(
+		(name) =>
+			name === 'ref' || /^on[A-Z]/.test(name) || /^(?:aria|data)-[a-z][a-z0-9-]*$/.test(name),
+	);
+	let hasRest = false;
+	walk(render, (node) => {
+		if (
+			['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression'].includes(node.type)
+		)
+			return false;
+		if (
+			!['JSXElement', 'Element'].includes(node.type) ||
+			!/^[a-z]/.test(node.openingElement?.name?.name ?? node.id?.name ?? '')
+		)
+			return;
+		const attributes = node.openingElement?.attributes ?? node.attributes ?? [];
+		const nativeSites = [];
+		let spread = 0;
+		for (const attribute of attributes) {
+			if (!['JSXSpreadAttribute', 'SpreadAttribute'].includes(attribute.type)) continue;
+			const ordinal = spread++;
+			const value = unwrap(attribute.argument);
+			if (
+				value?.type !== 'Identifier' ||
+				value.name !== rest.name ||
+				lexical.resolveBinding(lexical.nodeScopes.get(value), value.name)?.scope !== scope
+			)
+				continue;
+			hasRest = true;
+			nativeSites.push({ attribute, site: nextSite++, spread: ordinal, keys });
+			if (
+				['input', 'textarea', 'select'].includes(node.openingElement?.name?.name ?? node.id?.name)
+			)
+				conditional = false;
+			if (keys === undefined) continue;
+			if (keys.some((name) => ['class', 'className'].includes(name)))
+				error(filename, attribute, 'closed binding rest cannot supply class groups');
+			replacements.set(
+				attribute,
+				keys.map((name) =>
+					inheritHookMemoOrigin(
+						b.jsx_attribute(
+							b.jsx_id(name),
+							b.jsx_expression_container(b.member(value, b.literal(name), true)),
+						),
+						attribute,
+					),
+				),
+			);
+		}
+		if (nativeSites.length > 0) sites.set(attributes, nativeSites);
+		if (!attributes.some((attribute) => replacements.has(attribute))) return;
+		const expanded = attributes.flatMap((attribute) => replacements.get(attribute) ?? [attribute]);
+		sites.set(expanded, nativeSites);
+		const names = new Set();
+		for (const attribute of expanded) {
+			const raw = attrName(attribute);
+			if (typeof raw !== 'string') continue;
+			const name = (
+				raw === 'className'
+					? 'class'
+					: (ATTRIBUTE_ALIASES.get(raw) ??
+						raw.replace(
+							/^on(DoubleClick|Focus|Blur)(Capture)?$/,
+							(_, event, capture = '') =>
+								`on${event === 'DoubleClick' ? 'dblclick' : event === 'Focus' ? 'focusin' : 'focusout'}${capture}`,
+						))
+			).toLowerCase();
+			if (names.has(name))
+				error(
+					filename,
+					attribute,
+					'closed binding rest cannot collide with another native attribute',
+				);
+			names.add(name);
+		}
+		replacements.set(attributes, expanded);
+	});
+	// Only replace attribute lists. The original rest reference retains lexical
+	// provenance, and neither the authored function nor its parameter is rewritten.
+	for (const [node] of replacements) if (!Array.isArray(node)) replacements.delete(node);
+	return { render: mapCow(render, replacements), hasRest, sites, conditional };
 }
 
 function planView(fn, filename, source, imports, lexical, native = null) {
@@ -1650,15 +1741,17 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 				lexical.rootScope
 		);
 	};
-	const programFor = (fn, render) => {
-		if (programPlans.has(fn)) return programPlans.get(fn);
+	const programFor = (fn, render, props = null, annotationsOnly = false) => {
+		const key = annotationsOnly ? 'annotations' : JSON.stringify(props);
+		if (programPlans.get(fn)?.has(key)) return programPlans.get(fn).get(key);
 		if (inProgress.has(fn))
 			error(filename, fn, 'recursive binding child programs are not supported');
 		inProgress.add(fn);
+		const rest = bindingRestSpreads(fn, render, props, lexical, filename);
 		const setup = statements(fn)
 			.filter((statement) => statement.type === 'VariableDeclaration')
 			.flatMap((statement) => statement.declarations);
-		for (const declaration of setup)
+		for (const declaration of annotationsOnly ? [] : setup)
 			if (!callbackFor(declaration.init))
 				assertProjection(
 					declaration.init,
@@ -1712,7 +1805,7 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 				b.return(value),
 			]);
 		};
-		const plan = planBindingProgram(fn, render, {
+		const context = {
 			source,
 			filename,
 			helpers,
@@ -1722,6 +1815,8 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 			lexical,
 			allocateProgramName,
 			projectionBody,
+			annotationsOnly,
+			restSites: rest.sites,
 			parameterNames: bindingParameterNames(fn.params[0], filename),
 			refDependencies: (expression) => {
 				const records = refDependencies.get(callbackFor(expression)) ?? null;
@@ -1776,9 +1871,11 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 				});
 				return !renderable;
 			},
-			localProgram: (name) => {
+			localProgram: (name, props, annotationsOnly = false) => {
 				const child = localFunctions.get(name);
-				return child ? programFor(child, bindingRender(child, filename, false)) : null;
+				return child
+					? programFor(child, bindingRender(child, filename, false), props, annotationsOnly)
+					: null;
 			},
 			nativePlan: (element, namespace, ancestors) =>
 				planView(fn, filename, source, imports, lexical, { element, namespace, ancestors }),
@@ -1814,29 +1911,86 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 					});
 				visit(expression);
 			},
-		});
+		};
+		const plan = planBindingProgram(fn, rest.render, context);
 		inProgress.delete(fn);
-		programPlans.set(fn, plan);
+		if (!programPlans.has(fn)) programPlans.set(fn, new Map());
+		programPlans.get(fn).set(key, plan);
+		const authored =
+			!annotationsOnly && rest.hasRest
+				? planBindingProgram(fn, render, { ...context, annotationsOnly: true })
+				: plan;
+		if (annotationsOnly) {
+			const structuralPresentation =
+				!rest.hasRest && plan.structural && fn.body.type === 'JSXCodeBlock';
+			replacements.set(fn, {
+				...mapCow(fn, authored.replacements),
+				_octaneBindingView: { id: plan.id },
+				_octanePresentationHydration: {
+					id: plan.id,
+					supported: structuralPresentation,
+					...(structuralPresentation ? { structural: true } : {}),
+					...(rest.hasRest && fn.body.type === 'JSXCodeBlock'
+						? { structural: true, conditionalRest: true }
+						: {}),
+				},
+			});
+			return plan;
+		}
 		const field = (name) =>
 			plan.root.properties.find((property) => property.key.name === name)?.value;
 		const fixedPresentation =
+			!rest.hasRest &&
 			fn.body.type === 'JSXCodeBlock' &&
 			!plan.controls &&
 			field('regions').elements.length === 0 &&
 			field('bindings').elements.every((binding) => binding.elements[1].value !== 'text');
+		const conditionalRest =
+			rest.hasRest && rest.conditional && plan.structural && fn.body.type === 'JSXCodeBlock';
+		plan.structural &&= !rest.hasRest && fn.body.type === 'JSXCodeBlock';
+		const structuralPresentation = !fixedPresentation && plan.structural;
+		let createHandoff;
+		if (structuralPresentation || conditionalRest) {
+			createHandoff = allocateProgramName('_bindingHandoff');
+			plan.dependencies.push(
+				inheritHookMemoOrigin(
+					b.imports(
+						[['__createStructuralBindingHandoff', createHandoff]],
+						'octane/dom-binding-program',
+					),
+					fn,
+				),
+			);
+		}
 		plan.root = {
 			...plan.root,
 			properties: [
 				...plan.root.properties,
-				b.prop('init', b.id('handoff'), b.literal(fixedPresentation)),
+				b.prop(
+					'init',
+					b.id('handoff'),
+					b.literal(structuralPresentation ? 'structural' : fixedPresentation),
+				),
+				...(createHandoff ? [b.prop('init', b.id('createHandoff'), b.id(createHandoff))] : []),
+				// A receipt is not a lease capability. The runtime must explicitly
+				// validate the caller/range and prepare its host writers before takeover.
+				...(rest.hasRest && props !== null
+					? [b.prop('init', b.id('closedProps'), b.array(props.map((name) => b.literal(name))))]
+					: []),
+				...(conditionalRest ? [b.prop('init', b.id('conditionalRest'), b.literal(true))] : []),
 			],
 		};
 		replacements.set(fn, {
-			...mapCow(fn, plan.replacements),
+			...mapCow(fn, authored.replacements),
 			_octaneBindingView: { id: plan.id },
 			// Normal renderer ownership transfer is narrower than binding-program
 			// adoption. Keep its proof separate from the existing SSR view stamp.
-			_octanePresentationHydration: { id: plan.id, supported: fixedPresentation },
+			_octanePresentationHydration: {
+				id: plan.id,
+				supported: fixedPresentation || structuralPresentation,
+				...(structuralPresentation || conditionalRest ? { structural: true } : {}),
+				...(conditionalRest ? { conditionalRest: true } : {}),
+			},
 		});
 		return plan;
 	};
@@ -1855,12 +2009,19 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 			error(filename, node, 'binding views must be named top-level exported functions');
 		}
 		const render = bindingRender(node, filename);
+		if (
+			selectedExport !== node.id.name &&
+			bindingRestSpreads(node, render, null, lexical, filename).hasRest
+		) {
+			programFor(node, render, null, true);
+			return false;
+		}
 		const structural =
 			node.params[0]?.type === 'ObjectPattern' ||
 			needsBindingProgram(render, isUnbound) ||
 			statements(node).some((statement) => statement.type === 'VariableDeclaration');
 		if (structural || (helpers.mount && selectedExport === node.id.name)) {
-			const plan = programFor(node, render);
+			const plan = programFor(node, render, selectedExport === node.id.name ? helpers.props : null);
 			if (!structural) plan.scalar = planView(node, filename, source, imports, lexical);
 			plans.set(node.id.name, plan);
 			return false;

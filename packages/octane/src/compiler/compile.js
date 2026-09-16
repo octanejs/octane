@@ -108,7 +108,8 @@ import {
 	isDirectSignalHandleExpression,
 	lowerNativeAttributeReads,
 } from './native-attribute-reads.js';
-import { domBindingExportFromId, prepareDomBindings } from './dom-bindings.js';
+import { prepareDomBindings } from './dom-bindings.js';
+import { parseDomBindingRequest } from './dom-binding-request.js';
 import {
 	createTemplateIr,
 	appendTemplatePart,
@@ -1372,6 +1373,9 @@ const INTERNAL_CLIENT_RUNTIME_HELPERS = new Set([
 	'beginPresentationHydration',
 	'endPresentationHydration',
 	'presentationWrite',
+	'presentationStructure',
+	'presentationFailure',
+	'markBindingChildren',
 	'bindingText',
 	'bindingChildSlot',
 	'setBindingClass',
@@ -9447,7 +9451,8 @@ function compileAuthored(source, filename, options, bundlerMetadata) {
 		options = { ...options, nativeReads: true };
 		assertNativeReadOptions(options);
 	}
-	const bindingExport = domBindingExportFromId(filename);
+	const bindingRequest = parseDomBindingRequest(filename);
+	const bindingExport = bindingRequest?.exportName ?? null;
 	if (
 		bindingExport !== null &&
 		(mode !== 'client' ||
@@ -9482,7 +9487,8 @@ function compileAuthored(source, filename, options, bundlerMetadata) {
 					isDirectSignalHandleExpression,
 					bakeStaticAttr,
 					escapeHtml,
-					mount: new URLSearchParams(filename.split('?')[1] || '').get('octane-mount') === '1',
+					mount: bindingRequest?.mount ?? false,
+					props: bindingRequest?.props ?? null,
 				},
 			)
 		: analyzedAst;
@@ -15169,10 +15175,10 @@ function compileComponent(node, ctx, options) {
 	return { nodes: [declNode] };
 }
 
-/** Prepare only explicitly eligible fixed views; ordinary codegen stays direct. */
+/** Gate explicitly eligible presentation views; ordinary codegen stays direct. */
 function preparePresentationHydration(body, node, ctx) {
 	const proof = node._octanePresentationHydration;
-	if (!proof?.supported || ctx.mode === 'server' || ctx._universalRuntimeUnit != null) return body;
+	if (!proof || ctx.mode === 'server' || ctx._universalRuntimeUnit != null) return body;
 	const writers = new Set([
 		'bindSignalAttribute',
 		'setEventHandler',
@@ -15193,6 +15199,11 @@ function preparePresentationHydration(body, node, ctx) {
 		'nativeStyleBinding',
 		'nativeProjectionBinding',
 	]);
+	if (proof.structural) {
+		writers.add('setText');
+		writers.add('bindSignalText');
+		writers.add('markDangerouslySetInnerHTMLChildren');
+	}
 	for (const name of [...writers]) {
 		if (name.startsWith('set')) writers.add(`${name}IfChanged`);
 	}
@@ -15206,26 +15217,94 @@ function preparePresentationHydration(body, node, ctx) {
 		'readNativeDomStyle',
 		'readNativeDomProps',
 	]);
+	if (proof.structural) {
+		preparation.add('snapshotSpread');
+		preparation.add('child');
+		preparation.add('sibling');
+		preparation.add('compilerMemoRegion');
+		preparation.add('hookMemoEqual');
+		preparation.add('beginNativeReadWitness');
+		preparation.add('finishNativeReadWitness');
+		preparation.add('replayNativeReadWitness');
+		preparation.add('validateNativeReadWitness');
+		preparation.add('drainFrag');
+		// Registration stores the compiler-owned plan; it does not invoke it or write DOM.
+		preparation.add('registerWarmPlan');
+		preparation.add('presentationStructure');
+		preparation.add('bindingText');
+		preparation.add('bindingChildSlot');
+		preparation.add('markBindingChildren');
+		preparation.add('markChildrenBlock');
+	}
 	const helpers = new Map(
 		[...ctx.runtimeNeeded].map((name) => [runtimeAliasForContext(ctx, name), name]),
 	);
-	let supported = proof.supported;
+	let supported = proof.supported || proof.conditionalRest === true;
+	const hostProofs = new Map();
 	// Visit generated statements, but not authored callbacks or cleanup bodies.
 	// New DOM helpers fail closed until their preparation contract is audited.
 	const visit = (value, rewrite) => {
 		if (!value || typeof value !== 'object') return value;
 		if (Array.isArray(value)) return value.map((item) => visit(item, rewrite));
 		if (!value.type || /Function/.test(value.type)) return value;
-		if (value.type === 'ReturnStatement') supported = false;
+		if (value.type === 'ReturnStatement' && !value._octanePendingOutputGuard) supported = false;
 		const helper =
 			value.type === 'CallExpression' && value.callee.type === 'Identifier'
 				? helpers.get(value.callee.name)
 				: undefined;
-		if (helper && !writers.has(helper) && !preparation.has(helper) && !/^bag\d+$/.test(helper))
+		const host =
+			helper === 'bindSignalHostPropSources' &&
+			proof.structural &&
+			value._octanePresentationHostSources?.length > 0;
+		if (
+			helper &&
+			!host &&
+			!writers.has(helper) &&
+			!preparation.has(helper) &&
+			!/^bag(?:\d+|Of)$/.test(helper)
+		)
 			supported = false;
 		const result = { ...value };
 		for (const key of Object.keys(value)) {
 			if (key !== 'loc' && key !== 'metadata') result[key] = visit(value[key], rewrite);
+		}
+		if (rewrite && host) {
+			const records = value._octanePresentationHostSources;
+			const key = JSON.stringify(records);
+			let receipt = hostProofs.get(key);
+			if (receipt === undefined) {
+				receipt = b.id(allocCompilerName(ctx, '__presentationHostSources'));
+				hostProofs.set(key, receipt);
+				ctx.hoistedHelpers.push(
+					inheritOriginLoc(
+						b.const(
+							receipt,
+							b.array(
+								records.map((record) =>
+									b.object(
+										Object.entries(record).map(([name, field]) =>
+											b.prop('init', b.id(name), b.literal(field)),
+										),
+									),
+								),
+							),
+						),
+						value,
+					),
+				);
+			}
+			const args = result.arguments.slice();
+			while (args.length < 7) args.push(undefinedNode());
+			return inheritOriginLoc(
+				b.call(
+					requireRuntimeForContext(ctx, 'presentationWrite'),
+					result.callee,
+					b.literal(helper),
+					...args,
+					receipt,
+				),
+				value,
+			);
 		}
 		return rewrite && writers.has(helper)
 			? inheritOriginLoc(
@@ -15242,6 +15321,7 @@ function preparePresentationHydration(body, node, ctx) {
 	visit(body, false);
 	const frame = b.id(allocCompilerName(ctx, '__presentationHydration'));
 	const completed = b.id(allocCompilerName(ctx, '__presentationComplete'));
+	const failure = proof.structural ? b.id(allocCompilerName(ctx, '__presentationFailure')) : null;
 	const statements = supported ? visit(body, true) : body;
 	let directiveEnd = 0;
 	while (
@@ -15254,6 +15334,8 @@ function preparePresentationHydration(body, node, ctx) {
 		b.id('__s'),
 		b.literal(proof.id),
 		b.literal(supported),
+		...(proof.structural ? [b.literal(true)] : []),
+		...(proof.conditionalRest ? [b.literal(true)] : []),
 	);
 	// A new, unsupported writer can still render normally, but must reject an
 	// attempted lease before publishing anything. It never opens a frame.
@@ -15268,7 +15350,15 @@ function preparePresentationHydration(body, node, ctx) {
 				...statements.slice(directiveEnd),
 				b.stmt(b.assignment('=', completed, b.literal(true))),
 			]),
-			null,
+			failure === null
+				? null
+				: b.catch_clause(
+						failure,
+						null,
+						b.block([
+							b.stmt(b.call(requireRuntimeForContext(ctx, 'presentationFailure'), failure)),
+						]),
+					),
 			b.block([
 				b.stmt(b.call(requireRuntimeForContext(ctx, 'endPresentationHydration'), frame, completed)),
 			]),
@@ -15282,6 +15372,8 @@ function preparePresentationHydration(body, node, ctx) {
  * bodies. `cssHash` selects the enclosing scoped-style expression fallback.
  */
 function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null, options = null) {
+	const previousPresentationHydration = ctx.presentationHydration;
+	ctx.presentationHydration = node._octanePresentationHydration;
 	const returnedOutput = options?.returnedOutput === true;
 	const previousAutoCalculatedRenderableRefs = ctx.currentAutoCalculatedRenderableRefs;
 	let autoCalculatedDeclarations = null;
@@ -15761,7 +15853,7 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 						b.member(b.member(b.id('__s'), 'block'), 'pending'),
 						b.unary('!', b.member(b.member(b.id('__s'), 'block'), 'crossRenderUpdate')),
 					),
-					b.return(null),
+					{ ...b.return(null), _octanePendingOutputGuard: true },
 					null,
 				),
 				node,
@@ -15885,6 +15977,7 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 	// ONE FunctionDeclaration node — the caller prints it (once, with the full
 	// esrap map for top-level components) or embeds it in an enclosing body.
 	const presentationBody = preparePresentationHydration(bodyStatements, node, ctx);
+	ctx.presentationHydration = previousPresentationHydration;
 	const emittedFunction = b.function_declaration(
 		b.id(name, node.id ?? node),
 		fnParams,
@@ -25021,18 +25114,26 @@ function planJsx(
 		ctx.runtimeNeeded.add('ifBlock');
 		registerDirectiveOrigin(ctx, org, ['_$ifBlock', ic.thenHelper, ic.elseHelper]);
 		registerClauseOrigin(ctx, ic.alternateKeyword, [ic.elseHelper]);
-		const call = b.stmt(
-			b.call(
-				'_$ifBlock',
-				b.id('__s'),
-				b.literal(slotIndex),
-				hostExpr,
-				condition,
-				helperRefNode(ic.thenHelper),
-				inheritOriginLoc(helperRefNode(ic.elseHelper ?? 'null'), ic.alternateKeyword),
-				...trailing,
-			),
+		let invocation = b.call(
+			'_$ifBlock',
+			b.id('__s'),
+			b.literal(slotIndex),
+			hostExpr,
+			condition,
+			helperRefNode(ic.thenHelper),
+			inheritOriginLoc(helperRefNode(ic.elseHelper ?? 'null'), ic.alternateKeyword),
+			...trailing,
 		);
+		if (ctx.presentationHydration?.structural && ic.bindingSite) {
+			invocation = b.call(
+				requireRuntimeForContext(ctx, 'presentationStructure'),
+				invocation.callee,
+				b.literal('if'),
+				b.literal(bindingMarker(ic.bindingSite, '')),
+				...invocation.arguments,
+			);
+		}
+		const call = b.stmt(invocation);
 		pushAfterStmt(ic.id, org, conditionDeclaration ? b.block([conditionDeclaration, call]) : call);
 	}
 	for (const cc of compCalls) {
@@ -25314,6 +25415,23 @@ function planJsx(
 			const witnessMiss = cc.autoMemoWitnesses.length
 				? witnessMissChain(cc.autoMemoWitnesses)
 				: null;
+			let invocation = b.call(
+				componentHelper,
+				b.id('__s'),
+				b.literal(slotIndex),
+				hostExpr(),
+				cc.compNode,
+				cc.propsExpr,
+				...trailing,
+			);
+			if (ctx.presentationHydration?.structural && cc.bindingSite)
+				invocation = b.call(
+					requireRuntimeForContext(ctx, 'presentationStructure'),
+					invocation.callee,
+					b.literal('view'),
+					b.literal(bindingMarker(cc.bindingSite, 'v')),
+					...invocation.arguments,
+				);
 			pushAfterStmt(
 				cc.id,
 				org,
@@ -25321,17 +25439,7 @@ function planJsx(
 					ctx,
 					cc.autoMemoDeps,
 					slotIndex,
-					b.stmt(
-						b.call(
-							componentHelper,
-							b.id('__s'),
-							b.literal(slotIndex),
-							hostExpr(),
-							cc.compNode,
-							cc.propsExpr,
-							...trailing,
-						),
-					),
+					b.stmt(invocation),
 					witnessMiss,
 					cc.autoMemoContextAware,
 					depNodeFor(cc),
@@ -25421,21 +25529,24 @@ function planJsx(
 			cc.keyExpr != null ? b.literal(true) : undefinedNode(),
 			b.literal(cc.invocationSite),
 		];
-		pushAfterStmt(
-			cc.id,
-			org,
-			b.stmt(
-				b.call(
-					componentHelper,
-					b.id('__s'),
-					b.literal(slotIndex),
-					hostExpr(),
-					cc.compNode,
-					cc.propsExpr,
-					...trailing,
-				),
-			),
+		let invocation = b.call(
+			componentHelper,
+			b.id('__s'),
+			b.literal(slotIndex),
+			hostExpr(),
+			cc.compNode,
+			cc.propsExpr,
+			...trailing,
 		);
+		if (ctx.presentationHydration?.structural && cc.bindingSite)
+			invocation = b.call(
+				requireRuntimeForContext(ctx, 'presentationStructure'),
+				invocation.callee,
+				b.literal('view'),
+				b.literal(bindingMarker(cc.bindingSite, 'v')),
+				...invocation.arguments,
+			);
+		pushAfterStmt(cc.id, org, b.stmt(invocation));
 	}
 	for (const pc of ctx._portalCalls) {
 		const slotIndex = pc.slotIndex;
@@ -25812,6 +25923,16 @@ function commitSourceRows(sources, valueOf) {
 	return b.array(rows);
 }
 
+// Preserve the authored rest site's identity through known-spread expansion.
+// Its authored spread ordinal is not the eventual host-source row index.
+function presentationHostSourcesCall(bind, ...args) {
+	const call = b.call('_$bindSignalHostPropSources', ...args);
+	const receipts = bind.sources.flatMap(({ binding }, source) =>
+		binding.bindingRest ? [{ ...binding.bindingRest, source }] : [],
+	);
+	return receipts.length === 0 ? call : { ...call, _octanePresentationHostSources: receipts };
+}
+
 // Recombine a native spread snapshot only for mount/hydration or a key collision.
 // Spreading the snapshot cannot replay getters: the authored spreads already
 // copied their values before any of the trailing expressions were evaluated.
@@ -26150,8 +26271,8 @@ function emitBindingMount(bind, elVar, bag) {
 							b.assignment(
 								'=',
 								propsLocal,
-								b.call(
-									'_$bindSignalHostPropSources',
+								presentationHostSourcesCall(
+									bind,
 									b.id('__s'),
 									undefinedNode(),
 									el(),
@@ -26640,8 +26761,8 @@ function emitBindingUpdate(bind, bag, inlineBindingGuards = false) {
 						b.assignment(
 							'=',
 							F('_host'),
-							b.call(
-								'_$bindSignalHostPropSources',
+							presentationHostSourcesCall(
+								bind,
 								b.id('__s'),
 								F('_host'),
 								F('_el'),
@@ -27629,6 +27750,7 @@ function emitElementHtml(
 			const binding = {
 				id: bindings.length,
 				kind: 'hostSpread',
+				...(attr._octaneBindingRest ? { bindingRest: attr._octaneBindingRest } : {}),
 				// The INNER spread argument; the emit re-derives the
 				// `_$snapshotSpread(…)` wrapper around it.
 				expr: tsrxExprNode(attr.argument, ctx, componentName, inlinedSubs),
@@ -29183,6 +29305,17 @@ function hoistBodyHelper(
 			id: b.id(helperName, idOrigin ?? fakeOrigin ?? undefined),
 			params: params || [],
 			body: bodyStmts,
+			...(ctx.presentationHydration?.structural
+				? {
+						_octanePresentationHydration: {
+							id: ctx.presentationHydration.id,
+							supported:
+								ctx.presentationHydration.supported ||
+								ctx.presentationHydration.conditionalRest === true,
+							structural: true,
+						},
+					}
+				: {}),
 		},
 		fakeOrigin,
 	);
@@ -29327,6 +29460,7 @@ function makeIfCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) {
 		origin: node,
 		condExpr: node.test, // the fold replaces this with a `props.hN` member read
 		condTest: node.test, // raw test AST — the fold threads it as a `props.hN` hole
+		bindingSite: node._octaneBindingSite,
 		envNames,
 		thenHelper: thenHelperName,
 		elseHelper: elseHelperName,
@@ -29925,9 +30059,14 @@ function makeCompCall(
 				ctx.hoistedHelpers.push(inheritOriginLoc(b.const(bodyIdentity, b.object([])), node));
 				childrenArgs.push(b.id(bodyIdentity));
 			}
-			propNodes.push(
-				b.prop('init', b.literal('children'), b.call('_$markChildrenBlock', ...childrenArgs)),
-			);
+			let childrenValue = b.call('_$markChildrenBlock', ...childrenArgs);
+			if (ctx.presentationHydration?.structural && node._octaneBindingSite)
+				childrenValue = b.call(
+					requireRuntimeForContext(ctx, 'markBindingChildren'),
+					childrenValue,
+					b.literal(node._octaneBindingSite.id + ';' + node._octaneBindingSite.site),
+				);
+			propNodes.push(b.prop('init', b.literal('children'), childrenValue));
 		}
 	}
 
@@ -30125,6 +30264,7 @@ function makeCompCall(
 		propsExpr,
 		hostPath: null,
 		keyExpr,
+		bindingSite: node._octaneBindingSite,
 		liteEligible: node._octaneBindingSite ? false : liteEligible,
 		anchorlessAppendSafe,
 		autoMemoDeps,

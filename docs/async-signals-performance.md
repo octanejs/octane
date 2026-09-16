@@ -7,6 +7,26 @@ interchangeable results.
 
 Each section identifies its measured source or historical checkpoint. Results from different checkpoints must not be treated as current bundle sizes or added together.
 
+## Structural hydration handoff and closed caller props
+
+The structural-handoff candidate was compared with `7a83b5a89` using captured source snapshots and the same installed dependencies: Node 24.21.0, esbuild 0.28.1, browser ESM targeting `esnext`, production minification, and gzip level 9. The measured runtime SHA-256 is `fd8de1bcb84dbfff96edcb4d3374c50637f08449f42e1039507a7202b1b45a33`; the compiler SHA-256 is `a620c9245d9123cf2f03621f5f4c77c66610c2e8a6cfaa787685c841676d6faf`. No framework or fixture source changed during measurement.
+
+| Complete source-entry closure | Baseline raw / gzip bytes | Candidate raw / gzip bytes | Difference raw / gzip bytes |
+| --- | ---: | ---: | ---: |
+| Ordinary compiled component | 209,812 / 66,120 | 212,439 / 67,049 | +2,627 / +929 |
+| Scalar early-binding descriptor | 1,272 / 677 | 1,272 / 677 | 0 / 0 |
+| Structural early-binding descriptor | 30,554 / 10,437 | 33,719 / 11,423 | +3,165 / +986 |
+| Ineligible-list descriptor | 31,855 / 10,771 | 32,120 / 10,866 | +265 / +95 |
+| `createRoot` export | 195,845 / 62,379 | 198,171 / 63,207 | +2,326 / +828 |
+| `hydrateRoot` export | 246,422 / 78,081 | 249,678 / 79,215 | +3,256 / +1,134 |
+| Eligible normal-renderer component | 210,259 / 66,263 | 237,823 / 75,439 | +27,564 / +9,176 |
+
+These are overlapping framework closures, not additive chunks or an application-route budget. The eligible normal-renderer entry now retains the selected presentation-adoption and native-read support; it is distinct from the early descriptor. None of the three descriptor bundles retains the renderer, server, or signal engine/graph/facade. Ordinary component and root exports do not retain the optional native-read collector.
+
+Eight ordinary/scalar compiler controls, covering client/server and development/production, remain byte-identical. The scalar bundle is also byte-identical. Structural descriptor output adds 288 raw / 44 gzip bytes before bundling; the remaining increase is shared program support. The ineligible-list compiler output is unchanged. The eligible normal-renderer output adds 2,146 raw / 295 gzip bytes before bundling. No runtime timing or speedup is inferred from these byte measurements.
+
+The public behavior suite passes 98 development/production cases, including suspended and staged attempts, stale-read rejection, bare child-component roots, exact caller shapes, ref ownership, authored-error reporting, and unsupported-region refusal. Separate consumer-source JSDOM checks preserve native button/SVG identity, live signals, single-delivery commands, and owner cleanup through early-to-normal takeover. These are not served-application, browser, or physical iOS Safari qualification. The narrower fixed-view browser evidence below does not qualify the new structural path.
+
 ## Optional early-binding hydration handoff
 
 The fixed-view handoff candidate, including its catalogued runtime diagnostics and staged-cleanup repairs, was compared with `1cfbc9e78` using the same installed toolchain. Its measured runtime SHA-256 is `dce2729e189cc54d20c5c7be0d180f5bbddb806347eda69eb4beaad46d6816ab` and compiler SHA-256 is `260af6e9c8dc310457d650530085e65f94ed71da311feccf2127efc4072a3206`; loaded source hashes stayed unchanged during measurement. The source-entry runner used esbuild 0.28.1, Alien Signals 3.2.0, and devalue 5.8.2. The rich authored fixture used production Vite 8.1.5 / Rolldown 1.1.5 on Node 24.21.0, Darwin arm64.

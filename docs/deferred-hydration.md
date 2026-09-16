@@ -489,6 +489,8 @@ nodes.
 
 Binding views may use flat destructured props, including aliases, primitive literal defaults, and a final rest binding: `function Action({ label: text = 'Send', ...props }) @{ ... }`. Destructuring runs once for each prepared snapshot, so projections and event handlers share the same captured values and rest object. Defaults apply only to `undefined`, not `null`. Nested or computed patterns and nonliteral defaults fail extraction. A rendered `children` slot may be aliased or read through rest when it was not excluded; a non-null default for that slot is unsupported. A rest binding does not authorize an arbitrary native JSX spread: the existing spread restrictions still apply.
 
+For a child binding view called with explicit props, the compiler can specialize a native spread of that child's destructured rest parameter to the caller's known prop names. Authors keep normal component imports and JSX; the ordered prop-shape request is compiler-owned. This does not permit arbitrary object spreads, aliases of rest, conflicting native writers, or unsupported property channels. A generic `adoptBindings` call on a rest-spreading component without a proven caller shape still fails clearly. Normal SSR keeps the authored spread and shares its structural and class-group annotation allocation with the extracted view; it does not acquire the extracted artifact's narrower prop API.
+
 Pass the exact element emitted by the matching server build. Adoption validates
 template compatibility, native topology, and conflicting binding ownership
 before modifying it. Only declared dynamic properties and structural regions
@@ -536,7 +538,7 @@ event is being dispatched.
 
 ### Optional handoff to normal hydration
 
-An adopted fixed native view can keep handling interactions while its enclosing
+An adopted compiler-proven native view can keep handling interactions while its enclosing
 application waits to hydrate. Pass its `BindingHandle` to the later root:
 
 ```ts
@@ -563,14 +565,31 @@ handled by the early listener is not delivered again to its replacement.
 Signals remain alive. Replacing or unmounting the owning root releases pending
 leases; aborting a hydration attempt alone does not.
 
-This handoff is narrower than renderer-free presentation generally. It requires
-an adopted compiler-proven fixed native `@{}` view, without structural regions,
-dynamic text, writable controls, or unsupported writers. Native attributes,
-events, refs, and supported native style projections can transfer. Unsupported
-handoffs fail explicitly instead of silently loading a different renderer path.
-Child-view and slot programs still count as regions even when a particular call
-produces fixed DOM; they do not automatically qualify for this handoff.
-Keep richer renderer-free programs under their existing owner until an explicit
+Refs retain their per-owner lifetimes: accepted takeover detaches the early ref
+and attaches the normal ref to the same node. A discarded or suspended attempt
+does neither. Node identity is preserved; suppressing the detach/attach pair for
+an identical callback is not part of the contract.
+
+This handoff is narrower than renderer-free presentation generally. Fixed native
+views can transfer attributes, events, refs, and supported native style
+projections. Structural views additionally require proof of the current native
+nodes, selected conditional branches, child views, slots, and primitive text.
+The renderer validates that proof again before publishing, including after a
+suspended or staged attempt. A stale attempt cannot overwrite a newer early
+presentation.
+
+An unused generic-content branch does not
+prevent takeover of a supported slot branch, but switching into unsupported
+content while takeover is pending causes a clear refusal. A native rest spread
+also requires the same compiler-proven caller prop shape; proof from another
+instance or call site cannot authorize it.
+
+Views with writable controls or unsupported normal-renderer writers do not
+qualify for structural handoff. Neither do entered keyed-list, opaque, or generic
+renderable regions.
+Unsupported handoffs fail explicitly while preserving the early presentation;
+they do not silently replace its DOM or load a different renderer path. Keep
+richer renderer-free programs under their existing owner until an explicit
 replacement strategy is available.
 
 ### Capturing command input before deferred work

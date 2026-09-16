@@ -17,6 +17,7 @@ import {
 	isUnitlessStyleProp,
 } from '../dom-tables.js';
 import { shouldSanitizeURLAttribute } from '../sanitize-url.js';
+import { formatDomBindingRequest } from './dom-binding-request.js';
 
 function unwrap(node) {
 	while (
@@ -115,6 +116,7 @@ export function planBindingProgram(fn, render, context) {
 	const replacements = new Map();
 	const unbound = new Map();
 	const classAttributes = new Map();
+	const restAttributes = new Map();
 	const dependencies = [];
 	const hoists = [];
 	const expressions = [];
@@ -171,6 +173,24 @@ export function planBindingProgram(fn, render, context) {
 			}
 		} else if (node.type === 'JSXElement' || node.type === 'Element') {
 			const native = /^[a-z]/.test(tagOf(node) ?? '');
+			if (context.annotationsOnly) {
+				const attributes = node.openingElement?.attributes ?? node.attributes ?? [];
+				if (
+					attributes.some((attribute) => ['class', 'className'].includes(rawName(attribute))) &&
+					attributes.some((attribute) =>
+						attribute._octaneKnownAttributeSpread?.fields.some((name) =>
+							['class', 'className'].includes(name),
+						),
+					)
+				)
+					fail(
+						node,
+						'generic binding rest annotations cannot combine class attributes and known spreads',
+					);
+				for (const attribute of attributes) {
+					if (isUnbound(attrValue(attribute))) stripUnbound(attrValue(attribute));
+				}
+			}
 			const children = annotate(node.children ?? [], native);
 			next = { ...node, children };
 			if (!native) next._octaneBindingSite = metadata();
@@ -216,9 +236,14 @@ export function planBindingProgram(fn, render, context) {
 			node,
 		);
 	};
-	const validate = (expression) => assertProjection(expression);
+	const validate = (expression) => {
+		if (!context.annotationsOnly) assertProjection(expression);
+	};
 	const regionMarker = (site, arm) => `<!--[b;${id};${site};${arm}--><!--]-->`;
 	const compileFragment = (rawNodes, names, namespace = 0, ancestors = []) => {
+		// Only this fragment's writers determine its entry capability. Conditional
+		// arms and caller slots are checked when their concrete ranges are entered.
+		let structural = true;
 		const nodes = [];
 		const appendNode = (node) => {
 			nodes.push(node);
@@ -234,6 +259,7 @@ export function planBindingProgram(fn, render, context) {
 		const initialValues = [];
 		const regions = [];
 		const adapters = [];
+		const restSites = [];
 		let constructionError = null;
 		const initialize = (index, kind, name, value, unitless) => {
 			validate(value);
@@ -248,6 +274,7 @@ export function planBindingProgram(fn, render, context) {
 				}
 				const opaque = node._octaneBindingOpaque;
 				if (opaque) {
+					structural = false;
 					const index = nodes.length;
 					appendNode([parent, 'region', String(opaque.site)]);
 					regions.push(object({ node: b.literal(index), kind: b.literal('opaque') }));
@@ -298,6 +325,7 @@ export function planBindingProgram(fn, render, context) {
 					);
 				validate(node.expression);
 				const site = (node._octaneBindingText ?? node._octaneBindingValue).site;
+				if (node._octaneBindingValue) structural = false;
 				const signal = helpers.canCarryDirectSignalHandle(node.expression);
 				signals ||= signal;
 				const index = nodes.length;
@@ -322,8 +350,8 @@ export function planBindingProgram(fn, render, context) {
 				const thenNodes = blockNodes(node.consequent);
 				const elseNodes = blockNodes(node.alternate);
 				const arms = [
-					compileFragment(thenNodes, names, ns, parents),
-					compileFragment(elseNodes, names, ns, parents),
+					compileFragment(thenNodes, names, ns, parents).fragment,
+					compileFragment(elseNodes, names, ns, parents).fragment,
 				];
 				const index = nodes.length;
 				appendNode([parent, 'region', String(site)]);
@@ -354,6 +382,7 @@ export function planBindingProgram(fn, render, context) {
 				return html;
 			}
 			if (node.type === 'ForOfStatement') {
+				structural = false;
 				const item = node.left?.declarations?.[0]?.id;
 				if (node.await || item?.type !== 'Identifier' || !node.key)
 					fail(
@@ -379,8 +408,8 @@ export function planBindingProgram(fn, render, context) {
 					[...names, item.name, indexName],
 					ns,
 					parents,
-				);
-				const empty = compileFragment(blockNodes(node.empty), names, ns, parents);
+				).fragment;
+				const empty = compileFragment(blockNodes(node.empty), names, ns, parents).fragment;
 				const index = nodes.length;
 				appendNode([parent, 'region', String(site)]);
 				regions.push(
@@ -400,8 +429,36 @@ export function planBindingProgram(fn, render, context) {
 			if (node.type !== 'Element') fail(node, `unsupported binding program construct ${node.type}`);
 			const tag = tagOf(node);
 			if (!/^[a-z]/.test(tag ?? '')) {
+				const site = node._octaneBindingSite?.site;
+				if (site === undefined) fail(node, 'binding child component is missing its authored site');
+				const index = nodes.length;
+				appendNode([parent, 'region', String(site)]);
+				const html = createTemplateIr();
+				appendTemplatePart(html, regionMarker(site, 'v'), 'anchor');
+				if (context.annotationsOnly) {
+					localProgram(tag, null, true);
+					if ((node.children ?? []).some(significant))
+						compileFragment(node.children, names, ns, parents);
+					return html;
+				}
+				const props = [];
+				const propNames = [];
+				for (const attr of node.attributes ?? []) {
+					if (attr.type !== 'Attribute' && attr.type !== 'JSXAttribute')
+						fail(attr, 'binding child program props must be explicit');
+					const name = rawName(attr);
+					if (['key', 'children', '__proto__'].includes(name))
+						fail(attr, `binding child program ${name} is not supported`);
+					if (propNames.includes(name))
+						fail(attr, 'binding child program props cannot be repeated');
+					const value = attrValue(attr);
+					validate(value);
+					propNames.push(name);
+					props.push(b.prop('init', b.literal(name), value));
+				}
+				if ((node.children ?? []).some(significant)) propNames.push('children');
 				const imported = imports.get(tag);
-				const child = !imported ? localProgram(tag) : null;
+				const child = !imported ? localProgram(tag, propNames) : null;
 				if (
 					!child &&
 					(!imported?.imported ||
@@ -409,22 +466,23 @@ export function planBindingProgram(fn, render, context) {
 						/[?#]/.test(imported.source))
 				)
 					fail(node, 'binding child components must be directly imported named pure binding views');
-				let local = importedPrograms.get(tag);
+				const request = child
+					? null
+					: formatDomBindingRequest(imported.source, {
+							exportName: imported.imported,
+							mount: true,
+							props: propNames,
+						});
+				let local = importedPrograms.get(request);
 				if (local === undefined && !child) {
 					local = allocateProgramName('_bindingChild');
-					importedPrograms.set(tag, local);
+					importedPrograms.set(request, local);
 					childPrograms.add(local);
-					dependencies.push(
-						origin(
-							b.imports(
-								[['default', local]],
-								`${imported.source}?octane-bindings=${encodeURIComponent(imported.imported)}&octane-mount=1`,
-							),
-							node,
-						),
-					);
+					dependencies.push(origin(b.imports([['default', local]], request), node));
 				}
 				if (child) {
+					// Child capability is checked for the entered view instance when the
+					// lease is acquired and published, including a changed active branch.
 					signals ||= child.signals;
 					controls ||= child.controls;
 					styles ||= child.styles;
@@ -434,19 +492,8 @@ export function planBindingProgram(fn, render, context) {
 					for (const hoist of child.hoists) if (!hoists.includes(hoist)) hoists.push(hoist);
 					expressions.push(...child.expressions);
 				} else signals = true;
-				const props = [];
-				for (const attr of node.attributes ?? []) {
-					if (attr.type !== 'Attribute' && attr.type !== 'JSXAttribute')
-						fail(attr, 'binding child program props must be explicit');
-					const name = rawName(attr);
-					if (['key', 'children'].includes(name))
-						fail(attr, `binding child program ${name} is not supported`);
-					const value = attrValue(attr);
-					validate(value);
-					props.push(b.prop('init', b.literal(name), value));
-				}
 				if ((node.children ?? []).some(significant)) {
-					const fragment = compileFragment(node.children, names, ns, parents);
+					const fragment = compileFragment(node.children, names, ns, parents).fragment;
 					const local = allocateProgramName('_bindingSlotFragment');
 					hoists.push(origin(b.const(b.id(local), fragment), node));
 					if (slotFactory === null) {
@@ -473,14 +520,11 @@ export function planBindingProgram(fn, render, context) {
 											: b.unary('void', b.literal(0)),
 									),
 								),
+								b.literal(site),
 							),
 						),
 					);
 				}
-				const site = node._octaneBindingSite?.site;
-				if (site === undefined) fail(node, 'binding child component is missing its authored site');
-				const index = nodes.length;
-				appendNode([parent, 'region', String(site)]);
 				regions.push(
 					object({
 						node: b.literal(index),
@@ -495,14 +539,35 @@ export function planBindingProgram(fn, render, context) {
 						props: project(names, b.object(props), node),
 					}),
 				);
-				const html = createTemplateIr();
-				appendTemplatePart(html, regionMarker(site, 'v'), 'anchor');
 				return html;
 			}
 			const selfNs = tag === 'svg' ? 1 : ns;
 			const index = nodes.length;
+			for (const rest of context.restSites?.get(node.attributes) ?? []) {
+				const { site, spread, keys } = rest;
+				// The same normalized fragment allocator supplies descriptor addresses
+				// and normal-renderer metadata, including sites inside branches/slots.
+				if (keys !== undefined)
+					restSites.push(
+						object({
+							site: b.literal(site),
+							node: b.literal(index),
+							spread: b.literal(spread),
+							keys: data(keys),
+						}),
+					);
+				if (context.annotationsOnly)
+					restAttributes.set(rest.attribute, {
+						...rest.attribute,
+						_octaneBindingRest: { id, site, node: index, spread },
+					});
+			}
 			const nativeAttributes = (node.attributes ?? []).filter((attr) => {
 				const name = rawName(attr);
+				// Annotation-only compilation shares this fragment's exact normalized
+				// node allocation, but needs only partial-class ownership receipts.
+				// Other native props remain on the ordinary authored renderer path.
+				if (context.annotationsOnly) return name === 'class' || name === 'className';
 				if (name !== 'ref' && !/^on[A-Z]/.test(name ?? '')) return true;
 				const expression = attrValue(attr);
 				// Event/ref callbacks are native owner adapters, not eager projections.
@@ -750,6 +815,8 @@ export function planBindingProgram(fn, render, context) {
 		const template = createTemplateIr();
 		for (const node of normalize(rawNodes, namespace))
 			appendTemplateIr(template, emit(node, -1, namespace, ancestors));
+		if (constructionError !== null) structural = false;
+		if (context.annotationsOnly) return { fragment: null, structural };
 		const properties = {
 			html: b.literal(serializeTemplateIr(template).html),
 			ns: b.literal(namespace),
@@ -757,6 +824,7 @@ export function planBindingProgram(fn, render, context) {
 			bindings: data(bindings),
 			project: project(names, b.array(values), fn, projections),
 			regions: b.array(regions),
+			...(restSites.length ? { restSites: b.array(restSites) } : {}),
 			...(signalIndices.length ? { signalIndices: data(signalIndices) } : {}),
 			...(styleIndices.length ? { styleIndices: data(styleIndices) } : {}),
 			...(projectionGroups.length ? { projectionGroups: data(projectionGroups) } : {}),
@@ -804,12 +872,16 @@ export function planBindingProgram(fn, render, context) {
 				fn,
 			);
 		}
-		return object(properties);
+		return { fragment: object(properties), structural };
 	};
-	const root = compileFragment([annotated], parameterNames);
+	const { fragment: root, structural } = compileFragment([annotated], parameterNames);
 	for (const [call, value] of unbound) replacements.set(call, value);
-	const finalRender = mapCow(annotated, new Map([...unbound, ...classAttributes]));
+	const finalRender = mapCow(
+		annotated,
+		new Map([...unbound, ...classAttributes, ...restAttributes]),
+	);
 	replacements.set(render, finalRender);
+	if (context.annotationsOnly) return { id, replacements, structural: structural && !controls };
 	return {
 		fn,
 		render: finalRender,
@@ -831,6 +903,7 @@ export function planBindingProgram(fn, render, context) {
 		controls,
 		styles,
 		projectionsEnabled,
+		structural: structural && !controls,
 		childPrograms,
 	};
 }
