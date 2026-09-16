@@ -280,7 +280,12 @@ have the same resolved-graph prohibition, including renderer imports that emit
 zero bytes after tree shaking. This prevents an apparently small export-only
 measurement from hiding a renderer dependency introduced by compilation or
 automatic owner initialization. Native hook entries must include the correct runtime and Alien
-3.2.0. Ordinary runtime exports can resolve their optional native adapters, but
+3.2.0. Early signal and binding entries also reject a resolved transition-frame
+module, even if it emits zero bytes: a split-chunk application's recursive module
+group can otherwise hoist the deferred renderer's frame into startup. The report
+records this check for both revisions and gates the candidate; a historical
+baseline may retain the old edge.
+Ordinary runtime exports can resolve their optional native adapters, but
 the emitted-byte check requires all client/server adapter, collector, inspection,
 and retry implementations, plus server query-observation mirrors, to tree-shake
 to zero bytes. The read/event protocol

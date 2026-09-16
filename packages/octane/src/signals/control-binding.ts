@@ -15,7 +15,7 @@ import {
 	type NativeTransitionNotify,
 } from './read-protocol.js';
 import { SIGNAL_BINDING_READ, SIGNAL_BINDING_SUBSCRIBE, type SignalHandle } from './types.js';
-import { withoutSignalCandidate } from './transition-candidate.js';
+import { withoutSignalCandidate } from './transition-state.js';
 
 type SignalControl = HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
 type ControlChannel = 'value' | 'checked';

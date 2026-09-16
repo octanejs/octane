@@ -1,6 +1,4 @@
-import type { createReactiveSystem } from 'alien-signals/system';
 import type {
-	GraphOwner,
 	ScopedNode,
 	NodeState,
 	CandidateProducer,
@@ -10,8 +8,6 @@ import type {
 import { ScopeDisposedError, SignalFrameError } from './errors.js';
 import {
 	NativeAdoptionMiss,
-	createNativeReadCandidateSource,
-	setNativeCandidateResolver,
 	NATIVE_TRANSITION_CONSUMER,
 	SIGNAL_DEPENDENT_NODE,
 	type NativeReadSource,
@@ -19,52 +15,17 @@ import {
 	type NativeTransitionNotify,
 	type SignalDependencyNotify,
 } from './read-protocol.js';
-
-/** The graph registers primitives, not a candidate factory. This keeps candidate
- * orchestration out of signal-only bundles and the graph out of renderer-only bundles. */
-interface CandidateGraph {
-	ScopedNode: typeof import('./graph.js').ScopedNode;
-	graph: ReturnType<typeof createReactiveSystem>;
-	flags: { Dirty: number; Mutable: number; Watching: number };
-	historical(): boolean;
-	link(from: ScopedNode, to: ScopedNode): void;
-	removeQueued(node: ScopedNode): void;
-	assertAlive(owner: GraphOwner): void;
-	strictValue<T>(state: NodeState<T>, key?: string): T;
-	refreshNode<T>(node: ScopedNode<T>): NodeState<T>;
-	pure<T>(read: () => T): T;
-	untrack<T>(read: () => T): T;
-	signalBatch<T>(read: () => T): T;
-	publishNode<T>(node: ScopedNode<T>, state: NodeState<T>): void;
-	readyState<T>(value: T): NodeState<T>;
-	commitState(node: ScopedNode, state: NodeState): void;
-	sameState(a: NodeState | undefined, b: NodeState): boolean;
-	releaseRetainedOwners(node: ScopedNode): void;
-	retainOwners(node: ScopedNode): void;
-	releaseRetention(node: ScopedNode): void;
-	createNativeSource(node: ScopedNode, mode: SignalReadMode): NativeReadSource;
-	attachObserver(node: ScopedNode, notify: () => void, native: boolean): () => void;
-}
-
-let bridge: CandidateGraph;
-export function registerCandidateGraph(graph: CandidateGraph): void {
-	bridge = graph;
-}
-
-export function withoutSignalCandidate<T>(callback: () => T): T {
-	const previous = activeCandidate;
-	const resolver = setNativeCandidateResolver(null);
-	activeCandidate = undefined;
-	try {
-		return callback();
-	} finally {
-		activeCandidate = previous;
-		setNativeCandidateResolver(resolver);
-	}
-}
-
-/** Internal capability refusal, distinct from an authored TypeError. */
-export class CandidateUnsupportedError extends TypeError {}
+import {
+	activeCandidate,
+	addCandidateWriter,
+	candidateGraph as bridge,
+	candidateWriters,
+	CandidateUnsupportedError,
+	removeCandidateWriter,
+	swapActiveSignalCandidate,
+	swapCandidateInvalidation,
+	withoutSignalCandidate,
+} from './transition-state.js';
 
 export type CandidatePreparation =
 	| { status: 'ready'; token: object; receipt: { publish(accepted?: () => void): boolean } }
@@ -72,32 +33,6 @@ export type CandidatePreparation =
 	| { status: 'error'; token: object; error: unknown }
 	| { status: 'invalid'; token: object; reason: 'stale' | 'unsupported' };
 
-export let activeCandidate: SignalCandidateFrame | undefined;
-/** Synchronous action scope; never keep a candidate active across an await. */
-export function swapActiveSignalCandidate(
-	frame: SignalCandidateFrame | undefined,
-): SignalCandidateFrame | undefined {
-	const previous = activeCandidate;
-	activeCandidate = frame;
-	return previous;
-}
-export let deferCandidateInvalidation = false;
-export let candidateWriteCount = 0;
-let candidateWriters: WeakMap<ScopedNode, Set<SignalCandidateFrame>> | undefined;
-
-export function recordCandidateUrgentWrite(
-	node: ScopedNode,
-	value: unknown,
-): (() => void)[] | undefined {
-	let releases: (() => void)[] | undefined;
-	const writers = candidateWriters?.get(node);
-	if (writers)
-		for (const frame of writers) {
-			const release = frame.recordUrgentWrite(node, value);
-			if (release) (releases ??= []).push(release);
-		}
-	return releases;
-}
 function isThenable(value: unknown): value is PromiseLike<unknown> {
 	return (
 		value !== null &&
@@ -153,6 +88,78 @@ function settlePreparationWake(watch: PreparationWake): void {
 }
 
 /**
+ * A candidate-only source keeps existing consumer and memo witnesses alive when
+ * its graph is released. Acceptance is restricted to graph-native sources whose
+ * revisions are monotonic and whose subscription operations run no user code.
+ * The caller installs canonical state before accepting, and accepts all sources
+ * before releasing the candidate graph or invoking public callbacks.
+ */
+function createNativeReadCandidateSource(candidate: NativeReadSource) {
+	let target: NativeReadSource | undefined = candidate;
+	let accepted = false;
+	let acceptedVersion = NaN;
+	let canonicalVersion = NaN;
+	const subscriptions = new Set<{ notify: () => void; dispose: () => void }>();
+	const source: NativeReadSource = {
+		getVersion: () =>
+			target === undefined
+				? NaN
+				: !accepted
+					? target.getVersion()
+					: target.getVersion() === canonicalVersion
+						? acceptedVersion
+						: NaN,
+		subscribe(notify) {
+			if (target === undefined) throw new TypeError('The native read candidate has retired.');
+			const subscription = { notify, dispose: target.subscribe(notify) };
+			subscriptions.add(subscription);
+			return () => {
+				if (subscriptions.delete(subscription)) subscription.dispose();
+			};
+		},
+		serialize(version) {
+			return source.getVersion() === version
+				? target?.serialize?.(accepted ? canonicalVersion : version)
+				: undefined;
+		},
+	};
+	if (candidate.inspect) source.inspect = () => target!.inspect!();
+	return {
+		source,
+		accept(canonical: NativeReadSource, observedVersion: number): boolean {
+			if (accepted || target === undefined || target.getVersion() !== observedVersion) return false;
+			const version = canonical.getVersion();
+			const acquired = new Map<{ notify: () => void; dispose: () => void }, () => void>();
+			try {
+				for (const subscription of subscriptions)
+					acquired.set(subscription, canonical.subscribe(subscription.notify));
+			} catch (error) {
+				for (const dispose of acquired.values()) dispose();
+				throw error;
+			}
+			// Every canonical lease precedes any candidate lease release.
+			acceptedVersion = observedVersion;
+			canonicalVersion = version;
+			target = canonical;
+			accepted = true;
+			if (!canonical.inspect) delete source.inspect;
+			for (const [subscription, dispose] of acquired) {
+				subscription.dispose();
+				subscription.dispose = dispose;
+			}
+			return true;
+		},
+		discard(): void {
+			if (accepted || target === undefined) return;
+			target = undefined;
+			delete source.inspect;
+			for (const subscription of subscriptions) subscription.dispose();
+			subscriptions.clear();
+		},
+	};
+}
+
+/**
  * Private transition graph. The renderer supplies admission through existing
  * presentation transactions; ordinary signal consumers do not retain this class.
  */
@@ -170,12 +177,11 @@ export class SignalCandidateFrame {
 		if (activeCandidate && activeCandidate !== this) {
 			throw new CandidateUnsupportedError('Nested signal candidates are not supported.');
 		}
-		const previous = activeCandidate;
-		activeCandidate = this;
+		const previous = swapActiveSignalCandidate(this);
 		try {
 			return callback();
 		} finally {
-			activeCandidate = previous;
+			swapActiveSignalCandidate(previous);
 		}
 	}
 
@@ -259,11 +265,7 @@ export class SignalCandidateFrame {
 			if (Object.is(current, next)) return;
 			const entry = this.entries!.get(node)!;
 			if (!entry.written) {
-				candidateWriteCount++;
-				candidateWriters ??= new WeakMap();
-				let writers = candidateWriters.get(node);
-				if (!writers) candidateWriters.set(node, (writers = new Set()));
-				writers.add(this);
+				addCandidateWriter(node, this);
 				entry.written = true;
 			}
 			this.generation++;
@@ -369,10 +371,7 @@ export class SignalCandidateFrame {
 	private forgetWrite(entry: CandidateNode): void {
 		if (!entry.written) return;
 		entry.written = false;
-		const writers = candidateWriters!.get(entry.node)!;
-		writers.delete(this);
-		if (writers.size === 0) candidateWriters!.delete(entry.node);
-		if (--candidateWriteCount === 0) candidateWriters = undefined;
+		removeCandidateWriter(entry.node, this);
 	}
 
 	/** Urgent writes win their own cells without restarting unaffected producer leases. */
@@ -564,8 +563,7 @@ export class SignalCandidateFrame {
 								if (currentChanged || retainedChanged) changed.push(node);
 							}
 							this.active = false;
-							const previous = deferCandidateInvalidation;
-							deferCandidateInvalidation = true;
+							const previous = swapCandidateInvalidation(true);
 							try {
 								for (const node of changed) {
 									if (node.subs) {
@@ -574,7 +572,7 @@ export class SignalCandidateFrame {
 									}
 								}
 							} finally {
-								deferCandidateInvalidation = previous;
+								swapCandidateInvalidation(previous);
 							}
 							for (const { entry } of prepared) {
 								entry.node.flags = bridge.flags.Mutable | bridge.flags.Watching;

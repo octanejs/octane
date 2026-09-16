@@ -181,10 +181,10 @@ import {
 import { createNativeReadRetry, type NativeReadRetry } from './signals/native-read-retry.js';
 import {
 	activeCandidate,
-	SignalCandidateFrame,
 	swapActiveSignalCandidate,
 	withoutSignalCandidate,
-} from './signals/transition-candidate.js';
+} from './signals/transition-state.js';
+import { SignalCandidateFrame } from './signals/transition-candidate.js';
 import {
 	NativeAdoptionMiss,
 	NATIVE_TRANSITION_CONSUMER,

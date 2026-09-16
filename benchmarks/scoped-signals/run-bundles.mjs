@@ -13,6 +13,7 @@ import {
 	gitBlobHash,
 	sha256,
 	verifyBundleInputs,
+	verifyTransitionBoundary,
 } from './bundle-boundaries.mjs';
 
 const HERE = import.meta.dirname;
@@ -390,6 +391,14 @@ try {
 				},
 			};
 			payload.targets.push(row);
+			try {
+				verifyTransitionBoundary(scenario, inputs);
+				row.meta.transitionBoundary = 'passed';
+			} catch (error) {
+				row.meta.transitionBoundary = error.message;
+				// Preserve the failing historical control, but gate the candidate.
+				if (label === 'candidate') failures.push(`${row.name}: ${error.message}`);
+			}
 			try {
 				verifyBundleInputs(scenario, inputs);
 				for (const request of [

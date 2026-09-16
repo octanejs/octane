@@ -5,8 +5,8 @@ import {
 	recordCandidateUrgentWrite,
 	registerCandidateGraph,
 	withoutSignalCandidate,
-	type SignalCandidateFrame,
-} from './transition-candidate.js';
+} from './transition-state.js';
+import type { SignalCandidateFrame } from './transition-candidate.js';
 import {
 	createReactiveSystem,
 	type ReactiveFlags as AlienReactiveFlags,
@@ -86,8 +86,8 @@ export interface CandidateProducerReceipt {
 	accept?(): void;
 }
 
-export { SignalCandidateFrame, CandidateUnsupportedError } from './transition-candidate.js';
-export type { CandidatePreparation } from './transition-candidate.js';
+export { CandidateUnsupportedError } from './transition-state.js';
+export type { SignalCandidateFrame, CandidatePreparation } from './transition-candidate.js';
 
 export type SignalReadMode = 'value' | 'latest' | 'snapshot';
 

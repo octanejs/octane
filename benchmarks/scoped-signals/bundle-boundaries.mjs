@@ -161,6 +161,19 @@ export function gitBlobHash(contents, algorithm = 'sha1') {
 	return createHash(algorithm).update(`blob ${contents.length}\0`).update(contents).digest('hex');
 }
 
+export function verifyTransitionBoundary(scenario, inputs) {
+	if (scenario.id !== 'engine' && !scenario.rendererFree) return;
+	// Split-chunk grouping follows module edges, even when an isolated build
+	// removes the frame's exports. Early helpers must not resolve the frame.
+	assert.deepEqual(
+		inputs.filter((input) =>
+			/\/src\/signals\/transition-candidate\.[jt]s$/.test(input.path.replaceAll('\\', '/')),
+		),
+		[],
+		`${scenario.id}: early entry reached transition orchestration`,
+	);
+}
+
 // Engine boundaries inspect the complete resolved graph, including modules
 // that tree shaking removes. A zero-byte engine dependency is still a defect.
 // Runtime exports can resolve their optional native adapters, but an ordinary

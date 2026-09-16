@@ -18,6 +18,7 @@ import {
 	entrySource,
 	gitBlobHash,
 	verifyBundleInputs,
+	verifyTransitionBoundary,
 } from './bundle-boundaries.mjs';
 
 const scenario = (id) => BUNDLE_CASES.find((entry) => entry.id === id);
@@ -142,6 +143,18 @@ for (const id of ['ordinary-client', 'ordinary-server']) {
 test('independent engine rejects rendering, compiler, DevTools, and the old Alien version', () => {
 	const independent = [source('signals/index.ts'), source('signals/graph.ts'), alien()];
 	verifyBundleInputs(scenario('engine'), independent);
+	for (const entry of BUNDLE_CASES.filter((entry) => entry.id === 'engine' || entry.rendererFree)) {
+		verifyTransitionBoundary(entry, [source('signals/transition-state.ts')]);
+		for (const bytesInOutput of [0, 1]) {
+			assert.throws(
+				() =>
+					verifyTransitionBoundary(entry, [
+						{ ...source('signals/transition-candidate.ts'), bytesInOutput },
+					]),
+				/early entry reached transition orchestration/,
+			);
+		}
+	}
 	for (const filename of [
 		'runtime.ts',
 		'runtime.server.ts',
