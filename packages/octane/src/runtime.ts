@@ -19683,7 +19683,11 @@ function bindDirectSignal(
 		);
 	}
 	if (handle === null && prior === null) {
-		if (kind === 'attribute' && previous === value) return previous;
+		if (kind === 'attribute' && previous === value) {
+			// An undefined cache slot has not yet reconciled an adopted server attribute.
+			const hydration = value === undefined ? activeHydration() : null;
+			if (hydration === null || hydration.isFresh(target)) return previous;
+		}
 		if (TRANSITION_JOURNAL !== null) journalBag();
 		const scalarTarget =
 			(kind === 'text' || kind === 'textOnlyChild') && previous instanceof Text ? previous : target;
@@ -22889,6 +22893,9 @@ export function setSpread(
 		if (process.env.NODE_ENV !== 'production') queueDevFormDiagnostic(el, mountScope);
 		return;
 	}
+	// A fresh props cache is not a snapshot of attributes already present in SSR.
+	const hydration = prev === undefined ? activeHydration() : null;
+	const initialHydration = hydration !== null && !hydration.isFresh(el);
 	for (const k of Object.keys(Object(value))) {
 		if (k === 'key' || k === 'children') continue;
 		if (skipDangerouslySetInnerHTML && k === 'dangerouslySetInnerHTML') continue;
@@ -22915,7 +22922,7 @@ export function setSpread(
 		)
 			continue; // JS-only state stamped before the loops (see above)
 		if (k === 'class' || k === 'className') {
-			if (v === pv) continue;
+			if (v === pv && !initialHydration) continue;
 			// Hydration-aware + SVG-safe class write (suppress/warn parity with a
 			// direct class binding); nullish/false removes the attribute.
 			setClassAttr(el, v);
@@ -22934,7 +22941,7 @@ export function setSpread(
 		}
 		const actionName = formActionAttributeName(el, k);
 		if (actionName !== null) {
-			if (v === pv) continue;
+			if (v === pv && !initialHydration) continue;
 			setFormAction(
 				el as HTMLFormElement | HTMLButtonElement | HTMLInputElement,
 				actionName,
@@ -22946,9 +22953,10 @@ export function setSpread(
 		// Styles/raw HTML above still need their setters for stable object values.
 		// Controlled fields reassert live DOM drift; other unchanged props need no
 		// event-name parsing or custom-element routing.
-		if (v === pv && !isControlledHostProp(el, k)) continue;
+		if (v === pv && !isControlledHostProp(el, k) && !initialHydration) continue;
 		const ev = eventSlot(k, el);
 		if (ev) {
+			if (v === pv) continue;
 			// Lazy-delegate any event we haven't seen — the compiler can't predict
 			// event names that arrive dynamically through spread. Capture-phase
 			// handlers (`onXxxCapture`) register their own capture-phase listener.

@@ -7,6 +7,14 @@ interchangeable results.
 
 Each section identifies its measured source or historical checkpoint. Results from different checkpoints must not be treated as current bundle sizes or added together.
 
+## First-client undefined attributes during hydration
+
+The first client `undefined` for an explicitly owned attribute must remove the SSR value, not compare equal to an uninitialized client cache. The fix reuses existing hydration-aware setters for direct attributes and native prop spreads. It preserves native node identity, unrelated server attributes, refs, controlled-input adoption, and the absent-handler event fast path. No per-node state, extra prop enumeration, or getter evaluation is added.
+
+A runtime-only frozen comparison with `1fe1134a4` uses Node 24.21.0, esbuild 0.28.1, minified browser ESM and gzip level 9. The measured runtime SHA-256 is `e181dc796253e6be6cd8381ec061f6820c6f814dd4423e4d50d7c24c69fe1875`. The ordinary component adds 53 raw / 17 gzip bytes, the simple eligible component adds 53 / 15, and the closed-rest framework companion adds 142 / 42. Scalar, structural and ineligible early descriptors plus the `createRoot` and `hydrateRoot` export closures remain byte- and hash-identical. All eight ordinary/scalar client/server emitted controls are identical. These are overlapping closures, not additive route costs; no runtime speedup is claimed.
+
+The scoped hydration, signal, spread, ref, and staged-write suites pass 390 development/production cases. The existing hydration regression fails before the fix; a separate fault reproduces needless registration for an undefined event handler. Two independent reviews and their final hydration-file reruns pass. A consuming-source JSDOM probe confirms that a restored draft enables the same SSR button and removes stale accessibility and visual-disabled attributes while early-to-normal signal takeover still passes. This does not qualify a served application, browser/device behavior, or the separate direct `formAction` compiler-cache path.
+
 ## Structural hydration handoff and closed caller props
 
 The structural-handoff candidate was compared with `7a83b5a89` using captured source snapshots and the same installed dependencies: Node 24.21.0, esbuild 0.28.1, browser ESM targeting `esnext`, production minification, and gzip level 9. The measured runtime SHA-256 is `fd8de1bcb84dbfff96edcb4d3374c50637f08449f42e1039507a7202b1b45a33`; the compiler SHA-256 is `a620c9245d9123cf2f03621f5f4c77c66610c2e8a6cfaa787685c841676d6faf`. No framework or fixture source changed during measurement.

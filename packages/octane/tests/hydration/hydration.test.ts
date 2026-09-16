@@ -2,7 +2,7 @@ import { loadCompiledFixtureSource } from '../_server-fixture.js';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { hydrateRoot, flushSync, drainPassiveEffects } from '../../src/index.js';
+import { createRoot, hydrateRoot, flushSync, drainPassiveEffects } from '../../src/index.js';
 import * as ServerRT from 'octane/server';
 // CLIENT-compiled variants (the normal .tsrx import path, client mode). The
 // onClick handler in Counter makes this module call delegateEvents(['click']) at
@@ -106,21 +106,89 @@ describe('hydrateRoot — no mismatch (DOM adopted, not rebuilt)', () => {
 	});
 
 	it('removes a server data attribute when the client value is nullish', async () => {
-		const { html } = ServerRT.renderToString(server.StringData, { value: 'server' });
-		container.innerHTML = html;
-		const element = container.querySelector('#string-data');
 		const warn = vi.spyOn(console, 'error').mockImplementation(() => {});
 		try {
-			const root = hydrateRoot(container, StringData, { value: null });
-			flushSync(() => {});
-			expect(container.querySelector('#string-data')).toBe(element);
-			expect(element!.hasAttribute('data-state')).toBe(false);
-			if (process.env.OCTANE_TEST_COMPILE_MODE === 'prod') {
-				expect(warn).not.toHaveBeenCalled();
-			} else {
-				expect(warn.mock.calls.flat().join(' ')).toContain('attribute `data-state`');
+			for (const value of [null, undefined]) {
+				warn.mockClear();
+				const { html } = ServerRT.renderToString(server.StringData, { value: 'server' });
+				container.innerHTML = html;
+				const element = container.querySelector('#string-data');
+				const root = hydrateRoot(container, StringData, { value });
+				flushSync(() => {});
+				expect(container.querySelector('#string-data')).toBe(element);
+				expect(element!.hasAttribute('data-state')).toBe(false);
+				if (process.env.OCTANE_TEST_COMPILE_MODE === 'prod') {
+					expect(warn).not.toHaveBeenCalled();
+				} else {
+					expect(warn.mock.calls.flat().join(' ')).toContain('attribute `data-state`');
+				}
+				root.unmount();
 			}
-			root.unmount();
+			for (const spread of [false, true]) {
+				const source = `export function Action({ disabled, visuallyDisabled, absence, ...rest }) @{
+<button ${spread ? '{...rest}' : ''}
+ aria-disabled={disabled || visuallyDisabled || absence}
+ data-visually-disabled={disabled || visuallyDisabled ? '' : absence}
+ disabled={disabled} class={disabled ? 'off' : absence}
+ ${spread ? "formAction={disabled ? '/submit' : absence}" : ''}>{'Send'}</button>
+}`;
+				const options = {
+					id: '/src/disabled-action.tsrx',
+					compileOptions: { dev: process.env.OCTANE_TEST_COMPILE_MODE !== 'prod', hmr: false },
+				};
+				const ssr = loadCompiledFixtureSource(source, { ...options, mode: 'server' });
+				const client = loadCompiledFixtureSource(source, { ...options, mode: 'client' });
+				for (const absence of [undefined, null, false]) {
+					const initial = {
+						disabled: true,
+						visuallyDisabled: false,
+						absence,
+						title: 'Send',
+						onCanPlayThrough: undefined,
+					};
+					container.innerHTML = ServerRT.renderToString(ssr.Action, initial).html;
+					const button = container.querySelector('button')!;
+					button.setAttribute('data-server-owned', 'keep');
+					const props = { ...initial, disabled: false };
+					const expected = absence === false ? 'false' : null;
+					const listeners = vi.spyOn(container, 'addEventListener');
+					const root = hydrateRoot(container, client.Action, props);
+					const registeredAbsentEvent = listeners.mock.calls.some(
+						([name]) => name === 'canplaythrough',
+					);
+					listeners.mockRestore();
+					expect(registeredAbsentEvent).toBe(false);
+					flushSync(() => {});
+					expect(container.querySelector('button')).toBe(button);
+					expect(button.disabled).toBe(false);
+					expect(button.className).toBe('');
+					expect(button.getAttribute('formaction')).toBe(null);
+					expect(button.getAttribute('aria-disabled')).toBe(expected);
+					expect(button.getAttribute('data-visually-disabled')).toBe(expected);
+					expect(button.getAttribute('data-server-owned')).toBe('keep');
+					flushSync(() => root.render(client.Action, { ...props, title: 'Updated' }));
+					expect(button.getAttribute('aria-disabled')).toBe(expected);
+					flushSync(() => root.render(client.Action, initial));
+					expect(button.getAttribute('aria-disabled')).toBe('true');
+					flushSync(() => root.render(client.Action, props));
+					expect(button.getAttribute('aria-disabled')).toBe(expected);
+					expect(button.getAttribute('data-visually-disabled')).toBe(expected);
+					root.unmount();
+					const mounted = createRoot(container);
+					mounted.render(client.Action, props);
+					const fresh = container.querySelector('button')!;
+					expect(fresh.getAttribute('aria-disabled')).toBe(expected);
+					expect(fresh.getAttribute('data-visually-disabled')).toBe(expected);
+					flushSync(() => mounted.render(client.Action, { ...props, title: 'Updated' }));
+					expect(container.querySelector('button')).toBe(fresh);
+					expect(fresh.getAttribute('aria-disabled')).toBe(expected);
+					flushSync(() => mounted.render(client.Action, initial));
+					expect(fresh.getAttribute('aria-disabled')).toBe('true');
+					flushSync(() => mounted.render(client.Action, props));
+					expect(fresh.getAttribute('aria-disabled')).toBe(expected);
+					mounted.unmount();
+				}
+			}
 		} finally {
 			warn.mockRestore();
 		}
