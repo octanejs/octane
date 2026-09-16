@@ -19353,6 +19353,13 @@ function preparePresentationSignalValue(args: any[], frame: PresentationHydratio
 		preparePresentationOperation(frame, element, 'value', () => {
 			if (binding.disposed || scope.block.disposed) return;
 			runWithBlockSignalOwner(scope, () => {
+				// An earlier control's retirement can synchronously replace this
+				// captured owner. Never publish a stale writer over its successor.
+				if (!valid()) {
+					disposeDirectSignalBinding(binding);
+					reportRendererOwnerError(scope, new Error(formatClientError(77)));
+					return;
+				}
 				const before = snapshotHydrationControl(element)!;
 				const ctrl = armControlled(element);
 				ctrl.composing = before.composing || lease?.composing() === true;
@@ -19380,13 +19387,19 @@ function preparePresentationSignalValue(args: any[], frame: PresentationHydratio
 					// the renderer's composition listeners were armed before cleanup.
 					const snapshot = snapshotHydrationControl(element)!;
 					binding.value = element.value;
-					binding.pendingControl = snapshot.editRevision > 0;
+					// The offered owner already published earlier input to the model.
+					// Only a new retirement edit can supersede its final model write.
+					binding.pendingControl =
+						snapshot.editRevision > (lease === undefined ? 0 : before.editRevision);
 					activateDirectSignalBinding(binding, snapshot.revision);
 					if (binding.pendingControl) queueDirectSignalControlAdoption(binding);
 					else {
 						const current = readSignalBinding(handle);
 						ctrl.sawV = true;
-						ctrl.v = binding.value = current;
+						// setValue compares against the prepared model: a genuinely
+						// changed value must still win during inherited composition.
+						ctrl.v = value;
+						binding.value = current;
 						if (!ctrl.composing || !Object.is(current, value))
 							writeDirectSignalBinding(binding, current);
 					}

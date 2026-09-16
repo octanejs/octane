@@ -294,6 +294,22 @@ export function NativeControlSiblingPresentation({
 	</section>
 }
 
+export function NativeControlPairPresentation({
+	first,
+	second,
+	onReady,
+}: {
+	first: SignalHandle<string>;
+	second: SignalHandle<string>;
+	onReady?: (element: HTMLElement | null) => void;
+}) @{
+	'use dom bindings';
+	<section ref={onReady}>
+		<textarea value={unbound(first)} />
+		<textarea value={unbound(second)} />
+	</section>
+}
+
 export function UnmatchedNativeControl({
 	draft,
 	readOnly,

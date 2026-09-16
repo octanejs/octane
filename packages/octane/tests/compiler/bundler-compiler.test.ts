@@ -25,6 +25,7 @@ import * as BindingStyles from '../../src/dom-binding-styles.js';
 import * as BindingSignals from '../../src/dom-binding-signals.js';
 import * as SignalRead from '../../src/signals/read-protocol.js';
 import { createScope } from 'octane/signals';
+import * as Behavior from 'octane/behavior';
 
 const COMPONENT =
 	"import { useState } from 'octane';\n" +
@@ -55,6 +56,68 @@ function emittedHeadKey(code: string | undefined): string | undefined {
 }
 
 describe('bundler-neutral compiler integration', () => {
+	it.each([
+		'(external as typeof external)(stylex.attrs(styles))',
+		'external!(stylex.attrs(styles))',
+		'(external satisfies typeof external)((stylex.attrs(styles) as object))',
+		'external((stylex.attrs as typeof stylex.attrs)(styles))',
+		'external(stylex.attrs!(styles))',
+	])('preserves typed unbound provider spreads: %s', (spread) => {
+		const styles = { class: 'styled', style: { color: 'red' } };
+		const runtimeModules = {
+			'@stylexjs/stylex': { attrs: (value: unknown) => value },
+			'octane/behavior': Behavior,
+		};
+		for (const dev of [false, true]) {
+			for (const extension of ['tsx', 'tsrx']) {
+				const source = `import { unbound as external } from 'octane/behavior';
+import * as stylex from '@stylexjs/stylex';
+export function View({ styles, label }) ${extension === 'tsrx' ? "@{ 'use dom bindings';" : "{ 'use dom bindings'; return ("}
+ <div {...${spread}} aria-label={label} />
+${extension === 'tsrx' ? '}' : '); }'}`;
+				const id = `/project/src/TypedSpread.${extension}`;
+				const compileOptions = {
+					dev,
+					hmr: false,
+					knownAttributeSpreads: [
+						{
+							source: '@stylexjs/stylex',
+							imported: '*',
+							members: ['attrs'],
+							fields: ['class', 'style'],
+							style: 'object' as const,
+						},
+					],
+				};
+				const server = loadCompiledFixtureSource(source, {
+					id,
+					mode: 'server',
+					compileOptions,
+					runtimeModules,
+				});
+				const html = renderToString(server.View, { styles, label: 'Message' }).html;
+				expect(html).toContain('class="styled"');
+				expect(html).toContain('color:red');
+				expect(html).toContain('aria-label="Message"');
+				for (const moduleId of [id, `${id}?octane-bindings=View`])
+					expect(() =>
+						parseModule(
+							compile(source, moduleId, { ...compileOptions, mode: 'client' }).code,
+							'TypedSpread.js',
+						),
+					).not.toThrow();
+				for (const rejected of [
+					source.replace('{ styles, label }', '{ styles, label, external }'),
+					source.replace('{ styles, label }', '{ styles, label, stylex }'),
+					source.replace(spread, 'external?.(stylex.attrs(styles))'),
+				])
+					expect(() => compile(rejected, id, { ...compileOptions, mode: 'client' })).toThrow(
+						/explicitly unbound|pure projections|unbound requires/,
+					);
+			}
+		}
+	});
+
 	it('preserves compiler signal capability through client and server runtime-request transforms', () => {
 		const cleanupSource = `import { useLayoutEffect } from 'octane';
 export function Lifecycle(props) @{

@@ -9297,18 +9297,19 @@ function markKnownAttributeSpreads(ast, contracts) {
 		}
 		if (node.type !== 'JSXSpreadAttribute' && node.type !== 'SpreadAttribute') return null;
 		let call = unwrapTsExpr(node.argument);
+		const externalCallee = unwrapTsExpr(call?.callee);
 		const external =
 			call?.type === 'CallExpression' &&
 			!call.optional &&
-			call.callee.type === 'Identifier' &&
-			unboundImports.has(call.callee.name) &&
-			lexical.resolveBinding(lexical.nodeScopes.get(call.callee), call.callee.name)?.scope ===
+			externalCallee?.type === 'Identifier' &&
+			unboundImports.has(externalCallee.name) &&
+			lexical.resolveBinding(lexical.nodeScopes.get(externalCallee), externalCallee.name)?.scope ===
 				lexical.rootScope &&
 			call.arguments.length === 1 &&
 			call.arguments[0].type !== 'SpreadElement';
 		if (external) call = unwrapTsExpr(call.arguments[0]);
 		if (call?.type !== 'CallExpression' || call.optional) return null;
-		let callee = call.callee;
+		let callee = unwrapTsExpr(call.callee);
 		const members = [];
 		while (callee?.type === 'MemberExpression' && !callee.computed && !callee.optional) {
 			members.unshift(callee.property.name);

@@ -702,14 +702,15 @@ function planView(fn, filename, source, imports, lexical, native = null) {
 	let addressed = false;
 	const markUnbound = (expression, opaque = false) => {
 		const value = unwrap(expression);
+		const callee = unwrap(value?.callee);
 		const external =
-			value?.type === 'CallExpression' && value.callee.type === 'Identifier'
-				? imports.get(value.callee.name)
+			value?.type === 'CallExpression' && callee?.type === 'Identifier'
+				? imports.get(callee.name)
 				: null;
 		if (
 			external?.source !== 'octane/behavior' ||
 			external.imported !== 'unbound' ||
-			lexical.resolveBinding(lexical.nodeScopes.get(value.callee), value.callee.name)?.scope !==
+			lexical.resolveBinding(lexical.nodeScopes.get(callee), callee.name)?.scope !==
 				lexical.rootScope
 		)
 			return false;
@@ -1878,12 +1879,13 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 		: new Map();
 	const isUnbound = (expression) => {
 		const value = unwrap(expression);
-		if (value?.type !== 'CallExpression' || value.callee.type !== 'Identifier') return false;
-		const imported = imports.get(value.callee.name);
+		const callee = unwrap(value?.callee);
+		if (value?.type !== 'CallExpression' || callee?.type !== 'Identifier') return false;
+		const imported = imports.get(callee.name);
 		return (
 			imported?.source === 'octane/behavior' &&
 			imported.imported === 'unbound' &&
-			lexical.resolveBinding(lexical.nodeScopes.get(value.callee), value.callee.name)?.scope ===
+			lexical.resolveBinding(lexical.nodeScopes.get(callee), callee.name)?.scope ===
 				lexical.rootScope
 		);
 	};
