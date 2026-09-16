@@ -152,6 +152,7 @@ export function Action(props) @{
 		compileOptions: { dev, hmr: false },
 		runtimeModules: {
 			'octane/behavior': DomBindings,
+			'octane/dom-bindings': DomBindings,
 			'octane/dom-binding-signals': DomBindingSignals,
 		},
 	};
@@ -166,6 +167,9 @@ export function Action(props) @{
 import { adoptBindings } from 'octane/behavior';
 import { Action } from './behavior-action.tsrx';
 export function attach(root, source, options) { return adoptBindings(root, Action, source, options); }
+export function attachOrdered(root, source, options) {
+  return adoptBindings(root(), Action, source(), options());
+}
 export function attachPair(first, second, source) {
   let inner;
   const outer = adoptBindings(first, Action, {
@@ -226,6 +230,11 @@ export function attachPair(first, second, source) {
 			second: Element,
 			source: typeof state,
 		) => { outer: DomBindings.BindingHandle; inner: DomBindings.BindingHandle },
+		attachOrdered: client.attachOrdered as (
+			root: () => Element,
+			source: () => typeof state,
+			options: () => DomBindings.BindingOptions | undefined,
+		) => DomBindings.BindingHandle,
 		publish(next: Record<string, unknown>, notify = true) {
 			snapshot = { ...snapshot, ...next };
 			if (notify) for (const callback of subscriptions) callback();
@@ -253,6 +262,7 @@ export function Composer(props) @{
 		runtimeModules: {
 			'octane/behavior': DomBindings,
 			'octane/dom-binding-classes': DomBindingClasses,
+			'octane/dom-bindings': DomBindings,
 			'octane/dom-binding-signals': DomBindingSignals,
 		},
 	};
@@ -388,8 +398,23 @@ describe('behavior-only roots', () => {
 			expect(action.hidden).toBe(true);
 			action.hidden = false;
 			action.style.marginLeft = '7px';
-			const binding = fixture.attach(action, fixture.state);
+			const evaluationOrder: string[] = [];
+			const binding = fixture.attachOrdered(
+				() => {
+					evaluationOrder.push('root');
+					return action;
+				},
+				() => {
+					evaluationOrder.push('source');
+					return fixture.state;
+				},
+				() => {
+					evaluationOrder.push('options');
+					return undefined;
+				},
+			);
 			try {
+				expect(evaluationOrder).toEqual(['root', 'source', 'options']);
 				fixture.publish({
 					type: 'button',
 					disabled: true,
@@ -4344,6 +4369,8 @@ export function NestedParent(props) @{ 'use dom bindings';
 					const calls = vi.fn();
 					const firstRef = vi.fn();
 					const secondRef = vi.fn();
+					const repeatedCalls = vi.fn();
+					const repeatedRef = vi.fn();
 					const children = [
 						'<ClosedChild label={props.label} active={props.active} title={props.title} data-first={props.first} aria-label={props.title} onClick={props.onClick} ref={props.firstRef} />',
 						'<ClosedChild label={props.label} active={props.active} data-second={props.second} onPointerDown={props.onPointerDown} ref={props.secondRef}><span>{props.detail as string}</span></ClosedChild>',
@@ -4362,10 +4389,24 @@ export function NestedParent(props) @{ 'use dom bindings';
 							onPointerDown: calls,
 							firstRef,
 							secondRef,
+							showRepeated: true,
+							repeatedLabel: 'Independent',
+							repeatedTitle: 'Repeated',
+							repeatedCalls,
+							repeatedRef,
 						},
 						dev,
 						`${imported ? "import { ClosedChild } from './closed-child.tsrx';" : childSource}
-export function ClosedParent(props) @{ 'use dom bindings'; <section>${children.join('')}</section> }`,
+function RepeatedChild(props) @{
+ <ClosedChild label={props.label} active={false} title={props.title} data-first="repeated" aria-label={props.title} onClick={props.onClick} ref={props.ref} />
+}
+export function ClosedParent(props) @{ 'use dom bindings';
+ <section>${children.join('')}
+  @if (props.showRepeated) {
+   <RepeatedChild label={props.repeatedLabel} title={props.repeatedTitle} onClick={props.repeatedCalls} ref={props.repeatedRef} />
+  }
+ </section>
+}`,
 						modules,
 					);
 					for (const mount of [false, true]) {
@@ -4378,10 +4419,15 @@ export function ClosedParent(props) @{ 'use dom bindings'; <section>${children.j
 							detail: ' detail',
 							onClick: calls,
 							onPointerDown: calls,
+							showRepeated: true,
+							repeatedLabel: 'Independent',
+							repeatedTitle: 'Repeated',
 						});
 						calls.mockClear();
 						firstRef.mockClear();
 						secondRef.mockClear();
+						repeatedCalls.mockClear();
+						repeatedRef.mockClear();
 						const host = document.createElement('div');
 						container.append(host);
 						if (!mount) host.innerHTML = closed.html;
@@ -4405,6 +4451,14 @@ export function ClosedParent(props) @{ 'use dom bindings'; <section>${children.j
 						expect(second.hasAttribute('data-first')).toBe(false);
 						expect(firstRef).toHaveBeenCalledExactlyOnceWith(first);
 						expect(secondRef).toHaveBeenCalledExactlyOnceWith(second);
+						const repeated = host.querySelector('[data-first="repeated"]') as HTMLButtonElement;
+						expect(repeated.textContent).toBe('Independent');
+						expect(repeated.title).toBe('Repeated');
+						expect(repeated.classList.contains('active')).toBe(false);
+						expect(repeated.hasAttribute('data-second')).toBe(false);
+						expect(repeatedRef).toHaveBeenCalledExactlyOnceWith(repeated);
+						repeated.click();
+						expect(repeatedCalls).toHaveBeenCalledOnce();
 						first.click();
 						second.dispatchEvent(new Event('pointerdown', { bubbles: true }));
 						expect(calls).toHaveBeenCalledTimes(2);
@@ -4425,6 +4479,29 @@ export function ClosedParent(props) @{ 'use dom bindings'; <section>${children.j
 						expect(second.textContent).toBe('Updated changed');
 						expect(firstRef).toHaveBeenCalledOnce();
 						expect(secondRef).toHaveBeenCalledOnce();
+						expect(repeated.textContent).toBe('Independent');
+						expect(repeated.title).toBe('Repeated');
+						closed.publish({ showRepeated: false });
+						expect(repeated.isConnected).toBe(false);
+						expect(repeatedRef.mock.calls).toEqual([[repeated], [null]]);
+						repeated.click();
+						expect(repeatedCalls).toHaveBeenCalledOnce();
+						closed.publish({
+							showRepeated: true,
+							repeatedLabel: 'Restored',
+							repeatedTitle: 'Other',
+						});
+						const restored = host.querySelector('[data-first="repeated"]') as HTMLButtonElement;
+						expect(restored).not.toBe(repeated);
+						expect(restored.textContent).toBe('Restored');
+						expect(restored.title).toBe('Other');
+						expect(first.textContent).toBe('Updated');
+						expect(first.title).toBe('Latest');
+						expect(second.textContent).toBe('Updated changed');
+						restored.click();
+						expect(repeatedCalls).toHaveBeenCalledTimes(2);
+						closed.publish({ showRepeated: false });
+						expect(repeatedRef.mock.calls).toEqual([[repeated], [null], [restored], [null]]);
 						const nextCalls = vi.fn();
 						expect(() =>
 							closed.publish({

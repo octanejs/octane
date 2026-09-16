@@ -437,14 +437,16 @@ export function __createBindingStyleRestoration(
 	};
 }
 
-/** @internal Target of compiler-lowered adoptBindings calls. */
+/** @internal Fixed-layout adopter and compatibility dispatch for earlier compiler output. */
 export function __adoptBindings<Props>(
 	root: Element | BindingRange,
 	descriptor: CompiledBindings<Props> | CompiledBindingProgram<Props>,
 	source: BindingSource<Props>,
 	options?: BindingOptions,
 ): BindingHandle {
-	if ('adopt' in descriptor) return descriptor.adopt(root, descriptor, source, options);
+	// Only structural programs carry a root. Scalar artifacts also expose their
+	// selected adopter, so dispatching by that method would recurse into itself.
+	if ('root' in descriptor) return descriptor.adopt(root, descriptor, source, options);
 	if (!source || typeof source.getSnapshot !== 'function' || typeof source.subscribe !== 'function')
 		throw new TypeError('DOM bindings require synchronous getSnapshot() and subscribe() methods.');
 	const nodes = resolveNodes(root as Element, descriptor);

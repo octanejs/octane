@@ -7,6 +7,23 @@ interchangeable results.
 
 Each section identifies its measured source or historical checkpoint. Results from different checkpoints must not be treated as current bundle sizes or added together.
 
+## Artifact-selected early adoption
+
+Compiler-owned `adoptBindings` calls now use the adopter selected by their extracted view. Structural-only views no longer retain the fixed-layout adopter and node resolvers merely to dispatch to the structural program. Scalar views and combined mount/adopt artifacts retain the implementations they actually use. Identical local child plans also share an immutable descriptor; props, events, refs, subscriptions, and disposal remain per instance.
+
+A matched dispatch-only comparison against `2675a0eca`, using Node 24.21.0, esbuild 0.28.1, production browser ESM and gzip level 9, measures these complete closures:
+
+| Entry | Baseline raw / gzip bytes | Candidate raw / gzip bytes | Difference raw / gzip bytes |
+| --- | ---: | ---: | ---: |
+| Fixed-layout adoption | 11,693 / 4,427 | 11,706 / 4,437 | +13 / +10 |
+| Structural adoption | 37,690 / 12,662 | 31,177 / 10,564 | −6,513 / −2,098 |
+| Combined fixed-layout adoption and mounting | 34,764 / 11,676 | 34,767 / 11,677 | +3 / +1 |
+| Ordinary `createRoot` | 198,171 / 63,207 | 198,171 / 63,207 | 0 / 0 |
+
+The ordinary entry is byte- and hash-identical. All adoption entries exclude the renderer and signal graph. These overlapping closures are not additive application-route savings, and this does not establish a startup-budget pass or a CPU speedup. Child-plan sharing is a separate compiler-output reduction; repeated output already compresses well, so its raw-code reduction must not be presented as an equivalent gzip saving.
+
+The existing behavior suite covers scalar adoption, structural updates, combined mount/adopt fallback, nested calls, argument evaluation order, independent child instances, and cleanup. Deliberately restoring the old dispatch discriminator fails scalar adoption; using only the child declaration instead of its exact specialized plan fails event behavior. The bundle-boundary benchmark compares a real compiled public adoption entry with the selected-artifact control, with matching SSR/update/disposal semantics.
+
 ## Independent reads in static native output
 
 The compiler can start same-module immutable query/derived reads together in complete static native JSX output with homogeneous text/renderable holes. Public client and SSR regressions start both eligible loaders in one round instead of waiting for the first to settle. Declarations and unentered branches stay lazy; original reads retain errors and suspension. Components, resource-loading/custom hosts, dynamic attributes and opaque values remain ordering barriers. Review added resource-host exclusions and a case-insensitive attribute barrier after a customized built-in constructor probe exposed changed execution order.

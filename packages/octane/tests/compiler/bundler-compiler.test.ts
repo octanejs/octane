@@ -20,6 +20,7 @@ import { inspectProfileOutput, uniqueMetadata } from '../_profile-output';
 import { decodeMappings } from '../_source-map.js';
 import { loadCompiledFixtureSource } from '../_server-fixture.js';
 import { renderToString } from 'octane/server';
+import * as Bindings from '../../src/dom-bindings.js';
 import * as BindingStyles from '../../src/dom-binding-styles.js';
 import * as BindingSignals from '../../src/dom-binding-signals.js';
 import * as SignalRead from '../../src/signals/read-protocol.js';
@@ -218,6 +219,7 @@ export function Styled(props) ${extension === 'tsrx' ? "@{ 'use dom bindings'; <
 		const styles = { className: 'styled', style: { color: 'red' } };
 		const runtimeModules = {
 			'@stylexjs/stylex': { props: factory, default: { props: factory } },
+			'octane/dom-bindings': Bindings,
 			'octane/dom-binding-styles': BindingStyles,
 			'octane/dom-binding-signals': BindingSignals,
 		};

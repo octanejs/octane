@@ -490,6 +490,26 @@ export function planBindingProgram(fn, render, context) {
 					for (const dependency of child.dependencies)
 						if (!dependencies.includes(dependency)) dependencies.push(dependency);
 					for (const hoist of child.hoists) if (!hoists.includes(hoist)) hoists.push(hoist);
+					// A cached plan identifies one declaration and ordered prop specialization.
+					// Share only its immutable descriptor; each entered region owns its state.
+					const childHoists = (lexical.domBindingChildHoists ??= new WeakMap());
+					let hoist = childHoists.get(child);
+					if (hoist === undefined) {
+						hoist = origin(
+							b.const(
+								b.id(allocateProgramName('_bindingChild')),
+								object({
+									id: b.literal(child.id),
+									root: child.root,
+									...(child.prepareProps ? { prepareProps: child.prepareProps } : {}),
+								}),
+							),
+							child.fn,
+						);
+						childHoists.set(child, hoist);
+					}
+					if (!hoists.includes(hoist)) hoists.push(hoist);
+					local = hoist.declarations[0].id.name;
 					expressions.push(...child.expressions);
 				} else signals = true;
 				if ((node.children ?? []).some(significant)) {
@@ -529,13 +549,7 @@ export function planBindingProgram(fn, render, context) {
 					object({
 						node: b.literal(index),
 						kind: b.literal('view'),
-						view: child
-							? object({
-									id: b.literal(child.id),
-									root: child.root,
-									...(child.prepareProps ? { prepareProps: child.prepareProps } : {}),
-								})
-							: b.id(local),
+						view: b.id(local),
 						props: project(names, b.object(props), node),
 					}),
 				);

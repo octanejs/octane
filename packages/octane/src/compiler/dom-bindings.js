@@ -1472,14 +1472,19 @@ function projectProgram(ast, plan, filename, lexical) {
 			),
 		);
 	}
+	const adopt = lexical.domBindingAllocateName('_$adoptBindings');
+	importNodes.push(
+		inheritHookMemoOrigin(b.imports([['__adoptBindings', adopt]], 'octane/dom-bindings'), plan.fn),
+	);
 	return {
 		...ast,
 		body: [
 			...importNodes,
 			inheritHookMemoOrigin(
 				b.export_default(
-					b.object(
-						scalarProperties(
+					b.object([
+						b.prop('init', b.id('adopt'), b.id(adopt)),
+						...scalarProperties(
 							plan,
 							project,
 							classFactory ? b.id(classFactory) : null,
@@ -1488,7 +1493,7 @@ function projectProgram(ast, plan, filename, lexical) {
 							controlFactory ? b.id(controlFactory) : null,
 							projectionFactory ? b.id(projectionFactory) : null,
 						),
-					),
+					]),
 				),
 				plan.fn,
 			),
@@ -1601,7 +1606,7 @@ function lowerAdoptions(ast, filename) {
 			);
 		}
 		let helper = helpers.get(intrinsic);
-		if (helper === undefined) {
+		if (intrinsic === 'mountBindings' && helper === undefined) {
 			helper = allocate(`_$${intrinsic}`);
 			helpers.set(intrinsic, helper);
 			added.push(
@@ -1619,7 +1624,15 @@ function lowerAdoptions(ast, filename) {
 		consumed.add(node.callee);
 		consumed.add(view);
 		// Replace leaves so nested adoptions in source/options remain traversable.
-		replacements.set(node.callee, inheritHookMemoOrigin(b.id(helper), node.callee));
+		// The artifact selects its own implementation. A generic adopter would
+		// retain fixed-layout machinery even when every view is structural.
+		replacements.set(
+			node.callee,
+			inheritHookMemoOrigin(
+				intrinsic === 'adoptBindings' ? b.member(b.id(local), 'adopt') : b.id(helper),
+				node.callee,
+			),
+		);
 		replacements.set(view, inheritHookMemoOrigin(b.id(local), view));
 	});
 	const remaining = new Set();
