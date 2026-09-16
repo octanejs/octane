@@ -10,7 +10,7 @@ import { createDeclaredScalarCell } from './scalar-computations.js';
 import { ScopeDisposedError, SignalStreamError } from './errors.js';
 import { isThenable, readSignalBinding as readBinding, untrack } from './graph.js';
 import { readEarlySignalValue } from './early-values.js';
-import { NATIVE_DOM_VALUE } from './read-protocol.js';
+import { NATIVE_DOM_VALUE, forwardNativeTransitionConsumer } from './read-protocol.js';
 import { isSignalHandle } from './handle-protocol.js';
 
 export { isSignalHandle, isWritableSignal } from './handle-protocol.js';
@@ -33,6 +33,7 @@ import {
 	type Scope,
 	type ScopeSeed,
 	type SignalHandle,
+	type SignalOptions,
 	type SignalOwner,
 	type SignalOwnerIdentity,
 	type SignalRendererOwnerIdentity,
@@ -345,7 +346,7 @@ export abstract class Descriptor<T, H extends SignalHandle<T>> implements OwnerB
 	[SIGNAL_BINDING_SUBSCRIBE](notify: () => void, onRetire?: () => void): () => void {
 		const run = captureSignalOwner(requireOwner());
 		return this.resolve()[SIGNAL_BINDING_SUBSCRIBE](
-			() => run(notify),
+			forwardNativeTransitionConsumer(notify, () => run(notify)),
 			onRetire === undefined ? undefined : () => run(onRetire),
 		);
 	}
@@ -371,7 +372,9 @@ export abstract class Descriptor<T, H extends SignalHandle<T>> implements OwnerB
 		const token = requireOwner();
 		const scope = resolveDescriptorOwner(this.site, token);
 		const run = captureSignalOwner(token);
-		return this[SIGNAL_OWNER_RESOLVE](scope).subscribe(() => run(notify));
+		return this[SIGNAL_OWNER_RESOLVE](scope).subscribe(
+			forwardNativeTransitionConsumer(notify, () => run(notify)),
+		);
 	}
 }
 
@@ -398,28 +401,38 @@ export function descriptorKey(site: string | undefined, explicit: string | undef
 	return key;
 }
 
-export function __signalAt<T>(site: string, initial: T): WritableSignal<T>;
-export function __signalAt<T>(site: string, key: string, initial: T): WritableSignal<T>;
+/** @internal Read authored identity once, without interpreting initial data as a key. */
+export function signalOptionsKey(options?: SignalOptions): string | undefined {
+	if (options != null && typeof options !== 'object') {
+		throw new TypeError('Signal declaration options must be an object.');
+	}
+	const key = options?.key;
+	if (key !== undefined && (typeof key !== 'string' || !key.trim())) {
+		throw new TypeError('A signal declaration key must be a nonempty string.');
+	}
+	return key;
+}
+
 export function __signalAt<T>(
-	site: string,
-	keyOrInitial: string | T,
-	initial?: T,
+	site: string | undefined,
+	initial: T,
+	options?: SignalOptions,
 ): WritableSignal<T> {
-	const explicit = arguments.length === 3 ? (keyOrInitial as string) : undefined;
-	const value = arguments.length === 3 ? (initial as T) : (keyOrInitial as T);
+	const explicit = signalOptionsKey(options);
+	site ??= explicit;
 	const key = descriptorKey(site, explicit);
 	return new SignalDescriptor(
 		key,
 		'signal',
 		(owner) => {
 			const early = readEarlySignalValue(scopeOwners.get(owner) ?? owner, {
-				scope: site.startsWith('g:') ? 'document' : 'instance',
+				scope: site?.startsWith('g:') ? 'document' : 'instance',
 				nodeKey: key,
 			});
 			return createDeclaredSignalCell(
 				owner,
 				key,
-				early === undefined ? value : (early.value as T),
+				early === undefined ? initial : (early.value as T),
 				early !== undefined,
 			);
 		},
@@ -427,41 +440,27 @@ export function __signalAt<T>(
 	);
 }
 
-export function signal$<T>(initial: T): WritableSignal<T>;
-export function signal$<T>(key: string, initial: T): WritableSignal<T>;
-export function signal$<T>(keyOrInitial: string | T, initial?: T): WritableSignal<T> {
-	return arguments.length === 2
-		? __signalAt(keyOrInitial as string, keyOrInitial as string, initial as T)
-		: __signalAt(undefined as never, keyOrInitial as T);
+export function signal$<T>(initial: T, options?: SignalOptions): WritableSignal<T> {
+	return __signalAt(undefined, initial, options);
 }
 
 /** Compiler-only scalar proof; authored derived$ remains dynamically asynchronous. */
 export function __derivedScalarAt<T>(
-	site: string,
+	site: string | undefined,
 	compute: DerivedCompute<T>,
-	options?: DerivedOptions,
-): DerivedSignal<T>;
-export function __derivedScalarAt<T>(
-	site: string,
-	key: string,
-	compute: DerivedCompute<T>,
-	options?: DerivedOptions,
-): DerivedSignal<T>;
-export function __derivedScalarAt<T>(
-	site: string,
-	keyOrCompute: string | DerivedCompute<T>,
-	computeOrOptions?: DerivedCompute<T> | DerivedOptions,
-	_options?: DerivedOptions,
+	options?: DerivedOptions & SignalOptions,
 ): DerivedSignal<T> {
-	const explicit = typeof keyOrCompute === 'string' ? keyOrCompute : undefined;
-	const compute = (explicit ? computeOrOptions : keyOrCompute) as () => T;
 	if (typeof compute !== 'function') throw new TypeError('derived$ requires a function.');
+	const explicit = signalOptionsKey(options);
+	site ??= explicit;
 	const key = descriptorKey(site, explicit);
 	return new DerivedDescriptor(
 		key,
 		'derived',
 		(owner) =>
-			createDeclaredScalarCell(owner, key, () => runWithSignalOwner(owner, () => compute())),
+			createDeclaredScalarCell(owner, key, () =>
+				runWithSignalOwner(owner, () => (compute as () => T)()),
+			),
 		site,
 	);
 }

@@ -307,7 +307,7 @@ Pass.defaultProps = { label: 'default' };`,
 		}
 		const container = document.createElement('div');
 		document.body.appendChild(container);
-		const value$ = __signalAt('g:prop-child', 'prop-child', 'one');
+		const value$ = __signalAt('g:prop-child', 'one', { key: 'prop-child' });
 		const Body = (props: { value: unknown }, scope: Parameters<typeof childSlot>[0]) => {
 			childSlot(scope, 0, scope.block.parentNode, props.value, scope.block.endMarker);
 		};
@@ -360,7 +360,7 @@ Pass.defaultProps = { label: 'default' };`,
 		document.body.appendChild(container);
 		const input = document.createElement('input');
 		container.appendChild(input);
-		const draft$ = __signalAt('g:draft-candidate', 'draft-candidate', 'server');
+		const draft$ = __signalAt('g:draft-candidate', 'server', { key: 'draft-candidate' });
 		let token: unknown;
 		let owner: SignalOwner | null = null;
 		const Body = (_props: unknown, scope: Parameters<typeof bindSignalValue>[0]) => {

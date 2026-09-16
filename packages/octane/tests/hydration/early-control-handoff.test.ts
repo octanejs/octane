@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, startTransition } from 'octane';
 import { earlySignalBootstrapScript } from '../../src/server/early-signals.js';
 import {
 	applyHydrationControlCandidate,
@@ -116,7 +117,7 @@ describe('early hydration control handoff', () => {
 			const earlyValues = await import('../../src/signals/early-values.js');
 			const owner = { scopeKey: 'early-revision-document' };
 			earlyValues.registerSignalOwnerDocument(owner, earlyDocument);
-			const lateDraft$ = signals.__signalAt('g:draft', 'draft', 'default');
+			const lateDraft$ = signals.__signalAt('g:draft', 'default', { key: 'draft' });
 			expect(signals.runWithSignalOwner(owner, () => lateDraft$.get())).toBe('server');
 			earlyInput.setAttribute(
 				'data-octane-signal-control',
@@ -128,7 +129,7 @@ describe('early hydration control handoff', () => {
 			earlyInput.dispatchEvent(new InputEvent('input', { bubbles: true }));
 			sibling.value = 'newer first edit';
 			sibling.dispatchEvent(new InputEvent('input', { bubbles: true }));
-			const sharedDraft$ = signals.__signalAt('g:shared-draft', 'shared-draft', 'default');
+			const sharedDraft$ = signals.__signalAt('g:shared-draft', 'default', { key: 'shared-draft' });
 			expect(signals.runWithSignalOwner(owner, () => sharedDraft$.get())).toBe('newer first edit');
 		} finally {
 			keys.forEach((key, index) => {
@@ -173,9 +174,9 @@ describe('early hydration control handoff', () => {
 		input.value = '';
 		input.dispatchEvent(new InputEvent('input', { bubbles: true }));
 
-		const draft$ = __signalAt('g:draft', 'draft', 'server');
+		const draft$ = __signalAt('g:draft', 'server', { key: 'draft' });
 		expect(runWithSignalOwner(owner, () => draft$.get())).toBe('');
-		const length$ = __derivedAt('g:length', 'length', () => draft$.get().length);
+		const length$ = __derivedAt('g:length', () => draft$.get().length, { key: 'length' });
 		const dispose = runWithSignalOwner(owner, () => bindSignalControl(input, 'value', draft$));
 		cleanups.push(dispose);
 		expect(() =>
@@ -251,6 +252,31 @@ describe('early hydration control handoff', () => {
 		draft$.set('composed');
 		expect(input.selectionStart).toBe(2);
 		expect(input.selectionEnd).toBe(5);
+
+		// Target input listeners stay urgent while an unrelated Action awaits.
+		const phase$ = scope.signal$('phase', 0);
+		let release!: () => void;
+		const gate = new Promise<void>((resolve) => {
+			release = resolve;
+		});
+		startTransition(async () => {
+			phase$.set(1);
+			await gate;
+		});
+		try {
+			input.value = 'typing during action';
+			input.setSelectionRange(3, 3);
+			input.dispatchEvent(new InputEvent('input', { bubbles: true }));
+			expect(draft$.get()).toBe('typing during action');
+			expect(input.value).toBe('typing during action');
+			expect(input.selectionStart).toBe(3);
+			expect(input.selectionEnd).toBe(3);
+			expect(input).toBe(document.activeElement);
+			expect(phase$.get()).toBe(0);
+		} finally {
+			await act(() => release());
+		}
+		expect(phase$.get()).toBe(1);
 
 		// A renderer-free binding can start while inline island capture still owns
 		// activation. Its later upgrade must neither lose the click nor reapply
@@ -453,7 +479,7 @@ describe('early hydration control handoff', () => {
 			readIdentity: () => ({ buildId: 'control-build', documentId: 'control-document' }),
 		});
 		cleanups.push(lifecycle.dispose);
-		const pageDraft = __signalAt('g:pagehide-control', 'draft', 'page draft');
+		const pageDraft = __signalAt('g:pagehide-control', 'page draft', { key: 'draft' });
 		const stopPage = runWithSignalOwner(owner, () =>
 			bindSignalControl(retiringInput, 'value', pageDraft),
 		);

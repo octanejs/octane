@@ -75,28 +75,28 @@ export const BUNDLE_CASES = [
 		request: 'octane/signals',
 		exports: ['createScope', 'query'],
 		platform: 'browser',
-		baseline: false,
+		baseline: 'if-exported',
 	},
 	{
 		id: 'native-client',
 		request: 'octane/signals/client',
 		exports: ['useSignal$'],
 		platform: 'browser',
-		baseline: false,
+		baseline: 'if-exported',
 	},
 	{
 		id: 'native-server',
 		request: 'octane/signals/server',
 		exports: ['useSignal$'],
 		platform: 'node',
-		baseline: false,
+		baseline: 'if-exported',
 	},
 	{
 		id: 'compiled-plain-signals',
 		request: 'octane/signals',
 		exports: ['exercise'],
 		platform: 'browser',
-		baseline: false,
+		baseline: 'if-exported',
 		compilePlain: true,
 		rendererFree: true,
 	},
@@ -105,7 +105,7 @@ export const BUNDLE_CASES = [
 		request: 'octane/hydration/streamed-signals',
 		exports: ['bootstrapStreamedSignalHydration', 'installSignalDocumentLifecycle'],
 		platform: 'browser',
-		baseline: false,
+		baseline: 'if-exported',
 		rendererFree: true,
 	},
 	{
@@ -113,7 +113,7 @@ export const BUNDLE_CASES = [
 		request: 'octane/hydration/streamed-signals',
 		exports: ['bootstrapStreamedSignalResults', 'installSignalDocumentLifecycle'],
 		platform: 'browser',
-		baseline: false,
+		baseline: 'if-exported',
 		rendererFree: true,
 	},
 ];
@@ -196,6 +196,14 @@ export function verifyBundleInputs(scenario, inputs) {
 				`${scenario.id}: ordinary entry retained native adapter ${input.path}`,
 			);
 		}
+		if (scenario.id === 'ordinary-client')
+			for (const input of inputs)
+				if (/\/src\/signals\/native-read-seeds\.[jt]s$/.test(input.path.replaceAll('\\', '/')))
+					assert.equal(
+						input.bytesInOutput,
+						0,
+						`${scenario.id}: a mount-only root retained seed hydration`,
+					);
 	} else if (scenario.graphFree) {
 		assert.deepEqual(alien, [], `${scenario.id}: binding entry reached Alien Signals`);
 		assert.deepEqual(engine, [], `${scenario.id}: binding entry reached the signal graph`);

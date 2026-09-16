@@ -474,7 +474,9 @@ describe('bundler-neutral app codegen', () => {
 	it('adopts an SSR query before page evaluation and shares its owner with the root and a later island', async () => {
 		enableServerSignalBindings();
 		const load = vi.fn(async () => 'server conversation');
-		const value$ = __queryAt('g:generated-entry-query', 'generated-entry-query', () => 'a', load);
+		const value$ = __queryAt('g:generated-entry-query', () => 'a', load, {
+			key: 'generated-entry-query',
+		});
 		const stream = await renderToReadableStream(
 			() => {
 				value$.snapshot();

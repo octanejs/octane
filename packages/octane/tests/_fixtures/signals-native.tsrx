@@ -3,11 +3,14 @@ import {
 	ErrorBoundary,
 	memo,
 	Suspense,
+	useCallback,
 	useEffect,
 	useLayoutEffect,
 	useRef,
+	useState,
+	useTransition,
 } from 'octane';
-import { createResource, createScope, query } from 'octane/signals';
+import { createResource, createScope, query, type QueryContext } from 'octane/signals';
 import { formatCounter$ } from './signals-native-readers';
 
 export function createCounter$(scopeKey = 'native-counter', initial = 0) {
@@ -94,7 +97,10 @@ export function EventWrites(props: CounterFixture & { log: (entry: string) => vo
 	</section>
 }
 
-export function createResource$(scopeKey: string, load: (key: string) => Promise<string>) {
+export function createResource$(
+	scopeKey: string,
+	load: (key: string, context: QueryContext) => Promise<string>,
+) {
 	const scope = createScope({ scopeKey });
 	const key$ = scope.signal$('key', 'a');
 	const count$ = scope.signal$('count', 0);
@@ -138,16 +144,14 @@ function NativeHeldCount(props: Pick<ResourceFixture, 'scope' | 'count$'> & {
 	log: (entry: string) => void;
 }) @{
 	const value = props.scope.get(props.count$);
+	const ref = useCallback((node: HTMLButtonElement | null) => {
+		props.log('ref:' + value + ':' + (node === null ? 'detach' : 'attach'));
+	}, [value, props.log]);
 	useLayoutEffect(() => {
 		props.log('layout:' + value);
 		return () => props.log('cleanup:' + value);
 	}, [value]);
-	<button
-		class="count"
-		ref={(node: HTMLButtonElement | null) => {
-			props.log('ref:' + value + ':' + (node === null ? 'detach' : 'attach'));
-		}}
-	>{String(value)}</button>
+	<button class="count" ref={ref}>{String(value)}</button>
 }
 
 export function NativeHeldSiblings(props: ResourceFixture & { log: (entry: string) => void }) @{
@@ -163,11 +167,60 @@ export function NativeHeldSiblings(props: ResourceFixture & { log: (entry: strin
 	</section>
 }
 
+export function NativeHeldBindings(props: ResourceFixture) @{
+	<section>
+		<input class="direct-control" value={props.key$} />
+		<output class="direct-child" title={props.key$}>{props.key$}</output>
+		<div class="direct-style" style={{ left: props.count$, '--key': props.key$ }} />
+	</section>
+}
+
 export function NativeHeldIsolation(props: ResourceFixture & {
 	outside: CounterFixture;
 	log: (entry: string) => void;
+	gate?: Promise<unknown>;
+	settle?: Promise<unknown>;
+	lateKey?: boolean;
+	observeUpdater?: (value: number) => void;
 }) @{
+	const [pending, start] = useTransition();
+	const [local, setLocal] = useState(0);
+	const write = () => {
+		props.count$.set(1);
+		props.key$.set((key) => {
+			props.observeUpdater?.(props.count$.get());
+			return key === 'a' ? 'b' : 'c';
+		});
+		setLocal(1);
+	};
+	const action =
+		props.gate === undefined
+			? write
+			: async () => {
+					await props.gate;
+					if (props.lateKey) {
+						props.count$.set(1);
+						setLocal(1);
+					} else write();
+					await props.settle;
+					props.key$.set(() => {
+						props.observeUpdater?.(props.count$.get());
+						return 'b';
+					});
+				};
 	<main>
+		<button class="transition" onClick={() => start(action)}>
+			{pending ? 'pending' : 'ready'}
+		</button>
+		<form>
+			<button class="form-transition" formAction={action}>{'submit'}</button>
+		</form>
+		<p class="action-state">{String(local)}</p>
+		<button
+			class="urgent"
+			onClick={() => props.count$.set(2)}
+			onPointerMove={() => props.count$.set(3)}
+		>{'urgent'}</button>
 		<aside class="outside">
 			<NativeHeldCount {...props.outside} log={(entry) => props.log('outside:' + entry)} />
 		</aside>

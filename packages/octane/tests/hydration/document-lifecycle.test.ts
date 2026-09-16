@@ -148,11 +148,11 @@ it('freezes instance-local declarations and declarations first read while frozen
 		attempts.push(result);
 		return result.promise;
 	});
-	const value = __queryAt('i:frozen-child', 'frozen-child', () => 'key', load);
+	const value = __queryAt('i:frozen-child', () => 'key', load, { key: 'frozen-child' });
 	runWithSignalOwner(rendererOwner, () => value.snapshot());
 	transition('pagehide', true);
 	const late = runWithSignalOwner(rendererOwner, () =>
-		derived$('late-derived', async () => 'late ready'),
+		derived$(async () => 'late ready', { key: 'late-derived' }),
 	);
 	expect(runWithSignalOwner(rendererOwner, () => late.snapshot()).status).toBe('pending');
 	attempts[0].resolve('stale');
@@ -175,7 +175,7 @@ it.each(['pending', 'complete', 'complete-late'])(
 		metadata();
 		const owner = { scopeKey: 'stream-document' };
 		const load = vi.fn(async () => 'browser result');
-		const value = __queryAt('g:frozen-wire', 'frozen-wire', () => 'key', load);
+		const value = __queryAt('g:frozen-wire', () => 'key', load, { key: 'frozen-wire' });
 		const identity = {
 			protocol: 1 as const,
 			buildId: 'build',
@@ -461,7 +461,7 @@ it('revokes pending derived continuations without losing completed synchronous d
 	const results = [deferred<string>(), deferred<string>()];
 	let starts = 0;
 	const value = runWithSignalOwner(owner, () =>
-		derived$('async-value', () => results[starts++].promise),
+		derived$(() => results[starts++].promise, { key: 'async-value' }),
 	);
 	expect(runWithSignalOwner(owner, () => value.snapshot()).status).toBe('pending');
 	transition('pagehide', true);

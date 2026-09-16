@@ -180,10 +180,20 @@ import {
 } from './signals/native-read-collector.js';
 import { createNativeReadRetry, type NativeReadRetry } from './signals/native-read-retry.js';
 import {
+	activeCandidate,
+	SignalCandidateFrame,
+	swapActiveSignalCandidate,
+	withoutSignalCandidate,
+} from './signals/transition-candidate.js';
+import {
 	NativeAdoptionMiss,
+	NATIVE_TRANSITION_CONSUMER,
 	readNativeDomStyle,
+	registerNativeActionResolver,
 	runNativeBatch,
+	setNativeCandidateResolver,
 	setNativeAdoptionResolver,
+	type NativeTransitionPresentation,
 } from './signals/read-protocol.js';
 import { beginNativeEventBatch, endNativeEventBatch } from './signals/native-read-events.js';
 import {
@@ -1118,6 +1128,8 @@ function ensureNativeReadDriver(): NativeReadDriver {
 		capture: () => WIP_CAPTURE,
 		cleanup: registerHookCleanup,
 		schedule: scheduleNativeRead,
+		prepare: prepareNativeTransitionBlock,
+		retire: retireNativeTransitionBlock,
 		suspended: retainNativeRetryReads,
 		replayRefs: (capture, owner) =>
 			replayNativeUnpublishedRefs(capture as OffscreenCapture, owner as RootRenderOwner),
@@ -1242,6 +1254,8 @@ export function replayNativeReadWitness(witness: NativeReadWitness | null | unde
 }
 
 function retainNativeRetryReads(block: Block, reads: NativeReadWitness): void {
+	// The candidate's revocable preparation watch owns this unsuccessful read.
+	if (NATIVE_TRANSITION_ATTEMPT !== null) return;
 	// An existing Suspense/hidden Activity owner survives its unsuccessful body.
 	// Retain a minimal retry lease there, not in the discarded child Scope.
 	for (let current: Block | null = block; current !== null; current = current.parentBlock) {
@@ -2080,6 +2094,312 @@ interface TransitionActionBatch {
 	hooksPending: boolean;
 	pendingHolds?: number;
 	workComplete?: boolean;
+	/** Allocated only by a native write inside this Action. */
+	native?: SignalCandidateFrame;
+	nativeWake?: () => void;
+	nativeBlocks?: Set<Block>;
+	nativeBoundaries?: Map<TrySlot, TrackedThenable<any>>;
+}
+
+interface NativeTransitionAttempt {
+	blocks: Set<Block>;
+	transactions: Set<RootRenderTransaction>;
+	attempts: TransitionAttempt[];
+	presentations: NativeTransitionPresentation[];
+	suspensions: Map<TrySlot, TrackedThenable<any>>;
+	errorBlock?: Block;
+}
+
+let NATIVE_TRANSITION_QUEUE: Set<TransitionActionBatch> | null = null;
+let NATIVE_TRANSITION_ATTEMPT: NativeTransitionAttempt | null = null;
+
+function queueNativeTransition(batch: TransitionActionBatch): void {
+	(NATIVE_TRANSITION_QUEUE ??= new Set()).add(batch);
+	if (!scheduled && !syncFlush) {
+		scheduled = true;
+		queueMicrotask(flush);
+	}
+}
+
+/** The graph calls only tagged presentation readers, never subscriber callbacks. */
+function prepareNativeTransitionBlock(block: Block): void {
+	const admission = NATIVE_TRANSITION_ATTEMPT!;
+	if (block.disposed || admission.blocks.has(block)) return;
+	const hidden = SCHEDULED_VISIBILITY_DRIVER?.find(block, false);
+	if (hidden?.nativeTransition !== undefined && hidden.tryBlock !== null) block = hidden.tryBlock;
+	if (admission.blocks.has(block)) return;
+	const owner = block.idState.renderOwner;
+	if (owner === undefined || owner.disposed) return;
+	const retired = owner.transaction?.retired;
+	if (retired !== undefined && retired !== null)
+		for (let current: Block | null = block; current !== null; current = current.parentBlock)
+			if (retired.has(current)) return;
+	admission.blocks.add(block);
+	const root = beginRootRender(owner);
+	admission.transactions.add(owner.transaction!);
+	const mode = block.pendingMode;
+	block.pendingMode = 'transition';
+	const attempt = beginTransitionAttempt(block);
+	if (attempt !== null) admission.attempts.push(attempt);
+	try {
+		invalidateRender(block, block);
+		if (hidden?.nativeTransition !== undefined) {
+			journalObjectOnce(hidden);
+			journalRootProperty(block, 'inactive', block.inactive);
+			SCHEDULED_VISIBILITY_DRIVER!.reveal(hidden, 'transition');
+		} else renderBlock(block);
+	} catch (error) {
+		if (isSuspenseException(error)) {
+			// Independent consumers enter below their boundary's render catch.
+			// Route only to the real boundary to retain its configured timeout.
+			for (let owner: Block | null = block; owner !== null; owner = owner.parentBlock) {
+				const handler = (owner as any).__suspenseHandler;
+				if (handler) {
+					try {
+						handler(error.thenable, block);
+					} catch (suspension) {
+						if (!isSuspenseException(suspension)) throw suspension;
+					}
+					break;
+				}
+			}
+			throw error.thenable;
+		}
+		admission.errorBlock ??= block;
+		throw error;
+	} finally {
+		endTransitionAttempt(attempt);
+		block.pendingMode = mode;
+		endRootRender(root);
+	}
+}
+
+function finishNativeTransition(batch: TransitionActionBatch): void {
+	batch.nativeWake?.();
+	batch.nativeWake = undefined;
+	batch.native = undefined;
+	for (const block of batch.nativeBlocks ?? [])
+		block.idState.renderOwner?.nativeTransitions?.delete(batch);
+	batch.nativeBlocks = undefined;
+	for (const state of batch.nativeBoundaries?.keys() ?? []) {
+		if (state.nativeTransition !== batch) continue;
+		state.nativeTransition = undefined;
+		if (state.transitionTimeoutId !== null) {
+			clearTimeout(state.transitionTimeoutId);
+			state.transitionTimeoutId = null;
+		}
+	}
+	batch.nativeBoundaries = undefined;
+	NATIVE_TRANSITION_QUEUE?.delete(batch);
+	if (NATIVE_TRANSITION_QUEUE?.size === 0) NATIVE_TRANSITION_QUEUE = null;
+	releaseTransitionHookHolder(batch);
+}
+
+function retireNativeTransitionBlock(block: Block): void {
+	if (ROOT_RENDER_ROLLBACK) return;
+	for (const batch of block.idState.renderOwner?.nativeTransitions ?? []) {
+		if (!batch.nativeBlocks?.has(block)) continue;
+		// Retiring demand revokes that presentation, not the model write. The
+		// next preparation discovers only the surviving subscriber frontier.
+		queueNativeTransition(batch);
+	}
+}
+
+function prepareNativeTransitionUpdates(batch: TransitionActionBatch): void {
+	for (const update of batch.updates.values()) {
+		const { block, slot, state, reducer } = update;
+		const owner = block.idState.renderOwner;
+		if (block.disposed || owner === undefined || owner.disposed) continue;
+		const frame = beginRootRender(owner);
+		NATIVE_TRANSITION_ATTEMPT!.transactions.add(owner.transaction!);
+		try {
+			journalObjectOnce(slot);
+			if (state !== undefined) {
+				state.renderTransition = update;
+				state.updates = undefined;
+			} else if (reducer !== undefined) {
+				reducer.renderTransition = update;
+				reducer.renderPhaseActions = undefined;
+			} else slot.value = rebaseTransitionActionUpdate(update);
+			if (slot.pendingActionBatch === batch) {
+				slot.pendingActionBatch = undefined;
+				slot.pendingActionValue = undefined;
+			}
+		} finally {
+			endRootRender(frame);
+		}
+	}
+}
+
+function prepareNativeTransitionHook(batch: TransitionActionBatch, hook: TransitionHookSlot): void {
+	const owner = hook.block.idState.renderOwner;
+	if (hook.block.disposed || owner === undefined || owner.disposed) return;
+	const frame = beginRootRender(owner);
+	NATIVE_TRANSITION_ATTEMPT!.transactions.add(owner.transaction!);
+	try {
+		if (batch.hooksPending && hook.pendingBatches === 1) {
+			journalObjectOnce(hook);
+			hook.isPending = false;
+		}
+	} finally {
+		endRootRender(frame);
+	}
+	prepareNativeTransitionBlock(hook.block);
+}
+
+/** Native candidates share the existing root journals and scheduler commit wave. */
+function flushNativeTransitions(): void {
+	const queue = NATIVE_TRANSITION_QUEUE;
+	if (queue === null) return;
+	NATIVE_TRANSITION_QUEUE = null;
+	for (const batch of queue) {
+		const candidate = batch.native;
+		if (candidate === undefined) continue;
+		batch.nativeWake?.();
+		batch.nativeWake = undefined;
+		try {
+			if (!candidate.validate()) candidate.rebase();
+		} catch {
+			candidate.discard();
+			finishNativeTransition(batch);
+			flushTransitionActionBatch(batch);
+			continue;
+		}
+		if (!candidate.hasWrites()) {
+			candidate.discard();
+			finishNativeTransition(batch);
+			flushTransitionActionBatch(batch);
+			continue;
+		}
+		const admission: NativeTransitionAttempt = {
+			blocks: new Set(),
+			transactions: new Set(),
+			attempts: [],
+			presentations: [],
+			suspensions: new Map(),
+		};
+		NATIVE_TRANSITION_ATTEMPT = admission;
+		let outcome;
+		try {
+			outcome = candidate.prepare([
+				() => prepareNativeTransitionUpdates(batch),
+				...(batch.hook === null ? [] : [() => prepareNativeTransitionHook(batch, batch.hook!)]),
+				...(batch.hooks ?? []).map((hook) => () => prepareNativeTransitionHook(batch, hook)),
+				...[...batch.updates.values()].map(
+					(update) => () => prepareNativeTransitionBlock(update.block),
+				),
+				...candidate
+					.consumers()
+					.filter((consumer) => consumer.active())
+					.map((consumer) => () => {
+						const presentation = consumer.prepare();
+						if (presentation !== undefined) admission.presentations.push(presentation);
+					}),
+			]);
+		} finally {
+			NATIVE_TRANSITION_ATTEMPT = null;
+		}
+		for (const block of batch.nativeBlocks ?? [])
+			block.idState.renderOwner?.nativeTransitions?.delete(batch);
+		batch.nativeBlocks = admission.blocks;
+		for (const transaction of admission.transactions)
+			(transaction.owner.nativeTransitions ??= new Set()).add(batch);
+		const valid =
+			outcome.status === 'ready' &&
+			admission.presentations.every((presentation) => presentation.validate()) &&
+			[...admission.transactions].every(
+				(transaction) =>
+					!transaction.aborted &&
+					!transaction.owner.disposed &&
+					currentPresentations(transaction.capture) &&
+					(NATIVE_READ_DRIVER === null || NATIVE_READ_DRIVER.validateCapture(transaction.capture)),
+			);
+		if (
+			valid &&
+			outcome.status === 'ready' &&
+			outcome.receipt.publish(() => {
+				// All accepted subscriptions transfer before a public subscriber runs.
+				for (const transaction of admission.transactions) {
+					transaction.nativeAdmitted = true;
+					acceptNativeCapture(transaction.capture, transaction.owner, true);
+				}
+				batch.flushed = true;
+				batch.updates.clear();
+				finishNativeTransition(batch);
+				for (const presentation of admission.presentations) presentation.commit();
+				commitRootRenders();
+			})
+		) {
+			continue;
+		}
+		for (const transaction of admission.transactions) rollbackRootRender(transaction);
+		for (const presentation of admission.presentations) presentation.discard();
+		for (let i = admission.attempts.length - 1; i >= 0; i--) {
+			const swaps = admission.attempts[i].memoSwaps;
+			if (swaps !== null)
+				for (let j = swaps.length - 1; j >= 0; j--) applyTransitionMemoSwap(swaps[j], false);
+		}
+		commitRootRenders();
+		if (outcome.status === 'pending') {
+			for (const state of batch.nativeBoundaries?.keys() ?? []) {
+				if (admission.suspensions.has(state)) continue;
+				if (state.nativeTransition === batch) state.nativeTransition = undefined;
+				if (state.transitionTimeoutId !== null) {
+					clearTimeout(state.transitionTimeoutId);
+					state.transitionTimeoutId = null;
+				}
+			}
+			for (const [state, thenable] of admission.suspensions) {
+				state.nativeTransition = batch;
+				if (
+					state.hasResolved &&
+					state.branch === 1 &&
+					state.pendingBody !== null &&
+					TRANSITION_FALLBACK_TIMEOUT_MS !== Infinity &&
+					TRANSITION_FALLBACK_TIMEOUT_MS >= 0 &&
+					(state.transitionTimeoutId === null || batch.nativeBoundaries?.get(state) !== thenable)
+				) {
+					if (state.transitionTimeoutId !== null) clearTimeout(state.transitionTimeoutId);
+					state.transitionTimeoutId = setTimeout(() => {
+						state.transitionTimeoutId = null;
+						if (
+							state.nativeTransition === batch &&
+							!state.parentBlock.disposed &&
+							state.branch === 1
+						)
+							SCHEDULED_VISIBILITY_DRIVER!.hidePending(state);
+					}, TRANSITION_FALLBACK_TIMEOUT_MS);
+				}
+			}
+			batch.nativeBoundaries = admission.suspensions;
+			batch.nativeWake = candidate.watchPreparation(outcome, () => queueNativeTransition(batch));
+		} else if (
+			outcome.status === 'ready' ||
+			(outcome.status === 'invalid' && outcome.reason === 'stale')
+		) {
+			queueNativeTransition(batch);
+		} else {
+			candidate.discard();
+			finishNativeTransition(batch);
+			for (const update of batch.updates.values()) {
+				if (update.slot.pendingActionBatch === batch) {
+					update.slot.pendingActionBatch = undefined;
+					update.slot.pendingActionValue = undefined;
+				}
+			}
+			batch.updates.clear();
+			batch.flushed = true;
+			if (outcome.status === 'error') {
+				if (admission.errorBlock !== undefined && !admission.errorBlock.disposed)
+					handleResumeError(admission.errorBlock, outcome.error);
+				else reportTransitionError(outcome.error, batch.hook ?? undefined);
+			} else if (outcome.status === 'invalid')
+				reportTransitionError(
+					new TypeError('Unsupported native signal transition.'),
+					batch.hook ?? undefined,
+				);
+		}
+	}
 }
 
 /**
@@ -2098,6 +2418,29 @@ interface TransitionActionBatch {
 let ACTIVE_TRANSITION_ACTION_BATCH: TransitionActionBatch | null = null;
 /** The entangled batch shared by explicit transitions while an Action is awaiting. */
 let IN_FLIGHT_TRANSITION_ACTION_BATCH: TransitionActionBatch | null = null;
+let nativeActionResolverInstalled = false;
+
+function nativeCandidateForAction(batch: TransitionActionBatch): SignalCandidateFrame {
+	let candidate = batch.native;
+	if (candidate !== undefined && !candidate.validate()) {
+		if (candidate.hasWrites()) candidate.rebase();
+		else {
+			candidate.discard();
+			candidate = undefined;
+		}
+	}
+	return candidate ?? (batch.native = new SignalCandidateFrame());
+}
+
+/** Setters, not reads, consult the same post-await batch as ordinary hooks. */
+function ensureNativeActionResolver(): void {
+	if (nativeActionResolverInstalled) return;
+	nativeActionResolverInstalled = true;
+	registerNativeActionResolver(() => {
+		const batch = transitionActionBatchForUpdate();
+		return batch === null ? undefined : nativeCandidateForAction(batch);
+	});
+}
 
 function createTransitionActionBatch(): TransitionActionBatch {
 	return {
@@ -2182,6 +2525,17 @@ function stageTransitionValue<T>(
 
 function flushTransitionActionBatch(batch: TransitionActionBatch): void {
 	if (batch.flushed) return;
+	if (batch.native !== undefined) {
+		if (batch.native.hasWrites()) {
+			holdTransitionHookBatch(batch, batch);
+			queueNativeTransition(batch);
+			if (IN_FLIGHT_TRANSITION_ACTION_BATCH === batch) IN_FLIGHT_TRANSITION_ACTION_BATCH = null;
+			return;
+		}
+		// Equal writes and throwing updaters can still acquire candidate read leases.
+		batch.native.discard();
+		batch.native = undefined;
+	}
 	batch.flushed = true;
 	for (const update of batch.updates.values()) {
 		const { slot, block, forceRender } = update;
@@ -3149,6 +3503,8 @@ interface RootRenderOwner {
 	retrySignalOwners?: SignalRetryOwners;
 	/** Only native suspended readers allocate a retry lease outside their discarded Scopes. */
 	nativeRetry?: NativeReadRetry;
+	/** Only roots participating in a native candidate retain cancellation ownership. */
+	nativeTransitions?: Set<TransitionActionBatch>;
 	transaction: RootRenderTransaction | null;
 	/** Installed only when a single-origin transition suspends at this root. */
 	transition?: RootTransitionHold;
@@ -3171,6 +3527,8 @@ interface RootRenderTransaction {
 	aborted: boolean;
 	rootRequest: boolean;
 	hydrating?: boolean;
+	/** Collectively validated before a native candidate published canonical state. */
+	nativeAdmitted?: boolean;
 }
 
 interface RootRenderFrame {
@@ -3619,8 +3977,9 @@ function commitRootRenders(): void {
 			// ref, or effect callback can observe the candidate. A later callback
 			// write starts another transaction and does not revoke this snapshot.
 			if (
-				!currentPresentations(transaction.capture) ||
-				(NATIVE_READ_DRIVER !== null && !NATIVE_READ_DRIVER.validateCapture(transaction.capture))
+				!transaction.nativeAdmitted &&
+				(!currentPresentations(transaction.capture) ||
+					(NATIVE_READ_DRIVER !== null && !NATIVE_READ_DRIVER.validateCapture(transaction.capture)))
 			) {
 				const presentationChanged = !currentPresentations(transaction.capture);
 				rollbackRootRender(transaction);
@@ -6446,6 +6805,7 @@ interface ScheduledVisibilityDriver {
 	find: typeof findScheduledVisibilityOwner;
 	holdsNativeRead: typeof holdsNativeRead;
 	reveal: typeof attemptHiddenReveal;
+	hidePending: typeof hideTryContentAndMountPending;
 	visible: typeof renderVisibleTry;
 	rehide: typeof rehideActivityAfterDescendantRender;
 	retryActivity: typeof renderHiddenActivity;
@@ -6458,6 +6818,7 @@ function ensureScheduledVisibilityDriver(): void {
 		find: findScheduledVisibilityOwner,
 		holdsNativeRead,
 		reveal: attemptHiddenReveal,
+		hidePending: hideTryContentAndMountPending,
 		visible: renderVisibleTry,
 		rehide: rehideActivityAfterDescendantRender,
 		retryActivity: renderHiddenActivity,
@@ -6660,6 +7021,7 @@ function drainQueue(): { err: any } | null {
 		for (const activity of activitiesToRehide) SCHEDULED_VISIBILITY_DRIVER!.rehide(activity);
 	}
 	commitRootRenders();
+	flushNativeTransitions();
 	return pendingError;
 }
 
@@ -9174,6 +9536,7 @@ export function hasPendingWork(): boolean {
 	return (
 		QUEUE.length > 0 ||
 		ROOT_RENDER_TRANSACTIONS.length > 0 ||
+		NATIVE_TRANSITION_QUEUE !== null ||
 		effectEventQueue.length > 0 ||
 		effectEventCommitActions.length > 0 ||
 		effectQueues[INSERTION].length > 0 ||
@@ -19390,6 +19753,19 @@ function readSignalBinding(handle: SignalHandle<unknown>): unknown {
 	return handle[SIGNAL_BINDING_READ]();
 }
 
+/** Direct bindings enlist their real render owner without replaying notifications. */
+function nativeTransitionBindingNotify(
+	binding: { scope: Scope; disposed: boolean },
+	notify: () => void,
+): () => void {
+	return Object.assign(notify, {
+		[NATIVE_TRANSITION_CONSUMER]: {
+			active: () => !binding.disposed && !binding.scope.block.disposed,
+			prepare: () => prepareNativeTransitionBlock(binding.scope.block),
+		},
+	});
+}
+
 function isWritableSignal(value: unknown): value is WritableSignal<unknown> {
 	return (
 		isSignalHandle(value) &&
@@ -19404,6 +19780,7 @@ function disposeDirectSignalBinding(binding: DirectSignalBinding): void {
 		return;
 	binding.disposed = true;
 	binding.unsubscribe?.();
+	retireNativeTransitionBlock(binding.scope.block);
 	binding.controlWriterCleanup?.();
 	if (binding.input !== undefined) {
 		domNode(binding.target as Element).removeEventListener('input', binding.input);
@@ -19430,6 +19807,7 @@ function validateDirectSignalControl(element: Element, site: string): void {
 }
 
 function writeDirectSignalBinding(binding: DirectSignalBinding, value: unknown): void {
+	if (TRANSITION_JOURNAL !== null) journalObjectOnce(binding);
 	if (binding.kind === 'text' || binding.kind === 'textOnlyChild') {
 		if (binding.text === undefined) {
 			binding.text =
@@ -19549,8 +19927,12 @@ function installDirectSignalControl(binding: DirectSignalBinding): void {
 		if (binding.disposed || binding.pendingControl) return;
 		const snapshot = snapshotHydrationControl(element);
 		if (snapshot === null) return;
-		runWithBlockSignalOwner(binding.scope, () =>
-			handle.set(directSignalControlValue(binding, snapshot)),
+		// Target listeners precede delegated dispatch. A platform edit is urgent,
+		// even while an unrelated async Action keeps its post-await batch open.
+		withoutSignalCandidate(() =>
+			runWithBlockSignalOwner(binding.scope, () =>
+				handle.set(directSignalControlValue(binding, snapshot)),
+			),
 		);
 	};
 	binding.input = input;
@@ -19559,10 +19941,12 @@ function installDirectSignalControl(binding: DirectSignalBinding): void {
 		element,
 		binding.kind === 'checked' ? 'checked' : 'value',
 		(value) =>
-			runWithBlockSignalOwner(binding.scope, () => {
-				if (!binding.disposed && !binding.pendingControl && isWritableSignal(binding.handle))
-					binding.handle.set(value);
-			}),
+			withoutSignalCandidate(() =>
+				runWithBlockSignalOwner(binding.scope, () => {
+					if (!binding.disposed && !binding.pendingControl && isWritableSignal(binding.handle))
+						binding.handle.set(value);
+				}),
+			),
 	);
 }
 
@@ -19571,22 +19955,24 @@ function queueDirectSignalControlAdoption(binding: DirectSignalBinding): void {
 	// this publication, and committed actions run outside the native read guard.
 	enqueueEffectEventCommitAction(() => {
 		if (binding.disposed || binding.scope.block.disposed || !binding.pendingControl) return;
-		runWithBlockSignalOwner(binding.scope, () => {
-			const element = binding.target as Element;
-			const snapshot = snapshotHydrationControl(element)!;
-			if (snapshot.editRevision > 0 && isWritableSignal(binding.handle)) {
-				binding.handle.set(directSignalControlValue(binding, snapshot));
-			}
-			if (binding.disposed || binding.scope.block.disposed) return;
-			// A synchronous subscriber can dispatch a newer native edit. Leave the
-			// DOM authoritative until that exact revision has also been published.
-			if (!consumeHydrationControl(element, snapshot.revision)) {
-				queueDirectSignalControlAdoption(binding);
-				return;
-			}
-			binding.pendingControl = false;
-			writeDirectSignalBinding(binding, readSignalBinding(binding.handle!));
-		});
+		withoutSignalCandidate(() =>
+			runWithBlockSignalOwner(binding.scope, () => {
+				const element = binding.target as Element;
+				const snapshot = snapshotHydrationControl(element)!;
+				if (snapshot.editRevision > 0 && isWritableSignal(binding.handle)) {
+					binding.handle.set(directSignalControlValue(binding, snapshot));
+				}
+				if (binding.disposed || binding.scope.block.disposed) return;
+				// A synchronous subscriber can dispatch a newer native edit. Leave the
+				// DOM authoritative until that exact revision has also been published.
+				if (!consumeHydrationControl(element, snapshot.revision)) {
+					queueDirectSignalControlAdoption(binding);
+					return;
+				}
+				binding.pendingControl = false;
+				writeDirectSignalBinding(binding, readSignalBinding(binding.handle!));
+			}),
+		);
 	});
 }
 
@@ -19596,8 +19982,8 @@ function activateDirectSignalBinding(
 ): void {
 	if (binding.disposed) return;
 	if (binding.handle !== null)
-		binding.unsubscribe = binding.handle[SIGNAL_BINDING_SUBSCRIBE](() =>
-			updateDirectSignalBinding(binding),
+		binding.unsubscribe = binding.handle[SIGNAL_BINDING_SUBSCRIBE](
+			nativeTransitionBindingNotify(binding, () => updateDirectSignalBinding(binding)),
 		);
 	if (revision !== undefined) {
 		installDirectSignalControl(binding);
@@ -22419,7 +22805,9 @@ function addSignalHostSubscription(
 	binding: SignalHostPropSourcesBinding,
 	handle: SignalHandle<unknown>,
 ): () => void {
-	const unsubscribe = handle[SIGNAL_BINDING_SUBSCRIBE](() => updateSignalHostPropSources(binding));
+	const unsubscribe = handle[SIGNAL_BINDING_SUBSCRIBE](
+		nativeTransitionBindingNotify(binding, () => updateSignalHostPropSources(binding)),
+	);
 	binding.subscriptions.set(handle, unsubscribe);
 	return unsubscribe;
 }
@@ -22545,6 +22933,7 @@ function disposeSignalHostPropSources(binding: SignalHostPropSourcesBinding): vo
 		return;
 	binding.disposed = true;
 	for (const unsubscribe of binding.subscriptions.values()) unsubscribe();
+	retireNativeTransitionBlock(binding.scope.block);
 	binding.subscriptions.clear();
 	for (const cleanup of binding.controlWriters.values()) cleanup();
 	binding.controlWriters.clear();
@@ -31627,6 +32016,7 @@ function disposeDirectSignalChild(binding: DirectSignalChildBinding): void {
 	if (binding.disposed) return;
 	binding.disposed = true;
 	binding.unsubscribe?.();
+	retireNativeTransitionBlock(binding.scope.block);
 }
 
 function updateDirectSignalChild(binding: DirectSignalChildBinding): void {
@@ -31707,6 +32097,7 @@ export function bindSignalChild(
 	}
 	if (prior !== null && !prior.disposed && prior.handle === value) {
 		const next = readSignalBinding(value);
+		if (TRANSITION_JOURNAL !== null) journalObjectOnce(prior);
 		if (onlyChild) prior.text = childTextHole(parentScope, slotKey, domParent, next, cachedText);
 		else if (bindingMarker !== undefined)
 			bindingChildSlot(parentScope, slotKey, domParent, next, bindingMarker, anchor, ownEnd);
@@ -31733,7 +32124,9 @@ export function bindSignalChild(
 		value: initial,
 		disposed: false,
 	};
-	binding.unsubscribe = value[SIGNAL_BINDING_SUBSCRIBE](() => updateDirectSignalChild(binding));
+	binding.unsubscribe = value[SIGNAL_BINDING_SUBSCRIBE](
+		nativeTransitionBindingNotify(binding, () => updateDirectSignalChild(binding)),
+	);
 	registerHookCleanup(parentScope, () => disposeDirectSignalChild(binding));
 	if (prior !== null) {
 		const finish = (discarded: boolean): void =>
@@ -34065,6 +34458,8 @@ interface TrySlot {
 	 * scope teardown so we don't leak callbacks past the slot's lifetime.
 	 */
 	transitionTimeoutId: any | null;
+	/** Native candidates own retry; a finite fallback still uses this boundary's lifetime. */
+	nativeTransition?: TransitionActionBatch;
 	/**
 	 * Host refs detached when this boundary suspended (object refs set to null,
 	 * callback refs invoked with null). React treats ref attachment like a layout
@@ -35388,6 +35783,10 @@ function handleSuspense(
 	// the owner whose Action batch must keep its useTransition cue pending.
 	transitionOrigin = sourceBlock,
 ): void {
+	if (NATIVE_TRANSITION_ATTEMPT !== null) {
+		NATIVE_TRANSITION_ATTEMPT.suspensions.set(state, thenable);
+		throw new SuspenseException(thenable);
+	}
 	// Ordinary roots do not need hidden-subtree ancestry walks. Install this
 	// capability before the first boundary can preserve a suspended primary.
 	ensureScheduledVisibilityDriver();
@@ -36285,6 +36684,10 @@ function attemptHiddenRevealInner(
 	scheduledMode?: 'urgent' | 'transition',
 	reason: 'update' | 'parent' | 'retry' = 'update',
 ): void {
+	if (state.nativeTransition !== undefined && NATIVE_TRANSITION_ATTEMPT === null) {
+		queueNativeTransition(state.nativeTransition);
+		return;
+	}
 	const retryOnly = reason === 'retry';
 	let tryBlock = state.tryBlock;
 	if (tryBlock === null || tryBlock.disposed || state.hiddenDom === null) return;
@@ -36376,6 +36779,7 @@ function attemptHiddenRevealInner(
 		// may escape into the parent commit while the fallback remains visible.
 		restoreSubtreeEffectDeps(tryBlock, effectDeps);
 		discardOffscreenCapture(hiddenCapture);
+		if (NATIVE_TRANSITION_ATTEMPT !== null) throw thrown;
 		if (isSuspenseException(thrown)) {
 			deactivateScope(tryBlock, false);
 			// Still suspended — hide the try DOM again (the pending arm never moved)
@@ -36688,6 +37092,7 @@ function runTransition(fn: () => void | Promise<unknown>, hook?: TransitionHookS
 	// Install the optional off-screen swap graph before any listener or user
 	// update can observe transition priority.
 	ensureTransitionSwapDriver();
+	ensureNativeActionResolver();
 	// Bump the priority flag FIRST so any scheduleRender calls fired by the
 	// listener notification (and by fn itself) are tagged as transition.
 	TRANSITION_DEPTH++;
@@ -36710,7 +37115,18 @@ function runTransition(fn: () => void | Promise<unknown>, hook?: TransitionHookS
 	try {
 		tickTransitionCount(+1);
 		try {
-			result = fn();
+			const previousCandidate = activeCandidate;
+			const nativeResolver = setNativeCandidateResolver(() => {
+				const candidate = nativeCandidateForAction(actionBatch);
+				swapActiveSignalCandidate(candidate);
+				return candidate;
+			});
+			try {
+				result = fn();
+			} finally {
+				swapActiveSignalCandidate(previousCandidate);
+				setNativeCandidateResolver(nativeResolver);
+			}
 			if (result != null && typeof (result as { then?: unknown }).then === 'function') {
 				actionBatch.pendingActions++;
 				IN_FLIGHT_TRANSITION_ACTION_BATCH = actionBatch;

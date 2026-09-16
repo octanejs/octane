@@ -1,14 +1,77 @@
 import { cssStyleValue, hyphenateStyleName } from './style-values.js';
 import { __writeBinding, type BindingValue } from './dom-bindings.js';
-import type { BindingSignalConnection } from './dom-binding-signals.js';
+import type { BindingPreparedValue, BindingSignalConnection } from './dom-binding-signals.js';
 import { captureSignalOwner, currentSignalOwner } from './signals/owner-context.js';
 import {
 	beginNativeWriteGuard,
 	endNativeWriteGuard,
+	forwardNativeTransitionConsumer,
 	readNativeDomStyle,
 	setNativeReadObserver,
 	type NativeReadSource,
+	type NativeTransitionPresentation,
 } from './signals/read-protocol.js';
+
+/** Acquire prospective graph leases before releasing any published subscription. */
+export function __prepareBindingSources(
+	reads: Map<NativeReadSource, number>,
+	subscriptions: Map<NativeReadSource, () => void>,
+	notify: () => void,
+	active: () => boolean,
+	run: <T>(callback: () => T) => T,
+): NativeTransitionPresentation {
+	const previous = new Map(subscriptions);
+	const acquired = new Map<NativeReadSource, () => void>();
+	let accepted = false;
+	let retired = false;
+	let invalid = false;
+	try {
+		for (const source of reads.keys()) {
+			if (previous.has(source)) continue;
+			let live = true;
+			const stop = run(() =>
+				source.subscribe(
+					forwardNativeTransitionConsumer(notify, () => {
+						if (!live || retired || !active()) return;
+						if (!accepted) invalid = true;
+						else notify();
+					}),
+				),
+			);
+			acquired.set(source, () => {
+				live = false;
+				stop();
+			});
+		}
+	} catch (error) {
+		for (const stop of acquired.values()) stop();
+		throw error;
+	}
+	return {
+		validate: () =>
+			!retired &&
+			!invalid &&
+			active() &&
+			subscriptions.size === previous.size &&
+			[...previous].every(([source, stop]) => subscriptions.get(source) === stop) &&
+			[...reads].every(([source, version]) => source.getVersion() === version),
+		commit() {
+			if (accepted || retired || !active()) return;
+			accepted = true;
+			for (const [source, stop] of acquired) subscriptions.set(source, stop);
+			for (const [source, stop] of previous) {
+				if (reads.has(source)) continue;
+				subscriptions.delete(source);
+				stop();
+			}
+		},
+		discard() {
+			if (accepted || retired) return;
+			retired = true;
+			for (const stop of acquired.values()) stop();
+		},
+	};
+}
 
 /** Canonical style values after native handles and CSS units have been resolved. */
 export type BindingStyleSnapshot = Readonly<Record<string, string | null>>;
@@ -85,9 +148,11 @@ export function __createBindingStyles() {
 						// subscription was removed or replaced by a newer generation.
 						let active = true;
 						const stop = run(() =>
-							source.subscribe(() => {
-								if (active && !disposed) notify();
-							}),
+							source.subscribe(
+								forwardNativeTransitionConsumer(notify, () => {
+									if (active && !disposed) notify();
+								}),
+							),
 						);
 						if (typeof stop !== 'function')
 							throw new TypeError('A DOM style subscription must return cleanup.');
@@ -147,6 +212,36 @@ export function __createBindingStyles() {
 			};
 			return {
 				get,
+				preview(value): BindingPreparedValue {
+					const reads = new Map<NativeReadSource, number>();
+					const previousObserver = setNativeReadObserver((source, version) => {
+						if (!reads.has(source)) reads.set(source, version);
+					});
+					const guard = beginNativeWriteGuard();
+					let projected: BindingValue;
+					try {
+						projected = run(() => __normalizeBindingStyle(readNativeDomStyle(value)));
+					} finally {
+						endNativeWriteGuard(guard);
+						setNativeReadObserver(previousObserver);
+					}
+					const prepared = __prepareBindingSources(
+						reads,
+						subscriptions,
+						notify,
+						() => !disposed,
+						run,
+					);
+					return {
+						value: projected,
+						validate: prepared.validate,
+						discard: prepared.discard,
+						commit() {
+							raw = value;
+							prepared.commit();
+						},
+					};
+				},
 				read(value) {
 					raw = value;
 					return get();

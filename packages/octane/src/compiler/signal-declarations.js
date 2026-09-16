@@ -78,29 +78,34 @@ function isScalarResult(expression) {
 function declarationHelper(factory, call) {
 	if (factory !== 'derived$') return SIGNAL_FACTORIES.get(factory);
 	const args = call.arguments ?? [];
-	const offset = args[0]?.type === 'Literal' && typeof args[0].value === 'string' ? 1 : 0;
-	const compute = unwrapExpression(args[offset]);
+	const compute = unwrapExpression(args[0]);
 	if (
 		(compute?.type !== 'ArrowFunctionExpression' && compute?.type !== 'FunctionExpression') ||
 		compute.params.length !== 0
 	)
 		return '__derivedAt';
-	const options = unwrapExpression(args[offset + 1]);
+	const options = unwrapExpression(args[1]);
 	if (options !== undefined) {
-		// A literal assertion is immutable for this declaration; unknown options
-		// may have a changing sync flag or an observable accessor. Keep them general.
-		const property =
-			options?.type === 'ObjectExpression' && options.properties.length === 1
-				? options.properties[0]
-				: undefined;
-		return property?.type === 'Property' &&
-			property.kind === 'init' &&
-			!property.computed &&
-			(property.key?.name ?? property.key?.value) === 'sync' &&
-			property.value?.type === 'Literal' &&
-			property.value.value === true
-			? '__derivedScalarAt'
-			: '__derivedAt';
+		// A stable key does not change the result proof. Unknown options, spreads
+		// and accessors can change the sync assertion, so retain the general path.
+		if (options.type !== 'ObjectExpression') return '__derivedAt';
+		let sync;
+		const seen = new Set();
+		for (const property of options.properties) {
+			const key = property.key?.name ?? property.key?.value;
+			if (
+				property.type !== 'Property' ||
+				property.kind !== 'init' ||
+				property.computed ||
+				seen.has(key)
+			)
+				return '__derivedAt';
+			seen.add(key);
+			if (key === 'key' && validLiteralKey(property.value)) continue;
+			if (key !== 'sync' || property.value?.type !== 'Literal') return '__derivedAt';
+			sync = property.value.value;
+		}
+		if (seen.has('sync')) return sync === true ? '__derivedScalarAt' : '__derivedAt';
 	}
 	if (compute.async || compute.generator) return '__derivedAt';
 	const result =
@@ -112,6 +117,10 @@ function declarationHelper(factory, call) {
 	return isScalarResult(result) ? '__derivedScalarAt' : '__derivedAt';
 }
 
+function validLiteralKey(value) {
+	return value?.type === 'Literal' && typeof value.value === 'string' && value.value.trim() !== '';
+}
+
 // Declarations create lazy descriptors, not live cells. Only omit construction
 // when its validation and eager option reads are provably unobservable; a PURE
 // call still evaluates any effectful arguments. Unknown callbacks, observable
@@ -119,45 +128,39 @@ function declarationHelper(factory, call) {
 function pureSignalDeclaration(factory, call) {
 	const args = call.arguments ?? [];
 	if (args.some((argument) => argument.type === 'SpreadElement')) return false;
-	let offset = 0;
-	const first = unwrapExpression(args[0]);
-	if (first?.type === 'Literal' && typeof first.value === 'string') {
-		if (factory === 'signal$' && args.length === 1) return true;
-		// Empty keys do not select the callback overload at runtime.
-		if (!first.value.trim()) return false;
-		offset = 1;
-	}
-	if (factory === 'signal$') return args.length === 1 || (offset === 1 && args.length === 2);
 	const functionAt = (index) => {
 		const value = unwrapExpression(args[index]);
 		return value?.type === 'ArrowFunctionExpression' || value?.type === 'FunctionExpression';
 	};
-	if (factory === 'derived$') {
-		return functionAt(offset) && args.length >= offset + 1 && args.length <= offset + 2;
-	}
-	if (
-		factory !== 'query$' ||
-		!functionAt(offset) ||
-		!functionAt(offset + 1) ||
-		args.length < offset + 2 ||
-		args.length > offset + 3
-	) {
+	const count = factory === 'query$' ? 2 : 1;
+	if (args.length < count || args.length > count + 1) return false;
+	if (factory !== 'signal$' && !functionAt(0)) return false;
+	if (factory === 'query$' && !functionAt(1)) return false;
+	const options = unwrapExpression(args[count]);
+	if (options === undefined || (options.type === 'Literal' && options.value === null)) return true;
+	if (options.type !== 'ObjectExpression') return false;
+	let ownsKey = false;
+	for (const property of options.properties) {
+		if (property.type !== 'Property' || property.computed) return false;
+		const key = property.key?.name ?? property.key?.value;
+		// sync is read only when a general derived cell starts, never at declaration.
+		if (factory === 'derived$' && key === 'sync') continue;
+		if (property.kind !== 'init') return false;
+		if (key === 'key' && validLiteralKey(property.value)) {
+			ownsKey = true;
+			continue;
+		}
+		if (
+			factory === 'query$' &&
+			key === 'kind' &&
+			property.value?.type === 'Literal' &&
+			(property.value.value === 'promise' || property.value.value === 'stream')
+		)
+			continue;
 		return false;
 	}
-	const options = unwrapExpression(args[offset + 2]);
-	if (options === undefined || (options.type === 'Literal' && options.value === null)) return true;
-	// query$ reads options.kind while constructing the descriptor. A literal
-	// supported kind is safe; a getter, spread, or opaque options object is not.
-	if (options.type !== 'ObjectExpression' || options.properties.length !== 1) return false;
-	const property = options.properties[0];
-	return (
-		property.type === 'Property' &&
-		property.kind === 'init' &&
-		!property.computed &&
-		(property.key?.name ?? property.key?.value) === 'kind' &&
-		property.value?.type === 'Literal' &&
-		(property.value.value === 'promise' || property.value.value === 'stream')
-	);
+	// Without an own field the declaration can observe an inherited key accessor.
+	return ownsKey;
 }
 
 const AST_METADATA = new Set([

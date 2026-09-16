@@ -3,6 +3,7 @@ import { createResourceCellWith } from './engine.js';
 import { SignalStreamError } from './errors.js';
 import {
 	ScopedNode,
+	CandidateUnsupportedError,
 	assertAlive,
 	assertWritable,
 	errorState,
@@ -17,7 +18,9 @@ import {
 	releaseRetention,
 	signalBatch,
 	untrack,
+	untrackCommitted,
 	type GraphOwner,
+	type CandidateProducer,
 	type NodeState,
 } from './graph.js';
 import {
@@ -357,7 +360,7 @@ export class RequestEntry {
 		attempt.resolve();
 		// Revoke publication and release owner references before user cancellation
 		// callbacks run; those callbacks may synchronously select another request.
-		if (controller) untrack(() => signalBatch(() => controller.abort()));
+		if (controller) untrackCommitted(() => signalBatch(() => controller.abort()));
 		if (iterator) closeIterator(iterator);
 	}
 
@@ -426,7 +429,7 @@ function ignoreRetiredCloseFailure(): void {}
 
 function closeIterator(iterator: AsyncIterator<unknown>): void {
 	try {
-		const result = untrack(() => signalBatch(() => iterator.return?.()));
+		const result = untrackCommitted(() => signalBatch(() => iterator.return?.()));
 		// A retired producer cannot publish a close failure or keep an unhandled
 		// rejection alive. Current producer failures use failAttempt instead.
 		Promise.resolve(result).catch(ignoreRetiredCloseFailure);
@@ -541,6 +544,7 @@ function receiveStreamStep(attempt: Attempt, result: IteratorResult<unknown>): v
 }
 
 export class ResourceBinding<T = any> {
+	declare private candidate?: true;
 	private selected: RequestEntry | undefined;
 	private selectedIdentity: RetainedRequestIdentity | undefined;
 	private retainedRequest: RetainedRequestIdentity | undefined;
@@ -590,6 +594,95 @@ export class ResourceBinding<T = any> {
 		return request;
 	}
 
+	forkCandidate(target: ScopedNode<T>): CandidateProducer {
+		if (this.streamedSelection || this.owner.streamedSelections?.has(this.node.key)) {
+			throw new CandidateUnsupportedError(
+				'Streamed candidates are not supported by this prototype.',
+			);
+		}
+		const fork = new ResourceBinding(this.owner, target, this.describe);
+		fork.candidate = true;
+		// Retained data belongs to its last successful request, not necessarily
+		// the current selection. A different query family must still clear it.
+		fork.retainedRequest = this.retainedRequest;
+		return {
+			dispose: () => fork.dispose(),
+			prepare: () => {
+				if (this.streamedSelection || this.owner.streamedSelections?.has(this.node.key))
+					return { status: 'invalid' };
+				const entry = fork.selected;
+				const attempt = entry?.attempt;
+				if (entry) {
+					// Receiver-owned channels need their own adoption authority, even
+					// when another resource selected this canonical request first.
+					if (attempt?.streamed) return { status: 'invalid' };
+					const snapshot = entry.state.snapshot;
+					if (
+						attempt &&
+						(entry.request.definition.kind !== 'stream' || snapshot.status !== 'ready')
+					)
+						return { status: 'pending', waiting: target.state?.waiting ?? attempt.settled };
+					if (!(
+						(snapshot.status === 'ready' &&
+							(snapshot.complete || entry.request.definition.kind === 'stream')) ||
+						snapshot.status === 'error'
+					))
+						return { status: 'invalid' };
+				} else if (target.state?.snapshot.status !== 'idle') {
+					// Only an explicit skip has no selection. A description failure
+					// is not a completed request and cannot grant publication authority.
+					const state = target.state;
+					if (state?.snapshot.status === 'error')
+						return { status: 'error', error: state.snapshot.error };
+					if (state?.waiting) return { status: 'pending', waiting: state.waiting };
+					return { status: 'invalid' };
+				}
+				const state = entry?.state;
+				const authority = this.selectionAuthority;
+				const forkAuthority = fork.selectionAuthority;
+				return {
+					status: 'ready',
+					receipt: {
+						validate: () =>
+							!this.streamedSelection &&
+							!this.owner.streamedSelections?.has(this.node.key) &&
+							this.selectionAuthority === authority &&
+							fork.selectionAuthority === forkAuthority &&
+							fork.selected === entry &&
+							(entry
+								? entry.state === state && entry.attempt === attempt && entry.consumers.has(fork)
+								: target.state?.snapshot.status === 'idle'),
+						publish: () => {
+							const previous = this.selected;
+							const resolve = this.resolvePending;
+							// Install the accepted consumer before releasing either lease. No
+							// selector, loader or abort callback executes in this phase.
+							entry?.consumers.add(this);
+							entry?.consumers.delete(fork);
+							this.selected = entry;
+							this.selectedIdentity = fork.selectedIdentity;
+							this.retainedRequest = fork.retainedRequest;
+							this.describedAttempt = fork.describedAttempt;
+							this.observedAttempt = fork.observedAttempt;
+							this.selectionAuthority = fork.selectionAuthority;
+							this.pendingObserver = undefined;
+							this.pendingPromise = undefined;
+							this.resolvePending = undefined;
+							this.seeded = undefined;
+							fork.selected = undefined;
+							return () => {
+								resolve?.();
+								// Acceptance or earlier abort cleanup can select the old request
+								// again. Its new current lease is not this retired selection.
+								if (previous !== entry && previous !== this.selected) previous?.remove(this);
+							};
+						},
+					},
+				};
+			},
+		};
+	}
+
 	private compute(): NodeState<T> {
 		let request: Request<T>;
 		try {
@@ -621,6 +714,11 @@ export class ResourceBinding<T = any> {
 		if (this.selected?.request.identity !== request.identity) {
 			this.detach();
 			assertAlive(this.owner);
+			// Cancellation can synchronously retire the candidate without retiring
+			// its shared data scope. A dead fork must not acquire another request.
+			if (this.candidate && this.describe === undefined) {
+				throw new TypeError('The signal candidate has retired.');
+			}
 			this.selectedIdentity = {
 				queryKey: request.queryKey,
 				kind: request.definition.kind,
@@ -647,7 +745,9 @@ export class ResourceBinding<T = any> {
 			this.selected = entry;
 			entry.consumers.add(this);
 			this.owner.trace('select', this.node);
-			const streamed = this.owner.streamedSelections?.get(this.node.key);
+			const streamed = this.candidate
+				? undefined
+				: this.owner.streamedSelections?.get(this.node.key);
 			if (streamed && streamed.selectionKey !== request.identity) {
 				// A completed historical request cannot become live if restoration
 				// selects another key, nor if that old key is visited again later.
@@ -704,7 +804,10 @@ export class ResourceBinding<T = any> {
 		const entry = this.selected;
 		// The initial SSR channel belongs to this selection lease. Returning to
 		// the same key later starts a browser attempt, not the abandoned channel.
-		if (this.streamedSelection === this.owner.streamedSelections?.get(this.node.key)) {
+		if (
+			!this.candidate &&
+			this.streamedSelection === this.owner.streamedSelections?.get(this.node.key)
+		) {
 			this.owner.streamedSelections?.delete(this.node.key);
 		}
 		this.selected = undefined;

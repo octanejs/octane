@@ -41,11 +41,9 @@ describe('signal component instance identity', () => {
 			const ambient = { scopeKey: 'ambient-server-owner' };
 			const documentOwner = { scopeKey: 'rendered-server-owner' };
 			const nestedOwner = { scopeKey: 'nested-server-owner' };
-			const nestedValue$ = __signalAt(
-				'g:nested-owner-default',
-				'nested-owner-default',
-				'nested value',
-			);
+			const nestedValue$ = __signalAt('g:nested-owner-default', 'nested value', {
+				key: 'nested-owner-default',
+			});
 			const seen: Record<string, SignalOwner | null> = {};
 			const Nested = ({ value = nestedValue$.get() }: { value?: string }) => {
 				seen.nested = currentSignalOwner();
@@ -123,7 +121,7 @@ describe('signal component instance identity', () => {
 	);
 
 	it('strict-reads a generic child handle without compiler signal classification', async () => {
-		const value$ = __signalAt('g:server-child', 'server-child', 'server value');
+		const value$ = __signalAt('g:server-child', 'server value', { key: 'server-child' });
 		const ServerRoot = (_props: unknown, scope: any) => ssrChild(value$, scope);
 
 		expect(renderToString(ServerRoot).html).toContain('server value');
@@ -191,7 +189,7 @@ export function App(props) @{ <main>@for (const item of props.items; key item) {
 
 	it('serializes only the winning writable control identity', () => {
 		enableServerSignalBindings();
-		const draft$ = __signalAt('g:server-draft', 'server-draft', 'draft');
+		const draft$ = __signalAt('g:server-draft', 'draft', { key: 'server-draft' });
 		const ServerRoot = () => {
 			const control = ssrSignalControlValue(draft$, 'i:control');
 			const sources = [
@@ -213,7 +211,7 @@ export function App(props) @{ <main>@for (const item of props.items; key item) {
 
 	it('joins a winning writable control to its document-scoped signal node', () => {
 		enableServerSignalBindings();
-		const draft$ = __signalAt('g:joined-draft', 'joined-draft', 'draft');
+		const draft$ = __signalAt('g:joined-draft', 'draft', { key: 'joined-draft' });
 		const ServerRoot = () => {
 			const control = ssrSignalControlValue(draft$, 'i:control');
 			const sources = [[false, 'value', control] as const];

@@ -193,12 +193,12 @@ knownAttributeSpreads: [{
   source: '@octanejs/stylex',
   imported: '*',
   members: ['props'],
-  fields: ['className', 'style'],
+  fields: ['className', 'style', 'data-style-src'],
   style: 'object',
 }]
 ```
 
-The source and import must match the actual author module; a named import uses its own contract. Omitted style-object support preserves the smaller CSS-text path. For StyleX, class and style come from one ordered merge, preserving property precedence. The adapter must not expand one authored call into three independent
+The source and import must match the actual author module; a named import uses its own contract. StyleX development output can include `data-style-src`, so the contract retains that diagnostic attribute alongside class and style. Prefer the adapter's supplied contracts rather than duplicating this list. Omitted style-object support preserves the smaller CSS-text path. For StyleX, class and style come from one ordered merge, preserving property precedence. The adapter must not expand one authored call into three independent
 calls, and fine-grained subscriptions must not split conflicting style variants
 into independently concatenated class tokens. Dynamic style functions remain
 ordinary signal derivations; the integration must not create a parallel state
@@ -346,16 +346,15 @@ import { signal$, derived$, query$, optimistic$, action$ } from "octane/signals"
 import { isAmbiguousTransportFailure } from "./errors";
 
 export function createTodos(initialId: string) {
-  const selectedId$ = signal$("selected-id", initialId);
-  const draft$ = signal$("draft", "");
-  const todo$ = query$("todo", () => selectedId$.get(),
-    (id: string, { signal }) => getTodo(id, { signal }));
-  const heading$ = derived$("heading", () => todo$.get().title);
-  const preview$ = derived$("preview", async ({ signal }) => {
+  const selectedId$ = signal$(initialId, { key: "selected-id" });
+  const draft$ = signal$("", { key: "draft" });
+  const todo$ = query$(() => selectedId$.get(), (id: string, { signal }) => getTodo(id, { signal }), { key: "todo" });
+  const heading$ = derived$(() => todo$.get().title, { key: "heading" });
+  const preview$ = derived$(async ({ signal }) => {
     const id = todo$.get().id;
     const preview = await getPreview(id, { signal });
     return { ...preview, selectedId: selectedId$.get() }; // Tracked after await.
-  });
+  }, { key: "preview" });
   const visibleTodo$ = optimistic$(todo$, {
     compareAuthority: (incoming, current) => incoming.revision - current.revision,
   });
@@ -380,8 +379,8 @@ export function createTodos(initialId: string) {
 
 The author API separates writable state from read-only computation:
 
-- **`signal$(initial)`** is writable state; functions are data. Existing setter updater semantics remain: `set(() => fn)` stores a function. **`derived$(compute)`** is read-only and returns `T`, `Promise<T>`, or `AsyncIterable<T>`. Synchronous computation stays immediate, without an unconditional Promise or microtask. Explicit keyed forms are supported but not required.
-- **`query$(select, load)`**, with an optional explicit key, is read-only. Its synchronous tracked selector must succeed before `load(selected, { signal, previous })` starts. Pending or failed upstream reads propagate without starting the downstream loader. A dedicated `skip` sentinel means no selection; `undefined` remains a valid encoded key.
+- **`signal$(initial)`** is writable state; functions are data. Existing setter updater semantics remain: `set(() => fn)` stores a function. **`derived$(compute)`** is read-only and returns `T`, `Promise<T>`, or `AsyncIterable<T>`. Synchronous computation stays immediate, without an unconditional Promise or microtask. Both accept optional trailing `{ key }` options; positional authored keys are not supported. Explicit scope methods retain their fixed `scope.signal$(key, initial)` / `scope.derived$(key, compute)` signatures.
+- **`query$(select, load)`**, with optional trailing `{ key }` options, is read-only. Its synchronous tracked selector must succeed before `load(selected, { signal, previous })` starts. Pending or failed upstream reads propagate without starting the downstream loader. A dedicated `skip` sentinel means no selection; `undefined` remains a valid encoded key.
 - **Streaming and identity.** A stream loader opts in with `{ kind: "stream" }`, publishes complete yields, then terminates. Keys are stable within a feature instance; canonical argument encoding distinguishes selections. Neither a key nor browser-supplied arguments grant authority.
 
 The compiler does not need to know whether an imported producer is an `async` function. On demand, the general `derived$` path invokes the producer normally and inspects its returned value for a thenable or async iterable; a plain function returning `Promise.resolve(...)` works too. Immediate results stay immediate. Only compiler-proven synchronous computations use the smaller synchronous implementation. There is no `AsyncFunction` constructor test, forced `async` declaration, or eager execution solely to classify producers. Post-`await` dependency tracking remains a separate compiler/explicit-reader contract.
@@ -514,9 +513,9 @@ for the compiler, server adapter, and transport owners.
 Read dependencies are ordinary JavaScript reads. If a second request needs the first result, express the dependency; independent siblings should start without waiting for it.
 
 ```typescript
-const user$ = query$("user", () => sessionId$.get(), loadUser);
-const items$ = query$("items", () => user$.get().id, loadItems);
-const help$ = query$("help", () => locale$.get(), loadHelp); // Independent sibling.
+const user$ = query$(() => sessionId$.get(), loadUser, { key: "user" });
+const items$ = query$(() => user$.get().id, loadItems, { key: "items" });
+const help$ = query$(() => locale$.get(), loadHelp, { key: "help" }); // Independent sibling.
 ```
 
 A GET URL may prefill a draft with `?q=<text>` or identify an existing receipt with `?operation=<id>`. It must not initiate a mutation. Viewer authorization alone does not establish write intent.
@@ -745,14 +744,13 @@ type SavedPage<T> = { before: string | null; items: T[] };
 declare function fetchPage(before: string | null, options: { signal: AbortSignal }): Promise<Page<Todo>>;
 declare function dedupeById(items: Todo[]): Todo[]; // Keep the first occurrence in page order.
 export function createPagedTodos() { // Called under the document/feature owner.
-  const before$ = signal$("before", null as string | null);
-  const completedPages$ = signal$("completed-pages", [] as SavedPage<Todo>[]);
-  const page$ = query$("items.page", () => before$.get(),
-    (before, { signal }) => fetchPage(before, { signal }));
-  const visibleItems$ = derived$("visible-items", () => dedupeById([
+  const before$ = signal$(null as string | null, { key: "before" });
+  const completedPages$ = signal$([] as SavedPage<Todo>[], { key: "completed-pages" });
+  const page$ = query$(() => before$.get(), (before, { signal }) => fetchPage(before, { signal }), { key: "items.page" });
+  const visibleItems$ = derived$(() => dedupeById([
     ...completedPages$.get().flatMap((page) => page.items),
     ...page$.latest({ items: [], nextBefore: null }).items,
-  ]));
+  ]), { key: "visible-items" });
   function older() {
     const page = page$.snapshot();
     if (page.status !== "ready" || !page.complete || page.value.nextBefore === null) return;
@@ -825,7 +823,9 @@ The acceptance bar is observable:
 
 ## Engineering decisions to verify
 
-The September 15 [Jon review](https://github.com/octanejs/RFCs/discussions/3#discussioncomment-18450583) and [Dominic review](https://github.com/octanejs/RFCs/discussions/3#discussioncomment-18450790) remain open beyond the earlier three-item follow-up. The current candidate addresses speculative signal ownership on signal-free SSR paths and starts compiler-proven adjacent independent `query$` and `derived$` reads together, including complete static native JSX output with homogeneous read holes. Declaration laziness, true dependencies, strict read ordering, and cancellation remain part of that contract; arbitrary imported or property-based reads, opaque output and resource-loading hosts are not covered by this optimization. Explicit signal-transition semantics and parser-level independence from late CSS remain separate open work. The [implementation guide](./async-signals-implementation.md#new-core-team-review-remains-open) records the scoped implementation and qualification limits; passing existing tests does not settle every API or delivery requirement.
+The September 15 [Jon review](https://github.com/octanejs/RFCs/discussions/3#discussioncomment-18450583) and [Dominic review](https://github.com/octanejs/RFCs/discussions/3#discussioncomment-18450790) remain open beyond the earlier three-item follow-up. The current candidate addresses speculative signal ownership on signal-free SSR paths and starts compiler-proven adjacent independent `query$` and `derived$` reads together, including complete static native JSX output with homogeneous read holes. Declaration laziness, true dependencies, strict read ordering, and cancellation remain part of that contract; arbitrary imported or property-based reads, opaque output and resource-loading hosts are not covered by this optimization.
+
+Explicit signal transitions now have a private candidate graph joined to the renderer's existing action batches and presentation journals. Canonical values and public subscribers remain unchanged until the participating views and bindings can accept the candidate; urgent edits remain live, and superseded work loses publication authority. This implementation is still being qualified. In particular, receiver-owned SSR queries and unresolved historical adoption currently refuse explicit transition participation: even a completed SSR query needs a receiver-authority handoff before transition navigation can safely replace it. Parser-level independence from late CSS also remains open. The [implementation guide](./async-signals-implementation.md#new-core-team-review-remains-open) records the scoped implementation and qualification limits; passing existing tests does not settle every API or delivery requirement.
 
 An initial integration may use immediate selection changes, cached-first or placeholder presentation, and independent result reveal without opting into explicit signal-transition retention. Such an integration must preserve strict pending/error behavior and reject obsolete results, but need not wait for the separate `useTransition` pending/retention work. This scoped adoption does not declare that broader RFC contract implemented. Parallel query starts, runtime performance, and final build/browser validation remain priorities for this delivery.
 

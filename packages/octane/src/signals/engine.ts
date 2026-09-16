@@ -8,6 +8,7 @@ import {
 import { sameStreamFrameIdentity } from '../streamed-signals-protocol.js';
 import {
 	ScopedNode,
+	CandidateUnsupportedError,
 	assertAlive,
 	assertWritable,
 	derivedState,
@@ -24,9 +25,11 @@ import {
 	strictValue,
 	untrack,
 	type GraphOwner,
+	type CandidateProducer,
 	type NodeState,
 	type SignalObserver,
 	type SignalReadMode,
+	type SignalCandidateFrame,
 } from './graph.js';
 import {
 	NativeAdoptionMiss,
@@ -76,6 +79,7 @@ export interface DerivedBindingLifecycle {
 	suspend(): boolean;
 	resume(): void;
 	dispose(): void;
+	forkCandidate?(target: ScopedNode, frame: SignalCandidateFrame): CandidateProducer | undefined;
 }
 
 type DerivedBindingFactory<T> = new (
@@ -375,13 +379,36 @@ export class ScopeImpl implements Scope, GraphOwner {
 	): DerivedSignal<T> {
 		if (typeof compute !== 'function') throw new TypeError('derived$ requires a function.');
 		const node = this.createNode<T>(key, 'derived');
-		node.compute = () => derivedState(node, compute);
+		node.compute = (target) => derivedState(target, compute);
 		this.initializeRetention(node);
 		// Live derived values always reflect live inputs, including edits made
 		// before this node was created. Only an adoption frame reads historical
 		// computed values from a seed.
 		this.consumeSeed(key);
 		return node as DerivedSignal<T>;
+	}
+
+	/** Candidate state is private; the ordinary node/binding maps stay untouched. */
+	forkCandidate(
+		node: ScopedNode,
+		target: ScopedNode,
+		frame: SignalCandidateFrame,
+	): CandidateProducer | undefined {
+		if (this.nodes.get(node.key) !== node || this.readBarrier || this.frames.size) {
+			throw new CandidateUnsupportedError('Candidate frames require live, non-adopting nodes.');
+		}
+		const resource = this.resources.get(node);
+		if (resource) return resource.forkCandidate(target);
+		const binding = this.derivedBindings.get(node);
+		if (binding) {
+			if (!binding.forkCandidate) {
+				throw new CandidateUnsupportedError(
+					'Async derived candidates are not supported by this prototype.',
+				);
+			}
+			return binding.forkCandidate(target, frame);
+		}
+		target.compute = node.compute;
 	}
 
 	createDerivedDeclaration<T>(

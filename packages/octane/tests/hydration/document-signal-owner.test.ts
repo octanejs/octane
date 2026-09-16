@@ -55,7 +55,7 @@ describe('browser document signal ownership', () => {
 			}),
 		).toThrow(/already installed/);
 		expect(() =>
-			runWithSignalOwner(failedOwner, () => signal$('g:failed-document', '').get()),
+			runWithSignalOwner(failedOwner, () => signal$('', { key: 'g:failed-document' }).get()),
 		).toThrow(/disposed/);
 		const hydration = bootstrapStreamedSignalResults({
 			buildId: 'document-owner-build',
@@ -99,11 +99,11 @@ describe('browser document signal ownership', () => {
 				__octaneStreamedSignalSelections: { version: 1, identities: [], register() {} },
 			},
 		});
-		const draft$ = signal$('g:browser-document-draft', 'initial');
+		const draft$ = signal$('initial', { key: 'g:browser-document-draft' });
 		expect(draft$.get()).toBe('server');
-		const length$ = derived$('g:browser-document-length', () => draft$.get().length);
+		const length$ = derived$(() => draft$.get().length, { key: 'g:browser-document-length' });
 		expect(length$.get()).toBe(6);
-		expect(signal$('g:instance-only-seed', 'live default').get()).toBe('live default');
+		expect(signal$('live default', { key: 'g:instance-only-seed' }).get()).toBe('live default');
 		await Promise.resolve().then(() => draft$.set('before roots'));
 		expect(length$.get()).toBe(12);
 		expect(() =>
@@ -162,8 +162,8 @@ describe('browser document signal ownership', () => {
 		const documentOwner = { scopeKey: 'descriptor-read-document' };
 		const first = { scopeKey: 'first', documentOwner, instanceOwner: {}, instanceKey: 'first' };
 		const second = { scopeKey: 'second', documentOwner, instanceOwner: {}, instanceKey: 'second' };
-		const shared$ = signal$('g:descriptor-read', 1);
-		const local$ = signal$('i:descriptor-read', 1);
+		const shared$ = signal$(1, { key: 'g:descriptor-read' });
+		const local$ = signal$(1, { key: 'i:descriptor-read' });
 		const uncompiled$ = signal$(0);
 		try {
 			expect(() => runWithSignalOwner(first, () => uncompiled$.get())).toThrow(/compiler/);
@@ -191,7 +191,7 @@ describe('browser document signal ownership', () => {
 		expect(() => runWithSignalOwner(second, () => shared$.get())).toThrow(/disposed/);
 		// Retirement still wins over a missing compiler site on the read path.
 		expect(() => runWithSignalOwner(documentOwner, () => uncompiled$.get())).toThrow(/disposed/);
-		const value$ = signal$('g:explicit-owner-priority', 'initial');
+		const value$ = signal$('initial', { key: 'g:explicit-owner-priority' });
 		value$.set('browser');
 		const requestOwner = createScope({ scopeKey: 'request' });
 		try {
@@ -216,7 +216,7 @@ describe('browser document signal ownership', () => {
 
 	it('does not revive retired document authority for a late global callback', async () => {
 		enableSignalBindings();
-		const value$ = signal$('g:retired-browser-document', 'initial');
+		const value$ = signal$('initial', { key: 'g:retired-browser-document' });
 		expect(value$.get()).toBe('initial');
 		const owner = currentSignalOwner()!;
 		retireSignalOwnerIdentity(owner);

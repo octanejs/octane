@@ -16,6 +16,7 @@ import {
 	untrack,
 } from './graph.js';
 import { captureSignalOwner, currentSignalOwner, runWithSignalOwner } from './owner-context.js';
+import { forwardNativeTransitionConsumer } from './read-protocol.js';
 import {
 	SIGNAL_HANDLE,
 	SIGNAL_BINDING_READ,
@@ -265,7 +266,7 @@ class OptimisticDescriptor<T> implements OptimisticSignal<T>, OwnerBoundSignal<T
 		if (!owner) throw new Error('An optimistic subscription needs an active signal owner.');
 		const run = captureSignalOwner(owner);
 		return this.manager().view$[SIGNAL_BINDING_SUBSCRIBE](
-			() => run(notify),
+			forwardNativeTransitionConsumer(notify, () => run(notify)),
 			onRetire === undefined ? undefined : () => run(onRetire),
 		);
 	}
@@ -289,7 +290,9 @@ class OptimisticDescriptor<T> implements OptimisticSignal<T>, OwnerBoundSignal<T
 		const owner = currentSignalOwner();
 		if (!owner) throw new Error('An optimistic subscription needs an active signal owner.');
 		const run = captureSignalOwner(owner);
-		return this.manager().view$.subscribe(() => run(notify));
+		return this.manager().view$.subscribe(
+			forwardNativeTransitionConsumer(notify, () => run(notify)),
+		);
 	}
 
 	set(value: T | ((previous: T) => T)): void {

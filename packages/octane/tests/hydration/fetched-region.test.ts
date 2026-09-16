@@ -17,7 +17,7 @@ afterEach(() => {
 it.each([false, true])(
 	'places real SSR and historical values, then preserves active ownership (dev=%s)',
 	async (dev) => {
-		const source = `import { signal$ } from 'octane/signals'; export const model$ = signal$('model', 'initial'); export function History() @{ const value = model$.get(); <><style>article { color: rgb(1, 2, 3); }</style><article><p>{value as string}</p><button onClick={() => model$.set('clicked')}>Update</button></article></> }`;
+		const source = `import { signal$ } from 'octane/signals'; export const model$ = signal$('initial', { key: 'model' }); export function History() @{ const value = model$.get(); <><style>article { color: rgb(1, 2, 3); }</style><article><p>{value as string}</p><button onClick={() => model$.set('clicked')}>Update</button></article></> }`;
 		const id = '/src/fetched-history.tsrx';
 		const server = loadCompiledFixtureSource(source, {
 			id,

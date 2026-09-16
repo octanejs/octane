@@ -101,8 +101,8 @@ async function verifySelectiveDeclarationBehavior() {
 import { signal$ as state$, derived$ as derive$, query$, runWithSignalOwner } from 'octane/signals';
 import * as signals from 'octane/signals';
 const effects = [];
-const count$ = state$(3);
-const doubled$ = derive$((() => count$.get() * 2) as () => number);
+const count$ = state$(3, {key: 'count'});
+const doubled$ = derive$((() => count$.get() * 2) as () => number, {key: 'doubled'});
 export const unused$ = signals.derived$(async () => { effects.push('computed'); return 1; });
 export const unusedQuery$ = signals['query$']((() => 1) as () => number, async () => { effects.push('loaded'); return 1; }, {kind: 'promise'} as const);
 const initial$ = state$((effects.push('initial'), 1));
@@ -112,6 +112,9 @@ const unknownOptions = { get kind() { effects.push('unknown'); return 'promise';
 const unknown$ = query$(() => 1, async () => 1, unknownOptions);
 const spread$ = query$(() => 1, async () => 1, {...unknownOptions});
 const lazyOptions$ = derive$(async () => 1, { get sync() { effects.push('sync'); return true; } });
+const keyedOptions$ = state$((effects.push('keyed-initial'), 0), (effects.push('keyed-options'), { get key() { effects.push('key'); return 'unused'; } }));
+const keyedDerived$ = derive$(async () => 1, { get key() { effects.push('derived-key'); return 'unused-derived'; } });
+const keyedQuery$ = query$(() => 1, async () => 1, { get key() { effects.push('query-key'); return 'unused-query'; } });
 function makeCompute() { effects.push('callback'); return () => 1; }
 const opaque$ = derive$(makeCompute());
 function shadowed(state$) { state$('shadowed'); }
@@ -143,6 +146,11 @@ export function exercise() {
 							'getter',
 							'unknown',
 							'unknown',
+							'keyed-initial',
+							'keyed-options',
+							'key',
+							'derived-key',
+							'query-key',
 							'callback',
 							'shadowed',
 							'namespace',
@@ -157,7 +165,7 @@ export function exercise() {
 import { signal$, derived$, query$, runWithSignalOwner, retireSignalOwnerIdentity } from 'octane/signals';
 const count$ = signal$(3);
 const doubled$ = derived$(async () => count$.get() * 2);
-const queried$ = query$(() => count$.get(), async value => value * 3);
+const queried$ = query$(() => count$.get(), async value => value * 3, {key: 'queried', kind: 'promise'});
 export async function exercise() {
   const owner = {scopeKey: 'used-declarations'};
   const read = callback => runWithSignalOwner(owner, callback);
@@ -175,6 +183,13 @@ export async function exercise() {
 				}
 				{
 					for (const [declaration, message] of [
+						[`signal$('old-key', '')`, 'Signal declaration options must be an object.'],
+						[`signal$(0, {key: ''})`, 'A signal declaration key must be a nonempty string.'],
+						[`derived$(() => 1, {key: 3})`, 'A signal declaration key must be a nonempty string.'],
+						[
+							`query$(() => 1, async () => 1, {key: ' '})`,
+							'A signal declaration key must be a nonempty string.',
+						],
 						[`derived$('')`, 'derived$ requires a function.'],
 						[`derived$('key', null)`, 'derived$ requires a function.'],
 						[
@@ -383,7 +398,8 @@ export function makeShadowed$(String) { return derived$(() => String(source$.get
 			vi.unstubAllGlobals();
 		}
 		await verifySelectiveDeclarationBehavior();
-	});
+		// The complete TS/TSRX, client/server, and dev/prod matrix bundles each case.
+	}, 15_000);
 
 	it('assigns compiler-owned sites in ordinary JavaScript modules', () => {
 		const source = `import * as signals from 'octane/signals';

@@ -37,6 +37,14 @@ import type {
 	BindingControlLease,
 	BindingControlPrepared,
 } from './dom-binding-controls.js';
+import { captureSignalOwner, currentSignalOwner } from './signals/owner-context.js';
+import type { BindingControlPreview } from './signals/control-binding.js';
+import {
+	NATIVE_TRANSITION_CONSUMER,
+	forwardNativeTransitionConsumer,
+	type NativeTransitionNotify,
+	type NativeTransitionPresentation,
+} from './signals/read-protocol.js';
 
 export { __methodDep } from './method-dep.js';
 
@@ -438,6 +446,18 @@ interface Transaction {
 	preparing?: boolean;
 	frame: number;
 	published?: () => void;
+	preview?: BindingPreview;
+	consumer?: NativeTransitionNotify;
+}
+
+interface BindingPreview {
+	receipts: NativeTransitionPresentation[];
+	controls: BindingControlPreview[];
+	fragments: Set<FragmentInstance>;
+	signals: Map<FragmentInstance, Map<number, BindingSignalConnection>>;
+	projections: Map<FragmentInstance, Map<number, BindingProjectionConnection>>;
+	text: Map<RegionInstance, BindingSignalConnection>;
+	disposals: Array<() => void>;
 }
 
 /** @internal Imported only by an artifact carrying the structural takeover proof. */
@@ -741,7 +761,10 @@ function resolveFragment(
 		activated: false,
 	};
 	transaction.all.add(instance);
-	if (fresh) transaction.candidates.add(instance);
+	if (fresh) {
+		transaction.candidates.add(instance);
+		transaction.preview?.fragments.add(instance);
+	}
 	const cursors = new Map<number, Node | null>([[-1, range.start.nextSibling]]);
 	const counts = new Map<number, number>();
 	const regions = new Map<number, BindingRegion>();
@@ -902,7 +925,7 @@ function projectValues(
 			: (instance.definition.signalIndices ?? []);
 		for (const index of indices) {
 			requireActive(transaction);
-			let connection = instance.signals?.get(index);
+			let connection = (transaction.preview?.signals.get(instance) ?? instance.signals)?.get(index);
 			const style = operations[index]![1] === 'styleObject';
 			if (!connection && (style || transaction.signals?.isSignal(values[index]))) {
 				const prepare = (): (() => void) => {
@@ -920,7 +943,9 @@ function projectValues(
 					}
 					return () => writeOperation(instance, index, value, group, transaction);
 				};
-				const notify = (): void => transaction.notifySignal!(prepare);
+				const notify = forwardNativeTransitionConsumer(transaction.consumer!, (): void =>
+					transaction.notifySignal!(prepare),
+				);
 				connection = style
 					? transaction.styles!.connect(
 							instance.nodes[operations[index]![0]] as Element,
@@ -928,20 +953,35 @@ function projectValues(
 							transaction.restoreStyles,
 						)
 					: transaction.signals!.connect(notify);
-				(instance.signals ??= new Map()).set(index, connection);
+				if (transaction.preview) {
+					let signals = transaction.preview.signals.get(instance);
+					if (!signals)
+						transaction.preview.signals.set(instance, (signals = new Map(instance.signals)));
+					signals.set(index, connection);
+					const created = connection;
+					transaction.preview.disposals.push(() => created.dispose(true));
+				} else (instance.signals ??= new Map()).set(index, connection);
 			}
 			if (connection) {
 				if (!copied) {
 					values = [...values];
 					copied = true;
 				}
-				(values as unknown[])[index] = connection.read(values[index]);
+				if (transaction.preview) {
+					const receipt = connection.preview(values[index]);
+					transaction.preview.receipts.push(receipt);
+					(values as unknown[])[index] = receipt.value;
+				} else (values as unknown[])[index] = connection.read(values[index]);
 			}
 		}
 	}
 	return values.map((value, index) => {
 		if (operations[index]![1] === 'control') {
-			controls!.set(index, instance.controls!.get(index)!.prepare(value));
+			const control = transaction.preview
+				? instance.controls!.get(index)!.preview(value)
+				: instance.controls!.get(index)!.prepare(value);
+			transaction.preview?.controls.push(control as BindingControlPreview);
+			controls!.set(index, control);
 			return null;
 		}
 		return __normalizeBinding(operations[index]!, value);
@@ -1020,7 +1060,7 @@ function prepareFragment(
 		controls,
 		adapters: instance.cleanup?.prepare?.(environment),
 	};
-	if (instance.signals || instance.controls || instance.projections) {
+	if (!transaction.preview && (instance.signals || instance.controls || instance.projections)) {
 		instance.signalPlan = plan;
 		instance.signalFrame = transaction.frame;
 	}
@@ -1041,7 +1081,8 @@ function prepareFragment(
 		if (descriptor.kind === 'text') {
 			let value = descriptor.read(environment);
 			if (descriptor.signal && transaction.signals) {
-				if (!region.signal && transaction.signals.isSignal(value)) {
+				let connection = transaction.preview?.text.get(region) ?? region.signal;
+				if (!connection && transaction.signals.isSignal(value)) {
 					const prepare = (): (() => void) => {
 						if (
 							instance.disposed ||
@@ -1057,12 +1098,27 @@ function prepareFragment(
 							if (!instance.disposed && !transaction.disposed) writeText(region, next);
 						};
 					};
-					region.signal = transaction.signals.connect(() => transaction.notifySignal!(prepare));
+					connection = transaction.signals.connect(
+						forwardNativeTransitionConsumer(transaction.consumer!, () =>
+							transaction.notifySignal!(prepare),
+						),
+					);
+					if (transaction.preview) {
+						transaction.preview.text.set(region, connection);
+						const created = connection;
+						transaction.preview.disposals.push(() => created.dispose());
+					} else region.signal = connection;
 				}
-				if (region.signal) {
-					region.signalPlan = candidate;
-					region.signalFrame = transaction.frame;
-					value = region.signal.read(value);
+				if (connection) {
+					if (transaction.preview) {
+						const receipt = connection.preview(value);
+						transaction.preview.receipts.push(receipt);
+						value = receipt.value;
+					} else {
+						region.signalPlan = candidate;
+						region.signalFrame = transaction.frame;
+						value = connection.read(value);
+					}
 				}
 			}
 			candidate.text = textValue(value, descriptor.generic);
@@ -1402,6 +1458,7 @@ function bindProgram<Props>(
 	let ownedRoot: Comment | undefined;
 	let busy = true;
 	let dirty = false;
+	let revision = 0;
 	let mounted = !mount;
 	let unsubscribe: (() => void) | undefined;
 	const signal = options?.signal;
@@ -1562,14 +1619,106 @@ function bindProgram<Props>(
 	if (signalUpdates)
 		transaction.notifySignal = (prepare): void => {
 			if (!transaction.disposed) {
+				revision++;
 				signalUpdates.add(prepare);
 				drain();
 			}
 		};
-	const refresh = (): void => {
+	const refresh: NativeTransitionNotify = (): void => {
 		if (transaction.disposed) return;
+		revision++;
 		dirty = true;
 		drain();
+	};
+	transaction.consumer = refresh;
+	const owner = currentSignalOwner();
+	const run = owner === null ? <T>(callback: () => T): T => callback() : captureSignalOwner(owner);
+	refresh[NATIVE_TRANSITION_CONSUMER] = {
+		active: () => !transaction.disposed,
+		prepare: () =>
+			run(() => {
+				const version = revision;
+				const preview: BindingPreview = {
+					receipts: [],
+					controls: [],
+					fragments: new Set(),
+					signals: new Map(),
+					projections: new Map(),
+					text: new Map(),
+					disposals: [],
+				};
+				let accepted = false;
+				let retired = false;
+				const discard = (): void => {
+					if (accepted || retired) return;
+					retired = true;
+					for (const receipt of preview.receipts) receipt.discard();
+					for (const control of preview.controls) control.discard();
+					for (const dispose of preview.disposals) dispose();
+					for (const fragment of preview.fragments) releaseInstance(fragment, transaction);
+				};
+				let plan: FragmentPlan;
+				transaction.preview = preview;
+				const previousBusy = busy;
+				busy = true;
+				try {
+					const snapshot = source.getSnapshot();
+					if (snapshot != null && typeof (snapshot as { then?: unknown }).then === 'function')
+						throw new TypeError(
+							'DOM presentation requires a synchronous snapshot, not a thenable.',
+						);
+					plan = prepareFragment(
+						instance!,
+						descriptor.prepareProps ? descriptor.prepareProps(snapshot) : [snapshot],
+						transaction,
+					);
+				} catch (error) {
+					discard();
+					throw error;
+				} finally {
+					transaction.preview = undefined;
+					busy = previousBusy;
+				}
+				return {
+					validate: () =>
+						!retired &&
+						!transaction.disposed &&
+						!busy &&
+						version === revision &&
+						preview.receipts.every((receipt) => receipt.validate()) &&
+						preview.controls.every((control) => control.validate()),
+					discard,
+					commit() {
+						if (retired || accepted || transaction.disposed) return;
+						accepted = true;
+						busy = true;
+						try {
+							for (const [fragment, signals] of preview.signals) fragment.signals = signals;
+							for (const [fragment, projections] of preview.projections)
+								fragment.projections = projections;
+							for (const [region, signal] of preview.text) region.signal = signal;
+							for (const receipt of preview.receipts) receipt.commit();
+							transaction.hostOperations?.publish(plan, transaction);
+							const document = instance!.range.start.ownerDocument;
+							const tree = instance!.range.start.getRootNode();
+							transaction.focused =
+								'activeElement' in tree
+									? (tree as Document | ShadowRoot).activeElement
+									: document.activeElement;
+							while (transaction.focused?.shadowRoot?.activeElement)
+								transaction.focused = transaction.focused.shadowRoot.activeElement;
+							transaction.contentEditable = !!(transaction.focused as HTMLElement | null)
+								?.isContentEditable;
+							commitFragment(plan, transaction);
+							transaction.published?.();
+							for (const fragment of preview.fragments) transaction.candidates.delete(fragment);
+							activateInstance(instance!, transaction);
+						} finally {
+							busy = false;
+						}
+					},
+				};
+			}),
 	};
 	let handoff: BindingHandoff | undefined;
 	const handle = {
@@ -1898,7 +2047,9 @@ function claimProgramControl(
 		transaction.controls.claim(
 			node,
 			instance.definition.bindings[index]![2] as 'value' | 'checked',
-			() => transaction.notifySignal!(prepare),
+			forwardNativeTransitionConsumer(transaction.consumer!, () =>
+				transaction.notifySignal!(prepare),
+			),
 		),
 	);
 }
@@ -1914,7 +2065,9 @@ function projectHostValues(
 		for (const group of instance.definition.projectionGroups) {
 			requireActive(transaction);
 			const first = group[0]![0];
-			let connection = instance.projections?.get(first);
+			let connection = (
+				transaction.preview?.projections.get(instance) ?? instance.projections
+			)?.get(first);
 			if (!connection) {
 				const prepare = (): (() => void) => {
 					if (
@@ -1947,13 +2100,29 @@ function projectHostValues(
 					group,
 					operations,
 					instance.nodes,
-					() => transaction.notifySignal!(prepare),
+					forwardNativeTransitionConsumer(transaction.consumer!, () =>
+						transaction.notifySignal!(prepare),
+					),
 					transaction.restoreStyles,
 				);
-				instance.projections ??= new Map();
-				for (const [index] of group) instance.projections.set(index, connection);
+				if (transaction.preview) {
+					let projections = transaction.preview.projections.get(instance);
+					if (!projections)
+						transaction.preview.projections.set(
+							instance,
+							(projections = new Map(instance.projections)),
+						);
+					for (const [index] of group) projections.set(index, connection);
+					const created = connection;
+					transaction.preview.disposals.push(() => created.dispose(true));
+				} else {
+					instance.projections ??= new Map();
+					for (const [index] of group) instance.projections.set(index, connection);
+				}
 			}
-			const projected = connection.read(values[first]);
+			const receipt = transaction.preview ? connection.preview(values[first]) : undefined;
+			if (receipt) transaction.preview!.receipts.push(receipt);
+			const projected = receipt ? receipt.value : connection.read(values[first]);
 			for (const [index] of group) (values as unknown[])[index] = projected[index];
 		}
 	}

@@ -70,6 +70,11 @@ export interface DerivedContext {
 	readonly read: AttemptRead;
 }
 
+export interface SignalOptions {
+	/** Stable authored identity; the compiler supplies a site when omitted. */
+	readonly key?: string;
+}
+
 export interface DerivedOptions {
 	/** Assert that the computation returns synchronously and skip async-shape detection. */
 	readonly sync?: boolean;
