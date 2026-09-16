@@ -64,7 +64,7 @@
     {
       "path": "scripts/react-parity/react-transition-group-timer-order.test.mjs",
       "disposition": "audit-verifier-test",
-      "reason": "Regression control for deterministic zero-delay ordering in the pristine upstream Jest harness; not React-parity runtime evidence."
+      "reason": "Positive and negative controls for timer delivery and synchronous renderer commits in the pristine upstream Jest harness, including event-loop stalls and deliberately wrong delays; not React-parity runtime evidence."
     },
     {
       "path": "scripts/react-parity/react-transition-group-types-lib.test.mjs",
