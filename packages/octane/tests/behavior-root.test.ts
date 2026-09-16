@@ -96,7 +96,6 @@ export function mount(target, source, options) { return mountBindings(target, ${
 			mode: 'client',
 			runtimeModules: {
 				...options.runtimeModules,
-				['./dom-presentation.tsrx?octane-bindings=' + view]: artifact(false),
 				['./dom-presentation.tsrx?octane-bindings=' + view + '&octane-mount=1']: artifact(true),
 			},
 		},
