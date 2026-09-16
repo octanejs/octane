@@ -3561,6 +3561,20 @@ function rollbackRootRender(transaction: RootRenderTransaction): void {
 	}
 }
 
+function retireDetachedBindingLeases(owner: RootRenderOwner): void {
+	for (const lease of owner.bindingLeases!) {
+		if (owner.bindingContainer!.contains(lease.anchor)) continue;
+		owner.bindingLeases!.delete(lease);
+		PRESENTATION_PREPARATIONS.delete(lease);
+		releaseBindingHandoff(lease);
+		try {
+			lease.retire();
+		} catch (error) {
+			if (!reportUncaughtError(owner.current, error)) console.error(error);
+		}
+	}
+}
+
 function commitRootRenders(): void {
 	const transactions = ROOT_RENDER_TRANSACTIONS;
 	if (transactions.length === 0) return;
@@ -3632,21 +3646,12 @@ function commitRootRenders(): void {
 				continue;
 			}
 			spliceOffscreenCapture(transaction.capture);
-			if (owner.bindingLeases !== undefined) {
+			if (owner.bindingLeases !== undefined && owner.bindingLeases.size > 0) {
 				// A successful replacement may remove a still-dormant leased view.
-				// Matching takeovers published above; retire only the remaining ranges
-				// no longer owned by this container, never a suspended attempt.
-				for (const lease of owner.bindingLeases) {
-					if (owner.bindingContainer!.contains(lease.anchor)) continue;
-					owner.bindingLeases.delete(lease);
-					PRESENTATION_PREPARATIONS.delete(lease);
-					releaseBindingHandoff(lease);
-					try {
-						lease.retire();
-					} catch (error) {
-						if (!reportUncaughtError(owner.current, error)) console.error(error);
-					}
-				}
+				// Inspect native containment only after staged DOM publication. Retiring
+				// against projected removal would stop still-visible early interactions.
+				if (DEFERRED_LAYOUT_DRIVER?.stageAction(() => retireDetachedBindingLeases(owner)) !== true)
+					retireDetachedBindingLeases(owner);
 			}
 			// Outgoing cleanup may have removed the state origin of a held root
 			// transition. Inspect its lifetime after those deletions have completed.
@@ -14061,20 +14066,23 @@ function invalidateHydrateActivation(state: HydrateSlot): void {
 }
 
 function teardownHydrateBoundary(state: HydrateSlot): void {
+	const preserved = preservedHydrateActivations?.get(state);
+	if (preserved !== undefined) {
+		// Recursive teardown must recognize these refs as uncommitted even when
+		// observable cleanup waits for staged DOM publication. Restore this logical
+		// state if the preparing transition is abandoned.
+		if (isRecordingTransitionJournal()) journalObjectOnce(state.block);
+		state.block.mounted = false;
+	}
 	// Abort signals and custom strategy disposers are observable lifetimes. An
 	// abandoned preparation must keep them alive with the still-visible server DOM.
 	if (DEFERRED_LAYOUT_DRIVER?.stageAction(() => teardownHydrateBoundary(state), true) === true)
 		return;
 	cleanupHydrateInstallers(state);
 	cleanupHydrateStreamWait(state);
-	const preserved = preservedHydrateActivations?.get(state);
 	if (preserved !== undefined) {
 		releasePreservedHydrateActivation(state);
 		discardOffscreenCapture(preserved.capture);
-		// The connected server arm never committed its captured refs/effects.
-		// Let the existing exact-host aborted-mount suppression cover descendants
-		// that individually finished before a later sibling suspended.
-		state.block.mounted = false;
 	}
 	state.prefetchAbort?.abort();
 	resolveHydrateWaiters(state, 'abort');
@@ -18463,10 +18471,7 @@ export function beginPresentationHydration(
 				(candidate.root.nodeType === 8 && candidate.root.nextSibling === hydration?.node)),
 	);
 	if (lease === undefined) return null;
-	if (!supported)
-		throw new Error(
-			'Hydration binding leases require a supported fixed native view without structural regions or unsupported writers.',
-		);
+	if (!supported) throw new Error(formatClientError(75));
 	const pending = PRESENTATION_PREPARATIONS.get(lease);
 	const frame: PresentationHydrationFrame = {
 		previous: PRESENTATION_HYDRATION,
@@ -42250,8 +42255,7 @@ function createRootWithOutputHandler(
 	outputHandler: OutputHandler | null,
 ): Root {
 	assertValidRootContainer(container);
-	if (options?.bindingLeases !== undefined)
-		throw new Error('DOM binding hydration leases are supported only by hydrateRoot().');
+	if (options?.bindingLeases !== undefined) throw new Error(formatClientError(76));
 	options = warnCreateRootElementOption(options);
 	const ownerToken = claimRootContainer(container);
 	// Register the container as an event-delegation target up front. Listeners
@@ -42358,13 +42362,11 @@ export function hydrateRoot(
 			lease.owner !== undefined ||
 			!container.contains(lease.root)
 		)
-			throw new Error(
-				'Hydration binding leases require active fixed native views owned by this container.',
-			);
+			throw new Error(formatClientError(77));
 		return lease;
 	});
 	if (bindingLeases !== undefined && new Set(bindingLeases).size !== bindingLeases.length)
-		throw new Error('A hydration binding lease can be claimed only once.');
+		throw new Error(formatClientError(78));
 	const nativeSidecar = findHydrateSeedSidecar(container, NATIVE_SIGNAL_SEED_ATTR);
 	const nativeManifest =
 		nativeSidecar === null

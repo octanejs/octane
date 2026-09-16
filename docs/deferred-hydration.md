@@ -564,6 +564,8 @@ an adopted compiler-proven fixed native `@{}` view, without structural regions,
 dynamic text, writable controls, or unsupported writers. Native attributes,
 events, refs, and supported native style projections can transfer. Unsupported
 handoffs fail explicitly instead of silently loading a different renderer path.
+Child-view and slot programs still count as regions even when a particular call
+produces fixed DOM; they do not automatically qualify for this handoff.
 Keep richer renderer-free programs under their existing owner until an explicit
 replacement strategy is available.
 

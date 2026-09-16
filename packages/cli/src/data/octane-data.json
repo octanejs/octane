@@ -2194,6 +2194,26 @@
       "message": "Unsupported Octane signal binding ABI.",
       "runtime": ["client"],
       "status": "active"
+    },
+    "75": {
+      "message": "Hydration binding leases require a supported fixed native view without structural regions or unsupported writers.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "76": {
+      "message": "DOM binding hydration leases are supported only by hydrateRoot().",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "77": {
+      "message": "Hydration binding leases require active fixed native views owned by this container.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "78": {
+      "message": "A hydration binding lease can be claimed only once.",
+      "runtime": ["client"],
+      "status": "active"
     }
   }
 }

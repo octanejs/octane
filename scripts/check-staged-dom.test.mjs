@@ -129,10 +129,25 @@ test('native exceptions are specific operations, not blanket function exemptions
 	 const complete = img.complete;
 	 img.setAttribute('src', 'early');
 	 return complete;
+	}
+	function hydrateRoot(container: Node, anchor: Node) {
+	 const owned = container.contains(anchor);
+	 container.appendChild(anchor);
+	 return owned;
+	}
+	function beginPresentationHydration(marker: Node) {
+	 const sibling = marker.nextSibling;
+	 marker.textContent = 'early';
+	 return sibling;
+	}
+	function retireDetachedBindingLeases(container: Node, anchor: Node) {
+	 const retained = container.contains(anchor);
+	 container.removeChild(anchor);
+	 return retained;
 	}`);
 	assert.deepEqual(
 		findings.map((finding) => finding.operation),
-		['call:setAttribute'],
+		['call:setAttribute', 'call:appendChild', 'write:textContent', 'call:removeChild'],
 	);
 });
 

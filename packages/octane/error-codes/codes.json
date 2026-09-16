@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "nextCode": 75,
+  "nextCode": 79,
   "codes": {
     "1": {
       "message": "Maximum update depth exceeded. Octane limits the number of nested updates to prevent infinite loops.",
@@ -442,6 +442,30 @@
     },
     "74": {
       "message": "Unsupported Octane signal binding ABI.",
+      "argumentCount": 0,
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "75": {
+      "message": "Hydration binding leases require a supported fixed native view without structural regions or unsupported writers.",
+      "argumentCount": 0,
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "76": {
+      "message": "DOM binding hydration leases are supported only by hydrateRoot().",
+      "argumentCount": 0,
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "77": {
+      "message": "Hydration binding leases require active fixed native views owned by this container.",
+      "argumentCount": 0,
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "78": {
+      "message": "A hydration binding lease can be claimed only once.",
       "argumentCount": 0,
       "runtime": ["client"],
       "status": "active"

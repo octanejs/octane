@@ -15184,6 +15184,8 @@ function preparePresentationHydration(body, node, ctx) {
 		'setAriaAttribute',
 		'setClassName',
 		'setClassAttr',
+		'updateFreshClassName',
+		'updateFreshClassAttr',
 		'setBindingClass',
 		'setStyle',
 		'setStyleProperty',

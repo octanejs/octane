@@ -56,6 +56,12 @@ const NATIVE_OPERATIONS = new Map(
 		// Parent-free island activation replays captured native intent against the
 		// surviving, already-adopted target, never against projected replacement DOM.
 		createIndependentHydrateActivator: ['call:contains', 'call:dispatchEvent'],
+		// Explicit early-binding leases refer to committed native nodes: validate
+		// container ownership before hydration, match the existing SSR marker, and
+		// retire detached anchors only after a root replacement has been accepted.
+		hydrateRoot: ['call:contains'],
+		beginPresentationHydration: ['read:nextSibling'],
+		retireDetachedBindingLeases: ['call:contains'],
 		'FragmentInstance.dispatchEvent': ['call:dispatchEvent'],
 		'FragmentInstance.scrollIntoView': ['call:scrollIntoView'],
 		focusFragmentElement: ['read:focus'],

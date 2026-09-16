@@ -9,11 +9,11 @@ Each section identifies its measured source or historical checkpoint. Results fr
 
 ## Optional early-binding hydration handoff
 
-The fixed-view handoff candidate was compared with `1cfbc9e78` using the same installed toolchain. Its measured runtime SHA-256 is `065abf7c219204450d57fddcb2fa3c73e4613a1c5f6e9eb23d156b1c5a10e6f6`; loaded source hashes stayed unchanged during measurement. The source-entry runner used esbuild 0.28.1, Alien Signals 3.2.0, and devalue 5.8.2. The rich authored fixture used production Vite 8.1.5 / Rolldown 1.1.5 on Node 24.21.0, Darwin arm64.
+The fixed-view handoff candidate, including its catalogued runtime diagnostics and staged-cleanup repairs, was compared with `1cfbc9e78` using the same installed toolchain. Its measured runtime SHA-256 is `dce2729e189cc54d20c5c7be0d180f5bbddb806347eda69eb4beaad46d6816ab` and compiler SHA-256 is `260af6e9c8dc310457d650530085e65f94ed71da311feccf2127efc4072a3206`; loaded source hashes stayed unchanged during measurement. The source-entry runner used esbuild 0.28.1, Alien Signals 3.2.0, and devalue 5.8.2. The rich authored fixture used production Vite 8.1.5 / Rolldown 1.1.5 on Node 24.21.0, Darwin arm64.
 
 | Measured delivery | Baseline gzip bytes | Candidate gzip bytes | Difference |
 | --- | ---: | ---: | ---: |
-| Ordinary client source-entry closure | 58,419 | 58,730 | +311 |
+| Ordinary client source-entry closure | 58,419 | 58,698 | +279 |
 | Ordinary server source-entry closure | 17,654 | 17,654 | 0 |
 | Scalar binding source-entry closure | 3,907 | 3,910 | +3 |
 | Complete rich authored behavior entry | 35,575 | 35,949 | +374 |
@@ -27,6 +27,8 @@ The ordinary native-read scheduling path checks a pending-activation count befor
 The final fixed-button browser fixture passes development and production in bundled Chromium 149 and Playwright WebKit 26.5. A synchronous Stop-to-Send update works before renderer loading and on three subsequent clicks while hydration is suspended. Commands run once, early cleanup stays at zero until acceptance, current attributes and styles precede refs, and the same button, focused input, draft, and selection survive. A separate 32-case browser matrix covers capture/bubble listeners, stopped propagation, trusted synchronous takeover, and immediate redispatch of the same scripted Event. Cleanup happens once and later commands remain live. These are local fixture checks, not CI, application integration, physical iOS Safari, or input-latency qualification.
 
 Reproduce the byte controls with `benchmarks/scoped-signals/run-bundles.mjs` against an immutable `1cfbc9e78` package and `benchmarks/conversation-streaming/behavior-only/build.mjs --bundler=vite --rich-presentation=authored` for both revisions. Existing behavior-root and hydration tests retain pending, canceled, accepted, replaced-root, historical-adoption, and cleanup coverage. The [handoff contract](./deferred-hydration.md#optional-handoff-to-normal-hydration) remains intentionally limited to supported fixed native views; structural regions, dynamic text, and writable-control handoff are not qualified by these checks.
+
+The staged-replacement regression keeps early commands active until native DOM publication, retires the displaced lease once, and rejects a superseded transition's stale callback. A ref prepared by a hydration attempt that never commits receives neither a node nor a cleanup callback. Fresh array/object class values are covered on HTML and SVG hosts in both compiler modes.
 
 ## Style-object spread follow-up
 

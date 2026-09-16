@@ -58,6 +58,10 @@ type ClientErrorArguments = {
 	67: [unknown];
 	72: [];
 	74: [];
+	75: [];
+	76: [];
+	77: [];
+	78: [];
 };
 
 export function formatClientError<Code extends keyof ClientErrorArguments>(
@@ -266,6 +270,23 @@ export function formatClientError<Code extends keyof ClientErrorArguments>(
 				);
 			case 74:
 				return formatDevErrorMessage('Unsupported Octane signal binding ABI.', args);
+			case 75:
+				return formatDevErrorMessage(
+					'Hydration binding leases require a supported fixed native view without structural regions or unsupported writers.',
+					args,
+				);
+			case 76:
+				return formatDevErrorMessage(
+					'DOM binding hydration leases are supported only by hydrateRoot().',
+					args,
+				);
+			case 77:
+				return formatDevErrorMessage(
+					'Hydration binding leases require active fixed native views owned by this container.',
+					args,
+				);
+			case 78:
+				return formatDevErrorMessage('A hydration binding lease can be claimed only once.', args);
 			default:
 				return formatUnknownDevErrorMessage(code);
 		}
