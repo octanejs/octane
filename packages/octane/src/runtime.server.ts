@@ -4521,7 +4521,7 @@ function replayUpdatedComponentBody(
 		hp.occ = null;
 		rewindComponentReplayState(snapshot, scope, frame);
 		ACTIVE_PU_WARM_PLANS.length = warmPlanCheckpoint;
-		out = invokeServerSignalComponent(comp, props, scope, frame);
+		out = invokeServerSignalComponent(comp, props, scope, serverSignalOwner(frame));
 	} while (hp.update);
 	return out;
 }
@@ -4625,9 +4625,8 @@ function invokeServerSignalComponent(
 	comp: ServerComponent,
 	props: any,
 	scope: SSRScope,
-	frame: Frame | null,
+	owner: SignalRendererOwnerIdentity | undefined,
 ): unknown {
-	const owner = serverSignalOwner(frame);
 	if (owner === undefined) return comp(props ?? {}, scope, undefined);
 	const invoke = () => {
 		const previous = SERVER_SIGNAL_OWNER_ACTIVE;
@@ -4665,7 +4664,7 @@ function invokeComponentBody(
 	HOOK_PASS = hp;
 	try {
 		ACTIVE_PU_WARM_PLANS.length = warmPlanCheckpoint;
-		let out: unknown = invokeServerSignalComponent(comp, props, scope, frame);
+		let out: unknown = invokeServerSignalComponent(comp, props, scope, serverSignalOwner(frame));
 		if (hp.update) {
 			out = replayUpdatedComponentBody(comp, props, scope, frame, hp, snapshot, warmPlanCheckpoint);
 		}
@@ -4758,7 +4757,7 @@ function renderComponentFramed(
 					?.observeSignalAttempt !== undefined ||
 				(previous.previousOwner = enterSynchronousSignalOwner(previous.owner)) === undefined
 			) {
-				out = invokeServerSignalComponent(comp, props, scope, frame);
+				out = invokeServerSignalComponent(comp, props, scope, previous.owner);
 			} else {
 				try {
 					SERVER_SIGNAL_OWNER_ACTIVE = true;

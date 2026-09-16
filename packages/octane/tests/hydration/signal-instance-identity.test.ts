@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { componentSlot, createRoot, enableSignalBindings, type Scope } from '../../src/runtime.js';
 import {
+	enableNativeReadCollection,
 	enableServerSignalBindings,
 	renderToString,
 	ssrChild,
@@ -27,6 +28,7 @@ describe('signal component instance identity', () => {
 	it.each([false, true].flatMap((carrier) => [false, true].map((throws) => ({ carrier, throws }))))(
 		'restores nested server ownership after a child returns or throws (%j)',
 		({ carrier, throws }) => {
+			enableNativeReadCollection();
 			enableServerSignalBindings();
 			const storage = new AsyncLocalStorage<SignalOwner>();
 			const restore = carrier
@@ -38,9 +40,36 @@ describe('signal component instance identity', () => {
 				: undefined;
 			const ambient = { scopeKey: 'ambient-server-owner' };
 			const documentOwner = { scopeKey: 'rendered-server-owner' };
+			const nestedOwner = { scopeKey: 'nested-server-owner' };
+			const nestedValue$ = __signalAt(
+				'g:nested-owner-default',
+				'nested-owner-default',
+				'nested value',
+			);
 			const seen: Record<string, SignalOwner | null> = {};
+			const Nested = ({ value = nestedValue$.get() }: { value?: string }) => {
+				seen.nested = currentSignalOwner();
+				return value;
+			};
 			const Child = () => {
 				seen.child = currentSignalOwner();
+				const nested = renderToString(Nested, {}, { signalOwner: nestedOwner });
+				expect(nested.html).toContain('nested value');
+				expect(nested.signals?.scopes).toMatchObject([
+					{
+						version: 1,
+						scopeKey: nestedOwner.scopeKey,
+						entries: [
+							{
+								key: 'nested-owner-default',
+								kind: 'signal',
+								value: ['string', 'nested value'],
+								complete: true,
+							},
+						],
+					},
+				]);
+				seen.afterNested = currentSignalOwner();
 				if (throws) throw new Error('child failure');
 				return 'child';
 			};
@@ -65,6 +94,7 @@ describe('signal component instance identity', () => {
 					const result = renderToString(Parent, {}, { signalOwner: documentOwner });
 					expect(result.html).toContain(throws ? 'caught' : 'child');
 					expect(result.html).toContain('sibling');
+					expect(result.signals).toBeUndefined();
 					expect(currentSignalOwner()).toBe(ambient);
 					expect(() =>
 						renderToString(
@@ -78,10 +108,13 @@ describe('signal component instance identity', () => {
 					expect(currentSignalOwner()).toBe(ambient);
 				});
 				expect(seen.afterChild).toBe(seen.parent);
+				expect(seen.afterNested).toBe(seen.child);
 				expect(seen.child).not.toBe(seen.parent);
 				expect(seen.sibling).not.toBe(seen.child);
-				for (const owner of Object.values(seen)) {
-					expect(owner).toMatchObject({ documentOwner });
+				for (const [name, owner] of Object.entries(seen)) {
+					expect(owner).toMatchObject({
+						documentOwner: name === 'nested' ? nestedOwner : documentOwner,
+					});
 				}
 			} finally {
 				restore?.();
