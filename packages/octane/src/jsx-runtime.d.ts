@@ -169,6 +169,9 @@ type Transformed<P, T> = Omit<P, ReactSyntheticProps | 'className' | 'style' | '
 
 type BoundStyle<S> = S | SignalCSSProperties | null | SignalHandle<S | SignalCSSProperties | null>;
 
+/** Provider-owned compiler attributes. Augment without widening component props or signal types. */
+export interface NativeAttributeExtensions {}
+
 /**
  * Only a host JSX site installs direct bindings. Keep reusable attribute and
  * component-prop types scalar: their consumers may read values imperatively.
@@ -180,7 +183,7 @@ type BoundIntrinsicProps<P> = {
 		: K extends 'style'
 			? BoundStyle<P[K]>
 			: P[K] | SignalHandle<P[K]>;
-};
+} & NativeAttributeExtensions;
 
 type BoundIntrinsicElements = {
 	[K in keyof Octane.JSX.IntrinsicElements]: BoundIntrinsicProps<Octane.JSX.IntrinsicElements[K]>;

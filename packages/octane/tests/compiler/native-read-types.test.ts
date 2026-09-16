@@ -101,6 +101,20 @@ const created = { left: signal$(1) };
 		fixture(`/** @jsxImportSource octane */
 ${PRELUDE}
 import type { CSSProperties, SignalCSSProperties } from 'octane';
+declare module 'octane/jsx-runtime' {
+  interface NativeAttributeExtensions { sx?: 'compiled-style' | null; }
+}
+const extension = <div sx="compiled-style" />;
+const specializedExtension = <button sx="compiled-style" />;
+const svgExtension = <svg sx={null} />;
+// @ts-expect-error Provider extensions retain their exact type.
+const wrongExtension = <button sx={42} />;
+// @ts-expect-error Extensions do not automatically accept signal handles.
+const signalExtension = <div sx={task$} />;
+declare function Custom(props: { sx: number }): null;
+const componentExtension = <Custom sx={42} />;
+// @ts-expect-error Native extensions do not change component props.
+const wrongComponentExtension = <Custom sx="compiled-style" />;
 declare const whole$: SignalHandle<SignalCSSProperties | string | null>;
 const style: SignalCSSProperties = { left: task$, opacity: task$ };
 const host = <div style={style} />;

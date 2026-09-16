@@ -195,10 +195,29 @@ describe('isViteOwnedUrl', () => {
 });
 
 describe('octane() plugin factory', () => {
-	it('forwards the typed-text project option to the compiler', () => {
+	it('forwards typed-text and native attribute provider options to the compiler', async () => {
 		expect(() => octane({ textTypes: { tsconfig: ' tsconfig.json ' } })).toThrow(
 			'`textTypes` requires { tsconfig: string }.',
 		);
+		const [compiler] = await configuredOctane({
+			hmr: false,
+			knownAttributeSpreads: [
+				{
+					source: 'presentation',
+					imported: 'props',
+					fields: ['className', 'style'],
+					style: 'object',
+					jsxAttribute: 'sx',
+				},
+			],
+		});
+		const output = await (compiler.transform as any).call(
+			{},
+			'import {props} from "presentation"; export function App() @{ <main sx={{}} /> }',
+			'/repo/src/App.tsrx',
+		);
+		expect(output.code).toContain('props({})');
+		expect(output.code).not.toContain('"sx"');
 	});
 
 	it('types components with the live props-first ABI', () => {

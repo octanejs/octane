@@ -10,6 +10,8 @@ import * as DomBindingClasses from '../src/dom-binding-classes.js';
 import * as DomBindingSignals from '../src/dom-binding-signals.js';
 import * as DomBindingControls from '../src/dom-binding-controls.js';
 import * as DomBindingStyles from '../src/dom-binding-styles.js';
+import * as DomBindingProjections from '../src/dom-binding-projections.js';
+import * as SignalReads from '../src/signals/read-protocol.js';
 import { setStyle } from '../src/runtime.js';
 import {
 	createScope,
@@ -52,6 +54,8 @@ function authoredPresentation<Props extends object>(
 			'octane/dom-binding-signals': DomBindingSignals,
 			'octane/dom-binding-controls': DomBindingControls,
 			'octane/dom-binding-styles': DomBindingStyles,
+			'octane/dom-binding-projections': DomBindingProjections,
+			'octane/internal/signal-read': SignalReads,
 			...modules,
 		},
 	};
@@ -3306,6 +3310,115 @@ export function SignalStyleProps(props) @{ 'use dom bindings';
 				expect(projectedNode.style.getPropertyValue('--scale')).toBe('8');
 				expect(projectedNode.className).toBe('scaled');
 				expect(projected.cleanup).toHaveBeenCalledOnce();
+			}
+			for (const structural of [false, true]) {
+				for (const adopt of [false, true]) {
+					const height$ = controlScope.signal$<unknown>(`projection-${structural}-${adopt}`, 2);
+					const variant$ = controlScope.signal$(`projection-variant-${structural}-${adopt}`, 'dy');
+					const replacement$ = controlScope.signal$<unknown>(
+						`projection-replacement-${structural}-${adopt}`,
+						10,
+					);
+					const rows = [
+						{ id: 'a', height$ },
+						{ id: 'b', height$: replacement$ },
+					];
+					const projected = authoredPresentation(
+						'Projection',
+						{ height$, rows, variant$ },
+						dev,
+						`import * as stylex from 'binding-styles';
+const styles = stylex.create({ dy: (height) => ({
+ className: height == null ? 'empty' : 'sized',
+ style: { height },
+ 'data-style-src': height == null ? null : 'sized-source'
+}), doubled: height => ({ className: 'double', style: { height: height * 2 } }) });
+export function Projection(props) @{ 'use dom bindings';
+ ${structural ? '<section>@for (const row of props.rows; key row.id) { <div sx={props.variant$ === "dy" ? styles.dy(row.height$) : styles.doubled(row.height$)}><input /></div> }</section>' : '<div sx={props.variant$ === "dy" ? styles.dy(props.height$) : styles.doubled(props.height$)}><input /></div>'}
+}`,
+						{
+							'binding-styles': {
+								create: (config: unknown) => config,
+								props: (value: unknown) => value,
+							},
+						},
+						{
+							knownAttributeSpreads: [
+								{
+									source: 'binding-styles',
+									imported: '*',
+									members: ['props'],
+									fields: ['className', 'style', 'data-style-src'],
+									style: 'object',
+									jsxAttribute: 'sx',
+								},
+							],
+						},
+					);
+					const projectionHost = document.createElement('div');
+					container.append(projectionHost);
+					projectionHost.innerHTML = projected.html;
+					const serverNode = projectionHost.querySelector('div')!;
+					expect(serverNode.style.height).toBe('2px');
+					height$.set(3);
+					if (!adopt) projectionHost.replaceChildren();
+					const handle = adopt
+						? projected.attach(projectionHost.firstElementChild!, projected.state)
+						: projected.mount({ parent: projectionHost }, projected.state);
+					const node = projectionHost.querySelector('div')!;
+					const input = node.querySelector('input')!;
+					const retiredNode = structural ? projectionHost.querySelectorAll('div')[1]! : null;
+					if (adopt) expect(node).toBe(serverNode);
+					expect(node.style.height).toBe('3px');
+					height$.set(null);
+					expect([node.className, node.style.height, node.getAttribute('data-style-src')]).toEqual([
+						'empty',
+						'',
+						null,
+					]);
+					height$.set(4);
+					expect([node.className, node.style.height, node.getAttribute('data-style-src')]).toEqual([
+						'sized',
+						'4px',
+						'sized-source',
+					]);
+					variant$.set('doubled');
+					expect([node.className, node.style.height]).toEqual(['double', '8px']);
+					variant$.set('dy');
+					expect([node.className, node.style.height]).toEqual(['sized', '4px']);
+					if (structural) {
+						projected.publish({ rows: [rows[1]!, rows[0]!] });
+						expect(projectionHost.querySelectorAll('div')[1]).toBe(node);
+						projected.publish({ rows: [{ id: 'a', height$: replacement$ }] });
+					} else projected.publish({ height$: replacement$ });
+					expect(node.style.height).toBe('10px');
+					height$.set(99);
+					expect(node.style.height).toBe('10px');
+					expect(node.querySelector('input')).toBe(input);
+					replacement$.set(null);
+					if (retiredNode) expect(retiredNode.style.height).toBe('10px');
+					const disposed = node.outerHTML;
+					handle.dispose();
+					replacement$.set(11);
+					expect(node.outerHTML).toBe(disposed);
+					const rebound = projected.attach(projectionHost.firstElementChild!, projected.state);
+					expect(node.style.height).toBe('11px');
+					replacement$.set(null);
+					const accepted = node.outerHTML;
+					expect(() =>
+						replacement$.set({
+							toString() {
+								throw new Error('projection style rejected');
+							},
+						}),
+					).toThrow('projection style rejected');
+					// A later field failing must not publish the new class first.
+					expect(node.outerHTML).toBe(accepted);
+					replacement$.set(42);
+					expect(node.outerHTML).toBe(accepted);
+					rebound.dispose();
+					expect(projected.cleanup).toHaveBeenCalledTimes(2);
+				}
 			}
 			for (const reversed of [false, true]) {
 				const projected = authoredPresentation(

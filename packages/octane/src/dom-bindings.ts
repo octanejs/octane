@@ -4,6 +4,11 @@ import type { createBindingClassGroup } from './dom-binding-classes.js';
 import type { __createBindingSignals, BindingSignalConnection } from './dom-binding-signals.js';
 import type { __createBindingStyles, BindingStyleSnapshot } from './dom-binding-styles.js';
 import type {
+	__createBindingProjections,
+	BindingProjectionConnection,
+	BindingProjectionGroup,
+} from './dom-binding-projections.js';
+import type {
 	__createBindingControls,
 	BindingControlLease,
 	BindingControlPrepared,
@@ -122,6 +127,8 @@ export interface CompiledBindings<Props> {
 	readonly signalIndices?: readonly number[];
 	readonly connectStyle?: typeof __createBindingStyles;
 	readonly styleIndices?: readonly number[];
+	readonly connectProjection?: typeof __createBindingProjections;
+	readonly projectionGroups?: readonly BindingProjectionGroup[];
 	readonly createControls?: typeof __createBindingControls;
 	project(props: Props): readonly unknown[];
 }
@@ -443,12 +450,18 @@ export function __adoptBindings<Props>(
 	let styles: Map<number, ReturnType<typeof __createBindingStyleRestoration>> | undefined;
 	const signalFactory = descriptor.connectSignal?.();
 	const styleFactory = descriptor.connectStyle?.();
+	const projectionFactory = descriptor.connectProjection?.();
+	const projections = projectionFactory
+		? new Map<number, BindingProjectionConnection>()
+		: undefined;
 	const controlFactory = descriptor.createControls?.();
 	const controls = controlFactory ? new Map<number, BindingControlLease>() : undefined;
 	const signalConnections =
 		signalFactory || styleFactory ? new Map<number, BindingSignalConnection>() : undefined;
 	const signalUpdates =
-		signalFactory || styleFactory || controlFactory ? new Set<number>() : undefined;
+		signalFactory || styleFactory || projectionFactory || controlFactory
+			? new Set<number>()
+			: undefined;
 	let disposed = false;
 	let busy = true;
 	let dirty = false;
@@ -470,6 +483,17 @@ export function __adoptBindings<Props>(
 				}
 			}
 		}
+		for (const connection of projections ? new Set(projections.values()) : []) {
+			try {
+				connection.dispose();
+			} catch (error) {
+				if (!failed) {
+					failed = true;
+					failure = error;
+				}
+			}
+		}
+		projections?.clear();
 		for (const control of controls?.values() ?? []) {
 			try {
 				control.dispose();
@@ -513,6 +537,24 @@ export function __adoptBindings<Props>(
 		}
 		if (failed) throw failure;
 	};
+	const prepareProjection = projections
+		? (
+				index: number,
+				next: BindingValue[],
+				indices: number[] | undefined,
+			): BindingProjectionGroup | undefined => {
+				const projection = projections.get(index);
+				if (!projection) return;
+				if (index === projection.group[0]![0]) {
+					const values = projection.get();
+					for (const [fieldIndex] of projection.group) {
+						next[fieldIndex] = values[fieldIndex]!;
+						if (indices && !indices.includes(fieldIndex)) indices.push(fieldIndex);
+					}
+				}
+				return projection.group;
+			}
+		: undefined;
 	const drain = (): void => {
 		if (disposed) return;
 		if (busy) return;
@@ -543,6 +585,31 @@ export function __adoptBindings<Props>(
 							'A DOM binding projection must return its synchronous scalar values.',
 						);
 					let resolved = values;
+					if (projectionFactory && descriptor.projectionGroups) {
+						for (const group of descriptor.projectionGroups) {
+							if (disposed || dirty) break;
+							const first = group[0]![0];
+							let connection = projections!.get(first);
+							if (!connection) {
+								connection = projectionFactory.connect(
+									group,
+									bindings,
+									nodes,
+									() => {
+										if (!disposed) {
+											signalUpdates!.add(first);
+											drain();
+										}
+									},
+									options?.restoreStyles,
+								);
+								for (const [index] of group) projections!.set(index, connection);
+							}
+							const projected = connection.read(values[first]);
+							if (resolved === values) resolved = [...values];
+							for (const [index] of group) (resolved as unknown[])[index] = projected[index];
+						}
+					}
 					if (styleFactory && descriptor.styleIndices) {
 						for (const index of descriptor.styleIndices) {
 							if (disposed || dirty) break;
@@ -596,6 +663,7 @@ export function __adoptBindings<Props>(
 					signalUpdates!.clear();
 					next = [];
 					for (const index of indices) {
+						if (prepareProjection?.(index, next, indices)) continue;
 						const control = controls?.get(index);
 						if (control) preparedControls!.set(index, control.prepareCurrent());
 						else next[index] = normalize(bindings[index]!, signalConnections!.get(index)!.get());
@@ -607,6 +675,7 @@ export function __adoptBindings<Props>(
 					const pending = [...signalUpdates];
 					signalUpdates.clear();
 					for (const index of pending) {
+						if (prepareProjection?.(index, next, indices)) continue;
 						const control = controls?.get(index);
 						if (control) preparedControls!.set(index, control.prepareCurrent());
 						else next[index] = normalize(bindings[index]!, signalConnections!.get(index)!.get());
@@ -635,6 +704,18 @@ export function __adoptBindings<Props>(
 						const pending = [...signalUpdates];
 						signalUpdates.clear();
 						for (const index of pending) {
+							const projection = prepareProjection?.(index, next, indices);
+							if (projection) {
+								for (const [fieldIndex] of projection) {
+									const group = groups?.get(fieldIndex);
+									if (group)
+										preparedGroups!.set(
+											fieldIndex,
+											group.prepare((next[fieldIndex] as string | null) ?? ''),
+										);
+								}
+								continue;
+							}
 							const control = controls?.get(index);
 							if (control) preparedControls.set(index, control.prepareCurrent());
 							else {
@@ -665,8 +746,11 @@ export function __adoptBindings<Props>(
 					// Native attribute reactions may dispose synchronously during the
 					// write. Token cleanup must already know the contribution to retire.
 					if (binding[1] === 'classToken') previous[i] = next[i]!;
-					if (binding[1] === 'styleObject') signalConnections!.get(i)!.write!(next[i]);
-					else if (binding[1] === 'classGroup') preparedGroups!.get(i)!.commit();
+					if (binding[1] === 'styleObject') {
+						const projection = projections?.get(i);
+						if (projection) projection.writeStyle(i, next[i]!);
+						else signalConnections!.get(i)!.write!(next[i]);
+					} else if (binding[1] === 'classGroup') preparedGroups!.get(i)!.commit();
 					else if (
 						(binding[1] === 'styleProperty' || binding[1] === 'styleAttribute') &&
 						options?.restoreStyles

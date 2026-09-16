@@ -39,6 +39,7 @@ import { analyzeStrongMode } from './strong-mode.js';
 import { analyzeNativeReadDiagnostics, nativeReadOptions } from './native-read-diagnostics.js';
 import { jsxImportSourcePragmaModule } from './pragma.js';
 import { inheritHookMemoOrigin } from './inline-hook-memo.js';
+import { lowerNativeAttributeReads } from './native-attribute-reads.js';
 import {
 	collectServerFunctionNodes,
 	serverContextTypeImports,
@@ -108,6 +109,73 @@ const OCTANE_PLATFORM = {
 };
 
 const octaneTransform = createJsxTransform(OCTANE_PLATFORM);
+
+// Type-check only the reads that runtime compilation also admits. A StyleX
+// function keeps its ordinary parameter types everywhere outside native `sx`.
+function projectNativeAttributeReads(ast, contracts) {
+	const attributes = new Set(
+		contracts?.flatMap((contract) => (contract.jsxAttribute ? [contract.jsxAttribute] : [])),
+	);
+	if (attributes.size === 0) return ast;
+	const names = new Set();
+	const walk = (node, replace) => {
+		if (!node || typeof node !== 'object') return node;
+		if (Array.isArray(node)) return node.map((child) => walk(child, replace));
+		let result = node;
+		for (const key of Object.keys(node)) {
+			if (['metadata', 'loc', 'start', 'end', 'parent'].includes(key)) continue;
+			const value = node[key];
+			if (!value || typeof value !== 'object') continue;
+			const next = walk(value, replace);
+			if (next !== value) {
+				if (result === node) result = { ...node };
+				result[key] = next;
+			}
+		}
+		return replace(result) ?? result;
+	};
+	walk(ast, (node) => {
+		if (node.type === 'Identifier' || node.type === 'JSXIdentifier') names.add(node.name);
+		return null;
+	});
+	let helper = '__octane_nativeAttributeValue';
+	while (names.has(helper)) helper += '_';
+	let used = false;
+	const projected = walk(ast, (node) => {
+		if (node.type !== 'JSXOpeningElement' && node.type !== 'Element') return null;
+		const name = node.type === 'Element' ? node.id : node.name;
+		if (
+			(name?.type !== 'JSXIdentifier' && name?.type !== 'Identifier') ||
+			typeof name.name !== 'string' ||
+			name.name[0] !== name.name[0].toLowerCase()
+		)
+			return null;
+		return {
+			...node,
+			attributes: node.attributes.map((attribute) => {
+				if (
+					!attributes.has(attribute.name?.name ?? attribute.name) ||
+					attribute.value?.type !== 'JSXExpressionContainer'
+				)
+					return attribute;
+				const result = lowerNativeAttributeReads(attribute.value.expression, (value) => {
+					used = true;
+					return inheritHookMemoOrigin(b.call(b.id(helper), value), value);
+				});
+				return { ...attribute, value: { ...attribute.value, expression: result.expression } };
+			}),
+		};
+	});
+	return used
+		? {
+				...projected,
+				body: [
+					b.imports([['readNativeDomValue', helper]], 'octane/internal/signal-read'),
+					...projected.body,
+				],
+			}
+		: ast;
+}
 
 /**
  * A trusted final context belongs to the implementation, not its RPC caller.
@@ -348,7 +416,7 @@ function markNativeTemplateBodies(root) {
  * `intrinsics`; when present, the virtual TSX gets a file-local pragma so host
  * element types cannot leak into files owned by another renderer.
  *
- * @param {{ loose?: boolean, renderers?: unknown, strong?: boolean }} [options]
+ * @param {{ loose?: boolean, renderers?: unknown, strong?: boolean, knownAttributeSpreads?: readonly import('./index.js').KnownAttributeSpread[] }} [options]
  * @returns {import('./index.js').VolarCompileResult}
  */
 export function compileToVolarMappings(source, filename, options) {
@@ -453,7 +521,12 @@ export function compileToVolarMappings(source, filename, options) {
 	// mappings/hover still work.
 	const transform = selectOctaneTransform(ast);
 	const transformed = transform(
-		projectServerContextCalls(transformAst, filename),
+		projectServerContextCalls(
+			renderer.target === 'dom'
+				? projectNativeAttributeReads(transformAst, options?.knownAttributeSpreads)
+				: transformAst,
+			filename,
+		),
 		source,
 		filename,
 		{

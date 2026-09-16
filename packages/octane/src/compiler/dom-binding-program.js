@@ -126,6 +126,7 @@ export function planBindingProgram(fn, render, context) {
 	let signals = false;
 	let controls = false;
 	let styles = false;
+	let projectionsEnabled = false;
 	let nextSite = 0;
 	const fail = (node, message) => {
 		const error = new Error(
@@ -226,6 +227,7 @@ export function planBindingProgram(fn, render, context) {
 		const values = [];
 		const signalIndices = [];
 		const styleIndices = [];
+		const projectionGroups = [];
 		const projections = [];
 		const initializers = [];
 		const initialValues = [];
@@ -584,6 +586,9 @@ export function planBindingProgram(fn, render, context) {
 			for (const signalIndex of native.signalIndices)
 				signalIndices.push(bindings.length + signalIndex);
 			for (const styleIndex of native.styleIndices) styleIndices.push(bindings.length + styleIndex);
+			for (const group of native.projectionGroups)
+				projectionGroups.push(group.map(([binding, field]) => [bindings.length + binding, field]));
+			projectionsEnabled ||= native.projectionGroups.length > 0;
 			signals ||= native.signalIndices.length > 0;
 			controls ||= native.bindings.some((binding) => binding[1] === 'control');
 			styles ||= native.styleIndices.length > 0;
@@ -613,9 +618,9 @@ export function planBindingProgram(fn, render, context) {
 			}
 			const attributes = createTemplateIr();
 			for (const attr of node.attributes ?? []) {
+				if (attr._octaneKnownAttributeSpread) continue;
 				if (rawName(attr) === 'ref' || /^on[A-Z]/.test(rawName(attr) ?? '')) continue;
 				if (attr.type === 'SpreadAttribute' || attr.type === 'JSXSpreadAttribute') {
-					if (attr._octaneKnownAttributeSpread) continue;
 					constructionError ??=
 						'This view contains an external attribute spread without a native construction adapter.';
 					continue;
@@ -747,6 +752,7 @@ export function planBindingProgram(fn, render, context) {
 			regions: b.array(regions),
 			...(signalIndices.length ? { signalIndices: data(signalIndices) } : {}),
 			...(styleIndices.length ? { styleIndices: data(styleIndices) } : {}),
+			...(projectionGroups.length ? { projectionGroups: data(projectionGroups) } : {}),
 		};
 		if (initializers.length > 0) {
 			properties.initializers = data(initializers);
@@ -810,6 +816,7 @@ export function planBindingProgram(fn, render, context) {
 		signals,
 		controls,
 		styles,
+		projectionsEnabled,
 		childPrograms,
 	};
 }

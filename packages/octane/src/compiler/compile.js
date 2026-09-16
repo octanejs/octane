@@ -104,6 +104,10 @@ import { createTextTypeFactsLookup, normalizeTextTypeFilename } from './text-typ
 import { lowerSignalDeclarations } from './signal-declarations.js';
 import { lowerSignalAttemptReads } from './signal-attempt-reads.js';
 import { startIndependentSignalReads } from './signal-start-reads.js';
+import {
+	isDirectSignalHandleExpression,
+	lowerNativeAttributeReads,
+} from './native-attribute-reads.js';
 import { domBindingExportFromId, prepareDomBindings } from './dom-bindings.js';
 import {
 	createTemplateIr,
@@ -524,46 +528,6 @@ function attrBindingUpdateHelper(bind, inlineBindingGuards = false) {
 		default:
 			return helper;
 	}
-}
-
-// Direct signal bindings are an explicitly narrow syntax surface. A capability
-// identifier/member keeps its `$` suffix when passed through props or a local
-// alias; compiler-owned facade calls have already been rewritten to `__*At` by
-// lowerSignalDeclarations. `.get()` is deliberately absent: it is a scalar
-// read and opts out of targeted binding/two-way control behavior.
-function isDirectSignalHandleExpression(node) {
-	while (
-		node &&
-		(node.type === 'TSAsExpression' ||
-			node.type === 'TSTypeAssertion' ||
-			node.type === 'TSNonNullExpression' ||
-			node.type === 'ChainExpression')
-	) {
-		node = node.expression;
-	}
-	if (!node) return false;
-	if (node.type === 'Identifier') return node.name.endsWith('$');
-	if (node.type === 'MemberExpression' || node.type === 'OptionalMemberExpression') {
-		const name = node.computed
-			? node.property?.type === 'Literal' && typeof node.property.value === 'string'
-				? node.property.value
-				: null
-			: node.property?.name;
-		return typeof name === 'string' && name.endsWith('$');
-	}
-	if (node.type === 'CallExpression' || node.type === 'OptionalCallExpression') {
-		const callee = node.callee;
-		const name =
-			callee?.type === 'Identifier'
-				? callee.name
-				: callee?.type === 'MemberExpression' || callee?.type === 'OptionalMemberExpression'
-					? callee.computed
-						? callee.property?.value
-						: callee.property?.name
-					: null;
-		return /^_?\$?__(?:signal|derived|query)At$/.test(name ?? '');
-	}
-	return false;
 }
 
 function canCarryDirectSignalHandle(node) {
@@ -1380,6 +1344,7 @@ const HOOK_MEMO_RUNTIME_HELPERS = new Set([
 ]);
 const NATIVE_READ_RUNTIME_HELPERS = new Set([
 	'nativeStyleBinding',
+	'nativeProjectionBinding',
 	'readNativeDomStyle',
 	'readNativeDomProps',
 	'enableNativeReadCollection',
@@ -9140,6 +9105,7 @@ function markKnownAttributeSpreads(ast, contracts) {
 	if (!Array.isArray(contracts)) throw new TypeError('knownAttributeSpreads must be an array.');
 	if (contracts.length === 0) return ast;
 	const paths = new Set();
+	const shorthandProviders = new Map();
 	for (const contract of contracts) {
 		if (
 			!contract ||
@@ -9176,6 +9142,15 @@ function markKnownAttributeSpreads(ast, contracts) {
 				'Duplicate knownAttributeSpreads contract for the same imported factory.',
 			);
 		paths.add(path);
+		if (contract.jsxAttribute !== undefined) {
+			if (
+				typeof contract.jsxAttribute !== 'string' ||
+				!/^[A-Za-z_$][\w$-]*$/.test(contract.jsxAttribute) ||
+				shorthandProviders.has(contract.jsxAttribute)
+			)
+				throw new TypeError('Invalid or ambiguous knownAttributeSpreads jsxAttribute.');
+			shorthandProviders.set(contract.jsxAttribute, contract);
+		}
 	}
 	const imports = new Map();
 	for (const declaration of ast.body) {
@@ -9195,9 +9170,118 @@ function markKnownAttributeSpreads(ast, contracts) {
 			if (matches.length) imports.set(specifier.local.name, matches);
 		}
 	}
-	if (imports.size === 0) return ast;
+	const shorthandAttributes = new Map();
+	const usedNames = new Set();
+	if (shorthandProviders.size > 0) {
+		mapAst(ast, (node) => {
+			if (node.type === 'Identifier' || node.type === 'JSXIdentifier') usedNames.add(node.name);
+			if (node.type !== 'JSXOpeningElement' && node.type !== 'Element') return null;
+			const name = node.type === 'Element' ? node.id : node.name;
+			if (
+				(name?.type !== 'JSXIdentifier' && name?.type !== 'Identifier') ||
+				typeof name.name !== 'string' ||
+				name.name[0] !== name.name[0].toLowerCase()
+			)
+				return null;
+			const seen = new Set();
+			for (const attr of node.attributes ?? []) {
+				if (attr.type !== 'JSXAttribute' && attr.type !== 'Attribute') continue;
+				const raw = attr.name?.name ?? attr.name;
+				const contract = shorthandProviders.get(raw);
+				if (
+					!contract ||
+					seen.has(raw) ||
+					attr.value?.type !== 'JSXExpressionContainer' ||
+					attr.value.expression?.type === 'JSXEmptyExpression'
+				)
+					continue;
+				seen.add(raw);
+				shorthandAttributes.set(attr, contract);
+			}
+			return null;
+		});
+	}
+	if (imports.size === 0 && shorthandAttributes.size === 0) return ast;
 	const lexical = createLexicalAnalysis(ast);
-	return mapAst(ast, (node) => {
+	const addedImports = [];
+	const addedBindings = new Map();
+	let nativeReadName;
+	let hasProjection = false;
+	const read = (node) => {
+		if (nativeReadName === undefined) {
+			nativeReadName = '_nativeAttributeValue';
+			for (let suffix = 1; usedNames.has(nativeReadName); suffix++)
+				nativeReadName = `_nativeAttributeValue${suffix}`;
+			usedNames.add(nativeReadName);
+			addedImports.push(
+				inheritOriginLoc(
+					b.imports([['readNativeDomValue', nativeReadName]], 'octane/internal/signal-read'),
+					node,
+				),
+			);
+		}
+		const call = inheritOriginLoc(b.call(b.id(nativeReadName), node), node);
+		call.metadata = { octaneNativeSignalRead: true };
+		return call;
+	};
+	const result = mapAst(ast, (node) => {
+		const shorthand = shorthandAttributes.get(node);
+		if (shorthand) {
+			let local;
+			for (const [name, matches] of imports) {
+				if (
+					matches.includes(shorthand) &&
+					lexical.resolveBinding(lexical.nodeScopes.get(node), name)?.scope === lexical.rootScope
+				) {
+					local = name;
+					break;
+				}
+			}
+			if (local === undefined) {
+				local = addedBindings.get(shorthand);
+				if (local === undefined) {
+					local = '_jsxAttribute';
+					for (let suffix = 1; usedNames.has(local); suffix++) local = `_jsxAttribute${suffix}`;
+					usedNames.add(local);
+					addedBindings.set(shorthand, local);
+					addedImports.push(
+						inheritOriginLoc(
+							shorthand.imported === '*'
+								? b.import_all(local, shorthand.source)
+								: shorthand.imported === 'default'
+									? b.import_declaration(
+											[
+												{
+													type: 'ImportDefaultSpecifier',
+													local: b.id(local),
+													metadata: { path: [] },
+												},
+											],
+											shorthand.source,
+										)
+									: b.imports([[shorthand.imported, local]], shorthand.source),
+							node,
+						),
+					);
+				}
+			}
+			let callee = b.id(local);
+			for (const member of shorthand.members ?? []) callee = b.member(callee, b.id(member));
+			const lifted = lowerNativeAttributeReads(node.value.expression, read);
+			hasProjection ||= lifted.reactive;
+			return {
+				...node,
+				value: {
+					...node.value,
+					expression: inheritOriginLoc(b.call(callee, lifted.expression), node),
+				},
+				_octaneKnownAttributeSpread: {
+					fields: [...shorthand.fields],
+					style: shorthand.style,
+					...(lifted.reactive ? { projection: true } : {}),
+				},
+			};
+		}
 		if (node.type !== 'JSXSpreadAttribute' && node.type !== 'SpreadAttribute') return null;
 		const call = node.argument;
 		if (call?.type !== 'CallExpression' || call.optional) return null;
@@ -9229,6 +9313,41 @@ function markKnownAttributeSpreads(ast, contracts) {
 				}
 			: null;
 	});
+	if (hasProjection)
+		mapAst(result, (node) => {
+			if (node.type !== 'JSXOpeningElement' && node.type !== 'Element') return null;
+			const attributes = node.attributes ?? [];
+			const identity = (name) =>
+				(name === 'className' ? 'class' : (ATTRIBUTE_ALIASES.get(name) ?? name)).toLowerCase();
+			for (const attr of attributes) {
+				if (!attr._octaneKnownAttributeSpread?.projection) continue;
+				const fields = new Set(attr._octaneKnownAttributeSpread.fields.map(identity));
+				for (const other of attributes) {
+					if (other === attr) continue;
+					const known = other._octaneKnownAttributeSpread;
+					if (
+						(known && known.fields.some((field) => fields.has(identity(field)))) ||
+						(!known &&
+							(other.type === 'JSXSpreadAttribute' ||
+								other.type === 'SpreadAttribute' ||
+								fields.has(identity(jsxAttrRawName(other)))))
+					)
+						throw new Error(
+							'Native JSX signal projections cannot overlap other writers for their fields or an unknown spread.',
+						);
+				}
+			}
+			return null;
+		});
+	return addedImports.length > 0 || hasProjection
+		? {
+				...result,
+				body: [...addedImports, ...result.body],
+				...(hasProjection
+					? { metadata: { ...result.metadata, octaneNativeAttributeProjection: true } }
+					: {}),
+			}
+		: result;
 }
 
 // Keep the factory evaluation at its authored native element/iteration. Each
@@ -9238,11 +9357,30 @@ function expandKnownAttributeSpreads(attributes) {
 	if (!attributes.some((attr) => attr._octaneKnownAttributeSpread)) return attributes;
 	return attributes.flatMap((attr) => {
 		if (!attr._octaneKnownAttributeSpread) return [attr];
-		const source = { binding: null, expression: null };
+		if (
+			attr._octaneKnownAttributeSpread.projection &&
+			attr._octaneKnownAttributeSpread.fields.some(
+				(field) => field === 'class' || field === 'className',
+			) &&
+			attributes.some(
+				(other) => other !== attr && ['class', 'className'].includes(jsxAttrRawName(other)),
+			)
+		) {
+			throw new Error(
+				'A reactive native attribute projection cannot share its class with scoped or authored classes. Compose classes in the projection.',
+			);
+		}
+		const source = {
+			binding: null,
+			expression: null,
+			projection: attr._octaneKnownAttributeSpread.projection === true,
+			fields: attr._octaneKnownAttributeSpread.fields,
+		};
+		const argument = attr.argument ?? attr.value.expression;
 		return [
-			{ ...attr, knownSource: source },
+			{ knownSource: source, argument },
 			...attr._octaneKnownAttributeSpread.fields.map((field) => {
-				const object = inheritOriginLoc(b.id('_knownAttributeSpread'), attr.argument);
+				const object = inheritOriginLoc(b.id('_knownAttributeSpread'), argument);
 				object.metadata = { octaneKnownAttributeSource: source };
 				const expression = inheritOriginLoc(
 					b.conditional(
@@ -9250,16 +9388,18 @@ function expandKnownAttributeSpreads(attributes) {
 						undefinedNode(),
 						b.member(object, b.literal(field), true),
 					),
-					attr.argument,
+					argument,
 				);
 				expression.metadata = { octaneKnownAttributeRead: true };
-				return inheritOriginLoc(
+				const attribute = inheritOriginLoc(
 					b.jsx_attribute(
 						inheritOriginLoc(b.jsx_id(field), attr),
-						b.jsx_expression_container(expression, attr.argument),
+						b.jsx_expression_container(expression, argument),
 					),
 					attr,
 				);
+				if (source.projection) attribute._octaneKnownProjectionSource = source;
+				return attribute;
 			}),
 		];
 	});
@@ -9298,6 +9438,10 @@ function compileAuthored(source, filename, options, bundlerMetadata) {
 	const strongAnalysis = assertStrongMode(analyzedAst, source, cleanFilename, options);
 	const strongModeEnabled = strongAnalysis?.enabled === true;
 	analyzedAst = markKnownAttributeSpreads(analyzedAst, options?.knownAttributeSpreads);
+	if (analyzedAst.metadata?.octaneNativeAttributeProjection) {
+		options = { ...options, nativeReads: true };
+		assertNativeReadOptions(options);
+	}
 	const bindingExport = domBindingExportFromId(filename);
 	if (
 		bindingExport !== null &&
@@ -21089,6 +21233,15 @@ function jsxElementToCreateElement(node, ctx, eagerRoot = false) {
 	const attrs = node.attributes || node.openingElement?.attributes || [];
 	const properties = [];
 	for (const attr of attrs) {
+		if (
+			!componentTag &&
+			attr._octaneKnownAttributeSpread &&
+			attr.type !== 'JSXSpreadAttribute' &&
+			attr.type !== 'SpreadAttribute'
+		)
+			throw new Error(
+				'Native JSX attribute shorthands are not supported in descriptor-backed JSX values; use an owned template element.',
+			);
 		if (attr.type === 'SpreadAttribute' || attr.type === 'JSXSpreadAttribute') {
 			properties.push(b.spread(rewriteJsxValues(attr.argument, ctx)));
 			continue;
@@ -21953,6 +22106,14 @@ function rewriteOpaqueTitles(node, ctx, namespace = 'html') {
 function headAttrsExpression(el) {
 	const attrProps = [];
 	for (const a of el.openingElement.attributes || []) {
+		if (
+			a._octaneKnownAttributeSpread &&
+			a.type !== 'JSXSpreadAttribute' &&
+			a.type !== 'SpreadAttribute'
+		)
+			throw new Error(
+				'Native JSX attribute shorthands are not supported on hoisted head elements.',
+			);
 		if (a.type === 'SpreadAttribute' || a.type === 'JSXSpreadAttribute') {
 			attrProps.push(b.spread(a.argument));
 			continue;
@@ -24126,9 +24287,12 @@ function planJsx(
 			ctx.runtimeNeeded.add(b.spread ? 'canSplitStyleProperties' : 'isHydratingStyle');
 			if (b.spread) ctx.runtimeNeeded.add('styleObjectPrototype');
 		}
-		if (b.kind === 'nativeStyle') {
+		if (b.kind === 'nativeStyle' || b.kind === 'nativeProjection') {
 			b.slotIndex = ++nativeStyleSlots;
-			b.helper = requireRuntimeForContext(ctx, 'nativeStyleBinding');
+			b.helper = requireRuntimeForContext(
+				ctx,
+				b.kind === 'nativeStyle' ? 'nativeStyleBinding' : 'nativeProjectionBinding',
+			);
 		}
 		if (b.kind === 'spread') {
 			ctx.runtimeNeeded.add('setSpread');
@@ -25774,6 +25938,23 @@ function emitBindingMount(bind, elVar, bag) {
 		return st(b.stmt(b.call('_$queueFormAuthoringDiagnostic', ...args)));
 	}
 	switch (bind.kind) {
+		case 'nativeProjection': {
+			return st(
+				b.block([
+					...mountHost(),
+					b.stmt(
+						b.call(
+							bind.helper,
+							b.id('__s'),
+							b.literal(bind.slotIndex),
+							el(),
+							b.arrow([], bind.expr),
+							b.array(bind.fields.map((field) => b.literal(field))),
+						),
+					),
+				]),
+			);
+		}
 		case 'nativeStyle': {
 			return st(
 				b.block([
@@ -26259,6 +26440,20 @@ function emitBindingUpdate(bind, bag, inlineBindingGuards = false) {
 		);
 	}
 	switch (bind.kind) {
+		case 'nativeProjection': {
+			return st(
+				b.stmt(
+					b.call(
+						bind.helper,
+						b.id('__s'),
+						b.literal(bind.slotIndex),
+						F('_el'),
+						b.arrow([], bind.expr),
+						b.array(bind.fields.map((field) => b.literal(field))),
+					),
+				),
+			);
+		}
 		case 'nativeStyle': {
 			return st(
 				b.stmt(b.call(bind.helper, b.id('__s'), b.literal(bind.slotIndex), F('_el'), bind.expr)),
@@ -27309,11 +27504,13 @@ function emitElementHtml(
 	let sawRef = false;
 	for (let attrI = 0; attrI < attrs.length; attrI++) {
 		const attr = attrs[attrI];
+		if (attr._octaneKnownProjectionSource) continue;
 		if (attr.knownSource) {
 			const binding = {
 				id: bindings.length,
-				kind: 'hostValue',
+				kind: attr.knownSource.projection ? 'nativeProjection' : 'hostValue',
 				expr: tsrxExprNode(attr.argument, ctx, componentName, inlinedSubs),
+				fields: attr.knownSource.fields,
 				path,
 			};
 			attr.knownSource.binding = binding;

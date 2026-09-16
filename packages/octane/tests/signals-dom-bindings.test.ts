@@ -7,6 +7,7 @@ import type { CSSProperties } from 'octane/jsx-runtime';
 import * as Signals from 'octane/signals';
 import * as ClientSignals from 'octane/signals/client';
 import * as ServerSignals from 'octane/signals/server';
+import * as SignalRead from '../src/signals/read-protocol.js';
 import { mount } from './_helpers.js';
 import { loadCompiledFixtureSource, loadServerFixture } from './_server-fixture.js';
 import * as client from './_fixtures/signals-dom-bindings.tsrx';
@@ -307,6 +308,110 @@ describe('signal-valued DOM styles', () => {
 	);
 
 	it('adopts server styles and catches up with live signals on the same host', () => {
+		// A fixed-field factory owns class and style as one native read, including
+		// values passed into a compiled dynamic style function.
+		for (const dev of [false, true]) {
+			const source = `import * as styles from 'binding-styles';
+export function Styled(props) @{ <div sx={styles[props.variant$](props.height$)}><span>child</span></div> }
+export function Guarded(props) @{ @try { <Styled height$={props.height$} variant$={props.variant$} /> } @catch { <p>failed</p> } }`;
+			const options = {
+				id: `/native-projection-${dev}.tsrx`,
+				compileOptions: {
+					dev,
+					hmr: false,
+					knownAttributeSpreads: [
+						{
+							source: 'binding-styles',
+							imported: '*',
+							members: ['props'],
+							fields: ['className', 'style', 'data-style-src'],
+							style: 'object',
+							jsxAttribute: 'sx',
+						},
+					],
+				},
+				runtimeModules: {
+					'octane/internal/signal-read': SignalRead,
+					'binding-styles': {
+						props: (value: unknown) => value,
+						doubled: (value: number | null) => ({
+							className: 'double',
+							style: { height: value === null ? null : value * 2 },
+						}),
+						height: (value: number | null) => ({
+							className: value === null ? null : value === -1 ? 'invalid' : 'height',
+							style:
+								value === null
+									? null
+									: {
+											height:
+												value === -1
+													? {
+															toString() {
+																throw new Error('invalid height');
+															},
+														}
+													: value,
+											opacity: 0.5,
+										},
+							'data-style-src': dev ? 'source' : undefined,
+						}),
+					},
+				},
+			};
+			const server = loadCompiledFixtureSource(source, { ...options, mode: 'server' });
+			const client = loadCompiledFixtureSource(source, { ...options, mode: 'client' });
+			const scope = createScope({ scopeKey: `projection-${dev}` });
+			const first$ = scope.signal$<number | null>('first', 4);
+			const replacement$ = scope.signal$<number | null>('replacement', 12);
+			const variant$ = scope.signal$('variant', 'height');
+			const container = document.createElement('div');
+			document.body.appendChild(container);
+			container.innerHTML = renderToString(server.Styled, { height$: first$, variant$ }).html;
+			const host = container.querySelector('div')!;
+			const child = container.querySelector('span');
+			expect([host.className, host.style.height, host.style.opacity]).toEqual([
+				'height',
+				'4px',
+				'0.5',
+			]);
+			const root = hydrateRoot(container, client.Styled, { height$: first$, variant$ });
+			try {
+				flushSync(() => first$.set(8));
+				expect(host.style.height).toBe('8px');
+				expect(container.querySelector('div')).toBe(host);
+				expect(container.querySelector('span')).toBe(child);
+				expect(host.getAttribute('data-style-src')).toBe(dev ? 'source' : null);
+				flushSync(() => variant$.set('doubled'));
+				expect([host.className, host.style.height]).toEqual(['double', '16px']);
+				flushSync(() => variant$.set('height'));
+				expect([host.className, host.style.height]).toEqual(['height', '8px']);
+				flushSync(() => root.render(client.Styled, { height$: replacement$, variant$ }));
+				flushSync(() => first$.set(99));
+				expect(host.style.height).toBe('12px');
+				flushSync(() => replacement$.set(null));
+				expect(host.getAttribute('class')).toBeNull();
+				expect(host.style.cssText).toBe('');
+				root.unmount();
+				flushSync(() => replacement$.set(100));
+				expect(host.style.cssText).toBe('');
+				const guarded = mount(client.Guarded, { height$: replacement$, variant$ });
+				try {
+					const retained = guarded.find('div') as HTMLElement;
+					expect(retained.style.height).toBe('100px');
+					flushSync(() => replacement$.set(-1));
+					expect(guarded.container.textContent).toBe('failed');
+					expect(retained.className).toBe('height');
+					expect(retained.style.height).toBe('100px');
+				} finally {
+					guarded.unmount();
+				}
+			} finally {
+				root.unmount();
+				container.remove();
+				scope.dispose();
+			}
+		}
 		const scope = createScope({ scopeKey: 'dom-style-hydration' });
 		const left$ = scope.signal$<number | null>('left', 7);
 		const container = document.createElement('div');

@@ -9,6 +9,7 @@ import ts from 'typescript';
 import { describe, it, expect } from 'vitest';
 import { compileToVolarMappings, compileTypesInspection } from 'octane/compiler/volar';
 import { bundleVolarCompiler } from '../../scripts/bundle-volar.mjs';
+import { compileToVolarMappings as compileStylexToVolarMappings } from '../../../stylex/src/compiler.js';
 
 const OBJECT_RENDERERS = {
 	registry: {
@@ -832,7 +833,175 @@ declare module '@fixture/object-intrinsics/jsx-runtime' {
 		}
 	});
 
-	it('type-checks absent and optional host spread refs without weakening authored prop types', () => {
+	it('type-checks native attributes without weakening ordinary function and component props', () => {
+		const stylexRoot = mkdtempSync(join(tmpdir(), 'octane-volar-stylex-types-'));
+		try {
+			mkdirSync(join(stylexRoot, 'node_modules/@octanejs'), { recursive: true });
+			symlinkSync(
+				fileURLToPath(new URL('../..', import.meta.url)),
+				join(stylexRoot, 'node_modules/octane'),
+				'dir',
+			);
+			symlinkSync(
+				fileURLToPath(new URL('../../../stylex', import.meta.url)),
+				join(stylexRoot, 'node_modules/@octanejs/stylex'),
+				'dir',
+			);
+			const imports = `import * as stylex from '@octanejs/stylex';
+import type { SignalHandle } from 'octane/signals';
+const styles = stylex.create({ height: (height: number | null) => ({ height }), root: { color: 'red' } });
+declare const height$: SignalHandle<number | null>;
+declare const wrong$: SignalHandle<boolean>;
+declare const appearance$: SignalHandle<typeof styles.root>;
+declare const selected$: SignalHandle<'root'>;
+declare const dynamicStyle$: SignalHandle<'height'>;
+declare const payload$: SignalHandle<{ selected: typeof styles.root }>;
+declare function Custom(props: { sx: SignalHandle<number | null> }): null;
+`;
+			const valid = `${imports}
+export function Panel() @{
+  <div sx={styles.height(height$)}>
+    <span sx={appearance$} />
+    <span sx={styles[selected$]} />
+    <span sx={styles[dynamicStyle$](height$)} />
+    <span sx={(styles[dynamicStyle$])(height$)} />
+    <span sx={styles.height((height$).get())} />
+    <span sx={payload$.get().selected} />
+    <Custom sx={height$} />
+  </div>
+}`;
+			const compiled = compileStylexToVolarMappings(valid, join(stylexRoot, 'Panel.tsrx'));
+			expect(compiled.errors).toEqual([]);
+			const valueOffset = valid.indexOf('styles.height(height$)') + 'styles.height('.length;
+			expect(
+				compiled.mappings.some((mapping) =>
+					mapping.sourceOffsets.some(
+						(start, index) =>
+							start === valueOffset &&
+							compiled.code.slice(
+								mapping.generatedOffsets[index],
+								mapping.generatedOffsets[index] + 'height$'.length,
+							) === 'height$',
+					),
+				),
+			).toBe(true);
+			const validFile = join(stylexRoot, 'Panel.tsx');
+			writeFileSync(validFile, compiled.code);
+			const invalid = `${imports}
+const outside = styles.height(height$);
+export function Invalid() @{
+  <div sx={styles.height(wrong$)}>
+    <span sx={styles.height('invalid-length')} />
+    <Custom sx={42} />
+  </div>
+}`;
+			const invalidFile = join(stylexRoot, 'Invalid.tsx');
+			writeFileSync(
+				invalidFile,
+				compileStylexToVolarMappings(invalid, join(stylexRoot, 'Invalid.tsrx')).code,
+			);
+			const program = ts.createProgram({
+				rootNames: [validFile, invalidFile],
+				options: {
+					jsx: ts.JsxEmit.Preserve,
+					module: ts.ModuleKind.ESNext,
+					moduleResolution: ts.ModuleResolutionKind.Bundler,
+					strict: true,
+					skipLibCheck: true,
+					noEmit: true,
+					target: ts.ScriptTarget.ESNext,
+					types: [],
+				},
+			});
+			expect(
+				program
+					.getSemanticDiagnostics(program.getSourceFile(validFile))
+					.map((error) => ts.flattenDiagnosticMessageText(error.messageText, ' ')),
+			).toEqual([]);
+			const invalidDiagnostics = program.getSemanticDiagnostics(program.getSourceFile(invalidFile));
+			expect(invalidDiagnostics.map(({ code }) => code)).toEqual([2345, 2345, 2345, 2322]);
+			expect(() =>
+				compileStylexToVolarMappings(
+					`${imports} export function Invalid() @{<div sx={payload$.selected}/>} `,
+					'Invalid.tsrx',
+				),
+			).toThrow(/\.get\(\)/);
+			expect(() =>
+				compileStylexToVolarMappings(
+					`${imports} export function Invalid() @{<div sx={(payload$).selected}/>} `,
+					'Invalid.tsrx',
+				),
+			).toThrow(/\.get\(\)/);
+			// Exercise the consumer-selected provider, not just a manually compiled TSX file.
+			writeFileSync(join(stylexRoot, 'Panel.tsrx'), valid);
+			writeFileSync(join(stylexRoot, 'package.json'), JSON.stringify({ type: 'module' }));
+			writeFileSync(
+				join(stylexRoot, 'config.mts'),
+				`import { knownAttributeSpreads } from '@octanejs/stylex/compiler/contract';
+import { compileToVolarMappings } from '@octanejs/stylex/compiler';
+import type { KnownAttributeSpread } from 'octane/compiler';
+const contracts: readonly KnownAttributeSpread[] = knownAttributeSpreads;
+compileToVolarMappings('', 'Panel.tsrx', { knownAttributeSpreads: contracts });
+// @ts-expect-error The provider retains the Octane compiler's source type.
+compileToVolarMappings(42);
+// @ts-expect-error The contract retains its exact fixed-field type.
+const invalid: number = knownAttributeSpreads[0].fields[0];
+`,
+			);
+			writeFileSync(
+				join(stylexRoot, 'tsconfig.json'),
+				JSON.stringify({
+					compilerOptions: {
+						jsx: 'preserve',
+						module: 'nodenext',
+						moduleResolution: 'nodenext',
+						strict: true,
+						skipLibCheck: true,
+						noEmit: true,
+						target: 'esnext',
+						types: [],
+					},
+					tsrx: { compiler: '@octanejs/stylex/compiler' },
+					include: ['Panel.tsrx', 'config.mts'],
+				}),
+			);
+			const checkConsumer = () => {
+				try {
+					execFileSync(
+						process.execPath,
+						[
+							fileURLToPath(
+								new URL(
+									'../../../../node_modules/@tsrx/typescript-plugin/dist/tsc.js',
+									import.meta.url,
+								),
+							),
+							'--noEmit',
+							'-p',
+							join(stylexRoot, 'tsconfig.json'),
+						],
+						{ encoding: 'utf8', timeout: 30_000 },
+					);
+				} catch (error) {
+					throw new Error(String((error as { stdout?: string }).stdout ?? error));
+				}
+			};
+			expect(checkConsumer).not.toThrow();
+			writeFileSync(join(stylexRoot, 'Panel.tsrx'), invalid);
+			let consumerDiagnostics = '';
+			try {
+				checkConsumer();
+			} catch (error) {
+				consumerDiagnostics = String((error as { stdout?: string }).stdout ?? error);
+			}
+			expect(consumerDiagnostics).toContain("Argument of type 'boolean'");
+			const wrongLine = invalid
+				.slice(0, invalid.indexOf('styles.height(wrong$)'))
+				.split('\n').length;
+			expect(consumerDiagnostics).toContain(`Panel.tsrx(${wrongLine},`);
+		} finally {
+			rmSync(stylexRoot, { recursive: true, force: true });
+		}
 		const root = mkdtempSync(join(tmpdir(), 'octane-volar-spread-types-'));
 		try {
 			mkdirSync(join(root, 'node_modules'));

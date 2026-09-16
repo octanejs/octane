@@ -49,6 +49,7 @@
     "./dom-binding-signals": "./src/dom-binding-signals.ts",
     "./dom-binding-controls": "./src/dom-binding-controls.ts",
     "./dom-binding-styles": "./src/dom-binding-styles.ts",
+    "./dom-binding-projections": "./src/dom-binding-projections.ts",
     "./react/server": "./src/react/server.ts",
     "./server": "./src/server/index.ts",
     "./signals": "./src/signals/index.ts",
@@ -56,6 +57,7 @@
     "./signals/server": "./src/signals/server.ts",
     "./internal/client": "./src/internal/client.ts",
     "./internal/server": "./src/internal/server.ts",
+    "./internal/signal-read": "./src/internal/signal-read.ts",
     "./static": "./src/static/index.ts",
     "./testing": "./src/testing.ts",
     "./constants": "./src/constants.ts",
@@ -152,6 +154,14 @@
       "./dom-binding-styles": {
         "types": "./dist/dom-binding-styles.d.ts",
         "default": "./dist/dom-binding-styles.js"
+      },
+      "./dom-binding-projections": {
+        "types": "./dist/dom-binding-projections.d.ts",
+        "default": "./dist/dom-binding-projections.js"
+      },
+      "./internal/signal-read": {
+        "types": "./dist/internal/signal-read.d.ts",
+        "default": "./dist/internal/signal-read.js"
       },
       "./react/server": {
         "types": "./dist/react/server.d.ts",

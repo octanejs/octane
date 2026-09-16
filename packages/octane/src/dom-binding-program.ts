@@ -19,6 +19,11 @@ import type { createBindingClassGroup, BindingClassGroup } from './dom-binding-c
 import type { __createBindingSignals, BindingSignalConnection } from './dom-binding-signals.js';
 import type { __createBindingStyles } from './dom-binding-styles.js';
 import type {
+	__createBindingProjections,
+	BindingProjectionConnection,
+	BindingProjectionGroup,
+} from './dom-binding-projections.js';
+import type {
 	__createBindingControls,
 	BindingControlLease,
 	BindingControlPrepared,
@@ -245,6 +250,7 @@ export interface BindingFragment {
 	readonly createClassGroup?: typeof createBindingClassGroup;
 	readonly signalIndices?: readonly number[];
 	readonly styleIndices?: readonly number[];
+	readonly projectionGroups?: readonly BindingProjectionGroup[];
 	project(environment: readonly unknown[]): readonly unknown[];
 	readonly regions: readonly BindingRegion[];
 	readonly constructible?: false;
@@ -313,6 +319,7 @@ export interface CompiledBindingProgram<Props> {
 	readonly adoptScalar?: typeof __adoptBindings;
 	readonly connectSignal?: typeof __createBindingSignals;
 	readonly connectStyle?: typeof __createBindingStyles;
+	readonly connectProjection?: typeof __createBindingProjections;
 	readonly createControls?: typeof __createBindingControls;
 	readonly adopt: typeof __adoptBindingProgram<Props>;
 	readonly mount: typeof __mountBindingProgram<Props>;
@@ -343,6 +350,7 @@ interface FragmentInstance {
 	groups: Map<number, BindingClassGroup>;
 	styles?: Map<number, ReturnType<typeof __createBindingStyleRestoration>>;
 	signals?: Map<number, BindingSignalConnection>;
+	projections?: Map<number, BindingProjectionConnection>;
 	controls?: Map<number, BindingControlLease>;
 	signalPlan?: FragmentPlan;
 	signalFrame?: number;
@@ -383,6 +391,7 @@ interface Transaction {
 	restoreStyles: boolean;
 	signals?: ReturnType<typeof __createBindingSignals>;
 	styles?: ReturnType<typeof __createBindingStyles>;
+	projections?: ReturnType<typeof __createBindingProjections>;
 	controls?: ReturnType<typeof __createBindingControls>;
 	notifySignal?(prepare: () => () => void): void;
 	preparing?: boolean;
@@ -454,6 +463,9 @@ function releaseInstance(instance: FragmentInstance, transaction: Transaction): 
 	instance.updateAdapters = undefined;
 	for (const connection of instance.signals?.values() ?? []) attempt(() => connection.dispose());
 	instance.signals?.clear();
+	for (const connection of instance.projections ? new Set(instance.projections.values()) : [])
+		attempt(() => connection.dispose());
+	instance.projections?.clear();
 	instance.signalPlan = undefined;
 	for (const region of instance.regions) {
 		if (region.signal) attempt(() => region.signal!.dispose());
@@ -700,6 +712,54 @@ function projectValues(
 	const operations = instance.definition.bindings;
 	if (!Array.isArray(values) || values.length !== operations.length)
 		throw new TypeError('A DOM presentation projection must return its synchronous scalar values.');
+	if (transaction.projections && instance.definition.projectionGroups) {
+		values = [...values];
+		for (const group of instance.definition.projectionGroups) {
+			requireActive(transaction);
+			const first = group[0]![0];
+			let connection = instance.projections?.get(first);
+			if (!connection) {
+				const prepare = (): (() => void) => {
+					if (
+						instance.disposed ||
+						(transaction.preparing && instance.signalFrame !== transaction.frame)
+					)
+						return () => {};
+					const projected = connection!.get();
+					const groups = new Map<number, { commit(): void }>();
+					for (const [index] of group) {
+						const classGroup = instance.groups
+							.get(index)
+							?.prepare((projected[index] as string | null) ?? '');
+						if (classGroup) groups.set(index, classGroup);
+					}
+					if (transaction.preparing && instance.signalPlan) {
+						for (const [index] of group) {
+							instance.signalPlan.values[index] = projected[index]!;
+							const classGroup = groups.get(index);
+							if (classGroup) instance.signalPlan.groups.set(index, classGroup);
+						}
+						return () => {};
+					}
+					return () => {
+						for (const [index] of group)
+							writeOperation(instance, index, projected[index]!, groups.get(index), transaction);
+					};
+				};
+				connection = transaction.projections.connect(
+					group,
+					operations,
+					instance.nodes,
+					() => transaction.notifySignal!(prepare),
+					transaction.restoreStyles,
+				);
+				instance.projections ??= new Map();
+				for (const [index] of group) instance.projections.set(index, connection);
+			}
+			const projected = connection.read(values[first]);
+			for (const [index] of group) (values as unknown[])[index] = projected[index];
+		}
+	}
 	if (transaction.signals || transaction.styles) {
 		let copied = false;
 		const indices = instance.definition.styleIndices
@@ -825,7 +885,7 @@ function prepareFragment(
 		controls,
 		adapters: instance.cleanup?.prepare?.(environment),
 	};
-	if (instance.signals || instance.controls) {
+	if (instance.signals || instance.controls || instance.projections) {
 		instance.signalPlan = plan;
 		instance.signalFrame = transaction.frame;
 	}
@@ -1162,8 +1222,11 @@ function writeOperation(
 	if (transaction.disposed || instance.disposed || value === instance.previous[index]) return;
 	const operation = instance.definition.bindings[index]!;
 	if (operation[1] === 'classToken') instance.previous[index] = value;
-	if (operation[1] === 'styleObject') instance.signals!.get(index)!.write!(value);
-	else if (operation[1] === 'classGroup') group!.commit();
+	if (operation[1] === 'styleObject') {
+		const projection = instance.projections?.get(index);
+		if (projection) projection.writeStyle(index, value);
+		else instance.signals!.get(index)!.write!(value);
+	} else if (operation[1] === 'classGroup') group!.commit();
 	else if (
 		(operation[1] === 'styleProperty' || operation[1] === 'styleAttribute') &&
 		transaction.restoreStyles
@@ -1275,11 +1338,12 @@ function bindProgram<Props>(
 		restoreStyles: options?.restoreStyles === true,
 		signals: descriptor.connectSignal?.(),
 		styles: descriptor.connectStyle?.(),
+		projections: descriptor.connectProjection?.(),
 		controls: descriptor.createControls?.(),
 		frame: 0,
 	};
 	const signalUpdates =
-		transaction.signals || transaction.styles || transaction.controls
+		transaction.signals || transaction.styles || transaction.projections || transaction.controls
 			? new Set<() => () => void>()
 			: undefined;
 	let instance: FragmentInstance | undefined;
@@ -1337,6 +1401,18 @@ function bindProgram<Props>(
 		try {
 			while ((dirty || signalUpdates?.size) && !transaction.disposed) {
 				if (!dirty) {
+					if (transaction.projections) {
+						// A group may invalidate while another field coerces. Replace its
+						// stale prepared commit before writing any of the coupled fields.
+						const writes = new Map<() => () => void, () => void>();
+						while (signalUpdates!.size && !dirty && !transaction.disposed) {
+							const pending = [...signalUpdates!];
+							signalUpdates!.clear();
+							for (const prepare of pending) writes.set(prepare, prepare());
+						}
+						if (!dirty && !transaction.disposed) for (const write of writes.values()) write();
+						continue;
+					}
 					const pending = [...signalUpdates!];
 					signalUpdates!.clear();
 					const writes = pending.map((prepare) => prepare());

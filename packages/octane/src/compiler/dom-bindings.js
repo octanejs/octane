@@ -466,6 +466,7 @@ function assertProjection(
 		if (node.type === 'CallExpression' || node.type === 'OptionalCallExpression') {
 			const callee = unwrap(node.callee);
 			if (
+				node.metadata?.octaneNativeSignalRead ||
 				readMethod(node) ||
 				importedProjectionCall(node, imports, lexical, parameterScope) ||
 				factoryProjection(callee)
@@ -526,6 +527,7 @@ function planView(fn, filename, source, imports, lexical, native = null) {
 	const projections = [];
 	const signalIndices = [];
 	const styleIndices = [];
+	const projectionGroups = [];
 	const classAttributes = new Map();
 	const id = `d:${strongHash(`octane:dom-bindings:2\0${filename}\0${fn.id.name}\0${source}`)}`;
 	const parameterScope = lexical.nodeScopes.get(fn.body) ?? lexical.rootScope;
@@ -749,52 +751,63 @@ function planView(fn, filename, source, imports, lexical, native = null) {
 		const externalNames = new Set();
 		const knownFields = new Set();
 		for (const attr of element.openingElement?.attributes ?? element.attributes ?? []) {
-			if (attr.type === 'JSXSpreadAttribute' || attr.type === 'SpreadAttribute') {
-				if (attr._octaneKnownAttributeSpread) {
-					assertProjection(attr.argument, filename, imports, lexical, parameterScope);
-					const temporary = b.id(lexical.domBindingAllocateName('_bindingAttrs'));
-					projections.push(inheritHookMemoOrigin(b.const(temporary, attr.argument), attr));
-					for (const raw of attr._octaneKnownAttributeSpread.fields) {
-						let name = raw === 'className' ? 'class' : (ATTRIBUTE_ALIASES.get(raw) ?? raw);
-						if (ns === 0) name = name.toLowerCase();
-						const lower = name.toLowerCase();
-						if (
-							FORBIDDEN_ATTRS.has(lower) ||
-							lower.startsWith('on') ||
-							lower.startsWith('data-octane-class-') ||
-							externalAttribute(tag, lower) ||
-							((URL_ATTRS.has(lower) || name.includes(':')) &&
-								!shouldSanitizeURLAttribute(tag, name))
-						)
-							error(
-								filename,
-								attr,
-								`known spread field ${JSON.stringify(raw)} is not a presentation channel`,
-							);
-						if (owned.has(name) || externalNames.has(lower))
-							error(filename, attr, `known spread conflicts with attribute ${JSON.stringify(raw)}`);
-						owned.add(name);
-						knownFields.add(lower);
-						if (name === 'style' && attr._octaneKnownAttributeSpread.style === 'object') {
-							styleIndices.push(bindings.length);
-							bindings.push([index, 'styleObject', name]);
-						} else {
-							signalIndices.push(bindings.length);
-							bindings.push([index, bindingKind(tag, name), name]);
-						}
-						values.push(
-							inheritHookMemoOrigin(
-								b.conditional(
-									b.binary('==', temporary, b.literal(null)),
-									b.unary('void', b.literal(0)),
-									b.member(temporary, b.literal(raw), true),
-								),
-								attr,
-							),
+			if (attr._octaneKnownAttributeSpread) {
+				const argument = attr.argument ?? attr.value.expression;
+				// The compiler verified the exact imported factory against its
+				// provider contract. Its arguments still need the ordinary proof.
+				for (const value of argument.arguments)
+					assertProjection(value, filename, imports, lexical, parameterScope);
+				const temporary = b.id(lexical.domBindingAllocateName('_bindingAttrs'));
+				const group = attr._octaneKnownAttributeSpread.projection ? [] : null;
+				if (group) projectionGroups.push(group);
+				else projections.push(inheritHookMemoOrigin(b.const(temporary, argument), attr));
+				for (const raw of attr._octaneKnownAttributeSpread.fields) {
+					let name = raw === 'className' ? 'class' : (ATTRIBUTE_ALIASES.get(raw) ?? raw);
+					if (ns === 0) name = name.toLowerCase();
+					const lower = name.toLowerCase();
+					if (
+						FORBIDDEN_ATTRS.has(lower) ||
+						lower.startsWith('on') ||
+						lower.startsWith('data-octane-class-') ||
+						externalAttribute(tag, lower) ||
+						((URL_ATTRS.has(lower) || name.includes(':')) && !shouldSanitizeURLAttribute(tag, name))
+					)
+						error(
+							filename,
+							attr,
+							`known spread field ${JSON.stringify(raw)} is not a presentation channel`,
 						);
+					if (owned.has(name) || externalNames.has(lower))
+						error(filename, attr, `known spread conflicts with attribute ${JSON.stringify(raw)}`);
+					owned.add(name);
+					knownFields.add(lower);
+					if (group) group.push([bindings.length, raw]);
+					if (name === 'style' && attr._octaneKnownAttributeSpread.style === 'object') {
+						if (!group) styleIndices.push(bindings.length);
+						bindings.push([index, 'styleObject', name]);
+					} else {
+						if (!group) signalIndices.push(bindings.length);
+						bindings.push([index, bindingKind(tag, name), name]);
 					}
-					continue;
+					values.push(
+						group
+							? inheritHookMemoOrigin(
+									group.length === 1 ? b.arrow([], argument) : b.literal(null),
+									attr,
+								)
+							: inheritHookMemoOrigin(
+									b.conditional(
+										b.binary('==', temporary, b.literal(null)),
+										b.unary('void', b.literal(0)),
+										b.member(temporary, b.literal(raw), true),
+									),
+									attr,
+								),
+					);
 				}
+				continue;
+			}
+			if (attr.type === 'JSXSpreadAttribute' || attr.type === 'SpreadAttribute') {
 				if (!markUnbound(attr.argument))
 					error(filename, attr, 'binding attribute spreads must be explicitly unbound');
 				if (bindings.some((binding) => binding[0] === index))
@@ -975,6 +988,7 @@ function planView(fn, filename, source, imports, lexical, native = null) {
 		projections,
 		signalIndices,
 		styleIndices,
+		projectionGroups,
 		unbound,
 		classAttributes,
 		id,
@@ -992,6 +1006,7 @@ function scalarProperties(
 	signalFactory = null,
 	styleFactory = null,
 	controlFactory = null,
+	projectionFactory = null,
 ) {
 	return [
 		b.prop('init', b.id('id'), b.literal(plan.id)),
@@ -1013,6 +1028,12 @@ function scalarProperties(
 				]
 			: []),
 		...(controlFactory ? [b.prop('init', b.id('createControls'), controlFactory)] : []),
+		...(projectionFactory
+			? [
+					b.prop('init', b.id('projectionGroups'), literalData(plan.projectionGroups)),
+					b.prop('init', b.id('connectProjection'), projectionFactory),
+				]
+			: []),
 	];
 }
 
@@ -1103,6 +1124,7 @@ function projectProgram(ast, plan, filename, lexical) {
 		const signalFactory = plan.signals ? allocate('_bindingSignals') : null;
 		const styleFactory = plan.styles ? allocate('_bindingStyles') : null;
 		const controlFactory = plan.controls ? allocate('_bindingControls') : null;
+		const projectionFactory = plan.projectionsEnabled ? allocate('_bindingProjections') : null;
 		// Imported child artifacts carry their optional capabilities. Forward a
 		// factory rather than loading every capability for every parent view.
 		const capability = (name, local) => {
@@ -1126,6 +1148,7 @@ function projectProgram(ast, plan, filename, lexical) {
 					signalFactory ? b.id(signalFactory) : null,
 					styleFactory ? b.id(styleFactory) : null,
 					controlFactory ? b.id(controlFactory) : null,
+					projectionFactory ? b.id(projectionFactory) : null,
 				),
 			);
 		return {
@@ -1133,6 +1156,17 @@ function projectProgram(ast, plan, filename, lexical) {
 			body: [
 				...importNodes,
 				...plan.dependencies,
+				...(projectionFactory
+					? [
+							inheritHookMemoOrigin(
+								b.imports(
+									[['__createBindingProjections', projectionFactory]],
+									'octane/dom-binding-projections',
+								),
+								plan.fn,
+							),
+						]
+					: []),
 				...(styleFactory
 					? [
 							inheritHookMemoOrigin(
@@ -1193,6 +1227,7 @@ function projectProgram(ast, plan, filename, lexical) {
 							...(scalar ? [b.prop('init', b.id('scalar'), scalar)] : []),
 							...(adoptScalar ? [b.prop('init', b.id('adoptScalar'), b.id(adoptScalar))] : []),
 							...capability('connectStyle', styleFactory),
+							...capability('connectProjection', projectionFactory),
 							...capability('createControls', controlFactory),
 							...(signalFactory
 								? [b.prop('init', b.id('connectSignal'), b.id(signalFactory))]
@@ -1217,6 +1252,19 @@ function projectProgram(ast, plan, filename, lexical) {
 	let signalFactory = null;
 	let styleFactory = null;
 	let controlFactory = null;
+	let projectionFactory = null;
+	if (plan.projectionGroups.length > 0) {
+		projectionFactory = lexical.domBindingAllocateName('_bindingProjections');
+		importNodes.push(
+			inheritHookMemoOrigin(
+				b.imports(
+					[['__createBindingProjections', projectionFactory]],
+					'octane/dom-binding-projections',
+				),
+				plan.fn,
+			),
+		);
+	}
 	if (plan.styleIndices.length > 0) {
 		styleFactory = lexical.domBindingAllocateName('_bindingStyles');
 		importNodes.push(
@@ -1268,6 +1316,7 @@ function projectProgram(ast, plan, filename, lexical) {
 							signalFactory ? b.id(signalFactory) : null,
 							styleFactory ? b.id(styleFactory) : null,
 							controlFactory ? b.id(controlFactory) : null,
+							projectionFactory ? b.id(projectionFactory) : null,
 						),
 					),
 				),

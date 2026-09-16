@@ -13,6 +13,22 @@ import {
 /** Canonical style values after native handles and CSS units have been resolved. */
 export type BindingStyleSnapshot = Readonly<Record<string, string | null>>;
 
+/** Shared preparation keeps native style projections on the canonical CSS rules. */
+export function __normalizeBindingStyle(value: unknown): BindingValue {
+	if (value == null || value === false || value === '') return null;
+	if (typeof value === 'string') return value;
+	if (typeof value !== 'object')
+		throw new TypeError('A whole-style DOM binding requires a style object, CSS text or null.');
+	const result: Record<string, string | null> = Object.create(null);
+	for (const name in value) {
+		const property = (value as Record<string, unknown>)[name];
+		// Preserve authored alias order around shorthand declarations.
+		result[name] =
+			property == null || typeof property === 'boolean' ? null : cssStyleValue(name, property);
+	}
+	return result;
+}
+
 /**
  * Query-selected whole-style capability. Native source subscriptions belong to
  * this binding lifetime; the existing graph and canonical style reader own all
@@ -43,25 +59,6 @@ export function __createBindingStyles() {
 				return result;
 			};
 			previous = snapshotDOM();
-			const normalize = (value: unknown): BindingValue => {
-				if (value == null || value === false || value === '') return null;
-				if (typeof value === 'string') return value;
-				if (typeof value !== 'object')
-					throw new TypeError(
-						'A whole-style DOM binding requires a style object, CSS text or null.',
-					);
-				const result: Record<string, string | null> = Object.create(null);
-				for (const name in value) {
-					const property = (value as Record<string, unknown>)[name];
-					// Keep aliases in authored order: a shorthand between camelCase
-					// and kebab-case spellings must not become the last declaration.
-					result[name] =
-						property == null || typeof property === 'boolean'
-							? null
-							: cssStyleValue(name, property);
-				}
-				return result;
-			};
 			const get = (): BindingValue => {
 				if (disposed) return null;
 				const reads = new Map<NativeReadSource, number>();
@@ -71,7 +68,7 @@ export function __createBindingStyles() {
 				const guard = beginNativeWriteGuard();
 				let value: BindingValue;
 				try {
-					value = run(() => normalize(readNativeDomStyle(raw)));
+					value = run(() => __normalizeBindingStyle(readNativeDomStyle(raw)));
 				} finally {
 					endNativeWriteGuard(guard);
 					setNativeReadObserver(previousObserver);

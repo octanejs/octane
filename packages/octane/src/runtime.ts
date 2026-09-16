@@ -21,6 +21,7 @@ declare const process: { env: { NODE_ENV?: string } };
 
 import { resolveHookPath } from './hook-slot-cache.js';
 import { DOMStage } from './dom-stage.js';
+import { __normalizeBindingStyle } from './dom-binding-styles.js';
 import { bumpContextEpoch, contextEpochNow } from './context-epoch.js';
 
 import {
@@ -903,12 +904,65 @@ export function nativeStyleBinding(
 	el: HTMLElement | SVGElement,
 	value: any,
 ): void {
+	nativePresentationBinding(owner, slotIndex, el, nativeStyleBody, { el, value });
+}
+
+interface NativeProjectionProps {
+	el: HTMLElement | SVGElement;
+	compute: () => Record<string, unknown> | null | undefined;
+	fields: readonly string[];
+}
+
+function nativeProjectionBody(props: NativeProjectionProps, scope: Scope): void {
+	const prepare = () => {
+		const projected = props.compute();
+		return props.fields.map((field) => {
+			const value = projected?.[field];
+			if (field === 'style') return __normalizeBindingStyle(readNativeDomStyle(value));
+			if (field === 'class' || field === 'className')
+				return value == null || value === false ? null : normalizeClass(value);
+			return coerceAttrValue(props.el, field, value);
+		});
+	};
+	// Resolve and normalize the entire projection before the first DOM write.
+	// A throwing unit conversion must not leave a new class with the old style.
+	const values = SIGNAL_BINDINGS_ENABLED
+		? runWithBlockSignalOwner(scope.parent, prepare)
+		: prepare();
+	const previous = scope.slots[0] as unknown[] | undefined;
+	for (let i = 0; i < props.fields.length; i++) {
+		const field = props.fields[i]!;
+		const value = values[i];
+		if (previous !== undefined && Object.is(previous[i], value)) continue;
+		if (field === 'style') setStyle(props.el, value, previous?.[i]);
+		else if (field === 'class' || field === 'className') setClassAttr(props.el, value);
+		else setAttribute(props.el, field, value);
+	}
+	journalRootProperty(scope.slots, 0, scope.slots[0]);
+	scope.slots[0] = values;
+}
+
+/** One scheduled native read owns every field of a compiler-proven projection. @internal */
+export function nativeProjectionBinding(
+	owner: Scope,
+	slotIndex: number,
+	el: HTMLElement | SVGElement,
+	compute: NativeProjectionProps['compute'],
+	fields: readonly string[],
+): void {
+	nativePresentationBinding(owner, slotIndex, el, nativeProjectionBody, { el, compute, fields });
+}
+
+function nativePresentationBinding(
+	owner: Scope,
+	slotIndex: number,
+	el: HTMLElement | SVGElement,
+	body: Block['body'],
+	props: any,
+): void {
 	let binding = owner.slots[slotIndex] as NativeStyleBinding | undefined;
 	if (binding === undefined) {
-		const block = createBlock('control-flow', owner.block, el, null, null, nativeStyleBody, {
-			el,
-			value,
-		});
+		const block = createBlock('control-flow', owner.block, el, null, null, body, props);
 		block.parent = owner;
 		binding = {
 			__kind: 'nativeStyleBinding',
@@ -932,7 +986,7 @@ export function nativeStyleBinding(
 			block.slots[0] = undefined;
 		}
 		journalRootProperty(block, 'props', block.props);
-		block.props = { el, value };
+		block.props = props;
 	}
 	renderBlock(binding.block!);
 }

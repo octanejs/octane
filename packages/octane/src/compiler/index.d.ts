@@ -69,6 +69,8 @@ export interface KnownAttributeSpread {
 	fields: readonly string[];
 	/** Use signal-aware style-object bindings; fields must include style. Omitted retains CSS text. */
 	style?: 'object';
+	/** Opt-in native JSX expression shorthand, passed as one argument to this factory. */
+	jsxAttribute?: string;
 }
 
 export interface CompileOptions {
@@ -241,7 +243,12 @@ export function compile(source: string, filename: string, options?: CompileOptio
 export function compileToVolarMappings(
 	source: string,
 	filename?: string,
-	options?: { loose?: boolean; renderers?: unknown; strong?: boolean },
+	options?: {
+		loose?: boolean;
+		renderers?: unknown;
+		strong?: boolean;
+		knownAttributeSpreads?: readonly KnownAttributeSpread[];
+	},
 ): VolarCompileResult;
 
 /** @internal Shared authored-JSX diagnostic analysis for compiler integrations. */

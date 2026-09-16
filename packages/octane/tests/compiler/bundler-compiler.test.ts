@@ -18,6 +18,12 @@ import {
 } from '../../src/compiler/bundler.js';
 import { inspectProfileOutput, uniqueMetadata } from '../_profile-output';
 import { decodeMappings } from '../_source-map.js';
+import { loadCompiledFixtureSource } from '../_server-fixture.js';
+import { renderToString } from 'octane/server';
+import * as BindingStyles from '../../src/dom-binding-styles.js';
+import * as BindingSignals from '../../src/dom-binding-signals.js';
+import * as SignalRead from '../../src/signals/read-protocol.js';
+import { createScope } from 'octane/signals';
 
 const COMPONENT =
 	"import { useState } from 'octane';\n" +
@@ -123,6 +129,168 @@ export function Styled(props) ${extension === 'tsrx' ? "@{ 'use dom bindings'; <
 					expect(selected?.code).not.toContain('octane/internal/client');
 				}
 			}
+		}
+		const factory = (styles: { className: string; style: object }[]) => ({
+			...styles[0],
+			'data-style-src': 'source',
+		});
+		const styles = { className: 'styled', style: { color: 'red' } };
+		const runtimeModules = {
+			'@stylexjs/stylex': { props: factory, default: { props: factory } },
+			'octane/dom-binding-styles': BindingStyles,
+			'octane/dom-binding-signals': BindingSignals,
+		};
+		for (const provider of [
+			{ imported: 'props', prelude: "import { props as factory } from '@stylexjs/stylex';" },
+			{
+				imported: '*',
+				members: ['props'],
+				prelude: "import * as factory from '@stylexjs/stylex';",
+			},
+			{
+				imported: 'default',
+				members: ['props'],
+				prelude: "import factory from '@stylexjs/stylex';",
+			},
+			{ imported: 'props', prelude: '' },
+		]) {
+			const contract = {
+				source: '@stylexjs/stylex',
+				imported: provider.imported,
+				members: provider.members,
+				fields: ['className', 'style', 'data-style-src'],
+				style: 'object' as const,
+				jsxAttribute: 'sx',
+			};
+			for (const dev of [false, true]) {
+				for (const extension of ['tsx', 'tsrx']) {
+					// The parameter shadows every authored factory import. A generated
+					// import must not capture another authored binding either.
+					const source = `${provider.prelude}
+const _jsxAttribute = 'untouched';
+export function Styled(factory) ${extension === 'tsrx' ? "@{ 'use dom bindings';" : "{ 'use dom bindings'; return ("}
+ <div title={_jsxAttribute} sx={[factory.styles]} />
+${extension === 'tsrx' ? '}' : '); }'}`;
+					const id = `/project/src/Shorthand.${extension}`;
+					const compileOptions = { dev, hmr: false, knownAttributeSpreads: [contract] };
+					const server = loadCompiledFixtureSource(source, {
+						id,
+						mode: 'server',
+						compileOptions,
+						runtimeModules,
+					});
+					const html = renderToString(server.Styled, { styles }).html;
+					expect(html).toContain('class="styled"');
+					expect(html).toContain('color:red');
+					expect(html).toContain('data-style-src="source"');
+					expect(html).toContain('title="untouched"');
+					expect(html).not.toContain(' sx=');
+					expect(() =>
+						parseModule(
+							compile(source, id, { ...compileOptions, mode: 'client' }).code,
+							'Shorthand.js',
+						),
+					).not.toThrow();
+					const bindings = loadCompiledFixtureSource(source, {
+						id: `${id}?octane-bindings=Styled`,
+						mode: 'client',
+						compileOptions,
+						runtimeModules,
+					}).default;
+					expect(bindings.project({ styles })).toEqual([
+						'untouched',
+						'styled',
+						{ color: 'red' },
+						'source',
+					]);
+				}
+			}
+			const unchanged = `export function Child(props) { return props.sx; }
+export function App() @{ <><Child sx="component"/><div sx="native"/><div sx/></> }`;
+			const server = loadCompiledFixtureSource(unchanged, {
+				id: '/project/src/Unchanged.tsrx',
+				mode: 'server',
+				compileOptions: { knownAttributeSpreads: [contract] },
+				runtimeModules,
+			});
+			expect(renderToString(server.App).html).toContain('component');
+			expect(renderToString(server.App).html).toContain('sx="native"');
+			for (const invalid of ['', 'bad name', 'ns:sx']) {
+				expect(() =>
+					compile(COMPONENT, '/project/src/Invalid.tsrx', {
+						knownAttributeSpreads: [{ ...contract, jsxAttribute: invalid }],
+					}),
+				).toThrow(/jsxAttribute/);
+			}
+			expect(() =>
+				compile(COMPONENT, '/project/src/Ambiguous.tsrx', {
+					knownAttributeSpreads: [contract, { ...contract, source: 'another-provider' }],
+				}),
+			).toThrow(/jsxAttribute/);
+		}
+		const scope = createScope({ scopeKey: 'compiler-sx-projection' });
+		try {
+			const height$ = scope.signal$<number | null>('height', 12);
+			const height = (value: number | null) => ({
+				className: value === null ? undefined : 'height',
+				style: value === null ? undefined : { '--height': `${value}px` },
+				'data-style-src': 'height',
+			});
+			const appearance$ = scope.signal$('appearance', height(12));
+			const projectionContract = {
+				source: '@stylexjs/stylex',
+				imported: '*',
+				members: ['props'],
+				fields: ['className', 'style', 'data-style-src'],
+				style: 'object' as const,
+				jsxAttribute: 'sx',
+			};
+			for (const [expression, initial] of [
+				['stylex.height(props.height$)', 12],
+				['props.appearance$', 12],
+				['stylex.height(props.height$ === null ? null : props.height$ * 2)', 24],
+			] as const) {
+				const source = `import * as stylex from '@stylexjs/stylex';
+export function Styled(props) @{ 'use dom bindings'; <div sx={${expression}}/> }`;
+				const server = loadCompiledFixtureSource(source, {
+					id: '/project/src/Reactive.tsrx',
+					mode: 'server',
+					compileOptions: { knownAttributeSpreads: [projectionContract] },
+					runtimeModules: {
+						'@stylexjs/stylex': { props: (value: unknown) => value, height },
+						'octane/internal/signal-read': SignalRead,
+						'octane/dom-binding-signals': BindingSignals,
+						'octane/dom-binding-styles': BindingStyles,
+					},
+				});
+				expect(renderToString(server.Styled, { height$, appearance$ }).html).toContain(
+					`--height:${initial}px`,
+				);
+				height$.set(null);
+				appearance$.set(height(null));
+				expect(renderToString(server.Styled, { height$, appearance$ }).html).not.toContain(
+					'--height:',
+				);
+				height$.set(12);
+				appearance$.set(height(12));
+			}
+			for (const sibling of ['className="other"', 'style={{ color: "red" }}', '{...props.extra}']) {
+				expect(() =>
+					compile(
+						`export function Styled(props) @{ <div sx={props.appearance$} ${sibling}/> }`,
+						'/project/src/Conflicting.tsrx',
+						{ knownAttributeSpreads: [projectionContract] },
+					),
+				).toThrow(/cannot overlap/);
+			}
+			const staticCode = compile(
+				`export function Styled(props) @{ <div sx={props.appearance}/> }`,
+				'/project/src/Static.tsrx',
+				{ knownAttributeSpreads: [projectionContract] },
+			).code;
+			expect(staticCode).not.toContain('octane/internal/signal-read');
+		} finally {
+			scope.dispose();
 		}
 	});
 
