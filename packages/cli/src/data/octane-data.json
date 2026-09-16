@@ -1139,7 +1139,7 @@
     },
     {
       "name": "@octanejs/stylex",
-      "version": "0.1.51",
+      "version": "0.1.52",
       "category": "Styling",
       "upstream": { "package": "@stylexjs/stylex", "version": "0.19.0" },
       "surface": "Full compile-time integration: re-exports the StyleX runtime API (`create`, `props`, `attrs`, `keyframes`, `defineVars`, `createTheme`) and registers as an import source; the `/vite` plugin runs the StyleX compiler over octane's compiled output and emits one static atomic stylesheet (`virtual:stylex.css`) with zero StyleX runtime in the bundle.",
@@ -1430,7 +1430,7 @@
     },
     {
       "name": "@octanejs/to-print",
-      "version": "0.0.8",
+      "version": "0.0.9",
       "category": "UI Utilities",
       "upstream": {
         "package": "react-to-print",
@@ -1639,7 +1639,7 @@
     },
     {
       "name": "@octanejs/zag",
-      "version": "0.0.18",
+      "version": "0.0.19",
       "category": "UI Libraries",
       "upstream": { "package": "@zag-js/react", "version": "1.42.0" },
       "surface": "Complete port of the @zag-js/react@1.42.0 public adapter surface: useMachine, normalizeProps, Portal, the @zag-js/core mergeProps re-export, and the framework useSyncExternalStore re-export. The framework-agnostic @zag-js/core, @zag-js/store, @zag-js/types, and @zag-js/utils packages are reused unchanged.",
