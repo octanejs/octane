@@ -115,6 +115,60 @@ ${extension === 'tsrx' ? '}' : '); }'}`;
 							'TypedSpread.js',
 						),
 					).not.toThrow();
+				// External provider fields have the same ownership boundary as an
+				// unbound object, including class/className aliases in either direction.
+				for (const providerClass of ['class', 'className']) {
+					for (const mode of ['client', 'server'] as const) {
+						const options = {
+							...compileOptions,
+							mode,
+							knownAttributeSpreads: [
+								{ ...compileOptions.knownAttributeSpreads[0], fields: [providerClass, 'style'] },
+							],
+						};
+						const withAttribute = (attribute: string) =>
+							source
+								.replace('{ styles, label }', '{ styles, label, owned$ }')
+								.replace('aria-label={label}', `${attribute} aria-label={label}`);
+						for (const name of ['class', 'className', 'style']) {
+							const conflict = withAttribute(
+								name === 'style' ? 'style={{ color: owned$ }}' : `${name}={owned$}`,
+							);
+							for (const moduleId of mode === 'client' ? [id, `${id}?octane-bindings=View`] : [id])
+								expect(() => compile(conflict, moduleId, options)).toThrow(
+									/unbound spreads must not contribute owned attribute/,
+								);
+							for (const value of ['"fixed"', '{external(owned$)}'])
+								expect(() => compile(withAttribute(`${name}=${value}`), id, options)).not.toThrow();
+							expect(() =>
+								compile(conflict, id, {
+									...options,
+									knownAttributeSpreads: [
+										{
+											...options.knownAttributeSpreads[0],
+											fields: name === 'style' ? [providerClass] : ['style'],
+											style: name === 'style' ? undefined : 'object',
+										},
+									],
+								}),
+							).not.toThrow();
+						}
+						const provider = `stylex.${spread.includes('.nested') ? 'nested.' : ''}attrs(styles)`;
+						expect(() => compile(withAttribute(`{...${provider}}`), id, options)).toThrow(
+							/known spread conflicts with attribute/,
+						);
+						expect(() =>
+							compile(
+								source.replace(
+									`{...${spread}} aria-label={label}`,
+									`aria-label={label} {...${spread}}`,
+								),
+								id,
+								options,
+							),
+						).toThrow(/unbound attribute spreads must precede owned binding attributes/);
+					}
+				}
 				// Transparent receiver syntax must retain the fixed-field contract
 				// even without the unbound escape hatch for generic spreads.
 				if (spread.startsWith('external(')) {

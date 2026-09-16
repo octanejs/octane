@@ -982,26 +982,31 @@ function planView(fn, filename, source, imports, lexical, native = null) {
 					error(filename, attr, 'binding attribute spreads must be explicitly unbound');
 				if (bindings.some((binding) => binding[0] === index))
 					error(filename, attr, 'unbound attribute spreads must precede owned binding attributes');
+				const addExternalName = (raw, node) => {
+					const name = (
+						raw === 'className' ? 'class' : (ATTRIBUTE_ALIASES.get(raw) ?? raw)
+					).toLowerCase();
+					if (
+						FORBIDDEN_ATTRS.has(name) ||
+						name.startsWith('on') ||
+						name.startsWith('data-octane-class-')
+					)
+						error(
+							filename,
+							node,
+							`unbound spreads cannot supply reserved or structural attribute ${JSON.stringify(raw)}`,
+						);
+					externalNames.add(name);
+				};
 				const external = unwrap(unwrap(attr.argument).arguments[0]);
-				if (external?.type === 'ObjectExpression') {
+				if (attr._octaneKnownAttributeSpread) {
+					for (const raw of attr._octaneKnownAttributeSpread.fields) addExternalName(raw, attr);
+				} else if (external?.type === 'ObjectExpression') {
 					for (const property of external.properties) {
 						if (property.type !== 'Property' || property.computed) continue;
 						const raw = property.key.name ?? property.key.value;
 						if (typeof raw !== 'string') continue;
-						const name = (
-							raw === 'className' ? 'class' : (ATTRIBUTE_ALIASES.get(raw) ?? raw)
-						).toLowerCase();
-						if (
-							FORBIDDEN_ATTRS.has(name) ||
-							name.startsWith('on') ||
-							name.startsWith('data-octane-class-')
-						)
-							error(
-								filename,
-								property,
-								`unbound spreads cannot supply reserved or structural attribute ${JSON.stringify(raw)}`,
-							);
-						externalNames.add(name);
+						addExternalName(raw, property);
 					}
 				}
 				continue;
