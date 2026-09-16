@@ -9,7 +9,9 @@ CI. It becomes available in Actions after merging the workflow into `main`.
 Each trial runs the real `scripts/react-parity/check.mjs --shard N/4` entrypoint
 on the same Linux runner and Node version as parity CI, with its usual reporters,
 native sharding, timeouts and failure semantics. Trials fail independently;
-one passing trial does not erase another trial's failure.
+one passing trial does not erase another trial's failure. The diagnostic audit
+step is limited to 25 minutes within a separately budgeted job, leaving time to
+upload evidence if the audit hangs; test-level timeouts remain unchanged.
 
 Download the trial's artifact within seven days. Every invocation creates a
 fresh `run-*` directory containing:
