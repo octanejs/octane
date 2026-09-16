@@ -41,3 +41,9 @@ trigger portals, and teardown against the pinned React public entrypoint (`src/i
 export crosswalk lists each public upstream export with an Octane mapping or explicit divergence.
 With required differential and type lanes executing in the dedicated parity job, verification is
 `verified`; remaining gaps stay as explicit divergences rather than silent omissions.
+
+## Dependency compatibility update (2026-09-12)
+
+The installed React oracle is `0.10.12` and both adapters now consume core `0.14.2`. Both upstream React source files are byte-identical to `0.10.7`, so the immutable copied-source pin and complete source/type mapping above remain unchanged. Existing differential, lifecycle, SSR and precise type checks run against the updated dependencies. The earlier core-version mismatch is resolved for the installed oracle; the historical release pin remains visible above.
+
+`audit/release-compatibility.json` records the archive and compared-file hashes.

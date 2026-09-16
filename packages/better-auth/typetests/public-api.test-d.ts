@@ -45,3 +45,11 @@ type _InferredSession = Expect<
 
 const numberStore = atom(1);
 useStore(numberStore, { deps: [numberStore] as const });
+
+// The new framework-neutral method passes through the Octane projection intact.
+type _HydrateSession = Expect<
+	Equal<typeof client.hydrateSession, typeof vanillaClient.hydrateSession>
+>;
+client.hydrateSession(null);
+// @ts-expect-error session hydration keeps the complete upstream session shape
+client.hydrateSession({ user: { name: 'Ada' } });

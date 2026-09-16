@@ -57,9 +57,9 @@
     ]
   },
   "coreDependency": {
-    "upstreamVersion": "0.12.4",
-    "octaneVersion": "0.12.5",
-    "disposition": "version-divergence"
+    "upstreamVersion": "0.14.2",
+    "octaneVersion": "0.14.2",
+    "disposition": "version-aligned"
   },
   "upstreamTests": [],
   "typeSuite": {
