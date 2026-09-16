@@ -27,10 +27,11 @@ in CI and none otherwise. The byte-exact configuration is retained under
 `audit/repository-fixtures/`. Test identities, assertions, skips, and todos remain
 subject to the same strict report validation after retries.
 
-The adapted `#test-utils` facade scopes the unchanged upstream `waitSingleFrame`
-helper in Octane `act()`, so frame-driven transition updates commit before focus
-and DOM assertions. The pristine helper, test identities, assertions, and warning
-checks remain unchanged.
+The `#test-utils` facades scope the unchanged upstream `waitSingleFrame` helper
+in the corresponding renderer's `act()`, so frame-driven transition updates
+commit before focus and DOM assertions. The pristine runner uses a virtual
+facade over its selected upstream root; pristine bytes, test identities,
+assertions, and warning checks remain unchanged.
 
 The adapted Accordion CSS-transition suite explicitly enables animation waiting
 and restores the prior test flag afterward, matching neighboring upstream motion

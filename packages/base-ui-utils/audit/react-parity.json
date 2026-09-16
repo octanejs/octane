@@ -107,7 +107,7 @@
         {
           "path": "scripts/react-parity/base-ui-pristine-config.mjs",
           "role": "support",
-          "sha256": "87e828ef56540913957b25dec93023ab85be41439ff0129536ff9f1ef2a769ae"
+          "sha256": "e6cafdcd80742966b95733b2a786eb91b4d1907ef7f8f8a602f06ef36c18432c"
         }
       ]
     },
