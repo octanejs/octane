@@ -6,6 +6,7 @@ import {
 	snapshotHydrationControl,
 } from '../../src/hydration/event-capture.js';
 import {
+	act,
 	bindSignalChild,
 	bindSignalValue,
 	childSlot,
@@ -15,6 +16,7 @@ import {
 	enableSignalBindings,
 	flushSync,
 	hydrateRoot,
+	startTransition,
 	type Root,
 } from '../../src/runtime.js';
 import {
@@ -619,22 +621,28 @@ export function App(props) @{
 				}),
 			);
 			expect(container.querySelector('input')).toBe(input);
-			if (channel === 'value') input.value = 'typed';
-			else input.checked = false;
-			input.dispatchEvent(new InputEvent('input', { bubbles: true }));
-			expect(runWithSignalOwner(owner, () => client.value$.get())).toBe(
-				writable ? (channel === 'value' ? 'typed' : false) : channel === 'value' ? 'A' : true,
-			);
-			const candidate = captureHydrationControlCandidate(input)!;
-			expect(
-				applyHydrationControlCandidate(
-					candidate,
-					channel === 'value' ? { value: 'candidate' } : { checked: true },
-				),
-			).toBe(true);
-			expect(runWithSignalOwner(owner, () => client.value$.get())).toBe(
-				writable ? (channel === 'value' ? 'candidate' : true) : channel === 'value' ? 'A' : true,
-			);
+			let finishAction!: () => void;
+			startTransition(() => new Promise<void>((resolve) => (finishAction = resolve)));
+			try {
+				if (channel === 'value') input.value = 'typed';
+				else input.checked = false;
+				input.dispatchEvent(new InputEvent('input', { bubbles: true }));
+				expect(runWithSignalOwner(owner, () => client.value$.get())).toBe(
+					writable ? (channel === 'value' ? 'typed' : false) : channel === 'value' ? 'A' : true,
+				);
+				const candidate = captureHydrationControlCandidate(input)!;
+				expect(
+					applyHydrationControlCandidate(
+						candidate,
+						channel === 'value' ? { value: 'candidate' } : { checked: true },
+					),
+				).toBe(true);
+				expect(runWithSignalOwner(owner, () => client.value$.get())).toBe(
+					writable ? (channel === 'value' ? 'candidate' : true) : channel === 'value' ? 'A' : true,
+				);
+			} finally {
+				await act(finishAction);
+			}
 		},
 	);
 
@@ -868,31 +876,37 @@ export function App(props) @{
 			readonly.dispatchEvent(new InputEvent('input', { bubbles: true }));
 			const loaded = client ?? loadCompiledFixtureSource(source, { ...options, mode: 'client' });
 			const error = vi.spyOn(console, 'error');
-			root = hydrateRoot(container, loaded.App, {}, { signalOwner: owner });
-			expect(container.querySelector('input')).toBe(input);
-			expect(input.value).toBe(edit);
-			expect(document.activeElement).toBe(input);
-			expect([input.selectionStart, input.selectionEnd, input.selectionDirection]).toEqual([
-				Math.min(1, edit.length),
-				Math.min(3, edit.length),
-				'backward',
-			]);
-			await expect
-				.poll(() => container.querySelector('p')?.textContent)
-				.toBe(`Characters: ${edit.length}`);
-			expect(runWithSignalOwner(owner, () => loaded.draft$.get())).toBe(edit);
-			expect(new FormData(container.querySelector('form')!).get('fileAttachments')).toBe(edit);
-			expect(runWithSignalOwner(owner, () => loaded.readonly$.get())).toBe('fixed');
-			expect(snapshotHydrationControl(input)?.editRevision).toBe(0);
-			input.value = '';
-			input.dispatchEvent(new InputEvent('input', { bubbles: true }));
-			await expect.poll(() => container.querySelector('p')?.textContent).toBe('Characters: 0');
-			expect(new FormData(container.querySelector('form')!).get('fileAttachments')).toBe('');
-			expect(
-				error.mock.calls.filter((call) =>
-					String(call[0]).includes('will render a read-only field'),
-				),
-			).toHaveLength(0);
+			let finishAction!: () => void;
+			startTransition(() => new Promise<void>((resolve) => (finishAction = resolve)));
+			try {
+				root = hydrateRoot(container, loaded.App, {}, { signalOwner: owner });
+				expect(container.querySelector('input')).toBe(input);
+				expect(input.value).toBe(edit);
+				expect(document.activeElement).toBe(input);
+				expect([input.selectionStart, input.selectionEnd, input.selectionDirection]).toEqual([
+					Math.min(1, edit.length),
+					Math.min(3, edit.length),
+					'backward',
+				]);
+				await expect
+					.poll(() => container.querySelector('p')?.textContent)
+					.toBe(`Characters: ${edit.length}`);
+				expect(runWithSignalOwner(owner, () => loaded.draft$.get())).toBe(edit);
+				expect(new FormData(container.querySelector('form')!).get('fileAttachments')).toBe(edit);
+				expect(runWithSignalOwner(owner, () => loaded.readonly$.get())).toBe('fixed');
+				expect(snapshotHydrationControl(input)?.editRevision).toBe(0);
+				input.value = '';
+				input.dispatchEvent(new InputEvent('input', { bubbles: true }));
+				await expect.poll(() => container.querySelector('p')?.textContent).toBe('Characters: 0');
+				expect(new FormData(container.querySelector('form')!).get('fileAttachments')).toBe('');
+				expect(
+					error.mock.calls.filter((call) =>
+						String(call[0]).includes('will render a read-only field'),
+					),
+				).toHaveLength(0);
+			} finally {
+				await act(finishAction);
+			}
 		},
 	);
 

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "nextCode": 79,
+  "nextCode": 80,
   "codes": {
     "1": {
       "message": "Maximum update depth exceeded. Octane limits the number of nested updates to prevent infinite loops.",
@@ -466,6 +466,12 @@
     },
     "78": {
       "message": "A hydration binding lease can be claimed only once.",
+      "argumentCount": 0,
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "79": {
+      "message": "Unsupported native signal transition.",
       "argumentCount": 0,
       "runtime": ["client"],
       "status": "active"

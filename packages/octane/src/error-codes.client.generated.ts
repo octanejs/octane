@@ -62,6 +62,7 @@ type ClientErrorArguments = {
 	76: [];
 	77: [];
 	78: [];
+	79: [];
 };
 
 export function formatClientError<Code extends keyof ClientErrorArguments>(
@@ -287,6 +288,8 @@ export function formatClientError<Code extends keyof ClientErrorArguments>(
 				);
 			case 78:
 				return formatDevErrorMessage('A hydration binding lease can be claimed only once.', args);
+			case 79:
+				return formatDevErrorMessage('Unsupported native signal transition.', args);
 			default:
 				return formatUnknownDevErrorMessage(code);
 		}

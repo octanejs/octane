@@ -2394,10 +2394,7 @@ function flushNativeTransitions(): void {
 					handleResumeError(admission.errorBlock, outcome.error);
 				else reportTransitionError(outcome.error, batch.hook ?? undefined);
 			} else if (outcome.status === 'invalid')
-				reportTransitionError(
-					new TypeError('Unsupported native signal transition.'),
-					batch.hook ?? undefined,
-				);
+				reportTransitionError(new TypeError(formatClientError(79)), batch.hook ?? undefined);
 		}
 	}
 }
@@ -22846,9 +22843,13 @@ function addSignalHostControlWriter(
 	channel: 'value' | 'checked',
 ): () => void {
 	const cleanup = registerHydrationControlSignalWriter(binding.element, channel, (next) => {
-		const handle = winningSignalHostControl(binding.sources, channel);
-		if (!binding.disposed && !binding.pendingControl && isWritableSignal(handle))
-			runWithBlockSignalOwner(binding.scope, () => handle.set(next));
+		withoutSignalCandidate(() =>
+			runWithBlockSignalOwner(binding.scope, () => {
+				const handle = winningSignalHostControl(binding.sources, channel);
+				if (!binding.disposed && !binding.pendingControl && isWritableSignal(handle))
+					handle.set(next);
+			}),
+		);
 	});
 	binding.controlWriters.set(channel, cleanup);
 	return cleanup;
@@ -22913,13 +22914,17 @@ function syncSignalHostControl(binding: SignalHostPropSourcesBinding): void {
 		if (binding.disposed || binding.pendingControl) return;
 		const live = snapshotHydrationControl(element);
 		if (live === null) return;
-		runWithBlockSignalOwner(binding.scope, () => {
-			const nextValue = winningSignalHostControl(binding.sources, 'value');
-			const nextChecked = winningSignalHostControl(binding.sources, 'checked');
-			if (isWritableSignal(nextChecked) && live.checked !== undefined)
-				nextChecked.set(live.checked);
-			if (isWritableSignal(nextValue)) nextValue.set(live.selectedValues ?? live.value);
-		});
+		// A spread's winning handle must come from the committed source too:
+		// native edits never select or update a private Action candidate.
+		withoutSignalCandidate(() =>
+			runWithBlockSignalOwner(binding.scope, () => {
+				const nextValue = winningSignalHostControl(binding.sources, 'value');
+				const nextChecked = winningSignalHostControl(binding.sources, 'checked');
+				if (isWritableSignal(nextChecked) && live.checked !== undefined)
+					nextChecked.set(live.checked);
+				if (isWritableSignal(nextValue)) nextValue.set(live.selectedValues ?? live.value);
+			}),
+		);
 	};
 	binding.input = input;
 	(STAGED_DOM?.view(element) ?? element).addEventListener('input', input);
@@ -22945,23 +22950,25 @@ function disposeSignalHostPropSources(binding: SignalHostPropSourcesBinding): vo
 function queueSignalHostControlAdoption(binding: SignalHostPropSourcesBinding): void {
 	enqueueEffectEventCommitAction(() => {
 		if (binding.disposed || binding.scope.block.disposed || !binding.pendingControl) return;
-		runWithBlockSignalOwner(binding.scope, () => {
-			const snapshot = snapshotHydrationControl(binding.element)!;
-			if (snapshot.editRevision > 0) {
-				const checked = winningSignalHostControl(binding.sources, 'checked');
-				const value = winningSignalHostControl(binding.sources, 'value');
-				if (isWritableSignal(checked) && snapshot.checked !== undefined)
-					checked.set(snapshot.checked);
-				if (isWritableSignal(value)) value.set(snapshot.selectedValues ?? snapshot.value);
-			}
-			if (binding.disposed || binding.scope.block.disposed) return;
-			if (!consumeHydrationControl(binding.element, snapshot.revision)) {
-				queueSignalHostControlAdoption(binding);
-				return;
-			}
-			binding.pendingControl = false;
-			updateSignalHostPropSources(binding);
-		});
+		withoutSignalCandidate(() =>
+			runWithBlockSignalOwner(binding.scope, () => {
+				const snapshot = snapshotHydrationControl(binding.element)!;
+				if (snapshot.editRevision > 0) {
+					const checked = winningSignalHostControl(binding.sources, 'checked');
+					const value = winningSignalHostControl(binding.sources, 'value');
+					if (isWritableSignal(checked) && snapshot.checked !== undefined)
+						checked.set(snapshot.checked);
+					if (isWritableSignal(value)) value.set(snapshot.selectedValues ?? snapshot.value);
+				}
+				if (binding.disposed || binding.scope.block.disposed) return;
+				if (!consumeHydrationControl(binding.element, snapshot.revision)) {
+					queueSignalHostControlAdoption(binding);
+					return;
+				}
+				binding.pendingControl = false;
+				updateSignalHostPropSources(binding);
+			}),
+		);
 	});
 }
 

@@ -2214,6 +2214,11 @@
       "message": "A hydration binding lease can be claimed only once.",
       "runtime": ["client"],
       "status": "active"
+    },
+    "79": {
+      "message": "Unsupported native signal transition.",
+      "runtime": ["client"],
+      "status": "active"
     }
   }
 }
