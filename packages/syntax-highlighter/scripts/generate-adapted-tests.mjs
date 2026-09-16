@@ -45,12 +45,22 @@ for (const name of testFiles) {
 		}
 		adapted = `${adapted.slice(0, preloadIndex + preload.length)}
 
-  // Keep the request pending so runner load cannot race the loading-state assertion.
+  // Earlier cases request these Highlight.js grammars but await Prism loaders.
+  // Settle the actual registrations before snapshotting auto-detection fallback,
+  // matching the loaded-grammar state in the retained upstream snapshot.
+  await Promise.all(
+    ['javascript', 'fortran'].map((language) => SyntaxHighlighter.loadLanguage(language)),
+  );
+  // Keep the requested grammar pending independently of those earlier loads.
   const loadLanguage = vi
     .spyOn(SyntaxHighlighter, 'loadLanguage')
-    .mockImplementation(() => new Promise(() => {}));${adapted.slice(preloadIndex + preload.length, assertionIndex)}  await vi.waitFor(() => expect(loadLanguage).toHaveBeenCalledWith('gherkin'));
+    .mockImplementation(() => new Promise(() => {}));
+  try {${adapted.slice(preloadIndex + preload.length, assertionIndex)}  await vi.waitFor(() => expect(loadLanguage).toHaveBeenCalledWith('gherkin'));
+  expect(SyntaxHighlighter.isRegistered('gherkin')).toBe(false);
 ${assertion}
-  loadLanguage.mockRestore();${adapted.slice(assertionIndex + assertion.length)}`;
+  } finally {
+    loadLanguage.mockRestore();
+  }${adapted.slice(assertionIndex + assertion.length)}`;
 	}
 	const outputName = name.replace(/\.js$/, '.test.ts');
 	const compiled = await transform(adapted, {

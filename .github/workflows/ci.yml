@@ -503,18 +503,18 @@ jobs:
           REACT_PARITY_BROWSER_DIAGNOSTICS: "1"
         run: pnpm react-parity:check --shard ${{ matrix.shard }}/4
 
-      - name: Report browser runner resources on failure
+      - name: Collect browser failure resource diagnostics
         if: failure()
         run: |
           free -h
-          df -h /dev/shm
+          df -h /tmp /dev/shm
           for resource in memory.events memory.current memory.peak; do
-            if [ -f "/sys/fs/cgroup/$resource" ]; then
+            if [ -r "/sys/fs/cgroup/$resource" ]; then
               printf '%s\n' "$resource"
               cat "/sys/fs/cgroup/$resource"
             fi
           done
-          dmesg --ctime --level=err,warn | tail -80 || true
+          sudo -n dmesg --ctime | tail -100 || true
 
       - name: Upload failed React parity diagnostics
         if: failure()
