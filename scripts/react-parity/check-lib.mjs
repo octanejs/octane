@@ -23,7 +23,12 @@ export function buildHarnessArgv(harnessPath, relativeFile) {
 	return [harnessPath, 'run-required-non-vitest', '--manifest', relativeFile];
 }
 
-export function buildParityVitestArgv(configPath, shardValue = '1/1', reportPath) {
+export function buildParityVitestArgv(
+	configPath,
+	shardValue = '1/1',
+	reportPath,
+	browserDiagnostics = false,
+) {
 	const shard = parseShard(shardValue);
 	return [
 		'node_modules/vitest/vitest.mjs',
@@ -32,6 +37,9 @@ export function buildParityVitestArgv(configPath, shardValue = '1/1', reportPath
 		configPath,
 		'--reporter=./scripts/react-parity/vitest-json-reporter.mjs',
 		'--reporter=./scripts/react-parity/vitest-unhandled-reporter.mjs',
+		...(browserDiagnostics
+			? ['--reporter=./scripts/react-parity/browser-lifecycle-reporter.mjs']
+			: []),
 		...(reportPath ? [`--outputFile=${reportPath}`] : []),
 		...(shard.total === 1 ? [] : [`--shard=${shard.value}`]),
 	];
@@ -60,7 +68,12 @@ export async function runRequiredVitestLanes({
 		const { code, signal } = await new Promise((resolve, reject) => {
 			const child = spawnProcess(
 				process.execPath,
-				buildParityVitestArgv(configPath, shard.value, runReportPath),
+				buildParityVitestArgv(
+					configPath,
+					shard.value,
+					runReportPath,
+					Boolean(process.env.OCTANE_BROWSER_DIAGNOSTICS_DIR),
+				),
 				{ cwd: repo, stdio: 'inherit', env: process.env },
 			);
 			child.once('error', reject);
