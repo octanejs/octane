@@ -1,5 +1,11 @@
 # @octanejs/animejs
 
+## 0.0.23
+
+### Patch Changes
+
+- 888e71d: Declare imported and lifecycle-owned Anime.js surfaces and recommend direct upstream imports for vanilla APIs in the package documentation and CLI binding catalog. Existing convenience exports remain supported.
+
 ## 0.0.22
 
 ### Patch Changes
