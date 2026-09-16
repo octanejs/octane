@@ -54,6 +54,15 @@ type ClientErrorArguments = {
 	62: [];
 	63: [];
 	64: [];
+	66: [];
+	67: [unknown];
+	72: [];
+	74: [];
+	75: [];
+	76: [];
+	77: [];
+	78: [];
+	79: [];
 };
 
 export function formatClientError<Code extends keyof ClientErrorArguments>(
@@ -248,6 +257,39 @@ export function formatClientError<Code extends keyof ClientErrorArguments>(
 				);
 			case 64:
 				return formatDevErrorMessage('Multiple errors were thrown during act.', args);
+			case 66:
+				return formatDevErrorMessage(
+					'An independent Hydrate boundary cannot change ownership after mount.',
+					args,
+				);
+			case 67:
+				return formatDevErrorMessage('Signal control identity mismatch for "%s".', args);
+			case 72:
+				return formatDevErrorMessage(
+					'Octane DOM binding text range does not match its template.',
+					args,
+				);
+			case 74:
+				return formatDevErrorMessage('Unsupported Octane signal binding ABI.', args);
+			case 75:
+				return formatDevErrorMessage(
+					'Hydration binding leases require a supported fixed native view without structural regions or unsupported writers.',
+					args,
+				);
+			case 76:
+				return formatDevErrorMessage(
+					'DOM binding hydration leases are supported only by hydrateRoot().',
+					args,
+				);
+			case 77:
+				return formatDevErrorMessage(
+					'Hydration binding leases require active fixed native views owned by this container.',
+					args,
+				);
+			case 78:
+				return formatDevErrorMessage('A hydration binding lease can be claimed only once.', args);
+			case 79:
+				return formatDevErrorMessage('Unsupported native signal transition.', args);
 			default:
 				return formatUnknownDevErrorMessage(code);
 		}

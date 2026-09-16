@@ -495,24 +495,29 @@ jobs:
       # file shards before proving complete lane coverage.
       - name: Check React parity inventories and execute required lanes
         env:
-          # Retain Chromium stderr and process exit reasons when its websocket
-          # disappears; the RPC disconnect alone cannot distinguish a crash.
-          DEBUG: pw:browser
           REACT_PARITY_VITEST_REPORT: ${{ runner.temp }}/react-parity-vitest/shard-${{ matrix.shard }}.json
+          # Retain browser-process exits and RPC disconnects when a runner stops
+          # before it can produce a complete assertion report.
+          DEBUG: pw:browser*,vitest:browser:api,vitest:browser:pool,vitest:browser:playwright
+          VITEST_PW_DEBUG: "1"
+          REACT_PARITY_BROWSER_DIAGNOSTICS: "1"
         run: pnpm react-parity:check --shard ${{ matrix.shard }}/4
 
       - name: Collect browser failure resource diagnostics
-        if: ${{ failure() }}
+        if: failure()
         run: |
-          free -m
+          free -h
           df -h /tmp /dev/shm
-          if [ -r /sys/fs/cgroup/memory.events ]; then
-            cat /sys/fs/cgroup/memory.events
-          fi
+          for resource in memory.events memory.current memory.peak; do
+            if [ -r "/sys/fs/cgroup/$resource" ]; then
+              printf '%s\n' "$resource"
+              cat "/sys/fs/cgroup/$resource"
+            fi
+          done
           sudo -n dmesg --ctime | tail -100 || true
 
       - name: Upload failed React parity diagnostics
-        if: ${{ failure() }}
+        if: failure()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: react-parity-diagnostics-${{ matrix.shard }}
@@ -683,12 +688,12 @@ jobs:
         with:
           bun-version: 1.3.14
 
-      - name: Install Playwright Chromium for package and Astro coverage
+      - name: Install Playwright Chromium and WebKit for package and Astro coverage
         id: install_heavy_node_chromium
         if: ${{ !cancelled() && steps.install_heavy_node_dependencies.outcome == 'success' }}
         run: |
           bash scripts/ci-apt-https.sh
-          pnpm --filter website exec playwright install --with-deps chromium
+          pnpm --filter website exec playwright install --with-deps chromium webkit
 
       # Keep each former lane as a named step, and let independent suites run
       # after a sibling failure when their own prerequisites are still valid.

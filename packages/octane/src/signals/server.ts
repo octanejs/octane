@@ -1,4 +1,5 @@
 /** Server twin selected by the native-read compiler for octane/signals/client. */
+export * from './index.js';
 import { nativeLocalHook } from '../runtime.server.js';
 import { createLocalScope } from './engine.js';
 import type { Scope, WritableSignal } from './types.js';

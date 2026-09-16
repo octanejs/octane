@@ -1,7 +1,7 @@
+import { loadCompiledFixtureSource } from '../_server-fixture.js';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { compile } from 'octane/compiler';
 import { createRoot, hydrateRoot, flushSync } from '../../src/index.js';
 import * as ServerRT from 'octane/server';
 import { Doc, Overridable, Card, Wrap, Clicky, Bare } from './_fixtures/host-string-tag.tsrx';
@@ -19,16 +19,13 @@ const FIXTURE = join(
 	'packages/octane/tests/hydration/_fixtures/host-string-tag.tsrx',
 );
 function serverModule(): Record<string, any> {
-	let { code } = compile(readFileSync(FIXTURE, 'utf8'), 'host-string-tag.tsrx', {
+	return loadCompiledFixtureSource(readFileSync(FIXTURE, 'utf8'), {
+		id: 'host-string-tag.tsrx',
 		mode: 'server',
+		compileOptions: {
+			mode: 'server',
+		},
 	});
-	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/server['"];?/g,
-		(_m: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
-	);
-	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
-	const fn = new Function('__rt', '__exports', code + '\nreturn __exports;');
-	return fn(ServerRT, {});
 }
 const server = serverModule();
 

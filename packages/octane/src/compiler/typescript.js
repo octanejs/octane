@@ -421,6 +421,7 @@ export function createTextTypeProject(options) {
 		try {
 			compilation = compileToVolarMappings(source, rendererFilename(file, rendererRoot), {
 				renderers,
+				knownAttributeSpreads: options.knownAttributeSpreads,
 			});
 		} catch {
 			// Broken authored syntax is not evidence. Passing the authored text
@@ -495,6 +496,7 @@ export function createTextTypeProject(options) {
 				options: program.getCompilerOptions(),
 				references: loadConfig().projectReferences ?? [],
 				renderers: renderers.signature,
+				knownAttributeSpreads: options.knownAttributeSpreads,
 				rendererRoot,
 				roots: roots(),
 				inputs,

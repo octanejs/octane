@@ -2149,6 +2149,76 @@
       "message": "Internal SSR invariant violated: ASYNC_SCOPE is not an extension of the active frame's async scope. Please file an Octane issue.",
       "runtime": ["server"],
       "status": "active"
+    },
+    "66": {
+      "message": "An independent Hydrate boundary cannot change ownership after mount.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "67": {
+      "message": "Signal control identity mismatch for \"%s\".",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "68": {
+      "message": "A signal control cannot join values from different document owners.",
+      "runtime": ["server"],
+      "status": "active"
+    },
+    "69": {
+      "message": "Independent Hydrate requires a build manifest in RenderOptions.",
+      "runtime": ["server"],
+      "status": "active"
+    },
+    "70": {
+      "message": "Independent Hydrate activation chunk is missing from the build manifest.",
+      "runtime": ["server"],
+      "status": "active"
+    },
+    "71": {
+      "message": "Unsupported Octane server signal binding ABI.",
+      "runtime": ["server"],
+      "status": "active"
+    },
+    "72": {
+      "message": "Octane DOM binding text range does not match its template.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "73": {
+      "message": "Octane DOM bindings require unique list keys.",
+      "runtime": ["server"],
+      "status": "active"
+    },
+    "74": {
+      "message": "Unsupported Octane signal binding ABI.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "75": {
+      "message": "Hydration binding leases require a supported fixed native view without structural regions or unsupported writers.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "76": {
+      "message": "DOM binding hydration leases are supported only by hydrateRoot().",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "77": {
+      "message": "Hydration binding leases require active fixed native views owned by this container.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "78": {
+      "message": "A hydration binding lease can be claimed only once.",
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "79": {
+      "message": "Unsupported native signal transition.",
+      "runtime": ["client"],
+      "status": "active"
     }
   }
 }

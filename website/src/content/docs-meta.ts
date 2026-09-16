@@ -202,6 +202,7 @@ export const docsMeta: DocMeta[] = [
 			'createScope',
 			'signal$',
 			'derived$',
+			'createResource',
 			'asyncSignal$',
 			'query',
 			'reactive state',

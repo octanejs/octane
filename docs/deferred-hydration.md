@@ -32,14 +32,15 @@ Deferred hydration applies only when matching server HTML exists in the initial
 document. A boundary first mounted after the app is running renders normally on
 the client.
 
-## The three decisions
+## The activation decisions
 
-Every boundary makes three performance decisions:
+Every boundary makes these performance decisions:
 
 | Prop | Default | Controls |
 | --- | --- | --- |
 | `when` | required | When preserved server HTML becomes interactive. |
 | `split` | `true` | Whether the compiler moves the children into a generated JavaScript chunk. |
+| `independent` | `false` | Require standalone activation without evaluating or hydrating the lexical parent. |
 | `prefetch` | none | Whether code or other resources begin loading before `when` resolves. |
 
 The complete component surface is:
@@ -48,6 +49,7 @@ The complete component surface is:
 | --- | --- | --- |
 | `when` | `HydrationStrategy \| (() => HydrationStrategy)` | Required hydration trigger. The function form runs only on the client and must return synchronously. |
 | `split` | `boolean` | Compiler-split the direct children into a deferred chunk. Defaults to `true`. |
+| `independent` | `boolean` | Require a compiler-proven standalone widget. Unsupported ownership or captures fail compilation instead of falling back. |
 | `prefetch` | `HydrationPrefetchStrategy \| HydrationPrefetchFunction` | Start loading the split chunk or run custom preparation before hydration. |
 | `fallback` | renderable | Client-only loading UI for a later client mount or suspension. |
 | `onHydrated` | `() => void` | Called once after the child successfully commits on the client. |
@@ -192,6 +194,63 @@ route's deferred chunks, including its layout and configured root fallbacks,
 because that route's server HTML needs its styling before the child JavaScript
 loads. This eager CSS collection follows the composed route's asset graphs; it
 does not turn deferred JavaScript into an eager dependency.
+
+### `independent`
+
+`independent` is an explicit, strict request for a standalone widget entry:
+
+```tsrx
+<Hydrate independent when={interaction()}>
+	<TodoComposer city={city} />
+</Hydrate>
+```
+
+The compiler and bundler must preserve serializable captures, stable IDs and
+hook seeds, the matching server read frame, and every reachable stylesheet. If
+the child depends on parent-owned runtime state such as a ref initialized by a
+parent effect, compilation fails with a source-located diagnostic. It does not
+silently change to parent-first hydration. Lexical nesting alone is not a
+dependency: a local callback that closes only over a shared signal can remain
+eligible after compiler lifting.
+
+Ordinary `<Hydrate>` boundaries, including the default split form, retain the
+existing parent-first activation behavior.
+
+#### Replaceable selections versus commands
+
+Independent widgets normally preserve every captured interaction in order. A
+widget can explicitly mark a replaceable selection with a nonempty
+`data-octane-hydrate-selection` group on native `type="button"` buttons:
+
+```tsrx
+<Hydrate independent when={interaction({ events: 'click' })}>
+	<button type="button" data-octane-hydrate-selection="forecast-day"
+		onClick={() => selectedDay$.set('Monday')}>Monday</button>
+	<button type="button" data-octane-hydrate-selection="forecast-day"
+		onClick={() => selectedDay$.set('Tuesday')}>Tuesday</button>
+	<button type="button" onClick={sendForecast}>Send</button>
+</Hydrate>
+```
+
+Before activation, consecutive plain primary clicks in the same group and the
+same independent boundary keep only the latest click. For example,
+Monday → Tuesday → Send → Monday → Tuesday replays Tuesday → Send → Tuesday.
+A different group or another widget's captured action is also an ordering
+barrier. Groups do not merge across boundaries. This applies before bootstrap
+and while the widget's code is loading; once active, native events run normally.
+
+The marker asserts that replacing earlier clicks is safe. Do not put it on
+commands such as Send, Add, or Purchase; Octane does not inspect arbitrary event
+closures to infer this distinction. Modified clicks, non-primary clicks,
+submit/reset buttons, links, and input events do not coalesce. Use the explicit
+click-only strategy shown above: default `interaction()` also captures pointer,
+focus, and input events, which remain ordering barriers. Independent native
+links keep their native navigation instead of being queued for replay.
+
+Capture preserves the original target, boundary, and selection group. Replaced
+or stale controls are not redirected to equivalent-looking DOM. This opt-in
+does not evaluate a handler before its code arrives, promise immediate visual
+selection feedback, or recreate trusted browser user activation.
 
 ### `prefetch`
 
@@ -342,6 +401,122 @@ when elements leave the container. Importing the focused `octane/behavior`
 entry does not load the component runtime, compiler, or server renderer. The
 same API and public types are also exported by `octane`.
 
+### Compiled presentation on existing DOM
+
+For a fixed native element tree, `adoptBindings` from `octane/behavior` can
+replace a manual attribute/class presentation callback without creating a
+component root. This experimental path is explicit: mark a named component
+with `'use dom bindings'` and activate it from an Octane-compiled `.tsrx` or
+`.tsx` module. The ordinary component remains usable by the server renderer.
+
+```tsrx
+// PrimaryAction.tsrx
+import { unbound } from 'octane/behavior';
+
+export interface PrimaryActionProps {
+	type: 'button' | 'submit';
+	disabled: boolean;
+	label: string;
+	showSend: boolean;
+	showStop: boolean;
+	initiallyHidden: boolean;
+}
+
+export function PrimaryAction(props: PrimaryActionProps) @{
+	'use dom bindings';
+	<button
+		type={props.type}
+		disabled={props.disabled}
+		aria-label={props.label}
+		hidden={unbound(props.initiallyHidden)}
+	>
+		<span hidden={!props.showSend}>
+			<svg aria-hidden="true" viewBox="0 0 16 16">
+				<path d="M8 2 2 8h4v6h4V8h4Z" />
+			</svg>
+		</span>
+		<span hidden={!props.showStop}>
+			<svg aria-hidden="true" viewBox="0 0 16 16">
+				<path d="M3 3h10v10H3Z" />
+			</svg>
+		</span>
+	</button>
+}
+```
+
+```ts
+// activate-primary-action.tsrx — compiled even though it contains no JSX.
+import { adoptBindings, type BindingSource } from 'octane/behavior';
+import { PrimaryAction, type PrimaryActionProps } from './PrimaryAction.tsrx';
+
+export function activatePrimaryAction(
+	root: Element,
+	source: BindingSource<PrimaryActionProps>,
+	signal: AbortSignal,
+) {
+	return adoptBindings(root, PrimaryAction, source, { signal });
+}
+```
+
+`BindingSource` supplies `getSnapshot()` and `subscribe(notify)`. It can be an
+existing owned signal projection or external store; adoption does not create a
+second reactive graph. Each notification reads one snapshot and prepares all
+bound values before synchronously writing them. The handle's `refresh()` also
+publishes synchronously, including when the enclosing signal batch has not yet
+delivered subscriptions. Use it before a native operation such as
+`form.requestSubmit()` that immediately depends on updated button properties.
+
+The compiler selects a separate binding artifact; authors keep normal typed
+component imports. Do not import generated query modules by hand. A direct call
+from an uncompiled plain `.ts` file throws; import a compiled activation function
+instead. Keep that activation module free of ordinary rendered-component uses
+if its browser graph must exclude the renderer.
+
+With `octane()` followed by `@octanejs/stylex/vite`, production browser builds can share eligible co-located StyleX recipes between the normal component and its extracted binding artifact. Definitions stay local while StyleX performs its normal optimizations; only the resulting closed, immutable recipe data and required helpers move to generated shared modules. CSS remains in the existing stylesheet. Development/HMR, server compilation, and unsupported or escaping definitions retain their existing path. Authors do not need to export a separate styles module.
+
+Custom compiler adapters can use `stylexBindingConstants` from `@octanejs/stylex/compiler`. Pass the matching Octane result's optional `bindingConstants` metadata to this Babel plugin, placed **after** the StyleX plugin, and pass the prior Octane source map as `inputSourceMap`. Register each `{ id, code, map }` returned in `metadata.octaneStylexSharedConstants` as a build-owned virtual module. Preserve the canonical authored filename, honor development/server exclusions, and use the metadata from that exact compilation; do not reconstruct it from emitted JavaScript. This is build-time integration, not a browser runtime dependency. Measure the early-only and combined delivery graphs separately: sharing can reduce their combined cost while increasing the early-only cost.
+
+Import the named view directly from its defining module, not through a barrel.
+Keep that leaf module free of eager state initialization. Imported projection
+helpers must be pure; pass live values through the source snapshot rather than
+reading ambient state inside a projection. Snapshots must be synchronous values,
+never promises or other thenables.
+
+Pure projections also accept the canonical `isSignalHandle` import from `octane/signals` and unshadowed `String` and `Math.min` calls. Local `const` event and ref callbacks may be named or aliased in setup; their bodies execute as native adapters, not while preparing presentation values. They cannot be used as eager projections. Named refs preserve dependency-based attachment, but a ref that captures another local callback is unsupported. An explicit component `ref` may forward a ref supplied through props; this does not authorize arbitrary component-prop spreads.
+
+Compiler-proven presentation supports native HTML/SVG, text, native events and
+refs, direct signal bindings, conditions, keyed lists, and supported pure child
+composition. Hooks, arbitrary component logic, unsupported spreads, and raw
+HTML produce a diagnostic, not a renderer fallback. Structural programs own
+only their declared regions; fixed programs update properties without replacing
+nodes.
+
+Binding views may use flat destructured props, including aliases, primitive literal defaults, and a final rest binding: `function Action({ label: text = 'Send', ...props }) @{ ... }`. Destructuring runs once for each prepared snapshot, so projections and event handlers share the same captured values and rest object. Defaults apply only to `undefined`, not `null`. Nested or computed patterns and nonliteral defaults fail extraction. A rendered `children` slot may be aliased or read through rest when it was not excluded; a non-null default for that slot is unsupported. A rest binding does not authorize an arbitrary native JSX spread: the existing spread restrictions still apply.
+
+For a child binding view called with explicit props, the compiler can specialize a native spread of that child's destructured rest parameter to the caller's known prop names. Authors keep normal component imports and JSX; the ordered prop-shape request is compiler-owned. This does not permit arbitrary object spreads, aliases of rest, conflicting native writers, or unsupported property channels. A generic `adoptBindings` call on a rest-spreading component without a proven caller shape still fails clearly. Normal SSR keeps the authored spread and shares its structural and class-group annotation allocation with the extracted view; it does not acquire the extracted artifact's narrower prop API.
+
+When an eligible view returns only another view, `adoptBindings(element, View, source)` can resolve its enclosing compiler-owned range from the existing native element. Resolution follows only adjacent, single-content view/root wrappers and requires one exact `View` match; it does not search DOM ancestors, skip siblings, or cross conditional, slot, or list boundaries. Views with multiple root nodes still require an explicit range. Adopt the enclosing view whose explicit child props establish a closed spread shape, not the generic rest-spreading child itself.
+
+Pass the exact element emitted by the matching server build. Adoption validates
+template compatibility, native topology, and conflicting binding ownership
+before modifying it. Only declared dynamic properties and structural regions
+are owned; unrelated properties and existing event listeners remain
+with their current owner. An application must stop previous manual writers for
+the channels it hands over. Template compatibility is not document or request
+authorization: retain the enclosing application's lifetime and stream fencing.
+
+`unbound(value)` marks an explicitly external-owned attribute in an opted-in
+view. The ordinary component uses its value during SSR and normal rendering;
+the adopter neither evaluates nor writes that attribute. Above, the server can
+initially hide the button while an existing visibility controller retains ownership
+of `button.hidden`. This is not signal untracking or a delayed write.
+
+Call `dispose()` or abort the supplied signal to unsubscribe and release the
+binding claims. Both retain existing DOM. Compose this with a behavior root's
+adoption callback when discovery, externally streamed ranges, or automatic
+element-removal cleanup is needed; the small binding runtime does not require
+that machinery itself.
+
 Each external range belongs to its declared `owner`. Strictly nested ranges are
 allowed, and the closest registered range determines ownership for behaviors
 with an `owner` constraint. Registering the same element for another owner
@@ -367,6 +542,108 @@ or restore transient user activation that expired during asynchronous loading.
 Code requiring transient activation must run synchronously while the original
 event is being dispatched.
 
+### Optional handoff to normal hydration
+
+An adopted compiler-proven native view can keep handling interactions while its enclosing
+application waits to hydrate. Pass its `BindingHandle` to the later root:
+
+```ts
+// In the explicitly loaded renderer entry, not the early activation module.
+import { hydrateRoot } from 'octane';
+import { App } from './App.tsrx';
+
+const root = hydrateRoot(container, App, props, {
+	bindingLeases: [earlyBinding],
+});
+```
+
+Use matching server/client compiler output and the same signal engine and
+application state for both entries. If the application supplies a `signalOwner`,
+retain that same owner during hydration. Loading the early binding artifact does
+not load the renderer; explicitly loading this later entry does. Signal writes
+and early handlers do not request hydration on their own.
+
+The early binding remains active while hydration suspends or an attempt is
+discarded. Only an accepted attempt transfers ownership: it prepares current
+values, retires early listeners and subscriptions without restoring old
+presentation, and publishes normal bindings before refs. A command already
+handled by the early listener is not delivered again to its replacement.
+Signals remain alive. Replacing or unmounting the owning root releases pending
+leases; aborting a hydration attempt alone does not.
+
+Refs retain their per-owner lifetimes: accepted takeover detaches the early ref
+and attaches the normal ref to the same node. A discarded or suspended attempt
+does neither. Node identity is preserved; suppressing the detach/attach pair for
+an identical callback is not part of the contract.
+
+This handoff is narrower than renderer-free presentation generally. Fixed native
+views can transfer attributes, events, refs, and supported native style
+projections. Structural views additionally require proof of the current native
+nodes, selected conditional branches, child views, slots, and primitive text.
+The renderer validates that proof again before publishing, including after a
+suspended or staged attempt. A stale attempt cannot overwrite a newer early
+presentation.
+
+An unused generic-content branch does not
+prevent takeover of a supported slot branch, but switching into unsupported
+content while takeover is pending causes a clear refusal. A native rest spread
+also requires the same compiler-proven caller prop shape; proof from another
+instance or call site cannot authorize it.
+
+Views with writable controls or unsupported normal-renderer writers do not
+qualify for structural handoff. Neither do entered keyed-list, opaque, or generic
+renderable regions.
+Unsupported handoffs fail explicitly while preserving the early presentation;
+they do not silently replace its DOM or load a different renderer path. Keep
+richer renderer-free programs under their existing owner until an explicit
+replacement strategy is available.
+
+### Capturing command input before deferred work
+
+Retaining an event does not snapshot other controls or signals. A Save queued
+while a module loads must not later read whichever draft happens to be current.
+Use an eagerly registered `captureEvent` to produce a detached immutable payload:
+
+```ts
+const behavior = import('./save-behavior');
+root.registerBehavior({
+	target: form,
+	events: ['submit'],
+	ready: behavior,
+	captureEvent(event, element) {
+		event.preventDefault();
+		const fields = new FormData(element as HTMLFormElement);
+		return Object.freeze({
+			id: String(fields.get('selectedId')),
+			text: String(fields.get('draft')),
+		});
+	},
+	adopt() {},
+	handleEvent(_event, _element, _context, payload) {
+		void behavior.then(({ save }) => save(payload));
+	},
+});
+```
+
+Here `form` is an existing server-owned form and `root` its behavior root; the
+Save button submits that form. Capture runs synchronously during each matching
+native event, before readiness or adoption can delay delivery. The return type
+is inferred for the fourth `handleEvent` argument. The queued payload is retained
+once, in FIFO order, under the same target/owner lifetime as the event; replacement
+or disposal invalidates it. Octane does not clone or freeze arbitrary values for
+you: copy the primitive fields you need, not live DOM, mutable signal objects, or
+a shared object that later edits can change.
+
+With that policy, A → Save → B → Save delivers A and B while the editor stays B;
+A → Save → clear delivers A and leaves the editor empty. The handler passes the
+payload to `action$`, which still validates the selected owner/base before writing.
+Live control adoption remains independent and always keeps the latest user edit.
+
+The capture registration must be running before these commands are offered. It
+cannot reconstruct commands captured earlier by the default inline bootstrap.
+Neither this hook nor deferred delivery restores transient activation; cancellation
+such as `preventDefault()` must happen in the actual early capture handler.
+
 Root identity is scoped to its document and container. A second root for the
 same live container requires `{ replace: true }`, which disposes the old root
 without removing markup; creating a root for a replacement document never adopts
@@ -376,6 +653,62 @@ ancestor root. Pass `{ preserveDOM: false }` to `root.dispose()` only when the
 root should explicitly clear its container.
 
 ## Correctness and nesting
+
+### Later-fetched SSR regions
+
+A custom host can send separately fetched SSR through the same bounded renderer
+frame transport. `createStreamedRegionPlacementFrame` from `octane/server`
+packages a completed `renderToString` result with its exact historical signal
+owner, selection identity, content revision, scoped CSS, and completed-build
+stylesheet URLs. It rejects missing or mismatched owners, multiple data owners,
+and document-head metadata. It does not authorize requests or rebind cached HTML;
+cache authorized source data and render a new request-specific envelope.
+
+On the client, register the selected identity and dormant range with
+`createStreamedRegionReceiver`, then consume the response with
+`readStreamedRendererResponse` from `octane/hydration`. Result decoding uses the
+matching `decodeSignalValue` codec. The region's historical-frame callback
+establishes adoption separately from newer live data. When activating, mark the
+range active, retire only its receiver-owned outer anchors, and hydrate the
+original component HTML. Later placement is rejected for that active range;
+the renderer alone reconciles subsequent model updates.
+
+The [conversation-history fixture](../packages/vite-plugin-octane/tests/_fixtures/app/src/conversation-history/)
+demonstrates this integration, cached/fresh responses, stable-key updates,
+completed-page cursors, and independent document-owned drafts. Custom fetches
+and explicit owners must also participate in document retirement/freeze handling;
+installing the document lifecycle helper does not automatically cancel an
+application's unrelated transport.
+
+### Persisted document navigation
+
+The app integrations install document lifecycle handling when SSR emits a signal
+mailbox or the completed client build declares independent hydration support.
+On a persisted `pagehide`, pending query/derived reads and not-yet-entered island
+activation are fenced. Active island DOM, completed results (including results
+buffered before a descriptor executes), and writable drafts are retained.
+
+On a persisted `pageshow`, the integration checks the executing build ID, the
+document ID in `#__octane_data`, and the original owner lifetime. Compatible
+restoration starts only still-selected unfinished reads under fresh attempts;
+the old document stream remains closed. It does not resubmit accepted mutations:
+uncertain optimistic operations still require explicit reconciliation. A
+mismatched identity retires the owner and reloads; ordinary non-persisted exit
+retires the owner and disposes independent roots.
+
+This is document/build revalidation, not an account authorization service or a
+deployment-version lookup. Hosts still own account changes and subsequent server
+authorization. Client-only signal routes with neither SSR signal mailboxes nor
+independent capability do not automatically load this integration. A custom host
+can explicitly call `installSignalDocumentLifecycle` from
+`octane/hydration/streamed-signals`, providing the same build/document metadata,
+document owner, and optional stream/island lifecycle handles.
+
+Browsers decide whether to preserve a page at all. A new document after history
+navigation follows normal SSR/hydration; restored form values alone do not prove
+BFCache restoration.
+
+### Boundary ownership
 
 Deferred hydration is a performance hint. An update outside a dormant boundary
 may open it early when Octane must reconcile the child to avoid stale server

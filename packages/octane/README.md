@@ -45,6 +45,11 @@ interactions and disposable behavior without creating a component root or
 taking ownership of the existing markup. See the
 [external ownership guide](https://github.com/octanejs/octane/blob/main/docs/deferred-hydration.md#behavior-only-roots-and-external-ownership).
 
+For fixed native presentation, the experimental compiler-backed `adoptBindings`
+API updates declared properties on existing SSR nodes without importing the
+renderer. See [compiled DOM bindings](https://github.com/octanejs/octane/blob/main/docs/deferred-hydration.md#compiled-presentation-on-existing-dom)
+for explicit template eligibility, typed activation and lifetime ownership.
+
 For the full story, see the
 [main README](https://github.com/octanejs/octane#readme).
 

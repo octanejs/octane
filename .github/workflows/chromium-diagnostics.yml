@@ -42,6 +42,8 @@ jobs:
       - name: Run parity audit with diagnostics
         env:
           CI: "true"
+          DEBUG: pw:browser*,vitest:browser:api,vitest:browser:pool,vitest:browser:playwright
+          VITEST_PW_DEBUG: "1"
           PARITY_SHARD: ${{ inputs.shard }}
           DIAGNOSTICS_DIR: ${{ runner.temp }}/chromium-diagnostics
         run: node scripts/react-parity/browser-diagnostics.mjs --shard "$PARITY_SHARD" --output-dir "$DIAGNOSTICS_DIR"

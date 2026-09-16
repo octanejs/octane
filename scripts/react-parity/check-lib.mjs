@@ -23,12 +23,7 @@ export function buildHarnessArgv(harnessPath, relativeFile) {
 	return [harnessPath, 'run-required-non-vitest', '--manifest', relativeFile];
 }
 
-export function buildParityVitestArgv(
-	configPath,
-	shardValue = '1/1',
-	reportPath,
-	browserDiagnostics = false,
-) {
+export function buildParityVitestArgv(configPath, shardValue = '1/1', reportPath) {
 	const shard = parseShard(shardValue);
 	return [
 		'node_modules/vitest/vitest.mjs',
@@ -37,9 +32,6 @@ export function buildParityVitestArgv(
 		configPath,
 		'--reporter=./scripts/react-parity/vitest-json-reporter.mjs',
 		'--reporter=./scripts/react-parity/vitest-unhandled-reporter.mjs',
-		...(browserDiagnostics
-			? ['--reporter=./scripts/react-parity/browser-lifecycle-reporter.mjs']
-			: []),
 		...(reportPath ? [`--outputFile=${reportPath}`] : []),
 		...(shard.total === 1 ? [] : [`--shard=${shard.value}`]),
 	];
@@ -60,6 +52,7 @@ export async function runRequiredVitestLanes({
 	// only the reporter's fresh file, never a previous run's archived result.
 	const runDirectory = mkdtempSync(join(tmpdir(), 'octane-react-parity-vitest-'));
 	const runReportPath = join(runDirectory, 'report.json');
+	let report;
 	try {
 		if (reportPath) {
 			rmSync(reportPath, { force: true });
@@ -68,18 +61,12 @@ export async function runRequiredVitestLanes({
 		const { code, signal } = await new Promise((resolve, reject) => {
 			const child = spawnProcess(
 				process.execPath,
-				buildParityVitestArgv(
-					configPath,
-					shard.value,
-					runReportPath,
-					Boolean(process.env.OCTANE_BROWSER_DIAGNOSTICS_DIR),
-				),
+				buildParityVitestArgv(configPath, shard.value, runReportPath),
 				{ cwd: repo, stdio: 'inherit', env: process.env },
 			);
 			child.once('error', reject);
 			child.once('close', (code, signal) => resolve({ code, signal }));
 		});
-		let report;
 		try {
 			try {
 				report = readFileSync(runReportPath, 'utf8');
@@ -109,8 +96,12 @@ export async function runRequiredVitestLanes({
 		// aggregate gate. Runner-level errors can occur even when all recorded
 		// assertions passed, and the fresh raw report is needed to diagnose them.
 		if (reportPath && existsSync(runReportPath)) {
-			mkdirSync(dirname(reportPath), { recursive: true });
-			copyFileSync(runReportPath, `${reportPath}.failed`);
+			try {
+				mkdirSync(dirname(reportPath), { recursive: true });
+				copyFileSync(runReportPath, `${reportPath}.failed`);
+			} catch {
+				console.warn('Could not archive the failed Vitest report; the original failure follows.');
+			}
 		}
 		throw error;
 	} finally {

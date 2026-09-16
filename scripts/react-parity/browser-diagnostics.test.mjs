@@ -13,7 +13,6 @@ import {
 	diagnosticUrl,
 } from './browser-diagnostics-lib.mjs';
 import { runBrowserDiagnostics } from './browser-diagnostics.mjs';
-import { buildParityVitestArgv } from './check-lib.mjs';
 
 function temporary(t) {
 	const directory = mkdtempSync(join(tmpdir(), 'browser-diagnostics-test-'));
@@ -69,16 +68,12 @@ test('diagnostic output errors do not throw into the test runner', (t) => {
 		record('crash');
 	});
 	assert.equal(warnings.length, 1);
-});
-
-test('reporter opt-in retains normal parity reporters and native sharding', () => {
-	const normal = buildParityVitestArgv('config.mjs', '4/4', 'report.json');
-	const traced = buildParityVitestArgv('config.mjs', '4/4', 'report.json', true);
-	assert.deepEqual(
-		traced.filter((arg) => !arg.includes('browser-lifecycle-reporter')),
-		normal,
+	t.mock.method(console, 'error', () => {
+		throw new Error('stderr is closed');
+	});
+	assert.doesNotThrow(() =>
+		createDiagnosticWriter(join(temporary(t), 'missing', 'events.jsonl'))('close'),
 	);
-	assert.ok(traced.includes('--reporter=./scripts/react-parity/browser-lifecycle-reporter.mjs'));
 });
 
 test('each diagnostic run has fresh evidence and preserves failure despite sampler errors', async (t) => {

@@ -18,6 +18,7 @@ import {
 	getPublishablePackages,
 	getWorkspacePackages,
 	OCTANE_BETA_PEER_RANGE,
+	publishedOctanePeerRangeFor,
 	REPO_ROOT,
 	validateWorkspacePackages,
 } from './workspace-packages.mjs';
@@ -132,12 +133,45 @@ test('rejects an Octane peer range that can recreate major dependent releases', 
 	]);
 });
 
+for (const name of [
+	'app-core',
+	'vite-plugin-octane',
+	'rspack-plugin-octane',
+	'rsbuild-plugin-octane',
+]) {
+	test(`${name} requires its coordinated compiler release when published`, () => {
+		const manifest = JSON.parse(
+			readFileSync(new URL(`../packages/${name}/package.json`, import.meta.url)),
+		);
+		assert.equal(manifest.peerDependencies.octane, 'workspace:^');
+		for (const version of ['0.2.11', '0.2.12']) {
+			const range = publishedOctanePeerRangeFor(manifest.name, version);
+			assert.equal(range, `^${version}`);
+			assert.equal(semver.satisfies('0.2.10', range), false);
+			assert.equal(semver.satisfies(version, range), true);
+			assert.equal(semver.satisfies('0.3.0', range), false);
+		}
+		const correct = workspacePackage(manifest.name, manifest);
+		assert.deepEqual(validateWorkspacePackages([workspacePackage('octane'), correct]), []);
+		const legacy = workspacePackage(manifest.name, {
+			...manifest,
+			peerDependencies: { ...manifest.peerDependencies, octane: OCTANE_BETA_PEER_RANGE },
+		});
+		assert.ok(
+			validateWorkspacePackages([workspacePackage('octane'), legacy]).some((error) =>
+				error.includes('peerDependencies.octane'),
+			),
+		);
+	});
+}
+
 for (const name of ['base-ui', 'base-ui-utils', 'shadcn', 'testing-library']) {
 	test(`${name} excludes runtimes without its compiler and act prerequisites`, () => {
 		const manifest = JSON.parse(
 			readFileSync(new URL(`../packages/${name}/package.json`, import.meta.url)),
 		);
 		const range = manifest.peerDependencies.octane.replace(/^workspace:/, '');
+		assert.equal(publishedOctanePeerRangeFor(manifest.name, '0.2.11'), range);
 		assert.equal(semver.satisfies('0.1.51', range), false);
 		assert.equal(semver.satisfies('0.2.3', range), false);
 		assert.equal(semver.satisfies('0.2.4', range), false);

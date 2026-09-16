@@ -121,6 +121,9 @@ export default function octaneLoader(source, inputSourceMap) {
 			root,
 			profile,
 			...(options.strong === undefined ? null : { strong: options.strong }),
+			...(options.knownAttributeSpreads === undefined
+				? null
+				: { knownAttributeSpreads: options.knownAttributeSpreads }),
 			...(options.exclude === undefined ? null : { exclude: options.exclude }),
 			...(compilerOptions.renderers === undefined
 				? null
@@ -205,11 +208,16 @@ export default function octaneLoader(source, inputSourceMap) {
 				}
 				setBuildInfo(this._module, {
 					canonicalId: canonicalModuleId(id, root),
+					resourceQuery: id.slice(cleanModuleId(id).length),
 					transformKind: result.kind,
+					...(result.streamedSignals === true ? { streamedSignals: true } : null),
 					serverRpc:
 						result.kind === 'compile' &&
 						(result.code.includes('_$__serverRpc(') ||
 							result.code.includes('export const _$_server_$_')),
+					...(Array.isArray(result.independentWidgets) && result.independentWidgets.length > 0
+						? { independentWidgets: result.independentWidgets }
+						: null),
 					...(result.universalRuntime === undefined
 						? null
 						: { universalRuntime: result.universalRuntime }),

@@ -48,7 +48,7 @@
   },
   "peerDependencies": {
     "@rspack/core": "^2.0.0",
-    "octane": "workspace:^0.1.51 || ^0.2.0"
+    "octane": "workspace:^"
   },
   "devDependencies": {
     "@rspack/core": "catalog:default",

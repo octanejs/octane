@@ -26,6 +26,7 @@ import { nativeReadActivationIndex } from './native-read-codegen.js';
 import { findManualHookProviders, manualHookWrapperParameters } from './manual-hooks.js';
 import { findLeadingJsxImportSourcePragma } from './pragma.js';
 import { collectProvenContextBindings, isProvenContextUse } from './context-use.js';
+import { signalDeclarationSourceEdits } from './signal-declarations.js';
 import {
 	hookMethodName,
 	hasHookMethods,
@@ -1337,7 +1338,7 @@ function parseHookSource(source, id) {
  *   `inlineHookMemo: true` enables the production-client whole-AST memo path;
  *   the default remains surgical. `manualSlots: true` permits memo and observed
  *   getter rewrites without injecting or changing the authored slot policy.
- * @returns {{ code: string, map: any, diagnostics?: any[] } | null}
+ * @returns {{ code: string, map: any, streamedSignals?: true, diagnostics?: any[] } | null}
  */
 export function slotHooks(source, id, options) {
 	const environment = options?.environment ?? 'client';
@@ -1381,6 +1382,7 @@ export function slotHooks(source, id, options) {
 		);
 	const manualProviders = options?.manualSlots ? findManualHookProviders(ast) : new Map();
 	const nativeReadActivation = options?.nativeReads === true && importsNativeRenderer(ast);
+	const signalLowering = signalDeclarationSourceEdits(ast, id, source);
 	const canSpecializeRoot =
 		!options?.manualSlots &&
 		!options?.hmr &&
@@ -1391,6 +1393,7 @@ export function slotHooks(source, id, options) {
 		!importInfo.importsHook &&
 		!canSpecializeRoot &&
 		!nativeReadActivation &&
+		!signalLowering.usesSignals &&
 		!manualProviders.size
 	) {
 		return strongAnalysis?.diagnostics.length ? { code: source, map: null, ...strongHints } : null;
@@ -1417,6 +1420,8 @@ export function slotHooks(source, id, options) {
 	const getterCalls = importInfo.importsHook ? collectStateGetterCalls(ast) : new WeakSet();
 	if (
 		!strongAnalysis?.enabled &&
+		// The whole-AST memo path does not apply declaration identity edits.
+		!signalLowering.usesSignals &&
 		canPrint &&
 		options?.inlineHookMemo === true &&
 		environment === 'client' &&
@@ -1465,7 +1470,7 @@ export function slotHooks(source, id, options) {
 		hash: hookSlotHash(id),
 		nextId: 0,
 		nextPuId: 0,
-		edits: [],
+		edits: [...signalLowering.edits],
 		decls: [],
 		parallelHelpers: new Map(),
 		provenContextBindings: collectProvenContextBindings(ast),
@@ -1485,7 +1490,7 @@ export function slotHooks(source, id, options) {
 	if (canSpecializeRoot) {
 		collectVoidRootEdits(ast, st, options.isVoidComponentImport);
 	}
-	if (st.edits.length === 0 && !nativeReadActivation)
+	if (st.edits.length === 0 && !nativeReadActivation && !signalLowering.usesSignals)
 		return strongAnalysis?.diagnostics.length ? { code: source, map: null, ...strongHints } : null;
 	const activation = nativeReadActivation
 		? requireParallelHelper(st, 'enableNativeReadCollection')
@@ -1526,6 +1531,35 @@ export function slotHooks(source, id, options) {
 	const otherHelperImports = [...otherHelpers]
 		.map(([request, specifiers]) => `import { ${specifiers.join(', ')} } from '${request}';\n`)
 		.join('');
+	const signalHelperImports = new Map();
+	for (const helper of signalLowering.imports) {
+		let specifiers = signalHelperImports.get(helper.source);
+		if (specifiers === undefined) signalHelperImports.set(helper.source, (specifiers = []));
+		specifiers.push(`${helper.imported} as ${helper.local}`);
+	}
+	let signalActivation = '';
+	if (signalLowering.usesSignals) {
+		const request =
+			environment === 'server'
+				? 'octane/internal/server'
+				: nativeReadActivation
+					? 'octane/internal/client'
+					: 'octane/signals';
+		const imported =
+			environment === 'server'
+				? 'enableServerSignalBindings'
+				: nativeReadActivation
+					? 'enableSignalBindings'
+					: '__enableSignalDocument';
+		const local = allocSlotName(st, `_$${imported}`);
+		let specifiers = signalHelperImports.get(request);
+		if (specifiers === undefined) signalHelperImports.set(request, (specifiers = []));
+		specifiers.push(`${imported} as ${local}`);
+		signalActivation = `${local}(1);\n`;
+	}
+	const signalImports = [...signalHelperImports]
+		.map(([request, specifiers]) => `import { ${specifiers.join(', ')} } from '${request}';\n`)
+		.join('');
 	const profileImport =
 		st.profile && !st.manualSlots
 			? "import { __profileHook as _$__profileHook } from 'octane/profiling';\n"
@@ -1535,15 +1569,22 @@ export function slotHooks(source, id, options) {
 			? `const ${st.slotBaseName} = /* @__PURE__ */ ${st.hookSlotsName}(${st.nextId});\n`
 			: '';
 	const block =
-		helperImport + otherHelperImports + profileImport + slotBase + st.decls.join('\n') + '\n';
-	if (activation !== null) {
-		// Native plain modules can render a local function during evaluation.
-		// Its slots and invocation collector must already exist at that call.
+		helperImport +
+		otherHelperImports +
+		signalImports +
+		profileImport +
+		slotBase +
+		st.decls.join('\n') +
+		'\n' +
+		signalActivation;
+	if (activation !== null || signalLowering.usesSignals) {
+		// Plain modules may read global signals or render during evaluation.
+		// Their document capability and any render slots must already exist.
 		// No newline is inserted, retaining the surgical pass's line mapping.
 		const index = nativeReadActivationIndex(ast.body);
 		st.edits.push({
 			pos: ast.body[index]?.start ?? source.length,
-			text: `;${block.replace(/\n/g, ' ')}${activation}(1); `,
+			text: `;${block.replace(/\n/g, ' ')}${activation === null ? '' : `${activation}(1); `}`,
 		});
 	}
 	// Assemble disjoint edits once instead of copying the growing module for
@@ -1574,6 +1615,12 @@ export function slotHooks(source, id, options) {
 		chunks.push(source.slice(0, cursor));
 		code = chunks.reverse().join('');
 	}
-	if (activation === null) code = code.endsWith('\n') ? code + block : code + '\n' + block;
-	return { code, map: null, ...strongHints };
+	if (activation === null && !signalLowering.usesSignals)
+		code = code.endsWith('\n') ? code + block : code + '\n' + block;
+	return {
+		code,
+		map: null,
+		...(signalLowering.usesSignals || nativeReadActivation ? { streamedSignals: true } : null),
+		...strongHints,
+	};
 }

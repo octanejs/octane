@@ -273,6 +273,7 @@ test('verifies shard reports in a checkout without materialization dependencies'
 	await mkdir(join(root, 'reports'));
 	const reportPath = join(root, 'reports/shard-1.json');
 	await writeFile(reportPath, report);
+	await writeFile(`${reportPath}.failed.txt`, report);
 	const run = () =>
 		execFileSync(
 			process.execPath,
@@ -288,4 +289,6 @@ test('verifies shard reports in a checkout without materialization dependencies'
 	assert.match(run(), /verified complete React parity Vitest coverage across 1 shard reports/);
 	await writeFile(reportPath, JSON.stringify({ testResults: [] }));
 	assert.throws(run, /did not execute every declared test identity exactly once/);
+	await rm(reportPath);
+	assert.throws(run, /expected 1 React parity Vitest shard reports, found 0/);
 });

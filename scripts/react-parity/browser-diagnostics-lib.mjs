@@ -25,7 +25,13 @@ export function createDiagnosticWriter(file) {
 		try {
 			appendFileSync(file, `${JSON.stringify({ time: Date.now(), event, ...details })}\n`);
 		} catch (error) {
-			if (!warned) console.error(`Browser diagnostics unavailable: ${diagnosticError(error)}`);
+			if (!warned) {
+				try {
+					console.error(`Browser diagnostics unavailable: ${diagnosticError(error)}`);
+				} catch {
+					// A closed stderr must not turn a diagnostic write failure into a test failure.
+				}
+			}
 			warned = true;
 		}
 	};

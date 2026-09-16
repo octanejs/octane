@@ -39,6 +39,7 @@ export async function runBrowserDiagnostics({
 		env: {
 			...env,
 			OCTANE_BROWSER_DIAGNOSTICS_DIR: directory,
+			REACT_PARITY_BROWSER_DIAGNOSTICS: '1',
 			REACT_PARITY_VITEST_REPORT: join(directory, 'browser-test-report.json'),
 		},
 	});

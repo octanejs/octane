@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import {
+	createResource,
 	createScope,
 	query,
 	ScopeDisposedError,
@@ -48,7 +49,7 @@ describe('scoped promise resources', () => {
 			});
 			return new Promise<string>(() => {});
 		});
-		scope.asyncSignal$('resource', () => load(selected$.get()));
+		createResource(scope, 'resource', () => load(selected$.get()));
 		selected$.set('b');
 		expect(samples).toEqual([0]);
 		expect(scope.inspect().nodes.find((node) => node.key === 'resource')?.dependencies).toEqual([
@@ -64,7 +65,7 @@ describe('scoped promise resources', () => {
 			signal.addEventListener('abort', () => scope.dispose(), { once: true });
 			return new Promise<string>(() => {});
 		});
-		const resource$ = scope.asyncSignal$('resource', () => load(undefined));
+		const resource$ = createResource(scope, 'resource', () => load(undefined));
 		resource$.retry();
 		expect(signals.map((signal) => signal.aborted)).toEqual([true]);
 		expect(scope.inspect()).toMatchObject({ retired: true, activeRequests: 0 });
@@ -89,7 +90,7 @@ describe('scoped promise resources', () => {
 			});
 			return new Promise<void>(() => {});
 		});
-		data.asyncSignal$('work', () => load(undefined));
+		createResource(data, 'work', () => load(undefined));
 		expect(card$.get()).toEqual({ title: 'private value' });
 
 		data.dispose();
@@ -122,7 +123,7 @@ describe('scoped promise resources', () => {
 			);
 			return completion.promise;
 		});
-		resource$ = scope.asyncSignal$('resource', () => load(undefined));
+		resource$ = createResource(scope, 'resource', () => load(undefined));
 		resource$.retry();
 		expect(attempts.map(({ signal }) => signal.aborted)).toEqual([true, false]);
 		attempts[0].completion.resolve('obsolete');
@@ -146,7 +147,7 @@ describe('scoped promise resources', () => {
 			signal.addEventListener('abort', () => resource$.retry(), { once: true });
 			return new Promise<string>(() => {});
 		});
-		resource$ = scope.asyncSignal$('resource', () => load(undefined));
+		resource$ = createResource(scope, 'resource', () => load(undefined));
 		resource$.retry();
 		expect(calls).toBe(2);
 		expect(() => resource$.get()).toThrow(failure);
@@ -158,7 +159,7 @@ describe('scoped promise resources', () => {
 			const scope = owner();
 			const completion = deferred<typeof value>();
 			const load = query('empty-value', () => completion.promise);
-			const value$ = scope.asyncSignal$('value', () => load(undefined));
+			const value$ = createResource(scope, 'value', () => load(undefined));
 			expect(value$.snapshot()).toMatchObject({
 				status: 'pending',
 				refreshing: false,
@@ -191,8 +192,8 @@ describe('scoped promise resources', () => {
 		const fail = query('sync-failure', () => {
 			throw failure;
 		});
-		const success$ = scope.asyncSignal$('success', () => success(undefined));
-		const failure$ = scope.asyncSignal$('failure', () => fail(undefined));
+		const success$ = createResource(scope, 'success', () => success(undefined));
+		const failure$ = createResource(scope, 'failure', () => fail(undefined));
 		await nextSnapshot$(success$, (snapshot) => snapshot.status === 'ready');
 		expect(success$.get()).toBe('available');
 		expect(failure$.snapshot()).toMatchObject({ status: 'error', error: failure });
@@ -203,26 +204,48 @@ describe('scoped promise resources', () => {
 	it('shares equivalent canonical arguments within the owning scope', async () => {
 		const scope = owner();
 		const completion = deferred<string>();
+		const replacement = deferred<string>();
+		const selected$ = scope.signal$('selected', true);
 		const starts: unknown[] = [];
-		const load = query('canonical', (argument: unknown) => {
+		const signals: AbortSignal[] = [];
+		const load = query('canonical', (argument: unknown, { signal }) => {
 			starts.push(argument);
-			return completion.promise;
+			signals.push(signal);
+			return argument === 'replacement' ? replacement.promise : completion.promise;
 		});
-		const first$ = scope.asyncSignal$('first', () =>
-			load({ z: [undefined, -0], a: { y: 2, x: 1 } }),
+		const first$ = createResource(scope, 'first', () =>
+			load(selected$.get() ? { z: [undefined, -0], a: { y: 2, x: 1 } } : 'replacement'),
 		);
-		const second$ = scope.asyncSignal$('second', () =>
+		const second$ = createResource(scope, 'second', () =>
 			load({ a: { x: 1, y: 2 }, z: [undefined, -0] }),
 		);
+		// Explicit resources start eagerly and keep unique node identities even
+		// when their canonical requests share one producer.
+		expect(starts).toEqual([{ a: { x: 1, y: 2 }, z: [undefined, -0] }]);
+		expect(() => createResource(scope, 'first', () => load('duplicate'))).toThrow(/already exists/);
 		const ready = Promise.all(
 			[first$, second$].map((resource$) =>
 				nextSnapshot$(resource$, (snapshot) => snapshot.status === 'ready'),
 			),
 		);
-		expect(starts).toEqual([{ a: { x: 1, y: 2 }, z: [undefined, -0] }]);
+		let detachedAwake = false;
+		let sharedAwake = false;
+		void capturePending$(() => first$.get()).then(() => {
+			detachedAwake = true;
+		});
+		void capturePending$(() => second$.get()).then(() => {
+			sharedAwake = true;
+		});
+		selected$.set(false);
+		expect(starts).toEqual([{ a: { x: 1, y: 2 }, z: [undefined, -0] }, 'replacement']);
+		expect(signals[0].aborted).toBe(false);
+		await drainProducers();
+		expect(detachedAwake).toBe(true);
+		expect(sharedAwake).toBe(false);
 		completion.resolve('shared result');
+		replacement.resolve('replacement result');
 		await ready;
-		expect(first$.get()).toBe('shared result');
+		expect(first$.get()).toBe('replacement result');
 		expect(second$.get()).toBe('shared result');
 	});
 
@@ -248,7 +271,7 @@ describe('scoped promise resources', () => {
 			return attempt.promise;
 		});
 		const resources = arguments_.map((argument, index) =>
-			scope.asyncSignal$(`value-${index}`, () => load(argument)),
+			createResource(scope, `value-${index}`, () => load(argument)),
 		);
 		const ready = Promise.all(
 			resources.map((resource$) =>
@@ -274,8 +297,8 @@ describe('scoped promise resources', () => {
 		const original = load(arguments_);
 		arguments_.nested.id = 9;
 		arguments_.ids.push(3);
-		const first$ = scope.asyncSignal$('first', () => original);
-		const second$ = scope.asyncSignal$('second', () => load(arguments_));
+		const first$ = createResource(scope, 'first', () => original);
+		const second$ = createResource(scope, 'second', () => load(arguments_));
 		await Promise.all(
 			[first$, second$].map((resource$) =>
 				nextSnapshot$(resource$, (snapshot) => snapshot.status === 'ready'),
@@ -335,8 +358,8 @@ describe('scoped promise resources', () => {
 			attempts.push(attempt);
 			return attempt.promise;
 		});
-		const first$ = owner('same-key').asyncSignal$('value', () => load('same-argument'));
-		const second$ = owner('same-key').asyncSignal$('value', () => load('same-argument'));
+		const first$ = createResource(owner('same-key'), 'value', () => load('same-argument'));
+		const second$ = createResource(owner('same-key'), 'value', () => load('same-argument'));
 		const ready = Promise.all(
 			[first$, second$].map((resource$) =>
 				nextSnapshot$(resource$, (snapshot) => snapshot.status === 'ready'),
@@ -354,8 +377,8 @@ describe('scoped promise resources', () => {
 		const scope = owner();
 		const load = query('same-query', () => 'original');
 		const incompatible = query('same-query', () => 'different loader');
-		const first$ = scope.asyncSignal$('first', () => load(1));
-		const second$ = scope.asyncSignal$('second', () => incompatible(1));
+		const first$ = createResource(scope, 'first', () => load(1));
+		const second$ = createResource(scope, 'second', () => incompatible(1));
 		await nextSnapshot$(first$, (snapshot) => snapshot.status === 'ready');
 		expect(() => second$.get()).toThrow(/[Ii]ncompatible query/);
 		expect(first$.get()).toBe('original');
@@ -371,7 +394,7 @@ describe('scoped promise resources', () => {
 			starts.push({ id, sampled: incidental$.get(), gate });
 			return gate.promise;
 		});
-		const resource$ = scope.asyncSignal$('resource', () => load(selected$.get()));
+		const resource$ = createResource(scope, 'resource', () => load(selected$.get()));
 		const firstReady = nextSnapshot$(resource$, (snapshot) => snapshot.status === 'ready');
 		incidental$.set(2);
 		expect(resource$.snapshot().status).toBe('pending');
@@ -396,7 +419,7 @@ describe('scoped promise resources', () => {
 		const invalid$ = scope.signal$('invalid', true);
 		const target$ = scope.signal$('target', 0);
 		const load = query('pure-description', () => 'recovered');
-		const resource$ = scope.asyncSignal$('resource', () => {
+		const resource$ = createResource(scope, 'resource', () => {
 			if (invalid$.get()) target$.set(1);
 			return load(undefined);
 		});
@@ -419,7 +442,7 @@ describe('scoped promise resources', () => {
 			attempts.push(attempt);
 			return attempt.promise;
 		});
-		const resource$ = scope.asyncSignal$('resource', () => {
+		const resource$ = createResource(scope, 'resource', () => {
 			if (!available) throw failure;
 			return load('selected');
 		});
@@ -445,7 +468,7 @@ describe('scoped promise resources', () => {
 				if (id === 'b') target$.set(1);
 				return id;
 			});
-			const resource$ = scope.asyncSignal$('resource', () => load(selected$.get()));
+			const resource$ = createResource(scope, 'resource', () => load(selected$.get()));
 			const projection$ = scope.derived$('projection', () => resource$.get());
 			await nextSnapshot$(resource$, (snapshot) => snapshot.status === 'ready');
 			expect(resource$.get()).toBe('a');
@@ -470,7 +493,7 @@ describe('scoped promise resources', () => {
 			if (id === 'a') selected$.set('b');
 			return gate.promise;
 		});
-		const resource$ = scope.asyncSignal$('resource', () => load(selected$.get()));
+		const resource$ = createResource(scope, 'resource', () => load(selected$.get()));
 		expect(resource$.snapshot().status).toBe('pending');
 		expect(selected$.get()).toBe('b');
 		expect(attempts.map(({ id }) => id)).toEqual(['a', 'b']);
@@ -495,7 +518,7 @@ describe('scoped promise resources', () => {
 				attempts.push({ gate, signal });
 				return gate.promise;
 			});
-			const resource$ = scope.asyncSignal$('resource', () => load(selected$.get()));
+			const resource$ = createResource(scope, 'resource', () => load(selected$.get()));
 			const observed: string[] = [];
 			resource$.subscribe(() => {
 				const snapshot = resource$.snapshot();
@@ -529,7 +552,7 @@ describe('scoped promise resources', () => {
 			attempts.push({ gate, signal });
 			return gate.promise;
 		});
-		const resource$ = scope.asyncSignal$('resource', () => load(undefined));
+		const resource$ = createResource(scope, 'resource', () => load(undefined));
 		expect(resource$.snapshot().status).toBe('pending');
 		const oldWakeup = capturePending$(() => resource$.get());
 		resource$.retry();
@@ -556,8 +579,8 @@ describe('scoped promise resources', () => {
 				attempts.push(gate);
 				return gate.promise;
 			});
-			const first$ = scope.asyncSignal$('first', () => load('same'));
-			const second$ = scope.asyncSignal$('second', () => load('same'));
+			const first$ = createResource(scope, 'first', () => load('same'));
+			const second$ = createResource(scope, 'second', () => load('same'));
 			const initial = Promise.all(
 				[first$, second$].map((resource$) =>
 					nextSnapshot$(resource$, (snapshot) => snapshot.status === 'ready'),
@@ -599,7 +622,7 @@ describe('scoped promise resources', () => {
 			attempts.push(attempt);
 			return attempt.promise;
 		});
-		const result$ = scope.asyncSignal$('result', () => load(undefined));
+		const result$ = createResource(scope, 'result', () => load(undefined));
 		const label$ = scope.derived$('label', () => result$.latest('waiting'));
 		expect(scope.isPending(() => result$.get())).toBe(true);
 		expect(scope.isPending(() => result$.latest('waiting'))).toBe(false);
@@ -638,7 +661,7 @@ describe('scoped promise resources', () => {
 			attempts.push({ id, result });
 			return result.promise;
 		});
-		const result$ = scope.asyncSignal$('result', () => load(selected$.get()));
+		const result$ = createResource(scope, 'result', () => load(selected$.get()));
 		attempts[0].result.resolve('first a');
 		await drainProducers();
 		expect(result$.get()).toBe('first a');
@@ -668,7 +691,7 @@ describe('scoped promise resources', () => {
 			attempts.set(id, result);
 			return result.promise;
 		});
-		const record$ = scope.asyncSignal$('record', () => load(selected$.get()));
+		const record$ = createResource(scope, 'record', () => load(selected$.get()));
 		const card$ = scope.derived$('card', () => {
 			const record = record$.get();
 			return { ...record, activate: () => actedOn.push(record.id) };
@@ -703,7 +726,7 @@ describe('scoped promise resources', () => {
 			attempts.push({ id, signal, result });
 			return result.promise;
 		});
-		const result$ = view.asyncSignal$('result', () =>
+		const result$ = createResource(view, 'result', () =>
 			load(selectReplacement$.get() ? replacementId$.get() : previousId$.get()),
 		);
 		attempts[0].result.resolve('private a');
@@ -739,7 +762,7 @@ describe('scoped promise resources', () => {
 		const second = deferred<string>();
 		const originalQuery = query('original', (_id: string) => first.promise);
 		const replacementQuery = query('different', () => second.promise);
-		const result$ = view.asyncSignal$('result', () => {
+		const result$ = createResource(view, 'result', () => {
 			const phase = phase$.get();
 			if (phase === 'blocked') throw new Error('selection unavailable');
 			return phase === 'first' ? originalQuery(id$.get()) : replacementQuery(undefined);
@@ -770,8 +793,8 @@ describe('scoped promise resources', () => {
 			attempts.push({ id, gate, signal });
 			return gate.promise;
 		});
-		const first$ = scope.asyncSignal$('first', () => load(firstId$.get()));
-		const second$ = scope.asyncSignal$('second', () => load(secondId$.get()));
+		const first$ = createResource(scope, 'first', () => load(firstId$.get()));
+		const second$ = createResource(scope, 'second', () => load(secondId$.get()));
 		first$.snapshot();
 		second$.snapshot();
 		expect(attempts.map(({ id }) => id)).toEqual(['a']);
@@ -802,8 +825,10 @@ describe('scoped promise resources', () => {
 			attempts.set(`${argument.id}:${argument.part}`, gate);
 			return gate.promise;
 		});
-		const left$ = scope.asyncSignal$('left', () => load({ id: selected$.get(), part: 'left' }));
-		const right$ = scope.asyncSignal$('right', () => load({ id: selected$.get(), part: 'right' }));
+		const left$ = createResource(scope, 'left', () => load({ id: selected$.get(), part: 'left' }));
+		const right$ = createResource(scope, 'right', () =>
+			load({ id: selected$.get(), part: 'right' }),
+		);
 		const card$ = scope.derived$('card', () => ({
 			id: selected$.get(),
 			left: left$.get(),
@@ -846,7 +871,7 @@ describe('scoped promise resources', () => {
 			const gates = [deferred<number>(), deferred<number>(), deferred<number>()];
 			const load = query('independent', (index: number) => gates[index].promise);
 			const resources = gates.map((_, index) =>
-				scope.asyncSignal$(`resource-${index}`, () => load(index)),
+				createResource(scope, `resource-${index}`, () => load(index)),
 			);
 			resources.forEach((resource$) => resource$.snapshot());
 			const projection$ = scope.derived$('projection', () =>
@@ -875,7 +900,7 @@ describe('scoped promise resources', () => {
 			attempts.push(gate);
 			return gate.promise;
 		});
-		const resource$ = scope.asyncSignal$('resource', () => load(undefined));
+		const resource$ = createResource(scope, 'resource', () => load(undefined));
 		const initial = nextSnapshot$(resource$, (snapshot) => snapshot.status === 'ready');
 		attempts[0].resolve('retained');
 		await initial;
@@ -912,7 +937,7 @@ describe('scoped promise resources', () => {
 				signal = context.signal;
 				return gate.promise;
 			});
-			const resource$ = scope.asyncSignal$('resource', () => load(undefined));
+			const resource$ = createResource(scope, 'resource', () => load(undefined));
 			const observed: unknown[] = [];
 			const stop = resource$.subscribe(() => observed.push(resource$.snapshot()));
 			const wakeup = capturePending$(() => resource$.get());

@@ -8,6 +8,9 @@
  * document's own imports (an embedded `.tsrx` component, the provider layer)
  * can be injected too.
  */
+import * as ClientRuntime from 'octane/internal/client';
+import * as ServerRuntime from 'octane/internal/server';
+
 export function evalModuleCode(
 	code: string,
 	mods: Record<string, Record<string, any>>,
@@ -39,7 +42,11 @@ export function evalModuleCode(
 	});
 	if (defaultName) code += `\n__exports.default = ${defaultName};`;
 	const fn = new Function('__mods', '__exports', '__hot', code + '\nreturn __exports;');
-	return fn(mods, {}, hot);
+	return fn(
+		{ 'octane/internal/client': ClientRuntime, 'octane/internal/server': ServerRuntime, ...mods },
+		{},
+		hot,
+	);
 }
 
 /** Hydration block/item markers aside, the payload is plain HTML. */

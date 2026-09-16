@@ -14,6 +14,7 @@ import * as nodeFs from 'node:fs';
 import * as nodeModule from 'node:module';
 import * as nodePath from 'node:path';
 import { parseModule } from '@tsrx/core';
+export { DOM_BINDING_COMPILER_ABI_VERSION } from './dom-bindings.js';
 import {
 	compile,
 	compileForBundler,
@@ -23,6 +24,7 @@ import {
 } from './compile.js';
 import { validateRendererModuleSource } from './compile-universal.js';
 import { HYDRATE_QUERY_PARAM, hydrateBoundaryPathFromId } from './hydrate-boundaries.js';
+import { parseDomBindingRequest, formatDomBindingRequest } from './dom-binding-request.js';
 import {
 	DOM_RENDERER_MODULE,
 	normalizeRendererConfig,
@@ -54,6 +56,7 @@ export {
 	CLIENT_REFERENCE_MANIFEST_VERSION,
 	createClientReferenceManifest,
 } from './client-only-server.js';
+export const INDEPENDENT_HYDRATION_MANIFEST_FILENAME = 'octane-independent-hydration.json';
 export {
 	DOM_RENDERER_ID,
 	DOM_RENDERER_MODULE,
@@ -516,6 +519,7 @@ class OctaneBundlerCompiler {
 			profile: options.profile === true,
 			inlineHookMemo: options.inlineHookMemo !== false,
 			strong: options.strong === true,
+			knownAttributeSpreads: options.knownAttributeSpreads,
 			universalRuntime: normalizeUniversalRuntime(options.universalRuntime),
 		};
 		this.renderers = normalizeRendererConfig(options.renderers);
@@ -1064,6 +1068,10 @@ class OctaneBundlerCompiler {
 		);
 		const file = cleanModuleId(id);
 		const hydrateBoundaryPath = hydrateBoundaryPathFromId(id);
+		const bindingRequest = parseDomBindingRequest(id);
+		if (bindingRequest !== null && hydrateBoundaryPath !== null) {
+			throw new Error('Octane DOM binding and Hydrate queries cannot be combined.');
+		}
 		const collected = {
 			dependencies: new Set(),
 			missingDependencies: new Set(),
@@ -1096,7 +1104,7 @@ class OctaneBundlerCompiler {
 			options.universalRuntime ?? this.defaults.universalRuntime,
 		);
 		const filename = this._canonicalModuleId(file);
-		const targetRuntimeRequests = (source, kind) => {
+		const targetRuntimeRequests = (source, kind, streamedSignals = false) => {
 			if (environment !== 'server' || options.explicitRuntimeRequests !== true) return null;
 			const runtimeResult = rewriteServerRuntimeRequests(source, filename);
 			if (runtimeResult === null) return null;
@@ -1104,6 +1112,7 @@ class OctaneBundlerCompiler {
 				code: runtimeResult.code,
 				map: runtimeResult.map,
 				kind,
+				...(streamedSignals ? { streamedSignals: true } : null),
 				...finishMetadata(collected),
 			};
 		};
@@ -1131,6 +1140,9 @@ class OctaneBundlerCompiler {
 		const fullCompile =
 			this._isFullCompileSource(file, collected) &&
 			this._passesOwnershipGate(file, filename, pragmaOwned);
+		if (bindingRequest !== null && !fullCompile) {
+			throw new Error('Octane DOM binding queries require a compiler-owned .tsrx/.tsx view.');
+		}
 		// The narrow-the-rule config error concerns modules Octane owns. Under
 		// the ownership gate a host-owned project module (unmarked, or in an
 		// excluded path) may legitimately sit inside a client-only include in a
@@ -1177,13 +1189,22 @@ class OctaneBundlerCompiler {
 				!hasRendererBoundaries &&
 				typeof options.resolveCssModuleConstant === 'function';
 			const compileFilename =
-				hydrateBoundaryPath === null
-					? filename
-					: `${filename}?${HYDRATE_QUERY_PARAM}=${encodeURIComponent(hydrateBoundaryPath)}`;
+				bindingRequest !== null
+					? formatDomBindingRequest(filename, bindingRequest)
+					: hydrateBoundaryPath === null
+						? filename
+						: `${filename}?${HYDRATE_QUERY_PARAM}=${encodeURIComponent(hydrateBoundaryPath)}`;
 			const compileOptions = {
 				hmr,
 				mode: environment,
 				dev,
+				...(renderer.target === 'dom' &&
+				(options.knownAttributeSpreads ?? this.defaults.knownAttributeSpreads) !== undefined
+					? {
+							knownAttributeSpreads:
+								options.knownAttributeSpreads ?? this.defaults.knownAttributeSpreads,
+						}
+					: null),
 				...(renderer.target === 'dom' && options.textTypeFacts !== undefined
 					? { textTypeFacts: options.textTypeFacts }
 					: null),
@@ -1223,9 +1244,12 @@ class OctaneBundlerCompiler {
 			let out;
 			let voidComponentAst = null;
 			let cssModuleConstantImports;
-			if (collectVoidComponentExports || collectCssModuleConstants) {
+			let independentWidgets;
+			const collectIndependentWidgets = code.includes('Hydrate') && code.includes('independent');
+			if (collectVoidComponentExports || collectCssModuleConstants || collectIndependentWidgets) {
 				const compilation = compileForBundler(code, compileFilename, compileOptions);
 				out = compilation.result;
+				if (collectIndependentWidgets) independentWidgets = compilation.independentWidgets;
 				if (collectVoidComponentExports) voidComponentAst = compilation.hydrateAst;
 				if (collectCssModuleConstants) {
 					cssModuleConstantImports = compilation.cssModuleConstantImports;
@@ -1239,6 +1263,8 @@ class OctaneBundlerCompiler {
 				map: out.map,
 				diagnostics: out.diagnostics,
 				kind: 'compile',
+				...(out.streamedSignals === true ? { streamedSignals: true } : null),
+				...(out.bindingConstants === undefined ? null : { bindingConstants: out.bindingConstants }),
 				renderer,
 				...(out.universalRuntime === undefined ? null : { universalRuntime: out.universalRuntime }),
 				...(clientReference === null ? null : { clientReference }),
@@ -1248,6 +1274,7 @@ class OctaneBundlerCompiler {
 							voidComponentExports: findVoidComponentExports(voidComponentAst, filename),
 						}),
 				...(cssModuleConstantImports === undefined ? null : { cssModuleConstantImports }),
+				...(independentWidgets === undefined ? null : { independentWidgets }),
 				descriptorChildrenExports:
 					preparedDescriptorChildrenExports === null
 						? findDescriptorChildrenExports(code, filename)
@@ -1342,10 +1369,11 @@ class OctaneBundlerCompiler {
 			if (out === null) return passThrough();
 			// Strong plain modules report nonfatal hints like compiled modules do.
 			this._forwardCompileDiagnostics(out.diagnostics);
-			const slotted = targetRuntimeRequests(out.code, 'slots') ?? {
+			const slotted = targetRuntimeRequests(out.code, 'slots', out.streamedSignals) ?? {
 				code: out.code,
 				map: out.map,
 				kind: 'slots',
+				...(out.streamedSignals === true ? { streamedSignals: true } : null),
 				...finishMetadata(collected),
 			};
 			return out.diagnostics === undefined ? slotted : { ...slotted, diagnostics: out.diagnostics };

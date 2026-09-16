@@ -63,8 +63,24 @@ const OCTANE_025_CONSUMERS = new Set([
 	'@octanejs/testing-library',
 ]);
 
+// These integrations consume compiler/server APIs from the coordinated core
+// release. pnpm publishes workspace:^ as ^<the released sibling version>,
+// while source installs keep resolving the current workspace before versioning.
+const OCTANE_CURRENT_CORE_CONSUMERS = new Set([
+	'@octanejs/app-core',
+	'@octanejs/rspack-plugin',
+	'@octanejs/rsbuild-plugin',
+	'@octanejs/vite-plugin',
+]);
+
 export function octanePeerRangeFor(packageName) {
+	if (OCTANE_CURRENT_CORE_CONSUMERS.has(packageName)) return 'workspace:^';
 	return OCTANE_025_CONSUMERS.has(packageName) ? 'workspace:^0.2.5' : OCTANE_BETA_PEER_RANGE;
+}
+
+export function publishedOctanePeerRangeFor(packageName, octaneVersion) {
+	const range = octanePeerRangeFor(packageName).replace(/^workspace:/, '');
+	return range === '^' ? `^${octaneVersion}` : range;
 }
 
 function readJson(file) {

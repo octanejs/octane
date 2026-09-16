@@ -18,9 +18,9 @@ fresh `run-*` directory containing:
   every two seconds, Node/Chromium process RSS, descriptor counts and limits,
   and the audit exit status. Missing metrics are reported explicitly. Exited or
   inaccessible processes may be absent from a sample.
-- `browser-events.jsonl`: browser/page closure or crash, top-frame navigation,
-  WebSocket open/close/error (including Chromium's transport error text), Vite
-  reload/closure, provider teardown, and whether the test run had ended.
+- `browser-events.jsonl`: page closure or crash, top-frame navigation,
+  WebSocket close frames and transport error categories, server TCP socket
+  events, and Vite/provider teardown, using the existing parity observer.
 - `browser-test-report.json`, or `.json.failed`: the parity runner's successful
   report or raw failed report, when Vitest produced one. Failures before browser
   startup can legitimately have no browser events or test report.
@@ -31,9 +31,10 @@ causation. The intermittent disconnect's root cause is still unconfirmed; the
 initial controlled trials passed and did not establish memory, disk or file
 limit exhaustion. No timeout increase, retry or browser workaround is included.
 
-The lifecycle observer depends on the pinned Vitest Playwright provider. A real
-Chromium smoke test in normal CI checks attachment before navigation, transport
-errors, premature page closure, normal teardown and retained test failures.
+The lifecycle observer depends on the pinned Vitest Playwright provider and
+attaches after the initial page navigation. A real Chromium smoke test in normal
+CI checks transport error capture, premature page closure, normal teardown and
+retained test failures.
 The observer adds some overhead; an instrumented pass cannot rule out a timing
 race in ordinary CI.
 
