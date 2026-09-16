@@ -191,6 +191,30 @@ export function App(props) @{ const handle = draft$; ${markup} }`;
 		expect(server).toContain('ssrSignalControlValue');
 		expect(server).toContain('ssrSignalControlAttrs');
 		expect(server).toContain('enableServerSignalBindings(1)');
+		for (const strong of [false, true]) {
+			for (const dev of [false, true]) {
+				for (const content of [
+					'@if (props.show) { <><input name="fileAttachments" type="hidden" value={props.value$}/></> }',
+					'@for (const item of props.items; key item.id) { <input value={item.value$}/> }',
+					'@switch (props.choice) { @case "one": { <input value={props.value$}/> } @default: { <input value={props.other$}/> } }',
+				]) {
+					const source = `import 'octane/signals'; export function Example(props) @{ <form>${content}</form> }`;
+					const client = compile(source, '/src/nested-signal-controls.tsrx', {
+						strong,
+						dev,
+						hmr: false,
+					}).code;
+					const server = compile(source, '/src/nested-signal-controls.tsrx', {
+						strong,
+						dev,
+						hmr: false,
+						mode: 'server',
+					}).code;
+					expect(controlSites(client).sort()).toEqual(controlSites(server).sort());
+					expect(new Set(controlSites(client)).size).toBe(controlSites(client).length);
+				}
+			}
+		}
 	});
 
 	it('treats explicit get reads as one-way scalar bindings', () => {

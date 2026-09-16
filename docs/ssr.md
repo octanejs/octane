@@ -36,6 +36,12 @@ The server build must compile components with the Octane compiler in
 `mode: 'server'` (`@octanejs/vite-plugin` handles this automatically; SSR module
 loading through Vite picks the server transform automatically).
 
+Serve matching server and client compiler output. Signal control identities are
+derived from authored source sites, not generated branch or loop helper names;
+mixing HTML and client assets from different compiler/site-identity versions is
+not a supported hydration boundary. Deploy and invalidate cached HTML/assets as
+one matching build.
+
 If another renderer or an independent stream owns part of the server-rendered
 DOM, use a permanent-static `<Hydrate split={false} when={never()}>` boundary to
 preserve that range and `attachBehaviorRoot` from `octane/behavior` to attach

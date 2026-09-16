@@ -191,13 +191,16 @@ export function __createBindingStyles() {
 							if (writeAll || old === null || typeof old !== 'object' || next[name] !== old[name])
 								writeProperty(name, next[name]!);
 				},
-				dispose() {
+				dispose(preservePresentation) {
 					if (disposed) return;
 					disposed = true;
 					raw = previous = null;
 					let failed = false;
 					let failure: unknown;
-					for (const stop of [...subscriptions.values(), restore]) {
+					for (const stop of [
+						...subscriptions.values(),
+						...(preservePresentation ? [] : [restore]),
+					]) {
 						try {
 							stop();
 						} catch (error) {

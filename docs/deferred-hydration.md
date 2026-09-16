@@ -478,17 +478,17 @@ helpers must be pure; pass live values through the source snapshot rather than
 reading ambient state inside a projection. Snapshots must be synchronous values,
 never promises or other thenables.
 
-The first supported shape is one intrinsic HTML root with fixed native HTML/SVG
-descendants and explicit attribute/class/fixed-style projections. Visible text
-children (including static text), structural
-conditions and loops, component children, hooks, events, refs, spreads,
-`value`/`checked` control bindings, and raw HTML are not part of this path.
-Unsupported authoring produces a diagnostic, not a renderer fallback.
+Compiler-proven presentation supports native HTML/SVG, text, native events and
+refs, direct signal bindings, conditions, keyed lists, and supported pure child
+composition. Hooks, arbitrary component logic, unsupported spreads, and raw
+HTML produce a diagnostic, not a renderer fallback. Structural programs own
+only their declared regions; fixed programs update properties without replacing
+nodes.
 
 Pass the exact element emitted by the matching server build. Adoption validates
 template compatibility, native topology, and conflicting binding ownership
-before modifying it. It never inserts or replaces nodes. Only declared dynamic
-properties are owned; unrelated properties and existing event listeners remain
+before modifying it. Only declared dynamic properties and structural regions
+are owned; unrelated properties and existing event listeners remain
 with their current owner. An application must stop previous manual writers for
 the channels it hands over. Template compatibility is not document or request
 authorization: retain the enclosing application's lifetime and stream fencing.
@@ -529,6 +529,43 @@ redispatch the event, synthesize trust, repeat native link or form activation,
 or restore transient user activation that expired during asynchronous loading.
 Code requiring transient activation must run synchronously while the original
 event is being dispatched.
+
+### Optional handoff to normal hydration
+
+An adopted fixed native view can keep handling interactions while its enclosing
+application waits to hydrate. Pass its `BindingHandle` to the later root:
+
+```ts
+// In the explicitly loaded renderer entry, not the early activation module.
+import { hydrateRoot } from 'octane';
+import { App } from './App.tsrx';
+
+const root = hydrateRoot(container, App, props, {
+	bindingLeases: [earlyBinding],
+});
+```
+
+Use matching server/client compiler output and the same signal engine and
+application state for both entries. If the application supplies a `signalOwner`,
+retain that same owner during hydration. Loading the early binding artifact does
+not load the renderer; explicitly loading this later entry does. Signal writes
+and early handlers do not request hydration on their own.
+
+The early binding remains active while hydration suspends or an attempt is
+discarded. Only an accepted attempt transfers ownership: it prepares current
+values, retires early listeners and subscriptions without restoring old
+presentation, and publishes normal bindings before refs. A command already
+handled by the early listener is not delivered again to its replacement.
+Signals remain alive. Replacing or unmounting the owning root releases pending
+leases; aborting a hydration attempt alone does not.
+
+This handoff is narrower than renderer-free presentation generally. It requires
+an adopted compiler-proven fixed native `@{}` view, without structural regions,
+dynamic text, writable controls, or unsupported writers. Native attributes,
+events, refs, and supported native style projections can transfer. Unsupported
+handoffs fail explicitly instead of silently loading a different renderer path.
+Keep richer renderer-free programs under their existing owner until an explicit
+replacement strategy is available.
 
 ### Capturing command input before deferred work
 

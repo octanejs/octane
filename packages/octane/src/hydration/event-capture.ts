@@ -7,6 +7,7 @@ import {
 	HYDRATE_SUPPORTED_INTERACTION_EVENTS,
 } from './interaction-config.js';
 import { HYDRATE_INDEPENDENT_ATTR } from '../hydration-markers.js';
+import { hasBindingHandoffEvent } from '../dom-binding-handoff.js';
 import {
 	initializeHydrationControlCapture,
 	isEarlyHydrationIntentCurrent,
@@ -59,6 +60,8 @@ interface EarlyHydrationIntentMailbox {
 export interface HydrationReplayIntent {
 	event: Event;
 	path: number[];
+	/** An explicitly leased native listener receives the original event, never a replay. */
+	earlyBinding?: true;
 	/** Captured author opt-in; never inferred again from a later DOM version. */
 	selection?: HydrationSelectionIntent;
 }
@@ -309,6 +312,22 @@ function handleEarlyHydrationIntent(
 			: undefined;
 	const intent: HydrationReplayIntent = selection ? { event, path, selection } : { event, path };
 	HYDRATE_HANDLED_INTENT_EVENTS.add(event);
+	if (hasBindingHandoffEvent(event)) {
+		intent.earlyBinding = true;
+		// The native listener must finish before activation can retire its lease.
+		// Boundary-local capture observes the handled mark and also leaves it alone.
+		const activate = () => {
+			if (candidateBoundary !== undefined) candidateBoundary(event.type, intent);
+			else {
+				const pending = HYDRATE_PENDING_INTENTS.get(candidate!) ?? [];
+				appendHydrationReplayIntent(pending, intent);
+				HYDRATE_PENDING_INTENTS.set(candidate!, pending);
+			}
+		};
+		if (event.isTrusted) setTimeout(activate, 0);
+		else queueMicrotask(activate);
+		return;
+	}
 	if (event.bubbles) {
 		if (shouldPreventHydrationInteractionDefault(event)) event.preventDefault();
 		event.stopPropagation();

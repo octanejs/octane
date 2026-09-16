@@ -1,6 +1,85 @@
 import { unbound } from 'octane/behavior';
+import { Hydrate, use } from 'octane';
+import type { HydrationStrategy } from 'octane/hydration';
 import type { SignalHandle } from 'octane/signals';
 import type { SignalCSSProperties } from 'octane/jsx-runtime';
+
+export interface ActionPresentationProps {
+	type: SignalHandle<'submit' | 'button'>;
+	disabled: SignalHandle<boolean>;
+	label: SignalHandle<string>;
+	sendHidden: SignalHandle<boolean>;
+	stopHidden: SignalHandle<boolean>;
+	classes: SignalHandle<string>;
+	height$: SignalHandle<number>;
+	opacity$: SignalHandle<number>;
+	accent$: SignalHandle<string>;
+	title?: string;
+	onAction(event: MouseEvent): void;
+	onReady?(element: Element | null): void;
+}
+
+export function ActionPresentation(props: ActionPresentationProps) @{
+	'use dom bindings';
+	<button
+		id="early-action"
+		type={props.type}
+		disabled={props.disabled}
+		aria-disabled={props.disabled}
+		aria-label={props.label}
+		className={props.classes}
+		style={{ height: props.height$, opacity: props.opacity$, color: props.accent$ }}
+		title={props.title}
+		onClick={props.onAction}
+		ref={props.onReady}
+	>
+		<span hidden={props.sendHidden}>
+			<svg viewBox="0 0 24 24">
+				<path d="M1 1h5" />
+			</svg>
+		</span>
+		<span hidden={props.stopHidden}>
+			<svg viewBox="0 0 24 24">
+				<path d="M2 2h4" />
+			</svg>
+		</span>
+	</button>
+}
+
+function ActionHydrationSuffix(props: { suspend: boolean; promise: Promise<void> }) @{
+	if (props.suspend) use(props.promise);
+	<span>{'Ready'}</span>
+}
+
+export function ActionHydration(props: ActionPresentationProps & {
+	when: HydrationStrategy;
+	suspend: boolean;
+	promise: Promise<void>;
+	onHydrated(): void;
+}) @{
+	<Hydrate
+		when={props.when}
+		split={false}
+		fallback={<span id="action-fallback">{'Loading'}</span>}
+		onHydrated={props.onHydrated}
+	>
+		<ActionPresentation
+			type={props.type}
+			disabled={props.disabled}
+			label={props.label}
+			sendHidden={props.sendHidden}
+			stopHidden={props.stopHidden}
+			classes={props.classes}
+			height$={props.height$}
+			opacity$={props.opacity$}
+			accent$={props.accent$}
+			title={props.title}
+			onAction={props.onAction}
+			onReady={props.onReady}
+		/>
+		<ActionHydrationSuffix suspend={props.suspend} promise={props.promise} />
+	</Hydrate>
+}
 
 interface SubmitProps {
 	label: string;

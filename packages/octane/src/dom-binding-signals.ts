@@ -13,7 +13,7 @@ export interface BindingSignalConnection {
 	get(): unknown;
 	/** Optional whole-style writer, present only on the selected style capability. */
 	write?(value: unknown): void;
-	dispose(): void;
+	dispose(preservePresentation?: boolean): void;
 }
 
 /** @internal Query-selected capability; captures the existing owner, never creates a graph. */

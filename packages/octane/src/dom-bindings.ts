@@ -376,7 +376,7 @@ export function __createBindingStyleRestoration(
 	binding: BindingOperation,
 ): {
 	write(value: string | null): void;
-	dispose(): void;
+	dispose(preservePresentation?: boolean): void;
 } {
 	if (binding[1] === 'styleAttribute') {
 		let baseline: string | null | undefined;
@@ -389,10 +389,14 @@ export function __createBindingStyleRestoration(
 				expected = value;
 				write(node, binding, value);
 			},
-			dispose() {
+			dispose(preservePresentation) {
 				if (disposed) return;
 				disposed = true;
-				if (baseline !== undefined && node.getAttribute('style') === expected)
+				if (
+					!preservePresentation &&
+					baseline !== undefined &&
+					node.getAttribute('style') === expected
+				)
 					write(node, binding, baseline);
 			},
 		};
@@ -416,10 +420,11 @@ export function __createBindingStyleRestoration(
 			expected = [probe.style.getPropertyValue(name), probe.style.getPropertyPriority(name)];
 			write(node, binding, value);
 		},
-		dispose() {
+		dispose(preservePresentation) {
 			if (disposed) return;
 			disposed = true;
 			if (
+				!preservePresentation &&
 				baseline &&
 				expected &&
 				style.getPropertyValue(name) === expected[0] &&

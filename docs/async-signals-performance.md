@@ -7,6 +7,27 @@ interchangeable results.
 
 Each section identifies its measured source or historical checkpoint. Results from different checkpoints must not be treated as current bundle sizes or added together.
 
+## Optional early-binding hydration handoff
+
+The fixed-view handoff candidate was compared with `1cfbc9e78` using the same installed toolchain. Its measured runtime SHA-256 is `065abf7c219204450d57fddcb2fa3c73e4613a1c5f6e9eb23d156b1c5a10e6f6`; loaded source hashes stayed unchanged during measurement. The source-entry runner used esbuild 0.28.1, Alien Signals 3.2.0, and devalue 5.8.2. The rich authored fixture used production Vite 8.1.5 / Rolldown 1.1.5 on Node 24.21.0, Darwin arm64.
+
+| Measured delivery | Baseline gzip bytes | Candidate gzip bytes | Difference |
+| --- | ---: | ---: | ---: |
+| Ordinary client source-entry closure | 58,419 | 58,730 | +311 |
+| Ordinary server source-entry closure | 17,654 | 17,654 | 0 |
+| Scalar binding source-entry closure | 3,907 | 3,910 | +3 |
+| Complete rich authored behavior entry | 35,575 | 35,949 | +374 |
+| Rich fixture inline capture, including script tag | 457 | 457 | 0 |
+| Rich fixture later map interaction chunk | 92 | 92 | 0 |
+
+The program-binding source-entry closure adds 248 gzip bytes. These overlapping closures must not be added together. Source-entry measurements exclude consuming-application compilation and are not an application startup budget. The rich fixture's complete entry includes its signal engine, stream support, view, and driver, but still excludes the renderer and React. The handoff adds shared event-receipt and ownership machinery even when this fixture never loads the renderer; that cost is not zero.
+
+The ordinary native-read scheduling path checks a pending-activation count before walking ancestors. It walks only while some preserved hydration activation exists, retaining the pending boundary's publication ownership instead of committing a descendant independently. The count is released on completion, error, and teardown. This removes an unconditional ancestor walk; no CPU, allocation, or application-latency speedup is claimed.
+
+The final fixed-button browser fixture passes development and production in bundled Chromium 149 and Playwright WebKit 26.5. A synchronous Stop-to-Send update works before renderer loading and on three subsequent clicks while hydration is suspended. Commands run once, early cleanup stays at zero until acceptance, current attributes and styles precede refs, and the same button, focused input, draft, and selection survive. A separate 32-case browser matrix covers capture/bubble listeners, stopped propagation, trusted synchronous takeover, and immediate redispatch of the same scripted Event. Cleanup happens once and later commands remain live. These are local fixture checks, not CI, application integration, physical iOS Safari, or input-latency qualification.
+
+Reproduce the byte controls with `benchmarks/scoped-signals/run-bundles.mjs` against an immutable `1cfbc9e78` package and `benchmarks/conversation-streaming/behavior-only/build.mjs --bundler=vite --rich-presentation=authored` for both revisions. Existing behavior-root and hydration tests retain pending, canceled, accepted, replaced-root, historical-adoption, and cleanup coverage. The [handoff contract](./deferred-hydration.md#optional-handoff-to-normal-hydration) remains intentionally limited to supported fixed native views; structural regions, dynamic text, and writable-control handoff are not qualified by these checks.
+
 ## Style-object spread follow-up
 
 The compiler-only `knownAttributeSpreads` style-object opt-in was compared with its parent `45d45ebd5` using the same installed toolchain and `behavior-only/build.mjs --bundler=vite --rich-presentation=authored`. The existing rich entry, map interaction chunk, and inline capture remain byte-identical: their SHA-256 values are respectively `ddb4b0dda959d106c91f8087717bc3915d99038448207fcf04ecc12a21736aed`, `16e4f0a2b53604f699d80a9e0c4bb2cd5357bf8f9862e1139f1a99ba6c106045`, and `9170ed8229ac673a79ef56a574d76424f5da23c9aabbfc4f4ce703dd8e872f93`. This is a feature-off regression control, not a claim that selecting whole-style support is free.

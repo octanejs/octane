@@ -13,7 +13,7 @@ export interface BindingClassGroup {
 	/** Preparation can be discarded without changing the DOM or its receipts. */
 	prepare(value: string): { commit(): void };
 	/** An uncommitted adoption leaves the historical SSR contribution intact. */
-	dispose(): void;
+	dispose(preservePresentation?: boolean): void;
 }
 
 const receipts = /* @__PURE__ */ new WeakMap<Element, ClassReceipt>();
@@ -124,11 +124,11 @@ export function createBindingClassGroup(
 				},
 			};
 		},
-		dispose() {
+		dispose(preservePresentation) {
 			if (disposed) return;
 			// Cleanup owns the writes below even though the live group is now closed.
 			disposed = true;
-			if (!committed) {
+			if (!committed || preservePresentation) {
 				state.active.delete(index);
 				if (state.active.size === 0) receipts.delete(node);
 				return;

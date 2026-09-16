@@ -16,7 +16,7 @@ export interface BindingProjectionConnection {
 	read(compute: unknown): BindingValue[];
 	get(): BindingValue[];
 	writeStyle(index: number, value: BindingValue): void;
-	dispose(): void;
+	dispose(preservePresentation?: boolean): void;
 }
 
 /** Optional, view-owned projections share a read and prepare every field before any write. */
@@ -106,7 +106,7 @@ export function __createBindingProjections() {
 				writeStyle(index, value) {
 					if (!disposed) styleConnections.get(index)!.write!(value);
 				},
-				dispose() {
+				dispose(preservePresentation) {
 					if (disposed) return;
 					disposed = true;
 					compute = undefined;
@@ -114,7 +114,9 @@ export function __createBindingProjections() {
 					let failure: unknown;
 					for (const cleanup of [
 						...subscriptions.values(),
-						...[...styleConnections.values()].map((style) => () => style.dispose()),
+						...[...styleConnections.values()].map(
+							(style) => () => style.dispose(preservePresentation),
+						),
 					]) {
 						try {
 							cleanup();

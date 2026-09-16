@@ -1666,7 +1666,27 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 		});
 		inProgress.delete(fn);
 		programPlans.set(fn, plan);
-		replacements.set(fn, { ...mapCow(fn, plan.replacements), _octaneBindingView: { id: plan.id } });
+		const field = (name) =>
+			plan.root.properties.find((property) => property.key.name === name)?.value;
+		const fixedPresentation =
+			fn.body.type === 'JSXCodeBlock' &&
+			!plan.controls &&
+			field('regions').elements.length === 0 &&
+			field('bindings').elements.every((binding) => binding.elements[1].value !== 'text');
+		plan.root = {
+			...plan.root,
+			properties: [
+				...plan.root.properties,
+				b.prop('init', b.id('handoff'), b.literal(fixedPresentation)),
+			],
+		};
+		replacements.set(fn, {
+			...mapCow(fn, plan.replacements),
+			_octaneBindingView: { id: plan.id },
+			// Normal renderer ownership transfer is narrower than binding-program
+			// adoption. Keep its proof separate from the existing SSR view stamp.
+			_octanePresentationHydration: { id: plan.id, supported: fixedPresentation },
+		});
 		return plan;
 	};
 	walk(ast, (node, parent) => {

@@ -22,6 +22,16 @@ declare const process: { env: { NODE_ENV?: string } };
 import { resolveHookPath } from './hook-slot-cache.js';
 import { DOMStage } from './dom-stage.js';
 import { __normalizeBindingStyle } from './dom-binding-styles.js';
+import type { BindingHandle } from './dom-bindings.js';
+import {
+	BINDING_HANDOFF,
+	claimBindingHandoff,
+	consumeBindingEvent,
+	beginBindingEvent,
+	releaseBindingHandoff,
+	type BindingHandoff,
+	type BindingHandoffCapability,
+} from './dom-binding-handoff.js';
 import { bumpContextEpoch, contextEpochNow } from './context-epoch.js';
 
 import {
@@ -913,7 +923,7 @@ interface NativeProjectionProps {
 	fields: readonly string[];
 }
 
-function nativeProjectionBody(props: NativeProjectionProps, scope: Scope): void {
+function prepareNativeProjection(props: NativeProjectionProps, scope: Scope): unknown[] {
 	const prepare = () => {
 		const projected = props.compute();
 		return props.fields.map((field) => {
@@ -926,10 +936,14 @@ function nativeProjectionBody(props: NativeProjectionProps, scope: Scope): void 
 	};
 	// Resolve and normalize the entire projection before the first DOM write.
 	// A throwing unit conversion must not leave a new class with the old style.
-	const values = SIGNAL_BINDINGS_ENABLED
-		? runWithBlockSignalOwner(scope.parent, prepare)
-		: prepare();
-	const previous = scope.slots[0] as unknown[] | undefined;
+	return SIGNAL_BINDINGS_ENABLED ? runWithBlockSignalOwner(scope.parent, prepare) : prepare();
+}
+
+function publishNativeProjection(
+	props: NativeProjectionProps,
+	values: unknown[],
+	previous: unknown[] | undefined,
+): void {
 	for (let i = 0; i < props.fields.length; i++) {
 		const field = props.fields[i]!;
 		const value = values[i];
@@ -938,6 +952,63 @@ function nativeProjectionBody(props: NativeProjectionProps, scope: Scope): void 
 		else if (field === 'class' || field === 'className') setClassAttr(props.el, value);
 		else setAttribute(props.el, field, value);
 	}
+}
+
+function nativeProjectionBody(props: NativeProjectionProps, scope: Scope): void {
+	const values = prepareNativeProjection(props, scope);
+	publishNativeProjection(props, values, scope.slots[0] as unknown[] | undefined);
+	journalRootProperty(scope.slots, 0, scope.slots[0]);
+	scope.slots[0] = values;
+}
+
+function preparedNativeStyleBody(
+	props: { el: HTMLElement | SVGElement; value: unknown; frame: PresentationHydrationFrame },
+	scope: Scope,
+): void {
+	const native = setNativeAdoptionResolver(null);
+	const witness = beginNativeReadWitness();
+	let value: unknown;
+	let completed = false;
+	try {
+		value = runWithBlockSignalOwner(scope.parent, () =>
+			__normalizeBindingStyle(readNativeDomStyle(props.value)),
+		);
+		completed = true;
+	} finally {
+		props.frame.witnesses.set(scope, finishNativeReadWitness(witness, completed));
+		setNativeAdoptionResolver(native);
+	}
+	preparePresentationOperation(props.frame, scope, 'native', () => {
+		setStyle(props.el, value, '');
+		scope.block.body = nativeStyleBody;
+	});
+	journalRootProperty(scope.slots, 0, scope.slots[0]);
+	scope.slots[0] = value;
+}
+
+function preparedNativeProjectionBody(
+	props: NativeProjectionProps & { frame: PresentationHydrationFrame },
+	scope: Scope,
+): void {
+	const native = setNativeAdoptionResolver(null);
+	const witness = beginNativeReadWitness();
+	let values: unknown[];
+	let completed = false;
+	try {
+		values = prepareNativeProjection(props, scope);
+		completed = true;
+	} finally {
+		props.frame.witnesses.set(scope, finishNativeReadWitness(witness, completed));
+		setNativeAdoptionResolver(native);
+	}
+	preparePresentationOperation(props.frame, scope, 'native', () => {
+		publishNativeProjection(
+			props,
+			values,
+			props.fields.map((field) => (field === 'style' ? '' : undefined)),
+		);
+		scope.block.body = nativeProjectionBody;
+	});
 	journalRootProperty(scope.slots, 0, scope.slots[0]);
 	scope.slots[0] = values;
 }
@@ -1016,6 +1087,18 @@ function beginActiveNativeReadScope(scope: Scope): number {
 function scheduleNativeRead(target: Block): void {
 	// The adapter records the real owning Block separately from lightweight
 	// Scope proxies. Native reads and suspended retry leases share this path.
+	const activation = preservedHydrateActivationCount === 0 ? null : pendingHydrateOwner(target);
+	if (activation !== null) {
+		// A prepared descendant still belongs to the suspended island's capture.
+		// Rendering it as an independent root update would publish its refs and
+		// retire early bindings before the surrounding island has been accepted.
+		invalidateRender(target, activation.block);
+		if (activation.activationRequested) {
+			activation.serverActivationStarted = false;
+			scheduleRender(activation.parentBlock);
+		}
+		return;
+	}
 	invalidateRender(target, target);
 	// Native reads belong to a versioned publication frame. Invalidating an
 	// already-held primary retries that frame coherently; it does not supersede
@@ -3051,6 +3134,8 @@ interface RootRenderOwner {
 	current: Block | null;
 	/** Shared document/account data owner; distinct from this root's presentation owner. */
 	signalOwner?: SignalOwner;
+	bindingLeases?: Set<BindingHandoff>;
+	bindingContainer?: Node;
 	adopt?: (block: Block) => void;
 	retry: () => void;
 	request: ((mode: 'urgent' | 'transition') => void) | null;
@@ -3547,6 +3632,22 @@ function commitRootRenders(): void {
 				continue;
 			}
 			spliceOffscreenCapture(transaction.capture);
+			if (owner.bindingLeases !== undefined) {
+				// A successful replacement may remove a still-dormant leased view.
+				// Matching takeovers published above; retire only the remaining ranges
+				// no longer owned by this container, never a suspended attempt.
+				for (const lease of owner.bindingLeases) {
+					if (owner.bindingContainer!.contains(lease.anchor)) continue;
+					owner.bindingLeases.delete(lease);
+					PRESENTATION_PREPARATIONS.delete(lease);
+					releaseBindingHandoff(lease);
+					try {
+						lease.retire();
+					} catch (error) {
+						if (!reportUncaughtError(owner.current, error)) console.error(error);
+					}
+				}
+			}
 			// Outgoing cleanup may have removed the state origin of a held root
 			// transition. Inspect its lifetime after those deletions have completed.
 			if (owner.transition !== undefined) TRANSITION_SWAP_DRIVER!.commitRoot(owner, transaction);
@@ -13592,6 +13693,25 @@ interface PreservedHydrateActivation {
 // Keeping its actual DOM attached preserves focus, selection, draft values and
 // native IME sessions; cloning that arm cannot preserve browser-owned state.
 let preservedHydrateActivations: WeakMap<HydrateSlot, PreservedHydrateActivation> | null = null;
+let preservedHydrateActivationCount = 0;
+
+function releasePreservedHydrateActivation(state: HydrateSlot): void {
+	if (preservedHydrateActivations?.delete(state)) preservedHydrateActivationCount--;
+}
+
+function pendingHydrateOwner(target: Block): HydrateSlot | null {
+	let owner: HydrateSlot | null = null;
+	for (let block: Block | null = target; block !== null; block = block.parentBlock) {
+		const state = block.slots[0] as HydrateSlot | undefined;
+		if (
+			state?.__kind === 'hydrateBlockSlot' &&
+			!state.hydrated &&
+			preservedHydrateActivations?.has(state)
+		)
+			owner = state;
+	}
+	return owner;
+}
 
 function findSuspendedHydrateBlock(scope: Scope, thenable: TrackedThenable<unknown>): Block | null {
 	const own = (scope.block as Block & { __thenables?: TrackedThenable<unknown>[] }).__thenables;
@@ -13620,7 +13740,9 @@ function preserveSuspendedHydrateActivation(
 		source: suspendedBlock === state.block ? null : suspendedBlock,
 		cursor: hydration.node,
 	};
-	(preservedHydrateActivations ??= new WeakMap()).set(state, activation);
+	const activations = (preservedHydrateActivations ??= new WeakMap());
+	if (!activations.has(state)) preservedHydrateActivationCount++;
+	activations.set(state, activation);
 	const resume = () => {
 		if (
 			state.block.disposed ||
@@ -13947,7 +14069,7 @@ function teardownHydrateBoundary(state: HydrateSlot): void {
 	cleanupHydrateStreamWait(state);
 	const preserved = preservedHydrateActivations?.get(state);
 	if (preserved !== undefined) {
-		preservedHydrateActivations!.delete(state);
+		releasePreservedHydrateActivation(state);
 		discardOffscreenCapture(preserved.capture);
 		// The connected server arm never committed its captured refs/effects.
 		// Let the existing exact-host aborted-mount suppression cover descendants
@@ -13998,7 +14120,7 @@ function hydrateStrategyInteractionEvents(
 
 function queueHydrateIntent(state: HydrateSlot, intent: HydrationReplayIntent): void {
 	if (state.hydrated || resolveHydrateStrategy(state)._t === 'never') return;
-	state.replays.push(intent);
+	if (!intent.earlyBinding) state.replays.push(intent);
 	requestHydrateBoundary(state);
 }
 
@@ -14448,7 +14570,7 @@ function createHydrateSlot(
 		// bootstrapIndependentHydration owns the preserved children and intent
 		// listener. The parent root retains only the wrapper's outer lifetime.
 	} else if (serverPreserved && pendingIntents !== undefined && initialStrategy._t !== 'never') {
-		state.replays.push(...pendingIntents);
+		state.replays.push(...pendingIntents.filter((intent) => !intent.earlyBinding));
 		requestHydrateBoundary(state);
 	} else if (serverPreserved) {
 		const shouldDefer = initialStrategy._d ? initialStrategy._d() : initialStrategy._t !== 'load';
@@ -14531,7 +14653,7 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 		// A rejected parked promise can throw while its unfinished source retries.
 		// Discard the same uncommitted work as an explicit boundary unmount before
 		// the enclosing error boundary tears down its partially mounted children.
-		preservedHydrateActivations?.delete(state);
+		releasePreservedHydrateActivation(state);
 		discardOffscreenCapture(capture);
 		state.block.mounted = false;
 		if (error instanceof NativeAdoptionMiss) nativeRecovery = error;
@@ -14577,7 +14699,7 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 		return;
 	}
 	if (completed) {
-		preservedHydrateActivations?.delete(state);
+		releasePreservedHydrateActivation(state);
 		spliceOffscreenCapture(capture);
 	}
 	if (completed && hydration.hasAdjacentRangePair) hydration.coalesce();
@@ -18295,6 +18417,283 @@ export function bindingText(posNode: Node | null, value: unknown, marker: string
 }
 
 const BINDING_VIEW_ROOT = /* @__PURE__ */ Symbol.for('octane.binding.view-root');
+
+interface PresentationHydrationFrame {
+	previous: PresentationHydrationFrame | null;
+	scope: Scope;
+	writes: Map<object, Map<string, () => void>>;
+	native: ReturnType<typeof setNativeAdoptionResolver>;
+	readToken: number;
+	witnessToken: number;
+	witnesses: Map<object, NativeReadWitness | null>;
+	completed: boolean;
+}
+
+let PRESENTATION_HYDRATION: PresentationHydrationFrame | null = null;
+const PRESENTATION_PREPARATIONS = /* @__PURE__ */ new WeakMap<
+	BindingHandoff,
+	PresentationHydrationFrame
+>();
+
+function preparePresentationOperation(
+	frame: PresentationHydrationFrame,
+	target: object,
+	key: string,
+	write: () => void,
+): void {
+	let operations = frame.writes.get(target);
+	if (operations === undefined) frame.writes.set(target, (operations = new Map()));
+	operations.set(key, write);
+}
+
+/** @internal Only compiler-proven fixed native views enter this publication boundary. */
+export function beginPresentationHydration(
+	scope: Scope,
+	id: string,
+	supported = false,
+): PresentationHydrationFrame | null {
+	const owner = scope.block.idState.renderOwner;
+	if (owner?.bindingLeases === undefined || WIP_CAPTURE === null) return null;
+	const hydration = activeHydration();
+	const lease = [...owner.bindingLeases].find(
+		(candidate) =>
+			candidate.id === id &&
+			(candidate.root === scope.block.startMarker ||
+				candidate.root === hydration?.node ||
+				(candidate.root.nodeType === 8 && candidate.root.nextSibling === hydration?.node)),
+	);
+	if (lease === undefined) return null;
+	if (!supported)
+		throw new Error(
+			'Hydration binding leases require a supported fixed native view without structural regions or unsupported writers.',
+		);
+	const pending = PRESENTATION_PREPARATIONS.get(lease);
+	const frame: PresentationHydrationFrame = {
+		previous: PRESENTATION_HYDRATION,
+		scope,
+		// A suspended component's cache can skip an unchanged writer on retry.
+		// Carry that same scope's prepared operations, replacing by native channel.
+		writes:
+			pending?.scope === scope
+				? new Map([...pending.writes].map(([node, writes]) => [node, new Map(writes)]))
+				: new Map(),
+		native: setNativeAdoptionResolver(null),
+		readToken: beginNativeReadScope(scope),
+		witnessToken: beginNativeReadWitness(),
+		witnesses: pending?.scope === scope ? new Map(pending.witnesses) : new Map(),
+		completed: false,
+	};
+	PRESENTATION_HYDRATION = frame;
+	PRESENTATION_PREPARATIONS.set(lease, frame);
+	(WIP_CAPTURE.renderCleanups ??= []).push((discarded) => {
+		if (
+			discarded ||
+			!frame.completed ||
+			owner.disposed ||
+			scope.block.disposed ||
+			PRESENTATION_PREPARATIONS.get(lease) !== frame
+		)
+			return;
+		PRESENTATION_PREPARATIONS.delete(lease);
+		owner.bindingLeases!.delete(lease);
+		releaseBindingHandoff(lease);
+		// Only prepared native writes publish here, before refs. Retiring early
+		// ownership does not restore old styles/classes or retire shared signals.
+		let published = false;
+		try {
+			lease.retire(() => {
+				for (const writes of frame.writes.values()) for (const write of writes.values()) write();
+				published = true;
+			});
+		} catch (error) {
+			if (!published) throw error;
+			reportRendererOwnerError(scope, error);
+		} finally {
+			frame.writes.clear();
+			if (
+				published &&
+				!owner.disposed &&
+				owner.current !== null &&
+				[...frame.witnesses.values()].some(
+					(witness) => witness !== null && !validateNativeReadWitness(witness),
+				)
+			) {
+				// User retirement cleanup can write after acceptance. Reuse the
+				// native publication fence: refs/effects wait for the live reread,
+				// while direct bindings already observe writes under normal ownership.
+				owner.generation++;
+				invalidateRender(scope.block);
+				scheduleRender(owner.current);
+			}
+			frame.witnesses.clear();
+		}
+	});
+	return frame;
+}
+
+/** @internal Restore the read frame even when preparation suspends or throws. */
+export function endPresentationHydration(
+	frame: PresentationHydrationFrame | null,
+	completed = true,
+): void {
+	if (frame === null) return;
+	frame.completed = completed;
+	frame.witnesses.set(frame.scope, finishNativeReadWitness(frame.witnessToken, completed));
+	endNativeReadScope(frame.readToken, completed);
+	setNativeAdoptionResolver(frame.native);
+	PRESENTATION_HYDRATION = frame.previous;
+}
+
+function preparedPresentationAttribute(
+	el: Element,
+	name: string,
+	value: unknown,
+	kind: string,
+): unknown {
+	if (kind === 'class') return value == null || value === false ? null : normalizeClass(value);
+	if (kind === 'booleanAttr')
+		return !!value && typeof value !== 'function' && typeof value !== 'symbol';
+	const result = coerceAttrValue(el, name, value);
+	// Generic boolean writers require truthiness, not their normalized empty string.
+	return result === '' && BOOLEAN_ATTR_PROPS.has(name.toLowerCase()) ? true : result;
+}
+
+function preparePresentationSignalAttribute(
+	args: any[],
+	frame: PresentationHydrationFrame,
+): unknown {
+	const [scope, previous, element, name, value, site, attributeKind = 'attr'] = args as [
+		Scope,
+		unknown,
+		Element,
+		string,
+		unknown,
+		string,
+		DirectSignalAttributeKind?,
+	];
+	return runWithBlockSignalOwner(scope, () => {
+		const handle = isSignalHandle(value) ? value : null;
+		// Unlike the ordinary direct-binding read, this read belongs to validation.
+		const current = handle === null ? value : handle.get();
+		const prepared = preparedPresentationAttribute(element, name, current, attributeKind);
+		if (handle === null) {
+			preparePresentationOperation(frame, element, name, () =>
+				writeDirectSignalScalar(element, prepared, 'attribute', previous, name, attributeKind),
+			);
+			return value;
+		}
+		const prior = previous as DirectSignalBinding | undefined;
+		const reusable =
+			prior?.[DIRECT_SIGNAL_BINDING] === true &&
+			!prior.disposed &&
+			prior.unsubscribe === undefined &&
+			prior.handle === handle &&
+			prior.target === element &&
+			prior.site === site &&
+			prior.name === name &&
+			prior.attributeKind === attributeKind;
+		const binding: DirectSignalBinding = reusable
+			? prior
+			: {
+					[DIRECT_SIGNAL_BINDING]: true,
+					scope,
+					target: element,
+					kind: 'attribute',
+					site,
+					name,
+					attributeKind,
+					handle,
+					value: current,
+					disposed: false,
+				};
+		if (!reusable) registerHookCleanup(scope, () => disposeDirectSignalBinding(binding));
+		preparePresentationOperation(frame, element, name, () => {
+			if (binding.disposed) return;
+			writeDirectSignalScalar(element, prepared, 'attribute', previous, name, attributeKind);
+			binding.value = current;
+			runWithBlockSignalOwner(scope, () => activateDirectSignalBinding(binding, undefined));
+		});
+		return binding;
+	});
+}
+
+/** @internal Compiler-selected writer seam; ordinary renderer setters stay unchanged. */
+export function presentationWrite<T>(
+	writer: (...args: any[]) => T,
+	kind: string,
+	...args: any[]
+): T {
+	const frame = PRESENTATION_HYDRATION;
+	if (frame === null) return writer(...args);
+	if (kind === 'bindSignalAttribute') return preparePresentationSignalAttribute(args, frame) as T;
+	if (kind === 'nativeStyleBinding' || kind === 'nativeProjectionBinding') {
+		const [owner, slot, el] = args;
+		const style = kind === 'nativeStyleBinding';
+		nativePresentationBinding(
+			owner,
+			slot,
+			el,
+			style ? preparedNativeStyleBody : preparedNativeProjectionBody,
+			style ? { el, value: args[3], frame } : { el, compute: args[3], fields: args[4], frame },
+		);
+		return undefined as T;
+	}
+	const prepared = args.slice();
+	let result: unknown;
+	if (kind === 'setEventHandler') {
+		preparePresentationOperation(frame, prepared[0], 'event:' + prepared[1], () => {
+			writer(...prepared);
+			if (SIGNAL_BINDINGS_ENABLED || signalDocumentEnabled)
+				(SIGNAL_EVENT_OWNERS ??= new WeakMap()).set(prepared[0], frame.scope as ScopeImpl);
+		});
+		return undefined as T;
+	}
+	if (kind === 'setStyle') {
+		prepared[1] = __normalizeBindingStyle(args[1]);
+		prepared[2] = '';
+	} else if (kind === 'setStyleProperty') {
+		prepared[2] =
+			args[2] == null || typeof args[2] === 'boolean' ? null : cssStyleValue(args[1], args[2]);
+	} else if (kind === 'setStyleProperties') {
+		prepared[1] = args[1].map((value: unknown, i: number) =>
+			i % 2 === 0 || value == null || typeof value === 'boolean'
+				? value
+				: cssStyleValue(args[1][i - 1], value),
+		);
+	} else if (kind === 'setBindingClass' || kind === 'setBindingClassIfChanged') {
+		const index = kind.endsWith('IfChanged') ? 0 : 2;
+		const value = args[index];
+		prepared[index] = [normalizeClass(value[0]), value[1].map(normalizeClass)];
+		result = value;
+	} else {
+		const changed = kind.endsWith('IfChanged') || kind.startsWith('updateFresh');
+		const valueIndex = changed ? 0 : kind === 'setClassName' || kind === 'setClassAttr' ? 1 : 2;
+		const element = args[changed ? 2 : 0] as Element;
+		const className = kind.includes('Class');
+		const name = className ? 'class' : args[changed ? 3 : 1];
+		const attributeKind = className ? 'class' : kind.includes('Boolean') ? 'booleanAttr' : 'attr';
+		prepared[valueIndex] = preparedPresentationAttribute(
+			element,
+			name,
+			args[valueIndex],
+			attributeKind,
+		);
+		result = kind.startsWith('updateFresh') ? prepared[valueIndex] : args[valueIndex];
+	}
+	const changed = kind.endsWith('IfChanged') || kind.startsWith('updateFresh');
+	const element = args[changed ? 2 : 0];
+	const key = kind.includes('Class')
+		? 'class'
+		: kind.startsWith('setStyle')
+			? kind === 'setStyleProperty'
+				? 'style:' + args[1]
+				: 'style'
+			: args[changed ? 3 : 1];
+	preparePresentationOperation(frame, element, key, () => {
+		writer(...prepared);
+	});
+	return result as T;
+}
 
 /** @internal Authored presentation ranges may not inherit an unrelated caller's boundary. */
 export function bindPresentationView<T extends Function>(view: T, id: string): T {
@@ -22665,11 +23064,13 @@ function prepareDelegatedEvent(event: Event, listener: Node): EventTarget[] | un
 	// One public root without portals needs only the epoch; its bubble listener
 	// can build the path once, after native target listeners have run.
 	if (_delegationTargets.size === 1 && portalEventTargetCount === 0) {
+		beginBindingEvent(event);
 		(event as any)[EVENT_ROOT_EPOCH] = eventRootEpoch;
 		return;
 	}
 	const path = event.composedPath();
 	if (_delegationTargets.size === 1) {
+		beginBindingEvent(event);
 		(event as any)[EVENT_ROOT_EPOCH] = eventRootEpoch;
 		if (portalEventTargetCount !== 0) {
 			preparePortalEventOwners(path, eventRootEpoch);
@@ -22680,6 +23081,7 @@ function prepareDelegatedEvent(event: Event, listener: Node): EventTarget[] | un
 	for (let i = path.length - 1; i >= 0; i--) {
 		if (_delegationTargets.has(path[i] as Node)) {
 			if (path[i] === listener) {
+				beginBindingEvent(event);
 				(event as any)[EVENT_ROOT_EPOCH] = eventRootEpoch;
 				if (portalEventTargetCount !== 0) {
 					preparePortalEventOwners(path, eventRootEpoch);
@@ -23672,7 +24074,7 @@ function dispatchDelegated(this: Node, event: Event): void {
 			// Target-only native families never transfer a handler to a root boundary.
 			if (targetOnly && current !== event.target) break;
 			const slot = CAPTURE_SLOTS[i];
-			if (slot != null) {
+			if (slot != null && !consumeBindingEvent(event, current, false)) {
 				setCurrentTarget(event, current, frame);
 				fireEventSlot(slot, event, current);
 				if ((frame.flags & 1) !== 0) break;
@@ -23740,7 +24142,7 @@ function dispatchDelegatedCapture(
 		frame = beginDelegatedPropagation(event, stop, immediate);
 		for (let i = CAPTURE_PATH.length - 1; i >= pathBase; i--) {
 			const slot = CAPTURE_SLOTS[i];
-			if (slot != null) {
+			if (slot != null && !consumeBindingEvent(event, CAPTURE_PATH[i], true)) {
 				setCurrentTarget(event, CAPTURE_PATH[i], frame);
 				fireEventSlot(slot, event, CAPTURE_PATH[i]);
 				if ((frame.flags & 1) !== 0) break;
@@ -40920,6 +41322,8 @@ export interface Root {
 }
 
 export interface RootOptions {
+	/** Adopt fixed native early bindings only when their matching hydration capture commits. */
+	bindingLeases?: readonly BindingHandle[];
 	/**
 	 * Shared document/account owner for module signals. Roots borrow this owner;
 	 * unmounting a presentation root never retires shared data state.
@@ -41766,6 +42170,18 @@ function makeRoot(
 			}
 			unmounted = true;
 			renderOwner.disposed = true;
+			if (renderOwner.bindingLeases !== undefined) {
+				for (const lease of renderOwner.bindingLeases) {
+					releaseBindingHandoff(lease);
+					PRESENTATION_PREPARATIONS.delete(lease);
+					try {
+						lease.retire();
+					} catch (error) {
+						if (!reportUncaughtError(rootBlock, error)) console.error(error);
+					}
+				}
+				renderOwner.bindingLeases.clear();
+			}
 			renderOwner.nativeRetry?.clear();
 			if (renderOwner.retrySignalOwners !== undefined) clearSignalRetryOwners(renderOwner);
 			renderOwner.retry = noop;
@@ -41834,6 +42250,8 @@ function createRootWithOutputHandler(
 	outputHandler: OutputHandler | null,
 ): Root {
 	assertValidRootContainer(container);
+	if (options?.bindingLeases !== undefined)
+		throw new Error('DOM binding hydration leases are supported only by hydrateRoot().');
 	options = warnCreateRootElementOption(options);
 	const ownerToken = claimRootContainer(container);
 	// Register the container as an event-delegation target up front. Listeners
@@ -41931,6 +42349,22 @@ export function hydrateRoot(
 		body = ROOT_RENDERABLE_BODY;
 		props = bodyOrElement;
 	}
+	const bindingLeases = rootOptions?.bindingLeases?.map((handle) => {
+		const capability = handle as BindingHandle & Partial<BindingHandoffCapability>;
+		const lease = capability[BINDING_HANDOFF]?.();
+		if (
+			lease === undefined ||
+			!lease.active() ||
+			lease.owner !== undefined ||
+			!container.contains(lease.root)
+		)
+			throw new Error(
+				'Hydration binding leases require active fixed native views owned by this container.',
+			);
+		return lease;
+	});
+	if (bindingLeases !== undefined && new Set(bindingLeases).size !== bindingLeases.length)
+		throw new Error('A hydration binding lease can be claimed only once.');
 	const nativeSidecar = findHydrateSeedSidecar(container, NATIVE_SIGNAL_SEED_ATTR);
 	const nativeManifest =
 		nativeSidecar === null
@@ -42007,6 +42441,11 @@ export function hydrateRoot(
 		rootOptions,
 	);
 	const owner = idState.renderOwner!;
+	if (bindingLeases !== undefined) {
+		owner.bindingLeases = new Set(bindingLeases);
+		owner.bindingContainer = container;
+		for (const lease of bindingLeases) claimBindingHandoff(lease, owner);
+	}
 	const adopt = (): void => {
 		if (owner.disposed) return;
 		if (rootBlock.disposed) {

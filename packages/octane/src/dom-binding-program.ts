@@ -15,6 +15,12 @@ import {
 import { encodeBindingKey, parseBindingMarker, type BindingKey } from './dom-binding-protocol.js';
 import { moveNativeNodeBefore } from './dom-focused-move.js';
 import { rendererRangeClose } from './stream-protocol.js';
+import {
+	BINDING_HANDOFF,
+	registerBindingEvent,
+	markBindingEvent,
+	type BindingHandoff,
+} from './dom-binding-handoff.js';
 import type { createBindingClassGroup, BindingClassGroup } from './dom-binding-classes.js';
 import type { __createBindingSignals, BindingSignalConnection } from './dom-binding-signals.js';
 import type { __createBindingStyles } from './dom-binding-styles.js';
@@ -195,9 +201,11 @@ export function __activateBindingAdapters(
 					if (handler == null || handler === false) return;
 					if (typeof handler !== 'function')
 						throw new TypeError('A native event binding must resolve to a function.');
+					markBindingEvent(event, node, !!definition.capture);
 					handler.call(node, event);
 				};
 				node.addEventListener(definition.name, listener, !!definition.capture);
+				own(registerBindingEvent(node, definition.name));
 				own(() => node.removeEventListener(definition.name, listener, !!definition.capture));
 			}
 		}
@@ -243,6 +251,8 @@ export type BindingInitializer =
 
 /** @internal Generated expressions take the lexical environment, never a renderer scope. */
 export interface BindingFragment {
+	/** Compiler proof that the authored scoped view has a fixed native hydration boundary. */
+	readonly handoff?: boolean;
 	readonly html: string;
 	readonly ns?: 0 | 1;
 	readonly nodes: readonly BindingProgramNode[];
@@ -389,6 +399,7 @@ interface Transaction {
 	focused: Element | null;
 	contentEditable: boolean;
 	restoreStyles: boolean;
+	preservePresentation?: boolean;
 	signals?: ReturnType<typeof __createBindingSignals>;
 	styles?: ReturnType<typeof __createBindingStyles>;
 	projections?: ReturnType<typeof __createBindingProjections>;
@@ -461,10 +472,11 @@ function releaseInstance(instance: FragmentInstance, transaction: Transaction): 
 	attempt(() => instance.cleanup?.());
 	instance.cleanup = undefined;
 	instance.updateAdapters = undefined;
-	for (const connection of instance.signals?.values() ?? []) attempt(() => connection.dispose());
+	for (const connection of instance.signals?.values() ?? [])
+		attempt(() => connection.dispose(transaction.preservePresentation));
 	instance.signals?.clear();
 	for (const connection of instance.projections ? new Set(instance.projections.values()) : [])
-		attempt(() => connection.dispose());
+		attempt(() => connection.dispose(transaction.preservePresentation));
 	instance.projections?.clear();
 	instance.signalPlan = undefined;
 	for (const region of instance.regions) {
@@ -477,9 +489,15 @@ function releaseInstance(instance: FragmentInstance, transaction: Transaction): 
 	for (let i = 0; i < instance.owned.length; i++) {
 		const [node, channel] = instance.owned[i]!;
 		const binding = instance.definition.bindings[i]!;
-		if (instance.groups.has(i)) attempt(() => instance.groups.get(i)!.dispose());
-		if (instance.styles?.has(i)) attempt(() => instance.styles!.get(i)!.dispose());
-		if (binding[1] === 'classToken' && instance.previous[i] === '')
+		if (instance.groups.has(i))
+			attempt(() => instance.groups.get(i)!.dispose(transaction.preservePresentation));
+		if (instance.styles?.has(i))
+			attempt(() => instance.styles!.get(i)!.dispose(transaction.preservePresentation));
+		if (
+			!transaction.preservePresentation &&
+			binding[1] === 'classToken' &&
+			instance.previous[i] === ''
+		)
 			attempt(() => node.classList.remove(binding[2]));
 		__releaseBinding(node, channel);
 	}
@@ -1353,13 +1371,28 @@ function bindProgram<Props>(
 	let mounted = !mount;
 	let unsubscribe: (() => void) | undefined;
 	const signal = options?.signal;
-	const dispose = (disposal?: { preserveDOM?: boolean }): void => {
-		if (transaction.disposed) return;
+	const dispose = (disposal?: { preserveDOM?: boolean }, publish?: () => void): void => {
+		if (transaction.disposed) {
+			publish?.();
+			return;
+		}
 		transaction.disposed = true;
 		signalUpdates?.clear();
 		signal?.removeEventListener('abort', abort);
 		let failed = false;
 		let failure: unknown;
+		if (publish !== undefined) {
+			// Quiesce early native listeners before normal ownership is activated.
+			// Ref cleanup and source unsubscribe below may synchronously write or
+			// dispatch; they must observe the new owner, never stale preparation.
+			for (const owned of transaction.all) owned.controller?.abort();
+			try {
+				publish();
+			} catch (error) {
+				failed = true;
+				failure = error;
+			}
+		}
 		for (const owned of [...transaction.all]) {
 			try {
 				releaseInstance(owned, transaction);
@@ -1493,7 +1526,34 @@ function bindProgram<Props>(
 		dirty = true;
 		drain();
 	};
-	const handle = { refresh, dispose };
+	let handoff: BindingHandoff | undefined;
+	const handle = {
+		refresh,
+		dispose,
+		[BINDING_HANDOFF](): BindingHandoff {
+			if (
+				mount ||
+				descriptor.root.handoff !== true ||
+				!instance ||
+				descriptor.root.regions.length !== 0 ||
+				descriptor.root.bindings.some((binding) => binding[1] === 'control') ||
+				descriptor.root.nodes.some((node) => node[1] === 'element' && node[4] === null)
+			)
+				throw new Error(
+					'Hydration binding leases require an adopted fixed native view without structural regions or controls.',
+				);
+			return (handoff ??= {
+				id: descriptor.id,
+				root: instance.range.start,
+				anchor: instance.nodes.find((node) => node.nodeType === 1) ?? instance.range.start,
+				active: () => !transaction.disposed,
+				retire: (publish) => {
+					transaction.preservePresentation = true;
+					dispose(undefined, publish);
+				},
+			});
+		},
+	};
 	if (signal?.aborted) {
 		dispose();
 		return handle;

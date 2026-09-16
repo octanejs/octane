@@ -115,6 +115,8 @@ const stop = bindSignalControl(document.querySelector('textarea')!, 'value', dra
 
 `value` supports text inputs, textareas and selects; `checked` supports checkbox/radio inputs.
 Writable handles adopt captured early edits and receive native writeback.
+Compiled writable controls require [matching server/client builds](./ssr.md#quick-start),
+including controls nested inside conditional fragments or keyed lists.
 Readonly handles only project their value; neither mode sets HTML `readOnly`.
 The host retains structural ownership. No synthetic input, form-reset manager,
 radio-group manager or renderer root is installed. Initial pending/error reads

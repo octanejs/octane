@@ -838,13 +838,13 @@ export function App() @{ <select><option value="first">First</option><option val
 export const draft$ = signal$('server');
 export const readonly$ = signal$('fixed');
 const count$ = derived$(() => draft$.get().length);
-export function App() @{
+export function App(props) @{
   const fields = {value: draft$, 'aria-label': 'Message'};
-  <div>${spread ? '<input {...fields} />' : '<input aria-label="Message" value={draft$} />'}<input aria-label="Read only" value={readonly$.get()} readOnly /><p>{'Characters: ' + count$.get()}</p></div>
+  <form>@if (props.show !== false) { <>${spread ? '<input {...fields} />' : '<input aria-label="Message" value={draft$} />'}<input aria-label="Read only" value={readonly$.get()} readOnly /><input type="hidden" name="fileAttachments" value={draft$}/><p>{'Characters: ' + count$.get()}</p></> }</form>
 }`;
 			const options = {
 				id: `/src/early-edit-adoption-${dev}-${spread}-${live}-${edit.length}.tsrx`,
-				compileOptions: { dev },
+				compileOptions: { dev, strong: true },
 				runtimeModules: { 'octane/signals': Signals },
 			};
 			const server = loadCompiledFixtureSource(source, { ...options, mode: 'server' });
@@ -881,11 +881,13 @@ export function App() @{
 				.poll(() => container.querySelector('p')?.textContent)
 				.toBe(`Characters: ${edit.length}`);
 			expect(runWithSignalOwner(owner, () => loaded.draft$.get())).toBe(edit);
+			expect(new FormData(container.querySelector('form')!).get('fileAttachments')).toBe(edit);
 			expect(runWithSignalOwner(owner, () => loaded.readonly$.get())).toBe('fixed');
 			expect(snapshotHydrationControl(input)?.editRevision).toBe(0);
 			input.value = '';
 			input.dispatchEvent(new InputEvent('input', { bubbles: true }));
 			await expect.poll(() => container.querySelector('p')?.textContent).toBe('Characters: 0');
+			expect(new FormData(container.querySelector('form')!).get('fileAttachments')).toBe('');
 			expect(
 				error.mock.calls.filter((call) =>
 					String(call[0]).includes('will render a read-only field'),
