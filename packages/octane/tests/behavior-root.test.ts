@@ -28,6 +28,7 @@ import {
 	runWithSignalOwner,
 	SIGNAL_BINDING_SUBSCRIBE,
 	createResource,
+	isSignalHandle,
 	query,
 } from '../src/signals/index.js';
 import type {
@@ -558,7 +559,10 @@ describe('behavior-only roots', () => {
 							dev,
 							`export function FreshClass(${destructured ? '{ title: header = "default title", ...props }' : 'props'}) @{ 'use dom bindings';
  const title = ${destructured ? 'header' : 'props.title'};
- <${tag} title={title} className={${classes}} ref={props.onReady} onClick={() => props.onAction?.(title)}/>
+ const activate = () => props.onAction?.(title);
+ const click = activate;
+ const ready = (node) => props.onReady?.(node);
+ <${tag} title={title} className={${classes}} ref={ready} onClick={click}/>
 }`,
 						);
 						article.innerHTML = fixture.html;
@@ -3180,6 +3184,182 @@ export function ProjectedAction(${destructured ? '{ title: header = "default tit
 		for (const dev of [false, true]) {
 			const refA = { current: null as HTMLInputElement | null };
 			for (const adopt of [false, true]) {
+				const scope = createScope({ scopeKey: `native-setup-${dev}-${adopt}` });
+				const disabled = scope.signal$('disabled', false);
+				const onAction = vi.fn();
+				const onReady = vi.fn();
+				const action = authoredPresentation(
+					'NativeAction',
+					{ width: 24, disabled, title: 'initial', onAction, onReady },
+					dev,
+					`import { isSignalHandle as signalValue } from 'octane/signals';
+import { create } from 'binding-projections';
+const SCALE = 16;
+const layout = create({ position: (width) => width / 2 });
+export function NativeAction({ width, disabled, title, onAction, onReady }) @{ 'use dom bindings';
+ const size = String(Math.min(width, 16) / 16) + 'rem';
+ const units = width / SCALE;
+ const offset = layout.position(width);
+ const inactive = signalValue(disabled) ? disabled.get() : disabled;
+ const activate = (event) => {
+  if (signalValue(disabled) ? disabled.get() : disabled) {
+   event.preventDefault(); event.stopPropagation();
+  } else onAction(title, event.currentTarget, units, offset);
+ };
+ const relay = activate;
+ const attach = (node) => onReady(node);
+ const ready = attach;
+ <button type="button" title={title} aria-disabled={inactive} style={{ width: size }} onClick={relay} ref={ready} />
+}`,
+					{
+						'octane/signals': { isSignalHandle },
+						'binding-projections': { create: (configuration: unknown) => configuration },
+					},
+				);
+				const host = document.createElement('div');
+				container.append(host);
+				host.innerHTML = action.html;
+				const serverButton = host.querySelector('button')!;
+				expect(serverButton.style.width).toBe('1rem');
+				expect(onAction).not.toHaveBeenCalled();
+				expect(onReady).not.toHaveBeenCalled();
+				if (!adopt) host.replaceChildren();
+				const handle = adopt
+					? action.attach(host.firstElementChild!, action.state)
+					: action.mount({ parent: host }, action.state);
+				const button = host.querySelector('button')!;
+				if (adopt) expect(button).toBe(serverButton);
+				expect(onReady).toHaveBeenCalledExactlyOnceWith(button);
+				expect(onAction).not.toHaveBeenCalled();
+				button.click();
+				expect(onAction).toHaveBeenCalledExactlyOnceWith('initial', button, 1.5, 12);
+				action.publish({ width: 8, title: 'updated' });
+				expect(button.style.width).toBe('0.5rem');
+				expect(onReady).toHaveBeenCalledExactlyOnceWith(button);
+				onAction.mockClear();
+				button.click();
+				expect(onAction).toHaveBeenCalledExactlyOnceWith('updated', button, 0.5, 4);
+				const ancestor = vi.fn();
+				host.addEventListener('click', ancestor);
+				disabled.set(true);
+				const click = new MouseEvent('click', { bubbles: true, cancelable: true });
+				expect(button.dispatchEvent(click)).toBe(false);
+				expect(click.defaultPrevented).toBe(true);
+				expect(ancestor).not.toHaveBeenCalled();
+				expect(onAction).toHaveBeenCalledOnce();
+				action.publish({});
+				expect(button.getAttribute('aria-disabled')).toBe('true');
+				expect(onReady).toHaveBeenCalledExactlyOnceWith(button);
+				handle.dispose();
+				expect(onReady.mock.calls).toEqual([[button], [null]]);
+				disabled.set(false);
+				button.click();
+				expect(onAction).toHaveBeenCalledOnce();
+				scope.dispose();
+				const firstRef = vi.fn();
+				const nextRef = vi.fn();
+				const forwarded = authoredPresentation(
+					'Forwarded',
+					{ ref: firstRef, title: 'first', disabled: false },
+					dev,
+					`import * as signals from 'octane/signals';
+function Child({ ref, title, disabled }) @{ <button ref={ref} title={title} disabled={disabled} /> }
+export function Forwarded(props) @{ 'use dom bindings';
+ const disabled = signals.isSignalHandle(props.disabled) ? props.disabled.get() : props.disabled;
+ <section><Child ref={props.ref} title={props.title} disabled={disabled} /></section>
+}`,
+					{ 'octane/signals': { isSignalHandle } },
+				);
+				const childHost = document.createElement('div');
+				container.append(childHost);
+				if (adopt) childHost.innerHTML = forwarded.html;
+				const childHandle = adopt
+					? forwarded.attach(childHost.firstElementChild!, forwarded.state)
+					: forwarded.mount({ parent: childHost }, forwarded.state);
+				const childButton = childHost.querySelector('button')!;
+				expect(firstRef).toHaveBeenCalledExactlyOnceWith(childButton);
+				forwarded.publish({ title: 'next' });
+				expect(childButton.title).toBe('next');
+				expect(firstRef).toHaveBeenCalledOnce();
+				forwarded.publish({ ref: nextRef });
+				expect(firstRef.mock.calls).toEqual([[childButton], [null]]);
+				expect(nextRef).toHaveBeenCalledExactlyOnceWith(childButton);
+				childHandle.dispose();
+				expect(nextRef.mock.calls).toEqual([[childButton], [null]]);
+			}
+			for (const [parameter, setup, output, module = ''] of [
+				['{ String, value }', 'const title = String(value);', '<button title={title} />'],
+				['{ Math, value }', 'const title = Math.min(value, 16);', '<button title={title} />'],
+				[
+					'props',
+					'const convert = String; const title = convert(props.value);',
+					'<button title={title} />',
+				],
+				['props', 'const title = Math.random();', '<button title={title} />'],
+				['props', 'const title = Math["min"](props.value, 16);', '<button title={title} />'],
+				[
+					'{ signalValue, value }',
+					'const title = signalValue(value);',
+					'<button title={title} />',
+					"import { isSignalHandle as signalValue } from 'octane/signals';",
+				],
+				[
+					'props',
+					'const predicate = signalValue; const title = predicate(props.value);',
+					'<button title={title} />',
+					"import { isSignalHandle as signalValue } from 'octane/signals';",
+				],
+				[
+					'props',
+					'const title = signalValue(props.value);',
+					'<button title={title} />',
+					"import { useSignal as signalValue } from 'octane/signals';",
+				],
+				['props', 'const callback = () => props.action();', '<button title={callback} />'],
+				[
+					'props',
+					'const callback = () => props.action(); const value = callback();',
+					'<button title={value} />',
+				],
+				[
+					'props',
+					'const callback = () => props.action(); const value = wrap(callback);',
+					'<button title={value} />',
+					"import { wrap } from 'pure-projections';",
+				],
+				[
+					'props',
+					'const callback = () => outside(); const alias = callback;',
+					'<button onClick={alias} />',
+					'function outside() {}',
+				],
+				[
+					'props',
+					'const callback = (node) => props.onRef(node); const ref = (node) => callback(node);',
+					'<button ref={ref} />',
+				],
+				[
+					'props',
+					'const ref = (node) => props.onRef(node);',
+					'<Child ref={ref} />',
+					'function Child(props) @{ <button ref={props.ref} /> }',
+				],
+				[
+					'props',
+					'const callback = () => props.action();',
+					'<button {...props} onClick={callback} />',
+				],
+			]) {
+				for (const mode of ['client', 'server'] as const) {
+					expect(() =>
+						loadCompiledFixtureSource(
+							`${module}\nexport function Invalid(${parameter}) @{ 'use dom bindings'; ${setup} ${output} }`,
+							{ id: '/src/invalid-native-setup.tsrx', mode, compileOptions: { dev, hmr: false } },
+						),
+					).toThrow(/Octane DOM bindings/);
+				}
+			}
+			for (const adopt of [false, true]) {
 				const reads: string[] = [];
 				const events: unknown[] = [];
 				const symbol = Symbol('enumerable rest');
@@ -3233,8 +3413,12 @@ export function ProjectedAction(${destructured ? '{ title: header = "default tit
 					dev,
 					`export function Destructured({ label: text = 'Fallback', 'data-kind': kind = 'base', onAction, onRef, ...rest }) @{
  'use dom bindings';
+ const activate = () => onAction(text, rest);
+ const relay = activate;
+ const attach = (node) => onRef(node, rest);
+ const ready = attach;
  <section title={text} data-kind={kind}>
-  <button type="button" onClick={() => onAction(text, rest)} ref={(node) => onRef(node, rest)}>{text as string}</button>
+  <button type="button" onClick={relay} ref={ready}>{text as string}</button>
   <span title={rest.extra}>{text as string}</span>
  </section>
 }`,

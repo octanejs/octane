@@ -439,7 +439,7 @@ export function planBindingProgram(fn, render, context) {
 					if (attr.type !== 'Attribute' && attr.type !== 'JSXAttribute')
 						fail(attr, 'binding child program props must be explicit');
 					const name = rawName(attr);
-					if (['key', 'ref', 'children'].includes(name))
+					if (['key', 'children'].includes(name))
 						fail(attr, `binding child program ${name} is not supported`);
 					const value = attrValue(attr);
 					validate(value);

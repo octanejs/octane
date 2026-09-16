@@ -478,6 +478,8 @@ helpers must be pure; pass live values through the source snapshot rather than
 reading ambient state inside a projection. Snapshots must be synchronous values,
 never promises or other thenables.
 
+Pure projections also accept the canonical `isSignalHandle` import from `octane/signals` and unshadowed `String` and `Math.min` calls. Local `const` event and ref callbacks may be named or aliased in setup; their bodies execute as native adapters, not while preparing presentation values. They cannot be used as eager projections. Named refs preserve dependency-based attachment, but a ref that captures another local callback is unsupported. An explicit component `ref` may forward a ref supplied through props; this does not authorize arbitrary component-prop spreads.
+
 Compiler-proven presentation supports native HTML/SVG, text, native events and
 refs, direct signal bindings, conditions, keyed lists, and supported pure child
 composition. Hooks, arbitrary component logic, unsupported spreads, and raw

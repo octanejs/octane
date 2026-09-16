@@ -6,6 +6,7 @@ export { createResource, query } from './requests.js';
 export { ActionUncertainError, action$, isActionUncertain, optimistic$ } from './actions.js';
 export { __derivedAt, derived$ } from './derived-facade.js';
 export { __queryAt, query$ } from './query-facade.js';
+export { isSignalHandle, isWritableSignal } from './handle-protocol.js';
 export {
 	__derivedScalarAt,
 	__signalAt,
@@ -13,8 +14,6 @@ export {
 	acceptStreamedSignalResult,
 	attachStreamedSignalResult,
 	bindStreamedSignalSelection,
-	isSignalHandle,
-	isWritableSignal,
 	readSignalBinding,
 	failStreamedSignalResult,
 	signal$,

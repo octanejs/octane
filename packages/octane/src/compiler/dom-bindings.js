@@ -277,6 +277,39 @@ function importedProjectionCall(node, imports, lexical, parameterScope) {
 	);
 }
 
+function nativeProjectionReference(node, imports, lexical, parameterScope) {
+	if (
+		node.type !== 'CallExpression' ||
+		node.optional ||
+		node.arguments.some((argument) => argument.type === 'SpreadElement')
+	)
+		return null;
+	const callee = unwrap(node.callee);
+	const member = callee?.type === 'MemberExpression' && !callee.computed && !callee.optional;
+	const reference = member ? callee.object : callee;
+	if (reference?.type !== 'Identifier') return null;
+	const binding = lexical.resolveBinding(
+		lexical.nodeScopes.get(reference) ?? parameterScope,
+		reference.name,
+	);
+	if (
+		binding === null &&
+		((!member && reference.name === 'String' && node.arguments.length <= 1) ||
+			(member && reference.name === 'Math' && callee.property.name === 'min'))
+	)
+		return reference;
+	const imported = imports.get(reference.name);
+	return binding?.scope === lexical.rootScope &&
+		imported?.source === 'octane/signals' &&
+		node.arguments.length === 1 &&
+		(member
+			? imported.specifier.type === 'ImportNamespaceSpecifier' &&
+				callee.property.name === 'isSignalHandle'
+			: imported.imported === 'isSignalHandle')
+		? reference
+		: null;
+}
+
 function projectionFactoryConfiguration(expression, imports, lexical, parameterScope) {
 	const value = unwrap(expression);
 	return value?.type === 'CallExpression' &&
@@ -404,6 +437,7 @@ function assertProjection(
 			return false;
 		return readReceiver(callee.object);
 	};
+	const nativeReferences = new Set();
 	walk(expression, (node, parent, key) => {
 		if (node.type.startsWith('TS') && !UNWRAP.has(node.type)) return false;
 		if (
@@ -436,7 +470,11 @@ function assertProjection(
 				lexical.nodeScopes.get(node) ?? lexical.rootScope,
 				node.name,
 			);
-			if (binding === null && !['undefined', 'NaN', 'Infinity'].includes(node.name)) {
+			if (
+				binding === null &&
+				!nativeReferences.has(node) &&
+				!['undefined', 'NaN', 'Infinity'].includes(node.name)
+			) {
 				error(
 					filename,
 					node,
@@ -462,10 +500,15 @@ function assertProjection(
 					new Set([...constants, node.name]),
 				);
 			}
+			if (lexical.domBindingCallback?.(node))
+				error(filename, node, 'local callbacks are supported only as native adapters');
 		}
 		if (node.type === 'CallExpression' || node.type === 'OptionalCallExpression') {
 			const callee = unwrap(node.callee);
+			const native = nativeProjectionReference(node, imports, lexical, parameterScope);
+			if (native) nativeReferences.add(native);
 			if (
+				native ||
 				node.metadata?.octaneNativeSignalRead ||
 				readMethod(node) ||
 				importedProjectionCall(node, imports, lexical, parameterScope) ||
@@ -1544,9 +1587,40 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 	const inProgress = new Set();
 	const programPlans = new Map();
 	const programNames = new Set(imports.keys());
+	const localConstants = new Map();
 	walk(ast, (node) => {
 		if (node.type === 'Identifier') programNames.add(node.name);
+		if (node.type === 'VariableDeclaration' && node.kind === 'const') {
+			for (const declaration of node.declarations) {
+				if (declaration.id.type !== 'Identifier' || !declaration.init) continue;
+				const scope = lexical.resolveBinding(
+					lexical.nodeScopes.get(declaration.id),
+					declaration.id.name,
+				)?.scope;
+				if (!scope || scope === lexical.rootScope) continue;
+				if (!localConstants.has(scope)) localConstants.set(scope, new Map());
+				localConstants.get(scope).set(declaration.id.name, declaration);
+			}
+		}
 	});
+	const localDeclaration = (node) =>
+		node?.type === 'Identifier'
+			? localConstants
+					.get(lexical.resolveBinding(lexical.nodeScopes.get(node), node.name)?.scope)
+					?.get(node.name)
+			: null;
+	const callbackFor = (expression) => {
+		let value = unwrap(expression);
+		const seen = new Set();
+		while (value?.type === 'Identifier') {
+			const declaration = localDeclaration(value);
+			if (!declaration || seen.has(declaration)) return null;
+			seen.add(declaration);
+			value = unwrap(declaration.init);
+		}
+		return ['ArrowFunctionExpression', 'FunctionExpression'].includes(value?.type) ? value : null;
+	};
+	lexical.domBindingCallback = callbackFor;
 	const allocateProgramName = (prefix) => {
 		let name = prefix;
 		for (let i = 1; programNames.has(name); i++) name = `${prefix}${i}`;
@@ -1558,9 +1632,8 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 	const refCallbacks = [];
 	walk(ast, (node) => {
 		if ((node.type === 'JSXAttribute' || node.type === 'Attribute') && attrName(node) === 'ref') {
-			const value = attrValueForBinding(node);
-			if (['ArrowFunctionExpression', 'FunctionExpression'].includes(value?.type))
-				refCallbacks.push(value);
+			const callback = callbackFor(attrValueForBinding(node));
+			if (callback) refCallbacks.push(callback);
 		}
 	});
 	const refDependencies = refCallbacks.length
@@ -1586,13 +1659,14 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 			.filter((statement) => statement.type === 'VariableDeclaration')
 			.flatMap((statement) => statement.declarations);
 		for (const declaration of setup)
-			assertProjection(
-				declaration.init,
-				filename,
-				imports,
-				lexical,
-				lexical.nodeScopes.get(fn.body) ?? lexical.rootScope,
-			);
+			if (!callbackFor(declaration.init))
+				assertProjection(
+					declaration.init,
+					filename,
+					imports,
+					lexical,
+					lexical.nodeScopes.get(fn.body) ?? lexical.rootScope,
+				);
 		const setupBindings = new Map(
 			setup.map((declaration) => [
 				declaration.id.name,
@@ -1649,7 +1723,12 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 			allocateProgramName,
 			projectionBody,
 			parameterNames: bindingParameterNames(fn.params[0], filename),
-			refDependencies: (expression) => refDependencies.get(unwrap(expression)) ?? null,
+			refDependencies: (expression) => {
+				const records = refDependencies.get(callbackFor(expression)) ?? null;
+				if (records?.some((record) => callbackFor(record.node)))
+					error(filename, expression, 'native ref callbacks cannot capture local callbacks');
+				return records;
+			},
 			isChildSlot: (expression) => {
 				const value = unwrap(expression);
 				const parameter = fn.params[0];
@@ -1711,21 +1790,30 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 					lexical,
 					lexical.nodeScopes.get(fn.body) ?? lexical.rootScope,
 				),
-			assertAdapter: (expression) =>
-				walk(expression, (node, parent, key) => {
-					if (node.type.startsWith('TS') && !UNWRAP.has(node.type)) return false;
-					if (
-						isRuntimeReference(node, lexical, parent, key) &&
-						lexical.resolveBinding(lexical.nodeScopes.get(node) ?? lexical.rootScope, node.name)
-							?.scope === lexical.rootScope &&
-						!imports.has(node.name)
-					)
-						error(
-							filename,
-							node,
-							'native adapters must receive module-local callbacks through props or imports',
-						);
-				}),
+			assertAdapter: (expression) => {
+				const seen = new Set();
+				const visit = (value) =>
+					walk(value, (node, parent, key) => {
+						if (node.type.startsWith('TS') && !UNWRAP.has(node.type)) return false;
+						if (!isRuntimeReference(node, lexical, parent, key)) return;
+						if (
+							lexical.resolveBinding(lexical.nodeScopes.get(node) ?? lexical.rootScope, node.name)
+								?.scope === lexical.rootScope &&
+							!imports.has(node.name)
+						)
+							error(
+								filename,
+								node,
+								'native adapters must receive module-local callbacks through props or imports',
+							);
+						const declaration = localDeclaration(node);
+						if (declaration && callbackFor(declaration.init) && !seen.has(declaration)) {
+							seen.add(declaration);
+							visit(declaration.init);
+						}
+					});
+				visit(expression);
+			},
 		});
 		inProgress.delete(fn);
 		programPlans.set(fn, plan);
