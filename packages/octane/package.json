@@ -218,6 +218,7 @@
     "@volar/language-core": "catalog:default",
     "@volar/typescript": "catalog:default",
     "alien-signals": "3.2.0",
+    "csstype": "catalog:default",
     "devalue": "catalog:default",
     "entities": "7.0.1",
     "es-module-lexer": "catalog:default",
