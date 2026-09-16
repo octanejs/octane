@@ -21,6 +21,44 @@ describe('octane/compiler/vite integration', () => {
 		fixtureRoot = null;
 	});
 
+	for (const hmr of [false, true]) {
+		it(`renders import.meta environment attributes through component props (hmr=${hmr})`, async () => {
+			fixtureRoot = mkdtempSync(join(tmpdir(), 'octane-vite-import-meta-'));
+			mkdirSync(join(fixtureRoot, 'node_modules'));
+			symlinkSync(OCTANE_PACKAGE_ROOT, join(fixtureRoot, 'node_modules/octane'), 'dir');
+			writeFileSync(join(fixtureRoot, 'package.json'), JSON.stringify({ type: 'module' }));
+			writeFileSync(
+				join(fixtureRoot, 'Form.tsrx'),
+				`function Form(props) @{ <form {...props.attributes} /> }
+				export function App(props) @{
+					<Form attributes={{
+						...Object.assign({}, props.attributes),
+						...(import.meta.env.SSR ? { action: props.action } : {}),
+					}} />
+				}`,
+			);
+			writeFileSync(
+				join(fixtureRoot, 'entry.ts'),
+				`import { renderToStaticMarkup } from 'octane/server';
+				import { App } from './Form.tsrx';
+				export const render = (action) => renderToStaticMarkup(App, {
+					action, attributes: { method: 'post' },
+				}).html;`,
+			);
+			server = await createServer({
+				root: fixtureRoot,
+				configFile: false,
+				logLevel: 'silent',
+				appType: 'custom',
+				plugins: [octane({ hmr, strong: true })],
+				server: { middlewareMode: true },
+			});
+			const loaded = await server.ssrLoadModule('/entry.ts');
+			expect(loaded.render('/first')).toBe('<form method="post" action="/first"></form>');
+			expect(loaded.render('/second')).toBe('<form method="post" action="/second"></form>');
+		});
+	}
+
 	it('discovers a parent package and routes raw dependency imports to the SSR runtime', async () => {
 		fixtureRoot = mkdtempSync(join(tmpdir(), 'octane-vite-zero-shim-'));
 		const viteRoot = join(fixtureRoot, 'nested-app');
