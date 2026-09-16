@@ -9469,6 +9469,7 @@ function compileAuthored(source, filename, options, bundlerMetadata) {
 		source.includes('use dom bindings') ||
 		source.includes('adoptBindings') ||
 		source.includes('mountBindings');
+	let bindingConstants;
 	// Binding plans classify authored child expressions before signal lowering or
 	// JSX extraction. Use the same source-bound proof pass here, exactly once;
 	// query modules no longer contain the original child ranges after planning.
@@ -9490,6 +9491,21 @@ function compileAuthored(source, filename, options, bundlerMetadata) {
 					escapeHtml,
 					mount: bindingRequest?.mount ?? false,
 					props: bindingRequest?.props ?? null,
+					...(mode === 'client' &&
+					!options?.dev &&
+					!options?.hmr &&
+					(!options?.renderer?.target || options.renderer.target === 'dom')
+						? {
+								collectConstants(names) {
+									if (names.length > 0)
+										bindingConstants = {
+											version: 1,
+											source: strongHash(source),
+											names,
+										};
+								},
+							}
+						: null),
 				},
 			)
 		: analyzedAst;
@@ -9547,6 +9563,7 @@ function compileAuthored(source, filename, options, bundlerMetadata) {
 	if (strongAnalysis?.diagnostics.length > 0) {
 		result.diagnostics = [...strongAnalysis.diagnostics, ...(result.diagnostics ?? [])];
 	}
+	if (bindingConstants !== undefined) result.bindingConstants = bindingConstants;
 	return result;
 }
 

@@ -24,6 +24,43 @@ The ordinary entry is byte- and hash-identical. All adoption entries exclude the
 
 The existing behavior suite covers scalar adoption, structural updates, combined mount/adopt fallback, nested calls, argument evaluation order, independent child instances, and cleanup. Deliberately restoring the old dispatch discriminator fails scalar adoption; using only the child declaration instead of its exact specialized plan fails event behavior. The bundle-boundary benchmark compares a real compiled public adoption entry with the selected-artifact control, with matching SSR/update/disposal semantics.
 
+## Optional keyed-list capability
+
+Newly compiled renderer-free programs select keyed-list support only when an authored branch, child, or caller-owned slot can use it. Selection covers inactive branches, not just the initial output. Older descriptors keep the full list implementation through their existing entry points; mixed-generation descriptors are supported when they resolve against the updated runtime. This does not establish compatibility between separately bundled runtime versions or expand structural hydration handoff to lists.
+
+A matched comparison against `c1f60f058`, with unchanged fixtures and dependencies on Node 24.21.0, measures complete browser ESM closures with gzip level 9:
+
+| Bundler / entry | Baseline raw / gzip bytes | Candidate raw / gzip bytes | Difference raw / gzip bytes |
+| --- | ---: | ---: | ---: |
+| esbuild 0.28.1 / list-free adoption and mounting | 33,797 / 11,485 | 32,345 / 11,057 | −1,452 / −428 |
+| esbuild / list-enabled adoption and mounting | 30,805 / 10,573 | 31,103 / 10,667 | +298 / +94 |
+| Vite 8.1.5 / list-free adoption and mounting | 44,557 / 12,576 | 42,656 / 12,111 | −1,901 / −465 |
+| Vite / list-enabled adoption and mounting | 40,623 / 11,660 | 40,930 / 11,772 | +307 / +112 |
+
+Vite uses Rolldown 1.1.5. The ordinary `createRoot` control is byte- and hash-identical for both bundlers. All binding closures remain renderer- and signal-graph-free. These are overlapping source-entry measurements, not additive route savings or an application budget pass.
+
+The tradeoff is a capability reference on each root transaction and list-bearing artifact, plus an indirect call for each list adoption, preparation, and commit. There is no new per-item allocation, subscription, or plan scan. No CPU or latency improvement is claimed. Common range movement stays available to list-free mounting and branches.
+
+The existing behavior scenario and Node bundle-boundary benchmark preserve SSR node and keyed survivor identity, caller slots, inactive-to-active lists, empty/repopulated lists, native edits, commands, duplicate-key failure, abort, and disposal. The benchmark includes legacy entry controls; forcing legacy retention breaks its size ratio, and removing legacy-child capability forwarding breaks the inactive-list behavior. A separate actual `c1f60f058`-compiled artifact passes SSR adoption and mounting against the new runtime. Self-review removed a duplicate `ownerDocument` read by passing the existing preparation-time value to the list helper.
+
+## Shared compiled StyleX recipes
+
+Production client builds can share closed, immutable compiled StyleX recipes between the normal component and its extracted binding artifact. The compiler supplies proof of eligible authored uses; the StyleX adapter extracts the resulting class-name and inline-style objects after compilation. It preserves local folding and CSS/reset behavior. Development/HMR, server output, mutable or escaping recipes, and unproven dependencies remain unchanged. This is compile-time sharing, not a new runtime style owner.
+
+The permanent Node bundle-boundary benchmark uses 48 static and 12 dynamic recipes, the real Octane and StyleX transforms, and esbuild production splitting with gzip level 9. Sharing is disabled or enabled with the same candidate sources and dependencies; every emitted shared chunk is included:
+
+| Complete delivery | Sharing disabled, gzip bytes | Sharing enabled, gzip bytes | Difference |
+| --- | ---: | ---: | ---: |
+| Both entries and all shared chunks | 84,506 | 82,631 | −1,875 |
+| Standalone early entry | 14,166 | 14,344 | +178 |
+| Early import closure within the paired build | 17,085 | 17,054 | −31 |
+
+Sharing the complete recipe can increase a standalone early entry because the normal component needs fields that early-only compilation could prune. Savings across two entries are therefore not an equivalent startup saving. Neither these fixture sizes nor the optional-list measurements above establish a consuming application's budget pass. No CPU or interaction-latency improvement is claimed.
+
+The benchmark compares normal and renderer-free DOM behavior with sharing off and on, including numeric, zero, string and null widths, variants, reset styles, text, disabled state, node identity and cleanup. CSS is identical and the early closure excludes the renderer and signal graph. Disabling the extraction helper deliberately fails the sharing guard. Existing conformance tests cover cached Babel-plugin reuse, mutation and escape refusal, local folding, virtual-module emission, and original-source maps; compiler frozen-AST checks pass.
+
+A production fixture also passes SSR adoption and computed-style parity in bundled Chromium 149 and Playwright WebKit 26.5, preserving the server node through updates and releasing its subscription once. The fixture's server and client use the same canonical compiler module ID. This is local browser evidence, not physical iOS Safari or application qualification. Eight ordinary client/server development/HMR controls retain byte-identical output and source maps against `c1f60f058`.
+
 ## Independent reads in static native output
 
 The compiler can start same-module immutable query/derived reads together in complete static native JSX output with homogeneous text/renderable holes. Public client and SSR regressions start both eligible loaders in one round instead of waiting for the first to settle. Declarations and unentered branches stay lazy; original reads retain errors and suspension. Components, resource-loading/custom hosts, dynamic attributes and opaque values remain ordering barriers. Review added resource-host exclusions and a case-insensitive attribute barrier after a customized built-in constructor probe exposed changed execution order.

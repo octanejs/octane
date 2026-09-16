@@ -1057,6 +1057,9 @@ export function octane(options = {}) {
 				);
 				for (const dependency of result.dependencies) this.addWatchFile?.(dependency);
 				const meta = {};
+				if (result.bindingConstants !== undefined) {
+					meta['octane:binding-constants'] = result.bindingConstants;
+				}
 				if (result.clientReference !== undefined) {
 					meta[CLIENT_REFERENCE_META] = result.clientReference;
 				}

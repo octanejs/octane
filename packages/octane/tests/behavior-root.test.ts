@@ -4933,7 +4933,7 @@ export function Forwarded(props) @{ 'use dom bindings';
  </article>
 }
 export function Slotted({ label, rows, kind }) @{ 'use dom bindings';
- <section><Child label={label} rows={rows} kind={kind}><button type="button">{label as string}</button></Child></section>
+ <section><Child label={label} rows={rows} kind={kind}><button type="button">{label as string}</button>@for (const row of rows; key row) { <i data-slot-row>{row}</i> }</Child></section>
 }`,
 				);
 				for (const adopt of [false, true]) {
@@ -4950,6 +4950,17 @@ export function Slotted({ label, rows, kind }) @{ 'use dom bindings';
 						: slotted.mount({ parent: host }, slotted.state);
 					const button = host.querySelector('button')!;
 					if (adopt) expect(button).toBe(serverButton);
+					const firstRow = host.querySelector('span');
+					const firstSlotRow = host.querySelector('[data-slot-row]');
+					slotted.cleanup.mockClear();
+					const beforeTakeover = host.innerHTML;
+					expect(() =>
+						hydrateRoot(host, slotted.loadClient().Slotted, slotted.state.getSnapshot(), {
+							bindingLeases: [handle],
+						}),
+					).toThrow(/structural|fixed native|supported child view|lists/i);
+					expect(host.innerHTML).toBe(beforeTakeover);
+					expect(slotted.cleanup).not.toHaveBeenCalled();
 					slotted.publish({ label: 'Updated child', rows: ['second', 'first'], kind: 'updated' });
 					expect(host.querySelector('article')!.title).toBe('Updated child');
 					expect(host.querySelector('article')!.getAttribute('data-kind')).toBe('updated');
@@ -4959,6 +4970,22 @@ export function Slotted({ label, rows, kind }) @{ 'use dom bindings';
 						'second',
 						'first',
 					]);
+					expect(host.querySelectorAll('span')[1]).toBe(firstRow);
+					expect(host.querySelectorAll('[data-slot-row]')[1]).toBe(firstSlotRow);
+					slotted.publish({ rows: [] });
+					expect(host.querySelectorAll('span')).toHaveLength(0);
+					expect(host.querySelectorAll('[data-slot-row]')).toHaveLength(0);
+					slotted.publish({ rows: ['third', 'first'] });
+					expect([...host.querySelectorAll('span')].map((node) => node.textContent)).toEqual([
+						'third',
+						'first',
+					]);
+					expect(
+						[...host.querySelectorAll('[data-slot-row]')].map((node) => node.textContent),
+					).toEqual(['third', 'first']);
+					expect(host.querySelectorAll('span')[1]).not.toBe(firstRow);
+					expect(host.querySelectorAll('[data-slot-row]')[1]).not.toBe(firstSlotRow);
+					expect(host.querySelector('button')).toBe(button);
 					handle.dispose();
 				}
 			}

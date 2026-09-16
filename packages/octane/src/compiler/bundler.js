@@ -1264,6 +1264,7 @@ class OctaneBundlerCompiler {
 				diagnostics: out.diagnostics,
 				kind: 'compile',
 				...(out.streamedSignals === true ? { streamedSignals: true } : null),
+				...(out.bindingConstants === undefined ? null : { bindingConstants: out.bindingConstants }),
 				renderer,
 				...(out.universalRuntime === undefined ? null : { universalRuntime: out.universalRuntime }),
 				...(clientReference === null ? null : { clientReference }),

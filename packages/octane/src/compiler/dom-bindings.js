@@ -1204,6 +1204,139 @@ function scalarProperties(
 	];
 }
 
+function projectionDependencies(plan, lexical) {
+	const needed = new Set();
+	const collect = (expression) =>
+		walk(expression, (node, parent, key) => {
+			if (node.type.startsWith('TS') && !UNWRAP.has(node.type)) return false;
+			if (
+				isRuntimeReference(node, lexical, parent, key) &&
+				lexical.resolveBinding(lexical.nodeScopes.get(node) ?? lexical.rootScope, node.name)
+					?.scope === lexical.rootScope
+			) {
+				if (needed.has(node.name)) return;
+				needed.add(node.name);
+				const declaration = lexical.domBindingConstants.get(node.name);
+				if (declaration) collect(declaration.init);
+			}
+		});
+	collect(plan.expressions ?? plan.values);
+	collect(plan.projections?.map((declaration) => declaration.declarations[0].init));
+	return needed;
+}
+
+// A const declaration does not make its object immutable. Sharing is only safe
+// when every use terminates in a known style consumer, including uses through
+// local palettes/aliases. Unrelated exports and imperative callbacks stay local.
+function shareableConstants(ast, names, lexical, imports) {
+	const parents = new WeakMap();
+	const aliases = new Map();
+	const references = new Map();
+	const bindings = new WeakMap();
+	const resolve = (node) => {
+		const scope = lexical.resolveBinding(
+			lexical.nodeScopes.get(node) ?? lexical.rootScope,
+			node.name,
+		)?.scope;
+		if (!scope) return null;
+		if (!bindings.has(scope)) bindings.set(scope, new Map());
+		const names = bindings.get(scope);
+		if (!names.has(node.name)) names.set(node.name, { scope, name: node.name });
+		return names.get(node.name);
+	};
+	walk(ast, (node, parent, key) => {
+		parents.set(node, { parent, key });
+		if (
+			node.type === 'VariableDeclarator' &&
+			node.id.type === 'Identifier' &&
+			parent.kind === 'const' &&
+			parents.get(parent)?.parent?.type !== 'ExportNamedDeclaration'
+		)
+			aliases.set(node, resolve(node.id));
+		if (isRuntimeReference(node, lexical, parent, key)) {
+			const binding = resolve(node);
+			if (!references.has(binding)) references.set(binding, []);
+			references.get(binding).push(node);
+		}
+	});
+	const styleConsumer = (call) => {
+		const callee = unwrap(call.callee);
+		const member = callee?.type === 'MemberExpression' && !callee.computed;
+		const provider = member ? unwrap(callee.object) : callee;
+		const imported = provider?.type === 'Identifier' ? imports.get(provider.name) : null;
+		return (
+			imported &&
+			['@octanejs/stylex', '@stylexjs/stylex'].includes(imported.source) &&
+			resolve(provider)?.scope === lexical.rootScope &&
+			['props', 'attrs'].includes(member ? callee.property.name : imported.imported)
+		);
+	};
+	const checked = new Map();
+	const dynamicRecipe = (call, reference) => {
+		const callee = unwrap(call.callee);
+		if (callee?.type !== 'MemberExpression' || callee.computed || callee.object !== reference)
+			return false;
+		const definition = lexical.domBindingConstants.get(reference.name)?.init;
+		return (
+			definition?.type === 'CallExpression' &&
+			definition.arguments[0]?.properties?.some(
+				(property) =>
+					(property.key?.name ?? property.key?.value) === callee.property.name &&
+					['ArrowFunctionExpression', 'FunctionExpression'].includes(property.value?.type),
+			)
+		);
+	};
+	const safe = (binding, visiting = new Set()) => {
+		if (checked.has(binding)) return checked.get(binding);
+		if (!binding || visiting.has(binding)) return false;
+		const next = new Set(visiting).add(binding);
+		const valid = (references.get(binding) ?? []).every((reference) => {
+			let node = reference;
+			while (parents.has(node)) {
+				const { parent, key } = parents.get(node);
+				if (!parent) return false;
+				if (
+					UNWRAP.has(parent.type) ||
+					[
+						'MemberExpression',
+						'OptionalMemberExpression',
+						'Property',
+						'ObjectExpression',
+						'ArrayExpression',
+						'ConditionalExpression',
+						'LogicalExpression',
+						'JSXExpressionContainer',
+					].includes(parent.type)
+				) {
+					node = parent;
+					continue;
+				}
+				if (parent.type === 'VariableDeclarator' && key === 'init')
+					return safe(aliases.get(parent), next);
+				if (parent.type === 'JSXAttribute') {
+					const tag = parents.get(parent)?.parent?.name;
+					return (
+						attrName(parent) === 'sx' && tag?.type === 'JSXIdentifier' && /^[a-z]/.test(tag.name)
+					);
+				}
+				if (parent.type === 'CallExpression') {
+					if (key !== 'callee') return styleConsumer(parent);
+					if (!dynamicRecipe(parent, reference)) return false;
+					// Dynamic recipes may return shared hoisted class data. Their
+					// result must not escape to an imperative consumer either.
+					node = parent;
+					continue;
+				}
+				return false;
+			}
+			return false;
+		});
+		checked.set(binding, valid);
+		return valid;
+	};
+	return names.filter((name) => safe(resolve(lexical.domBindingConstants.get(name).id)));
+}
+
 function projectProgram(ast, plan, filename, lexical) {
 	const imports = importedBindings(ast);
 	for (const statement of ast.body) {
@@ -1241,23 +1374,7 @@ function projectProgram(ast, plan, filename, lexical) {
 			'binding view modules cannot contain eager module initialization; pass state as props',
 		);
 	}
-	const needed = new Set();
-	const collect = (expression) =>
-		walk(expression, (node, parent, key) => {
-			if (node.type.startsWith('TS') && !UNWRAP.has(node.type)) return false;
-			if (
-				isRuntimeReference(node, lexical, parent, key) &&
-				lexical.resolveBinding(lexical.nodeScopes.get(node) ?? lexical.rootScope, node.name)
-					?.scope === lexical.rootScope
-			) {
-				if (needed.has(node.name)) return;
-				needed.add(node.name);
-				const declaration = lexical.domBindingConstants.get(node.name);
-				if (declaration) collect(declaration.init);
-			}
-		});
-	collect(plan.expressions ?? plan.values);
-	collect(plan.projections?.map((declaration) => declaration.declarations[0].init));
+	const needed = projectionDependencies(plan, lexical);
 	const importNodes = ast.body.flatMap((node) => {
 		const declaration = node.declaration ?? node;
 		if (declaration.type === 'VariableDeclaration' && declaration.kind === 'const') {
@@ -1291,6 +1408,7 @@ function projectProgram(ast, plan, filename, lexical) {
 		const signalFactory = plan.signals ? allocate('_bindingSignals') : null;
 		const styleFactory = plan.styles ? allocate('_bindingStyles') : null;
 		const controlFactory = plan.controls ? allocate('_bindingControls') : null;
+		const listCapability = plan.lists ? allocate('_bindingList') : null;
 		const projectionFactory = plan.projectionsEnabled ? allocate('_bindingProjections') : null;
 		// Imported child artifacts carry their optional capabilities. Forward a
 		// factory rather than loading every capability for every parent view.
@@ -1298,7 +1416,15 @@ function projectProgram(ast, plan, filename, lexical) {
 			const value = local
 				? b.id(local)
 				: [...plan.childPrograms]
-						.map((child) => b.member(b.id(child), name))
+						.map((child) =>
+							name === 'list'
+								? b.logical(
+										'??',
+										b.member(b.id(child), name),
+										b.member(b.member(b.id(child), 'adopt'), name),
+									)
+								: b.member(b.id(child), name),
+						)
 						.reduce((left, right) => (left ? b.logical('||', left, right) : right), null);
 			return value ? [b.prop('init', b.id(name), value)] : [];
 		};
@@ -1367,8 +1493,9 @@ function projectProgram(ast, plan, filename, lexical) {
 				inheritHookMemoOrigin(
 					b.imports(
 						[
-							['__adoptBindingProgram', adopt],
-							['__mountBindingProgram', mount],
+							['__adoptSelectedBindingProgram', adopt],
+							['__mountSelectedBindingProgram', mount],
+							...(listCapability ? [['__bindingList', listCapability]] : []),
 						],
 						'octane/dom-binding-program',
 					),
@@ -1399,6 +1526,7 @@ function projectProgram(ast, plan, filename, lexical) {
 							...capability('connectStyle', styleFactory),
 							...capability('connectProjection', projectionFactory),
 							...capability('createControls', controlFactory),
+							...capability('list', listCapability),
 							...(signalFactory
 								? [b.prop('init', b.id('connectSignal'), b.id(signalFactory))]
 								: []),
@@ -2085,7 +2213,30 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 				ast,
 				`export ${JSON.stringify(selectedExport)} is not an opted-in static binding view`,
 			);
+		helpers.collectConstants?.(
+			shareableConstants(
+				ast,
+				[...projectionDependencies(plan, lexical)].filter((name) =>
+					lexical.domBindingConstants.has(name),
+				),
+				lexical,
+				imports,
+			),
+		);
 		return projectProgram(ast, plan, filename, lexical);
+	}
+	if (helpers.collectConstants) {
+		const names = new Set();
+		for (const fn of new Set(
+			[...plans.values()].map((plan) => plan.fn).concat([...programPlans.keys()]),
+		)) {
+			// Open rest-prop views only need annotations in the ordinary renderer;
+			// their authored body still identifies the shared module constants.
+			for (const name of projectionDependencies({ values: fn }, lexical)) {
+				if (lexical.domBindingConstants.has(name)) names.add(name);
+			}
+		}
+		helpers.collectConstants(shareableConstants(ast, [...names], lexical, imports));
 	}
 	return lowerAdoptions(mapCow(ast, replacements), filename);
 }

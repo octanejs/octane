@@ -352,7 +352,10 @@ export interface CompiledBindingProgram<Props> {
 	readonly connectStyle?: typeof __createBindingStyles;
 	readonly connectProjection?: typeof __createBindingProjections;
 	readonly createControls?: typeof __createBindingControls;
-	readonly adopt: typeof __adoptBindingProgram<Props>;
+	readonly list?: BindingListCapability;
+	readonly adopt: typeof __adoptSelectedBindingProgram<Props> & {
+		readonly list?: BindingListCapability;
+	};
 	readonly mount: typeof __mountBindingProgram<Props>;
 }
 
@@ -427,6 +430,7 @@ interface Transaction {
 	styles?: ReturnType<typeof __createBindingStyles>;
 	projections?: ReturnType<typeof __createBindingProjections>;
 	controls?: ReturnType<typeof __createBindingControls>;
+	list?: BindingListCapability;
 	notifySignal?(prepare: () => () => void): void;
 	preparing?: boolean;
 	frame: number;
@@ -859,31 +863,7 @@ function adoptRegion(region: RegionInstance, id: string, transaction: Transactio
 		}
 		region.child = resolveFragment(arm, id, body, false, transaction);
 	} else if (definition.kind === 'for') {
-		if (region.arm === 0) {
-			if (definition.empty)
-				region.child = resolveFragment(definition.empty, id, range, false, transaction);
-			else if (range.start.nextSibling !== range.end) mismatch();
-			return;
-		}
-		region.items = new Map();
-		let cursor: Node | null = range.start.nextSibling;
-		while (cursor !== range.end) {
-			const itemRange = rangeAt(cursor, range.end);
-			const marker = parseBindingMarker(itemRange.start.data);
-			if (
-				marker?.id !== id ||
-				marker.site !== region.site ||
-				marker.kind !== 'item' ||
-				region.items.has(marker.key!)
-			)
-				mismatch();
-			region.items.set(
-				marker.key!,
-				resolveFragment(definition.item, id, itemRange, false, transaction),
-			);
-			cursor = itemRange.end.nextSibling;
-		}
-		if (region.items.size === 0) mismatch();
+		transaction.list!.adopt(region, id, transaction);
 	} else if (definition.kind === 'view') {
 		region.child = resolveFragment(
 			definition.view.root,
@@ -1191,38 +1171,7 @@ function prepareFragment(
 					transaction,
 				);
 		} else if (descriptor.kind === 'for') {
-			const input = descriptor.items(environment);
-			if (input == null || typeof input[Symbol.iterator] !== 'function')
-				throw new TypeError('A DOM presentation list requires a synchronous iterable.');
-			const items = Array.from(input);
-			const keys = items.map((item, index) =>
-				encodeBindingKey(descriptor.key(item, index, environment)),
-			);
-			if (new Set(keys).size !== keys.length)
-				throw new Error('A DOM presentation list cannot contain duplicate keys.');
-			candidate.arm = items.length === 0 ? 0 : 1;
-			if (items.length === 0) {
-				if (descriptor.empty)
-					candidate.child = prepareFragment(
-						region.arm === 0 && region.child
-							? region.child
-							: createFragment(descriptor.empty, instance.id, document, transaction),
-						environment,
-						transaction,
-					);
-			} else {
-				candidate.items = new Map();
-				for (let index = 0; index < items.length; index++) {
-					const key = keys[index]!;
-					const child =
-						region.items?.get(key) ??
-						createFragment(descriptor.item, instance.id, document, transaction);
-					candidate.items.set(
-						key,
-						prepareFragment(child, [...environment, items[index], index], transaction),
-					);
-				}
-			}
+			transaction.list!.prepare(instance, region, candidate, environment, document, transaction);
 		} else if (descriptor.kind === 'view') {
 			candidate.child = prepareFragment(
 				region.child ??
@@ -1366,45 +1315,7 @@ function commitRegion(plan: RegionPlan, id: string, transaction: Transaction): v
 		return;
 	}
 	if (definition.kind === 'for') {
-		const oldChild = region.child;
-		const oldItems = region.items;
-		const child = plan.child?.instance ?? null;
-		const items = plan.items
-			? new Map([...plan.items].map(([key, item]) => [key, item.instance]))
-			: null;
-		region.child = child;
-		region.items = items;
-		region.arm = plan.arm;
-		if (oldChild && oldChild !== child) {
-			releaseInstance(oldChild, transaction);
-			if (transaction.disposed) return;
-			removeRange(region.range, true, transaction);
-		}
-		if (oldItems)
-			for (const [key, item] of oldItems) {
-				if (items?.get(key) === item) continue;
-				releaseInstance(item, transaction);
-				if (transaction.disposed) return;
-				removeRange(item.range, false, transaction);
-			}
-		if (plan.child) {
-			commitFragment(plan.child, transaction);
-			if (transaction.disposed) return;
-			if (child !== oldChild) insertBody(child!, region.range, false, transaction);
-		} else if (plan.items) {
-			for (const item of plan.items.values()) {
-				commitFragment(item, transaction);
-				if (transaction.disposed) return;
-			}
-			let anchor: Node = region.range.end;
-			for (const [key, item] of [...plan.items].reverse()) {
-				item.instance.range.start.data = `[b;${id};${region.site};k;${key}`;
-				moveRange(item.instance.range, region.range.end.parentNode!, anchor, transaction);
-				if (transaction.disposed) return;
-				anchor = item.instance.range.start;
-			}
-		}
-		region.range.start.data = `[f${plan.arm};b;${id};${region.site}`;
+		transaction.list!.commit(plan, id, transaction);
 		return;
 	}
 	const oldChild = region.child;
@@ -1544,6 +1455,7 @@ function bindProgram<Props>(
 	source: BindingSource<Props>,
 	options: BindingOptions | undefined,
 	mount: boolean,
+	list: BindingListCapability | undefined = descriptor.list,
 ): BindingHandle {
 	if (!source || typeof source.getSnapshot !== 'function' || typeof source.subscribe !== 'function')
 		throw new TypeError(
@@ -1568,6 +1480,7 @@ function bindProgram<Props>(
 		styles: descriptor.connectStyle?.(),
 		projections: descriptor.connectProjection?.(),
 		controls: descriptor.createControls?.(),
+		list,
 		frame: 0,
 	};
 	const signalUpdates =
@@ -1831,12 +1744,12 @@ function bindProgram<Props>(
 	}
 }
 
-/** @internal Entry installed directly on a structural query artifact. */
-export function __adoptBindingProgram<Props>(
+function adoptProgram<Props>(
 	root: Element | BindingRange,
 	descriptor: CompiledBindingProgram<Props>,
 	source: BindingSource<Props>,
-	options?: BindingOptions,
+	options: BindingOptions | undefined,
+	list?: BindingListCapability,
 ): BindingHandle {
 	if (
 		(root as Node).nodeType === 1 &&
@@ -1851,15 +1764,172 @@ export function __adoptBindingProgram<Props>(
 		if (marker?.kind !== 'root' && element.getAttribute('data-octane-bindings') === descriptor.id)
 			return descriptor.adoptScalar(element, descriptor.scalar, source, options);
 	}
-	return bindProgram(root, descriptor, source, options, false);
+	return bindProgram(root, descriptor, source, options, false, list);
+}
+
+/** @internal The current compiler supplies every capability used by its program. */
+export function __adoptSelectedBindingProgram<Props>(
+	root: Element | BindingRange,
+	descriptor: CompiledBindingProgram<Props>,
+	source: BindingSource<Props>,
+	options?: BindingOptions,
+): BindingHandle {
+	return adoptProgram(root, descriptor, source, options);
 }
 
 /** @internal Construct only compiler-proven native fragments, never application builders. */
-export function __mountBindingProgram<Props>(
+export function __mountSelectedBindingProgram<Props>(
 	target: BindingMountTarget,
 	descriptor: CompiledBindingProgram<Props>,
 	source: BindingSource<Props>,
 	options?: BindingOptions,
 ): BindingHandle {
 	return bindProgram(target, descriptor, source, options, true);
+}
+
+/** @internal A compiler-selected capability; list-free programs never reference it. */
+export const __bindingList = { adopt: adoptList, prepare: prepareList, commit: commitList };
+
+type BindingListCapability = typeof __bindingList;
+
+// Older query artifacts only carry their adopter, not selected capabilities.
+// Keeping this metadata on that legacy callable lets a new parent forward an
+// old imported child's lists without retaining list code for current children.
+export const __adoptBindingProgram = /* @__PURE__ */ Object.assign(
+	function __adoptBindingProgram<Props>(
+		root: Element | BindingRange,
+		descriptor: CompiledBindingProgram<Props>,
+		source: BindingSource<Props>,
+		options?: BindingOptions,
+	): BindingHandle {
+		return adoptProgram(root, descriptor, source, options, __bindingList);
+	},
+	{ list: __bindingList },
+);
+
+/** @internal Compatibility entry for artifacts emitted before capability selection. */
+export function __mountBindingProgram<Props>(
+	target: BindingMountTarget,
+	descriptor: CompiledBindingProgram<Props>,
+	source: BindingSource<Props>,
+	options?: BindingOptions,
+): BindingHandle {
+	return bindProgram(target, descriptor, source, options, true, __bindingList);
+}
+
+function adoptList(region: RegionInstance, id: string, transaction: Transaction): void {
+	const definition = region.definition as Extract<BindingRegion, { kind: 'for' }>;
+	const range = region.range;
+	if (region.arm === 0) {
+		if (definition.empty)
+			region.child = resolveFragment(definition.empty, id, range, false, transaction);
+		else if (range.start.nextSibling !== range.end) mismatch();
+		return;
+	}
+	region.items = new Map();
+	let cursor: Node | null = range.start.nextSibling;
+	while (cursor !== range.end) {
+		const itemRange = rangeAt(cursor, range.end);
+		const marker = parseBindingMarker(itemRange.start.data);
+		if (
+			marker?.id !== id ||
+			marker.site !== region.site ||
+			marker.kind !== 'item' ||
+			region.items.has(marker.key!)
+		)
+			mismatch();
+		region.items.set(
+			marker.key!,
+			resolveFragment(definition.item, id, itemRange, false, transaction),
+		);
+		cursor = itemRange.end.nextSibling;
+	}
+	if (region.items.size === 0) mismatch();
+}
+
+function prepareList(
+	instance: FragmentInstance,
+	region: RegionInstance,
+	candidate: RegionPlan,
+	environment: readonly unknown[],
+	document: Document,
+	transaction: Transaction,
+): void {
+	const descriptor = region.definition as Extract<BindingRegion, { kind: 'for' }>;
+	const input = descriptor.items(environment);
+	if (input == null || typeof input[Symbol.iterator] !== 'function')
+		throw new TypeError('A DOM presentation list requires a synchronous iterable.');
+	const items = Array.from(input);
+	const keys = items.map((item, index) =>
+		encodeBindingKey(descriptor.key(item, index, environment)),
+	);
+	if (new Set(keys).size !== keys.length)
+		throw new Error('A DOM presentation list cannot contain duplicate keys.');
+	candidate.arm = items.length === 0 ? 0 : 1;
+	if (items.length === 0) {
+		if (descriptor.empty)
+			candidate.child = prepareFragment(
+				region.arm === 0 && region.child
+					? region.child
+					: createFragment(descriptor.empty, instance.id, document, transaction),
+				environment,
+				transaction,
+			);
+	} else {
+		candidate.items = new Map();
+		for (let index = 0; index < items.length; index++) {
+			const key = keys[index]!;
+			const child =
+				region.items?.get(key) ??
+				createFragment(descriptor.item, instance.id, document, transaction);
+			candidate.items.set(
+				key,
+				prepareFragment(child, [...environment, items[index], index], transaction),
+			);
+		}
+	}
+}
+
+function commitList(plan: RegionPlan, id: string, transaction: Transaction): void {
+	const region = plan.instance;
+	const oldChild = region.child;
+	const oldItems = region.items;
+	const child = plan.child?.instance ?? null;
+	const items = plan.items
+		? new Map([...plan.items].map(([key, item]) => [key, item.instance]))
+		: null;
+	region.child = child;
+	region.items = items;
+	region.arm = plan.arm;
+	if (oldChild && oldChild !== child) {
+		releaseInstance(oldChild, transaction);
+		if (transaction.disposed) return;
+		removeRange(region.range, true, transaction);
+	}
+	if (oldItems)
+		for (const [key, item] of oldItems) {
+			if (items?.get(key) === item) continue;
+			releaseInstance(item, transaction);
+			if (transaction.disposed) return;
+			removeRange(item.range, false, transaction);
+		}
+	if (plan.child) {
+		commitFragment(plan.child, transaction);
+		if (transaction.disposed) return;
+		if (child !== oldChild) insertBody(child!, region.range, false, transaction);
+	} else if (plan.items) {
+		for (const item of plan.items.values()) {
+			commitFragment(item, transaction);
+			if (transaction.disposed) return;
+		}
+		let anchor: Node = region.range.end;
+		for (const [key, item] of [...plan.items].reverse()) {
+			item.instance.range.start.data = `[b;${id};${region.site};k;${key}`;
+			moveRange(item.instance.range, region.range.end.parentNode!, anchor, transaction);
+			if (transaction.disposed) return;
+			anchor = item.instance.range.start;
+		}
+	}
+	region.range.start.data = `[f${plan.arm};b;${id};${region.site}`;
+	return;
 }

@@ -128,6 +128,7 @@ export function planBindingProgram(fn, render, context) {
 	let slotFactory = null;
 	let signals = false;
 	let controls = false;
+	let lists = false;
 	let styles = false;
 	let projectionsEnabled = false;
 	let nextSite = 0;
@@ -382,6 +383,7 @@ export function planBindingProgram(fn, render, context) {
 				return html;
 			}
 			if (node.type === 'ForOfStatement') {
+				lists = true;
 				structural = false;
 				const item = node.left?.declarations?.[0]?.id;
 				if (node.await || item?.type !== 'Identifier' || !node.key)
@@ -487,6 +489,7 @@ export function planBindingProgram(fn, render, context) {
 					controls ||= child.controls;
 					styles ||= child.styles;
 					for (const program of child.childPrograms) childPrograms.add(program);
+					lists ||= child.lists;
 					for (const dependency of child.dependencies)
 						if (!dependencies.includes(dependency)) dependencies.push(dependency);
 					for (const hoist of child.hoists) if (!hoists.includes(hoist)) hoists.push(hoist);
@@ -915,6 +918,7 @@ export function planBindingProgram(fn, render, context) {
 		unbound,
 		signals,
 		controls,
+		lists,
 		styles,
 		projectionsEnabled,
 		structural: structural && !controls,

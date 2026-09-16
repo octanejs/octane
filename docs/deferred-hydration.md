@@ -472,6 +472,10 @@ from an uncompiled plain `.ts` file throws; import a compiled activation functio
 instead. Keep that activation module free of ordinary rendered-component uses
 if its browser graph must exclude the renderer.
 
+With `octane()` followed by `@octanejs/stylex/vite`, production browser builds can share eligible co-located StyleX recipes between the normal component and its extracted binding artifact. Definitions stay local while StyleX performs its normal optimizations; only the resulting closed, immutable recipe data and required helpers move to generated shared modules. CSS remains in the existing stylesheet. Development/HMR, server compilation, and unsupported or escaping definitions retain their existing path. Authors do not need to export a separate styles module.
+
+Custom compiler adapters can use `stylexBindingConstants` from `@octanejs/stylex/compiler`. Pass the matching Octane result's optional `bindingConstants` metadata to this Babel plugin, placed **after** the StyleX plugin, and pass the prior Octane source map as `inputSourceMap`. Register each `{ id, code, map }` returned in `metadata.octaneStylexSharedConstants` as a build-owned virtual module. Preserve the canonical authored filename, honor development/server exclusions, and use the metadata from that exact compilation; do not reconstruct it from emitted JavaScript. This is build-time integration, not a browser runtime dependency. Measure the early-only and combined delivery graphs separately: sharing can reduce their combined cost while increasing the early-only cost.
+
 Import the named view directly from its defining module, not through a barrel.
 Keep that leaf module free of eager state initialization. Imported projection
 helpers must be pure; pass live values through the source snapshot rather than

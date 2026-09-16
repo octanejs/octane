@@ -229,6 +229,12 @@ export interface CompileResult {
 	universalRuntime?: CompileOptions['universalRuntime'];
 	/** This module contains compiler-proven signal declarations or native reads. */
 	streamedSignals?: true;
+	/** Production client constants used by compiled binding views; build-time adapter metadata. */
+	bindingConstants?: {
+		version: 1;
+		source: string;
+		names: readonly string[];
+	};
 }
 
 /** Compile authored TSRX/JSX to Octane client or server JavaScript. */
