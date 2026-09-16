@@ -1,7 +1,7 @@
+import { loadCompiledFixtureSource } from './_server-fixture.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { compile } from 'octane/compiler';
 import * as ServerRuntime from 'octane/server';
 import { prerender } from 'octane/static';
 import { flushSync, hydrateRoot } from '../src/index.js';
@@ -16,16 +16,13 @@ import {
 const FIXTURE = join(process.cwd(), 'packages/octane/tests/_fixtures/ssr-suspense.tsrx');
 
 function serverModule(): Record<string, any> {
-	let { code } = compile(readFileSync(FIXTURE, 'utf8'), 'ssr-suspense.tsrx', {
+	return loadCompiledFixtureSource(readFileSync(FIXTURE, 'utf8'), {
+		id: 'ssr-suspense.tsrx',
 		mode: 'server',
+		compileOptions: {
+			mode: 'server',
+		},
 	});
-	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/server['"];?/g,
-		(_match: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
-	);
-	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
-	code = code.replace(/export function (\w+)/g, '__exports.$1 = function $1');
-	return new Function('__rt', '__exports', code + '\nreturn __exports;')(ServerRuntime, {});
 }
 
 const server = serverModule();

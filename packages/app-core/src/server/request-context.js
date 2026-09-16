@@ -18,14 +18,17 @@
 
 /**
  * @typedef {import('@octanejs/app-core').Context} Context
- * @typedef {import('@ripple-ts/adapter/rpc').AsyncContext<{ origin?: string, platform?: unknown, context?: Context }>} RequestAsyncContext
- * @typedef {{ asyncContext: RequestAsyncContext }} RequestContextHolder
+ * @typedef {import('@octanejs/app-core').RpcRequestOptions['asyncContext']} RequestAsyncContext
+ * @typedef {{ asyncContext: RequestAsyncContext, serverCallSource: import('octane/server').ServerCallContextSource }} RequestContextHolder
  */
 
 const REQUEST_CONTEXT_KEY = Symbol.for('octane.app-core.request-context');
+const SERVER_CALL_CONTEXT_KEY = Symbol.for('octane.server.call-context');
 
 const globals =
-	/** @type {typeof globalThis & { [REQUEST_CONTEXT_KEY]?: RequestContextHolder }} */ (globalThis);
+	/** @type {typeof globalThis & { [REQUEST_CONTEXT_KEY]?: RequestContextHolder, [SERVER_CALL_CONTEXT_KEY]?: import('octane/server').ServerCallContextSource }} */ (
+		globalThis
+	);
 
 /**
  * Publish the async context a request boundary runs its handler inside. Called
@@ -37,11 +40,20 @@ const globals =
  * @returns {void}
  */
 export function setRequestContextSource(asyncContext) {
-	const current = globals[REQUEST_CONTEXT_KEY];
+	let current = globals[REQUEST_CONTEXT_KEY];
 	if (current === undefined) {
-		globals[REQUEST_CONTEXT_KEY] = { asyncContext };
+		current = {
+			asyncContext,
+			serverCallSource: {
+				getStore: () => globals[REQUEST_CONTEXT_KEY]?.asyncContext.getStore()?.serverCallHost,
+			},
+		};
+		globals[REQUEST_CONTEXT_KEY] = current;
 	} else if (current.asyncContext !== asyncContext) {
 		current.asyncContext = asyncContext;
+	}
+	if (globals[SERVER_CALL_CONTEXT_KEY] !== current.serverCallSource) {
+		globals[SERVER_CALL_CONTEXT_KEY] = current.serverCallSource;
 	}
 }
 

@@ -1,17 +1,14 @@
+import { loadCompiledFixtureSource } from './_server-fixture.js';
 import { describe, expect, it } from 'vitest';
-import { compile } from 'octane/compiler';
 import * as ServerRuntime from 'octane/server';
 import { prerender } from 'octane/static';
 
 function evalServer(source: string, filename: string): Record<string, any> {
-	let code = compile(source, filename, { mode: 'server' }).code;
-	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]octane(?:\/server)?['"];?/g,
-		(_match, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
-	);
-	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
-	code = code.replace(/export function (\w+)/g, '__exports.$1 = function $1');
-	return new Function('__rt', '__exports', code + '\nreturn __exports;')(ServerRuntime, {});
+	return loadCompiledFixtureSource(source, {
+		id: filename,
+		mode: 'server',
+		compileOptions: { mode: 'server' },
+	});
 }
 
 describe('SSR async identity string encoding', () => {

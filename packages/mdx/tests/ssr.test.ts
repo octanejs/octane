@@ -12,6 +12,7 @@ import { join } from 'node:path';
 import * as ServerRT from 'octane/server';
 import * as ServerProvider from '@octanejs/mdx/server';
 import { compileMdxSync } from '@octanejs/mdx/compile';
+import { evalModuleCode } from './_helpers';
 
 const FIXTURES = join(process.cwd(), 'packages/mdx/tests/_fixtures');
 
@@ -20,20 +21,11 @@ const FIXTURES = join(process.cwd(), 'packages/mdx/tests/_fixtures');
 // → the real server provider layer.
 function serverModule(name: string): Record<string, any> {
 	const file = join(FIXTURES, name);
-	let { code } = compileMdxSync(readFileSync(file, 'utf8'), file, { mode: 'server' });
-	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/server['"];?/g,
-		(_m: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
-	);
-	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]@octanejs\/mdx\/server['"];?/g,
-		(_m: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __provider;`,
-	);
-	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
-	code = code.replace(/export default function MDXContent/, 'function MDXContent');
-	code += '\n__exports.default = MDXContent;';
-	const fn = new Function('__rt', '__provider', '__exports', code + '\nreturn __exports;');
-	return fn(ServerRT, ServerProvider, {});
+	const { code } = compileMdxSync(readFileSync(file, 'utf8'), file, { mode: 'server' });
+	return evalModuleCode(code, {
+		'octane/server': ServerRT,
+		'@octanejs/mdx/server': ServerProvider,
+	});
 }
 
 // Hydration block markers aside, the payload is plain HTML.

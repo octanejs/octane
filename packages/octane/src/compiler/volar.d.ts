@@ -3,7 +3,12 @@
 export function compileToVolarMappings(
 	source: string,
 	filename?: string,
-	options?: { loose?: boolean; renderers?: unknown; strong?: boolean },
+	options?: {
+		loose?: boolean;
+		renderers?: unknown;
+		strong?: boolean;
+		knownAttributeSpreads?: readonly import('./index.js').KnownAttributeSpread[];
+	},
 ): import('./index.js').VolarCompileResult;
 
 /** Virtual TSX and authored ranges used by compiler inspection tooling. */

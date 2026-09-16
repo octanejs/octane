@@ -3,6 +3,7 @@
 import { resolve, sep } from 'node:path';
 import { build } from 'esbuild';
 import { JSDOM } from 'jsdom';
+import { createScope } from 'octane/signals';
 import { describe, expect, it } from 'vitest';
 
 async function bundleConsumer(contents: string) {
@@ -27,6 +28,7 @@ async function bundleConsumer(contents: string) {
 
 	return {
 		contents: result.outputFiles[0].contents,
+		resolvedInputs: Object.keys(result.metafile.inputs).map((input) => input.split(sep).join('/')),
 		inputs: Object.entries(Object.values(result.metafile.outputs)[0].inputs)
 			.filter(([, metadata]) => metadata.bytesInOutput > 0)
 			.map(([input]) => input.split(sep).join('/')),
@@ -59,12 +61,51 @@ describe('production behavior-root entry points', () => {
 
 			root.dispose();
 			expect(container.firstElementChild).toBe(existing);
+			// Resolved dependencies matter when a later renderer consumer co-locates
+			// other exports from the same module in a shared eager chunk.
+			const bindings = await bundleConsumer(
+				"export { __adoptBindings } from 'octane/dom-bindings';",
+			);
+			expect(
+				bindings.resolvedInputs.filter((input) =>
+					/packages\/octane\/src\/(?:css|dom-tables)\.[jt]s$/.test(input),
+				),
+			).toEqual([]);
 		});
 	}
 
-	it('does not retain behavior ownership in ordinary component-root bundles', async () => {
+	it('keeps ordinary roots and standalone signal predicates free of unrelated ownership', async () => {
 		const bundle = await bundleConsumer("export { createRoot } from 'octane';");
 
 		expect(bundle.inputs.some((input) => /\/behavior-root\.ts$/.test(input))).toBe(false);
+
+		const predicates = await bundleConsumer(
+			"export { isSignalHandle, isWritableSignal } from 'octane/signals';",
+		);
+		const { isSignalHandle, isWritableSignal } = (await import(
+			`data:text/javascript;base64,${Buffer.from(predicates.contents).toString('base64')}`
+		)) as typeof import('../src/signals/handle-protocol.js');
+		const scope = createScope({ scopeKey: 'standalone-predicates' });
+		try {
+			const value$ = scope.signal$('value', 1);
+			const doubled$ = scope.derived$('doubled', () => value$.get() * 2);
+			expect(isSignalHandle(value$)).toBe(true);
+			expect(isWritableSignal(value$)).toBe(true);
+			expect(isSignalHandle(doubled$)).toBe(true);
+			expect(isWritableSignal(doubled$)).toBe(false);
+			for (const plain of [null, undefined, false, 1, 'value', {}, () => {}]) {
+				expect(isSignalHandle(plain)).toBe(false);
+				expect(isWritableSignal(plain)).toBe(false);
+			}
+		} finally {
+			scope.dispose();
+		}
+		expect(
+			predicates.inputs.filter((input) =>
+				/(?:^|\/)packages\/octane\/src\/(?:runtime(?:\.server)?\.ts|behavior-root\.ts|signals\/(?:engine|facade|graph|owner-context)\.ts)$/.test(
+					input,
+				),
+			),
+		).toEqual([]);
 	});
 });

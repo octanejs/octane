@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { compile } from 'octane/compiler';
 import { flushSync, hydrateRoot } from 'octane';
 import * as ServerRuntime from 'octane/server';
+import * as ServerHelpers from 'octane/internal/server';
 import { cleanup, fireEvent, render } from '@octanejs/testing-library';
 import { App } from '@octane-eval-submission/octane.ssr-signup-card/src/App.tsrx';
 
@@ -30,6 +31,7 @@ function evaluateServerModule(): Record<string, any> {
 	const module = { exports: {} as Record<string, any> };
 	const requireServerRuntime = (specifier: string) => {
 		if (specifier === 'octane/server') return ServerRuntime;
+		if (specifier === 'octane/internal/server') return ServerHelpers;
 		throw new Error(`Unsupported server-eval import: ${specifier}`);
 	};
 	new Function('require', 'module', 'exports', commonJs)(

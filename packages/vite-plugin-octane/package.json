@@ -50,10 +50,11 @@
     "@ripple-ts/adapter": "catalog:default"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.1.51 || ^0.2.0",
+    "octane": "workspace:^",
     "vite": "^8.0.16"
   },
   "devDependencies": {
+    "@types/jsdom": "catalog:default",
     "@types/node": "catalog:default",
     "octane": "workspace:*",
     "playwright": "catalog:default",

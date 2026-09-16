@@ -74,6 +74,61 @@ export function splitSsrTemplate(html) {
 }
 
 /**
+ * Separate the owned bootstrap so a streaming host can publish it after its
+ * complete shell, without waiting for long-lived result channels to finish.
+ * Unrelated authored scripts keep their position and scheduling attributes.
+ * @param {string} html
+ * @returns {{ html: string, afterShell: string }}
+ */
+export function prepareStreamingHydrationTemplate(html) {
+	const scripts = html.match(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi) ?? [];
+	const entries = scripts.filter((script) =>
+		/\bdata-octane-hydrate(?:\s|=|>)/i.test(script.slice(0, script.indexOf('>') + 1)),
+	);
+	if (entries.length !== 1) {
+		throw new Error('[octane] Early hydration requires one separately identified bootstrap entry.');
+	}
+	const entry = entries[0];
+	const end = entry.indexOf('>');
+	let tag = entry
+		.slice(0, end + 1)
+		.replace(/\s(?:async|defer)(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+))?(?=\s|>)/gi, '')
+		.replace(/^<script\b/i, '<script data-octane-stream');
+	if (/\stype\s*=\s*(?:"module"|'module'|module)(?=\s|>)/i.test(tag)) {
+		if (
+			/\sintegrity(?:\s|=|>)/i.test(tag) ||
+			/\sreferrerpolicy(?:\s|=|>)/i.test(tag) ||
+			/\scrossorigin\s*=\s*(?:"use-credentials"|'use-credentials'|use-credentials)(?=\s|>)/i.test(
+				tag,
+			)
+		) {
+			throw new Error(
+				'[octane] Early module hydration cannot preserve integrity, referrerpolicy, or credentialed script attributes.',
+			);
+		}
+		if (!/\ssrc\s*=/i.test(tag)) {
+			throw new Error('[octane] Early module hydration requires an external bootstrap entry.');
+		}
+		// WebKit can defer even async module scripts until an open HTML stream
+		// ends. A classic, nonce-bearing import kick runs after this complete
+		// shell instead. Keep the URL in an HTML attribute so the browser handles
+		// entities and relative URLs exactly as it did for the original src.
+		tag = tag
+			.replace(/\stype\s*=\s*(?:"module"|'module'|module)(?=\s|>)/i, '')
+			.replace(/\snomodule(?=\s|>)/i, '')
+			.replace(/\ssrc\s*=/i, ' data-octane-hydrate-src=');
+		return {
+			html: html.replace(entry, ''),
+			afterShell:
+				tag +
+				'import(new URL(document.currentScript.getAttribute("data-octane-hydrate-src"),document.baseURI).href).catch(function(e){console.error("[octane] Failed to load client hydration.",e);});</script>',
+		};
+	}
+	// Classic bundler entries must execute now as well, not wait for EOF.
+	return { html: html.replace(entry, ''), afterShell: tag + entry.slice(end + 1) };
+}
+
+/**
  * Add the request nonce to the production hydrate script the integration built. The
  * data attribute is inserted before build so this remains robust after the
  * script src is hashed/reordered.

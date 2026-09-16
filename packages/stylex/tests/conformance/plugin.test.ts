@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
+import { compile } from 'octane/compiler';
 import { stylex } from '../../src/vite';
+import { knownAttributeSpreads } from '../../src/compiler-contract.js';
 
 // The Vite plugin object's hooks, driven directly (no full Vite run): transform
 // collects rules, the virtual module aggregates them.
@@ -33,6 +35,37 @@ describe('@octanejs/stylex/vite plugin', () => {
 		expect(plugin.resolveId('virtual:stylex.css')).toBe('\0virtual:stylex.css');
 		const css = plugin.load('\0virtual:stylex.css');
 		expect(css).toContain('padding:16px');
+
+		// The shipped contract covers the namespace import documented above as
+		// well as named imports; consumers need not recreate compiler options.
+		for (const [prelude, factory] of [
+			["import { props as styleProps } from '@octanejs/stylex';", 'styleProps'],
+			["import * as stylex from '@octanejs/stylex';", 'stylex.props'],
+		]) {
+			for (const dev of [false, true]) {
+				const source = `${prelude}
+export function Styled(props) @{ 'use dom bindings'; <div {...${factory}(props.styles)} /> }`;
+				for (const mode of ['client', 'server'] as const) {
+					expect(() =>
+						compile(source, '/app/Styled.tsrx', { mode, dev, hmr: false, knownAttributeSpreads }),
+					).not.toThrow();
+				}
+				expect(() =>
+					compile(source, '/app/Styled.tsrx?octane-bindings=Styled', {
+						dev,
+						hmr: false,
+						knownAttributeSpreads,
+					}),
+				).not.toThrow();
+				expect(() =>
+					compile(
+						`${prelude} export function Conflict(props) @{ 'use dom bindings'; <div {...${factory}(props.styles)} style={{ color: 'red' }} /> }`,
+						'/app/Conflict.tsrx',
+						{ dev, hmr: false, knownAttributeSpreads },
+					),
+				).toThrow(/known spread conflicts/);
+			}
+		}
 	});
 
 	it('aggregates + dedupes across multiple files', () => {

@@ -1,7 +1,7 @@
+import { loadCompiledFixtureSource } from './_server-fixture.js';
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { compile } from 'octane/compiler';
 import * as RT from 'octane/server';
 import { prerender } from 'octane/static';
 import {
@@ -26,20 +26,11 @@ function evalServer(
 	file: string,
 	options: Record<string, unknown> = {},
 ): Record<string, any> {
-	let { code } = compile(source, file, { ...options, mode: 'server' });
-	// Bind the server-runtime import to the live module, and capture exports.
-	code = code.replace(
-		/import\s+\*\s+as\s+(\w+)\s+from\s+['"]octane\/server['"];?/g,
-		'const $1 = __rt;',
-	);
-	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/(?:server|internal\/server)['"];?/g,
-		(_m: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
-	);
-	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
-	code = code.replace(/export default (\w+);?/g, '__exports.default = $1;');
-	const fn = new Function('__rt', '__exports', code + '\nreturn __exports;');
-	return fn(RT, {});
+	return loadCompiledFixtureSource(source, {
+		id: file,
+		mode: 'server',
+		compileOptions: { ...options, mode: 'server' },
+	});
 }
 
 const fixture = (name: string) => readFileSync(join(FIXTURES, `${name}.tsrx`), 'utf8');
@@ -76,12 +67,15 @@ describe('SSR Phase 1 — ssr fixture (style / spread / innerHTML / components /
 	});
 
 	it('renders boolean attributes, void elements, and dynamic attrs', async () => {
-		expect(await RT.renderToString(ssr.Field, { value: 'v', disabled: true })).toMatchSnapshot(
-			'Field-disabled',
-		);
-		expect(await RT.renderToString(ssr.Field, { value: 'v', disabled: false })).toMatchSnapshot(
-			'Field-enabled',
-		);
+		for (const disabled of [true, false]) {
+			const result = await RT.renderToString(ssr.Field, { value: 'v', disabled });
+			expect({
+				...result,
+				// Opaque compiler hydration IDs are covered by adoption tests, not
+				// this host-attribute serialization snapshot.
+				html: result.html.replace(/ data-octane-input="[^"]*"/g, ''),
+			}).toMatchSnapshot(disabled ? 'Field-disabled' : 'Field-enabled');
+		}
 	});
 
 	it('serializes spread attributes', async () => {

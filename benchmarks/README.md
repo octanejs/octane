@@ -84,7 +84,7 @@ suites reuse it. Collected results land in `benchmarks/results/<suite>.json`
 Some suites need no preview servers: **news**, **hydration-interactivity**, and
 the three runtime-stress suites vite-build and time each target themselves (the
 runner loops their per-target invocations and merges them),
-**ssr-throughput**, **streaming-ssr**, **lynx-list**, **universal-leaf-update**,
+**ssr-throughput**, **streaming-ssr**, **conversation-streaming**, **lynx-list**, **universal-leaf-update**,
 **universal-object-teardown**,
 **universal-template-events**, **universal-native-hover**, **universal-owner-drafts**,
 **universal-hook-slot**,
@@ -270,6 +270,7 @@ internally, get their own baseline and guard namespace.
 | `portal-swarm` | portal-swarm | Octane + reference frameworks | portal render/dispatch |
 | `ssr-throughput` | ssr-throughput | none (Node-only) | comparative news SSR including Inferno + Octane-only stress fixtures |
 | `streaming-ssr` | streaming-ssr | none (Node-only) | streaming targets incl. Inferno and Preact; Svelte N/A |
+| `conversation-streaming` | conversation-streaming | none (production app, Node runner; optional WebKit runner) | public shell, shared auth, independent conversation/history SSR and composer activation |
 | `ssr-replay-streaming` | ssr-replay-streaming | none (Node-only) | populated replay collection copies and streaming promise subscriptions, with clean output and unchanged/one-wave controls |
 | `ssr-final-metadata` | ssr-final-metadata | none (Node-only) | final SSR guards, identity strings, metadata and prop/children work with semantic counterexamples and retained alternatives |
 | `ssr-final-replay` | ssr-final-replay | none (Node-only) | boundary collection copies, retry snapshots, thenable probes and full passes under clean output and abort/error controls |

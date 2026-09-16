@@ -1,7 +1,7 @@
+import { loadCompiledFixtureSource } from '../_server-fixture.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { compile } from 'octane/compiler';
 import { createRoot, flushSync, hydrateRoot } from '../../src/index.js';
 import * as ServerRT from 'octane/server';
 import { ReentryLeaf, ReentryOuter } from './_fixtures/root-reentry.tsrx';
@@ -9,13 +9,11 @@ import { ReentryLeaf, ReentryOuter } from './_fixtures/root-reentry.tsrx';
 const FIXTURE = join(process.cwd(), 'packages/octane/tests/hydration/_fixtures/root-reentry.tsrx');
 
 function serverModule(): Record<string, any> {
-	let { code } = compile(readFileSync(FIXTURE, 'utf8'), 'root-reentry.tsrx', { mode: 'server' });
-	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/server['"];?/g,
-		(_m: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
-	);
-	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
-	return new Function('__rt', '__exports', code + '\nreturn __exports;')(ServerRT, {});
+	return loadCompiledFixtureSource(readFileSync(FIXTURE, 'utf8'), {
+		id: 'root-reentry.tsrx',
+		mode: 'server',
+		compileOptions: { mode: 'server' },
+	});
 }
 
 const server = serverModule();

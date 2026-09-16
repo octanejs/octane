@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { act, flushSync, hydrateRoot } from 'octane';
 import { renderToString } from 'octane/server';
-import { createScope, query } from 'octane/signals';
+import { createResource, createScope, query } from 'octane/signals';
 import { flushEffects, mount } from './_helpers';
 import {
 	loadCompiledFixtureSource,
@@ -114,7 +114,7 @@ export function Reader(props) @{
 		const request = query('memo-pending', (key: string) =>
 			key === 'first' ? first.promise : second.promise,
 		);
-		const value$ = scope.asyncSignal$('value', () => request(key$.get()));
+		const value$ = createResource(scope, 'value', () => request(key$.get()));
 		const props = { read$: () => value$.get() };
 		const root = mount(client.MemoPending, props);
 		try {

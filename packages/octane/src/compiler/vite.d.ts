@@ -1,5 +1,5 @@
 import type { Plugin } from 'vite';
-import type { OctaneCssModuleConstants } from './index.js';
+import type { KnownAttributeSpread, OctaneCssModuleConstants } from './index.js';
 
 export type { OctaneCssModuleConstants } from './index.js';
 
@@ -87,6 +87,8 @@ export interface OctaneVitePluginOptions {
 	 * @default false
 	 */
 	strong?: boolean;
+	/** Trusted adapter output shapes; imported calls keep one evaluation per native host. */
+	knownAttributeSpreads?: readonly KnownAttributeSpread[];
 	/**
 	 * @experimental Infer primitive child text from a TypeScript project in
 	 * one-shot production builds. Serve and watched builds retain syntax

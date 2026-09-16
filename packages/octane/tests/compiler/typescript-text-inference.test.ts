@@ -449,5 +449,35 @@ describe('source-bound textTypeFacts compile option', () => {
 				compile(source, filename, { mode, hmr: false, textTypeFacts: original }),
 			);
 		}
+
+		const bindingSource = `export function View(props: {
+			settingsLabel: string; options: { id: string; label: string }[];
+		}) @{
+			'use dom bindings';
+			<section><h2>{props.settingsLabel}</h2>
+				@for (const option of props.options; key option.id) { <p>{option.label}</p> }
+			</section>
+		}`;
+		const bindingConsumer = fixture({ 'View.tsrx': bindingSource });
+		const bindingFilename = bindingConsumer.file('View.tsrx');
+		const bindingFacts = JSON.parse(
+			JSON.stringify(bindingConsumer.project.snapshot(bindingFilename)),
+		);
+		expect(stringChildren(bindingSource, bindingFacts)).toEqual([
+			'props.settingsLabel',
+			'option.label',
+		]);
+		for (const dev of [false, true]) {
+			const options = { dev, hmr: false, textTypeFacts: bindingFacts };
+			expect(compile(bindingSource, bindingFilename, options).code).toContain('bindingText');
+			expect(
+				compile(bindingSource, bindingFilename, { ...options, mode: 'server' }).code,
+			).toContain('ssrBindingBlock');
+			for (const query of ['?octane-bindings=View', '?octane-bindings=View&octane-mount=1']) {
+				const artifact = compile(bindingSource, bindingFilename + query, options).code;
+				expect(artifact).toContain('dom-binding-program');
+				expect(artifact).not.toContain('octane/internal/client');
+			}
+		}
 	});
 });

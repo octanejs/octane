@@ -6,6 +6,7 @@ import {
 	setTransitionFallbackTimeout,
 	startTransition,
 } from 'octane';
+import { bindSignalControl } from 'octane/signals';
 import { act, createLog, flushEffects, mount } from './_helpers';
 import {
 	createCounter$,
@@ -21,6 +22,7 @@ import {
 	NativeDetachedErrorCleanup,
 	NativeErrorBoundary,
 	NativeHeldBoundary,
+	NativeHeldBindings,
 	NativeHeldIsolation,
 	NativeHeldSiblings,
 	NativeNestedHeldSiblings,
@@ -45,7 +47,7 @@ function deferred<T>() {
 }
 
 describe('native signal rendering', () => {
-	it('updates a direct reader while writes remain immediately readable', () => {
+	it('updates a direct reader while writes remain immediately readable', async () => {
 		const state = createCounter$('direct', 1);
 		const rendered = mount(SignalReader, state);
 		try {
@@ -57,6 +59,88 @@ describe('native signal rendering', () => {
 			});
 			expect(rendered.find('.signal-value')).toBe(node);
 			expect(node.textContent).toBe('7');
+			const draft$ = state.scope.signal$('draft', '');
+			const urgent$ = state.scope.signal$('urgent', 0);
+			const gate = deferred<undefined>();
+			const settle = deferred<undefined>();
+			const input = document.createElement('input');
+			document.body.append(input);
+			const stopControl = bindSignalControl(input, 'value', draft$);
+			const stopDraft = draft$.subscribe(() => {
+				// The first transition may start reentrantly from native input. Its
+				// async continuation outlives this urgent publication boundary.
+				startTransition(async () => {
+					await gate.promise;
+					state.count$.set(8);
+					await settle.promise;
+				});
+				urgent$.set(5);
+			});
+			try {
+				await act(() => {
+					input.value = 'typed';
+					input.dispatchEvent(new Event('input', { bubbles: true }));
+				});
+				expect(draft$.get()).toBe('typed');
+				expect(urgent$.get()).toBe(5);
+				await act(() => gate.resolve(undefined));
+				expect(state.count$.get()).toBe(7);
+				expect(node.textContent).toBe('7');
+				await act(() => settle.resolve(undefined));
+				expect(state.count$.get()).toBe(8);
+				expect(node.textContent).toBe('8');
+				expect(rendered.find('.signal-value')).toBe(node);
+			} finally {
+				gate.resolve(undefined);
+				settle.resolve(undefined);
+				await act(() => {});
+				stopDraft();
+				stopControl();
+				input.remove();
+			}
+			flushSync(() => state.count$.set(7));
+			const subscribers = state.scope
+				.inspect()
+				.nodes.find((entry) => entry.key === 'count')!.subscribers;
+			for (let index = 0; index < 3; index++) {
+				startTransition(() => state.count$.set(7));
+				expect(
+					state.scope.inspect().nodes.find((entry) => entry.key === 'count')!.subscribers,
+				).toBe(subscribers);
+			}
+			const failure = new Error('expected updater failure');
+			startTransition(() => {
+				expect(() =>
+					state.count$.set(() => {
+						throw failure;
+					}),
+				).toThrow(failure);
+			});
+			expect(state.scope.inspect().nodes.find((entry) => entry.key === 'count')!.subscribers).toBe(
+				subscribers,
+			);
+			const pending = deferred<string>();
+			let started = 0;
+			const query = createResource$('no-op-read', () => {
+				started++;
+				return pending.promise;
+			});
+			try {
+				query.value$.latest('fallback');
+				const canonical = query.scope.inspect();
+				startTransition(() => {
+					query.key$.set('a');
+					query.value$.latest('fallback');
+				});
+				expect(query.scope.inspect().activeRequests).toBe(canonical.activeRequests);
+				expect(query.scope.inspect().nodes.map((entry) => entry.subscribers)).toEqual(
+					canonical.nodes.map((entry) => entry.subscribers),
+				);
+				await act(() => {});
+				expect(started).toBe(1);
+			} finally {
+				query.scope.dispose();
+			}
 		} finally {
 			rendered.unmount();
 			state.scope.dispose();
@@ -282,7 +366,10 @@ describe('native signal rendering', () => {
 			expect(rendered.find('.count').textContent).toBe('0');
 			expect(rendered.find('.async-value').textContent).toBe('old');
 			await act(() => state.scope.set(state.count$, 2));
-			expect(rendered.find('.count').textContent).toBe('0');
+			// Urgent input publishes against the accepted key while replacement data stays private.
+			expect(rendered.find('.count').textContent).toBe('2');
+			expect(state.key$.get()).toBe('a');
+			expect(rendered.find('.async-value').textContent).toBe('old');
 			expect(state.scope.get(state.count$)).toBe(2);
 			await act(() => second.resolve('new'));
 			expect(rendered.find('.panel')).toBe(panel);
@@ -326,18 +413,20 @@ describe('native signal rendering', () => {
 				expect(rendered.find('.async-value').textContent).toBe('old');
 				expect(log.drain()).toEqual([]);
 				await act(() => state.count$.set(2));
-				expect(button.textContent).toBe('0');
-				expect(log.drain()).toEqual([]);
+				expect(button.textContent).toBe('2');
+				expect(state.key$.get()).toBe('a');
+				expect(rendered.find('.async-value').textContent).toBe('old');
+				const accepted = log.drain();
+				expect(accepted.filter((entry) => entry.startsWith('layout:'))).toEqual(['layout:2']);
+				expect(accepted).toContain('ref:2:attach');
+				expect(accepted).toContain('cleanup:0');
 				await act(() => second.resolve('new'));
 				expect(rendered.find('.panel')).toBe(panel);
 				expect(rendered.find('.count')).toBe(button);
 				expect(document.activeElement).toBe(button);
 				expect(button.textContent).toBe('2');
 				expect(rendered.find('.async-value').textContent).toBe('new');
-				const accepted = log.drain();
-				expect(accepted.filter((entry) => entry.startsWith('layout:'))).toEqual(['layout:2']);
-				expect(accepted).toContain('ref:2:attach');
-				expect(accepted).toContain('cleanup:0');
+				expect(log.drain()).toEqual([]);
 			} finally {
 				rendered.unmount();
 				expect(state.scope.inspect().nodes.find((node) => node.key === 'count')?.subscribers).toBe(
@@ -350,45 +439,209 @@ describe('native signal rendering', () => {
 	it('keeps unrelated urgent updates live while a native primary holds a transition', async () => {
 		const first = deferred<string>();
 		const second = deferred<string>();
-		const state = createResource$('held-isolation', (key) =>
-			key === 'a' ? first.promise : second.promise,
-		);
+		const abandoned = deferred<string>();
+		let aborted = 0;
+		const started: string[] = [];
+		const state = createResource$('held-isolation', (key, context) => {
+			started.push(key);
+			if (key === 'c') {
+				context.signal.addEventListener('abort', () => aborted++);
+				return abandoned.promise;
+			}
+			return key === 'a' ? first.promise : second.promise;
+		});
 		const outside = createCounter$('held-outside');
 		const log = createLog();
 		const rendered = mount(NativeHeldIsolation, { ...state, outside, log: log.push });
+		const mirror = mount(NativeHeldSiblings, {
+			...state,
+			log: (entry: string) => log.push('mirror:' + entry),
+		});
+		const bindings = mount(NativeHeldBindings, state);
+		const directView = () => [
+			(bindings.find('.direct-control') as HTMLInputElement).value,
+			bindings.find('.direct-child').textContent,
+			bindings.find('.direct-child').getAttribute('title'),
+			(bindings.find('.direct-style') as HTMLElement).style.left,
+			(bindings.find('.direct-style') as HTMLElement).style.getPropertyValue('--key'),
+		];
+		const notifications: string[] = [];
+		const acceptedViews: Array<Array<string | null>> = [];
+		const stopCount = state.count$.subscribe(() =>
+			notifications.push('count:' + state.count$.get()),
+		);
+		const stopKey = state.key$.subscribe(() => {
+			notifications.push('key:' + state.key$.get());
+			acceptedViews.push([
+				rendered.find('.panel .count').textContent,
+				rendered.find('.async-value').textContent,
+				mirror.find('.panel .count').textContent,
+				mirror.find('.async-value').textContent,
+				rendered.find('.transition').textContent,
+				...directView(),
+			]);
+		});
 		try {
 			await act(() => first.resolve('old'));
 			const panel = rendered.find('.panel');
+			const mirrorPanel = mirror.find('.panel');
 			log.clear();
 			await act(() => {
-				startTransition(() =>
-					state.scope.batch(() => {
-						state.count$.set(1);
-						state.key$.set('b');
-					}),
-				);
+				(rendered.find('.transition') as HTMLButtonElement).click();
 				outside.count$.set(1);
+			});
+			expect({
+				key: state.key$.get(),
+				count: state.count$.get(),
+				pending: rendered.find('.transition').textContent,
+				notifications,
+				started,
+			}).toEqual({
+				key: 'a',
+				count: 0,
+				pending: 'pending',
+				notifications: [],
+				started: ['a', 'b'],
 			});
 			expect(rendered.find('.panel')).toBe(panel);
 			expect(rendered.find('.panel .count').textContent).toBe('0');
+			expect(mirror.find('.panel')).toBe(mirrorPanel);
+			expect(mirror.find('.panel .count').textContent).toBe('0');
+			expect(mirror.find('.async-value').textContent).toBe('old');
+			expect(directView()).toEqual(['a', 'a', 'a', '0px', 'a']);
 			expect(rendered.find('.outside .count').textContent).toBe('1');
 			expect(log.drain().filter((entry) => !entry.startsWith('outside:'))).toEqual([]);
 			await act(() => {
 				outside.count$.set(2);
 				state.count$.set(2);
 			});
-			expect(rendered.find('.panel .count').textContent).toBe('0');
+			expect(rendered.find('.panel .count').textContent).toBe('2');
+			expect(mirror.find('.panel .count').textContent).toBe('2');
+			expect(mirror.find('.async-value').textContent).toBe('old');
+			expect(directView()).toEqual(['a', 'a', 'a', '2px', 'a']);
 			expect(rendered.find('.outside .count').textContent).toBe('2');
-			expect(log.drain().filter((entry) => !entry.startsWith('outside:'))).toEqual([]);
+			expect(state.key$.get()).toBe('a');
+			expect(state.count$.get()).toBe(2);
+			expect(notifications).toEqual(['count:2']);
+			log.clear();
 			await act(() => second.resolve('new'));
 			expect(rendered.find('.panel')).toBe(panel);
 			expect(rendered.find('.panel .count').textContent).toBe('2');
 			expect(rendered.find('.async-value').textContent).toBe('new');
 			expect(rendered.find('.outside .count').textContent).toBe('2');
+			expect(rendered.find('.transition').textContent).toBe('ready');
+			expect(mirror.find('.panel')).toBe(mirrorPanel);
+			expect(mirror.find('.async-value').textContent).toBe('new');
+			expect(state.key$.get()).toBe('b');
+			expect(state.count$.get()).toBe(2);
+			expect(notifications).toEqual(['count:2', 'key:b']);
+			expect(acceptedViews).toEqual([['2', 'new', '2', 'new', 'ready', 'b', 'b', 'b', '2px', 'b']]);
+			await act(() => (rendered.find('.transition') as HTMLButtonElement).click());
+			expect(rendered.find('.transition').textContent).toBe('pending');
+			expect(state.key$.get()).toBe('b');
+			expect(aborted).toBe(0);
+			stopCount();
+			stopKey();
+			await act(() => {
+				rendered.unmount();
+				mirror.unmount();
+				bindings.unmount();
+			});
+			// Removing every presentation drops pending demand, not the model writes.
+			expect(state.key$.get()).toBe('c');
+			expect(state.count$.get()).toBe(1);
+			expect(aborted).toBe(1);
 		} finally {
+			stopCount();
+			stopKey();
 			rendered.unmount();
+			mirror.unmount();
+			bindings.unmount();
 			state.scope.dispose();
 			outside.scope.dispose();
+		}
+		for (const mode of ['form-transition', 'transition']) {
+			for (const lateKey of [false, true]) {
+				const gate = deferred<undefined>();
+				const settle = deferred<undefined>();
+				const first = deferred<string>();
+				const second = deferred<string>();
+				const state = createResource$('awaited-' + mode + '-' + lateKey, (key) =>
+					key === 'a' ? first.promise : second.promise,
+				);
+				const outside = createCounter$('awaited-outside-' + mode);
+				const draft$ = state.scope.signal$('draft', '');
+				const typing = mount(NativeHeldBindings, { ...state, key$: draft$ });
+				const updaterReads: number[] = [];
+				const rendered = mount(NativeHeldIsolation, {
+					...state,
+					outside,
+					log: () => {},
+					gate: gate.promise,
+					settle: settle.promise,
+					lateKey,
+					observeUpdater: (value: number) => updaterReads.push(value),
+				});
+				const notifications: string[] = [];
+				const stop = state.key$.subscribe(() => notifications.push(state.key$.get()));
+				try {
+					await act(() => first.resolve('old'));
+					await act(() => (rendered.find('.' + mode) as HTMLButtonElement).click());
+					const input = typing.find('.direct-control') as HTMLInputElement;
+					await act(() => {
+						input.value = 'typed';
+						input.setSelectionRange(2, 2);
+						input.dispatchEvent(new Event('input', { bubbles: true }));
+					});
+					expect(draft$.get()).toBe('typed');
+					expect(typing.find('.direct-child').textContent).toBe('typed');
+					expect(input.value).toBe('typed');
+					expect(input.selectionStart).toBe(2);
+					await act(() => gate.resolve(undefined));
+					expect(updaterReads).toEqual(lateKey ? [] : [1]);
+					expect({ key: state.key$.get(), count: state.count$.get(), notifications }).toEqual({
+						key: 'a',
+						count: 0,
+						notifications: [],
+					});
+					expect(rendered.find('.action-state').textContent).toBe('0');
+					if (mode === 'transition')
+						expect(rendered.find('.transition').textContent).toBe('pending');
+					await act(() => (rendered.find('.urgent') as HTMLButtonElement).click());
+					expect(state.count$.get()).toBe(2);
+					expect(rendered.find('.panel .count').textContent).toBe('2');
+					await act(() =>
+						rendered.find('.urgent').dispatchEvent(new Event('pointermove', { bubbles: true })),
+					);
+					expect(state.count$.get()).toBe(3);
+					expect(rendered.find('.panel .count').textContent).toBe('3');
+					flushSync(() => state.count$.set(4));
+					expect(rendered.find('.panel .count').textContent).toBe('4');
+					expect(state.key$.get()).toBe('a');
+					await act(() => settle.resolve(undefined));
+					expect(updaterReads).toEqual(lateKey ? [4] : [1, 4]);
+					expect(state.key$.get()).toBe('a');
+					expect(rendered.find('.async-value').textContent).toBe('old');
+					expect(rendered.find('.action-state').textContent).toBe('0');
+					await act(() => second.resolve('new'));
+					expect(state.key$.get()).toBe('b');
+					expect(state.count$.get()).toBe(4);
+					expect(rendered.find('.panel .count').textContent).toBe('4');
+					expect(rendered.find('.async-value').textContent).toBe('new');
+					expect(rendered.find('.action-state').textContent).toBe('1');
+					expect(rendered.find('.transition').textContent).toBe('ready');
+					expect(notifications).toEqual(['b']);
+				} finally {
+					gate.resolve(undefined);
+					settle.resolve(undefined);
+					await act(() => {});
+					stop();
+					rendered.unmount();
+					typing.unmount();
+					state.scope.dispose();
+					outside.scope.dispose();
+				}
+			}
 		}
 	});
 
@@ -582,43 +835,54 @@ describe('native signal rendering', () => {
 	});
 
 	it('accepts a timed pending fallback before primary cleanup writes', async () => {
-		const previousTimeout = getTransitionFallbackTimeout();
-		vi.useFakeTimers();
-		setTransitionFallbackTimeout(100);
-		const first = deferred<string>();
-		const second = deferred<string>();
-		const state = createResource$('timed-fallback-cleanup', (key) =>
-			key === 'a' ? first.promise : second.promise,
-		);
-		const log = createLog();
-		const refs: string[] = [];
-		let rendered: ReturnType<typeof mount> | undefined;
-		try {
-			await act(() => first.resolve('ready'));
-			rendered = mount(NativeTimedCleanup, {
-				...state,
-				log: log.push,
-				hostRef: (node: HTMLParagraphElement | null) => {
-					refs.push(node === null ? 'detach' : 'attach');
-				},
-			});
-			const primary = rendered.find('.cleanup-primary') as HTMLElement;
-			await act(() => startTransition(() => state.scope.set(state.key$, 'b')));
-			expect(rendered.findAll('output')).toEqual([]);
-			await act(() => vi.advanceTimersByTime(150));
-			expect(rendered.find('.cleanup-primary')).toBe(primary);
-			expect(primary.style.display).toBe('none');
-			expect(rendered.find('output').textContent).toBe('1');
-			expect(log.drain()).toEqual(['0:0:1', '1:1:1']);
-			expect(refs).toEqual(['attach', 'detach']);
-			await act(() => second.reject(new Error('expected hidden failure')));
-			expect(rendered.find('.caught').textContent).toBe('caught');
-			expect(refs).toEqual(['attach', 'detach']);
-		} finally {
-			rendered?.unmount();
-			state.scope.dispose();
-			setTransitionFallbackTimeout(previousTimeout);
-			vi.useRealTimers();
+		for (const outcome of ['ready', 'error']) {
+			const previousTimeout = getTransitionFallbackTimeout();
+			vi.useFakeTimers();
+			setTransitionFallbackTimeout(100);
+			const first = deferred<string>();
+			const second = deferred<string>();
+			const state = createResource$('timed-fallback-cleanup-' + outcome, (key) =>
+				key === 'a' ? first.promise : second.promise,
+			);
+			const log = createLog();
+			const refs: string[] = [];
+			let rendered: ReturnType<typeof mount> | undefined;
+			try {
+				await act(() => first.resolve('ready'));
+				rendered = mount(NativeTimedCleanup, {
+					...state,
+					log: log.push,
+					hostRef: (node: HTMLParagraphElement | null) => {
+						refs.push(node === null ? 'detach' : 'attach');
+					},
+				});
+				const primary = rendered.find('.cleanup-primary') as HTMLElement;
+				await act(() => startTransition(() => state.scope.set(state.key$, 'b')));
+				expect(rendered.findAll('output')).toEqual([]);
+				await act(() => vi.advanceTimersByTime(150));
+				expect(rendered.find('.cleanup-primary')).toBe(primary);
+				expect(primary.style.display).toBe('none');
+				expect(rendered.find('output').textContent).toBe('1');
+				expect(log.drain()).toEqual(['0:0:1', '1:1:1']);
+				expect(refs).toEqual(['attach', 'detach']);
+				if (outcome === 'ready') {
+					await act(() => second.resolve('new'));
+					expect(rendered.find('.cleanup-primary')).toBe(primary);
+					expect(primary.style.display).toBe('');
+					expect(primary.textContent).toBe('new');
+					expect(rendered.findAll('output')).toEqual([]);
+					expect(refs).toEqual(['attach', 'detach', 'attach']);
+				} else {
+					await act(() => second.reject(new Error('expected hidden failure')));
+					expect(rendered.find('.caught').textContent).toBe('caught');
+					expect(refs).toEqual(['attach', 'detach']);
+				}
+			} finally {
+				rendered?.unmount();
+				state.scope.dispose();
+				setTransitionFallbackTimeout(previousTimeout);
+				vi.useRealTimers();
+			}
 		}
 	});
 });

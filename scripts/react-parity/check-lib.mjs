@@ -52,6 +52,7 @@ export async function runRequiredVitestLanes({
 	// only the reporter's fresh file, never a previous run's archived result.
 	const runDirectory = mkdtempSync(join(tmpdir(), 'octane-react-parity-vitest-'));
 	const runReportPath = join(runDirectory, 'report.json');
+	let report;
 	try {
 		if (reportPath) {
 			rmSync(reportPath, { force: true });
@@ -66,7 +67,6 @@ export async function runRequiredVitestLanes({
 			child.once('error', reject);
 			child.once('close', (code, signal) => resolve({ code, signal }));
 		});
-		let report;
 		try {
 			try {
 				report = readFileSync(runReportPath, 'utf8');
@@ -96,8 +96,12 @@ export async function runRequiredVitestLanes({
 		// aggregate gate. Runner-level errors can occur even when all recorded
 		// assertions passed, and the fresh raw report is needed to diagnose them.
 		if (reportPath && existsSync(runReportPath)) {
-			mkdirSync(dirname(reportPath), { recursive: true });
-			copyFileSync(runReportPath, `${reportPath}.failed`);
+			try {
+				mkdirSync(dirname(reportPath), { recursive: true });
+				copyFileSync(runReportPath, `${reportPath}.failed`);
+			} catch {
+				console.warn('Could not archive the failed Vitest report; the original failure follows.');
+			}
 		}
 		throw error;
 	} finally {

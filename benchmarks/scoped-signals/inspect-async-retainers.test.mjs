@@ -40,7 +40,7 @@ function fixture(weakAttempt) {
 	link(root, 'allocation', allocation, 'internal');
 	link(allocation, 'transition_info', template, 'internal');
 	const prototype = add('object', 'Object');
-	for (const name of ['scopeKey', 'signal$', 'derived$', 'asyncSignal$', 'dispose'])
+	for (const name of ['scopeKey', 'signal$', 'derived$', 'serialize', 'dispose'])
 		link(prototype, name, resolver);
 	const live = add('object', 'minified-name-does-not-matter');
 	link(live, '__proto__', prototype);

@@ -1,4 +1,15 @@
-import { describe, test } from 'vitest';
+import { describe, expect, test } from 'vitest';
+
+// Compiler-owned input identity is absent from React's host snapshots. Normalize
+// a clone so snapshot formatting never removes hydration state from the live DOM.
+expect.addSnapshotSerializer({
+	test: (value) => value instanceof Element && value.hasAttribute('data-octane-input'),
+	serialize(value, config, indentation, depth, refs, printer) {
+		const clone = (value as Element).cloneNode(true) as Element;
+		clone.removeAttribute('data-octane-input');
+		return printer(clone, config, indentation, depth, refs);
+	},
+});
 
 export interface Option {
 	readonly label: string;

@@ -98,6 +98,7 @@ export const BENCHMARK_SUITES = [
 	'ssr-throughput',
 	'ssr-scope-keys',
 	'streaming-ssr',
+	'conversation-streaming',
 	'ssr-replay-streaming',
 	'ssr-final-metadata',
 	'ssr-final-replay',

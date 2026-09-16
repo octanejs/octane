@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { compile } from 'octane/compiler';
+import ts from 'typescript';
 import { mount } from './_helpers';
 import {
 	ShadowSetText,
@@ -83,19 +84,38 @@ describe('helper shadowing — user bindings named after runtime helpers', () =>
       }
     `;
 		const { code } = compile(src, 'shadow-emit.tsrx');
-		// Generated references use the alias…
-		expect(code).toMatch(/import\s*\{[^}]*setText as _\$setText[^}]*\}\s*from\s*['"]octane['"]/);
-		expect(code).toMatch(/_\$setText\(_b\.\w+, _v\)/);
-		// …while the user's names (including their rename) stay bare.
-		expect(code).toMatch(/import\s*\{[^}]*flushSync as fs[^}]*\}/);
-		expect(code).toMatch(/import\s*\{[^}]*\buseState\b[^}]*\}/);
-		// The generated text-update call must NOT be the bare (shadowable) name.
-		expect(code).not.toMatch(/[^$\w.]setText\(_b\./);
-
 		const server = compile(src, 'shadow-emit.tsrx', { mode: 'server' }).code;
-		expect(server).toMatch(
-			/import\s*\{[^}]*ssrText as _\$ssrText[^}]*\}\s*from\s*['"]octane\/server['"]/,
-		);
-		expect(server).toMatch(/_\$ssrText\(text\)/);
+		for (const output of [code, server]) {
+			const ast = ts.createSourceFile('compiled.ts', output, ts.ScriptTarget.Latest, true);
+			const authored: Record<string, string> = {};
+			const generated = new Set<string>();
+			for (const statement of ast.statements) {
+				if (
+					!ts.isImportDeclaration(statement) ||
+					!ts.isStringLiteral(statement.moduleSpecifier) ||
+					!/^octane(?:\/|$)/.test(statement.moduleSpecifier.text)
+				)
+					continue;
+				const bindings = statement.importClause?.namedBindings;
+				if (bindings === undefined || !ts.isNamedImports(bindings)) continue;
+				for (const binding of bindings.elements) {
+					const imported = (binding.propertyName ?? binding.name).text;
+					if (imported === 'useState' || imported === 'flushSync')
+						authored[imported] = binding.name.text;
+					else {
+						expect(binding.name.text).toBe(`_$${imported}`);
+						generated.add(imported);
+					}
+				}
+			}
+			expect(authored).toEqual({ useState: 'useState', flushSync: 'fs' });
+			expect(generated.size).toBeGreaterThan(0);
+			const visit = (node: ts.Node): void => {
+				if (ts.isCallExpression(node) && ts.isIdentifier(node.expression))
+					expect(generated.has(node.expression.text)).toBe(false);
+				ts.forEachChild(node, visit);
+			};
+			visit(ast);
+		}
 	});
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createScope, query } from 'octane/signals';
+import { createResource, createScope, query } from 'octane/signals';
 import { controlledStream, deferred, drainProducers } from './_fixtures/signals-async-controls';
 
 describe('scoped signal inspection', () => {
@@ -103,7 +103,7 @@ describe('scoped signal inspection', () => {
 		const pending = deferred<string>();
 		const scope = createScope({ scopeKey: 'lifetime-inspection' });
 		const load = query('load', () => pending.promise);
-		scope.asyncSignal$('result', () => load(undefined));
+		createResource(scope, 'result', () => load(undefined));
 		expect(scope.inspect()).toMatchObject({ activeRequests: 1, adoptionLeases: 0, retired: false });
 		pending.resolve('ready');
 		await drainProducers();
@@ -147,7 +147,7 @@ describe('scoped signal inspection', () => {
 		const load = query('stream', () => (attempt++ === 0 ? first : second).iterable, {
 			kind: 'stream',
 		});
-		const value$ = scope.asyncSignal$('value', () => load(undefined));
+		const value$ = createResource(scope, 'value', () => load(undefined));
 		try {
 			expect(scope.inspect().nodes[0]).toMatchObject({
 				status: 'pending',

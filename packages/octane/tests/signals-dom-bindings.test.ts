@@ -1,16 +1,20 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { act, flushSync, hydrateRoot, startTransition } from 'octane';
 import { renderToString } from 'octane/server';
-import { createScope, query } from 'octane/signals';
+import { createResource, createScope, query } from 'octane/signals';
 import type { CSSProperties } from 'octane/jsx-runtime';
+import * as Signals from 'octane/signals';
+import * as ClientSignals from 'octane/signals/client';
 import * as ServerSignals from 'octane/signals/server';
+import * as SignalRead from '../src/signals/read-protocol.js';
 import { mount } from './_helpers.js';
-import { loadServerFixture } from './_server-fixture.js';
+import { loadCompiledFixtureSource, loadServerFixture } from './_server-fixture.js';
 import * as client from './_fixtures/signals-dom-bindings.tsrx';
 
 const server = loadServerFixture<typeof client>(
 	'packages/octane/tests/_fixtures/signals-dom-bindings.tsrx',
-	{ runtimeModules: { 'octane/signals/server': ServerSignals } },
+	{ runtimeModules: { 'octane/signals': Signals, 'octane/signals/server': ServerSignals } },
 );
 
 describe('signal-valued DOM styles', () => {
@@ -26,7 +30,7 @@ describe('signal-valued DOM styles', () => {
 						resolve = done;
 					}),
 			);
-			const initial$ = scope.asyncSignal$('initial', () => request(undefined));
+			const initial$ = createResource(scope, 'initial', () => request(undefined));
 			const replacement$ = scope.signal$<number | null>('replacement', 30);
 			const rendered = mount(Component, { left$: initial$ });
 			try {
@@ -58,7 +62,7 @@ describe('signal-valued DOM styles', () => {
 					resolve = done;
 				}),
 		);
-		const pending$ = scope.asyncSignal$('pending', () => request(undefined));
+		const pending$ = createResource(scope, 'pending', () => request(undefined));
 		const rendered = mount(client.InlineGuardedStylePair, { left$: first$, right$: pending$ });
 		try {
 			await act(() => resolve(20));
@@ -90,7 +94,7 @@ describe('signal-valued DOM styles', () => {
 							resolve = done;
 						}),
 			);
-			const right$ = scope.asyncSignal$('right', () => request(key$.get()));
+			const right$ = createResource(scope, 'right', () => request(key$.get()));
 			const rendered = mount(Component, {
 				left$,
 				right$,
@@ -111,7 +115,8 @@ describe('signal-valued DOM styles', () => {
 				);
 				expect(hosts.map((host) => host.style.left)).toEqual(['0px', '10px']);
 				await act(() => left$.set(2));
-				expect(hosts.map((host) => host.style.left)).toEqual(['0px', '10px']);
+				expect(hosts.map((host) => host.style.left)).toEqual(['2px', '10px']);
+				expect(key$.get()).toBe('first');
 				await act(() => resolve(20));
 				const current = rendered.findAll('section > div');
 				expect(current).toHaveLength(2);
@@ -180,7 +185,7 @@ describe('signal-valued DOM styles', () => {
 					resolve = done;
 				}),
 		);
-		const left$ = scope.asyncSignal$('left', () => request(undefined));
+		const left$ = createResource(scope, 'left', () => request(undefined));
 		const rendered = mount(client.GuardedStyles, { left$ });
 		try {
 			expect(rendered.container.textContent).toBe('waiting');
@@ -304,6 +309,110 @@ describe('signal-valued DOM styles', () => {
 	);
 
 	it('adopts server styles and catches up with live signals on the same host', () => {
+		// A fixed-field factory owns class and style as one native read, including
+		// values passed into a compiled dynamic style function.
+		for (const dev of [false, true]) {
+			const source = `import * as styles from 'binding-styles';
+export function Styled(props) @{ <div sx={styles[props.variant$](props.height$)}><span>child</span></div> }
+export function Guarded(props) @{ @try { <Styled height$={props.height$} variant$={props.variant$} /> } @catch { <p>failed</p> } }`;
+			const options = {
+				id: `/native-projection-${dev}.tsrx`,
+				compileOptions: {
+					dev,
+					hmr: false,
+					knownAttributeSpreads: [
+						{
+							source: 'binding-styles',
+							imported: '*',
+							members: ['props'],
+							fields: ['className', 'style', 'data-style-src'],
+							style: 'object',
+							jsxAttribute: 'sx',
+						},
+					],
+				},
+				runtimeModules: {
+					'octane/internal/signal-read': SignalRead,
+					'binding-styles': {
+						props: (value: unknown) => value,
+						doubled: (value: number | null) => ({
+							className: 'double',
+							style: { height: value === null ? null : value * 2 },
+						}),
+						height: (value: number | null) => ({
+							className: value === null ? null : value === -1 ? 'invalid' : 'height',
+							style:
+								value === null
+									? null
+									: {
+											height:
+												value === -1
+													? {
+															toString() {
+																throw new Error('invalid height');
+															},
+														}
+													: value,
+											opacity: 0.5,
+										},
+							'data-style-src': dev ? 'source' : undefined,
+						}),
+					},
+				},
+			};
+			const server = loadCompiledFixtureSource(source, { ...options, mode: 'server' });
+			const client = loadCompiledFixtureSource(source, { ...options, mode: 'client' });
+			const scope = createScope({ scopeKey: `projection-${dev}` });
+			const first$ = scope.signal$<number | null>('first', 4);
+			const replacement$ = scope.signal$<number | null>('replacement', 12);
+			const variant$ = scope.signal$('variant', 'height');
+			const container = document.createElement('div');
+			document.body.appendChild(container);
+			container.innerHTML = renderToString(server.Styled, { height$: first$, variant$ }).html;
+			const host = container.querySelector('div')!;
+			const child = container.querySelector('span');
+			expect([host.className, host.style.height, host.style.opacity]).toEqual([
+				'height',
+				'4px',
+				'0.5',
+			]);
+			const root = hydrateRoot(container, client.Styled, { height$: first$, variant$ });
+			try {
+				flushSync(() => first$.set(8));
+				expect(host.style.height).toBe('8px');
+				expect(container.querySelector('div')).toBe(host);
+				expect(container.querySelector('span')).toBe(child);
+				expect(host.getAttribute('data-style-src')).toBe(dev ? 'source' : null);
+				flushSync(() => variant$.set('doubled'));
+				expect([host.className, host.style.height]).toEqual(['double', '16px']);
+				flushSync(() => variant$.set('height'));
+				expect([host.className, host.style.height]).toEqual(['height', '8px']);
+				flushSync(() => root.render(client.Styled, { height$: replacement$, variant$ }));
+				flushSync(() => first$.set(99));
+				expect(host.style.height).toBe('12px');
+				flushSync(() => replacement$.set(null));
+				expect(host.getAttribute('class')).toBeNull();
+				expect(host.style.cssText).toBe('');
+				root.unmount();
+				flushSync(() => replacement$.set(100));
+				expect(host.style.cssText).toBe('');
+				const guarded = mount(client.Guarded, { height$: replacement$, variant$ });
+				try {
+					const retained = guarded.find('div') as HTMLElement;
+					expect(retained.style.height).toBe('100px');
+					flushSync(() => replacement$.set(-1));
+					expect(guarded.container.textContent).toBe('failed');
+					expect(retained.className).toBe('height');
+					expect(retained.style.height).toBe('100px');
+				} finally {
+					guarded.unmount();
+				}
+			} finally {
+				root.unmount();
+				container.remove();
+				scope.dispose();
+			}
+		}
 		const scope = createScope({ scopeKey: 'dom-style-hydration' });
 		const left$ = scope.signal$<number | null>('left', 7);
 		const container = document.createElement('div');
@@ -323,6 +432,58 @@ describe('signal-valued DOM styles', () => {
 			root.unmount();
 			container.remove();
 			scope.dispose();
+		}
+
+		// Native style-only scopes must observe facade aliases in the enclosing
+		// component's owner, not create independent cells for each style block.
+		const source = readFileSync(
+			'packages/octane/tests/_fixtures/signals-dom-bindings.tsrx',
+			'utf8',
+		);
+		for (const dev of [false, true]) {
+			const options = {
+				id: `/native-style-facade-${dev}.tsrx`,
+				compileOptions: { nativeReads: true, dev, hmr: false },
+				runtimeModules: {
+					'octane/signals': Signals,
+					'octane/signals/client': ClientSignals,
+					'octane/signals/server': ServerSignals,
+				},
+			};
+			const nativeServer = loadCompiledFixtureSource<typeof client>(source, {
+				...options,
+				mode: 'server',
+			});
+			const nativeClient = loadCompiledFixtureSource<typeof client>(source, {
+				...options,
+				mode: 'client',
+			});
+			const nativeContainer = document.createElement('div');
+			document.body.appendChild(nativeContainer);
+			nativeContainer.innerHTML = renderToString(nativeServer.FacadeStyleOwners).html;
+			const rows = Array.from(nativeContainer.querySelectorAll<HTMLElement>('[data-style-row]'));
+			const global = nativeContainer.querySelector<HTMLElement>('[data-style-global]')!;
+			expect(rows.map((row) => row.style.left)).toEqual(['1px', '10px']);
+			expect(global.style.left).toBe('4px');
+			const nativeRoot = hydrateRoot(nativeContainer, nativeClient.FacadeStyleOwners);
+			try {
+				flushSync(() => {});
+				const adoptedRows = nativeContainer.querySelectorAll('[data-style-row]');
+				expect(adoptedRows).toHaveLength(2);
+				expect(adoptedRows[0]).toBe(rows[0]);
+				expect(adoptedRows[1]).toBe(rows[1]);
+				expect(nativeContainer.querySelector('[data-style-global]')).toBe(global);
+				flushSync(() => rows[0]!.querySelector('button')!.click());
+				expect(rows.map((row) => row.style.left)).toEqual(['2px', '10px']);
+				expect(rows.map((row) => row.style.getPropertyValue('--position'))).toEqual(['2', '10']);
+				expect(global.style.left).toBe('4px');
+				flushSync(() => global.querySelector('button')!.click());
+				expect(global.style.left).toBe('5px');
+				expect(rows.map((row) => row.style.left)).toEqual(['2px', '10px']);
+			} finally {
+				nativeRoot.unmount();
+				nativeContainer.remove();
+			}
 		}
 	});
 });

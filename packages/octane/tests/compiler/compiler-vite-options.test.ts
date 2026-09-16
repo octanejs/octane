@@ -7,6 +7,7 @@ import { octane } from 'octane/compiler/vite';
 import { compile } from 'octane/compiler';
 import { createTextTypeFixture } from '../_text-type-project.js';
 import {
+	INDEPENDENT_HYDRATION_MANIFEST_FILENAME,
 	findDescriptorChildrenExports,
 	findDescriptorChildrenImports,
 	findVoidComponentImports,
@@ -151,6 +152,96 @@ function isChildrenBlock(code: string, value: any): boolean {
 }
 
 describe('octane/compiler/vite public options', () => {
+	it('emits independent hydration entries with their complete activation CSS closure', () => {
+		const plugin = octane({ hmr: false });
+		const emitted: any[] = [];
+		const sourceId = '/project/src/App.tsrx';
+		const activationId = `${sourceId}?octane-hydrate=0`;
+		const template = {
+			version: 1,
+			boundaryId: 'w:1234',
+			moduleId: '/src/App.tsrx',
+			exportName: 'default',
+			request: './App.tsrx?octane-hydrate=0',
+			captureSchema: [{ name: 'props', type: 'json' }],
+			hookSeed: 12,
+			idSeed: 34,
+			signalSites: ['i:signal'],
+			styles: [],
+			parentDependencies: false,
+		};
+		const moduleInfo = new Map([
+			[sourceId, { meta: { 'octane:independent-widgets': [template] } }],
+			[activationId, { meta: {} }],
+		]);
+		const bundle = {
+			'assets/island.js': {
+				type: 'chunk',
+				fileName: 'assets/island.js',
+				modules: { [activationId]: {} },
+				imports: ['assets/shared.js'],
+				dynamicImports: ['assets/lazy.js'],
+				viteMetadata: { importedCss: new Set(['assets/island.css']) },
+			},
+			'assets/shared.js': {
+				type: 'chunk',
+				fileName: 'assets/shared.js',
+				modules: {},
+				imports: [],
+				dynamicImports: [],
+				viteMetadata: { importedCss: new Set(['assets/shared.css']) },
+			},
+			'assets/lazy.js': {
+				type: 'chunk',
+				fileName: 'assets/lazy.js',
+				modules: {},
+				imports: [],
+				dynamicImports: [],
+				viteMetadata: { importedCss: new Set(['assets/lazy.css']) },
+			},
+			'assets/root.js': {
+				type: 'chunk',
+				fileName: 'assets/root.js',
+				modules: { [sourceId]: {} },
+				imports: [],
+				dynamicImports: ['assets/island.js'],
+				viteMetadata: { importedCss: new Set() },
+			},
+		};
+
+		(plugin.generateBundle as any).call(
+			{
+				emitFile(value: unknown) {
+					emitted.push(value);
+				},
+				getModuleInfo(id: string) {
+					return moduleInfo.get(id) ?? null;
+				},
+			},
+			{},
+			bundle,
+		);
+
+		const asset = emitted.find(
+			(value) => value.fileName === INDEPENDENT_HYDRATION_MANIFEST_FILENAME,
+		);
+		expect(asset).toBeDefined();
+		const manifest = JSON.parse(asset.source);
+		expect(manifest).toMatchObject({ version: 1, buildId: expect.any(String) });
+		expect(manifest.widgets['w:1234']).toEqual({
+			version: 1,
+			boundaryId: 'w:1234',
+			moduleId: 'assets/island.js',
+			exportName: 'default',
+			captureSchema: [{ name: 'props', type: 'json' }],
+			hookSeed: 12,
+			idSeed: 34,
+			signalSites: ['i:signal'],
+			styles: ['assets/island.css', 'assets/lazy.css', 'assets/shared.css'],
+			parentDependencies: false,
+		});
+	});
+
 	it('requires an explicit nonempty tsconfig path for typed text', () => {
 		expect(() => octane({ textTypes: { tsconfig: ' tsconfig.json ' } })).toThrow(
 			'`textTypes` requires { tsconfig: string }.',
@@ -649,14 +740,56 @@ export function App(props: { label: Label }) @{ <p>{props.label}</p> }`;
 		).rejects.toThrow(/Invalid descriptor-children metadata.*\.\/Slot\.tsrx/);
 	});
 
-	it('enforces the public Strong option for both client and server transforms', async () => {
+	it('enforces public static compiler options for both client and server transforms', async () => {
 		for (const ssr of [false, true]) {
-			const plugin = octane({ hmr: false, strong: true });
+			const plugin = octane({
+				hmr: false,
+				strong: true,
+				knownAttributeSpreads: [
+					{ source: '@stylexjs/stylex', imported: 'attrs', fields: ['class', 'style'] },
+					{
+						source: '@stylexjs/stylex',
+						imported: 'props',
+						fields: ['className', 'style'],
+						style: 'object',
+					},
+				],
+			});
 			configure(plugin, 'build', { ssr });
 
 			await expect(
 				Promise.resolve(transform(plugin, RENDER_STATE_UPDATE, `${ROOT}/src/App.tsrx`, { ssr })),
 			).rejects.toThrow(/OCTANE_STRONG_RENDER_STATE_UPDATE|useLinkedState/);
+			const source = `import { attrs as nativeAttrs } from '@stylexjs/stylex';
+export function Styled(props) @{ 'use dom bindings'; <div {...nativeAttrs(props.styles)} /> }`;
+			expect(await transform(plugin, source, `${ROOT}/src/Styled.tsrx`, { ssr })).not.toBeNull();
+			if (!ssr)
+				expect(
+					await transform(plugin, source, `${ROOT}/src/Styled.tsrx?octane-bindings=Styled`, {
+						ssr,
+					}),
+				).not.toBeNull();
+			const objectSource = source.replace('attrs as nativeAttrs', 'props as nativeAttrs');
+			expect(
+				await transform(plugin, objectSource, `${ROOT}/src/StyleProps.tsrx`, { ssr }),
+			).not.toBeNull();
+			if (!ssr) {
+				const selected = await transform(
+					plugin,
+					objectSource,
+					`${ROOT}/src/StyleProps.tsrx?octane-bindings=Styled`,
+					{ ssr },
+				);
+				expect(selected?.code).toContain('octane/dom-binding-styles');
+				expect(selected?.code).not.toContain('octane/internal/client');
+			}
+			await (plugin.closeBundle as any)?.();
+			if (!ssr)
+				expect(
+					await transform(plugin, source, `${ROOT}/src/Styled.tsrx?octane-bindings=Styled`, {
+						ssr,
+					}),
+				).not.toBeNull();
 		}
 	});
 

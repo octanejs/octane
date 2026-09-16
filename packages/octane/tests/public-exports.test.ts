@@ -84,5 +84,12 @@ describe('published package export contract', () => {
 		expect(
 			missingPublishedPublicSubpaths(manifest.exports, manifest.publishConfig.exports),
 		).toEqual([]);
+		expect(Object.keys(REQUIRED_PUBLIC_VALUE_EXPORTS).sort()).toEqual(
+			[
+				...new Set(
+					publishedRuntimeEntries(manifest.publishConfig.exports).map(([subpath]) => subpath),
+				),
+			].sort(),
+		);
 	});
 });

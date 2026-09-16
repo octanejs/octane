@@ -27,7 +27,7 @@
 // Writable / web-stream reader loop live in each entry), with performance.now()
 // timestamps taken as each chunk lands.
 //
-// Usage:  node run.mjs [iterations] [--no-build]
+// Usage:  node run.mjs [iterations] [--no-build] [--octane-revision=SHA]
 //   iterations  — timed renders PER TARGET PER SCENARIO (default 30; the
 //                 unified runner passes 3 for --quick). Warmup is 5 renders
 //                 (news-suite convention), capped at the iteration count.
@@ -41,17 +41,26 @@
 process.env.NODE_ENV = 'production';
 
 import { build } from 'vite';
+import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { scoreOf, summarizeSamples, timingStatForJson } from '../lib/stats.mjs';
 import { verifyStream } from '../lib/stream-verify.mjs';
+import { hashOctaneSources, octanePackageAt, packageVersion } from '../activity/harness.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DIST = path.join(__dirname, 'dist');
 
 const args = process.argv.slice(2);
 const noBuild = args.includes('--no-build');
+const revisionArguments = args.filter((arg) => arg.startsWith('--octane-revision='));
+assert.ok(revisionArguments.length <= 1, 'Select one Octane revision.');
+const revision = revisionArguments[0]?.split('=')[1];
+assert.ok(!revisionArguments.length || /^[a-f\d]{7,40}$/i.test(revision), 'Select a commit SHA.');
+assert.ok(!revision || !noBuild, 'A selected revision requires a fresh build.');
 const positional = args.filter((a) => !a.startsWith('--'));
 const ITER = Math.max(1, parseInt(positional[0] || '30', 10));
 const WARMUP = Math.min(5, ITER);
@@ -87,15 +96,87 @@ if (selected.length === 0) {
 	process.exit(1);
 }
 
+// Freeze the complete package/compiler together, using the same fixture and
+// installed toolchain for both revisions. A reused build has no source claim.
+const octaneSource =
+	!noBuild && selected.some((target) => target.name === 'octane-tsrx')
+		? octanePackageAt(revision)
+		: null;
+const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+const provenance = octaneSource && {
+	revision: octaneSource.revision,
+	workingTree: !revision,
+	sourceSha256: hashOctaneSources(octaneSource.packageRoot),
+	node: process.version,
+	platform: process.platform,
+	arch: process.arch,
+	build: { target: 'esnext', minify: 'esbuild', hmr: false },
+	lockfileSha256: hash(new URL('../../pnpm-lock.yaml', import.meta.url)),
+	inputs: Object.fromEntries(
+		[
+			'run.mjs',
+			'../lib/stats.mjs',
+			'../lib/stream-verify.mjs',
+			'../activity/harness.mjs',
+			'octane/src/App.tsrx',
+			'octane/src/data.ts',
+			'octane/src/entry-server.ts',
+		].map((file) => [file, hash(path.join(__dirname, file))]),
+	),
+};
+
 // ── build phase (production SSR bundles, one per target) ─────────────────────
 
 async function buildSsr(root, outDir) {
+	let selectedConfig = {};
+	if (octaneSource && root === path.join(__dirname, 'octane')) {
+		const selectedRequire = createRequire(path.join(octaneSource.packageRoot, 'package.json'));
+		const { octane: createOctanePlugin } = await import(
+			pathToFileURL(selectedRequire.resolve('octane/compiler/vite'))
+		);
+		const require = createRequire(import.meta.url);
+		provenance.toolchain = Object.fromEntries(
+			['@tsrx/core', '@tsrx/oxc', 'vite', 'esbuild'].map((name) => [
+				name,
+				packageVersion(
+					name.startsWith('@tsrx/')
+						? selectedRequire
+						: name === 'esbuild'
+							? createRequire(require.resolve('vite'))
+							: require,
+					name,
+				),
+			]),
+		);
+		selectedConfig = {
+			configFile: false,
+			plugins: [
+				{
+					name: 'selected-octane-streaming-runtime',
+					enforce: 'pre',
+					resolveId(id) {
+						if (id === 'octane' || id.startsWith('octane/')) return selectedRequire.resolve(id);
+					},
+				},
+				createOctanePlugin(),
+			],
+			optimizeDeps: { exclude: ['octane', 'octane/compiler'] },
+		};
+	}
 	await build({
+		...selectedConfig,
 		root,
 		logLevel: 'warn',
 		// outDir lives under THIS suite's dist/ (outside the app root);
 		// emptyOutDir must be explicit for an out-of-root outDir.
-		build: { ssr: 'src/entry-server.ts', outDir, emptyOutDir: true },
+		build: {
+			ssr: 'src/entry-server.ts',
+			outDir,
+			emptyOutDir: true,
+			...(octaneSource && root === path.join(__dirname, 'octane')
+				? { target: 'esnext', minify: 'esbuild' }
+				: {}),
+		},
 		// The React target's compiled output imports @tsrx/react runtime helpers
 		// (e.g. `@tsrx/react/runtime/iterable`), which are only installed under
 		// the react fixture — bundle them IN so the built entry runs from dist/.
@@ -103,7 +184,7 @@ async function buildSsr(root, outDir) {
 		// from this suite package's own deps); octane and ripple are noExternal'd
 		// by their fixtures' vite configs. Merges with each fixture's config;
 		// harmless where unused.
-		ssr: { noExternal: ['@tsrx/react'] },
+		ssr: { noExternal: ['@tsrx/react', ...(octaneSource ? [/^octane($|\/)/] : [])] },
 	});
 }
 
@@ -175,6 +256,7 @@ for (const t of selected) {
 		continue;
 	}
 	const target = { name: t.name, scenarios: {} };
+	if (t.name === 'octane-tsrx' && provenance) provenance.entrySha256 = hash(entry);
 	const scenarios = [
 		...SCENARIOS,
 		...(typeof mod.renderControlledStream === 'function' ? CPU_SCENARIOS.map((s) => s.name) : []),
@@ -280,11 +362,32 @@ if (failures.length > 0) {
 	console.error(`\n✗ correctness gate failures:\n  - ${failures.join('\n  - ')}`);
 }
 
+if (provenance) {
+	assert.equal(
+		hashOctaneSources(octaneSource.packageRoot),
+		provenance.sourceSha256,
+		'Source changed during measurement',
+	);
+	assert.equal(
+		hash(path.join(DIST, 'octane-tsrx/entry-server.js')),
+		provenance.entrySha256,
+		'Built entry changed during measurement',
+	);
+	assert.equal(
+		hash(new URL('../../pnpm-lock.yaml', import.meta.url)),
+		provenance.lockfileSha256,
+		'Lockfile changed during measurement',
+	);
+	for (const [file, expected] of Object.entries(provenance.inputs))
+		assert.equal(hash(path.join(__dirname, file)), expected, `Measurement input changed: ${file}`);
+}
+
 // ── BENCH_JSON contract ───────────────────────────────────────────────────────
 if (process.env.BENCH_JSON) {
 	const out = {
 		suite: 'streaming-ssr',
 		iterations: ITER,
+		provenance,
 		targets: results.map((r) => {
 			const st = r.scenarios['staggered'];
 			const af = r.scenarios['all-fast'];

@@ -1,8 +1,9 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
 import { OCTANE_NONCE_STATE_KEY } from '../src/constants.js';
-import { RenderRoute } from '../src/routes.js';
+import { RenderRoute, ServerRoute } from '../src/routes.js';
 import { createHandler } from '../src/server/production.js';
+import { prepareStreamingHydrationTemplate } from '../src/html.js';
 
 type ServerManifest = Parameters<typeof createHandler>[0];
 type HandlerOptions = Parameters<typeof createHandler>[1];
@@ -40,6 +41,91 @@ function Layout(props: { children: Body }, scope?: unknown) {
 const Pending = () => '<p class="pending">pending</p>';
 const Catch = () => '<p class="catch">caught</p>';
 const Other = () => '<main class="other">other</main>';
+
+it('supplies trusted completed build and asset identities to authorized custom responses', async () => {
+	const manifest = makeManifest('streaming');
+	manifest.clientBuild = {
+		version: 1,
+		buildId: 'completed-build',
+		mode: 'production',
+		capabilities: { independentHydration: false },
+	};
+	manifest.routes.push(
+		new ServerRoute({
+			path: '/region',
+			handler(context) {
+				if (context.request.headers.get('authorization') !== 'allowed')
+					return new Response('Unauthorized', { status: 401 });
+				return Response.json({ build: context.clientBuild, assets: context.clientAssets });
+			},
+		}),
+	);
+	const handler = createHandler(manifest, renderOptions);
+	expect((await handler(new Request('https://octane.test/region'))).status).toBe(401);
+	const response = await handler(
+		new Request('https://octane.test/region?build=spoofed', {
+			headers: { authorization: 'allowed' },
+		}),
+	);
+	expect(await response.json()).toEqual({
+		build: manifest.clientBuild,
+		assets: manifest.clientAssets,
+	});
+});
+
+it.each([
+	'integrity="sha256-test"',
+	'crossorigin="use-credentials"',
+	'referrerpolicy="no-referrer"',
+])('rejects an early module entry whose fetch policy cannot be preserved (%s)', (attribute) => {
+	expect(() =>
+		prepareStreamingHydrationTemplate(
+			TEMPLATE.replace('data-octane-hydrate', attribute + ' data-octane-hydrate'),
+		),
+	).toThrow(/cannot preserve/);
+});
+
+it('starts only the hydration entry after the complete shell while its result stream stays open', async () => {
+	let cancelled = false;
+	const handler = createHandler(makeManifest('streaming'), {
+		...renderOptions,
+		htmlTemplate: TEMPLATE.replace(
+			'</head>',
+			'<script type="module" src="/unrelated.js"></script></head>',
+		),
+		renderToReadableStream: async (_component, _props, options) => {
+			options?.onEarlyHydrationReady?.();
+			return new ReadableStream<Uint8Array>({
+				start(controller) {
+					controller.enqueue(new TextEncoder().encode('<main>complete shell</main>'));
+					controller.enqueue(new TextEncoder().encode('<p>later result</p>'));
+				},
+				cancel() {
+					cancelled = true;
+				},
+			});
+		},
+	});
+	const response = await handler(new Request('https://octane.test/selected/ready'));
+	const reader = response.body!.getReader();
+	const decode = (value: Uint8Array | undefined) => new TextDecoder().decode(value);
+	try {
+		const head = decode((await reader.read()).value);
+		expect(head).toContain('<script type="module" src="/unrelated.js"></script>');
+		expect(head).not.toContain('src="/assets/hydrate.js"');
+		expect(decode((await reader.read()).value)).toBe('<main>complete shell</main>');
+		const bootstrap = decode((await reader.read()).value);
+		expect(bootstrap).toMatch(
+			/<script(?=[^>]*nonce="asset-nonce")[^>]*data-octane-hydrate-src="\/assets\/hydrate.js"/,
+		);
+		expect(bootstrap).not.toMatch(/<script[^>]*\b(?:async|defer|type)\s*(?:=|>)/);
+		expect(bootstrap).not.toContain('/unrelated.js');
+		expect(decode((await reader.read()).value)).toBe('<p>later result</p>');
+	} finally {
+		await reader.cancel();
+	}
+	expect(cancelled).toBe(true);
+});
 
 // These renderer stubs exercise app-core's real route/boundary composition and
 // HTML assembly. Compiler-generated Hydrate assets are covered by the bundler
@@ -127,6 +213,98 @@ function assetHrefs(html: string, rel: 'stylesheet' | 'modulepreload') {
 }
 
 describe.each(['buffered', 'streaming'] as const)('%s production route assets', (render) => {
+	it('shares the completed build with SSR while assigning each response a separate document identity', async () => {
+		const manifest = makeManifest(render);
+		manifest.clientBuild = {
+			version: 1,
+			buildId: 'client-build',
+			mode: 'production',
+			capabilities: { independentHydration: false },
+		};
+		const observed: NonNullable<Parameters<HandlerOptions['prerender']>[2]>[] = [];
+		const handler = createHandler(manifest, {
+			...renderOptions,
+			prerender: async (component, props, options) => {
+				observed.push(options!);
+				return renderOptions.prerender(component, props, options);
+			},
+			renderToReadableStream: async (component, props, options) => {
+				observed.push(options!);
+				return renderOptions.renderToReadableStream(component, props, options);
+			},
+		});
+		const documents = await Promise.all(
+			[0, 1].map(async () => {
+				const response = await handler(new Request('https://octane.test/other'));
+				expect(response.status).toBe(200);
+				const html = await response.text();
+				const data = JSON.parse(html.match(/<script id="__octane_data"[^>]*>(.*?)<\/script>/)![1]);
+				expect(data.clientBuild).toEqual(manifest.clientBuild);
+				expect(data.streamedSignals.buildId).toBe('client-build');
+				expect(data.streamedSignals.documentId).toEqual(expect.any(String));
+				expect(data.streamedSignals.documentId.length).toBeGreaterThan(0);
+				return data.streamedSignals;
+			}),
+		);
+		expect(documents[0].documentId).not.toBe(documents[1].documentId);
+		expect(observed.map((options) => options.streamedSignals)).toEqual(documents);
+	});
+
+	it('rejects malformed or inconsistent client build metadata at handler creation', () => {
+		const manifest = makeManifest(render);
+		manifest.clientBuild = {
+			version: 1,
+			buildId: '',
+			mode: 'production',
+			capabilities: { independentHydration: false },
+		};
+		expect(() => createHandler(manifest, renderOptions)).toThrow(/client build/);
+		manifest.clientBuild = { ...manifest.clientBuild, buildId: 'build' };
+		manifest.independentHydration = { version: 1, buildId: 'different', widgets: {} };
+		expect(() => createHandler(manifest, renderOptions)).toThrow(/build/);
+	});
+
+	it('passes the immutable independent Hydrate build resolver into the renderer', async () => {
+		const manifest = makeManifest(render);
+		manifest.independentHydration = {
+			version: 1,
+			buildId: 'build-1',
+			widgets: {
+				'w:one': {
+					version: 1,
+					boundaryId: 'w:one',
+					moduleId: 'assets/island.js',
+					exportName: 'default',
+					captureSchema: [],
+					hookSeed: 1,
+					idSeed: 2,
+					signalSites: [],
+					styles: ['assets/island.css'],
+					parentDependencies: false,
+				},
+			},
+		};
+		let observed: any;
+		const handler = createHandler(manifest, {
+			...renderOptions,
+			prerender: async (component, props, options) => {
+				observed = options;
+				return renderOptions.prerender(component, props, options);
+			},
+			renderToReadableStream: async (component, props, options) => {
+				observed = options;
+				return renderOptions.renderToReadableStream(component, props, options);
+			},
+		});
+		await (await handler(new Request('https://octane.test/other'))).text();
+		expect(observed.independentHydration.buildId).toBe('build-1');
+		expect(observed.independentHydration.resolve('w:one')).toEqual({
+			moduleId: 'assets/island.js',
+			styles: ['assets/island.css'],
+		});
+		expect(observed.independentHydration.resolve('w:missing')).toBeUndefined();
+	});
+
 	it.each([
 		['ready', 'class="layout-island"'],
 		['pending', 'class="pending"'],

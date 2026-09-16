@@ -25,9 +25,23 @@ export interface StaticClientEntry {
 	specifier: string;
 }
 
+export interface IndependentClientEntry {
+	/** Opaque module ID written into the independent hydration build manifest. */
+	id: string;
+	/** Bundler-resolvable compiler query whose default export is the activator. */
+	specifier: string;
+}
+
 export interface ClientEntryOptions {
 	configPath?: string;
 	staticEntries?: Array<string | StaticClientEntry>;
+	independentEntries?: IndependentClientEntry[];
+	/** Immutable token embedded before the client bundle is hashed. */
+	clientBuildId?: string;
+	/** Trusted bundler expression (for example Rspack's __webpack_hash__). */
+	clientBuildIdExpression?: string;
+	/** Subscribe to Vite's current-build capability discovery in development. */
+	devClientBuild?: boolean;
 	resolveImport?: (id: string) => string;
 	runtimeModuleId?: string;
 	generatedBy?: string;
@@ -43,6 +57,13 @@ export interface ServerEntryOptions {
 	clientAssetMap?: Record<string, ClientAssetEntry>;
 	/** JSON file resolved beside the built server entry at module evaluation. */
 	clientAssetMapFile?: string;
+	clientBuild?: import('@octanejs/app-core/production').ClientBuildManifest;
+	/** Required completed-client metadata; a missing file is an error. */
+	clientBuildFile?: string;
+	/** Completed client-build metadata for strict independent Hydrate boundaries. */
+	independentHydrationManifest?: import('@octanejs/app-core/production').IndependentHydrationBuildManifest;
+	/** Optional JSON manifest resolved beside the built server entry. */
+	independentHydrationManifestFile?: string;
 	/** Stable application module ID to emitted bundler import specifier. */
 	moduleImports?: Record<string, string>;
 	resolveImport?: (id: string) => string;

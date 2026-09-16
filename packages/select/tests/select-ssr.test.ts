@@ -49,6 +49,8 @@ function canonicalMarkup(html: string, removeLiveRegion = false) {
 	}
 	for (const element of window.document.body.querySelectorAll('*')) {
 		const attributes = [...element.attributes]
+			// Compiler-owned input identity does not change the native control contract.
+			.filter((attribute) => attribute.name !== 'data-octane-input')
 			.map((attribute) => [attribute.name.toLowerCase(), attribute.value] as const)
 			.sort(([a], [b]) => a.localeCompare(b));
 		for (const attribute of [...element.attributes]) element.removeAttribute(attribute.name);

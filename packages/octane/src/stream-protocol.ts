@@ -1,8 +1,9 @@
 /**
  * Tiny client/server streaming protocol subset shared with the lightweight
- * pre-root hydration event capture. Keep this module dependency-free: loading
+ * pre-root hydration event capture. Keep this graph renderer-free: loading
  * interaction capture before the main runtime must not initialize DOM tables.
  */
+import { isBindingOpenComment } from './dom-binding-protocol.js';
 
 /** Sentinel <template> attribute marking a pending streamed boundary. */
 export const STREAM_BOUNDARY_ATTR = 'data-oct-b';
@@ -14,6 +15,8 @@ function hydrationMarkerMultiplicity(data: string, open: boolean): number {
 	const marker = open ? '[' : ']';
 	if (data === marker) return 1;
 	if (open && (data === '[f0' || data === '[f1')) return 1;
+	if (open && (data.startsWith('[b;') || data.startsWith('[f')) && isBindingOpenComment(data))
+		return 1;
 	if (data.length < 2 || data.charCodeAt(0) !== marker.charCodeAt(0)) return 0;
 	const first = data.charCodeAt(1);
 	if (first < 49 || first > 57) return 0;

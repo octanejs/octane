@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { compile } from 'octane/compiler';
 import {
 	EXTERNAL_HYDRATION_PROMISE,
 	act,
@@ -34,14 +33,11 @@ import {
 const FIXTURE = join(process.cwd(), 'packages/octane/tests/_fixtures/ssr-suspense.tsrx');
 
 function serverModule(): Record<string, any> {
-	let { code } = compile(readFileSync(FIXTURE, 'utf8'), 'ssr-suspense.tsrx', { mode: 'server' });
-	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/server['"];?/g,
-		(_m: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
-	);
-	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
-	const fn = new Function('__rt', '__exports', code + '\nreturn __exports;');
-	return fn(ServerRT, {});
+	return loadCompiledFixtureSource(readFileSync(FIXTURE, 'utf8'), {
+		id: 'ssr-suspense.tsrx',
+		mode: 'server',
+		compileOptions: { mode: 'server' },
+	});
 }
 const server = serverModule();
 

@@ -36,6 +36,12 @@ The server build must compile components with the Octane compiler in
 `mode: 'server'` (`@octanejs/vite-plugin` handles this automatically; SSR module
 loading through Vite picks the server transform automatically).
 
+Serve matching server and client compiler output. Signal control identities are
+derived from authored source sites, not generated branch or loop helper names;
+mixing HTML and client assets from different compiler/site-identity versions is
+not a supported hydration boundary. Deploy and invalidate cached HTML/assets as
+one matching build.
+
 If another renderer or an independent stream owns part of the server-rendered
 DOM, use a permanent-static `<Hydrate split={false} when={never()}>` boundary to
 preserve that range and `attachBehaviorRoot` from `octane/behavior` to attach
@@ -43,6 +49,11 @@ behavior without claiming reconciliation ownership. The
 [behavior-only roots and external ownership guide](./deferred-hydration.md#behavior-only-roots-and-external-ownership)
 covers range readiness, nested owners, delegated native interactions, and
 disposal.
+
+Fixed native presentation can also be authored once and adopted without the
+renderer through [compiled DOM bindings](./deferred-hydration.md#compiled-presentation-on-existing-dom).
+This updates declared properties on matching existing SSR nodes; structural
+rendering and application event ownership remain separate.
 
 ### Run an SSG script directly
 

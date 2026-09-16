@@ -74,6 +74,26 @@ describe('adapter server targets', () => {
 });
 
 describe('server-function security configuration', () => {
+	it('keeps explicit streamed-response budgets separate from the request limit', () => {
+		const resultLimits = { maxFrameBytes: 2_000_000, maxTotalBytes: 8_000_000, timeoutMs: 5000 };
+		expect(resolveOctaneConfig({ server: { rpc: { resultLimits } } }).server.rpc).toEqual({
+			allowedOrigins: [],
+			maxBodyBytes: 1_048_576,
+			resultLimits,
+		});
+	});
+
+	it.each([
+		{ timeoutMs: 0 },
+		{ maxFrameBytes: -1 },
+		{ maxTotalBytes: 1.5 },
+		{ maxFrameBytes: 2048, maxTotalBytes: 1024 },
+	])('rejects invalid streamed-response budgets %j', (resultLimits) => {
+		expect(() => resolveOctaneConfig({ server: { rpc: { resultLimits } } })).toThrow(
+			'resultLimits',
+		);
+	});
+
 	it('defaults to a one-mebibyte same-origin request policy', () => {
 		expect(resolveOctaneConfig({}).server.rpc).toEqual({
 			allowedOrigins: [],

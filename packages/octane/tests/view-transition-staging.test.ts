@@ -1,9 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createScope } from '../src/signals/index.js';
+import * as SignalRuntime from '../src/signals/index.js';
 import {
 	act,
 	Activity,
 	createElement,
 	createRoot,
+	hydrateRoot,
 	flushSync,
 	startTransition,
 	type Root,
@@ -20,6 +23,13 @@ import {
 	StagingDelegationApp,
 	StagingPortalApp,
 } from './_fixtures/view-transition-matching.tsrx';
+import {
+	StagingHydratedBinding,
+	StagingSignalControls,
+} from './_fixtures/view-transition-signal-controls.tsrx';
+import { condition } from 'octane/hydration';
+import { renderToString } from 'octane/server';
+import { loadServerFixture } from './_server-fixture.js';
 
 function deferred() {
 	let resolve!: () => void;
@@ -179,6 +189,130 @@ describe('ViewTransition staged commits', () => {
 			expect(events.filter((event) => event === 'destroy-insertion:' + value)).toHaveLength(1);
 			expect(events.filter((event) => event === 'destroy-layout:' + value)).toHaveLength(1);
 		}
+
+		for (const replacement of ['handle', 'scalar']) {
+			root = createRoot(container);
+			const scope = createScope({ scopeKey: `staged-control-${replacement}` });
+			const before$ = scope.signal$('before', 'before');
+			const after$ = scope.signal$('after', 'after');
+			const cleanups: string[] = [];
+			try {
+				await act(() =>
+					root.render(StagingSignalControls, {
+						phase: 'before',
+						draft$: before$,
+						inputProps$: { value: before$ },
+						cleanups,
+					}),
+				);
+				const inputs = [...container.querySelectorAll('input')];
+				const presentation = container.querySelector('[data-presentation]')!;
+				const bindingText = presentation.querySelector('[data-binding-text]')!;
+				const bindingValue = presentation.querySelector('[data-binding-value]')!;
+				const firstOwner = container.querySelector<HTMLButtonElement>('[data-owner="first"]')!;
+				const secondOwner = container.querySelector<HTMLButtonElement>('[data-owner="second"]')!;
+				await act(() => {
+					firstOwner.click();
+					firstOwner.click();
+					secondOwner.click();
+				});
+				expect([firstOwner.textContent, secondOwner.textContent]).toEqual(['2', '1']);
+				const capture = handles.length;
+				startTransition(() =>
+					root.render(StagingSignalControls, {
+						phase: 'after',
+						draft$: replacement === 'handle' ? after$ : 'sample',
+						inputProps$: { value: replacement === 'handle' ? after$ : 'sample' },
+						cleanups,
+					}),
+				);
+				await vi.waitFor(() => expect(handles).toHaveLength(capture + 1));
+				expect(container.querySelector('span')!.textContent).toBe('before');
+				expect(bindingText.textContent).toBe('before text');
+				expect(bindingValue.textContent).toBe('before');
+				expect(presentation.querySelector('[data-binding-arm]')!.localName).toBe('i');
+				expect(cleanups).toEqual([]);
+				for (const input of inputs) {
+					input.value = `before update ${input.dataset.control}`;
+					input.dispatchEvent(new Event('input', { bubbles: true }));
+					expect(container.querySelector('span')!.textContent).toBe('before');
+					expect(bindingText.textContent).toBe('before text');
+					expect(bindingValue.textContent).toBe('before');
+					expect(cleanups).toEqual([]);
+					expect(before$.get()).toBe(input.value);
+					expect(after$.get()).toBe('after');
+				}
+				const lastEdit = before$.get();
+				await handles[capture].update();
+				expect([...container.querySelectorAll('input')]).toEqual(inputs);
+				expect(container.querySelector('span')!.textContent).toBe('after');
+				expect(container.querySelector('[data-presentation]')).toBe(presentation);
+				expect(presentation.querySelector('[data-binding-text]')).toBe(bindingText);
+				expect(presentation.querySelector('[data-binding-value]')).toBe(bindingValue);
+				expect(bindingText.textContent).toBe('after text');
+				expect(bindingValue.textContent).toBe('after');
+				expect(presentation.querySelector('[data-binding-arm]')!.localName).toBe('b');
+				expect(presentation.querySelector('[data-binding-arm]')!.textContent).toBe('aftertail');
+				expect(cleanups).toEqual(['first:2', 'second:1']);
+				for (const input of inputs) {
+					input.value = `after update ${input.dataset.control}`;
+					input.dispatchEvent(new Event('input', { bubbles: true }));
+					expect(before$.get()).toBe(lastEdit);
+					expect(after$.get()).toBe(replacement === 'handle' ? input.value : 'after');
+				}
+				handles[capture].ready.resolve();
+				handles[capture].finished.resolve();
+				await act(() => root.unmount());
+				expect(cleanups).toEqual(['first:2', 'second:1']);
+			} finally {
+				root.unmount();
+				scope.dispose();
+			}
+		}
+
+		// Use the canonical component with split={false}: a compiler-split import
+		// completes as legitimate urgent work and interrupts a held transition.
+		// With no such interruption, activation must preserve visible SSR until
+		// the browser opens this transition's mutation phase.
+		const server = loadServerFixture<
+			typeof import('./_fixtures/view-transition-signal-controls.tsrx')
+		>('packages/octane/tests/_fixtures/view-transition-signal-controls.tsrx', {
+			compileOptions: {},
+			runtimeModules: { 'octane/signals': SignalRuntime },
+		});
+		const when = condition(false);
+		container.innerHTML = renderToString(server.StagingHydratedBinding, {
+			phase: 'before',
+			when,
+		}).html;
+		const preserved = container.querySelector('[data-presentation]')!;
+		const preservedText = preserved.querySelector('[data-binding-text]')!;
+		await act(() => {
+			root = hydrateRoot(container, StagingHydratedBinding, {
+				phase: 'before',
+				when,
+			});
+		});
+		const hydrationCapture = handles.length;
+		startTransition(() =>
+			root.render(StagingHydratedBinding, {
+				phase: 'after',
+				when: condition(true),
+			}),
+		);
+		await vi.waitFor(() => expect(handles).toHaveLength(hydrationCapture + 1));
+		expect(container.querySelector('[data-presentation]')).toBe(preserved);
+		expect(preservedText.textContent).toBe('before text');
+		expect(preserved.querySelector('[data-binding-arm]')!.localName).toBe('i');
+		await handles[hydrationCapture].update();
+		expect(container.querySelector('[data-presentation]')).toBe(preserved);
+		expect(preserved.querySelector('[data-binding-text]')).toBe(preservedText);
+		expect(preservedText.textContent).toBe('after text');
+		expect(preserved.querySelector('[data-binding-value]')!.textContent).toBe('after');
+		expect(preserved.querySelector('[data-binding-arm]')!.textContent).toBe('aftertail');
+		handles[hydrationCapture].ready.resolve();
+		handles[hydrationCapture].finished.resolve();
+		await act(() => root.unmount());
 	});
 
 	it('cleans up ordinary deletions and a later unmount after a completed transition', async () => {

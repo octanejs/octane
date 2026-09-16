@@ -19,6 +19,8 @@ export interface OctanePluginOptions {
 	strong?: boolean;
 	/** TypeScript-backed child-text inference in one-shot production builds. */
 	textTypes?: OctaneVitePluginOptions['textTypes'];
+	/** Fixed native attribute factories and optional JSX shorthand providers. */
+	knownAttributeSpreads?: OctaneVitePluginOptions['knownAttributeSpreads'];
 	/**
 	 * Path fragments the compiler's plain `.ts`/`.js` hook-slotting pass must
 	 * skip. Prefer package manifest `octane.hookSlots.manual` declarations.

@@ -89,12 +89,13 @@ surviving handles unusable. Do not recreate shared scopes during rendering.
 
 <h2 id="async-resources">Load data with queries</h2>
 
-Define a loader with `query`, then select its arguments in `scope.asyncSignal$`.
+For explicitly owned resources, define a loader with `query`, then select its
+arguments in `createResource(scope, key, describe)`.
 The selection callback runs eagerly and tracks synchronous signal reads. The
 loader runs untracked and receives an `AbortSignal`.
 
 ```ts
-import { createScope, query } from 'octane/signals';
+import { createResource, createScope, query } from 'octane/signals';
 
 const account = createScope({ scopeKey: 'account' });
 const userId$ = account.signal$('user-id', 1);
@@ -103,7 +104,7 @@ const fetchUser = query('user', async (id: number, { signal }) => {
 	if (!response.ok) throw new Error(`User request failed: ${response.status}`);
 	return response.json() as Promise<{ id: number; name: string }>;
 });
-const user$ = account.asyncSignal$('user', () => fetchUser(userId$.get()));
+const user$ = createResource(account, 'user', () => fetchUser(userId$.get()));
 
 userId$.set(2); // Selects a new request and cancels obsolete work.
 user$.retry(); // Keeps a usable current value during a refresh.
@@ -114,6 +115,10 @@ Equivalent query arguments share an in-flight request within the same data
 scope. Retrying that request affects all resources selecting it. Separate
 scopes do not share requests, and entries are removed when no resource selects
 them. Reusing a query key with an incompatible loader is an error.
+
+The legacy `scope.asyncSignal$` method is removed. Importing `createScope` no
+longer retains query producers; only query-using callers import that implementation.
+Module-level declarations can use `query$` without creating an explicit scope.
 
 Late results from canceled, retried, or disposed attempts cannot publish, even
 if a producer ignores its abort signal. Dispose the scope when its owner ends.
@@ -192,7 +197,7 @@ const notifications = query(
 	(userId: number, { signal }) => watchNotifications(userId, signal),
 	{ kind: 'stream' },
 );
-const notification$ = account.asyncSignal$('notification', () => notifications(userId$.get()));
+const notification$ = createResource(account, 'notification', () => notifications(userId$.get()));
 ```
 
 Here `watchNotifications` is your async iterable producer. Before its first
@@ -281,7 +286,8 @@ The error classes are `ScopeDisposedError`, `SignalCycleError`,
 
 Native rendering supports the DOM client and server. Local `useDerived$` and
 local async hooks are not available; use explicitly owned `scope.derived$` and
-`scope.asyncSignal$`. Deep stores, async derived callbacks, cross-root atomic
+`createResource`, or the owner-optional `derived$` and `query$` declarations.
+Facade `derived$` supports asynchronous callbacks. Deep stores, cross-root atomic
 reveal, and native reads in non-DOM renderers are outside the API.
 
 The separate `@octanejs/alien-signals` binding keeps its existing API. For the

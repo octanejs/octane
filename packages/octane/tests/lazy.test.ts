@@ -1,13 +1,12 @@
+import { loadCompiledFixtureSource } from './_server-fixture.js';
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { mount, act } from './_helpers';
 import { flushSync, hydrateRoot, lazy } from '../src/index.js';
-import { compile } from 'octane/compiler';
 import { condition, never } from 'octane/hydration';
 import * as Server from 'octane/server';
 import { prerender } from 'octane/static';
-import { loadCompiledFixtureSource } from './_server-fixture';
 import { Greeting, Counter, LazyHost, LazyUpdateHost } from './_fixtures/lazy.tsrx';
 
 // React's lazy(load) — code-splitting. The wrapper suspends into the nearest
@@ -547,14 +546,11 @@ describe('lazy — client', () => {
 const FIXTURES = join(process.cwd(), 'packages/octane/tests/_fixtures');
 
 function evalServer(source: string, file: string): Record<string, any> {
-	let { code } = compile(source, file, { mode: 'server' });
-	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/server['"];?/g,
-		(_m: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
-	);
-	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
-	code = code.replace(/export function (\w+)/g, '__exports.$1 = function $1');
-	return new Function('__rt', '__exports', code + '\nreturn __exports;')(Server, {});
+	return loadCompiledFixtureSource(source, {
+		id: file,
+		mode: 'server',
+		compileOptions: { mode: 'server' },
+	});
 }
 
 const m = evalServer(readFileSync(join(FIXTURES, 'lazy.tsrx'), 'utf8'), 'lazy.tsrx');

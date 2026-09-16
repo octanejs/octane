@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { createScope, query, ScopeDisposedError, type AdoptionFrame } from 'octane/signals';
+import {
+	createResource,
+	createScope,
+	query,
+	ScopeDisposedError,
+	type AdoptionFrame,
+} from 'octane/signals';
 import { deferred, drainProducers, type Deferred } from './_fixtures/signals-async-controls';
 import { makeRng, makeRootRng } from './conformance/_helpers/fuzz-prng';
 
@@ -63,7 +69,7 @@ describe('scoped signals against an independent operation model', () => {
 				attempts.push(attempt);
 				return attempt.promise;
 			});
-			const result$ = scope.asyncSignal$('result', () => load(selected$.get()));
+			const result$ = createResource(scope, 'result', () => load(selected$.get()));
 			const view$ = scope.derived$('view', () => ({
 				title: title$.get(),
 				result: local$.get() ? ('local' as const) : result$.get(),

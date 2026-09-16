@@ -9,13 +9,18 @@ beforeAll(() => {
 	});
 });
 
+function normalizeMarkup(html: string): string {
+	// Compiler-owned input identity is absent from React's native host markup.
+	return html.replace(/ data-octane-input="[^"]*"/g, '');
+}
+
 describe('<TextareaAutosize /> adapted upstream inventory', () => {
 	// Per upstream/src/__tests__/index.test.js:17
 	it('renders ok', () => {
 		const app = mount(TextareaAutosize);
 		flushEffects();
 
-		expect(app.html()).toBe('<textarea></textarea>');
+		expect(normalizeMarkup(app.html())).toBe('<textarea></textarea>');
 		app.unmount();
 	});
 

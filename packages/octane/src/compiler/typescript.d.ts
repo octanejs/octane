@@ -23,6 +23,8 @@ export interface TextTypeProjectOptions {
 	root?: string;
 	/** The same renderer configuration used by the Octane compiler. */
 	renderers?: unknown;
+	/** The same native attribute contracts used by runtime compilation. */
+	knownAttributeSpreads?: readonly import('./index.js').KnownAttributeSpread[];
 }
 
 export interface TextTypeProject {

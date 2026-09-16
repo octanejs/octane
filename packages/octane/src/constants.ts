@@ -122,6 +122,12 @@ export const HYDRATE_ID_COUNT_ATTR = 'data-octane-hydrate-id-count';
 export { HYDRATE_STREAM_TOKEN_ATTR } from './stream-protocol.js';
 /** Direct-child JSON script carrying this boundary's `use()` seed slice. */
 export const HYDRATE_SEED_ATTR = 'data-octane-hydrate-seed';
+export {
+	INDEPENDENT_HYDRATE_MANIFEST_ATTR,
+	HYDRATE_INDEPENDENT_ATTR,
+	HYDRATE_INPUT_ATTR,
+	SIGNAL_CONTROL_ATTR,
+} from './hydration-markers.js';
 
 // ── Streaming SSR protocol (renderToPipeableStream / renderToReadableStream) ──
 // A boundary that is still PENDING when the shell flushes emits its fallback

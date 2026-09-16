@@ -1,7 +1,13 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import * as client from '../src/runtime.js';
 import * as server from '../src/runtime.server.js';
-import { createScope, query, type Scope, type SignalHandle } from '../src/signals/index.js';
+import {
+	createResource,
+	createScope,
+	query,
+	type Scope,
+	type SignalHandle,
+} from '../src/signals/index.js';
 import { act, mount, type MountResult } from './_helpers.js';
 import { deferred } from './_server-stream.js';
 
@@ -148,7 +154,7 @@ describe('native reads throughout component invocation', () => {
 		const request = query('collection-abi-pending-request', (key: number) =>
 			key === 1 ? Promise.resolve('ready') : pending.promise,
 		);
-		const value$ = model.scope.asyncSignal$('value', () => request(model.count$.get()));
+		const value$ = createResource(model.scope, 'value', () => request(model.count$.get()));
 		await act(() => {});
 		function Reader({ value = value$.get() }: { value?: string }) {
 			return client.createElement('p', null, value);
@@ -233,7 +239,7 @@ describe('native reads throughout component invocation', () => {
 		const model = state$('collection-abi-server-pending');
 		const pending = deferred<string>();
 		const request = query('collection-abi-server-pending-request', () => pending.promise);
-		const value$ = model.scope.asyncSignal$('value', () => request(undefined));
+		const value$ = createResource(model.scope, 'value', () => request(undefined));
 		function Reader({ value = value$.get() }: { value?: string }) {
 			return server.createElement('p', null, value);
 		}

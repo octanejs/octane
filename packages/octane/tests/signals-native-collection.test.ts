@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { flushSync, hydrateRoot, type Root } from 'octane';
 import { renderToString } from 'octane/server';
 import { prerender } from 'octane/static';
-import { createScope, query, type Scope } from 'octane/signals';
+import { createResource, createScope, query, type Scope } from 'octane/signals';
 import { act, mount, type MountResult } from './_helpers.js';
 import { loadServerFixture } from './_server-fixture.js';
 import { deferred } from './_server-stream.js';
@@ -219,7 +219,7 @@ describe('compiled component invocation native reads', () => {
 		const model = state$('compiled-collection-server-pending');
 		const pending = deferred<string>();
 		const request = query('compiled-collection-server-request', () => pending.promise);
-		const value$ = model.scope.asyncSignal$('value', () => request(undefined));
+		const value$ = createResource(model.scope, 'value', () => request(undefined));
 		const outputPromise = prerender(server.PendingDefault, { value$ });
 		await act(() => pending.resolve('settled'));
 		const output = await outputPromise;

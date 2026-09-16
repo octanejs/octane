@@ -1,7 +1,7 @@
+import { loadCompiledFixtureSource } from './_server-fixture.js';
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { compile } from 'octane/compiler';
 import * as RT from 'octane/server';
 import { prerender } from 'octane/static';
 import { hydrateRoot, flushSync } from '../src/index.js';
@@ -26,14 +26,11 @@ import {
 const FIXTURES = join(process.cwd(), 'packages/octane/tests/_fixtures');
 
 function evalServer(source: string, file: string): Record<string, any> {
-	let { code } = compile(source, file, { mode: 'server' });
-	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/server['"];?/g,
-		(_m: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
-	);
-	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
-	const fn = new Function('__rt', '__exports', code + '\nreturn __exports;');
-	return fn(RT, {});
+	return loadCompiledFixtureSource(source, {
+		id: file,
+		mode: 'server',
+		compileOptions: { mode: 'server' },
+	});
 }
 const m = evalServer(
 	readFileSync(join(FIXTURES, 'ssr-suspense.tsrx'), 'utf8'),

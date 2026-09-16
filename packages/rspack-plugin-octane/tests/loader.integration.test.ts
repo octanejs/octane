@@ -100,6 +100,7 @@ describe('loader with the neutral compiler', () => {
 		expect(result.map).toMatchObject({ version: 3, sources: ['App.tsrx'] });
 		expect(result.module.buildInfo.octane).toEqual({
 			canonicalId: '/src/App.tsrx',
+			resourceQuery: '',
 			transformKind: 'compile',
 			serverRpc: false,
 		});
@@ -399,6 +400,7 @@ describe('loader with the neutral compiler', () => {
 		});
 		expect(getOctaneRspackBuildInfo(result.module)).toEqual({
 			canonicalId: '/node_modules/@fixture/raw/index.tsx',
+			resourceQuery: '',
 			transformKind: 'compile',
 			serverRpc: false,
 		});

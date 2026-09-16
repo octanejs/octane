@@ -10,7 +10,7 @@ import { inspectAsyncRetainers } from './inspect-async-retainers.mjs';
 
 const HERE = import.meta.dirname;
 const REPO = path.resolve(HERE, '../..');
-const knownOptions = new Set(['tooling-root', 'cycles', 'snapshots']);
+const knownOptions = new Set(['tooling-root', 'cycles', 'snapshots', 'api']);
 const options = new Map();
 for (const argument of process.argv.slice(2)) {
 	const match = /^--([^=]+)=(.+)$/.exec(argument);
@@ -20,12 +20,15 @@ for (const argument of process.argv.slice(2)) {
 }
 const cycles = Number(options.get('cycles') ?? '1000');
 assert.ok(Number.isSafeInteger(cycles) && cycles >= 100, '--cycles must be an integer >= 100');
+const api = options.get('api') ?? 'query';
+assert.ok(api === 'query' || api === 'derived', '--api must be query or derived');
 const payload = {
 	suite: 'scoped-signals-async-retention',
 	mode: 'heap-diagnostics',
 	request: process.argv,
 	startedAt: new Date().toISOString(),
 	cycles,
+	api,
 	method:
 		'One Node worker keeps unresolved producer promises externally reachable while disposing a promise owner and stream owner per cycle. Three explicit collections after event-loop turns precede each snapshot. A live scope remains as a positive control, then is retired and dropped before external promises are released.',
 	inspectionMethod:
@@ -181,6 +184,7 @@ try {
 		engineFile,
 		snapshots,
 		String(cycles),
+		api,
 	];
 	const git = (...args) =>
 		execFileSync('git', args, { cwd: REPO, maxBuffer: 32 * 1024 * 1024 })
@@ -238,12 +242,12 @@ try {
 	);
 	assert.equal(
 		initial.inspection.strongRequestCount,
-		2,
+		api === 'query' ? 2 : 0,
 		'Live positive-control requests were not detected',
 	);
 	assert.equal(
 		initial.inspection.activeAttemptRecords,
-		2,
+		api === 'query' ? 2 : 0,
 		'Live positive-control attempts were not detected',
 	);
 	payload.positiveControl = 'passed';
@@ -271,11 +275,11 @@ try {
 		)
 			findings.push(`${row.name}: unexpected strongly retained signal node`);
 		if (
-			inspection.strongRequestCount !== (expectedActive ? 2 : 0) ||
+			inspection.strongRequestCount !== (expectedActive && api === 'query' ? 2 : 0) ||
 			inspection.retiredCycleRequestCount !== 0
 		)
 			findings.push(`${row.name}: unexpected strongly retained request entry`);
-		if (inspection.activeAttemptRecords !== (expectedActive ? 2 : 0))
+		if (inspection.activeAttemptRecords !== (expectedActive && api === 'query' ? 2 : 0))
 			findings.push(`${row.name}: unexpected active attempt records`);
 		if (
 			inspection.revokedAttemptsWithObjectEntry ||

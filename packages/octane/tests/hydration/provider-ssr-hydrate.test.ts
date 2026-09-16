@@ -1,7 +1,7 @@
+import { loadCompiledFixtureSource } from '../_server-fixture.js';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { compile } from 'octane/compiler';
 import {
 	createElement,
 	flushSync,
@@ -22,16 +22,13 @@ import { hydrationMarkerSummary } from './_marker-summary.js';
 //      `createElement` descriptor (the de-opt return path) SSR'd as `[object Object]`.
 
 function serverModule(file: string): Record<string, any> {
-	let { code } = compile(readFileSync(join(process.cwd(), file), 'utf8'), file.split('/').pop()!, {
+	return loadCompiledFixtureSource(readFileSync(join(process.cwd(), file), 'utf8'), {
+		id: file.split('/').pop()!,
 		mode: 'server',
+		compileOptions: {
+			mode: 'server',
+		},
 	});
-	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/server['"];?/g,
-		(_m: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
-	);
-	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
-	code = code.replace(/export function (\w+)/g, '__exports.$1 = function $1');
-	return new Function('__rt', '__exports', code + '\nreturn __exports;')(ServerRT, {});
 }
 const server = serverModule('packages/octane/tests/_fixtures/ssr-provider.tsx');
 

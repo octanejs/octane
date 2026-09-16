@@ -1,3 +1,4 @@
+import { loadCompiledFixtureSource } from '../_server-fixture.js';
 // useId determinism parity — ported from ReactDOMUseId-test.js.
 //
 // React guarantees that a component's useId is (a) stable across re-renders,
@@ -23,15 +24,11 @@ const FIXTURES = join(process.cwd(), 'packages/octane/tests/_fixtures');
 // runtime we compile the source in server mode here and bind its
 // `octane/server` import to the live runtime module.
 function evalServer(source: string, file: string): Record<string, any> {
-	let { code } = compile(source, file, { mode: 'server' });
-	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/server['"];?/g,
-		(_m: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
-	);
-	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
-	code = code.replace(/export default (\w+);?/g, '__exports.default = $1;');
-	const fn = new Function('__rt', '__exports', code + '\nreturn __exports;');
-	return fn(RT, {});
+	return loadCompiledFixtureSource(source, {
+		id: file,
+		mode: 'server',
+		compileOptions: { mode: 'server' },
+	});
 }
 
 const serverMod = evalServer(

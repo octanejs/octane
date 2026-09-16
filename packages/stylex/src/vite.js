@@ -53,6 +53,8 @@ export function stylex(options = {}) {
 	const useCSSLayers = options.useCSSLayers ?? false;
 	// Per-module rule sets, so re-transforming one file (HMR) replaces only its rules.
 	const rulesByFile = new Map();
+	const sharedConstants = new Map();
+	const constantsByOwner = new Map();
 	let isDev = false;
 	let isBuild = false;
 	let root = process.cwd();
@@ -62,6 +64,24 @@ export function stylex(options = {}) {
 		const all = [];
 		for (const rules of rulesByFile.values()) for (const r of rules) all.push(r);
 		return generateStylexCSS(all, useCSSLayers);
+	};
+	const replaceConstants = (owner, records) => {
+		for (const id of constantsByOwner.get(owner) ?? []) {
+			const entry = sharedConstants.get(id);
+			entry.owners.delete(owner);
+			if (entry.owners.size === 0) sharedConstants.delete(id);
+		}
+		constantsByOwner.delete(owner);
+		if (records.length === 0) return;
+		constantsByOwner.set(
+			owner,
+			records.map((record) => record.id),
+		);
+		for (const record of records) {
+			const entry = sharedConstants.get(record.id) ?? { record, owners: new Set() };
+			entry.owners.add(owner);
+			sharedConstants.set(record.id, entry);
+		}
 	};
 
 	return {
@@ -90,9 +110,12 @@ export function stylex(options = {}) {
 
 		resolveId(id) {
 			if (id === VIRTUAL_CSS_ID) return RESOLVED_VIRTUAL_CSS_ID;
+			if (sharedConstants.has(id)) return '\0' + id;
 			return null;
 		},
 		load(id) {
+			const shared = id.startsWith('\0') ? sharedConstants.get(id.slice(1)) : null;
+			if (shared) return { code: shared.record.code, map: shared.record.map };
 			if (id !== RESOLVED_VIRTUAL_CSS_ID) return null;
 			// In a build the graph may not be fully transformed yet — emit a placeholder
 			// that `generateBundle` replaces with the complete sheet. In serve, the live
@@ -100,17 +123,20 @@ export function stylex(options = {}) {
 			return isBuild ? PLACEHOLDER_RULE : aggregate();
 		},
 
-		transform(code, id) {
+		transform(code, id, transformOptions) {
+			const owner = `${transformOptions?.ssr ? 'server' : 'client'}:${id}`;
 			const file = id.split('?')[0];
 			if (!include.test(file) || file.includes('/node_modules/')) return null;
 			// Cheap gate: skip files that can't reference StyleX at all.
 			if (!importSources.some((s) => code.includes(typeof s === 'string' ? s : s.from))) {
+				replaceConstants(owner, []);
 				return null;
 			}
 			const {
 				code: out,
 				map,
 				rules,
+				sharedConstants: constants,
 			} = transformStylex(code, {
 				filename: file,
 				dev: isDev,
@@ -120,7 +146,14 @@ export function stylex(options = {}) {
 					rootDir: root,
 				},
 				stylexOptions: options.stylexOptions,
+				...(isBuild && !isDev && !transformOptions?.ssr
+					? {
+							bindingConstants: this.getModuleInfo?.(id)?.meta?.['octane:binding-constants'],
+							inputSourceMap: this.getCombinedSourcemap?.(),
+						}
+					: null),
 			});
+			replaceConstants(owner, constants);
 
 			const prevKey = keyOf(rulesByFile.get(id));
 			if (rules.length > 0) rulesByFile.set(id, rules);

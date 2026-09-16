@@ -260,7 +260,7 @@ async function main() {
 		const load = G.query('dom-pending-loader', (arg) =>
 			arg === 'a' ? pending : Promise.resolve('ready-b'),
 		);
-		const resource = scope.asyncSignal$('resource', () => load(scope.get(key)));
+		const resource = G.createResource(scope, 'resource', () => load(scope.get(key)));
 		const ReadS = serverNative((p, s) =>
 			S.ssrChild(S.createElement('output', null, scope.get(resource)), s),
 		);
@@ -322,7 +322,7 @@ async function main() {
 		const load = G.query('dom-latest-loader', (arg) =>
 			arg === 'a' ? Promise.resolve('ready-a') : pendingB,
 		);
-		const resource = scope.asyncSignal$('resource', () => load(scope.get(key)));
+		const resource = G.createResource(scope, 'resource', () => load(scope.get(key)));
 		await settle();
 		scope.set(key, 'b');
 		const Server = serverNative((p, s) =>
@@ -359,7 +359,7 @@ async function main() {
 			finish = resolve;
 		});
 		const load = G.query('dom-latest-empty-loader', () => pending);
-		const resource = scope.asyncSignal$('resource', () => load(null));
+		const resource = G.createResource(scope, 'resource', () => load(null));
 		const Server = serverNative((p, s) =>
 			S.ssrChild(S.createElement('output', null, resource.latest('loading')), s),
 		);
@@ -439,7 +439,7 @@ async function main() {
 	test('completed pending snapshot output is rejected instead of transporting activity', () => {
 		const scope = G.createScope({ scopeKey: 'dom-pending-snapshot' });
 		const load = G.query('dom-pending-snapshot-loader', () => new Promise(() => {}));
-		const resource = scope.asyncSignal$('resource', () => load(null));
+		const resource = G.createResource(scope, 'resource', () => load(null));
 		const Server = serverNative((p, s) =>
 			S.ssrChild(S.createElement('output', null, resource.snapshot().status), s),
 		);
@@ -518,7 +518,7 @@ async function main() {
 			finishB = resolve;
 		});
 		const load = G.query('dom-stream-seeds-loader', (arg) => (arg === 'a' ? first : second));
-		const resource = scope.asyncSignal$('resource', () => load(scope.get(key)));
+		const resource = G.createResource(scope, 'resource', () => load(scope.get(key)));
 		const ReaderS = serverNative((p, s) =>
 			S.ssrChild(S.createElement('output', null, scope.get(resource)), s),
 		);
@@ -734,7 +734,7 @@ async function main() {
 		});
 		const scope = G.createScope({ scopeKey: 'dom-error-reset' });
 		const load = G.query('dom-error-reset-query', () => (attempt++ === 0 ? first : second));
-		const resource = scope.asyncSignal$('resource', () => load(null));
+		const resource = G.createResource(scope, 'resource', () => load(null));
 		const Reader = native(() => element('output', null, resource.get()));
 		const App = () =>
 			element(
@@ -903,7 +903,7 @@ async function main() {
 	test('server render-phase retries discard native reads from the abandoned output', () => {
 		const scope = G.createScope({ scopeKey: 'dom-server-replay' });
 		const load = G.query('dom-server-replay-query', () => new Promise(() => {}));
-		const resource = scope.asyncSignal$('resource', () => load(null));
+		const resource = G.createResource(scope, 'resource', () => load(null));
 		const slot = Symbol('render-phase-state');
 		const Server = serverNative((p, s) => {
 			const [phase, setPhase] = S.useState(0, slot);

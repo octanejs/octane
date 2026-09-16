@@ -17,5 +17,11 @@ export {
 	runMiddlewareChain,
 } from './middleware.js';
 export { handleRpcRequest } from './server/rpc.js';
-export { getRequestContext, tryGetRequestContext } from './server/request-context.js';
+export {
+	getRequestContext,
+	tryGetRequestContext,
+	setRequestContextSource,
+} from './server/request-context.js';
+export { runServerRequest } from './server/signal-owners.js';
+export { createServerCallHost } from './server/server-calls.js';
 export { createRpcRegistry } from './server/rpc-registry.js';

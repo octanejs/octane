@@ -1,5 +1,4 @@
 import { describe, it, expect } from 'vitest';
-import { compile } from 'octane/compiler';
 import { act, mount } from './_helpers';
 import { loadCompiledFixtureSource } from './_server-fixture';
 import { BoundEventArguments } from './_fixtures/attrs-event-arguments';
@@ -199,6 +198,30 @@ describe('attributes', () => {
 				expect(button.hasAttribute('aria-label')).toBe(false);
 				expect(button.hasAttribute('disabled')).toBe(false);
 			}
+		} finally {
+			r.unmount();
+		}
+	});
+
+	it('preserves string, opaque data, boolean and ARIA attribute semantics on update', () => {
+		const { C } = loadCompiledFixtureSource(
+			`export function C(p) @{ <button data-string={'' + p.id} data-value={p.id}
+				disabled={p.disabled} aria-label={p.label} /> }`,
+			{ id: 'attributes-narrow.tsrx', mode: 'client', compileOptions: { hmr: false } },
+		);
+		const r = mount(C, { id: 2, disabled: true, label: false });
+		try {
+			const button = r.find('button');
+			expect(button.getAttribute('data-string')).toBe('2');
+			expect(button.getAttribute('data-value')).toBe('2');
+			expect(button.hasAttribute('disabled')).toBe(true);
+			expect(button.getAttribute('aria-label')).toBe('false');
+			r.update(C, { id: null, disabled: false, label: null });
+			expect(r.find('button')).toBe(button);
+			expect(button.getAttribute('data-string')).toBe('null');
+			expect(button.hasAttribute('data-value')).toBe(false);
+			expect(button.hasAttribute('disabled')).toBe(false);
+			expect(button.hasAttribute('aria-label')).toBe(false);
 		} finally {
 			r.unmount();
 		}

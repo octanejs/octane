@@ -102,8 +102,8 @@ test('weakening an adapted assertion without changing identity fails verificatio
 	const adaptedFile = 'packages/textarea-autosize/tests/upstream/adapted.test.ts';
 	const source = readFileSync(join(root, adaptedFile), 'utf8');
 	const weakened = source.replace(
-		"expect(app.html()).toBe('<textarea></textarea>');",
-		"expect(app.html()).toBe('<textarea>weakened</textarea>');",
+		"expect(normalizeMarkup(app.html())).toBe('<textarea></textarea>');",
+		"expect(normalizeMarkup(app.html())).toBe('<textarea>weakened</textarea>');",
 	);
 	assert.notEqual(weakened, source, 'fixture must change adapted assertion source');
 	assert.throws(function run() {

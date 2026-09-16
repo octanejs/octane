@@ -193,6 +193,36 @@ describe('streaming injection — fragment renders', () => {
 		expect(html).toContain(early);
 		expect(chunks[0]).not.toContain(early);
 		expect(html.indexOf('shell')).toBeLessThan(html.indexOf(early));
+
+		// The early capture hook must still precede the first write when the
+		// shell also needs ViewTransition annotation cleanup. Attribute-like text
+		// inside trusted quoted HTML is application data, not an annotation.
+		const raw = '<span title=\'keep vt-enter-x="quoted"\'>raw</span>';
+		const animatedInjection = createTestInjection();
+		animatedInjection.push(early);
+		animatedInjection.finish();
+		const collector = createPipeableCollector();
+		const chunksAtEarlyReady: number[] = [];
+		ServerRuntime.renderToPipeableStream(
+			() =>
+				ServerRuntime.createElement(
+					ServerRuntime.ViewTransition,
+					{ name: 'injected-shell' },
+					ServerRuntime.createElement('section', { dangerouslySetInnerHTML: { __html: raw } }),
+					ServerRuntime.createElement(server.FragmentApp, { promise: value.promise }),
+				),
+			undefined,
+			{
+				injection: { ...animatedInjection.source, streamedRenderer: true },
+				earlySignalBootstrap: 'external',
+				onEarlyHydrationReady: () => chunksAtEarlyReady.push(collector.chunks.length),
+			},
+		).pipe(collector.destination);
+		const animatedHtml = await collector.ended;
+		expect(chunksAtEarlyReady).toEqual([0]);
+		expect(collector.chunks[0]).toContain(raw);
+		expect(collector.chunks[0]).not.toContain(early);
+		expect(animatedHtml.indexOf('shell')).toBeLessThan(animatedHtml.indexOf(early));
 	});
 
 	it('merges through the web-stream API identically', async () => {

@@ -1,7 +1,28 @@
 import { Activity } from 'octane';
 import { useSignal$ } from 'octane/signals/client';
 import type { CSSProperties, SignalCSSProperties } from 'octane/jsx-runtime';
-import type { SignalHandle } from 'octane/signals';
+import { signal$, type SignalHandle } from 'octane/signals';
+
+const globalStyle$ = signal$(4);
+
+function FacadeStyleRow(props: { initial: number }) @{
+	const position$ = signal$(props.initial);
+	const position = position$;
+	<div data-style-row style={{ left: position, '--position': position }}>
+		<button onClick={() => position$.set((value) => value + 1)}>{'move row'}</button>
+	</div>
+}
+
+export function FacadeStyleOwners() @{
+	const position = globalStyle$;
+	<section>
+		<div data-style-global style={{ left: position }}>
+			<button onClick={() => globalStyle$.set((value) => value + 1)}>{'move global'}</button>
+		</div>
+		<FacadeStyleRow initial={1} />
+		<FacadeStyleRow initial={10} />
+	</section>
+}
 
 export function LocalStyles(props: { style?: CSSProperties }) @{
 	const left$ = useSignal$(1);

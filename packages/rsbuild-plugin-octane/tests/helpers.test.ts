@@ -237,6 +237,16 @@ describe('production output finalization', () => {
 	it('moves late client metadata beside the server entry before invoking the adapter', async () => {
 		write(root, 'build/client/index.html', '<html>client</html>');
 		write(root, 'build/client/octane-client-assets.json', '{"/src/Page.tsrx":{}}\n');
+		write(
+			root,
+			'build/client/octane-client-build.json',
+			'{"version":1,"buildId":"fixture","mode":"production","capabilities":{"independentHydration":false}}\n',
+		);
+		write(
+			root,
+			'build/client/octane-independent-hydration.json',
+			'{"version":1,"buildId":"fixture","widgets":{}}\n',
+		);
 		write(root, 'build/client/static/js/octane.js', 'client');
 		write(root, 'build/server/entry.js', 'export const handler = true;\n');
 		write(root, 'build/server/index.html', '<html>stale</html>');
@@ -255,6 +265,10 @@ describe('production output finalization', () => {
 		expect(readFileSync(join(root, 'build/server/octane-client-assets.json'), 'utf8')).toContain(
 			'/src/Page.tsrx',
 		);
+		expect(existsSync(join(root, 'build/client/octane-independent-hydration.json'))).toBe(false);
+		expect(
+			readFileSync(join(root, 'build/server/octane-independent-hydration.json'), 'utf8'),
+		).toContain('"buildId":"fixture"');
 		expect(existsSync(join(root, 'build/client/static/js/octane.js'))).toBe(true);
 		expect(adapt).toHaveBeenCalledOnce();
 		expect(adapt).toHaveBeenCalledWith(

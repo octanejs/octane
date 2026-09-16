@@ -1,7 +1,7 @@
+import { loadCompiledFixtureSource } from '../_server-fixture.js';
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { compile } from 'octane/compiler';
 import * as ServerRT from 'octane/server';
 import { mount } from '../_helpers';
 import { StyleObj } from './_fixtures/css-properties.tsrx';
@@ -37,16 +37,13 @@ const FIXTURE = join(
 // Compile the fixture in server mode against the real server runtime — the
 // same pattern as tests/style-px.test.ts / tests/clsx-class.test.ts.
 function evalServerModule(): Record<string, any> {
-	let { code } = compile(readFileSync(FIXTURE, 'utf8'), 'css-properties.tsrx', {
+	return loadCompiledFixtureSource(readFileSync(FIXTURE, 'utf8'), {
+		id: 'css-properties.tsrx',
 		mode: 'server',
+		compileOptions: {
+			mode: 'server',
+		},
 	});
-	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/server['"];?/g,
-		(_m: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
-	);
-	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
-	code = code.replace(/export function (\w+)/g, '__exports.$1 = function $1');
-	return new Function('__rt', '__exports', code + '\nreturn __exports;')(ServerRT, {});
 }
 
 describe('CSSPropertyOperations — serialization edges (SSR)', () => {

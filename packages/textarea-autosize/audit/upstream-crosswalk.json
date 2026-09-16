@@ -9,7 +9,7 @@
       "adaptedFullName": "<TextareaAutosize /> adapted upstream inventory renders ok",
       "upstreamFile": "upstream/src/__tests__/index.test.js",
       "adaptedFile": "packages/textarea-autosize/tests/upstream/adapted.test.ts",
-      "adaptedAssertions": ["613a2d66adeb871e327d661cb7755142e162c6ee685302c607033d66c45ee5af"],
+      "adaptedAssertions": ["5f6358cb25b146bac260423d3ee8df0cbd320748cc48bedc7f0b92d5c2c73f19"],
       "status": "ported"
     },
     {

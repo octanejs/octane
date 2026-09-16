@@ -25,6 +25,9 @@
 import { createRouter } from './router.js';
 import { createContext, runMiddlewareChain } from './middleware.js';
 import { handleRpcRequest } from './rpc.js';
+import { setRequestContextSource } from './request-context.js';
+import { createServerCallHost } from './server-calls.js';
+import { runServerRequest } from './signal-owners.js';
 import { rpcIdCollision } from './rpc-registry.js';
 import { handleServerRoute } from './server-route.js';
 import { composeHtmlStream } from './html-stream.js';
@@ -32,6 +35,7 @@ import {
 	applyHydrationNonce,
 	getContextNonce,
 	nonceAttribute,
+	prepareStreamingHydrationTemplate,
 	splitSsrTemplate,
 	validateSsrTemplate,
 } from './html-template.js';
@@ -69,7 +73,7 @@ const FETCH_COORDINATOR_KEY = Symbol.for('octane.app-core.fetch-coordinator');
 
 /**
  * @typedef {Object} FetchCoordinator
- * @property {import('@ripple-ts/adapter/rpc').AsyncContext<{ origin?: string, platform?: unknown }>} asyncContext
+ * @property {import('@octanejs/app-core').RpcRequestOptions['asyncContext']} asyncContext
  * @property {((request: Request, platform?: unknown) => Promise<Response>) | null} handler
  */
 
@@ -138,9 +142,16 @@ function buildRpcDescriptors(rpcModules, hashFn) {
  * the body-marker contract.
  *
  * @param {string} html
+ * @param {boolean} [earlyHydration]
  * @returns {(headContent: string) => string[]}
  */
-function prepareSsrTemplate(html) {
+function prepareSsrTemplate(html, earlyHydration = false) {
+	let afterShell = '';
+	if (earlyHydration) {
+		const prepared = prepareStreamingHydrationTemplate(html);
+		html = prepared.html;
+		afterShell = prepared.afterShell;
+	}
 	const [prefix, suffix] = splitSsrTemplate(html);
 	const prefixHeadAt = prefix.indexOf(HEAD_MARKER);
 	const headInPrefix = prefixHeadAt !== -1;
@@ -153,9 +164,9 @@ function prepareSsrTemplate(html) {
 		const nextPrefix = headInPrefix ? beforeHead + headContent + afterHead : prefix;
 		const nextSuffix = headInPrefix ? suffix : beforeHead + headContent + afterHead;
 		if (headContent.includes(BODY_MARKER) || BODY_CLOSE_TAG.test(headContent)) {
-			return splitSsrTemplate(nextPrefix + BODY_MARKER + nextSuffix);
+			return [...splitSsrTemplate(nextPrefix + BODY_MARKER + nextSuffix), afterShell];
 		}
-		return [nextPrefix, nextSuffix];
+		return [nextPrefix, nextSuffix, afterShell];
 	};
 }
 
@@ -195,6 +206,83 @@ function prepareRenderRoutes(routes) {
 		index++;
 	}
 	return prepared;
+}
+
+/**
+ * Freeze the client-build lookup behind the renderer's narrow per-boundary
+ * resolver. Request renders can then join immutable asset identity with their
+ * own encoded captures without consulting global mutable state.
+ *
+ * @param {ServerManifest['independentHydration']} manifest
+ * @returns {import('octane/server').RenderOptions['independentHydration'] | undefined}
+ */
+function prepareIndependentHydration(manifest) {
+	if (manifest == null) return undefined;
+	if (
+		manifest.version !== 1 ||
+		typeof manifest.buildId !== 'string' ||
+		manifest.buildId.length === 0 ||
+		manifest.widgets === null ||
+		typeof manifest.widgets !== 'object' ||
+		Array.isArray(manifest.widgets)
+	) {
+		throw new TypeError('Invalid independent Hydrate build manifest.');
+	}
+	return Object.freeze({
+		buildId: manifest.buildId,
+		resolve(boundaryId) {
+			const entry = manifest.widgets[boundaryId];
+			if (
+				entry === null ||
+				typeof entry !== 'object' ||
+				entry.version !== 1 ||
+				entry.boundaryId !== boundaryId ||
+				typeof entry.moduleId !== 'string' ||
+				!Array.isArray(entry.styles) ||
+				!entry.styles.every((style) => typeof style === 'string') ||
+				entry.parentDependencies !== false
+			) {
+				return undefined;
+			}
+			return { moduleId: entry.moduleId, styles: entry.styles };
+		},
+	});
+}
+
+/**
+ * Snapshot completed build authority once per handler, never from request data.
+ * Legacy custom handlers without a client build retain their existing path.
+ * @param {ServerManifest} manifest
+ * @returns {ServerManifest['clientBuild'] | undefined}
+ */
+function prepareClientBuild(manifest) {
+	const build = manifest.clientBuild;
+	if (build == null) return undefined;
+	if (
+		build.version !== 1 ||
+		typeof build.buildId !== 'string' ||
+		build.buildId.length === 0 ||
+		(build.mode !== 'production' && build.mode !== 'development') ||
+		typeof build.capabilities?.independentHydration !== 'boolean'
+	) {
+		throw new TypeError('Invalid completed client build metadata.');
+	}
+	if (
+		(manifest.independentHydration != null &&
+			manifest.independentHydration.buildId !== build.buildId) ||
+		(build.capabilities.independentHydration && manifest.independentHydration == null) ||
+		(!build.capabilities.independentHydration &&
+			manifest.independentHydration != null &&
+			Object.keys(manifest.independentHydration.widgets).length !== 0)
+	) {
+		throw new Error('Independent Hydrate metadata does not match the completed client build.');
+	}
+	return Object.freeze({
+		version: 1,
+		buildId: build.buildId,
+		mode: build.mode,
+		capabilities: Object.freeze({ independentHydration: build.capabilities.independentHydration }),
+	});
 }
 
 /**
@@ -255,12 +343,17 @@ export function createHandler(manifest, deps) {
 	const trustProxy = manifest.trustProxy ?? false;
 	const rpcPolicy = manifest.rpc;
 	const runtime = manifest.runtime;
+	const independentHydration = prepareIndependentHydration(manifest.independentHydration);
+	const clientBuild = prepareClientBuild(manifest);
 	validateSsrTemplate(htmlTemplate);
 	// Also pin the built-template contract up front. The marker is emitted by
 	// the integration's HTML transform and survives source hashing. Prepare the
 	// normalized no-nonce template once: this is the common request path, and its
 	// static fragments are identical for every request handled by this manifest.
-	const splitHydrationTemplate = prepareSsrTemplate(applyHydrationNonce(htmlTemplate, null));
+	const normalizedTemplate = applyHydrationNonce(htmlTemplate, null);
+	const splitHydrationTemplate = prepareSsrTemplate(normalizedTemplate);
+	/** @type {ReturnType<typeof prepareSsrTemplate> | undefined} */
+	let splitEarlyHydrationTemplate;
 
 	// RPC lookup for statically imported `module server` functions
 	// (compiler hash → server function).
@@ -300,6 +393,10 @@ export function createHandler(manifest, deps) {
 					return rpcDescriptors?.get(hash) ?? null;
 				},
 				executeServerFunction,
+				streamServerFunction: deps.streamServerFunction,
+				batchServerFunctions: deps.batchServerFunctions,
+				signalOwners: deps.signalOwners,
+				resultLimits: rpcPolicy?.resultLimits,
 				asyncContext,
 				trustProxy,
 				middlewares: globalMiddlewares,
@@ -319,22 +416,44 @@ export function createHandler(manifest, deps) {
 		}
 
 		const context = createContext(request, match.params, platform);
-
-		try {
-			if (match.route.type === 'render') {
-				return await runMiddlewareChain(
-					context,
-					globalMiddlewares,
-					match.route.before || [],
-					async () => renderRoute(/** @type {RenderRoute} */ (match.route), context),
-					[],
-				);
+		if (clientBuild != null) Object.defineProperty(context, 'clientBuild', { value: clientBuild });
+		if (manifest.clientAssets != null)
+			Object.defineProperty(context, 'clientAssets', { value: manifest.clientAssets });
+		const run = async () => {
+			try {
+				if (match.route.type === 'render') {
+					return await runMiddlewareChain(
+						context,
+						globalMiddlewares,
+						match.route.before || [],
+						async () => renderRoute(/** @type {RenderRoute} */ (match.route), context),
+						[],
+					);
+				}
+				return await handleServerRoute(match.route, context, globalMiddlewares);
+			} catch (error) {
+				console.error('[octane] Request error:', error);
+				return new Response('Internal Server Error', { status: 500 });
 			}
-			return await handleServerRoute(match.route, context, globalMiddlewares);
-		} catch (error) {
-			console.error('[octane] Request error:', error);
-			return new Response('Internal Server Error', { status: 500 });
-		}
+		};
+		if (!asyncContext) return run();
+		setRequestContextSource(asyncContext);
+		const origin = url.origin;
+		return runServerRequest(
+			asyncContext,
+			{
+				origin,
+				platform,
+				context,
+				serverCallHost: createServerCallHost(context, {
+					asyncContext,
+					middlewares: globalMiddlewares,
+					origin,
+				}),
+			},
+			deps.signalOwners,
+			run,
+		);
 	};
 
 	if (fetchCoordinator) fetchCoordinator.handler = handler;
@@ -388,6 +507,13 @@ export function createHandler(manifest, deps) {
 
 		// The hydration payload — SAME keys, SAME order as dev render-route.js, so
 		// the data script is byte-identical between dev and production.
+		const streamedSignals =
+			clientBuild == null
+				? undefined
+				: {
+						buildId: clientBuild.buildId,
+						documentId: crypto.randomUUID(),
+					};
 		const routeData = JSON.stringify({
 			entry: entryPath,
 			exportName: exportName ?? null,
@@ -397,6 +523,8 @@ export function createHandler(manifest, deps) {
 			url: requestUrl,
 			preHydrate: manifest.preHydrate ?? null,
 			rootBoundary: manifest.rootBoundaryEntries ?? { pending: null, catch: null },
+			clientBuild,
+			streamedSignals,
 		});
 		const dataScript = `<script id="__octane_data" type="application/json"${nonceAttribute(nonce)}>${escapeScript(routeData)}</script>`;
 
@@ -427,12 +555,14 @@ export function createHandler(manifest, deps) {
 		// `$&`, `` $` ``, `$'` and `$1` in the inserted text expand against the
 		// match, and this text now carries author-controlled metadata as well as
 		// the serialized route data.
-		/** @param {string} hoistedHead */
-		const splitAroundBody = (hoistedHead) => {
+		/** @param {string} hoistedHead @param {boolean} [earlyHydration] */
+		const splitAroundBody = (hoistedHead, earlyHydration = false) => {
 			const completeHead = headContent + hoistedHead;
-			return noncedTemplate === null
-				? splitHydrationTemplate(completeHead)
-				: splitSsrTemplate(noncedTemplate.replace(HEAD_MARKER, () => completeHead));
+			if (noncedTemplate !== null)
+				return prepareSsrTemplate(noncedTemplate, earlyHydration)(completeHead);
+			if (!earlyHydration) return splitHydrationTemplate(completeHead);
+			splitEarlyHydrationTemplate ??= prepareSsrTemplate(normalizedTemplate, true);
+			return splitEarlyHydrationTemplate(completeHead);
 		};
 
 		if (manifest.render === 'buffered') {
@@ -447,6 +577,8 @@ export function createHandler(manifest, deps) {
 			} = await prerender(RootComponent, undefined, {
 				nonce: nonce ?? undefined,
 				headChannel: 'separate',
+				...(streamedSignals === undefined ? {} : { streamedSignals }),
+				...(independentHydration === undefined ? {} : { independentHydration }),
 				signal: context.request.signal,
 				onError(/** @type {unknown} */ error) {
 					console.error('[octane] SSR render error:', error);
@@ -459,10 +591,16 @@ export function createHandler(manifest, deps) {
 		// Streaming (default): shell flushes at first await, suspense segments
 		// stream out-of-order behind it — identical to dev.
 		let hoistedHead = '';
+		let earlyHydration = clientBuild?.capabilities.independentHydration === true;
 		/** @type {ReadableStream<Uint8Array>} */
 		const renderStream = await renderToReadableStream(RootComponent, undefined, {
+			onEarlyHydrationReady() {
+				earlyHydration = true;
+			},
 			nonce: nonce ?? undefined,
 			headChannel: 'separate',
+			...(streamedSignals === undefined ? {} : { streamedSignals }),
+			...(independentHydration === undefined ? {} : { independentHydration }),
 			// Fires before the shell is written, so the metadata is in hand before
 			// the template prefix (which carries `<head>`) is composed below.
 			onHeadReady(/** @type {string} */ head) {
@@ -474,8 +612,8 @@ export function createHandler(manifest, deps) {
 			},
 		});
 
-		const [prefix, suffix] = splitAroundBody(hoistedHead);
-		const body = composeHtmlStream(prefix, renderStream, suffix);
+		const [prefix, suffix, afterShell] = splitAroundBody(hoistedHead, earlyHydration);
+		const body = composeHtmlStream(prefix, renderStream, suffix, afterShell);
 
 		return new Response(body, { status, headers });
 	}

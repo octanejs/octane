@@ -3,10 +3,8 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { EventEmitter } from 'node:events';
 import { setImmediate as nextHostTurn } from 'node:timers/promises';
-import { compile } from 'octane/compiler';
 import { act, createRoot, hydrateRoot, flushSync } from '../src/index.js';
 import * as ServerRT from 'octane/server';
-import * as HydrationRT from 'octane/hydration';
 import { prerender } from 'octane/static';
 import { initializeHydrationEventCapture, interaction } from 'octane/hydration';
 import { loadCompiledFixtureSource, loadServerFixture } from './_server-fixture.js';
@@ -42,22 +40,10 @@ function serverModule(): Record<string, any> {
 	// Compile under the SAME root-relative id Vite hands the client transform: the
 	// scoped-<style> class hash is filename-derived, so server/client markup
 	// only matches (and hydration only adopts) when the ids agree.
-	let { code } = compile(readFileSync(FIXTURE, 'utf8'), FIXTURE_ID, { mode: 'server' });
-	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/server['"];?/g,
-		(_m: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
-	);
-	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/hydration['"];?/g,
-		(_m: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __hydration;`,
-	);
-	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
-	code = code.replace(/export function (\w+)/g, '__exports.$1 = function $1');
-	return new Function('__rt', '__hydration', '__exports', code + '\nreturn __exports;')(
-		ServerRT,
-		HydrationRT,
-		{},
-	);
+	return loadCompiledFixtureSource(readFileSync(FIXTURE, 'utf8'), {
+		id: FIXTURE_ID,
+		mode: 'server',
+	});
 }
 const server = serverModule();
 const permanentStaticServer = loadServerFixture<{

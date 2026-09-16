@@ -3,7 +3,11 @@
  * contract: @mdx-js/mdx (jsx: true) → recmaOctaneAdapter → octane/compiler.
  */
 import { describe, it, expect } from 'vitest';
+import * as Octane from 'octane';
+import * as Provider from '@octanejs/mdx';
+import { render, cleanup } from '@octanejs/testing-library';
 import { compileMdx, compileMdxSync, defaultRemarkPlugins } from '@octanejs/mdx/compile';
+import { evalModuleCode } from './_helpers';
 
 type TreeNode = Record<string, unknown>;
 
@@ -120,16 +124,25 @@ describe('compileMdxSync', () => {
 		expect(code).toContain('export default');
 	});
 
-	it('mounts the MDX body through the component machinery in both branches', () => {
+	it('renders the MDX body with and without a layout', () => {
 		const { code } = compileMdxSync('# hi\n', '/docs/doc.mdx');
-		// The no-layout branch mounts through the component machinery (the bare
-		// `_createMdxContent(props)` call was rewritten to JSX and lowered to a
-		// descriptor — `<_createMdxContent/>` is a component REFERENCE per JSX
-		// semantics) — no direct call that would bypass the
-		// `(props, __s, __extra)` ABI.
-		expect(code).toContain('_$createElement(_createMdxContent');
-		// …and the emitted ternary-else direct-call shape is gone.
-		expect(code).not.toContain(': _createMdxContent(');
+		const mod = evalModuleCode(code, { octane: Octane, '@octanejs/mdx': Provider });
+		function Layout(props: { children?: Octane.OctaneNode }) {
+			return Octane.createElement('main', null, props.children);
+		}
+		for (const wrapped of [false, true]) {
+			try {
+				const { container } = render(mod.default, {
+					props: { components: wrapped ? { wrapper: Layout } : {} },
+				});
+				const heading = container.querySelector('h1');
+				expect(heading?.textContent).toBe('hi');
+				expect(container.querySelector('main') !== null).toBe(wrapped);
+				expect(heading?.parentElement).toBe(wrapped ? container.querySelector('main') : container);
+			} finally {
+				cleanup();
+			}
+		}
 	});
 
 	it('adds document-level profiling only to client output', () => {

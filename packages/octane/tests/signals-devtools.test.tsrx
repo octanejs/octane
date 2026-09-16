@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { createScope, query, type Resource, type WritableSignal } from 'octane/signals';
+import {
+	createResource,
+	createScope,
+	query,
+	type Resource,
+	type WritableSignal,
+} from 'octane/signals';
 import type { DevtoolsTreeNode, OctaneDevtoolsHook } from '../src/devtools-hook';
 import { act, mount } from './_helpers';
 
@@ -63,7 +69,7 @@ describe('native read DevTools profile integration', () => {
 			});
 			const pending = deferred<string>();
 			const load = query('profile-load', () => pending.promise);
-			const resource$ = scope.asyncSignal$('resource', () => load(undefined));
+			const resource$ = createResource(scope, 'resource', () => load(undefined));
 			const rendered = mount(ProfileNativeHost, { count$, resource$ });
 			try {
 				const tree = nodes(hook().getTree());
@@ -113,7 +119,7 @@ describe('native read DevTools profile integration', () => {
 		const scope = createScope({ scopeKey: 'profile-pending' });
 		const pending = deferred<string>();
 		const load = query('profile-pending-load', () => pending.promise);
-		const resource$ = scope.asyncSignal$('resource', () => load(undefined));
+		const resource$ = createResource(scope, 'resource', () => load(undefined));
 		const rendered = mount(ProfilePendingHost, { resource$ });
 		try {
 			expect(rendered.container.textContent).toBe('loading');

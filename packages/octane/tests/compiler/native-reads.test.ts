@@ -48,7 +48,7 @@ export function App(props) @{ <div style={${expression}} /> }`;
 		// An object used only as the condition never supplies the host style.
 		expect(() =>
 			compile(
-				`${PREFIX} export function App() @{ <div style={{ left: count$ } && {}} /> }`,
+				`${PREFIX} export function App() @{ <div style={{ left: scope.signal$('offset', 0) } && {}} /> }`,
 				FILENAME,
 				options,
 			),
@@ -80,9 +80,10 @@ export function App(props) @{
 	it.each([{ dev: true }, { dev: false, hmr: false }])(
 		'keeps the ordinary DOM compile path for $ names in %j',
 		(options) => {
-			const plain = ORDINARY_DOLLAR.replaceAll('tick$', 'tick');
+			// Keep authored offsets identical: declaration/binding sites encode them.
+			const plain = ORDINARY_DOLLAR.replaceAll('tick$', 'tick_');
 			const compiled = compile(ORDINARY_DOLLAR, FILENAME, options).code;
-			expect(compiled.replaceAll('tick$', 'tick')).toBe(compile(plain, FILENAME, options).code);
+			expect(compiled.replaceAll('tick$', 'tick_')).toBe(compile(plain, FILENAME, options).code);
 		},
 	);
 
@@ -109,6 +110,97 @@ export function useCounter$() { return ${name}(0); }`;
 const scope = createScope({ scopeKey: 'plain' }); const count = scope.signal$('count', 0);`;
 		const compiler = createOctaneCompiler({ root: '/project' });
 		expect(() => compiler.transform(source, '/project/src/store.ts')).toThrow(NAMING);
+		for (const module of ['octane/signals', 'octane/signals/client', 'octane/signals/server']) {
+			expect(() =>
+				compiler.transform(
+					`import { createResource as resource } from '${module}';
+const result = resource(owner, 'result', describe);`,
+					'/project/src/resource.ts',
+				),
+			).toThrow(NAMING);
+		}
+		const bindingModule = `${PREFIX}
+import { adoptBindings as adopt, mountBindings as mount } from 'octane/behavior';
+import { View } from './view.tsrx';
+let props = { count: count$ };
+`;
+		for (const dev of [false, true]) {
+			for (const setup of [
+				`export function activate(root) {
+  return adopt(root, View, { getSnapshot: () => props, subscribe() { return () => {}; } });
+}`,
+				`const source = { getSnapshot() { return props; }, subscribe() { return () => {}; } };
+const alias = { ...source };
+export function activate(root) { return mount({ parent: root }, View, alias); }`,
+			]) {
+				for (const extension of ['ts', 'tsrx']) {
+					const output = compiler.transform(
+						bindingModule + setup,
+						'/project/src/controls.' + extension,
+						{ dev, hmr: false },
+					);
+					expect(output?.code).toContain('getSnapshot');
+					if (extension === 'tsrx') {
+						expect(output?.code).toContain('?octane-bindings=View');
+						expect(output?.code).not.toContain('enableNativeReadCollection');
+						expect(output?.code).not.toContain('octane/internal/client');
+					}
+				}
+			}
+			const activation = `export function activate(root) {
+  return adopt(root, View, { getSnapshot: () => props, subscribe() { return () => {}; } });
+}`;
+			for (const reader of [
+				`export function Reader({ value = count$.get() } = {}) @{ <p>{value as string}</p> }`,
+				`function Reader({ value = count$.get() } = {}) {
+  return createElement('p', null, String(value));
+}`,
+			]) {
+				const output = compiler.transform(
+					`${bindingModule}
+import { createElement, createRoot } from 'octane';
+${reader}
+const root = createRoot(document.createElement('div'));
+root.render(Reader, {});
+${activation}`,
+					'/project/src/mixed-controls.tsrx',
+					{ dev, hmr: false },
+				)!;
+				const beforeParameters = output.code.indexOf('_$enableNativeReadCollection(1);');
+				expect(beforeParameters).toBeGreaterThan(-1);
+				expect(beforeParameters).toBeLessThan(output.code.indexOf('root.render('));
+			}
+			const component = compiler.transform(
+				`${bindingModule}${activation}
+export function Reader({ value = count$.get() } = {}) @{ <p>{value as string}</p> }`,
+				'/project/src/component-controls.tsrx',
+				{ dev, hmr: false },
+			)!;
+			expect(component.code).toContain('_$enableNativeReadCollection(1);');
+			// Only the proven BindingSource protocol property receives the exemption.
+			for (const setup of [
+				`const unrelated = { getSnapshot: () => props };`,
+				`export function activate(adopt, root) {
+  return adopt(root, View, { getSnapshot: () => props, subscribe() { return () => {}; } });
+}`,
+				`export function activate(root) {
+  return adopt(root, { getSnapshot: () => props }, {});
+}`,
+				`export function activate(root) {
+  return adopt(root, View, { getSnapshot: () => props, peek: () => props, subscribe() { return () => {}; } });
+}`,
+				`const getSnapshot = () => props;
+export function activate(root) {
+  return adopt(root, View, { getSnapshot, subscribe() { return () => {}; } });
+}`,
+			])
+				expect(() =>
+					compiler.transform(bindingModule + setup, '/project/src/controls.ts', {
+						dev,
+						hmr: false,
+					}),
+				).toThrow(NAMING);
+		}
 	});
 
 	it('checks runtime capabilities alongside inline type imports', () => {
@@ -209,27 +301,16 @@ export function App() @{ <div /> }`;
 describe('native signal capability names', () => {
 	it.each([
 		['created handles', `const count = scope.signal$('draft-title', 1);`],
-		['aliases', 'const alias = count$;'],
-		['destructured aliases', 'const { count$: count } = { count$ };'],
-		['array destructuring', 'const [count] = [count$];'],
-		['object fields', 'const bag = { count: count$ };'],
-		['assigned fields', 'const bag = {}; bag.count = count$;'],
 		['handle factories', 'function createCount() { return count$; }'],
 		['aggregate factories', 'function makeCounter() { return { count$ }; }'],
 		['arrow factories', 'const createCount = () => count$;'],
 		['live accessor functions', 'function readCount() { return scope.get(count$); }'],
 		['live accessor arrows', 'const readCount = () => scope.get(count$);'],
-		[
-			'live accessor aliases',
-			'function readCount$() { return scope.get(count$); } const read = readCount$;',
-		],
-		['known read parameters', 'function read$(value) { return scope.get(value); }'],
 	])('rejects missing suffixes on %s', (_label, setup) => {
 		expect(() => compile(app(setup), FILENAME, {})).toThrow(NAMING);
 	});
 
 	it.each([
-		['export aliases', 'export { count$ as count };'],
 		[
 			'imported scope factory aliases',
 			`import { createScope as makeScope } from 'octane/signals';
@@ -242,9 +323,49 @@ const count = otherScope.signal$('other', 0);`,
 const otherScope = signals.createScope();
 const count = otherScope.signal$('other', 0);`,
 		],
-		['local hook aliases', `import { useSignal$ as useSignal } from 'octane/signals/client';`],
+		[
+			'imported resource factories',
+			`import { createResource } from 'octane/signals';
+const result = createResource(scope, 'result', describe);`,
+		],
+		[
+			'imported resource factory aliases',
+			`import { createResource as resource } from 'octane/signals';
+const result = resource(scope, 'result', describe);`,
+		],
+		[
+			'namespace resource imports',
+			`import * as signals from 'octane/signals';
+const result = signals.createResource(scope, 'result', describe);`,
+		],
 	])('rejects missing suffixes through %s', (_label, module) => {
 		expect(() => compile(app('', PREFIX + module), FILENAME, {})).toThrow(NAMING);
+	});
+
+	it('allows handles and factories to pass through ordinary alias and prop names', () => {
+		const source = app(
+			`
+const alias = count$;
+const { count$: count } = { count$ };
+const [item] = [count$];
+const bag = { count: count$ };
+bag.count = count$;
+function readCount$() { return scope.get(count$); }
+const read = readCount$;
+function read$(value) { return scope.get(value); }
+`,
+			`${PREFIX}\nexport { count$ as exportedCount };`,
+		);
+		expect(() => compile(source, FILENAME, {})).not.toThrow();
+	});
+
+	it('allows imported capability factories to use ordinary local aliases', () => {
+		const source = app(
+			'',
+			`${PREFIX}
+import { useSignal$ as useSignal } from 'octane/signals/client';`,
+		);
+		expect(() => compile(source, FILENAME, {})).not.toThrow();
 	});
 
 	it('accepts suffixed capabilities, ordinary snapshots, durable keys, and commands', () => {
@@ -266,20 +387,27 @@ const reset = () => scope.set(count$, 0);
 	});
 
 	it('does not give shadowed or unrelated APIs native semantics', () => {
-		const source = app(`
+		const source = app(
+			`
 const unrelated = { signal$(value) { return value; }, get(value) { return value; } };
 const result = unrelated.signal$(1);
+function shadowResource(createResource) {
+  const value = createResource(scope, 'field', () => 1);
+  return value;
+}
 function shadow(createScope) {
   const scope = createScope();
   const value = scope.signal$('field', 1);
   return value;
 }
-`);
+`,
+			`${PREFIX}\nimport { createResource } from 'octane/signals';`,
+		);
 		expect(() => compile(source, FILENAME, {})).not.toThrow();
 	});
 
 	it.each(modes)('reports the authored binding in %j', (options) => {
-		const source = app('const wrong = count$;');
+		const source = app("const wrong = scope.signal$('wrong', 0);");
 		const start = source.indexOf('wrong');
 		let diagnostic: any;
 		try {
@@ -305,6 +433,19 @@ describe('native reads and ordinary hook dependencies', () => {
 			`import { useMemo } from 'octane';\n${PREFIX}`,
 		);
 		expect(() => compile(source, FILENAME, {})).toThrow(MEMO_READ);
+		for (const [imported, factory] of [
+			['{ createResource }', 'createResource'],
+			['{ createResource as resource }', 'resource'],
+			['* as signals', 'signals.createResource'],
+		]) {
+			const resource = app(
+				`const value = memo(() => result$.get(), []);`,
+				`import { useMemo as memo } from 'octane';
+import ${imported} from 'octane/signals';
+const result$ = ${factory}(owner, 'result', describe);`,
+			);
+			expect(() => compile(resource, FILENAME, {})).toThrow(MEMO_READ);
+		}
 	});
 
 	it('diagnoses a helper read and a memo import alias without relying on dollar spelling', () => {
@@ -378,6 +519,8 @@ describe('native-read AST ownership', () => {
 
 	it.each(modes)('does not mutate a frozen parser tree in %j', (options) => {
 		const source = `${PREFIX}
+import { signal$ } from 'octane/signals';
+const nested$ = signal$(signal$(2));
 function readCount$() { return scope.get(count$); }
 export function App(props) @{
   const value = readCount$();
