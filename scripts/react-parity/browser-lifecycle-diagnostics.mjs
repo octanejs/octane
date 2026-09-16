@@ -68,7 +68,7 @@ function observeServer(project) {
 function diagnosticUrl(url) {
 	if (!url || !URL.canParse(url)) return undefined;
 	const parsed = new URL(url);
-	return parsed.protocol === 'http:' || parsed.protocol === 'https:'
+	return ['http:', 'https:', 'ws:', 'wss:'].includes(parsed.protocol)
 		? `${parsed.origin}${parsed.pathname}`
 		: parsed.protocol;
 }
@@ -89,6 +89,35 @@ async function observePage(provider, sessionId, project) {
 	await Promise.all([cdp.send('Page.enable'), cdp.send('Network.enable')]);
 	const { frameTree } = await cdp.send('Page.getFrameTree');
 	let topFrameId = frameTree.frame.id;
+	const sockets = new Map();
+	cdp.on('Network.webSocketCreated', ({ requestId, url }) => {
+		sockets.set(requestId, diagnosticUrl(url));
+	});
+	for (const [event, direction] of [
+		['Network.webSocketFrameSent', 'sent'],
+		['Network.webSocketFrameReceived', 'received'],
+	]) {
+		cdp.on(event, ({ requestId, response }) => {
+			if (response.opcode !== 8) return;
+			// CDP encodes non-text frames as base64. Retain only the close code,
+			// never application frames, the close reason, or URL query tokens.
+			const payload = Buffer.from(response.payloadData, 'base64');
+			const code = payload.length >= 2 ? payload.readUInt16BE(0) : undefined;
+			report('websocket-close-frame', {
+				requestId,
+				direction,
+				url: sockets.get(requestId),
+				code: code >= 1000 && code <= 4999 ? code : undefined,
+			});
+		});
+	}
+	cdp.on('Network.webSocketClosed', ({ requestId }) => {
+		report('websocket-closed', { requestId, url: sockets.get(requestId) });
+		sockets.delete(requestId);
+	});
+	cdp.on('Network.webSocketFrameError', ({ requestId }) => {
+		report('websocket-frame-error', { requestId, url: sockets.get(requestId) });
+	});
 	cdp.on('Page.frameNavigated', ({ frame }) => {
 		if (!frame.parentId) topFrameId = frame.id;
 	});
