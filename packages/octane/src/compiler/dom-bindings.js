@@ -1408,6 +1408,7 @@ function projectProgram(ast, plan, filename, lexical) {
 		const signalFactory = plan.signals ? allocate('_bindingSignals') : null;
 		const styleFactory = plan.styles ? allocate('_bindingStyles') : null;
 		const controlFactory = plan.controls ? allocate('_bindingControls') : null;
+		const hostCapability = plan.hostOperations ? allocate('_bindingHostOperations') : null;
 		const listCapability = plan.lists ? allocate('_bindingList') : null;
 		const projectionFactory = plan.projectionsEnabled ? allocate('_bindingProjections') : null;
 		// Imported child artifacts carry their optional capabilities. Forward a
@@ -1417,7 +1418,7 @@ function projectProgram(ast, plan, filename, lexical) {
 				? b.id(local)
 				: [...plan.childPrograms]
 						.map((child) =>
-							name === 'list'
+							name === 'list' || name === 'hostOperations'
 								? b.logical(
 										'??',
 										b.member(b.id(child), name),
@@ -1493,9 +1494,10 @@ function projectProgram(ast, plan, filename, lexical) {
 				inheritHookMemoOrigin(
 					b.imports(
 						[
-							['__adoptSelectedBindingProgram', adopt],
-							['__mountSelectedBindingProgram', mount],
+							['__adoptLeanBindingProgram', adopt],
+							['__mountLeanBindingProgram', mount],
 							...(listCapability ? [['__bindingList', listCapability]] : []),
+							...(hostCapability ? [['__bindingProgramHostOperations', hostCapability]] : []),
 						],
 						'octane/dom-binding-program',
 					),
@@ -1527,6 +1529,7 @@ function projectProgram(ast, plan, filename, lexical) {
 							...capability('connectProjection', projectionFactory),
 							...capability('createControls', controlFactory),
 							...capability('list', listCapability),
+							...capability('hostOperations', hostCapability),
 							...(signalFactory
 								? [b.prop('init', b.id('connectSignal'), b.id(signalFactory))]
 								: []),

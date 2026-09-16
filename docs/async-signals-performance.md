@@ -76,6 +76,23 @@ This moves unrelated table delivery out of the early path; it does not remove th
 
 Both benchmark variants execute the emitted early and renderer modules, comparing numeric and zero units, unitless and vendor properties, custom-property casing, resets, and child preservation. A deliberate broad-import fault passes those semantic controls and then fails the early dependency guard. Existing development/production CSS, static-bake, and server serialization cases remain unchanged.
 
+## Optional advanced host operations
+
+Renderer-free structural programs now select control, grouped-projection, grouped-class, and native-initialization orchestration only when a compiled fragment can use it. Selection includes inactive branches, local and imported children, and caller-owned slots. Ordinary class, style, text, attribute and event bindings remain available without this capability. Both older program entry-point families retain their prior behavior against the updated runtime; this is not a claim about mixing separately bundled runtime versions.
+
+A frozen comparison against `8f230e95b`, applying only this three-file capability change with the same dependencies and authored inputs, measures complete minified browser ESM closures on Node 24.21.0 with gzip level 9:
+
+| Bundler / entry | Baseline gzip bytes | Candidate gzip bytes | Difference |
+| --- | ---: | ---: | ---: |
+| esbuild 0.28.1 / simple structural bindings | 12,504 | 11,640 | −864 |
+| esbuild / control-bearing bindings | 12,680 | 12,860 | +180 |
+| Vite 8.1.5 / simple structural bindings | 13,775 | 12,819 | −956 |
+| Vite / control-bearing bindings | 13,889 | 14,089 | +200 |
+
+The ordinary `createRoot` control is byte-identical in both bundlers. Older selected artifacts retain the conservative capability and grow by 241 gzip bytes with esbuild and 256 with Vite. These measurements are not additive to other fixture savings and do not establish an application budget pass. The tradeoff is one optional transaction reference and indirect lifecycle calls where the capability is used. Simple programs avoid the grouped-class preparation scan; no per-node scan or per-instance helper allocation is added. CPU and browser latency remain unmeasured.
+
+The permanent Node bundle guard compares the same current descriptor with and without its previous selected entry points: 11,612 versus 12,732 gzip bytes for the simple case. Its imported host-bearing semantic control is 16,722 versus 16,806 bytes. Development/production, mount/adoption, initially hidden/visible branches, repeated controls, initial select values, preserved external classes, grouped styles, events and abort/disposal pass. A separate 64-case matrix uses actual `8f230e95b` compiler artifacts, including both imported-child and caller-slot ownership. Forcing the conservative implementation fails the size ratio; deleting older-child capability forwarding fails control activation. The existing behavior and compiler/AST suites remain unchanged.
+
 ## Independent reads in static native output
 
 The compiler can start same-module immutable query/derived reads together in complete static native JSX output with homogeneous text/renderable holes. Public client and SSR regressions start both eligible loaders in one round instead of waiting for the first to settle. Declarations and unentered branches stay lazy; original reads retain errors and suspension. Components, resource-loading/custom hosts, dynamic attributes and opaque values remain ordering barriers. Review added resource-host exclusions and a case-insensitive attribute barrier after a customized built-in constructor probe exposed changed execution order.

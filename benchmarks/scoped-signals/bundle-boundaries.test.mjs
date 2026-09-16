@@ -651,6 +651,246 @@ export function mount(root, source, options) { return view.mount(root, view, sou
 		}
 });
 
+test('simple programs omit advanced host costs while imported older hosts remain live', async (t) => {
+	const directory = path.resolve('packages/octane');
+	const sources = {
+		'SimpleHost.tsrx': `export function SimpleHost(props) @{ 'use dom bindings';
+ <main class={props.classes} style={props.style}><button onClick={props.onClick}>{props.label as string}</button>
+ @if (props.shown) { <strong>Shown</strong> } @else { <i>Hidden</i> }</main>
+}`,
+		'HostParent.tsrx': `import {HostChild} from './HostChild.tsrx';
+export function HostParent(props) @{ 'use dom bindings'; <main>
+ <HostChild value={props.label} height$={props.height} classes={props.classes} onClick={props.onClick} />
+ <HostChild value="Second" height$={8} classes="second" onClick={props.onClick} />
+ @if (props.shown) { <HostChild value="Third" height$={props.height} classes={props.classes} onClick={props.onClick} /> }
+ @else { <i>Hidden</i> }</main>
+}`,
+		'HostChild.tsrx': `import {unbound} from 'octane/behavior'; import * as stylex from 'binding-styles';
+const styles = stylex.create({size: height => ({className: height == null ? 'empty' : 'sized', style: {height}})});
+export function HostChild(props) @{ 'use dom bindings'; <article>
+ <input value={props.value}/><select defaultValue="b"><option value="a">A</option><option value="b">B</option></select>
+ <span class={[unbound('external'), props.classes]}>Class</span>
+ <div sx={styles.size(props.height$)}><input /></div><button onClick={props.onClick}>Go</button>
+</article> }`,
+	};
+	const bundle = async (view, mode, dev, oldRoot = false, oldChild = false) => {
+		const entry =
+			mode === 'server'
+				? `import {${view}} from './${view}.tsrx'; import {renderToString} from 'octane/server';
+export function render(props) { return renderToString(${view}, props).html; }`
+				: `import view from './${view}.tsrx?octane-bindings=${view}&octane-mount=1';
+export function adopt(root, source, options) { return view.adopt(root, view, source, options); }
+export function mount(root, source, options) { return view.mount(root, view, source, options); }`;
+		const result = await build({
+			stdin: { contents: entry, resolveDir: directory },
+			bundle: true,
+			write: false,
+			minify: true,
+			metafile: true,
+			format: 'esm',
+			platform: mode === 'server' ? 'node' : 'browser',
+			target: 'es2022',
+			legalComments: 'none',
+			tsconfigRaw: { compilerOptions: {} },
+			define: { 'process.env.NODE_ENV': '"production"', __OCTANE_PROFILE_ENABLED__: 'false' },
+			plugins: [
+				{
+					name: 'optional-host-artifacts',
+					setup(plugin) {
+						plugin.onResolve(
+							{ filter: /(?:SimpleHost|HostParent|HostChild)\.tsrx(?:\?.*)?$/ },
+							({ path: id }) => ({ path: id, namespace: 'optional-host' }),
+						);
+						plugin.onResolve({ filter: /^binding-styles$/ }, () => ({
+							path: 'binding-styles',
+							namespace: 'host-styles',
+						}));
+						// The adapter's compiled object contract; no CSS generation is measured here.
+						plugin.onLoad({ filter: /.*/, namespace: 'host-styles' }, () => ({
+							contents:
+								'export const create = value => value; export const props = value => value;',
+							loader: 'js',
+						}));
+						plugin.onLoad({ filter: /.*/, namespace: 'optional-host' }, ({ path: id }) => {
+							const current = id.startsWith('current:');
+							const request = current ? id.slice('current:'.length) : id;
+							const name = path.basename(request.split('?')[0]);
+							const old = name === `${view}.tsrx` ? oldRoot : oldChild;
+							return {
+								contents:
+									!current && old && request.includes('?')
+										? `import current from ${JSON.stringify('current:' + request)};
+import {__adoptSelectedBindingProgram, __mountSelectedBindingProgram} from 'octane/dom-binding-program';
+export default {...current, hostOperations: undefined, adopt: __adoptSelectedBindingProgram, mount: __mountSelectedBindingProgram};`
+										: compile(sources[name], path.join(directory, request), {
+												mode,
+												dev,
+												hmr: false,
+												knownAttributeSpreads: [
+													{
+														source: 'binding-styles',
+														imported: '*',
+														members: ['props'],
+														fields: ['className', 'style'],
+														style: 'object',
+														jsxAttribute: 'sx',
+													},
+												],
+											}).code,
+								loader: 'js',
+								resolveDir: directory,
+							};
+						});
+					},
+				},
+			],
+		});
+		if (mode === 'client')
+			assert.ok(
+				!Object.keys(result.metafile.inputs).some((id) =>
+					/packages\/octane\/src\/(?:runtime(?:\.server)?\.ts|signals\/(?:engine|graph|facade)\.ts)$/.test(
+						id,
+					),
+				),
+				'Host bindings reached the renderer or signal graph.',
+			);
+		const code = result.outputFiles[0].text;
+		return {
+			api: await import('data:text/javascript;base64,' + Buffer.from(code).toString('base64')),
+			gzip: gzipSync(code, { level: 9 }).length,
+		};
+	};
+	const window = new Window();
+	const globals = new Map();
+	for (const name of ['window', 'document', 'Node', 'Element', 'HTMLElement', 'Comment', 'Text']) {
+		globals.set(name, Object.getOwnPropertyDescriptor(globalThis, name));
+		Object.defineProperty(globalThis, name, {
+			configurable: true,
+			value: name === 'window' ? window : window[name],
+		});
+	}
+	t.after(() => {
+		for (const [name, descriptor] of globals) {
+			if (descriptor) Object.defineProperty(globalThis, name, descriptor);
+			else delete globalThis[name];
+		}
+		window.close();
+	});
+	for (const view of ['SimpleHost', 'HostParent'])
+		for (const dev of [false, true]) {
+			const server = await bundle(view, 'server', dev);
+			const variants =
+				view === 'SimpleHost'
+					? [
+							[false, false],
+							[true, false],
+						]
+					: [
+							[false, false],
+							[false, true],
+							[true, false],
+							[true, true],
+						];
+			const sizes = [];
+			for (const [oldRoot, oldChild] of variants) {
+				const client = await bundle(view, 'client', dev, oldRoot, oldChild);
+				sizes.push(client.gzip);
+				for (const adopt of [false, true])
+					for (const shown of [false, true]) {
+						let clicks = 0;
+						let snapshot = {
+							label: 'First',
+							classes: 'primary',
+							style: { height: 2 },
+							height: 2,
+							shown,
+							onClick: () => clicks++,
+						};
+						const listeners = new Set();
+						const source = {
+							getSnapshot: () => snapshot,
+							subscribe(notify) {
+								listeners.add(notify);
+								return () => listeners.delete(notify);
+							},
+						};
+						const publish = (props) => {
+							snapshot = { ...snapshot, ...props };
+							for (const notify of listeners) notify();
+						};
+						const host = window.document.createElement('div');
+						window.document.body.append(host);
+						if (adopt) host.innerHTML = server.api.render(snapshot);
+						const serverMain = host.querySelector('main');
+						const controller = new AbortController();
+						const handle = adopt
+							? client.api.adopt(serverMain, source, { signal: controller.signal })
+							: client.api.mount({ parent: host }, source, { signal: controller.signal });
+						try {
+							const main = host.querySelector('main');
+							const first = host.querySelector('article');
+							if (adopt) assert.equal(main, serverMain);
+							if (first) {
+								assert.equal(first.querySelector('input').value, 'First');
+								assert.equal(first.querySelector('select').value, 'b');
+								assert.equal(first.querySelector('span').className, 'external primary');
+								assert.equal(first.querySelector('div').style.height, '2px');
+							}
+							host.querySelector('button').click();
+							assert.equal(clicks, 1);
+							publish({
+								label: 'Updated',
+								height: 3,
+								style: { height: 3 },
+								classes: 'changed',
+								shown: true,
+							});
+							assert.equal(host.querySelector('main'), main);
+							if (view === 'SimpleHost') {
+								assert.equal(main.className, 'changed');
+								assert.equal(main.style.height, '3px');
+								assert.equal(host.querySelector('button').textContent, 'Updated');
+								assert.equal(host.querySelector('strong').textContent, 'Shown');
+							} else {
+								assert.equal(host.querySelector('article'), first);
+								assert.deepEqual(
+									[...host.querySelectorAll('article > input')].map((node) => node.value),
+									['Updated', 'Second', 'Third'],
+								);
+								assert.deepEqual(
+									[...host.querySelectorAll('article > div')].map((node) => node.style.height),
+									['3px', '8px', '3px'],
+								);
+								assert.equal(first.querySelector('span').className, 'external changed');
+								const retired = host.querySelectorAll('article')[2];
+								publish({ shown: false });
+								retired.querySelector('button').click();
+								assert.equal(clicks, 1);
+								publish({ shown: true });
+								assert.notEqual(host.querySelectorAll('article')[2], retired);
+							}
+							controller.abort();
+							assert.equal(listeners.size, 0);
+							host.querySelector('button').click();
+							assert.equal(clicks, 1);
+							const html = host.innerHTML;
+							publish({ label: 'Disposed' });
+							assert.equal(host.innerHTML, html);
+						} finally {
+							handle.dispose();
+							host.remove();
+						}
+					}
+			}
+			if (!dev) {
+				t.diagnostic(
+					JSON.stringify({ view, selectedGzip: sizes[0], compatibilityGzip: sizes.at(-1) }),
+				);
+				assert.ok(sizes[0] / sizes.at(-1) < (view === 'SimpleHost' ? 0.95 : 1.02));
+			}
+		}
+});
+
 test('early whole-style bindings exclude later renderer attribute tables', async (t) => {
 	const directory = await mkdtemp(path.join(tmpdir(), 'octane-style-boundary-'));
 	t.after(() => rm(directory, { recursive: true, force: true }));

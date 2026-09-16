@@ -353,8 +353,10 @@ export interface CompiledBindingProgram<Props> {
 	readonly connectProjection?: typeof __createBindingProjections;
 	readonly createControls?: typeof __createBindingControls;
 	readonly list?: BindingListCapability;
-	readonly adopt: typeof __adoptSelectedBindingProgram<Props> & {
+	readonly hostOperations?: BindingProgramHostOperations;
+	readonly adopt: typeof __adoptLeanBindingProgram<Props> & {
 		readonly list?: BindingListCapability;
+		readonly hostOperations?: BindingProgramHostOperations;
 	};
 	readonly mount: typeof __mountBindingProgram<Props>;
 }
@@ -430,6 +432,7 @@ interface Transaction {
 	styles?: ReturnType<typeof __createBindingStyles>;
 	projections?: ReturnType<typeof __createBindingProjections>;
 	controls?: ReturnType<typeof __createBindingControls>;
+	hostOperations?: BindingProgramHostOperations;
 	list?: BindingListCapability;
 	notifySignal?(prepare: () => () => void): void;
 	preparing?: boolean;
@@ -676,8 +679,7 @@ function releaseInstance(instance: FragmentInstance, transaction: Transaction): 
 	};
 	// Abort native control/event bridges before releasing channels. An item owns
 	// this lifetime only; removing it does not retire the shared document source.
-	for (const control of instance.controls?.values() ?? []) attempt(() => control.dispose());
-	instance.controls?.clear();
+	transaction.hostOperations?.releaseControls(instance, attempt);
 	attempt(() => instance.controller?.abort());
 	attempt(() => instance.cleanup?.());
 	instance.cleanup = undefined;
@@ -685,9 +687,7 @@ function releaseInstance(instance: FragmentInstance, transaction: Transaction): 
 	for (const connection of instance.signals?.values() ?? [])
 		attempt(() => connection.dispose(transaction.preservePresentation));
 	instance.signals?.clear();
-	for (const connection of instance.projections ? new Set(instance.projections.values()) : [])
-		attempt(() => connection.dispose(transaction.preservePresentation));
-	instance.projections?.clear();
+	transaction.hostOperations?.releaseProjections(instance, transaction, attempt);
 	instance.signalPlan = undefined;
 	for (const region of instance.regions) {
 		if (region.signal) attempt(() => region.signal!.dispose());
@@ -813,30 +813,8 @@ function resolveFragment(
 		const node = instance.nodes[binding[0]];
 		if (node?.nodeType !== 1) mismatch();
 		instance.owned.push([node as Element, __claimBinding(node as Element, binding)]);
-		if (binding[1] === 'control') {
-			if (!transaction.controls)
-				throw new TypeError('A DOM control binding requires its compiler-selected adapter.');
-			const prepare = (): (() => void) => {
-				if (
-					instance.disposed ||
-					(transaction.preparing && instance.signalFrame !== transaction.frame)
-				)
-					return () => {};
-				const prepared = instance.controls!.get(index)!.prepareCurrent();
-				prepared.publish();
-				if (transaction.preparing && instance.signalPlan) {
-					instance.signalPlan.controls!.set(index, prepared);
-					return () => {};
-				}
-				return prepared.commit;
-			};
-			(instance.controls ??= new Map()).set(
-				index,
-				transaction.controls.claim(node as Element, binding[2] as 'value' | 'checked', () =>
-					transaction.notifySignal!(prepare),
-				),
-			);
-		}
+		if (binding[1] === 'control')
+			transaction.hostOperations!.claimControl(instance, index, node as Element, transaction);
 		if (!fresh && binding[1] === 'classGroup')
 			instance.groups.set(
 				index,
@@ -916,54 +894,7 @@ function projectValues(
 	const operations = instance.definition.bindings;
 	if (!Array.isArray(values) || values.length !== operations.length)
 		throw new TypeError('A DOM presentation projection must return its synchronous scalar values.');
-	if (transaction.projections && instance.definition.projectionGroups) {
-		values = [...values];
-		for (const group of instance.definition.projectionGroups) {
-			requireActive(transaction);
-			const first = group[0]![0];
-			let connection = instance.projections?.get(first);
-			if (!connection) {
-				const prepare = (): (() => void) => {
-					if (
-						instance.disposed ||
-						(transaction.preparing && instance.signalFrame !== transaction.frame)
-					)
-						return () => {};
-					const projected = connection!.get();
-					const groups = new Map<number, { commit(): void }>();
-					for (const [index] of group) {
-						const classGroup = instance.groups
-							.get(index)
-							?.prepare((projected[index] as string | null) ?? '');
-						if (classGroup) groups.set(index, classGroup);
-					}
-					if (transaction.preparing && instance.signalPlan) {
-						for (const [index] of group) {
-							instance.signalPlan.values[index] = projected[index]!;
-							const classGroup = groups.get(index);
-							if (classGroup) instance.signalPlan.groups.set(index, classGroup);
-						}
-						return () => {};
-					}
-					return () => {
-						for (const [index] of group)
-							writeOperation(instance, index, projected[index]!, groups.get(index), transaction);
-					};
-				};
-				connection = transaction.projections.connect(
-					group,
-					operations,
-					instance.nodes,
-					() => transaction.notifySignal!(prepare),
-					transaction.restoreStyles,
-				);
-				instance.projections ??= new Map();
-				for (const [index] of group) instance.projections.set(index, connection);
-			}
-			const projected = connection.read(values[first]);
-			for (const [index] of group) (values as unknown[])[index] = projected[index];
-		}
-	}
+	values = transaction.hostOperations?.project(values, instance, transaction) ?? values;
 	if (transaction.signals || transaction.styles) {
 		let copied = false;
 		const indices = instance.definition.styleIndices
@@ -1083,7 +1014,7 @@ function prepareFragment(
 		instance,
 		environment,
 		values: projectValues(definition.project(environment), instance, transaction, controls),
-		initial: initialValues(instance, environment),
+		initial: transaction.hostOperations?.initial(instance, environment) ?? null,
 		regions: [],
 		groups: new Map(),
 		controls,
@@ -1094,29 +1025,7 @@ function prepareFragment(
 		instance.signalFrame = transaction.frame;
 	}
 	requireActive(transaction);
-	for (let index = 0; index < definition.bindings.length; index++) {
-		const operation = definition.bindings[index]!;
-		if (operation[1] !== 'classGroup') continue;
-		let group = instance.groups.get(index);
-		if (!group) {
-			const receipt = definition.initializers?.findIndex(
-				(initializer) =>
-					initializer[0] === operation[0] &&
-					initializer[1] === 'classGroupInitial' &&
-					initializer[2] === operation[2],
-			);
-			if (receipt === undefined || receipt < 0 || typeof plan.initial?.[receipt] !== 'string')
-				throw new Error('A constructible class group requires its compiler baseline initializer.');
-			group = definition.createClassGroup!(
-				instance.nodes[operation[0]] as Element,
-				operation[2],
-				operation[3] as number,
-				plan.initial[receipt] as string,
-			);
-			instance.groups.set(index, group);
-		}
-		plan.groups.set(index, group.prepare((plan.values[index] as string | null) ?? ''));
-	}
+	transaction.hostOperations?.groups(plan);
 	const document = instance.range.start.ownerDocument;
 	requireActive(transaction);
 	for (const region of instance.regions) {
@@ -1391,7 +1300,7 @@ function commitFragment(plan: FragmentPlan, transaction: Transaction): void {
 	instance.signalPlan = undefined;
 	instance.environment = plan.environment;
 	instance.updateAdapters = plan.adapters;
-	initializeProperties(plan, false, transaction);
+	transaction.hostOperations?.initialize(plan, false, transaction);
 	for (let index = 0; index < plan.values.length && !transaction.disposed; index++) {
 		if (instance.definition.bindings[index]![1] === 'control') continue;
 		writeOperation(instance, index, plan.values[index]!, plan.groups.get(index), transaction);
@@ -1400,7 +1309,7 @@ function commitFragment(plan: FragmentPlan, transaction: Transaction): void {
 		if (transaction.disposed) return;
 		commitRegion(region, instance.id, transaction);
 	}
-	initializeProperties(plan, true, transaction);
+	transaction.hostOperations?.initialize(plan, true, transaction);
 	for (const control of plan.controls?.values() ?? []) {
 		if (transaction.disposed) return;
 		control.commit();
@@ -1456,6 +1365,7 @@ function bindProgram<Props>(
 	options: BindingOptions | undefined,
 	mount: boolean,
 	list: BindingListCapability | undefined = descriptor.list,
+	hostOperations: BindingProgramHostOperations | undefined = descriptor.hostOperations,
 ): BindingHandle {
 	if (!source || typeof source.getSnapshot !== 'function' || typeof source.subscribe !== 'function')
 		throw new TypeError(
@@ -1481,6 +1391,7 @@ function bindProgram<Props>(
 		projections: descriptor.connectProjection?.(),
 		controls: descriptor.createControls?.(),
 		list,
+		hostOperations,
 		frame: 0,
 	};
 	const signalUpdates =
@@ -1599,7 +1510,7 @@ function bindProgram<Props>(
 					transaction,
 				);
 				if (!dirty && !transaction.disposed && transaction.controls)
-					publishControls(plan, transaction);
+					transaction.hostOperations!.publish(plan, transaction);
 				while (signalUpdates?.size && !dirty && !transaction.disposed) {
 					const pending = [...signalUpdates];
 					signalUpdates.clear();
@@ -1750,6 +1661,7 @@ function adoptProgram<Props>(
 	source: BindingSource<Props>,
 	options: BindingOptions | undefined,
 	list?: BindingListCapability,
+	hostOperations?: BindingProgramHostOperations,
 ): BindingHandle {
 	if (
 		(root as Node).nodeType === 1 &&
@@ -1764,11 +1676,11 @@ function adoptProgram<Props>(
 		if (marker?.kind !== 'root' && element.getAttribute('data-octane-bindings') === descriptor.id)
 			return descriptor.adoptScalar(element, descriptor.scalar, source, options);
 	}
-	return bindProgram(root, descriptor, source, options, false, list);
+	return bindProgram(root, descriptor, source, options, false, list, hostOperations);
 }
 
 /** @internal The current compiler supplies every capability used by its program. */
-export function __adoptSelectedBindingProgram<Props>(
+export function __adoptLeanBindingProgram<Props>(
 	root: Element | BindingRange,
 	descriptor: CompiledBindingProgram<Props>,
 	source: BindingSource<Props>,
@@ -1778,7 +1690,7 @@ export function __adoptSelectedBindingProgram<Props>(
 }
 
 /** @internal Construct only compiler-proven native fragments, never application builders. */
-export function __mountSelectedBindingProgram<Props>(
+export function __mountLeanBindingProgram<Props>(
 	target: BindingMountTarget,
 	descriptor: CompiledBindingProgram<Props>,
 	source: BindingSource<Props>,
@@ -1792,9 +1704,22 @@ export const __bindingList = { adopt: adoptList, prepare: prepareList, commit: c
 
 type BindingListCapability = typeof __bindingList;
 
+/** @internal Selected only for controls, grouped projections/classes, or native initialization. */
+export const __bindingProgramHostOperations = {
+	claimControl: claimProgramControl,
+	project: projectHostValues,
+	initial: initialValues,
+	groups: prepareHostGroups,
+	initialize: initializeProperties,
+	publish: publishControls,
+	releaseControls: releaseHostControls,
+	releaseProjections: releaseHostProjections,
+};
+type BindingProgramHostOperations = typeof __bindingProgramHostOperations;
+
 // Older query artifacts only carry their adopter, not selected capabilities.
 // Keeping this metadata on that legacy callable lets a new parent forward an
-// old imported child's lists without retaining list code for current children.
+// old imported child's capabilities without retaining them for current children.
 export const __adoptBindingProgram = /* @__PURE__ */ Object.assign(
 	function __adoptBindingProgram<Props>(
 		root: Element | BindingRange,
@@ -1802,9 +1727,16 @@ export const __adoptBindingProgram = /* @__PURE__ */ Object.assign(
 		source: BindingSource<Props>,
 		options?: BindingOptions,
 	): BindingHandle {
-		return adoptProgram(root, descriptor, source, options, __bindingList);
+		return adoptProgram(
+			root,
+			descriptor,
+			source,
+			options,
+			__bindingList,
+			__bindingProgramHostOperations,
+		);
 	},
-	{ list: __bindingList },
+	{ list: __bindingList, hostOperations: __bindingProgramHostOperations },
 );
 
 /** @internal Compatibility entry for artifacts emitted before capability selection. */
@@ -1814,7 +1746,15 @@ export function __mountBindingProgram<Props>(
 	source: BindingSource<Props>,
 	options?: BindingOptions,
 ): BindingHandle {
-	return bindProgram(target, descriptor, source, options, true, __bindingList);
+	return bindProgram(
+		target,
+		descriptor,
+		source,
+		options,
+		true,
+		__bindingList,
+		__bindingProgramHostOperations,
+	);
 }
 
 function adoptList(region: RegionInstance, id: string, transaction: Transaction): void {
@@ -1932,4 +1872,175 @@ function commitList(plan: RegionPlan, id: string, transaction: Transaction): voi
 	}
 	region.range.start.data = `[f${plan.arm};b;${id};${region.site}`;
 	return;
+}
+
+function claimProgramControl(
+	instance: FragmentInstance,
+	index: number,
+	node: Element,
+	transaction: Transaction,
+): void {
+	if (!transaction.controls)
+		throw new TypeError('A DOM control binding requires its compiler-selected adapter.');
+	const prepare = (): (() => void) => {
+		if (instance.disposed || (transaction.preparing && instance.signalFrame !== transaction.frame))
+			return () => {};
+		const prepared = instance.controls!.get(index)!.prepareCurrent();
+		prepared.publish();
+		if (transaction.preparing && instance.signalPlan) {
+			instance.signalPlan.controls!.set(index, prepared);
+			return () => {};
+		}
+		return prepared.commit;
+	};
+	(instance.controls ??= new Map()).set(
+		index,
+		transaction.controls.claim(
+			node,
+			instance.definition.bindings[index]![2] as 'value' | 'checked',
+			() => transaction.notifySignal!(prepare),
+		),
+	);
+}
+
+function projectHostValues(
+	values: readonly unknown[],
+	instance: FragmentInstance,
+	transaction: Transaction,
+): readonly unknown[] {
+	const operations = instance.definition.bindings;
+	if (transaction.projections && instance.definition.projectionGroups) {
+		values = [...values];
+		for (const group of instance.definition.projectionGroups) {
+			requireActive(transaction);
+			const first = group[0]![0];
+			let connection = instance.projections?.get(first);
+			if (!connection) {
+				const prepare = (): (() => void) => {
+					if (
+						instance.disposed ||
+						(transaction.preparing && instance.signalFrame !== transaction.frame)
+					)
+						return () => {};
+					const projected = connection!.get();
+					const groups = new Map<number, { commit(): void }>();
+					for (const [index] of group) {
+						const classGroup = instance.groups
+							.get(index)
+							?.prepare((projected[index] as string | null) ?? '');
+						if (classGroup) groups.set(index, classGroup);
+					}
+					if (transaction.preparing && instance.signalPlan) {
+						for (const [index] of group) {
+							instance.signalPlan.values[index] = projected[index]!;
+							const classGroup = groups.get(index);
+							if (classGroup) instance.signalPlan.groups.set(index, classGroup);
+						}
+						return () => {};
+					}
+					return () => {
+						for (const [index] of group)
+							writeOperation(instance, index, projected[index]!, groups.get(index), transaction);
+					};
+				};
+				connection = transaction.projections.connect(
+					group,
+					operations,
+					instance.nodes,
+					() => transaction.notifySignal!(prepare),
+					transaction.restoreStyles,
+				);
+				instance.projections ??= new Map();
+				for (const [index] of group) instance.projections.set(index, connection);
+			}
+			const projected = connection.read(values[first]);
+			for (const [index] of group) (values as unknown[])[index] = projected[index];
+		}
+	}
+
+	return values;
+}
+
+function prepareHostGroups(plan: FragmentPlan): void {
+	const instance = plan.instance;
+	const definition = instance.definition;
+	for (let index = 0; index < definition.bindings.length; index++) {
+		const operation = definition.bindings[index]!;
+		if (operation[1] !== 'classGroup') continue;
+		let group = instance.groups.get(index);
+		if (!group) {
+			const receipt = definition.initializers?.findIndex(
+				(initializer) =>
+					initializer[0] === operation[0] &&
+					initializer[1] === 'classGroupInitial' &&
+					initializer[2] === operation[2],
+			);
+			if (receipt === undefined || receipt < 0 || typeof plan.initial?.[receipt] !== 'string')
+				throw new Error('A constructible class group requires its compiler baseline initializer.');
+			group = definition.createClassGroup!(
+				instance.nodes[operation[0]] as Element,
+				operation[2],
+				operation[3] as number,
+				plan.initial[receipt] as string,
+			);
+			instance.groups.set(index, group);
+		}
+		plan.groups.set(index, group.prepare((plan.values[index] as string | null) ?? ''));
+	}
+}
+
+function releaseHostControls(
+	instance: FragmentInstance,
+	attempt: (callback: () => void) => void,
+): void {
+	for (const control of instance.controls?.values() ?? []) attempt(() => control.dispose());
+	instance.controls?.clear();
+}
+
+function releaseHostProjections(
+	instance: FragmentInstance,
+	transaction: Transaction,
+	attempt: (callback: () => void) => void,
+): void {
+	for (const connection of instance.projections ? new Set(instance.projections.values()) : [])
+		attempt(() => connection.dispose(transaction.preservePresentation));
+	instance.projections?.clear();
+}
+
+/** @internal Compatibility for artifacts which selected lists but not host operations. */
+export const __adoptSelectedBindingProgram = /* @__PURE__ */ Object.assign(
+	function __adoptSelectedBindingProgram<Props>(
+		root: Element | BindingRange,
+		descriptor: CompiledBindingProgram<Props>,
+		source: BindingSource<Props>,
+		options?: BindingOptions,
+	): BindingHandle {
+		return adoptProgram(
+			root,
+			descriptor,
+			source,
+			options,
+			descriptor.list,
+			__bindingProgramHostOperations,
+		);
+	},
+	{ hostOperations: __bindingProgramHostOperations },
+);
+
+/** @internal Compatibility for artifacts which selected lists but not host operations. */
+export function __mountSelectedBindingProgram<Props>(
+	target: BindingMountTarget,
+	descriptor: CompiledBindingProgram<Props>,
+	source: BindingSource<Props>,
+	options?: BindingOptions,
+): BindingHandle {
+	return bindProgram(
+		target,
+		descriptor,
+		source,
+		options,
+		true,
+		descriptor.list,
+		__bindingProgramHostOperations,
+	);
 }

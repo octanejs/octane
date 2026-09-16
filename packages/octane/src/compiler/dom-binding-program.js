@@ -128,6 +128,7 @@ export function planBindingProgram(fn, render, context) {
 	let slotFactory = null;
 	let signals = false;
 	let controls = false;
+	let hostOperations = false;
 	let lists = false;
 	let styles = false;
 	let projectionsEnabled = false;
@@ -487,6 +488,7 @@ export function planBindingProgram(fn, render, context) {
 					// lease is acquired and published, including a changed active branch.
 					signals ||= child.signals;
 					controls ||= child.controls;
+					hostOperations ||= child.hostOperations;
 					styles ||= child.styles;
 					for (const program of child.childPrograms) childPrograms.add(program);
 					lists ||= child.lists;
@@ -846,6 +848,10 @@ export function planBindingProgram(fn, render, context) {
 			...(styleIndices.length ? { styleIndices: data(styleIndices) } : {}),
 			...(projectionGroups.length ? { projectionGroups: data(projectionGroups) } : {}),
 		};
+		hostOperations ||=
+			initializers.length > 0 ||
+			projectionGroups.length > 0 ||
+			bindings.some((binding) => binding[1] === 'control' || binding[1] === 'classGroup');
 		if (initializers.length > 0) {
 			properties.initializers = data(initializers);
 			properties.initialize = project(names, b.array(initialValues));
@@ -918,6 +924,7 @@ export function planBindingProgram(fn, render, context) {
 		unbound,
 		signals,
 		controls,
+		hostOperations,
 		lists,
 		styles,
 		projectionsEnabled,
