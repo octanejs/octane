@@ -695,6 +695,8 @@ function planView(fn, filename, source, imports, lexical, native = null) {
 	const signalIndices = [];
 	const styleIndices = [];
 	const projectionGroups = [];
+	const providerBindings = new Set();
+	const unboundAttributes = new Set();
 	const classAttributes = new Map();
 	const id = `d:${strongHash(`octane:dom-bindings:2\0${filename}\0${fn.id.name}\0${source}`)}`;
 	const parameterScope = lexical.nodeScopes.get(fn.body) ?? lexical.rootScope;
@@ -959,6 +961,7 @@ function planView(fn, filename, source, imports, lexical, native = null) {
 						if (!group) signalIndices.push(bindings.length);
 						bindings.push([index, bindingKind(tag, name), name]);
 					}
+					providerBindings.add(bindings.length - 1);
 					values.push(
 						group
 							? inheritHookMemoOrigin(
@@ -1030,6 +1033,16 @@ function planView(fn, filename, source, imports, lexical, native = null) {
 				nodes[index][3] = null;
 				continue;
 			}
+			const value =
+				attr.value === null
+					? b.literal(true)
+					: unwrap(
+							attr.value?.type === 'JSXExpressionContainer' ? attr.value.expression : attr.value,
+						);
+			if ((lower === 'ref' || /^on[A-Z]/.test(raw)) && markUnbound(value)) {
+				unboundAttributes.add(lower);
+				continue;
+			}
 			if (
 				!/^[A-Za-z_][A-Za-z0-9_.:-]*$/.test(name) ||
 				lower.startsWith('on') ||
@@ -1038,13 +1051,10 @@ function planView(fn, filename, source, imports, lexical, native = null) {
 			) {
 				error(filename, attr, `attribute ${JSON.stringify(raw)} is not supported in binding views`);
 			}
-			const value =
-				attr.value === null
-					? b.literal(true)
-					: unwrap(
-							attr.value?.type === 'JSXExpressionContainer' ? attr.value.expression : attr.value,
-						);
-			if (markUnbound(value)) continue;
+			if (markUnbound(value)) {
+				unboundAttributes.add(lower);
+				continue;
+			}
 			if (value?.type !== 'Literal' && externalNames.has(lower))
 				error(
 					filename,
@@ -1152,6 +1162,28 @@ function planView(fn, filename, source, imports, lexical, native = null) {
 		}
 	};
 	visit(render, -1, native?.namespace ?? 0, native?.ancestors ?? []);
+	// Opaque descendants are outside this receipt. Only a scalar native host's
+	// declared presentation channels can transfer independently of those children.
+	const hostHandoff =
+		nodes.length === 1 &&
+		nodes[0][3] === null &&
+		!addressed &&
+		!['textarea', 'input', 'select'].includes(nodes[0][1]) &&
+		bindings.length > 0 &&
+		bindings.every(
+			(binding, index) =>
+				binding[0] === 0 &&
+				(['class', 'styleProperty', 'styleAttribute', 'styleObject'].includes(binding[1]) ||
+					providerBindings.has(index)),
+		) &&
+		[...(render.openingElement?.attributes ?? render.attributes ?? [])].every(
+			(attr) =>
+				!['JSXSpreadAttribute', 'SpreadAttribute'].includes(attr.type) ||
+				(attr._octaneKnownAttributeSpread && !attr._octaneKnownAttributeSpread.unbound),
+		) &&
+		!(render.openingElement?.attributes ?? render.attributes ?? []).some(
+			(attr) => attrName(attr)?.toLowerCase() === 'dangerouslysetinnerhtml',
+		);
 	return {
 		fn,
 		render,
@@ -1167,6 +1199,8 @@ function planView(fn, filename, source, imports, lexical, native = null) {
 		unbound,
 		classAttributes,
 		id,
+		hostHandoff,
+		unboundAttributes,
 	};
 }
 
@@ -1189,6 +1223,7 @@ function scalarProperties(
 		b.prop('init', b.id('nodes'), literalData(plan.nodes)),
 		b.prop('init', b.id('bindings'), literalData(plan.bindings)),
 		b.prop('init', b.id('project'), project),
+		...(plan.hostHandoff ? [b.prop('init', b.id('handoff'), b.literal('host'))] : []),
 		...(plan.signalIndices.length
 			? [
 					b.prop('init', b.id('signalIndices'), literalData(plan.signalIndices)),
@@ -2219,6 +2254,16 @@ export function prepareDomBindings(ast, source, filename, selectedExport, helper
 			);
 		}
 		for (const [node, replacement] of rewritten) replacements.set(node, replacement);
+		if (plan.hostHandoff)
+			replacements.set(node, {
+				...mapCow(node, rewritten),
+				_octanePresentationHydration: {
+					id: plan.id,
+					supported: true,
+					host: true,
+					unboundAttributes: plan.unboundAttributes,
+				},
+			});
 	});
 	if (selectedExport !== null) {
 		const plan = plans.get(selectedExport);

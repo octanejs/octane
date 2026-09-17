@@ -1,5 +1,12 @@
 import { normalizeClass } from './class-names.js';
 import { sanitizeURL } from './sanitize-url.js';
+import { STREAM_SCRIPT_ATTR, SUSPENSE_SCRIPT_ATTR } from './stream-protocol.js';
+import { NATIVE_SIGNAL_SEED_ATTR } from './signals/native-read-seeds.js';
+import {
+	BINDING_HANDOFF,
+	type BindingHandoff,
+	type BindingHandoffCapability,
+} from './dom-binding-handoff.js';
 import type { createBindingClassGroup } from './dom-binding-classes.js';
 import type {
 	__createBindingSignals,
@@ -130,6 +137,8 @@ export type BindingValue = string | null | BindingStyleSnapshot;
 /** @internal No application function is invoked to discover the DOM topology. */
 export interface CompiledBindings<Props> {
 	readonly id: string;
+	/** Compiler-proven single native host, with no descendant ownership. */
+	readonly handoff?: 'host';
 	/** Targets carry compiler-issued addresses when unbound siblings may change. */
 	readonly addressed?: true;
 	readonly nodes: readonly BindingNode[];
@@ -486,16 +495,34 @@ export function __adoptBindings<Props>(
 	let dirty = false;
 	let revision = 0;
 	let unsubscribe: (() => void) | undefined;
+	let publicationRetries: Set<() => void> | undefined;
+	let published: (() => void) | undefined;
 	const signal = options?.signal;
-	const dispose = (): void => {
-		if (disposed) return;
+	const dispose = (
+		_disposal?: { preserveDOM?: boolean } | Event,
+		publish?: () => void,
+		preservePresentation = false,
+	): void => {
+		if (disposed) {
+			publish?.();
+			return;
+		}
 		disposed = true;
+		publicationRetries?.clear();
 		signal?.removeEventListener('abort', dispose);
 		let failed = false;
 		let failure: unknown;
+		// Mark the early writer inactive before successor publication. Arbitrary
+		// signal/source cleanup below must observe the accepted renderer owner.
+		try {
+			publish?.();
+		} catch (error) {
+			failed = true;
+			failure = error;
+		}
 		for (const connection of signalConnections?.values() ?? []) {
 			try {
-				connection.dispose();
+				connection.dispose(preservePresentation);
 			} catch (error) {
 				if (!failed) {
 					failed = true;
@@ -505,7 +532,7 @@ export function __adoptBindings<Props>(
 		}
 		for (const connection of projections ? new Set(projections.values()) : []) {
 			try {
-				connection.dispose();
+				connection.dispose(preservePresentation);
 			} catch (error) {
 				if (!failed) {
 					failed = true;
@@ -530,12 +557,12 @@ export function __adoptBindings<Props>(
 		for (let i = 0; i < owned.length; i++) {
 			const [node, name] = owned[i]!;
 			try {
-				groups?.get(i)?.dispose();
-				styles?.get(i)?.dispose();
+				groups?.get(i)?.dispose(preservePresentation);
+				styles?.get(i)?.dispose(preservePresentation);
 				// A declared token adopts its server contribution, not a permanent
 				// baseline. Keep its claim until removal so reentrant adoption cannot
 				// acquire a token that this lifetime is still cleaning up.
-				if (bindings[i]![1] === 'classToken' && previous[i] === '')
+				if (!preservePresentation && bindings[i]![1] === 'classToken' && previous[i] === '')
 					node.classList.remove(bindings[i]![2]);
 			} catch (error) {
 				if (!failed) {
@@ -850,6 +877,7 @@ export function __adoptBindings<Props>(
 								writePrepared(next, indices, preparedControls, preparedGroups);
 							} finally {
 								busy = false;
+								published?.();
 							}
 						},
 					};
@@ -873,6 +901,7 @@ export function __adoptBindings<Props>(
 				for (const index of previousUpdates ?? []) signalUpdates!.add(index);
 			}
 			busy = false;
+			if (!preview) published?.();
 		}
 	};
 	const refresh: NativeTransitionNotify = (): void => {
@@ -887,7 +916,71 @@ export function __adoptBindings<Props>(
 		active: () => !disposed,
 		prepare: () => run(() => drain(true)),
 	};
-	const handle = { refresh, dispose };
+	const handle: BindingHandle & Partial<BindingHandoffCapability> = { refresh, dispose };
+	if (descriptor.handoff === 'host') {
+		published = () => {
+			if (!publicationRetries?.size) return;
+			const pending = [...publicationRetries];
+			publicationRetries.clear();
+			for (const retry of pending)
+				queueMicrotask(() => {
+					if (!disposed) retry();
+				});
+		};
+		const host = root as Element;
+		const document = host.ownerDocument;
+		const ancestry: Array<readonly [Node, ParentNode | null]> = [];
+		for (let node: Node | null = host; node !== null; node = node.parentNode)
+			ancestry.push([node, node.parentNode]);
+		// Renderer seed/reveal sidecars are consumed before native hydration.
+		// Authored siblings still identify the exact host site across that cleanup.
+		const sibling = (node: Node, previous: boolean): Node | null => {
+			let next = previous ? node.previousSibling : node.nextSibling;
+			while (
+				next?.nodeType === 1 &&
+				(next as Element).localName === 'script' &&
+				((next as Element).hasAttribute(NATIVE_SIGNAL_SEED_ATTR) ||
+					(next as Element).hasAttribute(SUSPENSE_SCRIPT_ATTR) ||
+					(next as Element).hasAttribute(STREAM_SCRIPT_ATTR))
+			)
+				next = previous ? next.previousSibling : next.nextSibling;
+			return next;
+		};
+		const previousSibling = sibling(host, true);
+		const nextSibling = sibling(host, false);
+		let handoff: BindingHandoff | undefined;
+		handle[BINDING_HANDOFF] = () => {
+			if (handoff !== undefined) return handoff;
+			return (handoff = {
+				id: descriptor.id,
+				root: host,
+				anchor: host,
+				host: new Set(
+					bindings.map((binding) =>
+						binding[1] === 'styleProperty'
+							? 'style:' + binding[2]
+							: binding[1].startsWith('style')
+								? 'style'
+								: binding[2],
+					),
+				),
+				revision: () => (busy ? -1 : revision),
+				afterPublication: (callback) => {
+					(publicationRetries ??= new Set()).add(callback);
+					return () => publicationRetries!.delete(callback);
+				},
+				valid: () =>
+					host.parentNode !== null &&
+					host.ownerDocument === document &&
+					ancestry.every(([node, parent]) => node.parentNode === parent) &&
+					sibling(host, true) === previousSibling &&
+					sibling(host, false) === nextSibling &&
+					host.getAttribute('data-octane-bindings') === descriptor.id,
+				active: () => !disposed,
+				retire: (publish) => dispose(undefined, publish, true),
+			});
+		};
+	}
 	if (signal?.aborted) {
 		dispose();
 		return handle;

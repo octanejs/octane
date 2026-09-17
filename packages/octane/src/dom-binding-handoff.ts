@@ -28,13 +28,15 @@ export interface BindingHandoff {
 	readonly root: Node;
 	readonly anchor: Node;
 	readonly end?: Node;
-	/** Allocated only for a claimed structural presentation. -1 means publication is in progress. */
+	/** A scalar host's declared native channels; descendants belong to other owners. */
+	readonly host?: ReadonlySet<string>;
+	/** Revisioned presentations return -1 while publication is in progress. */
 	revision?(): number;
 	ranges?(): ReadonlyMap<Node, BindingHandoffRange>;
 	view?(root: Node): BindingHandoffView | undefined;
 	rest?(element: Element, site: number): BindingHandoffRest | undefined;
 	valid?(): boolean;
-	/** One deferred retry; only structural leases allocate publication listeners. */
+	/** One deferred retry; listener storage is allocated only when requested. */
 	afterPublication?(callback: () => void): () => void;
 	active(): boolean;
 	retire(publish?: () => void): void;

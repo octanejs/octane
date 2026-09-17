@@ -55,7 +55,9 @@ export function needsBindingProgram(node, isUnbound) {
 	if (!/^[a-z]/.test(tagOf(node) ?? '')) return true;
 	if (
 		(node.openingElement?.attributes ?? node.attributes ?? []).some(
-			(attr) => rawName(attr) === 'ref' || /^on[A-Z]/.test(rawName(attr) ?? ''),
+			(attr) =>
+				(rawName(attr) === 'ref' || /^on[A-Z]/.test(rawName(attr) ?? '')) &&
+				!isUnbound(attrValue(attr)),
 		)
 	)
 		return true;
@@ -590,6 +592,7 @@ export function planBindingProgram(fn, render, context) {
 				if (context.annotationsOnly) return name === 'class' || name === 'className';
 				if (name !== 'ref' && !/^on[A-Z]/.test(name ?? '')) return true;
 				const expression = attrValue(attr);
+				if (isUnbound(expression)) return true;
 				// Event/ref callbacks are native owner adapters, not eager projections.
 				assertAdapter(expression);
 				if (

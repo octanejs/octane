@@ -3952,7 +3952,18 @@ function rollbackRootRender(transaction: RootRenderTransaction): void {
 
 function retireDetachedBindingLeases(owner: RootRenderOwner): void {
 	for (const lease of owner.bindingLeases!) {
-		if (owner.bindingContainer!.contains(lease.anchor)) continue;
+		// An invalid accepted host fences its original live scope. Replacement
+		// retires that scope even if its externally moved host remains contained.
+		const preparation =
+			lease.host !== undefined && !lease.active()
+				? PRESENTATION_PREPARATIONS.get(lease)
+				: undefined;
+		if (
+			preparation !== undefined
+				? !preparation.scope.block.disposed
+				: owner.bindingContainer!.contains(lease.anchor)
+		)
+			continue;
 		owner.bindingLeases!.delete(lease);
 		PRESENTATION_PREPARATIONS.delete(lease);
 		releaseBindingHandoff(lease);
@@ -18962,6 +18973,8 @@ interface PresentationHydrationFrame {
 	readToken: number;
 	witnessToken: number;
 	witnesses: Map<object, NativeReadWitness | null>;
+	/** Successor native writers only; a host receipt never tears down children. */
+	hostSuccessors?: Map<object, () => void>;
 	controls?: Map<
 		Element,
 		{
@@ -18974,7 +18987,7 @@ interface PresentationHydrationFrame {
 	completed: boolean;
 	lease: BindingHandoff;
 	revision?: number;
-	/** Installed only for structural/control receipts, not ordinary fixed presentations. */
+	/** Installed only for structural/control/host receipts, not ordinary fixed presentations. */
 	current?: typeof currentPresentation;
 	hydration: HydrationCapability | null;
 }
@@ -19033,7 +19046,10 @@ function currentPresentation(frame: PresentationHydrationFrame): boolean {
 		lease.valid?.() !== false &&
 		lease.revision?.() === frame.revision &&
 		lease.root.parentNode !== null &&
-		lease.end?.parentNode === lease.root.parentNode &&
+		(lease.host === undefined
+			? lease.end?.parentNode === lease.root.parentNode
+			: lease.owner === frame.scope.block.idState.renderOwner &&
+				frame.scope.block.idState.renderOwner!.bindingContainer!.contains(lease.root)) &&
 		[...frame.witnesses.values()].every(
 			(witness) => witness === null || validateNativeReadWitness(witness),
 		)
@@ -19104,6 +19120,7 @@ export function beginPresentationHydration(
 	supported = false,
 	structural = false,
 	conditionalRest = false,
+	host = false,
 ): PresentationHydrationFrame | null {
 	const owner = scope.block.idState.renderOwner;
 	if (
@@ -19127,9 +19144,13 @@ export function beginPresentationHydration(
 			candidate.id === id &&
 			(candidate.root === scope.block.startMarker ||
 				candidate.root === hydration?.node ||
-				(candidate.root.nodeType === 8 && candidate.root.nextSibling === hydration?.node)),
+				(candidate.root.nodeType === 8 && candidate.root.nextSibling === hydration?.node) ||
+				(candidate.host !== undefined &&
+					PRESENTATION_PREPARATIONS.get(candidate)?.scope === scope)),
 	);
 	if (lease === undefined) return null;
+	if (!lease.active()) throw new PresentationAdoptionMiss(lease, false);
+	if (host !== (lease.host !== undefined)) throw new PresentationAdoptionMiss(lease, false);
 	if (
 		conditionalRest
 			? !supported || !structural || !hasClosedPresentationView(lease, scope, id)
@@ -19139,7 +19160,7 @@ export function beginPresentationHydration(
 	const revision = lease.revision?.();
 	if ((revision === undefined || revision >= 0) && lease.valid?.() === false)
 		throw new PresentationAdoptionMiss(lease, false);
-	if (revision !== undefined && (!structural || revision < 0))
+	if (revision !== undefined && ((!structural && !host) || revision < 0))
 		throw new PresentationAdoptionMiss(lease, revision < 0, revision);
 	const pending = PRESENTATION_PREPARATIONS.get(lease);
 	const frame: PresentationHydrationFrame = {
@@ -19155,6 +19176,9 @@ export function beginPresentationHydration(
 		readToken: beginNativeReadScope(scope),
 		witnessToken: beginNativeReadWitness(),
 		witnesses: pending?.scope === scope ? new Map(pending.witnesses) : new Map(),
+		...(lease.host === undefined
+			? {}
+			: { hostSuccessors: new Map(pending?.scope === scope ? pending.hostSuccessors : undefined) }),
 		...(pending?.scope === scope && pending.controls !== undefined
 			? { controls: new Map(pending.controls) }
 			: {}),
@@ -19166,6 +19190,7 @@ export function beginPresentationHydration(
 	PRESENTATION_HYDRATION = frame;
 	if (revision !== undefined || frame.controls !== undefined) trackPresentationFrame(frame);
 	PRESENTATION_PREPARATIONS.set(lease, frame);
+	const hostRefs = host ? WIP_CAPTURE.refs : undefined;
 	(WIP_CAPTURE.renderCleanups ??= []).push((discarded) => {
 		if (
 			discarded ||
@@ -19187,6 +19212,8 @@ export function beginPresentationHydration(
 		// ownership does not restore old styles/classes or retire shared signals.
 		let publicationStarted = false;
 		let published = false;
+		let hostFailed = false;
+		let hostFailure: unknown;
 		try {
 			lease.retire(() => {
 				// The early presentation is already retired on callback entry, even
@@ -19197,6 +19224,14 @@ export function beginPresentationHydration(
 				} catch (error) {
 					// Publication is irreversible. Revoke every captured successor before
 					// arbitrary unsubscribe or presentation cleanup can dispatch input.
+					for (const stop of frame.hostSuccessors?.values() ?? []) {
+						try {
+							stop();
+						} catch {
+							// Keep the publication error while revoking every host writer.
+						}
+					}
+					frame.hostSuccessors?.clear();
 					for (const [element, control] of frame.controls ?? []) {
 						const binding = control.binding;
 						// An already-released, intact and unclaimed channel needs no new
@@ -19223,8 +19258,36 @@ export function beginPresentationHydration(
 			});
 		} catch (error) {
 			if (!publicationStarted) throw error;
-			reportRendererOwnerError(scope, error);
+			if (frame.hostSuccessors !== undefined) {
+				hostFailed = true;
+				hostFailure = error;
+			} else reportRendererOwnerError(scope, error);
 		} finally {
+			// Retirement may invoke application cleanup which moves/replaces the
+			// host. Revoke only this receipt's successor writers, never children.
+			if (frame.hostSuccessors !== undefined && (!published || lease.valid?.() === false)) {
+				published = false;
+				// Successful receipts disappear. This failed, already-retired receipt
+				// fences only the same host scope until normal root disposal clears it.
+				owner.bindingLeases!.add(lease);
+				PRESENTATION_PREPARATIONS.set(lease, frame);
+				for (const entry of hostRefs!) if (entry.el === lease.root) entry.ref = null;
+				for (const stop of frame.hostSuccessors.values()) {
+					try {
+						stop();
+					} catch (error) {
+						if (!hostFailed) {
+							hostFailed = true;
+							hostFailure = error;
+						}
+					}
+				}
+				if (!hostFailed) {
+					hostFailed = true;
+					hostFailure = new Error(formatClientError(77));
+				}
+			}
+			frame.hostSuccessors?.clear();
 			frame.writes.clear();
 			frame.controls?.clear();
 			if (
@@ -19244,6 +19307,7 @@ export function beginPresentationHydration(
 			}
 			frame.witnesses.clear();
 		}
+		if (hostFailed) reportRendererOwnerError(scope, hostFailure);
 	});
 	return frame;
 }
@@ -19289,7 +19353,19 @@ function preparePresentationSignalBinding(
 	return runWithBlockSignalOwner(scope, () => {
 		const handle = isSignalHandle(value) ? value : null;
 		// Unlike the ordinary direct-binding read, this read belongs to validation.
-		const current = handle === null ? value : handle.get();
+		// A host receipt validates this channel without subscribing the component
+		// as a second writer beside the direct binding being prepared below.
+		const witness =
+			handle !== null && frame.lease.host !== undefined ? beginNativeReadWitness(true) : -1;
+		let current: unknown;
+		let readCompleted = false;
+		try {
+			current = handle === null ? value : handle.get();
+			readCompleted = true;
+		} finally {
+			if (witness >= 0)
+				frame.witnesses.set(handle!, finishNativeReadWitness(witness, readCompleted));
+		}
 		if (
 			text &&
 			((current !== null && (typeof current === 'object' || typeof current === 'function')) ||
@@ -19336,6 +19412,7 @@ function preparePresentationSignalBinding(
 				};
 		if (text) binding.text = prepared as Text;
 		if (!reusable) registerHookCleanup(scope, () => disposeDirectSignalBinding(binding));
+		frame.hostSuccessors?.set(binding, () => disposeDirectSignalBinding(binding));
 		// Text insertion/update already has its own operation; activation must not replace it.
 		preparePresentationOperation(frame, element, name ?? 'signalText', () => {
 			if (binding.disposed) return;
@@ -19547,6 +19624,46 @@ export function presentationWrite<T>(
 ): T {
 	const frame = PRESENTATION_HYDRATION;
 	if (frame === null) return writer(...args);
+	if (frame.lease.host !== undefined) {
+		// A host receipt proves native fields, never descendant or generic-spread
+		// ownership. Known provider projections must retain their exact field set.
+		const channels = frame.lease.host;
+		const changed = kind.endsWith('IfChanged') || kind.startsWith('updateFresh');
+		const element =
+			kind === 'bindSignalAttribute' ||
+			kind === 'nativeStyleBinding' ||
+			kind === 'nativeProjectionBinding'
+				? args[2]
+				: args[changed ? 2 : 0];
+		const keys =
+			kind === 'nativeProjectionBinding'
+				? args[4].map((field: string) => (field === 'className' ? 'class' : field))
+				: kind === 'setStyleProperties'
+					? args[1]
+							.filter((_: unknown, index: number) => index % 2 === 0)
+							.map((key: string) => 'style:' + key)
+					: [
+							kind === 'nativeStyleBinding' || kind === 'setStyle'
+								? 'style'
+								: kind === 'setStyleProperty'
+									? 'style:' + args[1]
+									: kind.includes('Class')
+										? 'class'
+										: kind === 'bindSignalAttribute'
+											? args[3]
+											: args[changed ? 3 : 1],
+						];
+		if (
+			element !== frame.lease.root ||
+			keys.some((key: string) => !channels.has(key)) ||
+			kind === 'bindSignalValue' ||
+			kind === 'setEventHandler' ||
+			kind === 'bindSignalText' ||
+			kind === 'setText' ||
+			kind === 'markDangerouslySetInnerHTMLChildren'
+		)
+			presentationMiss(false);
+	}
 	if (kind === 'queueNativeChangeDiagnostic') {
 		preparePresentationOperation(frame, args[0], 'nativeChangeDiagnostic', () => writer(...args));
 		return undefined as T;
@@ -19572,13 +19689,21 @@ export function presentationWrite<T>(
 	if (kind === 'nativeStyleBinding' || kind === 'nativeProjectionBinding') {
 		const [owner, slot, el] = args;
 		const style = kind === 'nativeStyleBinding';
-		nativePresentationBinding(
-			owner,
-			slot,
-			el,
-			style ? preparedNativeStyleBody : preparedNativeProjectionBody,
-			style ? { el, value: args[3], frame } : { el, compute: args[3], fields: args[4], frame },
-		);
+		try {
+			nativePresentationBinding(
+				owner,
+				slot,
+				el,
+				style ? preparedNativeStyleBody : preparedNativeProjectionBody,
+				style ? { el, value: args[3], frame } : { el, compute: args[3], fields: args[4], frame },
+			);
+		} finally {
+			if (frame.hostSuccessors !== undefined) {
+				const binding = owner.slots[slot] as NativeStyleBinding | undefined;
+				if (binding !== undefined)
+					frame.hostSuccessors.set(binding, () => disposeNativeStyleBinding(binding));
+			}
+		}
 		return undefined as T;
 	}
 	const prepared = args.slice();
@@ -43602,6 +43727,7 @@ export function hydrateRoot(
 		if (
 			lease === undefined ||
 			!lease.active() ||
+			(lease.host !== undefined && lease.valid?.() === false) ||
 			lease.owner !== undefined ||
 			!container.contains(lease.root)
 		)

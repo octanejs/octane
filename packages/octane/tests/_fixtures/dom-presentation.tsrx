@@ -1,5 +1,5 @@
 import { unbound } from 'octane/behavior';
-import { Hydrate, use } from 'octane';
+import { Hydrate, use, type OctaneNode } from 'octane';
 import type { HydrationStrategy } from 'octane/hydration';
 import type { SignalHandle } from 'octane/signals';
 import type { SignalCSSProperties } from 'octane/jsx-runtime';
@@ -274,6 +274,67 @@ export function NativeControlPresentation({
 	/>
 }
 
+export interface NativeControlHostProps {
+	className: string | SignalHandle<string>;
+	children?: OctaneNode;
+	action?: string;
+	inert?: boolean;
+	onReady?(element: HTMLFormElement | null): void;
+	onKeyDown?(event: KeyboardEvent): void;
+}
+
+export function NativeControlHost(props: NativeControlHostProps) @{
+	'use dom bindings';
+	<form
+		class={props.className}
+		action={unbound(props.action)}
+		inert={unbound(props.inert)}
+		ref={unbound(props.onReady)}
+		onKeyDown={unbound(props.onKeyDown)}
+	>{unbound(props.children)}</form>
+}
+
+export function NativeControlLayout(
+	props: NativeControlPresentationProps & NativeControlHostProps,
+) @{
+	<NativeControlHost
+		className={props.className}
+		action={props.action}
+		inert={props.inert}
+		onReady={props.onReady}
+		onKeyDown={props.onKeyDown}
+	>
+		<NativeControlPresentation
+			draft={props.draft}
+			readOnly={props.readOnly}
+			disabled={props.disabled}
+			required={props.required}
+			placeholder={props.placeholder}
+		/>
+		<p>{'Message'}</p>
+	</NativeControlHost>
+}
+
+export function NativeControlLayoutContainer(
+	props: NativeControlPresentationProps & NativeControlHostProps,
+) @{
+	<section>
+		<NativeControlLayout
+			className={props.className}
+			action={props.action}
+			inert={props.inert}
+			onReady={props.onReady}
+			onKeyDown={props.onKeyDown}
+			draft={props.draft}
+			readOnly={props.readOnly}
+			disabled={props.disabled}
+			required={props.required}
+			placeholder={props.placeholder}
+		/>
+		<aside>{'Sibling'}</aside>
+	</section>
+}
+
 export function NativeControlSiblingPresentation({
 	draft: draft$,
 	readOnly,
@@ -351,20 +412,23 @@ function NativeControlHydrationSuffix(props: {
 }
 
 export function NativeControlHydration(props: NativeControlPresentationProps & {
+	className: string;
 	when: HydrationStrategy;
 	suspend: boolean;
 	promise: Promise<void>;
 	onHydrated(): void;
 }) @{
 	<Hydrate when={props.when} split={false} onHydrated={props.onHydrated}>
-		<NativeControlPresentation
-			draft={props.draft}
-			readOnly={props.readOnly}
-			disabled={props.disabled}
-			required={props.required}
-			placeholder={props.placeholder}
-		/>
-		<NativeControlHydrationSuffix suspend={props.suspend} promise={props.promise} />
+		<NativeControlHost className={props.className}>
+			<NativeControlPresentation
+				draft={props.draft}
+				readOnly={props.readOnly}
+				disabled={props.disabled}
+				required={props.required}
+				placeholder={props.placeholder}
+			/>
+			<NativeControlHydrationSuffix suspend={props.suspend} promise={props.promise} />
+		</NativeControlHost>
 	</Hydrate>
 }
 

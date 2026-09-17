@@ -430,7 +430,15 @@ describe('behavior-only roots', () => {
 				const disabled = scope.signal$('disabled', false);
 				const required = scope.signal$('required', false);
 				const placeholder = scope.signal$('placeholder', 'Message');
+				const onReady = vi.fn();
+				const onKeyDown = vi.fn();
+				const earlyReady = vi.fn();
+				const earlyKeyDown = vi.fn();
 				const props = {
+					action: '/server-submit',
+					inert: false,
+					onReady,
+					onKeyDown,
 					draft,
 					readOnly,
 					disabled,
@@ -440,12 +448,8 @@ describe('behavior-only roots', () => {
 				};
 				const attrs = vi.fn(Stylex.attrs);
 				const view = styled ? 'NativeStylexControlPresentation' : 'NativeControlPresentation';
-				const fixture = authoredPresentation(
-					view,
-					props,
-					dev,
-					styled
-						? `${presentationSource}
+				const source = styled
+					? `${presentationSource}
 import * as stylex from '@stylexjs/stylex';
 export function NativeStylexControlPresentation({
   draft: draft$, readOnly, disabled, required, placeholder, styles: sx,
@@ -453,27 +457,77 @@ export function NativeStylexControlPresentation({
   'use dom bindings';
   <textarea {...${spread}} value={unbound(draft$)}
     readOnly={readOnly} disabled={disabled} required={required} placeholder={placeholder} />
+}
+export function NativeStylexControlHost(props: NativeControlHostProps) @{
+  'use dom bindings';
+  <form {...stylex.attrs({ $$css: true, layout: props.className })} action={unbound(props.action)} inert={unbound(props.inert)}
+    ref={unbound(props.onReady)} onKeyDown={unbound(props.onKeyDown)}>{unbound(props.children)}</form>
+}
+export function NativeStylexControlLayout(props: NativeControlPresentationProps & NativeControlHostProps & { styles: stylex.CompiledStyles }) @{
+  <NativeStylexControlHost className={props.className} action={props.action} inert={props.inert}
+    onReady={props.onReady} onKeyDown={props.onKeyDown}>
+    <NativeStylexControlPresentation draft={props.draft} readOnly={props.readOnly}
+      disabled={props.disabled} required={props.required} placeholder={props.placeholder} styles={props.styles} />
+    <p>{'Message'}</p>
+  </NativeStylexControlHost>
 }`
-						: presentationSource,
-					{ '@stylexjs/stylex': { ...Stylex, attrs } },
-					{
-						knownAttributeSpreads: [
-							{
-								source: '@stylexjs/stylex',
-								imported: '*',
-								members: ['attrs'],
-								fields: ['class', 'style', 'data-style-src'],
-							},
-						],
-					},
-				);
-				container.innerHTML = fixture.html;
+					: presentationSource;
+				const modules = { '@stylexjs/stylex': { ...Stylex, attrs } };
+				const compileOptions = {
+					knownAttributeSpreads: [
+						{
+							source: '@stylexjs/stylex',
+							imported: '*',
+							members: ['attrs'],
+							fields: ['class', 'style', 'data-style-src'],
+						},
+					],
+				};
+				const fixture = authoredPresentation(view, props, dev, source, modules, compileOptions);
+				const layout =
+					!styled || spread === 'unbound(stylex.attrs(sx))'
+						? authoredPresentation(
+								styled ? 'NativeStylexControlHost' : 'NativeControlHost',
+								{
+									className: 'compact',
+									action: '/ignored-early',
+									inert: true,
+									onReady: earlyReady,
+									onKeyDown: earlyKeyDown,
+								},
+								dev,
+								source,
+								modules,
+								compileOptions,
+							)
+						: undefined;
+				const layoutView = styled ? 'NativeStylexControlLayout' : 'NativeControlLayout';
+				container.innerHTML = layout
+					? renderToString(fixture.server[layoutView], { ...props, className: 'compact' }).html
+					: fixture.html;
+				const form = container.querySelector('form');
+				const description = container.querySelector('p');
 				const textarea = container.querySelector('textarea')!;
 				const control = runWithSignalOwner(scope, () =>
 					bindSignalControl(textarea, 'value', draft),
 				);
 				let binding: DomBindings.BindingHandle | undefined;
+				let layoutBinding: DomBindings.BindingHandle | undefined;
 				try {
+					if (layout) {
+						layoutBinding = layout.attach(form!, layout.state);
+						layout.publish({ className: 'expanded has-status' });
+						expect(form!.className).toBe('expanded has-status');
+						expect(form!.querySelector('textarea')).toBe(textarea);
+						expect(form!.querySelector('p')).toBe(description);
+						expect(form!.getAttribute('action')).toBe('/server-submit');
+						expect(form!.hasAttribute('inert')).toBe(false);
+						form!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+						expect(earlyReady).not.toHaveBeenCalled();
+						expect(earlyKeyDown).not.toHaveBeenCalled();
+						expect(onReady).not.toHaveBeenCalled();
+						expect(onKeyDown).not.toHaveBeenCalled();
+					}
 					attrs.mockClear();
 					binding = runWithSignalOwner(scope, () => fixture.attach(textarea, fixture.state));
 					expect(attrs).not.toHaveBeenCalled();
@@ -499,11 +553,35 @@ export function NativeStylexControlPresentation({
 					const client = fixture.loadClient();
 					const options = {
 						signalOwner: scope,
-						bindingLeases: [binding],
+						bindingLeases: layoutBinding ? [layoutBinding, binding] : [binding],
 						controlLeases: [control],
 					};
-					hydratedRoot = hydrateRoot(container, client[view], props, options);
+					hydratedRoot = hydrateRoot(
+						container,
+						client[layout ? layoutView : view],
+						layout
+							? { ...props, className: 'expanded has-status', action: '/accepted-submit' }
+							: props,
+						options,
+					);
 					await act(() => {});
+					if (layout) {
+						expect(container.querySelector('form')).toBe(form);
+						expect(form!.querySelector('p')).toBe(description);
+						expect(form!.className).toBe('expanded has-status');
+						expect(layout.cleanup).toHaveBeenCalledOnce();
+						expect(form!.getAttribute('action')).toBe('/accepted-submit');
+						expect(form!.hasAttribute('inert')).toBe(false);
+						expect(onReady).toHaveBeenCalledExactlyOnceWith(form);
+						form!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+						expect(onKeyDown).toHaveBeenCalledOnce();
+						expect(onKeyDown.mock.calls[0][0]).toBeInstanceOf(KeyboardEvent);
+						expect(earlyReady).not.toHaveBeenCalled();
+						expect(earlyKeyDown).not.toHaveBeenCalled();
+						layout.publish({ className: 'stale early layout' });
+						layoutBinding!.refresh();
+						expect(form!.className).toBe('expanded has-status');
+					}
 					expect(container.querySelector('textarea')).toBe(textarea);
 					expect(document.activeElement).toBe(textarea);
 					expect(textarea.value).toBe('early draft');
@@ -551,10 +629,32 @@ export function NativeStylexControlPresentation({
 					textarea.value = 'hydrated edit';
 					await act(() => textarea.dispatchEvent(new InputEvent('input', { bubbles: true })));
 					expect(draft.get()).toBe('hydrated edit');
+					if (layout) {
+						await act(() =>
+							hydratedRoot!.render(client[layoutView], {
+								...props,
+								className: 'renderer compact',
+								action: '/renderer-submit',
+							}),
+						);
+						expect(container.querySelector('form')).toBe(form);
+						expect(form!.className).toBe('renderer compact');
+						expect(form!.getAttribute('action')).toBe('/renderer-submit');
+						form!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+						expect(onKeyDown).toHaveBeenCalledTimes(2);
+						expect(earlyKeyDown).not.toHaveBeenCalled();
+						expect(form!.querySelector('textarea')).toBe(textarea);
+						expect(form!.querySelector('p')).toBe(description);
+						expect(textarea.value).toBe('hydrated edit');
+						layout.publish({ className: 'stale again' });
+						layoutBinding!.refresh();
+						expect(form!.className).toBe('renderer compact');
+					}
 				} finally {
 					hydratedRoot?.unmount();
 					hydratedRoot = undefined;
 					binding?.dispose();
+					layoutBinding?.dispose();
 					control();
 					scope.dispose();
 				}
@@ -622,11 +722,13 @@ export function NativeStylexControlPresentation({
 					required: scope.signal$('required', true),
 				};
 				const fixture = authoredPresentation('NativeControlPresentation', props, dev);
+				const layout = authoredPresentation('NativeControlHost', { className: 'compact' }, dev);
 				const pending = deferred<void>();
 				const onHydrated = vi.fn();
 				const onUncaughtError = vi.fn();
 				const application = {
 					...props,
+					className: 'compact',
 					when: never(),
 					suspend: false,
 					promise: pending.promise,
@@ -636,7 +738,10 @@ export function NativeStylexControlPresentation({
 					fixture.server.NativeControlHydration,
 					application,
 				).html;
+				const form = container.querySelector('form')!;
 				const textarea = container.querySelector('textarea')!;
+				const suffix = container.querySelector('span')!;
+				const layoutBinding = layout.attach(form, layout.state);
 				const control = runWithSignalOwner(scope, () =>
 					bindSignalControl(textarea, 'value', draft),
 				);
@@ -654,7 +759,7 @@ export function NativeStylexControlPresentation({
 				try {
 					hydratedRoot = hydrateRoot(container, client.NativeControlHydration, application, {
 						signalOwner: scope,
-						bindingLeases: [binding],
+						bindingLeases: [layoutBinding, binding],
 						controlLeases: [control],
 						onUncaughtError,
 					});
@@ -667,11 +772,18 @@ export function NativeStylexControlPresentation({
 					);
 					expect(onHydrated).not.toHaveBeenCalled();
 					expect(fixture.cleanup).not.toHaveBeenCalled();
+					expect(layout.cleanup).not.toHaveBeenCalled();
 					for (let index = 0; index < 4; index++) {
 						await act(() => draft.set('pending model ' + index));
 						expect(textarea.value).toBe('pending model ' + index);
 						expect(fixture.cleanup).not.toHaveBeenCalled();
+						expect(layout.cleanup).not.toHaveBeenCalled();
 					}
+					layout.publish({ className: 'expanded has-status' });
+					expect(form.className).toBe('expanded has-status');
+					expect(form.querySelector('textarea')).toBe(textarea);
+					expect(form.querySelector('span')).toBe(suffix);
+					expect(layout.cleanup).not.toHaveBeenCalled();
 					placeholder.set('Search');
 					textarea.value = 'edit while suspended';
 					textarea.dispatchEvent(new InputEvent('input', { bubbles: true }));
@@ -680,15 +792,25 @@ export function NativeStylexControlPresentation({
 					if (outcome === 'abort')
 						await act(() => hydratedRoot!.render(client.NativeControlHydration, application));
 					await act(() => pending.resolve());
+					expect(container.querySelector('form')).toBe(form);
+					expect(form.querySelector('span')).toBe(suffix);
 					expect(container.querySelector('textarea')).toBe(textarea);
 					expect(textarea.value).toBe('edit while suspended');
 					if (outcome === 'resume') {
 						expect(onHydrated).toHaveBeenCalledOnce();
 						expect(fixture.cleanup).toHaveBeenCalledOnce();
+						expect(layout.cleanup).toHaveBeenCalledOnce();
+						expect(form.className).toBe('compact');
+						layout.publish({ className: 'stale layout' });
+						layoutBinding.refresh();
+						expect(form.className).toBe('compact');
 						control();
 					} else {
 						expect(onHydrated).not.toHaveBeenCalled();
 						expect(fixture.cleanup).not.toHaveBeenCalled();
+						expect(layout.cleanup).not.toHaveBeenCalled();
+						layout.publish({ className: 'early after abort' });
+						expect(form.className).toBe('early after abort');
 					}
 					expect(onUncaughtError).not.toHaveBeenCalled();
 					await act(() => placeholder.set('Still live'));
@@ -704,6 +826,7 @@ export function NativeStylexControlPresentation({
 					hydratedRoot?.unmount();
 					hydratedRoot = undefined;
 					binding.dispose();
+					layoutBinding.dispose();
 					control();
 					scope.dispose();
 				}
@@ -735,11 +858,20 @@ export function NativeStylexControlPresentation({
 						? 'NativeControlSiblingPresentation'
 						: 'NativeControlPresentation';
 				const fixture = authoredPresentation(view, props, dev);
-				container.innerHTML = fixture.html;
+				const layout =
+					refusal === 'opaque sibling during preparation'
+						? undefined
+						: authoredPresentation('NativeControlHost', { className: 'compact' }, dev);
+				container.innerHTML = layout
+					? renderToString(fixture.server.NativeControlLayout, { ...props, className: 'compact' })
+							.html
+					: fixture.html;
+				const form = container.querySelector('form');
+				const layoutBinding = layout?.attach(form!, layout.state);
 				const textarea = container.querySelector('textarea')!;
 				let control = runWithSignalOwner(scope, () => bindSignalControl(textarea, 'value', draft));
 				const binding = runWithSignalOwner(scope, () =>
-					fixture.attach(container.firstElementChild!, fixture.state),
+					fixture.attach(layout ? textarea : container.firstElementChild!, fixture.state),
 				);
 				let offered = control;
 				let foreign: HTMLTextAreaElement | undefined;
@@ -778,11 +910,11 @@ export function NativeStylexControlPresentation({
 					const takeOver = () => {
 						hydratedRoot = hydrateRoot(
 							container,
-							client[view],
-							{ ...props, draft: nextDraft },
+							client[layout ? 'NativeControlLayout' : view],
+							{ ...props, draft: nextDraft, className: 'renderer layout' },
 							{
 								signalOwner: scope,
-								bindingLeases: [binding],
+								bindingLeases: layoutBinding ? [layoutBinding, binding] : [binding],
 								...(refusal === 'missing' ? {} : { controlLeases: [offered] }),
 								onUncaughtError,
 							},
@@ -809,6 +941,13 @@ export function NativeStylexControlPresentation({
 					preparation.mockRestore();
 					expect(container.querySelector('textarea')).toBe(textarea);
 					expect(fixture.cleanup).not.toHaveBeenCalled();
+					if (layout) {
+						expect(container.querySelector('form')).toBe(form);
+						expect(form!.className).toBe('compact');
+						expect(layout.cleanup).not.toHaveBeenCalled();
+						layout.publish({ className: 'early after refusal' });
+						expect(form!.className).toBe('early after refusal');
+					}
 					placeholder.set('Search');
 					textarea.value = 'early owner survived';
 					textarea.dispatchEvent(new InputEvent('input', { bubbles: true }));
@@ -818,19 +957,33 @@ export function NativeStylexControlPresentation({
 						expect(container.querySelector('span')!.firstElementChild).toBe(opaque);
 						opaque.remove();
 					}
-					hydratedRoot = hydrateRoot(container, client[view], props, {
-						signalOwner: scope,
-						bindingLeases: [binding],
-						controlLeases: [control],
-					});
+					hydratedRoot = hydrateRoot(
+						container,
+						client[layout ? 'NativeControlLayout' : view],
+						{ ...props, className: 'renderer layout' },
+						{
+							signalOwner: scope,
+							bindingLeases: layoutBinding ? [layoutBinding, binding] : [binding],
+							controlLeases: [control],
+						},
+					);
 					await act(() => {});
 					expect(container.querySelector('textarea')).toBe(textarea);
 					expect(textarea.value).toBe('early owner survived');
 					expect(fixture.cleanup).toHaveBeenCalledOnce();
+					if (layout) {
+						expect(layout.cleanup).toHaveBeenCalledOnce();
+						expect(container.querySelector('form')).toBe(form);
+						expect(form!.className).toBe('renderer layout');
+						layout.publish({ className: 'stale after retry' });
+						layoutBinding!.refresh();
+						expect(form!.className).toBe('renderer layout');
+					}
 				} finally {
 					hydratedRoot?.unmount();
 					hydratedRoot = undefined;
 					binding.dispose();
+					layoutBinding?.dispose();
 					offered();
 					control();
 					preparation.mockRestore();
@@ -1178,6 +1331,206 @@ export function NativeStylexControlPresentation({
 						subscription.mockRestore();
 						if (secondScope !== scope) secondScope.dispose();
 						scope.dispose();
+					}
+				}
+				for (const knownStylex of [false, true]) {
+					for (const nextComponent of ['same', 'different'] as const) {
+						const layoutScope = createScope({
+							scopeKey: `host-source-retirement-${mutation}-${dev}-${knownStylex}-${nextComponent}`,
+						});
+						const classes = layoutScope.signal$('classes', 'renderer-layout');
+						const onReady = vi.fn<(element: HTMLFormElement | null) => void>();
+						const source = knownStylex
+							? `import * as stylex from '@stylexjs/stylex';\n${presentationSource}`
+									.replace('children?: OctaneNode;', 'children?: OctaneNode; styleValue?: string;')
+									.replace(
+										/<form\s+class=\{props\.className\}/,
+										() =>
+											'<form {...stylex.attrs([{ $$css: true, layout: props.className }, { "--layout-size": props.styleValue }])}',
+									)
+									.replace(
+										/(<NativeControlHost\s+className=\{props\.className\})(\s+action=)/,
+										'$1 styleValue={props.styleValue}$2',
+									)
+									.replace(
+										/(<NativeControlLayout\s+className=\{props\.className\})/,
+										'$1 styleValue={props.styleValue}',
+									)
+							: presentationSource;
+						const layout = authoredPresentation(
+							'NativeControlHost',
+							{ className: 'early-layout', styleValue: '12px' },
+							dev,
+							source,
+							{ '@stylexjs/stylex': Stylex },
+							{
+								knownAttributeSpreads: [
+									{
+										source: '@stylexjs/stylex',
+										imported: '*',
+										members: ['attrs'],
+										fields: ['class', 'style', 'data-style-src'],
+									},
+								],
+							},
+						);
+						const layoutProps = {
+							onReady,
+							className: 'early-layout',
+							styleValue: '12px',
+							draft: layoutScope.signal$('draft', 'host child draft'),
+							placeholder: layoutScope.signal$('placeholder', 'Message'),
+							readOnly: layoutScope.signal$('readonly', false),
+							disabled: layoutScope.signal$('disabled', false),
+							required: layoutScope.signal$('required', false),
+						};
+						container.innerHTML = renderToString(
+							layout.server.NativeControlLayoutContainer,
+							layoutProps,
+						).html;
+						const layoutForm = container.querySelector('form')!;
+						const textarea = layoutForm.querySelector('textarea')!;
+						expect(layoutForm.className).toBe('early-layout');
+						expect(layoutForm.style.getPropertyValue('--layout-size')).toBe(
+							knownStylex ? '12px' : '',
+						);
+						const ancestor = layoutForm.parentElement!;
+						const destination = document.createElement('aside');
+						const replacement = layoutForm.cloneNode(true) as HTMLFormElement;
+						const failure = new Error('early layout cleanup replaced its host');
+						const cleanup = vi.fn(() => {
+							if (mutation === 'removed') layoutForm.remove();
+							else if (mutation === 'reparented' || mutation === 'ancestor reparented') {
+								container.append(destination);
+								destination.append(mutation === 'reparented' ? layoutForm : ancestor);
+							} else layoutForm.replaceWith(replacement);
+							if (mutation === 'throwing replacement') throw failure;
+						});
+						const layoutBinding = layout.attach(layoutForm, {
+							getSnapshot: layout.state.getSnapshot,
+							subscribe(notify) {
+								const stop = layout.state.subscribe(notify);
+								return () => {
+									stop();
+									cleanup();
+								};
+							},
+						});
+						const onUncaughtError = vi.fn();
+						const layoutClient = layout.loadClient();
+						try {
+							hydratedRoot = hydrateRoot(
+								container,
+								layoutClient.NativeControlLayoutContainer,
+								{
+									...layoutProps,
+									className: knownStylex ? 'renderer-layout' : classes,
+									styleValue: '24px',
+								},
+								{ signalOwner: layoutScope, bindingLeases: [layoutBinding], onUncaughtError },
+							);
+							await act(() => {});
+							expect(cleanup).toHaveBeenCalledOnce();
+							expect(layout.cleanup).toHaveBeenCalledOnce();
+							expect(onUncaughtError).toHaveBeenCalledOnce();
+							if (mutation === 'throwing replacement')
+								expect(onUncaughtError).toHaveBeenCalledWith(failure);
+							else
+								expect(onUncaughtError.mock.calls[0][0].message).toMatch(
+									/active fixed native views|errors\/77/,
+								);
+							if (mutation === 'ancestor reparented') expect(ancestor.parentNode).toBe(destination);
+							else
+								expect(layoutForm.parentNode).toBe(mutation === 'reparented' ? destination : null);
+							expect(layoutForm.querySelector('textarea')).toBe(textarea);
+							expect(onReady).not.toHaveBeenCalledWith(layoutForm);
+							const failedClass = layoutForm.className;
+							const replacementClass = replacement.className;
+							const failedStyle = layoutForm.getAttribute('style');
+							const replacementStyle = replacement.getAttribute('style');
+
+							await act(() => classes.set('stale successor must not paint'));
+							expect(layoutForm.className).toBe(failedClass);
+							expect(replacement.className).toBe(replacementClass);
+							layout.publish({ className: 'stale early must not paint', styleValue: '36px' });
+							layoutBinding.refresh();
+							expect(layoutForm.className).toBe(failedClass);
+							expect(layoutForm.getAttribute('style')).toBe(failedStyle);
+							let successorTextarea: HTMLTextAreaElement | null = null;
+							if (nextComponent === 'different') {
+								await act(() =>
+									hydratedRoot!.render(layoutClient.NativeControlPresentation, {
+										...layoutProps,
+										placeholder: layoutScope.signal$(
+											'successor-placeholder',
+											'Replacement composer',
+										),
+									}),
+								);
+								successorTextarea = container.querySelector<HTMLTextAreaElement>(
+									'textarea[placeholder="Replacement composer"]',
+								);
+								expect(successorTextarea).not.toBeNull();
+								expect(successorTextarea).not.toBe(textarea);
+								expect(successorTextarea!.isConnected).toBe(true);
+								await act(() => layoutProps.draft.set('replacement model update'));
+								expect(successorTextarea!.value).toBe('replacement model update');
+								successorTextarea!.value = 'replacement native edit';
+								await act(() =>
+									successorTextarea!.dispatchEvent(new InputEvent('input', { bubbles: true })),
+								);
+								expect(layoutProps.draft.get()).toBe('replacement native edit');
+								expect(onUncaughtError).toHaveBeenCalledOnce();
+							} else {
+								// A new normal render is a separate attempt against the invalid site.
+								for (let retry = 0; retry < 2; retry++) {
+									try {
+										await act(() =>
+											hydratedRoot!.render(layoutClient.NativeControlLayoutContainer, {
+												...layoutProps,
+												className: `explicit stale render ${retry}`,
+												styleValue: `${48 + retry}px`,
+											}),
+										);
+									} catch (error) {
+										expect((error as Error).message).toMatch(/unmounted root|errors\/29/);
+									}
+									expect(layoutForm.className).toBe(failedClass);
+									expect(replacement.className).toBe(replacementClass);
+									expect(layoutForm.getAttribute('style')).toBe(failedStyle);
+									expect(replacement.getAttribute('style')).toBe(replacementStyle);
+									expect(onReady).not.toHaveBeenCalledWith(layoutForm);
+								}
+								expect(onUncaughtError.mock.calls.length).toBeGreaterThan(1);
+								for (const [error] of onUncaughtError.mock.calls.slice(1))
+									expect(error.message).toMatch(
+										/supported fixed native view|active fixed native views|errors\/(75|77)/,
+									);
+							}
+							expect(layoutForm.className).toBe(failedClass);
+							expect(replacement.className).toBe(replacementClass);
+							expect(layoutForm.getAttribute('style')).toBe(failedStyle);
+							expect(replacement.getAttribute('style')).toBe(replacementStyle);
+							expect(onReady).not.toHaveBeenCalledWith(layoutForm);
+							const reports = onUncaughtError.mock.calls.length;
+							hydratedRoot.unmount();
+							hydratedRoot = undefined;
+							await act(() => classes.set('retired successor must not paint'));
+							if (successorTextarea) {
+								await act(() => layoutProps.draft.set('after replacement unmount'));
+								expect(successorTextarea.value).toBe('replacement native edit');
+							}
+							expect(layoutForm.className).toBe(failedClass);
+							expect(replacement.className).toBe(replacementClass);
+							expect(cleanup).toHaveBeenCalledOnce();
+							expect(onUncaughtError).toHaveBeenCalledTimes(reports);
+							expect(onReady).not.toHaveBeenCalledWith(layoutForm);
+						} finally {
+							hydratedRoot?.unmount();
+							hydratedRoot = undefined;
+							layoutBinding.dispose();
+							layoutScope.dispose();
+						}
 					}
 				}
 			});
@@ -2931,6 +3284,68 @@ export function RefreshDuringPreparation(props) @{ 'use dom bindings';
 				hydratedRoot = undefined;
 				preparationBinding.dispose();
 			}
+			const busyScope = createScope({ scopeKey: `host-publication-retry-${dev}` });
+			const busyHost = authoredPresentation('NativeControlHost', { className: 'early' }, dev);
+			const busyProps = {
+				className: 'early',
+				draft: busyScope.signal$('draft', 'preserved child draft'),
+				placeholder: busyScope.signal$('placeholder', 'Message'),
+				readOnly: busyScope.signal$('readonly', false),
+				disabled: busyScope.signal$('disabled', false),
+				required: busyScope.signal$('required', false),
+			};
+			article.innerHTML = renderToString(busyHost.server.NativeControlLayout, busyProps).html;
+			const busyForm = article.querySelector('form')!;
+			const busyTextarea = busyForm.querySelector('textarea')!;
+			const busyParagraph = busyForm.querySelector('p')!;
+			const busyClient = busyHost.loadClient();
+			const busyReady = vi.fn();
+			const busyError = vi.fn();
+			let beginDuringSnapshot = false;
+			let busyBinding: DomBindings.BindingHandle;
+			busyBinding = busyHost.attach(busyForm, {
+				getSnapshot() {
+					if (beginDuringSnapshot) {
+						beginDuringSnapshot = false;
+						hydratedRoot = hydrateRoot(
+							article,
+							busyClient.NativeControlLayout,
+							{
+								...busyProps,
+								className: 'accepted after publication',
+								onReady: busyReady,
+							},
+							{ signalOwner: busyScope, bindingLeases: [busyBinding], onUncaughtError: busyError },
+						);
+					}
+					return busyHost.state.getSnapshot();
+				},
+				subscribe: busyHost.state.subscribe,
+			});
+			try {
+				beginDuringSnapshot = true;
+				busyHost.publish({ className: 'early publication in progress' });
+				expect(busyForm.className).toBe('early publication in progress');
+				expect(busyHost.cleanup).not.toHaveBeenCalled();
+				expect(busyReady).not.toHaveBeenCalled();
+				await act(() => {});
+				expect(busyError).not.toHaveBeenCalled();
+				expect(article.querySelector('form')).toBe(busyForm);
+				expect(busyForm.querySelector('textarea')).toBe(busyTextarea);
+				expect(busyForm.querySelector('p')).toBe(busyParagraph);
+				expect(busyTextarea.value).toBe('preserved child draft');
+				expect(busyForm.className).toBe('accepted after publication');
+				expect(busyHost.cleanup).toHaveBeenCalledOnce();
+				expect(busyReady).toHaveBeenCalledExactlyOnceWith(busyForm);
+				busyHost.publish({ className: 'retired publication' });
+				busyBinding.refresh();
+				expect(busyForm.className).toBe('accepted after publication');
+			} finally {
+				hydratedRoot?.unmount();
+				hydratedRoot = undefined;
+				busyBinding.dispose();
+				busyScope.dispose();
+			}
 			const tree = authoredPresentation(
 				'TreePresentation',
 				{ active: false, label: 'Server', detail: ' detail', onAction: vi.fn() },
@@ -4522,6 +4937,81 @@ export function TreeHydration(props) @{
 		const controlBinding = controls.attach(form, controls.state);
 		expect(form.getAttribute('data-mode')).toBe('must-not-publish');
 		controlBinding.dispose();
+		const layoutScope = createScope({ scopeKey: 'host-layout-topology' });
+		const layout = authoredPresentation('NativeControlHost', { className: 'compact' });
+		const layoutProps = {
+			className: 'compact',
+			draft: layoutScope.signal$('draft', 'preserved draft'),
+			placeholder: layoutScope.signal$('placeholder', 'Message'),
+			readOnly: layoutScope.signal$('readonly', false),
+			disabled: layoutScope.signal$('disabled', false),
+			required: layoutScope.signal$('required', true),
+		};
+		range.innerHTML = renderToString(layout.server.NativeControlLayoutContainer, layoutProps).html;
+		const layoutForm = range.querySelector('form')!;
+		const layoutTextarea = range.querySelector('textarea')!;
+		const wrongHost = document.createElement('section');
+		expect(() => layout.attach(wrongHost, layout.state)).toThrow(/topology|mismatch/i);
+		expect(layout.cleanup).not.toHaveBeenCalled();
+		const sibling = range.querySelector('aside')!;
+		const layoutNextSibling = layoutForm.nextSibling;
+		const layoutBinding = layout.attach(layoutForm, layout.state);
+		const replacement = layoutForm.cloneNode(true) as HTMLFormElement;
+		layoutForm.replaceWith(replacement);
+		try {
+			expect(() =>
+				hydrateRoot(range, layout.loadClient().NativeControlLayoutContainer, layoutProps, {
+					signalOwner: layoutScope,
+					bindingLeases: [layoutBinding],
+				}),
+			).toThrow(/active fixed native views|Minified Octane error #77;/);
+			expect(range.querySelector('form')).toBe(replacement);
+			expect(replacement.className).toBe('compact');
+			expect(layout.cleanup).not.toHaveBeenCalled();
+			replacement.replaceWith(layoutForm);
+			layout.publish({ className: 'early after replacement refusal' });
+			expect(layoutForm.className).toBe('early after replacement refusal');
+			expect(layoutForm.querySelector('textarea')).toBe(layoutTextarea);
+			layoutForm.parentElement!.append(layoutForm);
+			expect(() =>
+				hydrateRoot(range, layout.loadClient().NativeControlLayoutContainer, layoutProps, {
+					signalOwner: layoutScope,
+					bindingLeases: [layoutBinding],
+				}),
+			).toThrow(/active fixed native views|Minified Octane error #77;/);
+			expect(sibling.parentElement!.lastElementChild).toBe(layoutForm);
+			expect(layout.cleanup).not.toHaveBeenCalled();
+			layout.publish({ className: 'early after movement refusal' });
+			expect(layoutForm.className).toBe('early after movement refusal');
+			sibling.parentElement!.insertBefore(layoutForm, layoutNextSibling);
+			// A child's content is outside the host receipt; normal hydration owns it.
+			captureHydrationControlCandidate(layoutTextarea);
+			layoutTextarea.value = 'native child edit';
+			layoutTextarea.dispatchEvent(new InputEvent('input', { bubbles: true }));
+			const paragraph = layoutForm.querySelector('p')!;
+			hydratedRoot = hydrateRoot(
+				range,
+				layout.loadClient().NativeControlLayoutContainer,
+				layoutProps,
+				{
+					signalOwner: layoutScope,
+					bindingLeases: [layoutBinding],
+				},
+			);
+			await act(() => {});
+			expect(range.querySelector('form')).toBe(layoutForm);
+			expect(layoutForm.querySelector('textarea')).toBe(layoutTextarea);
+			expect(layoutTextarea.value).toBe('native child edit');
+			expect(layoutForm.querySelector('p')).toBe(paragraph);
+			expect(layoutForm.className).toBe('compact');
+			expect(layout.cleanup).toHaveBeenCalledOnce();
+		} finally {
+			hydratedRoot?.unmount();
+			hydratedRoot = undefined;
+			layoutBinding.dispose();
+			layoutScope.dispose();
+		}
+
 		for (const failureKind of ['duplicate', 'projection']) {
 			const items: AttachmentPresentationProps['items'] = [
 				{ id: 'a', name: 'First', preview: null, state: 'ready', error: '' },
