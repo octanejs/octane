@@ -9905,7 +9905,11 @@ function nativeEffectPublicationCurrent(entry: PendingEffect, slot: EffectSlot):
 	if (ROOT_RENDER_TRANSACTION !== null) journalObjectOnce(slot);
 	slot.deps = undefined;
 	slot.active = slot.connectedFn !== null;
-	invalidateRender(entry.scope.block, entry.scope.block);
+	// The superseding render may have already drained before this old entry was
+	// rejected. Retry through the existing native path so suspended islands and
+	// held transitions retain their ownership; cache invalidation alone is idle.
+	if (!entry.scope.block.idState.renderOwner?.disposed && !blockSubtreeDisposed(entry.scope.block))
+		scheduleNativeRead(entry.scope.block);
 	return false;
 }
 
