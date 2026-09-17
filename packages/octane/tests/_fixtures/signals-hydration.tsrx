@@ -9,6 +9,22 @@ export interface NativeHydrationState {
 	log?: (value: string) => void;
 }
 
+export function StreamedSignalShell(props: {
+	onInput?: (event: Event) => void;
+}) @{
+	<>
+		<section>
+			<p>{'shell'}</p>
+			<input defaultValue="server draft" onInput={props.onInput} />
+		</section>
+		<script
+			type="application/json"
+			id="authored-data"
+			dangerouslySetInnerHTML={{ __html: '{"source":"authored"}' }}
+		/>
+	</>
+}
+
 export function SignalHydration(props: NativeHydrationState) @{
 	const value = props.scope.get(props.value$);
 	const output = useRef<HTMLOutputElement | null>(null);
