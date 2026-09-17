@@ -27,7 +27,7 @@ function LegendA(props) {
 		(t) => el.setAttribute('transform', t),
 	);
 	el.appendChild(<rect class={props.item.swatch} width="10" height="10" y="-9" />);
-	el.appendChild(<text x="14">{props.item.label}</text>);
+	el.appendChild(<text x="14" textContent={props.item.label} />);
 	return el;
 }
 
@@ -35,15 +35,9 @@ function Tip(props) {
 	const el = (
 		<g class="tooltip" transform={props.ui.tooltip?.transform ?? ''}>
 			<rect class="tooltip-bg" width="120" height="46" rx="4" />
-			<text class="tt-title" x="8" y="14">
-				{props.ui.tooltip?.title ?? ''}
-			</text>
-			<text class="tt-l1" x="8" y="28">
-				{props.ui.tooltip?.l1 ?? ''}
-			</text>
-			<text class="tt-l2" x="8" y="42">
-				{props.ui.tooltip?.l2 ?? ''}
-			</text>
+			<text class="tt-title" x="8" y="14" textContent={props.ui.tooltip?.title ?? ''} />
+			<text class="tt-l1" x="8" y="28" textContent={props.ui.tooltip?.l1 ?? ''} />
+			<text class="tt-l2" x="8" y="42" textContent={props.ui.tooltip?.l2 ?? ''} />
 		</g>
 	);
 	props.target().appendChild(el);
@@ -118,13 +112,13 @@ export default function App() {
 									<rect class="node-body" x="-23" y="-15" width="46" height="30" rx="6" />
 									<use class="node-sym" href={n.href} x="-8" y="-8" width="16" height="16" />
 									<circle class="status-ring" r="19" />
-									<Show when={n.labeled}>
+									{n.labeled ? (
 										<foreignObject class="label-fo" x="-40" y="18" width="80" height="22">
 											<div class="label">
-												<span class="label-text">{n.labelText}</span>
+												<span class="label-text" textContent={n.labelText} />
 											</div>
 										</foreignObject>
-									</Show>
+									) : null}
 								</g>
 							)}
 						</For>
@@ -150,7 +144,7 @@ export default function App() {
 										{(t) => (
 											<g class="tick" transform={t.transform}>
 												<line y2="4" />
-												<text y="14">{t.label}</text>
+												<text y="14" textContent={t.label} />
 											</g>
 										)}
 									</For>
@@ -160,7 +154,7 @@ export default function App() {
 										{(t) => (
 											<g class="tick" transform={t.transform}>
 												<line x2="-4" />
-												<text x="-8">{t.label}</text>
+												<text x="-8" textContent={t.label} />
 											</g>
 										)}
 									</For>

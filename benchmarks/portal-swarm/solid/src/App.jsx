@@ -1,4 +1,4 @@
-import { createSignal, For, Show, onCleanup } from 'solid-js';
+import { createSignal, For, onCleanup } from 'solid-js';
 import { ITEMS, sharedTarget, targetFor, hit } from './data.js';
 import { bindA, bindB, bindBS } from './ops.js';
 
@@ -29,7 +29,7 @@ import { bindA, bindB, bindBS } from './ops.js';
 function Tip(props) {
 	const el = (
 		<div class={props.cls}>
-			<span class="tip-label">{props.item.label}</span>
+			<span class="tip-label" textContent={props.item.label} />
 			<button class="tip-btn">hit</button>
 		</div>
 	);
@@ -50,19 +50,19 @@ function Section(props) {
 
 	return (
 		<section class={props.secClass}>
-			<h3 class="tick">{props.prefix + tick()}</h3>
+			<h3 class="tick" textContent={props.prefix + tick()} />
 			<ul class="list">
 				<For each={ITEMS}>
 					{(item) => (
 						<li class="item">
-							<span class="label">{item.label}</span>
-							<Show when={open()}>
+							<span class="label" textContent={item.label} />
+							{open() ? (
 								<Tip
 									item={item}
 									cls={props.tipClass}
 									target={distinct() ? targetFor(item.id) : sharedTarget()}
 								/>
-							</Show>
+							) : null}
 						</li>
 					)}
 				</For>

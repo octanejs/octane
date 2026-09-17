@@ -1,4 +1,4 @@
-import { createSignal, For, Show, flush } from 'solid-js';
+import { createSignal, For, flush } from 'solid-js';
 import { render } from '@solidjs/web';
 import { initialConversations, nextReply, userMessage, segText } from './data.js';
 
@@ -90,16 +90,17 @@ function ChatApp() {
 						<div class={'message ' + m.role + (m.id === streamingId() ? ' streaming' : '')}>
 							<div class="bubble">
 								<For each={m.segments}>
-									{(s) => (
-										<Show
-											when={s.type === 'code'}
-											fallback={<p class="text" textContent={segText(s, doneOf(m))} />}
-										>
+									{(s) =>
+										// a segment's type never changes: a plain construction-time
+										// branch, not a reactive <Show>
+										s.type === 'code' ? (
 											<pre class="code">
 												<code textContent={segText(s, doneOf(m))} />
 											</pre>
-										</Show>
-									)}
+										) : (
+											<p class="text" textContent={segText(s, doneOf(m))} />
+										)
+									}
 								</For>
 							</div>
 						</div>

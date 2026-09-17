@@ -58,13 +58,15 @@ function Mid(props) {
 	// flips back to true the subtree is freshly constructed. Using a plain
 	// ternary (not <Show>) is correct because Mid's body itself runs once
 	// and props.depth/path are stable.
+	const depth = props.depth;
+	const path = props.path;
 	return (
 		<>
 			{visible() ? (
 				<LocalCtx value={local}>
 					<div class="mid">
-						<Node depth={props.depth - 1} path={props.path + 'L'} />
-						<Node depth={props.depth - 1} path={props.path + 'R'} />
+						<Node depth={depth - 1} path={path + 'L'} />
+						<Node depth={depth - 1} path={path + 'R'} />
 					</div>
 				</LocalCtx>
 			) : null}
@@ -74,28 +76,32 @@ function Mid(props) {
 
 function Node(props) {
 	// Solid component bodies run ONCE; this ternary picks the right branch at
-	// construction. props.depth/path never change after mount, so no need for
-	// <Show> reactivity here.
-	return props.depth > 0 ? (
-		props.path === MID_PATH ? (
-			<Mid depth={props.depth} path={props.path} />
+	// construction. depth/path never change after mount, so they are read ONCE
+	// into locals — passed as `props.depth - 1` they would compile to getters
+	// chaining through every ancestor (O(depth) per leaf read).
+	const depth = props.depth;
+	const path = props.path;
+	return depth > 0 ? (
+		path === MID_PATH ? (
+			<Mid depth={depth} path={path} />
 		) : (
 			<div class="n">
-				<Node depth={props.depth - 1} path={props.path + 'L'} />
-				<Node depth={props.depth - 1} path={props.path + 'R'} />
+				<Node depth={depth - 1} path={path + 'L'} />
+				<Node depth={depth - 1} path={path + 'R'} />
 			</div>
 		)
 	) : (
-		<Leaf path={props.path} />
+		<Leaf path={path} />
 	);
 }
 
 function Leaf(props) {
 	const root = useContext(RootCtx);
 	const local = useContext(LocalCtx);
-	// root()/local() inside JSX create fine-grained subscriptions. The text
-	// node updates surgically when either signal changes.
-	return <span class="leaf">{props.path + '|' + root() + ':' + local()}</span>;
+	const path = props.path;
+	// root()/local() inside the binding create fine-grained subscriptions. The
+	// text updates surgically when either signal changes.
+	return <span class="leaf" textContent={path + '|' + root() + ':' + local()} />;
 }
 
 export default function App(props) {

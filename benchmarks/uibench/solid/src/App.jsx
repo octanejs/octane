@@ -2,6 +2,14 @@ import { For, createStore, reconcile } from 'solid-js';
 import { bindSetter } from '../../shared/bridge.js';
 import { INITIAL_SNAPSHOT } from '../../shared/workloads.js';
 
+// Authored in the canonical Solid 2.0 shape (the same one Solid's own UIbench
+// entry uses): one keyed `reconcile` of the whole snapshot into a store each
+// commit, `<For>` over the store arrays (row/box/node proxies are stable across
+// a reconcile, so the list is keyed by reference), `textContent` for text
+// leaves, and a plain `.map` for a row's cells — the cells of a row never
+// change independently in this matrix, so a keyed list per row would only add
+// per-row list machinery.
+
 function TableView(props) {
 	return (
 		<table class="uibench-table" data-kind="table">
@@ -9,8 +17,8 @@ function TableView(props) {
 				<For each={props.rows}>
 					{(row) => (
 						<tr data-id={row.id} class={row.active ? 'active' : 'inactive'}>
-							<th>{row.label}</th>
-							<For each={row.cells}>{(cell) => <td>{cell.text}</td>}</For>
+							<th textContent={row.label} />
+							{row.cells.map((cell) => <td textContent={cell.text} />)}
 						</tr>
 					)}
 				</For>
@@ -32,7 +40,7 @@ function AnimView(props) {
 function TreeItem(props) {
 	return (
 		<li data-id={props.node.id} class={props.node.children.length === 0 ? 'leaf' : 'container'}>
-			<span>{props.node.label}</span>
+			<span textContent={props.node.label} />
 			{props.node.children.length > 0 ? (
 				<ul>
 					<For each={props.node.children}>{(child) => <TreeItem node={child} />}</For>
@@ -51,21 +59,13 @@ function TreeView(props) {
 }
 
 export default function App() {
-	const [snapshot, setSnapshot] = createStore({
-		kind: INITIAL_SNAPSHOT.kind,
-		rows: INITIAL_SNAPSHOT.rows,
-		boxes: [],
-		nodes: [],
-	});
-
-	bindSetter((next) =>
-		setSnapshot((current) => {
-			current.kind = next.kind;
-			if (next.kind === 'table') reconcile(next.rows, 'id')(current.rows);
-			else if (next.kind === 'anim') reconcile(next.boxes, 'id')(current.boxes);
-			else reconcile(next.nodes, 'id')(current.nodes);
-		}),
-	);
+	// A private copy: the store owns its backing, and the shared snapshot is
+	// the other fixtures' too.
+	const [snapshot, setSnapshot] = createStore(structuredClone(INITIAL_SNAPSHOT));
+	// Each commit is a fresh immutable snapshot; `reconcile(_, 'id')` diffs it
+	// into the store by key so surviving rows/boxes/nodes keep their proxies
+	// (and their DOM) and only changed leaves notify.
+	bindSetter((next) => setSnapshot(reconcile(next, 'id')));
 
 	return (
 		<>

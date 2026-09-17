@@ -18,18 +18,23 @@ export function navigate(route) {
 }
 
 function Leaf(props) {
-	return <span class="leaf">{props.path}</span>;
+	return <span class="leaf" textContent={props.path} />;
 }
 
 function Node(props) {
-	// props.depth / props.path are construction-time constants here.
-	return props.depth > 0 ? (
+	// depth / path are construction-time constants: read them ONCE into locals.
+	// Passed as `props.depth - 1` they would compile to getters that chain
+	// through every ancestor's getter (O(depth) per leaf read); a local is what
+	// a structural constant is.
+	const depth = props.depth;
+	const path = props.path;
+	return depth > 0 ? (
 		<div class="n">
-			<Node depth={props.depth - 1} path={props.path + 'L'} />
-			<Node depth={props.depth - 1} path={props.path + 'R'} />
+			<Node depth={depth - 1} path={path + 'L'} />
+			<Node depth={depth - 1} path={path + 'R'} />
 		</div>
 	) : (
-		<Leaf path={props.path} />
+		<Leaf path={path} />
 	);
 }
 

@@ -1,12 +1,12 @@
-import { createEffect, onCleanup, getOwner } from 'solid-js';
+import { createEffect, onCleanup, onSettled, getOwner } from 'solid-js';
 import { fx, rowRef, setRowOwner } from './fx.js';
 
 // Solid 2.0 Row — the fine-grained equivalent of the hook-based rows:
 //
-//   * mount/cleanup: Solid 2.0 has no onMount export; an effect with an empty
-//     compute runs its (untracked) effect phase exactly once post-mount, and
-//     onCleanup in the component body runs once on row disposal — together the
-//     useEffect-[item.id] equivalent (keyed rows never change id in place).
+//   * mount/cleanup: onSettled (Solid 2.0's onMount) runs once after the row's
+//     first commit, and onCleanup in the component body runs once on row
+//     disposal — together the useEffect-[item.id] equivalent (keyed rows never
+//     change id in place).
 //   * useLayoutEffect-[item.value] equivalent: the compute tracks item.value
 //     (a store leaf signal — reconcile updates it in place for same-id rows);
 //     the untracked effect phase does the layout read on probe rows only.
@@ -25,12 +25,9 @@ export default function Row(props) {
 	// captured HERE (in the body), which <For> disposes on row removal.
 	setRowOwner(getOwner());
 
-	createEffect(
-		() => {},
-		() => {
-			fx.mounts++;
-		},
-	);
+	onSettled(() => {
+		fx.mounts++;
+	});
 	onCleanup(() => {
 		fx.cleanups++;
 	});
@@ -47,11 +44,9 @@ export default function Row(props) {
 
 	return (
 		<tr ref={rowRef}>
-			<td class="col-id" ref={cell}>
-				{item.id}
-			</td>
-			<td class="col-label">{item.label}</td>
-			<td class="col-value">{item.value}</td>
+			<td class="col-id" ref={cell} textContent={item.id} />
+			<td class="col-label" textContent={item.label} />
+			<td class="col-value" textContent={item.value} />
 		</tr>
 	);
 }
